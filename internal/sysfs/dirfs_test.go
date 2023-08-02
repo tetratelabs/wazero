@@ -16,8 +16,8 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
-func TestNewDirFS(t *testing.T) {
-	testFS := NewDirFS(".")
+func TestDirFS(t *testing.T) {
+	testFS := DirFS(".")
 
 	// Guest can look up /
 	f, errno := testFS.OpenFile("/", sys.O_RDONLY, 0)
@@ -25,14 +25,14 @@ func TestNewDirFS(t *testing.T) {
 	require.EqualErrno(t, 0, f.Close())
 
 	t.Run("host path not found", func(t *testing.T) {
-		testFS := NewDirFS("a")
+		testFS := DirFS("a")
 		_, errno = testFS.OpenFile(".", sys.O_RDONLY, 0)
 		require.EqualErrno(t, sys.ENOENT, errno)
 	})
 	t.Run("host path not a directory", func(t *testing.T) {
 		arg0 := os.Args[0] // should be safe in scratch tests which don't have the source mounted.
 
-		testFS := NewDirFS(arg0)
+		testFS := DirFS(arg0)
 		d, errno := testFS.OpenFile(".", sys.O_RDONLY, 0)
 		require.EqualErrno(t, 0, errno)
 		_, errno = d.Readdir(-1)
@@ -41,13 +41,13 @@ func TestNewDirFS(t *testing.T) {
 }
 
 func TestDirFS_join(t *testing.T) {
-	testFS := NewDirFS("/").(*dirFS)
+	testFS := DirFS("/").(*dirFS)
 	require.Equal(t, "/", testFS.join(""))
 	require.Equal(t, "/", testFS.join("."))
 	require.Equal(t, "/", testFS.join("/"))
 	require.Equal(t, "/tmp", testFS.join("tmp"))
 
-	testFS = NewDirFS(".").(*dirFS)
+	testFS = DirFS(".").(*dirFS)
 	require.Equal(t, ".", testFS.join(""))
 	require.Equal(t, ".", testFS.join("."))
 	require.Equal(t, ".", testFS.join("/"))
@@ -55,7 +55,7 @@ func TestDirFS_join(t *testing.T) {
 }
 
 func TestDirFS_String(t *testing.T) {
-	testFS := NewDirFS(".")
+	testFS := DirFS(".")
 
 	// String has the name of the path entered
 	require.Equal(t, ".", testFS.(fmt.Stringer).String())
@@ -65,7 +65,7 @@ func TestDirFS_Lstat(t *testing.T) {
 	tmpDir := t.TempDir()
 	require.NoError(t, fstest.WriteTestFiles(tmpDir))
 
-	testFS := NewDirFS(tmpDir)
+	testFS := DirFS(tmpDir)
 	for _, path := range []string{"animals.txt", "sub", "sub-link"} {
 		require.EqualErrno(t, 0, testFS.Symlink(path, path+"-link"))
 	}
@@ -75,7 +75,7 @@ func TestDirFS_Lstat(t *testing.T) {
 
 func TestDirFS_MkDir(t *testing.T) {
 	tmpDir := t.TempDir()
-	testFS := NewDirFS(tmpDir)
+	testFS := DirFS(tmpDir)
 
 	name := "mkdir"
 	realPath := path.Join(tmpDir, name)
@@ -152,7 +152,7 @@ func requireMode(t *testing.T, testFS sys.FS, path string, mode fs.FileMode) {
 func TestDirFS_Rename(t *testing.T) {
 	t.Run("from doesn't exist", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		testFS := NewDirFS(tmpDir)
+		testFS := DirFS(tmpDir)
 
 		file1 := "file1"
 		file1Path := path.Join(tmpDir, file1)
@@ -164,7 +164,7 @@ func TestDirFS_Rename(t *testing.T) {
 	})
 	t.Run("file to non-exist", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		testFS := NewDirFS(tmpDir)
+		testFS := DirFS(tmpDir)
 
 		file1 := "file1"
 		file1Path := path.Join(tmpDir, file1)
@@ -187,7 +187,7 @@ func TestDirFS_Rename(t *testing.T) {
 	})
 	t.Run("dir to non-exist", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		testFS := NewDirFS(tmpDir)
+		testFS := DirFS(tmpDir)
 
 		dir1 := "dir1"
 		dir1Path := path.Join(tmpDir, dir1)
@@ -208,7 +208,7 @@ func TestDirFS_Rename(t *testing.T) {
 	})
 	t.Run("dir to file", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		testFS := NewDirFS(tmpDir)
+		testFS := DirFS(tmpDir)
 
 		dir1 := "dir1"
 		dir1Path := path.Join(tmpDir, dir1)
@@ -227,7 +227,7 @@ func TestDirFS_Rename(t *testing.T) {
 	})
 	t.Run("file to dir", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		testFS := NewDirFS(tmpDir)
+		testFS := DirFS(tmpDir)
 
 		file1 := "file1"
 		file1Path := path.Join(tmpDir, file1)
@@ -246,7 +246,7 @@ func TestDirFS_Rename(t *testing.T) {
 	// Similar to https://github.com/ziglang/zig/blob/0.10.1/lib/std/fs/test.zig#L567-L582
 	t.Run("dir to empty dir should be fine", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		testFS := NewDirFS(tmpDir)
+		testFS := DirFS(tmpDir)
 
 		dir1 := "dir1"
 		dir1Path := path.Join(tmpDir, dir1)
@@ -279,7 +279,7 @@ func TestDirFS_Rename(t *testing.T) {
 	// Similar to https://github.com/ziglang/zig/blob/0.10.1/lib/std/fs/test.zig#L584-L604
 	t.Run("dir to non empty dir should be EXIST", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		testFS := NewDirFS(tmpDir)
+		testFS := DirFS(tmpDir)
 
 		dir1 := "dir1"
 		dir1Path := path.Join(tmpDir, dir1)
@@ -306,7 +306,7 @@ func TestDirFS_Rename(t *testing.T) {
 
 	t.Run("file to file", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		testFS := NewDirFS(tmpDir)
+		testFS := DirFS(tmpDir)
 
 		file1 := "file1"
 		file1Path := path.Join(tmpDir, file1)
@@ -334,7 +334,7 @@ func TestDirFS_Rename(t *testing.T) {
 	})
 	t.Run("dir to itself", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		testFS := NewDirFS(tmpDir)
+		testFS := DirFS(tmpDir)
 
 		dir1 := "dir1"
 		dir1Path := path.Join(tmpDir, dir1)
@@ -349,7 +349,7 @@ func TestDirFS_Rename(t *testing.T) {
 	})
 	t.Run("file to itself", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		testFS := NewDirFS(tmpDir)
+		testFS := DirFS(tmpDir)
 
 		file1 := "file1"
 		file1Path := path.Join(tmpDir, file1)
@@ -369,7 +369,7 @@ func TestDirFS_Rename(t *testing.T) {
 func TestDirFS_Rmdir(t *testing.T) {
 	t.Run("doesn't exist", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		testFS := NewDirFS(tmpDir)
+		testFS := DirFS(tmpDir)
 
 		name := "rmdir"
 
@@ -379,7 +379,7 @@ func TestDirFS_Rmdir(t *testing.T) {
 
 	t.Run("dir not empty", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		testFS := NewDirFS(tmpDir)
+		testFS := DirFS(tmpDir)
 
 		name := "rmdir"
 		realPath := path.Join(tmpDir, name)
@@ -396,7 +396,7 @@ func TestDirFS_Rmdir(t *testing.T) {
 
 	t.Run("dir previously not empty", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		testFS := NewDirFS(tmpDir)
+		testFS := DirFS(tmpDir)
 
 		name := "rmdir"
 		realPath := path.Join(tmpDir, name)
@@ -414,7 +414,7 @@ func TestDirFS_Rmdir(t *testing.T) {
 
 	t.Run("dir empty", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		testFS := NewDirFS(tmpDir)
+		testFS := DirFS(tmpDir)
 
 		name := "rmdir"
 		realPath := path.Join(tmpDir, name)
@@ -426,7 +426,7 @@ func TestDirFS_Rmdir(t *testing.T) {
 
 	t.Run("dir empty while opening", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		testFS := NewDirFS(tmpDir)
+		testFS := DirFS(tmpDir)
 
 		name := "rmdir"
 		realPath := path.Join(tmpDir, name)
@@ -443,7 +443,7 @@ func TestDirFS_Rmdir(t *testing.T) {
 
 	t.Run("not directory", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		testFS := NewDirFS(tmpDir)
+		testFS := DirFS(tmpDir)
 
 		name := "rmdir"
 		realPath := path.Join(tmpDir, name)
@@ -460,7 +460,7 @@ func TestDirFS_Rmdir(t *testing.T) {
 func TestDirFS_Unlink(t *testing.T) {
 	t.Run("doesn't exist", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		testFS := NewDirFS(tmpDir)
+		testFS := DirFS(tmpDir)
 		name := "unlink"
 
 		err := testFS.Unlink(name)
@@ -469,7 +469,7 @@ func TestDirFS_Unlink(t *testing.T) {
 
 	t.Run("target: dir", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		testFS := NewDirFS(tmpDir)
+		testFS := DirFS(tmpDir)
 
 		dir := "dir"
 		realPath := path.Join(tmpDir, dir)
@@ -484,7 +484,7 @@ func TestDirFS_Unlink(t *testing.T) {
 
 	t.Run("target: symlink to dir", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		testFS := NewDirFS(tmpDir)
+		testFS := DirFS(tmpDir)
 
 		// Create link target dir.
 		subDirName := "subdir"
@@ -502,7 +502,7 @@ func TestDirFS_Unlink(t *testing.T) {
 
 	t.Run("file exists", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		testFS := NewDirFS(tmpDir)
+		testFS := DirFS(tmpDir)
 
 		name := "unlink"
 		realPath := path.Join(tmpDir, name)
@@ -518,7 +518,7 @@ func TestDirFS_Unlink(t *testing.T) {
 
 func TestDirFS_Utimesns(t *testing.T) {
 	tmpDir := t.TempDir()
-	testFS := NewDirFS(tmpDir)
+	testFS := DirFS(tmpDir)
 
 	file := "file"
 	err := os.WriteFile(path.Join(tmpDir, file), []byte{}, 0o700)
@@ -574,7 +574,7 @@ func TestDirFS_Utimesns(t *testing.T) {
 
 			t.Run(name, func(t *testing.T) {
 				tmpDir := t.TempDir()
-				testFS := NewDirFS(tmpDir)
+				testFS := DirFS(tmpDir)
 
 				file := path.Join(tmpDir, "file")
 				errno := os.WriteFile(file, []byte{}, 0o700)
@@ -638,7 +638,7 @@ func TestDirFS_OpenFile(t *testing.T) {
 	require.NoError(t, os.Mkdir(tmpDir, 0o700))
 	require.NoError(t, fstest.WriteTestFiles(tmpDir))
 
-	testFS := NewDirFS(tmpDir)
+	testFS := DirFS(tmpDir)
 
 	testOpen_Read(t, testFS, statSetsIno(), true)
 
@@ -656,7 +656,7 @@ func TestDirFS_Stat(t *testing.T) {
 	tmpDir := t.TempDir()
 	require.NoError(t, fstest.WriteTestFiles(tmpDir))
 
-	testFS := NewDirFS(tmpDir)
+	testFS := DirFS(tmpDir)
 	testStat(t, testFS)
 
 	// from os.TestDirFSPathsValid
@@ -673,7 +673,7 @@ func TestDirFS_Stat(t *testing.T) {
 
 func TestDirFS_Readdir(t *testing.T) {
 	root := t.TempDir()
-	testFS := NewDirFS(root)
+	testFS := DirFS(root)
 
 	const readDirTarget = "dir"
 	errno := testFS.Mkdir(readDirTarget, 0o700)
@@ -728,7 +728,7 @@ func TestDirFS_Link(t *testing.T) {
 	tmpDir := t.TempDir()
 	require.NoError(t, fstest.WriteTestFiles(tmpDir))
 
-	testFS := NewDirFS(tmpDir)
+	testFS := DirFS(tmpDir)
 
 	require.EqualErrno(t, testFS.Link("cat", ""), sys.ENOENT)
 	require.EqualErrno(t, testFS.Link("sub/test.txt", "sub/test.txt"), sys.EEXIST)
@@ -745,7 +745,7 @@ func TestDirFS_Symlink(t *testing.T) {
 	tmpDir := t.TempDir()
 	require.NoError(t, fstest.WriteTestFiles(tmpDir))
 
-	testFS := NewDirFS(tmpDir)
+	testFS := DirFS(tmpDir)
 
 	require.EqualErrno(t, sys.EEXIST, testFS.Symlink("sub/test.txt", "sub/test.txt"))
 	// Non-existing old name is allowed.
@@ -767,6 +767,6 @@ func TestDirFS_Readlink(t *testing.T) {
 	tmpDir := t.TempDir()
 	require.NoError(t, fstest.WriteTestFiles(tmpDir))
 
-	testFS := NewDirFS(tmpDir)
+	testFS := DirFS(tmpDir)
 	testReadlink(t, testFS, testFS)
 }

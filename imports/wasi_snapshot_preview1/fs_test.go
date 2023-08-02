@@ -242,9 +242,9 @@ func Test_fdFdstatGet(t *testing.T) {
 	// replace stdin with a fake TTY file.
 	// TODO: Make this easier once we have in-memory sys.File
 	stdin, _ := fsc.LookupFile(sys.FdStdin)
-	stdinFile, errno := sysfs.Adapt(&gofstest.MapFS{"stdin": &gofstest.MapFile{
+	stdinFile, errno := (&sysfs.AdaptFS{FS: &gofstest.MapFS{"stdin": &gofstest.MapFile{
 		Mode: fs.ModeDevice | fs.ModeCharDevice | 0o600,
-	}}).OpenFile("stdin", 0, 0)
+	}}}).OpenFile("stdin", 0, 0)
 	require.EqualErrno(t, 0, errno)
 
 	stdin.File = stdinFile
@@ -3648,8 +3648,8 @@ func Test_pathLink(t *testing.T) {
 
 func Test_pathOpen(t *testing.T) {
 	dir := t.TempDir() // open before loop to ensure no locking problems.
-	writeFS := sysfs.NewDirFS(dir)
-	readFS := sysfs.NewReadFS(writeFS)
+	writeFS := sysfs.DirFS(dir)
+	readFS := &sysfs.ReadFS{FS: writeFS}
 
 	fileName := "file"
 	fileContents := []byte("012")

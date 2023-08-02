@@ -419,9 +419,9 @@ func validateMounts(mounts sliceFlag, stdErr logging.Writer) (rc int, rootPath s
 			fmt.Fprintf(stdErr, "invalid mount: path %q is not a directory\n", dir)
 		}
 
-		root := sysfs.NewDirFS(dir)
+		root := sysfs.DirFS(dir)
 		if readOnly {
-			root = sysfs.NewReadFS(root)
+			root = &sysfs.ReadFS{FS: root}
 		}
 
 		config = config.(sysfs.FSConfig).WithSysFSMount(root, guestPath)

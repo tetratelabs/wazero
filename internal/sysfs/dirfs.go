@@ -9,7 +9,7 @@ import (
 	"github.com/tetratelabs/wazero/sys"
 )
 
-func NewDirFS(dir string) experimentalsys.FS {
+func DirFS(dir string) experimentalsys.FS {
 	return &dirFS{
 		dir:        dir,
 		cleanedDir: ensureTrailingPathSeparator(dir),
@@ -23,8 +23,11 @@ func ensureTrailingPathSeparator(dir string) string {
 	return dir
 }
 
+// dirFS is not exported because the input fields must be maintained together.
+// This is likely why os.DirFS doesn't, either!
 type dirFS struct {
 	experimentalsys.UnimplementedFS
+
 	dir string
 	// cleanedDir is for easier OS-specific concatenation, as it always has
 	// a trailing path separator.

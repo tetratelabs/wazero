@@ -29,13 +29,13 @@ func TestFSConfig(t *testing.T) {
 		{
 			name:               "WithFSMount",
 			input:              base.WithFSMount(testFS, "/"),
-			expectedFS:         []sys.FS{sysfs.Adapt(testFS)},
+			expectedFS:         []sys.FS{&sysfs.AdaptFS{FS: testFS}},
 			expectedGuestPaths: []string{"/"},
 		},
 		{
 			name:               "WithFSMount overwrites",
 			input:              base.WithFSMount(testFS, "/").WithFSMount(testFS2, "/"),
-			expectedFS:         []sys.FS{sysfs.Adapt(testFS2)},
+			expectedFS:         []sys.FS{&sysfs.AdaptFS{FS: testFS2}},
 			expectedGuestPaths: []string{"/"},
 		},
 		{
@@ -45,13 +45,13 @@ func TestFSConfig(t *testing.T) {
 		{
 			name:               "WithDirMount overwrites",
 			input:              base.WithFSMount(testFS, "/").WithDirMount(".", "/"),
-			expectedFS:         []sys.FS{sysfs.NewDirFS(".")},
+			expectedFS:         []sys.FS{sysfs.DirFS(".")},
 			expectedGuestPaths: []string{"/"},
 		},
 		{
 			name:               "multiple",
 			input:              base.WithReadOnlyDirMount(".", "/").WithDirMount("/tmp", "/tmp"),
-			expectedFS:         []sys.FS{sysfs.NewReadFS(sysfs.NewDirFS(".")), sysfs.NewDirFS("/tmp")},
+			expectedFS:         []sys.FS{&sysfs.ReadFS{FS: sysfs.DirFS(".")}, sysfs.DirFS("/tmp")},
 			expectedGuestPaths: []string{"/", "/tmp"},
 		},
 	}

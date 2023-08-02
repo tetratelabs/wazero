@@ -60,7 +60,7 @@ func OpenFSFile(fs fs.FS, path string, flag experimentalsys.Oflag, perm fs.FileM
 		return nil, errno
 	}
 	// Don't return an os.File because the path is not absolute. osFile needs
-	// the path to be real and certain fs.File impls are subrooted.
+	// the path to be real and certain FS.File impls are subrooted.
 	return &fsFile{fs: fs, name: path, file: f}, 0
 }
 
@@ -261,7 +261,7 @@ func (f *fsFile) Seek(offset int64, whence int) (newOffset int64, errno experime
 // Notably, this uses readdirFile or fs.ReadDirFile if available. This does not
 // return inodes on windows.
 func (f *fsFile) Readdir(n int) (dirents []experimentalsys.Dirent, errno experimentalsys.Errno) {
-	// Windows lets you Readdir after close, fs.File also may not implement
+	// Windows lets you Readdir after close, FS.File also may not implement
 	// close in a meaningful way. read our closed field to return consistent
 	// results.
 	if f.closed {
@@ -286,8 +286,8 @@ func (f *fsFile) Readdir(n int) (dirents []experimentalsys.Dirent, errno experim
 		return
 	}
 
-	// Try with fs.ReadDirFile which is available on api.FS implementations
-	// like embed:fs.
+	// Try with FS.ReadDirFile which is available on api.FS implementations
+	// like embed:FS.
 	if rdf, ok := f.file.(fs.ReadDirFile); ok {
 		entries, e := rdf.ReadDir(n)
 		if errno = adjustReaddirErr(f, f.closed, e); errno != 0 {

@@ -70,7 +70,7 @@ func testOpen_O_RDWR(t *testing.T, tmpDir string, testFS experimentalsys.FS) {
 
 	t.Run("O_TRUNC", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		testFS := NewDirFS(tmpDir)
+		testFS := DirFS(tmpDir)
 
 		name := "truncate"
 		realPath := path.Join(tmpDir, name)

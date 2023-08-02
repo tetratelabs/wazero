@@ -17,29 +17,23 @@ import (
 	"github.com/tetratelabs/wazero/sys"
 )
 
-func TestAdapt_nil(t *testing.T) {
-	testFS := Adapt(nil)
-	_, ok := testFS.(experimentalsys.UnimplementedFS)
-	require.True(t, ok)
-}
-
-func TestAdapt_MkDir(t *testing.T) {
-	testFS := Adapt(os.DirFS(t.TempDir()))
+func TestAdaptFS_MkDir(t *testing.T) {
+	testFS := &AdaptFS{FS: os.DirFS(t.TempDir())}
 
 	err := testFS.Mkdir("mkdir", fs.ModeDir)
 	require.EqualErrno(t, experimentalsys.ENOSYS, err)
 }
 
-func TestAdapt_Chmod(t *testing.T) {
-	testFS := Adapt(os.DirFS(t.TempDir()))
+func TestAdaptFS_Chmod(t *testing.T) {
+	testFS := &AdaptFS{FS: os.DirFS(t.TempDir())}
 
 	err := testFS.Chmod("chmod", fs.ModeDir)
 	require.EqualErrno(t, experimentalsys.ENOSYS, err)
 }
 
-func TestAdapt_Rename(t *testing.T) {
+func TestAdaptFS_Rename(t *testing.T) {
 	tmpDir := t.TempDir()
-	testFS := Adapt(os.DirFS(tmpDir))
+	testFS := &AdaptFS{FS: os.DirFS(tmpDir)}
 
 	file1 := "file1"
 	file1Path := joinPath(tmpDir, file1)
@@ -57,9 +51,9 @@ func TestAdapt_Rename(t *testing.T) {
 	require.EqualErrno(t, experimentalsys.ENOSYS, err)
 }
 
-func TestAdapt_Rmdir(t *testing.T) {
+func TestAdaptFS_Rmdir(t *testing.T) {
 	tmpDir := t.TempDir()
-	testFS := Adapt(os.DirFS(tmpDir))
+	testFS := &AdaptFS{FS: os.DirFS(tmpDir)}
 
 	path := "rmdir"
 	realPath := joinPath(tmpDir, path)
@@ -69,9 +63,9 @@ func TestAdapt_Rmdir(t *testing.T) {
 	require.EqualErrno(t, experimentalsys.ENOSYS, err)
 }
 
-func TestAdapt_Unlink(t *testing.T) {
+func TestAdaptFS_Unlink(t *testing.T) {
 	tmpDir := t.TempDir()
-	testFS := Adapt(os.DirFS(tmpDir))
+	testFS := &AdaptFS{FS: os.DirFS(tmpDir)}
 
 	path := "unlink"
 	realPath := joinPath(tmpDir, path)
@@ -81,9 +75,9 @@ func TestAdapt_Unlink(t *testing.T) {
 	require.EqualErrno(t, experimentalsys.ENOSYS, err)
 }
 
-func TestAdapt_UtimesNano(t *testing.T) {
+func TestAdaptFS_UtimesNano(t *testing.T) {
 	tmpDir := t.TempDir()
-	testFS := Adapt(os.DirFS(tmpDir))
+	testFS := &AdaptFS{FS: os.DirFS(tmpDir)}
 
 	path := "utimes"
 	realPath := joinPath(tmpDir, path)
@@ -93,13 +87,13 @@ func TestAdapt_UtimesNano(t *testing.T) {
 	require.EqualErrno(t, experimentalsys.ENOSYS, err)
 }
 
-func TestAdapt_Open_Read(t *testing.T) {
-	// Create a subdirectory, so we can test reads outside the sys.FS root.
+func TestAdaptFS_Open_Read(t *testing.T) {
 	tmpDir := t.TempDir()
+	// Create a subdirectory, so we can test reads outside the sys.FS root.
 	tmpDir = joinPath(tmpDir, t.Name())
 	require.NoError(t, os.Mkdir(tmpDir, 0o700))
 	require.NoError(t, fstest.WriteTestFiles(tmpDir))
-	testFS := Adapt(os.DirFS(tmpDir))
+	testFS := &AdaptFS{FS: os.DirFS(tmpDir)}
 
 	// We can't correct operating system portability issues with os.DirFS on
 	// windows. Use syscall.DirFS instead!
@@ -113,10 +107,10 @@ func TestAdapt_Open_Read(t *testing.T) {
 	})
 }
 
-func TestAdapt_Lstat(t *testing.T) {
+func TestAdaptFS_Lstat(t *testing.T) {
 	tmpDir := t.TempDir()
+	testFS := &AdaptFS{FS: os.DirFS(tmpDir)}
 	require.NoError(t, fstest.WriteTestFiles(tmpDir))
-	testFS := Adapt(os.DirFS(tmpDir))
 
 	for _, path := range []string{"animals.txt", "sub", "sub-link"} {
 		fullPath := joinPath(tmpDir, path)
@@ -128,15 +122,15 @@ func TestAdapt_Lstat(t *testing.T) {
 	}
 }
 
-func TestAdapt_Stat(t *testing.T) {
+func TestAdaptFS_Stat(t *testing.T) {
 	tmpDir := t.TempDir()
+	testFS := &AdaptFS{FS: os.DirFS(tmpDir)}
 	require.NoError(t, fstest.WriteTestFiles(tmpDir))
 
-	testFS := Adapt(os.DirFS(tmpDir))
 	testStat(t, testFS)
 }
 
-// hackFS cheats the api.FS contract by opening for write (sys.O_RDWR).
+// hackFS cheats the fs.FS contract by opening for write (sys.O_RDWR).
 //
 // Until we have an alternate public interface for filesystems, some users will
 // rely on this. Via testing, we ensure we don't accidentally break them.
@@ -156,11 +150,11 @@ func (dir hackFS) Open(name string) (fs.File, error) {
 	}
 }
 
-// TestAdapt_HackedWrites ensures we allow writes even if they violate the
+// TestAdaptFS_HackedWrites ensures we allow writes even if they violate the
 // api.FS contract.
-func TestAdapt_HackedWrites(t *testing.T) {
+func TestAdaptFS_HackedWrites(t *testing.T) {
 	tmpDir := t.TempDir()
-	testFS := Adapt(hackFS(tmpDir))
+	testFS := &AdaptFS{FS: hackFS(tmpDir)}
 
 	testOpen_O_RDWR(t, tmpDir, testFS)
 }
@@ -237,7 +231,7 @@ func (i *sysFileInfo) Sys() any {
 // to zero).
 //
 // A fs.File implementing this should be functionally equivalent to an os.File,
-// even if both are less ideal than using NewDirFS directly, especially on
+// even if both are less ideal than using DirFS directly, especially on
 // Windows.
 //
 // For example, on Windows, we cannot reliably read the inode for a

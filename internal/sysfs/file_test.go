@@ -832,7 +832,7 @@ func testSync_NoError(t *testing.T, sync func(experimentalsys.File) experimental
 		f    experimentalsys.File
 	}{
 		{name: "UnimplementedFile", f: experimentalsys.UnimplementedFile{}},
-		{name: "File of read-only fs.File", f: ro},
+		{name: "File of read-only FS.File", f: ro},
 		{name: "File of os.File", f: rw},
 	}
 

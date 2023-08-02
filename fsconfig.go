@@ -165,17 +165,21 @@ func (c *fsConfig) clone() *fsConfig {
 
 // WithDirMount implements FSConfig.WithDirMount
 func (c *fsConfig) WithDirMount(dir, guestPath string) FSConfig {
-	return c.WithSysFSMount(sysfs.NewDirFS(dir), guestPath)
+	return c.WithSysFSMount(sysfs.DirFS(dir), guestPath)
 }
 
 // WithReadOnlyDirMount implements FSConfig.WithReadOnlyDirMount
 func (c *fsConfig) WithReadOnlyDirMount(dir, guestPath string) FSConfig {
-	return c.WithSysFSMount(sysfs.NewReadFS(sysfs.NewDirFS(dir)), guestPath)
+	return c.WithSysFSMount(&sysfs.ReadFS{FS: sysfs.DirFS(dir)}, guestPath)
 }
 
 // WithFSMount implements FSConfig.WithFSMount
 func (c *fsConfig) WithFSMount(fs fs.FS, guestPath string) FSConfig {
-	return c.WithSysFSMount(sysfs.Adapt(fs), guestPath)
+	var adapted experimentalsys.FS
+	if fs != nil {
+		adapted = &sysfs.AdaptFS{FS: fs}
+	}
+	return c.WithSysFSMount(adapted, guestPath)
 }
 
 // WithSysFSMount implements sysfs.FSConfig
@@ -188,7 +192,7 @@ func (c *fsConfig) WithSysFSMount(fs experimentalsys.FS, guestPath string) FSCon
 	if i, ok := ret.guestPathToFS[cleaned]; ok {
 		ret.fs[i] = fs
 		ret.guestPaths[i] = guestPath
-	} else {
+	} else if fs != nil {
 		ret.guestPathToFS[cleaned] = len(ret.fs)
 		ret.fs = append(ret.fs, fs)
 		ret.guestPaths = append(ret.guestPaths, guestPath)

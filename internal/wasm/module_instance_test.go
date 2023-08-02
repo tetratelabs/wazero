@@ -112,7 +112,7 @@ func TestModuleInstance_Close(t *testing.T) {
 	}
 
 	t.Run("calls Context.Close()", func(t *testing.T) {
-		testFS := sysfs.Adapt(testfs.FS{"foo": &testfs.File{}})
+		testFS := &sysfs.AdaptFS{FS: testfs.FS{"foo": &testfs.File{}}}
 		sysCtx := internalsys.DefaultContext(testFS)
 		fsCtx := sysCtx.FS()
 
@@ -147,7 +147,7 @@ func TestModuleInstance_Close(t *testing.T) {
 
 	t.Run("error closing", func(t *testing.T) {
 		// Right now, the only way to err closing the sys context is if a File.Close erred.
-		testFS := sysfs.Adapt(testfs.FS{"foo": &testfs.File{CloseErr: errors.New("error closing")}})
+		testFS := &sysfs.AdaptFS{FS: testfs.FS{"foo": &testfs.File{CloseErr: errors.New("error closing")}}}
 		sysCtx := internalsys.DefaultContext(testFS)
 		fsCtx := sysCtx.FS()
 
@@ -217,7 +217,7 @@ func TestModuleInstance_CallDynamic(t *testing.T) {
 	}
 
 	t.Run("calls Context.Close()", func(t *testing.T) {
-		testFS := sysfs.Adapt(testfs.FS{"foo": &testfs.File{}})
+		testFS := &sysfs.AdaptFS{FS: testfs.FS{"foo": &testfs.File{}}}
 		sysCtx := internalsys.DefaultContext(testFS)
 		fsCtx := sysCtx.FS()
 
@@ -245,7 +245,7 @@ func TestModuleInstance_CallDynamic(t *testing.T) {
 
 	t.Run("error closing", func(t *testing.T) {
 		// Right now, the only way to err closing the sys context is if a File.Close erred.
-		testFS := sysfs.Adapt(testfs.FS{"foo": &testfs.File{CloseErr: errors.New("error closing")}})
+		testFS := &sysfs.AdaptFS{FS: testfs.FS{"foo": &testfs.File{CloseErr: errors.New("error closing")}}}
 		sysCtx := internalsys.DefaultContext(testFS)
 		fsCtx := sysCtx.FS()
 

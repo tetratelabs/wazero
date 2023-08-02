@@ -24,7 +24,7 @@ func TestNewFSContext(t *testing.T) {
 	embedFS, err := fs.Sub(testdata, "testdata")
 	require.NoError(t, err)
 
-	dirfs := sysfs.NewDirFS(".")
+	dirfs := sysfs.DirFS(".")
 
 	// Test various usual configuration for the file system.
 	tests := []struct {
@@ -33,21 +33,21 @@ func TestNewFSContext(t *testing.T) {
 	}{
 		{
 			name: "embed.FS",
-			fs:   sysfs.Adapt(embedFS),
+			fs:   &sysfs.AdaptFS{FS: embedFS},
 		},
 		{
-			name: "NewDirFS",
+			name: "DirFS",
 			// Don't use "testdata" because it may not be present in
 			// cross-architecture (a.k.a. scratch) build containers.
 			fs: dirfs,
 		},
 		{
-			name: "NewReadFS",
-			fs:   sysfs.NewReadFS(dirfs),
+			name: "ReadFS",
+			fs:   &sysfs.ReadFS{FS: dirfs},
 		},
 		{
 			name: "fstest.MapFS",
-			fs:   sysfs.Adapt(gofstest.MapFS{}),
+			fs:   &sysfs.AdaptFS{FS: gofstest.MapFS{}},
 		},
 	}
 
@@ -96,7 +96,7 @@ func TestNewFSContext(t *testing.T) {
 func TestFSContext_CloseFile(t *testing.T) {
 	embedFS, err := fs.Sub(testdata, "testdata")
 	require.NoError(t, err)
-	testFS := sysfs.Adapt(embedFS)
+	testFS := &sysfs.AdaptFS{FS: embedFS}
 
 	c := Context{}
 	err = c.InitFSContext(nil, nil, nil, []sys.FS{testFS}, []string{"/"}, nil)
@@ -154,7 +154,7 @@ func TestFSContext_noPreopens(t *testing.T) {
 }
 
 func TestContext_Close(t *testing.T) {
-	testFS := sysfs.Adapt(testfs.FS{"foo": &testfs.File{}})
+	testFS := &sysfs.AdaptFS{FS: testfs.FS{"foo": &testfs.File{}}}
 
 	c := Context{}
 	err := c.InitFSContext(nil, nil, nil, []sys.FS{testFS}, []string{"/"}, nil)
@@ -181,7 +181,7 @@ func TestContext_Close(t *testing.T) {
 func TestContext_Close_Error(t *testing.T) {
 	file := &testfs.File{CloseErr: errors.New("error closing")}
 
-	testFS := sysfs.Adapt(testfs.FS{"foo": file})
+	testFS := &sysfs.AdaptFS{FS: testfs.FS{"foo": file}}
 
 	c := Context{}
 	err := c.InitFSContext(nil, nil, nil, []sys.FS{testFS}, []string{"/"}, nil)
@@ -201,7 +201,7 @@ func TestContext_Close_Error(t *testing.T) {
 
 func TestFSContext_Renumber(t *testing.T) {
 	tmpDir := t.TempDir()
-	dirFS := sysfs.NewDirFS(tmpDir)
+	dirFS := sysfs.DirFS(tmpDir)
 
 	const dirName = "dir"
 	errno := dirFS.Mkdir(dirName, 0o700)
@@ -252,7 +252,7 @@ func TestFSContext_Renumber(t *testing.T) {
 
 func TestDirentCache_Read(t *testing.T) {
 	c := Context{}
-	err := c.InitFSContext(nil, nil, nil, []sys.FS{sysfs.Adapt(fstest.FS)}, []string{"/"}, nil)
+	err := c.InitFSContext(nil, nil, nil, []sys.FS{&sysfs.AdaptFS{FS: fstest.FS}}, []string{"/"}, nil)
 	require.NoError(t, err)
 	fsc := c.fsc
 	defer fsc.Close()
@@ -430,7 +430,7 @@ func TestDirentCache_ReadNewFile(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	c := Context{}
-	err := c.InitFSContext(nil, nil, nil, []sys.FS{sysfs.NewDirFS(tmpDir)}, []string{"/"}, nil)
+	err := c.InitFSContext(nil, nil, nil, []sys.FS{sysfs.DirFS(tmpDir)}, []string{"/"}, nil)
 	require.NoError(t, err)
 	fsc := c.fsc
 	defer fsc.Close()
