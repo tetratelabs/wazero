@@ -38,7 +38,9 @@ func TestSerializeCompiledModule(t *testing.T) {
 	}{
 		{
 			in: &compiledModule{
-				executable: makeCodeSegment(1, 2, 3, 4, 5),
+				compiledCode: &compiledCode{
+					executable: makeCodeSegment(1, 2, 3, 4, 5),
+				},
 				functions: []compiledFunction{
 					{executableOffset: 0, stackPointerCeil: 12345},
 				},
@@ -57,11 +59,13 @@ func TestSerializeCompiledModule(t *testing.T) {
 		},
 		{
 			in: &compiledModule{
-				ensureTermination: true,
-				executable:        makeCodeSegment(1, 2, 3, 4, 5),
+				compiledCode: &compiledCode{
+					executable: makeCodeSegment(1, 2, 3, 4, 5),
+				},
 				functions: []compiledFunction{
 					{executableOffset: 0, stackPointerCeil: 12345},
 				},
+				ensureTermination: true,
 			},
 			exp: concat(
 				[]byte(wazeroMagic),
@@ -77,12 +81,14 @@ func TestSerializeCompiledModule(t *testing.T) {
 		},
 		{
 			in: &compiledModule{
-				ensureTermination: true,
-				executable:        makeCodeSegment(1, 2, 3, 4, 5, 1, 2, 3),
+				compiledCode: &compiledCode{
+					executable: makeCodeSegment(1, 2, 3, 4, 5, 1, 2, 3),
+				},
 				functions: []compiledFunction{
 					{executableOffset: 0, stackPointerCeil: 12345},
 					{executableOffset: 5, stackPointerCeil: 0xffffffff},
 				},
+				ensureTermination: true,
 			},
 			exp: concat(
 				[]byte(wazeroMagic),
@@ -159,7 +165,9 @@ func TestDeserializeCompiledModule(t *testing.T) {
 				[]byte{1, 2, 3, 4, 5}, // machine code.
 			),
 			expCompiledModule: &compiledModule{
-				executable: makeCodeSegment(1, 2, 3, 4, 5),
+				compiledCode: &compiledCode{
+					executable: makeCodeSegment(1, 2, 3, 4, 5),
+				},
 				functions: []compiledFunction{
 					{executableOffset: 0, stackPointerCeil: 12345, index: 0},
 				},
@@ -181,9 +189,11 @@ func TestDeserializeCompiledModule(t *testing.T) {
 				[]byte{1, 2, 3, 4, 5}, // code.
 			),
 			expCompiledModule: &compiledModule{
-				ensureTermination: true,
-				executable:        makeCodeSegment(1, 2, 3, 4, 5),
+				compiledCode: &compiledCode{
+					executable: makeCodeSegment(1, 2, 3, 4, 5),
+				},
 				functions:         []compiledFunction{{executableOffset: 0, stackPointerCeil: 12345, index: 0}},
+				ensureTermination: true,
 			},
 			expStaleCache: false,
 			expErr:        "",
@@ -208,7 +218,9 @@ func TestDeserializeCompiledModule(t *testing.T) {
 			),
 			importedFunctionCount: 1,
 			expCompiledModule: &compiledModule{
-				executable: makeCodeSegment(1, 2, 3, 4, 5, 6, 7, 8, 9, 10),
+				compiledCode: &compiledCode{
+					executable: makeCodeSegment(1, 2, 3, 4, 5, 6, 7, 8, 9, 10),
+				},
 				functions: []compiledFunction{
 					{executableOffset: 0, stackPointerCeil: 12345, index: 1},
 					{executableOffset: 7, stackPointerCeil: 0xffffffff, index: 2},
@@ -279,8 +291,8 @@ func TestDeserializeCompiledModule(t *testing.T) {
 			if tc.expCompiledModule != nil {
 				require.Equal(t, len(tc.expCompiledModule.functions), len(cm.functions))
 				for i := 0; i < len(cm.functions); i++ {
-					require.Equal(t, cm, cm.functions[i].parent)
-					tc.expCompiledModule.functions[i].parent = cm
+					require.Equal(t, cm.compiledCode, cm.functions[i].parent)
+					tc.expCompiledModule.functions[i].parent = cm.compiledCode
 				}
 			}
 
@@ -361,13 +373,13 @@ func TestEngine_getCompiledModuleFromCache(t *testing.T) {
 			},
 			expHit: true,
 			expCompiledModule: &compiledModule{
-				executable: makeCodeSegment(1, 2, 3, 4, 5, 6, 7, 8, 9, 10),
+				compiledCode: &compiledCode{
+					executable: makeCodeSegment(1, 2, 3, 4, 5, 6, 7, 8, 9, 10),
+				},
 				functions: []compiledFunction{
 					{stackPointerCeil: 12345, executableOffset: 0, index: 0},
 					{stackPointerCeil: 0xffffffff, executableOffset: 5, index: 1},
 				},
-				source:            nil,
-				ensureTermination: false,
 			},
 		},
 	}
@@ -379,7 +391,7 @@ func TestEngine_getCompiledModuleFromCache(t *testing.T) {
 			if exp := tc.expCompiledModule; exp != nil {
 				exp.source = m
 				for i := range tc.expCompiledModule.functions {
-					tc.expCompiledModule.functions[i].parent = exp
+					tc.expCompiledModule.functions[i].parent = exp.compiledCode
 				}
 			}
 
@@ -422,8 +434,10 @@ func TestEngine_addCompiledModuleToCache(t *testing.T) {
 		tc := filecache.New(t.TempDir())
 		e := engine{fileCache: tc}
 		cm := &compiledModule{
-			executable: makeCodeSegment(1, 2, 3),
-			functions:  []compiledFunction{{stackPointerCeil: 123}},
+			compiledCode: &compiledCode{
+				executable: makeCodeSegment(1, 2, 3),
+			},
+			functions: []compiledFunction{{stackPointerCeil: 123}},
 		}
 		m := &wasm.Module{ID: sha256.Sum256(nil), IsHostModule: true} // Host module!
 		err := e.addCompiledModuleToCache(m, cm)
@@ -438,8 +452,10 @@ func TestEngine_addCompiledModuleToCache(t *testing.T) {
 		e := engine{fileCache: tc}
 		m := &wasm.Module{}
 		cm := &compiledModule{
-			executable: makeCodeSegment(1, 2, 3),
-			functions:  []compiledFunction{{stackPointerCeil: 123}},
+			compiledCode: &compiledCode{
+				executable: makeCodeSegment(1, 2, 3),
+			},
+			functions: []compiledFunction{{stackPointerCeil: 123}},
 		}
 		err := e.addCompiledModuleToCache(m, cm)
 		require.NoError(t, err)
