@@ -46,7 +46,6 @@ type pollEvent struct {
 	eventType byte
 	userData  []byte
 	errno     wasip1.Errno
-	outOffset uint32
 }
 
 type filePollEvent struct {
@@ -102,7 +101,7 @@ func pollOneoffFn(_ context.Context, mod api.Module, params []uint64) sys.Errno 
 	// https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#subscription_u
 	for i := uint32(0); i < nsubscriptions; i++ {
 		inOffset := i * 48
-		outOffset := i * 32
+		outOffset := nevents * 32
 
 		eventType := inBuf[inOffset+8] // +8 past userdata
 		// +8 past userdata +8 contents_offset
@@ -110,7 +109,6 @@ func pollOneoffFn(_ context.Context, mod api.Module, params []uint64) sys.Errno 
 		userData := inBuf[inOffset : inOffset+8]
 
 		evt := &pollEvent{
-			outOffset: outOffset,
 			eventType: eventType,
 			userData:  userData,
 			errno:     wasip1.ErrnoSuccess,
@@ -127,7 +125,7 @@ func pollOneoffFn(_ context.Context, mod api.Module, params []uint64) sys.Errno 
 				timeout = newTimeout
 			}
 			// Ack the clock event to the outBuf.
-			writeEvent(outBuf, evt)
+			writeEvent(outBuf[outOffset:], evt)
 			nevents++
 		case wasip1.EventTypeFdRead:
 			fd := int32(le.Uint32(argBuf))
@@ -136,7 +134,7 @@ func pollOneoffFn(_ context.Context, mod api.Module, params []uint64) sys.Errno 
 			}
 			if file, ok := fsc.LookupFile(fd); !ok {
 				evt.errno = wasip1.ErrnoBadf
-				writeEvent(outBuf, evt)
+				writeEvent(outBuf[outOffset:], evt)
 				nevents++
 			} else if !file.File.IsNonblock() {
 				// If the fd is blocking, do not ack yet,
@@ -144,7 +142,7 @@ func pollOneoffFn(_ context.Context, mod api.Module, params []uint64) sys.Errno 
 				fe := &filePollEvent{f: file, e: evt}
 				blockingSubs = append(blockingSubs, fe)
 			} else {
-				writeEvent(outBuf, evt)
+				writeEvent(outBuf[outOffset:], evt)
 				nevents++
 			}
 		case wasip1.EventTypeFdWrite:
@@ -158,7 +156,7 @@ func pollOneoffFn(_ context.Context, mod api.Module, params []uint64) sys.Errno 
 				evt.errno = wasip1.ErrnoBadf
 			}
 			nevents++
-			writeEvent(outBuf, evt)
+			writeEvent(outBuf[outOffset:], evt)
 		default:
 			return sys.EINVAL
 		}
@@ -178,7 +176,7 @@ func pollOneoffFn(_ context.Context, mod api.Module, params []uint64) sys.Errno 
 
 	// If nevents != nsubscriptions, then there are blocking subscribers.
 	// We check these fds once using poll.
-	n, errno := pollFileEventsOnce(blockingSubs, outBuf)
+	n, errno := pollFileEventsOnce(blockingSubs, outBuf[nevents*32:])
 	if errno != 0 {
 		return errno
 	}
@@ -188,7 +186,7 @@ func pollOneoffFn(_ context.Context, mod api.Module, params []uint64) sys.Errno 
 	// (i.e. there are clock subscriptions), we poll until either the timeout expires
 	// or any File.Poll() returns true ("ready"); otherwise we are done.
 	if n == 0 && timeout > 0 {
-		n, errno = pollFileEventsUntil(sysCtx, timeout, blockingSubs, outBuf)
+		n, errno = pollFileEventsUntil(sysCtx, timeout, blockingSubs, outBuf[nevents*32:])
 		if errno != 0 {
 			return errno
 		}
@@ -236,10 +234,10 @@ func processClockEvent(inBuf []byte) (time.Duration, sys.Errno) {
 // writeEvent writes the event corresponding to the processed subscription.
 // https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-event-struct
 func writeEvent(outBuf []byte, evt *pollEvent) {
-	copy(outBuf[evt.outOffset:], evt.userData) // userdata
-	outBuf[evt.outOffset+8] = byte(evt.errno)  // uint16, but safe as < 255
-	outBuf[evt.outOffset+9] = 0
-	le.PutUint32(outBuf[evt.outOffset+10:], uint32(evt.eventType))
+	copy(outBuf, evt.userData)  // userdata
+	outBuf[8] = byte(evt.errno) // uint16, but safe as < 255
+	outBuf[9] = 0
+	le.PutUint32(outBuf[10:], uint32(evt.eventType))
 	// TODO: When FD events are supported, write outOffset+16
 }
 
@@ -262,7 +260,7 @@ func pollFileEventsOnce(evts []*filePollEvent, outBuf []byte) (n uint32, errno s
 		}
 		if isReady {
 			e.e.errno = 0
-			writeEvent(outBuf, e.e)
+			writeEvent(outBuf[n*32:], e.e)
 			n++
 		}
 	}
