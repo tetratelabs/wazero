@@ -48,6 +48,10 @@ type (
 		// as the underlying memory region is accessed by assembly directly by using
 		// codesElement0Address.
 		functions []function
+
+		// Keep a reference to the compiled module to prevent the GC from reclaiming
+		// it while the code may still be needed.
+		module *compiledModule
 	}
 
 	// callEngine holds context per moduleEngine.Call, and shared across all the
@@ -129,6 +133,10 @@ type (
 
 		// initialFn is the initial function for this call engine.
 		initialFn *function
+
+		// Keep a reference to the compiled module to prevent the GC from reclaiming
+		// it while the code may still be needed.
+		module *compiledModule
 
 		// stackIterator provides a way to iterate over the stack for Listeners.
 		// It is setup and valid only during a call to a Listener hook.
@@ -637,6 +645,8 @@ func (e *engine) NewModuleEngine(module *wasm.Module, instance *wasm.ModuleInsta
 			parent:             c,
 		}
 	}
+
+	me.module = cm
 	return me, nil
 }
 
@@ -769,6 +779,9 @@ func (ce *callEngine) call(ctx context.Context, params, results []uint64) (_ []u
 		results = make([]uint64, ft.ResultNumInUint64)
 	}
 	copy(results, ce.stack)
+
+	// Ensure that the compiled module will never be GC'd before this method returns.
+	runtime.KeepAlive(ce.module)
 	return results, nil
 }
 
@@ -973,6 +986,7 @@ func (e *moduleEngine) newCallEngine(stackSize uint64, fn *function) *callEngine
 		initialFn:         fn,
 		moduleContext:     moduleContext{fn: fn},
 		ensureTermination: fn.parent.parent.ensureTermination,
+		module:            e.module,
 	}
 
 	stackHeader := (*reflect.SliceHeader)(unsafe.Pointer(&ce.stack))
