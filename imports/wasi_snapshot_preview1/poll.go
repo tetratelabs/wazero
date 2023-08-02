@@ -28,6 +28,7 @@ import (
 //   - sys.ENOTSUP: a parameters is valid, but not yet supported.
 //   - sys.EFAULT: there is not enough memory to read the subscriptions or
 //     write results.
+//   - sys.EINTR: an OS interrupt has occurred while invoking the syscall.
 //
 // # Notes
 //
@@ -95,6 +96,8 @@ func pollOneoffFn(_ context.Context, mod api.Module, params []uint64) sys.Errno 
 	// The timeout is initialized at max Duration, the loop will find the minimum.
 	var timeout time.Duration = 1<<63 - 1
 	// Count of all the subscriptions that have been already written back to outBuf.
+	// nevents*32 returns at all times the offset where the next event should be written:
+	// this way we ensure that there are no gaps between records.
 	nevents := uint32(0)
 
 	// Layout is subscription_u: Union
@@ -136,14 +139,14 @@ func pollOneoffFn(_ context.Context, mod api.Module, params []uint64) sys.Errno 
 				evt.errno = wasip1.ErrnoBadf
 				writeEvent(outBuf[outOffset:], evt)
 				nevents++
-			} else if !file.File.IsNonblock() {
+			} else if file.File.IsNonblock() {
+				writeEvent(outBuf[outOffset:], evt)
+				nevents++
+			} else {
 				// If the fd is blocking, do not ack yet,
 				// append to a slice for delayed evaluation.
 				fe := &filePollEvent{f: file, e: evt}
 				blockingSubs = append(blockingSubs, fe)
-			} else {
-				writeEvent(outBuf[outOffset:], evt)
-				nevents++
 			}
 		case wasip1.EventTypeFdWrite:
 			fd := int32(le.Uint32(argBuf))

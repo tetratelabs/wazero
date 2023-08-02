@@ -416,7 +416,6 @@ func Test_pollOneoff_Mixed(t *testing.T) {
 
 	tests := []struct {
 		name                                   string
-		skip                                   bool
 		in, out, nsubscriptions, resultNevents uint32
 		connected, nonblocking                 bool
 		mem                                    []byte // at offset in
@@ -620,9 +619,6 @@ func Test_pollOneoff_Mixed(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.skip {
-				t.Skip()
-			}
 			ctx := sock.WithConfig(testCtx,
 				sock.NewConfig().WithTCPListener("127.0.0.1", 0))
 
