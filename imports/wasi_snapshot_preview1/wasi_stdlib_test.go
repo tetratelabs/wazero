@@ -643,6 +643,9 @@ func Test_Mixed(t *testing.T) {
 		// TODO: "cargo-wasi": wasmCargoWasi,
 		"zig-cc": wasmZigCc,
 	}
+	if wasmGotip != nil {
+		toolchains["gotip"] = wasmGotip
+	}
 
 	for toolchain, bin := range toolchains {
 		toolchain := toolchain
@@ -654,15 +657,20 @@ func Test_Mixed(t *testing.T) {
 }
 
 func testMixed(t *testing.T, bin []byte) {
-	// This is identical to testSock, except we also hook a pipe to stdin
+	// This is almost identical to testSock, except we also hook a pipe to stdin
 	// We expect poll_oneoff to be invoked successfully.
 	sockCfg := experimentalsock.NewConfig().WithTCPListener("127.0.0.1", 0)
+
+	var logBuf bytes.Buffer
 	ctx := experimentalsock.WithConfig(testCtx, sockCfg)
+	ctx = context.WithValue(ctx, experimentalapi.FunctionListenerFactoryKey{},
+		logging.NewHostLoggingListenerFactory(&logBuf, logging.LogScopePoll))
+
 	r, w, err := os.Pipe()
 	require.NoError(t, err)
 	defer r.Close()
 	defer w.Close()
-	_, err = w.Write([]byte("wazero"))
+
 	require.NoError(t, err)
 	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "mixed").WithSysNanosleep().WithStdin(r)
 	tcpAddrCh := make(chan *net.TCPAddr, 1)
@@ -682,10 +690,19 @@ func testMixed(t *testing.T, bin []byte) {
 	require.NoError(t, err)
 	defer conn.Close()
 
-	n, err := conn.Write([]byte("wazero"))
+	go func() {
+		_, err = w.Write([]byte("wazero"))
+		require.NoError(t, err)
+		err = w.Close()
+		require.NoError(t, err)
+		n, err := conn.Write([]byte("wazero"))
+		require.NotEqual(t, 0, n)
+		require.NoError(t, err)
+	}()
 	console := <-ch
-	require.NotEqual(t, 0, n)
-	require.NoError(t, err)
-	// Nonblocking connections may contain error logging, we ignore those.
-	require.Equal(t, "wazero\n", console[len(console)-7:])
+
+	// The log should print poll_oneoff at least once.
+	require.Contains(t, logBuf.String(), "poll_oneoff", logBuf.String())
+	// Nonblocking connections may contain error logging/whitespace, we ignore those.
+	require.Equal(t, "wazero", strings.TrimSpace(console[len(console)-7:]))
 }

@@ -38,6 +38,10 @@ func main() {
 		if err := mainSock(); err != nil {
 			panic(err)
 		}
+	case "mixed":
+		if err := mainMixed(); err != nil {
+			panic(err)
+		}
 	case "nonblock":
 		if err := mainNonblock(os.Args[2], os.Args[3:]); err != nil {
 			panic(err)
@@ -139,6 +143,67 @@ func mainSock() error {
 		return err
 	}
 	fmt.Println(string(buf[:n]))
+	return nil
+}
+
+// mainMixed is an explicit test of a blocking socket + stdin pipe.
+// It exercises poll_oneoff by setting read deadlines.
+func mainMixed() error {
+	// Get a listener from the pre-opened file descriptor.
+	// The listener is the first pre-open, with a file-descriptor of 3.
+	f := os.NewFile(3, "")
+	l, err := net.FileListener(f)
+	defer f.Close()
+	if err != nil {
+		return err
+	}
+	defer l.Close()
+
+	ch1 := make(chan error)
+	ch2 := make(chan error)
+
+	go func() {
+		// Accept a connection
+		conn, err := l.Accept()
+		if err != nil {
+			ch1 <- err
+			return
+		}
+		defer conn.Close()
+
+		// Do a blocking read of up to 32 bytes.
+		// Note: the test should write: "wazero", so that's all we should read.
+		var buf [32]byte
+		// Force a deadline to involve netpoll.
+		_ = conn.SetReadDeadline(time.Now().Add(time.Second))
+		n, err := conn.Read(buf[:])
+		if err != nil {
+			ch1 <- err
+			return
+		}
+		fmt.Println(string(buf[:n]))
+		close(ch1)
+	}()
+
+	go func() {
+		// Force a deadline to involve netpoll.
+		_ = os.Stdin.SetReadDeadline(time.Now().Add(time.Second))
+		b, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			ch2 <- err
+			return
+		}
+		os.Stdout.Write(b)
+		close(ch2)
+	}()
+	err1 := <-ch1
+	err2 := <-ch2
+	if err1 != nil {
+		return err1
+	}
+	if err2 != nil {
+		return err2
+	}
 	return nil
 }
 
