@@ -759,6 +759,8 @@ func (ce *callEngine) call(ctx context.Context, params, results []uint64) (_ []u
 			// If the module closed during the call, and the call didn't err for another reason, set an ExitError.
 			err = m.FailIfClosed()
 		}
+		// Ensure that the compiled module will never be GC'd before this method returns.
+		runtime.KeepAlive(ce.module)
 	}()
 
 	ft := ce.initialFn.funcType
@@ -778,9 +780,6 @@ func (ce *callEngine) call(ctx context.Context, params, results []uint64) (_ []u
 		results = make([]uint64, ft.ResultNumInUint64)
 	}
 	copy(results, ce.stack)
-
-	// Ensure that the compiled module will never be GC'd before this method returns.
-	runtime.KeepAlive(ce.module)
 	return results, nil
 }
 
