@@ -640,8 +640,8 @@ func testLargeStdout(t *testing.T, tname string, bin []byte) {
 
 func Test_Mixed(t *testing.T) {
 	toolchains := map[string][]byte{
-		// TODO: "cargo-wasi": wasmCargoWasi,
-		"zig-cc": wasmZigCc,
+		"cargo-wasi": wasmCargoWasi,
+		"zig-cc":     wasmZigCc,
 	}
 	if wasmGotip != nil {
 		toolchains["gotip"] = wasmGotip
