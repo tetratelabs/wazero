@@ -114,10 +114,10 @@ func (v *InvokeFunc) Call(ctx context.Context, mod api.Module, stack []uint64) {
 
 	err = f.CallWithStack(ctx, stack)
 	if err != nil {
-		mod.ExportedFunction("stackRestore").Call(ctx, stackSave[0])
+		_, _ = mod.ExportedFunction("stackRestore").Call(ctx, stackSave[0])
 		if !errors.Is(err, ThrowLongjmpError) {
 			panic(err)
 		}
-		mod.ExportedFunction("setThrew").Call(ctx, 1, 0)
+		_, _ = mod.ExportedFunction("setThrew").Call(ctx, 1, 0)
 	}
 }
