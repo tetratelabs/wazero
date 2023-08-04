@@ -41,8 +41,9 @@ var _ socketapi.TCPSock = (*tcpListenerFile)(nil)
 type tcpListenerFile struct {
 	baseSockFile
 
-	fd   uintptr
-	addr *net.TCPAddr
+	fd       uintptr
+	addr     *net.TCPAddr
+	nonblock bool
 }
 
 // Accept implements the same method as documented on socketapi.TCPSock
@@ -57,7 +58,12 @@ func (f *tcpListenerFile) Accept() (socketapi.TCPConn, sys.Errno) {
 
 // SetNonblock implements the same method as documented on sys.File
 func (f *tcpListenerFile) SetNonblock(enabled bool) sys.Errno {
+	f.nonblock = enabled
 	return sys.UnwrapOSError(setNonblock(f.fd, enabled))
+}
+
+func (f *tcpListenerFile) IsNonblock() bool {
+	return f.nonblock
 }
 
 // Close implements the same method as documented on sys.File
@@ -75,7 +81,8 @@ var _ socketapi.TCPConn = (*tcpConnFile)(nil)
 type tcpConnFile struct {
 	baseSockFile
 
-	fd uintptr
+	fd       uintptr
+	nonblock bool
 
 	// closed is true when closed was called. This ensures proper sys.EBADF
 	closed bool
@@ -91,7 +98,13 @@ func newTcpConn(tc *net.TCPConn) socketapi.TCPConn {
 
 // SetNonblock implements the same method as documented on sys.File
 func (f *tcpConnFile) SetNonblock(enabled bool) (errno sys.Errno) {
+	f.nonblock = enabled
 	return sys.UnwrapOSError(setNonblock(f.fd, enabled))
+}
+
+// IsNonblock implements the same method as documented on sys.File
+func (f *tcpConnFile) IsNonblock() bool {
+	return f.nonblock
 }
 
 // Read implements the same method as documented on sys.File

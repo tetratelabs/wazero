@@ -103,3 +103,30 @@ func TestTcpConnFile_Stat(t *testing.T) {
 	_, errno := file.Stat()
 	require.Zero(t, errno, "Stat should not fail")
 }
+
+func TestTcpConnFile_SetNonblock(t *testing.T) {
+	listen, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer listen.Close()
+
+	lf := newTCPListenerFile(listen.(*net.TCPListener))
+
+	tcpAddr, err := net.ResolveTCPAddr("tcp", listen.Addr().String())
+	require.NoError(t, err)
+	tcp, err := net.DialTCP("tcp", nil, tcpAddr)
+	require.NoError(t, err)
+	defer tcp.Close() //nolint
+
+	errno := lf.SetNonblock(true)
+	require.EqualErrno(t, 0, errno)
+	require.True(t, lf.IsNonblock())
+
+	conn, errno := lf.Accept()
+	require.EqualErrno(t, 0, errno)
+	defer conn.Close()
+
+	file := newTcpConn(tcp)
+	errno = file.SetNonblock(true)
+	require.EqualErrno(t, 0, errno)
+	require.True(t, file.IsNonblock())
+}

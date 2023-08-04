@@ -90,6 +90,16 @@ func syscallConnControl(conn syscall.Conn, fn func(fd uintptr) (int, sys.Errno))
 	return
 }
 
+func _pollSock(conn syscall.Conn, flag sys.Pflag, timeoutMillis int32) (bool, sys.Errno) {
+	if flag != sys.POLLIN {
+		return false, sys.ENOTSUP
+	}
+	n, errno := syscallConnControl(conn, func(fd uintptr) (int, sys.Errno) {
+		return _poll([]pollFd{newPollFd(fd, _POLLIN, 0)}, timeoutMillis)
+	})
+	return n > 0, errno
+}
+
 // newTCPListenerFile is a constructor for a socketapi.TCPSock.
 //
 // Note: currently the Windows implementation of socketapi.TCPSock
@@ -99,9 +109,7 @@ func syscallConnControl(conn syscall.Conn, fn func(fd uintptr) (int, sys.Errno))
 // standard library, instead of invoke syscalls/Win32 APIs
 // because they are sensibly different from Unix's.
 func newTCPListenerFile(tl *net.TCPListener) socketapi.TCPSock {
-	w := &winTcpListenerFile{tl: tl}
-	_ = w.SetNonblock(true)
-	return w
+	return &winTcpListenerFile{tl: tl}
 }
 
 var _ socketapi.TCPSock = (*winTcpListenerFile)(nil)
@@ -116,14 +124,11 @@ type winTcpListenerFile struct {
 
 // Accept implements the same method as documented on socketapi.TCPSock
 func (f *winTcpListenerFile) Accept() (socketapi.TCPConn, sys.Errno) {
-	// Ensure we have an incoming connection using winsock_select.
-	n, errno := syscallConnControl(f.tl, func(fd uintptr) (int, sys.Errno) {
-		return _poll([]pollFd{newPollFd(fd, _POLLIN, 0)}, 0)
-	})
-
-	// Otherwise return immediately.
-	if n == 0 || errno != 0 {
-		return nil, sys.EAGAIN
+	// Ensure we have an incoming connection using winsock_select, otherwise return immediately.
+	if f.nonblock {
+		if ready, errno := _pollSock(f.tl, sys.POLLIN, 0); !ready || errno != 0 {
+			return nil, sys.EAGAIN
+		}
 	}
 
 	// Accept normally blocks goroutines, but we
@@ -186,6 +191,7 @@ func newTcpConn(tc *net.TCPConn) socketapi.TCPConn {
 
 // SetNonblock implements the same method as documented on sys.File
 func (f *winTcpConnFile) SetNonblock(enabled bool) (errno sys.Errno) {
+	f.nonblock = true
 	_, errno = syscallConnControl(f.tc, func(fd uintptr) (int, sys.Errno) {
 		return 0, sys.UnwrapOSError(setNonblockSocket(syscall.Handle(fd), enabled))
 	})
