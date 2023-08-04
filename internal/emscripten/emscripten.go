@@ -25,16 +25,18 @@ var NotifyMemoryGrowth = &wasm.HostFunc{
 // it ignores the error and does not act on it.
 const FunctionThrowLongjmp = "_emscripten_throw_longjmp"
 
-var ThrowLongjmpError = errors.New("_emscripten_throw_longjmp")
-var ThrowLongjmp = &wasm.HostFunc{
-	ExportName: FunctionThrowLongjmp,
-	Name:       FunctionThrowLongjmp,
-	ParamTypes: []wasm.ValueType{},
-	ParamNames: []string{},
-	Code: wasm.Code{GoFunc: api.GoModuleFunc(func(context.Context, api.Module, []uint64) {
-		panic(ThrowLongjmpError)
-	})},
-}
+var (
+	ThrowLongjmpError = errors.New("_emscripten_throw_longjmp")
+	ThrowLongjmp      = &wasm.HostFunc{
+		ExportName: FunctionThrowLongjmp,
+		Name:       FunctionThrowLongjmp,
+		ParamTypes: []wasm.ValueType{},
+		ParamNames: []string{},
+		Code: wasm.Code{GoFunc: api.GoModuleFunc(func(context.Context, api.Module, []uint64) {
+			panic(ThrowLongjmpError)
+		})},
+	}
+)
 
 // InvokePrefix is the naming convention of Emscripten dynamic functions.
 //
