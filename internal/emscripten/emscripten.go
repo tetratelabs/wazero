@@ -2,6 +2,7 @@ package emscripten
 
 import (
 	"context"
+	"errors"
 	"strconv"
 
 	"github.com/tetratelabs/wazero/api"
@@ -16,6 +17,23 @@ var NotifyMemoryGrowth = &wasm.HostFunc{
 	ParamTypes: []wasm.ValueType{wasm.ValueTypeI32},
 	ParamNames: []string{"memory_index"},
 	Code:       wasm.Code{GoFunc: api.GoModuleFunc(func(context.Context, api.Module, []uint64) {})},
+}
+
+// Emscripten uses this host method to throw an error that can then be caught
+// in the dynamic invoke functions. Emscripten uses this to allow for
+// setjmp/longjmp support. When this error is seen in the invoke handler,
+// it ignores the error and does not act on it.
+const FunctionThrowLongjmp = "_emscripten_throw_longjmp"
+
+var ThrowLongjmpError = errors.New("_emscripten_throw_longjmp")
+var ThrowLongjmp = &wasm.HostFunc{
+	ExportName: FunctionThrowLongjmp,
+	Name:       FunctionThrowLongjmp,
+	ParamTypes: []wasm.ValueType{},
+	ParamNames: []string{},
+	Code: wasm.Code{GoFunc: api.GoModuleFunc(func(context.Context, api.Module, []uint64) {
+		panic(ThrowLongjmpError)
+	})},
 }
 
 // InvokePrefix is the naming convention of Emscripten dynamic functions.
@@ -89,8 +107,17 @@ func (v *InvokeFunc) Call(ctx context.Context, mod api.Module, stack []uint64) {
 		panic(err)
 	}
 
-	err = f.CallWithStack(ctx, stack)
+	stackSave, err := mod.ExportedFunction("stackSave").Call(ctx)
 	if err != nil {
 		panic(err)
+	}
+
+	err = f.CallWithStack(ctx, stack)
+	if err != nil {
+		mod.ExportedFunction("stackRestore").Call(ctx, stackSave[0])
+		if !errors.Is(err, ThrowLongjmpError) {
+			panic(err)
+		}
+		mod.ExportedFunction("setThrew").Call(ctx, 1, 0)
 	}
 }
