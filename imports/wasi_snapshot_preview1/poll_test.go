@@ -2,6 +2,7 @@ package wasi_snapshot_preview1_test
 
 import (
 	"io/fs"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -150,6 +151,12 @@ func Test_pollOneoff_Errors(t *testing.T) {
 }
 
 func Test_pollOneoff_Stdin(t *testing.T) {
+	w, r, err := os.Pipe()
+	require.NoError(t, err)
+	defer w.Close()
+	defer r.Close()
+	_, _ = w.Write([]byte("wazero"))
+
 	tests := []struct {
 		name                                   string
 		in, out, nsubscriptions, resultNevents uint32
@@ -192,7 +199,6 @@ func Test_pollOneoff_Stdin(t *testing.T) {
 			mem: concat(
 				clockNsSub(20*1000*1000),
 				fdReadSub,
-				singleton('?'),
 			),
 			expectedErrno: wasip1.ErrnoSuccess,
 			out:           128, // past in
@@ -227,7 +233,6 @@ func Test_pollOneoff_Stdin(t *testing.T) {
 			mem: concat(
 				clockNsSub(20*1000*1000),
 				fdReadSub,
-				singleton('?'),
 			),
 			expectedErrno: wasip1.ErrnoSuccess,
 			out:           128, // past in
@@ -262,7 +267,6 @@ func Test_pollOneoff_Stdin(t *testing.T) {
 			mem: concat(
 				clockNsSub(20*1000*1000),
 				fdReadSub,
-				singleton('?'),
 			),
 			expectedErrno: wasip1.ErrnoSuccess,
 			out:           128, // past in
@@ -297,7 +301,6 @@ func Test_pollOneoff_Stdin(t *testing.T) {
 			mem: concat(
 				clockNsSub(20*1000*1000),
 				fdReadSub,
-				singleton('?'),
 			),
 			expectedErrno: wasip1.ErrnoSuccess,
 			out:           128, // past in
@@ -332,7 +335,6 @@ func Test_pollOneoff_Stdin(t *testing.T) {
 			mem: concat(
 				clockNsSub(20*1000*1000),
 				fdReadSub,
-				singleton('?'),
 			),
 
 			expectedErrno: wasip1.ErrnoSuccess,
@@ -357,6 +359,52 @@ func Test_pollOneoff_Stdin(t *testing.T) {
 			expectedLog: `
 ==> wasi_snapshot_preview1.poll_oneoff(in=0,out=128,nsubscriptions=2)
 <== (nevents=1,errno=ESUCCESS)
+`,
+		},
+		{
+			name:            "pollable pipe, multiple subs, events returned out of order",
+			nsubscriptions:  3,
+			expectedNevents: 3,
+			mem: concat(
+				fdReadSub,
+				clockNsSub(20*1000*1000),
+				// Illegal file fd with custom user data to recognize it in the event buffer.
+				fdReadSubFdWithUserData(100, []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77})),
+			stdin:         &sys.StdinFile{Reader: w},
+			expectedErrno: wasip1.ErrnoSuccess,
+			out:           128, // past in
+			resultNevents: 512, // past out
+			expectedMem: []byte{
+				// Clock is acknowledged first.
+				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // userdata
+				byte(wasip1.ErrnoSuccess), 0x0, // errno is 16 bit
+				wasip1.EventTypeClock, 0x0, 0x0, 0x0, // 4 bytes for type enum
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+				0x0, 0x0,
+
+				// Then an illegal file with custom user data.
+				0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, // userdata
+				byte(wasip1.ErrnoBadf), 0x0, // errno is 16 bit
+				wasip1.EventTypeFdRead, 0x0, 0x0, 0x0, // 4 bytes for type enum
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+				0x0, 0x0,
+
+				// Stdin pipes are delayed to invoke sysfs.poll
+				// thus, they are written back last.
+				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // userdata
+				byte(wasip1.ErrnoSuccess), 0x0, // errno is 16 bit
+				wasip1.EventTypeFdRead, 0x0, 0x0, 0x0, // 4 bytes for type enum
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+				0x0, 0x0,
+
+				'?', // stopped after encoding
+			},
+			expectedLog: `
+==> wasi_snapshot_preview1.poll_oneoff(in=0,out=128,nsubscriptions=3)
+<== (nevents=3,errno=ESUCCESS)
 `,
 		},
 	}
@@ -420,7 +468,6 @@ func Test_pollOneoff_Zero(t *testing.T) {
 		concat(
 			clockNsSub(20*1000*1000),
 			fdReadSub,
-			singleton('?'),
 		),
 	)
 
@@ -460,7 +507,6 @@ func Test_pollOneoff_Zero(t *testing.T) {
 		concat(
 			clockNsSub(20*1000*1000),
 			fdReadSub,
-			singleton('?'),
 		),
 	)
 
@@ -491,10 +537,6 @@ func Test_pollOneoff_Zero(t *testing.T) {
 	require.Equal(t, uint32(1), nevents)
 }
 
-func singleton(b byte) []byte {
-	return []byte{b}
-}
-
 func concat(bytes ...[]byte) []byte {
 	var res []byte
 	for i := range bytes {
@@ -522,7 +564,24 @@ func fdReadSubFd(fd byte) []byte {
 		0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // userdata
 		wasip1.EventTypeFdRead, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
 		fd, 0x0, 0x0, 0x0, // valid readable FD
+		0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+		0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+		0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+		0x0, 0x0, 0x0, 0x0, // pad to 32 bytes
 	}
+}
+
+func fdReadSubFdWithUserData(fd byte, userdata []byte) []byte {
+	return concat(
+		userdata,
+		[]byte{
+			wasip1.EventTypeFdRead, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			fd, 0x0, 0x0, 0x0, // valid readable FD
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, // pad to 32 bytes
+		})
 }
 
 // subscription for an EventTypeFdRead on stdin
