@@ -13,6 +13,8 @@
 
   (table 20 20 funcref)
 
+  (func $stackSave (export "stackSave") (result i32) (i32.const 0))
+
   (func $v_i32 (result i32) (i32.const 42))
   (func $v_i32_unreachable (result i32) unreachable)
 
