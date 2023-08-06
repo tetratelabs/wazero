@@ -126,7 +126,8 @@ func (v *InvokeFunc) Call(ctx context.Context, mod api.Module, stack []uint64) {
 	//}
 
 	// This is the equivalent of "var sp = stackSave();".
-	// We reuse savedStack to save allocations.
+	// We reuse savedStack to save allocations. We allocate with a size of 2
+	// here to accommodate for the input and output of setThrew.
 	var savedStack [2]uint64
 	err = mod.ExportedFunction("stackSave").CallWithStack(ctx, savedStack[:])
 	if err != nil {
