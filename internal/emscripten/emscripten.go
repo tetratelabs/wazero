@@ -152,8 +152,9 @@ func (v *InvokeFunc) Call(ctx context.Context, mod api.Module, stack []uint64) {
 		// ignore the error because we have restored the stack to what it was
 		// before the indirect function call, so the program can continue.
 		// This is the equivalent of the "if (e !== e+0) throw e;" line in the
-		// JS implementation, which checks if the error is Infinity, which is
-		// what the JS implementation of _emscripten_throw_longjmp throws.
+		// JS implementation, which checks if the error is not a number, which
+		// is what the JS implementation throws (Infinity for
+		// _emscripten_throw_longjmp, a memory address for C++ exceptions).
 		if !errors.Is(err, ThrowLongjmpError) {
 			panic(err)
 		}
