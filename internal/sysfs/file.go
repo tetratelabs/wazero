@@ -7,10 +7,11 @@ import (
 	"time"
 
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
+	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/sys"
 )
 
-func NewStdioFile(stdin bool, f fs.File) (experimentalsys.File, error) {
+func NewStdioFile(stdin bool, f fs.File) (fsapi.File, error) {
 	// Return constant stat, which has fake times, but keep the underlying
 	// file mode. Fake times are needed to pass wasi-testsuite.
 	// https://github.com/WebAssembly/wasi-testsuite/blob/af57727/tests/rust/src/bin/fd_filestat_get.rs#L1-L19
@@ -26,7 +27,7 @@ func NewStdioFile(stdin bool, f fs.File) (experimentalsys.File, error) {
 	} else {
 		flag = experimentalsys.O_WRONLY
 	}
-	var file experimentalsys.File
+	var file fsapi.File
 	if of, ok := f.(*os.File); ok {
 		// This is ok because functions that need path aren't used by stdioFile
 		file = newOsFile("", flag, 0, of)
@@ -65,7 +66,7 @@ func OpenFSFile(fs fs.FS, path string, flag experimentalsys.Oflag, perm fs.FileM
 }
 
 type stdioFile struct {
-	experimentalsys.File
+	fsapi.File
 	st sys.Stat_t
 }
 
@@ -341,6 +342,21 @@ func (f *fsFile) Close() experimentalsys.Errno {
 
 func (f *fsFile) close() experimentalsys.Errno {
 	return experimentalsys.UnwrapOSError(f.file.Close())
+}
+
+// IsNonblock implements the same method as documented on fsapi.File
+func (f *fsFile) IsNonblock() bool {
+	return false
+}
+
+// SetNonblock implements the same method as documented on fsapi.File
+func (f *fsFile) SetNonblock(bool) experimentalsys.Errno {
+	return experimentalsys.ENOSYS
+}
+
+// Poll implements the same method as documented on fsapi.File
+func (f *fsFile) Poll(fsapi.Pflag, int32) (ready bool, errno experimentalsys.Errno) {
+	return false, experimentalsys.ENOSYS
 }
 
 // dirError is used for commands that work against a directory, but not a file.

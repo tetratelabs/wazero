@@ -11,6 +11,7 @@ import (
 	gofstest "testing/fstest"
 
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
+	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/sys"
@@ -319,7 +320,7 @@ func TestFileReadAndPread(t *testing.T) {
 }
 
 func TestFilePoll_POLLIN(t *testing.T) {
-	pflag := experimentalsys.POLLIN
+	pflag := fsapi.POLLIN
 
 	// Test using os.Pipe as it is known to support poll.
 	r, w, err := os.Pipe()
@@ -355,7 +356,7 @@ func TestFilePoll_POLLIN(t *testing.T) {
 }
 
 func TestFilePoll_POLLOUT(t *testing.T) {
-	pflag := experimentalsys.POLLOUT
+	pflag := fsapi.POLLOUT
 
 	// Test using os.Pipe as it is known to support poll.
 	r, w, err := os.Pipe()

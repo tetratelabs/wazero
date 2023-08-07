@@ -7,10 +7,11 @@ import (
 	"runtime"
 
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
+	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/sys"
 )
 
-func newOsFile(path string, flag experimentalsys.Oflag, perm fs.FileMode, f *os.File) experimentalsys.File {
+func newOsFile(path string, flag experimentalsys.Oflag, perm fs.FileMode, f *os.File) fsapi.File {
 	// Windows cannot read files written to a directory after it was opened.
 	// This was noticed in #1087 in zig tests. Use a flag instead of a
 	// different type.
@@ -102,12 +103,12 @@ func (f *osFile) reopen() (errno experimentalsys.Errno) {
 	return
 }
 
-// IsNonblock implements the same method as documented on sys.File
+// IsNonblock implements the same method as documented on fsapi.File
 func (f *osFile) IsNonblock() bool {
 	return isNonblock(f)
 }
 
-// SetNonblock implements the same method as documented on sys.File
+// SetNonblock implements the same method as documented on fsapi.File
 func (f *osFile) SetNonblock(enable bool) (errno experimentalsys.Errno) {
 	if enable {
 		f.flag |= experimentalsys.O_NONBLOCK
@@ -178,8 +179,8 @@ func (f *osFile) Seek(offset int64, whence int) (newOffset int64, errno experime
 	return
 }
 
-// Poll implements the same method as documented on sys.File
-func (f *osFile) Poll(flag experimentalsys.Pflag, timeoutMillis int32) (ready bool, errno experimentalsys.Errno) {
+// Poll implements the same method as documented on fsapi.File
+func (f *osFile) Poll(flag fsapi.Pflag, timeoutMillis int32) (ready bool, errno experimentalsys.Errno) {
 	return poll(f.fd, flag, timeoutMillis)
 }
 

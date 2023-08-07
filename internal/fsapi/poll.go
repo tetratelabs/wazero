@@ -1,4 +1,4 @@
-package sys
+package fsapi
 
 // Pflag are bit flags used for File.Poll. Values, including zero, should not
 // be interpreted numerically. Instead, use by constants prefixed with 'POLL'.

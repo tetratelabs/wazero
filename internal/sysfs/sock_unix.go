@@ -7,6 +7,7 @@ import (
 	"syscall"
 
 	"github.com/tetratelabs/wazero/experimental/sys"
+	"github.com/tetratelabs/wazero/internal/fsapi"
 	socketapi "github.com/tetratelabs/wazero/internal/sock"
 )
 
@@ -56,16 +57,6 @@ func (f *tcpListenerFile) Accept() (socketapi.TCPConn, sys.Errno) {
 	return &tcpConnFile{fd: uintptr(nfd)}, 0
 }
 
-// SetNonblock implements the same method as documented on sys.File
-func (f *tcpListenerFile) SetNonblock(enabled bool) sys.Errno {
-	f.nonblock = enabled
-	return sys.UnwrapOSError(setNonblock(f.fd, enabled))
-}
-
-func (f *tcpListenerFile) IsNonblock() bool {
-	return f.nonblock
-}
-
 // Close implements the same method as documented on sys.File
 func (f *tcpListenerFile) Close() sys.Errno {
 	return sys.UnwrapOSError(syscall.Close(int(f.fd)))
@@ -74,6 +65,22 @@ func (f *tcpListenerFile) Close() sys.Errno {
 // Addr is exposed for testing.
 func (f *tcpListenerFile) Addr() *net.TCPAddr {
 	return f.addr
+}
+
+// SetNonblock implements the same method as documented on fsapi.File
+func (f *tcpListenerFile) SetNonblock(enabled bool) sys.Errno {
+	f.nonblock = enabled
+	return sys.UnwrapOSError(setNonblock(f.fd, enabled))
+}
+
+// IsNonblock implements the same method as documented on fsapi.File
+func (f *tcpListenerFile) IsNonblock() bool {
+	return f.nonblock
+}
+
+// Poll implements the same method as documented on fsapi.File
+func (f *tcpListenerFile) Poll(flag fsapi.Pflag, timeoutMillis int32) (ready bool, errno sys.Errno) {
+	return false, sys.ENOSYS
 }
 
 var _ socketapi.TCPConn = (*tcpConnFile)(nil)
@@ -94,17 +101,6 @@ func newTcpConn(tc *net.TCPConn) socketapi.TCPConn {
 		panic(err)
 	}
 	return &tcpConnFile{fd: f.Fd()}
-}
-
-// SetNonblock implements the same method as documented on sys.File
-func (f *tcpConnFile) SetNonblock(enabled bool) (errno sys.Errno) {
-	f.nonblock = enabled
-	return sys.UnwrapOSError(setNonblock(f.fd, enabled))
-}
-
-// IsNonblock implements the same method as documented on sys.File
-func (f *tcpConnFile) IsNonblock() bool {
-	return f.nonblock
 }
 
 // Read implements the same method as documented on sys.File
@@ -165,4 +161,20 @@ func (f *tcpConnFile) close() sys.Errno {
 	}
 	f.closed = true
 	return sys.UnwrapOSError(syscall.Shutdown(int(f.fd), syscall.SHUT_RDWR))
+}
+
+// SetNonblock implements the same method as documented on fsapi.File
+func (f *tcpConnFile) SetNonblock(enabled bool) (errno sys.Errno) {
+	f.nonblock = enabled
+	return sys.UnwrapOSError(setNonblock(f.fd, enabled))
+}
+
+// IsNonblock implements the same method as documented on fsapi.File
+func (f *tcpConnFile) IsNonblock() bool {
+	return f.nonblock
+}
+
+// Poll implements the same method as documented on fsapi.File
+func (f *tcpConnFile) Poll(flag fsapi.Pflag, timeoutMillis int32) (ready bool, errno sys.Errno) {
+	return false, sys.ENOSYS
 }

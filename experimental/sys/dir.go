@@ -61,16 +61,6 @@ func (DirFile) SetAppend(bool) Errno {
 	return EISDIR
 }
 
-// IsNonblock implements File.IsNonblock
-func (DirFile) IsNonblock() bool {
-	return false
-}
-
-// SetNonblock implements File.SetNonblock
-func (DirFile) SetNonblock(bool) Errno {
-	return EISDIR
-}
-
 // IsDir implements File.IsDir
 func (DirFile) IsDir() (bool, Errno) {
 	return true, 0
@@ -84,11 +74,6 @@ func (DirFile) Read([]byte) (int, Errno) {
 // Pread implements File.Pread
 func (DirFile) Pread([]byte, int64) (int, Errno) {
 	return 0, EISDIR
-}
-
-// Poll implements File.Poll
-func (DirFile) Poll(Pflag, int32) (ready bool, errno Errno) {
-	return false, ENOSYS
 }
 
 // Write implements File.Write
