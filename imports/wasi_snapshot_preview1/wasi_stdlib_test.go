@@ -20,8 +20,8 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	experimentalsock "github.com/tetratelabs/wazero/experimental/sock"
-	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
+	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/fstest"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -329,7 +329,7 @@ func Test_Poll(t *testing.T) {
 	tests := []struct {
 		name            string
 		args            []string
-		stdin           experimentalsys.File
+		stdin           fsapi.File
 		expectedOutput  string
 		expectedTimeout time.Duration
 	}{

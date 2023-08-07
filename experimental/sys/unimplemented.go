@@ -101,16 +101,6 @@ func (UnimplementedFile) SetAppend(bool) Errno {
 	return ENOSYS
 }
 
-// IsNonblock implements File.IsNonblock
-func (UnimplementedFile) IsNonblock() bool {
-	return false
-}
-
-// SetNonblock implements File.SetNonblock
-func (UnimplementedFile) SetNonblock(bool) Errno {
-	return ENOSYS
-}
-
 // Stat implements File.Stat
 func (UnimplementedFile) Stat() (sys.Stat_t, Errno) {
 	return sys.Stat_t{}, ENOSYS
@@ -134,11 +124,6 @@ func (UnimplementedFile) Seek(int64, int) (int64, Errno) {
 // Readdir implements File.Readdir
 func (UnimplementedFile) Readdir(int) (dirents []Dirent, errno Errno) {
 	return nil, ENOSYS
-}
-
-// Poll implements File.Poll
-func (UnimplementedFile) Poll(Pflag, int32) (ready bool, errno Errno) {
-	return false, ENOSYS
 }
 
 // Write implements File.Write

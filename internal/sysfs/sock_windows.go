@@ -8,6 +8,7 @@ import (
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/experimental/sys"
+	"github.com/tetratelabs/wazero/internal/fsapi"
 	socketapi "github.com/tetratelabs/wazero/internal/sock"
 )
 
@@ -17,8 +18,6 @@ const (
 	MSG_PEEK = 0x2
 	// _FIONBIO is the flag to set the O_NONBLOCK flag on socket handles using ioctlsocket.
 	_FIONBIO = 0x8004667e
-	// _WASWOULDBLOCK corresponds to syscall.EWOULDBLOCK in WinSock.
-	_WASWOULDBLOCK = 10035
 )
 
 var (
@@ -26,12 +25,8 @@ var (
 	modws2_32 = syscall.NewLazyDLL("ws2_32.dll")
 	// procrecvfrom exposes recvfrom from WinSock.
 	procrecvfrom = modws2_32.NewProc("recvfrom")
-	// procaccept exposes accept from WinSock.
-	procaccept = modws2_32.NewProc("accept")
 	// procioctlsocket exposes ioctlsocket from WinSock.
 	procioctlsocket = modws2_32.NewProc("ioctlsocket")
-	// procselect exposes select from WinSock.
-	procselect = modws2_32.NewProc("select")
 )
 
 // recvfrom exposes the underlying syscall in Windows.
@@ -90,8 +85,8 @@ func syscallConnControl(conn syscall.Conn, fn func(fd uintptr) (int, sys.Errno))
 	return
 }
 
-func _pollSock(conn syscall.Conn, flag sys.Pflag, timeoutMillis int32) (bool, sys.Errno) {
-	if flag != sys.POLLIN {
+func _pollSock(conn syscall.Conn, flag fsapi.Pflag, timeoutMillis int32) (bool, sys.Errno) {
+	if flag != fsapi.POLLIN {
 		return false, sys.ENOTSUP
 	}
 	n, errno := syscallConnControl(conn, func(fd uintptr) (int, sys.Errno) {
@@ -126,7 +121,7 @@ type winTcpListenerFile struct {
 func (f *winTcpListenerFile) Accept() (socketapi.TCPConn, sys.Errno) {
 	// Ensure we have an incoming connection using winsock_select, otherwise return immediately.
 	if f.nonblock {
-		if ready, errno := _pollSock(f.tl, sys.POLLIN, 0); !ready || errno != 0 {
+		if ready, errno := _pollSock(f.tl, fsapi.POLLIN, 0); !ready || errno != 0 {
 			return nil, sys.EAGAIN
 		}
 	}
@@ -141,20 +136,6 @@ func (f *winTcpListenerFile) Accept() (socketapi.TCPConn, sys.Errno) {
 	}
 }
 
-// IsNonblock implements File.IsNonblock
-func (f *winTcpListenerFile) IsNonblock() bool {
-	return f.nonblock
-}
-
-// SetNonblock implements the same method as documented on sys.File
-func (f *winTcpListenerFile) SetNonblock(enabled bool) sys.Errno {
-	f.nonblock = enabled
-	_, errno := syscallConnControl(f.tl, func(fd uintptr) (int, sys.Errno) {
-		return 0, setNonblockSocket(syscall.Handle(fd), enabled)
-	})
-	return errno
-}
-
 // Close implements the same method as documented on sys.File
 func (f *winTcpListenerFile) Close() sys.Errno {
 	if !f.closed {
@@ -166,6 +147,25 @@ func (f *winTcpListenerFile) Close() sys.Errno {
 // Addr is exposed for testing.
 func (f *winTcpListenerFile) Addr() *net.TCPAddr {
 	return f.tl.Addr().(*net.TCPAddr)
+}
+
+// IsNonblock implements the same method as documented on fsapi.File
+func (f *winTcpListenerFile) IsNonblock() bool {
+	return f.nonblock
+}
+
+// SetNonblock implements the same method as documented on fsapi.File
+func (f *winTcpListenerFile) SetNonblock(enabled bool) sys.Errno {
+	f.nonblock = enabled
+	_, errno := syscallConnControl(f.tl, func(fd uintptr) (int, sys.Errno) {
+		return 0, setNonblockSocket(syscall.Handle(fd), enabled)
+	})
+	return errno
+}
+
+// Poll implements the same method as documented on fsapi.File
+func (f *winTcpListenerFile) Poll(fsapi.Pflag, int32) (ready bool, errno sys.Errno) {
+	return false, sys.ENOSYS
 }
 
 var _ socketapi.TCPConn = (*winTcpConnFile)(nil)
@@ -187,20 +187,6 @@ type winTcpConnFile struct {
 
 func newTcpConn(tc *net.TCPConn) socketapi.TCPConn {
 	return &winTcpConnFile{tc: tc}
-}
-
-// SetNonblock implements the same method as documented on sys.File
-func (f *winTcpConnFile) SetNonblock(enabled bool) (errno sys.Errno) {
-	f.nonblock = true
-	_, errno = syscallConnControl(f.tc, func(fd uintptr) (int, sys.Errno) {
-		return 0, sys.UnwrapOSError(setNonblockSocket(syscall.Handle(fd), enabled))
-	})
-	return
-}
-
-// IsNonblock implements File.IsNonblock
-func (f *winTcpConnFile) IsNonblock() bool {
-	return f.nonblock
 }
 
 // Read implements the same method as documented on sys.File
@@ -277,4 +263,23 @@ func (f *winTcpConnFile) close() sys.Errno {
 	}
 	f.closed = true
 	return f.Shutdown(syscall.SHUT_RDWR)
+}
+
+// IsNonblock implements the same method as documented on fsapi.File
+func (f *winTcpConnFile) IsNonblock() bool {
+	return f.nonblock
+}
+
+// SetNonblock implements the same method as documented on fsapi.File
+func (f *winTcpConnFile) SetNonblock(enabled bool) (errno sys.Errno) {
+	f.nonblock = true
+	_, errno = syscallConnControl(f.tc, func(fd uintptr) (int, sys.Errno) {
+		return 0, sys.UnwrapOSError(setNonblockSocket(syscall.Handle(fd), enabled))
+	})
+	return
+}
+
+// Poll implements the same method as documented on fsapi.File
+func (f *winTcpConnFile) Poll(fsapi.Pflag, int32) (ready bool, errno sys.Errno) {
+	return false, sys.ENOSYS
 }

@@ -17,6 +17,7 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
+	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/fstest"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/sys"
@@ -247,7 +248,7 @@ func Test_fdFdstatGet(t *testing.T) {
 	}}}).OpenFile("stdin", 0, 0)
 	require.EqualErrno(t, 0, errno)
 
-	stdin.File = stdinFile
+	stdin.File = fsapi.Adapt(stdinFile)
 
 	// Make this file writeable, to ensure flags read-back correctly.
 	fileFD, errno := fsc.OpenFile(preopen, file, experimentalsys.O_RDWR, 0)

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/tetratelabs/wazero/experimental/sys"
+	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
@@ -117,15 +118,16 @@ func TestTcpConnFile_SetNonblock(t *testing.T) {
 	require.NoError(t, err)
 	defer tcp.Close() //nolint
 
-	errno := lf.SetNonblock(true)
+	nblf := fsapi.Adapt(lf)
+	errno := nblf.SetNonblock(true)
 	require.EqualErrno(t, 0, errno)
-	require.True(t, lf.IsNonblock())
+	require.True(t, nblf.IsNonblock())
 
 	conn, errno := lf.Accept()
 	require.EqualErrno(t, 0, errno)
 	defer conn.Close()
 
-	file := newTcpConn(tcp)
+	file := fsapi.Adapt(newTcpConn(tcp))
 	errno = file.SetNonblock(true)
 	require.EqualErrno(t, 0, errno)
 	require.True(t, file.IsNonblock())

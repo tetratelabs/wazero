@@ -10,6 +10,7 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
+	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasip1"
@@ -161,7 +162,7 @@ func Test_pollOneoff_Stdin(t *testing.T) {
 		name                                   string
 		in, out, nsubscriptions, resultNevents uint32
 		mem                                    []byte // at offset in
-		stdin                                  experimentalsys.File
+		stdin                                  fsapi.File
 		expectedErrno                          wasip1.Errno
 		expectedMem                            []byte // at offset out
 		expectedLog                            string
@@ -442,7 +443,7 @@ func Test_pollOneoff_Stdin(t *testing.T) {
 	}
 }
 
-func setStdin(t *testing.T, mod api.Module, stdin experimentalsys.File) {
+func setStdin(t *testing.T, mod api.Module, stdin fsapi.File) {
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 	f, ok := fsc.LookupFile(sys.FdStdin)
 	require.True(t, ok)
@@ -613,8 +614,8 @@ type neverReadyTtyStdinFile struct {
 }
 
 // Poll implements the same method as documented on sys.File
-func (neverReadyTtyStdinFile) Poll(flag experimentalsys.Pflag, timeoutMillis int32) (ready bool, errno experimentalsys.Errno) {
-	if flag != experimentalsys.POLLIN {
+func (neverReadyTtyStdinFile) Poll(flag fsapi.Pflag, timeoutMillis int32) (ready bool, errno experimentalsys.Errno) {
+	if flag != fsapi.POLLIN {
 		return false, experimentalsys.ENOTSUP
 	}
 	switch {
@@ -632,8 +633,8 @@ type pollStdinFile struct {
 }
 
 // Poll implements the same method as documented on sys.File
-func (p *pollStdinFile) Poll(flag experimentalsys.Pflag, timeoutMillis int32) (ready bool, errno experimentalsys.Errno) {
-	if flag != experimentalsys.POLLIN {
+func (p *pollStdinFile) Poll(flag fsapi.Pflag, timeoutMillis int32) (ready bool, errno experimentalsys.Errno) {
+	if flag != fsapi.POLLIN {
 		return false, experimentalsys.ENOTSUP
 	}
 	return p.ready, 0

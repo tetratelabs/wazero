@@ -67,29 +67,6 @@ type File interface {
 	//   - Implementations should cache this result.
 	IsDir() (bool, Errno)
 
-	// IsNonblock returns true if the file was opened with O_NONBLOCK, or
-	// SetNonblock was successfully enabled on this file.
-	//
-	// # Notes
-	//
-	//   - This might not match the underlying state of the file descriptor if
-	//     the file was not opened via OpenFile.
-	IsNonblock() bool
-
-	// SetNonblock toggles the non-blocking mode (O_NONBLOCK) of this file.
-	//
-	// # Errors
-	//
-	// A zero Errno is success. The below are expected otherwise:
-	//   - ENOSYS: the implementation does not support this function.
-	//   - EBADF: the file or directory was closed.
-	//
-	// # Notes
-	//
-	//   - This is like syscall.SetNonblock and `fcntl` with O_NONBLOCK in
-	//     POSIX. See https://pubs.opengroup.org/onlinepubs/9699919799/functions/fcntl.html
-	SetNonblock(enable bool) Errno
-
 	// IsAppend returns true if the file was opened with O_APPEND, or
 	// SetAppend was successfully enabled on this file.
 	//
@@ -199,37 +176,6 @@ type File interface {
 	//   - This is like io.Seeker and `fseek` in POSIX, preferring semantics
 	//     of io.Seeker. See https://pubs.opengroup.org/onlinepubs/9699919799/functions/fseek.html
 	Seek(offset int64, whence int) (newOffset int64, errno Errno)
-
-	// Poll returns if the file has data ready to be read or written.
-	//
-	// # Parameters
-	//
-	// The `flag` parameter determines which event to await, such as POLLIN,
-	// POLLOUT, or a combination like `POLLIN|POLLOUT`.
-	//
-	// The `timeoutMillis` parameter is how long to block for an event, or
-	// interrupted, in milliseconds. There are two special values:
-	//   - zero returns immediately
-	//   - any negative value blocks any amount of time
-	//
-	// # Results
-	//
-	// `ready` means there was data ready to read or written. False can mean no
-	// event was ready or `errno` is not zero.
-	//
-	// A zero `errno` is success. The below are expected otherwise:
-	//   - ENOSYS: the implementation does not support this function.
-	//   - ENOTSUP: the implementation does not the flag combination.
-	//   - EINTR: the call was interrupted prior to an event.
-	//
-	// # Notes
-	//
-	//   - This is like `poll` in POSIX, for a single file.
-	//     See https://pubs.opengroup.org/onlinepubs/9699919799/functions/poll.html
-	//   - No-op files, such as those which read from /dev/null, should return
-	//     immediately true, as data will never become available.
-	//   - See /RATIONALE.md for detailed notes including impact of blocking.
-	Poll(flag Pflag, timeoutMillis int32) (ready bool, errno Errno)
 
 	// Readdir reads the contents of the directory associated with file and
 	// returns a slice of up to n Dirent values in an arbitrary order. This is

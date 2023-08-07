@@ -5,6 +5,7 @@ import (
 	"os"
 
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
+	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/internal/sysfs"
 	"github.com/tetratelabs/wazero/sys"
 )
@@ -47,9 +48,9 @@ func (noopStdinFile) Read([]byte) (int, experimentalsys.Errno) {
 	return 0, 0 // Always EOF
 }
 
-// Poll implements the same method as documented on sys.File
-func (noopStdinFile) Poll(flag experimentalsys.Pflag, timeoutMillis int32) (ready bool, errno experimentalsys.Errno) {
-	if flag != experimentalsys.POLLIN {
+// Poll implements the same method as documented on fsapi.File
+func (noopStdinFile) Poll(flag fsapi.Pflag, timeoutMillis int32) (ready bool, errno experimentalsys.Errno) {
+	if flag != fsapi.POLLIN {
 		return false, experimentalsys.ENOTSUP
 	}
 	return true, 0 // always ready to read nothing
@@ -82,6 +83,21 @@ func (noopStdioFile) IsDir() (bool, experimentalsys.Errno) {
 
 // Close implements the same method as documented on sys.File
 func (noopStdioFile) Close() (errno experimentalsys.Errno) { return }
+
+// IsNonblock implements the same method as documented on fsapi.File
+func (noopStdioFile) IsNonblock() bool {
+	return false
+}
+
+// SetNonblock implements the same method as documented on fsapi.File
+func (noopStdioFile) SetNonblock(bool) experimentalsys.Errno {
+	return experimentalsys.ENOSYS
+}
+
+// Poll implements the same method as documented on fsapi.File
+func (noopStdioFile) Poll(fsapi.Pflag, int32) (ready bool, errno experimentalsys.Errno) {
+	return false, experimentalsys.ENOSYS
+}
 
 func stdinFileEntry(r io.Reader) (*FileEntry, error) {
 	if r == nil {
