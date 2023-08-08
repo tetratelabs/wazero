@@ -3,6 +3,7 @@
 #include "funcdata.h"
 #include "textflag.h"
 
+// See the comments on EmitGoEntryPreamble for what this function is supposed to do.
 TEXT ·entrypoint(SB), NOSPLIT|NOFRAME, $0-40
 	MOVD executable+0(FP), R27
 	MOVD executionContextPtr+8(FP), R0

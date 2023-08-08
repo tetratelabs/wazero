@@ -7,12 +7,12 @@ import (
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 )
 
-// EmitGoEntryPreamble implements backend.FunctionABI. This assumes the caller (Entrypoint) of this preamble passes:
+// EmitGoEntryPreamble implements backend.FunctionABI. This assumes `entrypoint` function (in abi_go_entry_arm64.s) passes:
 //
 //  1. execution context ptr in x0
 //  2. module context ptr in x1
 //  3. param/result slice ptr in x19; the pointer to []uint64{} which is used to pass arguments and accept return values.
-//  4. Go-allocated stack slice ptr in x28
+//  4. Go-allocated stack slice ptr in x26.
 //
 // also SP and FP are correct Go-runtime-based values, and LR is the return address to the Go-side caller.
 func (a *abiImpl) EmitGoEntryPreamble() {
