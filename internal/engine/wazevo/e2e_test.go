@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"os"
 	"testing"
 	"unsafe"
 
@@ -83,6 +84,9 @@ func TestE2E(t *testing.T) {
 			}()
 			compiled, err := r.CompileModule(ctx, binaryencoding.EncodeModule(tc.m))
 			require.NoError(t, err)
+
+			fmt.Println(binaryencoding.EncodeModule(tc.m))
+			os.WriteFile("swap.wasm", binaryencoding.EncodeModule(tc.m), 0644)
 
 			inst, err := r.InstantiateModule(ctx, compiled, wazero.NewModuleConfig())
 			require.NoError(t, err)

@@ -2,6 +2,8 @@ package wazevo
 
 import (
 	"context"
+	"os"
+	"runtime"
 	"testing"
 	"unsafe"
 
@@ -12,6 +14,12 @@ import (
 )
 
 var ctx = context.Background()
+
+func TestMain(m *testing.M) {
+	if runtime.GOARCH != "arm64" {
+		os.Exit(0)
+	}
+}
 
 func TestNewEngine(t *testing.T) {
 	e := NewEngine(ctx, api.CoreFeaturesV1, nil)

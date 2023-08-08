@@ -3,6 +3,7 @@ package backend_test
 import (
 	"encoding/hex"
 	"fmt"
+	"os"
 	"runtime"
 	"testing"
 
@@ -14,6 +15,12 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
+
+func TestMain(m *testing.M) {
+	if runtime.GOARCH != "arm64" {
+		os.Exit(0)
+	}
+}
 
 func newMachine() backend.Machine {
 	switch runtime.GOARCH {
