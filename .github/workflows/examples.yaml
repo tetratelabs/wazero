@@ -34,7 +34,7 @@ jobs:
     strategy:
       matrix:  # Use versions consistent with TinyGo.
         go-version:
-          - "1.21"  # Current Go version
+          - "1.20"  # Latest Go version supported by TinyGo until its next version.
           - "1.19"  # Floor Go version of latest TinyGo
 
     steps:
