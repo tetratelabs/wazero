@@ -235,7 +235,7 @@ rt := wazero.NewRuntimeConfig() // initialized properly
 There are a few drawbacks to this, notably some work for maintainers.
 * Interfaces are decoupled from the structs implementing them, which means the signature has to be repeated twice.
 * Interfaces have to be documented and guarded at time of use, that 3rd party implementations aren't supported.
-* As of Golang 1.18, interfaces are still [not well supported](https://github.com/golang/go/issues/5860) in godoc.
+* As of Golang 1.21, interfaces are still [not well supported](https://github.com/golang/go/issues/5860) in godoc.
 
 ## Config
 

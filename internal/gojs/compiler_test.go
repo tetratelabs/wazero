@@ -130,7 +130,7 @@ func TestMain(m *testing.M) {
 // compileJsWasm allows us to generate a binary with runtime.GOOS=js and
 // runtime.GOARCH=wasm. This intentionally does so on-demand, as it allows us
 // to test the user's current version of Go, as opposed to a specific one.
-// For example, this allows testing both Go 1.18 and 1.19 in CI.
+// For example, this allows testing both Go 1.19 and 1.20 in CI.
 func compileJsWasm(goBin string) error {
 	// Prepare the working directory.
 	workdir, err := os.MkdirTemp("", "example")

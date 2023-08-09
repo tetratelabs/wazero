@@ -27,6 +27,7 @@ func Test_isAtLeastGo120(t *testing.T) {
 		expected bool
 	}{
 		{input: "go1.18.10", expected: false},
+		{input: "go1.19.10", expected: false},
 		{input: "go1.20.5", expected: true},
 		{input: "devel go1.21-39c50707 Thu Jul 6 23:23:41 2023 +0000", expected: true},
 		{input: "go1.21rc2", expected: true},
