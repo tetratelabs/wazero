@@ -122,19 +122,19 @@
   (func $calli32_i32i32i32i32_v (export "calli32_i32i32i32i32_v") (param i32 i32 i32 i32 i32)
     (call $invoke_viiii (local.get 0) (local.get 1) (local.get 2) (local.get 3) (local.get 4)))
 
-  (func $call_longjump
+  (func $call_longjmp_throw
     (call $_emscripten_throw_longjmp)
     (global.set $__stack_pointer (i32.const 43)))
 
-  (func $call_longjump_unreachable unreachable)
+  (func $call_longjmp_throw_unreachable unreachable)
 
-  (elem (i32.const 20) $call_longjump $call_longjump_unreachable)
+  (elem (i32.const 20) $call_longjmp_throw $call_longjmp_throw_unreachable)
 
-  ;; call_longjump_invoke should be called with 20 or 21 and expect unreachable
-  ;; on 21. call_longjump_invoke mimics Emscripten by setting the stack pointer
-  ;; to a different value than default. We ensure that the stack pointer was
-  ;; not changed to 43 by $call_longjump.
-  (func $call_longjump_invoke (export "call_longjump_invoke") (param i32)
+  ;; $call_invoke_v_with_longjmp_throw should be called with 20 or 21 and
+  ;; expect unreachable on 21. $call_invoke_v_with_longjmp_throw mimics
+  ;; Emscripten by setting the stack pointer to a different value than default.
+  ;; We ensure that the stack pointer was not changed to 43 by $call_longjump.
+  (func $call_invoke_v_with_longjmp_throw (export "call_invoke_v_with_longjmp_throw") (param i32)
     (global.set $__stack_pointer (i32.const 42))
     (call $invoke_v (local.get 0))
     global.get $__stack_pointer

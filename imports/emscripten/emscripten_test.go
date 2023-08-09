@@ -517,15 +517,15 @@ func TestInstantiateForModule(t *testing.T) {
 `,
 		},
 		{
-			name:        "invoke_v_jmp",
-			funcName:    "call_longjump_invoke",
+			name:        "invoke_v_with_longjmp",
+			funcName:    "call_invoke_v_with_longjmp_throw",
 			tableOffset: 20,
 			params:      []uint64{},
-			expectedLog: `--> .call_longjump_invoke(20)
+			expectedLog: `--> .call_invoke_v_with_longjmp_throw(20)
 	==> env.invoke_v(index=20)
 		--> .stackSave()
 		<-- 42
-		--> .call_longjump()
+		--> .call_longjmp_throw()
 			==> env._emscripten_throw_longjmp()
 		--> .stackRestore(42)
 		<--
