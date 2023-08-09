@@ -59,6 +59,7 @@ var defKinds = [numInstructionKinds]defKind{
 	fpuRRR:          defKindRD,
 	nop0:            defKindNone,
 	call:            defKindCall,
+	callInd:         defKindCall,
 	ret:             defKindNone,
 	store32:         defKindNone,
 	store64:         defKindNone,
@@ -116,6 +117,7 @@ const (
 	useKindRNRMRA
 	useKindRet
 	useKindCall
+	useKindCallInd
 	useKindAMode
 	useKindRNAMode
 	useKindCond
@@ -138,6 +140,7 @@ var useKinds = [numInstructionKinds]useKind{
 	fpuRRR:          useKindRNRM,
 	nop0:            useKindNone,
 	call:            useKindCall,
+	callInd:         useKindCallInd,
 	ret:             useKindRet,
 	store32:         useKindRNAMode,
 	store64:         useKindRNAMode,
@@ -209,6 +212,9 @@ func (i *instruction) uses(regs []regalloc.VReg) []regalloc.VReg {
 		}
 	case useKindCall:
 		regs = append(regs, i.abi.argRealRegs...)
+	case useKindCallInd:
+		regs = append(regs, i.rn.nr())
+		regs = append(regs, i.abi.argRealRegs...)
 	default:
 		panic(fmt.Sprintf("useKind for %v not defined", i))
 	}
@@ -266,6 +272,8 @@ func (i *instruction) assignUses(regs []regalloc.VReg) {
 		}
 	case useKindCall:
 		panic("BUG: call instructions shouldn't be assigned")
+	case useKindCallInd:
+		i.rn = i.rn.assignReg(regs[0])
 	default:
 		panic(fmt.Sprintf("useKind for %v not defined", i))
 	}
@@ -280,6 +288,12 @@ func (i *instruction) asCall(ref ssa.FuncRef, abi *abiImpl) {
 func (i *instruction) asCallImm(imm int64) {
 	i.kind = call
 	i.u2 = uint64(imm)
+}
+
+func (i *instruction) asCallIndirect(ptr regalloc.VReg, abi *abiImpl) {
+	i.kind = callInd
+	i.rn = operandNR(ptr)
+	i.abi = abi
 }
 
 func (i *instruction) callFuncRef() ssa.FuncRef {
@@ -804,7 +818,7 @@ func (i *instruction) String() (str string) {
 			str = fmt.Sprintf("bl %s", ssa.FuncRef(i.u1))
 		}
 	case callInd:
-		panic("TODO")
+		str = fmt.Sprintf("bl %s", formatVRegSized(i.rn.nr(), 32))
 	case ret:
 		str = "ret"
 	case epiloguePlaceholder:

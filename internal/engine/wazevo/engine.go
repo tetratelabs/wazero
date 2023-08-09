@@ -63,7 +63,7 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []exper
 
 	// Creates new compiler instances which are reused for each function.
 	ssaBuilder := ssa.NewBuilder()
-	fe := frontend.NewFrontendCompiler(module, ssaBuilder)
+	fe := frontend.NewFrontendCompiler(module, ssaBuilder, &cm.offsets)
 	machine := newMachine()
 	be := backend.NewCompiler(machine, ssaBuilder)
 
@@ -191,9 +191,8 @@ func (e *engine) addCompiledModule(m *wasm.Module, cm *compiledModule) {
 // NewModuleEngine implements wasm.Engine.
 func (e *engine) NewModuleEngine(m *wasm.Module, mi *wasm.ModuleInstance) (wasm.ModuleEngine, error) {
 	me := &moduleEngine{}
-	if m.ImportFunctionCount > 0 {
-		panic("TODO: imported functions")
-	}
+
+	// Note: imported functions are resolved in moduleEngine.ResolveImportedFunction.
 
 	compiled, ok := e.compiledModules[m.ID]
 	if !ok {
@@ -201,6 +200,6 @@ func (e *engine) NewModuleEngine(m *wasm.Module, mi *wasm.ModuleInstance) (wasm.
 	}
 	me.parent = compiled
 	me.module = mi
-	me.setupOpaque(&compiled.offsets)
+	me.setupOpaque()
 	return me, nil
 }

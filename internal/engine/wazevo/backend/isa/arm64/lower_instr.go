@@ -130,7 +130,9 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		m.lowerTrap(instr.Arg())
 	case ssa.OpcodeStore, ssa.OpcodeIstore8, ssa.OpcodeIstore16, ssa.OpcodeIstore32:
 		m.lowerStore(instr)
-	case ssa.OpcodeCall:
+	case ssa.OpcodeLoad:
+		m.lowerLoad(instr)
+	case ssa.OpcodeCall, ssa.OpcodeCallIndirect:
 		m.lowerCall(instr)
 	case ssa.OpcodeIcmp:
 		m.lowerIcmp(instr)

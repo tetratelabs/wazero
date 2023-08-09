@@ -138,8 +138,8 @@ const (
 	// to this function. If the target cannot be reached by near call, the backend fails to compile.
 	OpcodeCall
 
-	// OpcodeCallIndirect ...
-	// `rvals = call_indirect SIG, callee, args`.
+	// OpcodeCallIndirect calls a function specified by `callee` which is a function address: `returnvals = call_indirect SIG, callee, args`.
+	// Note that this is different from call_indirect in Wasm, which also does type checking, etc.
 	OpcodeCallIndirect
 
 	// OpcodeFuncAddr ...
@@ -832,32 +832,34 @@ const (
 // instructionSideEffects provides the info to determine if an instruction has side effects.
 // Instructions with side effects must not be eliminated regardless whether the result is used or not.
 var instructionSideEffects = [opcodeEnd]sideEffect{
-	OpcodeJump:     sideEffectTrue,
-	OpcodeIconst:   sideEffectFalse,
-	OpcodeCall:     sideEffectTrue,
-	OpcodeIadd:     sideEffectFalse,
-	OpcodeImul:     sideEffectFalse,
-	OpcodeIsub:     sideEffectFalse,
-	OpcodeIcmp:     sideEffectFalse,
-	OpcodeFcmp:     sideEffectFalse,
-	OpcodeFadd:     sideEffectFalse,
-	OpcodeSExtend:  sideEffectFalse,
-	OpcodeUExtend:  sideEffectFalse,
-	OpcodeFsub:     sideEffectFalse,
-	OpcodeF32const: sideEffectFalse,
-	OpcodeF64const: sideEffectFalse,
-	OpcodeIshl:     sideEffectFalse,
-	OpcodeSshr:     sideEffectFalse,
-	OpcodeUshr:     sideEffectFalse,
-	OpcodeStore:    sideEffectTrue,
-	OpcodeTrap:     sideEffectTrue,
-	OpcodeReturn:   sideEffectTrue,
-	OpcodeBrz:      sideEffectTrue,
-	OpcodeBrnz:     sideEffectTrue,
-	OpcodeFdiv:     sideEffectFalse,
-	OpcodeFmul:     sideEffectFalse,
-	OpcodeFmax:     sideEffectFalse,
-	OpcodeFmin:     sideEffectFalse,
+	OpcodeJump:         sideEffectTrue,
+	OpcodeIconst:       sideEffectFalse,
+	OpcodeCall:         sideEffectTrue,
+	OpcodeCallIndirect: sideEffectTrue,
+	OpcodeIadd:         sideEffectFalse,
+	OpcodeImul:         sideEffectFalse,
+	OpcodeIsub:         sideEffectFalse,
+	OpcodeIcmp:         sideEffectFalse,
+	OpcodeFcmp:         sideEffectFalse,
+	OpcodeFadd:         sideEffectFalse,
+	OpcodeLoad:         sideEffectFalse,
+	OpcodeSExtend:      sideEffectFalse,
+	OpcodeUExtend:      sideEffectFalse,
+	OpcodeFsub:         sideEffectFalse,
+	OpcodeF32const:     sideEffectFalse,
+	OpcodeF64const:     sideEffectFalse,
+	OpcodeIshl:         sideEffectFalse,
+	OpcodeSshr:         sideEffectFalse,
+	OpcodeUshr:         sideEffectFalse,
+	OpcodeStore:        sideEffectTrue,
+	OpcodeTrap:         sideEffectTrue,
+	OpcodeReturn:       sideEffectTrue,
+	OpcodeBrz:          sideEffectTrue,
+	OpcodeBrnz:         sideEffectTrue,
+	OpcodeFdiv:         sideEffectFalse,
+	OpcodeFmul:         sideEffectFalse,
+	OpcodeFmax:         sideEffectFalse,
+	OpcodeFmin:         sideEffectFalse,
 }
 
 // HasSideEffects returns true if this instruction has side effects.
@@ -878,6 +880,22 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeIconst:  returnTypesFnSingle,
 	OpcodeSExtend: returnTypesFnSingle,
 	OpcodeUExtend: returnTypesFnSingle,
+	OpcodeCallIndirect: func(b *builder, instr *Instruction) (t1 Type, ts []Type) {
+		sigID := SignatureID(instr.v)
+		sig, ok := b.signatures[sigID]
+		if !ok {
+			panic("BUG")
+		}
+		switch len(sig.Results) {
+		case 0:
+			t1 = typeInvalid
+		case 1:
+			t1 = sig.Results[0]
+		default:
+			t1, ts = sig.Results[0], sig.Results[1:]
+		}
+		return
+	},
 	OpcodeCall: func(b *builder, instr *Instruction) (t1 Type, ts []Type) {
 		sigID := SignatureID(instr.v)
 		sig, ok := b.signatures[sigID]
@@ -894,6 +912,7 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 		}
 		return
 	},
+	OpcodeLoad:     returnTypesFnSingle,
 	OpcodeIadd:     returnTypesFnSingle,
 	OpcodeIsub:     returnTypesFnSingle,
 	OpcodeImul:     returnTypesFnSingle,
@@ -912,6 +931,19 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeReturn:   returnTypesFnNoReturns,
 	OpcodeBrz:      returnTypesFnNoReturns,
 	OpcodeBrnz:     returnTypesFnNoReturns,
+}
+
+// AsLoad initializes this instruction as a store instruction with OpcodeLoad.
+func (i *Instruction) AsLoad(ptr Value, offset uint32, typ Type) {
+	i.opcode = OpcodeLoad
+	i.v = ptr
+	i.u64 = uint64(offset)
+	i.typ = typ
+}
+
+// LoadData returns the operands for a load instruction.
+func (i *Instruction) LoadData() (ptr Value, offset uint32, typ Type) {
+	return i.v, uint32(i.u64), i.typ
 }
 
 // AsStore initializes this instruction as a store instruction with OpcodeStore.
@@ -1188,6 +1220,27 @@ func (i *Instruction) CallData() (ref FuncRef, sigID SignatureID, args []Value) 
 	return
 }
 
+// AsCallIndirect initializes this instruction as a call-indirect instruction with OpcodeCallIndirect.
+func (i *Instruction) AsCallIndirect(funcPtr Value, sig *Signature, args []Value) {
+	i.opcode = OpcodeCallIndirect
+	i.typ = TypeF64
+	i.vs = args
+	i.v = Value(sig.ID)
+	i.v2 = funcPtr
+	sig.used = true
+}
+
+// CallIndirectData returns the call indirect data for this instruction necessary for backends.
+func (i *Instruction) CallIndirectData() (funcPtr Value, sigID SignatureID, args []Value) {
+	if i.opcode != OpcodeCallIndirect {
+		panic("BUG: CallIndirectData only available for OpcodeCallIndirect")
+	}
+	funcPtr = i.v2
+	sigID = SignatureID(i.v)
+	args = i.vs
+	return
+}
+
 // AsSExtend initializes this instruction as a sign extension instruction with OpcodeSExtend.
 func (i *Instruction) AsSExtend(v Value, from, to byte) {
 	i.opcode = OpcodeSExtend
@@ -1244,14 +1297,20 @@ func (i *Instruction) Format(b Builder) string {
 		instSuffix = fmt.Sprintf(" %s, %s, %s", FloatCmpCond(i.u64), i.v.Format(b), i.v2.Format(b))
 	case OpcodeSExtend, OpcodeUExtend:
 		instSuffix = fmt.Sprintf(" %s, %d->%d", i.v.Format(b), i.u64>>8, i.u64&0xff)
-	case OpcodeCall:
+	case OpcodeCall, OpcodeCallIndirect:
 		vs := make([]string, len(i.vs))
 		for idx := range vs {
 			vs[idx] = i.vs[idx].Format(b)
 		}
-		instSuffix = fmt.Sprintf(" %s:%s, %s", FuncRef(i.u64), SignatureID(i.v), strings.Join(vs, ", "))
+		if i.opcode == OpcodeCallIndirect {
+			instSuffix = fmt.Sprintf(" %s:%s, %s", i.v2.Format(b), SignatureID(i.v), strings.Join(vs, ", "))
+		} else {
+			instSuffix = fmt.Sprintf(" %s:%s, %s", FuncRef(i.u64), SignatureID(i.v), strings.Join(vs, ", "))
+		}
 	case OpcodeStore:
 		instSuffix = fmt.Sprintf(" %s, %s, %#x", i.v.Format(b), i.v2.Format(b), int32(i.u64))
+	case OpcodeLoad:
+		instSuffix = fmt.Sprintf(" %s, %#x", i.v.Format(b), int32(i.u64))
 	case OpcodeIconst:
 		switch i.typ {
 		case TypeI32:

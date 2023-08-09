@@ -38,6 +38,12 @@ func (i *instruction) encode(c backend.Compiler) {
 			c.AddRelocationInfo(i.callFuncRef())
 			c.Emit4Bytes(encodeUnconditionalBranch(true, 0)) // 0 = placeholder
 		}
+	case callInd:
+		// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/BLR--Branch-with-Link-to-Register-
+		rn := regNumberInEncoding[i.rn.realReg()]
+		c.Emit4Bytes(
+			0b1101011<<25 | 0b111111<<16 | rn<<5,
+		)
 	case store8, store16, store32, store64, fpuStore32, fpuStore64, fpuStore128:
 		c.Emit4Bytes(encodeStoreOrStore(i.kind, regNumberInEncoding[i.rn.realReg()], i.amode))
 	case uLoad8, uLoad16, uLoad32, uLoad64, sLoad8, sLoad16, sLoad32, fpuLoad32, fpuLoad64, fpuLoad128:

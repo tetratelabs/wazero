@@ -19,6 +19,7 @@ func TestMain(m *testing.M) {
 	if runtime.GOARCH != "arm64" {
 		os.Exit(0)
 	}
+	os.Exit(m.Run())
 }
 
 func TestNewEngine(t *testing.T) {

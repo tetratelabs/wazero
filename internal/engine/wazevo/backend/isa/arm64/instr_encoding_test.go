@@ -16,6 +16,9 @@ func TestInstruction_encode(t *testing.T) {
 		setup func(*instruction)
 		want  string
 	}{
+		{want: "60033fd6", setup: func(i *instruction) {
+			i.asCallIndirect(tmpRegVReg, nil)
+		}},
 		{want: "fb633bcb", setup: func(i *instruction) {
 			i.asALU(aluOpSub, operandNR(tmpRegVReg), operandNR(spVReg), operandNR(tmpRegVReg), true)
 		}},

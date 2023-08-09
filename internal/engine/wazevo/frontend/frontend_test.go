@@ -7,6 +7,7 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/testcases"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
@@ -868,6 +869,20 @@ blk3: () <-- (blk2)
 	Jump blk_ret, v11
 `,
 		},
+		{
+			name: "imported_function_call", m: testcases.ImportedFunctionCall.Module,
+			exp: `
+signatures:
+	sig0: i64i64i32_i32
+
+blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
+	Store module_ctx, exec_ctx, 0x8
+	v3:i64 = Load module_ctx, 0x0
+	v4:i64 = Load module_ctx, 0x8
+	v5:i32 = CallIndirect v3:sig0, exec_ctx, v4, v2
+	Jump blk_ret, v5
+`,
+		},
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
@@ -877,7 +892,8 @@ blk3: () <-- (blk2)
 
 			b := ssa.NewBuilder()
 
-			fc := NewFrontendCompiler(tc.m, b)
+			offset := wazevoapi.NewModuleContextOffsetData(tc.m)
+			fc := NewFrontendCompiler(tc.m, b, &offset)
 			typeIndex := tc.m.FunctionSection[tc.targetIndex]
 			code := &tc.m.CodeSection[tc.targetIndex]
 			fc.Init(tc.targetIndex, &tc.m.TypeSection[typeIndex], code.LocalTypes, code.Body)

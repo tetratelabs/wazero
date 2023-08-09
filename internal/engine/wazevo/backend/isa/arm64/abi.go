@@ -317,9 +317,17 @@ func (a *abiImpl) alignedStackSlotSize() int64 {
 }
 
 func (m *machine) lowerCall(si *ssa.Instruction) {
-	callee, sigID, args := si.CallData()
-	sig := m.compiler.ResolveSignature(sigID)
-	calleeABI := m.getOrCreateABIImpl(sig)
+	isDirectCall := si.Opcode() == ssa.OpcodeCall
+	var indirectCalleePtr ssa.Value
+	var directCallee ssa.FuncRef
+	var sigID ssa.SignatureID
+	var args []ssa.Value
+	if isDirectCall {
+		directCallee, sigID, args = si.CallData()
+	} else {
+		indirectCalleePtr, sigID, args = si.CallIndirectData()
+	}
+	calleeABI := m.getOrCreateABIImpl(m.compiler.ResolveSignature(sigID))
 
 	stackSlotSize := calleeABI.alignedStackSlotSize()
 	if stackSlotSize > 0 {
@@ -336,9 +344,16 @@ func (m *machine) lowerCall(si *ssa.Instruction) {
 		calleeABI.callerGenVRegToFunctionArg(i, reg, def)
 	}
 
-	call := m.allocateInstr()
-	call.asCall(callee, calleeABI)
-	m.insert(call)
+	if isDirectCall {
+		call := m.allocateInstr()
+		call.asCall(directCallee, calleeABI)
+		m.insert(call)
+	} else {
+		ptr := m.compiler.VRegOf(indirectCalleePtr)
+		callInd := m.allocateInstr()
+		callInd.asCallIndirect(ptr, calleeABI)
+		m.insert(callInd)
+	}
 
 	var index int
 	r1, rs := si.Returns()

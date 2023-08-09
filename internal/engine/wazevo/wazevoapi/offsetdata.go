@@ -42,7 +42,15 @@ type ExecutionContextOffsetData struct {
 
 // ModuleContextOffsetData allows the compilers to get the information about offsets to the fields of wazevo.moduleContextOpaque,
 // This is unique per module.
-type ModuleContextOffsetData struct{}
+type ModuleContextOffsetData struct {
+	TotalSize                                                     int
+	LocalMemoryBegin, ImportedMemoryBegin, ImportedFunctionsBegin Offset
+}
+
+func (m *ModuleContextOffsetData) ImportedFunctionOffset(i wasm.Index) (ptr, moduleCtx Offset) {
+	base := m.ImportedFunctionsBegin + Offset(i)*16
+	return base, base + 8
+}
 
 // Offset represents an offset of a field of a struct.
 type Offset int32
@@ -57,14 +65,39 @@ func (o Offset) I64() int64 {
 	return int64(o)
 }
 
-// NewModuleContextOffsetData creates a ModuleContextOffsetData for the given Module.
-func NewModuleContextOffsetData(_ *wasm.Module) ModuleContextOffsetData {
-	// TODO
-	return ModuleContextOffsetData{}
-}
+// NewModuleContextOffsetData creates a ModuleContextOffsetData determining the structure of moduleContextOpaque for the given Module.
+// The structure is described in the comment of wazevo.moduleContextOpaque.
+func NewModuleContextOffsetData(m *wasm.Module) ModuleContextOffsetData {
+	ret := ModuleContextOffsetData{}
+	var offset Offset
+	if m.MemorySection != nil {
+		ret.LocalMemoryBegin = offset
+		// buffer base + memory size.
+		const localMemorySizeInOpaqueVMContext = 16
+		offset += localMemorySizeInOpaqueVMContext
+		ret.TotalSize += localMemorySizeInOpaqueVMContext
+	} else {
+		// Indicates that there's no local memory
+		ret.LocalMemoryBegin = -1
+	}
 
-// Size returns the size of total bytes of the moduleContextOpaque.
-func (m *ModuleContextOffsetData) Size() int {
-	// TODO:
-	return 0
+	if m.ImportMemoryCount > 0 {
+		// *wasm.MemoryInstance
+		const importedMemorySizeInOpaqueVMCContext = 8
+		ret.ImportedMemoryBegin = offset
+		offset += importedMemorySizeInOpaqueVMCContext
+		ret.TotalSize += importedMemorySizeInOpaqueVMCContext
+	} else {
+		// Indicates that there's no imported memory
+		ret.ImportedMemoryBegin = -1
+	}
+
+	if m.ImportFunctionCount > 0 {
+		ret.ImportedFunctionsBegin = offset
+		// Each function consists of the pointer to the executable and the pointer to its moduleContextOpaque (16 bytes).
+		ret.TotalSize += int(m.ImportFunctionCount) * 16
+	} else {
+		ret.ImportedFunctionsBegin = -1
+	}
+	return ret
 }

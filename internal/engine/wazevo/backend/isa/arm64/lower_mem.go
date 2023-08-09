@@ -175,7 +175,26 @@ func (a addressMode) sizeInBitsToShiftAmount(sizeInBits byte) (lsl byte) {
 	return
 }
 
+func (m *machine) lowerLoad(si *ssa.Instruction) {
+	// TODO: merge consecutive loads into a single pair store instruction.
+	ptr, offset, typ := si.LoadData()
+	amode := m.lowerToAddressMode(ptr, offset, typ.Bits())
+
+	dst := m.compiler.VRegOf(si.Return())
+	load := m.allocateInstr()
+	switch typ {
+	case ssa.TypeI32, ssa.TypeI64:
+		load.asULoad(operandNR(dst), amode, typ.Bits())
+	case ssa.TypeF32, ssa.TypeF64:
+		load.asFpuLoad(operandNR(dst), amode, typ.Bits())
+	default:
+		panic("TODO")
+	}
+	m.insert(load)
+}
+
 func (m *machine) lowerStore(si *ssa.Instruction) {
+	// TODO: merge consecutive stores into a single pair store instruction.
 	value, ptr, offset, storeSizeInBits := si.StoreData()
 	amode := m.lowerToAddressMode(ptr, offset, storeSizeInBits)
 

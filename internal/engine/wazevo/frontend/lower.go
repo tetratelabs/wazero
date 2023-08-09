@@ -684,22 +684,34 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		argN := len(typ.Params)
 		args := make([]ssa.Value, argN+2)
 		args[0] = c.execCtxPtrValue
-		args[1] = c.moduleCtxPtrValue
 		state.nPopInto(argN, args[2:])
 
 		sig := c.signatures[typ]
+		call := builder.AllocateInstruction()
 		if fnIndex >= c.m.ImportFunctionCount {
-			call := builder.AllocateInstruction()
+			args[1] = c.moduleCtxPtrValue // This case the callee module is itself.
 			call.AsCall(FunctionIndexToFuncRef(fnIndex), sig, args)
 			builder.InsertInstruction(call)
-
-			first, rest := call.Returns()
-			state.push(first)
-			for _, v := range rest {
-				state.push(v)
-			}
 		} else {
-			panic("TODO: support calling imported functions")
+			// This case we have to read the address of the imported function from the module context.
+			moduleCtx := c.moduleCtxPtrValue
+			loadFuncPtr, loadModuleCtxPtr := builder.AllocateInstruction(), builder.AllocateInstruction()
+			funcPtrOffset, moduleCtxPtrOffset := c.offset.ImportedFunctionOffset(fnIndex)
+			loadFuncPtr.AsLoad(moduleCtx, funcPtrOffset.U32(), ssa.TypeI64)
+			loadModuleCtxPtr.AsLoad(moduleCtx, moduleCtxPtrOffset.U32(), ssa.TypeI64)
+			builder.InsertInstruction(loadFuncPtr)
+			builder.InsertInstruction(loadModuleCtxPtr)
+
+			args[1] = loadModuleCtxPtr.Return() // This case the callee module is itself.
+
+			call.AsCallIndirect(loadFuncPtr.Return(), sig, args)
+			builder.InsertInstruction(call)
+		}
+
+		first, rest := call.Returns()
+		state.push(first)
+		for _, v := range rest {
+			state.push(v)
 		}
 	case wasm.OpcodeDrop:
 		_ = state.pop()
