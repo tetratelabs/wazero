@@ -618,8 +618,14 @@ func (ce *callEngine) callGoFunc(ctx context.Context, m *wasm.ModuleInstance, f 
 	fn := f.parent.hostFn
 	switch fn := fn.(type) {
 	case api.GoModuleFunction:
+		if fn == nil {
+			panic("BUG")
+		}
 		fn.Call(ctx, m, stack)
 	case api.GoFunction:
+		if fn == nil {
+			panic("BUG")
+		}
 		fn.Call(ctx, stack)
 	}
 

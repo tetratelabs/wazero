@@ -1048,8 +1048,14 @@ entry:
 			fn := calleeHostFunction.parent.goFunc
 			switch fn := fn.(type) {
 			case api.GoModuleFunction:
+				if fn == nil {
+					panic("BUG")
+				}
 				fn.Call(ctx, ce.callerModuleInstance, stack)
 			case api.GoFunction:
+				if fn == nil {
+					panic("BUG")
+				}
 				fn.Call(ctx, stack)
 			}
 

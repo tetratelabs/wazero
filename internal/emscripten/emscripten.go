@@ -3,6 +3,7 @@ package emscripten
 import (
 	"context"
 	"errors"
+	"runtime"
 	"strconv"
 
 	"github.com/tetratelabs/wazero/api"
@@ -134,6 +135,7 @@ func (v *InvokeFunc) Call(ctx context.Context, mod api.Module, stack []uint64) {
 		panic(err)
 	}
 	err = f.CallWithStack(ctx, stack)
+	runtime.KeepAlive(t)
 	if err != nil {
 		// Module closed: any calls will just fail with the same error.
 		if _, ok := err.(*sys.ExitError); ok {
