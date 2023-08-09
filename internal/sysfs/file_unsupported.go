@@ -1,4 +1,4 @@
-//go:build !unix && !linux && !darwin && !windows
+//go:build !unix && !windows
 
 package sysfs
 
