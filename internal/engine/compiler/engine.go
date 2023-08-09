@@ -376,13 +376,13 @@ const (
 	functionSize                     = 40
 
 	// Offsets for wasm.ModuleInstance.
-	moduleInstanceGlobalsOffset          = 32
-	moduleInstanceMemoryOffset           = 56
-	moduleInstanceTablesOffset           = 64
-	moduleInstanceEngineOffset           = 88
-	moduleInstanceTypeIDsOffset          = 104
-	moduleInstanceDataInstancesOffset    = 128
-	moduleInstanceElementInstancesOffset = 152
+	moduleInstanceGlobalsOffset          = 24
+	moduleInstanceMemoryOffset           = 48
+	moduleInstanceTablesOffset           = 56
+	moduleInstanceEngineOffset           = 80
+	moduleInstanceTypeIDsOffset          = 96
+	moduleInstanceDataInstancesOffset    = 120
+	moduleInstanceElementInstancesOffset = 144
 
 	// Offsets for wasm.TableInstance.
 	tableInstanceTableOffset    = 0

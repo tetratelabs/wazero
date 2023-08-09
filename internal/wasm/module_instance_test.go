@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -97,7 +96,7 @@ func TestModuleInstance_Close(t *testing.T) {
 				// Closing should not err.
 				require.NoError(t, tc.closer(ctx, m))
 
-				require.Equal(t, tc.expectedClosed, m.Closed)
+				require.Equal(t, tc.expectedClosed, m.Closed.Load())
 
 				// Outside callers should be able to know it was closed.
 				require.True(t, m.IsClosed())
@@ -205,7 +204,7 @@ func TestModuleInstance_CallDynamic(t *testing.T) {
 				// Closing should not err.
 				require.NoError(t, tc.closer(ctx, m))
 
-				require.Equal(t, tc.expectedClosed, m.Closed)
+				require.Equal(t, tc.expectedClosed, m.Closed.Load())
 
 				// Verify our intended side-effect
 				require.Nil(t, s.Module(moduleName))
@@ -268,7 +267,7 @@ func TestModuleInstance_CallDynamic(t *testing.T) {
 func TestModuleInstance_CloseModuleOnCanceledOrTimeout(t *testing.T) {
 	s := newStore()
 	t.Run("timeout", func(t *testing.T) {
-		cc := &ModuleInstance{Closed: 0, ModuleName: "test", s: s, Sys: internalsys.DefaultContext(nil)}
+		cc := &ModuleInstance{ModuleName: "test", s: s, Sys: internalsys.DefaultContext(nil)}
 		const duration = time.Second
 		ctx, cancel := context.WithTimeout(context.Background(), duration)
 		defer cancel()
@@ -277,7 +276,7 @@ func TestModuleInstance_CloseModuleOnCanceledOrTimeout(t *testing.T) {
 		defer done()
 
 		// Resource shouldn't be released at this point.
-		require.Equal(t, exitCodeFlag(exitCodeFlagResourceNotClosed), atomic.LoadUint64(&cc.Closed)&exitCodeFlagMask)
+		require.Equal(t, exitCodeFlag(exitCodeFlagResourceNotClosed), cc.Closed.Load()&exitCodeFlagMask)
 		require.NotNil(t, cc.Sys)
 
 		err := cc.FailIfClosed()
@@ -288,7 +287,7 @@ func TestModuleInstance_CloseModuleOnCanceledOrTimeout(t *testing.T) {
 	})
 
 	t.Run("cancel", func(t *testing.T) {
-		cc := &ModuleInstance{Closed: 0, ModuleName: "test", s: s, Sys: internalsys.DefaultContext(nil)}
+		cc := &ModuleInstance{ModuleName: "test", s: s, Sys: internalsys.DefaultContext(nil)}
 		ctx, cancel := context.WithCancel(context.Background())
 		done := cc.CloseModuleOnCanceledOrTimeout(context.WithValue(ctx, struct{}{}, 1)) // Wrapping arbitrary context.
 		cancel()
@@ -299,7 +298,7 @@ func TestModuleInstance_CloseModuleOnCanceledOrTimeout(t *testing.T) {
 		time.Sleep(time.Second)
 
 		// Resource shouldn't be released at this point.
-		require.Equal(t, exitCodeFlag(exitCodeFlagResourceNotClosed), atomic.LoadUint64(&cc.Closed)&exitCodeFlagMask)
+		require.Equal(t, exitCodeFlag(exitCodeFlagResourceNotClosed), cc.Closed.Load()&exitCodeFlagMask)
 		require.NotNil(t, cc.Sys)
 
 		err := cc.FailIfClosed()
@@ -310,7 +309,7 @@ func TestModuleInstance_CloseModuleOnCanceledOrTimeout(t *testing.T) {
 	})
 
 	t.Run("timeout over cancel", func(t *testing.T) {
-		cc := &ModuleInstance{Closed: 0, ModuleName: "test", s: s, Sys: internalsys.DefaultContext(nil)}
+		cc := &ModuleInstance{ModuleName: "test", s: s, Sys: internalsys.DefaultContext(nil)}
 		const duration = time.Second
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -322,7 +321,7 @@ func TestModuleInstance_CloseModuleOnCanceledOrTimeout(t *testing.T) {
 		defer done()
 
 		// Resource shouldn't be released at this point.
-		require.Equal(t, exitCodeFlag(exitCodeFlagResourceNotClosed), atomic.LoadUint64(&cc.Closed)&exitCodeFlagMask)
+		require.Equal(t, exitCodeFlag(exitCodeFlagResourceNotClosed), cc.Closed.Load()&exitCodeFlagMask)
 		require.NotNil(t, cc.Sys)
 
 		err := cc.FailIfClosed()
@@ -333,7 +332,7 @@ func TestModuleInstance_CloseModuleOnCanceledOrTimeout(t *testing.T) {
 	})
 
 	t.Run("cancel over timeout", func(t *testing.T) {
-		cc := &ModuleInstance{Closed: 0, ModuleName: "test", s: s, Sys: internalsys.DefaultContext(nil)}
+		cc := &ModuleInstance{ModuleName: "test", s: s, Sys: internalsys.DefaultContext(nil)}
 		ctx, cancel := context.WithCancel(context.Background())
 		// Wrap the timeout context by cancel context.
 		var timeoutDone context.CancelFunc
@@ -347,7 +346,7 @@ func TestModuleInstance_CloseModuleOnCanceledOrTimeout(t *testing.T) {
 		time.Sleep(time.Second)
 
 		// Resource shouldn't be released at this point.
-		require.Equal(t, exitCodeFlag(exitCodeFlagResourceNotClosed), atomic.LoadUint64(&cc.Closed)&exitCodeFlagMask)
+		require.Equal(t, exitCodeFlag(exitCodeFlagResourceNotClosed), cc.Closed.Load()&exitCodeFlagMask)
 		require.NotNil(t, cc.Sys)
 
 		err := cc.FailIfClosed()
@@ -358,7 +357,7 @@ func TestModuleInstance_CloseModuleOnCanceledOrTimeout(t *testing.T) {
 	})
 
 	t.Run("cancel works", func(t *testing.T) {
-		cc := &ModuleInstance{Closed: 0, ModuleName: "test", s: s}
+		cc := &ModuleInstance{ModuleName: "test", s: s}
 		cancelChan := make(chan struct{})
 		var wg sync.WaitGroup
 		wg.Add(1)
@@ -373,7 +372,7 @@ func TestModuleInstance_CloseModuleOnCanceledOrTimeout(t *testing.T) {
 	})
 
 	t.Run("no close on all resources canceled", func(t *testing.T) {
-		cc := &ModuleInstance{Closed: 0, ModuleName: "test", s: s}
+		cc := &ModuleInstance{ModuleName: "test", s: s}
 		cancelChan := make(chan struct{})
 		close(cancelChan)
 		ctx, cancel := context.WithCancel(context.Background())
@@ -390,7 +389,7 @@ func TestModuleInstance_CloseWithCtxErr(t *testing.T) {
 	s := newStore()
 
 	t.Run("context canceled", func(t *testing.T) {
-		cc := &ModuleInstance{Closed: 0, ModuleName: "test", s: s}
+		cc := &ModuleInstance{ModuleName: "test", s: s}
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 
@@ -401,7 +400,7 @@ func TestModuleInstance_CloseWithCtxErr(t *testing.T) {
 	})
 
 	t.Run("context timeout", func(t *testing.T) {
-		cc := &ModuleInstance{Closed: 0, ModuleName: "test", s: s}
+		cc := &ModuleInstance{ModuleName: "test", s: s}
 		duration := time.Second
 		ctx, cancel := context.WithTimeout(context.Background(), duration)
 		defer cancel()
@@ -415,7 +414,7 @@ func TestModuleInstance_CloseWithCtxErr(t *testing.T) {
 	})
 
 	t.Run("no error", func(t *testing.T) {
-		cc := &ModuleInstance{Closed: 0, ModuleName: "test", s: s}
+		cc := &ModuleInstance{ModuleName: "test", s: s}
 
 		cc.CloseWithCtxErr(context.Background())
 
