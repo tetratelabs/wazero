@@ -170,8 +170,8 @@ func (v *InvokeFunc) Call(ctx context.Context, mod api.Module, stack []uint64) {
 // potentially nil interface can be fatal on some platforms due to a bug? in Go/QEMU.
 // See https://github.com/tetratelabs/wazero/issues/1621
 func callOrPanic(ctx context.Context, m api.Module, name string, stack []uint64) {
-	if srf := m.ExportedFunction(name); srf != nil {
-		err := srf.CallWithStack(ctx, stack)
+	if f := m.ExportedFunction(name); f != nil {
+		err := f.CallWithStack(ctx, stack)
 		if err != nil {
 			panic(err)
 		}
