@@ -342,7 +342,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ~/tests
-          key: go-wasip1-binaries-${{ matrix.os }}
+          key: go-wasip1-binaries-${{ matrix.os }}-${{ matrix.go-version }}
 
       - if: ${{ steps.cache-go-test-binaries.outputs.cache-hit != 'true' }}
         name: Build Test Binaries
