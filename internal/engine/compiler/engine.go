@@ -376,13 +376,13 @@ const (
 	functionSize                     = 40
 
 	// Offsets for wasm.ModuleInstance.
-	moduleInstanceGlobalsOffset          = 32
-	moduleInstanceMemoryOffset           = 56
-	moduleInstanceTablesOffset           = 64
-	moduleInstanceEngineOffset           = 88
-	moduleInstanceTypeIDsOffset          = 104
-	moduleInstanceDataInstancesOffset    = 128
-	moduleInstanceElementInstancesOffset = 152
+	moduleInstanceGlobalsOffset          = 24
+	moduleInstanceMemoryOffset           = 48
+	moduleInstanceTablesOffset           = 56
+	moduleInstanceEngineOffset           = 80
+	moduleInstanceTypeIDsOffset          = 96
+	moduleInstanceDataInstancesOffset    = 120
+	moduleInstanceElementInstancesOffset = 144
 
 	// Offsets for wasm.TableInstance.
 	tableInstanceTableOffset    = 0
@@ -966,13 +966,13 @@ func newEngine(enabledFeatures api.CoreFeatures, fileCache filecache.Cache) *eng
 //
 // By declaring these values as `var`, slices created via `make([]..., var)`
 // will never be allocated on stack [1]. This means accessing these slices via
-// raw pointers is safe: As of version 1.18, Go's garbage collector never relocates
+// raw pointers is safe: As of version 1.21, Go's garbage collector never relocates
 // heap-allocated objects (aka no compaction of memory [2]).
 //
 // On Go upgrades, re-validate heap-allocation via `go build -gcflags='-m' ./internal/engine/compiler/...`.
 //
-//	[1] https://github.com/golang/go/blob/68ecdc2c70544c303aa923139a5f16caf107d955/src/cmd/compile/internal/escape/utils.go#L206-L208
-//	[2] https://github.com/golang/go/blob/68ecdc2c70544c303aa923139a5f16caf107d955/src/runtime/mgc.go#L9
+//	[1] https://github.com/golang/go/blob/c19c4c566c63818dfd059b352e52c4710eecf14d/src/cmd/compile/internal/escape/utils.go#L213-L215
+//	[2] https://github.com/golang/go/blob/c19c4c566c63818dfd059b352e52c4710eecf14d/src/runtime/mgc.go#L9
 //	[3] https://mayurwadekar2.medium.com/escape-analysis-in-golang-ee40a1c064c1
 //	[4] https://medium.com/@yulang.chu/go-stack-or-heap-2-slices-which-keep-in-stack-have-limitation-of-size-b3f3adfd6190
 var initialStackSize uint64 = 512

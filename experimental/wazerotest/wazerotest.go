@@ -24,7 +24,6 @@ const (
 // WebAssembly module.
 type Module struct {
 	internalapi.WazeroOnlyType
-	exitStatus uint64
 
 	// The module name that will be returned by calling the Name method.
 	ModuleName string
@@ -39,6 +38,8 @@ type Module struct {
 	// The program memory. If non-nil, the memory is automatically exported as
 	// "memory".
 	ExportMemory *Memory
+
+	exitStatus atomic.Uint64
 
 	once                        sync.Once
 	exportedFunctions           map[string]api.Function
@@ -111,7 +112,7 @@ func (m *Module) Close(ctx context.Context) error {
 
 // CloseWithExitCode implements the same method as documented on api.Closer.
 func (m *Module) CloseWithExitCode(ctx context.Context, exitCode uint32) error {
-	atomic.CompareAndSwapUint64(&m.exitStatus, 0, exitStatusMarker|uint64(exitCode))
+	m.exitStatus.CompareAndSwap(0, exitStatusMarker|uint64(exitCode))
 	return nil
 }
 
@@ -144,7 +145,7 @@ func (m *Module) Function(i int) api.Function {
 }
 
 func (m *Module) ExitStatus() (exitCode uint32, exited bool) {
-	exitStatus := atomic.LoadUint64(&m.exitStatus)
+	exitStatus := m.exitStatus.Load()
 	return uint32(exitStatus), exitStatus != 0
 }
 
