@@ -516,6 +516,25 @@ func TestInstantiateForModule(t *testing.T) {
 <--
 `,
 		},
+		{
+			name:        "invoke_v_jmp",
+			funcName:    "call_longjump_invoke",
+			tableOffset: 20,
+			params:      []uint64{},
+			expectedLog: `--> .call_longjump_invoke(20)
+	==> env.invoke_v(index=20)
+		--> .stackSave()
+		<-- 42
+		--> .call_longjump()
+			==> env._emscripten_throw_longjmp()
+		--> .stackRestore(42)
+		<--
+		--> .setThrew(1,0)
+		<--
+	<==
+<--
+`,
+		},
 	}
 
 	for _, tt := range tests {
