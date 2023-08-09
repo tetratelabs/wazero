@@ -170,7 +170,7 @@ func (f *osFile) Seek(offset int64, whence int) (newOffset int64, errno experime
 		errno = fileError(f, f.closed, errno)
 
 		// If the error was trying to rewind a directory, re-open it. Notably,
-		// seeking to zero on a directory doesn't work on Windows with Go 1.18.
+		// seeking to zero on a directory doesn't work on Windows with Go 1.19.
 		if errno == experimentalsys.EISDIR && offset == 0 && whence == io.SeekStart {
 			errno = 0
 			f.reopenDir = true
