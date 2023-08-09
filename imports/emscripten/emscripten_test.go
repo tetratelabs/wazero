@@ -371,7 +371,7 @@ func TestInstantiateForModule(t *testing.T) {
 			expectedLog: `--> .call_v_i32(0)
 	==> env.invoke_i(index=0)
 		--> .stackSave()
-		<-- 0
+		<-- 65536
 		--> .v_i32()
 		<-- 42
 	<== 42
@@ -387,7 +387,7 @@ func TestInstantiateForModule(t *testing.T) {
 			expectedLog: `--> .call_i32_i32(2,42)
 	==> env.invoke_ii(index=2,a1=42)
 		--> .stackSave()
-		<-- 0
+		<-- 65536
 		--> .i32_i32(42)
 		<-- 42
 	<== 42
@@ -403,7 +403,7 @@ func TestInstantiateForModule(t *testing.T) {
 			expectedLog: `--> .call_i32i32_i32(4,1,2)
 	==> env.invoke_iii(index=4,a1=1,a2=2)
 		--> .stackSave()
-		<-- 0
+		<-- 65536
 		--> .i32i32_i32(1,2)
 		<-- 3
 	<== 3
@@ -419,7 +419,7 @@ func TestInstantiateForModule(t *testing.T) {
 			expectedLog: `--> .call_i32i32i32_i32(6,1,2,4)
 	==> env.invoke_iiii(index=6,a1=1,a2=2,a3=4)
 		--> .stackSave()
-		<-- 0
+		<-- 65536
 		--> .i32i32i32_i32(1,2,4)
 		<-- 7
 	<== 7
@@ -435,7 +435,7 @@ func TestInstantiateForModule(t *testing.T) {
 			expectedLog: `--> .calli32_i32i32i32i32_i32(8,1,2,4,8)
 	==> env.invoke_iiiii(index=8,a1=1,a2=2,a3=4,a4=8)
 		--> .stackSave()
-		<-- 0
+		<-- 65536
 		--> .i32i32i32i32_i32(1,2,4,8)
 		<-- 15
 	<== 15
@@ -449,7 +449,7 @@ func TestInstantiateForModule(t *testing.T) {
 			expectedLog: `--> .call_v_v(10)
 	==> env.invoke_v(index=10)
 		--> .stackSave()
-		<-- 0
+		<-- 65536
 		--> .v_v()
 		<--
 	<==
@@ -464,7 +464,7 @@ func TestInstantiateForModule(t *testing.T) {
 			expectedLog: `--> .call_i32_v(12,42)
 	==> env.invoke_vi(index=12,a1=42)
 		--> .stackSave()
-		<-- 0
+		<-- 65536
 		--> .i32_v(42)
 		<--
 	<==
@@ -479,7 +479,7 @@ func TestInstantiateForModule(t *testing.T) {
 			expectedLog: `--> .call_i32i32_v(14,1,2)
 	==> env.invoke_vii(index=14,a1=1,a2=2)
 		--> .stackSave()
-		<-- 0
+		<-- 65536
 		--> .i32i32_v(1,2)
 		<--
 	<==
@@ -494,7 +494,7 @@ func TestInstantiateForModule(t *testing.T) {
 			expectedLog: `--> .call_i32i32i32_v(16,1,2,4)
 	==> env.invoke_viii(index=16,a1=1,a2=2,a3=4)
 		--> .stackSave()
-		<-- 0
+		<-- 65536
 		--> .i32i32i32_v(1,2,4)
 		<--
 	<==
@@ -509,7 +509,7 @@ func TestInstantiateForModule(t *testing.T) {
 			expectedLog: `--> .calli32_i32i32i32i32_v(18,1,2,4,8)
 	==> env.invoke_viiii(index=18,a1=1,a2=2,a3=4,a4=8)
 		--> .stackSave()
-		<-- 0
+		<-- 65536
 		--> .i32i32i32i32_v(1,2,4,8)
 		<--
 	<==

@@ -13,8 +13,13 @@
 
   (table 20 20 funcref)
 
-  (func $stackSave (export "stackSave") (result i32) (i32.const 0))
-  (func $stackRestore (export "stackRestore") (param i32))
+  (global $__stack_pointer (mut i32) (i32.const 65536))
+  (func $stackSave (export "stackSave") (result i32)
+    global.get $__stack_pointer)
+  (func $stackRestore (export "stackRestore") (param i32)
+    local.get 0
+    global.set $__stack_pointer)
+  (func $setThrew (export "setThrew") (param i32 i32))
 
   (func $v_i32 (result i32) (i32.const 42))
   (func $v_i32_unreachable (result i32) unreachable)
