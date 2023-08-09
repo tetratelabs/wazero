@@ -7,7 +7,7 @@ on:
       - 'site/**'
       - 'netlify.toml'
   push:
-    branches: [main]
+    branches: [go1.21]
     paths-ignore:  # ignore docs as they are built with Netlify.
       - '**/*.md'
       - 'site/**'
@@ -18,7 +18,7 @@ defaults:
     shell: bash
 
 env:  # Update this prior to requiring a higher minor version in go.mod
-  GO_VERSION: "1.20"  # 1.xx == latest patch of 1.xx
+  GO_VERSION: "1.21"  # 1.xx == latest patch of 1.xx
   TINYGO_VERSION: "0.28.1"
   ZIG_VERSION: "0.11.0-dev.3334+cd1417dbd"
 
@@ -323,45 +323,32 @@ jobs:
   go_tests:
     # Due to the embedding of the GOROOT of the building env(https://github.com/golang/go/blob/3c59639b902fada0a2e5a6a35bafd10fc9183b89/src/os/os_test.go#L112),
     # we have to build and cache on each OS unlike others in this file.
-    name: Go (${{ matrix.os }})
+    name: Go (${{ matrix.os }}, Go-${{ matrix.go-version }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false # don't fail fast as sometimes failures are arch/OS specific
       matrix:
         os: [ubuntu-22.04, macos-12, windows-2022]
+        go-version:
+          - "1.21"  # Current Go version && The only version that supports wasip1.
 
     steps:
-      - name: Install Go
-        uses: actions/setup-go@v4
+      - uses: actions/setup-go@v4
         with:
-          cache: false
-          go-version: ${{ env.GO_VERSION }}
-
-      # Go's source code changes, sometimes many times a day. To balance
-      # freshness with run latency and cache thrash, rebuild only once a week.
-      - name: Create cache key
-        run:
-          week_number=$(date +'%U')
-          echo "CACHE_KEY=gotip-test-binaries-${week_number}-${{ matrix.os }}" >> $GITHUB_ENV
+          go-version: ${{ matrix.go-version }}
 
       - name: Cache Go test binaries
         id: cache-go-test-binaries
         uses: actions/cache@v3
         with:
-          path: ~/sdk
-          key: ${{ env.CACHE_KEY }}
-
-      - if: ${{ steps.cache-go-test-binaries.outputs.cache-hit != 'true' }}
-        name: Install and download Go tip
-        run: |
-          go install golang.org/dl/gotip@latest
-          echo "$GOPATH/bin:$PATH" >> $GITHUB_PATH
-          gotip download
+          path: ~/tests
+          key: go-wasip1-binaries-${{ matrix.os }}-${{ matrix.go-version }}
 
       - if: ${{ steps.cache-go-test-binaries.outputs.cache-hit != 'true' }}
         name: Build Test Binaries
         run: |
-          cd $(gotip env GOROOT)
+          mkdir ~/tests
+          cd $(go env GOROOT)
           # Choose important packages to limit execution time.
           for value in src/archive/tar \
             src/bufio \
@@ -427,7 +414,8 @@ jobs:
             src/testing/quick \
             src/time
           do
-            GOOS=wasip1 GOARCH=wasm gotip test -v -c -o ~/sdk/tests/${value//\//_}.test ./$value
+            echo "GOOS=wasip1 GOARCH=wasm go test -v -c -o ~/tests/${value//\//_}.test ./$value"
+            GOOS=wasip1 GOARCH=wasm go test -v -c -o ~/tests/${value//\//_}.test ./$value
           done
 
       - name: Checkout wazero
@@ -439,12 +427,12 @@ jobs:
       - if: ${{ runner.os != 'Windows' }}
         name: Run standard library tests
         run: |
-          echo "Running $(find ~/sdk/tests -name *.test | wc -l) test binaries"
+          echo "Running $(find ~/tests -name *.test | wc -l) test binaries"
 
           # Go tests often look for files relative to the source. Change to the corresponding directory.
-          for bin in ~/sdk/tests/*.test; do
+          for bin in ~/tests/*.test; do
             dir=$(basename $bin); dir=${dir%.test}; dir=${dir//_/\/}
-            pushd ~/sdk/gotip/$dir
+            pushd $(go env GOROOT)/$dir
             wazero run -mount=/:/ -env PWD=$PWD $bin -- -test.short -test.v
             popd
           done
@@ -455,23 +443,22 @@ jobs:
         continue-on-error: true
         run: |
           GOOS=$(go env GOOS)
-          echo "Running $(find ~/sdk/tests -name *.test | wc -l) test binaries"
-
-          GOROOT=~/sdk/gotip
+          echo "Running $(find ~/tests -name *.test | wc -l) test binaries"
 
           MOUNT=c:\\:/
-          SCRIPT="$HOME/sdk/tests.cmd"
+          SCRIPT="$HOME/tests.cmd"
           # Trim `/c` from the in-Wasm GOROOT.
-          GOROOT=$(cygpath -u $GOROOT | cut -c 3-)
+          REAL_GOROOT=$(go env GOROOT)
+          GOROOT=$(cygpath -u $REAL_GOROOT | cut -c 3-)
           # Append early exit on cmd.
           POSTFIX="if %errorlevel% neq 0 exit /b %errorlevel%"
-          RUNNER="cmd //c %USERPROFILE%\sdk\tests.cmd"
+          RUNNER="cmd //c %USERPROFILE%\tests.cmd"
           EXTRAPARAMS="-mount=%TEMP%:/tmp"
 
           # Go tests often look for files relative to the source. Change to the corresponding directory.
-          for bin in ~/sdk/tests/*.test; do
+          for bin in ~/tests/*.test; do
             dir=$(basename $bin); dir=${dir%.test}; dir=${dir//_/\/}
-            pushd ~/sdk/gotip/$dir
+            pushd $REAL_GOROOT/$dir
 
             # Trim `/c` from the in-Wasm pwd.
             IN_WASM_PWD=$(pwd | cut -c 3-)
@@ -479,7 +466,7 @@ jobs:
             bin=`cygpath -w $bin`
 
             # Create a script with all the tests (do not run yet).
-            echo ${MOUNT} ${IN_WASM_PWD} ~/sdk/gotip/$dir
+            echo ${MOUNT} ${IN_WASM_PWD} $GOROOT/$dir
             COMMAND="wazero run -mount=${MOUNT} ${EXTRAPARAMS} -hostlogging=filesystem -env PWD=${IN_WASM_PWD} -env GOROOT=${GOROOT} -env GOOS=wasip1 $bin -- -test.short -test.v"
             echo $COMMAND >> $SCRIPT
             # Uncomment the following line for early exit on error on Windows.
