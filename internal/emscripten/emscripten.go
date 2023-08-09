@@ -103,13 +103,6 @@ func (v *InvokeFunc) Call(ctx context.Context, mod api.Module, stack []uint64) {
 	tableOffset := wasm.Index(stack[0]) // position in the module's only table.
 	copy(stack, stack[1:])              // pop the tableOffset.
 
-	// Lookup the table index we will call.
-	t := m.Tables[0] // Note: Emscripten doesn't use multiple tables
-	f, err := m.Engine.LookupFunction(t, typeID, tableOffset)
-	if err != nil {
-		panic(err)
-	}
-
 	// The Go implementation below mimics the Emscripten JS behaviour to support
 	// longjmps from indirect function calls. The implementation of these
 	// indirection function calls in Emscripten JS is like this:
@@ -134,6 +127,12 @@ func (v *InvokeFunc) Call(ctx context.Context, mod api.Module, stack []uint64) {
 		panic(err)
 	}
 
+	// Lookup the table index we will call.
+	t := m.Tables[0] // Note: Emscripten doesn't use multiple tables
+	f, err := m.Engine.LookupFunction(t, typeID, tableOffset)
+	if err != nil {
+		panic(err)
+	}
 	err = f.CallWithStack(ctx, stack)
 	if err != nil {
 		// Module closed: any calls will just fail with the same error.
