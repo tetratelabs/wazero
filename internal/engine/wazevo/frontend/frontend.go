@@ -14,7 +14,8 @@ import (
 type Compiler struct {
 	// Per-module data that is used across all functions.
 
-	m *wasm.Module
+	m      *wasm.Module
+	offset *wazevoapi.ModuleContextOffsetData
 	// ssaBuilder is a ssa.Builder used by this frontend.
 	ssaBuilder ssa.Builder
 	signatures map[*wasm.FunctionType]*ssa.Signature
@@ -39,12 +40,13 @@ type Compiler struct {
 }
 
 // NewFrontendCompiler returns a frontend Compiler.
-func NewFrontendCompiler(m *wasm.Module, ssaBuilder ssa.Builder) *Compiler {
+func NewFrontendCompiler(m *wasm.Module, ssaBuilder ssa.Builder, offset *wazevoapi.ModuleContextOffsetData) *Compiler {
 	c := &Compiler{
 		m:                   m,
 		ssaBuilder:          ssaBuilder,
 		br:                  bytes.NewReader(nil),
 		wasmLocalToVariable: make(map[wasm.Index]ssa.Variable),
+		offset:              offset,
 	}
 
 	c.signatures = make(map[*wasm.FunctionType]*ssa.Signature, len(m.TypeSection))

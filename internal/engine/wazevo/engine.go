@@ -29,9 +29,17 @@ type (
 
 	// compiledModule is a compiled variant of a wasm.Module and ready to be used for instantiation.
 	compiledModule struct {
-		executable       []byte
-		functionsOffsets []int
-		offsets          wazevoapi.ModuleContextOffsetData
+		executable      []byte
+		functionOffsets []compiledFunctionOffset
+		offsets         wazevoapi.ModuleContextOffsetData
+	}
+
+	// compiledFunctionOffset tells us that where in the executable a function begins.
+	compiledFunctionOffset struct {
+		// offset is the beggining of the function.
+		offset int
+		// goPreambleSize is the size of Go preamble of the function.
+		goPreambleSize int
 	}
 )
 
@@ -63,12 +71,12 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []exper
 
 	// Creates new compiler instances which are reused for each function.
 	ssaBuilder := ssa.NewBuilder()
-	fe := frontend.NewFrontendCompiler(module, ssaBuilder)
+	fe := frontend.NewFrontendCompiler(module, ssaBuilder, &cm.offsets)
 	machine := newMachine()
 	be := backend.NewCompiler(machine, ssaBuilder)
 
 	totalSize := 0 // Total binary size of the executable.
-	cm.functionsOffsets = make([]int, localFns)
+	cm.functionOffsets = make([]compiledFunctionOffset, localFns)
 	bodies := make([][]byte, localFns)
 	for i := range module.CodeSection {
 		fidx := wasm.Index(i + importedFns)
@@ -78,7 +86,8 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []exper
 
 		// Align 16-bytes boundary.
 		totalSize = (totalSize + 15) &^ 15
-		cm.functionsOffsets[i] = totalSize
+		compiledFuncOffset := &cm.functionOffsets[i]
+		compiledFuncOffset.offset = totalSize
 
 		typ := &module.TypeSection[module.FunctionSection[i]]
 
@@ -113,6 +122,9 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []exper
 		e.refToBinaryOffset[fref] = totalSize +
 			// During the relocation, call target needs to be the beginning of function after Go entry preamble.
 			goPreambleSize
+		if needGoEntryPreamble {
+			compiledFuncOffset.goPreambleSize = goPreambleSize
+		}
 
 		// At this point, relocation offsets are relative to the start of the function body,
 		// so we adjust it to the start of the executable.
@@ -136,8 +148,8 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []exper
 	cm.executable = executable
 
 	for i, b := range bodies {
-		offset := cm.functionsOffsets[i]
-		copy(executable[offset:], b)
+		offset := cm.functionOffsets[i]
+		copy(executable[offset.offset:], b)
 	}
 
 	// Resolve relocations for local function calls.
@@ -162,7 +174,7 @@ func (e *engine) Close() (err error) {
 
 	for _, cm := range e.compiledModules {
 		cm.executable = nil
-		cm.functionsOffsets = nil
+		cm.functionOffsets = nil
 	}
 	e.compiledModules = nil
 	return nil
@@ -191,9 +203,8 @@ func (e *engine) addCompiledModule(m *wasm.Module, cm *compiledModule) {
 // NewModuleEngine implements wasm.Engine.
 func (e *engine) NewModuleEngine(m *wasm.Module, mi *wasm.ModuleInstance) (wasm.ModuleEngine, error) {
 	me := &moduleEngine{}
-	if m.ImportFunctionCount > 0 {
-		panic("TODO: imported functions")
-	}
+
+	// Note: imported functions are resolved in moduleEngine.ResolveImportedFunction.
 
 	compiled, ok := e.compiledModules[m.ID]
 	if !ok {
@@ -201,6 +212,6 @@ func (e *engine) NewModuleEngine(m *wasm.Module, mi *wasm.ModuleInstance) (wasm.
 	}
 	me.parent = compiled
 	me.module = mi
-	me.setupOpaque(&compiled.offsets)
+	me.setupOpaque()
 	return me, nil
 }

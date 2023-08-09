@@ -751,11 +751,38 @@ var (
 			wasm.OpcodeEnd,
 		}, nil),
 	}
+	ImportedFunctionCall = TestCase{
+		Name: "imported_function_call",
+		Imported: &wasm.Module{
+			ExportSection:   []wasm.Export{{Name: "i32_i32", Type: wasm.ExternTypeFunc}},
+			TypeSection:     []wasm.FunctionType{i32_i32},
+			FunctionSection: []wasm.Index{0},
+			CodeSection: []wasm.Code{{Body: []byte{
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeI32Mul,
+				wasm.OpcodeEnd,
+			}}},
+			NameSection: &wasm.NameSection{ModuleName: "env"},
+		},
+		Module: &wasm.Module{
+			ImportFunctionCount: 1,
+			TypeSection:         []wasm.FunctionType{i32_i32},
+			ImportSection:       []wasm.Import{{Type: wasm.ExternTypeFunc, Module: "env", Name: "i32_i32"}},
+			FunctionSection:     []wasm.Index{0},
+			ExportSection:       []wasm.Export{{Name: ExportName, Type: wasm.ExternTypeFunc, Index: 1}},
+			CodeSection: []wasm.Code{{Body: []byte{
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeCall, 0,
+				wasm.OpcodeEnd,
+			}}},
+		},
+	}
 )
 
 type TestCase struct {
-	Name   string
-	Module *wasm.Module
+	Name             string
+	Imported, Module *wasm.Module
 }
 
 func SingleFunctionModule(typ wasm.FunctionType, body []byte, localTypes []wasm.ValueType) *wasm.Module {

@@ -12,6 +12,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/frontend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/testcases"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
@@ -20,6 +21,7 @@ func TestMain(m *testing.M) {
 	if runtime.GOARCH != "arm64" {
 		os.Exit(0)
 	}
+	os.Exit(m.Run())
 }
 
 func newMachine() backend.Machine {
@@ -1854,10 +1856,40 @@ L2 (SSA Block: blk1):
 	ret
 `,
 		},
+		{
+			name: "imported_function_call", m: testcases.ImportedFunctionCall.Module,
+			afterLoweringARM64: `
+L1 (SSA Block: blk0):
+	mov x0?, x0
+	mov x1?, x1
+	mov x2?, x2
+	str x1?, [x0?, #0x8]
+	ldr x3?, [x1?]
+	ldr x4?, [x1?, #0x8]
+	mov x0, x0?
+	mov x1, x4?
+	mov x2, x2?
+	bl w3?
+	mov x5?, x0
+	mov x0, x5?
+	ret
+`,
+			afterFinalizeARM64: `
+L1 (SSA Block: blk0):
+	str x30, [sp, #-0x10]!
+	str x1, [x0, #0x8]
+	ldr x8, [x1]
+	ldr x1, [x1, #0x8]
+	bl w8
+	ldr x30, [sp], #0x10
+	ret
+`,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ssab := ssa.NewBuilder()
-			fc := frontend.NewFrontendCompiler(tc.m, ssab)
+			offset := wazevoapi.NewModuleContextOffsetData(tc.m)
+			fc := frontend.NewFrontendCompiler(tc.m, ssab, &offset)
 			machine := newMachine()
 			machine.DisableStackCheck()
 			be := backend.NewCompiler(machine, ssab)

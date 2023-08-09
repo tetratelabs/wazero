@@ -73,6 +73,8 @@ type (
 		// IsCall returns true if this instruction is a call instruction. The result is used to insert
 		// caller saved register spills and restores.
 		IsCall() bool
+		// IsIndirectCall returns true if this instruction is an indirect call instruction.
+		IsIndirectCall() bool
 		// IsReturn returns true if this instruction is a return instruction.
 		IsReturn() bool
 	}

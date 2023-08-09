@@ -24,9 +24,9 @@ func TestE2E(t *testing.T) {
 	}
 	// const i32, i64, f32, f64 = wasm.ValueTypeI32, wasm.ValueTypeI64, wasm.ValueTypeF32, wasm.ValueTypeF64
 	for _, tc := range []struct {
-		name  string
-		m     *wasm.Module
-		calls []callCase
+		name        string
+		imported, m *wasm.Module
+		calls       []callCase
 	}{
 		{
 			name: "swap", m: testcases.SwapParamAndReturn.Module,
@@ -68,6 +68,18 @@ func TestE2E(t *testing.T) {
 				{expErr: "stack overflow"}, {expErr: "stack overflow"}, {expErr: "stack overflow"}, {expErr: "stack overflow"},
 			},
 		},
+		{
+			name:     "call",
+			imported: testcases.ImportedFunctionCall.Imported,
+			m:        testcases.ImportedFunctionCall.Module,
+			calls: []callCase{
+				{params: []uint64{0}, expResults: []uint64{0}},
+				{params: []uint64{2}, expResults: []uint64{2 * 2}},
+				{params: []uint64{45}, expResults: []uint64{45 * 45}},
+				{params: []uint64{90}, expResults: []uint64{90 * 90}},
+				{params: []uint64{100}, expResults: []uint64{100 * 100}},
+			},
+		},
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
@@ -81,6 +93,15 @@ func TestE2E(t *testing.T) {
 			defer func() {
 				require.NoError(t, r.Close(ctx))
 			}()
+
+			if tc.imported != nil {
+				imported, err := r.CompileModule(ctx, binaryencoding.EncodeModule(tc.imported))
+				require.NoError(t, err)
+
+				_, err = r.InstantiateModule(ctx, imported, wazero.NewModuleConfig())
+				require.NoError(t, err)
+			}
+
 			compiled, err := r.CompileModule(ctx, binaryencoding.EncodeModule(tc.m))
 			require.NoError(t, err)
 
