@@ -104,6 +104,10 @@ func NewFunctionExporterForModule(guest wazero.CompiledModule) (FunctionExporter
 			ret = append(ret, internal.NotifyMemoryGrowth)
 			continue
 		}
+		if importName == internal.FunctionThrowLongjmp {
+			ret = append(ret, internal.ThrowLongjmp)
+			continue
+		}
 		if !strings.HasPrefix(importName, internal.InvokePrefix) {
 			continue // not invoke, and maybe not emscripten
 		}

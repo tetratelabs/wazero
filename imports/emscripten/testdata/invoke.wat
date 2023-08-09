@@ -10,8 +10,17 @@
   (import "env" "invoke_vii" (func $invoke_vii (param i32 i32 i32)))
   (import "env" "invoke_viii" (func $invoke_viii (param i32 i32 i32 i32)))
   (import "env" "invoke_viiii" (func $invoke_viiii (param i32 i32 i32 i32 i32)))
+  (import "env" "_emscripten_throw_longjmp" (func $_emscripten_throw_longjmp))
 
-  (table 20 20 funcref)
+  (table 22 22 funcref)
+
+  (global $__stack_pointer (mut i32) (i32.const 65536))
+  (func $stackSave (export "stackSave") (result i32)
+    global.get $__stack_pointer)
+  (func $stackRestore (export "stackRestore") (param i32)
+    local.get 0
+    global.set $__stack_pointer)
+  (func $setThrew (export "setThrew") (param i32 i32))
 
   (func $v_i32 (result i32) (i32.const 42))
   (func $v_i32_unreachable (result i32) unreachable)
@@ -112,4 +121,25 @@
   ;; numbers and expect unreachable on 19.
   (func $calli32_i32i32i32i32_v (export "calli32_i32i32i32i32_v") (param i32 i32 i32 i32 i32)
     (call $invoke_viiii (local.get 0) (local.get 1) (local.get 2) (local.get 3) (local.get 4)))
+
+  (func $call_longjmp_throw
+    (call $_emscripten_throw_longjmp)
+    (global.set $__stack_pointer (i32.const 43)))
+
+  (func $call_longjmp_throw_unreachable unreachable)
+
+  (elem (i32.const 20) $call_longjmp_throw $call_longjmp_throw_unreachable)
+
+  ;; $call_invoke_v_with_longjmp_throw should be called with 20 or 21 and
+  ;; expect unreachable on 21. $call_invoke_v_with_longjmp_throw mimics
+  ;; Emscripten by setting the stack pointer to a different value than default.
+  ;; We ensure that the stack pointer was not changed to 43 by $call_longjump.
+  (func $call_invoke_v_with_longjmp_throw (export "call_invoke_v_with_longjmp_throw") (param i32)
+    (global.set $__stack_pointer (i32.const 42))
+    (call $invoke_v (local.get 0))
+    global.get $__stack_pointer
+    i32.const 42
+    i32.ne
+    (if (then unreachable))
+  )
 )
