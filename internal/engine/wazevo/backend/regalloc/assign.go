@@ -32,7 +32,7 @@ func (a *Allocator) assignRegistersPerBlock(f Function, blk Block, vRegIDToNode 
 }
 
 func (a *Allocator) assignRegistersPerInstr(f Function, pc programCounter, instr Instr, vRegIDToNode []*node, liveNodes []liveNodeInBlock) {
-	if instr.IsCall() {
+	if direct := instr.IsCall(); direct || instr.IsIndirectCall() {
 		// Only take care of non-real VRegs (e.g. VReg.IsRealReg() == false) since
 		// the real VRegs are already placed in the right registers at this point.
 		actives := a.activeNonRealVRegsAt(pc+pcUseOffset, liveNodes)
@@ -43,7 +43,10 @@ func (a *Allocator) assignRegistersPerInstr(f Function, pc programCounter, instr
 				f.ReloadRegisterAfter(v, instr)
 			}
 		}
-		return
+		// Direct function calls do not need assignment, while indirect one needs the assignment on the function pointer.
+		if direct {
+			return
+		}
 	} else if instr.IsReturn() {
 		return
 	}

@@ -210,6 +210,9 @@ func (m *mockInstr) IsCopy() bool { return m.isCopy }
 // IsCall implements Instr.
 func (m *mockInstr) IsCall() bool { return m.isCall }
 
+// IsIndirectCall implements Instr.
+func (m *mockInstr) IsIndirectCall() bool { return m.isCall }
+
 // IsReturn implements Instr.
 func (m *mockInstr) IsReturn() bool { return false }
 

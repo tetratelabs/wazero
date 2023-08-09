@@ -72,7 +72,13 @@ func TestE2E(t *testing.T) {
 			name:     "call",
 			imported: testcases.ImportedFunctionCall.Imported,
 			m:        testcases.ImportedFunctionCall.Module,
-			calls:    []callCase{{params: []uint64{45}, expResults: []uint64{90}}},
+			calls: []callCase{
+				{params: []uint64{0}, expResults: []uint64{0}},
+				{params: []uint64{2}, expResults: []uint64{2 * 2}},
+				{params: []uint64{45}, expResults: []uint64{45 * 45}},
+				{params: []uint64{90}, expResults: []uint64{90 * 90}},
+				{params: []uint64{100}, expResults: []uint64{100 * 100}},
+			},
 		},
 	} {
 		tc := tc

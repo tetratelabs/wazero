@@ -72,15 +72,15 @@ func TestModuleEngine_ResolveImportedFunction(t *testing.T) {
 	im1 := &moduleEngine{
 		opaquePtr: &op1,
 		parent: &compiledModule{
-			executable:       make([]byte, 1000),
-			functionsOffsets: []int{1, 5, 10},
+			executable:      make([]byte, 1000),
+			functionOffsets: []compiledFunctionOffset{{offset: 1, goPreambleSize: 4}, {offset: 5, goPreambleSize: 4}, {offset: 10, goPreambleSize: 4}},
 		},
 	}
 	im2 := &moduleEngine{
 		opaquePtr: &op2,
 		parent: &compiledModule{
-			executable:       make([]byte, 1000),
-			functionsOffsets: []int{50},
+			executable:      make([]byte, 1000),
+			functionOffsets: []compiledFunctionOffset{{offset: 50, goPreambleSize: 4}},
 		},
 	}
 
@@ -94,10 +94,10 @@ func TestModuleEngine_ResolveImportedFunction(t *testing.T) {
 		op         *byte
 		executable *byte
 	}{
-		{index: 0, op: &op1, executable: &im1.parent.executable[1]},
-		{index: 1, op: &op2, executable: &im2.parent.executable[50]},
-		{index: 2, op: &op1, executable: &im1.parent.executable[10]},
-		{index: 3, op: &op1, executable: &im1.parent.executable[5]},
+		{index: 0, op: &op1, executable: &im1.parent.executable[1+4]},
+		{index: 1, op: &op2, executable: &im2.parent.executable[50+4]},
+		{index: 2, op: &op1, executable: &im1.parent.executable[10+4]},
+		{index: 3, op: &op1, executable: &im1.parent.executable[5+4]},
 	} {
 		buf := m.opaque[begin+16*tc.index:]
 		actualExecutable := binary.LittleEndian.Uint64(buf)

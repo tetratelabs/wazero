@@ -5,7 +5,6 @@ import (
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -68,24 +67,25 @@ func (m *moduleEngine) setupOpaque() {
 
 // NewFunction implements wasm.ModuleEngine.
 func (m *moduleEngine) NewFunction(index wasm.Index) api.Function {
-	if importedFnCount := m.module.Source.ImportFunctionCount; index < m.module.Source.ImportFunctionCount {
+	localIndex := index
+	if importedFnCount := m.module.Source.ImportFunctionCount; index < importedFnCount {
 		panic("TODO: directly call a imported function.")
 	} else {
-		index -= importedFnCount
+		localIndex -= importedFnCount
 	}
 
 	src := m.module.Source
-	typ := src.TypeSection[src.FunctionSection[index]]
+	typ := src.TypeSection[src.FunctionSection[localIndex]]
 	sizeOfParamResultSlice := len(typ.Results)
 	if ps := len(typ.Params); ps > sizeOfParamResultSlice {
 		sizeOfParamResultSlice = ps
 	}
 	p := m.parent
-	offset := p.functionsOffsets[index]
+	offset := p.functionOffsets[localIndex]
 
 	ce := &callEngine{
 		indexInModule:          index,
-		executable:             &p.executable[offset],
+		executable:             &p.executable[offset.offset],
 		parent:                 m,
 		sizeOfParamResultSlice: sizeOfParamResultSlice,
 	}
@@ -95,13 +95,14 @@ func (m *moduleEngine) NewFunction(index wasm.Index) api.Function {
 
 // ResolveImportedFunction implements wasm.ModuleEngine.
 func (m *moduleEngine) ResolveImportedFunction(index, indexInImportedModule wasm.Index, importedModuleEngine wasm.ModuleEngine) {
-	offset := m.parent.offsets.ImportedFunctionsBegin + wazevoapi.Offset(index)*16
+	ptr, moduleCtx := m.parent.offsets.ImportedFunctionOffset(index)
 	importedME := importedModuleEngine.(*moduleEngine)
 
-	executable := &importedME.parent.executable[importedME.parent.functionsOffsets[indexInImportedModule]]
-	binary.LittleEndian.PutUint64(m.opaque[offset:], uint64(uintptr(unsafe.Pointer(executable))))
-	binary.LittleEndian.PutUint64(m.opaque[offset+8:], uint64(uintptr(unsafe.Pointer(importedME.opaquePtr))))
-	offset += 16
+	offset := importedME.parent.functionOffsets[indexInImportedModule]
+	// When calling imported function from the machine code, we need to skip the Go preamble.
+	executable := &importedME.parent.executable[offset.offset+offset.goPreambleSize]
+	binary.LittleEndian.PutUint64(m.opaque[ptr:], uint64(uintptr(unsafe.Pointer(executable))))
+	binary.LittleEndian.PutUint64(m.opaque[moduleCtx:], uint64(uintptr(unsafe.Pointer(importedME.opaquePtr))))
 }
 
 // LookupFunction implements wasm.ModuleEngine.

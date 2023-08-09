@@ -79,6 +79,7 @@ var defKinds = [numInstructionKinds]defKind{
 	fpuStore32:      defKindNone,
 	fpuStore64:      defKindNone,
 	fpuStore128:     defKindNone,
+	udf:             defKindNone,
 }
 
 // defs returns the list of regalloc.VReg that are defined by the instruction.
@@ -124,6 +125,7 @@ const (
 )
 
 var useKinds = [numInstructionKinds]useKind{
+	udf:             useKindNone,
 	aluRRR:          useKindRNRM,
 	aluRRRR:         useKindRNRMRA,
 	aluRRImm12:      useKindRN,

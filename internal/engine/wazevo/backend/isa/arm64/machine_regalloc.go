@@ -260,6 +260,11 @@ func (r *regAllocInstrImpl) IsCall() bool {
 	return r.i.kind == call
 }
 
+// IsIndirectCall implements regalloc.Instr IsIndirectCall.
+func (r *regAllocInstrImpl) IsIndirectCall() bool {
+	return r.i.kind == callInd
+}
+
 // IsReturn implements regalloc.Instr IsReturn.
 func (r *regAllocInstrImpl) IsReturn() bool {
 	return r.i.kind == ret
