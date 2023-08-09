@@ -3,6 +3,7 @@ package emscripten
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strconv"
 
 	"github.com/tetratelabs/wazero/api"
@@ -129,10 +130,7 @@ func (v *InvokeFunc) Call(ctx context.Context, mod api.Module, stack []uint64) {
 	// We reuse savedStack to save allocations. We allocate with a size of 2
 	// here to accommodate for the input and output of setThrew.
 	var savedStack [2]uint64
-	err = mod.ExportedFunction("stackSave").CallWithStack(ctx, savedStack[:])
-	if err != nil {
-		panic(err)
-	}
+	callOrPanic(ctx, mod, "stackSave", savedStack[:])
 
 	err = f.CallWithStack(ctx, stack)
 	if err != nil {
@@ -143,9 +141,7 @@ func (v *InvokeFunc) Call(ctx context.Context, mod api.Module, stack []uint64) {
 
 		// This is the equivalent of "stackRestore(sp);".
 		// Do not overwrite err here to preserve the original error.
-		if err := mod.ExportedFunction("stackRestore").CallWithStack(ctx, savedStack[:]); err != nil {
-			panic(err)
-		}
+		callOrPanic(ctx, mod, "stackRestore", savedStack[:])
 
 		// If we encounter ThrowLongjmpError, this means that the C code did a
 		// longjmp, which in turn called _emscripten_throw_longjmp and that is
@@ -163,9 +159,23 @@ func (v *InvokeFunc) Call(ctx context.Context, mod api.Module, stack []uint64) {
 		// This is the equivalent of "_setThrew(1, 0);".
 		savedStack[0] = 1
 		savedStack[1] = 0
-		err = mod.ExportedFunction("setThrew").CallWithStack(ctx, savedStack[:])
+		callOrPanic(ctx, mod, "setThrew", savedStack[:])
+	}
+}
+
+// maybeCallOrPanic calls a given function if it is exported, otherwise panics.
+//
+// This ensures if the given name is exported before calling it. In other words, this explicitly checks if an api.Function
+// returned by api.Module.ExportedFunction is not nil. This is necessary because directly calling a method which is
+// potentially nil interface can be fatal on some platforms due to a bug? in Go/QEMU.
+// See https://github.com/tetratelabs/wazero/issues/1621
+func callOrPanic(ctx context.Context, m api.Module, name string, stack []uint64) {
+	if srf := m.ExportedFunction(name); srf != nil {
+		err := srf.CallWithStack(ctx, stack)
 		if err != nil {
-			panic(err) // setThrew failed
+			panic(err)
 		}
+	} else {
+		panic(fmt.Sprintf("%s not exported", name))
 	}
 }
