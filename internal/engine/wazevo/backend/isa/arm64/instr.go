@@ -681,17 +681,17 @@ func (i *instruction) String() (str string) {
 	case bitRR:
 		panic("TODO")
 	case uLoad8:
-		panic("TODO")
+		str = fmt.Sprintf("ldrb %s, %s", formatVRegSized(i.rd.nr(), 32), i.amode.format(32))
 	case sLoad8:
-		panic("TODO")
+		str = fmt.Sprintf("ldrsb %s, %s", formatVRegSized(i.rd.nr(), 32), i.amode.format(32))
 	case uLoad16:
-		panic("TODO")
+		str = fmt.Sprintf("ldrh %s, %s", formatVRegSized(i.rd.nr(), 32), i.amode.format(32))
 	case sLoad16:
-		panic("TODO")
+		str = fmt.Sprintf("ldrsh %s, %s", formatVRegSized(i.rd.nr(), 32), i.amode.format(32))
 	case uLoad32:
 		str = fmt.Sprintf("ldr %s, %s", formatVRegSized(i.rd.nr(), 32), i.amode.format(32))
 	case sLoad32:
-		panic("TODO")
+		str = fmt.Sprintf("ldrs %s, %s", formatVRegSized(i.rd.nr(), 32), i.amode.format(32))
 	case uLoad64:
 		str = fmt.Sprintf("ldr %s, %s", formatVRegSized(i.rd.nr(), 64), i.amode.format(64))
 	case store8:

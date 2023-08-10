@@ -129,10 +129,10 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 	case ssa.OpcodeIconst, ssa.OpcodeF32const, ssa.OpcodeF64const: // Constant instructions are inlined.
 	case ssa.OpcodeExitWithCode:
 		execCtx, code := instr.ExitWithCodeData()
-		m.lowerExitWithCode(execCtx, code)
+		m.lowerExitWithCode(m.compiler.VRegOf(execCtx), code)
 	case ssa.OpcodeExitIfNotZeroWithCode:
 		execCtx, c, code := instr.ExitIfNotZeroWithCodeData()
-		m.lowerExitIfNotZeroWithCode(execCtx, c, code)
+		m.lowerExitIfNotZeroWithCode(m.compiler.VRegOf(execCtx), c, code)
 	case ssa.OpcodeStore, ssa.OpcodeIstore8, ssa.OpcodeIstore16, ssa.OpcodeIstore32:
 		m.lowerStore(instr)
 	case ssa.OpcodeLoad:
@@ -315,9 +315,10 @@ func (m *machine) lowerImul(x, y, result ssa.Value) {
 	m.insert(mul)
 }
 
+const exitWithCodeEncodingSize = exitSequenceSize + 8
+
 // lowerExitWithCode lowers the lowerExitWithCode takes a context pointer as argument.
-func (m *machine) lowerExitWithCode(ctx ssa.Value, code wazevoapi.ExitCode) {
-	execCtxVReg := m.compiler.VRegOf(ctx)
+func (m *machine) lowerExitWithCode(execCtxVReg regalloc.VReg, code wazevoapi.ExitCode) {
 
 	loadExitCodeConst := m.allocateInstr()
 	loadExitCodeConst.asMOVZ(tmpRegVReg, uint64(code), 0, true)
@@ -337,6 +338,45 @@ func (m *machine) lowerExitWithCode(ctx ssa.Value, code wazevoapi.ExitCode) {
 	m.insert(exitSeq)
 }
 
-func (m *machine) lowerExitIfNotZeroWithCode(ctx ssa.Value, c ssa.Value, code wazevoapi.ExitCode) {
+func (m *machine) lowerExitIfNotZeroWithCode(execCtxVReg regalloc.VReg, cond ssa.Value, code wazevoapi.ExitCode) {
+	condDef := m.compiler.ValueDefinition(cond)
+	if !m.compiler.MatchInstr(condDef, ssa.OpcodeIcmp) {
+		// We can have general case just like cachine.LowerConditionalBranch.
+		panic("TODO: OpcodeExitIfNotZeroWithCode must come after Icmp at the moment")
+	}
+	m.compiler.MarkLowered(condDef.Instr)
 
+	cvalInstr := condDef.Instr
+	x, y, c := cvalInstr.IcmpData()
+	cc, signed := condFlagFromSSAIntegerCmpCond(c), c.Signed()
+
+	if x.Type() != y.Type() {
+		panic("TODO(maybe): support icmp with different types")
+	}
+
+	extMod := extModeOf(x.Type(), signed)
+
+	// First operand must be in pure register form.
+	rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extMod)
+	// Second operand can be in any of Imm12, ER, SR, or NR form supported by the SUBS instructions.
+	rm := m.getOperand_Imm12_ER_SR_NR(m.compiler.ValueDefinition(y), extMod)
+
+	alu := m.allocateInstr()
+	// subs zr, rn, rm
+	alu.asALU(
+		aluOpSubS,
+		// We don't need the result, just need to set flags.
+		operandNR(xzrVReg),
+		rn,
+		rm,
+		x.Type().Bits() == 64,
+	)
+	m.insert(alu)
+
+	// We have to skip the entire exit sequence if the condition is false.
+	cbr := m.allocateInstr()
+	cbr.asCondBr(cc.asCond(), invalidLabel, false /* ignored */)
+	cbr.condBrOffsetResolve(exitWithCodeEncodingSize)
+	m.insert(cbr)
+	m.lowerExitWithCode(execCtxVReg, code)
 }

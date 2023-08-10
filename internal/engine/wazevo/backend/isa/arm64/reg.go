@@ -2,6 +2,7 @@ package arm64
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
@@ -271,7 +272,7 @@ func formatVRegSized(r regalloc.VReg, size byte) (ret string) {
 			case 64:
 				ret = fmt.Sprintf("x%d?", r.ID())
 			default:
-				panic("BUG: invalid register size")
+				panic("BUG: invalid register size: " + strconv.Itoa(int(size)))
 			}
 		case regalloc.RegTypeFloat:
 			switch size {

@@ -2,6 +2,7 @@ package arm64
 
 import (
 	"encoding/hex"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 	"math"
 	"testing"
 
@@ -759,4 +760,13 @@ func Test_encodeExitSequence(t *testing.T) {
 	// ret
 	require.Equal(t, "dd0a40f9db0e40f97f030091de1240f9c0035fd6", hex.EncodeToString(m.buf))
 	require.Equal(t, len(m.buf), exitSequenceSize)
+}
+
+func Test_lowerExitWithCodeEncodingSize(t *testing.T) {
+	compiler, _, m := newSetupWithMockContext()
+	m.lowerExitWithCode(x10VReg, wazevoapi.ExitCodeGrowStack)
+	m.FlushPendingInstructions()
+	require.NotNil(t, m.perBlockHead)
+	m.encode(m.perBlockHead)
+	require.Equal(t, exitWithCodeEncodingSize, len(compiler.Buf()))
 }
