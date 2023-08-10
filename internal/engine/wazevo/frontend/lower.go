@@ -814,6 +814,14 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		for _, v := range rest {
 			state.push(v)
 		}
+
+		// After calling any function, memory buffer might have changed. So we need to re-defined the variable.
+		if c.needMemory {
+			// When these are not used in the following instructions, they will be optimized out.
+			// So in any ways, we define them!
+			_ = c.getMemoryBaseValue()
+			_ = c.getMemoryLenValue()
+		}
 	case wasm.OpcodeDrop:
 		_ = state.pop()
 	default:

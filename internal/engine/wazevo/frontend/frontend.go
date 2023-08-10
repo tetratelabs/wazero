@@ -30,6 +30,7 @@ type Compiler struct {
 	wasmFunctionLocalTypes                []wasm.ValueType
 	wasmFunctionBody                      []byte
 	memoryBaseVariable, memoryLenVariable ssa.Variable
+	needMemory                            bool
 	// br is reused during lowering.
 	br            *bytes.Reader
 	loweringState loweringState
@@ -166,8 +167,11 @@ func (c *Compiler) declareWasmLocals(entry ssa.BasicBlock) {
 }
 
 func (c *Compiler) declareNecessaryVariables() {
-	c.memoryBaseVariable = c.ssaBuilder.DeclareVariable(ssa.TypeI64)
-	c.memoryLenVariable = c.ssaBuilder.DeclareVariable(ssa.TypeI64)
+	c.needMemory = len(c.m.ImportedMemories()) > 0 || c.m.MemorySection != nil
+	if c.needMemory {
+		c.memoryBaseVariable = c.ssaBuilder.DeclareVariable(ssa.TypeI64)
+		c.memoryLenVariable = c.ssaBuilder.DeclareVariable(ssa.TypeI64)
+	}
 	// TODO: add tables, globals.
 }
 
