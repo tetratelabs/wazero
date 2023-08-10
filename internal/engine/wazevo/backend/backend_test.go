@@ -1883,6 +1883,9 @@ L1 (SSA Block: blk0):
 	ret
 `,
 		},
+		{
+			name: "imported_function_call", m: testcases.MemoryLoads.Module,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ssab := ssa.NewBuilder()

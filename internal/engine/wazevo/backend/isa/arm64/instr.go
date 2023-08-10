@@ -383,6 +383,21 @@ func (i *instruction) asStore(src operand, amode addressMode, sizeInBits byte) {
 	i.amode = amode
 }
 
+func (i *instruction) asSLoad(dst operand, amode addressMode, sizeInBits byte) {
+	switch sizeInBits {
+	case 8:
+		i.kind = sLoad8
+	case 16:
+		i.kind = sLoad16
+	case 32:
+		i.kind = sLoad32
+	default:
+		panic("BUG")
+	}
+	i.rd = dst
+	i.amode = amode
+}
+
 func (i *instruction) asULoad(dst operand, amode addressMode, sizeInBits byte) {
 	switch sizeInBits {
 	case 8:

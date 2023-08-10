@@ -130,10 +130,15 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 	case ssa.OpcodeExitWithCode:
 		execCtx, code := instr.ExitWithCodeData()
 		m.lowerExitWithCode(execCtx, code)
+	case ssa.OpcodeExitIfNotZeroWithCode:
+		execCtx, c, code := instr.ExitIfNotZeroWithCodeData()
+		m.lowerExitIfNotZeroWithCode(execCtx, c, code)
 	case ssa.OpcodeStore, ssa.OpcodeIstore8, ssa.OpcodeIstore16, ssa.OpcodeIstore32:
 		m.lowerStore(instr)
 	case ssa.OpcodeLoad:
 		m.lowerLoad(instr)
+	case ssa.OpcodeUload8, ssa.OpcodeUload16, ssa.OpcodeUload32, ssa.OpcodeSload8, ssa.OpcodeSload16, ssa.OpcodeSload32:
+		m.lowerExtLoad(instr)
 	case ssa.OpcodeCall, ssa.OpcodeCallIndirect:
 		m.lowerCall(instr)
 	case ssa.OpcodeIcmp:
@@ -330,4 +335,8 @@ func (m *machine) lowerExitWithCode(ctx ssa.Value, code wazevoapi.ExitCode) {
 	m.insert(loadExitCodeConst)
 	m.insert(setExitCode)
 	m.insert(exitSeq)
+}
+
+func (m *machine) lowerExitIfNotZeroWithCode(ctx ssa.Value, c ssa.Value, code wazevoapi.ExitCode) {
+
 }

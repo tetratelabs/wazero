@@ -1166,6 +1166,11 @@ func (i *Instruction) ExitWithCodeData() (ctx Value, code wazevoapi.ExitCode) {
 	return i.v, wazevoapi.ExitCode(i.u64)
 }
 
+// ExitIfNotZeroWithCodeData returns the context and exit code of OpcodeExitWithCode.
+func (i *Instruction) ExitIfNotZeroWithCodeData() (ctx, c Value, code wazevoapi.ExitCode) {
+	return i.v, i.v2, wazevoapi.ExitCode(i.u64)
+}
+
 // InvertBrx inverts either OpcodeBrz or OpcodeBrnz to the other.
 func (i *Instruction) InvertBrx() {
 	switch i.opcode {
