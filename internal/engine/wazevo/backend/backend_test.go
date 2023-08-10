@@ -1885,6 +1885,536 @@ L1 (SSA Block: blk0):
 		},
 		{
 			name: "imported_function_call", m: testcases.MemoryLoads.Module,
+			afterLoweringARM64: `
+L1 (SSA Block: blk0):
+	mov x0?, x0
+	mov x1?, x1
+	mov x2?, x2
+	uxtw x4?, w2?
+	ldr w5?, [x1?, #0x8]
+	add x6?, x4?, #0x4
+	subs xzr, x5?, x6?
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x0?]
+	trap_sequence w0?
+	ldr w8?, [x1?]
+	ldr w9?, [x8?]
+	uxtw x11?, w2?
+	add x12?, x11?, #0x8
+	subs xzr, x5?, x12?
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x0?]
+	trap_sequence w0?
+	ldr x14?, [x8?]
+	uxtw x16?, w2?
+	add x17?, x16?, #0x4
+	subs xzr, x5?, x17?
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x0?]
+	trap_sequence w0?
+	ldr s19?, [x8?]
+	uxtw x21?, w2?
+	add x22?, x21?, #0x8
+	subs xzr, x5?, x22?
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x0?]
+	trap_sequence w0?
+	ldr d24?, [x8?]
+	uxtw x26?, w2?
+	add x27?, x26?, #0x13
+	subs xzr, x5?, x27?
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x0?]
+	trap_sequence w0?
+	ldr w29?, [x8?, #0xf]
+	uxtw x31?, w2?
+	add x32?, x31?, #0x17
+	subs xzr, x5?, x32?
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x0?]
+	trap_sequence w0?
+	ldr x34?, [x8?, #0xf]
+	uxtw x36?, w2?
+	add x37?, x36?, #0x13
+	subs xzr, x5?, x37?
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x0?]
+	trap_sequence w0?
+	ldr s39?, [x8?, #0xf]
+	uxtw x41?, w2?
+	add x42?, x41?, #0x17
+	subs xzr, x5?, x42?
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x0?]
+	trap_sequence w0?
+	ldr d44?, [x8?, #0xf]
+	uxtw x46?, w2?
+	add x47?, x46?, #0x1
+	subs xzr, x5?, x47?
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x0?]
+	trap_sequence w0?
+	ldrb w49?, [x8?]
+	uxtw x51?, w2?
+	add x52?, x51?, #0x10
+	subs xzr, x5?, x52?
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x0?]
+	trap_sequence w0?
+	ldrb w54?, [x8?, #0xf]
+	uxtw x56?, w2?
+	add x57?, x56?, #0x1
+	subs xzr, x5?, x57?
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x0?]
+	trap_sequence w0?
+	ldrb w59?, [x8?]
+	uxtw x61?, w2?
+	add x62?, x61?, #0x10
+	subs xzr, x5?, x62?
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x0?]
+	trap_sequence w0?
+	ldrb w64?, [x8?, #0xf]
+	uxtw x66?, w2?
+	add x67?, x66?, #0x2
+	subs xzr, x5?, x67?
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x0?]
+	trap_sequence w0?
+	ldrh w69?, [x8?]
+	uxtw x71?, w2?
+	add x72?, x71?, #0x11
+	subs xzr, x5?, x72?
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x0?]
+	trap_sequence w0?
+	ldrh w74?, [x8?, #0xf]
+	uxtw x76?, w2?
+	add x77?, x76?, #0x2
+	subs xzr, x5?, x77?
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x0?]
+	trap_sequence w0?
+	ldrh w79?, [x8?]
+	uxtw x81?, w2?
+	add x82?, x81?, #0x11
+	subs xzr, x5?, x82?
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x0?]
+	trap_sequence w0?
+	ldrh w84?, [x8?, #0xf]
+	uxtw x86?, w2?
+	add x87?, x86?, #0x1
+	subs xzr, x5?, x87?
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x0?]
+	trap_sequence w0?
+	ldrb w89?, [x8?]
+	uxtw x91?, w2?
+	add x92?, x91?, #0x10
+	subs xzr, x5?, x92?
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x0?]
+	trap_sequence w0?
+	ldrb w94?, [x8?, #0xf]
+	uxtw x96?, w2?
+	add x97?, x96?, #0x1
+	subs xzr, x5?, x97?
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x0?]
+	trap_sequence w0?
+	ldrb w99?, [x8?]
+	uxtw x101?, w2?
+	add x102?, x101?, #0x10
+	subs xzr, x5?, x102?
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x0?]
+	trap_sequence w0?
+	ldrb w104?, [x8?, #0xf]
+	uxtw x106?, w2?
+	add x107?, x106?, #0x2
+	subs xzr, x5?, x107?
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x0?]
+	trap_sequence w0?
+	ldrh w109?, [x8?]
+	uxtw x111?, w2?
+	add x112?, x111?, #0x11
+	subs xzr, x5?, x112?
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x0?]
+	trap_sequence w0?
+	ldrh w114?, [x8?, #0xf]
+	uxtw x116?, w2?
+	add x117?, x116?, #0x2
+	subs xzr, x5?, x117?
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x0?]
+	trap_sequence w0?
+	ldrh w119?, [x8?]
+	uxtw x121?, w2?
+	add x122?, x121?, #0x11
+	subs xzr, x5?, x122?
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x0?]
+	trap_sequence w0?
+	ldrh w124?, [x8?, #0xf]
+	uxtw x126?, w2?
+	add x127?, x126?, #0x4
+	subs xzr, x5?, x127?
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x0?]
+	trap_sequence w0?
+	ldr w129?, [x8?]
+	uxtw x131?, w2?
+	add x132?, x131?, #0x13
+	subs xzr, x5?, x132?
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x0?]
+	trap_sequence w0?
+	ldr w134?, [x8?, #0xf]
+	uxtw x136?, w2?
+	add x137?, x136?, #0x4
+	subs xzr, x5?, x137?
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x0?]
+	trap_sequence w0?
+	ldr w139?, [x8?]
+	uxtw x141?, w2?
+	add x142?, x141?, #0x13
+	subs xzr, x5?, x142?
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x0?]
+	trap_sequence w0?
+	ldr w144?, [x8?, #0xf]
+	mov x0, x9?
+	mov x1, x14?
+	mov q0.8b, q19?.8b
+	mov q1.8b, q24?.8b
+	mov x2, x29?
+	mov x3, x34?
+	mov q2.8b, q39?.8b
+	mov q3.8b, q44?.8b
+	mov x4, x49?
+	mov x5, x54?
+	mov x6, x59?
+	mov x7, x64?
+	str w69?, [#ret_space, #0x0]
+	str w74?, [#ret_space, #0x8]
+	str w79?, [#ret_space, #0x10]
+	str w84?, [#ret_space, #0x18]
+	str x89?, [#ret_space, #0x20]
+	str x94?, [#ret_space, #0x28]
+	str x99?, [#ret_space, #0x30]
+	str x104?, [#ret_space, #0x38]
+	str x109?, [#ret_space, #0x40]
+	str x114?, [#ret_space, #0x48]
+	str x119?, [#ret_space, #0x50]
+	str x124?, [#ret_space, #0x58]
+	str x129?, [#ret_space, #0x60]
+	str x134?, [#ret_space, #0x68]
+	str x139?, [#ret_space, #0x70]
+	str x144?, [#ret_space, #0x78]
+	ret
+`,
+
+			afterFinalizeARM64: `
+L1 (SSA Block: blk0):
+	str x30, [sp, #-0x10]!
+	str x18, [sp, #-0x10]!
+	str x19, [sp, #-0x10]!
+	str x20, [sp, #-0x10]!
+	str x21, [sp, #-0x10]!
+	str x22, [sp, #-0x10]!
+	str x23, [sp, #-0x10]!
+	str x24, [sp, #-0x10]!
+	str x25, [sp, #-0x10]!
+	str x26, [sp, #-0x10]!
+	mov x23, x0
+	mov x25, x2
+	uxtw x8, w25
+	ldr w24, [x1, #0x8]
+	add x8, x8, #0x4
+	subs xzr, x24, x8
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x23]
+	trap_sequence w23
+	ldr w26, [x1]
+	ldr w0, [x26]
+	uxtw x8, w25
+	add x8, x8, #0x8
+	subs xzr, x24, x8
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x23]
+	trap_sequence w23
+	ldr x1, [x26]
+	uxtw x8, w25
+	add x8, x8, #0x4
+	subs xzr, x24, x8
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x23]
+	trap_sequence w23
+	ldr s0, [x26]
+	uxtw x8, w25
+	add x8, x8, #0x8
+	subs xzr, x24, x8
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x23]
+	trap_sequence w23
+	ldr d1, [x26]
+	uxtw x8, w25
+	add x8, x8, #0x13
+	subs xzr, x24, x8
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x23]
+	trap_sequence w23
+	ldr w2, [x26, #0xf]
+	uxtw x8, w25
+	add x8, x8, #0x17
+	subs xzr, x24, x8
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x23]
+	trap_sequence w23
+	ldr x3, [x26, #0xf]
+	uxtw x8, w25
+	add x8, x8, #0x13
+	subs xzr, x24, x8
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x23]
+	trap_sequence w23
+	ldr s2, [x26, #0xf]
+	uxtw x8, w25
+	add x8, x8, #0x17
+	subs xzr, x24, x8
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x23]
+	trap_sequence w23
+	ldr d3, [x26, #0xf]
+	uxtw x8, w25
+	add x8, x8, #0x1
+	subs xzr, x24, x8
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x23]
+	trap_sequence w23
+	ldrb w4, [x26]
+	uxtw x8, w25
+	add x8, x8, #0x10
+	subs xzr, x24, x8
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x23]
+	trap_sequence w23
+	ldrb w5, [x26, #0xf]
+	uxtw x8, w25
+	add x8, x8, #0x1
+	subs xzr, x24, x8
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x23]
+	trap_sequence w23
+	ldrb w6, [x26]
+	uxtw x8, w25
+	add x8, x8, #0x10
+	subs xzr, x24, x8
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x23]
+	trap_sequence w23
+	ldrb w7, [x26, #0xf]
+	uxtw x8, w25
+	add x8, x8, #0x2
+	subs xzr, x24, x8
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x23]
+	trap_sequence w23
+	ldrh w8, [x26]
+	uxtw x9, w25
+	add x9, x9, #0x11
+	subs xzr, x24, x9
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x23]
+	trap_sequence w23
+	ldrh w9, [x26, #0xf]
+	uxtw x10, w25
+	add x10, x10, #0x2
+	subs xzr, x24, x10
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x23]
+	trap_sequence w23
+	ldrh w10, [x26]
+	uxtw x11, w25
+	add x11, x11, #0x11
+	subs xzr, x24, x11
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x23]
+	trap_sequence w23
+	ldrh w11, [x26, #0xf]
+	uxtw x12, w25
+	add x12, x12, #0x1
+	subs xzr, x24, x12
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x23]
+	trap_sequence w23
+	ldrb w12, [x26]
+	uxtw x13, w25
+	add x13, x13, #0x10
+	subs xzr, x24, x13
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x23]
+	trap_sequence w23
+	ldrb w13, [x26, #0xf]
+	uxtw x14, w25
+	add x14, x14, #0x1
+	subs xzr, x24, x14
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x23]
+	trap_sequence w23
+	ldrb w14, [x26]
+	uxtw x15, w25
+	add x15, x15, #0x10
+	subs xzr, x24, x15
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x23]
+	trap_sequence w23
+	ldrb w15, [x26, #0xf]
+	uxtw x16, w25
+	add x16, x16, #0x2
+	subs xzr, x24, x16
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x23]
+	trap_sequence w23
+	ldrh w16, [x26]
+	uxtw x17, w25
+	add x17, x17, #0x11
+	subs xzr, x24, x17
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x23]
+	trap_sequence w23
+	ldrh w17, [x26, #0xf]
+	uxtw x18, w25
+	add x18, x18, #0x2
+	subs xzr, x24, x18
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x23]
+	trap_sequence w23
+	ldrh w18, [x26]
+	uxtw x19, w25
+	add x19, x19, #0x11
+	subs xzr, x24, x19
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x23]
+	trap_sequence w23
+	ldrh w19, [x26, #0xf]
+	uxtw x20, w25
+	add x20, x20, #0x4
+	subs xzr, x24, x20
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x23]
+	trap_sequence w23
+	ldr w20, [x26]
+	uxtw x21, w25
+	add x21, x21, #0x13
+	subs xzr, x24, x21
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x23]
+	trap_sequence w23
+	ldr w21, [x26, #0xf]
+	uxtw x22, w25
+	add x22, x22, #0x4
+	subs xzr, x24, x22
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x23]
+	trap_sequence w23
+	ldr w22, [x26]
+	uxtw x25, w25
+	add x25, x25, #0x13
+	subs xzr, x24, x25
+	b.hi #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x23]
+	trap_sequence w23
+	ldr w23, [x26, #0xf]
+	str w8, [sp, #0xa0]
+	str w9, [sp, #0xa8]
+	str w10, [sp, #0xb0]
+	str w11, [sp, #0xb8]
+	str x12, [sp, #0xc0]
+	str x13, [sp, #0xc8]
+	str x14, [sp, #0xd0]
+	str x15, [sp, #0xd8]
+	str x16, [sp, #0xe0]
+	str x17, [sp, #0xe8]
+	str x18, [sp, #0xf0]
+	str x19, [sp, #0xf8]
+	str x20, [sp, #0x100]
+	str x21, [sp, #0x108]
+	str x22, [sp, #0x110]
+	str x23, [sp, #0x118]
+	ldr x26, [sp], #0x10
+	ldr x25, [sp], #0x10
+	ldr x24, [sp], #0x10
+	ldr x23, [sp], #0x10
+	ldr x22, [sp], #0x10
+	ldr x21, [sp], #0x10
+	ldr x20, [sp], #0x10
+	ldr x19, [sp], #0x10
+	ldr x18, [sp], #0x10
+	ldr x30, [sp], #0x10
+	ret
+`,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

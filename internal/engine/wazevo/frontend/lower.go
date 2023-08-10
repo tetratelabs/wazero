@@ -493,7 +493,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 
 		// Check for out of bounds memory access: `baseAddrPlusCeil > memLen`.
 		cmp := builder.AllocateInstruction()
-		cmp.AsIcmp(memLen, baseAddrPlusCeil.Return(), ssa.IntegerCmpCondUnsignedLessThan)
+		cmp.AsIcmp(memLen, baseAddrPlusCeil.Return(), ssa.IntegerCmpCondUnsignedGreaterThan)
 		builder.InsertInstruction(cmp)
 		exitIfNZ := builder.AllocateInstruction()
 		exitIfNZ.AsExitIfNotZeroWithCode(c.execCtxPtrValue, cmp.Return(), wazevoapi.ExitCodeMemoryOutOfBounds)

@@ -883,170 +883,170 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
 	v4:i64 = UExtend v2, 32->64
 	v5:i64 = Uload32 module_ctx, 0x8
 	v6:i64 = Iadd v4, v3
-	v7:i32 = Icmp lt_u, v5, v6
+	v7:i32 = Icmp gt_u, v5, v6
 	ExitIfNotZero v7, exec_ctx, memory_out_of_bounds
 	v8:i64 = Uload32 module_ctx, 0x0
 	v9:i32 = Load v8, 0x0
 	v10:i64 = Iconst_64 0x8
 	v11:i64 = UExtend v2, 32->64
 	v12:i64 = Iadd v11, v10
-	v13:i32 = Icmp lt_u, v5, v12
+	v13:i32 = Icmp gt_u, v5, v12
 	ExitIfNotZero v13, exec_ctx, memory_out_of_bounds
 	v14:i64 = Load v8, 0x0
 	v15:i64 = Iconst_64 0x4
 	v16:i64 = UExtend v2, 32->64
 	v17:i64 = Iadd v16, v15
-	v18:i32 = Icmp lt_u, v5, v17
+	v18:i32 = Icmp gt_u, v5, v17
 	ExitIfNotZero v18, exec_ctx, memory_out_of_bounds
 	v19:f32 = Load v8, 0x0
 	v20:i64 = Iconst_64 0x8
 	v21:i64 = UExtend v2, 32->64
 	v22:i64 = Iadd v21, v20
-	v23:i32 = Icmp lt_u, v5, v22
+	v23:i32 = Icmp gt_u, v5, v22
 	ExitIfNotZero v23, exec_ctx, memory_out_of_bounds
 	v24:f64 = Load v8, 0x0
 	v25:i64 = Iconst_64 0x13
 	v26:i64 = UExtend v2, 32->64
 	v27:i64 = Iadd v26, v25
-	v28:i32 = Icmp lt_u, v5, v27
+	v28:i32 = Icmp gt_u, v5, v27
 	ExitIfNotZero v28, exec_ctx, memory_out_of_bounds
 	v29:i32 = Load v8, 0xf
 	v30:i64 = Iconst_64 0x17
 	v31:i64 = UExtend v2, 32->64
 	v32:i64 = Iadd v31, v30
-	v33:i32 = Icmp lt_u, v5, v32
+	v33:i32 = Icmp gt_u, v5, v32
 	ExitIfNotZero v33, exec_ctx, memory_out_of_bounds
 	v34:i64 = Load v8, 0xf
 	v35:i64 = Iconst_64 0x13
 	v36:i64 = UExtend v2, 32->64
 	v37:i64 = Iadd v36, v35
-	v38:i32 = Icmp lt_u, v5, v37
+	v38:i32 = Icmp gt_u, v5, v37
 	ExitIfNotZero v38, exec_ctx, memory_out_of_bounds
 	v39:f32 = Load v8, 0xf
 	v40:i64 = Iconst_64 0x17
 	v41:i64 = UExtend v2, 32->64
 	v42:i64 = Iadd v41, v40
-	v43:i32 = Icmp lt_u, v5, v42
+	v43:i32 = Icmp gt_u, v5, v42
 	ExitIfNotZero v43, exec_ctx, memory_out_of_bounds
 	v44:f64 = Load v8, 0xf
 	v45:i64 = Iconst_64 0x1
 	v46:i64 = UExtend v2, 32->64
 	v47:i64 = Iadd v46, v45
-	v48:i32 = Icmp lt_u, v5, v47
+	v48:i32 = Icmp gt_u, v5, v47
 	ExitIfNotZero v48, exec_ctx, memory_out_of_bounds
 	v49:i32 = Sload8 v8, 0x0
 	v50:i64 = Iconst_64 0x10
 	v51:i64 = UExtend v2, 32->64
 	v52:i64 = Iadd v51, v50
-	v53:i32 = Icmp lt_u, v5, v52
+	v53:i32 = Icmp gt_u, v5, v52
 	ExitIfNotZero v53, exec_ctx, memory_out_of_bounds
 	v54:i32 = Sload8 v8, 0xf
 	v55:i64 = Iconst_64 0x1
 	v56:i64 = UExtend v2, 32->64
 	v57:i64 = Iadd v56, v55
-	v58:i32 = Icmp lt_u, v5, v57
+	v58:i32 = Icmp gt_u, v5, v57
 	ExitIfNotZero v58, exec_ctx, memory_out_of_bounds
 	v59:i32 = Uload8 v8, 0x0
 	v60:i64 = Iconst_64 0x10
 	v61:i64 = UExtend v2, 32->64
 	v62:i64 = Iadd v61, v60
-	v63:i32 = Icmp lt_u, v5, v62
+	v63:i32 = Icmp gt_u, v5, v62
 	ExitIfNotZero v63, exec_ctx, memory_out_of_bounds
 	v64:i32 = Uload8 v8, 0xf
 	v65:i64 = Iconst_64 0x2
 	v66:i64 = UExtend v2, 32->64
 	v67:i64 = Iadd v66, v65
-	v68:i32 = Icmp lt_u, v5, v67
+	v68:i32 = Icmp gt_u, v5, v67
 	ExitIfNotZero v68, exec_ctx, memory_out_of_bounds
 	v69:i32 = Sload16 v8, 0x0
 	v70:i64 = Iconst_64 0x11
 	v71:i64 = UExtend v2, 32->64
 	v72:i64 = Iadd v71, v70
-	v73:i32 = Icmp lt_u, v5, v72
+	v73:i32 = Icmp gt_u, v5, v72
 	ExitIfNotZero v73, exec_ctx, memory_out_of_bounds
 	v74:i32 = Sload16 v8, 0xf
 	v75:i64 = Iconst_64 0x2
 	v76:i64 = UExtend v2, 32->64
 	v77:i64 = Iadd v76, v75
-	v78:i32 = Icmp lt_u, v5, v77
+	v78:i32 = Icmp gt_u, v5, v77
 	ExitIfNotZero v78, exec_ctx, memory_out_of_bounds
 	v79:i32 = Uload16 v8, 0x0
 	v80:i64 = Iconst_64 0x11
 	v81:i64 = UExtend v2, 32->64
 	v82:i64 = Iadd v81, v80
-	v83:i32 = Icmp lt_u, v5, v82
+	v83:i32 = Icmp gt_u, v5, v82
 	ExitIfNotZero v83, exec_ctx, memory_out_of_bounds
 	v84:i32 = Uload16 v8, 0xf
 	v85:i64 = Iconst_64 0x1
 	v86:i64 = UExtend v2, 32->64
 	v87:i64 = Iadd v86, v85
-	v88:i32 = Icmp lt_u, v5, v87
+	v88:i32 = Icmp gt_u, v5, v87
 	ExitIfNotZero v88, exec_ctx, memory_out_of_bounds
 	v89:i64 = Sload8 v8, 0x0
 	v90:i64 = Iconst_64 0x10
 	v91:i64 = UExtend v2, 32->64
 	v92:i64 = Iadd v91, v90
-	v93:i32 = Icmp lt_u, v5, v92
+	v93:i32 = Icmp gt_u, v5, v92
 	ExitIfNotZero v93, exec_ctx, memory_out_of_bounds
 	v94:i64 = Sload8 v8, 0xf
 	v95:i64 = Iconst_64 0x1
 	v96:i64 = UExtend v2, 32->64
 	v97:i64 = Iadd v96, v95
-	v98:i32 = Icmp lt_u, v5, v97
+	v98:i32 = Icmp gt_u, v5, v97
 	ExitIfNotZero v98, exec_ctx, memory_out_of_bounds
 	v99:i64 = Uload8 v8, 0x0
 	v100:i64 = Iconst_64 0x10
 	v101:i64 = UExtend v2, 32->64
 	v102:i64 = Iadd v101, v100
-	v103:i32 = Icmp lt_u, v5, v102
+	v103:i32 = Icmp gt_u, v5, v102
 	ExitIfNotZero v103, exec_ctx, memory_out_of_bounds
 	v104:i64 = Uload8 v8, 0xf
 	v105:i64 = Iconst_64 0x2
 	v106:i64 = UExtend v2, 32->64
 	v107:i64 = Iadd v106, v105
-	v108:i32 = Icmp lt_u, v5, v107
+	v108:i32 = Icmp gt_u, v5, v107
 	ExitIfNotZero v108, exec_ctx, memory_out_of_bounds
 	v109:i64 = Sload16 v8, 0x0
 	v110:i64 = Iconst_64 0x11
 	v111:i64 = UExtend v2, 32->64
 	v112:i64 = Iadd v111, v110
-	v113:i32 = Icmp lt_u, v5, v112
+	v113:i32 = Icmp gt_u, v5, v112
 	ExitIfNotZero v113, exec_ctx, memory_out_of_bounds
 	v114:i64 = Sload16 v8, 0xf
 	v115:i64 = Iconst_64 0x2
 	v116:i64 = UExtend v2, 32->64
 	v117:i64 = Iadd v116, v115
-	v118:i32 = Icmp lt_u, v5, v117
+	v118:i32 = Icmp gt_u, v5, v117
 	ExitIfNotZero v118, exec_ctx, memory_out_of_bounds
 	v119:i64 = Uload16 v8, 0x0
 	v120:i64 = Iconst_64 0x11
 	v121:i64 = UExtend v2, 32->64
 	v122:i64 = Iadd v121, v120
-	v123:i32 = Icmp lt_u, v5, v122
+	v123:i32 = Icmp gt_u, v5, v122
 	ExitIfNotZero v123, exec_ctx, memory_out_of_bounds
 	v124:i64 = Uload16 v8, 0xf
 	v125:i64 = Iconst_64 0x4
 	v126:i64 = UExtend v2, 32->64
 	v127:i64 = Iadd v126, v125
-	v128:i32 = Icmp lt_u, v5, v127
+	v128:i32 = Icmp gt_u, v5, v127
 	ExitIfNotZero v128, exec_ctx, memory_out_of_bounds
 	v129:i64 = Sload32 v8, 0x0
 	v130:i64 = Iconst_64 0x13
 	v131:i64 = UExtend v2, 32->64
 	v132:i64 = Iadd v131, v130
-	v133:i32 = Icmp lt_u, v5, v132
+	v133:i32 = Icmp gt_u, v5, v132
 	ExitIfNotZero v133, exec_ctx, memory_out_of_bounds
 	v134:i64 = Sload32 v8, 0xf
 	v135:i64 = Iconst_64 0x4
 	v136:i64 = UExtend v2, 32->64
 	v137:i64 = Iadd v136, v135
-	v138:i32 = Icmp lt_u, v5, v137
+	v138:i32 = Icmp gt_u, v5, v137
 	ExitIfNotZero v138, exec_ctx, memory_out_of_bounds
 	v139:i64 = Uload32 v8, 0x0
 	v140:i64 = Iconst_64 0x13
 	v141:i64 = UExtend v2, 32->64
 	v142:i64 = Iadd v141, v140
-	v143:i32 = Icmp lt_u, v5, v142
+	v143:i32 = Icmp gt_u, v5, v142
 	ExitIfNotZero v143, exec_ctx, memory_out_of_bounds
 	v144:i64 = Uload32 v8, 0xf
 	Jump blk_ret, v9, v14, v19, v24, v29, v34, v39, v44, v49, v54, v59, v64, v69, v74, v79, v84, v89, v94, v99, v104, v109, v114, v119, v124, v129, v134, v139, v144

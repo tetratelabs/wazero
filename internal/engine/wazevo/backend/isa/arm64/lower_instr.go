@@ -376,7 +376,7 @@ func (m *machine) lowerExitIfNotZeroWithCode(execCtxVReg regalloc.VReg, cond ssa
 	// We have to skip the entire exit sequence if the condition is false.
 	cbr := m.allocateInstr()
 	cbr.asCondBr(cc.asCond(), invalidLabel, false /* ignored */)
-	cbr.condBrOffsetResolve(exitWithCodeEncodingSize)
+	cbr.condBrOffsetResolve(exitWithCodeEncodingSize + 4)
 	m.insert(cbr)
 	m.lowerExitWithCode(execCtxVReg, code)
 }
