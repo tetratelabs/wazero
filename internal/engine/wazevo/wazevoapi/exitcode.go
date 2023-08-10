@@ -7,6 +7,7 @@ const (
 	ExitCodeOK ExitCode = iota
 	ExitCodeGrowStack
 	ExitCodeUnreachable
+	ExitCodeMemoryOutOfBounds
 )
 
 // String implements fmt.Stringer.
@@ -18,6 +19,8 @@ func (e ExitCode) String() string {
 		return "grow_stack"
 	case ExitCodeUnreachable:
 		return "unreachable"
+	case ExitCodeMemoryOutOfBounds:
+		return "memory_out_of_bounds"
 	}
 	panic("TODO")
 }

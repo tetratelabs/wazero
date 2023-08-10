@@ -786,40 +786,72 @@ var (
 				Params: []wasm.ValueType{i32},
 				Results: []wasm.ValueType{
 					i32, i64, f32, f64, i32, i64, f32, f64,
+					i32, i32, i32, i32, i32, i32, i32, i32,
+					i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64,
 				},
 			}},
 			MemorySection:   &wasm.Memory{Min: 1},
 			FunctionSection: []wasm.Index{0},
 			CodeSection: []wasm.Code{{Body: []byte{
-				wasm.OpcodeLocalGet, 0,
 				// Basic loads (without extensions).
+				wasm.OpcodeLocalGet, 0,
 				wasm.OpcodeI32Load, 0x2, 0x0, // alignment=2 (natural alignment) staticOffset=0
 				wasm.OpcodeLocalGet, 0,
-				wasm.OpcodeI64Load, 0x3, 0x0, // alignment=4 (natural alignment) staticOffset=0
+				wasm.OpcodeI64Load, 0x3, 0x0, // alignment=3 (natural alignment) staticOffset=0
 				wasm.OpcodeLocalGet, 0,
 				wasm.OpcodeF32Load, 0x2, 0x0, // alignment=2 (natural alignment) staticOffset=0
 				wasm.OpcodeLocalGet, 0,
-				wasm.OpcodeF64Load, 0x3, 0x0, // alignment=4 (natural alignment) staticOffset=0
+				wasm.OpcodeF64Load, 0x3, 0x0, // alignment=3 (natural alignment) staticOffset=0
 				wasm.OpcodeLocalGet, 0,
 				wasm.OpcodeI32Load, 0x2, 0xf, // alignment=2 (natural alignment) staticOffset=16
 				wasm.OpcodeLocalGet, 0,
-				wasm.OpcodeI64Load, 0x3, 0xf, // alignment=4 (natural alignment) staticOffset=16
+				wasm.OpcodeI64Load, 0x3, 0xf, // alignment=3 (natural alignment) staticOffset=16
 				wasm.OpcodeLocalGet, 0,
 				wasm.OpcodeF32Load, 0x2, 0xf, // alignment=2 (natural alignment) staticOffset=16
 				wasm.OpcodeLocalGet, 0,
-				wasm.OpcodeF64Load, 0x3, 0xf, // alignment=4 (natural alignment) staticOffset=16
+				wasm.OpcodeF64Load, 0x3, 0xf, // alignment=3 (natural alignment) staticOffset=16
 
-				// TODO:
-				// wasm.OpcodeI32Load8S
-				// wasm.OpcodeI32Load8U
-				// wasm.OpcodeI32Load16S
-				// wasm.OpcodeI32Load16U
-				// wasm.OpcodeI64Load8S
-				// wasm.OpcodeI64Load8U
-				// wasm.OpcodeI64Load16S
-				// wasm.OpcodeI64Load16U
-				// wasm.OpcodeI64Load32S
-				// wasm.OpcodeI64Load32U
+				// Extension integer loads.
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeI32Load8S, 0x0, 0x0, // alignment=0 (natural alignment) staticOffset=0
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeI32Load8S, 0x0, 0xf, // alignment=0 (natural alignment) staticOffset=16
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeI32Load8U, 0x0, 0x0, // alignment=0 (natural alignment) staticOffset=0
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeI32Load8U, 0x0, 0xf, // alignment=0 (natural alignment) staticOffset=16
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeI32Load16S, 0x1, 0x0, // alignment=1 (natural alignment) staticOffset=0
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeI32Load16S, 0x1, 0xf, // alignment=1 (natural alignment) staticOffset=16
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeI32Load16U, 0x1, 0x0, // alignment=1 (natural alignment) staticOffset=0
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeI32Load16U, 0x1, 0xf, // alignment=1 (natural alignment) staticOffset=16
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeI64Load8S, 0x0, 0x0, // alignment=0 (natural alignment) staticOffset=0
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeI64Load8S, 0x0, 0xf, // alignment=0 (natural alignment) staticOffset=16
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeI64Load8U, 0x0, 0x0, // alignment=0 (natural alignment) staticOffset=0
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeI64Load8U, 0x0, 0xf, // alignment=0 (natural alignment) staticOffset=16
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeI64Load16S, 0x1, 0x0, // alignment=1 (natural alignment) staticOffset=0
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeI64Load16S, 0x1, 0xf, // alignment=1 (natural alignment) staticOffset=16
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeI64Load16U, 0x1, 0x0, // alignment=1 (natural alignment) staticOffset=0
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeI64Load16U, 0x1, 0xf, // alignment=1 (natural alignment) staticOffset=16
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeI64Load32S, 0x2, 0x0, // alignment=2 (natural alignment) staticOffset=0
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeI64Load32S, 0x2, 0xf, // alignment=2 (natural alignment) staticOffset=16
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeI64Load32U, 0x2, 0x0, // alignment=2 (natural alignment) staticOffset=0
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeI64Load32U, 0x2, 0xf, // alignment=2 (natural alignment) staticOffset=16
 
 				wasm.OpcodeEnd,
 			}}},

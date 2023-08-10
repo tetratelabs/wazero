@@ -118,7 +118,7 @@ func (l *loweringState) ctrlPeekAt(n int) (ret *controlFrame) {
 	return &l.controlFrames[tail-n]
 }
 
-const debug = true
+const debug = false
 
 // lowerBody lowers the body of the Wasm function to the SSA form.
 func (c *Compiler) lowerBody(entryBlk ssa.BasicBlock) {
@@ -434,26 +434,108 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		variable := c.localVariable(index)
 		v := state.pop()
 		builder.DefineVariableInCurrentBB(variable, v)
-	//case wasm.OpcodeI32Load, wasm.OpcodeI64Load, wasm.OpcodeF32Load, wasm.OpcodeF64Load:
-	//	_, offset, _ := c.readMemArg()
-	//	if state.unreachable {
-	//		return
-	//	}
-	//
-	//	var ceil = offset
-	//	switch op {
-	//	case wasm.OpcodeI32Load, wasm.OpcodeF32Load:
-	//		ceil += 4
-	//	case wasm.OpcodeI64Load, wasm.OpcodeF64Load:
-	//		ceil += 8
-	//	}
-	//
-	//	baseAdr := state.pop()
-	//	memBase := c.getMemoryBaseValue()
-	//	memLen := c.getMemoryLenValue()
-	//
-	//	// Check for out of bounds memory access.
+	case wasm.OpcodeI32Load,
+		wasm.OpcodeI64Load,
+		wasm.OpcodeF32Load,
+		wasm.OpcodeF64Load,
+		wasm.OpcodeI32Load8S,
+		wasm.OpcodeI32Load8U,
+		wasm.OpcodeI32Load16S,
+		wasm.OpcodeI32Load16U,
+		wasm.OpcodeI64Load8S,
+		wasm.OpcodeI64Load8U,
+		wasm.OpcodeI64Load16S,
+		wasm.OpcodeI64Load16U,
+		wasm.OpcodeI64Load32S,
+		wasm.OpcodeI64Load32U:
+		_, offset := c.readMemArg()
+		if state.unreachable {
+			return
+		}
 
+		var ceil = offset
+		switch op {
+		case wasm.OpcodeI32Load, wasm.OpcodeF32Load:
+			ceil += 4
+		case wasm.OpcodeI64Load, wasm.OpcodeF64Load:
+			ceil += 8
+		case wasm.OpcodeI32Load8S, wasm.OpcodeI32Load8U:
+			ceil += 1
+		case wasm.OpcodeI32Load16S, wasm.OpcodeI32Load16U:
+			ceil += 2
+		case wasm.OpcodeI64Load8S, wasm.OpcodeI64Load8U:
+			ceil += 1
+		case wasm.OpcodeI64Load16S, wasm.OpcodeI64Load16U:
+			ceil += 2
+		case wasm.OpcodeI64Load32S, wasm.OpcodeI64Load32U:
+			ceil += 4
+		default:
+			panic("BUG")
+		}
+
+		ceilConst := builder.AllocateInstruction()
+		ceilConst.AsIconst64(uint64(ceil))
+		builder.InsertInstruction(ceilConst)
+
+		// We calculate the offset in 64-bit space.
+		baseAddr := state.pop()
+		extBaseAddr := builder.AllocateInstruction()
+		extBaseAddr.AsUExtend(baseAddr, 32, 64)
+		builder.InsertInstruction(extBaseAddr)
+
+		// Note: memLen is already zero extended to 64-bit space at the load time.
+		memLen := c.getMemoryLenValue()
+
+		// baseAddrPlusCeil = baseAddr + ceil
+		baseAddrPlusCeil := builder.AllocateInstruction()
+		baseAddrPlusCeil.AsIadd(extBaseAddr.Return(), ceilConst.Return())
+		builder.InsertInstruction(baseAddrPlusCeil)
+
+		// Check for out of bounds memory access: `baseAddrPlusCeil > memLen`.
+		cmp := builder.AllocateInstruction()
+		cmp.AsIcmp(memLen, baseAddrPlusCeil.Return(), ssa.IntegerCmpCondUnsignedLessThan)
+		builder.InsertInstruction(cmp)
+		exitIfNZ := builder.AllocateInstruction()
+		exitIfNZ.AsExitIfNotZeroWithCode(c.execCtxPtrValue, cmp.Return(), wazevoapi.ExitCodeMemoryOutOfBounds)
+		builder.InsertInstruction(exitIfNZ)
+
+		// Load the value.
+		memBase := c.getMemoryBaseValue()
+		load := builder.AllocateInstruction()
+		switch op {
+		case wasm.OpcodeI32Load:
+			load.AsLoad(memBase, offset, ssa.TypeI32)
+		case wasm.OpcodeI64Load:
+			load.AsLoad(memBase, offset, ssa.TypeI64)
+		case wasm.OpcodeF32Load:
+			load.AsLoad(memBase, offset, ssa.TypeF32)
+		case wasm.OpcodeF64Load:
+			load.AsLoad(memBase, offset, ssa.TypeF64)
+		case wasm.OpcodeI32Load8S:
+			load.AsExtLoad(ssa.OpcodeSload8, memBase, offset, false)
+		case wasm.OpcodeI32Load8U:
+			load.AsExtLoad(ssa.OpcodeUload8, memBase, offset, false)
+		case wasm.OpcodeI32Load16S:
+			load.AsExtLoad(ssa.OpcodeSload16, memBase, offset, false)
+		case wasm.OpcodeI32Load16U:
+			load.AsExtLoad(ssa.OpcodeUload16, memBase, offset, false)
+		case wasm.OpcodeI64Load8S:
+			load.AsExtLoad(ssa.OpcodeSload8, memBase, offset, true)
+		case wasm.OpcodeI64Load8U:
+			load.AsExtLoad(ssa.OpcodeUload8, memBase, offset, true)
+		case wasm.OpcodeI64Load16S:
+			load.AsExtLoad(ssa.OpcodeSload16, memBase, offset, true)
+		case wasm.OpcodeI64Load16U:
+			load.AsExtLoad(ssa.OpcodeUload16, memBase, offset, true)
+		case wasm.OpcodeI64Load32S:
+			load.AsExtLoad(ssa.OpcodeSload32, memBase, offset, true)
+		case wasm.OpcodeI64Load32U:
+			load.AsExtLoad(ssa.OpcodeUload32, memBase, offset, true)
+		default:
+			panic("BUG")
+		}
+		builder.InsertInstruction(load)
+		state.push(load.Return())
 	case wasm.OpcodeBlock:
 		// Note: we do not need to create a BB for this as that would always have only one predecessor
 		// which is the current BB, and therefore it's always ok to merge them in any way.
@@ -743,23 +825,23 @@ func (c *Compiler) getMemoryBaseValue() ssa.Value {
 	if c.offset.LocalMemoryBegin < 0 {
 		panic("TODO: imported memory")
 	}
-	return c.getModuleCtxValue(c.memoryBaseVariable, c.offset.LocalMemoryBase(), ssa.TypeI64)
+	return c.getModuleCtxValueI32ZeroExt(c.memoryBaseVariable, c.offset.LocalMemoryBase())
 }
 
 func (c *Compiler) getMemoryLenValue() ssa.Value {
 	if c.offset.LocalMemoryBegin < 0 {
 		panic("TODO: imported memory")
 	}
-	return c.getModuleCtxValue(c.memoryLenVariable, c.offset.LocalMemoryLen(), ssa.TypeI64)
+	return c.getModuleCtxValueI32ZeroExt(c.memoryLenVariable, c.offset.LocalMemoryLen())
 }
 
-func (c *Compiler) getModuleCtxValue(variable ssa.Variable, offset wazevoapi.Offset, typ ssa.Type) ssa.Value {
+func (c *Compiler) getModuleCtxValueI32ZeroExt(variable ssa.Variable, offset wazevoapi.Offset) ssa.Value {
 	builder := c.ssaBuilder
 	if v := builder.FindValue(variable); v.Valid() {
 		return v
 	}
 	load := builder.AllocateInstruction()
-	load.AsLoad(c.moduleCtxPtrValue, uint32(offset), typ)
+	load.AsExtLoad(ssa.OpcodeUload32, c.moduleCtxPtrValue, uint32(offset), true)
 	builder.InsertInstruction(load)
 	ret := load.Return()
 	builder.DefineVariableInCurrentBB(variable, ret)
@@ -848,24 +930,22 @@ func (c *Compiler) readBlockType() *wasm.FunctionType {
 	return bt
 }
 
-func (c *Compiler) readMemArg() (align, offset uint32, err error) {
+func (c *Compiler) readMemArg() (align, offset uint32) {
 	state := &c.loweringState
 
 	align, num, err := leb128.LoadUint32(c.wasmFunctionBody[state.pc+1:])
 	if err != nil {
-		err = fmt.Errorf("read memory align: %v", err)
-		return
+		panic(fmt.Errorf("read memory align: %v", err))
 	}
 
 	state.pc += int(num)
 	offset, num, err = leb128.LoadUint32(c.wasmFunctionBody[state.pc+1:])
 	if err != nil {
-		err = fmt.Errorf("read memory offset: %v", err)
-		return
+		panic(fmt.Errorf("read memory offset: %v", err))
 	}
 
 	state.pc += int(num)
-	return align, offset, nil
+	return align, offset
 }
 
 // insertJumpToBlock inserts a jump instruction to the given block in the current block.
