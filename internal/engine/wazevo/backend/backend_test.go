@@ -224,14 +224,13 @@ L2 (SSA Block: blk1):
 			afterLoweringARM64: `
 L1 (SSA Block: blk0):
 	mov x0?, x0
-	mov x4?, xzr
-	cbz w4?, (L2)
+	mov x3?, xzr
+	cbz w3?, (L2)
 L3 (SSA Block: blk1):
 	ret
 L2 (SSA Block: blk2):
-L4 (SSA Block: blk3):
-	orr w5?, wzr, #0x2
-	str w5?, [x0?]
+	movz x27, #0x2, LSL 0
+	str w27, [x0?]
 	trap_sequence w0?
 `,
 			afterFinalizeARM64: `
@@ -243,9 +242,8 @@ L3 (SSA Block: blk1):
 	ldr x30, [sp], #0x10
 	ret
 L2 (SSA Block: blk2):
-L4 (SSA Block: blk3):
-	orr w8, wzr, #0x2
-	str w8, [x0]
+	movz x27, #0x2, LSL 0
+	str w27, [x0]
 	trap_sequence w0
 `,
 		},

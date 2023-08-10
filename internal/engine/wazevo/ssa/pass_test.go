@@ -134,7 +134,7 @@ blk3: () <-- (blk1,blk2)
 				{
 					// At this point, loop is not sealed, so PHI will be added to this header. However, the only
 					// input to the PHI is iConst above, so there must be an alias to iConst from the PHI value.
-					value := b.FindValue(var1)
+					value := b.MustFindValue(var1)
 
 					tmpInst := b.AllocateInstruction()
 					tmpInst.AsIconst32(0xff)

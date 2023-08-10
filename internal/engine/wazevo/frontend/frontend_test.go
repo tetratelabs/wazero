@@ -38,12 +38,7 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 			name: "unreachable", m: testcases.Unreachable.Module,
 			exp: `
 blk0: (exec_ctx:i64, module_ctx:i64)
-	Jump blk1
-
-blk1: () <-- (blk0)
-	v2:i32 = Iconst_32 0x2
-	Store v2, exec_ctx, 0x0
-	Trap exec_ctx
+	Exit exec_ctx, unreachable
 `,
 		},
 		{
@@ -178,12 +173,7 @@ blk1: () <-- (blk0)
 	Jump blk_ret
 
 blk2: () <-- (blk0)
-	Jump blk3
-
-blk3: () <-- (blk2)
-	v3:i32 = Iconst_32 0x2
-	Store v3, exec_ctx, 0x0
-	Trap exec_ctx
+	Exit exec_ctx, unreachable
 `,
 		},
 		{
@@ -196,7 +186,6 @@ blk1: () <-- (blk0,blk1)
 	Jump blk1
 
 blk2: ()
-	Jump blk_ret
 `,
 			expAfterOpt: `
 blk0: (exec_ctx:i64, module_ctx:i64)
@@ -218,7 +207,6 @@ blk1: () <-- (blk0,blk1)
 	Jump blk3
 
 blk2: ()
-	Jump blk_ret
 
 blk3: () <-- (blk1)
 	Return
@@ -246,11 +234,10 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 	v5:f64 = F64const 0.000000
 	Jump blk1
 
-blk1: () <-- (blk0,blk2)
+blk1: () <-- (blk0)
 	Jump blk_ret
 
 blk2: ()
-	Jump blk1
 `,
 			expAfterOpt: `
 blk0: (exec_ctx:i64, module_ctx:i64)
@@ -376,8 +363,14 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
 blk1: (v4:i32) <-- (blk0)
 	Return v4
 
-blk2: (v5:i32)
-	Jump blk_ret, v5
+blk2: ()
+`,
+			expAfterOpt: `
+blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
+	Jump blk1
+
+blk1: () <-- (blk0)
+	Return v2
 `,
 		},
 		{
@@ -432,7 +425,6 @@ blk1: (v3:i32) <-- (blk0,blk3)
 	Jump blk4
 
 blk2: ()
-	Jump blk_ret
 
 blk3: () <-- (blk4)
 	v4:i32 = Iconst_32 0x1
@@ -883,6 +875,7 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
 	Jump blk_ret, v5
 `,
 		},
+		//{name: "memory_loads", m: testcases.MemoryLoads.Module,},
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {

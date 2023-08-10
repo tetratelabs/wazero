@@ -749,13 +749,14 @@ func TestInstruction_encoding_store(t *testing.T) {
 	}
 }
 
-func Test_encodeTrapSequence(t *testing.T) {
+func Test_encodeExitSequence(t *testing.T) {
 	m := &mockCompiler{}
-	encodeTrapSequence(m, x22VReg)
+	encodeExitSequence(m, x22VReg)
 	// ldr x29, [x22, #0x10]
 	// ldr x27, [x22, #0x18]
 	// mov sp, x27
 	// ldr x30, [x22, #0x20]
 	// ret
 	require.Equal(t, "dd0a40f9db0e40f97f030091de1240f9c0035fd6", hex.EncodeToString(m.buf))
+	require.Equal(t, len(m.buf), exitSequenceSize)
 }

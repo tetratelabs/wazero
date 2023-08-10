@@ -375,7 +375,7 @@ func (m *machine) insertStackBoundsCheck(requiredStackSize int64, cur *instructi
 			kind: addressModeKindRegUnsignedImm12,
 			// Execution context is always the first argument.
 			rn: x0VReg, imm: wazevoapi.ExecutionContextOffsets.ExitCodeOffset.I64(),
-		}, 64)
+		}, 32)
 	setExistStatus.prev = cur
 	cur.next = setExistStatus
 	cur = setExistStatus
@@ -405,7 +405,7 @@ func (m *machine) insertStackBoundsCheck(requiredStackSize int64, cur *instructi
 
 	// Read the return address into tmp, and store it in the execution context.
 	adr := m.allocateInstrAfterLowering()
-	adr.asAdr(tmpRegVReg, trapSequenceSize+8)
+	adr.asAdr(tmpRegVReg, exitSequenceSize+8)
 	adr.prev = cur
 	cur.next = adr
 	cur = adr
@@ -422,7 +422,7 @@ func (m *machine) insertStackBoundsCheck(requiredStackSize int64, cur *instructi
 
 	// Exit the execution.
 	trapSeq := m.allocateInstrAfterLowering()
-	trapSeq.asTrapSequence(x0VReg)
+	trapSeq.asExitSequence(x0VReg)
 	trapSeq.prev = cur
 	cur.next = trapSeq
 	cur = trapSeq

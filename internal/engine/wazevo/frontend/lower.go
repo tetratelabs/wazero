@@ -118,7 +118,7 @@ func (l *loweringState) ctrlPeekAt(n int) (ret *controlFrame) {
 	return &l.controlFrames[tail-n]
 }
 
-const debug = false
+const debug = true
 
 // lowerBody lowers the body of the Wasm function to the SSA form.
 func (c *Compiler) lowerBody(entryBlk ssa.BasicBlock) {
@@ -424,7 +424,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 			return
 		}
 		variable := c.localVariable(index)
-		v := builder.FindValue(variable)
+		v := builder.MustFindValue(variable)
 		state.push(v)
 	case wasm.OpcodeLocalSet:
 		index := c.readI32u()
@@ -434,6 +434,26 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		variable := c.localVariable(index)
 		v := state.pop()
 		builder.DefineVariableInCurrentBB(variable, v)
+	//case wasm.OpcodeI32Load, wasm.OpcodeI64Load, wasm.OpcodeF32Load, wasm.OpcodeF64Load:
+	//	_, offset, _ := c.readMemArg()
+	//	if state.unreachable {
+	//		return
+	//	}
+	//
+	//	var ceil = offset
+	//	switch op {
+	//	case wasm.OpcodeI32Load, wasm.OpcodeF32Load:
+	//		ceil += 4
+	//	case wasm.OpcodeI64Load, wasm.OpcodeF64Load:
+	//		ceil += 8
+	//	}
+	//
+	//	baseAdr := state.pop()
+	//	memBase := c.getMemoryBaseValue()
+	//	memLen := c.getMemoryLenValue()
+	//
+	//	// Check for out of bounds memory access.
+
 	case wasm.OpcodeBlock:
 		// Note: we do not need to create a BB for this as that would always have only one predecessor
 		// which is the current BB, and therefore it's always ok to merge them in any way.
@@ -659,10 +679,9 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		state.unreachable = true
 
 	case wasm.OpcodeUnreachable:
-		// TODO: in order to assign the correct source address, we need to have
-		// 	a dedicated block before jumping to `trapBlk` which is shared across functions.
-		trapBlk := c.getOrCreateTrapBlock(wazevoapi.ExitCodeUnreachable)
-		c.insertJumpToBlock(nil, trapBlk)
+		exit := builder.AllocateInstruction()
+		exit.AsExitWithCode(c.execCtxPtrValue, wazevoapi.ExitCodeUnreachable)
+		builder.InsertInstruction(exit)
 		state.unreachable = true
 
 	case wasm.OpcodeCall:
@@ -718,6 +737,33 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 	default:
 		panic("TODO: unsupported in wazevo yet: " + wasm.InstructionName(op))
 	}
+}
+
+func (c *Compiler) getMemoryBaseValue() ssa.Value {
+	if c.offset.LocalMemoryBegin < 0 {
+		panic("TODO: imported memory")
+	}
+	return c.getModuleCtxValue(c.memoryBaseVariable, c.offset.LocalMemoryBase(), ssa.TypeI64)
+}
+
+func (c *Compiler) getMemoryLenValue() ssa.Value {
+	if c.offset.LocalMemoryBegin < 0 {
+		panic("TODO: imported memory")
+	}
+	return c.getModuleCtxValue(c.memoryLenVariable, c.offset.LocalMemoryLen(), ssa.TypeI64)
+}
+
+func (c *Compiler) getModuleCtxValue(variable ssa.Variable, offset wazevoapi.Offset, typ ssa.Type) ssa.Value {
+	builder := c.ssaBuilder
+	if v := builder.FindValue(variable); v.Valid() {
+		return v
+	}
+	load := builder.AllocateInstruction()
+	load.AsLoad(c.moduleCtxPtrValue, uint32(offset), typ)
+	builder.InsertInstruction(load)
+	ret := load.Return()
+	builder.DefineVariableInCurrentBB(variable, ret)
+	return ret
 }
 
 func (c *Compiler) insertIcmp(cond ssa.IntegerCmpCond) {
@@ -802,6 +848,26 @@ func (c *Compiler) readBlockType() *wasm.FunctionType {
 	return bt
 }
 
+func (c *Compiler) readMemArg() (align, offset uint32, err error) {
+	state := &c.loweringState
+
+	align, num, err := leb128.LoadUint32(c.wasmFunctionBody[state.pc+1:])
+	if err != nil {
+		err = fmt.Errorf("read memory align: %v", err)
+		return
+	}
+
+	state.pc += int(num)
+	offset, num, err = leb128.LoadUint32(c.wasmFunctionBody[state.pc+1:])
+	if err != nil {
+		err = fmt.Errorf("read memory offset: %v", err)
+		return
+	}
+
+	state.pc += int(num)
+	return align, offset, nil
+}
+
 // insertJumpToBlock inserts a jump instruction to the given block in the current block.
 func (c *Compiler) insertJumpToBlock(args []ssa.Value, targetBlk ssa.BasicBlock) {
 	builder := c.ssaBuilder
@@ -826,6 +892,10 @@ func (c *Compiler) insertIntegerExtend(signed bool, from, to byte) {
 }
 
 func (c *Compiler) switchTo(originalStackLen int, targetBlk ssa.BasicBlock) {
+	if targetBlk.Preds() == 0 {
+		c.loweringState.unreachable = true
+	}
+
 	// Now we should adjust the stack and start translating the continuation block.
 	c.loweringState.values = c.loweringState.values[:originalStackLen]
 

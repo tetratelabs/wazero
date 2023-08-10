@@ -63,7 +63,7 @@ var defKinds = [numInstructionKinds]defKind{
 	ret:             defKindNone,
 	store32:         defKindNone,
 	store64:         defKindNone,
-	trapSequence:    defKindNone,
+	exitSequence:    defKindNone,
 	condBr:          defKindNone,
 	br:              defKindNone,
 	cSet:            defKindRD,
@@ -146,7 +146,7 @@ var useKinds = [numInstructionKinds]useKind{
 	ret:             useKindRet,
 	store32:         useKindRNAMode,
 	store64:         useKindRNAMode,
-	trapSequence:    useKindRN,
+	exitSequence:    useKindRN,
 	condBr:          useKindCond,
 	br:              useKindNone,
 	cSet:            useKindNone,
@@ -872,7 +872,7 @@ func (i *instruction) String() (str string) {
 		panic("TODO")
 	case loadAddr:
 		panic("TODO")
-	case trapSequence:
+	case exitSequence:
 		str = fmt.Sprintf("trap_sequence %s", formatVRegSized(i.rn.nr(), 32))
 	case udf:
 		str = "udf"
@@ -1056,9 +1056,9 @@ const (
 	jtSequence
 	// loadAddr represents a load address instruction.
 	loadAddr
-	// trapSequence consists of multiple instructions, and exits the execution immediately.
-	// See encodeTrapSequence.
-	trapSequence
+	// exitSequence consists of multiple instructions, and exits the execution immediately.
+	// See encodeExitSequence.
+	exitSequence
 	// UDF is the undefined instruction. For debugging only.
 	udf
 
@@ -1070,8 +1070,8 @@ func (i *instruction) asUDF() {
 	i.kind = udf
 }
 
-func (i *instruction) asTrapSequence(ctx regalloc.VReg) {
-	i.kind = trapSequence
+func (i *instruction) asExitSequence(ctx regalloc.VReg) {
+	i.kind = exitSequence
 	i.rn = operandNR(ctx)
 }
 
@@ -1358,13 +1358,13 @@ func binarySize(begin, end *instruction) (size int64) {
 	return size
 }
 
-const trapSequenceSize = 5 * 4 // 5 instructions as in encodeTrapSequence.
+const exitSequenceSize = 5 * 4 // 5 instructions as in encodeExitSequence.
 
 // size returns the size of the instruction in encoded bytes.
 func (i *instruction) size() int64 {
 	switch i.kind {
-	case trapSequence:
-		return trapSequenceSize // 5 instructions as in encodeTrapSequence.
+	case exitSequence:
+		return exitSequenceSize // 5 instructions as in encodeExitSequence.
 	case nop0:
 		return 0
 	case loadFpuConst32:

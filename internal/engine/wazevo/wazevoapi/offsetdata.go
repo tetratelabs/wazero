@@ -65,6 +65,19 @@ func (o Offset) I64() int64 {
 	return int64(o)
 }
 
+// LocalMemoryBase returns an offset of the first byte of the local memory.
+func (m *ModuleContextOffsetData) LocalMemoryBase() Offset {
+	return m.LocalMemoryBegin
+}
+
+// LocalMemoryLen returns an offset of the length of the local memory buffer.
+func (m *ModuleContextOffsetData) LocalMemoryLen() Offset {
+	if l := m.LocalMemoryBegin; l >= 0 {
+		return l + 8
+	}
+	return -1
+}
+
 // NewModuleContextOffsetData creates a ModuleContextOffsetData determining the structure of moduleContextOpaque for the given Module.
 // The structure is described in the comment of wazevo.moduleContextOpaque.
 func NewModuleContextOffsetData(m *wasm.Module) ModuleContextOffsetData {

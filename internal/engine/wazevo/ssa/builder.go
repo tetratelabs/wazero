@@ -48,7 +48,11 @@ type Builder interface {
 	// allocateValue allocates an unused Value.
 	allocateValue(typ Type) Value
 
-	// FindValue searches the latest definition of the given Variable and returns the result.
+	// MustFindValue searches the latest definition of the given Variable and returns the result.
+	MustFindValue(variable Variable) Value
+
+	// FindValue is the same as FindValue except that if the Value is not defined anywhere yet,
+	// the given callback `create` is called to create a new Value.
 	FindValue(variable Variable) Value
 
 	// Seal declares that we've known all the predecessors to this block and were added via AddPred.
@@ -350,35 +354,50 @@ func (b *builder) allocateValue(typ Type) (v Value) {
 	return
 }
 
+// MustFindValue implements Builder.MustFindValue.
+func (b *builder) MustFindValue(variable Variable) Value {
+	typ := b.definedVariableType(variable)
+	return b.findValue(typ, variable, b.currentBB, true)
+}
+
 // FindValue implements Builder.FindValue.
 func (b *builder) FindValue(variable Variable) Value {
 	typ := b.definedVariableType(variable)
-	return b.findValue(typ, variable, b.currentBB)
+	return b.findValue(typ, variable, b.currentBB, false)
 }
 
 // findValue recursively tries to find the latest definition of a `variable`. The algorithm is described in
 // the section 2 of the paper https://link.springer.com/content/pdf/10.1007/978-3-642-37051-9_6.pdf.
 //
 // TODO: reimplement this in iterative, not recursive, to avoid stack overflow.
-func (b *builder) findValue(typ Type, variable Variable, blk *basicBlock) Value {
+func (b *builder) findValue(typ Type, variable Variable, blk *basicBlock, must bool) Value {
 	if val, ok := blk.lastDefinitions[variable]; ok {
 		// The value is already defined in this block!
 		return val
 	} else if !blk.sealed { // Incomplete CFG as in the paper.
-		// If this is not sealed, that means it might have additional unknown predecessor later on.
-		// So we temporarily define the placeholder value here (not add as a parameter yet!),
-		// and record it as unknown.
-		// The unknown values are resolved when we call seal this block via BasicBlock.Seal().
-		value := b.allocateValue(typ)
-		blk.lastDefinitions[variable] = value
-		blk.unknownValues[variable] = value
-		return value
+		if must {
+			// If this is not sealed, that means it might have additional unknown predecessor later on.
+			// So we temporarily define the placeholder value here (not add as a parameter yet!),
+			// and record it as unknown.
+			// The unknown values are resolved when we call seal this block via BasicBlock.Seal().
+			value := b.allocateValue(typ)
+			blk.lastDefinitions[variable] = value
+			blk.unknownValues[variable] = value
+			return value
+		}
+		return ValueInvalid
 	}
 
 	if pred := blk.singlePred; pred != nil {
 		// If this block is sealed and have only one predecessor,
 		// we can use the value in that block without ambiguity on definition.
-		return b.findValue(typ, variable, pred)
+		return b.findValue(typ, variable, pred, must)
+	} else if len(blk.preds) == 0 {
+		// This case the value is not defined.
+		if must {
+			panic("BUG: value is not defined for " + variable.String())
+		}
+		return ValueInvalid
 	}
 
 	// If this block has multiple predecessors, we have to gather the definitions,
@@ -393,7 +412,7 @@ func (b *builder) findValue(typ Type, variable Variable, blk *basicBlock) Value 
 	for i := range blk.preds {
 		pred := &blk.preds[i]
 		// Find the definition in the predecessor recursively.
-		value := b.findValue(typ, variable, pred.blk)
+		value := b.findValue(typ, variable, pred.blk, must)
 		pred.branch.addArgumentBranchInst(value)
 	}
 	return paramValue
@@ -412,7 +431,10 @@ func (b *builder) Seal(raw BasicBlock) {
 		blk.addParamOn(typ, phiValue)
 		for i := range blk.preds {
 			pred := &blk.preds[i]
-			predValue := b.findValue(typ, variable, pred.blk)
+			predValue := b.findValue(typ, variable, pred.blk, false)
+			if !predValue.Valid() {
+				panic("BUG: value is not defined anywhere in the predecessors in the CFG")
+			}
 			pred.branch.addArgumentBranchInst(predValue)
 		}
 	}
@@ -655,8 +677,9 @@ func (b *builder) LayoutBlocks() {
 		}
 
 		for sidx, succ := range blk.success {
-			if len(succ.preds) < 2 {
-				// If there's no multiple incoming edges to this successor, (pred, succ) is not critical.
+			if !succ.ReturnBlock() && // If the successor is a return block, we need to split the edge any way because we need "epilogue" to be inserted.
+				// Plus if there's no multiple incoming edges to this successor, (pred, succ) is not critical.
+				len(succ.preds) < 2 {
 				continue
 			}
 

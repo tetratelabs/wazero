@@ -20,8 +20,8 @@ func (m *machine) encode(root *instruction) {
 func (i *instruction) encode(c backend.Compiler) {
 	switch kind := i.kind; kind {
 	case nop0:
-	case trapSequence:
-		encodeTrapSequence(c, i.rn.reg())
+	case exitSequence:
+		encodeExitSequence(c, i.rn.reg())
 	case ret:
 		// https://developer.arm.com/documentation/ddi0596/2020-12/Base-Instructions/RET--Return-from-subroutine-?lang=en
 		c.Emit4Bytes(encodeRet())
@@ -740,8 +740,8 @@ func encodeAluRRImm(op aluOp, rd, rn, amount, _64bit uint32) uint32 {
 	return _64bit<<31 | opc<<29 | 0b100110<<23 | _64bit<<22 | immr<<16 | imms<<10 | rn<<5 | rd
 }
 
-// encodeTrapSequence matches the implementation detail of abiImpl.emitGoEntryPreamble.
-func encodeTrapSequence(c backend.Compiler, ctxReg regalloc.VReg) {
+// encodeExitSequence matches the implementation detail of abiImpl.emitGoEntryPreamble.
+func encodeExitSequence(c backend.Compiler, ctxReg regalloc.VReg) {
 	// Restore the FP, SP and LR, and return to the Go code:
 	// 		ldr fp, [savedExecutionContextPtr, #OriginalFramePointer]
 	// 		ldr tmp, [savedExecutionContextPtr, #OriginalStackPointer]

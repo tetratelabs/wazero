@@ -1,6 +1,7 @@
 package testcases
 
 import (
+	"github.com/tetratelabs/wazero/internal/leb128"
 	"math"
 
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -778,6 +779,53 @@ var (
 			}}},
 		},
 	}
+	MemoryLoads = TestCase{
+		Name: "memory_loads",
+		Module: &wasm.Module{
+			TypeSection: []wasm.FunctionType{{
+				Params: []wasm.ValueType{i32},
+				Results: []wasm.ValueType{
+					i32, i64, f32, f64, i32, i64, f32, f64,
+				},
+			}},
+			MemorySection:   &wasm.Memory{Min: 1},
+			FunctionSection: []wasm.Index{0},
+			CodeSection: []wasm.Code{{Body: []byte{
+				wasm.OpcodeLocalGet, 0,
+				// Basic loads (without extensions).
+				wasm.OpcodeI32Load, 0x2, 0x0, // alignment=2 (natural alignment) staticOffset=0
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeI64Load, 0x3, 0x0, // alignment=4 (natural alignment) staticOffset=0
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeF32Load, 0x2, 0x0, // alignment=2 (natural alignment) staticOffset=0
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeF64Load, 0x3, 0x0, // alignment=4 (natural alignment) staticOffset=0
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeI32Load, 0x2, 0xf, // alignment=2 (natural alignment) staticOffset=16
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeI64Load, 0x3, 0xf, // alignment=4 (natural alignment) staticOffset=16
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeF32Load, 0x2, 0xf, // alignment=2 (natural alignment) staticOffset=16
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeF64Load, 0x3, 0xf, // alignment=4 (natural alignment) staticOffset=16
+
+				// TODO:
+				// wasm.OpcodeI32Load8S
+				// wasm.OpcodeI32Load8U
+				// wasm.OpcodeI32Load16S
+				// wasm.OpcodeI32Load16U
+				// wasm.OpcodeI64Load8S
+				// wasm.OpcodeI64Load8U
+				// wasm.OpcodeI64Load16S
+				// wasm.OpcodeI64Load16U
+				// wasm.OpcodeI64Load32S
+				// wasm.OpcodeI64Load32U
+
+				wasm.OpcodeEnd,
+			}}},
+			DataSection: []wasm.DataSegment{{OffsetExpression: constOffsetExpr(0), Init: maskedBuf(int(wasm.MemoryPageSize))}},
+		},
+	}
 )
 
 type TestCase struct {
@@ -818,3 +866,18 @@ const (
 
 	blockSignature_vv = 0x40 // 0x40 is the v_v signature in 33-bit signed. See wasm.DecodeBlockType.
 )
+
+func maskedBuf(size int) []byte {
+	ret := make([]byte, size)
+	for i := range ret {
+		ret[i] = byte(i)
+	}
+	return ret
+}
+
+func constOffsetExpr(i int32) wasm.ConstantExpression {
+	return wasm.ConstantExpression{
+		Opcode: wasm.OpcodeI32Const,
+		Data:   leb128.EncodeInt32(i),
+	}
+}

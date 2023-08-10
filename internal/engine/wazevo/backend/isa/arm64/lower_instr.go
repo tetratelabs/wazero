@@ -9,6 +9,7 @@ package arm64
 import (
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 )
 
 // LowerSingleBranch implements backend.Machine.
@@ -126,8 +127,9 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 	case ssa.OpcodeFadd, ssa.OpcodeFsub, ssa.OpcodeFmul, ssa.OpcodeFdiv, ssa.OpcodeFmax, ssa.OpcodeFmin:
 		m.lowerFpuBinOp(instr)
 	case ssa.OpcodeIconst, ssa.OpcodeF32const, ssa.OpcodeF64const: // Constant instructions are inlined.
-	case ssa.OpcodeTrap:
-		m.lowerTrap(instr.Arg())
+	case ssa.OpcodeExitWithCode:
+		execCtx, code := instr.ExitWithCodeData()
+		m.lowerExitWithCode(execCtx, code)
 	case ssa.OpcodeStore, ssa.OpcodeIstore8, ssa.OpcodeIstore16, ssa.OpcodeIstore32:
 		m.lowerStore(instr)
 	case ssa.OpcodeLoad:
@@ -308,10 +310,24 @@ func (m *machine) lowerImul(x, y, result ssa.Value) {
 	m.insert(mul)
 }
 
-// lowerTrap lowers the trap as trapSequence instruction that takes a context pointer as argument.
-func (m *machine) lowerTrap(ctx ssa.Value) {
+// lowerExitWithCode lowers the lowerExitWithCode takes a context pointer as argument.
+func (m *machine) lowerExitWithCode(ctx ssa.Value, code wazevoapi.ExitCode) {
 	execCtxVReg := m.compiler.VRegOf(ctx)
-	instr := m.allocateInstr()
-	instr.asTrapSequence(execCtxVReg)
-	m.insert(instr)
+
+	loadExitCodeConst := m.allocateInstr()
+	loadExitCodeConst.asMOVZ(tmpRegVReg, uint64(code), 0, true)
+
+	setExitCode := m.allocateInstr()
+	setExitCode.asStore(operandNR(tmpRegVReg),
+		addressMode{
+			kind: addressModeKindRegUnsignedImm12,
+			rn:   execCtxVReg, imm: wazevoapi.ExecutionContextOffsets.ExitCodeOffset.I64(),
+		}, 32)
+
+	exitSeq := m.allocateInstr()
+	exitSeq.asExitSequence(execCtxVReg)
+
+	m.insert(loadExitCodeConst)
+	m.insert(setExitCode)
+	m.insert(exitSeq)
 }

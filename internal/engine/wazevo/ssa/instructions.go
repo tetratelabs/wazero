@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"fmt"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 	"math"
 	"strings"
 )
@@ -127,8 +128,8 @@ const (
 	// `BrTable x, block, JT`.
 	OpcodeBrTable
 
-	// OpcodeTrap exit the execution immediately.
-	OpcodeTrap
+	// OpcodeExitWithCode exit the execution immediately.
+	OpcodeExitWithCode
 
 	// OpcodeReturn returns from the function: `return rvalues`.
 	OpcodeReturn
@@ -852,7 +853,7 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeSshr:         sideEffectFalse,
 	OpcodeUshr:         sideEffectFalse,
 	OpcodeStore:        sideEffectTrue,
-	OpcodeTrap:         sideEffectTrue,
+	OpcodeExitWithCode: sideEffectTrue,
 	OpcodeReturn:       sideEffectTrue,
 	OpcodeBrz:          sideEffectTrue,
 	OpcodeBrnz:         sideEffectTrue,
@@ -912,25 +913,25 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 		}
 		return
 	},
-	OpcodeLoad:     returnTypesFnSingle,
-	OpcodeIadd:     returnTypesFnSingle,
-	OpcodeIsub:     returnTypesFnSingle,
-	OpcodeImul:     returnTypesFnSingle,
-	OpcodeIcmp:     returnTypesFnI32,
-	OpcodeFcmp:     returnTypesFnI32,
-	OpcodeFadd:     returnTypesFnSingle,
-	OpcodeFsub:     returnTypesFnSingle,
-	OpcodeFdiv:     returnTypesFnSingle,
-	OpcodeFmul:     returnTypesFnSingle,
-	OpcodeFmax:     returnTypesFnSingle,
-	OpcodeFmin:     returnTypesFnSingle,
-	OpcodeF32const: returnTypesFnF32,
-	OpcodeF64const: returnTypesFnF64,
-	OpcodeStore:    returnTypesFnNoReturns,
-	OpcodeTrap:     returnTypesFnNoReturns,
-	OpcodeReturn:   returnTypesFnNoReturns,
-	OpcodeBrz:      returnTypesFnNoReturns,
-	OpcodeBrnz:     returnTypesFnNoReturns,
+	OpcodeLoad:         returnTypesFnSingle,
+	OpcodeIadd:         returnTypesFnSingle,
+	OpcodeIsub:         returnTypesFnSingle,
+	OpcodeImul:         returnTypesFnSingle,
+	OpcodeIcmp:         returnTypesFnI32,
+	OpcodeFcmp:         returnTypesFnI32,
+	OpcodeFadd:         returnTypesFnSingle,
+	OpcodeFsub:         returnTypesFnSingle,
+	OpcodeFdiv:         returnTypesFnSingle,
+	OpcodeFmul:         returnTypesFnSingle,
+	OpcodeFmax:         returnTypesFnSingle,
+	OpcodeFmin:         returnTypesFnSingle,
+	OpcodeF32const:     returnTypesFnF32,
+	OpcodeF64const:     returnTypesFnF64,
+	OpcodeStore:        returnTypesFnNoReturns,
+	OpcodeExitWithCode: returnTypesFnNoReturns,
+	OpcodeReturn:       returnTypesFnNoReturns,
+	OpcodeBrz:          returnTypesFnNoReturns,
+	OpcodeBrnz:         returnTypesFnNoReturns,
 }
 
 // AsLoad initializes this instruction as a store instruction with OpcodeLoad.
@@ -1127,10 +1128,16 @@ func (i *Instruction) ReturnVals() []Value {
 	return i.vs
 }
 
-// AsTrap initializes this instruction as a trap instruction with OpcodeTrap.
-func (i *Instruction) AsTrap(ctx Value) {
-	i.opcode = OpcodeTrap
+// AsExitWithCode initializes this instruction as a trap instruction with OpcodeExitWithCode.
+func (i *Instruction) AsExitWithCode(ctx Value, code wazevoapi.ExitCode) {
+	i.opcode = OpcodeExitWithCode
 	i.v = ctx
+	i.u64 = uint64(code)
+}
+
+// ExitWithCodeData returns the context and exit code of OpcodeExitWithCode.
+func (i *Instruction) ExitWithCodeData() (ctx Value, code wazevoapi.ExitCode) {
+	return i.v, wazevoapi.ExitCode(i.u64)
 }
 
 // InvertBrx inverts either OpcodeBrz or OpcodeBrnz to the other.
@@ -1287,8 +1294,8 @@ func (i *Instruction) ExtendFromToBits() (from, to byte) {
 func (i *Instruction) Format(b Builder) string {
 	var instSuffix string
 	switch i.opcode {
-	case OpcodeTrap:
-		instSuffix = fmt.Sprintf(" %s", i.v.Format(b))
+	case OpcodeExitWithCode:
+		instSuffix = fmt.Sprintf(" %s, %s", i.v.Format(b), wazevoapi.ExitCode(i.u64))
 	case OpcodeIadd, OpcodeIsub, OpcodeImul, OpcodeFadd, OpcodeFsub, OpcodeFmin, OpcodeFmax, OpcodeFdiv, OpcodeFmul:
 		instSuffix = fmt.Sprintf(" %s, %s", i.v.Format(b), i.v2.Format(b))
 	case OpcodeIcmp:
@@ -1419,8 +1426,8 @@ func (o Opcode) String() (ret string) {
 		return "Brnz"
 	case OpcodeBrTable:
 		return "BrTable"
-	case OpcodeTrap:
-		return "Trap"
+	case OpcodeExitWithCode:
+		return "Exit"
 	case OpcodeReturn:
 		return "Return"
 	case OpcodeCall:
