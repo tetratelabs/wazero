@@ -2,6 +2,7 @@ package frontend
 
 import (
 	"fmt"
+	"math"
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
@@ -1177,7 +1178,31 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 	Jump blk_ret, v3, v5, v7, v9
 `,
 		},
+		{
+			name: "globals_set",
+			m:    testcases.GlobalsSet.Module,
+			exp: `
+blk0: (exec_ctx:i64, module_ctx:i64)
+	v2:i32 = Iconst_32 0x1
+	v3:i64 = Load module_ctx, 0x0
+	v4:i64 = Iconst_64 0x2
+	v5:i64 = Load module_ctx, 0x8
+	v6:f32 = F32const 3.000000
+	v7:i64 = Load module_ctx, 0x10
+	v8:f64 = F64const 4.000000
+	v9:i64 = Load module_ctx, 0x18
+	Jump blk_ret, v2, v4, v6, v8
+`,
+		},
 	} {
+
+		b := math.Float32bits(3.0)
+		fmt.Println(
+			[]byte{
+				byte(b), byte(b >> 8), byte(b >> 16), byte(b >> 24),
+			},
+		)
+
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			// Just in case let's check the test module is valid.

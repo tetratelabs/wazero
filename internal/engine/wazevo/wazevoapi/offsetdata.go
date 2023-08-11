@@ -54,8 +54,8 @@ func (m *ModuleContextOffsetData) ImportedFunctionOffset(i wasm.Index) (ptr, mod
 	return base, base + 8
 }
 
-// GlobalOffset returns an offset of the i-th global variable.
-func (m *ModuleContextOffsetData) GlobalOffset(i wasm.Index) Offset {
+// GlobalInstanceOffset returns an offset of the i-th global instance.
+func (m *ModuleContextOffsetData) GlobalInstanceOffset(i wasm.Index) Offset {
 	return m.GlobalsBegin + Offset(i)*8
 }
 

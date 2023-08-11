@@ -122,6 +122,13 @@ func TestE2E(t *testing.T) {
 				{expResults: []uint64{0x80000000, 0x8000000000000000, 0x7f7fffff, 0x7fefffffffffffff}},
 			},
 		},
+		{
+			name: "globals_set",
+			m:    testcases.GlobalsSet.Module,
+			calls: []callCase{
+				{expResults: []uint64{1, 2, uint64(math.Float32bits(3.0)), math.Float64bits(4.0)}},
+			},
+		},
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
