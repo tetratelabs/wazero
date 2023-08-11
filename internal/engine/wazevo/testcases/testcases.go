@@ -790,7 +790,6 @@ var (
 			MemorySection:   &wasm.Memory{Min: 1},
 			FunctionSection: []wasm.Index{0},
 			CodeSection: []wasm.Code{{Body: []byte{
-				// Basic loads (without extensions).
 				wasm.OpcodeLocalGet, 0,
 				wasm.OpcodeI32Load, 0x2, 0x0, // alignment=2 (natural alignment) staticOffset=0
 				wasm.OpcodeEnd,
@@ -799,7 +798,35 @@ var (
 		},
 	}
 
-	// TODO: add memory loads before and after the call case.
+	MemoryLoadBasic2 = TestCase{
+		Name: "memory_load_basic2",
+		Module: &wasm.Module{
+			TypeSection:     []wasm.FunctionType{i32_i32, {}},
+			ExportSection:   []wasm.Export{{Name: ExportName, Type: wasm.ExternTypeFunc, Index: 0}},
+			MemorySection:   &wasm.Memory{Min: 1},
+			FunctionSection: []wasm.Index{0, 1},
+			CodeSection: []wasm.Code{
+				{Body: []byte{
+					wasm.OpcodeLocalGet, 0,
+					wasm.OpcodeI32Const, 0,
+					wasm.OpcodeI32Eq,
+					wasm.OpcodeIf, blockSignature_vv,
+					wasm.OpcodeCall, 0x1, // After this the memory buf/size pointer reloads.
+					wasm.OpcodeElse, // But in Else block, we do nothing, so not reloaded.
+					wasm.OpcodeEnd,
+
+					// Therefore, this block should reload the memory buf/size pointer here.
+					wasm.OpcodeLocalGet, 0,
+					wasm.OpcodeI32Load, 0x2, 0x0, // alignment=2 (natural alignment) staticOffset=0
+
+					wasm.OpcodeEnd,
+				}},
+				{Body: []byte{wasm.OpcodeEnd}},
+			},
+			DataSection: []wasm.DataSegment{{OffsetExpression: constOffsetExpr(0), Init: maskedBuf(int(wasm.MemoryPageSize))}},
+		},
+	}
+
 	MemoryLoads = TestCase{
 		Name: "memory_loads",
 		Module: &wasm.Module{

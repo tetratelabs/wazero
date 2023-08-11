@@ -174,6 +174,9 @@ type builder struct {
 	donePasses bool
 	// doneBlockLayout is true if LayoutBlocks is called.
 	doneBlockLayout bool
+
+	// vs is reused by builder.FindValue.
+	vs []Value
 }
 
 // ReturnBlock implements Builder.ReturnBlock.
@@ -400,9 +403,27 @@ func (b *builder) findValue(typ Type, variable Variable, blk *basicBlock, must b
 		return ValueInvalid
 	}
 
+	b.vs = b.vs[:0]
 	// If this block has multiple predecessors, we have to gather the definitions,
-	// and treat them as an argument to this block. So the first thing we do now is
-	// define a new parameter to this block which may or may not be redundant, but
+	// and treat them as an argument to this block.
+	//
+	// First gather all the definitions.
+	for i := range blk.preds {
+		pred := &blk.preds[i]
+		// Find the definition in the predecessor recursively.
+		value := b.findValue(typ, variable, pred.blk, must)
+		b.vs = append(b.vs, value)
+	}
+	if !must {
+		// If this is not a must, the value definition might be incomplete.
+		for _, v := range b.vs {
+			if !v.Valid() {
+				// If one of them is invalid, the value is not defined.
+				return ValueInvalid
+			}
+		}
+	}
+	// So the next thing we do now is to define a new parameter to this block which may or may not be redundant, but
 	// later we eliminate trivial params in an optimization pass.
 	paramValue := blk.AddParam(b, typ)
 	b.DefineVariable(variable, paramValue, blk)
@@ -411,9 +432,7 @@ func (b *builder) findValue(typ Type, variable Variable, blk *basicBlock, must b
 	// the newly added PHI.
 	for i := range blk.preds {
 		pred := &blk.preds[i]
-		// Find the definition in the predecessor recursively.
-		value := b.findValue(typ, variable, pred.blk, must)
-		pred.branch.addArgumentBranchInst(value)
+		pred.branch.addArgumentBranchInst(b.vs[i])
 	}
 	return paramValue
 }

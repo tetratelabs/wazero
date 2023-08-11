@@ -878,6 +878,71 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
 `,
 		},
 		{
+			name: "memory_load_basic2", m: testcases.MemoryLoadBasic2.Module,
+			exp: `
+signatures:
+	sig1: i64i64_v
+
+blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
+	v3:i32 = Iconst_32 0x0
+	v4:i32 = Icmp eq, v2, v3
+	Brz v4, blk2
+	Jump blk1
+
+blk1: () <-- (blk0)
+	Store module_ctx, exec_ctx, 0x8
+	Call f1:sig1, exec_ctx, module_ctx
+	v5:i64 = Load module_ctx, 0x0
+	v6:i64 = Uload32 module_ctx, 0x8
+	Jump blk3, v2
+
+blk2: () <-- (blk0)
+	Jump blk3, v2
+
+blk3: (v7:i32) <-- (blk1,blk2)
+	v8:i64 = Iconst_64 0x4
+	v9:i64 = UExtend v7, 32->64
+	v10:i64 = Uload32 module_ctx, 0x8
+	v11:i64 = Iadd v9, v8
+	v12:i32 = Icmp ge_u, v10, v11
+	ExitIfNotZero v12, exec_ctx, memory_out_of_bounds
+	v13:i64 = Load module_ctx, 0x0
+	v14:i64 = Iadd v13, v9
+	v15:i32 = Load v14, 0x0
+	Jump blk_ret, v15
+`,
+			expAfterOpt: `
+signatures:
+	sig1: i64i64_v
+
+blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
+	v3:i32 = Iconst_32 0x0
+	v4:i32 = Icmp eq, v2, v3
+	Brz v4, blk2
+	Jump blk1
+
+blk1: () <-- (blk0)
+	Store module_ctx, exec_ctx, 0x8
+	Call f1:sig1, exec_ctx, module_ctx
+	Jump blk3
+
+blk2: () <-- (blk0)
+	Jump blk3
+
+blk3: () <-- (blk1,blk2)
+	v8:i64 = Iconst_64 0x4
+	v9:i64 = UExtend v2, 32->64
+	v10:i64 = Uload32 module_ctx, 0x8
+	v11:i64 = Iadd v9, v8
+	v12:i32 = Icmp ge_u, v10, v11
+	ExitIfNotZero v12, exec_ctx, memory_out_of_bounds
+	v13:i64 = Load module_ctx, 0x0
+	v14:i64 = Iadd v13, v9
+	v15:i32 = Load v14, 0x0
+	Jump blk_ret, v15
+`,
+		},
+		{
 			name: "imported_function_call", m: testcases.ImportedFunctionCall.Module,
 			exp: `
 signatures:
