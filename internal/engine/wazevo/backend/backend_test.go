@@ -2508,7 +2508,7 @@ L1 (SSA Block: blk0):
 `,
 		},
 		{
-			name: "globals_mutable",
+			name: "globals_mutable[0]",
 			m:    testcases.GlobalsMutable.Module,
 			afterLoweringARM64: `
 L1 (SSA Block: blk0):
@@ -2581,6 +2581,46 @@ L1 (SSA Block: blk0):
 	mov x1, x9
 	mov x0, x8
 	add sp, sp, #0x20
+	ldr x30, [sp], #0x10
+	ret
+`,
+		},
+		{
+			name:        "globals_mutable[1]",
+			m:           testcases.GlobalsMutable.Module,
+			targetIndex: 1,
+			afterLoweringARM64: `
+L1 (SSA Block: blk0):
+	mov x1?, x1
+	ldr x3?, [x1?]
+	orr w13?, wzr, #0x1
+	str w13?, [x3?, #0x8]
+	ldr x5?, [x1?, #0x8]
+	orr x12?, xzr, #0x2
+	str x12?, [x5?, #0x8]
+	ldr x7?, [x1?, #0x10]
+	ldr s11?, #8; b 8; data.f32 3.000000
+	str s11?, [x7?, #0x8]
+	ldr x9?, [x1?, #0x18]
+	ldr d10?, #8; b 16; data.f64 4.000000
+	str d10?, [x9?, #0x8]
+	ret
+`,
+			afterFinalizeARM64: `
+L1 (SSA Block: blk0):
+	str x30, [sp, #-0x10]!
+	ldr x9, [x1]
+	orr w8, wzr, #0x1
+	str w8, [x9, #0x8]
+	ldr x9, [x1, #0x8]
+	orr x8, xzr, #0x2
+	str x8, [x9, #0x8]
+	ldr x8, [x1, #0x10]
+	ldr s8, #8; b 8; data.f32 3.000000
+	str s8, [x8, #0x8]
+	ldr x8, [x1, #0x18]
+	ldr d8, #8; b 16; data.f64 4.000000
+	str d8, [x8, #0x8]
 	ldr x30, [sp], #0x10
 	ret
 `,

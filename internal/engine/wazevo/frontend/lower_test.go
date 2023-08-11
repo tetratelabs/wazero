@@ -9,9 +9,6 @@ import (
 )
 
 func TestGlobalInstanceValueOffset(t *testing.T) {
-	// Offsets for wasm.GlobalInstance
 	var globalInstance wasm.GlobalInstance
-	require.Equal(t, int(unsafe.Offsetof(globalInstance.Val)), globalInstanceValueOffset,
-		"globalInstanceValueOffset")
-
+	require.Equal(t, int(unsafe.Offsetof(globalInstance.Val)), globalInstanceValueOffset)
 }

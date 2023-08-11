@@ -112,6 +112,9 @@ type Builder interface {
 
 	// ReturnBlock returns the BasicBlock which is used to return from the function.
 	ReturnBlock() BasicBlock
+
+	// InsertUndefined inserts an undefined instruction at the current position.
+	InsertUndefined()
 }
 
 // NewBuilder returns a new Builder implementation.
@@ -905,4 +908,11 @@ func swapInstruction(blk *basicBlock, old, New *Instruction) {
 		}
 	}
 	old.prev, old.next = nil, nil
+}
+
+// InsertUndefined implements Builder.InsertUndefined.
+func (b *builder) InsertUndefined() {
+	instr := b.AllocateInstruction()
+	instr.opcode = OpcodeUndefined
+	b.InsertInstruction(instr)
 }

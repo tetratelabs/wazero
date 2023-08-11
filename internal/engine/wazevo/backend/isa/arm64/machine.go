@@ -132,6 +132,7 @@ func (m *machine) Reset() {
 	m.clobberedRegs = m.clobberedRegs[:0]
 	m.orderedLabels = m.orderedLabels[:0]
 	m.regAllocFn.reset()
+	m.spillSlotSize = 0
 	m.unresolvedAddressModes = m.unresolvedAddressModes[:0]
 }
 

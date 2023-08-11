@@ -955,6 +955,7 @@ var (
 					wasm.OpcodeGlobalSet, 2,
 					wasm.OpcodeF64Const, 0, 0, 0, 0, 0, 0, 16, 64, // 4.0
 					wasm.OpcodeGlobalSet, 3,
+					wasm.OpcodeReturn,
 					wasm.OpcodeEnd,
 				}},
 			},

@@ -191,7 +191,6 @@ func (c *Compiler) declareNecessaryVariables() {
 	}
 
 	// TODO: add tables.
-
 }
 
 func (c *Compiler) declareWasmGlobal(typ wasm.ValueType, mutable bool) {
