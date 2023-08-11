@@ -875,6 +875,7 @@ func (c *Compiler) setWasmGlobalValue(index wasm.Index, v ssa.Value) {
 
 	store := builder.AllocateInstruction()
 	store.AsStore(v, loadGlobalInstPtr.Return(), uint32(globalInstanceValueOffset))
+	builder.InsertInstruction(store)
 
 	// The value has changed to `v`, so we record it.
 	builder.DefineVariableInCurrentBB(variable, v)

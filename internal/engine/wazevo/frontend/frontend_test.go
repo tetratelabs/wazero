@@ -1184,12 +1184,16 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 blk0: (exec_ctx:i64, module_ctx:i64)
 	v2:i32 = Iconst_32 0x1
 	v3:i64 = Load module_ctx, 0x0
+	Store v2, v3, 0x8
 	v4:i64 = Iconst_64 0x2
 	v5:i64 = Load module_ctx, 0x8
+	Store v4, v5, 0x8
 	v6:f32 = F32const 3.000000
 	v7:i64 = Load module_ctx, 0x10
+	Store v6, v7, 0x8
 	v8:f64 = F64const 4.000000
 	v9:i64 = Load module_ctx, 0x18
+	Store v8, v9, 0x8
 	Jump blk_ret, v2, v4, v6, v8
 `,
 		},
