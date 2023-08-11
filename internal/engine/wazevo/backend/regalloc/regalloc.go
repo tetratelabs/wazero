@@ -17,7 +17,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 )
 
-const debug = true
+const debug = false
 
 // NewAllocator returns a new Allocator.
 func NewAllocator(allocatableRegs *RegisterInfo) Allocator {
