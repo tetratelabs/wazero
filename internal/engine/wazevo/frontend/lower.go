@@ -453,7 +453,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 			return
 		}
 
-		var ceil = offset
+		ceil := offset
 		switch op {
 		case wasm.OpcodeI32Load, wasm.OpcodeF32Load:
 			ceil += 4
@@ -491,46 +491,51 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		baseAddrPlusCeil.AsIadd(extBaseAddr.Return(), ceilConst.Return())
 		builder.InsertInstruction(baseAddrPlusCeil)
 
-		// Check for out of bounds memory access: `baseAddrPlusCeil > memLen`.
+		// Check for out of bounds memory access: `memLen >= baseAddrPlusCeil`.
 		cmp := builder.AllocateInstruction()
-		cmp.AsIcmp(memLen, baseAddrPlusCeil.Return(), ssa.IntegerCmpCondUnsignedGreaterThan)
+		cmp.AsIcmp(memLen, baseAddrPlusCeil.Return(), ssa.IntegerCmpCondUnsignedGreaterThanOrEqual)
 		builder.InsertInstruction(cmp)
 		exitIfNZ := builder.AllocateInstruction()
 		exitIfNZ.AsExitIfNotZeroWithCode(c.execCtxPtrValue, cmp.Return(), wazevoapi.ExitCodeMemoryOutOfBounds)
 		builder.InsertInstruction(exitIfNZ)
 
-		// Load the value.
+		// Load the value from memBase + extBaseAddr.
 		memBase := c.getMemoryBaseValue()
+		addrCalc := builder.AllocateInstruction()
+		addrCalc.AsIadd(memBase, extBaseAddr.Return())
+		builder.InsertInstruction(addrCalc)
+
+		addr := addrCalc.Return()
 		load := builder.AllocateInstruction()
 		switch op {
 		case wasm.OpcodeI32Load:
-			load.AsLoad(memBase, offset, ssa.TypeI32)
+			load.AsLoad(addr, offset, ssa.TypeI32)
 		case wasm.OpcodeI64Load:
-			load.AsLoad(memBase, offset, ssa.TypeI64)
+			load.AsLoad(addr, offset, ssa.TypeI64)
 		case wasm.OpcodeF32Load:
-			load.AsLoad(memBase, offset, ssa.TypeF32)
+			load.AsLoad(addr, offset, ssa.TypeF32)
 		case wasm.OpcodeF64Load:
-			load.AsLoad(memBase, offset, ssa.TypeF64)
+			load.AsLoad(addr, offset, ssa.TypeF64)
 		case wasm.OpcodeI32Load8S:
-			load.AsExtLoad(ssa.OpcodeSload8, memBase, offset, false)
+			load.AsExtLoad(ssa.OpcodeSload8, addr, offset, false)
 		case wasm.OpcodeI32Load8U:
-			load.AsExtLoad(ssa.OpcodeUload8, memBase, offset, false)
+			load.AsExtLoad(ssa.OpcodeUload8, addr, offset, false)
 		case wasm.OpcodeI32Load16S:
-			load.AsExtLoad(ssa.OpcodeSload16, memBase, offset, false)
+			load.AsExtLoad(ssa.OpcodeSload16, addr, offset, false)
 		case wasm.OpcodeI32Load16U:
-			load.AsExtLoad(ssa.OpcodeUload16, memBase, offset, false)
+			load.AsExtLoad(ssa.OpcodeUload16, addr, offset, false)
 		case wasm.OpcodeI64Load8S:
-			load.AsExtLoad(ssa.OpcodeSload8, memBase, offset, true)
+			load.AsExtLoad(ssa.OpcodeSload8, addr, offset, true)
 		case wasm.OpcodeI64Load8U:
-			load.AsExtLoad(ssa.OpcodeUload8, memBase, offset, true)
+			load.AsExtLoad(ssa.OpcodeUload8, addr, offset, true)
 		case wasm.OpcodeI64Load16S:
-			load.AsExtLoad(ssa.OpcodeSload16, memBase, offset, true)
+			load.AsExtLoad(ssa.OpcodeSload16, addr, offset, true)
 		case wasm.OpcodeI64Load16U:
-			load.AsExtLoad(ssa.OpcodeUload16, memBase, offset, true)
+			load.AsExtLoad(ssa.OpcodeUload16, addr, offset, true)
 		case wasm.OpcodeI64Load32S:
-			load.AsExtLoad(ssa.OpcodeSload32, memBase, offset, true)
+			load.AsExtLoad(ssa.OpcodeSload32, addr, offset, true)
 		case wasm.OpcodeI64Load32U:
-			load.AsExtLoad(ssa.OpcodeUload32, memBase, offset, true)
+			load.AsExtLoad(ssa.OpcodeUload32, addr, offset, true)
 		default:
 			panic("BUG")
 		}
@@ -833,23 +838,27 @@ func (c *Compiler) getMemoryBaseValue() ssa.Value {
 	if c.offset.LocalMemoryBegin < 0 {
 		panic("TODO: imported memory")
 	}
-	return c.getModuleCtxValueI32ZeroExt(c.memoryBaseVariable, c.offset.LocalMemoryBase())
+	return c.getModuleCtxValue(c.memoryBaseVariable, c.offset.LocalMemoryBase(), false)
 }
 
 func (c *Compiler) getMemoryLenValue() ssa.Value {
 	if c.offset.LocalMemoryBegin < 0 {
 		panic("TODO: imported memory")
 	}
-	return c.getModuleCtxValueI32ZeroExt(c.memoryLenVariable, c.offset.LocalMemoryLen())
+	return c.getModuleCtxValue(c.memoryLenVariable, c.offset.LocalMemoryLen(), true)
 }
 
-func (c *Compiler) getModuleCtxValueI32ZeroExt(variable ssa.Variable, offset wazevoapi.Offset) ssa.Value {
+func (c *Compiler) getModuleCtxValue(variable ssa.Variable, offset wazevoapi.Offset, zeroExt bool) ssa.Value {
 	builder := c.ssaBuilder
 	if v := builder.FindValue(variable); v.Valid() {
 		return v
 	}
 	load := builder.AllocateInstruction()
-	load.AsExtLoad(ssa.OpcodeUload32, c.moduleCtxPtrValue, uint32(offset), true)
+	if zeroExt {
+		load.AsExtLoad(ssa.OpcodeUload32, c.moduleCtxPtrValue, uint32(offset), true)
+	} else {
+		load.AsExtLoad(ssa.OpcodeLoad, c.moduleCtxPtrValue, uint32(offset), true)
+	}
 	builder.InsertInstruction(load)
 	ret := load.Return()
 	builder.DefineVariableInCurrentBB(variable, ret)

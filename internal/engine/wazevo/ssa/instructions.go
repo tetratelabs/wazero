@@ -2,9 +2,10 @@ package ssa
 
 import (
 	"fmt"
-	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 	"math"
 	"strings"
+
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 )
 
 // Opcode represents a SSA instruction.

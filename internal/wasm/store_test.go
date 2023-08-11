@@ -453,6 +453,9 @@ func (e *mockEngine) NewModuleEngine(_ *Module, _ *ModuleInstance) (ModuleEngine
 	return &mockModuleEngine{callFailIndex: e.callFailIndex, resolveImportsCalled: map[Index]Index{}}, nil
 }
 
+// mockModuleEngine implements the same method as documented on wasm.ModuleEngine.
+func (e *mockModuleEngine) DoneInstantiation() {}
+
 // FunctionInstanceReference implements the same method as documented on wasm.ModuleEngine.
 func (e *mockModuleEngine) FunctionInstanceReference(i Index) Reference {
 	return e.functionRefs[i]

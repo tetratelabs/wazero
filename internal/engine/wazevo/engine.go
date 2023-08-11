@@ -212,6 +212,11 @@ func (e *engine) NewModuleEngine(m *wasm.Module, mi *wasm.ModuleInstance) (wasm.
 	}
 	me.parent = compiled
 	me.module = mi
-	me.setupOpaque()
+
+	if size := compiled.offsets.TotalSize; size != 0 {
+		opaque := make([]byte, size)
+		me.opaque = opaque
+		me.opaquePtr = &opaque[0]
+	}
 	return me, nil
 }

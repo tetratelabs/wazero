@@ -196,8 +196,11 @@ func (a *abiImpl) CalleeGenFunctionArgsToVRegs(args []ssa.Value) {
 
 // CalleeGenVRegsToFunctionReturns implements backend.FunctionABI.
 func (a *abiImpl) CalleeGenVRegsToFunctionReturns(rets []ssa.Value) {
-	for i, ret := range rets {
-		r := &a.rets[i]
+	l := len(rets) - 1
+	for i := range rets {
+		// Reverse order in order to avoid overwriting the stack returns existing in the return registers.
+		ret := rets[l-i]
+		r := &a.rets[l-i]
 		reg := a.m.compiler.VRegOf(ret)
 		if def := a.m.compiler.ValueDefinition(ret); def.IsFromInstr() {
 			// Constant instructions are inlined.

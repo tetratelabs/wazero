@@ -42,6 +42,7 @@ func TestModuleEngine_setupOpaque(t *testing.T) {
 			m := &moduleEngine{
 				parent: &compiledModule{offsets: tc.offset},
 				module: tc.m,
+				opaque: make([]byte, tc.offset.TotalSize),
 			}
 			m.setupOpaque()
 

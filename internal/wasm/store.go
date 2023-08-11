@@ -381,6 +381,8 @@ func (s *Store) instantiate(
 			return nil, fmt.Errorf("start %s failed: %w", module.funcDesc(SectionIDFunction, funcIdx), err)
 		}
 	}
+
+	m.Engine.DoneInstantiation()
 	return
 }
 

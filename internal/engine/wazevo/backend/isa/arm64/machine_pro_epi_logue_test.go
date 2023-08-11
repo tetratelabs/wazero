@@ -223,7 +223,7 @@ func TestMachine_insertStackBoundsCheck(t *testing.T) {
 	str x27, [x0, #0x40]
 	adr x27, #0x1c
 	str x27, [x0, #0x30]
-	trap_sequence w0
+	exit_sequence w0
 	ldr x1, [x0, #0x50]
 	ldr x2, [x0, #0x60]
 	ldr x3, [x0, #0x70]
@@ -321,7 +321,7 @@ func TestMachine_insertStackBoundsCheck(t *testing.T) {
 	str x27, [x0, #0x40]
 	adr x27, #0x1c
 	str x27, [x0, #0x30]
-	trap_sequence w0
+	exit_sequence w0
 	ldr x1, [x0, #0x50]
 	ldr x2, [x0, #0x60]
 	ldr x3, [x0, #0x70]

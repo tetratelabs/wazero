@@ -40,15 +40,9 @@ type (
 )
 
 func (m *moduleEngine) setupOpaque() {
-	offsets := &m.parent.offsets
-	size := offsets.TotalSize
-	if size == 0 {
-		return
-	}
-	opaque := make([]byte, size)
-	m.opaque = opaque
-	m.opaquePtr = &opaque[0]
 	inst := m.module
+	offsets := &m.parent.offsets
+	opaque := m.opaque
 
 	if lm := offsets.LocalMemoryBegin; lm >= 0 {
 		b := uint64(uintptr(unsafe.Pointer(&inst.MemoryInstance.Buffer[0])))
@@ -103,6 +97,11 @@ func (m *moduleEngine) ResolveImportedFunction(index, indexInImportedModule wasm
 	executable := &importedME.parent.executable[offset.offset+offset.goPreambleSize]
 	binary.LittleEndian.PutUint64(m.opaque[ptr:], uint64(uintptr(unsafe.Pointer(executable))))
 	binary.LittleEndian.PutUint64(m.opaque[moduleCtx:], uint64(uintptr(unsafe.Pointer(importedME.opaquePtr))))
+}
+
+// DoneInstantiation implements wasm.ModuleEngine.
+func (m *moduleEngine) DoneInstantiation() {
+	m.setupOpaque()
 }
 
 // LookupFunction implements wasm.ModuleEngine.

@@ -319,7 +319,6 @@ const exitWithCodeEncodingSize = exitSequenceSize + 8
 
 // lowerExitWithCode lowers the lowerExitWithCode takes a context pointer as argument.
 func (m *machine) lowerExitWithCode(execCtxVReg regalloc.VReg, code wazevoapi.ExitCode) {
-
 	loadExitCodeConst := m.allocateInstr()
 	loadExitCodeConst.asMOVZ(tmpRegVReg, uint64(code), 0, true)
 
@@ -376,7 +375,7 @@ func (m *machine) lowerExitIfNotZeroWithCode(execCtxVReg regalloc.VReg, cond ssa
 	// We have to skip the entire exit sequence if the condition is false.
 	cbr := m.allocateInstr()
 	cbr.asCondBr(cc.asCond(), invalidLabel, false /* ignored */)
-	cbr.condBrOffsetResolve(exitWithCodeEncodingSize + 4)
+	cbr.condBrOffsetResolve(exitWithCodeEncodingSize + 4 /* br offset is from the beginning of this instruction */)
 	m.insert(cbr)
 	m.lowerExitWithCode(execCtxVReg, code)
 }

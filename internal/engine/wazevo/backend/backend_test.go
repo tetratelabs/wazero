@@ -62,19 +62,19 @@ L1 (SSA Block: blk0):
 			name: "consts", m: testcases.Constants.Module,
 			afterLoweringARM64: `
 L1 (SSA Block: blk0):
-	orr w0, wzr, #0x1
-	orr x1, xzr, #0x2
-	ldr s0, #8; b 8; data.f32 32.000000
 	ldr d1, #8; b 16; data.f64 64.000000
+	ldr s0, #8; b 8; data.f32 32.000000
+	orr x1, xzr, #0x2
+	orr w0, wzr, #0x1
 	ret
 `,
 			afterFinalizeARM64: `
 L1 (SSA Block: blk0):
 	str x30, [sp, #-0x10]!
-	orr w0, wzr, #0x1
-	orr x1, xzr, #0x2
-	ldr s0, #8; b 8; data.f32 32.000000
 	ldr d1, #8; b 16; data.f64 64.000000
+	ldr s0, #8; b 8; data.f32 32.000000
+	orr x1, xzr, #0x2
+	orr w0, wzr, #0x1
 	ldr x30, [sp], #0x10
 	ret
 `,
@@ -120,9 +120,9 @@ L1 (SSA Block: blk0):
 	fdiv d16?, d15?, d4?
 	fmax d17?, d16?, d4?
 	fmin d18?, d17?, d4?
-	mov x0, x6?
-	mov q0.8b, q12?.8b
 	mov q1.8b, q18?.8b
+	mov q0.8b, q12?.8b
+	mov x0, x6?
 	ret
 `,
 			afterFinalizeARM64: `
@@ -151,15 +151,15 @@ L1 (SSA Block: blk0):
 			afterLoweringARM64: `
 L1 (SSA Block: blk0):
 	mov x2?, x2
-	mov x0, x2?
 	mov x1, xzr
+	mov x0, x2?
 	ret
 `,
 			afterFinalizeARM64: `
 L1 (SSA Block: blk0):
 	str x30, [sp, #-0x10]!
-	mov x0, x2
 	mov x1, xzr
+	mov x0, x2
 	ldr x30, [sp], #0x10
 	ret
 `,
@@ -170,15 +170,15 @@ L1 (SSA Block: blk0):
 L1 (SSA Block: blk0):
 	mov x2?, x2
 	mov x3?, x3
-	mov x0, x3?
 	mov x1, x2?
+	mov x0, x3?
 	ret
 `,
 			afterFinalizeARM64: `
 L1 (SSA Block: blk0):
 	str x30, [sp, #-0x10]!
-	mov x0, x3
 	mov x1, x2
+	mov x0, x3
 	ldr x30, [sp], #0x10
 	ret
 `,
@@ -190,16 +190,16 @@ L1 (SSA Block: blk0):
 	mov x2?, x2
 	mov x3?, x3
 L2 (SSA Block: blk1):
-	mov x0, x3?
 	mov x1, x2?
+	mov x0, x3?
 	ret
 `,
 			afterFinalizeARM64: `
 L1 (SSA Block: blk0):
 	str x30, [sp, #-0x10]!
 L2 (SSA Block: blk1):
-	mov x0, x3
 	mov x1, x2
+	mov x0, x3
 	ldr x30, [sp], #0x10
 	ret
 `,
@@ -231,7 +231,7 @@ L3 (SSA Block: blk1):
 L2 (SSA Block: blk2):
 	movz x27, #0x2, LSL 0
 	str w27, [x0?]
-	trap_sequence w0?
+	exit_sequence w0?
 `,
 			afterFinalizeARM64: `
 L1 (SSA Block: blk0):
@@ -244,7 +244,7 @@ L3 (SSA Block: blk1):
 L2 (SSA Block: blk2):
 	movz x27, #0x2, LSL 0
 	str w27, [x0]
-	trap_sequence w0
+	exit_sequence w0
 `,
 		},
 		{
@@ -551,8 +551,8 @@ L1 (SSA Block: blk0):
 	bl f3
 	mov x5?, x0
 	mov x6?, x1
-	mov x0, x5?
 	mov x1, x6?
+	mov x0, x5?
 	ret
 `,
 			afterFinalizeARM64: `
@@ -762,46 +762,46 @@ L1 (SSA Block: blk0):
 	ldr s44?, [sp, #0xb0]
 	ldr d45?, [sp, #0xb8]
 	add sp, sp, #0xc0
-	mov x0, x6?
-	mov x1, x7?
-	mov q0.8b, q8?.8b
-	mov q1.8b, q9?.8b
-	mov x2, x10?
-	mov x3, x11?
-	mov q2.8b, q12?.8b
-	mov q3.8b, q13?.8b
-	mov x4, x14?
-	mov x5, x15?
-	mov q4.8b, q16?.8b
-	mov q5.8b, q17?.8b
-	mov x6, x18?
-	mov x7, x19?
-	mov q6.8b, q20?.8b
-	mov q7.8b, q21?.8b
-	str w22?, [#ret_space, #0x0]
-	str x23?, [#ret_space, #0x8]
-	str s24?, [#ret_space, #0x10]
-	str d25?, [#ret_space, #0x18]
-	str w26?, [#ret_space, #0x20]
-	str x27?, [#ret_space, #0x28]
-	str s28?, [#ret_space, #0x30]
-	str d29?, [#ret_space, #0x38]
-	str w30?, [#ret_space, #0x40]
-	str x31?, [#ret_space, #0x48]
-	str s32?, [#ret_space, #0x50]
-	str d33?, [#ret_space, #0x58]
-	str w34?, [#ret_space, #0x60]
-	str x35?, [#ret_space, #0x68]
-	str s36?, [#ret_space, #0x70]
-	str d37?, [#ret_space, #0x78]
-	str w38?, [#ret_space, #0x80]
-	str x39?, [#ret_space, #0x88]
-	str s40?, [#ret_space, #0x90]
-	str d41?, [#ret_space, #0x98]
-	str w42?, [#ret_space, #0xa0]
-	str x43?, [#ret_space, #0xa8]
-	str s44?, [#ret_space, #0xb0]
 	str d45?, [#ret_space, #0xb8]
+	str s44?, [#ret_space, #0xb0]
+	str x43?, [#ret_space, #0xa8]
+	str w42?, [#ret_space, #0xa0]
+	str d41?, [#ret_space, #0x98]
+	str s40?, [#ret_space, #0x90]
+	str x39?, [#ret_space, #0x88]
+	str w38?, [#ret_space, #0x80]
+	str d37?, [#ret_space, #0x78]
+	str s36?, [#ret_space, #0x70]
+	str x35?, [#ret_space, #0x68]
+	str w34?, [#ret_space, #0x60]
+	str d33?, [#ret_space, #0x58]
+	str s32?, [#ret_space, #0x50]
+	str x31?, [#ret_space, #0x48]
+	str w30?, [#ret_space, #0x40]
+	str d29?, [#ret_space, #0x38]
+	str s28?, [#ret_space, #0x30]
+	str x27?, [#ret_space, #0x28]
+	str w26?, [#ret_space, #0x20]
+	str d25?, [#ret_space, #0x18]
+	str s24?, [#ret_space, #0x10]
+	str x23?, [#ret_space, #0x8]
+	str w22?, [#ret_space, #0x0]
+	mov q7.8b, q21?.8b
+	mov q6.8b, q20?.8b
+	mov x7, x19?
+	mov x6, x18?
+	mov q5.8b, q17?.8b
+	mov q4.8b, q16?.8b
+	mov x5, x15?
+	mov x4, x14?
+	mov q3.8b, q13?.8b
+	mov q2.8b, q12?.8b
+	mov x3, x11?
+	mov x2, x10?
+	mov q1.8b, q9?.8b
+	mov q0.8b, q8?.8b
+	mov x1, x7?
+	mov x0, x6?
 	ret
 `,
 			afterFinalizeARM64: `
@@ -839,30 +839,30 @@ L1 (SSA Block: blk0):
 	ldr s9, [sp, #0xb0]
 	ldr d8, [sp, #0xb8]
 	add sp, sp, #0xc0
-	str w19, [sp, #0x50]
-	str x18, [sp, #0x58]
-	str s19, [sp, #0x60]
-	str d18, [sp, #0x68]
-	str w17, [sp, #0x70]
-	str x16, [sp, #0x78]
-	str s17, [sp, #0x80]
-	str d16, [sp, #0x88]
-	str w15, [sp, #0x90]
-	str x14, [sp, #0x98]
-	str s15, [sp, #0xa0]
-	str d14, [sp, #0xa8]
-	str w13, [sp, #0xb0]
-	str x12, [sp, #0xb8]
-	str s13, [sp, #0xc0]
-	str d12, [sp, #0xc8]
-	str w11, [sp, #0xd0]
-	str x10, [sp, #0xd8]
-	str s11, [sp, #0xe0]
-	str d10, [sp, #0xe8]
-	str w9, [sp, #0xf0]
-	str x8, [sp, #0xf8]
-	str s9, [sp, #0x100]
 	str d8, [sp, #0x108]
+	str s9, [sp, #0x100]
+	str x8, [sp, #0xf8]
+	str w9, [sp, #0xf0]
+	str d10, [sp, #0xe8]
+	str s11, [sp, #0xe0]
+	str x10, [sp, #0xd8]
+	str w11, [sp, #0xd0]
+	str d12, [sp, #0xc8]
+	str s13, [sp, #0xc0]
+	str x12, [sp, #0xb8]
+	str w13, [sp, #0xb0]
+	str d14, [sp, #0xa8]
+	str s15, [sp, #0xa0]
+	str x14, [sp, #0x98]
+	str w15, [sp, #0x90]
+	str d16, [sp, #0x88]
+	str s17, [sp, #0x80]
+	str x16, [sp, #0x78]
+	str w17, [sp, #0x70]
+	str d18, [sp, #0x68]
+	str s19, [sp, #0x60]
+	str x18, [sp, #0x58]
+	str w19, [sp, #0x50]
 	ldr q19, [sp], #0x10
 	ldr q18, [sp], #0x10
 	ldr x19, [sp], #0x10
@@ -879,10 +879,10 @@ L1 (SSA Block: blk0):
 	mov x11?, x7
 	ldr s20?, [#arg_space, #0x20]
 	ldr d29?, [#arg_space, #0x68]
-	mov x0, x2?
-	mov x1, x11?
-	mov q0.8b, q20?.8b
 	mov q1.8b, q29?.8b
+	mov q0.8b, q20?.8b
+	mov x1, x11?
+	mov x0, x2?
 	ret
 `,
 			afterFinalizeARM64: `
@@ -890,8 +890,8 @@ L1 (SSA Block: blk0):
 	str x30, [sp, #-0x10]!
 	ldr s0, [sp, #0x30]
 	ldr d1, [sp, #0x78]
-	mov x0, x2
 	mov x1, x7
+	mov x0, x2
 	ldr x30, [sp], #0x10
 	ret
 `,
@@ -904,95 +904,89 @@ L1 (SSA Block: blk0):
 	mov x3?, x3
 	mov q4?.8b, q0.8b
 	mov q5?.8b, q1.8b
-	mov x0, x2?
-	mov x1, x3?
-	mov q0.8b, q4?.8b
-	mov q1.8b, q5?.8b
-	mov x2, x2?
-	mov x3, x3?
-	mov q2.8b, q4?.8b
-	mov q3.8b, q5?.8b
-	mov x4, x2?
-	mov x5, x3?
-	mov q4.8b, q4?.8b
-	mov q5.8b, q5?.8b
-	mov x6, x2?
-	mov x7, x3?
-	mov q6.8b, q4?.8b
-	mov q7.8b, q5?.8b
-	str w2?, [#ret_space, #0x0]
-	str x3?, [#ret_space, #0x8]
-	str s4?, [#ret_space, #0x10]
-	str d5?, [#ret_space, #0x18]
-	str w2?, [#ret_space, #0x20]
-	str x3?, [#ret_space, #0x28]
-	str s4?, [#ret_space, #0x30]
-	str d5?, [#ret_space, #0x38]
-	str w2?, [#ret_space, #0x40]
-	str x3?, [#ret_space, #0x48]
-	str s4?, [#ret_space, #0x50]
-	str d5?, [#ret_space, #0x58]
-	str w2?, [#ret_space, #0x60]
-	str x3?, [#ret_space, #0x68]
-	str s4?, [#ret_space, #0x70]
-	str d5?, [#ret_space, #0x78]
-	str w2?, [#ret_space, #0x80]
-	str x3?, [#ret_space, #0x88]
-	str s4?, [#ret_space, #0x90]
-	str d5?, [#ret_space, #0x98]
-	str w2?, [#ret_space, #0xa0]
-	str x3?, [#ret_space, #0xa8]
-	str s4?, [#ret_space, #0xb0]
 	str d5?, [#ret_space, #0xb8]
+	str s4?, [#ret_space, #0xb0]
+	str x3?, [#ret_space, #0xa8]
+	str w2?, [#ret_space, #0xa0]
+	str d5?, [#ret_space, #0x98]
+	str s4?, [#ret_space, #0x90]
+	str x3?, [#ret_space, #0x88]
+	str w2?, [#ret_space, #0x80]
+	str d5?, [#ret_space, #0x78]
+	str s4?, [#ret_space, #0x70]
+	str x3?, [#ret_space, #0x68]
+	str w2?, [#ret_space, #0x60]
+	str d5?, [#ret_space, #0x58]
+	str s4?, [#ret_space, #0x50]
+	str x3?, [#ret_space, #0x48]
+	str w2?, [#ret_space, #0x40]
+	str d5?, [#ret_space, #0x38]
+	str s4?, [#ret_space, #0x30]
+	str x3?, [#ret_space, #0x28]
+	str w2?, [#ret_space, #0x20]
+	str d5?, [#ret_space, #0x18]
+	str s4?, [#ret_space, #0x10]
+	str x3?, [#ret_space, #0x8]
+	str w2?, [#ret_space, #0x0]
+	mov q7.8b, q5?.8b
+	mov q6.8b, q4?.8b
+	mov x7, x3?
+	mov x6, x2?
+	mov q5.8b, q5?.8b
+	mov q4.8b, q4?.8b
+	mov x5, x3?
+	mov x4, x2?
+	mov q3.8b, q5?.8b
+	mov q2.8b, q4?.8b
+	mov x3, x3?
+	mov x2, x2?
+	mov q1.8b, q5?.8b
+	mov q0.8b, q4?.8b
+	mov x1, x3?
+	mov x0, x2?
 	ret
 `,
 			afterFinalizeARM64: `
 L1 (SSA Block: blk0):
 	str x30, [sp, #-0x10]!
-	mov x8, x2
-	mov x9, x3
-	mov q8.8b, q0.8b
-	mov q9.8b, q1.8b
-	mov x0, x8
-	mov x1, x9
-	mov q0.8b, q8.8b
-	mov q1.8b, q9.8b
-	mov x2, x8
-	mov x3, x9
-	mov q2.8b, q8.8b
-	mov q3.8b, q9.8b
-	mov x4, x8
-	mov x5, x9
-	mov q4.8b, q8.8b
-	mov q5.8b, q9.8b
-	mov x6, x8
-	mov x7, x9
-	mov q6.8b, q8.8b
-	mov q7.8b, q9.8b
-	str w8, [sp, #0x10]
-	str x9, [sp, #0x18]
-	str s8, [sp, #0x20]
-	str d9, [sp, #0x28]
-	str w8, [sp, #0x30]
-	str x9, [sp, #0x38]
-	str s8, [sp, #0x40]
-	str d9, [sp, #0x48]
-	str w8, [sp, #0x50]
-	str x9, [sp, #0x58]
-	str s8, [sp, #0x60]
-	str d9, [sp, #0x68]
-	str w8, [sp, #0x70]
-	str x9, [sp, #0x78]
-	str s8, [sp, #0x80]
-	str d9, [sp, #0x88]
-	str w8, [sp, #0x90]
-	str x9, [sp, #0x98]
-	str s8, [sp, #0xa0]
-	str d9, [sp, #0xa8]
-	str w8, [sp, #0xb0]
-	str x9, [sp, #0xb8]
-	str s8, [sp, #0xc0]
-	str d9, [sp, #0xc8]
+	mov x0, x2
+	mov x1, x3
+	str d1, [sp, #0xc8]
+	str s0, [sp, #0xc0]
+	str x1, [sp, #0xb8]
+	str w0, [sp, #0xb0]
+	str d1, [sp, #0xa8]
+	str s0, [sp, #0xa0]
+	str x1, [sp, #0x98]
+	str w0, [sp, #0x90]
+	str d1, [sp, #0x88]
+	str s0, [sp, #0x80]
+	str x1, [sp, #0x78]
+	str w0, [sp, #0x70]
+	str d1, [sp, #0x68]
+	str s0, [sp, #0x60]
+	str x1, [sp, #0x58]
+	str w0, [sp, #0x50]
+	str d1, [sp, #0x48]
+	str s0, [sp, #0x40]
+	str x1, [sp, #0x38]
+	str w0, [sp, #0x30]
+	str d1, [sp, #0x28]
+	str s0, [sp, #0x20]
+	str x1, [sp, #0x18]
+	str w0, [sp, #0x10]
+	mov q7.8b, q1.8b
+	mov q6.8b, q0.8b
+	mov x7, x1
+	mov x6, x0
+	mov q5.8b, q1.8b
+	mov q4.8b, q0.8b
+	mov x5, x1
+	mov x4, x0
+	mov q3.8b, q1.8b
+	mov q2.8b, q0.8b
+	mov x3, x1
+	mov x2, x0
 	ldr x30, [sp], #0x10
 	ret
 `,
@@ -1041,46 +1035,46 @@ L1 (SSA Block: blk0):
 	ldr x39?, [#arg_space, #0xb8]
 	ldr s40?, [#arg_space, #0xc0]
 	ldr d41?, [#arg_space, #0xc8]
-	mov q0.8b, q41?.8b
-	mov q1.8b, q40?.8b
-	mov x0, x39?
-	mov x1, x38?
-	mov q2.8b, q37?.8b
-	mov q3.8b, q36?.8b
-	mov x2, x35?
-	mov x3, x34?
-	mov q4.8b, q33?.8b
-	mov q5.8b, q32?.8b
-	mov x4, x31?
-	mov x5, x30?
-	mov q6.8b, q29?.8b
-	mov q7.8b, q28?.8b
-	mov x6, x27?
-	mov x7, x26?
-	str d25?, [#ret_space, #0x0]
-	str s24?, [#ret_space, #0x8]
-	str x23?, [#ret_space, #0x10]
-	str w22?, [#ret_space, #0x18]
-	str d21?, [#ret_space, #0x20]
-	str s20?, [#ret_space, #0x28]
-	str x19?, [#ret_space, #0x30]
-	str w18?, [#ret_space, #0x38]
-	str d17?, [#ret_space, #0x40]
-	str s16?, [#ret_space, #0x48]
-	str x15?, [#ret_space, #0x50]
-	str w14?, [#ret_space, #0x58]
-	str d13?, [#ret_space, #0x60]
-	str s12?, [#ret_space, #0x68]
-	str x11?, [#ret_space, #0x70]
-	str w10?, [#ret_space, #0x78]
-	str d9?, [#ret_space, #0x80]
-	str s8?, [#ret_space, #0x88]
-	str x7?, [#ret_space, #0x90]
-	str w6?, [#ret_space, #0x98]
-	str d5?, [#ret_space, #0xa0]
-	str s4?, [#ret_space, #0xa8]
-	str x3?, [#ret_space, #0xb0]
 	str w2?, [#ret_space, #0xb8]
+	str x3?, [#ret_space, #0xb0]
+	str s4?, [#ret_space, #0xa8]
+	str d5?, [#ret_space, #0xa0]
+	str w6?, [#ret_space, #0x98]
+	str x7?, [#ret_space, #0x90]
+	str s8?, [#ret_space, #0x88]
+	str d9?, [#ret_space, #0x80]
+	str w10?, [#ret_space, #0x78]
+	str x11?, [#ret_space, #0x70]
+	str s12?, [#ret_space, #0x68]
+	str d13?, [#ret_space, #0x60]
+	str w14?, [#ret_space, #0x58]
+	str x15?, [#ret_space, #0x50]
+	str s16?, [#ret_space, #0x48]
+	str d17?, [#ret_space, #0x40]
+	str w18?, [#ret_space, #0x38]
+	str x19?, [#ret_space, #0x30]
+	str s20?, [#ret_space, #0x28]
+	str d21?, [#ret_space, #0x20]
+	str w22?, [#ret_space, #0x18]
+	str x23?, [#ret_space, #0x10]
+	str s24?, [#ret_space, #0x8]
+	str d25?, [#ret_space, #0x0]
+	mov x7, x26?
+	mov x6, x27?
+	mov q7.8b, q28?.8b
+	mov q6.8b, q29?.8b
+	mov x5, x30?
+	mov x4, x31?
+	mov q5.8b, q32?.8b
+	mov q4.8b, q33?.8b
+	mov x3, x34?
+	mov x2, x35?
+	mov q3.8b, q36?.8b
+	mov q2.8b, q37?.8b
+	mov x1, x38?
+	mov x0, x39?
+	mov q1.8b, q40?.8b
+	mov q0.8b, q41?.8b
 	ret
 `,
 			afterFinalizeARM64: `
@@ -1130,30 +1124,30 @@ L1 (SSA Block: blk0):
 	ldr x0, [sp, #0x108]
 	ldr s1, [sp, #0x110]
 	ldr d0, [sp, #0x118]
-	str d15, [sp, #0x120]
-	str s16, [sp, #0x128]
-	str x13, [sp, #0x130]
-	str w14, [sp, #0x138]
-	str d17, [sp, #0x140]
-	str s18, [sp, #0x148]
-	str x15, [sp, #0x150]
-	str w16, [sp, #0x158]
-	str d19, [sp, #0x160]
-	str s14, [sp, #0x168]
-	str x17, [sp, #0x170]
-	str w18, [sp, #0x178]
-	str d13, [sp, #0x180]
-	str s12, [sp, #0x188]
-	str x19, [sp, #0x190]
-	str w12, [sp, #0x198]
-	str d11, [sp, #0x1a0]
-	str s10, [sp, #0x1a8]
-	str x11, [sp, #0x1b0]
-	str w10, [sp, #0x1b8]
-	str d9, [sp, #0x1c0]
-	str s8, [sp, #0x1c8]
-	str x9, [sp, #0x1d0]
 	str w8, [sp, #0x1d8]
+	str x9, [sp, #0x1d0]
+	str s8, [sp, #0x1c8]
+	str d9, [sp, #0x1c0]
+	str w10, [sp, #0x1b8]
+	str x11, [sp, #0x1b0]
+	str s10, [sp, #0x1a8]
+	str d11, [sp, #0x1a0]
+	str w12, [sp, #0x198]
+	str x19, [sp, #0x190]
+	str s12, [sp, #0x188]
+	str d13, [sp, #0x180]
+	str w18, [sp, #0x178]
+	str x17, [sp, #0x170]
+	str s14, [sp, #0x168]
+	str d19, [sp, #0x160]
+	str w16, [sp, #0x158]
+	str x15, [sp, #0x150]
+	str s18, [sp, #0x148]
+	str d17, [sp, #0x140]
+	str w14, [sp, #0x138]
+	str x13, [sp, #0x130]
+	str s16, [sp, #0x128]
+	str d15, [sp, #0x120]
 	ldr q19, [sp], #0x10
 	ldr q18, [sp], #0x10
 	ldr x19, [sp], #0x10
@@ -1211,26 +1205,26 @@ L1 (SSA Block: blk0):
 	cset x24?, hs
 	subs xzr, x4?, x5?
 	cset x25?, hs
-	mov x0, x6?
-	mov x1, x7?
-	mov x2, x8?
-	mov x3, x9?
-	mov x4, x10?
-	mov x5, x11?
-	mov x6, x12?
-	mov x7, x13?
-	str w14?, [#ret_space, #0x0]
-	str w15?, [#ret_space, #0x8]
-	str w16?, [#ret_space, #0x10]
-	str w17?, [#ret_space, #0x18]
-	str w18?, [#ret_space, #0x20]
-	str w19?, [#ret_space, #0x28]
-	str w20?, [#ret_space, #0x30]
-	str w21?, [#ret_space, #0x38]
-	str w22?, [#ret_space, #0x40]
-	str w23?, [#ret_space, #0x48]
-	str w24?, [#ret_space, #0x50]
 	str w25?, [#ret_space, #0x58]
+	str w24?, [#ret_space, #0x50]
+	str w23?, [#ret_space, #0x48]
+	str w22?, [#ret_space, #0x40]
+	str w21?, [#ret_space, #0x38]
+	str w20?, [#ret_space, #0x30]
+	str w19?, [#ret_space, #0x28]
+	str w18?, [#ret_space, #0x20]
+	str w17?, [#ret_space, #0x18]
+	str w16?, [#ret_space, #0x10]
+	str w15?, [#ret_space, #0x8]
+	str w14?, [#ret_space, #0x0]
+	mov x7, x13?
+	mov x6, x12?
+	mov x5, x11?
+	mov x4, x10?
+	mov x3, x9?
+	mov x2, x8?
+	mov x1, x7?
+	mov x0, x6?
 	ret
 `,
 			afterFinalizeARM64: `
@@ -1240,62 +1234,62 @@ L1 (SSA Block: blk0):
 	str x19, [sp, #-0x10]!
 	str x20, [sp, #-0x10]!
 	str x21, [sp, #-0x10]!
-	mov x18, x2
+	mov x8, x2
 	mov x20, x3
 	mov x19, x4
 	mov x21, x5
-	subs wzr, w18, w20
+	subs wzr, w8, w20
 	cset x0, eq
 	subs xzr, x19, x21
 	cset x1, eq
-	subs wzr, w18, w20
+	subs wzr, w8, w20
 	cset x2, ne
 	subs xzr, x19, x21
 	cset x3, ne
-	subs wzr, w18, w20
+	subs wzr, w8, w20
 	cset x4, lt
 	subs xzr, x19, x21
 	cset x5, lt
-	subs wzr, w18, w20
+	subs wzr, w8, w20
 	cset x6, lo
 	subs xzr, x19, x21
 	cset x7, lo
-	subs wzr, w18, w20
+	subs wzr, w8, w20
+	cset x18, gt
+	subs xzr, x19, x21
 	cset x17, gt
+	subs wzr, w8, w20
+	cset x16, hi
 	subs xzr, x19, x21
-	cset x16, gt
-	subs wzr, w18, w20
 	cset x15, hi
+	subs wzr, w8, w20
+	cset x14, le
 	subs xzr, x19, x21
-	cset x14, hi
-	subs wzr, w18, w20
 	cset x13, le
+	subs wzr, w8, w20
+	cset x12, ls
 	subs xzr, x19, x21
-	cset x12, le
-	subs wzr, w18, w20
 	cset x11, ls
+	subs wzr, w8, w20
+	cset x10, ge
 	subs xzr, x19, x21
-	cset x10, ls
-	subs wzr, w18, w20
 	cset x9, ge
-	subs xzr, x19, x21
-	cset x8, ge
-	subs wzr, w18, w20
-	cset x18, hs
+	subs wzr, w8, w20
+	cset x8, hs
 	subs xzr, x19, x21
 	cset x19, hs
-	str w17, [sp, #0x50]
-	str w16, [sp, #0x58]
-	str w15, [sp, #0x60]
-	str w14, [sp, #0x68]
-	str w13, [sp, #0x70]
-	str w12, [sp, #0x78]
-	str w11, [sp, #0x80]
-	str w10, [sp, #0x88]
-	str w9, [sp, #0x90]
-	str w8, [sp, #0x98]
-	str w18, [sp, #0xa0]
 	str w19, [sp, #0xa8]
+	str w8, [sp, #0xa0]
+	str w9, [sp, #0x98]
+	str w10, [sp, #0x90]
+	str w11, [sp, #0x88]
+	str w12, [sp, #0x80]
+	str w13, [sp, #0x78]
+	str w14, [sp, #0x70]
+	str w15, [sp, #0x68]
+	str w16, [sp, #0x60]
+	str w17, [sp, #0x58]
+	str w18, [sp, #0x50]
 	ldr x21, [sp], #0x10
 	ldr x20, [sp], #0x10
 	ldr x19, [sp], #0x10
@@ -1325,43 +1319,43 @@ L1 (SSA Block: blk0):
 	lsr w20?, w2?, 0x1f
 	lsr x21?, x4?, x5?
 	lsr x23?, x4?, 0x20
-	mov x0, x6?
-	mov x1, x8?
-	mov x2, x9?
-	mov x3, x11?
-	mov x4, x12?
-	mov x5, x14?
-	mov x6, x15?
-	mov x7, x17?
-	str w18?, [#ret_space, #0x0]
-	str w20?, [#ret_space, #0x8]
-	str x21?, [#ret_space, #0x10]
 	str x23?, [#ret_space, #0x18]
+	str x21?, [#ret_space, #0x10]
+	str w20?, [#ret_space, #0x8]
+	str w18?, [#ret_space, #0x0]
+	mov x7, x17?
+	mov x6, x15?
+	mov x5, x14?
+	mov x4, x12?
+	mov x3, x11?
+	mov x2, x9?
+	mov x1, x8?
+	mov x0, x6?
 	ret
 `,
 			afterFinalizeARM64: `
 L1 (SSA Block: blk0):
 	str x30, [sp, #-0x10]!
 	mov x9, x2
-	mov x8, x3
-	mov x11, x4
-	mov x10, x5
-	lsl w0, w9, w8
+	mov x10, x3
+	mov x8, x4
+	mov x11, x5
+	lsl w0, w9, w10
 	lsl w1, w9, 0x1f
-	lsl x2, x11, x10
-	lsl x3, x11, 0x20
-	asr w4, w9, w8
+	lsl x2, x8, x11
+	lsl x3, x8, 0x20
+	asr w4, w9, w10
 	asr w5, w9, 0x1f
-	asr x6, x11, x10
-	asr x7, x11, 0x20
-	lsr w8, w9, w8
+	asr x6, x8, x11
+	asr x7, x8, 0x20
+	lsr w10, w9, w10
 	lsr w9, w9, 0x1f
-	lsr x10, x11, x10
-	lsr x11, x11, 0x20
-	str w8, [sp, #0x10]
+	lsr x11, x8, x11
+	lsr x8, x8, 0x20
+	str x8, [sp, #0x28]
+	str x11, [sp, #0x20]
 	str w9, [sp, #0x18]
-	str x10, [sp, #0x20]
-	str x11, [sp, #0x28]
+	str w10, [sp, #0x10]
 	ldr x30, [sp], #0x10
 	ret
 `,
@@ -1380,13 +1374,13 @@ L1 (SSA Block: blk0):
 	sxtw x8?, w3?
 	sxtb w9?, w2?
 	sxth w10?, w2?
-	mov x0, x4?
-	mov x1, x5?
-	mov x2, x6?
-	mov x3, x7?
-	mov x4, x8?
-	mov x5, x9?
 	mov x6, x10?
+	mov x5, x9?
+	mov x4, x8?
+	mov x3, x7?
+	mov x2, x6?
+	mov x1, x5?
+	mov x0, x4?
 	ret
 `,
 			afterFinalizeARM64: `
@@ -1438,18 +1432,18 @@ L1 (SSA Block: blk0):
 	cset x16?, ls
 	fcmp s4?, s5?
 	cset x17?, ge
-	mov x0, x6?
-	mov x1, x7?
-	mov x2, x8?
-	mov x3, x9?
-	mov x4, x10?
-	mov x5, x11?
-	mov x6, x12?
-	mov x7, x13?
-	str w14?, [#ret_space, #0x0]
-	str w15?, [#ret_space, #0x8]
-	str w16?, [#ret_space, #0x10]
 	str w17?, [#ret_space, #0x18]
+	str w16?, [#ret_space, #0x10]
+	str w15?, [#ret_space, #0x8]
+	str w14?, [#ret_space, #0x0]
+	mov x7, x13?
+	mov x6, x12?
+	mov x5, x11?
+	mov x4, x10?
+	mov x3, x9?
+	mov x2, x8?
+	mov x1, x7?
+	mov x0, x6?
 	ret
 `,
 			afterFinalizeARM64: `
@@ -1479,10 +1473,10 @@ L1 (SSA Block: blk0):
 	cset x9, ls
 	fcmp s2, s3
 	cset x8, ge
-	str w11, [sp, #0x10]
-	str w10, [sp, #0x18]
-	str w9, [sp, #0x20]
 	str w8, [sp, #0x28]
+	str w9, [sp, #0x20]
+	str w10, [sp, #0x18]
+	str w11, [sp, #0x10]
 	ldr x30, [sp], #0x10
 	ret
 `,
@@ -1612,8 +1606,8 @@ L1 (SSA Block: blk0):
 	fadd s119?, s68?, s118?
 	fadd s120?, s66?, s119?
 	fadd s121?, s64?, s120?
-	mov x0, x62?
 	mov q0.8b, q121?.8b
+	mov x0, x62?
 	ret
 `,
 			afterFinalizeARM64: `
@@ -1884,7 +1878,7 @@ L1 (SSA Block: blk0):
 `,
 		},
 		{
-			name: "imported_function_call", m: testcases.MemoryLoads.Module,
+			name: "memory_load_basic", m: testcases.MemoryLoadBasic.Module,
 			afterLoweringARM64: `
 L1 (SSA Block: blk0):
 	mov x0?, x0
@@ -1894,256 +1888,323 @@ L1 (SSA Block: blk0):
 	ldr w5?, [x1?, #0x8]
 	add x6?, x4?, #0x4
 	subs xzr, x5?, x6?
-	b.hi #0x20
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
 	str w27, [x0?]
-	trap_sequence w0?
-	ldr w8?, [x1?]
-	ldr w9?, [x8?]
-	uxtw x11?, w2?
-	add x12?, x11?, #0x8
-	subs xzr, x5?, x12?
-	b.hi #0x20
+	exit_sequence w0?
+	ldr x8?, [x1?]
+	add x11?, x8?, x4?
+	ldr w10?, [x11?]
+	mov x0, x10?
+	ret
+`,
+			afterFinalizeARM64: `
+L1 (SSA Block: blk0):
+	str x30, [sp, #-0x10]!
+	uxtw x8, w2
+	ldr w10, [x1, #0x8]
+	add x9, x8, #0x4
+	subs xzr, x10, x9
+	b.hs #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x0]
+	exit_sequence w0
+	ldr x9, [x1]
+	add x8, x9, x8
+	ldr w0, [x8]
+	ldr x30, [sp], #0x10
+	ret
+`,
+		},
+		{
+			name: "memory_loads", m: testcases.MemoryLoads.Module,
+			afterLoweringARM64: `
+L1 (SSA Block: blk0):
+	mov x0?, x0
+	mov x1?, x1
+	mov x2?, x2
+	uxtw x4?, w2?
+	ldr w5?, [x1?, #0x8]
+	add x6?, x4?, #0x4
+	subs xzr, x5?, x6?
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
 	str w27, [x0?]
-	trap_sequence w0?
-	ldr x14?, [x8?]
-	uxtw x16?, w2?
-	add x17?, x16?, #0x4
-	subs xzr, x5?, x17?
-	b.hi #0x20
+	exit_sequence w0?
+	ldr x8?, [x1?]
+	add x200?, x8?, x4?
+	ldr w10?, [x200?]
+	uxtw x12?, w2?
+	add x13?, x12?, #0x8
+	subs xzr, x5?, x13?
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
 	str w27, [x0?]
-	trap_sequence w0?
-	ldr s19?, [x8?]
-	uxtw x21?, w2?
-	add x22?, x21?, #0x8
-	subs xzr, x5?, x22?
-	b.hi #0x20
+	exit_sequence w0?
+	add x199?, x8?, x12?
+	ldr x16?, [x199?]
+	uxtw x18?, w2?
+	add x19?, x18?, #0x4
+	subs xzr, x5?, x19?
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
 	str w27, [x0?]
-	trap_sequence w0?
-	ldr d24?, [x8?]
-	uxtw x26?, w2?
-	add x27?, x26?, #0x13
-	subs xzr, x5?, x27?
-	b.hi #0x20
+	exit_sequence w0?
+	add x198?, x8?, x18?
+	ldr s22?, [x198?]
+	uxtw x24?, w2?
+	add x25?, x24?, #0x8
+	subs xzr, x5?, x25?
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
 	str w27, [x0?]
-	trap_sequence w0?
-	ldr w29?, [x8?, #0xf]
-	uxtw x31?, w2?
-	add x32?, x31?, #0x17
-	subs xzr, x5?, x32?
-	b.hi #0x20
+	exit_sequence w0?
+	add x197?, x8?, x24?
+	ldr d28?, [x197?]
+	uxtw x30?, w2?
+	add x31?, x30?, #0x13
+	subs xzr, x5?, x31?
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
 	str w27, [x0?]
-	trap_sequence w0?
-	ldr x34?, [x8?, #0xf]
+	exit_sequence w0?
+	add x196?, x8?, x30?
+	ldr w34?, [x196?, #0xf]
 	uxtw x36?, w2?
-	add x37?, x36?, #0x13
+	add x37?, x36?, #0x17
 	subs xzr, x5?, x37?
-	b.hi #0x20
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
 	str w27, [x0?]
-	trap_sequence w0?
-	ldr s39?, [x8?, #0xf]
-	uxtw x41?, w2?
-	add x42?, x41?, #0x17
-	subs xzr, x5?, x42?
-	b.hi #0x20
+	exit_sequence w0?
+	add x195?, x8?, x36?
+	ldr x40?, [x195?, #0xf]
+	uxtw x42?, w2?
+	add x43?, x42?, #0x13
+	subs xzr, x5?, x43?
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
 	str w27, [x0?]
-	trap_sequence w0?
-	ldr d44?, [x8?, #0xf]
-	uxtw x46?, w2?
-	add x47?, x46?, #0x1
-	subs xzr, x5?, x47?
-	b.hi #0x20
+	exit_sequence w0?
+	add x194?, x8?, x42?
+	ldr s46?, [x194?, #0xf]
+	uxtw x48?, w2?
+	add x49?, x48?, #0x17
+	subs xzr, x5?, x49?
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
 	str w27, [x0?]
-	trap_sequence w0?
-	ldrb w49?, [x8?]
-	uxtw x51?, w2?
-	add x52?, x51?, #0x10
-	subs xzr, x5?, x52?
-	b.hi #0x20
+	exit_sequence w0?
+	add x193?, x8?, x48?
+	ldr d52?, [x193?, #0xf]
+	uxtw x54?, w2?
+	add x55?, x54?, #0x1
+	subs xzr, x5?, x55?
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
 	str w27, [x0?]
-	trap_sequence w0?
-	ldrb w54?, [x8?, #0xf]
-	uxtw x56?, w2?
-	add x57?, x56?, #0x1
-	subs xzr, x5?, x57?
-	b.hi #0x20
+	exit_sequence w0?
+	add x192?, x8?, x54?
+	ldrsb w58?, [x192?]
+	uxtw x60?, w2?
+	add x61?, x60?, #0x10
+	subs xzr, x5?, x61?
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
 	str w27, [x0?]
-	trap_sequence w0?
-	ldrb w59?, [x8?]
-	uxtw x61?, w2?
-	add x62?, x61?, #0x10
-	subs xzr, x5?, x62?
-	b.hi #0x20
-	movz x27, #0x3, LSL 0
-	str w27, [x0?]
-	trap_sequence w0?
-	ldrb w64?, [x8?, #0xf]
+	exit_sequence w0?
+	add x191?, x8?, x60?
+	ldrsb w64?, [x191?, #0xf]
 	uxtw x66?, w2?
-	add x67?, x66?, #0x2
+	add x67?, x66?, #0x1
 	subs xzr, x5?, x67?
-	b.hi #0x20
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
 	str w27, [x0?]
-	trap_sequence w0?
-	ldrh w69?, [x8?]
-	uxtw x71?, w2?
-	add x72?, x71?, #0x11
-	subs xzr, x5?, x72?
-	b.hi #0x20
+	exit_sequence w0?
+	add x190?, x8?, x66?
+	ldrb w70?, [x190?]
+	uxtw x72?, w2?
+	add x73?, x72?, #0x10
+	subs xzr, x5?, x73?
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
 	str w27, [x0?]
-	trap_sequence w0?
-	ldrh w74?, [x8?, #0xf]
-	uxtw x76?, w2?
-	add x77?, x76?, #0x2
-	subs xzr, x5?, x77?
-	b.hi #0x20
+	exit_sequence w0?
+	add x189?, x8?, x72?
+	ldrb w76?, [x189?, #0xf]
+	uxtw x78?, w2?
+	add x79?, x78?, #0x2
+	subs xzr, x5?, x79?
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
 	str w27, [x0?]
-	trap_sequence w0?
-	ldrh w79?, [x8?]
-	uxtw x81?, w2?
-	add x82?, x81?, #0x11
-	subs xzr, x5?, x82?
-	b.hi #0x20
+	exit_sequence w0?
+	add x188?, x8?, x78?
+	ldrsh w82?, [x188?]
+	uxtw x84?, w2?
+	add x85?, x84?, #0x11
+	subs xzr, x5?, x85?
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
 	str w27, [x0?]
-	trap_sequence w0?
-	ldrh w84?, [x8?, #0xf]
-	uxtw x86?, w2?
-	add x87?, x86?, #0x1
-	subs xzr, x5?, x87?
-	b.hi #0x20
+	exit_sequence w0?
+	add x187?, x8?, x84?
+	ldrsh w88?, [x187?, #0xf]
+	uxtw x90?, w2?
+	add x91?, x90?, #0x2
+	subs xzr, x5?, x91?
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
 	str w27, [x0?]
-	trap_sequence w0?
-	ldrb w89?, [x8?]
-	uxtw x91?, w2?
-	add x92?, x91?, #0x10
-	subs xzr, x5?, x92?
-	b.hi #0x20
-	movz x27, #0x3, LSL 0
-	str w27, [x0?]
-	trap_sequence w0?
-	ldrb w94?, [x8?, #0xf]
+	exit_sequence w0?
+	add x186?, x8?, x90?
+	ldrh w94?, [x186?]
 	uxtw x96?, w2?
-	add x97?, x96?, #0x1
+	add x97?, x96?, #0x11
 	subs xzr, x5?, x97?
-	b.hi #0x20
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
 	str w27, [x0?]
-	trap_sequence w0?
-	ldrb w99?, [x8?]
-	uxtw x101?, w2?
-	add x102?, x101?, #0x10
-	subs xzr, x5?, x102?
-	b.hi #0x20
+	exit_sequence w0?
+	add x185?, x8?, x96?
+	ldrh w100?, [x185?, #0xf]
+	uxtw x102?, w2?
+	add x103?, x102?, #0x1
+	subs xzr, x5?, x103?
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
 	str w27, [x0?]
-	trap_sequence w0?
-	ldrb w104?, [x8?, #0xf]
-	uxtw x106?, w2?
-	add x107?, x106?, #0x2
-	subs xzr, x5?, x107?
-	b.hi #0x20
+	exit_sequence w0?
+	add x184?, x8?, x102?
+	ldrsb w106?, [x184?]
+	uxtw x108?, w2?
+	add x109?, x108?, #0x10
+	subs xzr, x5?, x109?
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
 	str w27, [x0?]
-	trap_sequence w0?
-	ldrh w109?, [x8?]
-	uxtw x111?, w2?
-	add x112?, x111?, #0x11
-	subs xzr, x5?, x112?
-	b.hi #0x20
+	exit_sequence w0?
+	add x183?, x8?, x108?
+	ldrsb w112?, [x183?, #0xf]
+	uxtw x114?, w2?
+	add x115?, x114?, #0x1
+	subs xzr, x5?, x115?
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
 	str w27, [x0?]
-	trap_sequence w0?
-	ldrh w114?, [x8?, #0xf]
-	uxtw x116?, w2?
-	add x117?, x116?, #0x2
-	subs xzr, x5?, x117?
-	b.hi #0x20
+	exit_sequence w0?
+	add x182?, x8?, x114?
+	ldrb w118?, [x182?]
+	uxtw x120?, w2?
+	add x121?, x120?, #0x10
+	subs xzr, x5?, x121?
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
 	str w27, [x0?]
-	trap_sequence w0?
-	ldrh w119?, [x8?]
-	uxtw x121?, w2?
-	add x122?, x121?, #0x11
-	subs xzr, x5?, x122?
-	b.hi #0x20
-	movz x27, #0x3, LSL 0
-	str w27, [x0?]
-	trap_sequence w0?
-	ldrh w124?, [x8?, #0xf]
+	exit_sequence w0?
+	add x181?, x8?, x120?
+	ldrb w124?, [x181?, #0xf]
 	uxtw x126?, w2?
-	add x127?, x126?, #0x4
+	add x127?, x126?, #0x2
 	subs xzr, x5?, x127?
-	b.hi #0x20
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
 	str w27, [x0?]
-	trap_sequence w0?
-	ldr w129?, [x8?]
-	uxtw x131?, w2?
-	add x132?, x131?, #0x13
-	subs xzr, x5?, x132?
-	b.hi #0x20
+	exit_sequence w0?
+	add x180?, x8?, x126?
+	ldrsh w130?, [x180?]
+	uxtw x132?, w2?
+	add x133?, x132?, #0x11
+	subs xzr, x5?, x133?
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
 	str w27, [x0?]
-	trap_sequence w0?
-	ldr w134?, [x8?, #0xf]
-	uxtw x136?, w2?
-	add x137?, x136?, #0x4
-	subs xzr, x5?, x137?
-	b.hi #0x20
+	exit_sequence w0?
+	add x179?, x8?, x132?
+	ldrsh w136?, [x179?, #0xf]
+	uxtw x138?, w2?
+	add x139?, x138?, #0x2
+	subs xzr, x5?, x139?
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
 	str w27, [x0?]
-	trap_sequence w0?
-	ldr w139?, [x8?]
-	uxtw x141?, w2?
-	add x142?, x141?, #0x13
-	subs xzr, x5?, x142?
-	b.hi #0x20
+	exit_sequence w0?
+	add x178?, x8?, x138?
+	ldrh w142?, [x178?]
+	uxtw x144?, w2?
+	add x145?, x144?, #0x11
+	subs xzr, x5?, x145?
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
 	str w27, [x0?]
-	trap_sequence w0?
-	ldr w144?, [x8?, #0xf]
-	mov x0, x9?
-	mov x1, x14?
-	mov q0.8b, q19?.8b
-	mov q1.8b, q24?.8b
-	mov x2, x29?
-	mov x3, x34?
-	mov q2.8b, q39?.8b
-	mov q3.8b, q44?.8b
-	mov x4, x49?
-	mov x5, x54?
-	mov x6, x59?
-	mov x7, x64?
-	str w69?, [#ret_space, #0x0]
-	str w74?, [#ret_space, #0x8]
-	str w79?, [#ret_space, #0x10]
-	str w84?, [#ret_space, #0x18]
-	str x89?, [#ret_space, #0x20]
-	str x94?, [#ret_space, #0x28]
-	str x99?, [#ret_space, #0x30]
-	str x104?, [#ret_space, #0x38]
-	str x109?, [#ret_space, #0x40]
-	str x114?, [#ret_space, #0x48]
-	str x119?, [#ret_space, #0x50]
-	str x124?, [#ret_space, #0x58]
-	str x129?, [#ret_space, #0x60]
-	str x134?, [#ret_space, #0x68]
-	str x139?, [#ret_space, #0x70]
-	str x144?, [#ret_space, #0x78]
+	exit_sequence w0?
+	add x177?, x8?, x144?
+	ldrh w148?, [x177?, #0xf]
+	uxtw x150?, w2?
+	add x151?, x150?, #0x4
+	subs xzr, x5?, x151?
+	b.hs #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x0?]
+	exit_sequence w0?
+	add x176?, x8?, x150?
+	ldrs w154?, [x176?]
+	uxtw x156?, w2?
+	add x157?, x156?, #0x13
+	subs xzr, x5?, x157?
+	b.hs #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x0?]
+	exit_sequence w0?
+	add x175?, x8?, x156?
+	ldrs w160?, [x175?, #0xf]
+	uxtw x162?, w2?
+	add x163?, x162?, #0x4
+	subs xzr, x5?, x163?
+	b.hs #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x0?]
+	exit_sequence w0?
+	add x174?, x8?, x162?
+	ldr w166?, [x174?]
+	uxtw x168?, w2?
+	add x169?, x168?, #0x13
+	subs xzr, x5?, x169?
+	b.hs #0x20
+	movz x27, #0x3, LSL 0
+	str w27, [x0?]
+	exit_sequence w0?
+	add x173?, x8?, x168?
+	ldr w172?, [x173?, #0xf]
+	str x172?, [#ret_space, #0x78]
+	str x166?, [#ret_space, #0x70]
+	str x160?, [#ret_space, #0x68]
+	str x154?, [#ret_space, #0x60]
+	str x148?, [#ret_space, #0x58]
+	str x142?, [#ret_space, #0x50]
+	str x136?, [#ret_space, #0x48]
+	str x130?, [#ret_space, #0x40]
+	str x124?, [#ret_space, #0x38]
+	str x118?, [#ret_space, #0x30]
+	str x112?, [#ret_space, #0x28]
+	str x106?, [#ret_space, #0x20]
+	str w100?, [#ret_space, #0x18]
+	str w94?, [#ret_space, #0x10]
+	str w88?, [#ret_space, #0x8]
+	str w82?, [#ret_space, #0x0]
+	mov x7, x76?
+	mov x6, x70?
+	mov x5, x64?
+	mov x4, x58?
+	mov q3.8b, q52?.8b
+	mov q2.8b, q46?.8b
+	mov x3, x40?
+	mov x2, x34?
+	mov q1.8b, q28?.8b
+	mov q0.8b, q22?.8b
+	mov x1, x16?
+	mov x0, x10?
 	ret
 `,
 
@@ -2159,250 +2220,280 @@ L1 (SSA Block: blk0):
 	str x24, [sp, #-0x10]!
 	str x25, [sp, #-0x10]!
 	str x26, [sp, #-0x10]!
-	mov x23, x0
-	mov x25, x2
-	uxtw x8, w25
-	ldr w24, [x1, #0x8]
-	add x8, x8, #0x4
-	subs xzr, x24, x8
-	b.hi #0x20
+	str x28, [sp, #-0x10]!
+	mov x8, x0
+	uxtw x11, w2
+	ldr w9, [x1, #0x8]
+	add x10, x11, #0x4
+	subs xzr, x9, x10
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
-	str w27, [x23]
-	trap_sequence w23
-	ldr w26, [x1]
-	ldr w0, [x26]
-	uxtw x8, w25
-	add x8, x8, #0x8
-	subs xzr, x24, x8
-	b.hi #0x20
+	str w27, [x8]
+	exit_sequence w8
+	ldr x10, [x1]
+	add x11, x10, x11
+	ldr w0, [x11]
+	uxtw x12, w2
+	add x11, x12, #0x8
+	subs xzr, x9, x11
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
-	str w27, [x23]
-	trap_sequence w23
-	ldr x1, [x26]
-	uxtw x8, w25
-	add x8, x8, #0x4
-	subs xzr, x24, x8
-	b.hi #0x20
+	str w27, [x8]
+	exit_sequence w8
+	add x11, x10, x12
+	ldr x1, [x11]
+	uxtw x12, w2
+	add x11, x12, #0x4
+	subs xzr, x9, x11
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
-	str w27, [x23]
-	trap_sequence w23
-	ldr s0, [x26]
-	uxtw x8, w25
-	add x8, x8, #0x8
-	subs xzr, x24, x8
-	b.hi #0x20
+	str w27, [x8]
+	exit_sequence w8
+	add x11, x10, x12
+	ldr s0, [x11]
+	uxtw x12, w2
+	add x11, x12, #0x8
+	subs xzr, x9, x11
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
-	str w27, [x23]
-	trap_sequence w23
-	ldr d1, [x26]
-	uxtw x8, w25
-	add x8, x8, #0x13
-	subs xzr, x24, x8
-	b.hi #0x20
+	str w27, [x8]
+	exit_sequence w8
+	add x11, x10, x12
+	ldr d1, [x11]
+	uxtw x12, w2
+	add x11, x12, #0x13
+	subs xzr, x9, x11
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
-	str w27, [x23]
-	trap_sequence w23
-	ldr w2, [x26, #0xf]
-	uxtw x8, w25
-	add x8, x8, #0x17
-	subs xzr, x24, x8
-	b.hi #0x20
+	str w27, [x8]
+	exit_sequence w8
+	add x11, x10, x12
+	ldr w11, [x11, #0xf]
+	uxtw x13, w2
+	add x12, x13, #0x17
+	subs xzr, x9, x12
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
-	str w27, [x23]
-	trap_sequence w23
-	ldr x3, [x26, #0xf]
-	uxtw x8, w25
-	add x8, x8, #0x13
-	subs xzr, x24, x8
-	b.hi #0x20
+	str w27, [x8]
+	exit_sequence w8
+	add x12, x10, x13
+	ldr x3, [x12, #0xf]
+	uxtw x13, w2
+	add x12, x13, #0x13
+	subs xzr, x9, x12
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
-	str w27, [x23]
-	trap_sequence w23
-	ldr s2, [x26, #0xf]
-	uxtw x8, w25
-	add x8, x8, #0x17
-	subs xzr, x24, x8
-	b.hi #0x20
+	str w27, [x8]
+	exit_sequence w8
+	add x12, x10, x13
+	ldr s2, [x12, #0xf]
+	uxtw x13, w2
+	add x12, x13, #0x17
+	subs xzr, x9, x12
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
-	str w27, [x23]
-	trap_sequence w23
-	ldr d3, [x26, #0xf]
-	uxtw x8, w25
-	add x8, x8, #0x1
-	subs xzr, x24, x8
-	b.hi #0x20
+	str w27, [x8]
+	exit_sequence w8
+	add x12, x10, x13
+	ldr d3, [x12, #0xf]
+	uxtw x13, w2
+	add x12, x13, #0x1
+	subs xzr, x9, x12
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
-	str w27, [x23]
-	trap_sequence w23
-	ldrb w4, [x26]
-	uxtw x8, w25
-	add x8, x8, #0x10
-	subs xzr, x24, x8
-	b.hi #0x20
+	str w27, [x8]
+	exit_sequence w8
+	add x12, x10, x13
+	ldrsb w4, [x12]
+	uxtw x13, w2
+	add x12, x13, #0x10
+	subs xzr, x9, x12
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
-	str w27, [x23]
-	trap_sequence w23
-	ldrb w5, [x26, #0xf]
-	uxtw x8, w25
-	add x8, x8, #0x1
-	subs xzr, x24, x8
-	b.hi #0x20
+	str w27, [x8]
+	exit_sequence w8
+	add x12, x10, x13
+	ldrsb w5, [x12, #0xf]
+	uxtw x13, w2
+	add x12, x13, #0x1
+	subs xzr, x9, x12
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
-	str w27, [x23]
-	trap_sequence w23
-	ldrb w6, [x26]
-	uxtw x8, w25
-	add x8, x8, #0x10
-	subs xzr, x24, x8
-	b.hi #0x20
+	str w27, [x8]
+	exit_sequence w8
+	add x12, x10, x13
+	ldrb w6, [x12]
+	uxtw x13, w2
+	add x12, x13, #0x10
+	subs xzr, x9, x12
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
-	str w27, [x23]
-	trap_sequence w23
-	ldrb w7, [x26, #0xf]
-	uxtw x8, w25
-	add x8, x8, #0x2
-	subs xzr, x24, x8
-	b.hi #0x20
+	str w27, [x8]
+	exit_sequence w8
+	add x12, x10, x13
+	ldrb w7, [x12, #0xf]
+	uxtw x13, w2
+	add x12, x13, #0x2
+	subs xzr, x9, x12
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
-	str w27, [x23]
-	trap_sequence w23
-	ldrh w8, [x26]
-	uxtw x9, w25
-	add x9, x9, #0x11
-	subs xzr, x24, x9
-	b.hi #0x20
+	str w27, [x8]
+	exit_sequence w8
+	add x12, x10, x13
+	ldrsh w12, [x12]
+	uxtw x14, w2
+	add x13, x14, #0x11
+	subs xzr, x9, x13
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
-	str w27, [x23]
-	trap_sequence w23
-	ldrh w9, [x26, #0xf]
-	uxtw x10, w25
-	add x10, x10, #0x2
-	subs xzr, x24, x10
-	b.hi #0x20
+	str w27, [x8]
+	exit_sequence w8
+	add x13, x10, x14
+	ldrsh w13, [x13, #0xf]
+	uxtw x15, w2
+	add x14, x15, #0x2
+	subs xzr, x9, x14
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
-	str w27, [x23]
-	trap_sequence w23
-	ldrh w10, [x26]
-	uxtw x11, w25
-	add x11, x11, #0x11
-	subs xzr, x24, x11
-	b.hi #0x20
+	str w27, [x8]
+	exit_sequence w8
+	add x14, x10, x15
+	ldrh w14, [x14]
+	uxtw x16, w2
+	add x15, x16, #0x11
+	subs xzr, x9, x15
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
-	str w27, [x23]
-	trap_sequence w23
-	ldrh w11, [x26, #0xf]
-	uxtw x12, w25
-	add x12, x12, #0x1
-	subs xzr, x24, x12
-	b.hi #0x20
+	str w27, [x8]
+	exit_sequence w8
+	add x15, x10, x16
+	ldrh w15, [x15, #0xf]
+	uxtw x17, w2
+	add x16, x17, #0x1
+	subs xzr, x9, x16
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
-	str w27, [x23]
-	trap_sequence w23
-	ldrb w12, [x26]
-	uxtw x13, w25
-	add x13, x13, #0x10
-	subs xzr, x24, x13
-	b.hi #0x20
+	str w27, [x8]
+	exit_sequence w8
+	add x16, x10, x17
+	ldrsb w16, [x16]
+	uxtw x18, w2
+	add x17, x18, #0x10
+	subs xzr, x9, x17
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
-	str w27, [x23]
-	trap_sequence w23
-	ldrb w13, [x26, #0xf]
-	uxtw x14, w25
-	add x14, x14, #0x1
-	subs xzr, x24, x14
-	b.hi #0x20
+	str w27, [x8]
+	exit_sequence w8
+	add x17, x10, x18
+	ldrsb w17, [x17, #0xf]
+	uxtw x19, w2
+	add x18, x19, #0x1
+	subs xzr, x9, x18
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
-	str w27, [x23]
-	trap_sequence w23
-	ldrb w14, [x26]
-	uxtw x15, w25
-	add x15, x15, #0x10
-	subs xzr, x24, x15
-	b.hi #0x20
+	str w27, [x8]
+	exit_sequence w8
+	add x18, x10, x19
+	ldrb w18, [x18]
+	uxtw x20, w2
+	add x19, x20, #0x10
+	subs xzr, x9, x19
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
-	str w27, [x23]
-	trap_sequence w23
-	ldrb w15, [x26, #0xf]
-	uxtw x16, w25
-	add x16, x16, #0x2
-	subs xzr, x24, x16
-	b.hi #0x20
+	str w27, [x8]
+	exit_sequence w8
+	add x19, x10, x20
+	ldrb w19, [x19, #0xf]
+	uxtw x21, w2
+	add x20, x21, #0x2
+	subs xzr, x9, x20
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
-	str w27, [x23]
-	trap_sequence w23
-	ldrh w16, [x26]
-	uxtw x17, w25
-	add x17, x17, #0x11
-	subs xzr, x24, x17
-	b.hi #0x20
+	str w27, [x8]
+	exit_sequence w8
+	add x20, x10, x21
+	ldrsh w20, [x20]
+	uxtw x22, w2
+	add x21, x22, #0x11
+	subs xzr, x9, x21
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
-	str w27, [x23]
-	trap_sequence w23
-	ldrh w17, [x26, #0xf]
-	uxtw x18, w25
-	add x18, x18, #0x2
-	subs xzr, x24, x18
-	b.hi #0x20
+	str w27, [x8]
+	exit_sequence w8
+	add x21, x10, x22
+	ldrsh w21, [x21, #0xf]
+	uxtw x23, w2
+	add x22, x23, #0x2
+	subs xzr, x9, x22
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
-	str w27, [x23]
-	trap_sequence w23
-	ldrh w18, [x26]
-	uxtw x19, w25
-	add x19, x19, #0x11
-	subs xzr, x24, x19
-	b.hi #0x20
+	str w27, [x8]
+	exit_sequence w8
+	add x22, x10, x23
+	ldrh w22, [x22]
+	uxtw x24, w2
+	add x23, x24, #0x11
+	subs xzr, x9, x23
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
-	str w27, [x23]
-	trap_sequence w23
-	ldrh w19, [x26, #0xf]
-	uxtw x20, w25
-	add x20, x20, #0x4
-	subs xzr, x24, x20
-	b.hi #0x20
+	str w27, [x8]
+	exit_sequence w8
+	add x23, x10, x24
+	ldrh w23, [x23, #0xf]
+	uxtw x25, w2
+	add x24, x25, #0x4
+	subs xzr, x9, x24
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
-	str w27, [x23]
-	trap_sequence w23
-	ldr w20, [x26]
-	uxtw x21, w25
-	add x21, x21, #0x13
-	subs xzr, x24, x21
-	b.hi #0x20
+	str w27, [x8]
+	exit_sequence w8
+	add x24, x10, x25
+	ldrs w24, [x24]
+	uxtw x26, w2
+	add x25, x26, #0x13
+	subs xzr, x9, x25
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
-	str w27, [x23]
-	trap_sequence w23
-	ldr w21, [x26, #0xf]
-	uxtw x22, w25
-	add x22, x22, #0x4
-	subs xzr, x24, x22
-	b.hi #0x20
+	str w27, [x8]
+	exit_sequence w8
+	add x25, x10, x26
+	ldrs w25, [x25, #0xf]
+	uxtw x28, w2
+	add x26, x28, #0x4
+	subs xzr, x9, x26
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
-	str w27, [x23]
-	trap_sequence w23
-	ldr w22, [x26]
-	uxtw x25, w25
-	add x25, x25, #0x13
-	subs xzr, x24, x25
-	b.hi #0x20
+	str w27, [x8]
+	exit_sequence w8
+	add x26, x10, x28
+	ldr w26, [x26]
+	uxtw x29, w2
+	add x28, x29, #0x13
+	subs xzr, x9, x28
+	b.hs #0x20
 	movz x27, #0x3, LSL 0
-	str w27, [x23]
-	trap_sequence w23
-	ldr w23, [x26, #0xf]
-	str w8, [sp, #0xa0]
-	str w9, [sp, #0xa8]
-	str w10, [sp, #0xb0]
-	str w11, [sp, #0xb8]
-	str x12, [sp, #0xc0]
-	str x13, [sp, #0xc8]
-	str x14, [sp, #0xd0]
-	str x15, [sp, #0xd8]
-	str x16, [sp, #0xe0]
-	str x17, [sp, #0xe8]
-	str x18, [sp, #0xf0]
-	str x19, [sp, #0xf8]
-	str x20, [sp, #0x100]
-	str x21, [sp, #0x108]
-	str x22, [sp, #0x110]
-	str x23, [sp, #0x118]
+	str w27, [x8]
+	exit_sequence w8
+	add x8, x10, x29
+	ldr w8, [x8, #0xf]
+	str x8, [sp, #0x128]
+	str x26, [sp, #0x120]
+	str x25, [sp, #0x118]
+	str x24, [sp, #0x110]
+	str x23, [sp, #0x108]
+	str x22, [sp, #0x100]
+	str x21, [sp, #0xf8]
+	str x20, [sp, #0xf0]
+	str x19, [sp, #0xe8]
+	str x18, [sp, #0xe0]
+	str x17, [sp, #0xd8]
+	str x16, [sp, #0xd0]
+	str w15, [sp, #0xc8]
+	str w14, [sp, #0xc0]
+	str w13, [sp, #0xb8]
+	str w12, [sp, #0xb0]
+	mov x2, x11
+	ldr x28, [sp], #0x10
 	ldr x26, [sp], #0x10
 	ldr x25, [sp], #0x10
 	ldr x24, [sp], #0x10

@@ -36,6 +36,9 @@ type Engine interface {
 
 // ModuleEngine implements function calls for a given module.
 type ModuleEngine interface {
+	// DoneInstantiation is called at the end of the instantiation of the module.
+	DoneInstantiation()
+
 	// NewFunction returns an api.Function for the given function pointed by the given Index.
 	NewFunction(index Index) api.Function
 

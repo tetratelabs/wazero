@@ -661,6 +661,9 @@ func (e *moduleEngine) FunctionInstanceReference(funcIndex wasm.Index) wasm.Refe
 	return uintptr(unsafe.Pointer(&e.functions[funcIndex]))
 }
 
+// DoneInstantiation implements wasm.ModuleEngine.
+func (e *moduleEngine) DoneInstantiation() {}
+
 // NewFunction implements wasm.ModuleEngine.
 func (e *moduleEngine) NewFunction(index wasm.Index) api.Function {
 	return e.newFunction(&e.functions[index])

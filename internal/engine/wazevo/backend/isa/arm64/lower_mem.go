@@ -190,11 +190,11 @@ func (m *machine) lowerExtLoad(si *ssa.Instruction) {
 	case ssa.OpcodeUload32:
 		load.asULoad(operandNR(m.compiler.VRegOf(si.Return())), amode, 32)
 	case ssa.OpcodeSload8:
-		load.asULoad(operandNR(m.compiler.VRegOf(si.Return())), amode, 8)
+		load.asSLoad(operandNR(m.compiler.VRegOf(si.Return())), amode, 8)
 	case ssa.OpcodeSload16:
-		load.asULoad(operandNR(m.compiler.VRegOf(si.Return())), amode, 16)
+		load.asSLoad(operandNR(m.compiler.VRegOf(si.Return())), amode, 16)
 	case ssa.OpcodeSload32:
-		load.asULoad(operandNR(m.compiler.VRegOf(si.Return())), amode, 32)
+		load.asSLoad(operandNR(m.compiler.VRegOf(si.Return())), amode, 32)
 	default:
 		panic("BUG")
 	}
