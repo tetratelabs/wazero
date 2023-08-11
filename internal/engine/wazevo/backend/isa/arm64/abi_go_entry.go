@@ -23,7 +23,7 @@ var (
 	executionContextPtrReg = x0VReg
 	// callee-saved regs so that they can be used in the prologue and epilogue.
 	savedExecutionContextPtr = x18VReg
-	paramResultSlicePtr      = v19VReg
+	paramResultSlicePtr      = x19VReg
 	// goAllocatedStackPtr is not used in the epilogue.
 	goAllocatedStackPtr = x26VReg
 )

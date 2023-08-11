@@ -28,11 +28,12 @@ type (
 	// 	    localMemoryBufferPtr                      *byte                (optional)
 	// 	    localMemoryLength                         uint64               (optional)
 	// 	    importedMemoryInstance                    *wasm.MemoryInstance (optional)
-	// 	    importedFunctions [len(vm.importedFunctions)] struct { the total size depends on # of imported functions.
+	// 	    importedFunctions [importedFunctions] struct { the total size depends on # of imported functions.
 	// 	        executable      *byte
 	// 	        opaqueCtx       *moduleContextOpaque
 	// 	    }
-	// 	    TODO: add more fields, like tables and globals
+	//      globals                                    []*wasm.GlobalInstance (optional)
+	// 	    TODO: add more fields, like tables, etc.
 	// 	}
 	//
 	// See wazevoapi.NewModuleContextOffsetData for the details of the offsets.
@@ -57,6 +58,14 @@ func (m *moduleEngine) setupOpaque() {
 	}
 
 	// Note: imported functions are resolved in ResolveImportedFunction.
+
+	if globalOffset := offsets.GlobalsBegin; globalOffset >= 0 {
+		for _, g := range inst.Globals {
+			b := uint64(uintptr(unsafe.Pointer(g)))
+			binary.LittleEndian.PutUint64(opaque[globalOffset:], b)
+			globalOffset += 8
+		}
+	}
 }
 
 // NewFunction implements wasm.ModuleEngine.

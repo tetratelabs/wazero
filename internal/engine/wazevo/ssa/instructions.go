@@ -116,6 +116,10 @@ func (i *Instruction) IsBranching() bool {
 const (
 	OpcodeInvalid Opcode = iota
 
+	// OpcodeUndefined is a placeholder for undefined opcode. This can be used for debugging to intentionally
+	// cause a crash at certain point.
+	OpcodeUndefined
+
 	// OpcodeJump takes the list of args to the `block` and unconditionally jumps to it.
 	OpcodeJump
 
@@ -826,6 +830,7 @@ const (
 // instructionSideEffects provides the info to determine if an instruction has side effects.
 // Instructions with side effects must not be eliminated regardless whether the result is used or not.
 var instructionSideEffects = [opcodeEnd]sideEffect{
+	OpcodeUndefined:             sideEffectTrue,
 	OpcodeJump:                  sideEffectTrue,
 	OpcodeIconst:                sideEffectFalse,
 	OpcodeCall:                  sideEffectTrue,
@@ -874,13 +879,14 @@ func (i *Instruction) HasSideEffects() bool {
 
 // instructionReturnTypes provides the function to determine the return types of an instruction.
 var instructionReturnTypes = [opcodeEnd]returnTypesFn{
-	OpcodeIshl:    returnTypesFnSingle,
-	OpcodeSshr:    returnTypesFnSingle,
-	OpcodeUshr:    returnTypesFnSingle,
-	OpcodeJump:    returnTypesFnNoReturns,
-	OpcodeIconst:  returnTypesFnSingle,
-	OpcodeSExtend: returnTypesFnSingle,
-	OpcodeUExtend: returnTypesFnSingle,
+	OpcodeIshl:      returnTypesFnSingle,
+	OpcodeSshr:      returnTypesFnSingle,
+	OpcodeUshr:      returnTypesFnSingle,
+	OpcodeJump:      returnTypesFnNoReturns,
+	OpcodeUndefined: returnTypesFnNoReturns,
+	OpcodeIconst:    returnTypesFnSingle,
+	OpcodeSExtend:   returnTypesFnSingle,
+	OpcodeUExtend:   returnTypesFnSingle,
 	OpcodeCallIndirect: func(b *builder, instr *Instruction) (t1 Type, ts []Type) {
 		sigID := SignatureID(instr.v)
 		sig, ok := b.signatures[sigID]
@@ -1454,6 +1460,8 @@ func (o Opcode) String() (ret string) {
 	switch o {
 	case OpcodeInvalid:
 		return "invalid"
+	case OpcodeUndefined:
+		return "undefined"
 	case OpcodeJump:
 		return "Jump"
 	case OpcodeBrz:

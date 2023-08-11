@@ -2507,6 +2507,124 @@ L1 (SSA Block: blk0):
 	ret
 `,
 		},
+		{
+			name: "globals_mutable[0]",
+			m:    testcases.GlobalsMutable.Module,
+			afterLoweringARM64: `
+L1 (SSA Block: blk0):
+	mov x0?, x0
+	mov x1?, x1
+	ldr x2?, [x1?]
+	ldr w3?, [x2?, #0x8]
+	ldr x4?, [x1?, #0x8]
+	ldr x5?, [x4?, #0x8]
+	ldr x6?, [x1?, #0x10]
+	ldr s7?, [x6?, #0x8]
+	ldr x8?, [x1?, #0x18]
+	ldr d9?, [x8?, #0x8]
+	str x1?, [x0?, #0x8]
+	mov x0, x0?
+	mov x1, x1?
+	bl f1
+	ldr x10?, [x1?]
+	ldr w11?, [x10?, #0x8]
+	ldr x12?, [x1?, #0x8]
+	ldr x13?, [x12?, #0x8]
+	ldr x14?, [x1?, #0x10]
+	ldr s15?, [x14?, #0x8]
+	ldr x16?, [x1?, #0x18]
+	ldr d17?, [x16?, #0x8]
+	mov q3.8b, q17?.8b
+	mov q2.8b, q15?.8b
+	mov x3, x13?
+	mov x2, x11?
+	mov q1.8b, q9?.8b
+	mov q0.8b, q7?.8b
+	mov x1, x5?
+	mov x0, x3?
+	ret
+`,
+			afterFinalizeARM64: `
+L1 (SSA Block: blk0):
+	str x30, [sp, #-0x10]!
+	sub sp, sp, #0x20
+	mov x10, x1
+	ldr x8, [x10]
+	ldr w8, [x8, #0x8]
+	ldr x9, [x10, #0x8]
+	ldr x9, [x9, #0x8]
+	ldr x11, [x10, #0x10]
+	ldr s0, [x11, #0x8]
+	ldr x11, [x10, #0x18]
+	ldr d1, [x11, #0x8]
+	str x10, [x0, #0x8]
+	mov x1, x10
+	str x10, [sp]
+	str w8, [sp, #0x8]
+	str x9, [sp, #0xc]
+	str s0, [sp, #0x14]
+	str d1, [sp, #0x18]
+	bl f1
+	ldr d1, [sp, #0x18]
+	ldr s0, [sp, #0x14]
+	ldr x9, [sp, #0xc]
+	ldr w8, [sp, #0x8]
+	ldr x10, [sp]
+	ldr x11, [x10]
+	ldr w2, [x11, #0x8]
+	ldr x11, [x10, #0x8]
+	ldr x3, [x11, #0x8]
+	ldr x11, [x10, #0x10]
+	ldr s2, [x11, #0x8]
+	ldr x10, [x10, #0x18]
+	ldr d3, [x10, #0x8]
+	mov x1, x9
+	mov x0, x8
+	add sp, sp, #0x20
+	ldr x30, [sp], #0x10
+	ret
+`,
+		},
+		{
+			name:        "globals_mutable[1]",
+			m:           testcases.GlobalsMutable.Module,
+			targetIndex: 1,
+			afterLoweringARM64: `
+L1 (SSA Block: blk0):
+	mov x1?, x1
+	ldr x3?, [x1?]
+	orr w13?, wzr, #0x1
+	str w13?, [x3?, #0x8]
+	ldr x5?, [x1?, #0x8]
+	orr x12?, xzr, #0x2
+	str x12?, [x5?, #0x8]
+	ldr x7?, [x1?, #0x10]
+	ldr s11?, #8; b 8; data.f32 3.000000
+	str s11?, [x7?, #0x8]
+	ldr x9?, [x1?, #0x18]
+	ldr d10?, #8; b 16; data.f64 4.000000
+	str d10?, [x9?, #0x8]
+	ret
+`,
+			afterFinalizeARM64: `
+L1 (SSA Block: blk0):
+	str x30, [sp, #-0x10]!
+	ldr x9, [x1]
+	orr w8, wzr, #0x1
+	str w8, [x9, #0x8]
+	ldr x9, [x1, #0x8]
+	orr x8, xzr, #0x2
+	str x8, [x9, #0x8]
+	ldr x8, [x1, #0x10]
+	ldr s8, #8; b 8; data.f32 3.000000
+	str s8, [x8, #0x8]
+	ldr x8, [x1, #0x18]
+	ldr d8, #8; b 16; data.f64 4.000000
+	str d8, [x8, #0x8]
+	ldr x30, [sp], #0x10
+	ret
+`,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ssab := ssa.NewBuilder()

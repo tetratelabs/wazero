@@ -98,6 +98,12 @@ const (
 
 func (a addressMode) format(dstSizeBits byte) (ret string) {
 	base := formatVRegSized(a.rn, 64)
+	if rn := a.rn; rn.RegType() != regalloc.RegTypeInt {
+		panic("invalid base register type: " + a.rn.RegType().String())
+	} else if rn.IsRealReg() && v0 <= a.rn.RealReg() && a.rn.RealReg() <= v30 {
+		panic("BUG: likely a bug in reg alloc or reset behavior")
+	}
+
 	switch a.kind {
 	case addressModeKindRegScaledExtended:
 		amount := a.sizeInBitsToShiftAmount(dstSizeBits)

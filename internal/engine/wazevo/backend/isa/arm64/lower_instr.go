@@ -167,6 +167,10 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		x, y := instr.BinaryData()
 		result := instr.Return()
 		m.lowerImul(x, y, result)
+	case ssa.OpcodeUndefined:
+		undef := m.allocateInstr()
+		undef.asUDF()
+		m.insert(undef)
 	default:
 		panic("TODO: lowering " + instr.Opcode().String())
 	}

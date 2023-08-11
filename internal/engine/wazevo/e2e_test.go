@@ -115,6 +115,26 @@ func TestE2E(t *testing.T) {
 				{params: []uint64{0xf}, expResults: []uint64{0x1211100f, 0x161514131211100f, 0x1211100f, 0x161514131211100f, 0x21201f1e, 0x2524232221201f1e, 0x21201f1e, 0x2524232221201f1e, 0xf, 0x1e, 0xf, 0x1e, 0x100f, 0x1f1e, 0x100f, 0x1f1e, 0xf, 0x1e, 0xf, 0x1e, 0x100f, 0x1f1e, 0x100f, 0x1f1e, 0x1211100f, 0x21201f1e, 0x1211100f, 0x21201f1e}},
 			},
 		},
+		{
+			name: "globals_get",
+			m:    testcases.GlobalsGet.Module,
+			calls: []callCase{
+				{expResults: []uint64{0x80000000, 0x8000000000000000, 0x7f7fffff, 0x7fefffffffffffff}},
+			},
+		},
+		{
+			name:  "globals_set",
+			m:     testcases.GlobalsSet.Module,
+			calls: []callCase{{expResults: []uint64{1, 2, uint64(math.Float32bits(3.0)), math.Float64bits(4.0)}}},
+		},
+		{
+			name: "globals_mutable",
+			m:    testcases.GlobalsMutable.Module,
+			calls: []callCase{{expResults: []uint64{
+				100, 200, uint64(math.Float32bits(300.0)), math.Float64bits(400.0),
+				1, 2, uint64(math.Float32bits(3.0)), math.Float64bits(4.0),
+			}}},
+		},
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {

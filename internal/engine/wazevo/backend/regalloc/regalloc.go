@@ -410,6 +410,7 @@ func (a *Allocator) buildLiveRangesForReals(blkID int, info *blockInfo) {
 // Reset resets the allocator's internal state so that it can be reused.
 func (a *Allocator) Reset() {
 	a.nodePool.Reset()
+	a.blockInfos = a.blockInfos[:0]
 	for i := range a.vRegIDToNode {
 		a.vRegIDToNode[i] = nil
 	}

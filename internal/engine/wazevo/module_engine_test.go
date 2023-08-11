@@ -21,6 +21,7 @@ func TestModuleEngine_setupOpaque(t *testing.T) {
 				LocalMemoryBegin:       10,
 				ImportedMemoryBegin:    -1,
 				ImportedFunctionsBegin: -1,
+				GlobalsBegin:           -1,
 			},
 			m: &wasm.ModuleInstance{MemoryInstance: &wasm.MemoryInstance{
 				Buffer: make([]byte, 0xff),
@@ -30,11 +31,23 @@ func TestModuleEngine_setupOpaque(t *testing.T) {
 			offset: wazevoapi.ModuleContextOffsetData{
 				LocalMemoryBegin:       -1,
 				ImportedMemoryBegin:    30,
+				GlobalsBegin:           -1,
 				ImportedFunctionsBegin: -1,
 			},
 			m: &wasm.ModuleInstance{MemoryInstance: &wasm.MemoryInstance{
 				Buffer: make([]byte, 0xff),
 			}},
+		},
+		{
+			offset: wazevoapi.ModuleContextOffsetData{
+				LocalMemoryBegin:       -1,
+				ImportedMemoryBegin:    -1,
+				ImportedFunctionsBegin: -1,
+				GlobalsBegin:           30,
+			},
+			m: &wasm.ModuleInstance{
+				Globals: []*wasm.GlobalInstance{{}, {}, {}, {}, {}, {}},
+			},
 		},
 	} {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
@@ -58,6 +71,13 @@ func TestModuleEngine_setupOpaque(t *testing.T) {
 				actualPtr := uintptr(binary.LittleEndian.Uint64(m.opaque[tc.offset.ImportedMemoryBegin:]))
 				expPtr := uintptr(unsafe.Pointer(&tc.m.MemoryInstance))
 				require.Equal(t, expPtr, actualPtr)
+			}
+			if tc.offset.GlobalsBegin >= 0 {
+				for i, g := range tc.m.Globals {
+					actualPtr := uintptr(binary.LittleEndian.Uint64(m.opaque[int(tc.offset.GlobalsBegin)+8*i:]))
+					expPtr := uintptr(unsafe.Pointer(g))
+					require.Equal(t, expPtr, actualPtr)
+				}
 			}
 		})
 	}

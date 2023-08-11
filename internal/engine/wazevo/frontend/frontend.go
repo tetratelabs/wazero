@@ -31,6 +31,9 @@ type Compiler struct {
 	wasmFunctionBody                      []byte
 	memoryBaseVariable, memoryLenVariable ssa.Variable
 	needMemory                            bool
+	globalVariables                       []ssa.Variable
+	globalVariablesTypes                  []ssa.Type
+	mutableGlobalVariablesIndexes         []wasm.Index // index to ^.
 	// br is reused during lowering.
 	br            *bytes.Reader
 	loweringState loweringState
@@ -172,7 +175,45 @@ func (c *Compiler) declareNecessaryVariables() {
 		c.memoryBaseVariable = c.ssaBuilder.DeclareVariable(ssa.TypeI64)
 		c.memoryLenVariable = c.ssaBuilder.DeclareVariable(ssa.TypeI64)
 	}
-	// TODO: add tables, globals.
+
+	c.globalVariables = c.globalVariables[:0]
+	c.mutableGlobalVariablesIndexes = c.mutableGlobalVariablesIndexes[:0]
+	c.globalVariablesTypes = c.globalVariablesTypes[:0]
+	for _, imp := range c.m.ImportSection {
+		if imp.Type == wasm.ExternTypeGlobal {
+			desc := imp.DescGlobal
+			c.declareWasmGlobal(desc.ValType, desc.Mutable)
+		}
+	}
+	for _, g := range c.m.GlobalSection {
+		desc := g.Type
+		c.declareWasmGlobal(desc.ValType, desc.Mutable)
+	}
+
+	// TODO: add tables.
+}
+
+func (c *Compiler) declareWasmGlobal(typ wasm.ValueType, mutable bool) {
+	var st ssa.Type
+	switch typ {
+	case wasm.ValueTypeI32:
+		st = ssa.TypeI32
+	case wasm.ValueTypeI64:
+		st = ssa.TypeI64
+	case wasm.ValueTypeF32:
+		st = ssa.TypeF32
+	case wasm.ValueTypeF64:
+		st = ssa.TypeF64
+	default:
+		panic("TODO: " + wasm.ValueTypeName(typ))
+	}
+	v := c.ssaBuilder.DeclareVariable(st)
+	index := wasm.Index(len(c.globalVariables))
+	c.globalVariables = append(c.globalVariables, v)
+	c.globalVariablesTypes = append(c.globalVariablesTypes, st)
+	if mutable {
+		c.mutableGlobalVariablesIndexes = append(c.mutableGlobalVariablesIndexes, index)
+	}
 }
 
 // wasmToSSA converts wasm.ValueType to ssa.Type.

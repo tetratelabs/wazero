@@ -1161,7 +1161,98 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
 	Jump blk_ret, v10, v16, v22, v28, v34, v40, v46, v52, v58, v64, v70, v76, v82, v88, v94, v100, v106, v112, v118, v124, v130, v136, v142, v148, v154, v160, v166, v172
 `,
 		},
+		{
+			name: "globals_get",
+			m:    testcases.GlobalsGet.Module,
+			exp: `
+blk0: (exec_ctx:i64, module_ctx:i64)
+	v2:i64 = Load module_ctx, 0x0
+	v3:i32 = Load v2, 0x8
+	v4:i64 = Load module_ctx, 0x8
+	v5:i64 = Load v4, 0x8
+	v6:i64 = Load module_ctx, 0x10
+	v7:f32 = Load v6, 0x8
+	v8:i64 = Load module_ctx, 0x18
+	v9:f64 = Load v8, 0x8
+	Jump blk_ret, v3, v5, v7, v9
+`,
+		},
+		{
+			name: "globals_set",
+			m:    testcases.GlobalsSet.Module,
+			exp: `
+blk0: (exec_ctx:i64, module_ctx:i64)
+	v2:i32 = Iconst_32 0x1
+	v3:i64 = Load module_ctx, 0x0
+	Store v2, v3, 0x8
+	v4:i64 = Iconst_64 0x2
+	v5:i64 = Load module_ctx, 0x8
+	Store v4, v5, 0x8
+	v6:f32 = F32const 3.000000
+	v7:i64 = Load module_ctx, 0x10
+	Store v6, v7, 0x8
+	v8:f64 = F64const 4.000000
+	v9:i64 = Load module_ctx, 0x18
+	Store v8, v9, 0x8
+	Jump blk_ret, v2, v4, v6, v8
+`,
+		},
+		{
+			name: "globals_mutable",
+			m:    testcases.GlobalsMutable.Module,
+			exp: `
+signatures:
+	sig1: i64i64_v
+
+blk0: (exec_ctx:i64, module_ctx:i64)
+	v2:i64 = Load module_ctx, 0x0
+	v3:i32 = Load v2, 0x8
+	v4:i64 = Load module_ctx, 0x8
+	v5:i64 = Load v4, 0x8
+	v6:i64 = Load module_ctx, 0x10
+	v7:f32 = Load v6, 0x8
+	v8:i64 = Load module_ctx, 0x18
+	v9:f64 = Load v8, 0x8
+	Store module_ctx, exec_ctx, 0x8
+	Call f1:sig1, exec_ctx, module_ctx
+	v10:i64 = Load module_ctx, 0x0
+	v11:i32 = Load v10, 0x8
+	v12:i64 = Load module_ctx, 0x8
+	v13:i64 = Load v12, 0x8
+	v14:i64 = Load module_ctx, 0x10
+	v15:f32 = Load v14, 0x8
+	v16:i64 = Load module_ctx, 0x18
+	v17:f64 = Load v16, 0x8
+	Jump blk_ret, v3, v5, v7, v9, v11, v13, v15, v17
+`,
+			expAfterOpt: `
+signatures:
+	sig1: i64i64_v
+
+blk0: (exec_ctx:i64, module_ctx:i64)
+	v2:i64 = Load module_ctx, 0x0
+	v3:i32 = Load v2, 0x8
+	v4:i64 = Load module_ctx, 0x8
+	v5:i64 = Load v4, 0x8
+	v6:i64 = Load module_ctx, 0x10
+	v7:f32 = Load v6, 0x8
+	v8:i64 = Load module_ctx, 0x18
+	v9:f64 = Load v8, 0x8
+	Store module_ctx, exec_ctx, 0x8
+	Call f1:sig1, exec_ctx, module_ctx
+	v10:i64 = Load module_ctx, 0x0
+	v11:i32 = Load v10, 0x8
+	v12:i64 = Load module_ctx, 0x8
+	v13:i64 = Load v12, 0x8
+	v14:i64 = Load module_ctx, 0x10
+	v15:f32 = Load v14, 0x8
+	v16:i64 = Load module_ctx, 0x18
+	v17:f64 = Load v16, 0x8
+	Jump blk_ret, v3, v5, v7, v9, v11, v13, v15, v17
+`,
+		},
 	} {
+
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			// Just in case let's check the test module is valid.
