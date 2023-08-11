@@ -175,6 +175,32 @@ func (a addressMode) sizeInBitsToShiftAmount(sizeInBits byte) (lsl byte) {
 	return
 }
 
+func (m *machine) lowerExtLoad(si *ssa.Instruction) {
+	ptr, offset, _ := si.LoadData()
+
+	// Extension loads are always 64 bit destination.
+	amode := m.lowerToAddressMode(ptr, offset, 64)
+
+	load := m.allocateInstr()
+	switch si.Opcode() {
+	case ssa.OpcodeUload8:
+		load.asULoad(operandNR(m.compiler.VRegOf(si.Return())), amode, 8)
+	case ssa.OpcodeUload16:
+		load.asULoad(operandNR(m.compiler.VRegOf(si.Return())), amode, 16)
+	case ssa.OpcodeUload32:
+		load.asULoad(operandNR(m.compiler.VRegOf(si.Return())), amode, 32)
+	case ssa.OpcodeSload8:
+		load.asSLoad(operandNR(m.compiler.VRegOf(si.Return())), amode, 8)
+	case ssa.OpcodeSload16:
+		load.asSLoad(operandNR(m.compiler.VRegOf(si.Return())), amode, 16)
+	case ssa.OpcodeSload32:
+		load.asSLoad(operandNR(m.compiler.VRegOf(si.Return())), amode, 32)
+	default:
+		panic("BUG")
+	}
+	m.insert(load)
+}
+
 func (m *machine) lowerLoad(si *ssa.Instruction) {
 	// TODO: merge consecutive loads into a single pair store instruction.
 	ptr, offset, typ := si.LoadData()

@@ -9,10 +9,9 @@ import (
 
 // EmitGoEntryPreamble implements backend.FunctionABI. This assumes `entrypoint` function (in abi_go_entry_arm64.s) passes:
 //
-//  1. execution context ptr in x0
-//  2. module context ptr in x1
-//  3. param/result slice ptr in x19; the pointer to []uint64{} which is used to pass arguments and accept return values.
-//  4. Go-allocated stack slice ptr in x26.
+//  1. First (execution context ptr) and Second arguments are already passed in x0, and x1.
+//  2. param/result slice ptr in x19; the pointer to []uint64{} which is used to pass arguments and accept return values.
+//  3. Go-allocated stack slice ptr in x26.
 //
 // also SP and FP are correct Go-runtime-based values, and LR is the return address to the Go-side caller.
 func (a *abiImpl) EmitGoEntryPreamble() {
@@ -118,7 +117,32 @@ func (a *abiImpl) constructGoEntryPreamble() (root *instruction) {
 			instr.asStore(rd, mode, ret.Type.Bits())
 			cur = linkInstr(cur, instr)
 		case backend.ABIArgKindStack:
-			panic("TODO")
+			offset, typ := ret.Offset, ret.Type
+			if offset != 0 && !offsetFitsInAddressModeKindRegUnsignedImm12(typ.Bits(), ret.Offset) {
+				// Do we really want to support?
+				panic("TODO: too many parameters")
+			}
+
+			tmpOperand := operandNR(tmpRegVReg)
+
+			// First load the value from the Go-allocated stack into temporary.
+			mode := addressMode{kind: addressModeKindRegUnsignedImm12, rn: spVReg, imm: offset}
+			toTmp := m.allocateInstr()
+			switch ret.Type {
+			case ssa.TypeI32, ssa.TypeI64:
+				toTmp.asULoad(tmpOperand, mode, typ.Bits())
+			case ssa.TypeF32, ssa.TypeF64:
+				toTmp.asFpuLoad(tmpOperand, mode, typ.Bits())
+			default:
+				panic("TODO")
+			}
+			cur = linkInstr(cur, toTmp)
+
+			// Then write it back to the paramResultSlicePtr.
+			mode = addressMode{kind: addressModeKindPostIndex, rn: paramResultSlicePtr, imm: 8}
+			storeTmp := m.allocateInstr()
+			storeTmp.asStore(tmpOperand, mode, ret.Type.Bits())
+			cur = linkInstr(cur, storeTmp)
 		}
 	}
 	// Finally, restore the FP, SP and LR, and return to the Go code.

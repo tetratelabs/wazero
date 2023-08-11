@@ -9,6 +9,7 @@ package arm64
 import (
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 )
 
 // LowerSingleBranch implements backend.Machine.
@@ -126,12 +127,18 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 	case ssa.OpcodeFadd, ssa.OpcodeFsub, ssa.OpcodeFmul, ssa.OpcodeFdiv, ssa.OpcodeFmax, ssa.OpcodeFmin:
 		m.lowerFpuBinOp(instr)
 	case ssa.OpcodeIconst, ssa.OpcodeF32const, ssa.OpcodeF64const: // Constant instructions are inlined.
-	case ssa.OpcodeTrap:
-		m.lowerTrap(instr.Arg())
+	case ssa.OpcodeExitWithCode:
+		execCtx, code := instr.ExitWithCodeData()
+		m.lowerExitWithCode(m.compiler.VRegOf(execCtx), code)
+	case ssa.OpcodeExitIfNotZeroWithCode:
+		execCtx, c, code := instr.ExitIfNotZeroWithCodeData()
+		m.lowerExitIfNotZeroWithCode(m.compiler.VRegOf(execCtx), c, code)
 	case ssa.OpcodeStore, ssa.OpcodeIstore8, ssa.OpcodeIstore16, ssa.OpcodeIstore32:
 		m.lowerStore(instr)
 	case ssa.OpcodeLoad:
 		m.lowerLoad(instr)
+	case ssa.OpcodeUload8, ssa.OpcodeUload16, ssa.OpcodeUload32, ssa.OpcodeSload8, ssa.OpcodeSload16, ssa.OpcodeSload32:
+		m.lowerExtLoad(instr)
 	case ssa.OpcodeCall, ssa.OpcodeCallIndirect:
 		m.lowerCall(instr)
 	case ssa.OpcodeIcmp:
@@ -308,10 +315,67 @@ func (m *machine) lowerImul(x, y, result ssa.Value) {
 	m.insert(mul)
 }
 
-// lowerTrap lowers the trap as trapSequence instruction that takes a context pointer as argument.
-func (m *machine) lowerTrap(ctx ssa.Value) {
-	execCtxVReg := m.compiler.VRegOf(ctx)
-	instr := m.allocateInstr()
-	instr.asTrapSequence(execCtxVReg)
-	m.insert(instr)
+const exitWithCodeEncodingSize = exitSequenceSize + 8
+
+// lowerExitWithCode lowers the lowerExitWithCode takes a context pointer as argument.
+func (m *machine) lowerExitWithCode(execCtxVReg regalloc.VReg, code wazevoapi.ExitCode) {
+	loadExitCodeConst := m.allocateInstr()
+	loadExitCodeConst.asMOVZ(tmpRegVReg, uint64(code), 0, true)
+
+	setExitCode := m.allocateInstr()
+	setExitCode.asStore(operandNR(tmpRegVReg),
+		addressMode{
+			kind: addressModeKindRegUnsignedImm12,
+			rn:   execCtxVReg, imm: wazevoapi.ExecutionContextOffsets.ExitCodeOffset.I64(),
+		}, 32)
+
+	exitSeq := m.allocateInstr()
+	exitSeq.asExitSequence(execCtxVReg)
+
+	m.insert(loadExitCodeConst)
+	m.insert(setExitCode)
+	m.insert(exitSeq)
+}
+
+func (m *machine) lowerExitIfNotZeroWithCode(execCtxVReg regalloc.VReg, cond ssa.Value, code wazevoapi.ExitCode) {
+	condDef := m.compiler.ValueDefinition(cond)
+	if !m.compiler.MatchInstr(condDef, ssa.OpcodeIcmp) {
+		// We can have general case just like cachine.LowerConditionalBranch.
+		panic("TODO: OpcodeExitIfNotZeroWithCode must come after Icmp at the moment")
+	}
+	m.compiler.MarkLowered(condDef.Instr)
+
+	cvalInstr := condDef.Instr
+	x, y, c := cvalInstr.IcmpData()
+	cc, signed := condFlagFromSSAIntegerCmpCond(c), c.Signed()
+
+	if x.Type() != y.Type() {
+		panic("TODO(maybe): support icmp with different types")
+	}
+
+	extMod := extModeOf(x.Type(), signed)
+
+	// First operand must be in pure register form.
+	rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extMod)
+	// Second operand can be in any of Imm12, ER, SR, or NR form supported by the SUBS instructions.
+	rm := m.getOperand_Imm12_ER_SR_NR(m.compiler.ValueDefinition(y), extMod)
+
+	alu := m.allocateInstr()
+	// subs zr, rn, rm
+	alu.asALU(
+		aluOpSubS,
+		// We don't need the result, just need to set flags.
+		operandNR(xzrVReg),
+		rn,
+		rm,
+		x.Type().Bits() == 64,
+	)
+	m.insert(alu)
+
+	// We have to skip the entire exit sequence if the condition is false.
+	cbr := m.allocateInstr()
+	cbr.asCondBr(cc.asCond(), invalidLabel, false /* ignored */)
+	cbr.condBrOffsetResolve(exitWithCodeEncodingSize + 4 /* br offset is from the beginning of this instruction */)
+	m.insert(cbr)
+	m.lowerExitWithCode(execCtxVReg, code)
 }

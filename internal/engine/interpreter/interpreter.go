@@ -442,6 +442,9 @@ func (e *moduleEngine) ResolveImportedFunction(index, indexInImportedModule wasm
 	e.functions[index] = imported.functions[indexInImportedModule]
 }
 
+// DoneInstantiation implements wasm.ModuleEngine.
+func (e *moduleEngine) DoneInstantiation() {}
+
 // FunctionInstanceReference implements the same method as documented on wasm.ModuleEngine.
 func (e *moduleEngine) FunctionInstanceReference(funcIndex wasm.Index) wasm.Reference {
 	return uintptr(unsafe.Pointer(&e.functions[funcIndex]))

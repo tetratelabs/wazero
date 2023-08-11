@@ -120,6 +120,8 @@ func (c *callEngine) CallWithStack(ctx context.Context, paramResultStack []uint6
 			afterStackGrowEntrypoint(c.execCtx.goCallReturnAddress, c.execCtxPtr, newsp)
 		case wazevoapi.ExitCodeUnreachable:
 			return wasmruntime.ErrRuntimeUnreachable
+		case wazevoapi.ExitCodeMemoryOutOfBounds:
+			return wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess
 		default:
 			panic("BUG")
 		}

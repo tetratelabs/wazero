@@ -24,16 +24,15 @@ type Compiler struct {
 
 	// wasmLocalToVariable maps the index (considered as wasm.Index of locals)
 	// to the corresponding ssa.Variable.
-	wasmLocalToVariable    map[wasm.Index]ssa.Variable
-	wasmLocalFunctionIndex wasm.Index
-	wasmFunctionTyp        *wasm.FunctionType
-	wasmFunctionLocalTypes []wasm.ValueType
-	wasmFunctionBody       []byte
+	wasmLocalToVariable                   map[wasm.Index]ssa.Variable
+	wasmLocalFunctionIndex                wasm.Index
+	wasmFunctionTyp                       *wasm.FunctionType
+	wasmFunctionLocalTypes                []wasm.ValueType
+	wasmFunctionBody                      []byte
+	memoryBaseVariable, memoryLenVariable ssa.Variable
+	needMemory                            bool
 	// br is reused during lowering.
-	br *bytes.Reader
-	// trapBlocks maps wazevoapi.ExitCode to the corresponding BasicBlock which
-	// exits the execution with the code.
-	trapBlocks    [wazevoapi.ExitCodeCount]ssa.BasicBlock
+	br            *bytes.Reader
 	loweringState loweringState
 
 	execCtxPtrValue, moduleCtxPtrValue ssa.Value
@@ -76,7 +75,6 @@ func NewFrontendCompiler(m *wasm.Module, ssaBuilder ssa.Builder, offset *wazevoa
 func (c *Compiler) Init(idx wasm.Index, typ *wasm.FunctionType, localTypes []wasm.ValueType, body []byte) {
 	c.ssaBuilder.Init(c.signatures[typ])
 	c.loweringState.reset()
-	c.trapBlocks = [wazevoapi.ExitCodeCount]ssa.BasicBlock{}
 
 	c.wasmLocalFunctionIndex = idx
 	c.wasmFunctionTyp = typ
@@ -129,9 +127,9 @@ func (c *Compiler) LowerToSSA() error {
 		c.wasmLocalToVariable[wasm.Index(i)] = variable
 	}
 	c.declareWasmLocals(entryBlock)
+	c.declareNecessaryVariables()
 
 	c.lowerBody(entryBlock)
-	c.emitTrapBlocks()
 	return nil
 }
 
@@ -168,6 +166,15 @@ func (c *Compiler) declareWasmLocals(entry ssa.BasicBlock) {
 	}
 }
 
+func (c *Compiler) declareNecessaryVariables() {
+	c.needMemory = len(c.m.ImportedMemories()) > 0 || c.m.MemorySection != nil
+	if c.needMemory {
+		c.memoryBaseVariable = c.ssaBuilder.DeclareVariable(ssa.TypeI64)
+		c.memoryLenVariable = c.ssaBuilder.DeclareVariable(ssa.TypeI64)
+	}
+	// TODO: add tables, globals.
+}
+
 // wasmToSSA converts wasm.ValueType to ssa.Type.
 func wasmToSSA(vt wasm.ValueType) ssa.Type {
 	switch vt {
@@ -196,40 +203,4 @@ func (c *Compiler) addBlockParamsFromWasmTypes(tps []wasm.ValueType, blk ssa.Bas
 func (c *Compiler) formatBuilder() string {
 	// TODO: use source position to add the Wasm-level source info.
 	return c.ssaBuilder.Format()
-}
-
-// getOrCreateTrapBlock returns the trap block for the given trap code.
-func (c *Compiler) getOrCreateTrapBlock(code wazevoapi.ExitCode) ssa.BasicBlock {
-	blk := c.trapBlocks[code]
-	if blk == nil {
-		blk = c.ssaBuilder.AllocateBasicBlock()
-		c.trapBlocks[code] = blk
-	}
-	return blk
-}
-
-// emitTrapBlocks emits the trap blocks.
-func (c *Compiler) emitTrapBlocks() {
-	builder := c.ssaBuilder
-	for exitCode := wazevoapi.ExitCode(0); exitCode < wazevoapi.ExitCodeCount; exitCode++ {
-		blk := c.trapBlocks[exitCode]
-		if blk == nil {
-			continue
-		}
-		builder.SetCurrentBlock(blk)
-
-		exitCodeInstr := builder.AllocateInstruction()
-		exitCodeInstr.AsIconst32(uint32(exitCode))
-		builder.InsertInstruction(exitCodeInstr)
-		exitCodeVal := exitCodeInstr.Return()
-
-		execCtx := c.execCtxPtrValue
-		store := builder.AllocateInstruction()
-		store.AsStore(exitCodeVal, execCtx, wazevoapi.ExecutionContextOffsets.ExitCodeOffset.U32())
-		builder.InsertInstruction(store)
-
-		trap := builder.AllocateInstruction()
-		trap.AsTrap(c.execCtxPtrValue)
-		builder.InsertInstruction(trap)
-	}
 }

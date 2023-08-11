@@ -3,6 +3,7 @@ package testcases
 import (
 	"math"
 
+	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -778,6 +779,136 @@ var (
 			}}},
 		},
 	}
+	MemoryLoadBasic = TestCase{
+		Name: "memory_load_basic",
+		Module: &wasm.Module{
+			TypeSection: []wasm.FunctionType{{
+				Params:  []wasm.ValueType{i32},
+				Results: []wasm.ValueType{i32},
+			}},
+			ExportSection:   []wasm.Export{{Name: ExportName, Type: wasm.ExternTypeFunc, Index: 0}},
+			MemorySection:   &wasm.Memory{Min: 1},
+			FunctionSection: []wasm.Index{0},
+			CodeSection: []wasm.Code{{Body: []byte{
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeI32Load, 0x2, 0x0, // alignment=2 (natural alignment) staticOffset=0
+				wasm.OpcodeEnd,
+			}}},
+			DataSection: []wasm.DataSegment{{OffsetExpression: constOffsetExpr(0), Init: maskedBuf(int(wasm.MemoryPageSize))}},
+		},
+	}
+
+	MemoryLoadBasic2 = TestCase{
+		Name: "memory_load_basic2",
+		Module: &wasm.Module{
+			TypeSection:     []wasm.FunctionType{i32_i32, {}},
+			ExportSection:   []wasm.Export{{Name: ExportName, Type: wasm.ExternTypeFunc, Index: 0}},
+			MemorySection:   &wasm.Memory{Min: 1},
+			FunctionSection: []wasm.Index{0, 1},
+			CodeSection: []wasm.Code{
+				{Body: []byte{
+					wasm.OpcodeLocalGet, 0,
+					wasm.OpcodeI32Const, 0,
+					wasm.OpcodeI32Eq,
+					wasm.OpcodeIf, blockSignature_vv,
+					wasm.OpcodeCall, 0x1, // After this the memory buf/size pointer reloads.
+					wasm.OpcodeElse, // But in Else block, we do nothing, so not reloaded.
+					wasm.OpcodeEnd,
+
+					// Therefore, this block should reload the memory buf/size pointer here.
+					wasm.OpcodeLocalGet, 0,
+					wasm.OpcodeI32Load, 0x2, 0x0, // alignment=2 (natural alignment) staticOffset=0
+
+					wasm.OpcodeEnd,
+				}},
+				{Body: []byte{wasm.OpcodeEnd}},
+			},
+			DataSection: []wasm.DataSegment{{OffsetExpression: constOffsetExpr(0), Init: maskedBuf(int(wasm.MemoryPageSize))}},
+		},
+	}
+
+	MemoryLoads = TestCase{
+		Name: "memory_loads",
+		Module: &wasm.Module{
+			TypeSection: []wasm.FunctionType{{
+				Params: []wasm.ValueType{i32},
+				Results: []wasm.ValueType{
+					i32, i64, f32, f64, i32, i64, f32, f64,
+					i32, i32, i32, i32, i32, i32, i32, i32,
+					i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64,
+				},
+			}},
+			ExportSection:   []wasm.Export{{Name: ExportName, Type: wasm.ExternTypeFunc, Index: 0}},
+			MemorySection:   &wasm.Memory{Min: 1},
+			FunctionSection: []wasm.Index{0},
+			CodeSection: []wasm.Code{{Body: []byte{
+				// Basic loads (without extensions).
+				wasm.OpcodeLocalGet, 0, // 0
+				wasm.OpcodeI32Load, 0x2, 0x0, // alignment=2 (natural alignment) staticOffset=0
+				wasm.OpcodeLocalGet, 0, // 1
+				wasm.OpcodeI64Load, 0x3, 0x0, // alignment=3 (natural alignment) staticOffset=0
+				wasm.OpcodeLocalGet, 0, // 2
+				wasm.OpcodeF32Load, 0x2, 0x0, // alignment=2 (natural alignment) staticOffset=0
+				wasm.OpcodeLocalGet, 0, // 3
+				wasm.OpcodeF64Load, 0x3, 0x0, // alignment=3 (natural alignment) staticOffset=0
+				wasm.OpcodeLocalGet, 0, // 4
+				wasm.OpcodeI32Load, 0x2, 0xf, // alignment=2 (natural alignment) staticOffset=16
+				wasm.OpcodeLocalGet, 0, // 5
+				wasm.OpcodeI64Load, 0x3, 0xf, // alignment=3 (natural alignment) staticOffset=16
+				wasm.OpcodeLocalGet, 0, // 6
+				wasm.OpcodeF32Load, 0x2, 0xf, // alignment=2 (natural alignment) staticOffset=16
+				wasm.OpcodeLocalGet, 0, // 7
+				wasm.OpcodeF64Load, 0x3, 0xf, // alignment=3 (natural alignment) staticOffset=16
+
+				// Extension integer loads.
+				wasm.OpcodeLocalGet, 0, // 8
+				wasm.OpcodeI32Load8S, 0x0, 0x0, // alignment=0 (natural alignment) staticOffset=0
+				wasm.OpcodeLocalGet, 0, // 9
+				wasm.OpcodeI32Load8S, 0x0, 0xf, // alignment=0 (natural alignment) staticOffset=16
+
+				wasm.OpcodeLocalGet, 0, // 10
+				wasm.OpcodeI32Load8U, 0x0, 0x0, // alignment=0 (natural alignment) staticOffset=0
+				wasm.OpcodeLocalGet, 0, // 11
+				wasm.OpcodeI32Load8U, 0x0, 0xf, // alignment=0 (natural alignment) staticOffset=16
+				wasm.OpcodeLocalGet, 0, // 12
+				wasm.OpcodeI32Load16S, 0x1, 0x0, // alignment=1 (natural alignment) staticOffset=0
+				wasm.OpcodeLocalGet, 0, // 13
+				wasm.OpcodeI32Load16S, 0x1, 0xf, // alignment=1 (natural alignment) staticOffset=16
+				wasm.OpcodeLocalGet, 0, // 14
+				wasm.OpcodeI32Load16U, 0x1, 0x0, // alignment=1 (natural alignment) staticOffset=0
+				wasm.OpcodeLocalGet, 0, // 15
+				wasm.OpcodeI32Load16U, 0x1, 0xf, // alignment=1 (natural alignment) staticOffset=16
+				wasm.OpcodeLocalGet, 0, // 16
+				wasm.OpcodeI64Load8S, 0x0, 0x0, // alignment=0 (natural alignment) staticOffset=0
+				wasm.OpcodeLocalGet, 0, // 17
+				wasm.OpcodeI64Load8S, 0x0, 0xf, // alignment=0 (natural alignment) staticOffset=16
+				wasm.OpcodeLocalGet, 0, // 18
+				wasm.OpcodeI64Load8U, 0x0, 0x0, // alignment=0 (natural alignment) staticOffset=0
+				wasm.OpcodeLocalGet, 0, // 19
+
+				wasm.OpcodeI64Load8U, 0x0, 0xf, // alignment=0 (natural alignment) staticOffset=16
+				wasm.OpcodeLocalGet, 0, // 20
+				wasm.OpcodeI64Load16S, 0x1, 0x0, // alignment=1 (natural alignment) staticOffset=0
+				wasm.OpcodeLocalGet, 0, // 21
+				wasm.OpcodeI64Load16S, 0x1, 0xf, // alignment=1 (natural alignment) staticOffset=16
+				wasm.OpcodeLocalGet, 0, // 22
+				wasm.OpcodeI64Load16U, 0x1, 0x0, // alignment=1 (natural alignment) staticOffset=0
+				wasm.OpcodeLocalGet, 0, // 23
+				wasm.OpcodeI64Load16U, 0x1, 0xf, // alignment=1 (natural alignment) staticOffset=16
+				wasm.OpcodeLocalGet, 0, // 24
+				wasm.OpcodeI64Load32S, 0x2, 0x0, // alignment=2 (natural alignment) staticOffset=0
+				wasm.OpcodeLocalGet, 0, // 25
+				wasm.OpcodeI64Load32S, 0x2, 0xf, // alignment=2 (natural alignment) staticOffset=16
+				wasm.OpcodeLocalGet, 0, // 26
+				wasm.OpcodeI64Load32U, 0x2, 0x0, // alignment=2 (natural alignment) staticOffset=0
+				wasm.OpcodeLocalGet, 0, // 27
+				wasm.OpcodeI64Load32U, 0x2, 0xf, // alignment=2 (natural alignment) staticOffset=16
+
+				wasm.OpcodeEnd,
+			}}},
+			DataSection: []wasm.DataSegment{{OffsetExpression: constOffsetExpr(0), Init: maskedBuf(int(wasm.MemoryPageSize))}},
+		},
+	}
 )
 
 type TestCase struct {
@@ -818,3 +949,18 @@ const (
 
 	blockSignature_vv = 0x40 // 0x40 is the v_v signature in 33-bit signed. See wasm.DecodeBlockType.
 )
+
+func maskedBuf(size int) []byte {
+	ret := make([]byte, size)
+	for i := range ret {
+		ret[i] = byte(i)
+	}
+	return ret
+}
+
+func constOffsetExpr(i int32) wasm.ConstantExpression {
+	return wasm.ConstantExpression{
+		Opcode: wasm.OpcodeI32Const,
+		Data:   leb128.EncodeInt32(i),
+	}
+}

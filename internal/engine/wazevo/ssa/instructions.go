@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"math"
 	"strings"
+
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 )
 
 // Opcode represents a SSA instruction.
@@ -127,8 +129,11 @@ const (
 	// `BrTable x, block, JT`.
 	OpcodeBrTable
 
-	// OpcodeTrap exit the execution immediately.
-	OpcodeTrap
+	// OpcodeExitWithCode exit the execution immediately.
+	OpcodeExitWithCode
+
+	// OpcodeExitIfNotZeroWithCode exits the execution immediately if the value `c` is not zero.
+	OpcodeExitIfNotZeroWithCode
 
 	// OpcodeReturn returns from the function: `return rvalues`.
 	OpcodeReturn
@@ -198,48 +203,37 @@ const (
 	// `v = ssub_sat x, y`.
 	OpcodeSsubSat
 
-	// OpcodeLoad ...
-	// `v = load MemFlags, p, Offset`.
+	// OpcodeLoad loads a Type value from the [base + offset] address: `v = Load base, offset`.
 	OpcodeLoad
 
-	// OpcodeStore ...
-	// `store MemFlags, x, p, Offset`.
+	// OpcodeStore stores a Type value to the [base + offset] address: `Store v, base, offset`.
 	OpcodeStore
 
-	// OpcodeUload8 ...
-	// `v = uload8 MemFlags, p, Offset`.
+	// OpcodeUload8 loads the 8-bit value from the [base + offset] address, zero-extended to 64 bits: `v = Uload8 base, offset`.
 	OpcodeUload8
 
-	// OpcodeSload8 ...
-	// `v = sload8 MemFlags, p, Offset`.
+	// OpcodeSload8 loads the 8-bit value from the [base + offset] address, sign-extended to 64 bits: `v = Sload8 base, offset`.
 	OpcodeSload8
 
-	// OpcodeIstore8 ...
-	// `istore8 MemFlags, x, p, Offset`.
+	// OpcodeIstore8 stores the 8-bit value to the [base + offset] address, sign-extended to 64 bits: `Istore8 v, base, offset`.
 	OpcodeIstore8
 
-	// OpcodeUload16 ...
-	// `v = uload16 MemFlags, p, Offset`.
+	// OpcodeUload16 loads the 16-bit value from the [base + offset] address, zero-extended to 64 bits: `v = Uload16 base, offset`.
 	OpcodeUload16
 
-	// OpcodeSload16 ...
-	// `v = sload16 MemFlags, p, Offset`.
+	// OpcodeSload16 loads the 16-bit value from the [base + offset] address, sign-extended to 64 bits: `v = Sload16 base, offset`.
 	OpcodeSload16
 
-	// OpcodeIstore16 ...
-	// `istore16 MemFlags, x, p, Offset`.
+	// OpcodeIstore16 stores the 16-bit value to the [base + offset] address, zero-extended to 64 bits: `Istore16 v, base, offset`.
 	OpcodeIstore16
 
-	// OpcodeUload32 ...
-	// `v = uload32 MemFlags, p, Offset`.
+	// OpcodeUload32 loads the 32-bit value from the [base + offset] address, zero-extended to 64 bits: `v = Uload32 base, offset`.
 	OpcodeUload32
 
-	// OpcodeSload32 ...
-	// `v = sload32 MemFlags, p, Offset`.
+	// OpcodeSload32 loads the 32-bit value from the [base + offset] address, sign-extended to 64 bits: `v = Sload32 base, offset`.
 	OpcodeSload32
 
-	// OpcodeIstore32 ...
-	// `istore32 MemFlags, x, p, Offset`.
+	// OpcodeIstore32 stores the 32-bit value to the [base + offset] address, zero-extended to 64 bits: `Istore16 v, base, offset`.
 	OpcodeIstore32
 
 	// OpcodeUload8x8 ...
@@ -832,34 +826,41 @@ const (
 // instructionSideEffects provides the info to determine if an instruction has side effects.
 // Instructions with side effects must not be eliminated regardless whether the result is used or not.
 var instructionSideEffects = [opcodeEnd]sideEffect{
-	OpcodeJump:         sideEffectTrue,
-	OpcodeIconst:       sideEffectFalse,
-	OpcodeCall:         sideEffectTrue,
-	OpcodeCallIndirect: sideEffectTrue,
-	OpcodeIadd:         sideEffectFalse,
-	OpcodeImul:         sideEffectFalse,
-	OpcodeIsub:         sideEffectFalse,
-	OpcodeIcmp:         sideEffectFalse,
-	OpcodeFcmp:         sideEffectFalse,
-	OpcodeFadd:         sideEffectFalse,
-	OpcodeLoad:         sideEffectFalse,
-	OpcodeSExtend:      sideEffectFalse,
-	OpcodeUExtend:      sideEffectFalse,
-	OpcodeFsub:         sideEffectFalse,
-	OpcodeF32const:     sideEffectFalse,
-	OpcodeF64const:     sideEffectFalse,
-	OpcodeIshl:         sideEffectFalse,
-	OpcodeSshr:         sideEffectFalse,
-	OpcodeUshr:         sideEffectFalse,
-	OpcodeStore:        sideEffectTrue,
-	OpcodeTrap:         sideEffectTrue,
-	OpcodeReturn:       sideEffectTrue,
-	OpcodeBrz:          sideEffectTrue,
-	OpcodeBrnz:         sideEffectTrue,
-	OpcodeFdiv:         sideEffectFalse,
-	OpcodeFmul:         sideEffectFalse,
-	OpcodeFmax:         sideEffectFalse,
-	OpcodeFmin:         sideEffectFalse,
+	OpcodeJump:                  sideEffectTrue,
+	OpcodeIconst:                sideEffectFalse,
+	OpcodeCall:                  sideEffectTrue,
+	OpcodeCallIndirect:          sideEffectTrue,
+	OpcodeIadd:                  sideEffectFalse,
+	OpcodeImul:                  sideEffectFalse,
+	OpcodeIsub:                  sideEffectFalse,
+	OpcodeIcmp:                  sideEffectFalse,
+	OpcodeFcmp:                  sideEffectFalse,
+	OpcodeFadd:                  sideEffectFalse,
+	OpcodeLoad:                  sideEffectFalse,
+	OpcodeUload8:                sideEffectFalse,
+	OpcodeUload16:               sideEffectFalse,
+	OpcodeUload32:               sideEffectFalse,
+	OpcodeSload8:                sideEffectFalse,
+	OpcodeSload16:               sideEffectFalse,
+	OpcodeSload32:               sideEffectFalse,
+	OpcodeSExtend:               sideEffectFalse,
+	OpcodeUExtend:               sideEffectFalse,
+	OpcodeFsub:                  sideEffectFalse,
+	OpcodeF32const:              sideEffectFalse,
+	OpcodeF64const:              sideEffectFalse,
+	OpcodeIshl:                  sideEffectFalse,
+	OpcodeSshr:                  sideEffectFalse,
+	OpcodeUshr:                  sideEffectFalse,
+	OpcodeStore:                 sideEffectTrue,
+	OpcodeExitWithCode:          sideEffectTrue,
+	OpcodeExitIfNotZeroWithCode: sideEffectTrue,
+	OpcodeReturn:                sideEffectTrue,
+	OpcodeBrz:                   sideEffectTrue,
+	OpcodeBrnz:                  sideEffectTrue,
+	OpcodeFdiv:                  sideEffectFalse,
+	OpcodeFmul:                  sideEffectFalse,
+	OpcodeFmax:                  sideEffectFalse,
+	OpcodeFmin:                  sideEffectFalse,
 }
 
 // HasSideEffects returns true if this instruction has side effects.
@@ -912,25 +913,32 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 		}
 		return
 	},
-	OpcodeLoad:     returnTypesFnSingle,
-	OpcodeIadd:     returnTypesFnSingle,
-	OpcodeIsub:     returnTypesFnSingle,
-	OpcodeImul:     returnTypesFnSingle,
-	OpcodeIcmp:     returnTypesFnI32,
-	OpcodeFcmp:     returnTypesFnI32,
-	OpcodeFadd:     returnTypesFnSingle,
-	OpcodeFsub:     returnTypesFnSingle,
-	OpcodeFdiv:     returnTypesFnSingle,
-	OpcodeFmul:     returnTypesFnSingle,
-	OpcodeFmax:     returnTypesFnSingle,
-	OpcodeFmin:     returnTypesFnSingle,
-	OpcodeF32const: returnTypesFnF32,
-	OpcodeF64const: returnTypesFnF64,
-	OpcodeStore:    returnTypesFnNoReturns,
-	OpcodeTrap:     returnTypesFnNoReturns,
-	OpcodeReturn:   returnTypesFnNoReturns,
-	OpcodeBrz:      returnTypesFnNoReturns,
-	OpcodeBrnz:     returnTypesFnNoReturns,
+	OpcodeLoad:                  returnTypesFnSingle,
+	OpcodeIadd:                  returnTypesFnSingle,
+	OpcodeIsub:                  returnTypesFnSingle,
+	OpcodeImul:                  returnTypesFnSingle,
+	OpcodeIcmp:                  returnTypesFnI32,
+	OpcodeFcmp:                  returnTypesFnI32,
+	OpcodeFadd:                  returnTypesFnSingle,
+	OpcodeFsub:                  returnTypesFnSingle,
+	OpcodeFdiv:                  returnTypesFnSingle,
+	OpcodeFmul:                  returnTypesFnSingle,
+	OpcodeFmax:                  returnTypesFnSingle,
+	OpcodeFmin:                  returnTypesFnSingle,
+	OpcodeF32const:              returnTypesFnF32,
+	OpcodeF64const:              returnTypesFnF64,
+	OpcodeStore:                 returnTypesFnNoReturns,
+	OpcodeExitWithCode:          returnTypesFnNoReturns,
+	OpcodeExitIfNotZeroWithCode: returnTypesFnNoReturns,
+	OpcodeReturn:                returnTypesFnNoReturns,
+	OpcodeBrz:                   returnTypesFnNoReturns,
+	OpcodeBrnz:                  returnTypesFnNoReturns,
+	OpcodeUload8:                returnTypesFnSingle,
+	OpcodeUload16:               returnTypesFnSingle,
+	OpcodeUload32:               returnTypesFnSingle,
+	OpcodeSload8:                returnTypesFnSingle,
+	OpcodeSload16:               returnTypesFnSingle,
+	OpcodeSload32:               returnTypesFnSingle,
 }
 
 // AsLoad initializes this instruction as a store instruction with OpcodeLoad.
@@ -939,6 +947,18 @@ func (i *Instruction) AsLoad(ptr Value, offset uint32, typ Type) {
 	i.v = ptr
 	i.u64 = uint64(offset)
 	i.typ = typ
+}
+
+// AsExtLoad initializes this instruction as a store instruction with OpcodeLoad.
+func (i *Instruction) AsExtLoad(op Opcode, ptr Value, offset uint32, dst64bit bool) {
+	i.opcode = op
+	i.v = ptr
+	i.u64 = uint64(offset)
+	if dst64bit {
+		i.typ = TypeI64
+	} else {
+		i.typ = TypeI32
+	}
 }
 
 // LoadData returns the operands for a load instruction.
@@ -1127,10 +1147,29 @@ func (i *Instruction) ReturnVals() []Value {
 	return i.vs
 }
 
-// AsTrap initializes this instruction as a trap instruction with OpcodeTrap.
-func (i *Instruction) AsTrap(ctx Value) {
-	i.opcode = OpcodeTrap
+// AsExitWithCode initializes this instruction as a trap instruction with OpcodeExitWithCode.
+func (i *Instruction) AsExitWithCode(ctx Value, code wazevoapi.ExitCode) {
+	i.opcode = OpcodeExitWithCode
 	i.v = ctx
+	i.u64 = uint64(code)
+}
+
+// AsExitIfNotZeroWithCode initializes this instruction as a trap instruction with OpcodeExitIfNotZeroWithCode.
+func (i *Instruction) AsExitIfNotZeroWithCode(ctx, c Value, code wazevoapi.ExitCode) {
+	i.opcode = OpcodeExitIfNotZeroWithCode
+	i.v = ctx
+	i.v2 = c
+	i.u64 = uint64(code)
+}
+
+// ExitWithCodeData returns the context and exit code of OpcodeExitWithCode.
+func (i *Instruction) ExitWithCodeData() (ctx Value, code wazevoapi.ExitCode) {
+	return i.v, wazevoapi.ExitCode(i.u64)
+}
+
+// ExitIfNotZeroWithCodeData returns the context and exit code of OpcodeExitWithCode.
+func (i *Instruction) ExitIfNotZeroWithCodeData() (ctx, c Value, code wazevoapi.ExitCode) {
+	return i.v, i.v2, wazevoapi.ExitCode(i.u64)
 }
 
 // InvertBrx inverts either OpcodeBrz or OpcodeBrnz to the other.
@@ -1287,8 +1326,10 @@ func (i *Instruction) ExtendFromToBits() (from, to byte) {
 func (i *Instruction) Format(b Builder) string {
 	var instSuffix string
 	switch i.opcode {
-	case OpcodeTrap:
-		instSuffix = fmt.Sprintf(" %s", i.v.Format(b))
+	case OpcodeExitWithCode:
+		instSuffix = fmt.Sprintf(" %s, %s", i.v.Format(b), wazevoapi.ExitCode(i.u64))
+	case OpcodeExitIfNotZeroWithCode:
+		instSuffix = fmt.Sprintf(" %s, %s, %s", i.v2.Format(b), i.v.Format(b), wazevoapi.ExitCode(i.u64))
 	case OpcodeIadd, OpcodeIsub, OpcodeImul, OpcodeFadd, OpcodeFsub, OpcodeFmin, OpcodeFmax, OpcodeFdiv, OpcodeFmul:
 		instSuffix = fmt.Sprintf(" %s, %s", i.v.Format(b), i.v2.Format(b))
 	case OpcodeIcmp:
@@ -1310,6 +1351,8 @@ func (i *Instruction) Format(b Builder) string {
 	case OpcodeStore:
 		instSuffix = fmt.Sprintf(" %s, %s, %#x", i.v.Format(b), i.v2.Format(b), int32(i.u64))
 	case OpcodeLoad:
+		instSuffix = fmt.Sprintf(" %s, %#x", i.v.Format(b), int32(i.u64))
+	case OpcodeUload8, OpcodeUload16, OpcodeUload32, OpcodeSload8, OpcodeSload16, OpcodeSload32:
 		instSuffix = fmt.Sprintf(" %s, %#x", i.v.Format(b), int32(i.u64))
 	case OpcodeIconst:
 		switch i.typ {
@@ -1419,8 +1462,10 @@ func (o Opcode) String() (ret string) {
 		return "Brnz"
 	case OpcodeBrTable:
 		return "BrTable"
-	case OpcodeTrap:
-		return "Trap"
+	case OpcodeExitWithCode:
+		return "Exit"
+	case OpcodeExitIfNotZeroWithCode:
+		return "ExitIfNotZero"
 	case OpcodeReturn:
 		return "Return"
 	case OpcodeCall:

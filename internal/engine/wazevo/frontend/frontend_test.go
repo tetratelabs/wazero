@@ -38,12 +38,7 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 			name: "unreachable", m: testcases.Unreachable.Module,
 			exp: `
 blk0: (exec_ctx:i64, module_ctx:i64)
-	Jump blk1
-
-blk1: () <-- (blk0)
-	v2:i32 = Iconst_32 0x2
-	Store v2, exec_ctx, 0x0
-	Trap exec_ctx
+	Exit exec_ctx, unreachable
 `,
 		},
 		{
@@ -178,12 +173,7 @@ blk1: () <-- (blk0)
 	Jump blk_ret
 
 blk2: () <-- (blk0)
-	Jump blk3
-
-blk3: () <-- (blk2)
-	v3:i32 = Iconst_32 0x2
-	Store v3, exec_ctx, 0x0
-	Trap exec_ctx
+	Exit exec_ctx, unreachable
 `,
 		},
 		{
@@ -196,7 +186,6 @@ blk1: () <-- (blk0,blk1)
 	Jump blk1
 
 blk2: ()
-	Jump blk_ret
 `,
 			expAfterOpt: `
 blk0: (exec_ctx:i64, module_ctx:i64)
@@ -218,7 +207,6 @@ blk1: () <-- (blk0,blk1)
 	Jump blk3
 
 blk2: ()
-	Jump blk_ret
 
 blk3: () <-- (blk1)
 	Return
@@ -246,11 +234,10 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 	v5:f64 = F64const 0.000000
 	Jump blk1
 
-blk1: () <-- (blk0,blk2)
+blk1: () <-- (blk0)
 	Jump blk_ret
 
 blk2: ()
-	Jump blk1
 `,
 			expAfterOpt: `
 blk0: (exec_ctx:i64, module_ctx:i64)
@@ -376,8 +363,14 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
 blk1: (v4:i32) <-- (blk0)
 	Return v4
 
-blk2: (v5:i32)
-	Jump blk_ret, v5
+blk2: ()
+`,
+			expAfterOpt: `
+blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
+	Jump blk1
+
+blk1: () <-- (blk0)
+	Return v2
 `,
 		},
 		{
@@ -432,7 +425,6 @@ blk1: (v3:i32) <-- (blk0,blk3)
 	Jump blk4
 
 blk2: ()
-	Jump blk_ret
 
 blk3: () <-- (blk4)
 	v4:i32 = Iconst_32 0x1
@@ -870,6 +862,87 @@ blk3: () <-- (blk2)
 `,
 		},
 		{
+			name: "memory_load_basic", m: testcases.MemoryLoadBasic.Module,
+			exp: `
+blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
+	v3:i64 = Iconst_64 0x4
+	v4:i64 = UExtend v2, 32->64
+	v5:i64 = Uload32 module_ctx, 0x8
+	v6:i64 = Iadd v4, v3
+	v7:i32 = Icmp ge_u, v5, v6
+	ExitIfNotZero v7, exec_ctx, memory_out_of_bounds
+	v8:i64 = Load module_ctx, 0x0
+	v9:i64 = Iadd v8, v4
+	v10:i32 = Load v9, 0x0
+	Jump blk_ret, v10
+`,
+		},
+		{
+			name: "memory_load_basic2", m: testcases.MemoryLoadBasic2.Module,
+			exp: `
+signatures:
+	sig1: i64i64_v
+
+blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
+	v3:i32 = Iconst_32 0x0
+	v4:i32 = Icmp eq, v2, v3
+	Brz v4, blk2
+	Jump blk1
+
+blk1: () <-- (blk0)
+	Store module_ctx, exec_ctx, 0x8
+	Call f1:sig1, exec_ctx, module_ctx
+	v5:i64 = Load module_ctx, 0x0
+	v6:i64 = Uload32 module_ctx, 0x8
+	Jump blk3, v2
+
+blk2: () <-- (blk0)
+	Jump blk3, v2
+
+blk3: (v7:i32) <-- (blk1,blk2)
+	v8:i64 = Iconst_64 0x4
+	v9:i64 = UExtend v7, 32->64
+	v10:i64 = Uload32 module_ctx, 0x8
+	v11:i64 = Iadd v9, v8
+	v12:i32 = Icmp ge_u, v10, v11
+	ExitIfNotZero v12, exec_ctx, memory_out_of_bounds
+	v13:i64 = Load module_ctx, 0x0
+	v14:i64 = Iadd v13, v9
+	v15:i32 = Load v14, 0x0
+	Jump blk_ret, v15
+`,
+			expAfterOpt: `
+signatures:
+	sig1: i64i64_v
+
+blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
+	v3:i32 = Iconst_32 0x0
+	v4:i32 = Icmp eq, v2, v3
+	Brz v4, blk2
+	Jump blk1
+
+blk1: () <-- (blk0)
+	Store module_ctx, exec_ctx, 0x8
+	Call f1:sig1, exec_ctx, module_ctx
+	Jump blk3
+
+blk2: () <-- (blk0)
+	Jump blk3
+
+blk3: () <-- (blk1,blk2)
+	v8:i64 = Iconst_64 0x4
+	v9:i64 = UExtend v2, 32->64
+	v10:i64 = Uload32 module_ctx, 0x8
+	v11:i64 = Iadd v9, v8
+	v12:i32 = Icmp ge_u, v10, v11
+	ExitIfNotZero v12, exec_ctx, memory_out_of_bounds
+	v13:i64 = Load module_ctx, 0x0
+	v14:i64 = Iadd v13, v9
+	v15:i32 = Load v14, 0x0
+	Jump blk_ret, v15
+`,
+		},
+		{
 			name: "imported_function_call", m: testcases.ImportedFunctionCall.Module,
 			exp: `
 signatures:
@@ -881,6 +954,211 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
 	v4:i64 = Load module_ctx, 0x8
 	v5:i32 = CallIndirect v3:sig0, exec_ctx, v4, v2
 	Jump blk_ret, v5
+`,
+		},
+		{
+			name: "memory_loads", m: testcases.MemoryLoads.Module,
+			exp: `
+blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
+	v3:i64 = Iconst_64 0x4
+	v4:i64 = UExtend v2, 32->64
+	v5:i64 = Uload32 module_ctx, 0x8
+	v6:i64 = Iadd v4, v3
+	v7:i32 = Icmp ge_u, v5, v6
+	ExitIfNotZero v7, exec_ctx, memory_out_of_bounds
+	v8:i64 = Load module_ctx, 0x0
+	v9:i64 = Iadd v8, v4
+	v10:i32 = Load v9, 0x0
+	v11:i64 = Iconst_64 0x8
+	v12:i64 = UExtend v2, 32->64
+	v13:i64 = Iadd v12, v11
+	v14:i32 = Icmp ge_u, v5, v13
+	ExitIfNotZero v14, exec_ctx, memory_out_of_bounds
+	v15:i64 = Iadd v8, v12
+	v16:i64 = Load v15, 0x0
+	v17:i64 = Iconst_64 0x4
+	v18:i64 = UExtend v2, 32->64
+	v19:i64 = Iadd v18, v17
+	v20:i32 = Icmp ge_u, v5, v19
+	ExitIfNotZero v20, exec_ctx, memory_out_of_bounds
+	v21:i64 = Iadd v8, v18
+	v22:f32 = Load v21, 0x0
+	v23:i64 = Iconst_64 0x8
+	v24:i64 = UExtend v2, 32->64
+	v25:i64 = Iadd v24, v23
+	v26:i32 = Icmp ge_u, v5, v25
+	ExitIfNotZero v26, exec_ctx, memory_out_of_bounds
+	v27:i64 = Iadd v8, v24
+	v28:f64 = Load v27, 0x0
+	v29:i64 = Iconst_64 0x13
+	v30:i64 = UExtend v2, 32->64
+	v31:i64 = Iadd v30, v29
+	v32:i32 = Icmp ge_u, v5, v31
+	ExitIfNotZero v32, exec_ctx, memory_out_of_bounds
+	v33:i64 = Iadd v8, v30
+	v34:i32 = Load v33, 0xf
+	v35:i64 = Iconst_64 0x17
+	v36:i64 = UExtend v2, 32->64
+	v37:i64 = Iadd v36, v35
+	v38:i32 = Icmp ge_u, v5, v37
+	ExitIfNotZero v38, exec_ctx, memory_out_of_bounds
+	v39:i64 = Iadd v8, v36
+	v40:i64 = Load v39, 0xf
+	v41:i64 = Iconst_64 0x13
+	v42:i64 = UExtend v2, 32->64
+	v43:i64 = Iadd v42, v41
+	v44:i32 = Icmp ge_u, v5, v43
+	ExitIfNotZero v44, exec_ctx, memory_out_of_bounds
+	v45:i64 = Iadd v8, v42
+	v46:f32 = Load v45, 0xf
+	v47:i64 = Iconst_64 0x17
+	v48:i64 = UExtend v2, 32->64
+	v49:i64 = Iadd v48, v47
+	v50:i32 = Icmp ge_u, v5, v49
+	ExitIfNotZero v50, exec_ctx, memory_out_of_bounds
+	v51:i64 = Iadd v8, v48
+	v52:f64 = Load v51, 0xf
+	v53:i64 = Iconst_64 0x1
+	v54:i64 = UExtend v2, 32->64
+	v55:i64 = Iadd v54, v53
+	v56:i32 = Icmp ge_u, v5, v55
+	ExitIfNotZero v56, exec_ctx, memory_out_of_bounds
+	v57:i64 = Iadd v8, v54
+	v58:i32 = Sload8 v57, 0x0
+	v59:i64 = Iconst_64 0x10
+	v60:i64 = UExtend v2, 32->64
+	v61:i64 = Iadd v60, v59
+	v62:i32 = Icmp ge_u, v5, v61
+	ExitIfNotZero v62, exec_ctx, memory_out_of_bounds
+	v63:i64 = Iadd v8, v60
+	v64:i32 = Sload8 v63, 0xf
+	v65:i64 = Iconst_64 0x1
+	v66:i64 = UExtend v2, 32->64
+	v67:i64 = Iadd v66, v65
+	v68:i32 = Icmp ge_u, v5, v67
+	ExitIfNotZero v68, exec_ctx, memory_out_of_bounds
+	v69:i64 = Iadd v8, v66
+	v70:i32 = Uload8 v69, 0x0
+	v71:i64 = Iconst_64 0x10
+	v72:i64 = UExtend v2, 32->64
+	v73:i64 = Iadd v72, v71
+	v74:i32 = Icmp ge_u, v5, v73
+	ExitIfNotZero v74, exec_ctx, memory_out_of_bounds
+	v75:i64 = Iadd v8, v72
+	v76:i32 = Uload8 v75, 0xf
+	v77:i64 = Iconst_64 0x2
+	v78:i64 = UExtend v2, 32->64
+	v79:i64 = Iadd v78, v77
+	v80:i32 = Icmp ge_u, v5, v79
+	ExitIfNotZero v80, exec_ctx, memory_out_of_bounds
+	v81:i64 = Iadd v8, v78
+	v82:i32 = Sload16 v81, 0x0
+	v83:i64 = Iconst_64 0x11
+	v84:i64 = UExtend v2, 32->64
+	v85:i64 = Iadd v84, v83
+	v86:i32 = Icmp ge_u, v5, v85
+	ExitIfNotZero v86, exec_ctx, memory_out_of_bounds
+	v87:i64 = Iadd v8, v84
+	v88:i32 = Sload16 v87, 0xf
+	v89:i64 = Iconst_64 0x2
+	v90:i64 = UExtend v2, 32->64
+	v91:i64 = Iadd v90, v89
+	v92:i32 = Icmp ge_u, v5, v91
+	ExitIfNotZero v92, exec_ctx, memory_out_of_bounds
+	v93:i64 = Iadd v8, v90
+	v94:i32 = Uload16 v93, 0x0
+	v95:i64 = Iconst_64 0x11
+	v96:i64 = UExtend v2, 32->64
+	v97:i64 = Iadd v96, v95
+	v98:i32 = Icmp ge_u, v5, v97
+	ExitIfNotZero v98, exec_ctx, memory_out_of_bounds
+	v99:i64 = Iadd v8, v96
+	v100:i32 = Uload16 v99, 0xf
+	v101:i64 = Iconst_64 0x1
+	v102:i64 = UExtend v2, 32->64
+	v103:i64 = Iadd v102, v101
+	v104:i32 = Icmp ge_u, v5, v103
+	ExitIfNotZero v104, exec_ctx, memory_out_of_bounds
+	v105:i64 = Iadd v8, v102
+	v106:i64 = Sload8 v105, 0x0
+	v107:i64 = Iconst_64 0x10
+	v108:i64 = UExtend v2, 32->64
+	v109:i64 = Iadd v108, v107
+	v110:i32 = Icmp ge_u, v5, v109
+	ExitIfNotZero v110, exec_ctx, memory_out_of_bounds
+	v111:i64 = Iadd v8, v108
+	v112:i64 = Sload8 v111, 0xf
+	v113:i64 = Iconst_64 0x1
+	v114:i64 = UExtend v2, 32->64
+	v115:i64 = Iadd v114, v113
+	v116:i32 = Icmp ge_u, v5, v115
+	ExitIfNotZero v116, exec_ctx, memory_out_of_bounds
+	v117:i64 = Iadd v8, v114
+	v118:i64 = Uload8 v117, 0x0
+	v119:i64 = Iconst_64 0x10
+	v120:i64 = UExtend v2, 32->64
+	v121:i64 = Iadd v120, v119
+	v122:i32 = Icmp ge_u, v5, v121
+	ExitIfNotZero v122, exec_ctx, memory_out_of_bounds
+	v123:i64 = Iadd v8, v120
+	v124:i64 = Uload8 v123, 0xf
+	v125:i64 = Iconst_64 0x2
+	v126:i64 = UExtend v2, 32->64
+	v127:i64 = Iadd v126, v125
+	v128:i32 = Icmp ge_u, v5, v127
+	ExitIfNotZero v128, exec_ctx, memory_out_of_bounds
+	v129:i64 = Iadd v8, v126
+	v130:i64 = Sload16 v129, 0x0
+	v131:i64 = Iconst_64 0x11
+	v132:i64 = UExtend v2, 32->64
+	v133:i64 = Iadd v132, v131
+	v134:i32 = Icmp ge_u, v5, v133
+	ExitIfNotZero v134, exec_ctx, memory_out_of_bounds
+	v135:i64 = Iadd v8, v132
+	v136:i64 = Sload16 v135, 0xf
+	v137:i64 = Iconst_64 0x2
+	v138:i64 = UExtend v2, 32->64
+	v139:i64 = Iadd v138, v137
+	v140:i32 = Icmp ge_u, v5, v139
+	ExitIfNotZero v140, exec_ctx, memory_out_of_bounds
+	v141:i64 = Iadd v8, v138
+	v142:i64 = Uload16 v141, 0x0
+	v143:i64 = Iconst_64 0x11
+	v144:i64 = UExtend v2, 32->64
+	v145:i64 = Iadd v144, v143
+	v146:i32 = Icmp ge_u, v5, v145
+	ExitIfNotZero v146, exec_ctx, memory_out_of_bounds
+	v147:i64 = Iadd v8, v144
+	v148:i64 = Uload16 v147, 0xf
+	v149:i64 = Iconst_64 0x4
+	v150:i64 = UExtend v2, 32->64
+	v151:i64 = Iadd v150, v149
+	v152:i32 = Icmp ge_u, v5, v151
+	ExitIfNotZero v152, exec_ctx, memory_out_of_bounds
+	v153:i64 = Iadd v8, v150
+	v154:i64 = Sload32 v153, 0x0
+	v155:i64 = Iconst_64 0x13
+	v156:i64 = UExtend v2, 32->64
+	v157:i64 = Iadd v156, v155
+	v158:i32 = Icmp ge_u, v5, v157
+	ExitIfNotZero v158, exec_ctx, memory_out_of_bounds
+	v159:i64 = Iadd v8, v156
+	v160:i64 = Sload32 v159, 0xf
+	v161:i64 = Iconst_64 0x4
+	v162:i64 = UExtend v2, 32->64
+	v163:i64 = Iadd v162, v161
+	v164:i32 = Icmp ge_u, v5, v163
+	ExitIfNotZero v164, exec_ctx, memory_out_of_bounds
+	v165:i64 = Iadd v8, v162
+	v166:i64 = Uload32 v165, 0x0
+	v167:i64 = Iconst_64 0x13
+	v168:i64 = UExtend v2, 32->64
+	v169:i64 = Iadd v168, v167
+	v170:i32 = Icmp ge_u, v5, v169
+	ExitIfNotZero v170, exec_ctx, memory_out_of_bounds
+	v171:i64 = Iadd v8, v168
+	v172:i64 = Uload32 v171, 0xf
+	Jump blk_ret, v10, v16, v22, v28, v34, v40, v46, v52, v58, v64, v70, v76, v82, v88, v94, v100, v106, v112, v118, v124, v130, v136, v142, v148, v154, v160, v166, v172
 `,
 		},
 	} {
