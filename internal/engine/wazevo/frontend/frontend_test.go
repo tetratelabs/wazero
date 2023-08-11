@@ -612,6 +612,17 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i64)
 `,
 		},
 		{
+			name: "integer bit counts", m: testcases.IntegerBitCounts.Module,
+			exp: `
+blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i64)
+	v4:i32 = Clz v2
+	v5:i32 = Ctz v2
+	v6:i64 = Clz v3
+	v7:i64 = Ctz v3
+	Jump blk_ret, v4, v5, v6, v7
+`,
+		},
+		{
 			name: "float comparisons", m: testcases.FloatComparisons.Module,
 			exp: `
 blk0: (exec_ctx:i64, module_ctx:i64, v2:f32, v3:f32, v4:f64, v5:f64)

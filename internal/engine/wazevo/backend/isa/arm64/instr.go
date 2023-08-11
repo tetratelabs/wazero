@@ -50,6 +50,7 @@ var defKinds = [numInstructionKinds]defKind{
 	aluRRRShift:     defKindRD,
 	aluRRImmShift:   defKindRD,
 	aluRRRExtend:    defKindRD,
+	bitRR:           defKindRD,
 	movZ:            defKindRD,
 	movN:            defKindRD,
 	mov32:           defKindRD,
@@ -143,6 +144,7 @@ var useKinds = [numInstructionKinds]useKind{
 	aluRRRShift:     useKindRNRM,
 	aluRRImmShift:   useKindRN,
 	aluRRRExtend:    useKindRNRM,
+	bitRR:           useKindRN,
 	movZ:            useKindNone,
 	movN:            useKindNone,
 	mov32:           useKindRN,
@@ -612,6 +614,15 @@ func (i *instruction) asALUBitmaskImm(aluOp aluOp, rn, rd regalloc.VReg, imm uin
 	}
 }
 
+func (i *instruction) asBitRR(bitOp bitOp, rd, rn regalloc.VReg, is64bit bool) {
+	i.kind = bitRR
+	i.rn, i.rd = operandNR(rn), operandNR(rd)
+	i.u1 = uint64(bitOp)
+	if is64bit {
+		i.u2 = 1
+	}
+}
+
 func (i *instruction) asFpuRRR(op fpuBinOp, rd, rn, rm operand, dst64bit bool) {
 	i.kind = fpuRRR
 	i.u1 = uint64(op)
@@ -722,7 +733,12 @@ func (i *instruction) String() (str string) {
 			e,
 		)
 	case bitRR:
-		panic("TODO")
+		size := is64SizeBitToSize(i.u2)
+		str = fmt.Sprintf("%s %s, %s",
+			bitOp(i.u1).String(),
+			formatVRegSized(i.rd.nr(), size),
+			formatVRegSized(i.rn.nr(), size),
+		)
 	case uLoad8:
 		str = fmt.Sprintf("ldrb %s, %s", formatVRegSized(i.rd.nr(), 32), i.amode.format(32))
 	case sLoad8:
@@ -1233,6 +1249,26 @@ const (
 	// MAdd and MSub are only applicable for aluRRRR.
 	aluOpMAdd
 	aluOpMSub
+)
+
+// bitOp determines the type of bitwise operation. Instructions whose kind is one of
+// bitOpRbit and bitOpClz would use this type.
+type bitOp int
+
+func (b bitOp) String() string {
+	switch b {
+	case bitOpRbit:
+		return "rbit"
+	case bitOpClz:
+		return "clz"
+	}
+	panic(int(b))
+}
+
+const (
+	// 32/64-bit Clz.
+	bitOpRbit bitOp = iota
+	bitOpClz
 )
 
 // fpuBinOp represents a binary floating-point unit (FPU) operation.

@@ -434,6 +434,8 @@ func TestInstruction_encode(t *testing.T) {
 		{want: "400041d3", setup: func(i *instruction) {
 			i.asALUShift(aluOpLsl, operandNR(x0VReg), operandNR(x2VReg), operandShiftImm(63), true)
 		}},
+		{want: "4010c05a", setup: func(i *instruction) { i.asBitRR(bitOpClz, x0VReg, x2VReg, false) }},
+		{want: "4010c0da", setup: func(i *instruction) { i.asBitRR(bitOpClz, x0VReg, x2VReg, true) }},
 	} {
 		tc := tc
 		t.Run(tc.want, func(t *testing.T) {

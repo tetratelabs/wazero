@@ -836,6 +836,8 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeIcmp:               sideEffectFalse,
 	OpcodeFcmp:               sideEffectFalse,
 	OpcodeFadd:               sideEffectFalse,
+	OpcodeClz:                sideEffectFalse,
+	OpcodeCtz:                sideEffectFalse,
 	OpcodeLoad:               sideEffectFalse,
 	OpcodeUload8:             sideEffectFalse,
 	OpcodeUload16:            sideEffectFalse,
@@ -933,6 +935,8 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeFmin:               returnTypesFnSingle,
 	OpcodeF32const:           returnTypesFnF32,
 	OpcodeF64const:           returnTypesFnF64,
+	OpcodeClz:                returnTypesFnSingle,
+	OpcodeCtz:                returnTypesFnSingle,
 	OpcodeStore:              returnTypesFnNoReturns,
 	OpcodeIstore8:            returnTypesFnNoReturns,
 	OpcodeIstore16:           returnTypesFnNoReturns,
@@ -1302,6 +1306,32 @@ func (i *Instruction) CallIndirectData() (funcPtr Value, sigID SignatureID, args
 	return
 }
 
+// AsClz initializes this instruction as a Count Leading Zeroes instruction with OpcodeClz.
+func (i *Instruction) AsClz(x Value) {
+	i.opcode = OpcodeClz
+	i.v = x
+	i.typ = x.Type()
+}
+
+// AsCtz initializes this instruction as a Count Trailing Zeroes instruction with OpcodeCtz.
+func (i *Instruction) AsCtz(x Value) {
+	i.opcode = OpcodeCtz
+	i.v = x
+	i.typ = x.Type()
+}
+
+// AsPopcnt initializes this instruction as an Integer Population Count instruction with OpcodePopcnt.
+func (i *Instruction) AsPopcnt(x Value) {
+	i.opcode = OpcodePopcnt
+	i.v = x
+	i.typ = x.Type()
+}
+
+// UnaryData return the operand for a unary instruction.
+func (i *Instruction) UnaryData() Value {
+	return i.v
+}
+
 // AsSExtend initializes this instruction as a sign extension instruction with OpcodeSExtend.
 func (i *Instruction) AsSExtend(v Value, from, to byte) {
 	i.opcode = OpcodeSExtend
@@ -1438,6 +1468,8 @@ func (i *Instruction) Format(b Builder) string {
 	case OpcodeIshl, OpcodeSshr, OpcodeUshr:
 		instSuffix = fmt.Sprintf(" %s, %s", i.v.Format(b), i.v2.Format(b))
 	case OpcodeUndefined:
+	case OpcodeClz, OpcodeCtz, OpcodePopcnt:
+		instSuffix = " " + i.v.Format(b)
 	default:
 		panic(fmt.Sprintf("TODO: format for %s", i.opcode))
 	}
