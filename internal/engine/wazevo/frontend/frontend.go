@@ -180,8 +180,10 @@ func (c *Compiler) declareNecessaryVariables() {
 	c.mutableGlobalVariablesIndexes = c.mutableGlobalVariablesIndexes[:0]
 	c.globalVariablesTypes = c.globalVariablesTypes[:0]
 	for _, imp := range c.m.ImportSection {
-		desc := imp.DescGlobal
-		c.declareWasmGlobal(desc.ValType, desc.Mutable)
+		if imp.Type == wasm.ExternTypeGlobal {
+			desc := imp.DescGlobal
+			c.declareWasmGlobal(desc.ValType, desc.Mutable)
+		}
 	}
 	for _, g := range c.m.GlobalSection {
 		desc := g.Type
