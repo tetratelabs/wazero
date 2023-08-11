@@ -1161,6 +1161,22 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
 	Jump blk_ret, v10, v16, v22, v28, v34, v40, v46, v52, v58, v64, v70, v76, v82, v88, v94, v100, v106, v112, v118, v124, v130, v136, v142, v148, v154, v160, v166, v172
 `,
 		},
+		{
+			name: "globals_get",
+			m:    testcases.GlobalsGet.Module,
+			exp: `
+blk0: (exec_ctx:i64, module_ctx:i64)
+	v2:i64 = Load module_ctx, 0x0
+	v3:i32 = Load v2, 0x8
+	v4:i64 = Load module_ctx, 0x8
+	v5:i64 = Load v4, 0x8
+	v6:i64 = Load module_ctx, 0x10
+	v7:f32 = Load v6, 0x8
+	v8:i64 = Load module_ctx, 0x18
+	v9:f64 = Load v8, 0x8
+	Jump blk_ret, v3, v5, v7, v9
+`,
+		},
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {

@@ -43,13 +43,20 @@ type ExecutionContextOffsetData struct {
 // ModuleContextOffsetData allows the compilers to get the information about offsets to the fields of wazevo.moduleContextOpaque,
 // This is unique per module.
 type ModuleContextOffsetData struct {
-	TotalSize                                                     int
-	LocalMemoryBegin, ImportedMemoryBegin, ImportedFunctionsBegin Offset
+	TotalSize int
+	LocalMemoryBegin, ImportedMemoryBegin, ImportedFunctionsBegin,
+	GlobalsBegin Offset
 }
 
+// ImportedFunctionOffset returns an offset of the i-th imported function.
 func (m *ModuleContextOffsetData) ImportedFunctionOffset(i wasm.Index) (ptr, moduleCtx Offset) {
 	base := m.ImportedFunctionsBegin + Offset(i)*16
 	return base, base + 8
+}
+
+// GlobalOffset returns an offset of the i-th global variable.
+func (m *ModuleContextOffsetData) GlobalOffset(i wasm.Index) Offset {
+	return m.GlobalsBegin + Offset(i)*8
 }
 
 // Offset represents an offset of a field of a struct.
@@ -108,9 +115,19 @@ func NewModuleContextOffsetData(m *wasm.Module) ModuleContextOffsetData {
 	if m.ImportFunctionCount > 0 {
 		ret.ImportedFunctionsBegin = offset
 		// Each function consists of the pointer to the executable and the pointer to its moduleContextOpaque (16 bytes).
-		ret.TotalSize += int(m.ImportFunctionCount) * 16
+		size := int(m.ImportFunctionCount) * 16
+		offset += Offset(size)
+		ret.TotalSize += size
 	} else {
 		ret.ImportedFunctionsBegin = -1
+	}
+
+	if globals := int(m.ImportGlobalCount) + len(m.GlobalSection); globals > 0 {
+		ret.GlobalsBegin = offset
+		// Pointers to *wasm.GlobalInstance.
+		ret.TotalSize += globals * 8
+	} else {
+		ret.GlobalsBegin = -1
 	}
 	return ret
 }

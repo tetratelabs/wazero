@@ -418,6 +418,13 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		builder.InsertInstruction(ishl)
 		value := ishl.Return()
 		state.push(value)
+	case wasm.OpcodeGlobalGet:
+		index := c.readI32u()
+		if state.unreachable {
+			return
+		}
+		v := c.getWasmGlobalValue(index)
+		state.push(v)
 	case wasm.OpcodeLocalGet:
 		index := c.readI32u()
 		if state.unreachable {
@@ -820,13 +827,8 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 			state.push(v)
 		}
 
-		// After calling any function, memory buffer might have changed. So we need to re-defined the variable.
-		if c.needMemory {
-			// When these are not used in the following instructions, they will be optimized out.
-			// So in any ways, we define them!
-			_ = c.getMemoryBaseValue()
-			_ = c.getMemoryLenValue()
-		}
+		c.reloadAfterCall()
+
 	case wasm.OpcodeDrop:
 		_ = state.pop()
 	default:
@@ -834,21 +836,61 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 	}
 }
 
+func (c *Compiler) reloadAfterCall() {
+	// After calling any function, memory buffer might have changed. So we need to re-defined the variable.
+	if c.needMemory {
+		// When these are not used in the following instructions, they will be optimized out.
+		// So in any ways, we define them!
+		_ = c.getMemoryBaseValue()
+		_ = c.getMemoryLenValue()
+	}
+
+	// Also, any mutable Global can change.
+	for _, index := range c.mutableGlobalVariablesIndexes {
+		c.getWasmGlobalValue(index)
+	}
+}
+
+// globalInstanceValueOffset is the offsetOf .Value field of wasm.GlobalInstance.
+const globalInstanceValueOffset = 8
+
+func (c *Compiler) getWasmGlobalValue(index wasm.Index) ssa.Value {
+	variable := c.globalVariables[index]
+	typ := c.globalVariablesTypes[index]
+	offset := c.offset.GlobalOffset(index)
+
+	builder := c.ssaBuilder
+	if v := builder.FindValue(variable); v.Valid() {
+		return v
+	}
+
+	loadGlobalInstPtr := builder.AllocateInstruction()
+	loadGlobalInstPtr.AsLoad(c.moduleCtxPtrValue, uint32(offset), ssa.TypeI64)
+	builder.InsertInstruction(loadGlobalInstPtr)
+
+	load := builder.AllocateInstruction()
+	load.AsLoad(loadGlobalInstPtr.Return(), uint32(globalInstanceValueOffset), typ)
+	builder.InsertInstruction(load)
+	ret := load.Return()
+	builder.DefineVariableInCurrentBB(variable, ret)
+	return ret
+}
+
 func (c *Compiler) getMemoryBaseValue() ssa.Value {
 	if c.offset.LocalMemoryBegin < 0 {
 		panic("TODO: imported memory")
 	}
-	return c.getModuleCtxValue(c.memoryBaseVariable, c.offset.LocalMemoryBase(), false)
+	return c.getModuleCtxValueI32Or64(c.memoryBaseVariable, c.offset.LocalMemoryBase(), false)
 }
 
 func (c *Compiler) getMemoryLenValue() ssa.Value {
 	if c.offset.LocalMemoryBegin < 0 {
 		panic("TODO: imported memory")
 	}
-	return c.getModuleCtxValue(c.memoryLenVariable, c.offset.LocalMemoryLen(), true)
+	return c.getModuleCtxValueI32Or64(c.memoryLenVariable, c.offset.LocalMemoryLen(), true)
 }
 
-func (c *Compiler) getModuleCtxValue(variable ssa.Variable, offset wazevoapi.Offset, zeroExt bool) ssa.Value {
+func (c *Compiler) getModuleCtxValueI32Or64(variable ssa.Variable, offset wazevoapi.Offset, zeroExt bool) ssa.Value {
 	builder := c.ssaBuilder
 	if v := builder.FindValue(variable); v.Valid() {
 		return v

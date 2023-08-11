@@ -794,7 +794,7 @@ var (
 				wasm.OpcodeI32Load, 0x2, 0x0, // alignment=2 (natural alignment) staticOffset=0
 				wasm.OpcodeEnd,
 			}}},
-			DataSection: []wasm.DataSegment{{OffsetExpression: constOffsetExpr(0), Init: maskedBuf(int(wasm.MemoryPageSize))}},
+			DataSection: []wasm.DataSegment{{OffsetExpression: constExprI32(0), Init: maskedBuf(int(wasm.MemoryPageSize))}},
 		},
 	}
 
@@ -823,7 +823,43 @@ var (
 				}},
 				{Body: []byte{wasm.OpcodeEnd}},
 			},
-			DataSection: []wasm.DataSegment{{OffsetExpression: constOffsetExpr(0), Init: maskedBuf(int(wasm.MemoryPageSize))}},
+			DataSection: []wasm.DataSegment{{OffsetExpression: constExprI32(0), Init: maskedBuf(int(wasm.MemoryPageSize))}},
+		},
+	}
+
+	GlobalsGet = TestCase{
+		Name: "globals_get",
+		Module: &wasm.Module{
+			TypeSection:     []wasm.FunctionType{{Results: []wasm.ValueType{i32, i64, f32, f64}}},
+			ExportSection:   []wasm.Export{{Name: ExportName, Type: wasm.ExternTypeFunc, Index: 0}},
+			FunctionSection: []wasm.Index{0},
+			GlobalSection: []wasm.Global{
+				{
+					Type: wasm.GlobalType{ValType: wasm.ValueTypeI32, Mutable: false},
+					Init: constExprI32(math.MinInt32),
+				},
+				{
+					Type: wasm.GlobalType{ValType: wasm.ValueTypeI64, Mutable: false},
+					Init: constExprI64(math.MinInt64),
+				},
+				{
+					Type: wasm.GlobalType{ValType: wasm.ValueTypeF32, Mutable: false},
+					Init: constExprF32(math.MaxFloat32),
+				},
+				{
+					Type: wasm.GlobalType{ValType: wasm.ValueTypeF64, Mutable: false},
+					Init: constExprF64(math.MaxFloat64),
+				},
+			},
+			CodeSection: []wasm.Code{
+				{Body: []byte{
+					wasm.OpcodeGlobalGet, 0,
+					wasm.OpcodeGlobalGet, 1,
+					wasm.OpcodeGlobalGet, 2,
+					wasm.OpcodeGlobalGet, 3,
+					wasm.OpcodeEnd,
+				}},
+			},
 		},
 	}
 
@@ -906,7 +942,7 @@ var (
 
 				wasm.OpcodeEnd,
 			}}},
-			DataSection: []wasm.DataSegment{{OffsetExpression: constOffsetExpr(0), Init: maskedBuf(int(wasm.MemoryPageSize))}},
+			DataSection: []wasm.DataSegment{{OffsetExpression: constExprI32(0), Init: maskedBuf(int(wasm.MemoryPageSize))}},
 		},
 	}
 )
@@ -958,9 +994,35 @@ func maskedBuf(size int) []byte {
 	return ret
 }
 
-func constOffsetExpr(i int32) wasm.ConstantExpression {
+func constExprI32(i int32) wasm.ConstantExpression {
 	return wasm.ConstantExpression{
 		Opcode: wasm.OpcodeI32Const,
 		Data:   leb128.EncodeInt32(i),
+	}
+}
+
+func constExprI64(i int64) wasm.ConstantExpression {
+	return wasm.ConstantExpression{
+		Opcode: wasm.OpcodeI64Const,
+		Data:   leb128.EncodeInt64(i),
+	}
+}
+
+func constExprF32(i float32) wasm.ConstantExpression {
+	b := math.Float32bits(i)
+	return wasm.ConstantExpression{
+		Opcode: wasm.OpcodeF32Const,
+		Data:   []byte{byte(b), byte(b >> 8), byte(b >> 16), byte(b >> 24)},
+	}
+}
+
+func constExprF64(i float64) wasm.ConstantExpression {
+	b := math.Float64bits(i)
+	return wasm.ConstantExpression{
+		Opcode: wasm.OpcodeF64Const,
+		Data: []byte{
+			byte(b), byte(b >> 8), byte(b >> 16), byte(b >> 24),
+			byte(b >> 32), byte(b >> 40), byte(b >> 48), byte(b >> 56),
+		},
 	}
 }
