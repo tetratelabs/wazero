@@ -829,7 +829,9 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		}
 
 		first, rest := call.Returns()
-		state.push(first)
+		if first.Valid() {
+			state.push(first)
+		}
 		for _, v := range rest {
 			state.push(v)
 		}

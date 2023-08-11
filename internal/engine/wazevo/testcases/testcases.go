@@ -907,6 +907,60 @@ var (
 		},
 	}
 
+	GlobalsMutable = TestCase{
+		Module: &wasm.Module{
+			TypeSection: []wasm.FunctionType{
+				{Results: []wasm.ValueType{i32, i64, f32, f64, i32, i64, f32, f64}},
+				{},
+			},
+			ExportSection:   []wasm.Export{{Name: ExportName, Type: wasm.ExternTypeFunc, Index: 0}},
+			FunctionSection: []wasm.Index{0, 1},
+			GlobalSection: []wasm.Global{
+				{
+					Type: wasm.GlobalType{ValType: wasm.ValueTypeI32, Mutable: true},
+					Init: constExprI32(100),
+				},
+				{
+					Type: wasm.GlobalType{ValType: wasm.ValueTypeI64, Mutable: true},
+					Init: constExprI64(200),
+				},
+				{
+					Type: wasm.GlobalType{ValType: wasm.ValueTypeF32, Mutable: true},
+					Init: constExprF32(300.0),
+				},
+				{
+					Type: wasm.GlobalType{ValType: wasm.ValueTypeF64, Mutable: true},
+					Init: constExprF64(400.0),
+				},
+			},
+			CodeSection: []wasm.Code{
+				{Body: []byte{
+					wasm.OpcodeGlobalGet, 0,
+					wasm.OpcodeGlobalGet, 1,
+					wasm.OpcodeGlobalGet, 2,
+					wasm.OpcodeGlobalGet, 3,
+					wasm.OpcodeCall, 1,
+					wasm.OpcodeGlobalGet, 0,
+					wasm.OpcodeGlobalGet, 1,
+					wasm.OpcodeGlobalGet, 2,
+					wasm.OpcodeGlobalGet, 3,
+					wasm.OpcodeEnd,
+				}},
+				{Body: []byte{
+					wasm.OpcodeI32Const, 1,
+					wasm.OpcodeGlobalSet, 0,
+					wasm.OpcodeI64Const, 2,
+					wasm.OpcodeGlobalSet, 1,
+					wasm.OpcodeF32Const, 0, 0, 64, 64, // 3.0
+					wasm.OpcodeGlobalSet, 2,
+					wasm.OpcodeF64Const, 0, 0, 0, 0, 0, 0, 16, 64, // 4.0
+					wasm.OpcodeGlobalSet, 3,
+					wasm.OpcodeEnd,
+				}},
+			},
+		},
+	}
+
 	MemoryLoads = TestCase{
 		Name: "memory_loads",
 		Module: &wasm.Module{
