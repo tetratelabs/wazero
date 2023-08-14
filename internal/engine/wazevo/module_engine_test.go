@@ -2,6 +2,7 @@ package wazevo
 
 import (
 	"encoding/binary"
+	"runtime"
 	"strconv"
 	"testing"
 	"unsafe"
@@ -79,6 +80,7 @@ func TestModuleEngine_setupOpaque(t *testing.T) {
 				actualOpaquePtr := uintptr(binary.LittleEndian.Uint64(m.opaque[tc.offset.ImportedMemoryBegin+8:]))
 				expOpaquePtr := uintptr(unsafe.Pointer(&importedOpaque[0]))
 				require.Equal(t, expOpaquePtr, actualOpaquePtr)
+				runtime.KeepAlive(imported)
 			}
 			if tc.offset.GlobalsBegin >= 0 {
 				for i, g := range tc.m.Globals {
