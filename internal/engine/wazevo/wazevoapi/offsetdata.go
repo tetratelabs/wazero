@@ -3,16 +3,18 @@ package wazevoapi
 import "github.com/tetratelabs/wazero/internal/wasm"
 
 var ExecutionContextOffsets = ExecutionContextOffsetData{
-	ExitCodeOffset:         0,
-	CallerModuleContextPtr: 8,
-	OriginalFramePointer:   16,
-	OriginalStackPointer:   24,
-	GoReturnAddress:        32,
-	StackBottomPtr:         40,
-	GoCallReturnAddress:    48,
-	StackPointerBeforeGrow: 56,
-	StackGrowRequiredSize:  64,
-	SavedRegistersBegin:    80,
+	ExitCodeOffset:              0,
+	CallerModuleContextPtr:      8,
+	OriginalFramePointer:        16,
+	OriginalStackPointer:        24,
+	GoReturnAddress:             32,
+	StackBottomPtr:              40,
+	GoCallReturnAddress:         48,
+	StackPointerBeforeGrow:      56,
+	StackGrowRequiredSize:       64,
+	MemoryGrowTrampolineAddress: 72,
+	SavedRegistersBegin:         80,
+	GoFunctionCallStackBegin:    1104,
 }
 
 // ExecutionContextOffsetData allows the compilers to get the information about offsets to the fields of wazevo.executionContext,
@@ -32,18 +34,23 @@ type ExecutionContextOffsetData struct {
 	StackBottomPtr Offset
 	// GoCallReturnAddress is an offset of `goCallReturnAddress` field in wazevo.executionContext
 	GoCallReturnAddress Offset
-	// GoCallReturnAddress is an offset of `stackPointerBeforeGrow` field in wazevo.executionContext
+	// GoCallReturnAddress is an offset of `stackPointerBeforeGoCall` field in wazevo.executionContext
 	StackPointerBeforeGrow Offset
 	// StackGrowRequiredSize is an offset of `stackGrowRequiredSize` field in wazevo.executionContext
 	StackGrowRequiredSize Offset
+	// MemoryGrowTrampolineAddress is an offset of `memoryGrowTrampolineAddress` field in wazevo.executionContext
+	MemoryGrowTrampolineAddress Offset
 	// GoCallReturnAddress is an offset of the first element of `savedRegisters` field in wazevo.executionContext
 	SavedRegistersBegin Offset
+	// GoFunctionCallStackBegin is an offset of the first element of `goFunctionCallStack` field in wazevo.executionContext
+	GoFunctionCallStackBegin Offset
 }
 
 // ModuleContextOffsetData allows the compilers to get the information about offsets to the fields of wazevo.moduleContextOpaque,
 // This is unique per module.
 type ModuleContextOffsetData struct {
 	TotalSize int
+	ModuleInstanceOffset,
 	LocalMemoryBegin, ImportedMemoryBegin, ImportedFunctionsBegin,
 	GlobalsBegin Offset
 }
@@ -72,6 +79,11 @@ func (o Offset) I64() int64 {
 	return int64(o)
 }
 
+// U64 encodes an Offset as int64 for convenience.
+func (o Offset) U64() uint64 {
+	return uint64(o)
+}
+
 // LocalMemoryBase returns an offset of the first byte of the local memory.
 func (m *ModuleContextOffsetData) LocalMemoryBase() Offset {
 	return m.LocalMemoryBegin
@@ -90,12 +102,15 @@ func (m *ModuleContextOffsetData) LocalMemoryLen() Offset {
 func NewModuleContextOffsetData(m *wasm.Module) ModuleContextOffsetData {
 	ret := ModuleContextOffsetData{}
 	var offset Offset
+
+	ret.ModuleInstanceOffset = 0
+	offset += 8
+
 	if m.MemorySection != nil {
 		ret.LocalMemoryBegin = offset
 		// buffer base + memory size.
 		const localMemorySizeInOpaqueVMContext = 16
 		offset += localMemorySizeInOpaqueVMContext
-		ret.TotalSize += localMemorySizeInOpaqueVMContext
 	} else {
 		// Indicates that there's no local memory
 		ret.LocalMemoryBegin = -1
@@ -106,7 +121,6 @@ func NewModuleContextOffsetData(m *wasm.Module) ModuleContextOffsetData {
 		const importedMemorySizeInOpaqueVMCContext = 8
 		ret.ImportedMemoryBegin = offset
 		offset += importedMemorySizeInOpaqueVMCContext
-		ret.TotalSize += importedMemorySizeInOpaqueVMCContext
 	} else {
 		// Indicates that there's no imported memory
 		ret.ImportedMemoryBegin = -1
@@ -117,7 +131,6 @@ func NewModuleContextOffsetData(m *wasm.Module) ModuleContextOffsetData {
 		// Each function consists of the pointer to the executable and the pointer to its moduleContextOpaque (16 bytes).
 		size := int(m.ImportFunctionCount) * 16
 		offset += Offset(size)
-		ret.TotalSize += size
 	} else {
 		ret.ImportedFunctionsBegin = -1
 	}
@@ -125,9 +138,11 @@ func NewModuleContextOffsetData(m *wasm.Module) ModuleContextOffsetData {
 	if globals := int(m.ImportGlobalCount) + len(m.GlobalSection); globals > 0 {
 		ret.GlobalsBegin = offset
 		// Pointers to *wasm.GlobalInstance.
-		ret.TotalSize += globals * 8
+		offset += Offset(globals) * 8
 	} else {
 		ret.GlobalsBegin = -1
 	}
+
+	ret.TotalSize = int(offset)
 	return ret
 }

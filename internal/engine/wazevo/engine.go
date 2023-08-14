@@ -25,13 +25,20 @@ type (
 		mux               sync.RWMutex
 		rels              []backend.RelocationInfo
 		refToBinaryOffset map[ssa.FuncRef]int
+
+		builtinFunctions *builtinFunctions
+	}
+
+	builtinFunctions struct {
+		memoryGrowExecutable []byte
 	}
 
 	// compiledModule is a compiled variant of a wasm.Module and ready to be used for instantiation.
 	compiledModule struct {
-		executable      []byte
-		functionOffsets []compiledFunctionOffset
-		offsets         wazevoapi.ModuleContextOffsetData
+		executable       []byte
+		functionOffsets  []compiledFunctionOffset
+		offsets          wazevoapi.ModuleContextOffsetData
+		builtinFunctions *builtinFunctions
 	}
 
 	// compiledFunctionOffset tells us that where in the executable a function begins.
@@ -47,7 +54,10 @@ var _ wasm.Engine = (*engine)(nil)
 
 // NewEngine returns the implementation of wasm.Engine.
 func NewEngine(_ context.Context, _ api.CoreFeatures, _ filecache.Cache) wasm.Engine {
-	return &engine{compiledModules: make(map[wasm.ModuleID]*compiledModule), refToBinaryOffset: make(map[ssa.FuncRef]int)}
+	e := &engine{compiledModules: make(map[wasm.ModuleID]*compiledModule), refToBinaryOffset: make(map[ssa.FuncRef]int)}
+
+	e.compileBuiltinFunctions()
+	return e
 }
 
 // CompileModule implements wasm.Engine.
@@ -164,6 +174,9 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []exper
 		}
 	}
 	e.compiledModules[module.ID] = cm
+	cm.builtinFunctions = e.builtinFunctions
+
+	// TODO: finalizer.
 	return nil
 }
 
@@ -177,6 +190,7 @@ func (e *engine) Close() (err error) {
 		cm.functionOffsets = nil
 	}
 	e.compiledModules = nil
+	e.builtinFunctions = nil
 	return nil
 }
 
@@ -219,4 +233,37 @@ func (e *engine) NewModuleEngine(m *wasm.Module, mi *wasm.ModuleInstance) (wasm.
 		me.opaquePtr = &opaque[0]
 	}
 	return me, nil
+}
+
+func (e *engine) compileBuiltinFunctions() {
+	e.builtinFunctions = &builtinFunctions{}
+	{
+		machine := newMachine()
+		be := backend.NewCompiler(machine, ssa.NewBuilder())
+		machine.CompileGoFunctionTrampoline(wazevoapi.ExitCodeGrowMemory, &ssa.Signature{
+			Params:  []ssa.Type{ssa.TypeI32 /* exec context */, ssa.TypeI32},
+			Results: []ssa.Type{ssa.TypeI32},
+		})
+		be.Encode()
+		src := be.Buf()
+
+		executable, err := platform.MmapCodeSegment(len(src))
+		if err != nil {
+			panic(err)
+		}
+
+		copy(executable, src)
+
+		if runtime.GOARCH == "arm64" {
+			// On arm64, we cannot give all of rwx at the same time, so we change it to exec.
+			if err = platform.MprotectRX(executable); err != nil {
+				panic(err)
+			}
+		}
+		e.builtinFunctions.memoryGrowExecutable = executable
+	}
+
+	// TODO: table grow, etc.
+
+	// TODO: finalizer.
 }

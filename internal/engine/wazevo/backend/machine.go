@@ -3,6 +3,7 @@ package backend
 import (
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 )
 
 type (
@@ -94,5 +95,8 @@ type (
 
 		// Encode encodes the machine instructions to the Compiler.
 		Encode()
+
+		// CompileGoFunctionTrampoline compiles the trampoline function  to call a Go function of the given exit code and signature.
+		CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *ssa.Signature)
 	}
 )

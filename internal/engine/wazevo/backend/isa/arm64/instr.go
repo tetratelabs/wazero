@@ -723,7 +723,7 @@ func (i *instruction) String() (str string) {
 			formatVRegSized(i.rd.nr(), 64),
 			formatVRegSized(i.rn.nr(), 64))
 	case mov32:
-		panic("TODO")
+		str = fmt.Sprintf("mov %s, %s", formatVRegSized(i.rd.nr(), 32), formatVRegSized(i.rn.nr(), 32))
 	case movZ:
 		size := is64SizeBitToSize(i.u3)
 		str = fmt.Sprintf("movz %s, #%#x, LSL %d", formatVRegSized(i.rd.nr(), size), uint16(i.u1), i.u2*16)

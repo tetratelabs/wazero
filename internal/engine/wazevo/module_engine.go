@@ -5,6 +5,7 @@ import (
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -40,16 +41,24 @@ type (
 	moduleContextOpaque []byte
 )
 
+func putLocalMemory(opaque []byte, offset wazevoapi.Offset, mem *wasm.MemoryInstance) {
+	b := uint64(uintptr(unsafe.Pointer(&mem.Buffer[0])))
+	s := uint64(len(mem.Buffer))
+	binary.LittleEndian.PutUint64(opaque[offset:], b)
+	binary.LittleEndian.PutUint64(opaque[offset+8:], s)
+}
+
 func (m *moduleEngine) setupOpaque() {
 	inst := m.module
 	offsets := &m.parent.offsets
 	opaque := m.opaque
 
+	binary.LittleEndian.PutUint64(opaque[offsets.ModuleInstanceOffset:],
+		uint64(uintptr(unsafe.Pointer(m.module))),
+	)
+
 	if lm := offsets.LocalMemoryBegin; lm >= 0 {
-		b := uint64(uintptr(unsafe.Pointer(&inst.MemoryInstance.Buffer[0])))
-		s := uint64(len(inst.MemoryInstance.Buffer))
-		binary.LittleEndian.PutUint64(opaque[lm:], b)
-		binary.LittleEndian.PutUint64(opaque[lm+8:], s)
+		putLocalMemory(opaque, lm, inst.MemoryInstance)
 	}
 
 	if im := offsets.ImportedMemoryBegin; im >= 0 {
@@ -92,6 +101,8 @@ func (m *moduleEngine) NewFunction(index wasm.Index) api.Function {
 		parent:                 m,
 		sizeOfParamResultSlice: sizeOfParamResultSlice,
 	}
+
+	ce.execCtx.memoryGrowTrampolineAddress = &m.parent.builtinFunctions.memoryGrowExecutable[0]
 	ce.init()
 	return ce
 }

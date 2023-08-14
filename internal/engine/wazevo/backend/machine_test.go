@@ -3,6 +3,7 @@ package backend
 import (
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 )
 
 // mockMachine implements Machine for testing.
@@ -21,6 +22,11 @@ type mockMachine struct {
 	format                 func() string
 	linkAdjacentBlocks     func(prev, next ssa.BasicBlock)
 	rinfo                  *regalloc.RegisterInfo
+}
+
+func (m mockMachine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *ssa.Signature) {
+	// TODO implement me
+	panic("implement me")
 }
 
 // Encode implements Machine.Encode.

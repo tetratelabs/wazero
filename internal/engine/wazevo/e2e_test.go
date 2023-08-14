@@ -22,7 +22,6 @@ func TestE2E(t *testing.T) {
 		params, expResults []uint64
 		expErr             string
 	}
-	// const i32, i64, f32, f64 = wasm.ValueTypeI32, wasm.ValueTypeI64, wasm.ValueTypeF32, wasm.ValueTypeF64
 	for _, tc := range []struct {
 		name        string
 		imported, m *wasm.Module
@@ -134,6 +133,11 @@ func TestE2E(t *testing.T) {
 				100, 200, uint64(math.Float32bits(300.0)), math.Float64bits(400.0),
 				1, 2, uint64(math.Float32bits(3.0)), math.Float64bits(4.0),
 			}}},
+		},
+		{
+			name:  "memory_size_grow",
+			m:     testcases.MemorySizeGrow.Module,
+			calls: []callCase{{expResults: []uint64{1, 2, 0xffffffff}}},
 		},
 	} {
 		tc := tc

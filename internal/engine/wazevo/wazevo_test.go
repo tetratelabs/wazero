@@ -55,8 +55,11 @@ func Test_ExecutionContextOffsets(t *testing.T) {
 	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.originalStackPointer)), offsets.OriginalStackPointer)
 	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.goReturnAddress)), offsets.GoReturnAddress)
 	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.goCallReturnAddress)), offsets.GoCallReturnAddress)
-	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.stackPointerBeforeGrow)), offsets.StackPointerBeforeGrow)
+	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.stackPointerBeforeGoCall)), offsets.StackPointerBeforeGrow)
 	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.stackGrowRequiredSize)), offsets.StackGrowRequiredSize)
+	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.memoryGrowTrampolineAddress)), offsets.MemoryGrowTrampolineAddress)
+	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.savedRegisters))%16, wazevoapi.Offset(0),
+		"SavedRegistersBegin must be aligned to 16 bytes")
 	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.savedRegisters)), offsets.SavedRegistersBegin)
-	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.savedRegisters))%16, wazevoapi.Offset(0))
+	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.goFunctionCallStack)), offsets.GoFunctionCallStackBegin)
 }

@@ -17,8 +17,9 @@ type Compiler struct {
 	m      *wasm.Module
 	offset *wazevoapi.ModuleContextOffsetData
 	// ssaBuilder is a ssa.Builder used by this frontend.
-	ssaBuilder ssa.Builder
-	signatures map[*wasm.FunctionType]*ssa.Signature
+	ssaBuilder    ssa.Builder
+	signatures    map[*wasm.FunctionType]*ssa.Signature
+	memoryGrowSig ssa.Signature
 
 	// Followings are reset by per function.
 
@@ -51,7 +52,7 @@ func NewFrontendCompiler(m *wasm.Module, ssaBuilder ssa.Builder, offset *wazevoa
 		offset:              offset,
 	}
 
-	c.signatures = make(map[*wasm.FunctionType]*ssa.Signature, len(m.TypeSection))
+	c.signatures = make(map[*wasm.FunctionType]*ssa.Signature, len(m.TypeSection)+1)
 	for i := range m.TypeSection {
 		wasmSig := &m.TypeSection[i]
 		sig := &ssa.Signature{
@@ -71,6 +72,16 @@ func NewFrontendCompiler(m *wasm.Module, ssaBuilder ssa.Builder, offset *wazevoa
 		c.signatures[wasmSig] = sig
 		c.ssaBuilder.DeclareSignature(sig)
 	}
+
+	c.memoryGrowSig = ssa.Signature{
+		ID: ssa.SignatureID(len(m.TypeSection)),
+		// Takes execution context and the page size to grow.
+		Params: []ssa.Type{ssa.TypeI32, ssa.TypeI32},
+		// Returns the new size.
+		Results: []ssa.Type{ssa.TypeI32},
+	}
+	c.ssaBuilder.DeclareSignature(&c.memoryGrowSig)
+
 	return c
 }
 
