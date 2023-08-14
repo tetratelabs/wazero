@@ -4,6 +4,6 @@ package arm64
 // This implements wazevo.entrypoint, and see the comments there for detail.
 func entrypoint(executable *byte, executionContextPtr uintptr, moduleContextPtr *byte, paramResultPtr *uint64, goAllocatedStackSlicePtr uintptr)
 
-// afterStackGrowEntrypoint enters the machine code after growing the stack.
-// This implements wazevo.afterStackGrowEntrypoint, and see the comments there for detail.
-func afterStackGrowEntrypoint(executable *byte, executionContextPtr uintptr, stackPointer uintptr)
+// afterGoFunctionCallEntrypoint enters the machine code after growing the stack.
+// This implements wazevo.afterGoFunctionCallEntrypoint, and see the comments there for detail.
+func afterGoFunctionCallEntrypoint(executable *byte, executionContextPtr uintptr, stackPointer uintptr)

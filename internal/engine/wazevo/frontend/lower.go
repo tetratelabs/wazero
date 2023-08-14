@@ -448,6 +448,54 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		variable := c.localVariable(index)
 		v := state.pop()
 		builder.DefineVariableInCurrentBB(variable, v)
+	case wasm.OpcodeMemorySize:
+		state.pc++ // skips the memory index.
+		if state.unreachable {
+			return
+		}
+
+		var memSizeInBytes ssa.Value
+		if c.offset.LocalMemoryBegin < 0 {
+			panic("TODO: imported memory")
+		} else {
+			load := builder.AllocateInstruction()
+			load.AsLoad(c.moduleCtxPtrValue, c.offset.LocalMemoryLen().U32(), ssa.TypeI32)
+			builder.InsertInstruction(load)
+			memSizeInBytes = load.Return()
+		}
+
+		amount := builder.AllocateInstruction()
+		amount.AsIconst32(uint32(wasm.MemoryPageSizeInBits))
+		builder.InsertInstruction(amount)
+		memSize := builder.AllocateInstruction()
+		memSize.AsUshr(memSizeInBytes, amount.Return())
+		builder.InsertInstruction(memSize)
+		state.push(memSize.Return())
+
+	case wasm.OpcodeMemoryGrow:
+		state.pc++ // skips the memory index.
+		if state.unreachable {
+			return
+		}
+
+		c.storeCallerModuleContext()
+
+		pages := state.pop()
+		loadPtr := builder.AllocateInstruction()
+		loadPtr.AsLoad(c.execCtxPtrValue,
+			wazevoapi.ExecutionContextOffsets.MemoryGrowTrampolineAddress.U32(), ssa.TypeI64)
+		builder.InsertInstruction(loadPtr)
+
+		// TODO: reuse the slice.
+		args := []ssa.Value{c.execCtxPtrValue, pages}
+		callGrow := builder.AllocateInstruction()
+		callGrow.AsCallIndirect(loadPtr.Return(), &c.memoryGrowSig, args)
+		builder.InsertInstruction(callGrow)
+
+		state.push(callGrow.Return())
+
+		// After the memory grow, reload the cached memory base and len.
+		c.reloadMemoryBaseLen()
 	case wasm.OpcodeI32Load,
 		wasm.OpcodeI64Load,
 		wasm.OpcodeF32Load,
@@ -851,14 +899,18 @@ func (c *Compiler) reloadAfterCall() {
 
 	// After calling any function, memory buffer might have changed. So we need to re-defined the variable.
 	if c.needMemory {
-		_ = c.getMemoryBaseValue(true)
-		_ = c.getMemoryLenValue(true)
+		c.reloadMemoryBaseLen()
 	}
 
 	// Also, any mutable Global can change.
 	for _, index := range c.mutableGlobalVariablesIndexes {
 		_ = c.getWasmGlobalValue(index, true)
 	}
+}
+
+func (c *Compiler) reloadMemoryBaseLen() {
+	_ = c.getMemoryBaseValue(true)
+	_ = c.getMemoryLenValue(true)
 }
 
 // globalInstanceValueOffset is the offsetOf .Value field of wasm.GlobalInstance.
@@ -909,17 +961,29 @@ func (c *Compiler) getMemoryBaseValue(forceReload bool) ssa.Value {
 	if c.offset.LocalMemoryBegin < 0 {
 		panic("TODO: imported memory")
 	}
-	return c.getModuleCtxValueI32Or64(c.memoryBaseVariable, c.offset.LocalMemoryBase(), false, forceReload)
+
+	variable := c.memoryBaseVariable
+	builder := c.ssaBuilder
+	if !forceReload {
+		if v := builder.FindValue(variable); v.Valid() {
+			return v
+		}
+	}
+
+	load := builder.AllocateInstruction()
+	load.AsLoad(c.moduleCtxPtrValue, c.offset.LocalMemoryBase().U32(), ssa.TypeI64)
+	builder.InsertInstruction(load)
+	ret := load.Return()
+	builder.DefineVariableInCurrentBB(variable, ret)
+	return ret
 }
 
 func (c *Compiler) getMemoryLenValue(forceReload bool) ssa.Value {
 	if c.offset.LocalMemoryBegin < 0 {
 		panic("TODO: imported memory")
 	}
-	return c.getModuleCtxValueI32Or64(c.memoryLenVariable, c.offset.LocalMemoryLen(), true, forceReload)
-}
 
-func (c *Compiler) getModuleCtxValueI32Or64(variable ssa.Variable, offset wazevoapi.Offset, zeroExt bool, forceReload bool) ssa.Value {
+	variable := c.memoryLenVariable
 	builder := c.ssaBuilder
 	if !forceReload {
 		if v := builder.FindValue(variable); v.Valid() {
@@ -927,11 +991,7 @@ func (c *Compiler) getModuleCtxValueI32Or64(variable ssa.Variable, offset wazevo
 		}
 	}
 	load := builder.AllocateInstruction()
-	if zeroExt {
-		load.AsExtLoad(ssa.OpcodeUload32, c.moduleCtxPtrValue, uint32(offset), true)
-	} else {
-		load.AsExtLoad(ssa.OpcodeLoad, c.moduleCtxPtrValue, uint32(offset), true)
-	}
+	load.AsExtLoad(ssa.OpcodeUload32, c.moduleCtxPtrValue, c.offset.LocalMemoryLen().U32(), true)
 	builder.InsertInstruction(load)
 	ret := load.Return()
 	builder.DefineVariableInCurrentBB(variable, ret)

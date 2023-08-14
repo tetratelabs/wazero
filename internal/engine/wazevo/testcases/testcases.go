@@ -798,6 +798,24 @@ var (
 		},
 	}
 
+	MemorySizeGrow = TestCase{
+		Name: "memory_size_grow",
+		Module: &wasm.Module{
+			TypeSection:     []wasm.FunctionType{{Results: []wasm.ValueType{i32, i32, i32}}},
+			ExportSection:   []wasm.Export{{Name: ExportName, Type: wasm.ExternTypeFunc, Index: 0}},
+			MemorySection:   &wasm.Memory{Min: 1, Max: 2, IsMaxEncoded: true},
+			FunctionSection: []wasm.Index{0},
+			CodeSection: []wasm.Code{{Body: []byte{
+				wasm.OpcodeI32Const, 1,
+				wasm.OpcodeMemoryGrow, 0, // return 1.
+				wasm.OpcodeMemorySize, 0, // return 2.
+				wasm.OpcodeI32Const, 1,
+				wasm.OpcodeMemoryGrow, 0, // return -1 since already maximum size.
+				wasm.OpcodeEnd,
+			}}},
+		},
+	}
+
 	MemoryLoadBasic2 = TestCase{
 		Name: "memory_load_basic2",
 		Module: &wasm.Module{

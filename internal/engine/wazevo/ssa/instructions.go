@@ -1247,7 +1247,6 @@ func (i *Instruction) AsBrnz(v Value, args []Value, target BasicBlock) {
 // AsCall initializes this instruction as a call instruction with OpcodeCall.
 func (i *Instruction) AsCall(ref FuncRef, sig *Signature, args []Value) {
 	i.opcode = OpcodeCall
-	i.typ = TypeF64
 	i.u64 = uint64(ref)
 	i.vs = args
 	i.v = Value(sig.ID)

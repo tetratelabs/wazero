@@ -6,6 +6,7 @@ type ExitCode uint32
 const (
 	ExitCodeOK ExitCode = iota
 	ExitCodeGrowStack
+	ExitCodeGrowMemory
 	ExitCodeUnreachable
 	ExitCodeMemoryOutOfBounds
 )

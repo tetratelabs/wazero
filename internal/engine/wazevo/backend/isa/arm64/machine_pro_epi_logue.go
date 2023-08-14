@@ -320,65 +320,13 @@ func (m *machine) insertStackBoundsCheck(requiredStackSize int64, cur *instructi
 	cur = cbr
 
 	// Save the callee saved and argument registers.
-	offset := wazevoapi.ExecutionContextOffsets.SavedRegistersBegin.I64()
-	for _, v := range saveRequiredRegs {
-		store := m.allocateInstrAfterLowering()
-		var sizeInBits byte
-		switch v.RegType() {
-		case regalloc.RegTypeInt:
-			sizeInBits = 64
-		case regalloc.RegTypeFloat:
-			sizeInBits = 128
-		}
-		store.asStore(operandNR(v),
-			addressMode{
-				kind: addressModeKindRegUnsignedImm12,
-				// Execution context is always the first argument.
-				rn: x0VReg, imm: offset,
-			}, sizeInBits)
-		store.prev = cur
-		cur.next = store
-		cur = store
-		offset += 16 // Imm12 must be aligned 16 for vector regs, so we unconditionally store regs at the offset of multiple of 16.
-	}
+	cur = m.saveRegistersInExecutionContext(cur, saveRequiredRegs)
 
-	// Save the current stack pointer:
-	// 	mov tmp, sp,
-	// 	str tmp, [exec_ctx, #stackPointerBeforeGrow]
-	movSp := m.allocateInstrAfterLowering()
-	movSp.asMove64(tmpRegVReg, spVReg)
-	movSp.prev = cur
-	cur.next = movSp
-	cur = movSp
-	strSp := m.allocateInstrAfterLowering()
-	strSp.asStore(operandNR(tmpRegVReg),
-		addressMode{
-			kind: addressModeKindRegUnsignedImm12,
-			// Execution context is always the first argument.
-			rn: x0VReg, imm: wazevoapi.ExecutionContextOffsets.StackPointerBeforeGrow.I64(),
-		}, 64)
-	strSp.prev = cur
-	cur.next = strSp
-	cur = strSp
+	// Save the current stack pointer.
+	cur = m.saveCurrentStackPointer(cur, x0VReg)
 
 	// Set the exit status on the execution context.
-	// 	movz tmp, #wazevoapi.ExitCodeGrowStack
-	// 	str tmp, [exec_context]
-	loadStatusConst := m.allocateInstrAfterLowering()
-	loadStatusConst.asMOVZ(tmpRegVReg, uint64(wazevoapi.ExitCodeGrowStack), 0, true)
-	loadStatusConst.prev = cur
-	cur.next = loadStatusConst
-	cur = loadStatusConst
-	setExistStatus := m.allocateInstrAfterLowering()
-	setExistStatus.asStore(operandNR(tmpRegVReg),
-		addressMode{
-			kind: addressModeKindRegUnsignedImm12,
-			// Execution context is always the first argument.
-			rn: x0VReg, imm: wazevoapi.ExecutionContextOffsets.ExitCodeOffset.I64(),
-		}, 32)
-	setExistStatus.prev = cur
-	cur.next = setExistStatus
-	cur = setExistStatus
+	cur = m.setExitCode(cur, x0VReg, wazevoapi.ExitCodeGrowStack)
 
 	// Set the required stack size and set it to the exec context.
 	{
@@ -403,55 +351,11 @@ func (m *machine) insertStackBoundsCheck(requiredStackSize int64, cur *instructi
 		cur = setRequiredStackSize
 	}
 
-	// Read the return address into tmp, and store it in the execution context.
-	adr := m.allocateInstrAfterLowering()
-	adr.asAdr(tmpRegVReg, exitSequenceSize+8)
-	adr.prev = cur
-	cur.next = adr
-	cur = adr
-	storeReturnAddr := m.allocateInstrAfterLowering()
-	storeReturnAddr.asStore(operandNR(tmpRegVReg),
-		addressMode{
-			kind: addressModeKindRegUnsignedImm12,
-			// Execution context is always the first argument.
-			rn: x0VReg, imm: wazevoapi.ExecutionContextOffsets.GoCallReturnAddress.I64(),
-		}, 64)
-	storeReturnAddr.prev = cur
-	cur.next = storeReturnAddr
-	cur = storeReturnAddr
-
 	// Exit the execution.
-	trapSeq := m.allocateInstrAfterLowering()
-	trapSeq.asExitSequence(x0VReg)
-	trapSeq.prev = cur
-	cur.next = trapSeq
-	cur = trapSeq
+	cur = m.storeReturnAddressAndExit(cur)
 
 	// After the exit, restore the saved registers.
-	offset = wazevoapi.ExecutionContextOffsets.SavedRegistersBegin.I64()
-	for _, v := range saveRequiredRegs {
-		load := m.allocateInstrAfterLowering()
-		var as func(dst operand, amode addressMode, sizeInBits byte)
-		var sizeInBits byte
-		switch v.RegType() {
-		case regalloc.RegTypeInt:
-			as = load.asULoad
-			sizeInBits = 64
-		case regalloc.RegTypeFloat:
-			as = load.asFpuLoad
-			sizeInBits = 128
-		}
-		as(operandNR(v),
-			addressMode{
-				kind: addressModeKindRegUnsignedImm12,
-				// Execution context is always the first argument.
-				rn: x0VReg, imm: offset,
-			}, sizeInBits)
-		load.prev = cur
-		cur.next = load
-		cur = load
-		offset += 16 // Imm12 must be aligned 16 for vector regs, so we unconditionally load regs at the offset of multiple of 16.
-	}
+	cur = m.restoreRegistersInExecutionContext(cur, saveRequiredRegs)
 
 	// Now that we know the entire code, we can finalize how many bytes
 	// we have to skip when the stack size is sufficient.

@@ -229,7 +229,7 @@ L1 (SSA Block: blk0):
 L3 (SSA Block: blk1):
 	ret
 L2 (SSA Block: blk2):
-	movz x27, #0x2, LSL 0
+	movz x27, #0x3, LSL 0
 	str w27, [x0?]
 	exit_sequence w0?
 `,
@@ -242,7 +242,7 @@ L3 (SSA Block: blk1):
 	ldr x30, [sp], #0x10
 	ret
 L2 (SSA Block: blk2):
-	movz x27, #0x2, LSL 0
+	movz x27, #0x3, LSL 0
 	str w27, [x0]
 	exit_sequence w0
 `,
@@ -1856,8 +1856,8 @@ L1 (SSA Block: blk0):
 	mov x1?, x1
 	mov x2?, x2
 	str x1?, [x0?, #0x8]
-	ldr x3?, [x1?]
-	ldr x4?, [x1?, #0x8]
+	ldr x3?, [x1?, #0x8]
+	ldr x4?, [x1?, #0x10]
 	mov x0, x0?
 	mov x1, x4?
 	mov x2, x2?
@@ -1870,8 +1870,8 @@ L1 (SSA Block: blk0):
 L1 (SSA Block: blk0):
 	str x30, [sp, #-0x10]!
 	str x1, [x0, #0x8]
-	ldr x8, [x1]
-	ldr x1, [x1, #0x8]
+	ldr x8, [x1, #0x8]
+	ldr x1, [x1, #0x10]
 	bl w8
 	ldr x30, [sp], #0x10
 	ret
@@ -1885,14 +1885,14 @@ L1 (SSA Block: blk0):
 	mov x1?, x1
 	mov x2?, x2
 	uxtw x4?, w2?
-	ldr w5?, [x1?, #0x8]
+	ldr w5?, [x1?, #0x10]
 	add x6?, x4?, #0x4
 	subs xzr, x5?, x6?
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x0?]
 	exit_sequence w0?
-	ldr x8?, [x1?]
+	ldr x8?, [x1?, #0x8]
 	add x11?, x8?, x4?
 	ldr w10?, [x11?]
 	mov x0, x10?
@@ -1902,14 +1902,14 @@ L1 (SSA Block: blk0):
 L1 (SSA Block: blk0):
 	str x30, [sp, #-0x10]!
 	uxtw x8, w2
-	ldr w10, [x1, #0x8]
+	ldr w10, [x1, #0x10]
 	add x9, x8, #0x4
 	subs xzr, x10, x9
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x0]
 	exit_sequence w0
-	ldr x9, [x1]
+	ldr x9, [x1, #0x8]
 	add x8, x9, x8
 	ldr w0, [x8]
 	ldr x30, [sp], #0x10
@@ -1924,21 +1924,21 @@ L1 (SSA Block: blk0):
 	mov x1?, x1
 	mov x2?, x2
 	uxtw x4?, w2?
-	ldr w5?, [x1?, #0x8]
+	ldr w5?, [x1?, #0x10]
 	add x6?, x4?, #0x4
 	subs xzr, x5?, x6?
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x0?]
 	exit_sequence w0?
-	ldr x8?, [x1?]
+	ldr x8?, [x1?, #0x8]
 	add x200?, x8?, x4?
 	ldr w10?, [x200?]
 	uxtw x12?, w2?
 	add x13?, x12?, #0x8
 	subs xzr, x5?, x13?
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x0?]
 	exit_sequence w0?
 	add x199?, x8?, x12?
@@ -1947,7 +1947,7 @@ L1 (SSA Block: blk0):
 	add x19?, x18?, #0x4
 	subs xzr, x5?, x19?
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x0?]
 	exit_sequence w0?
 	add x198?, x8?, x18?
@@ -1956,7 +1956,7 @@ L1 (SSA Block: blk0):
 	add x25?, x24?, #0x8
 	subs xzr, x5?, x25?
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x0?]
 	exit_sequence w0?
 	add x197?, x8?, x24?
@@ -1965,7 +1965,7 @@ L1 (SSA Block: blk0):
 	add x31?, x30?, #0x13
 	subs xzr, x5?, x31?
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x0?]
 	exit_sequence w0?
 	add x196?, x8?, x30?
@@ -1974,7 +1974,7 @@ L1 (SSA Block: blk0):
 	add x37?, x36?, #0x17
 	subs xzr, x5?, x37?
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x0?]
 	exit_sequence w0?
 	add x195?, x8?, x36?
@@ -1983,7 +1983,7 @@ L1 (SSA Block: blk0):
 	add x43?, x42?, #0x13
 	subs xzr, x5?, x43?
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x0?]
 	exit_sequence w0?
 	add x194?, x8?, x42?
@@ -1992,7 +1992,7 @@ L1 (SSA Block: blk0):
 	add x49?, x48?, #0x17
 	subs xzr, x5?, x49?
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x0?]
 	exit_sequence w0?
 	add x193?, x8?, x48?
@@ -2001,7 +2001,7 @@ L1 (SSA Block: blk0):
 	add x55?, x54?, #0x1
 	subs xzr, x5?, x55?
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x0?]
 	exit_sequence w0?
 	add x192?, x8?, x54?
@@ -2010,7 +2010,7 @@ L1 (SSA Block: blk0):
 	add x61?, x60?, #0x10
 	subs xzr, x5?, x61?
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x0?]
 	exit_sequence w0?
 	add x191?, x8?, x60?
@@ -2019,7 +2019,7 @@ L1 (SSA Block: blk0):
 	add x67?, x66?, #0x1
 	subs xzr, x5?, x67?
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x0?]
 	exit_sequence w0?
 	add x190?, x8?, x66?
@@ -2028,7 +2028,7 @@ L1 (SSA Block: blk0):
 	add x73?, x72?, #0x10
 	subs xzr, x5?, x73?
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x0?]
 	exit_sequence w0?
 	add x189?, x8?, x72?
@@ -2037,7 +2037,7 @@ L1 (SSA Block: blk0):
 	add x79?, x78?, #0x2
 	subs xzr, x5?, x79?
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x0?]
 	exit_sequence w0?
 	add x188?, x8?, x78?
@@ -2046,7 +2046,7 @@ L1 (SSA Block: blk0):
 	add x85?, x84?, #0x11
 	subs xzr, x5?, x85?
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x0?]
 	exit_sequence w0?
 	add x187?, x8?, x84?
@@ -2055,7 +2055,7 @@ L1 (SSA Block: blk0):
 	add x91?, x90?, #0x2
 	subs xzr, x5?, x91?
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x0?]
 	exit_sequence w0?
 	add x186?, x8?, x90?
@@ -2064,7 +2064,7 @@ L1 (SSA Block: blk0):
 	add x97?, x96?, #0x11
 	subs xzr, x5?, x97?
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x0?]
 	exit_sequence w0?
 	add x185?, x8?, x96?
@@ -2073,7 +2073,7 @@ L1 (SSA Block: blk0):
 	add x103?, x102?, #0x1
 	subs xzr, x5?, x103?
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x0?]
 	exit_sequence w0?
 	add x184?, x8?, x102?
@@ -2082,7 +2082,7 @@ L1 (SSA Block: blk0):
 	add x109?, x108?, #0x10
 	subs xzr, x5?, x109?
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x0?]
 	exit_sequence w0?
 	add x183?, x8?, x108?
@@ -2091,7 +2091,7 @@ L1 (SSA Block: blk0):
 	add x115?, x114?, #0x1
 	subs xzr, x5?, x115?
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x0?]
 	exit_sequence w0?
 	add x182?, x8?, x114?
@@ -2100,7 +2100,7 @@ L1 (SSA Block: blk0):
 	add x121?, x120?, #0x10
 	subs xzr, x5?, x121?
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x0?]
 	exit_sequence w0?
 	add x181?, x8?, x120?
@@ -2109,7 +2109,7 @@ L1 (SSA Block: blk0):
 	add x127?, x126?, #0x2
 	subs xzr, x5?, x127?
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x0?]
 	exit_sequence w0?
 	add x180?, x8?, x126?
@@ -2118,7 +2118,7 @@ L1 (SSA Block: blk0):
 	add x133?, x132?, #0x11
 	subs xzr, x5?, x133?
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x0?]
 	exit_sequence w0?
 	add x179?, x8?, x132?
@@ -2127,7 +2127,7 @@ L1 (SSA Block: blk0):
 	add x139?, x138?, #0x2
 	subs xzr, x5?, x139?
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x0?]
 	exit_sequence w0?
 	add x178?, x8?, x138?
@@ -2136,7 +2136,7 @@ L1 (SSA Block: blk0):
 	add x145?, x144?, #0x11
 	subs xzr, x5?, x145?
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x0?]
 	exit_sequence w0?
 	add x177?, x8?, x144?
@@ -2145,7 +2145,7 @@ L1 (SSA Block: blk0):
 	add x151?, x150?, #0x4
 	subs xzr, x5?, x151?
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x0?]
 	exit_sequence w0?
 	add x176?, x8?, x150?
@@ -2154,7 +2154,7 @@ L1 (SSA Block: blk0):
 	add x157?, x156?, #0x13
 	subs xzr, x5?, x157?
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x0?]
 	exit_sequence w0?
 	add x175?, x8?, x156?
@@ -2163,7 +2163,7 @@ L1 (SSA Block: blk0):
 	add x163?, x162?, #0x4
 	subs xzr, x5?, x163?
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x0?]
 	exit_sequence w0?
 	add x174?, x8?, x162?
@@ -2172,7 +2172,7 @@ L1 (SSA Block: blk0):
 	add x169?, x168?, #0x13
 	subs xzr, x5?, x169?
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x0?]
 	exit_sequence w0?
 	add x173?, x8?, x168?
@@ -2223,21 +2223,21 @@ L1 (SSA Block: blk0):
 	str x28, [sp, #-0x10]!
 	mov x8, x0
 	uxtw x11, w2
-	ldr w9, [x1, #0x8]
+	ldr w9, [x1, #0x10]
 	add x10, x11, #0x4
 	subs xzr, x9, x10
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x8]
 	exit_sequence w8
-	ldr x10, [x1]
+	ldr x10, [x1, #0x8]
 	add x11, x10, x11
 	ldr w0, [x11]
 	uxtw x12, w2
 	add x11, x12, #0x8
 	subs xzr, x9, x11
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x8]
 	exit_sequence w8
 	add x11, x10, x12
@@ -2246,7 +2246,7 @@ L1 (SSA Block: blk0):
 	add x11, x12, #0x4
 	subs xzr, x9, x11
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x8]
 	exit_sequence w8
 	add x11, x10, x12
@@ -2255,7 +2255,7 @@ L1 (SSA Block: blk0):
 	add x11, x12, #0x8
 	subs xzr, x9, x11
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x8]
 	exit_sequence w8
 	add x11, x10, x12
@@ -2264,7 +2264,7 @@ L1 (SSA Block: blk0):
 	add x11, x12, #0x13
 	subs xzr, x9, x11
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x8]
 	exit_sequence w8
 	add x11, x10, x12
@@ -2273,7 +2273,7 @@ L1 (SSA Block: blk0):
 	add x12, x13, #0x17
 	subs xzr, x9, x12
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x8]
 	exit_sequence w8
 	add x12, x10, x13
@@ -2282,7 +2282,7 @@ L1 (SSA Block: blk0):
 	add x12, x13, #0x13
 	subs xzr, x9, x12
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x8]
 	exit_sequence w8
 	add x12, x10, x13
@@ -2291,7 +2291,7 @@ L1 (SSA Block: blk0):
 	add x12, x13, #0x17
 	subs xzr, x9, x12
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x8]
 	exit_sequence w8
 	add x12, x10, x13
@@ -2300,7 +2300,7 @@ L1 (SSA Block: blk0):
 	add x12, x13, #0x1
 	subs xzr, x9, x12
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x8]
 	exit_sequence w8
 	add x12, x10, x13
@@ -2309,7 +2309,7 @@ L1 (SSA Block: blk0):
 	add x12, x13, #0x10
 	subs xzr, x9, x12
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x8]
 	exit_sequence w8
 	add x12, x10, x13
@@ -2318,7 +2318,7 @@ L1 (SSA Block: blk0):
 	add x12, x13, #0x1
 	subs xzr, x9, x12
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x8]
 	exit_sequence w8
 	add x12, x10, x13
@@ -2327,7 +2327,7 @@ L1 (SSA Block: blk0):
 	add x12, x13, #0x10
 	subs xzr, x9, x12
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x8]
 	exit_sequence w8
 	add x12, x10, x13
@@ -2336,7 +2336,7 @@ L1 (SSA Block: blk0):
 	add x12, x13, #0x2
 	subs xzr, x9, x12
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x8]
 	exit_sequence w8
 	add x12, x10, x13
@@ -2345,7 +2345,7 @@ L1 (SSA Block: blk0):
 	add x13, x14, #0x11
 	subs xzr, x9, x13
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x8]
 	exit_sequence w8
 	add x13, x10, x14
@@ -2354,7 +2354,7 @@ L1 (SSA Block: blk0):
 	add x14, x15, #0x2
 	subs xzr, x9, x14
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x8]
 	exit_sequence w8
 	add x14, x10, x15
@@ -2363,7 +2363,7 @@ L1 (SSA Block: blk0):
 	add x15, x16, #0x11
 	subs xzr, x9, x15
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x8]
 	exit_sequence w8
 	add x15, x10, x16
@@ -2372,7 +2372,7 @@ L1 (SSA Block: blk0):
 	add x16, x17, #0x1
 	subs xzr, x9, x16
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x8]
 	exit_sequence w8
 	add x16, x10, x17
@@ -2381,7 +2381,7 @@ L1 (SSA Block: blk0):
 	add x17, x18, #0x10
 	subs xzr, x9, x17
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x8]
 	exit_sequence w8
 	add x17, x10, x18
@@ -2390,7 +2390,7 @@ L1 (SSA Block: blk0):
 	add x18, x19, #0x1
 	subs xzr, x9, x18
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x8]
 	exit_sequence w8
 	add x18, x10, x19
@@ -2399,7 +2399,7 @@ L1 (SSA Block: blk0):
 	add x19, x20, #0x10
 	subs xzr, x9, x19
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x8]
 	exit_sequence w8
 	add x19, x10, x20
@@ -2408,7 +2408,7 @@ L1 (SSA Block: blk0):
 	add x20, x21, #0x2
 	subs xzr, x9, x20
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x8]
 	exit_sequence w8
 	add x20, x10, x21
@@ -2417,7 +2417,7 @@ L1 (SSA Block: blk0):
 	add x21, x22, #0x11
 	subs xzr, x9, x21
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x8]
 	exit_sequence w8
 	add x21, x10, x22
@@ -2426,7 +2426,7 @@ L1 (SSA Block: blk0):
 	add x22, x23, #0x2
 	subs xzr, x9, x22
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x8]
 	exit_sequence w8
 	add x22, x10, x23
@@ -2435,7 +2435,7 @@ L1 (SSA Block: blk0):
 	add x23, x24, #0x11
 	subs xzr, x9, x23
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x8]
 	exit_sequence w8
 	add x23, x10, x24
@@ -2444,7 +2444,7 @@ L1 (SSA Block: blk0):
 	add x24, x25, #0x4
 	subs xzr, x9, x24
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x8]
 	exit_sequence w8
 	add x24, x10, x25
@@ -2453,7 +2453,7 @@ L1 (SSA Block: blk0):
 	add x25, x26, #0x13
 	subs xzr, x9, x25
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x8]
 	exit_sequence w8
 	add x25, x10, x26
@@ -2462,7 +2462,7 @@ L1 (SSA Block: blk0):
 	add x26, x28, #0x4
 	subs xzr, x9, x26
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x8]
 	exit_sequence w8
 	add x26, x10, x28
@@ -2471,7 +2471,7 @@ L1 (SSA Block: blk0):
 	add x28, x29, #0x13
 	subs xzr, x9, x28
 	b.hs #0x20
-	movz x27, #0x3, LSL 0
+	movz x27, #0x4, LSL 0
 	str w27, [x8]
 	exit_sequence w8
 	add x8, x10, x29
@@ -2514,25 +2514,25 @@ L1 (SSA Block: blk0):
 L1 (SSA Block: blk0):
 	mov x0?, x0
 	mov x1?, x1
-	ldr x2?, [x1?]
+	ldr x2?, [x1?, #0x8]
 	ldr w3?, [x2?, #0x8]
-	ldr x4?, [x1?, #0x8]
+	ldr x4?, [x1?, #0x10]
 	ldr x5?, [x4?, #0x8]
-	ldr x6?, [x1?, #0x10]
+	ldr x6?, [x1?, #0x18]
 	ldr s7?, [x6?, #0x8]
-	ldr x8?, [x1?, #0x18]
+	ldr x8?, [x1?, #0x20]
 	ldr d9?, [x8?, #0x8]
 	str x1?, [x0?, #0x8]
 	mov x0, x0?
 	mov x1, x1?
 	bl f1
-	ldr x10?, [x1?]
+	ldr x10?, [x1?, #0x8]
 	ldr w11?, [x10?, #0x8]
-	ldr x12?, [x1?, #0x8]
+	ldr x12?, [x1?, #0x10]
 	ldr x13?, [x12?, #0x8]
-	ldr x14?, [x1?, #0x10]
+	ldr x14?, [x1?, #0x18]
 	ldr s15?, [x14?, #0x8]
-	ldr x16?, [x1?, #0x18]
+	ldr x16?, [x1?, #0x20]
 	ldr d17?, [x16?, #0x8]
 	mov q3.8b, q17?.8b
 	mov q2.8b, q15?.8b
@@ -2549,13 +2549,13 @@ L1 (SSA Block: blk0):
 	str x30, [sp, #-0x10]!
 	sub sp, sp, #0x20
 	mov x10, x1
-	ldr x8, [x10]
+	ldr x8, [x10, #0x8]
 	ldr w8, [x8, #0x8]
-	ldr x9, [x10, #0x8]
+	ldr x9, [x10, #0x10]
 	ldr x9, [x9, #0x8]
-	ldr x11, [x10, #0x10]
-	ldr s0, [x11, #0x8]
 	ldr x11, [x10, #0x18]
+	ldr s0, [x11, #0x8]
+	ldr x11, [x10, #0x20]
 	ldr d1, [x11, #0x8]
 	str x10, [x0, #0x8]
 	mov x1, x10
@@ -2570,13 +2570,13 @@ L1 (SSA Block: blk0):
 	ldr x9, [sp, #0xc]
 	ldr w8, [sp, #0x8]
 	ldr x10, [sp]
-	ldr x11, [x10]
-	ldr w2, [x11, #0x8]
 	ldr x11, [x10, #0x8]
-	ldr x3, [x11, #0x8]
+	ldr w2, [x11, #0x8]
 	ldr x11, [x10, #0x10]
+	ldr x3, [x11, #0x8]
+	ldr x11, [x10, #0x18]
 	ldr s2, [x11, #0x8]
-	ldr x10, [x10, #0x18]
+	ldr x10, [x10, #0x20]
 	ldr d3, [x10, #0x8]
 	mov x1, x9
 	mov x0, x8
@@ -2592,16 +2592,16 @@ L1 (SSA Block: blk0):
 			afterLoweringARM64: `
 L1 (SSA Block: blk0):
 	mov x1?, x1
-	ldr x3?, [x1?]
+	ldr x3?, [x1?, #0x8]
 	orr w13?, wzr, #0x1
 	str w13?, [x3?, #0x8]
-	ldr x5?, [x1?, #0x8]
+	ldr x5?, [x1?, #0x10]
 	orr x12?, xzr, #0x2
 	str x12?, [x5?, #0x8]
-	ldr x7?, [x1?, #0x10]
+	ldr x7?, [x1?, #0x18]
 	ldr s11?, #8; b 8; data.f32 3.000000
 	str s11?, [x7?, #0x8]
-	ldr x9?, [x1?, #0x18]
+	ldr x9?, [x1?, #0x20]
 	ldr d10?, #8; b 16; data.f64 4.000000
 	str d10?, [x9?, #0x8]
 	ret
@@ -2609,16 +2609,16 @@ L1 (SSA Block: blk0):
 			afterFinalizeARM64: `
 L1 (SSA Block: blk0):
 	str x30, [sp, #-0x10]!
-	ldr x9, [x1]
+	ldr x9, [x1, #0x8]
 	orr w8, wzr, #0x1
 	str w8, [x9, #0x8]
-	ldr x9, [x1, #0x8]
+	ldr x9, [x1, #0x10]
 	orr x8, xzr, #0x2
 	str x8, [x9, #0x8]
-	ldr x8, [x1, #0x10]
+	ldr x8, [x1, #0x18]
 	ldr s8, #8; b 8; data.f32 3.000000
 	str s8, [x8, #0x8]
-	ldr x8, [x1, #0x18]
+	ldr x8, [x1, #0x20]
 	ldr d8, #8; b 16; data.f64 4.000000
 	str d8, [x8, #0x8]
 	ldr x30, [sp], #0x10

@@ -9,5 +9,5 @@ func entrypoint(executable *byte, executionContextPtr uintptr, moduleContextPtr 
 
 // entrypoint is implemented by the backend.
 //
-//go:linkname afterStackGrowEntrypoint github.com/tetratelabs/wazero/internal/engine/wazevo/backend/isa/arm64.afterStackGrowEntrypoint
-func afterStackGrowEntrypoint(executable *byte, executionContextPtr uintptr, stackPointer uintptr)
+//go:linkname afterGoFunctionCallEntrypoint github.com/tetratelabs/wazero/internal/engine/wazevo/backend/isa/arm64.afterGoFunctionCallEntrypoint
+func afterGoFunctionCallEntrypoint(executable *byte, executionContextPtr uintptr, stackPointer uintptr)

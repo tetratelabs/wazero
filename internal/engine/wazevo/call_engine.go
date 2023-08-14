@@ -51,15 +51,17 @@ type (
 		stackBottomPtr *byte
 		// goCallReturnAddress holds the return address to go back to the caller of the Go function.
 		goCallReturnAddress *byte
-		// stackPointerBeforeGrow holds the stack pointer before stack grow.
-		stackPointerBeforeGrow uintptr
+		// stackPointerBeforeGoCall holds the stack pointer before calling a Go function.
+		stackPointerBeforeGoCall uintptr
 		// stackGrowRequiredSize holds the required size of stack grow.
 		stackGrowRequiredSize uintptr
-		// _ is needed to align .savedRegisters at 16 bytes boundary.
-		_ uint64
+		// memoryGrowTrampolineAddress holds the address of memory grow trampoline function.
+		memoryGrowTrampolineAddress *byte
 		// savedRegisters is the opaque spaces for save/restore registers.
 		// We want to align 16 bytes for each register, so we use [64][2]uint64.
 		savedRegisters [64][2]uint64
+
+		goFunctionCallStack [128]uint64
 	}
 )
 
@@ -117,15 +119,38 @@ func (c *callEngine) CallWithStack(ctx context.Context, paramResultStack []uint6
 				return err
 			}
 			c.execCtx.exitCode = wazevoapi.ExitCodeOK
-			afterStackGrowEntrypoint(c.execCtx.goCallReturnAddress, c.execCtxPtr, newsp)
+			afterGoFunctionCallEntrypoint(c.execCtx.goCallReturnAddress, c.execCtxPtr, newsp)
 		case wazevoapi.ExitCodeUnreachable:
 			return wasmruntime.ErrRuntimeUnreachable
 		case wazevoapi.ExitCodeMemoryOutOfBounds:
 			return wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess
+		case wazevoapi.ExitCodeGrowMemory:
+			mod := moduleInstanceFromPtr(c.execCtx.callerModuleContextPtr)
+			mem := mod.MemoryInstance
+			argRes := &c.execCtx.goFunctionCallStack[0]
+			if res, ok := mem.Grow(uint32(*argRes)); !ok {
+				*argRes = uint64(0xffffffff) // = -1 in signed 32-bit integer.
+			} else {
+				*argRes = uint64(res)
+				if mod.Source.MemorySection != nil {
+					var opaque []byte
+					sh := (*reflect.SliceHeader)(unsafe.Pointer(&opaque))
+					sh.Data = uintptr(unsafe.Pointer(c.execCtx.callerModuleContextPtr))
+					sh.Len = 24
+					sh.Cap = 24
+					putLocalMemory(opaque, 8, mem)
+				}
+			}
+			c.execCtx.exitCode = wazevoapi.ExitCodeOK
+			afterGoFunctionCallEntrypoint(c.execCtx.goCallReturnAddress, c.execCtxPtr, c.execCtx.stackPointerBeforeGoCall)
 		default:
 			panic("BUG")
 		}
 	}
+}
+
+func moduleInstanceFromPtr(ptr *byte) *wasm.ModuleInstance {
+	return *(**wasm.ModuleInstance)(unsafe.Pointer(ptr))
 }
 
 const callStackCeiling = uintptr(5000000) // in uint64 (8 bytes) == 40000000 bytes in total == 40mb.
@@ -141,7 +166,7 @@ func (c *callEngine) growStack() (newSP uintptr, err error) {
 	newLen := 2*currentLen + c.execCtx.stackGrowRequiredSize
 	newStack := make([]byte, newLen)
 
-	relSp := c.stackTop - c.execCtx.stackPointerBeforeGrow
+	relSp := c.stackTop - c.execCtx.stackPointerBeforeGoCall
 
 	// Copy the existing contents in the previous Go-allocated stack into the new one.
 	var prevStackAligned, newStackAligned []byte

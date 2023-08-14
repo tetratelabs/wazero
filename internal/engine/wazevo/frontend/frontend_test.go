@@ -867,11 +867,11 @@ blk3: () <-- (blk2)
 blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
 	v3:i64 = Iconst_64 0x4
 	v4:i64 = UExtend v2, 32->64
-	v5:i64 = Uload32 module_ctx, 0x8
+	v5:i64 = Uload32 module_ctx, 0x10
 	v6:i64 = Iadd v4, v3
 	v7:i32 = Icmp ge_u, v5, v6
 	ExitIfNotZero v7, exec_ctx, memory_out_of_bounds
-	v8:i64 = Load module_ctx, 0x0
+	v8:i64 = Load module_ctx, 0x8
 	v9:i64 = Iadd v8, v4
 	v10:i32 = Load v9, 0x0
 	Jump blk_ret, v10
@@ -892,8 +892,8 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
 blk1: () <-- (blk0)
 	Store module_ctx, exec_ctx, 0x8
 	Call f1:sig1, exec_ctx, module_ctx
-	v5:i64 = Load module_ctx, 0x0
-	v6:i64 = Uload32 module_ctx, 0x8
+	v5:i64 = Load module_ctx, 0x8
+	v6:i64 = Uload32 module_ctx, 0x10
 	Jump blk3, v2
 
 blk2: () <-- (blk0)
@@ -902,11 +902,11 @@ blk2: () <-- (blk0)
 blk3: (v7:i32) <-- (blk1,blk2)
 	v8:i64 = Iconst_64 0x4
 	v9:i64 = UExtend v7, 32->64
-	v10:i64 = Uload32 module_ctx, 0x8
+	v10:i64 = Uload32 module_ctx, 0x10
 	v11:i64 = Iadd v9, v8
 	v12:i32 = Icmp ge_u, v10, v11
 	ExitIfNotZero v12, exec_ctx, memory_out_of_bounds
-	v13:i64 = Load module_ctx, 0x0
+	v13:i64 = Load module_ctx, 0x8
 	v14:i64 = Iadd v13, v9
 	v15:i32 = Load v14, 0x0
 	Jump blk_ret, v15
@@ -932,11 +932,11 @@ blk2: () <-- (blk0)
 blk3: () <-- (blk1,blk2)
 	v8:i64 = Iconst_64 0x4
 	v9:i64 = UExtend v2, 32->64
-	v10:i64 = Uload32 module_ctx, 0x8
+	v10:i64 = Uload32 module_ctx, 0x10
 	v11:i64 = Iadd v9, v8
 	v12:i32 = Icmp ge_u, v10, v11
 	ExitIfNotZero v12, exec_ctx, memory_out_of_bounds
-	v13:i64 = Load module_ctx, 0x0
+	v13:i64 = Load module_ctx, 0x8
 	v14:i64 = Iadd v13, v9
 	v15:i32 = Load v14, 0x0
 	Jump blk_ret, v15
@@ -950,8 +950,8 @@ signatures:
 
 blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
 	Store module_ctx, exec_ctx, 0x8
-	v3:i64 = Load module_ctx, 0x0
-	v4:i64 = Load module_ctx, 0x8
+	v3:i64 = Load module_ctx, 0x8
+	v4:i64 = Load module_ctx, 0x10
 	v5:i32 = CallIndirect v3:sig0, exec_ctx, v4, v2
 	Jump blk_ret, v5
 `,
@@ -962,11 +962,11 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
 blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
 	v3:i64 = Iconst_64 0x4
 	v4:i64 = UExtend v2, 32->64
-	v5:i64 = Uload32 module_ctx, 0x8
+	v5:i64 = Uload32 module_ctx, 0x10
 	v6:i64 = Iadd v4, v3
 	v7:i32 = Icmp ge_u, v5, v6
 	ExitIfNotZero v7, exec_ctx, memory_out_of_bounds
-	v8:i64 = Load module_ctx, 0x0
+	v8:i64 = Load module_ctx, 0x8
 	v9:i64 = Iadd v8, v4
 	v10:i32 = Load v9, 0x0
 	v11:i64 = Iconst_64 0x8
@@ -1166,13 +1166,13 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
 			m:    testcases.GlobalsGet.Module,
 			exp: `
 blk0: (exec_ctx:i64, module_ctx:i64)
-	v2:i64 = Load module_ctx, 0x0
+	v2:i64 = Load module_ctx, 0x8
 	v3:i32 = Load v2, 0x8
-	v4:i64 = Load module_ctx, 0x8
+	v4:i64 = Load module_ctx, 0x10
 	v5:i64 = Load v4, 0x8
-	v6:i64 = Load module_ctx, 0x10
+	v6:i64 = Load module_ctx, 0x18
 	v7:f32 = Load v6, 0x8
-	v8:i64 = Load module_ctx, 0x18
+	v8:i64 = Load module_ctx, 0x20
 	v9:f64 = Load v8, 0x8
 	Jump blk_ret, v3, v5, v7, v9
 `,
@@ -1183,16 +1183,16 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 			exp: `
 blk0: (exec_ctx:i64, module_ctx:i64)
 	v2:i32 = Iconst_32 0x1
-	v3:i64 = Load module_ctx, 0x0
+	v3:i64 = Load module_ctx, 0x8
 	Store v2, v3, 0x8
 	v4:i64 = Iconst_64 0x2
-	v5:i64 = Load module_ctx, 0x8
+	v5:i64 = Load module_ctx, 0x10
 	Store v4, v5, 0x8
 	v6:f32 = F32const 3.000000
-	v7:i64 = Load module_ctx, 0x10
+	v7:i64 = Load module_ctx, 0x18
 	Store v6, v7, 0x8
 	v8:f64 = F64const 4.000000
-	v9:i64 = Load module_ctx, 0x18
+	v9:i64 = Load module_ctx, 0x20
 	Store v8, v9, 0x8
 	Jump blk_ret, v2, v4, v6, v8
 `,
@@ -1205,23 +1205,23 @@ signatures:
 	sig1: i64i64_v
 
 blk0: (exec_ctx:i64, module_ctx:i64)
-	v2:i64 = Load module_ctx, 0x0
+	v2:i64 = Load module_ctx, 0x8
 	v3:i32 = Load v2, 0x8
-	v4:i64 = Load module_ctx, 0x8
+	v4:i64 = Load module_ctx, 0x10
 	v5:i64 = Load v4, 0x8
-	v6:i64 = Load module_ctx, 0x10
+	v6:i64 = Load module_ctx, 0x18
 	v7:f32 = Load v6, 0x8
-	v8:i64 = Load module_ctx, 0x18
+	v8:i64 = Load module_ctx, 0x20
 	v9:f64 = Load v8, 0x8
 	Store module_ctx, exec_ctx, 0x8
 	Call f1:sig1, exec_ctx, module_ctx
-	v10:i64 = Load module_ctx, 0x0
+	v10:i64 = Load module_ctx, 0x8
 	v11:i32 = Load v10, 0x8
-	v12:i64 = Load module_ctx, 0x8
+	v12:i64 = Load module_ctx, 0x10
 	v13:i64 = Load v12, 0x8
-	v14:i64 = Load module_ctx, 0x10
+	v14:i64 = Load module_ctx, 0x18
 	v15:f32 = Load v14, 0x8
-	v16:i64 = Load module_ctx, 0x18
+	v16:i64 = Load module_ctx, 0x20
 	v17:f64 = Load v16, 0x8
 	Jump blk_ret, v3, v5, v7, v9, v11, v13, v15, v17
 `,
@@ -1230,25 +1230,69 @@ signatures:
 	sig1: i64i64_v
 
 blk0: (exec_ctx:i64, module_ctx:i64)
-	v2:i64 = Load module_ctx, 0x0
+	v2:i64 = Load module_ctx, 0x8
 	v3:i32 = Load v2, 0x8
-	v4:i64 = Load module_ctx, 0x8
+	v4:i64 = Load module_ctx, 0x10
 	v5:i64 = Load v4, 0x8
-	v6:i64 = Load module_ctx, 0x10
+	v6:i64 = Load module_ctx, 0x18
 	v7:f32 = Load v6, 0x8
-	v8:i64 = Load module_ctx, 0x18
+	v8:i64 = Load module_ctx, 0x20
 	v9:f64 = Load v8, 0x8
 	Store module_ctx, exec_ctx, 0x8
 	Call f1:sig1, exec_ctx, module_ctx
-	v10:i64 = Load module_ctx, 0x0
+	v10:i64 = Load module_ctx, 0x8
 	v11:i32 = Load v10, 0x8
-	v12:i64 = Load module_ctx, 0x8
+	v12:i64 = Load module_ctx, 0x10
 	v13:i64 = Load v12, 0x8
-	v14:i64 = Load module_ctx, 0x10
+	v14:i64 = Load module_ctx, 0x18
 	v15:f32 = Load v14, 0x8
-	v16:i64 = Load module_ctx, 0x18
+	v16:i64 = Load module_ctx, 0x20
 	v17:f64 = Load v16, 0x8
 	Jump blk_ret, v3, v5, v7, v9, v11, v13, v15, v17
+`,
+		},
+		{
+			name: "memory_size_grow",
+			m:    testcases.MemorySizeGrow.Module,
+			exp: `
+signatures:
+	sig1: i32i32_i32
+
+blk0: (exec_ctx:i64, module_ctx:i64)
+	v2:i32 = Iconst_32 0x1
+	Store module_ctx, exec_ctx, 0x8
+	v3:i64 = Load exec_ctx, 0x48
+	v4:i32 = CallIndirect v3:sig1, exec_ctx, v2
+	v5:i64 = Load module_ctx, 0x8
+	v6:i64 = Uload32 module_ctx, 0x10
+	v7:i32 = Load module_ctx, 0x10
+	v8:i32 = Iconst_32 0x10
+	v9:i32 = Ushr v7, v8
+	v10:i32 = Iconst_32 0x1
+	Store module_ctx, exec_ctx, 0x8
+	v11:i64 = Load exec_ctx, 0x48
+	v12:i32 = CallIndirect v11:sig1, exec_ctx, v10
+	v13:i64 = Load module_ctx, 0x8
+	v14:i64 = Uload32 module_ctx, 0x10
+	Jump blk_ret, v4, v9, v12
+`,
+			expAfterOpt: `
+signatures:
+	sig1: i32i32_i32
+
+blk0: (exec_ctx:i64, module_ctx:i64)
+	v2:i32 = Iconst_32 0x1
+	Store module_ctx, exec_ctx, 0x8
+	v3:i64 = Load exec_ctx, 0x48
+	v4:i32 = CallIndirect v3:sig1, exec_ctx, v2
+	v7:i32 = Load module_ctx, 0x10
+	v8:i32 = Iconst_32 0x10
+	v9:i32 = Ushr v7, v8
+	v10:i32 = Iconst_32 0x1
+	Store module_ctx, exec_ctx, 0x8
+	v11:i64 = Load exec_ctx, 0x48
+	v12:i32 = CallIndirect v11:sig1, exec_ctx, v10
+	Jump blk_ret, v4, v9, v12
 `,
 		},
 	} {
