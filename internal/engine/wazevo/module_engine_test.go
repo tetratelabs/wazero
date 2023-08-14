@@ -68,9 +68,17 @@ func TestModuleEngine_setupOpaque(t *testing.T) {
 				require.Equal(t, expLen, actualLen)
 			}
 			if tc.offset.ImportedMemoryBegin >= 0 {
+				importedOpaque := []byte{1, 2, 3}
+				imported := &moduleEngine{opaquePtr: &importedOpaque[0], module: &wasm.ModuleInstance{MemoryInstance: tc.m.MemoryInstance}}
+				m.ResolveImportedMemory(imported)
+
 				actualPtr := uintptr(binary.LittleEndian.Uint64(m.opaque[tc.offset.ImportedMemoryBegin:]))
-				expPtr := uintptr(unsafe.Pointer(&tc.m.MemoryInstance))
+				expPtr := uintptr(unsafe.Pointer(tc.m.MemoryInstance))
 				require.Equal(t, expPtr, actualPtr)
+
+				actualOpaquePtr := uintptr(binary.LittleEndian.Uint64(m.opaque[tc.offset.ImportedMemoryBegin+8:]))
+				expOpaquePtr := uintptr(unsafe.Pointer(&importedOpaque[0]))
+				require.Equal(t, expOpaquePtr, actualOpaquePtr)
 			}
 			if tc.offset.GlobalsBegin >= 0 {
 				for i, g := range tc.m.Globals {

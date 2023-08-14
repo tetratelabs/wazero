@@ -845,6 +845,45 @@ var (
 		},
 	}
 
+	ImportedMemoryGrow = TestCase{
+		Name: "imported_memory_grow",
+		Imported: &wasm.Module{
+			ExportSection: []wasm.Export{
+				{Name: "mem", Type: wasm.ExternTypeMemory, Index: 0},
+				{Name: "size", Type: wasm.ExternTypeFunc, Index: 0},
+			},
+			MemorySection:   &wasm.Memory{Min: 1},
+			TypeSection:     []wasm.FunctionType{v_i32},
+			FunctionSection: []wasm.Index{0},
+			CodeSection:     []wasm.Code{{Body: []byte{wasm.OpcodeMemorySize, 0, wasm.OpcodeEnd}}},
+			DataSection:     []wasm.DataSegment{{OffsetExpression: constExprI32(0), Init: maskedBuf(int(wasm.MemoryPageSize))}},
+			NameSection:     &wasm.NameSection{ModuleName: "env"},
+		},
+		Module: &wasm.Module{
+			ImportMemoryCount:   1,
+			ImportFunctionCount: 1,
+			ImportSection: []wasm.Import{
+				{Module: "env", Name: "mem", Type: wasm.ExternTypeMemory, DescMem: &wasm.Memory{Min: 1}},
+				{Module: "env", Name: "size", Type: wasm.ExternTypeFunc, DescFunc: 0},
+			},
+			TypeSection:     []wasm.FunctionType{v_i32, {Results: []wasm.ValueType{i32, i32, i32, i32}}},
+			ExportSection:   []wasm.Export{{Name: ExportName, Type: wasm.ExternTypeFunc, Index: 1}},
+			FunctionSection: []wasm.Index{1},
+			CodeSection: []wasm.Code{
+				{Body: []byte{
+					wasm.OpcodeCall, 0, // Call imported size function. --> 1
+					wasm.OpcodeMemorySize, 0, // --> 1.
+					wasm.OpcodeI32Const, 10,
+					wasm.OpcodeMemoryGrow, 0,
+					wasm.OpcodeDrop,
+					wasm.OpcodeCall, 0, // Call imported size function. --> 11.
+					wasm.OpcodeMemorySize, 0, // --> 11.
+					wasm.OpcodeEnd,
+				}},
+			},
+		},
+	}
+
 	GlobalsGet = TestCase{
 		Name: "globals_get",
 		Module: &wasm.Module{

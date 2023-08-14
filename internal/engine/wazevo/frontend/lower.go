@@ -456,7 +456,16 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 
 		var memSizeInBytes ssa.Value
 		if c.offset.LocalMemoryBegin < 0 {
-			panic("TODO: imported memory")
+			loadMemInstPtr := builder.AllocateInstruction()
+			loadMemInstPtr.AsLoad(c.moduleCtxPtrValue, c.offset.ImportedMemoryBegin.U32(), ssa.TypeI64)
+			builder.InsertInstruction(loadMemInstPtr)
+			memInstPtr := loadMemInstPtr.Return()
+
+			loadBufSizePtr := builder.AllocateInstruction()
+			loadBufSizePtr.AsLoad(memInstPtr, memoryInstanceBufSizeOffset, ssa.TypeI64)
+			builder.InsertInstruction(loadBufSizePtr)
+			memSizeInBytes = loadBufSizePtr.Return()
+
 		} else {
 			load := builder.AllocateInstruction()
 			load.AsLoad(c.moduleCtxPtrValue, c.offset.LocalMemoryLen().U32(), ssa.TypeI32)
@@ -845,7 +854,23 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		// TODO: maybe this can be optimized out if this is in-module function calls. Investigate later.
 		c.storeCallerModuleContext()
 
-		typIndex := c.m.FunctionSection[fnIndex]
+		var typIndex wasm.Index
+		if fnIndex < c.m.ImportFunctionCount {
+			var fi int
+			for i := range c.m.ImportSection {
+				imp := &c.m.ImportSection[i]
+				if imp.Type == wasm.ExternTypeFunc {
+					if fi == int(fnIndex) {
+						typIndex = imp.DescFunc
+						break
+					}
+					fi++
+				}
+			}
+		} else {
+			fnIndex -= c.m.ImportFunctionCount
+			typIndex = c.m.FunctionSection[fnIndex]
+		}
 		typ := &c.m.TypeSection[typIndex]
 
 		// TODO: reuse slice?
@@ -957,32 +982,43 @@ func (c *Compiler) getWasmGlobalValue(index wasm.Index, forceLoad bool) ssa.Valu
 	return ret
 }
 
-func (c *Compiler) getMemoryBaseValue(forceReload bool) ssa.Value {
-	if c.offset.LocalMemoryBegin < 0 {
-		panic("TODO: imported memory")
-	}
+const (
+	memoryInstanceBufOffset     = 0
+	memoryInstanceBufSizeOffset = memoryInstanceBufOffset + 8
+)
 
-	variable := c.memoryBaseVariable
+func (c *Compiler) getMemoryBaseValue(forceReload bool) ssa.Value {
 	builder := c.ssaBuilder
+	variable := c.memoryBaseVariable
 	if !forceReload {
 		if v := builder.FindValue(variable); v.Valid() {
 			return v
 		}
 	}
 
-	load := builder.AllocateInstruction()
-	load.AsLoad(c.moduleCtxPtrValue, c.offset.LocalMemoryBase().U32(), ssa.TypeI64)
-	builder.InsertInstruction(load)
-	ret := load.Return()
+	var ret ssa.Value
+	if c.offset.LocalMemoryBegin < 0 {
+		loadMemInstPtr := builder.AllocateInstruction()
+		loadMemInstPtr.AsLoad(c.moduleCtxPtrValue, c.offset.ImportedMemoryBegin.U32(), ssa.TypeI64)
+		builder.InsertInstruction(loadMemInstPtr)
+		memInstPtr := loadMemInstPtr.Return()
+
+		loadBufPtr := builder.AllocateInstruction()
+		loadBufPtr.AsLoad(memInstPtr, memoryInstanceBufOffset, ssa.TypeI64)
+		builder.InsertInstruction(loadBufPtr)
+		ret = loadBufPtr.Return()
+	} else {
+		load := builder.AllocateInstruction()
+		load.AsLoad(c.moduleCtxPtrValue, c.offset.LocalMemoryBase().U32(), ssa.TypeI64)
+		builder.InsertInstruction(load)
+		ret = load.Return()
+	}
+
 	builder.DefineVariableInCurrentBB(variable, ret)
 	return ret
 }
 
 func (c *Compiler) getMemoryLenValue(forceReload bool) ssa.Value {
-	if c.offset.LocalMemoryBegin < 0 {
-		panic("TODO: imported memory")
-	}
-
 	variable := c.memoryLenVariable
 	builder := c.ssaBuilder
 	if !forceReload {
@@ -990,10 +1026,26 @@ func (c *Compiler) getMemoryLenValue(forceReload bool) ssa.Value {
 			return v
 		}
 	}
-	load := builder.AllocateInstruction()
-	load.AsExtLoad(ssa.OpcodeUload32, c.moduleCtxPtrValue, c.offset.LocalMemoryLen().U32(), true)
-	builder.InsertInstruction(load)
-	ret := load.Return()
+
+	var ret ssa.Value
+	if c.offset.LocalMemoryBegin < 0 {
+		loadMemInstPtr := builder.AllocateInstruction()
+		loadMemInstPtr.AsLoad(c.moduleCtxPtrValue, c.offset.ImportedMemoryBegin.U32(), ssa.TypeI64)
+		builder.InsertInstruction(loadMemInstPtr)
+		memInstPtr := loadMemInstPtr.Return()
+
+		loadBufSizePtr := builder.AllocateInstruction()
+		loadBufSizePtr.AsLoad(memInstPtr, memoryInstanceBufSizeOffset, ssa.TypeI64)
+		builder.InsertInstruction(loadBufSizePtr)
+
+		ret = loadBufSizePtr.Return()
+	} else {
+		load := builder.AllocateInstruction()
+		load.AsExtLoad(ssa.OpcodeUload32, c.moduleCtxPtrValue, c.offset.LocalMemoryLen().U32(), true)
+		builder.InsertInstruction(load)
+		ret = load.Return()
+	}
+
 	builder.DefineVariableInCurrentBB(variable, ret)
 	return ret
 }

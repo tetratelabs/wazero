@@ -412,6 +412,7 @@ type mockModuleEngine struct {
 	callFailIndex        int
 	functionRefs         map[Index]Reference
 	resolveImportsCalled map[Index]Index
+	importedMemModEngine ModuleEngine
 }
 
 type mockCallEngine struct {
@@ -464,6 +465,11 @@ func (e *mockModuleEngine) FunctionInstanceReference(i Index) Reference {
 // ResolveImportedFunction implements the same method as documented on wasm.ModuleEngine.
 func (e *mockModuleEngine) ResolveImportedFunction(index, importedIndex Index, _ ModuleEngine) {
 	e.resolveImportsCalled[index] = importedIndex
+}
+
+// ResolveImportedMemory implements the same method as documented on wasm.ModuleEngine.
+func (e *mockModuleEngine) ResolveImportedMemory(imp ModuleEngine) {
+	e.importedMemModEngine = imp
 }
 
 // NewFunction implements the same method as documented on wasm.ModuleEngine.
@@ -808,14 +814,16 @@ func Test_resolveImports(t *testing.T) {
 			max := uint32(10)
 			memoryInst := &MemoryInstance{Max: max}
 			s := newStore()
+			importedME := &mockModuleEngine{}
 			s.nameToModule[moduleName] = &ModuleInstance{
 				MemoryInstance: memoryInst,
 				Exports: map[string]*Export{name: {
 					Type: ExternTypeMemory,
 				}},
 				ModuleName: moduleName,
+				Engine:     importedME,
 			}
-			m := &ModuleInstance{s: s}
+			m := &ModuleInstance{s: s, Engine: &mockModuleEngine{resolveImportsCalled: map[Index]Index{}}}
 			err := m.resolveImports(&Module{
 				ImportPerModule: map[string][]*Import{
 					moduleName: {{Module: moduleName, Name: name, Type: ExternTypeMemory, DescMem: &Memory{Max: max}}},
@@ -823,6 +831,7 @@ func Test_resolveImports(t *testing.T) {
 			})
 			require.NoError(t, err)
 			require.Equal(t, m.MemoryInstance, memoryInst)
+			require.Equal(t, importedME, m.Engine.(*mockModuleEngine).importedMemModEngine)
 		})
 		t.Run("minimum size mismatch", func(t *testing.T) {
 			importMemoryType := &Memory{Min: 2, Cap: 2}

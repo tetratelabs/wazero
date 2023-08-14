@@ -61,10 +61,7 @@ func (m *moduleEngine) setupOpaque() {
 		putLocalMemory(opaque, lm, inst.MemoryInstance)
 	}
 
-	if im := offsets.ImportedMemoryBegin; im >= 0 {
-		b := uint64(uintptr(unsafe.Pointer(&inst.MemoryInstance)))
-		binary.LittleEndian.PutUint64(opaque[im:], b)
-	}
+	// Note: imported memory is resolved in ResolveImportedFunction.
 
 	// Note: imported functions are resolved in ResolveImportedFunction.
 
@@ -117,6 +114,17 @@ func (m *moduleEngine) ResolveImportedFunction(index, indexInImportedModule wasm
 	executable := &importedME.parent.executable[offset.offset+offset.goPreambleSize]
 	binary.LittleEndian.PutUint64(m.opaque[ptr:], uint64(uintptr(unsafe.Pointer(executable))))
 	binary.LittleEndian.PutUint64(m.opaque[moduleCtx:], uint64(uintptr(unsafe.Pointer(importedME.opaquePtr))))
+}
+
+// ResolveImportedMemory implements wasm.ModuleEngine.
+func (m *moduleEngine) ResolveImportedMemory(importedModuleEngine wasm.ModuleEngine) {
+	importedME := importedModuleEngine.(*moduleEngine)
+	inst := importedME.module
+
+	offset := m.parent.offsets.ImportedMemoryBegin
+	b := uint64(uintptr(unsafe.Pointer(inst.MemoryInstance)))
+	binary.LittleEndian.PutUint64(m.opaque[offset:], b)
+	binary.LittleEndian.PutUint64(m.opaque[offset+8:], uint64(uintptr(unsafe.Pointer(importedME.opaquePtr))))
 }
 
 // DoneInstantiation implements wasm.ModuleEngine.

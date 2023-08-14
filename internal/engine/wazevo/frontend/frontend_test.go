@@ -1252,11 +1252,83 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 `,
 		},
 		{
+			name: "imported_memory_grow",
+			m:    testcases.ImportedMemoryGrow.Module,
+			exp: `
+signatures:
+	sig0: i64i64_i32
+	sig2: i64i32_i32
+
+blk0: (exec_ctx:i64, module_ctx:i64)
+	Store module_ctx, exec_ctx, 0x8
+	v2:i64 = Load module_ctx, 0x18
+	v3:i64 = Load module_ctx, 0x20
+	v4:i32 = CallIndirect v2:sig0, exec_ctx, v3
+	v5:i64 = Load module_ctx, 0x8
+	v6:i64 = Load v5, 0x0
+	v7:i64 = Load module_ctx, 0x8
+	v8:i64 = Load v7, 0x8
+	v9:i64 = Load module_ctx, 0x8
+	v10:i64 = Load v9, 0x8
+	v11:i32 = Iconst_32 0x10
+	v12:i64 = Ushr v10, v11
+	v13:i32 = Iconst_32 0xa
+	Store module_ctx, exec_ctx, 0x8
+	v14:i64 = Load exec_ctx, 0x48
+	v15:i32 = CallIndirect v14:sig2, exec_ctx, v13
+	v16:i64 = Load module_ctx, 0x8
+	v17:i64 = Load v16, 0x0
+	v18:i64 = Load module_ctx, 0x8
+	v19:i64 = Load v18, 0x8
+	Store module_ctx, exec_ctx, 0x8
+	v20:i64 = Load module_ctx, 0x18
+	v21:i64 = Load module_ctx, 0x20
+	v22:i32 = CallIndirect v20:sig0, exec_ctx, v21
+	v23:i64 = Load module_ctx, 0x8
+	v24:i64 = Load v23, 0x0
+	v25:i64 = Load module_ctx, 0x8
+	v26:i64 = Load v25, 0x8
+	v27:i64 = Load module_ctx, 0x8
+	v28:i64 = Load v27, 0x8
+	v29:i32 = Iconst_32 0x10
+	v30:i64 = Ushr v28, v29
+	Jump blk_ret, v4, v12, v22, v30
+`,
+			expAfterOpt: `
+signatures:
+	sig0: i64i64_i32
+	sig2: i64i32_i32
+
+blk0: (exec_ctx:i64, module_ctx:i64)
+	Store module_ctx, exec_ctx, 0x8
+	v2:i64 = Load module_ctx, 0x18
+	v3:i64 = Load module_ctx, 0x20
+	v4:i32 = CallIndirect v2:sig0, exec_ctx, v3
+	v9:i64 = Load module_ctx, 0x8
+	v10:i64 = Load v9, 0x8
+	v11:i32 = Iconst_32 0x10
+	v12:i64 = Ushr v10, v11
+	v13:i32 = Iconst_32 0xa
+	Store module_ctx, exec_ctx, 0x8
+	v14:i64 = Load exec_ctx, 0x48
+	v15:i32 = CallIndirect v14:sig2, exec_ctx, v13
+	Store module_ctx, exec_ctx, 0x8
+	v20:i64 = Load module_ctx, 0x18
+	v21:i64 = Load module_ctx, 0x20
+	v22:i32 = CallIndirect v20:sig0, exec_ctx, v21
+	v27:i64 = Load module_ctx, 0x8
+	v28:i64 = Load v27, 0x8
+	v29:i32 = Iconst_32 0x10
+	v30:i64 = Ushr v28, v29
+	Jump blk_ret, v4, v12, v22, v30
+`,
+		},
+		{
 			name: "memory_size_grow",
 			m:    testcases.MemorySizeGrow.Module,
 			exp: `
 signatures:
-	sig1: i32i32_i32
+	sig1: i64i32_i32
 
 blk0: (exec_ctx:i64, module_ctx:i64)
 	v2:i32 = Iconst_32 0x1
@@ -1278,7 +1350,7 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 `,
 			expAfterOpt: `
 signatures:
-	sig1: i32i32_i32
+	sig1: i64i32_i32
 
 blk0: (exec_ctx:i64, module_ctx:i64)
 	v2:i32 = Iconst_32 0x1

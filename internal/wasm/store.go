@@ -451,6 +451,7 @@ func (m *ModuleInstance) resolveImports(module *Module) (err error) {
 					return
 				}
 				m.MemoryInstance = importedMemory
+				m.Engine.ResolveImportedMemory(importedModule.Engine)
 			case ExternTypeGlobal:
 				expected := i.DescGlobal
 				importedGlobal := importedModule.Globals[imported.Index]
