@@ -442,6 +442,9 @@ func (e *moduleEngine) ResolveImportedFunction(index, indexInImportedModule wasm
 	e.functions[index] = imported.functions[indexInImportedModule]
 }
 
+// ResolveImportedMemory implements wasm.ModuleEngine.
+func (e *moduleEngine) ResolveImportedMemory(wasm.ModuleEngine) {}
+
 // DoneInstantiation implements wasm.ModuleEngine.
 func (e *moduleEngine) DoneInstantiation() {}
 

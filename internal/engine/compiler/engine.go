@@ -656,6 +656,9 @@ func (e *moduleEngine) ResolveImportedFunction(index, indexInImportedModule wasm
 	e.functions[index] = imported.functions[indexInImportedModule]
 }
 
+// ResolveImportedMemory implements wasm.ModuleEngine.
+func (e *moduleEngine) ResolveImportedMemory(wasm.ModuleEngine) {}
+
 // FunctionInstanceReference implements the same method as documented on wasm.ModuleEngine.
 func (e *moduleEngine) FunctionInstanceReference(funcIndex wasm.Index) wasm.Reference {
 	return uintptr(unsafe.Pointer(&e.functions[funcIndex]))

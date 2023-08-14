@@ -76,7 +76,7 @@ func NewFrontendCompiler(m *wasm.Module, ssaBuilder ssa.Builder, offset *wazevoa
 	c.memoryGrowSig = ssa.Signature{
 		ID: ssa.SignatureID(len(m.TypeSection)),
 		// Takes execution context and the page size to grow.
-		Params: []ssa.Type{ssa.TypeI32, ssa.TypeI32},
+		Params: []ssa.Type{ssa.TypeI64, ssa.TypeI32},
 		// Returns the new size.
 		Results: []ssa.Type{ssa.TypeI32},
 	}
@@ -181,7 +181,7 @@ func (c *Compiler) declareWasmLocals(entry ssa.BasicBlock) {
 }
 
 func (c *Compiler) declareNecessaryVariables() {
-	c.needMemory = len(c.m.ImportedMemories()) > 0 || c.m.MemorySection != nil
+	c.needMemory = c.m.ImportMemoryCount > 0 || c.m.MemorySection != nil
 	if c.needMemory {
 		c.memoryBaseVariable = c.ssaBuilder.DeclareVariable(ssa.TypeI64)
 		c.memoryLenVariable = c.ssaBuilder.DeclareVariable(ssa.TypeI64)

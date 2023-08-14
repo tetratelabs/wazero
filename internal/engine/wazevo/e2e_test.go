@@ -139,6 +139,12 @@ func TestE2E(t *testing.T) {
 			m:     testcases.MemorySizeGrow.Module,
 			calls: []callCase{{expResults: []uint64{1, 2, 0xffffffff}}},
 		},
+		{
+			name:     "imported_memory_grow",
+			imported: testcases.ImportedMemoryGrow.Imported,
+			m:        testcases.ImportedMemoryGrow.Module,
+			calls:    []callCase{{expResults: []uint64{1, 1, 11, 11}}},
+		},
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {

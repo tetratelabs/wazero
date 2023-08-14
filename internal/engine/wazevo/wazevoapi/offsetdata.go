@@ -51,7 +51,9 @@ type ExecutionContextOffsetData struct {
 type ModuleContextOffsetData struct {
 	TotalSize int
 	ModuleInstanceOffset,
-	LocalMemoryBegin, ImportedMemoryBegin, ImportedFunctionsBegin,
+	LocalMemoryBegin,
+	ImportedMemoryBegin,
+	ImportedFunctionsBegin,
 	GlobalsBegin Offset
 }
 
@@ -109,18 +111,18 @@ func NewModuleContextOffsetData(m *wasm.Module) ModuleContextOffsetData {
 	if m.MemorySection != nil {
 		ret.LocalMemoryBegin = offset
 		// buffer base + memory size.
-		const localMemorySizeInOpaqueVMContext = 16
-		offset += localMemorySizeInOpaqueVMContext
+		const localMemorySizeInOpaqueModuleContext = 16
+		offset += localMemorySizeInOpaqueModuleContext
 	} else {
 		// Indicates that there's no local memory
 		ret.LocalMemoryBegin = -1
 	}
 
 	if m.ImportMemoryCount > 0 {
-		// *wasm.MemoryInstance
-		const importedMemorySizeInOpaqueVMCContext = 8
+		// *wasm.MemoryInstance + imported memory's owner (moduleContextOpaque)
+		const importedMemorySizeInOpaqueModuleContext = 16
 		ret.ImportedMemoryBegin = offset
-		offset += importedMemorySizeInOpaqueVMCContext
+		offset += importedMemorySizeInOpaqueModuleContext
 	} else {
 		// Indicates that there's no imported memory
 		ret.ImportedMemoryBegin = -1

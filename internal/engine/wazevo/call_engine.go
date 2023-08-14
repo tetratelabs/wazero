@@ -2,6 +2,7 @@ package wazevo
 
 import (
 	"context"
+	"encoding/binary"
 	"reflect"
 	"unsafe"
 
@@ -60,7 +61,7 @@ type (
 		// savedRegisters is the opaque spaces for save/restore registers.
 		// We want to align 16 bytes for each register, so we use [64][2]uint64.
 		savedRegisters [64][2]uint64
-
+		// goFunctionCallStack is used to pass/receive parameters/results for Go function calls.
 		goFunctionCallStack [128]uint64
 	}
 )
@@ -132,13 +133,14 @@ func (c *callEngine) CallWithStack(ctx context.Context, paramResultStack []uint6
 				*argRes = uint64(0xffffffff) // = -1 in signed 32-bit integer.
 			} else {
 				*argRes = uint64(res)
-				if mod.Source.MemorySection != nil {
-					var opaque []byte
-					sh := (*reflect.SliceHeader)(unsafe.Pointer(&opaque))
-					sh.Data = uintptr(unsafe.Pointer(c.execCtx.callerModuleContextPtr))
-					sh.Len = 24
-					sh.Cap = 24
-					putLocalMemory(opaque, 8, mem)
+				calleeOpaque := opaqueViewFromPtr(uintptr(unsafe.Pointer(c.execCtx.callerModuleContextPtr)))
+				if mod.Source.MemorySection != nil { // Local memory.
+					putLocalMemory(calleeOpaque, 8 /* local memory begins at 8 */, mem)
+				} else {
+					// Imported memory's owner at offset 16 of the callerModuleContextPtr.
+					opaquePtr := uintptr(binary.LittleEndian.Uint64(calleeOpaque[16:]))
+					importedMemOwner := opaqueViewFromPtr(opaquePtr)
+					putLocalMemory(importedMemOwner, 8 /* local memory begins at 8 */, mem)
 				}
 			}
 			c.execCtx.exitCode = wazevoapi.ExitCodeOK
@@ -151,6 +153,15 @@ func (c *callEngine) CallWithStack(ctx context.Context, paramResultStack []uint6
 
 func moduleInstanceFromPtr(ptr *byte) *wasm.ModuleInstance {
 	return *(**wasm.ModuleInstance)(unsafe.Pointer(ptr))
+}
+
+func opaqueViewFromPtr(ptr uintptr) []byte {
+	var opaque []byte
+	sh := (*reflect.SliceHeader)(unsafe.Pointer(&opaque))
+	sh.Data = ptr
+	sh.Len = 24
+	sh.Cap = 24
+	return opaque
 }
 
 const callStackCeiling = uintptr(5000000) // in uint64 (8 bytes) == 40000000 bytes in total == 40mb.
