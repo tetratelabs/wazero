@@ -25,11 +25,12 @@ type (
 		mux               sync.RWMutex
 		rels              []backend.RelocationInfo
 		refToBinaryOffset map[ssa.FuncRef]int
-
+		// builtinFunctions is hods compiled builtin function trampolines.
 		builtinFunctions *builtinFunctions
 	}
 
 	builtinFunctions struct {
+		// memoryGrowExecutable is a compiled executable for memory.grow builtin function.
 		memoryGrowExecutable []byte
 	}
 
