@@ -34,7 +34,7 @@ some compilers partially implement features. Notes about portability follow.
 
 ### cargo-wasi (Rustlang)
 
-The [Rustlang source][testdata/cargo-wasi] uses [cargo-wasi][1] because the
+The [Rustlang source](testdata/cargo-wasi) uses [cargo-wasi][1] because the
 normal release target `wasm32-wasi` results in almost 2MB, which is too large
 to check into our source tree.
 
