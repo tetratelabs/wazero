@@ -7,6 +7,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/tetratelabs/wazero/api"
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/sys"
@@ -26,6 +27,7 @@ type Context struct {
 	osyield            sys.Osyield
 	randSource         io.Reader
 	fsc                FSContext
+	meter              api.Meter
 }
 
 // Args is like os.Args and defaults to nil.
@@ -109,12 +111,20 @@ func (c *Context) RandSource() io.Reader {
 	return c.randSource
 }
 
+// AddMeterCost increments the total based on the cost of an operation.
+func (c *Context) AddMeterCost(op string) int {
+	if c.meter != nil {
+		c.meter.AddCost(op)
+	}
+	return 0
+}
+
 // DefaultContext returns Context with no values set except a possible nil
 // sys.FS.
 //
 // Note: This is only used for testing.
 func DefaultContext(fs experimentalsys.FS) *Context {
-	if sysCtx, err := NewContext(0, nil, nil, nil, nil, nil, nil, nil, 0, nil, 0, nil, nil, []experimentalsys.FS{fs}, []string{""}, nil); err != nil {
+	if sysCtx, err := NewContext(0, nil, nil, nil, nil, nil, nil, nil, 0, nil, 0, nil, nil, []experimentalsys.FS{fs}, []string{""}, nil, nil); err != nil {
 		panic(fmt.Errorf("BUG: DefaultContext should never error: %w", err))
 	} else {
 		return sysCtx
@@ -137,6 +147,7 @@ func NewContext(
 	osyield sys.Osyield,
 	fs []experimentalsys.FS, guestPaths []string,
 	tcpListeners []*net.TCPListener,
+	meter api.Meter,
 ) (sysCtx *Context, err error) {
 	sysCtx = &Context{args: args, environ: environ}
 
@@ -186,6 +197,12 @@ func NewContext(
 		sysCtx.osyield = osyield
 	} else {
 		sysCtx.osyield = platform.FakeOsyield
+	}
+
+	if meter != nil {
+		sysCtx.meter = meter
+		// } else {
+		// sysCtx.meter = platform.FakeMeter
 	}
 
 	err = sysCtx.InitFSContext(stdin, stdout, stderr, fs, guestPaths, tcpListeners)

@@ -154,7 +154,8 @@ func (m *ModuleInstance) ensureResourcesClosed(ctx context.Context) (err error) 
 		if err = sysCtx.FS().Close(); err != nil {
 			return err
 		}
-		m.Sys = nil
+		// TODO: ensure proper handling
+		// m.Sys = nil
 	}
 
 	if m.CodeCloser == nil {

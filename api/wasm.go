@@ -416,6 +416,12 @@ type Function interface {
 	internalapi.WazeroOnly
 }
 
+// Meter collects the cost for a set of operations.
+type Meter interface {
+	AddCost(string)
+	GetCost() uint64
+}
+
 // GoModuleFunction is a Function implemented in Go instead of a wasm binary.
 // The Module parameter is the calling module, used to access memory or
 // exported functions. See GoModuleFunc for an example.

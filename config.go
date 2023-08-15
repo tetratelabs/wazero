@@ -635,6 +635,9 @@ type ModuleConfig interface {
 	// Note: The caller is responsible to close any io.Reader they supply: It
 	// is not closed on api.Module Close.
 	WithRandSource(io.Reader) ModuleConfig
+
+	// WithMeter adds an api meter which manages the cost of operations.
+	WithMeter(api.Meter) ModuleConfig
 }
 
 type moduleConfig struct {
@@ -660,6 +663,8 @@ type moduleConfig struct {
 	fsConfig FSConfig
 	// sockConfig is the network listener configuration for ABI like WASI.
 	sockConfig *internalsock.Config
+	// meter manages the cost of operations.
+	meter api.Meter
 }
 
 // NewModuleConfig returns a ModuleConfig that can be used for configuring module instantiation.
@@ -819,6 +824,13 @@ func (c *moduleConfig) WithRandSource(source io.Reader) ModuleConfig {
 	return ret
 }
 
+// WithMeter implements ModuleConfig.WithMeter
+func (c *moduleConfig) WithMeter(meter api.Meter) ModuleConfig {
+	ret := c.clone()
+	ret.meter = meter
+	return ret
+}
+
 // toSysContext creates a baseline wasm.Context configured by ModuleConfig.
 func (c *moduleConfig) toSysContext() (sysCtx *internalsys.Context, err error) {
 	var environ [][]byte // Intentionally doesn't pre-allocate to reduce logic to default to nil.
@@ -872,5 +884,6 @@ func (c *moduleConfig) toSysContext() (sysCtx *internalsys.Context, err error) {
 		c.nanosleep, c.osyield,
 		fs, guestPaths,
 		listeners,
+		c.meter,
 	)
 }
