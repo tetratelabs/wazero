@@ -248,6 +248,12 @@ func TestE2E_host_functions(t *testing.T) {
 	var expectedMod api.Module
 
 	b := r.NewHostModuleBuilder("env")
+	b.NewFunctionBuilder().WithFunc(func(ctx2 context.Context, d float64) float64 {
+		require.Equal(t, ctx, ctx2)
+		fmt.Printf("%#x\n", math.Float64bits(d))
+		require.Equal(t, 35.0, d)
+		return math.Sqrt(d)
+	}).Export("root")
 	b.NewFunctionBuilder().WithFunc(func(ctx2 context.Context, mod api.Module, a uint32, b uint64, c float32, d float64) (uint32, uint64, float32, float64) {
 		require.Equal(t, expectedMod, mod)
 		require.Equal(t, ctx, ctx2)
@@ -257,17 +263,12 @@ func TestE2E_host_functions(t *testing.T) {
 		require.Equal(t, 35.0, d)
 		return a * a, b * b, c * c, d * d
 	}).Export("square")
-	b.NewFunctionBuilder().WithFunc(func(ctx2 context.Context, d float64) float64 {
-		require.Equal(t, ctx, ctx2)
-		require.Equal(t, 35.0, d)
-		return math.Sqrt(d)
-	}).Export("root")
 
 	_, err := b.Instantiate(ctx)
 	require.NoError(t, err)
 
 	m := &wasm.Module{
-		ImportFunctionCount: 1,
+		ImportFunctionCount: 2,
 		ImportSection: []wasm.Import{
 			{Module: "env", Name: "root", Type: wasm.ExternTypeFunc, DescFunc: 0},
 			{Module: "env", Name: "square", Type: wasm.ExternTypeFunc, DescFunc: 1},

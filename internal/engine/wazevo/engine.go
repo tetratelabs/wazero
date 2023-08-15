@@ -203,7 +203,8 @@ func (e *engine) compileHostModule(module *wasm.Module) error {
 		totalSize = (totalSize + 15) &^ 15
 		cm.functionOffsets[i].offset = totalSize
 
-		typ := &module.TypeSection[module.FunctionSection[i]]
+		typIndex := module.FunctionSection[i]
+		typ := &module.TypeSection[typIndex]
 		if typ.ParamNumInUint64 >= goFunctionCallStackSize || typ.ResultNumInUint64 >= goFunctionCallStackSize {
 			return fmt.Errorf("too many params or results for a host function (maximum %d): %v",
 				goFunctionCallStackSize, typ)
@@ -216,6 +217,7 @@ func (e *engine) compileHostModule(module *wasm.Module) error {
 			return fmt.Errorf("too many host functions (maximum %d)", hostFunctionNumMaximum)
 		}
 
+		sig.ID = ssa.SignatureID(typIndex)
 		sig.Params = append(sig.Params[:0],
 			ssa.TypeI64, // First argument must be exec context.
 			ssa.TypeI64, // The second argument is the moduleContextOpaque of this host module.

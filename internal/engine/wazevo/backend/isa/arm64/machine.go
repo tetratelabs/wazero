@@ -134,6 +134,7 @@ func (m *machine) Reset() {
 	m.regAllocFn.reset()
 	m.spillSlotSize = 0
 	m.unresolvedAddressModes = m.unresolvedAddressModes[:0]
+	m.rootInstr = nil
 }
 
 // InitializeABI implements backend.Machine InitializeABI.

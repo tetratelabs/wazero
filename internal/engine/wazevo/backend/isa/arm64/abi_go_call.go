@@ -109,6 +109,7 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 			movTmpToReg := m.allocateInstr()
 
 			mode := addressMode{kind: addressModeKindPostIndex, rn: stackPtrReg}
+			tmpRegVRegVec := v17VReg // Caller save, so we can use it for whatever we want.
 			switch r.Type {
 			case ssa.TypeI32:
 				mode.imm = 8 // We use uint64 for all basic types, except SIMD v128.
@@ -120,12 +121,12 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 				movTmpToReg.asMove64(r.Reg, tmpRegVReg)
 			case ssa.TypeF32:
 				mode.imm = 8 // We use uint64 for all basic types, except SIMD v128.
-				loadIntoTmp.asFpuLoad(operandNR(tmpRegVReg), mode, 32)
-				movTmpToReg.asFpuMov64(r.Reg, tmpRegVReg)
+				loadIntoTmp.asFpuLoad(operandNR(tmpRegVRegVec), mode, 32)
+				movTmpToReg.asFpuMov64(r.Reg, tmpRegVRegVec)
 			case ssa.TypeF64:
 				mode.imm = 8 // We use uint64 for all basic types, except SIMD v128.
-				loadIntoTmp.asFpuLoad(operandNR(tmpRegVReg), mode, 64)
-				movTmpToReg.asFpuMov64(r.Reg, tmpRegVReg)
+				loadIntoTmp.asFpuLoad(operandNR(tmpRegVRegVec), mode, 64)
+				movTmpToReg.asFpuMov64(r.Reg, tmpRegVRegVec)
 			}
 			loadIntoTmp.prev = cur
 			cur.next = loadIntoTmp
