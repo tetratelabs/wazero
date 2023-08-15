@@ -3,18 +3,19 @@ package wazevoapi
 import "github.com/tetratelabs/wazero/internal/wasm"
 
 var ExecutionContextOffsets = ExecutionContextOffsetData{
-	ExitCodeOffset:              0,
-	CallerModuleContextPtr:      8,
-	OriginalFramePointer:        16,
-	OriginalStackPointer:        24,
-	GoReturnAddress:             32,
-	StackBottomPtr:              40,
-	GoCallReturnAddress:         48,
-	StackPointerBeforeGrow:      56,
-	StackGrowRequiredSize:       64,
-	MemoryGrowTrampolineAddress: 72,
-	SavedRegistersBegin:         80,
-	GoFunctionCallStackBegin:    1104,
+	ExitCodeOffset:                          0,
+	CallerModuleContextPtr:                  8,
+	OriginalFramePointer:                    16,
+	OriginalStackPointer:                    24,
+	GoReturnAddress:                         32,
+	StackBottomPtr:                          40,
+	GoCallReturnAddress:                     48,
+	StackPointerBeforeGrow:                  56,
+	StackGrowRequiredSize:                   64,
+	MemoryGrowTrampolineAddress:             72,
+	SavedRegistersBegin:                     80,
+	GoFunctionCallCalleeModuleContextOpaque: 1104,
+	GoFunctionCallStackBegin:                1112,
 }
 
 // ExecutionContextOffsetData allows the compilers to get the information about offsets to the fields of wazevo.executionContext,
@@ -42,6 +43,8 @@ type ExecutionContextOffsetData struct {
 	MemoryGrowTrampolineAddress Offset
 	// GoCallReturnAddress is an offset of the first element of `savedRegisters` field in wazevo.executionContext
 	SavedRegistersBegin Offset
+	// GoFunctionCallCalleeModuleContextOpaque is an offset of `goFunctionCallCalleeModuleContextOpaque` field in wazevo.executionContext
+	GoFunctionCallCalleeModuleContextOpaque Offset
 	// GoFunctionCallStackBegin is an offset of the first element of `goFunctionCallStack` field in wazevo.executionContext
 	GoFunctionCallStackBegin Offset
 }

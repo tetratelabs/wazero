@@ -331,6 +331,7 @@ func (m *machine) insertStackBoundsCheck(requiredStackSize int64, cur *instructi
 	// Set the required stack size and set it to the exec context.
 	{
 		// First load the requiredStackSize into the temporary register,
+		m.pendingInstructions = m.pendingInstructions[:0]
 		m.lowerConstantI64(tmpRegVReg, requiredStackSize)
 		// lowerConstantI64 adds instructions into m.pendingInstructions,
 		// so we manually link them together.

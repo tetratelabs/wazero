@@ -36,17 +36,21 @@ type (
 
 	// compiledModule is a compiled variant of a wasm.Module and ready to be used for instantiation.
 	compiledModule struct {
-		executable       []byte
-		functionOffsets  []compiledFunctionOffset
+		executable      []byte
+		functionOffsets []compiledFunctionOffset
+
+		// The followings are only available for non host modules.
+
 		offsets          wazevoapi.ModuleContextOffsetData
 		builtinFunctions *builtinFunctions
 	}
 
 	// compiledFunctionOffset tells us that where in the executable a function begins.
 	compiledFunctionOffset struct {
-		// offset is the beggining of the function.
+		// offset is the beginning of the function.
 		offset int
 		// goPreambleSize is the size of Go preamble of the function.
+		// This is only needed for non host modules.
 		goPreambleSize int
 	}
 )
@@ -62,9 +66,13 @@ func NewEngine(_ context.Context, _ api.CoreFeatures, _ filecache.Cache) wasm.En
 }
 
 // CompileModule implements wasm.Engine.
-func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []experimental.FunctionListener, ensureTermination bool) error {
+func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []experimental.FunctionListener, _ bool) error {
 	e.rels = e.rels[:0]
 	cm := &compiledModule{offsets: wazevoapi.NewModuleContextOffsetData(module)}
+
+	if module.IsHostModule {
+		return e.compileHostModule(module)
+	}
 
 	importedFns, localFns := int(module.ImportFunctionCount), len(module.FunctionSection)
 	if importedFns+localFns == 0 {
@@ -181,6 +189,95 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []exper
 	return nil
 }
 
+func (e *engine) compileHostModule(module *wasm.Module) error {
+	machine := newMachine()
+	be := backend.NewCompiler(machine, ssa.NewBuilder())
+
+	num := len(module.CodeSection)
+	cm := &compiledModule{}
+	cm.functionOffsets = make([]compiledFunctionOffset, num)
+	totalSize := 0 // Total binary size of the executable.
+	bodies := make([][]byte, num)
+	var sig ssa.Signature
+	for i := range module.CodeSection {
+		totalSize = (totalSize + 15) &^ 15
+		cm.functionOffsets[i].offset = totalSize
+
+		typ := &module.TypeSection[module.FunctionSection[i]]
+		if typ.ParamNumInUint64 >= goFunctionCallStackSize || typ.ResultNumInUint64 >= goFunctionCallStackSize {
+			return fmt.Errorf("too many params or results for a host function (maximum %d): %v",
+				goFunctionCallStackSize, typ)
+		}
+
+		// We can relax until the index fits together in ExitCode as we do in wazevoapi.ExitCodeCallGoModuleFunctionWithIndex.
+		// However, 1 << 16 should be large enough for a real use case.
+		const hostFunctionNumMaximum = 1 << 16
+		if i >= hostFunctionNumMaximum {
+			return fmt.Errorf("too many host functions (maximum %d)", hostFunctionNumMaximum)
+		}
+
+		sig.Params = append(sig.Params[:0],
+			ssa.TypeI64, // First argument must be exec context.
+			ssa.TypeI64, // The second argument is the moduleContextOpaque of this host module.
+		)
+		for _, t := range typ.Params {
+			sig.Params = append(sig.Params, frontend.WasmTypeToSSAType(t))
+		}
+
+		sig.Results = sig.Results[:0]
+		for _, t := range typ.Results {
+			sig.Results = append(sig.Results, frontend.WasmTypeToSSAType(t))
+		}
+
+		c := &module.CodeSection[i]
+		if c.GoFunc == nil {
+			panic("BUG: GoFunc must be set for host module")
+		}
+
+		var exitCode wazevoapi.ExitCode
+		fn := c.GoFunc
+		switch fn.(type) {
+		case api.GoModuleFunction:
+			exitCode = wazevoapi.ExitCodeCallGoModuleFunctionWithIndex(i)
+		case api.GoFunction:
+			exitCode = wazevoapi.ExitCodeCallGoFunctionWithIndex(i)
+		}
+
+		be.Init(false)
+		machine.CompileGoFunctionTrampoline(exitCode, &sig, true)
+		be.Encode()
+		body := be.Buf()
+
+		// TODO: optimize as zero copy.
+		copied := make([]byte, len(body))
+		copy(copied, body)
+		bodies[i] = copied
+		totalSize += len(body)
+	}
+
+	// Allocate executable memory and then copy the generated machine code.
+	executable, err := platform.MmapCodeSegment(totalSize)
+	if err != nil {
+		panic(err)
+	}
+	cm.executable = executable
+
+	for i, b := range bodies {
+		offset := cm.functionOffsets[i]
+		copy(executable[offset.offset:], b)
+	}
+
+	if runtime.GOARCH == "arm64" {
+		// On arm64, we cannot give all of rwx at the same time, so we change it to exec.
+		if err = platform.MprotectRX(executable); err != nil {
+			return err
+		}
+	}
+
+	e.compiledModules[module.ID] = cm
+	return nil
+}
+
 // Close implements wasm.Engine.
 func (e *engine) Close() (err error) {
 	e.mux.Lock()
@@ -228,10 +325,15 @@ func (e *engine) NewModuleEngine(m *wasm.Module, mi *wasm.ModuleInstance) (wasm.
 	me.parent = compiled
 	me.module = mi
 
-	if size := compiled.offsets.TotalSize; size != 0 {
-		opaque := make([]byte, size)
-		me.opaque = opaque
-		me.opaquePtr = &opaque[0]
+	if m.IsHostModule {
+		me.opaque = buildHostModuleOpaque(m)
+		me.opaquePtr = &me.opaque[0]
+	} else {
+		if size := compiled.offsets.TotalSize; size != 0 {
+			opaque := make([]byte, size)
+			me.opaque = opaque
+			me.opaquePtr = &opaque[0]
+		}
 	}
 	return me, nil
 }
@@ -244,7 +346,7 @@ func (e *engine) compileBuiltinFunctions() {
 		machine.CompileGoFunctionTrampoline(wazevoapi.ExitCodeGrowMemory, &ssa.Signature{
 			Params:  []ssa.Type{ssa.TypeI32 /* exec context */, ssa.TypeI32},
 			Results: []ssa.Type{ssa.TypeI32},
-		})
+		}, false)
 		be.Encode()
 		src := be.Buf()
 

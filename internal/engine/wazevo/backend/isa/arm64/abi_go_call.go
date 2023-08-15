@@ -13,7 +13,7 @@ var calleeSavedRegistersPlusLinkRegSorted = []regalloc.VReg{
 }
 
 // CompileGoFunctionTrampoline implements backend.Machine.
-func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *ssa.Signature) {
+func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *ssa.Signature, needModuleContextPtr bool) {
 	cur := m.allocateInstr()
 	cur.asNop0()
 	m.rootInstr = cur
@@ -25,6 +25,25 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 	cur = m.saveRegistersInExecutionContext(cur, calleeSavedRegistersPlusLinkRegSorted)
 
 	// Next, we need to store all the arguments to the execution context.
+
+	argBegin := 1 // Skips exec context by default.
+	if needModuleContextPtr {
+		offset := wazevoapi.ExecutionContextOffsets.GoFunctionCallCalleeModuleContextOpaque.I64()
+		if !offsetFitsInAddressModeKindRegUnsignedImm12(64, offset) {
+			panic("BUG: too large or un-aligned offset for goFunctionCallCalleeModuleContextOpaque in execution context")
+		}
+
+		// Module context is always the second argument.
+		moduleCtrPtr := x1VReg
+		store := m.allocateInstr()
+		amode := addressMode{kind: addressModeKindRegUnsignedImm12, rn: execCtrPtr, imm: offset}
+		store.asStore(operandNR(moduleCtrPtr), amode, 64)
+		store.prev = cur
+		cur.next = store
+		cur = store
+
+		argBegin++
+	}
 
 	stackPtrReg := x15VReg // Caller save, so we can use it for whatever we want.
 	imm12Op, ok := asImm12Operand(wazevoapi.ExecutionContextOffsets.GoFunctionCallStackBegin.U64())
@@ -39,7 +58,7 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 	cur = goCallStackPtrCalc
 
 	abi := m.getOrCreateABIImpl(sig)
-	for _, arg := range abi.args[1:] { // Skips exec context.
+	for _, arg := range abi.args[argBegin:] {
 		if arg.Kind == backend.ABIArgKindReg {
 			store := m.allocateInstr()
 			v := arg.Reg
@@ -181,16 +200,19 @@ func (m *machine) restoreRegistersInExecutionContext(cur *instruction, regs []re
 }
 
 func (m *machine) setExitCode(cur *instruction, execCtr regalloc.VReg, exitCode wazevoapi.ExitCode) *instruction {
+	constReg := x17VReg // caller-saved, so we can use it.
+
+	m.pendingInstructions = m.pendingInstructions[:0]
+	m.lowerConstantI32(x17VReg, int32(exitCode))
+	for _, instr := range m.pendingInstructions {
+		instr.prev = cur
+		cur.next = instr
+		cur = instr
+	}
+
 	// Set the exit status on the execution context.
-	// 	movz tmp, #wazevoapi.ExitCodeGrowStack
-	// 	str tmp, [exec_context]
-	loadStatusConst := m.allocateInstrAfterLowering()
-	loadStatusConst.asMOVZ(tmpRegVReg, uint64(exitCode), 0, true)
-	loadStatusConst.prev = cur
-	cur.next = loadStatusConst
-	cur = loadStatusConst
 	setExistStatus := m.allocateInstrAfterLowering()
-	setExistStatus.asStore(operandNR(tmpRegVReg),
+	setExistStatus.asStore(operandNR(constReg),
 		addressMode{
 			kind: addressModeKindRegUnsignedImm12,
 			rn:   execCtr, imm: wazevoapi.ExecutionContextOffsets.ExitCodeOffset.I64(),

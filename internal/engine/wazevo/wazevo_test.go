@@ -61,5 +61,6 @@ func Test_ExecutionContextOffsets(t *testing.T) {
 	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.savedRegisters))%16, wazevoapi.Offset(0),
 		"SavedRegistersBegin must be aligned to 16 bytes")
 	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.savedRegisters)), offsets.SavedRegistersBegin)
+	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.goFunctionCallCalleeModuleContextOpaque)), offsets.GoFunctionCallCalleeModuleContextOpaque)
 	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.goFunctionCallStack)), offsets.GoFunctionCallStackBegin)
 }

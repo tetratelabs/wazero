@@ -24,10 +24,8 @@ type mockMachine struct {
 	rinfo                  *regalloc.RegisterInfo
 }
 
-func (m mockMachine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *ssa.Signature) {
-	// TODO implement me
-	panic("implement me")
-}
+// CompileGoFunctionTrampoline implements Machine.CompileGoFunctionTrampoline.
+func (m mockMachine) CompileGoFunctionTrampoline(wazevoapi.ExitCode, *ssa.Signature, bool) {}
 
 // Encode implements Machine.Encode.
 func (m mockMachine) Encode() {
@@ -36,8 +34,7 @@ func (m mockMachine) Encode() {
 }
 
 // ResolveRelocations implements Machine.ResolveRelocations.
-func (m mockMachine) ResolveRelocations(refToBinaryOffset map[ssa.FuncRef]int, binary []byte, relocations []RelocationInfo) {
-}
+func (m mockMachine) ResolveRelocations(map[ssa.FuncRef]int, []byte, []RelocationInfo) {}
 
 // SetupPrologue implements Machine.SetupPrologue.
 func (m mockMachine) SetupPrologue() {}
