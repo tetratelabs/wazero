@@ -69,7 +69,6 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 	str q31, [x0, #0x1d0]
 	str x1, [x0, #0x450]
 	add x15, x0, #0x458
-	str x1, [x15], #0x8
 	str d0, [x15], #0x8
 	str d1, [x15], #0x8
 	str x2, [x15], #0x8
