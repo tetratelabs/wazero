@@ -217,7 +217,7 @@ func (e *engine) compileHostModule(module *wasm.Module) error {
 			return fmt.Errorf("too many host functions (maximum %d)", hostFunctionNumMaximum)
 		}
 
-		sig.ID = ssa.SignatureID(typIndex)
+		sig.ID = ssa.SignatureID(typIndex) // This is important since we reuse the `machine` which caches the ABI based on the SignatureID.
 		sig.Params = append(sig.Params[:0],
 			ssa.TypeI64, // First argument must be exec context.
 			ssa.TypeI64, // The second argument is the moduleContextOpaque of this host module.
