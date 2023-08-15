@@ -69,7 +69,10 @@ func TestModuleEngine_setupOpaque(t *testing.T) {
 				require.Equal(t, expLen, actualLen)
 			}
 			if tc.offset.ImportedMemoryBegin >= 0 {
-				imported := &moduleEngine{opaque: []byte{1, 2, 3}, module: &wasm.ModuleInstance{MemoryInstance: tc.m.MemoryInstance}}
+				imported := &moduleEngine{
+					opaque: []byte{1, 2, 3}, module: &wasm.ModuleInstance{MemoryInstance: tc.m.MemoryInstance},
+					parent: &compiledModule{offsets: wazevoapi.ModuleContextOffsetData{ImportedMemoryBegin: -1}},
+				}
 				imported.opaquePtr = &imported.opaque[0]
 				m.ResolveImportedMemory(imported)
 

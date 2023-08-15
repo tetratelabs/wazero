@@ -79,7 +79,8 @@ func (a *Allocator) assignRegistersPerInstr(f Function, pc programCounter, instr
 		return
 	case 1:
 	default:
-		panic("multiple defs (== call instruction) should be special cased")
+		// multiple defs (== call instruction) can be special cased, and no need to assign (already real regs following the calling convention.
+		return
 	}
 
 	d := defs[0]

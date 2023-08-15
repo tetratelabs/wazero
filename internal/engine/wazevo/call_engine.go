@@ -61,10 +61,14 @@ type (
 		// savedRegisters is the opaque spaces for save/restore registers.
 		// We want to align 16 bytes for each register, so we use [64][2]uint64.
 		savedRegisters [64][2]uint64
+		// goFunctionCallCalleeModuleContextOpaque is the pointer to the target Go function's moduleContextOpaque.
+		goFunctionCallCalleeModuleContextOpaque uintptr
 		// goFunctionCallStack is used to pass/receive parameters/results for Go function calls.
-		goFunctionCallStack [128]uint64
+		goFunctionCallStack [goFunctionCallStackSize]uint64
 	}
 )
+
+const goFunctionCallStackSize = 128
 
 var initialStackSize uint64 = 512
 
@@ -111,7 +115,7 @@ func (c *callEngine) CallWithStack(ctx context.Context, paramResultStack []uint6
 
 	entrypoint(c.executable, c.execCtxPtr, c.parent.opaquePtr, paramResultPtr, c.stackTop)
 	for {
-		switch c.execCtx.exitCode {
+		switch ec := c.execCtx.exitCode; ec & wazevoapi.ExitCodeMask {
 		case wazevoapi.ExitCodeOK:
 			return nil
 		case wazevoapi.ExitCodeGrowStack:
@@ -126,7 +130,7 @@ func (c *callEngine) CallWithStack(ctx context.Context, paramResultStack []uint6
 		case wazevoapi.ExitCodeMemoryOutOfBounds:
 			return wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess
 		case wazevoapi.ExitCodeGrowMemory:
-			mod := moduleInstanceFromPtr(c.execCtx.callerModuleContextPtr)
+			mod := c.callerModuleInstance()
 			mem := mod.MemoryInstance
 			argRes := &c.execCtx.goFunctionCallStack[0]
 			if res, ok := mem.Grow(uint32(*argRes)); !ok {
@@ -145,14 +149,27 @@ func (c *callEngine) CallWithStack(ctx context.Context, paramResultStack []uint6
 			}
 			c.execCtx.exitCode = wazevoapi.ExitCodeOK
 			afterGoFunctionCallEntrypoint(c.execCtx.goCallReturnAddress, c.execCtxPtr, c.execCtx.stackPointerBeforeGoCall)
+		case wazevoapi.ExitCodeCallGoFunction:
+			index := wazevoapi.GoFunctionIndexFromExitCode(ec)
+			f := hostModuleGoFuncFromOpaque[api.GoFunction](index, c.execCtx.goFunctionCallCalleeModuleContextOpaque)
+			f.Call(ctx, c.execCtx.goFunctionCallStack[:])
+			c.execCtx.exitCode = wazevoapi.ExitCodeOK
+			afterGoFunctionCallEntrypoint(c.execCtx.goCallReturnAddress, c.execCtxPtr, c.execCtx.stackPointerBeforeGoCall)
+		case wazevoapi.ExitCodeCallGoModuleFunction:
+			index := wazevoapi.GoFunctionIndexFromExitCode(ec)
+			f := hostModuleGoFuncFromOpaque[api.GoModuleFunction](index, c.execCtx.goFunctionCallCalleeModuleContextOpaque)
+			mod := c.callerModuleInstance()
+			f.Call(ctx, mod, c.execCtx.goFunctionCallStack[:])
+			c.execCtx.exitCode = wazevoapi.ExitCodeOK
+			afterGoFunctionCallEntrypoint(c.execCtx.goCallReturnAddress, c.execCtxPtr, c.execCtx.stackPointerBeforeGoCall)
 		default:
 			panic("BUG")
 		}
 	}
 }
 
-func moduleInstanceFromPtr(ptr *byte) *wasm.ModuleInstance {
-	return *(**wasm.ModuleInstance)(unsafe.Pointer(ptr))
+func (c *callEngine) callerModuleInstance() *wasm.ModuleInstance {
+	return *(**wasm.ModuleInstance)(unsafe.Pointer(c.execCtx.callerModuleContextPtr))
 }
 
 func opaqueViewFromPtr(ptr uintptr) []byte {

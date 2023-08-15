@@ -64,10 +64,10 @@ func NewFrontendCompiler(m *wasm.Module, ssaBuilder ssa.Builder, offset *wazevoa
 		sig.Params[0] = executionContextPtrTyp
 		sig.Params[1] = moduleContextPtrTyp
 		for j, typ := range wasmSig.Params {
-			sig.Params[j+2] = wasmToSSA(typ)
+			sig.Params[j+2] = WasmTypeToSSAType(typ)
 		}
 		for j, typ := range wasmSig.Results {
-			sig.Results[j] = wasmToSSA(typ)
+			sig.Results[j] = WasmTypeToSSAType(typ)
 		}
 		c.signatures[wasmSig] = sig
 		c.ssaBuilder.DeclareSignature(sig)
@@ -134,7 +134,7 @@ func (c *Compiler) LowerToSSA() error {
 	builder.AnnotateValue(c.moduleCtxPtrValue, "module_ctx")
 
 	for i, typ := range c.wasmFunctionTyp.Params {
-		st := wasmToSSA(typ)
+		st := WasmTypeToSSAType(typ)
 		variable := builder.DeclareVariable(st)
 		value := entryBlock.AddParam(builder, st)
 		builder.DefineVariable(variable, value, entryBlock)
@@ -156,7 +156,7 @@ func (c *Compiler) localVariable(index wasm.Index) ssa.Variable {
 func (c *Compiler) declareWasmLocals(entry ssa.BasicBlock) {
 	localCount := wasm.Index(len(c.wasmFunctionTyp.Params))
 	for i, typ := range c.wasmFunctionLocalTypes {
-		st := wasmToSSA(typ)
+		st := WasmTypeToSSAType(typ)
 		variable := c.ssaBuilder.DeclareVariable(st)
 		c.wasmLocalToVariable[wasm.Index(i)+localCount] = variable
 
@@ -227,8 +227,8 @@ func (c *Compiler) declareWasmGlobal(typ wasm.ValueType, mutable bool) {
 	}
 }
 
-// wasmToSSA converts wasm.ValueType to ssa.Type.
-func wasmToSSA(vt wasm.ValueType) ssa.Type {
+// WasmTypeToSSAType converts wasm.ValueType to ssa.Type.
+func WasmTypeToSSAType(vt wasm.ValueType) ssa.Type {
 	switch vt {
 	case wasm.ValueTypeI32:
 		return ssa.TypeI32
@@ -246,7 +246,7 @@ func wasmToSSA(vt wasm.ValueType) ssa.Type {
 // addBlockParamsFromWasmTypes adds the block parameters to the given block.
 func (c *Compiler) addBlockParamsFromWasmTypes(tps []wasm.ValueType, blk ssa.BasicBlock) {
 	for _, typ := range tps {
-		st := wasmToSSA(typ)
+		st := WasmTypeToSSAType(typ)
 		blk.AddParam(c.ssaBuilder, st)
 	}
 }

@@ -26,9 +26,11 @@ type (
 	// Internally, the buffer is structured as follows:
 	//
 	// 	type moduleContextOpaque struct {
+	// 	    moduleInstance                            *wasm.ModuleInstance
 	// 	    localMemoryBufferPtr                      *byte                (optional)
 	// 	    localMemoryLength                         uint64               (optional)
 	// 	    importedMemoryInstance                    *wasm.MemoryInstance (optional)
+	// 	    importedMemoryOwnerOpaqueCtx              *byte                (optional)
 	// 	    importedFunctions [importedFunctions] struct { the total size depends on # of imported functions.
 	// 	        executable      *byte
 	// 	        opaqueCtx       *moduleContextOpaque
@@ -38,6 +40,8 @@ type (
 	// 	}
 	//
 	// See wazevoapi.NewModuleContextOffsetData for the details of the offsets.
+	//
+	// Note that for host modules, the structure is entirely different. See buildHostModuleOpaque.
 	moduleContextOpaque []byte
 )
 
@@ -121,6 +125,11 @@ func (m *moduleEngine) ResolveImportedMemory(importedModuleEngine wasm.ModuleEng
 	importedME := importedModuleEngine.(*moduleEngine)
 	inst := importedME.module
 
+	if importedME.parent.offsets.ImportedMemoryBegin >= 0 {
+		// This case can be resolved by recursively resolving the owner.
+		panic("TODO: support re-exported memory import")
+	}
+
 	offset := m.parent.offsets.ImportedMemoryBegin
 	b := uint64(uintptr(unsafe.Pointer(inst.MemoryInstance)))
 	binary.LittleEndian.PutUint64(m.opaque[offset:], b)
@@ -129,7 +138,9 @@ func (m *moduleEngine) ResolveImportedMemory(importedModuleEngine wasm.ModuleEng
 
 // DoneInstantiation implements wasm.ModuleEngine.
 func (m *moduleEngine) DoneInstantiation() {
-	m.setupOpaque()
+	if !m.module.Source.IsHostModule {
+		m.setupOpaque()
+	}
 }
 
 // LookupFunction implements wasm.ModuleEngine.

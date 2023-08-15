@@ -17,15 +17,23 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
+const (
+	i32 = wasm.ValueTypeI32
+	i64 = wasm.ValueTypeI64
+	f32 = wasm.ValueTypeF32
+	f64 = wasm.ValueTypeF64
+)
+
 func TestE2E(t *testing.T) {
 	type callCase struct {
 		params, expResults []uint64
 		expErr             string
 	}
 	for _, tc := range []struct {
-		name        string
-		imported, m *wasm.Module
-		calls       []callCase
+		name           string
+		imported, m    *wasm.Module
+		needHostModule bool
+		calls          []callCase
 	}{
 		{
 			name: "swap", m: testcases.SwapParamAndReturn.Module,
@@ -223,4 +231,80 @@ func configureWazevo(config wazero.RuntimeConfig) {
 	cm := (*runtimeConfig)(configInterface.data)
 	// Insert the wazevo implementation.
 	cm.newEngine = wazevo.NewEngine
+}
+
+func TestE2E_host_functions(t *testing.T) {
+	config := wazero.NewRuntimeConfigCompiler()
+
+	// Configure the new optimizing backend!
+	configureWazevo(config)
+
+	ctx := context.Background()
+	r := wazero.NewRuntimeWithConfig(ctx, config)
+	defer func() {
+		require.NoError(t, r.Close(ctx))
+	}()
+
+	var expectedMod api.Module
+
+	b := r.NewHostModuleBuilder("env")
+	b.NewFunctionBuilder().WithFunc(func(ctx2 context.Context, d float64) float64 {
+		require.Equal(t, ctx, ctx2)
+		fmt.Printf("%#x\n", math.Float64bits(d))
+		require.Equal(t, 35.0, d)
+		return math.Sqrt(d)
+	}).Export("root")
+	b.NewFunctionBuilder().WithFunc(func(ctx2 context.Context, mod api.Module, a uint32, b uint64, c float32, d float64) (uint32, uint64, float32, float64) {
+		require.Equal(t, expectedMod, mod)
+		require.Equal(t, ctx, ctx2)
+		require.Equal(t, uint32(2), a)
+		require.Equal(t, uint64(100), b)
+		require.Equal(t, float32(15.0), c)
+		require.Equal(t, 35.0, d)
+		return a * a, b * b, c * c, d * d
+	}).Export("square")
+
+	_, err := b.Instantiate(ctx)
+	require.NoError(t, err)
+
+	m := &wasm.Module{
+		ImportFunctionCount: 2,
+		ImportSection: []wasm.Import{
+			{Module: "env", Name: "root", Type: wasm.ExternTypeFunc, DescFunc: 0},
+			{Module: "env", Name: "square", Type: wasm.ExternTypeFunc, DescFunc: 1},
+		},
+		TypeSection: []wasm.FunctionType{
+			{Results: []wasm.ValueType{f64}, Params: []wasm.ValueType{f64}},
+			{Results: []wasm.ValueType{i32, i64, f32, f64}, Params: []wasm.ValueType{i32, i64, f32, f64}},
+			{Results: []wasm.ValueType{i32, i64, f32, f64, f64}, Params: []wasm.ValueType{i32, i64, f32, f64}},
+		},
+		FunctionSection: []wasm.Index{2},
+		CodeSection: []wasm.Code{{
+			Body: []byte{
+				wasm.OpcodeLocalGet, 0, wasm.OpcodeLocalGet, 1, wasm.OpcodeLocalGet, 2, wasm.OpcodeLocalGet, 3,
+				wasm.OpcodeCall, 1,
+				wasm.OpcodeLocalGet, 3,
+				wasm.OpcodeCall, 0,
+				wasm.OpcodeEnd,
+			},
+		}},
+		ExportSection: []wasm.Export{{Name: "f", Type: wasm.ExternTypeFunc, Index: 2}},
+	}
+
+	compiled, err := r.CompileModule(ctx, binaryencoding.EncodeModule(m))
+	require.NoError(t, err)
+
+	inst, err := r.InstantiateModule(ctx, compiled, wazero.NewModuleConfig())
+	require.NoError(t, err)
+
+	expectedMod = inst
+
+	f := inst.ExportedFunction("f")
+
+	res, err := f.Call(ctx, []uint64{2, 100, uint64(math.Float32bits(15.0)), math.Float64bits(35.0)}...)
+	require.NoError(t, err)
+	require.Equal(t, []uint64{
+		2 * 2, 100 * 100, uint64(math.Float32bits(15.0 * 15.0)), math.Float64bits(35.0 * 35.0),
+		math.Float64bits(math.Sqrt(35.0)),
+	}, res)
 }
