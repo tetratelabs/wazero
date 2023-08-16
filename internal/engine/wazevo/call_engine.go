@@ -162,6 +162,12 @@ func (c *callEngine) CallWithStack(ctx context.Context, paramResultStack []uint6
 			f.Call(ctx, mod, c.execCtx.goFunctionCallStack[:])
 			c.execCtx.exitCode = wazevoapi.ExitCodeOK
 			afterGoFunctionCallEntrypoint(c.execCtx.goCallReturnAddress, c.execCtxPtr, c.execCtx.stackPointerBeforeGoCall)
+		case wazevoapi.ExitCodeTableOutOfBounds:
+			return wasmruntime.ErrRuntimeInvalidTableAccess
+		case wazevoapi.ExitCodeIndirectCallNullPointer:
+			return wasmruntime.ErrRuntimeInvalidTableAccess
+		case wazevoapi.ExitCodeIndirectCallTypeMismatch:
+			return wasmruntime.ErrRuntimeIndirectCallTypeMismatch
 		default:
 			panic("BUG")
 		}

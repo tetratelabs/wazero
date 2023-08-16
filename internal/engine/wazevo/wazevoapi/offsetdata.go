@@ -2,6 +2,17 @@ package wazevoapi
 
 import "github.com/tetratelabs/wazero/internal/wasm"
 
+const (
+	// FunctionInstanceSize is the size of wazevo.functionInstance.
+	FunctionInstanceSize = 24
+	// FunctionInstanceExecutableOffset is an offset of `executable` field in wazevo.functionInstance
+	FunctionInstanceExecutableOffset = 0
+	// FunctionInstanceModuleContextOpaquePtrOffset is an offset of `moduleContextOpaquePtr` field in wazevo.functionInstance
+	FunctionInstanceModuleContextOpaquePtrOffset = 8
+	// FunctionInstanceTypeIDOffset is an offset of `typeID` field in wazevo.functionInstance
+	FunctionInstanceTypeIDOffset = 16
+)
+
 var ExecutionContextOffsets = ExecutionContextOffsetData{
 	ExitCodeOffset:                          0,
 	CallerModuleContextPtr:                  8,
@@ -57,13 +68,18 @@ type ModuleContextOffsetData struct {
 	LocalMemoryBegin,
 	ImportedMemoryBegin,
 	ImportedFunctionsBegin,
-	GlobalsBegin Offset
+	GlobalsBegin,
+	TypeIDs1stElement,
+	TablesBegin Offset
 }
 
 // ImportedFunctionOffset returns an offset of the i-th imported function.
-func (m *ModuleContextOffsetData) ImportedFunctionOffset(i wasm.Index) (ptr, moduleCtx Offset) {
-	base := m.ImportedFunctionsBegin + Offset(i)*16
-	return base, base + 8
+// Each item is stored as wazevo.functionInstance whose size matches FunctionInstanceSize.
+func (m *ModuleContextOffsetData) ImportedFunctionOffset(i wasm.Index) (
+	executableOffset, moduleCtxOffset, typeIDOffset Offset,
+) {
+	base := m.ImportedFunctionsBegin + Offset(i)*FunctionInstanceSize
+	return base, base + 8, base + 16
 }
 
 // GlobalInstanceOffset returns an offset of the i-th global instance.
@@ -102,6 +118,11 @@ func (m *ModuleContextOffsetData) LocalMemoryLen() Offset {
 	return -1
 }
 
+// TableOffset returns an offset of the i-th table instance.
+func (m *ModuleContextOffsetData) TableOffset(tableIndex int) Offset {
+	return m.TablesBegin + Offset(tableIndex)*8
+}
+
 // NewModuleContextOffsetData creates a ModuleContextOffsetData determining the structure of moduleContextOpaque for the given Module.
 // The structure is described in the comment of wazevo.moduleContextOpaque.
 func NewModuleContextOffsetData(m *wasm.Module) ModuleContextOffsetData {
@@ -133,8 +154,8 @@ func NewModuleContextOffsetData(m *wasm.Module) ModuleContextOffsetData {
 
 	if m.ImportFunctionCount > 0 {
 		ret.ImportedFunctionsBegin = offset
-		// Each function consists of the pointer to the executable and the pointer to its moduleContextOpaque (16 bytes).
-		size := int(m.ImportFunctionCount) * 16
+		// Each function is stored wazevo.functionInstance.
+		size := int(m.ImportFunctionCount) * FunctionInstanceSize
 		offset += Offset(size)
 	} else {
 		ret.ImportedFunctionsBegin = -1
@@ -146,6 +167,18 @@ func NewModuleContextOffsetData(m *wasm.Module) ModuleContextOffsetData {
 		offset += Offset(globals) * 8
 	} else {
 		ret.GlobalsBegin = -1
+	}
+
+	if tables := len(m.TableSection) + int(m.ImportTableCount); tables > 0 {
+		ret.TypeIDs1stElement = offset
+		offset += 8 // First element of TypeIDs.
+
+		ret.TablesBegin = offset
+		// Pointers to *wasm.TableInstance.
+		offset += Offset(tables) * 8
+	} else {
+		ret.TypeIDs1stElement = -1
+		ret.TablesBegin = -1
 	}
 
 	ret.TotalSize = int(offset)

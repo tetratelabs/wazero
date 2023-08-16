@@ -130,9 +130,9 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 	case ssa.OpcodeExitWithCode:
 		execCtx, code := instr.ExitWithCodeData()
 		m.lowerExitWithCode(m.compiler.VRegOf(execCtx), code)
-	case ssa.OpcodeExitIfNotZeroWithCode:
-		execCtx, c, code := instr.ExitIfNotZeroWithCodeData()
-		m.lowerExitIfNotZeroWithCode(m.compiler.VRegOf(execCtx), c, code)
+	case ssa.OpcodeExitIfTrueWithCode:
+		execCtx, c, code := instr.ExitIfTrueWithCodeData()
+		m.lowerExitIfTrueWithCode(m.compiler.VRegOf(execCtx), c, code)
 	case ssa.OpcodeStore, ssa.OpcodeIstore8, ssa.OpcodeIstore16, ssa.OpcodeIstore32:
 		m.lowerStore(instr)
 	case ssa.OpcodeLoad:
@@ -341,11 +341,11 @@ func (m *machine) lowerExitWithCode(execCtxVReg regalloc.VReg, code wazevoapi.Ex
 	m.insert(exitSeq)
 }
 
-func (m *machine) lowerExitIfNotZeroWithCode(execCtxVReg regalloc.VReg, cond ssa.Value, code wazevoapi.ExitCode) {
+func (m *machine) lowerExitIfTrueWithCode(execCtxVReg regalloc.VReg, cond ssa.Value, code wazevoapi.ExitCode) {
 	condDef := m.compiler.ValueDefinition(cond)
 	if !m.compiler.MatchInstr(condDef, ssa.OpcodeIcmp) {
 		// We can have general case just like cachine.LowerConditionalBranch.
-		panic("TODO: OpcodeExitIfNotZeroWithCode must come after Icmp at the moment")
+		panic("TODO: OpcodeExitIfTrueWithCode must come after Icmp at the moment")
 	}
 	m.compiler.MarkLowered(condDef.Instr)
 
@@ -378,7 +378,7 @@ func (m *machine) lowerExitIfNotZeroWithCode(execCtxVReg regalloc.VReg, cond ssa
 
 	// We have to skip the entire exit sequence if the condition is false.
 	cbr := m.allocateInstr()
-	cbr.asCondBr(cc.asCond(), invalidLabel, false /* ignored */)
+	cbr.asCondBr(cc.invert().asCond(), invalidLabel, false /* ignored */)
 	cbr.condBrOffsetResolve(exitWithCodeEncodingSize + 4 /* br offset is from the beginning of this instruction */)
 	m.insert(cbr)
 	m.lowerExitWithCode(execCtxVReg, code)

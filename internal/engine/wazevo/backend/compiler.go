@@ -187,10 +187,10 @@ func (c *compiler) assignVirtualRegisters() {
 
 	need := len(refCounts)
 	if need >= len(c.ssaValueToVRegs) {
-		c.ssaValueToVRegs = append(c.ssaValueToVRegs, make([]regalloc.VReg, need)...)
+		c.ssaValueToVRegs = append(c.ssaValueToVRegs, make([]regalloc.VReg, need+1)...)
 	}
 	if need >= len(c.ssaValueDefinitions) {
-		c.ssaValueDefinitions = append(c.ssaValueDefinitions, make([]SSAValueDefinition, need)...)
+		c.ssaValueDefinitions = append(c.ssaValueDefinitions, make([]SSAValueDefinition, need+1)...)
 	}
 
 	for blk := builder.BlockIteratorReversePostOrderBegin(); blk != nil; blk = builder.BlockIteratorReversePostOrderNext() {

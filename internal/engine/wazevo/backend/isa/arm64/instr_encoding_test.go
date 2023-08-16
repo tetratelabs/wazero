@@ -17,6 +17,78 @@ func TestInstruction_encode(t *testing.T) {
 		setup func(*instruction)
 		want  string
 	}{
+		{want: "5b28030b", setup: func(i *instruction) {
+			i.asALU(aluOpAdd, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSL), false)
+		}},
+		{want: "5b28038b", setup: func(i *instruction) {
+			i.asALU(aluOpAdd, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSL), true)
+		}},
+		{want: "5b28032b", setup: func(i *instruction) {
+			i.asALU(aluOpAddS, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSL), false)
+		}},
+		{want: "5b2803ab", setup: func(i *instruction) {
+			i.asALU(aluOpAddS, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSL), true)
+		}},
+		{want: "5b28430b", setup: func(i *instruction) {
+			i.asALU(aluOpAdd, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSR), false)
+		}},
+		{want: "5b28438b", setup: func(i *instruction) {
+			i.asALU(aluOpAdd, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSR), true)
+		}},
+		{want: "5b28432b", setup: func(i *instruction) {
+			i.asALU(aluOpAddS, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSR), false)
+		}},
+		{want: "5b2843ab", setup: func(i *instruction) {
+			i.asALU(aluOpAddS, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSR), true)
+		}},
+		{want: "5b28830b", setup: func(i *instruction) {
+			i.asALU(aluOpAdd, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpASR), false)
+		}},
+		{want: "5b28838b", setup: func(i *instruction) {
+			i.asALU(aluOpAdd, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpASR), true)
+		}},
+		{want: "5b28832b", setup: func(i *instruction) {
+			i.asALU(aluOpAddS, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpASR), false)
+		}},
+		{want: "5b2883ab", setup: func(i *instruction) {
+			i.asALU(aluOpAddS, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpASR), true)
+		}},
+		{want: "5b28034b", setup: func(i *instruction) {
+			i.asALU(aluOpSub, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSL), false)
+		}},
+		{want: "5b2803cb", setup: func(i *instruction) {
+			i.asALU(aluOpSub, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSL), true)
+		}},
+		{want: "5b28036b", setup: func(i *instruction) {
+			i.asALU(aluOpSubS, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSL), false)
+		}},
+		{want: "5b2803eb", setup: func(i *instruction) {
+			i.asALU(aluOpSubS, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSL), true)
+		}},
+		{want: "5b28434b", setup: func(i *instruction) {
+			i.asALU(aluOpSub, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSR), false)
+		}},
+		{want: "5b2843cb", setup: func(i *instruction) {
+			i.asALU(aluOpSub, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSR), true)
+		}},
+		{want: "5b28436b", setup: func(i *instruction) {
+			i.asALU(aluOpSubS, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSR), false)
+		}},
+		{want: "5b2843eb", setup: func(i *instruction) {
+			i.asALU(aluOpSubS, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSR), true)
+		}},
+		{want: "5b28834b", setup: func(i *instruction) {
+			i.asALU(aluOpSub, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpASR), false)
+		}},
+		{want: "5b2883cb", setup: func(i *instruction) {
+			i.asALU(aluOpSub, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpASR), true)
+		}},
+		{want: "5b28836b", setup: func(i *instruction) {
+			i.asALU(aluOpSubS, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpASR), false)
+		}},
+		{want: "5b2883eb", setup: func(i *instruction) {
+			i.asALU(aluOpSubS, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpASR), true)
+		}},
 		{want: "60033fd6", setup: func(i *instruction) {
 			i.asCallIndirect(tmpRegVReg, nil)
 		}},
