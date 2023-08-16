@@ -22,6 +22,7 @@ func TestModuleEngine_setupOpaque(t *testing.T) {
 				LocalMemoryBegin:       10,
 				ImportedMemoryBegin:    -1,
 				ImportedFunctionsBegin: -1,
+				TablesBegin:            -1,
 				GlobalsBegin:           -1,
 			},
 			m: &wasm.ModuleInstance{MemoryInstance: &wasm.MemoryInstance{
@@ -33,6 +34,7 @@ func TestModuleEngine_setupOpaque(t *testing.T) {
 				LocalMemoryBegin:       -1,
 				ImportedMemoryBegin:    30,
 				GlobalsBegin:           -1,
+				TablesBegin:            -1,
 				ImportedFunctionsBegin: -1,
 			},
 			m: &wasm.ModuleInstance{MemoryInstance: &wasm.MemoryInstance{
@@ -50,6 +52,7 @@ func TestModuleEngine_setupOpaque(t *testing.T) {
 			m: &wasm.ModuleInstance{
 				Globals: []*wasm.GlobalInstance{{}, {}, {}, {}, {}, {}},
 				Tables:  []*wasm.TableInstance{{}, {}, {}},
+				TypeIDs: make([]wasm.FunctionTypeID, 50),
 			},
 		},
 	} {
@@ -94,6 +97,10 @@ func TestModuleEngine_setupOpaque(t *testing.T) {
 				}
 			}
 			if tc.offset.TablesBegin >= 0 {
+				typeIDsPtr := uintptr(binary.LittleEndian.Uint64(m.opaque[int(tc.offset.TypeIDs1stElement):]))
+				expPtr := uintptr(unsafe.Pointer(&tc.m.TypeIDs[0]))
+				require.Equal(t, expPtr, typeIDsPtr)
+
 				for i, table := range tc.m.Tables {
 					actualPtr := uintptr(binary.LittleEndian.Uint64(m.opaque[int(tc.offset.TablesBegin)+8*i:]))
 					expPtr := uintptr(unsafe.Pointer(table))
@@ -117,7 +124,10 @@ func TestModuleEngine_ResolveImportedFunction(t *testing.T) {
 			executable:      make([]byte, 1000),
 			functionOffsets: []compiledFunctionOffset{{offset: 1, goPreambleSize: 4}, {offset: 5, goPreambleSize: 4}, {offset: 10, goPreambleSize: 4}},
 		},
-		module: &wasm.ModuleInstance{TypeIDs: []wasm.FunctionTypeID{111, 222, 333}},
+		module: &wasm.ModuleInstance{
+			TypeIDs: []wasm.FunctionTypeID{0, 0, 0, 0, 111, 222, 333},
+			Source:  &wasm.Module{FunctionSection: []wasm.Index{4, 5, 6}},
+		},
 	}
 	im2 := &moduleEngine{
 		opaquePtr: &op2,
@@ -125,7 +135,10 @@ func TestModuleEngine_ResolveImportedFunction(t *testing.T) {
 			executable:      make([]byte, 1000),
 			functionOffsets: []compiledFunctionOffset{{offset: 50, goPreambleSize: 4}},
 		},
-		module: &wasm.ModuleInstance{TypeIDs: []wasm.FunctionTypeID{999}},
+		module: &wasm.ModuleInstance{
+			TypeIDs: []wasm.FunctionTypeID{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 999},
+			Source:  &wasm.Module{FunctionSection: []wasm.Index{10}},
+		},
 	}
 
 	m.ResolveImportedFunction(0, 0, im1)
@@ -133,7 +146,7 @@ func TestModuleEngine_ResolveImportedFunction(t *testing.T) {
 	m.ResolveImportedFunction(2, 2, im1)
 	m.ResolveImportedFunction(3, 1, im1)
 
-	for _, tc := range []struct {
+	for i, tc := range []struct {
 		index      int
 		op         *byte
 		executable *byte
@@ -144,15 +157,17 @@ func TestModuleEngine_ResolveImportedFunction(t *testing.T) {
 		{index: 2, op: &op1, executable: &im1.parent.executable[10+4], expTypeID: 333},
 		{index: 3, op: &op1, executable: &im1.parent.executable[5+4], expTypeID: 222},
 	} {
-		buf := m.opaque[begin+wazevoapi.FunctionInstanceSize*tc.index:]
-		actualExecutable := binary.LittleEndian.Uint64(buf)
-		actualOpaquePtr := binary.LittleEndian.Uint64(buf[8:])
-		actualTypeID := binary.LittleEndian.Uint64(buf[16:])
-		expExecutable := uint64(uintptr(unsafe.Pointer(tc.executable)))
-		expOpaquePtr := uint64(uintptr(unsafe.Pointer(tc.op)))
-		require.Equal(t, expExecutable, actualExecutable)
-		require.Equal(t, expOpaquePtr, actualOpaquePtr)
-		require.Equal(t, uint64(tc.expTypeID), actualTypeID)
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			buf := m.opaque[begin+wazevoapi.FunctionInstanceSize*tc.index:]
+			actualExecutable := binary.LittleEndian.Uint64(buf)
+			actualOpaquePtr := binary.LittleEndian.Uint64(buf[8:])
+			actualTypeID := binary.LittleEndian.Uint64(buf[16:])
+			expExecutable := uint64(uintptr(unsafe.Pointer(tc.executable)))
+			expOpaquePtr := uint64(uintptr(unsafe.Pointer(tc.op)))
+			require.Equal(t, expExecutable, actualExecutable)
+			require.Equal(t, expOpaquePtr, actualOpaquePtr)
+			require.Equal(t, uint64(tc.expTypeID), actualTypeID)
+		})
 	}
 }
 
@@ -164,4 +179,24 @@ func TestModuleContextOffsetData_ImportedFunctionOffset(t *testing.T) {
 	require.Equal(t, 100+10*wazevoapi.FunctionInstanceSize, int(ptr))
 	require.Equal(t, moduleCtx, ptr+8)
 	require.Equal(t, typeID, ptr+16)
+}
+
+func Test_getTypeIDOf(t *testing.T) {
+	m := &wasm.ModuleInstance{
+		TypeIDs: []wasm.FunctionTypeID{111, 222, 333, 444},
+		Source: &wasm.Module{
+			ImportFunctionCount: 1,
+			ImportSection: []wasm.Import{
+				{Type: wasm.ExternTypeMemory},
+				{Type: wasm.ExternTypeTable},
+				{Type: wasm.ExternTypeFunc, DescFunc: 3},
+			},
+			FunctionSection: []wasm.Index{2, 1, 0},
+		},
+	}
+
+	require.Equal(t, wasm.FunctionTypeID(444), getTypeIDOf(0, m))
+	require.Equal(t, wasm.FunctionTypeID(333), getTypeIDOf(1, m))
+	require.Equal(t, wasm.FunctionTypeID(222), getTypeIDOf(2, m))
+	require.Equal(t, wasm.FunctionTypeID(111), getTypeIDOf(3, m))
 }

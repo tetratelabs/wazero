@@ -58,12 +58,15 @@ type ModuleContextOffsetData struct {
 	ImportedMemoryBegin,
 	ImportedFunctionsBegin,
 	GlobalsBegin,
+	TypeIDs1stElement,
 	TablesBegin Offset
 }
 
 // ImportedFunctionOffset returns an offset of the i-th imported function.
 // Each item is stored as wazevo.functionInstance whose size matches FunctionInstanceSize.
-func (m *ModuleContextOffsetData) ImportedFunctionOffset(i wasm.Index) (ptr, moduleCtx, typeID Offset) {
+func (m *ModuleContextOffsetData) ImportedFunctionOffset(i wasm.Index) (
+	executableOffset, moduleCtxOffset, typeIDOffset Offset,
+) {
 	base := m.ImportedFunctionsBegin + Offset(i)*FunctionInstanceSize
 	return base, base + 8, base + 16
 }
@@ -105,6 +108,11 @@ func (m *ModuleContextOffsetData) LocalMemoryLen() Offset {
 		return l + 8
 	}
 	return -1
+}
+
+// TableOffset returns an offset of the i-th table instance.
+func (m *ModuleContextOffsetData) TableOffset(tableIndex int) Offset {
+	return m.TablesBegin + Offset(tableIndex)*8
 }
 
 // NewModuleContextOffsetData creates a ModuleContextOffsetData determining the structure of moduleContextOpaque for the given Module.
@@ -154,10 +162,14 @@ func NewModuleContextOffsetData(m *wasm.Module) ModuleContextOffsetData {
 	}
 
 	if tables := len(m.TableSection) + int(m.ImportTableCount); tables > 0 {
+		ret.TypeIDs1stElement = offset
+		offset += 8 // First element of TypeIDs.
+
 		ret.TablesBegin = offset
 		// Pointers to *wasm.TableInstance.
 		offset += Offset(tables) * 8
 	} else {
+		ret.TypeIDs1stElement = -1
 		ret.TablesBegin = -1
 	}
 

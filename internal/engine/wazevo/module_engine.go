@@ -40,6 +40,7 @@ type (
 	// 	    importedMemoryOwnerOpaqueCtx              *byte                (optional)
 	// 	    importedFunctions                         [# of importedFunctions]functionInstance
 	//      globals                                   []*wasm.GlobalInstance (optional)
+	//      typeIDsBegin                              &wasm.ModuleInstance.TypeIDs[0]  (optional)
 	//      tables                                    []*wasm.TableInstance  (optional)
 	// 	    TODO: add more fields, like tables, etc.
 	// 	}
@@ -82,6 +83,10 @@ func (m *moduleEngine) setupOpaque() {
 	}
 
 	if tableOffset := offsets.TablesBegin; tableOffset >= 0 {
+		// First we write the first element's address of typeIDs.
+		binary.LittleEndian.PutUint64(opaque[offsets.TypeIDs1stElement:], uint64(uintptr(unsafe.Pointer(&inst.TypeIDs[0]))))
+
+		// Then we write the table addresses.
 		for _, table := range inst.Tables {
 			binary.LittleEndian.PutUint64(opaque[tableOffset:], uint64(uintptr(unsafe.Pointer(table))))
 			tableOffset += 8
@@ -121,16 +126,38 @@ func (m *moduleEngine) NewFunction(index wasm.Index) api.Function {
 
 // ResolveImportedFunction implements wasm.ModuleEngine.
 func (m *moduleEngine) ResolveImportedFunction(index, indexInImportedModule wasm.Index, importedModuleEngine wasm.ModuleEngine) {
-	ptr, moduleCtx, typeID := m.parent.offsets.ImportedFunctionOffset(index)
+	executableOffset, moduleCtxOffset, typeIDOffset := m.parent.offsets.ImportedFunctionOffset(index)
 	importedME := importedModuleEngine.(*moduleEngine)
 
 	offset := importedME.parent.functionOffsets[indexInImportedModule]
+	typeID := getTypeIDOf(indexInImportedModule, importedME.module)
 	// When calling imported function from the machine code, we need to skip the Go preamble.
 	executable := &importedME.parent.executable[offset.offset+offset.goPreambleSize]
 	// Write functionInstance.
-	binary.LittleEndian.PutUint64(m.opaque[ptr:], uint64(uintptr(unsafe.Pointer(executable))))
-	binary.LittleEndian.PutUint64(m.opaque[moduleCtx:], uint64(uintptr(unsafe.Pointer(importedME.opaquePtr))))
-	binary.LittleEndian.PutUint64(m.opaque[typeID:], uint64(importedME.module.TypeIDs[indexInImportedModule]))
+	binary.LittleEndian.PutUint64(m.opaque[executableOffset:], uint64(uintptr(unsafe.Pointer(executable))))
+	binary.LittleEndian.PutUint64(m.opaque[moduleCtxOffset:], uint64(uintptr(unsafe.Pointer(importedME.opaquePtr))))
+	binary.LittleEndian.PutUint64(m.opaque[typeIDOffset:], uint64(typeID))
+}
+
+func getTypeIDOf(funcIndex wasm.Index, m *wasm.ModuleInstance) wasm.FunctionTypeID {
+	source := m.Source
+
+	var typeIndex wasm.Index
+	if funcIndex >= source.ImportFunctionCount {
+		funcIndex -= source.ImportFunctionCount
+		typeIndex = source.FunctionSection[funcIndex]
+	} else {
+		var cnt wasm.Index
+		for i := range source.ImportSection {
+			if source.ImportSection[i].Type == wasm.ExternTypeFunc {
+				if cnt == funcIndex {
+					return m.TypeIDs[source.ImportSection[i].DescFunc]
+				}
+				cnt++
+			}
+		}
+	}
+	return m.TypeIDs[typeIndex]
 }
 
 // ResolveImportedMemory implements wasm.ModuleEngine.
@@ -165,7 +192,7 @@ func (m *moduleEngine) FunctionInstanceReference(funcIndex wasm.Index) wasm.Refe
 
 	p := m.parent
 	executable := &p.executable[p.functionOffsets[funcIndex].offset]
-	typeID := m.module.TypeIDs[funcIndex]
+	typeID := m.module.TypeIDs[m.module.Source.FunctionSection[funcIndex]]
 	m.localFunctionInstances = append(m.localFunctionInstances, functionInstance{
 		executable:             executable,
 		moduleContextOpaquePtr: m.opaquePtr,
