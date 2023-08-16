@@ -45,9 +45,11 @@ func TestModuleEngine_setupOpaque(t *testing.T) {
 				ImportedMemoryBegin:    -1,
 				ImportedFunctionsBegin: -1,
 				GlobalsBegin:           30,
+				TablesBegin:            100,
 			},
 			m: &wasm.ModuleInstance{
 				Globals: []*wasm.GlobalInstance{{}, {}, {}, {}, {}, {}},
+				Tables:  []*wasm.TableInstance{{}, {}, {}},
 			},
 		},
 	} {
@@ -88,6 +90,13 @@ func TestModuleEngine_setupOpaque(t *testing.T) {
 				for i, g := range tc.m.Globals {
 					actualPtr := uintptr(binary.LittleEndian.Uint64(m.opaque[int(tc.offset.GlobalsBegin)+8*i:]))
 					expPtr := uintptr(unsafe.Pointer(g))
+					require.Equal(t, expPtr, actualPtr)
+				}
+			}
+			if tc.offset.TablesBegin >= 0 {
+				for i, table := range tc.m.Tables {
+					actualPtr := uintptr(binary.LittleEndian.Uint64(m.opaque[int(tc.offset.TablesBegin)+8*i:]))
+					expPtr := uintptr(unsafe.Pointer(table))
 					require.Equal(t, expPtr, actualPtr)
 				}
 			}

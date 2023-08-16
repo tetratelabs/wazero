@@ -57,7 +57,8 @@ type ModuleContextOffsetData struct {
 	LocalMemoryBegin,
 	ImportedMemoryBegin,
 	ImportedFunctionsBegin,
-	GlobalsBegin Offset
+	GlobalsBegin,
+	TablesBegin Offset
 }
 
 // ImportedFunctionOffset returns an offset of the i-th imported function.
@@ -150,6 +151,14 @@ func NewModuleContextOffsetData(m *wasm.Module) ModuleContextOffsetData {
 		offset += Offset(globals) * 8
 	} else {
 		ret.GlobalsBegin = -1
+	}
+
+	if tables := len(m.TableSection) + int(m.ImportTableCount); tables > 0 {
+		ret.TablesBegin = offset
+		// Pointers to *wasm.TableInstance.
+		offset += Offset(tables) * 8
+	} else {
+		ret.TablesBegin = -1
 	}
 
 	ret.TotalSize = int(offset)

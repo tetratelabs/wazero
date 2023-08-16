@@ -40,6 +40,7 @@ type (
 	// 	    importedMemoryOwnerOpaqueCtx              *byte                (optional)
 	// 	    importedFunctions                         [# of importedFunctions]functionInstance
 	//      globals                                   []*wasm.GlobalInstance (optional)
+	//      tables                                    []*wasm.TableInstance  (optional)
 	// 	    TODO: add more fields, like tables, etc.
 	// 	}
 	//
@@ -75,9 +76,15 @@ func (m *moduleEngine) setupOpaque() {
 
 	if globalOffset := offsets.GlobalsBegin; globalOffset >= 0 {
 		for _, g := range inst.Globals {
-			b := uint64(uintptr(unsafe.Pointer(g)))
-			binary.LittleEndian.PutUint64(opaque[globalOffset:], b)
+			binary.LittleEndian.PutUint64(opaque[globalOffset:], uint64(uintptr(unsafe.Pointer(g))))
 			globalOffset += 8
+		}
+	}
+
+	if tableOffset := offsets.TablesBegin; tableOffset >= 0 {
+		for _, table := range inst.Tables {
+			binary.LittleEndian.PutUint64(opaque[tableOffset:], uint64(uintptr(unsafe.Pointer(table))))
+			tableOffset += 8
 		}
 	}
 }
