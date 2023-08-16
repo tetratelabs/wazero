@@ -117,6 +117,7 @@ func (m *moduleEngine) NewFunction(index wasm.Index) api.Function {
 		executable:             &p.executable[offset.offset],
 		parent:                 m,
 		sizeOfParamResultSlice: sizeOfParamResultSlice,
+		numberOfResults:        typ.ResultNumInUint64,
 	}
 
 	ce.execCtx.memoryGrowTrampolineAddress = &m.parent.builtinFunctions.memoryGrowExecutable[0]
@@ -151,7 +152,8 @@ func getTypeIDOf(funcIndex wasm.Index, m *wasm.ModuleInstance) wasm.FunctionType
 		for i := range source.ImportSection {
 			if source.ImportSection[i].Type == wasm.ExternTypeFunc {
 				if cnt == funcIndex {
-					return m.TypeIDs[source.ImportSection[i].DescFunc]
+					typeIndex = source.ImportSection[i].DescFunc
+					break
 				}
 				cnt++
 			}

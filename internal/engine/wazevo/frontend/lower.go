@@ -509,6 +509,52 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 
 		// After the memory grow, reload the cached memory base and len.
 		c.reloadMemoryBaseLen()
+
+	case wasm.OpcodeI32Store,
+		wasm.OpcodeI64Store,
+		wasm.OpcodeF32Store,
+		wasm.OpcodeF64Store,
+		wasm.OpcodeI32Store8,
+		wasm.OpcodeI32Store16,
+		wasm.OpcodeI64Store8,
+		wasm.OpcodeI64Store16,
+		wasm.OpcodeI64Store32:
+
+		_, offset := c.readMemArg()
+		if state.unreachable {
+			return
+		}
+
+		var opSize uint64
+		var opcode ssa.Opcode
+		switch op {
+		case wasm.OpcodeI32Store, wasm.OpcodeF32Store:
+			opcode = ssa.OpcodeStore
+			opSize = 4
+		case wasm.OpcodeI64Store, wasm.OpcodeF64Store:
+			opcode = ssa.OpcodeStore
+			opSize = 8
+		case wasm.OpcodeI32Store8, wasm.OpcodeI64Store8:
+			opcode = ssa.OpcodeIstore8
+			opSize = 1
+		case wasm.OpcodeI32Store16, wasm.OpcodeI64Store16:
+			opcode = ssa.OpcodeIstore16
+			opSize = 2
+		case wasm.OpcodeI64Store32:
+			opcode = ssa.OpcodeIstore32
+			opSize = 4
+		default:
+			panic("BUG")
+		}
+
+		value := state.pop()
+		baseAddr := state.pop()
+		addr := c.memOpSetup(baseAddr, uint64(offset), opSize)
+
+		store := builder.AllocateInstruction()
+		store.AsStore(opcode, value, addr, offset)
+		builder.InsertInstruction(store)
+
 	case wasm.OpcodeI32Load,
 		wasm.OpcodeI64Load,
 		wasm.OpcodeF32Load,
@@ -528,59 +574,28 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 			return
 		}
 
-		ceil := offset
+		var opSize uint64
 		switch op {
 		case wasm.OpcodeI32Load, wasm.OpcodeF32Load:
-			ceil += 4
+			opSize = 4
 		case wasm.OpcodeI64Load, wasm.OpcodeF64Load:
-			ceil += 8
+			opSize = 8
 		case wasm.OpcodeI32Load8S, wasm.OpcodeI32Load8U:
-			ceil += 1
+			opSize = 1
 		case wasm.OpcodeI32Load16S, wasm.OpcodeI32Load16U:
-			ceil += 2
+			opSize = 2
 		case wasm.OpcodeI64Load8S, wasm.OpcodeI64Load8U:
-			ceil += 1
+			opSize = 1
 		case wasm.OpcodeI64Load16S, wasm.OpcodeI64Load16U:
-			ceil += 2
+			opSize = 2
 		case wasm.OpcodeI64Load32S, wasm.OpcodeI64Load32U:
-			ceil += 4
+			opSize = 4
 		default:
 			panic("BUG")
 		}
 
-		ceilConst := builder.AllocateInstruction()
-		ceilConst.AsIconst64(uint64(ceil))
-		builder.InsertInstruction(ceilConst)
-
-		// We calculate the offset in 64-bit space.
 		baseAddr := state.pop()
-		extBaseAddr := builder.AllocateInstruction()
-		extBaseAddr.AsUExtend(baseAddr, 32, 64)
-		builder.InsertInstruction(extBaseAddr)
-
-		// Note: memLen is already zero extended to 64-bit space at the load time.
-		memLen := c.getMemoryLenValue(false)
-
-		// baseAddrPlusCeil = baseAddr + ceil
-		baseAddrPlusCeil := builder.AllocateInstruction()
-		baseAddrPlusCeil.AsIadd(extBaseAddr.Return(), ceilConst.Return())
-		builder.InsertInstruction(baseAddrPlusCeil)
-
-		// Check for out of bounds memory access: `memLen >= baseAddrPlusCeil`.
-		cmp := builder.AllocateInstruction()
-		cmp.AsIcmp(memLen, baseAddrPlusCeil.Return(), ssa.IntegerCmpCondUnsignedLessThan)
-		builder.InsertInstruction(cmp)
-		exitIfNZ := builder.AllocateInstruction()
-		exitIfNZ.AsExitIfTrueWithCode(c.execCtxPtrValue, cmp.Return(), wazevoapi.ExitCodeMemoryOutOfBounds)
-		builder.InsertInstruction(exitIfNZ)
-
-		// Load the value from memBase + extBaseAddr.
-		memBase := c.getMemoryBaseValue(false)
-		addrCalc := builder.AllocateInstruction()
-		addrCalc.AsIadd(memBase, extBaseAddr.Return())
-		builder.InsertInstruction(addrCalc)
-
-		addr := addrCalc.Return()
+		addr := c.memOpSetup(baseAddr, uint64(offset), opSize)
 		load := builder.AllocateInstruction()
 		switch op {
 		case wasm.OpcodeI32Load:
@@ -1059,6 +1074,44 @@ func (c *Compiler) lowerCallIndirect(typeIndex, tableIndex uint32) {
 	c.reloadAfterCall()
 }
 
+// memOpSetup inserts the bounds check and calculates the address of the memory operation (loads/stores).
+func (c *Compiler) memOpSetup(baseAddr ssa.Value, constOffset, operationSizeInBytes uint64) (address ssa.Value) {
+	builder := c.ssaBuilder
+
+	ceil := constOffset + operationSizeInBytes
+	ceilConst := builder.AllocateInstruction()
+	ceilConst.AsIconst64(ceil)
+	builder.InsertInstruction(ceilConst)
+
+	// We calculate the offset in 64-bit space.
+	extBaseAddr := builder.AllocateInstruction()
+	extBaseAddr.AsUExtend(baseAddr, 32, 64)
+	builder.InsertInstruction(extBaseAddr)
+
+	// Note: memLen is already zero extended to 64-bit space at the load time.
+	memLen := c.getMemoryLenValue(false)
+
+	// baseAddrPlusCeil = baseAddr + ceil
+	baseAddrPlusCeil := builder.AllocateInstruction()
+	baseAddrPlusCeil.AsIadd(extBaseAddr.Return(), ceilConst.Return())
+	builder.InsertInstruction(baseAddrPlusCeil)
+
+	// Check for out of bounds memory access: `memLen >= baseAddrPlusCeil`.
+	cmp := builder.AllocateInstruction()
+	cmp.AsIcmp(memLen, baseAddrPlusCeil.Return(), ssa.IntegerCmpCondUnsignedLessThan)
+	builder.InsertInstruction(cmp)
+	exitIfNZ := builder.AllocateInstruction()
+	exitIfNZ.AsExitIfTrueWithCode(c.execCtxPtrValue, cmp.Return(), wazevoapi.ExitCodeMemoryOutOfBounds)
+	builder.InsertInstruction(exitIfNZ)
+
+	// Load the value from memBase + extBaseAddr.
+	memBase := c.getMemoryBaseValue(false)
+	addrCalc := builder.AllocateInstruction()
+	addrCalc.AsIadd(memBase, extBaseAddr.Return())
+	builder.InsertInstruction(addrCalc)
+	return addrCalc.Return()
+}
+
 func (c *Compiler) reloadAfterCall() {
 	// Note that when these are not used in the following instructions, they will be optimized out.
 	// So in any ways, we define them!
@@ -1092,7 +1145,7 @@ func (c *Compiler) setWasmGlobalValue(index wasm.Index, v ssa.Value) {
 	builder.InsertInstruction(loadGlobalInstPtr)
 
 	store := builder.AllocateInstruction()
-	store.AsStore(v, loadGlobalInstPtr.Return(), uint32(globalInstanceValueOffset))
+	store.AsStore(ssa.OpcodeStore, v, loadGlobalInstPtr.Return(), uint32(globalInstanceValueOffset))
 	builder.InsertInstruction(store)
 
 	// The value has changed to `v`, so we record it.
@@ -1216,7 +1269,8 @@ func (c *Compiler) storeCallerModuleContext() {
 	builder := c.ssaBuilder
 	execCtx := c.execCtxPtrValue
 	store := builder.AllocateInstruction()
-	store.AsStore(c.moduleCtxPtrValue, execCtx, wazevoapi.ExecutionContextOffsets.CallerModuleContextPtr.U32())
+	store.AsStore(ssa.OpcodeStore,
+		c.moduleCtxPtrValue, execCtx, wazevoapi.ExecutionContextOffsets.CallerModuleContextPtr.U32())
 	builder.InsertInstruction(store)
 }
 

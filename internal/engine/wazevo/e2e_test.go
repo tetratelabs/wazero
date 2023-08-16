@@ -30,10 +30,9 @@ func TestE2E(t *testing.T) {
 		expErr             string
 	}
 	for _, tc := range []struct {
-		name           string
-		imported, m    *wasm.Module
-		needHostModule bool
-		calls          []callCase
+		name        string
+		imported, m *wasm.Module
+		calls       []callCase
 	}{
 		{
 			name: "swap", m: testcases.SwapParamAndReturn.Module,
@@ -87,6 +86,18 @@ func TestE2E(t *testing.T) {
 				{params: []uint64{100}, expResults: []uint64{100 * 100}},
 			},
 		},
+		{
+			name: "memory_store_basic",
+			m:    testcases.MemoryStoreBasic.Module,
+			calls: []callCase{
+				{params: []uint64{0, 0xf}, expResults: []uint64{0xf}},
+				{params: []uint64{256, 0xff}, expResults: []uint64{0xff}},
+				{params: []uint64{100, 0xffffffff}, expResults: []uint64{0xffffffff}},
+				// We load I32, so we can't load from the last 3 bytes.
+				{params: []uint64{uint64(wasm.MemoryPageSize) - 3}, expErr: "out of bounds memory access"},
+			},
+		},
+
 		{
 			name: "memory_load_basic",
 			m:    testcases.MemoryLoadBasic.Module,

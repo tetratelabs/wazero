@@ -779,6 +779,26 @@ var (
 			}}},
 		},
 	}
+
+	MemoryStoreBasic = TestCase{
+		Name: "memory_load_basic",
+		Module: &wasm.Module{
+			TypeSection:     []wasm.FunctionType{{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}}},
+			ExportSection:   []wasm.Export{{Name: ExportName, Type: wasm.ExternTypeFunc, Index: 0}},
+			MemorySection:   &wasm.Memory{Min: 1},
+			FunctionSection: []wasm.Index{0},
+			CodeSection: []wasm.Code{{Body: []byte{
+				wasm.OpcodeLocalGet, 0, // offset
+				wasm.OpcodeLocalGet, 1, // value
+				wasm.OpcodeI32Store, 0x2, 0x0, // alignment=2 (natural alignment) staticOffset=0
+				// Read back.
+				wasm.OpcodeLocalGet, 0, // offset
+				wasm.OpcodeI32Load, 0x2, 0x0, // alignment=2 (natural alignment) staticOffset=0
+				wasm.OpcodeEnd,
+			}}},
+		},
+	}
+
 	MemoryLoadBasic = TestCase{
 		Name: "memory_load_basic",
 		Module: &wasm.Module{

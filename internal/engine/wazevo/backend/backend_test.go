@@ -2667,7 +2667,9 @@ L1 (SSA Block: blk0):
 
 			switch runtime.GOARCH {
 			case "arm64":
-				require.Equal(t, tc.afterLoweringARM64, be.Format())
+				if tc.afterLoweringARM64 != "" {
+					require.Equal(t, tc.afterLoweringARM64, be.Format())
+				}
 			default:
 				t.Fail()
 			}

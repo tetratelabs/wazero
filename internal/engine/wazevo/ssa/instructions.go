@@ -973,11 +973,25 @@ func (i *Instruction) LoadData() (ptr Value, offset uint32, typ Type) {
 }
 
 // AsStore initializes this instruction as a store instruction with OpcodeStore.
-func (i *Instruction) AsStore(value, ptr Value, offset uint32) {
-	i.opcode = OpcodeStore
+func (i *Instruction) AsStore(storeOp Opcode, value, ptr Value, offset uint32) {
+	i.opcode = storeOp
 	i.v = value
 	i.v2 = ptr
-	i.u64 = uint64(offset) | uint64(value.Type().Bits())<<32
+
+	var dstSize uint64
+	switch storeOp {
+	case OpcodeStore:
+		dstSize = uint64(value.Type().Bits())
+	case OpcodeIstore8:
+		dstSize = 8
+	case OpcodeIstore16:
+		dstSize = 16
+	case OpcodeIstore32:
+		dstSize = 32
+	default:
+		panic("invalid store opcode" + storeOp.String())
+	}
+	i.u64 = uint64(offset) | dstSize<<32
 }
 
 // StoreData returns the operands for a store instruction.
@@ -1401,6 +1415,7 @@ func (i *Instruction) Format(b Builder) string {
 		instSuffix = strings.Join(vs, ", ")
 	case OpcodeIshl, OpcodeSshr, OpcodeUshr:
 		instSuffix = fmt.Sprintf(" %s, %s", i.v.Format(b), i.v2.Format(b))
+	case OpcodeUndefined:
 	default:
 		panic(fmt.Sprintf("TODO: format for %s", i.opcode))
 	}
@@ -1460,7 +1475,7 @@ func (o Opcode) String() (ret string) {
 	case OpcodeInvalid:
 		return "invalid"
 	case OpcodeUndefined:
-		return "undefined"
+		return "Undefined"
 	case OpcodeJump:
 		return "Jump"
 	case OpcodeBrz:
