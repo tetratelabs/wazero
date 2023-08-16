@@ -144,9 +144,13 @@ func (c *Compiler) lowerBody(entryBlk ssa.BasicBlock) {
 	}
 }
 
+func (c *Compiler) state() *loweringState {
+	return &c.loweringState
+}
+
 func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 	builder := c.ssaBuilder
-	state := &c.loweringState
+	state := c.state()
 	switch op {
 	case wasm.OpcodeI32Const:
 		c := c.readI32s()
@@ -842,6 +846,14 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		builder.InsertInstruction(exit)
 		state.unreachable = true
 
+	case wasm.OpcodeCallIndirect:
+		typeIndex := c.readI32u()
+		tableIndex := c.readI32u()
+		if state.unreachable {
+			return
+		}
+		c.lowerCallIndirect(typeIndex, tableIndex)
+
 	case wasm.OpcodeCall:
 		fnIndex := c.readI32u()
 		if state.unreachable {
@@ -916,6 +928,131 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 	default:
 		panic("TODO: unsupported in wazevo yet: " + wasm.InstructionName(op))
 	}
+}
+
+const (
+	tableInstanceBaseAddressOffset = 0
+	tableInstanceLenOffset         = tableInstanceBaseAddressOffset + 8
+)
+
+func (c *Compiler) lowerCallIndirect(typeIndex, tableIndex uint32) {
+	builder := c.ssaBuilder
+	state := c.state()
+
+	targetOffsetInTable := state.pop()
+
+	// Load the table.
+	tableOffset := c.offset.TableOffset(int(tableIndex))
+	loadTableInstancePtr := builder.AllocateInstruction()
+	loadTableInstancePtr.AsLoad(c.moduleCtxPtrValue, tableOffset.U32(), ssa.TypeI64)
+	builder.InsertInstruction(loadTableInstancePtr)
+	tableInstancePtr := loadTableInstancePtr.Return()
+
+	// Load the table's length.
+	loadTableLen := builder.AllocateInstruction()
+	loadTableLen.AsLoad(tableInstancePtr, tableInstanceLenOffset, ssa.TypeI32)
+	builder.InsertInstruction(loadTableLen)
+	tableLen := loadTableLen.Return()
+
+	// Compare the length and the target, and trap if out of bounds.
+	checkOOB := builder.AllocateInstruction()
+	checkOOB.AsIcmp(targetOffsetInTable, tableLen, ssa.IntegerCmpCondUnsignedGreaterThanOrEqual)
+	builder.InsertInstruction(checkOOB)
+	exitIfOOB := builder.AllocateInstruction()
+	exitIfOOB.AsExitIfNotZeroWithCode(c.execCtxPtrValue, checkOOB.Return(), wazevoapi.ExitCodeInvalidTableAccess)
+	builder.InsertInstruction(exitIfOOB)
+
+	// Get the base address of wasm.TableInstance.References.
+	loadTableBaseAddress := builder.AllocateInstruction()
+	loadTableBaseAddress.AsLoad(tableInstancePtr, tableInstanceBaseAddressOffset, ssa.TypeI64)
+	builder.InsertInstruction(loadTableBaseAddress)
+	tableBase := loadTableBaseAddress.Return()
+
+	// Calculate the address of the target function. First we need to multiply targetOffsetInTable by 8 (pointer size).
+	multiplyBy8 := builder.AllocateInstruction()
+	three := builder.AllocateInstruction()
+	three.AsIconst64(3)
+	builder.InsertInstruction(three)
+	multiplyBy8.AsIshl(targetOffsetInTable, three.Return())
+	builder.InsertInstruction(multiplyBy8)
+	targetOffsetInTableMultipliedBy8 := multiplyBy8.Return()
+	// Then add the multiplied value to the base which results in the address of the target function (*wazevo.functionInstance)
+	calcFunctionInstancePtr := builder.AllocateInstruction()
+	calcFunctionInstancePtr.AsIadd(tableBase, targetOffsetInTableMultipliedBy8)
+	builder.InsertInstruction(calcFunctionInstancePtr)
+	functionInstancePtr := calcFunctionInstancePtr.Return()
+
+	// Check if it is not the null pointer.
+	zero := builder.AllocateInstruction()
+	zero.AsIconst64(0)
+	builder.InsertInstruction(zero)
+	checkNull := builder.AllocateInstruction()
+	checkNull.AsIcmp(functionInstancePtr, zero.Return(), ssa.IntegerCmpCondEqual)
+	builder.InsertInstruction(checkNull)
+	exitIfNull := builder.AllocateInstruction()
+	exitIfNull.AsExitIfNotZeroWithCode(c.execCtxPtrValue, checkNull.Return(), wazevoapi.ExitCodeInvalidTableAccess)
+	builder.InsertInstruction(exitIfNull)
+
+	// We need to do the type check. First, load the target function instance's typeID.
+	loadTypeID := builder.AllocateInstruction()
+	loadTypeID.AsLoad(functionInstancePtr, wazevoapi.FunctionInstanceTypeIDOffset, ssa.TypeI32)
+	builder.InsertInstruction(loadTypeID)
+	actualTypeID := loadTypeID.Return()
+
+	// Next, we load the expected TypeID:
+	loadTypeIDsBegin := builder.AllocateInstruction()
+	loadTypeIDsBegin.AsLoad(c.moduleCtxPtrValue, c.offset.TypeIDs1stElement.U32(), ssa.TypeI32)
+	builder.InsertInstruction(loadTypeIDsBegin)
+	typeIDsBegin := loadTypeIDsBegin.Return()
+
+	loadExpectedTypeID := builder.AllocateInstruction()
+	loadExpectedTypeID.AsLoad(typeIDsBegin, uint32(typeIndex)*4 /* size of wasm.FunctionTypeID */, ssa.TypeI32)
+	builder.InsertInstruction(loadExpectedTypeID)
+	expectedTypeID := loadExpectedTypeID.Return()
+
+	// Check if the type ID matches.
+	checkTypeID := builder.AllocateInstruction()
+	checkTypeID.AsIcmp(actualTypeID, expectedTypeID, ssa.IntegerCmpCondNotEqual)
+	builder.InsertInstruction(checkTypeID)
+	exitIfNotMatch := builder.AllocateInstruction()
+	exitIfNotMatch.AsExitIfNotZeroWithCode(c.execCtxPtrValue, checkTypeID.Return(), wazevoapi.ExitCodeIndirectCallTypeMismatch)
+	builder.InsertInstruction(exitIfNotMatch)
+
+	// Now ready to call the function. Load the executable and moduleContextOpaquePtr from the function instance.
+	loadExecutablePtr := builder.AllocateInstruction()
+	loadExecutablePtr.AsLoad(functionInstancePtr, wazevoapi.FunctionInstanceExecutableOffset, ssa.TypeI64)
+	builder.InsertInstruction(loadExecutablePtr)
+	executablePtr := loadExecutablePtr.Return()
+	loadModuleContextOpaquePtr := builder.AllocateInstruction()
+	loadModuleContextOpaquePtr.AsLoad(functionInstancePtr, wazevoapi.FunctionInstanceModuleContextOpaquePtrOffset, ssa.TypeI64)
+	builder.InsertInstruction(loadModuleContextOpaquePtr)
+	moduleContextOpaquePtr := loadModuleContextOpaquePtr.Return()
+
+	// TODO: reuse slice?
+	typ := &c.m.TypeSection[typeIndex]
+	argN := len(typ.Params)
+	args := make([]ssa.Value, argN+2)
+	args[0] = c.execCtxPtrValue
+	args[1] = moduleContextOpaquePtr
+	state.nPopInto(argN, args[2:])
+
+	// Before transfer the control to the callee, we have to store the current module's moduleContextPtr
+	// into execContext.callerModuleContextPtr in case when the callee is a Go function.
+	c.storeCallerModuleContext()
+
+	call := builder.AllocateInstruction()
+	call.AsCallIndirect(executablePtr, c.signatures[typ], args)
+	builder.InsertInstruction(call)
+
+	first, rest := call.Returns()
+	if first.Valid() {
+		state.push(first)
+	}
+	for _, v := range rest {
+		state.push(v)
+	}
+
+	c.reloadAfterCall()
 }
 
 func (c *Compiler) reloadAfterCall() {
@@ -1051,7 +1188,7 @@ func (c *Compiler) getMemoryLenValue(forceReload bool) ssa.Value {
 }
 
 func (c *Compiler) insertIcmp(cond ssa.IntegerCmpCond) {
-	state, builder := &c.loweringState, c.ssaBuilder
+	state, builder := c.state(), c.ssaBuilder
 	y, x := state.pop(), state.pop()
 	cmp := builder.AllocateInstruction()
 	cmp.AsIcmp(x, y, cond)
@@ -1061,7 +1198,7 @@ func (c *Compiler) insertIcmp(cond ssa.IntegerCmpCond) {
 }
 
 func (c *Compiler) insertFcmp(cond ssa.FloatCmpCond) {
-	state, builder := &c.loweringState, c.ssaBuilder
+	state, builder := c.state(), c.ssaBuilder
 	y, x := state.pop(), state.pop()
 	cmp := builder.AllocateInstruction()
 	cmp.AsFcmp(x, y, cond)
@@ -1120,7 +1257,7 @@ func (c *Compiler) readF64() float64 {
 
 // readBlockType reads the block type from the current position of the bytecode reader.
 func (c *Compiler) readBlockType() *wasm.FunctionType {
-	state := &c.loweringState
+	state := c.state()
 
 	c.br.Reset(c.wasmFunctionBody[state.pc+1:])
 	bt, num, err := wasm.DecodeBlockType(c.m.TypeSection, c.br, api.CoreFeaturesV2)
@@ -1133,7 +1270,7 @@ func (c *Compiler) readBlockType() *wasm.FunctionType {
 }
 
 func (c *Compiler) readMemArg() (align, offset uint32) {
-	state := &c.loweringState
+	state := c.state()
 
 	align, num, err := leb128.LoadUint32(c.wasmFunctionBody[state.pc+1:])
 	if err != nil {
@@ -1159,7 +1296,7 @@ func (c *Compiler) insertJumpToBlock(args []ssa.Value, targetBlk ssa.BasicBlock)
 }
 
 func (c *Compiler) insertIntegerExtend(signed bool, from, to byte) {
-	state := &c.loweringState
+	state := c.state()
 	builder := c.ssaBuilder
 	v := state.pop()
 	extend := builder.AllocateInstruction()

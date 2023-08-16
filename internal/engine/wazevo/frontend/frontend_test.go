@@ -1367,6 +1367,36 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 	Jump blk_ret, v4, v9, v12
 `,
 		},
+		{
+			name: "call_indirect", m: testcases.CallIndirect.Module,
+			exp: `
+signatures:
+	sig2: i64i64_i32
+
+blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
+	v3:i64 = Load module_ctx, 0x10
+	v4:i32 = Load v3, 0x8
+	v5:i32 = Icmp ge_u, v2, v4
+	ExitIfNotZero v5, exec_ctx, invalid_table_access
+	v6:i64 = Load v3, 0x0
+	v7:i64 = Iconst_64 0x3
+	v8:i32 = Ishl v2, v7
+	v9:i64 = Iadd v6, v8
+	v10:i64 = Iconst_64 0x0
+	v11:i32 = Icmp eq, v9, v10
+	ExitIfNotZero v11, exec_ctx, invalid_table_access
+	v12:i32 = Load v9, 0x10
+	v13:i32 = Load module_ctx, 0x8
+	v14:i32 = Load v13, 0x8
+	v15:i32 = Icmp neq, v12, v14
+	ExitIfNotZero v15, exec_ctx, indirect_call_type_mismatch
+	v16:i64 = Load v9, 0x0
+	v17:i64 = Load v9, 0x8
+	Store module_ctx, exec_ctx, 0x8
+	v18:i32 = CallIndirect v16:sig2, exec_ctx, v17
+	Jump blk_ret, v18
+`,
+		},
 	} {
 
 		tc := tc

@@ -138,6 +138,17 @@ func (i *instruction) encode(c backend.Compiler) {
 			i.u3 == 1,
 			rn == sp,
 		))
+	case aluRRRShift:
+		r, amt, sop := i.rm.sr()
+		c.Emit4Bytes(encodeAluRRRShift(
+			aluOp(i.u1),
+			regNumberInEncoding[i.rd.realReg()],
+			regNumberInEncoding[i.rn.realReg()],
+			regNumberInEncoding[r.RealReg()],
+			uint32(amt),
+			sop,
+			i.u3 == 1,
+		))
 	case aluRRBitmaskImm:
 		c.Emit4Bytes(encodeAluBitmaskImmediate(
 			aluOp(i.u1),
@@ -558,6 +569,41 @@ func encodeAluRRImm12(op aluOp, rd, rn uint32, imm12 uint16, shiftBit byte, _64b
 		_31to24 |= 0b1 << 7
 	}
 	return _31to24<<24 | uint32(shiftBit)<<22 | uint32(imm12&0b111111111111)<<10 | rn<<5 | rd
+}
+
+// encodeAluRRR encodes as Data Processing (shifted register), depending on aluOp.
+// https://developer.arm.com/documentation/ddi0596/2020-12/Index-by-Encoding/Data-Processing----Register?lang=en#addsub_shift
+func encodeAluRRRShift(op aluOp, rd, rn, rm, amount uint32, shiftOp shiftOp, _64bit bool) uint32 {
+	var _31to24 uint32
+	switch op {
+	case aluOpAdd:
+		_31to24 = 0b00001011
+	case aluOpAddS:
+		_31to24 = 0b00101011
+	case aluOpSub:
+		_31to24 = 0b01001011
+	case aluOpSubS:
+		_31to24 = 0b01101011
+	default:
+		panic(op.String())
+	}
+
+	if _64bit {
+		_31to24 |= 0b1 << 7
+	}
+
+	var shift uint32
+	switch shiftOp {
+	case shiftOpLSL:
+		shift = 0b00
+	case shiftOpLSR:
+		shift = 0b01
+	case shiftOpASR:
+		shift = 0b10
+	default:
+		panic(shiftOp.String())
+	}
+	return _31to24<<24 | shift<<22 | rm<<16 | (amount << 10) | (rn << 5) | rd
 }
 
 // encodeAluRRR encodes as Data Processing (register), depending on aluOp.

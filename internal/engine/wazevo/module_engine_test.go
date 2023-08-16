@@ -171,8 +171,12 @@ func TestModuleEngine_ResolveImportedFunction(t *testing.T) {
 	}
 }
 
-func TestModuleContextOffsetData_ImportedFunctionOffset(t *testing.T) {
-	require.Equal(t, wazevoapi.FunctionInstanceSize, int(unsafe.Sizeof(functionInstance{})))
+func Test_functionInstance_offsets(t *testing.T) {
+	var fi functionInstance
+	require.Equal(t, wazevoapi.FunctionInstanceSize, int(unsafe.Sizeof(fi)))
+	require.Equal(t, wazevoapi.FunctionInstanceExecutableOffset, int(unsafe.Offsetof(fi.executable)))
+	require.Equal(t, wazevoapi.FunctionInstanceModuleContextOpaquePtrOffset, int(unsafe.Offsetof(fi.moduleContextOpaquePtr)))
+	require.Equal(t, wazevoapi.FunctionInstanceTypeIDOffset, int(unsafe.Offsetof(fi.typeID)))
 
 	m := wazevoapi.ModuleContextOffsetData{ImportedFunctionsBegin: 100}
 	ptr, moduleCtx, typeID := m.ImportedFunctionOffset(10)

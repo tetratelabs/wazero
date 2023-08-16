@@ -80,9 +80,6 @@ func (o operand) er() (r regalloc.VReg, eop extendOp, to byte) {
 
 // operandSR encodes the given VReg as an operand of operandKindSR.
 func operandSR(r regalloc.VReg, amt byte, sop shiftOp) operand {
-	if sop != shiftOpLSL {
-		panic("TODO: do we need to support other shift operations?")
-	}
 	return operand{kind: operandKindSR, data: uint64(r), data2: uint64(amt)<<32 | uint64(sop)}
 }
 

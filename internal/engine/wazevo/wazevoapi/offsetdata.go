@@ -2,6 +2,17 @@ package wazevoapi
 
 import "github.com/tetratelabs/wazero/internal/wasm"
 
+const (
+	// FunctionInstanceSize is the size of wazevo.functionInstance.
+	FunctionInstanceSize = 24
+	// FunctionInstanceExecutableOffset is an offset of `executable` field in wazevo.functionInstance
+	FunctionInstanceExecutableOffset = 0
+	// FunctionInstanceModuleContextOpaquePtrOffset is an offset of `moduleContextOpaquePtr` field in wazevo.functionInstance
+	FunctionInstanceModuleContextOpaquePtrOffset = 8
+	// FunctionInstanceTypeIDOffset is an offset of `typeID` field in wazevo.functionInstance
+	FunctionInstanceTypeIDOffset = 16
+)
+
 var ExecutionContextOffsets = ExecutionContextOffsetData{
 	ExitCodeOffset:                          0,
 	CallerModuleContextPtr:                  8,
@@ -70,9 +81,6 @@ func (m *ModuleContextOffsetData) ImportedFunctionOffset(i wasm.Index) (
 	base := m.ImportedFunctionsBegin + Offset(i)*FunctionInstanceSize
 	return base, base + 8, base + 16
 }
-
-// FunctionInstanceSize is the size of wazevo.functionInstance.
-const FunctionInstanceSize = 24
 
 // GlobalInstanceOffset returns an offset of the i-th global instance.
 func (m *ModuleContextOffsetData) GlobalInstanceOffset(i wasm.Index) Offset {

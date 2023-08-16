@@ -153,6 +153,13 @@ func TestE2E(t *testing.T) {
 			m:        testcases.ImportedMemoryGrow.Module,
 			calls:    []callCase{{expResults: []uint64{1, 1, 11, 11}}},
 		},
+		{
+			name: "call_indirect",
+			m:    testcases.CallIndirect.Module,
+			calls: []callCase{
+				{params: []uint64{1 /* table offset at 1 */}, expResults: []uint64{10}},
+			},
+		},
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
