@@ -1107,9 +1107,10 @@ var (
 			TypeSection:     []wasm.FunctionType{i32_i32, {}, v_i32, v_i32i32},
 			ExportSection:   []wasm.Export{{Name: ExportName, Type: wasm.ExternTypeFunc, Index: 0}},
 			FunctionSection: []wasm.Index{0, 1, 2, 3},
-			TableSection:    []wasm.Table{{Type: wasm.RefTypeFuncref, Min: 1}},
+			TableSection:    []wasm.Table{{Type: wasm.RefTypeFuncref, Min: 1000}},
 			ElementSection: []wasm.ElementSegment{
-				{OffsetExpr: constExprI32(0), TableIndex: 0, Type: wasm.RefTypeFuncref, Mode: wasm.ElementModeActive,
+				{
+					OffsetExpr: constExprI32(0), TableIndex: 0, Type: wasm.RefTypeFuncref, Mode: wasm.ElementModeActive,
 					// Set the function 1, 2, 3 at the beginning of the table.
 					Init: []wasm.Index{1, 2, 3},
 				},

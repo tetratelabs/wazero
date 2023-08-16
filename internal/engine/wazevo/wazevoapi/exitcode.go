@@ -13,7 +13,8 @@ const (
 	ExitCodeCallGoModuleFunction
 	// ExitCodeCallGoFunction is an exit code for a call to an api.GoFunction.
 	ExitCodeCallGoFunction
-	ExitCodeInvalidTableAccess
+	ExitCodeTableOutOfBounds
+	ExitCodeIndirectCallNullPointer
 	ExitCodeIndirectCallTypeMismatch
 	exitCodeMax
 )
@@ -35,8 +36,10 @@ func (e ExitCode) String() string {
 		return "unreachable"
 	case ExitCodeMemoryOutOfBounds:
 		return "memory_out_of_bounds"
-	case ExitCodeInvalidTableAccess:
-		return "invalid_table_access"
+	case ExitCodeTableOutOfBounds:
+		return "table_out_of_bounds"
+	case ExitCodeIndirectCallNullPointer:
+		return "indirect_call_null_pointer"
 	case ExitCodeIndirectCallTypeMismatch:
 		return "indirect_call_type_mismatch"
 	}

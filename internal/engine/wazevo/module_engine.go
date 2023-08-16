@@ -17,7 +17,7 @@ type (
 		parent                 *compiledModule
 		module                 *wasm.ModuleInstance
 		opaque                 moduleContextOpaque
-		localFunctionInstances []functionInstance
+		localFunctionInstances []*functionInstance
 	}
 
 	functionInstance struct {
@@ -193,13 +193,14 @@ func (m *moduleEngine) FunctionInstanceReference(funcIndex wasm.Index) wasm.Refe
 	p := m.parent
 	executable := &p.executable[p.functionOffsets[funcIndex].offset]
 	typeID := m.module.TypeIDs[m.module.Source.FunctionSection[funcIndex]]
-	m.localFunctionInstances = append(m.localFunctionInstances, functionInstance{
+
+	lf := &functionInstance{
 		executable:             executable,
 		moduleContextOpaquePtr: m.opaquePtr,
 		typeID:                 typeID,
-	})
-	l := len(m.localFunctionInstances) - 1
-	return uintptr(unsafe.Pointer(&m.localFunctionInstances[l]))
+	}
+	m.localFunctionInstances = append(m.localFunctionInstances, lf)
+	return uintptr(unsafe.Pointer(lf))
 }
 
 // LookupFunction implements wasm.ModuleEngine.

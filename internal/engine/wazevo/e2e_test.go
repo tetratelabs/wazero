@@ -156,8 +156,13 @@ func TestE2E(t *testing.T) {
 		{
 			name: "call_indirect",
 			m:    testcases.CallIndirect.Module,
+			// parameter == table offset.
 			calls: []callCase{
-				{params: []uint64{1 /* table offset at 1 */}, expResults: []uint64{10}},
+				{params: []uint64{0}, expErr: "indirect call type mismatch"},
+				{params: []uint64{1}, expResults: []uint64{10}},
+				{params: []uint64{2}, expErr: "indirect call type mismatch"},
+				{params: []uint64{10}, expErr: "invalid table access"},             // Null pointer.
+				{params: []uint64{math.MaxUint32}, expErr: "invalid table access"}, // Out of bounds.
 			},
 		},
 	} {

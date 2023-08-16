@@ -568,10 +568,10 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 
 		// Check for out of bounds memory access: `memLen >= baseAddrPlusCeil`.
 		cmp := builder.AllocateInstruction()
-		cmp.AsIcmp(memLen, baseAddrPlusCeil.Return(), ssa.IntegerCmpCondUnsignedGreaterThanOrEqual)
+		cmp.AsIcmp(memLen, baseAddrPlusCeil.Return(), ssa.IntegerCmpCondUnsignedLessThan)
 		builder.InsertInstruction(cmp)
 		exitIfNZ := builder.AllocateInstruction()
-		exitIfNZ.AsExitIfNotZeroWithCode(c.execCtxPtrValue, cmp.Return(), wazevoapi.ExitCodeMemoryOutOfBounds)
+		exitIfNZ.AsExitIfTrueWithCode(c.execCtxPtrValue, cmp.Return(), wazevoapi.ExitCodeMemoryOutOfBounds)
 		builder.InsertInstruction(exitIfNZ)
 
 		// Load the value from memBase + extBaseAddr.
@@ -959,7 +959,7 @@ func (c *Compiler) lowerCallIndirect(typeIndex, tableIndex uint32) {
 	checkOOB.AsIcmp(targetOffsetInTable, tableLen, ssa.IntegerCmpCondUnsignedGreaterThanOrEqual)
 	builder.InsertInstruction(checkOOB)
 	exitIfOOB := builder.AllocateInstruction()
-	exitIfOOB.AsExitIfNotZeroWithCode(c.execCtxPtrValue, checkOOB.Return(), wazevoapi.ExitCodeInvalidTableAccess)
+	exitIfOOB.AsExitIfTrueWithCode(c.execCtxPtrValue, checkOOB.Return(), wazevoapi.ExitCodeTableOutOfBounds)
 	builder.InsertInstruction(exitIfOOB)
 
 	// Get the base address of wasm.TableInstance.References.
@@ -977,10 +977,14 @@ func (c *Compiler) lowerCallIndirect(typeIndex, tableIndex uint32) {
 	builder.InsertInstruction(multiplyBy8)
 	targetOffsetInTableMultipliedBy8 := multiplyBy8.Return()
 	// Then add the multiplied value to the base which results in the address of the target function (*wazevo.functionInstance)
-	calcFunctionInstancePtr := builder.AllocateInstruction()
-	calcFunctionInstancePtr.AsIadd(tableBase, targetOffsetInTableMultipliedBy8)
-	builder.InsertInstruction(calcFunctionInstancePtr)
-	functionInstancePtr := calcFunctionInstancePtr.Return()
+	calcFunctionInstancePtrAddressInTable := builder.AllocateInstruction()
+	calcFunctionInstancePtrAddressInTable.AsIadd(tableBase, targetOffsetInTableMultipliedBy8)
+	builder.InsertInstruction(calcFunctionInstancePtrAddressInTable)
+	functionInstancePtrAddress := calcFunctionInstancePtrAddressInTable.Return()
+	loadFunctionInstancePtr := builder.AllocateInstruction()
+	loadFunctionInstancePtr.AsLoad(functionInstancePtrAddress, 0, ssa.TypeI64)
+	builder.InsertInstruction(loadFunctionInstancePtr)
+	functionInstancePtr := loadFunctionInstancePtr.Return()
 
 	// Check if it is not the null pointer.
 	zero := builder.AllocateInstruction()
@@ -990,7 +994,7 @@ func (c *Compiler) lowerCallIndirect(typeIndex, tableIndex uint32) {
 	checkNull.AsIcmp(functionInstancePtr, zero.Return(), ssa.IntegerCmpCondEqual)
 	builder.InsertInstruction(checkNull)
 	exitIfNull := builder.AllocateInstruction()
-	exitIfNull.AsExitIfNotZeroWithCode(c.execCtxPtrValue, checkNull.Return(), wazevoapi.ExitCodeInvalidTableAccess)
+	exitIfNull.AsExitIfTrueWithCode(c.execCtxPtrValue, checkNull.Return(), wazevoapi.ExitCodeIndirectCallNullPointer)
 	builder.InsertInstruction(exitIfNull)
 
 	// We need to do the type check. First, load the target function instance's typeID.
@@ -1001,7 +1005,7 @@ func (c *Compiler) lowerCallIndirect(typeIndex, tableIndex uint32) {
 
 	// Next, we load the expected TypeID:
 	loadTypeIDsBegin := builder.AllocateInstruction()
-	loadTypeIDsBegin.AsLoad(c.moduleCtxPtrValue, c.offset.TypeIDs1stElement.U32(), ssa.TypeI32)
+	loadTypeIDsBegin.AsLoad(c.moduleCtxPtrValue, c.offset.TypeIDs1stElement.U32(), ssa.TypeI64)
 	builder.InsertInstruction(loadTypeIDsBegin)
 	typeIDsBegin := loadTypeIDsBegin.Return()
 
@@ -1015,7 +1019,7 @@ func (c *Compiler) lowerCallIndirect(typeIndex, tableIndex uint32) {
 	checkTypeID.AsIcmp(actualTypeID, expectedTypeID, ssa.IntegerCmpCondNotEqual)
 	builder.InsertInstruction(checkTypeID)
 	exitIfNotMatch := builder.AllocateInstruction()
-	exitIfNotMatch.AsExitIfNotZeroWithCode(c.execCtxPtrValue, checkTypeID.Return(), wazevoapi.ExitCodeIndirectCallTypeMismatch)
+	exitIfNotMatch.AsExitIfTrueWithCode(c.execCtxPtrValue, checkTypeID.Return(), wazevoapi.ExitCodeIndirectCallTypeMismatch)
 	builder.InsertInstruction(exitIfNotMatch)
 
 	// Now ready to call the function. Load the executable and moduleContextOpaquePtr from the function instance.

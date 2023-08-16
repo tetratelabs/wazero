@@ -898,7 +898,7 @@ func (i *instruction) String() (str string) {
 	case loadAddr:
 		panic("TODO")
 	case exitSequence:
-		str = fmt.Sprintf("exit_sequence %s", formatVRegSized(i.rn.nr(), 32))
+		str = fmt.Sprintf("exit_sequence %s", formatVRegSized(i.rn.nr(), 64))
 	case udf:
 		str = "udf"
 	default:
