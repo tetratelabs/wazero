@@ -54,7 +54,7 @@ func TestNewModuleContextOffsetData(t *testing.T) {
 				ImportedMemoryBegin:    -1,
 				ImportedFunctionsBegin: 8,
 				GlobalsBegin:           -1,
-				TotalSize:              168,
+				TotalSize:              10*FunctionInstanceSize + 8,
 			},
 		},
 		{
@@ -65,7 +65,7 @@ func TestNewModuleContextOffsetData(t *testing.T) {
 				ImportedMemoryBegin:    8,
 				ImportedFunctionsBegin: 24,
 				GlobalsBegin:           -1,
-				TotalSize:              184,
+				TotalSize:              10*FunctionInstanceSize + 24,
 			},
 		},
 		{
@@ -80,8 +80,8 @@ func TestNewModuleContextOffsetData(t *testing.T) {
 				LocalMemoryBegin:       8,
 				ImportedMemoryBegin:    -1,
 				ImportedFunctionsBegin: 24,
-				GlobalsBegin:           24 + 16*10,
-				TotalSize:              24 + 16*10 + 8*30,
+				GlobalsBegin:           24 + 10*FunctionInstanceSize,
+				TotalSize:              24 + 10*FunctionInstanceSize + 8*30,
 			},
 		},
 	} {

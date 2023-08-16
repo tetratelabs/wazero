@@ -13,10 +13,17 @@ type (
 	// moduleEngine implements wasm.ModuleEngine.
 	moduleEngine struct {
 		// opaquePtr equals &opaque[0].
-		opaquePtr *byte
-		parent    *compiledModule
-		module    *wasm.ModuleInstance
-		opaque    moduleContextOpaque
+		opaquePtr              *byte
+		parent                 *compiledModule
+		module                 *wasm.ModuleInstance
+		opaque                 moduleContextOpaque
+		localFunctionInstances []functionInstance
+	}
+
+	functionInstance struct {
+		executable             *byte
+		moduleContextOpaquePtr *byte
+		typeID                 wasm.FunctionTypeID
 	}
 
 	// moduleContextOpaque is the opaque byte slice of Module instance specific contents whose size
@@ -31,11 +38,8 @@ type (
 	// 	    localMemoryLength                         uint64               (optional)
 	// 	    importedMemoryInstance                    *wasm.MemoryInstance (optional)
 	// 	    importedMemoryOwnerOpaqueCtx              *byte                (optional)
-	// 	    importedFunctions [importedFunctions] struct { the total size depends on # of imported functions.
-	// 	        executable      *byte
-	// 	        opaqueCtx       *moduleContextOpaque
-	// 	    }
-	//      globals                                    []*wasm.GlobalInstance (optional)
+	// 	    importedFunctions                         [# of importedFunctions]functionInstance
+	//      globals                                   []*wasm.GlobalInstance (optional)
 	// 	    TODO: add more fields, like tables, etc.
 	// 	}
 	//
@@ -110,14 +114,16 @@ func (m *moduleEngine) NewFunction(index wasm.Index) api.Function {
 
 // ResolveImportedFunction implements wasm.ModuleEngine.
 func (m *moduleEngine) ResolveImportedFunction(index, indexInImportedModule wasm.Index, importedModuleEngine wasm.ModuleEngine) {
-	ptr, moduleCtx := m.parent.offsets.ImportedFunctionOffset(index)
+	ptr, moduleCtx, typeID := m.parent.offsets.ImportedFunctionOffset(index)
 	importedME := importedModuleEngine.(*moduleEngine)
 
 	offset := importedME.parent.functionOffsets[indexInImportedModule]
 	// When calling imported function from the machine code, we need to skip the Go preamble.
 	executable := &importedME.parent.executable[offset.offset+offset.goPreambleSize]
+	// Write functionInstance.
 	binary.LittleEndian.PutUint64(m.opaque[ptr:], uint64(uintptr(unsafe.Pointer(executable))))
 	binary.LittleEndian.PutUint64(m.opaque[moduleCtx:], uint64(uintptr(unsafe.Pointer(importedME.opaquePtr))))
+	binary.LittleEndian.PutUint64(m.opaque[typeID:], uint64(importedME.module.TypeIDs[indexInImportedModule]))
 }
 
 // ResolveImportedMemory implements wasm.ModuleEngine.
@@ -143,10 +149,26 @@ func (m *moduleEngine) DoneInstantiation() {
 	}
 }
 
+// FunctionInstanceReference implements wasm.ModuleEngine.
+func (m *moduleEngine) FunctionInstanceReference(funcIndex wasm.Index) wasm.Reference {
+	if funcIndex < m.module.Source.ImportFunctionCount {
+		begin, _, _ := m.parent.offsets.ImportedFunctionOffset(funcIndex)
+		return uintptr(unsafe.Pointer(&m.opaque[begin]))
+	}
+
+	p := m.parent
+	executable := &p.executable[p.functionOffsets[funcIndex].offset]
+	typeID := m.module.TypeIDs[funcIndex]
+	m.localFunctionInstances = append(m.localFunctionInstances, functionInstance{
+		executable:             executable,
+		moduleContextOpaquePtr: m.opaquePtr,
+		typeID:                 typeID,
+	})
+	l := len(m.localFunctionInstances) - 1
+	return uintptr(unsafe.Pointer(&m.localFunctionInstances[l]))
+}
+
 // LookupFunction implements wasm.ModuleEngine.
 func (m *moduleEngine) LookupFunction(t *wasm.TableInstance, typeId wasm.FunctionTypeID, tableOffset wasm.Index) (api.Function, error) {
 	panic("TODO")
 }
-
-// FunctionInstanceReference implements wasm.ModuleEngine.
-func (m *moduleEngine) FunctionInstanceReference(funcIndex wasm.Index) wasm.Reference { panic("TODO") }

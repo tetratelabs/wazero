@@ -108,6 +108,7 @@ func TestModuleEngine_ResolveImportedFunction(t *testing.T) {
 			executable:      make([]byte, 1000),
 			functionOffsets: []compiledFunctionOffset{{offset: 1, goPreambleSize: 4}, {offset: 5, goPreambleSize: 4}, {offset: 10, goPreambleSize: 4}},
 		},
+		module: &wasm.ModuleInstance{TypeIDs: []wasm.FunctionTypeID{111, 222, 333}},
 	}
 	im2 := &moduleEngine{
 		opaquePtr: &op2,
@@ -115,6 +116,7 @@ func TestModuleEngine_ResolveImportedFunction(t *testing.T) {
 			executable:      make([]byte, 1000),
 			functionOffsets: []compiledFunctionOffset{{offset: 50, goPreambleSize: 4}},
 		},
+		module: &wasm.ModuleInstance{TypeIDs: []wasm.FunctionTypeID{999}},
 	}
 
 	m.ResolveImportedFunction(0, 0, im1)
@@ -126,18 +128,31 @@ func TestModuleEngine_ResolveImportedFunction(t *testing.T) {
 		index      int
 		op         *byte
 		executable *byte
+		expTypeID  wasm.FunctionTypeID
 	}{
-		{index: 0, op: &op1, executable: &im1.parent.executable[1+4]},
-		{index: 1, op: &op2, executable: &im2.parent.executable[50+4]},
-		{index: 2, op: &op1, executable: &im1.parent.executable[10+4]},
-		{index: 3, op: &op1, executable: &im1.parent.executable[5+4]},
+		{index: 0, op: &op1, executable: &im1.parent.executable[1+4], expTypeID: 111},
+		{index: 1, op: &op2, executable: &im2.parent.executable[50+4], expTypeID: 999},
+		{index: 2, op: &op1, executable: &im1.parent.executable[10+4], expTypeID: 333},
+		{index: 3, op: &op1, executable: &im1.parent.executable[5+4], expTypeID: 222},
 	} {
-		buf := m.opaque[begin+16*tc.index:]
+		buf := m.opaque[begin+wazevoapi.FunctionInstanceSize*tc.index:]
 		actualExecutable := binary.LittleEndian.Uint64(buf)
 		actualOpaquePtr := binary.LittleEndian.Uint64(buf[8:])
+		actualTypeID := binary.LittleEndian.Uint64(buf[16:])
 		expExecutable := uint64(uintptr(unsafe.Pointer(tc.executable)))
 		expOpaquePtr := uint64(uintptr(unsafe.Pointer(tc.op)))
 		require.Equal(t, expExecutable, actualExecutable)
 		require.Equal(t, expOpaquePtr, actualOpaquePtr)
+		require.Equal(t, uint64(tc.expTypeID), actualTypeID)
 	}
+}
+
+func TestModuleContextOffsetData_ImportedFunctionOffset(t *testing.T) {
+	require.Equal(t, wazevoapi.FunctionInstanceSize, int(unsafe.Sizeof(functionInstance{})))
+
+	m := wazevoapi.ModuleContextOffsetData{ImportedFunctionsBegin: 100}
+	ptr, moduleCtx, typeID := m.ImportedFunctionOffset(10)
+	require.Equal(t, 100+10*wazevoapi.FunctionInstanceSize, int(ptr))
+	require.Equal(t, moduleCtx, ptr+8)
+	require.Equal(t, typeID, ptr+16)
 }

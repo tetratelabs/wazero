@@ -889,7 +889,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 			// This case we have to read the address of the imported function from the module context.
 			moduleCtx := c.moduleCtxPtrValue
 			loadFuncPtr, loadModuleCtxPtr := builder.AllocateInstruction(), builder.AllocateInstruction()
-			funcPtrOffset, moduleCtxPtrOffset := c.offset.ImportedFunctionOffset(fnIndex)
+			funcPtrOffset, moduleCtxPtrOffset, _ := c.offset.ImportedFunctionOffset(fnIndex)
 			loadFuncPtr.AsLoad(moduleCtx, funcPtrOffset.U32(), ssa.TypeI64)
 			loadModuleCtxPtr.AsLoad(moduleCtx, moduleCtxPtrOffset.U32(), ssa.TypeI64)
 			builder.InsertInstruction(loadFuncPtr)

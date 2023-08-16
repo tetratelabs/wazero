@@ -61,10 +61,14 @@ type ModuleContextOffsetData struct {
 }
 
 // ImportedFunctionOffset returns an offset of the i-th imported function.
-func (m *ModuleContextOffsetData) ImportedFunctionOffset(i wasm.Index) (ptr, moduleCtx Offset) {
-	base := m.ImportedFunctionsBegin + Offset(i)*16
-	return base, base + 8
+// Each item is stored as wazevo.functionInstance whose size matches FunctionInstanceSize.
+func (m *ModuleContextOffsetData) ImportedFunctionOffset(i wasm.Index) (ptr, moduleCtx, typeID Offset) {
+	base := m.ImportedFunctionsBegin + Offset(i)*FunctionInstanceSize
+	return base, base + 8, base + 16
 }
+
+// FunctionInstanceSize is the size of wazevo.functionInstance.
+const FunctionInstanceSize = 24
 
 // GlobalInstanceOffset returns an offset of the i-th global instance.
 func (m *ModuleContextOffsetData) GlobalInstanceOffset(i wasm.Index) Offset {
@@ -133,8 +137,8 @@ func NewModuleContextOffsetData(m *wasm.Module) ModuleContextOffsetData {
 
 	if m.ImportFunctionCount > 0 {
 		ret.ImportedFunctionsBegin = offset
-		// Each function consists of the pointer to the executable and the pointer to its moduleContextOpaque (16 bytes).
-		size := int(m.ImportFunctionCount) * 16
+		// Each function is stored wazevo.functionInstance.
+		size := int(m.ImportFunctionCount) * FunctionInstanceSize
 		offset += Offset(size)
 	} else {
 		ret.ImportedFunctionsBegin = -1
