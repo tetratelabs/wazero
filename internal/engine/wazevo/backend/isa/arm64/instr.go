@@ -87,6 +87,9 @@ var defKinds = [numInstructionKinds]defKind{
 	fpuStore64:      defKindNone,
 	fpuStore128:     defKindNone,
 	udf:             defKindNone,
+	cSel:            defKindRD,
+	fpuCSel32:       defKindRD,
+	fpuCSel64:       defKindRD,
 }
 
 // defs returns the list of regalloc.VReg that are defined by the instruction.
@@ -176,6 +179,9 @@ var useKinds = [numInstructionKinds]useKind{
 	fpuStore128:     useKindRNAMode,
 	loadFpuConst32:  useKindNone,
 	loadFpuConst64:  useKindNone,
+	cSel:            useKindRNRM,
+	fpuCSel32:       useKindRNRM,
+	fpuCSel64:       useKindRNRM,
 }
 
 // uses returns the list of regalloc.VReg that are used by the instruction.
@@ -440,9 +446,32 @@ func (i *instruction) asFpuLoad(dst operand, amode addressMode, sizeInBits byte)
 	i.amode = amode
 }
 
-func (i *instruction) asCSst(rd regalloc.VReg, c condFlag) {
+func (i *instruction) asCSet(rd regalloc.VReg, c condFlag) {
 	i.kind = cSet
 	i.rd = operandNR(rd)
+	i.u1 = uint64(c)
+}
+
+func (i *instruction) asCSel(rd, rn, rm operand, c condFlag, _64bit bool) {
+	i.kind = cSel
+	i.rd = rd
+	i.rn = rn
+	i.rm = rm
+	i.u1 = uint64(c)
+	if _64bit {
+		i.u3 = 1
+	}
+}
+
+func (i *instruction) asFpuCSel(rd, rn, rm operand, c condFlag, _64bit bool) {
+	if _64bit {
+		i.kind = fpuCSel64
+	} else {
+		i.kind = fpuCSel32
+	}
+	i.rd = rd
+	i.rn = rn
+	i.rm = rm
 	i.u1 = uint64(c)
 }
 
@@ -521,7 +550,7 @@ func (i *instruction) asFpuCmp(rn, rm operand, is64bit bool) {
 	i.kind = fpuCmp
 	i.rn, i.rm = rn, rm
 	if is64bit {
-		i.u1 = 1
+		i.u3 = 1
 	}
 }
 
@@ -757,7 +786,13 @@ func (i *instruction) String() (str string) {
 		}
 		str = fmt.Sprintf("%sxt%s %s, %s", signedStr, fromStr, formatVRegSized(i.rd.nr(), toBits), formatVRegSized(i.rn.nr(), 32))
 	case cSel:
-		panic("TODO")
+		size := is64SizeBitToSize(i.u3)
+		str = fmt.Sprintf("csel %s, %s, %s, %s",
+			formatVRegSized(i.rd.nr(), size),
+			formatVRegSized(i.rn.nr(), size),
+			formatVRegSized(i.rm.nr(), size),
+			condFlag(i.u1),
+		)
 	case cSet:
 		str = fmt.Sprintf("cset %s, %s", formatVRegSized(i.rd.nr(), 64), condFlag(i.u1))
 	case cCmpImm:
@@ -805,9 +840,19 @@ func (i *instruction) String() (str string) {
 	case intToFpu:
 		panic("TODO")
 	case fpuCSel32:
-		panic("TODO")
+		str = fmt.Sprintf("fcsel %s, %s, %s, %s",
+			formatVRegSized(i.rd.nr(), 32),
+			formatVRegSized(i.rn.nr(), 32),
+			formatVRegSized(i.rm.nr(), 32),
+			condFlag(i.u1),
+		)
 	case fpuCSel64:
-		panic("TODO")
+		str = fmt.Sprintf("fcsel %s, %s, %s, %s",
+			formatVRegSized(i.rd.nr(), 64),
+			formatVRegSized(i.rn.nr(), 64),
+			formatVRegSized(i.rm.nr(), 64),
+			condFlag(i.u1),
+		)
 	case fpuRound:
 		panic("TODO")
 	case movToFpu:

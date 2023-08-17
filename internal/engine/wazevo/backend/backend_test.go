@@ -58,19 +58,24 @@ L1 (SSA Block: blk0):
 	ret
 `,
 		},
-		//		{
-		//			name: "selects", m: testcases.Selects.Module,
-		//			afterLoweringARM64: `
-		//L1 (SSA Block: blk0):
-		//	ret
-		//`,
-		//			afterFinalizeARM64: `
-		//L1 (SSA Block: blk0):
-		//	str x30, [sp, #-0x10]!
-		//	ldr x30, [sp], #0x10
-		//	ret
-		//`,
-		//		},
+		{
+			name: "selects", m: testcases.Selects.Module,
+			afterFinalizeARM64: `
+L1 (SSA Block: blk0):
+	str x30, [sp, #-0x10]!
+	subs xzr, x4, x5
+	csel w0, w2, w3, eq
+	subs wzr, w3, wzr
+	csel x1, x4, x5, ne
+	fcmp d2, d3
+	fcsel s8, s0, s1, gt
+	fcmp s0, s1
+	fcsel d1, d2, d3, ne
+	mov q0.8b, q8.8b
+	ldr x30, [sp], #0x10
+	ret
+`,
+		},
 		{
 			name: "consts", m: testcases.Constants.Module,
 			afterLoweringARM64: `
@@ -1433,17 +1438,17 @@ L1 (SSA Block: blk0):
 	cset x10?, ls
 	fcmp s2?, s3?
 	cset x11?, ge
-	fcmp s4?, s5?
+	fcmp d4?, d5?
 	cset x12?, eq
-	fcmp s4?, s5?
+	fcmp d4?, d5?
 	cset x13?, ne
-	fcmp s4?, s5?
+	fcmp d4?, d5?
 	cset x14?, mi
-	fcmp s4?, s5?
+	fcmp d4?, d5?
 	cset x15?, gt
-	fcmp s4?, s5?
+	fcmp d4?, d5?
 	cset x16?, ls
-	fcmp s4?, s5?
+	fcmp d4?, d5?
 	cset x17?, ge
 	str w17?, [#ret_space, #0x18]
 	str w16?, [#ret_space, #0x10]
@@ -1474,17 +1479,17 @@ L1 (SSA Block: blk0):
 	cset x4, ls
 	fcmp s0, s1
 	cset x5, ge
-	fcmp s2, s3
+	fcmp d2, d3
 	cset x6, eq
-	fcmp s2, s3
+	fcmp d2, d3
 	cset x7, ne
-	fcmp s2, s3
+	fcmp d2, d3
 	cset x11, mi
-	fcmp s2, s3
+	fcmp d2, d3
 	cset x10, gt
-	fcmp s2, s3
+	fcmp d2, d3
 	cset x9, ls
-	fcmp s2, s3
+	fcmp d2, d3
 	cset x8, ge
 	str w8, [sp, #0x28]
 	str w9, [sp, #0x20]

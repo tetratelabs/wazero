@@ -195,7 +195,7 @@ func (i *instruction) encode(c backend.Compiler) {
 		// https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/FCMP--Floating-point-quiet-Compare--scalar--?lang=en
 		rn, rm := regNumberInEncoding[i.rn.realReg()], regNumberInEncoding[i.rm.realReg()]
 		var ftype uint32
-		if i.u1 == 1 {
+		if i.u3 == 1 {
 			ftype = 0b01 // double precision.
 		}
 		c.Emit4Bytes(0b1111<<25 | ftype<<22 | 1<<21 | rm<<16 | 0b1<<13 | rn<<5)
@@ -212,9 +212,56 @@ func (i *instruction) encode(c backend.Compiler) {
 		c.Emit4Bytes(
 			uint32(off&0b11)<<29 | 0b1<<28 | uint32(off&0b1111111111_1111111100)<<3 | rd,
 		)
+	case cSel:
+		c.Emit4Bytes(encodeConditionalSelect(
+			kind,
+			regNumberInEncoding[i.rd.realReg()],
+			regNumberInEncoding[i.rn.realReg()],
+			regNumberInEncoding[i.rm.realReg()],
+			condFlag(i.u1),
+			i.u3 == 1,
+		))
+	case fpuCSel32:
+		c.Emit4Bytes(encodeFpuCSel(
+			regNumberInEncoding[i.rd.realReg()],
+			regNumberInEncoding[i.rn.realReg()],
+			regNumberInEncoding[i.rm.realReg()],
+			condFlag(i.u1),
+			false,
+		))
+	case fpuCSel64:
+		c.Emit4Bytes(encodeFpuCSel(
+			regNumberInEncoding[i.rd.realReg()],
+			regNumberInEncoding[i.rn.realReg()],
+			regNumberInEncoding[i.rm.realReg()],
+			condFlag(i.u1),
+			true,
+		))
 	default:
 		panic(i.String())
 	}
+}
+
+func encodeFpuCSel(rd, rn, rm uint32, c condFlag, _64bit bool) uint32 {
+	var ftype uint32
+	if _64bit {
+		ftype = 0b01 // double precision.
+	}
+	return 0b1111<<25 | ftype<<22 | 0b1<<21 | rm<<16 | uint32(c)<<12 | 0b11<<10 | rn<<5 | rd
+}
+
+// encodeConditionalSelect encodes as "Conditional select" in
+// https://developer.arm.com/documentation/ddi0596/2020-12/Index-by-Encoding/Data-Processing----Register?lang=en#condsel
+func encodeConditionalSelect(kind instructionKind, rd, rn, rm uint32, c condFlag, _64bit bool) uint32 {
+	if kind != cSel {
+		panic("TODO: support other conditional select")
+	}
+
+	ret := 0b110101<<23 | rm<<16 | uint32(c)<<12 | rn<<5 | rd
+	if _64bit {
+		ret |= 0b1 << 31
+	}
+	return ret
 }
 
 // encodeLoadFpuConst32 encodes the following three instructions:

@@ -82,10 +82,15 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 		{
 			name: "selects", m: testcases.Selects.Module,
 			exp: `
-blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i32)
-	v4:i32 = Select v2, v2, v3
-	v5:i32 = Select v3, v2, v3
-	Jump blk_ret, v4, v5
+blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i32, v4:i64, v5:i64, v6:f32, v7:f32, v8:f64, v9:f64)
+	v10:i32 = Icmp eq, v4, v5
+	v11:i32 = Select v10, v2, v3
+	v12:i64 = Select v3, v4, v5
+	v13:i32 = Fcmp gt, v8, v9
+	v14:f32 = Select v13, v6, v7
+	v15:i32 = Fcmp neq, v6, v7
+	v16:f64 = Select v15, v8, v9
+	Jump blk_ret, v11, v12, v14, v16
 `,
 		},
 		{
