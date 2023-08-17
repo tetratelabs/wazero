@@ -50,7 +50,8 @@ func TestE2E(t *testing.T) {
 						200,
 						uint64(math.Float32bits(3.0)),
 						math.Float64bits(-123.4),
-					}},
+					},
+				},
 			},
 		},
 		{
