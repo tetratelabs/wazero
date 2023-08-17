@@ -98,6 +98,15 @@ var (
 			wasm.OpcodeEnd,
 		}, []wasm.ValueType{i32}),
 	}
+	LocalParamTeeReturn = TestCase{
+		Name: "local_param_tee_return",
+		Module: SingleFunctionModule(i32_i32i32, []byte{
+			wasm.OpcodeLocalGet, 0,
+			wasm.OpcodeLocalTee, 1,
+			wasm.OpcodeLocalGet, 1,
+			wasm.OpcodeEnd,
+		}, []wasm.ValueType{i32}),
+	}
 	SwapParamAndReturn = TestCase{
 		Name: "swap_param_and_return",
 		Module: SingleFunctionModule(i32i32_i32i32, []byte{
@@ -115,8 +124,6 @@ var (
 			wasm.OpcodeLocalSet, 0,
 			wasm.OpcodeBlock, blockSignature_vv,
 			wasm.OpcodeEnd,
-			wasm.OpcodeLocalGet, 0,
-			wasm.OpcodeLocalGet, 1,
 			wasm.OpcodeEnd,
 		}, nil),
 	}

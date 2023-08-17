@@ -80,6 +80,18 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 `,
 		},
 		{
+			name: "local param tee return", m: testcases.LocalParamTeeReturn.Module,
+			exp: `
+blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
+	v3:i32 = Iconst_32 0x0
+	Jump blk_ret, v2, v2
+`,
+			expAfterOpt: `
+blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
+	Jump blk_ret, v2, v2
+`,
+		},
+		{
 			name: "locals + params", m: testcases.LocalsParams.Module,
 			exp: `
 blk0: (exec_ctx:i64, module_ctx:i64, v2:i64, v3:f32, v4:f64)

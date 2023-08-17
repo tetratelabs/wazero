@@ -141,7 +141,6 @@ type (
 		Val uint64
 		// ValHi is only used for vector type globals, and holds the higher bits of the vector.
 		ValHi uint64
-		// ^^ TODO: this should be guarded with atomics when mutable
 	}
 
 	// FunctionTypeID is a uniquely assigned integer for a function type.
