@@ -58,6 +58,19 @@ L1 (SSA Block: blk0):
 	ret
 `,
 		},
+		//		{
+		//			name: "selects", m: testcases.Selects.Module,
+		//			afterLoweringARM64: `
+		//L1 (SSA Block: blk0):
+		//	ret
+		//`,
+		//			afterFinalizeARM64: `
+		//L1 (SSA Block: blk0):
+		//	str x30, [sp, #-0x10]!
+		//	ldr x30, [sp], #0x10
+		//	ret
+		//`,
+		//		},
 		{
 			name: "consts", m: testcases.Constants.Module,
 			afterLoweringARM64: `

@@ -467,6 +467,24 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		newValue := state.peek()
 		builder.DefineVariableInCurrentBB(variable, newValue)
 
+	case wasm.OpcodeSelect, wasm.OpcodeTypedSelect:
+		if op == wasm.OpcodeTypedSelect {
+			state.pc += 2 // ignores the type which is only needed during validation.
+		}
+
+		if state.unreachable {
+			return
+		}
+
+		cond := state.pop()
+		v2 := state.pop()
+		v1 := state.pop()
+
+		sl := builder.AllocateInstruction()
+		sl.AsSelect(cond, v1, v2)
+		builder.InsertInstruction(sl)
+		state.push(sl.Return())
+
 	case wasm.OpcodeMemorySize:
 		state.pc++ // skips the memory index.
 		if state.unreachable {

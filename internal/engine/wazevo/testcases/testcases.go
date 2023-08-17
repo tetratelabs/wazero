@@ -115,6 +115,21 @@ var (
 			wasm.OpcodeEnd,
 		}, nil),
 	}
+	Selects = TestCase{
+		Name: "swap_param_and_return",
+		Module: SingleFunctionModule(i32i32_i32i32, []byte{
+			wasm.OpcodeLocalGet, 0, // x
+			wasm.OpcodeLocalGet, 1, // y
+			wasm.OpcodeLocalGet, 0, // cond
+			wasm.OpcodeSelect,
+
+			wasm.OpcodeLocalGet, 0, // x
+			wasm.OpcodeLocalGet, 1, // y
+			wasm.OpcodeLocalGet, 1, // cond
+			wasm.OpcodeTypedSelect, 1, wasm.ValueTypeI32,
+			wasm.OpcodeEnd,
+		}, nil),
+	}
 	SwapParamsAndReturn = TestCase{
 		Name: "swap_params_and_return",
 		Module: SingleFunctionModule(i32i32_i32i32, []byte{
@@ -124,6 +139,8 @@ var (
 			wasm.OpcodeLocalSet, 0,
 			wasm.OpcodeBlock, blockSignature_vv,
 			wasm.OpcodeEnd,
+			wasm.OpcodeLocalGet, 0,
+			wasm.OpcodeLocalGet, 1,
 			wasm.OpcodeEnd,
 		}, nil),
 	}

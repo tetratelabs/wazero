@@ -319,13 +319,8 @@ const (
 	// `nop`.
 	OpcodeNop
 
-	// OpcodeSelect ...
-	// `v = select c, x, y`.
+	// OpcodeSelect chooses between two values based on a condition `c`: `v = Select c, x, y`.
 	OpcodeSelect
-
-	// OpcodeSelectSpectreGuard ...
-	// `v = select_spectre_guard c, x, y`.
-	OpcodeSelectSpectreGuard
 
 	// OpcodeBitselect ...
 	// `v = bitselect c, x, y`.
@@ -868,6 +863,7 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeFdiv:               sideEffectFalse,
 	OpcodeFmul:               sideEffectFalse,
 	OpcodeFmax:               sideEffectFalse,
+	OpcodeSelect:             sideEffectFalse,
 	OpcodeFmin:               sideEffectFalse,
 }
 
@@ -888,6 +884,7 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeJump:      returnTypesFnNoReturns,
 	OpcodeUndefined: returnTypesFnNoReturns,
 	OpcodeIconst:    returnTypesFnSingle,
+	OpcodeSelect:    returnTypesFnSingle,
 	OpcodeSExtend:   returnTypesFnSingle,
 	OpcodeUExtend:   returnTypesFnSingle,
 	OpcodeCallIndirect: func(b *builder, instr *Instruction) (t1 Type, ts []Type) {
@@ -1339,6 +1336,23 @@ func (i *Instruction) ExtendData() (from, to byte, signed bool) {
 	return
 }
 
+// AsSelect initializes this instruction as an unsigned extension instruction with OpcodeSelect.
+func (i *Instruction) AsSelect(c, x, y Value) {
+	i.opcode = OpcodeSelect
+	i.v = c
+	i.v2 = x
+	i.u64 = uint64(y)
+	i.typ = x.Type()
+}
+
+// SelectData returns the select data for this instruction necessary for backends.
+func (i *Instruction) SelectData() (c, x, y Value) {
+	c = i.v
+	x = i.v2
+	y = Value(i.u64)
+	return
+}
+
 // ExtendFromToBits returns the from and to bit size for the extension instruction.
 func (i *Instruction) ExtendFromToBits() (from, to byte) {
 	from = byte(i.u64 >> 8)
@@ -1379,6 +1393,8 @@ func (i *Instruction) Format(b Builder) string {
 		instSuffix = fmt.Sprintf(" %s, %#x", i.v.Format(b), int32(i.u64))
 	case OpcodeUload8, OpcodeUload16, OpcodeUload32, OpcodeSload8, OpcodeSload16, OpcodeSload32:
 		instSuffix = fmt.Sprintf(" %s, %#x", i.v.Format(b), int32(i.u64))
+	case OpcodeSelect:
+		instSuffix = fmt.Sprintf(" %s, %s, %s", i.v.Format(b), i.v2.Format(b), Value(i.u64).Format(b))
 	case OpcodeIconst:
 		switch i.typ {
 		case TypeI32:
@@ -1592,8 +1608,6 @@ func (o Opcode) String() (ret string) {
 		return "Nop"
 	case OpcodeSelect:
 		return "Select"
-	case OpcodeSelectSpectreGuard:
-		return "SelectSpectreGuard"
 	case OpcodeBitselect:
 		return "Bitselect"
 	case OpcodeVsplit:

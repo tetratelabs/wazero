@@ -80,6 +80,15 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 `,
 		},
 		{
+			name: "selects", m: testcases.Selects.Module,
+			exp: `
+blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i32)
+	v4:i32 = Select v2, v2, v3
+	v5:i32 = Select v3, v2, v3
+	Jump blk_ret, v4, v5
+`,
+		},
+		{
 			name: "local param tee return", m: testcases.LocalParamTeeReturn.Module,
 			exp: `
 blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
