@@ -36,6 +36,24 @@ func TestE2E(t *testing.T) {
 		calls       []callCase
 	}{
 		{
+			name: "selects", m: testcases.Selects.Module,
+			calls: []callCase{
+				{
+					params: []uint64{
+						0, 1, // i32,
+						200, 100, // i64,
+						uint64(math.Float32bits(3.0)), uint64(math.Float32bits(10.0)),
+						math.Float64bits(-123.4), math.Float64bits(-10000000000.0),
+					},
+					expResults: []uint64{
+						1,
+						200,
+						uint64(math.Float32bits(3.0)),
+						math.Float64bits(-123.4),
+					}},
+			},
+		},
+		{
 			name: "swap", m: testcases.SwapParamAndReturn.Module,
 			calls: []callCase{
 				{params: []uint64{math.MaxUint32, math.MaxInt32}, expResults: []uint64{math.MaxInt32, math.MaxUint32}},
