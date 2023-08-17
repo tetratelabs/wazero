@@ -2,6 +2,7 @@ package wazevo_test
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"math"
 	"testing"
@@ -30,10 +31,9 @@ func TestE2E(t *testing.T) {
 		expErr             string
 	}
 	for _, tc := range []struct {
-		name           string
-		imported, m    *wasm.Module
-		needHostModule bool
-		calls          []callCase
+		name        string
+		imported, m *wasm.Module
+		calls       []callCase
 	}{
 		{
 			name: "swap", m: testcases.SwapParamAndReturn.Module,
@@ -87,6 +87,18 @@ func TestE2E(t *testing.T) {
 				{params: []uint64{100}, expResults: []uint64{100 * 100}},
 			},
 		},
+		{
+			name: "memory_store_basic",
+			m:    testcases.MemoryStoreBasic.Module,
+			calls: []callCase{
+				{params: []uint64{0, 0xf}, expResults: []uint64{0xf}},
+				{params: []uint64{256, 0xff}, expResults: []uint64{0xff}},
+				{params: []uint64{100, 0xffffffff}, expResults: []uint64{0xffffffff}},
+				// We load I32, so we can't load from the last 3 bytes.
+				{params: []uint64{uint64(wasm.MemoryPageSize) - 3}, expErr: "out of bounds memory access"},
+			},
+		},
+
 		{
 			name: "memory_load_basic",
 			m:    testcases.MemoryLoadBasic.Module,
@@ -319,4 +331,74 @@ func TestE2E_host_functions(t *testing.T) {
 		2 * 2, 100 * 100, uint64(math.Float32bits(15.0 * 15.0)), math.Float64bits(35.0 * 35.0),
 		math.Float64bits(math.Sqrt(35.0)),
 	}, res)
+}
+
+func TestE2E_stores(t *testing.T) {
+	config := wazero.NewRuntimeConfigCompiler()
+
+	// Configure the new optimizing backend!
+	configureWazevo(config)
+
+	ctx := context.Background()
+	r := wazero.NewRuntimeWithConfig(ctx, config)
+	defer func() {
+		require.NoError(t, r.Close(ctx))
+	}()
+
+	compiled, err := r.CompileModule(ctx, binaryencoding.EncodeModule(testcases.MemoryStores.Module))
+	require.NoError(t, err)
+
+	inst, err := r.InstantiateModule(ctx, compiled, wazero.NewModuleConfig())
+	require.NoError(t, err)
+
+	f := inst.ExportedFunction("f")
+
+	mem, ok := inst.Memory().Read(0, wasm.MemoryPageSize)
+	require.True(t, ok)
+	for _, tc := range []struct {
+		i32 uint32
+		i64 uint64
+		f32 float32
+		f64 float64
+	}{
+		{0, 0, 0, 0},
+		{1, 2, 3.0, 4.0},
+		{math.MaxUint32, math.MaxUint64, float32(math.NaN()), math.NaN()},
+		{1 << 31, 1 << 63, 3.0, 4.0},
+	} {
+		t.Run(fmt.Sprintf("i32=%#x,i64=%#x,f32=%#x,f64=%#x", tc.i32, tc.i64, tc.f32, tc.f64), func(t *testing.T) {
+			_, err = f.Call(ctx, []uint64{uint64(tc.i32), tc.i64, uint64(math.Float32bits(tc.f32)), math.Float64bits(tc.f64)}...)
+			require.NoError(t, err)
+
+			offset := 0
+			require.Equal(t, binary.LittleEndian.Uint32(mem[offset:]), tc.i32)
+			offset += 8
+			require.Equal(t, binary.LittleEndian.Uint64(mem[offset:]), tc.i64)
+			offset += 8
+			require.Equal(t, math.Float32bits(tc.f32), binary.LittleEndian.Uint32(mem[offset:]))
+			offset += 8
+			require.Equal(t, math.Float64bits(tc.f64), binary.LittleEndian.Uint64(mem[offset:]))
+			offset += 8
+
+			// i32.store_8
+			view := binary.LittleEndian.Uint64(mem[offset:])
+			require.Equal(t, uint64(tc.i32)&0xff, view)
+			offset += 8
+			// i32.store_16
+			view = binary.LittleEndian.Uint64(mem[offset:])
+			require.Equal(t, uint64(tc.i32)&0xffff, view)
+			offset += 8
+			// i64.store_8
+			view = binary.LittleEndian.Uint64(mem[offset:])
+			require.Equal(t, tc.i64&0xff, view)
+			offset += 8
+			// i64.store_16
+			view = binary.LittleEndian.Uint64(mem[offset:])
+			require.Equal(t, tc.i64&0xffff, view)
+			offset += 8
+			// i64.store_32
+			view = binary.LittleEndian.Uint64(mem[offset:])
+			require.Equal(t, tc.i64&0xffffffff, view)
+		})
+	}
 }

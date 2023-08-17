@@ -862,6 +862,29 @@ blk3: () <-- (blk2)
 `,
 		},
 		{
+			name: "memory_store_basic", m: testcases.MemoryStoreBasic.Module,
+			exp: `
+blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i32)
+	v4:i64 = Iconst_64 0x4
+	v5:i64 = UExtend v2, 32->64
+	v6:i64 = Uload32 module_ctx, 0x10
+	v7:i64 = Iadd v5, v4
+	v8:i32 = Icmp lt_u, v6, v7
+	ExitIfTrue v8, exec_ctx, memory_out_of_bounds
+	v9:i64 = Load module_ctx, 0x8
+	v10:i64 = Iadd v9, v5
+	Store v3, v10, 0x0
+	v11:i64 = Iconst_64 0x4
+	v12:i64 = UExtend v2, 32->64
+	v13:i64 = Iadd v12, v11
+	v14:i32 = Icmp lt_u, v6, v13
+	ExitIfTrue v14, exec_ctx, memory_out_of_bounds
+	v15:i64 = Iadd v9, v12
+	v16:i32 = Load v15, 0x0
+	Jump blk_ret, v16
+`,
+		},
+		{
 			name: "memory_load_basic", m: testcases.MemoryLoadBasic.Module,
 			exp: `
 blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)

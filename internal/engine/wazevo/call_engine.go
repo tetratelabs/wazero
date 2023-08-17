@@ -33,7 +33,8 @@ type (
 		// execCtx holds various information to be read/written by assembly functions.
 		execCtx executionContext
 		// execCtxPtr holds the pointer to the executionContext which doesn't change after callEngine is created.
-		execCtxPtr uintptr
+		execCtxPtr      uintptr
+		numberOfResults int
 	}
 
 	// executionContext is the struct to be read/written by assembly functions.
@@ -103,7 +104,7 @@ func (c *callEngine) Call(ctx context.Context, params ...uint64) ([]uint64, erro
 	if err := c.CallWithStack(ctx, paramResultSlice); err != nil {
 		return nil, err
 	}
-	return paramResultSlice, nil
+	return paramResultSlice[:c.numberOfResults], nil
 }
 
 // CallWithStack implements api.Function.

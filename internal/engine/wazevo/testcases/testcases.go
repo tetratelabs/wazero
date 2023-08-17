@@ -779,6 +779,75 @@ var (
 			}}},
 		},
 	}
+
+	MemoryStoreBasic = TestCase{
+		Name: "memory_load_basic",
+		Module: &wasm.Module{
+			TypeSection:     []wasm.FunctionType{{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}}},
+			ExportSection:   []wasm.Export{{Name: ExportName, Type: wasm.ExternTypeFunc, Index: 0}},
+			MemorySection:   &wasm.Memory{Min: 1},
+			FunctionSection: []wasm.Index{0},
+			CodeSection: []wasm.Code{{Body: []byte{
+				wasm.OpcodeLocalGet, 0, // offset
+				wasm.OpcodeLocalGet, 1, // value
+				wasm.OpcodeI32Store, 0x2, 0x0, // alignment=2 (natural alignment) staticOffset=0
+				// Read back.
+				wasm.OpcodeLocalGet, 0, // offset
+				wasm.OpcodeI32Load, 0x2, 0x0, // alignment=2 (natural alignment) staticOffset=0
+				wasm.OpcodeEnd,
+			}}},
+		},
+	}
+
+	MemoryStores = TestCase{
+		Name: "memory_load_basic",
+		Module: &wasm.Module{
+			TypeSection:     []wasm.FunctionType{{Params: []wasm.ValueType{i32, i64, f32, f64}}},
+			ExportSection:   []wasm.Export{{Name: ExportName, Type: wasm.ExternTypeFunc, Index: 0}},
+			MemorySection:   &wasm.Memory{Min: 1},
+			FunctionSection: []wasm.Index{0},
+			CodeSection: []wasm.Code{{Body: []byte{
+				wasm.OpcodeI32Const, 0, // offset
+				wasm.OpcodeLocalGet, 0, // value
+				wasm.OpcodeI32Store, 0x2, 0x0,
+
+				wasm.OpcodeI32Const, 8, // offset
+				wasm.OpcodeLocalGet, 1, // value
+				wasm.OpcodeI64Store, 0x3, 0x0,
+
+				wasm.OpcodeI32Const, 16, // offset
+				wasm.OpcodeLocalGet, 2, // value
+				wasm.OpcodeF32Store, 0x2, 0x0,
+
+				wasm.OpcodeI32Const, 24, // offset
+				wasm.OpcodeLocalGet, 3, // value
+				wasm.OpcodeF64Store, 0x3, 0x0,
+
+				wasm.OpcodeI32Const, 32,
+				wasm.OpcodeLocalGet, 0, // value
+				wasm.OpcodeI32Store8, 0x0, 0,
+
+				wasm.OpcodeI32Const, 40,
+				wasm.OpcodeLocalGet, 0, // value
+				wasm.OpcodeI32Store16, 0x1, 0,
+
+				wasm.OpcodeI32Const, 48,
+				wasm.OpcodeLocalGet, 1, // value
+				wasm.OpcodeI64Store8, 0x0, 0,
+
+				wasm.OpcodeI32Const, 56,
+				wasm.OpcodeLocalGet, 1, // value
+				wasm.OpcodeI64Store16, 0x1, 0,
+
+				wasm.OpcodeI32Const, 0xc0, 0, // 64 in leb128.
+				wasm.OpcodeLocalGet, 1, // value
+				wasm.OpcodeI64Store32, 0x2, 0,
+
+				wasm.OpcodeEnd,
+			}}},
+		},
+	}
+
 	MemoryLoadBasic = TestCase{
 		Name: "memory_load_basic",
 		Module: &wasm.Module{

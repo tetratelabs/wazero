@@ -61,6 +61,8 @@ var defKinds = [numInstructionKinds]defKind{
 	call:            defKindCall,
 	callInd:         defKindCall,
 	ret:             defKindNone,
+	store8:          defKindNone,
+	store16:         defKindNone,
 	store32:         defKindNone,
 	store64:         defKindNone,
 	exitSequence:    defKindNone,
@@ -149,6 +151,8 @@ var useKinds = [numInstructionKinds]useKind{
 	call:            useKindCall,
 	callInd:         useKindCallInd,
 	ret:             useKindRet,
+	store8:          useKindRNAMode,
+	store16:         useKindRNAMode,
 	store32:         useKindRNAMode,
 	store64:         useKindRNAMode,
 	exitSequence:    useKindRN,
@@ -705,9 +709,9 @@ func (i *instruction) String() (str string) {
 	case uLoad64:
 		str = fmt.Sprintf("ldr %s, %s", formatVRegSized(i.rd.nr(), 64), i.amode.format(64))
 	case store8:
-		panic("TODO")
+		str = fmt.Sprintf("strb %s, %s", formatVRegSized(i.rn.nr(), 32), i.amode.format(8))
 	case store16:
-		panic("TODO")
+		str = fmt.Sprintf("strh %s, %s", formatVRegSized(i.rn.nr(), 32), i.amode.format(16))
 	case store32:
 		str = fmt.Sprintf("str %s, %s", formatVRegSized(i.rn.nr(), 32), i.amode.format(32))
 	case store64:

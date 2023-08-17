@@ -200,7 +200,7 @@ blk2: () <-- (blk1)
 
 				// This has side effect.
 				store := b.AllocateInstruction()
-				store.AsStore(refThriceVal, refThriceVal, 0)
+				store.AsStore(OpcodeStore, refThriceVal, refThriceVal, 0)
 				b.InsertInstruction(store)
 
 				iconstDeadInst := b.AllocateInstruction()

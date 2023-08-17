@@ -1917,6 +1917,107 @@ L1 (SSA Block: blk0):
 `,
 		},
 		{
+			name: "memory_stores", m: testcases.MemoryStores.Module,
+			afterFinalizeARM64: `
+L1 (SSA Block: blk0):
+	str x30, [sp, #-0x10]!
+	mov x8, xzr
+	uxtw x10, w8
+	ldr w8, [x1, #0x10]
+	add x9, x10, #0x4
+	subs xzr, x8, x9
+	b.hs #0x20
+	movz x27, #0x4, LSL 0
+	str w27, [x0]
+	exit_sequence x0
+	ldr x9, [x1, #0x8]
+	add x10, x9, x10
+	str w2, [x10]
+	orr w10, wzr, #0x8
+	uxtw x11, w10
+	add x10, x11, #0x8
+	subs xzr, x8, x10
+	b.hs #0x20
+	movz x27, #0x4, LSL 0
+	str w27, [x0]
+	exit_sequence x0
+	add x10, x9, x11
+	str x3, [x10]
+	orr w10, wzr, #0x10
+	uxtw x11, w10
+	add x10, x11, #0x4
+	subs xzr, x8, x10
+	b.hs #0x20
+	movz x27, #0x4, LSL 0
+	str w27, [x0]
+	exit_sequence x0
+	add x10, x9, x11
+	str s0, [x10]
+	orr w10, wzr, #0x18
+	uxtw x11, w10
+	add x10, x11, #0x8
+	subs xzr, x8, x10
+	b.hs #0x20
+	movz x27, #0x4, LSL 0
+	str w27, [x0]
+	exit_sequence x0
+	add x10, x9, x11
+	str d1, [x10]
+	orr w10, wzr, #0x20
+	uxtw x11, w10
+	add x10, x11, #0x1
+	subs xzr, x8, x10
+	b.hs #0x20
+	movz x27, #0x4, LSL 0
+	str w27, [x0]
+	exit_sequence x0
+	add x10, x9, x11
+	strb w2, [x10]
+	movz w10, #0x28, LSL 0
+	uxtw x11, w10
+	add x10, x11, #0x2
+	subs xzr, x8, x10
+	b.hs #0x20
+	movz x27, #0x4, LSL 0
+	str w27, [x0]
+	exit_sequence x0
+	add x10, x9, x11
+	strh w2, [x10]
+	orr w10, wzr, #0x30
+	uxtw x11, w10
+	add x10, x11, #0x1
+	subs xzr, x8, x10
+	b.hs #0x20
+	movz x27, #0x4, LSL 0
+	str w27, [x0]
+	exit_sequence x0
+	add x10, x9, x11
+	strb w3, [x10]
+	orr w10, wzr, #0x38
+	uxtw x11, w10
+	add x10, x11, #0x2
+	subs xzr, x8, x10
+	b.hs #0x20
+	movz x27, #0x4, LSL 0
+	str w27, [x0]
+	exit_sequence x0
+	add x10, x9, x11
+	strh w3, [x10]
+	orr w10, wzr, #0x40
+	uxtw x11, w10
+	add x10, x11, #0x4
+	subs xzr, x8, x10
+	b.hs #0x20
+	movz x27, #0x4, LSL 0
+	str w27, [x0]
+	exit_sequence x0
+	add x8, x9, x11
+	str w3, [x8]
+	ldr x30, [sp], #0x10
+	ret
+`,
+		},
+		{
 			name: "memory_loads", m: testcases.MemoryLoads.Module,
 			afterLoweringARM64: `
 L1 (SSA Block: blk0):
@@ -2667,7 +2768,9 @@ L1 (SSA Block: blk0):
 
 			switch runtime.GOARCH {
 			case "arm64":
-				require.Equal(t, tc.afterLoweringARM64, be.Format())
+				if tc.afterLoweringARM64 != "" {
+					require.Equal(t, tc.afterLoweringARM64, be.Format())
+				}
 			default:
 				t.Fail()
 			}
