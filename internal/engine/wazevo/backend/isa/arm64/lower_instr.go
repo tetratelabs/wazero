@@ -7,6 +7,8 @@ package arm64
 // and merge the multiple instructions if possible. It can be considered as "N:1" instruction selection.
 
 import (
+	"fmt"
+
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
@@ -55,31 +57,10 @@ func (m *machine) LowerConditionalBranch(b *ssa.Instruction) {
 			cc = cc.invert()
 		}
 
-		if x.Type() != y.Type() {
-			panic("TODO(maybe): support icmp with different types")
-		}
-
-		extMod := extModeOf(x.Type(), signed)
-
+		m.lowerIcmpToFlag(x, y, signed)
 		cbr := m.allocateInstr()
 		cbr.asCondBr(cc.asCond(), target, false /* ignored */)
-
-		// First operand must be in pure register form.
-		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extMod)
-		// Second operand can be in any of Imm12, ER, SR, or NR form supported by the SUBS instructions.
-		rm := m.getOperand_Imm12_ER_SR_NR(m.compiler.ValueDefinition(y), extMod)
-
-		alu := m.allocateInstr()
-		// subs zr, rn, rm
-		alu.asALU(
-			aluOpSubS,
-			// We don't need the result, just need to set flags.
-			operandNR(xzrVReg),
-			rn,
-			rm,
-			x.Type().Bits() == 64,
-		)
-		m.insert2(alu, cbr)
+		m.insert(cbr)
 		m.compiler.MarkLowered(cvalDef.Instr)
 	case m.compiler.MatchInstr(cvalDef, ssa.OpcodeFcmp): // This case we can use the Fpu flag directly.
 		cvalInstr := cvalDef.Instr
@@ -88,18 +69,10 @@ func (m *machine) LowerConditionalBranch(b *ssa.Instruction) {
 		if b.Opcode() == ssa.OpcodeBrz {
 			cc = cc.invert()
 		}
-
-		if x.Type() != y.Type() {
-			panic("TODO(maybe): support icmp with different types")
-		}
-
-		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
-		rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
-		cmp := m.allocateInstr()
-		cmp.asFpuCmp(rn, rm, x.Type().Bits() == 64)
+		m.lowerFcmpToFlag(x, y)
 		cbr := m.allocateInstr()
 		cbr.asCondBr(cc.asCond(), target, false /* ignored */)
-		m.insert2(cmp, cbr)
+		m.insert(cbr)
 		m.compiler.MarkLowered(cvalDef.Instr)
 	default:
 		rn := m.getOperand_NR(cvalDef, extModeNone)
@@ -171,6 +144,9 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		undef := m.allocateInstr()
 		undef.asUDF()
 		m.insert(undef)
+	case ssa.OpcodeSelect:
+		c, x, y := instr.SelectData()
+		m.lowerSelect(c, x, y, instr.Return())
 	default:
 		panic("TODO: lowering " + instr.Opcode().String())
 	}
@@ -271,7 +247,7 @@ func (m *machine) lowerIcmp(si *ssa.Instruction) {
 	m.insert(alu)
 
 	cset := m.allocateInstr()
-	cset.asCSst(m.compiler.VRegOf(si.Return()), flag)
+	cset.asCSet(m.compiler.VRegOf(si.Return()), flag)
 	m.insert(cset)
 }
 
@@ -303,7 +279,7 @@ func (m *machine) lowerFcmp(x, y, result ssa.Value, c ssa.FloatCmpCond) {
 	m.insert(fc)
 
 	cset := m.allocateInstr()
-	cset.asCSst(m.compiler.VRegOf(result), condFlagFromSSAFloatCmpCond(c))
+	cset.asCSet(m.compiler.VRegOf(result), condFlagFromSSAFloatCmpCond(c))
 	m.insert(cset)
 }
 
@@ -341,18 +317,7 @@ func (m *machine) lowerExitWithCode(execCtxVReg regalloc.VReg, code wazevoapi.Ex
 	m.insert(exitSeq)
 }
 
-func (m *machine) lowerExitIfTrueWithCode(execCtxVReg regalloc.VReg, cond ssa.Value, code wazevoapi.ExitCode) {
-	condDef := m.compiler.ValueDefinition(cond)
-	if !m.compiler.MatchInstr(condDef, ssa.OpcodeIcmp) {
-		// We can have general case just like cachine.LowerConditionalBranch.
-		panic("TODO: OpcodeExitIfTrueWithCode must come after Icmp at the moment")
-	}
-	m.compiler.MarkLowered(condDef.Instr)
-
-	cvalInstr := condDef.Instr
-	x, y, c := cvalInstr.IcmpData()
-	cc, signed := condFlagFromSSAIntegerCmpCond(c), c.Signed()
-
+func (m *machine) lowerIcmpToFlag(x, y ssa.Value, signed bool) {
 	if x.Type() != y.Type() {
 		panic("TODO(maybe): support icmp with different types")
 	}
@@ -375,11 +340,92 @@ func (m *machine) lowerExitIfTrueWithCode(execCtxVReg regalloc.VReg, cond ssa.Va
 		x.Type().Bits() == 64,
 	)
 	m.insert(alu)
+}
+
+func (m *machine) lowerFcmpToFlag(x, y ssa.Value) {
+	if x.Type() != y.Type() {
+		panic("TODO(maybe): support icmp with different types")
+	}
+
+	rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+	rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
+	cmp := m.allocateInstr()
+	cmp.asFpuCmp(rn, rm, x.Type().Bits() == 64)
+	fmt.Println(x.Type())
+	m.insert(cmp)
+}
+
+func (m *machine) lowerExitIfTrueWithCode(execCtxVReg regalloc.VReg, cond ssa.Value, code wazevoapi.ExitCode) {
+	condDef := m.compiler.ValueDefinition(cond)
+	if !m.compiler.MatchInstr(condDef, ssa.OpcodeIcmp) {
+		// We can have general case just like cachine.LowerConditionalBranch.
+		panic("TODO: OpcodeExitIfTrueWithCode must come after Icmp at the moment")
+	}
+	m.compiler.MarkLowered(condDef.Instr)
+
+	cvalInstr := condDef.Instr
+	x, y, c := cvalInstr.IcmpData()
+	signed := c.Signed()
+	m.lowerIcmpToFlag(x, y, signed)
 
 	// We have to skip the entire exit sequence if the condition is false.
 	cbr := m.allocateInstr()
-	cbr.asCondBr(cc.invert().asCond(), invalidLabel, false /* ignored */)
+	cbr.asCondBr(condFlagFromSSAIntegerCmpCond(c).invert().asCond(), invalidLabel, false /* ignored */)
 	cbr.condBrOffsetResolve(exitWithCodeEncodingSize + 4 /* br offset is from the beginning of this instruction */)
 	m.insert(cbr)
 	m.lowerExitWithCode(execCtxVReg, code)
+}
+
+func (m *machine) lowerSelect(c, x, y, result ssa.Value) {
+	cvalDef := m.compiler.ValueDefinition(c)
+
+	var cc condFlag
+	switch {
+	case m.compiler.MatchInstr(cvalDef, ssa.OpcodeIcmp): // This case, we can use the ALU flag set by SUBS instruction.
+		cvalInstr := cvalDef.Instr
+		x, y, c := cvalInstr.IcmpData()
+		cc = condFlagFromSSAIntegerCmpCond(c)
+		m.lowerIcmpToFlag(x, y, c.Signed())
+		m.compiler.MarkLowered(cvalDef.Instr)
+	case m.compiler.MatchInstr(cvalDef, ssa.OpcodeFcmp): // This case we can use the Fpu flag directly.
+		cvalInstr := cvalDef.Instr
+		x, y, c := cvalInstr.FcmpData()
+		cc = condFlagFromSSAFloatCmpCond(c)
+		m.lowerFcmpToFlag(x, y)
+		m.compiler.MarkLowered(cvalDef.Instr)
+	default:
+		rn := m.getOperand_NR(cvalDef, extModeNone)
+		if c.Type() != ssa.TypeI32 && c.Type() != ssa.TypeI64 {
+			panic("TODO?BUG?: support select with non-integer condition")
+		}
+		alu := m.allocateInstr()
+		// subs zr, rn, zr
+		alu.asALU(
+			aluOpSubS,
+			// We don't need the result, just need to set flags.
+			operandNR(xzrVReg),
+			rn,
+			operandNR(xzrVReg),
+			c.Type().Bits() == 64,
+		)
+		m.insert(alu)
+		cc = ne
+	}
+
+	rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+	rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
+
+	rd := operandNR(m.compiler.VRegOf(result))
+	switch x.Type() {
+	case ssa.TypeI32, ssa.TypeI64:
+		// csel rd, rn, rm, cc
+		csel := m.allocateInstr()
+		csel.asCSel(rd, rn, rm, cc, x.Type().Bits() == 64)
+		m.insert(csel)
+	case ssa.TypeF32, ssa.TypeF64:
+		// fcsel rd, rn, rm, cc
+		fcsel := m.allocateInstr()
+		fcsel.asFpuCSel(rd, rn, rm, cc, x.Type().Bits() == 64)
+		m.insert(fcsel)
+	}
 }

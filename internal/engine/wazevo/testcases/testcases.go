@@ -98,11 +98,59 @@ var (
 			wasm.OpcodeEnd,
 		}, []wasm.ValueType{i32}),
 	}
+	LocalParamTeeReturn = TestCase{
+		Name: "local_param_tee_return",
+		Module: SingleFunctionModule(i32_i32i32, []byte{
+			wasm.OpcodeLocalGet, 0,
+			wasm.OpcodeLocalTee, 1,
+			wasm.OpcodeLocalGet, 1,
+			wasm.OpcodeEnd,
+		}, []wasm.ValueType{i32}),
+	}
 	SwapParamAndReturn = TestCase{
 		Name: "swap_param_and_return",
 		Module: SingleFunctionModule(i32i32_i32i32, []byte{
 			wasm.OpcodeLocalGet, 1,
 			wasm.OpcodeLocalGet, 0,
+			wasm.OpcodeEnd,
+		}, nil),
+	}
+	Selects = TestCase{
+		Name: "swap_param_and_return",
+		Module: SingleFunctionModule(i32i32i64i64f32f32f64f64_i32i64, []byte{
+			// i32 select.
+			wasm.OpcodeLocalGet, 0, // x
+			wasm.OpcodeLocalGet, 1, // y
+			// cond
+			wasm.OpcodeLocalGet, 2,
+			wasm.OpcodeLocalGet, 3,
+			wasm.OpcodeI64Eq,
+			wasm.OpcodeSelect,
+
+			// i64 select.
+			wasm.OpcodeLocalGet, 2, // x
+			wasm.OpcodeLocalGet, 3, // y
+			wasm.OpcodeLocalGet, 1, // cond
+			wasm.OpcodeTypedSelect, 1, wasm.ValueTypeI64,
+
+			// f32 select.
+			wasm.OpcodeLocalGet, 4, // x
+			wasm.OpcodeLocalGet, 5, // y
+			// cond
+			wasm.OpcodeLocalGet, 6,
+			wasm.OpcodeLocalGet, 7,
+			wasm.OpcodeF64Gt,
+			wasm.OpcodeTypedSelect, 1, wasm.ValueTypeF32,
+
+			// f64 select.
+			wasm.OpcodeLocalGet, 6, // x
+			wasm.OpcodeLocalGet, 7, // y
+			// cond
+			wasm.OpcodeLocalGet, 4,
+			wasm.OpcodeLocalGet, 5,
+			wasm.OpcodeF32Ne,
+			wasm.OpcodeTypedSelect, 1, wasm.ValueTypeF64,
+
 			wasm.OpcodeEnd,
 		}, nil),
 	}
@@ -1216,16 +1264,17 @@ func SingleFunctionModule(typ wasm.FunctionType, body []byte, localTypes []wasm.
 }
 
 var (
-	vv                  = wasm.FunctionType{}
-	v_i32               = wasm.FunctionType{Results: []wasm.ValueType{i32}}
-	v_i32i32            = wasm.FunctionType{Results: []wasm.ValueType{i32, i32}}
-	i32_v               = wasm.FunctionType{Params: []wasm.ValueType{i32}}
-	i32_i32             = wasm.FunctionType{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32}}
-	i32i32_i32          = wasm.FunctionType{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}}
-	i32i32_i32i32       = wasm.FunctionType{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32, i32}}
-	i32_i32i32          = wasm.FunctionType{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32, i32}}
-	i32f32f64_v         = wasm.FunctionType{Params: []wasm.ValueType{i32, f32, f64}, Results: nil}
-	i64f32f64_i64f32f64 = wasm.FunctionType{Params: []wasm.ValueType{i64, f32, f64}, Results: []wasm.ValueType{i64, f32, f64}}
+	vv                              = wasm.FunctionType{}
+	v_i32                           = wasm.FunctionType{Results: []wasm.ValueType{i32}}
+	v_i32i32                        = wasm.FunctionType{Results: []wasm.ValueType{i32, i32}}
+	i32_v                           = wasm.FunctionType{Params: []wasm.ValueType{i32}}
+	i32_i32                         = wasm.FunctionType{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32}}
+	i32i32_i32                      = wasm.FunctionType{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}}
+	i32i32_i32i32                   = wasm.FunctionType{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32, i32}}
+	i32i32i64i64f32f32f64f64_i32i64 = wasm.FunctionType{Params: []wasm.ValueType{i32, i32, i64, i64, f32, f32, f64, f64}, Results: []wasm.ValueType{i32, i64, f32, f64}}
+	i32_i32i32                      = wasm.FunctionType{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32, i32}}
+	i32f32f64_v                     = wasm.FunctionType{Params: []wasm.ValueType{i32, f32, f64}, Results: nil}
+	i64f32f64_i64f32f64             = wasm.FunctionType{Params: []wasm.ValueType{i64, f32, f64}, Results: []wasm.ValueType{i64, f32, f64}}
 )
 
 const (

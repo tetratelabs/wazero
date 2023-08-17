@@ -71,6 +71,11 @@ func (l *loweringState) reset() {
 	l.unreachableDepth = 0
 }
 
+func (l *loweringState) peek() (ret ssa.Value) {
+	tail := len(l.values) - 1
+	return l.values[tail]
+}
+
 func (l *loweringState) pop() (ret ssa.Value) {
 	tail := len(l.values) - 1
 	ret = l.values[tail]
@@ -450,8 +455,36 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 			return
 		}
 		variable := c.localVariable(index)
-		v := state.pop()
-		builder.DefineVariableInCurrentBB(variable, v)
+		newValue := state.pop()
+		builder.DefineVariableInCurrentBB(variable, newValue)
+
+	case wasm.OpcodeLocalTee:
+		index := c.readI32u()
+		if state.unreachable {
+			return
+		}
+		variable := c.localVariable(index)
+		newValue := state.peek()
+		builder.DefineVariableInCurrentBB(variable, newValue)
+
+	case wasm.OpcodeSelect, wasm.OpcodeTypedSelect:
+		if op == wasm.OpcodeTypedSelect {
+			state.pc += 2 // ignores the type which is only needed during validation.
+		}
+
+		if state.unreachable {
+			return
+		}
+
+		cond := state.pop()
+		v2 := state.pop()
+		v1 := state.pop()
+
+		sl := builder.AllocateInstruction()
+		sl.AsSelect(cond, v1, v2)
+		builder.InsertInstruction(sl)
+		state.push(sl.Return())
+
 	case wasm.OpcodeMemorySize:
 		state.pc++ // skips the memory index.
 		if state.unreachable {

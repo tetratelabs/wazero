@@ -152,7 +152,7 @@ func TestMachine_LowerConditionalBranch(t *testing.T) {
 				return cmpInSameGroupFromParams(true, ssa.IntegerCmpCondInvalid, ssa.FloatCmpCondEqual, ctx, builder, m)
 			},
 			instructions: []string{
-				"fcmp s1, s2",
+				"fcmp d1, d2",
 				"b.ne L1",
 			},
 		},
@@ -162,7 +162,7 @@ func TestMachine_LowerConditionalBranch(t *testing.T) {
 				return cmpInSameGroupFromParams(false, ssa.IntegerCmpCondInvalid, ssa.FloatCmpCondGreaterThan, ctx, builder, m)
 			},
 			instructions: []string{
-				"fcmp s1, s2",
+				"fcmp d1, d2",
 				"b.gt L1",
 			},
 		},

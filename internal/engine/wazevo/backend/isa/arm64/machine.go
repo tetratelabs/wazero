@@ -214,10 +214,6 @@ func (m *machine) insert(i *instruction) {
 	m.pendingInstructions = append(m.pendingInstructions, i)
 }
 
-func (m *machine) insert2(i1, i2 *instruction) {
-	m.pendingInstructions = append(m.pendingInstructions, i1, i2)
-}
-
 func (m *machine) FlushPendingInstructions() {
 	l := len(m.pendingInstructions)
 	if l == 0 {

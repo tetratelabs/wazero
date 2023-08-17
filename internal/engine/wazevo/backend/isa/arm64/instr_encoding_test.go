@@ -17,6 +17,14 @@ func TestInstruction_encode(t *testing.T) {
 		setup func(*instruction)
 		want  string
 	}{
+		{want: "4100839a", setup: func(i *instruction) { i.asCSel(operandNR(x1VReg), operandNR(x2VReg), operandNR(x3VReg), eq, true) }},
+		{want: "4110839a", setup: func(i *instruction) { i.asCSel(operandNR(x1VReg), operandNR(x2VReg), operandNR(x3VReg), ne, true) }},
+		{want: "4100831a", setup: func(i *instruction) { i.asCSel(operandNR(x1VReg), operandNR(x2VReg), operandNR(x3VReg), eq, false) }},
+		{want: "4110831a", setup: func(i *instruction) { i.asCSel(operandNR(x1VReg), operandNR(x2VReg), operandNR(x3VReg), ne, false) }},
+		{want: "41cc631e", setup: func(i *instruction) { i.asFpuCSel(operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), gt, true) }},
+		{want: "41bc631e", setup: func(i *instruction) { i.asFpuCSel(operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), lt, true) }},
+		{want: "41cc231e", setup: func(i *instruction) { i.asFpuCSel(operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), gt, false) }},
+		{want: "41bc231e", setup: func(i *instruction) { i.asFpuCSel(operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), lt, false) }},
 		{want: "5b28030b", setup: func(i *instruction) {
 			i.asALU(aluOpAdd, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSL), false)
 		}},
@@ -130,8 +138,8 @@ func TestInstruction_encode(t *testing.T) {
 		{want: "b21c4093", setup: func(i *instruction) { i.asExtend(x18VReg, x5VReg, 8, 64, true) }},
 		{want: "b23c4093", setup: func(i *instruction) { i.asExtend(x18VReg, x5VReg, 16, 64, true) }},
 		{want: "b27c4093", setup: func(i *instruction) { i.asExtend(x18VReg, x5VReg, 32, 64, true) }},
-		{want: "f2079f9a", setup: func(i *instruction) { i.asCSst(x18VReg, ne) }},
-		{want: "f2179f9a", setup: func(i *instruction) { i.asCSst(x18VReg, eq) }},
+		{want: "f2079f9a", setup: func(i *instruction) { i.asCSet(x18VReg, ne) }},
+		{want: "f2179f9a", setup: func(i *instruction) { i.asCSet(x18VReg, eq) }},
 		{want: "32008012", setup: func(i *instruction) { i.asMOVN(x18VReg, 1, 0, false) }},
 		{want: "52559512", setup: func(i *instruction) { i.asMOVN(x18VReg, 0xaaaa, 0, false) }},
 		{want: "f2ff9f12", setup: func(i *instruction) { i.asMOVN(x18VReg, 0xffff, 0, false) }},
