@@ -857,6 +857,9 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeSshr:               sideEffectFalse,
 	OpcodeUshr:               sideEffectFalse,
 	OpcodeStore:              sideEffectTrue,
+	OpcodeIstore8:            sideEffectTrue,
+	OpcodeIstore16:           sideEffectTrue,
+	OpcodeIstore32:           sideEffectTrue,
 	OpcodeExitWithCode:       sideEffectTrue,
 	OpcodeExitIfTrueWithCode: sideEffectTrue,
 	OpcodeReturn:             sideEffectTrue,
@@ -934,6 +937,9 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeF32const:           returnTypesFnF32,
 	OpcodeF64const:           returnTypesFnF64,
 	OpcodeStore:              returnTypesFnNoReturns,
+	OpcodeIstore8:            returnTypesFnNoReturns,
+	OpcodeIstore16:           returnTypesFnNoReturns,
+	OpcodeIstore32:           returnTypesFnNoReturns,
 	OpcodeExitWithCode:       returnTypesFnNoReturns,
 	OpcodeExitIfTrueWithCode: returnTypesFnNoReturns,
 	OpcodeReturn:             returnTypesFnNoReturns,
@@ -1367,7 +1373,7 @@ func (i *Instruction) Format(b Builder) string {
 		} else {
 			instSuffix = fmt.Sprintf(" %s:%s, %s", FuncRef(i.u64), SignatureID(i.v), strings.Join(vs, ", "))
 		}
-	case OpcodeStore:
+	case OpcodeStore, OpcodeIstore8, OpcodeIstore16, OpcodeIstore32:
 		instSuffix = fmt.Sprintf(" %s, %s, %#x", i.v.Format(b), i.v2.Format(b), int32(i.u64))
 	case OpcodeLoad:
 		instSuffix = fmt.Sprintf(" %s, %#x", i.v.Format(b), int32(i.u64))
