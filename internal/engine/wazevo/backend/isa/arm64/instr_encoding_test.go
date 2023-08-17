@@ -17,6 +17,14 @@ func TestInstruction_encode(t *testing.T) {
 		setup func(*instruction)
 		want  string
 	}{
+		{want: "4100839a", setup: func(i *instruction) { i.asCSel(operandNR(x1VReg), operandNR(x2VReg), operandNR(x3VReg), eq, true) }},
+		{want: "4110839a", setup: func(i *instruction) { i.asCSel(operandNR(x1VReg), operandNR(x2VReg), operandNR(x3VReg), ne, true) }},
+		{want: "4100831a", setup: func(i *instruction) { i.asCSel(operandNR(x1VReg), operandNR(x2VReg), operandNR(x3VReg), eq, false) }},
+		{want: "4110831a", setup: func(i *instruction) { i.asCSel(operandNR(x1VReg), operandNR(x2VReg), operandNR(x3VReg), ne, false) }},
+		{want: "41cc631e", setup: func(i *instruction) { i.asFpuCSel(operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), gt, true) }},
+		{want: "41bc631e", setup: func(i *instruction) { i.asFpuCSel(operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), lt, true) }},
+		{want: "41cc231e", setup: func(i *instruction) { i.asFpuCSel(operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), gt, false) }},
+		{want: "41bc231e", setup: func(i *instruction) { i.asFpuCSel(operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), lt, false) }},
 		{want: "5b28030b", setup: func(i *instruction) {
 			i.asALU(aluOpAdd, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSL), false)
 		}},
