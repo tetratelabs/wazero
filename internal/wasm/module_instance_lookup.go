@@ -7,7 +7,9 @@ import (
 	"github.com/tetratelabs/wazero/internal/internalapi"
 )
 
-// LookupFunction implements api.ModuleInstance.
+// LookupFunction looks up the table by the given index, and returns the api.Function implementation if found,
+// otherwise this panics according to the same semantics as call_indirect instruction.
+// Currently, this is only used by emscripten which needs to do call_indirect-like operation in the host function.
 func (m *ModuleInstance) LookupFunction(t *TableInstance, typeId FunctionTypeID, tableOffset Index) api.Function {
 	fm, index := m.Engine.LookupFunction(t, typeId, tableOffset)
 	if source := fm.Source; source.IsHostModule {
@@ -27,17 +29,16 @@ func (m *ModuleInstance) LookupFunction(t *TableInstance, typeId FunctionTypeID,
 }
 
 type (
-	lookedUpGoFunction struct {
+	// lookedUpGoFunction implements api.Function for an api.GoFunction.
+	lookedUpGoFunction lookedUpGoFunctionBase[api.GoFunction]
+	// lookedUpGoModuleFunction implements api.Function for an api.GoModuleFunction.
+	lookedUpGoModuleFunction lookedUpGoFunctionBase[api.GoModuleFunction]
+	// lookedUpGoFunctionBase is a base type for lookedUpGoFunction and lookedUpGoModuleFunction.
+	lookedUpGoFunctionBase[T any] struct {
 		internalapi.WazeroOnly
 		def            *FunctionDefinition
 		lookedUpModule *ModuleInstance
-		g              api.GoFunction
-	}
-	lookedUpGoModuleFunction struct {
-		internalapi.WazeroOnly
-		def            *FunctionDefinition
-		lookedUpModule *ModuleInstance
-		g              api.GoModuleFunction
+		g              T
 	}
 )
 
