@@ -10,7 +10,6 @@ import (
 )
 
 func TestModuleInstance_LookupFunction(t *testing.T) {
-
 	var called int
 	hostModule := &Module{
 		IsHostModule: true,
