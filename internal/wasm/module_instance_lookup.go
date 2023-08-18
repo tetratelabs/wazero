@@ -3,6 +3,7 @@ package wasm
 import (
 	"context"
 	"fmt"
+
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/internalapi"
 )
@@ -13,8 +14,8 @@ import (
 func (m *ModuleInstance) LookupFunction(t *TableInstance, typeId FunctionTypeID, tableOffset Index) api.Function {
 	fm, index := m.Engine.LookupFunction(t, typeId, tableOffset)
 	if source := fm.Source; source.IsHostModule {
-		// This case, the function is a host function stored in the table.
-		// At the top leve, engines are only responsible for calling Wasm-defined functions,
+		// This case, the found function is a host function stored in the table.
+		// Generally, Engine.NewFunction are only responsible for calling Wasm-defined exported functions,
 		// so we need to wrap the host function as a special case.
 		def := &source.FunctionDefinitionSection[index]
 		goF := source.CodeSection[index].GoFunc
