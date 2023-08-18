@@ -13,7 +13,10 @@ import (
 func (m *ModuleInstance) LookupFunction(t *TableInstance, typeId FunctionTypeID, tableOffset Index) api.Function {
 	fm, index := m.Engine.LookupFunction(t, typeId, tableOffset)
 	if source := fm.Source; source.IsHostModule {
-		def := source.FunctionDefinition(index)
+		// This case, the function is a host function stored in the table.
+		// At the top leve, engines are only responsible for calling Wasm-defined functions,
+		// so we need to wrap the host function as a special case.
+		def := &source.FunctionDefinitionSection[index]
 		goF := source.CodeSection[index].GoFunc
 		switch typed := goF.(type) {
 		case api.GoFunction:
