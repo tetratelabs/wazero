@@ -301,7 +301,7 @@ func (m *machine) getOperand_NR(def *backend.SSAValueDefinition, mode extMode) (
 		}
 	}
 
-	var r = v
+	r := v
 	switch inBits := def.SSAValue().Type().Bits(); {
 	case mode == extModeNone:
 	case inBits == 32 && (mode == extModeZeroExtend32 || mode == extModeSignExtend32):
