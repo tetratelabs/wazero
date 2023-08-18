@@ -51,8 +51,8 @@ type ModuleEngine interface {
 	// ResolveImportedMemory is called when this module imports a memory from another module.
 	ResolveImportedMemory(importedModuleEngine ModuleEngine)
 
-	// LookupFunction returns the api.Function created from the function in the function table at the given offset.
-	LookupFunction(t *TableInstance, typeId FunctionTypeID, tableOffset Index) (api.Function, error)
+	// LookupFunction returns the FunctionModule and the Index of the function in the returned ModuleInstance at the given offset in the table.
+	LookupFunction(t *TableInstance, typeId FunctionTypeID, tableOffset Index) (*ModuleInstance, Index)
 
 	// FunctionInstanceReference returns Reference for the given Index for a FunctionInstance. The returned values are used by
 	// the initialization via ElementSegment.

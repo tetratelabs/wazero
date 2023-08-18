@@ -252,6 +252,7 @@ func RunTestModuleEngineLookupFunction(t *testing.T, et EngineTester) {
 	require.NoError(t, err)
 	m := &wasm.ModuleInstance{
 		TypeIDs: []wasm.FunctionTypeID{0, 1},
+		Source:  mod,
 	}
 	m.Tables = []*wasm.TableInstance{
 		{Min: 2, References: make([]wasm.Reference, 2), Type: wasm.RefTypeFuncref},
@@ -264,9 +265,13 @@ func RunTestModuleEngineLookupFunction(t *testing.T, et EngineTester) {
 	linkModuleToEngine(m, me)
 
 	t.Run("null reference", func(t *testing.T) {
-		_, err := me.LookupFunction(m.Tables[0], m.TypeIDs[0], 0) // offset 0 is not initialized yet.
+		err = require.CapturePanic(func() {
+			m.LookupFunction(m.Tables[0], m.TypeIDs[0], 0) // offset 0 is not initialized yet.
+		})
 		require.Equal(t, wasmruntime.ErrRuntimeInvalidTableAccess, err)
-		_, err = me.LookupFunction(m.Tables[0], m.TypeIDs[0], 1) // offset 1 is not initialized yet.
+		err = require.CapturePanic(func() {
+			m.LookupFunction(m.Tables[0], m.TypeIDs[0], 1) // offset 1 is not initialized yet.
+		})
 		require.Equal(t, wasmruntime.ErrRuntimeInvalidTableAccess, err)
 	})
 
@@ -274,39 +279,41 @@ func RunTestModuleEngineLookupFunction(t *testing.T, et EngineTester) {
 	m.Tables[0].References[1] = me.FunctionInstanceReference(0)
 
 	t.Run("initialized", func(t *testing.T) {
-		f1, err := me.LookupFunction(m.Tables[0], m.TypeIDs[0], 0) // offset 0 is now initialized.
-		require.NoError(t, err)
+		f1 := m.LookupFunction(m.Tables[0], m.TypeIDs[0], 0) // offset 0 is now initialized.
 		require.Equal(t, wasm.Index(2), f1.Definition().Index())
-		f2, err := me.LookupFunction(m.Tables[0], m.TypeIDs[0], 1) // offset 1 is now initialized.
-		require.NoError(t, err)
+		f2 := m.LookupFunction(m.Tables[0], m.TypeIDs[0], 1) // offset 1 is now initialized.
 		require.Equal(t, wasm.Index(0), f2.Definition().Index())
 	})
 
 	t.Run("out of range", func(t *testing.T) {
-		_, err := me.LookupFunction(m.Tables[0], m.TypeIDs[0], 100 /* out of range */)
+		err = require.CapturePanic(func() {
+			me.LookupFunction(m.Tables[0], m.TypeIDs[0], 100 /* out of range */)
+		})
 		require.Equal(t, wasmruntime.ErrRuntimeInvalidTableAccess, err)
 	})
 
 	t.Run("access to externref table", func(t *testing.T) {
-		_, err := me.LookupFunction(m.Tables[1], /* table[1] has externref type. */
-			m.TypeIDs[0], 0)
+		err := require.CapturePanic(func() {
+			m.LookupFunction(m.Tables[1], /* table[1] has externref type. */
+				m.TypeIDs[0], 0)
+		})
 		require.Equal(t, wasmruntime.ErrRuntimeInvalidTableAccess, err)
 	})
 
 	t.Run("access to externref table", func(t *testing.T) {
-		_, err := me.LookupFunction(m.Tables[0], /* type mismatch */
-			m.TypeIDs[1], 0)
+		err = require.CapturePanic(func() {
+			me.LookupFunction(m.Tables[0], /* type mismatch */
+				m.TypeIDs[1], 0)
+		})
 		require.Equal(t, wasmruntime.ErrRuntimeIndirectCallTypeMismatch, err)
 	})
 
 	m.Tables[2].References[0] = me.FunctionInstanceReference(1)
 	m.Tables[2].References[5] = me.FunctionInstanceReference(2)
 	t.Run("initialized - tables[2]", func(t *testing.T) {
-		f1, err := me.LookupFunction(m.Tables[2], m.TypeIDs[0], 0)
-		require.NoError(t, err)
+		f1 := m.LookupFunction(m.Tables[2], m.TypeIDs[0], 0)
 		require.Equal(t, wasm.Index(1), f1.Definition().Index())
-		f2, err := me.LookupFunction(m.Tables[2], m.TypeIDs[0], 5)
-		require.NoError(t, err)
+		f2 := m.LookupFunction(m.Tables[2], m.TypeIDs[0], 5)
 		require.Equal(t, wasm.Index(2), f2.Definition().Index())
 	})
 }
