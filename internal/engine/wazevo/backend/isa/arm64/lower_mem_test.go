@@ -394,10 +394,10 @@ func TestMachine_collectAddends(t *testing.T) {
 						require.True(t, lowerd)
 					}
 					// Param must be zero-extended.
-					require.Equal(t, "uxtw x1000?, w1000?", formatEmittedInstructionsInCurrentBlock(m))
+					require.Equal(t, "uxtw x1?, w1000?", formatEmittedInstructionsInCurrentBlock(m))
 				}
 			},
-			exp64s: []regalloc.VReg{v1000},
+			exp64s: []regalloc.VReg{regalloc.VReg(1).SetRegType(regalloc.RegTypeInt)},
 			offset: 1 + 2 + 3 - 1,
 		},
 		{

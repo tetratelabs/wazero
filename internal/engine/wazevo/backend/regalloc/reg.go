@@ -87,7 +87,7 @@ func (v VReg) String() string {
 	if v.IsRealReg() {
 		return fmt.Sprintf("r%d", v.ID()-vRegIDReservedForRealBegin)
 	}
-	return fmt.Sprintf("r%d?", v.ID())
+	return fmt.Sprintf("v%d?", v.ID())
 }
 
 // RegType represents the type of a register.

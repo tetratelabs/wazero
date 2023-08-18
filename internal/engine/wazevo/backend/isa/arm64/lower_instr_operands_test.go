@@ -53,8 +53,8 @@ func TestMachine_getOperand_NR(t *testing.T) {
 				def = &backend.SSAValueDefinition{BlkParamVReg: regToVReg(x4), BlockParamValue: v}
 				return def, extModeZeroExtend64
 			},
-			exp:          operandNR(regToVReg(x4)),
-			instructions: []string{"uxtw x4, w4"},
+			exp:          operandNR(regalloc.VReg(1).SetRegType(regalloc.RegTypeInt)),
+			instructions: []string{"uxtw x1?, w4"},
 		},
 		{
 			name: "block param - sign extend",
@@ -64,8 +64,8 @@ func TestMachine_getOperand_NR(t *testing.T) {
 				def = &backend.SSAValueDefinition{BlkParamVReg: regToVReg(x4), BlockParamValue: v}
 				return def, extModeSignExtend64
 			},
-			exp:          operandNR(regToVReg(x4)),
-			instructions: []string{"sxtw x4, w4"},
+			exp:          operandNR(regalloc.VReg(1).SetRegType(regalloc.RegTypeInt)),
+			instructions: []string{"sxtw x1?, w4"},
 		},
 		{
 			name: "const instr",
