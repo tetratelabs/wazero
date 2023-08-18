@@ -19,8 +19,6 @@ const (
 	// TypeF64 represents 64-bit floats in the IEEE 754.
 	TypeF64
 
-	// TypeV128 represents 128-bit vectors.
-	TypeV128
 	// TODO: SIMD, ref types!
 )
 
@@ -37,8 +35,6 @@ func (t Type) String() (ret string) {
 		return "f32"
 	case TypeF64:
 		return "f64"
-	case TypeV128:
-		return "v128"
 	default:
 		panic(int(t))
 	}
@@ -56,8 +52,6 @@ func (t Type) Bits() byte {
 		return 32
 	case TypeI64, TypeF64:
 		return 64
-	case TypeV128:
-		return 128
 	default:
 		panic(int(t))
 	}
