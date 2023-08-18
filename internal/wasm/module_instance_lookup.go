@@ -21,9 +21,10 @@ func (m *ModuleInstance) LookupFunction(t *TableInstance, typeId FunctionTypeID,
 		goF := source.CodeSection[index].GoFunc
 		switch typed := goF.(type) {
 		case api.GoFunction:
-			return &lookedUpGoFunction{def: def, lookedUpModule: m, g: typed}
+			// GoFunction doesn't need looked up module.
+			return &lookedUpGoFunction{def: def, g: goFunctionAsGoModuleFunction(typed)}
 		case api.GoModuleFunction:
-			return &lookedUpGoModuleFunction{def: def, lookedUpModule: m, g: typed}
+			return &lookedUpGoFunction{def: def, lookedUpModule: m, g: typed}
 		default:
 			panic(fmt.Sprintf("unexpected GoFunc type: %T", goF))
 		}
@@ -32,42 +33,19 @@ func (m *ModuleInstance) LookupFunction(t *TableInstance, typeId FunctionTypeID,
 	}
 }
 
-type (
-	// lookedUpGoFunction implements api.Function for an api.GoFunction.
-	lookedUpGoFunction lookedUpGoFunctionBase[api.GoFunction]
-	// lookedUpGoModuleFunction implements api.Function for an api.GoModuleFunction.
-	lookedUpGoModuleFunction lookedUpGoFunctionBase[api.GoModuleFunction]
-	// lookedUpGoFunctionBase is a base type for lookedUpGoFunction and lookedUpGoModuleFunction.
-	lookedUpGoFunctionBase[T any] struct {
-		internalapi.WazeroOnly
-		def            *FunctionDefinition
-		lookedUpModule *ModuleInstance
-		g              T
-	}
-)
-
-// Definition implements api.Function.
-func (l *lookedUpGoModuleFunction) Definition() api.FunctionDefinition { return l.def }
-
-// Call implements api.Function.
-func (l *lookedUpGoModuleFunction) Call(ctx context.Context, params ...uint64) ([]uint64, error) {
-	typ := l.def.Functype
-	stackSize := typ.ParamNumInUint64
-	rn := typ.ResultNumInUint64
-	if rn > stackSize {
-		stackSize = rn
-	}
-	stack := make([]uint64, stackSize)
-	copy(stack, params)
-	// The Go host function always needs to access caller's module, in this case the one holding the table.
-	l.g.Call(ctx, l.lookedUpModule, stack)
-	return stack[:rn], nil
+// lookedUpGoFunction implements lookedUpGoModuleFunction.
+type lookedUpGoFunction struct {
+	internalapi.WazeroOnly
+	def            *FunctionDefinition
+	lookedUpModule *ModuleInstance
+	g              api.GoModuleFunction
 }
 
-// CallWithStack implements api.Function.
-func (l *lookedUpGoModuleFunction) CallWithStack(ctx context.Context, stack []uint64) error {
-	l.g.Call(ctx, l.lookedUpModule, stack)
-	return nil
+// goFunctionAsGoModuleFunction converts api.GoFunction to api.GoModuleFunction which ignores the api.Module argument.
+func goFunctionAsGoModuleFunction(g api.GoFunction) api.GoModuleFunction {
+	return api.GoModuleFunc(func(ctx context.Context, _ api.Module, stack []uint64) {
+		g.Call(ctx, stack)
+	})
 }
 
 // Definition implements api.Function.
@@ -83,12 +61,13 @@ func (l *lookedUpGoFunction) Call(ctx context.Context, params ...uint64) ([]uint
 	}
 	stack := make([]uint64, stackSize)
 	copy(stack, params)
-	l.g.Call(ctx, stack)
+	// The Go host function always needs to access caller's module, in this case the one holding the table.
+	l.g.Call(ctx, l.lookedUpModule, stack)
 	return stack[:rn], nil
 }
 
 // CallWithStack implements api.Function.
 func (l *lookedUpGoFunction) CallWithStack(ctx context.Context, stack []uint64) error {
-	l.g.Call(ctx, stack)
+	l.g.Call(ctx, l.lookedUpModule, stack)
 	return nil
 }
