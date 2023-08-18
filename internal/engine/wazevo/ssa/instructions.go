@@ -1320,13 +1320,6 @@ func (i *Instruction) AsCtz(x Value) {
 	i.typ = x.Type()
 }
 
-// AsPopcnt initializes this instruction as an Integer Population Count instruction with OpcodePopcnt.
-func (i *Instruction) AsPopcnt(x Value) {
-	i.opcode = OpcodePopcnt
-	i.v = x
-	i.typ = x.Type()
-}
-
 // UnaryData return the operand for a unary instruction.
 func (i *Instruction) UnaryData() Value {
 	return i.v
@@ -1468,7 +1461,7 @@ func (i *Instruction) Format(b Builder) string {
 	case OpcodeIshl, OpcodeSshr, OpcodeUshr:
 		instSuffix = fmt.Sprintf(" %s, %s", i.v.Format(b), i.v2.Format(b))
 	case OpcodeUndefined:
-	case OpcodeClz, OpcodeCtz, OpcodePopcnt:
+	case OpcodeClz, OpcodeCtz:
 		instSuffix = " " + i.v.Format(b)
 	default:
 		panic(fmt.Sprintf("TODO: format for %s", i.opcode))

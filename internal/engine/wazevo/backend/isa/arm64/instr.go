@@ -1266,8 +1266,9 @@ func (b bitOp) String() string {
 }
 
 const (
-	// 32/64-bit Clz.
+	// 32/64-bit Rbit.
 	bitOpRbit bitOp = iota
+	// 32/64-bit Clz.
 	bitOpClz
 )
 

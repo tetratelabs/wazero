@@ -328,7 +328,6 @@ func encodeBitRR(op bitOp, rd, rn, _64bit uint32) uint32 {
 	default:
 		panic("TODO/BUG")
 	}
-	_, _ = opcode2, opcode
 	return _64bit<<31 | 0b1_0_11010110<<21 | opcode2<<15 | opcode<<10 | rn<<5 | rd
 }
 
