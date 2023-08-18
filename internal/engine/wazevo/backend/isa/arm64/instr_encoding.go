@@ -157,6 +157,13 @@ func (i *instruction) encode(c backend.Compiler) {
 			i.u2,
 			i.u3 == 1,
 		))
+	case bitRR:
+		c.Emit4Bytes(encodeBitRR(
+			bitOp(i.u1),
+			regNumberInEncoding[i.rd.realReg()],
+			regNumberInEncoding[i.rn.realReg()],
+			uint32(i.u2)),
+		)
 	case aluRRImm12:
 		imm12, shift := i.rm.imm12()
 		c.Emit4Bytes(encodeAluRRImm12(
@@ -307,6 +314,21 @@ func encodeAluRRRR(op aluOp, rd, rn, rm, ra, _64bit uint32) uint32 {
 		panic("TODO/BUG")
 	}
 	return _64bit<<31 | 0b11011<<24 | op31<<21 | rm<<16 | oO<<15 | ra<<10 | rn<<5 | rd
+}
+
+// encodeBitRR encodes as Data-processing (1 source) in
+// https://developer.arm.com/documentation/ddi0596/2020-12/Index-by-Encoding/Data-Processing----Register?lang=en
+func encodeBitRR(op bitOp, rd, rn, _64bit uint32) uint32 {
+	var opcode2, opcode uint32
+	switch op {
+	case bitOpRbit:
+		opcode2, opcode = 0b00000, 0b000000
+	case bitOpClz:
+		opcode2, opcode = 0b00000, 0b000100
+	default:
+		panic("TODO/BUG")
+	}
+	return _64bit<<31 | 0b1_0_11010110<<21 | opcode2<<15 | opcode<<10 | rn<<5 | rd
 }
 
 func encodeAsMov32(rn, rd uint32) uint32 {
