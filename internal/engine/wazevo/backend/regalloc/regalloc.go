@@ -193,7 +193,7 @@ func (a *Allocator) livenessAnalysis(f Function) {
 						// In short, a virtual register must be defined only once because that's the invariant of
 						// liveness analysis result used in the current implementation. If you reach here, you can either
 						// use "temporary" physical register (like x27 in AArch64), or simply allocate a new virtual
-						// register for the second definition. In any ways, such a new virtual register doesn't cost
+						// register for the additional definition. In any ways, such a new virtual register doesn't cost
 						// at all in the final code because they are instantly killed and won't interfere with other
 						// virtual registers later on.
 						//
