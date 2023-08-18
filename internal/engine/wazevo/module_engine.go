@@ -206,6 +206,6 @@ func (m *moduleEngine) FunctionInstanceReference(funcIndex wasm.Index) wasm.Refe
 }
 
 // LookupFunction implements wasm.ModuleEngine.
-func (m *moduleEngine) LookupFunction(t *wasm.TableInstance, typeId wasm.FunctionTypeID, tableOffset wasm.Index) (api.Function, error) {
+func (m *moduleEngine) LookupFunction(t *wasm.TableInstance, typeId wasm.FunctionTypeID, tableOffset wasm.Index) (*wasm.ModuleInstance, wasm.Index) {
 	panic("TODO")
 }

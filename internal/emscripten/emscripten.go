@@ -106,10 +106,7 @@ func (v *InvokeFunc) Call(ctx context.Context, mod api.Module, stack []uint64) {
 
 	// Lookup the table index we will call.
 	t := m.Tables[0] // Note: Emscripten doesn't use multiple tables
-	f, err := m.Engine.LookupFunction(t, typeID, tableOffset)
-	if err != nil {
-		panic(err)
-	}
+	f := m.LookupFunction(t, typeID, tableOffset)
 
 	// The Go implementation below mimics the Emscripten JS behaviour to support
 	// longjmps from indirect function calls. The implementation of these

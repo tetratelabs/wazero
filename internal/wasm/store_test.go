@@ -436,8 +436,8 @@ func (e *mockEngine) CompileModule(context.Context, *Module, []experimental.Func
 }
 
 // LookupFunction implements the same method as documented on wasm.Engine.
-func (e *mockModuleEngine) LookupFunction(*TableInstance, FunctionTypeID, Index) (api.Function, error) {
-	return nil, nil
+func (e *mockModuleEngine) LookupFunction(*TableInstance, FunctionTypeID, Index) (*ModuleInstance, Index) {
+	return nil, 0
 }
 
 // CompiledModuleCount implements the same method as documented on wasm.Engine.
