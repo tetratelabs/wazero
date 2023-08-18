@@ -58,6 +58,7 @@ func (l *lookedUpGoModuleFunction) Call(ctx context.Context, params ...uint64) (
 	}
 	stack := make([]uint64, stackSize)
 	copy(stack, params)
+	// The Go host function always needs to access caller's module, in this case the one holding the table.
 	l.g.Call(ctx, l.lookedUpModule, stack)
 	return stack[:rn], nil
 }
