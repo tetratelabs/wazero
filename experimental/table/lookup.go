@@ -15,6 +15,8 @@ import (
 //   - `tableIndex` is the index of the table instance in the module.
 //   - `tableOffset` is the offset of the lookup target in the table.
 //   - `expectedParamTypes` and `expectedResultTypes` are used to check the type of the function found in the table.
+//
+// Note: the returned api.Function is always valid, i.e. not nil, if this returns without panic.
 func LookupFunction(
 	module api.Module, tableIndex uint32, tableOffset uint32,
 	expectedParamTypes, expectedResultTypes []api.ValueType,
@@ -27,6 +29,5 @@ func LookupFunction(
 		panic("table index out of range")
 	}
 	table := m.Tables[tableIndex]
-	f := m.LookupFunction(table, typeID, tableOffset)
-	return f
+	return m.LookupFunction(table, typeID, tableOffset)
 }
