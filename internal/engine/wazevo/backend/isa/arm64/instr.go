@@ -735,7 +735,7 @@ func (i *instruction) String() (str string) {
 	case bitRR:
 		size := is64SizeBitToSize(i.u2)
 		str = fmt.Sprintf("%s %s, %s",
-			bitOp(i.u1).String(),
+			bitOp(i.u1),
 			formatVRegSized(i.rd.nr(), size),
 			formatVRegSized(i.rn.nr(), size),
 		)
@@ -1255,6 +1255,7 @@ const (
 // bitOpRbit and bitOpClz would use this type.
 type bitOp int
 
+// String implements fmt.Stringer.
 func (b bitOp) String() string {
 	switch b {
 	case bitOpRbit:
