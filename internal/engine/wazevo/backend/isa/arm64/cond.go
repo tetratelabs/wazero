@@ -213,3 +213,29 @@ func condFlagFromSSAFloatCmpCond(c ssa.FloatCmpCond) condFlag {
 		panic(c)
 	}
 }
+
+// vecArrangement is the arrangement of data within a vector register.
+type vecArrangement byte
+
+const (
+	// vecArrangementNone is an arrangement indicating no data is stored.
+	vecArrangementNone vecArrangement = iota
+	// vecArrangement8B is an arrangement of 8 bytes (64-bit vector)
+	vecArrangement8B
+	// vecArrangement16B is an arrangement of 16 bytes (128-bit vector)
+	vecArrangement16B
+)
+
+func (v vecArrangement) String() (ret string) {
+	switch v {
+	case vecArrangement8B:
+		ret = "8B"
+	case vecArrangement16B:
+		ret = "16B"
+	case vecArrangementNone:
+		ret = "none"
+	default:
+		panic(v)
+	}
+	return
+}

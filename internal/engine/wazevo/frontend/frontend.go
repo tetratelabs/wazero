@@ -238,6 +238,8 @@ func WasmTypeToSSAType(vt wasm.ValueType) ssa.Type {
 		return ssa.TypeF32
 	case wasm.ValueTypeF64:
 		return ssa.TypeF64
+	case wasm.ValueTypeV128:
+		return ssa.TypeV128
 	default:
 		panic("TODO: " + wasm.ValueTypeName(vt))
 	}

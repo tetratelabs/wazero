@@ -236,6 +236,20 @@ func (i *instruction) encode(c backend.Compiler) {
 			condFlag(i.u1),
 			i.u3 == 1,
 		))
+	case vecRRR:
+		c.Emit4Bytes(encodeVecRRR(
+			vecOp(i.u1),
+			regNumberInEncoding[i.rd.realReg()],
+			regNumberInEncoding[i.rn.realReg()],
+			vecArrangement(i.u2),
+		))
+	case vecMisc:
+		c.Emit4Bytes(encodeVecMisc(
+			vecOp(i.u1),
+			regNumberInEncoding[i.rd.realReg()],
+			regNumberInEncoding[i.rn.realReg()],
+			vecArrangement(i.u2),
+		))
 	default:
 		panic(i.String())
 	}
@@ -847,6 +861,48 @@ func encodeAluRRImm(op aluOp, rd, rn, amount, _64bit uint32) uint32 {
 		panic(op.String())
 	}
 	return _64bit<<31 | opc<<29 | 0b100110<<23 | _64bit<<22 | immr<<16 | imms<<10 | rn<<5 | rd
+}
+
+func encodeVecRRR(op vecOp, rd, rn uint32, arr vecArrangement) uint32 {
+	switch op {
+	case vecOpUaddlv:
+		q, size := vecArrangementParams(arr)
+		return q<<29 | 0b101110<<24 | size<<22 | 0b110000001110<<10 | rn<<5 | rd
+	default:
+		panic("unsupported or illegal vecOp: " + op.String())
+	}
+}
+
+func encodeVecMisc(op vecOp, rd, rn uint32, arr vecArrangement) uint32 {
+	switch op {
+	case vecOpCnt:
+		var q, size uint32
+		if arr == vecArrangement8B {
+			q = uint32(0b0)
+			size = uint32(0b00)
+		} else {
+			q = uint32(0b1)
+			size = uint32(0b00)
+		}
+		return q<<30 | 0b001110<<24 | size<<22 | 0b100000010110<<10 | rn<<5 | rd
+
+	default:
+		panic("unsupported or illegal vecOp: " + op.String())
+	}
+}
+
+func vecArrangementParams(arr vecArrangement) (q uint32, size uint32) {
+	switch arr {
+	case vecArrangement8B:
+		q = uint32(0b0)
+		size = uint32(0b00)
+	case vecArrangement16B:
+		q = uint32(0b1)
+		size = uint32(0b00)
+	default:
+		panic("unsupported arrangement: " + arr.String())
+	}
+	return
 }
 
 // encodeExitSequence matches the implementation detail of abiImpl.emitGoEntryPreamble.

@@ -90,6 +90,8 @@ var defKinds = [numInstructionKinds]defKind{
 	udf:             defKindNone,
 	cSel:            defKindRD,
 	fpuCSel:         defKindRD,
+	vecRRR:          defKindRD,
+	vecMisc:         defKindRD,
 }
 
 // defs returns the list of regalloc.VReg that are defined by the instruction.
@@ -182,6 +184,8 @@ var useKinds = [numInstructionKinds]useKind{
 	loadFpuConst64:  useKindNone,
 	cSel:            useKindRNRM,
 	fpuCSel:         useKindRNRM,
+	vecMisc:         useKindRN,
+	vecRRR:          useKindRN,
 }
 
 // uses returns the list of regalloc.VReg that are used by the instruction.
@@ -659,6 +663,20 @@ func (i *instruction) asFpuMov128(rd, rn regalloc.VReg) {
 	i.rn, i.rd = operandNR(rn), operandNR(rd)
 }
 
+func (i *instruction) asVecRRR(op vecOp, rd, rn regalloc.VReg, arr vecArrangement) {
+	i.kind = vecRRR
+	i.u1 = uint64(op)
+	i.rn, i.rd = operandNR(rn), operandNR(rd)
+	i.u2 = uint64(arr)
+}
+
+func (i *instruction) asVecMisc(op vecOp, rd, rn regalloc.VReg, arr vecArrangement) {
+	i.kind = vecMisc
+	i.u1 = uint64(op)
+	i.rn, i.rd = operandNR(rn), operandNR(rd)
+	i.u2 = uint64(arr)
+}
+
 func (i *instruction) isCopy() bool {
 	op := i.kind
 	return op == mov64 || op == mov32 || op == fpuMov64 || op == fpuMov128
@@ -811,7 +829,7 @@ func (i *instruction) String() (str string) {
 	case cCmpImm:
 		panic("TODO")
 	case fpuMov64:
-		str = fmt.Sprintf("mov %s.8b, %s.8b", formatVRegSized(i.rd.nr(), 128), formatVRegSized(i.rn.nr(), 128))
+		str = fmt.Sprintf("mov %s.8b, %s.8b", formatVRegSized(i.rd.nr(), 64), formatVRegSized(i.rn.nr(), 64))
 	case fpuMov128:
 		str = fmt.Sprintf("mov %s.16b, %s.16b", formatVRegSized(i.rd.nr(), 128), formatVRegSized(i.rn.nr(), 128))
 	case fpuMovFromVec:
@@ -881,9 +899,21 @@ func (i *instruction) String() (str string) {
 	case vecMiscNarrow:
 		panic("TODO")
 	case vecRRR:
-		panic("TODO")
+		str = fmt.Sprintf("%s %s.%s, %s.%s",
+			vecOp(i.u1),
+			formatVRegSized(i.rd.nr(), 64),
+			vecArrangement(i.u2),
+			formatVRegSized(i.rn.nr(), 64),
+			vecArrangement(i.u2),
+		)
 	case vecMisc:
-		panic("TODO")
+		str = fmt.Sprintf("%s %s.%s, %s.%s",
+			vecOp(i.u1),
+			formatVRegSized(i.rd.nr(), 64),
+			vecArrangement(i.u2),
+			formatVRegSized(i.rn.nr(), 64),
+			vecArrangement(i.u2),
+		)
 	case vecLanes:
 		panic("TODO")
 	case vecTbl:
@@ -1238,6 +1268,26 @@ const (
 	// MAdd and MSub are only applicable for aluRRRR.
 	aluOpMAdd
 	aluOpMSub
+)
+
+// vecOp determines the type of vector operation. Instructions whose kind is one of
+// vecOpCnt would use this type.
+type vecOp int
+
+// String implements fmt.Stringer.
+func (b vecOp) String() string {
+	switch b {
+	case vecOpCnt:
+		return "cnt"
+	case vecOpUaddlv:
+		return "uaddlv"
+	}
+	panic(int(b))
+}
+
+const (
+	vecOpCnt vecOp = iota
+	vecOpUaddlv
 )
 
 // bitOp determines the type of bitwise operation. Instructions whose kind is one of

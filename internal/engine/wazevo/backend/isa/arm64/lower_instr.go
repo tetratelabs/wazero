@@ -155,6 +155,10 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		x := instr.UnaryData()
 		result := instr.Return()
 		m.lowerCtz(x, result)
+	case ssa.OpcodePopcnt:
+		x := instr.UnaryData()
+		result := instr.Return()
+		m.lowerPopcnt(x, result)
 	default:
 		panic("TODO: lowering " + instr.Opcode().String())
 	}
@@ -321,6 +325,44 @@ func (m *machine) lowerCtz(x, result ssa.Value) {
 	clz := m.allocateInstr()
 	clz.asBitRR(bitOpClz, rd, tmpRegVReg, x.Type().Bits() == 64)
 	m.insert(clz)
+}
+
+func (m *machine) lowerPopcnt(x, result ssa.Value) {
+	// arm64 doesn't have an instruction for population count on scalar register,
+	// so we use the vector one (VCNT).
+	// This exactly what the official Go implements bits.OneCount.
+	// For example, "func () int { return bits.OneCount(10) }" is compiled as
+	//
+	//    MOVD    $10, R0 ;; Load 10.
+	//    FMOVD   R0, F0
+	//    VCNT    V0.B8, V0.B8
+	//    UADDLV  V0.B8, V0
+	//
+
+	//   fmov   d0, x3
+	//   cnt    v0.16b, v0.16b
+	//   uaddlv h0, v0.8b
+	//   fmov   x3, d0
+
+	freg := m.compiler.AllocateVReg(regalloc.RegTypeFloat)
+	rd := m.compiler.VRegOf(result)
+	rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+
+	fmov := m.allocateInstr()
+	fmov.asFpuMov64(freg, rn.nr())
+	m.insert(fmov)
+
+	cnt := m.allocateInstr()
+	cnt.asVecMisc(vecOpCnt, freg, freg, vecArrangement16B)
+	m.insert(cnt)
+
+	uaddlv := m.allocateInstr()
+	uaddlv.asVecRRR(vecOpUaddlv, freg, freg, vecArrangement8B)
+	m.insert(uaddlv)
+
+	fmov2 := m.allocateInstr()
+	fmov2.asFpuMov64(rd, freg)
+	m.insert(fmov2)
 }
 
 const exitWithCodeEncodingSize = exitSequenceSize + 8

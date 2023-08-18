@@ -617,9 +617,11 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i64)
 blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i64)
 	v4:i32 = Clz v2
 	v5:i32 = Ctz v2
-	v6:i64 = Clz v3
-	v7:i64 = Ctz v3
-	Jump blk_ret, v4, v5, v6, v7
+	v6:i32 = Popcnt v2
+	v7:i64 = Clz v3
+	v8:i64 = Ctz v3
+	v9:i64 = Popcnt v3
+	Jump blk_ret, v4, v5, v6, v7, v8, v9
 `,
 		},
 		{
