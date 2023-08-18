@@ -9,6 +9,52 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
+func TestModuleInstance_LookupFunction(t *testing.T) {
+	hostModule := &Module{
+		IsHostModule: true,
+		CodeSection: []Code{
+			{GoFunc: api.GoFunc(func(context.Context, []uint64) {})},
+			{GoFunc: api.GoModuleFunc(func(context.Context, api.Module, []uint64) {})},
+		},
+		FunctionDefinitionSection: []FunctionDefinition{{}, {}},
+	}
+
+	me := &mockModuleEngine{
+		lookupEntries: map[Index]mockModuleEngineLookupEntry{
+			0: {m: &ModuleInstance{Source: hostModule}, index: 0},
+			1: {m: &ModuleInstance{Source: hostModule}, index: 1},
+		},
+	}
+	m := &ModuleInstance{Engine: me}
+
+	t.Run("host", func(t *testing.T) {
+		gf, ok := m.LookupFunction(nil, 0, 0).(*lookedUpGoFunction)
+		require.True(t, ok)
+		require.Equal(t, m, gf.lookedUpModule)
+		require.Equal(t, hostModule.CodeSection[0].GoFunc, gf.g)
+		require.Equal(t, &hostModule.FunctionDefinitionSection[0], gf.def)
+
+		gmf, ok := m.LookupFunction(nil, 0, 1).(*lookedUpGoModuleFunction)
+		require.True(t, ok)
+		require.Equal(t, m, gmf.lookedUpModule)
+		require.Equal(t, hostModule.CodeSection[1].GoFunc, gmf.g)
+		require.Equal(t, &hostModule.FunctionDefinitionSection[1], gmf.def)
+	})
+
+	t.Run("wasm", func(t *testing.T) {
+		me.lookupEntries[2] = mockModuleEngineLookupEntry{
+			m: &ModuleInstance{
+				Source: &Module{},
+				Engine: me,
+			},
+			index: 100,
+		}
+		wf, ok := m.LookupFunction(nil, 0, 2).(*mockCallEngine)
+		require.True(t, ok)
+		require.Equal(t, Index(100), wf.index)
+	})
+}
+
 func Test_lookedUpGoFunction(t *testing.T) {
 	def := &FunctionDefinition{
 		Functype: &FunctionType{

@@ -413,6 +413,12 @@ type mockModuleEngine struct {
 	functionRefs         map[Index]Reference
 	resolveImportsCalled map[Index]Index
 	importedMemModEngine ModuleEngine
+	lookupEntries        map[Index]mockModuleEngineLookupEntry
+}
+
+type mockModuleEngineLookupEntry struct {
+	m     *ModuleInstance
+	index Index
 }
 
 type mockCallEngine struct {
@@ -436,7 +442,10 @@ func (e *mockEngine) CompileModule(context.Context, *Module, []experimental.Func
 }
 
 // LookupFunction implements the same method as documented on wasm.Engine.
-func (e *mockModuleEngine) LookupFunction(*TableInstance, FunctionTypeID, Index) (*ModuleInstance, Index) {
+func (e *mockModuleEngine) LookupFunction(_ *TableInstance, _ FunctionTypeID, offset Index) (*ModuleInstance, Index) {
+	if entry, ok := e.lookupEntries[offset]; ok {
+		return entry.m, entry.index
+	}
 	return nil, 0
 }
 
