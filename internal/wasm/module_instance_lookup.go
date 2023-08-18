@@ -36,7 +36,8 @@ func (m *ModuleInstance) LookupFunction(t *TableInstance, typeId FunctionTypeID,
 // lookedUpGoFunction implements lookedUpGoModuleFunction.
 type lookedUpGoFunction struct {
 	internalapi.WazeroOnly
-	def            *FunctionDefinition
+	def *FunctionDefinition
+	// lookedUpModule is the *ModuleInstance from which this Go function is looked up, i.e. owner of the table.
 	lookedUpModule *ModuleInstance
 	g              api.GoModuleFunction
 }
@@ -61,13 +62,12 @@ func (l *lookedUpGoFunction) Call(ctx context.Context, params ...uint64) ([]uint
 	}
 	stack := make([]uint64, stackSize)
 	copy(stack, params)
-	// The Go host function always needs to access caller's module, in this case the one holding the table.
-	l.g.Call(ctx, l.lookedUpModule, stack)
-	return stack[:rn], nil
+	return stack[:rn], l.CallWithStack(ctx, stack)
 }
 
 // CallWithStack implements api.Function.
 func (l *lookedUpGoFunction) CallWithStack(ctx context.Context, stack []uint64) error {
+	// The Go host function always needs to access caller's module, in this case the one holding the table.
 	l.g.Call(ctx, l.lookedUpModule, stack)
 	return nil
 }
