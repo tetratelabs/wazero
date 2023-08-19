@@ -301,20 +301,25 @@ func (m *machine) getOperand_NR(def *backend.SSAValueDefinition, mode extMode) (
 		}
 	}
 
+	r := v
 	switch inBits := def.SSAValue().Type().Bits(); {
 	case mode == extModeNone:
 	case inBits == 32 && (mode == extModeZeroExtend32 || mode == extModeSignExtend32):
 	case inBits == 32 && mode == extModeZeroExtend64:
+		extended := m.compiler.AllocateVReg(regalloc.RegTypeInt)
 		ext := m.allocateInstr()
-		ext.asExtend(v, v, 32, 64, false)
+		ext.asExtend(extended, v, 32, 64, false)
 		m.insert(ext)
+		r = extended
 	case inBits == 32 && mode == extModeSignExtend64:
+		extended := m.compiler.AllocateVReg(regalloc.RegTypeInt)
 		ext := m.allocateInstr()
-		ext.asExtend(v, v, 32, 64, true)
+		ext.asExtend(extended, v, 32, 64, true)
 		m.insert(ext)
+		r = extended
 	case inBits == 64 && (mode == extModeZeroExtend64 || mode == extModeSignExtend64):
 	}
-	return operandNR(v)
+	return operandNR(r)
 }
 
 func asImm12Operand(val uint64) (op operand, ok bool) {

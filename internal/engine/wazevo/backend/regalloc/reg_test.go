@@ -15,8 +15,8 @@ func TestRegTypeOf(t *testing.T) {
 }
 
 func TestVReg_String(t *testing.T) {
-	require.Equal(t, "r0?", VReg(0).String())
-	require.Equal(t, "r100?", VReg(100).String())
+	require.Equal(t, "v0?", VReg(0).String())
+	require.Equal(t, "v100?", VReg(100).String())
 	require.Equal(t, "r5", FromRealReg(5, RegTypeInt).String())
 }
 

@@ -1,7 +1,6 @@
 package regalloc
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -219,7 +218,6 @@ func TestAllocator_coloringFor(t *testing.T) {
 			var actual []string
 			for _, n := range testNodes {
 				actual = append(actual, n.r.String())
-				fmt.Println(n)
 			}
 			var exp []string
 			for _, r := range tc.expRegs {

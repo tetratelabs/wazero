@@ -188,6 +188,19 @@ func (a *Allocator) livenessAnalysis(f Function) {
 				if def.IsRealReg() {
 					info.realRegDefs[def] = append(info.realRegDefs[def], pos)
 				} else {
+					if _, ok := info.defs[def]; ok {
+						// This must be a bug in lowering logic in the ISA-specific code.
+						// In short, a virtual register must be defined only once because that's the invariant of
+						// liveness analysis result used in the current implementation. If you reach here, you can either
+						// use "temporary" physical register (like x27 in AArch64), or simply allocate a new virtual
+						// register for the additional definition. In any ways, such a new virtual register doesn't cost
+						// at all in the final code because they are instantly killed and won't interfere with other
+						// virtual registers later on.
+						//
+						// TODO: this should be enforced globally, not just per block. But that can be costly to check.
+						panic(fmt.Sprintf("BUG: multiple definitions found for a virtual register %s", def.String()))
+					}
+
 					info.defs[def] = pos
 					a.vs = append(a.vs, def)
 				}

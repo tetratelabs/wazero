@@ -259,9 +259,9 @@ func (c *compiler) AllocateVRegWithSSAType(regType regalloc.RegType, typ ssa.Typ
 
 // Init implements Compiler.Init.
 func (c *compiler) Init(needGoEntryPreamble bool) {
-	for i := regalloc.VRegID(0); i < c.nextVRegID; i++ {
+	for i, v := range c.ssaValueToVRegs {
 		c.ssaValueToVRegs[i] = regalloc.VRegInvalid
-		delete(c.ssaTypeOfVRegID, i)
+		delete(c.ssaTypeOfVRegID, v.ID())
 	}
 	c.currentGID = 0
 	c.nextVRegID = 0

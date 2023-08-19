@@ -315,11 +315,11 @@ func (m *machine) lowerCtz(x, result ssa.Value) {
 	rd := m.compiler.VRegOf(result)
 	rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
 	rbit := m.allocateInstr()
-	rbit.asBitRR(bitOpRbit, rd, rn.nr(), x.Type().Bits() == 64)
+	rbit.asBitRR(bitOpRbit, tmpRegVReg, rn.nr(), x.Type().Bits() == 64)
 	m.insert(rbit)
 
 	clz := m.allocateInstr()
-	clz.asBitRR(bitOpClz, rd, rd, x.Type().Bits() == 64)
+	clz.asBitRR(bitOpClz, rd, tmpRegVReg, x.Type().Bits() == 64)
 	m.insert(clz)
 }
 

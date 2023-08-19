@@ -1424,11 +1424,11 @@ L1 (SSA Block: blk0):
 	mov x2?, x2
 	mov x3?, x3
 	clz w4?, w2?
-	rbit w5?, w2?
-	clz w5?, w5?
+	rbit w27, w2?
+	clz w5?, w27
 	clz x6?, x3?
-	rbit x7?, x3?
-	clz x7?, x7?
+	rbit x27, x3?
+	clz x7?, x27
 	mov x3, x7?
 	mov x2, x6?
 	mov x1, x5?
@@ -1439,11 +1439,11 @@ L1 (SSA Block: blk0):
 L1 (SSA Block: blk0):
 	str x30, [sp, #-0x10]!
 	clz w0, w2
-	rbit w1, w2
-	clz w1, w1
+	rbit w27, w2
+	clz w1, w27
 	clz x2, x3
-	rbit x3, x3
-	clz x3, x3
+	rbit x27, x3
+	clz x3, x27
 	ldr x30, [sp], #0x10
 	ret
 `,
