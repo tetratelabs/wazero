@@ -89,8 +89,7 @@ var defKinds = [numInstructionKinds]defKind{
 	fpuStore128:     defKindNone,
 	udf:             defKindNone,
 	cSel:            defKindRD,
-	fpuCSel32:       defKindRD,
-	fpuCSel64:       defKindRD,
+	fpuCSel:         defKindRD,
 }
 
 // defs returns the list of regalloc.VReg that are defined by the instruction.
@@ -182,8 +181,7 @@ var useKinds = [numInstructionKinds]useKind{
 	loadFpuConst32:  useKindNone,
 	loadFpuConst64:  useKindNone,
 	cSel:            useKindRNRM,
-	fpuCSel32:       useKindRNRM,
-	fpuCSel64:       useKindRNRM,
+	fpuCSel:         useKindRNRM,
 }
 
 // uses returns the list of regalloc.VReg that are used by the instruction.
@@ -466,15 +464,14 @@ func (i *instruction) asCSel(rd, rn, rm operand, c condFlag, _64bit bool) {
 }
 
 func (i *instruction) asFpuCSel(rd, rn, rm operand, c condFlag, _64bit bool) {
-	if _64bit {
-		i.kind = fpuCSel64
-	} else {
-		i.kind = fpuCSel32
-	}
+	i.kind = fpuCSel
 	i.rd = rd
 	i.rn = rn
 	i.rm = rm
 	i.u1 = uint64(c)
+	if _64bit {
+		i.u3 = 1
+	}
 }
 
 func (i *instruction) asBr(target label) {
@@ -855,18 +852,12 @@ func (i *instruction) String() (str string) {
 		panic("TODO")
 	case intToFpu:
 		panic("TODO")
-	case fpuCSel32:
+	case fpuCSel:
+		size := is64SizeBitToSize(i.u3)
 		str = fmt.Sprintf("fcsel %s, %s, %s, %s",
-			formatVRegSized(i.rd.nr(), 32),
-			formatVRegSized(i.rn.nr(), 32),
-			formatVRegSized(i.rm.nr(), 32),
-			condFlag(i.u1),
-		)
-	case fpuCSel64:
-		str = fmt.Sprintf("fcsel %s, %s, %s, %s",
-			formatVRegSized(i.rd.nr(), 64),
-			formatVRegSized(i.rn.nr(), 64),
-			formatVRegSized(i.rm.nr(), 64),
+			formatVRegSized(i.rd.nr(), size),
+			formatVRegSized(i.rn.nr(), size),
+			formatVRegSized(i.rm.nr(), size),
 			condFlag(i.u1),
 		)
 	case fpuRound:
@@ -1082,10 +1073,8 @@ const (
 	fpuToInt
 	// intToFpu represents a conversion from integer to FP.
 	intToFpu
-	// fpuCSel32 represents a 32-bit FP conditional select.
-	fpuCSel32
-	// fpuCSel64 represents a 64-bit FP conditional select.
-	fpuCSel64
+	// fpuCSel represents a 32/64-bit FP conditional select.
+	fpuCSel
 	// fpuRound represents a rounding to integer operation.
 	fpuRound
 	// movToFpu represents a move from a GPR to a scalar FP register.

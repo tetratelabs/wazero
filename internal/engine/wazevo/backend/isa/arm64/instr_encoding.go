@@ -228,27 +228,21 @@ func (i *instruction) encode(c backend.Compiler) {
 			condFlag(i.u1),
 			i.u3 == 1,
 		))
-	case fpuCSel32:
+	case fpuCSel:
 		c.Emit4Bytes(encodeFpuCSel(
 			regNumberInEncoding[i.rd.realReg()],
 			regNumberInEncoding[i.rn.realReg()],
 			regNumberInEncoding[i.rm.realReg()],
 			condFlag(i.u1),
-			false,
-		))
-	case fpuCSel64:
-		c.Emit4Bytes(encodeFpuCSel(
-			regNumberInEncoding[i.rd.realReg()],
-			regNumberInEncoding[i.rn.realReg()],
-			regNumberInEncoding[i.rm.realReg()],
-			condFlag(i.u1),
-			true,
+			i.u3 == 1,
 		))
 	default:
 		panic(i.String())
 	}
 }
 
+// encodeFpuCSel encodes as "Floating-point conditional select" in
+// https://developer.arm.com/documentation/ddi0596/2020-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
 func encodeFpuCSel(rd, rn, rm uint32, c condFlag, _64bit bool) uint32 {
 	var ftype uint32
 	if _64bit {
