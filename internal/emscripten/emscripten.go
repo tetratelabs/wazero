@@ -93,10 +93,7 @@ func (v *InvokeFunc) Call(ctx context.Context, mod api.Module, stack []uint64) {
 	m := mod.(*wasm.ModuleInstance)
 
 	// Lookup the type of the function we are calling indirectly.
-	typeID, err := m.GetFunctionTypeID(v.FunctionType)
-	if err != nil {
-		panic(err)
-	}
+	typeID := m.GetFunctionTypeID(v.FunctionType)
 
 	// This needs copy (not reslice) because the stack is reused for results.
 	// Consider invoke_i (zero arguments, one result): index zero (tableOffset)
@@ -129,7 +126,7 @@ func (v *InvokeFunc) Call(ctx context.Context, mod api.Module, stack []uint64) {
 	var savedStack [2]uint64
 	callOrPanic(ctx, mod, "stackSave", savedStack[:])
 
-	err = f.CallWithStack(ctx, stack)
+	err := f.CallWithStack(ctx, stack)
 	if err != nil {
 		// Module closed: any calls will just fail with the same error.
 		if _, ok := err.(*sys.ExitError); ok {

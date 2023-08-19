@@ -153,8 +153,14 @@ type (
 const maximumFunctionTypes = 1 << 27
 
 // GetFunctionTypeID is used by emscripten.
-func (m *ModuleInstance) GetFunctionTypeID(t *FunctionType) (FunctionTypeID, error) {
-	return m.s.GetFunctionTypeID(t)
+func (m *ModuleInstance) GetFunctionTypeID(t *FunctionType) FunctionTypeID {
+	id, err := m.s.GetFunctionTypeID(t)
+	if err != nil {
+		// This is not recoverable in practice since the only error GetFunctionTypeID returns is
+		// when there's too many function types in the store.
+		panic(err)
+	}
+	return id
 }
 
 func (m *ModuleInstance) buildElementInstances(elements []ElementSegment) {
