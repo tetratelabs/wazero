@@ -236,6 +236,20 @@ func (i *instruction) encode(c backend.Compiler) {
 			condFlag(i.u1),
 			i.u3 == 1,
 		))
+	case movToVec:
+		c.Emit4Bytes(encodeMoveToVec(
+			regNumberInEncoding[i.rd.realReg()],
+			regNumberInEncoding[i.rn.realReg()],
+			vecArrangement(byte(i.u1)),
+			vecIndex(i.u2),
+		))
+	case movFromVec:
+		c.Emit4Bytes(encodeMoveFromVec(
+			regNumberInEncoding[i.rd.realReg()],
+			regNumberInEncoding[i.rn.realReg()],
+			vecArrangement(byte(i.u1)),
+			vecIndex(i.u2),
+		))
 	case vecRRR:
 		c.Emit4Bytes(encodeVecRRR(
 			vecOp(i.u1),
@@ -263,6 +277,57 @@ func encodeFpuCSel(rd, rn, rm uint32, c condFlag, _64bit bool) uint32 {
 		ftype = 0b01 // double precision.
 	}
 	return 0b1111<<25 | ftype<<22 | 0b1<<21 | rm<<16 | uint32(c)<<12 | 0b11<<10 | rn<<5 | rd
+}
+
+// encodeMoveToVec encodes as "Move general-purpose register to a vector element." in
+// https://developer.arm.com/documentation/dui0801/g/A64-SIMD-Vector-Instructions/MOV--vector--from-general-
+// https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/MOV--from-general---Move-general-purpose-register-to-a-vector-element--an-alias-of-INS--general--?lang=en
+func encodeMoveToVec(rd, rn uint32, arr vecArrangement, index vecIndex) uint32 {
+	var imm5 uint32
+	switch arr {
+	// case vecArrangementB:
+	//	imm5 |= 0b1
+	//	imm5 |= uint32(index) << 1
+	// case vecArrangementH:
+	//	imm5 |= 0b10
+	//	imm5 |= uint32(index) << 2
+	case vecArrangementS:
+		imm5 |= 0b100
+		imm5 |= uint32(index) << 3
+	case vecArrangementD:
+		imm5 |= 0b1000
+		imm5 |= uint32(index) << 4
+	default:
+		panic("Unsupported arrangement " + arr.String())
+	}
+
+	return 0b01001110000<<21 | imm5<<16 | 0b000111<<10 | rn<<5 | rd
+}
+
+// encodeMoveFromVec encodes as "Move vector element to a general-purpose register." in
+// https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/UMOV--Unsigned-Move-vector-element-to-general-purpose-register-?lang=en
+// https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/MOV--to-general---Move-vector-element-to-general-purpose-register--an-alias-of-UMOV-?lang=en
+func encodeMoveFromVec(rd, rn uint32, arr vecArrangement, index vecIndex) uint32 {
+	var q uint32
+	var imm5 uint32
+	switch arr {
+	// case vecArrangementB:
+	//	imm5 |= 0b1
+	//	imm5 |= uint32(index) << 1
+	// case vecArrangementH:
+	//	imm5 |= 0b10
+	//	imm5 |= uint32(index) << 2
+	case vecArrangementS:
+		imm5 |= 0b100
+		imm5 |= uint32(index) << 3
+	case vecArrangementD:
+		imm5 |= 0b1000
+		imm5 |= uint32(index) << 4
+		q = 0b1
+	default:
+		panic("Unsupported arrangement " + arr.String())
+	}
+	return 0b0_001110000<<21 | q<<30 | imm5<<16 | 0b001111<<10 | rn<<5 | rd
 }
 
 // encodeConditionalSelect encodes as "Conditional select" in

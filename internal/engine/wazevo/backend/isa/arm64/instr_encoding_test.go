@@ -25,6 +25,10 @@ func TestInstruction_encode(t *testing.T) {
 		{want: "41bc631e", setup: func(i *instruction) { i.asFpuCSel(operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), lt, true) }},
 		{want: "41cc231e", setup: func(i *instruction) { i.asFpuCSel(operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), gt, false) }},
 		{want: "41bc231e", setup: func(i *instruction) { i.asFpuCSel(operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), lt, false) }},
+		{want: "411c084e", setup: func(i *instruction) { i.asMovToVec(x1VReg, v2VReg, vecArrangementD, vecIndex(0)) }},
+		{want: "411c044e", setup: func(i *instruction) { i.asMovToVec(x1VReg, v2VReg, vecArrangementS, vecIndex(0)) }},
+		{want: "223c084e", setup: func(i *instruction) { i.asMovFromVec(v2VReg, x1VReg, vecArrangementD, vecIndex(0)) }},
+		{want: "223c040e", setup: func(i *instruction) { i.asMovFromVec(v2VReg, x1VReg, vecArrangementS, vecIndex(0)) }},
 		{want: "5b28030b", setup: func(i *instruction) {
 			i.asALU(aluOpAdd, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSL), false)
 		}},

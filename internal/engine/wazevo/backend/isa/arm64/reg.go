@@ -293,6 +293,18 @@ func formatVRegSized(r regalloc.VReg, size byte) (ret string) {
 	return
 }
 
+func formatVRegSizedVec(r regalloc.VReg, size byte, arr vecArrangement, index vecIndex) (ret string) {
+	c := "?"
+	if r.IsRealReg() {
+		c = ""
+	}
+	ret = fmt.Sprintf("v%d%s.%s", r.ID(), c, arr)
+	if index != vecIndexNone {
+		ret += fmt.Sprintf("[%d]", index)
+	}
+	return
+}
+
 func regTypeToRegisterSizeInBits(r regalloc.RegType) byte {
 	switch r {
 	case regalloc.RegTypeInt:

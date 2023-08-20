@@ -1426,17 +1426,17 @@ L1 (SSA Block: blk0):
 	clz w4?, w2?
 	rbit w27, w2?
 	clz w5?, w27
-	mov d11?.8b, x2?.8b
-	cnt d11?.16B, d11?.16B
-	uaddlv d11?.8B, d11?.8B
-	mov x6?.8b, d11?.8b
+	ins v13?.D[0], x2?
+	cnt v14?.16B, v13?.16B
+	uaddlv v15?.8B, v14?.8B
+	mov v6?.D[0], x6?
 	clz x7?, x3?
 	rbit x27, x3?
 	clz x8?, x27
-	mov d10?.8b, x3?.8b
-	cnt d10?.16B, d10?.16B
-	uaddlv d10?.8B, d10?.8B
-	mov x9?.8b, d10?.8b
+	ins v10?.D[0], x3?
+	cnt v11?.16B, v10?.16B
+	uaddlv v12?.8B, v11?.8B
+	mov v9?.D[0], x9?
 	mov x5, x9?
 	mov x4, x8?
 	mov x3, x7?
@@ -1452,14 +1452,17 @@ L1 (SSA Block: blk0):
 	clz w0, w2
 	rbit w27, w2
 	clz w1, w27
-	cnt x2.16B, x2.16B
-	uaddlv x2.8B, x2.8B
-	clz x2, x3
-	rbit x27, x3
-	clz x3, x27
-	cnt x8.16B, x8.16B
-	uaddlv x8.8B, x8.8B
-	mov x5.8b, x8.8b
+	ins v13.D[0], x2
+	cnt v14.16B, v13.16B
+	uaddlv v15.8B, v14.8B
+	mov v6.D[0], x2
+	clz x3, x8
+	rbit x27, x8
+	clz x4, x27
+	ins v10.D[0], x8
+	cnt v11.16B, v10.16B
+	uaddlv v12.8B, v11.8B
+	mov v9.D[0], x5
 	ldr x30, [sp], #0x10
 	ret
 `,

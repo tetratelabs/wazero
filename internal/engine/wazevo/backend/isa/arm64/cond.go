@@ -289,3 +289,9 @@ func (v vecArrangement) String() (ret string) {
 	}
 	return
 }
+
+// vecIndex is the index of an element of a vector register
+type vecIndex byte
+
+// vecIndexNone indicates no vector index specified.
+const vecIndexNone = ^vecIndex(0)

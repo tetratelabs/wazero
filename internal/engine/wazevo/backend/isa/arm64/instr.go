@@ -90,6 +90,8 @@ var defKinds = [numInstructionKinds]defKind{
 	udf:             defKindNone,
 	cSel:            defKindRD,
 	fpuCSel:         defKindRD,
+	movToVec:        defKindRD,
+	movFromVec:      defKindRD,
 	vecRRR:          defKindRD,
 	vecMisc:         defKindRD,
 }
@@ -184,6 +186,8 @@ var useKinds = [numInstructionKinds]useKind{
 	loadFpuConst64:  useKindNone,
 	cSel:            useKindRNRM,
 	fpuCSel:         useKindRNRM,
+	movToVec:        useKindRN,
+	movFromVec:      useKindRN,
 	vecMisc:         useKindRN,
 	vecRRR:          useKindRN,
 }
@@ -663,6 +667,22 @@ func (i *instruction) asFpuMov128(rd, rn regalloc.VReg) {
 	i.rn, i.rd = operandNR(rn), operandNR(rd)
 }
 
+func (i *instruction) asMovToVec(rd, rn regalloc.VReg, arr vecArrangement, index vecIndex) {
+	i.kind = movToVec
+	i.rd = operandNR(rd)
+	i.rn = operandNR(rn)
+	i.u1 = uint64(arr)
+	i.u2 = uint64(index)
+}
+
+func (i *instruction) asMovFromVec(rd, rn regalloc.VReg, arr vecArrangement, index vecIndex) {
+	i.kind = movFromVec
+	i.rd = operandNR(rd)
+	i.rn = operandNR(rn)
+	i.u1 = uint64(arr)
+	i.u2 = uint64(index)
+}
+
 func (i *instruction) asVecRRR(op vecOp, rd, rn regalloc.VReg, arr vecArrangement) {
 	i.kind = vecRRR
 	i.u1 = uint64(op)
@@ -829,7 +849,7 @@ func (i *instruction) String() (str string) {
 	case cCmpImm:
 		panic("TODO")
 	case fpuMov64:
-		str = fmt.Sprintf("mov %s.8b, %s.8b", formatVRegSized(i.rd.nr(), 64), formatVRegSized(i.rn.nr(), 64))
+		str = fmt.Sprintf("mov %s.8b, %s.8b", formatVRegSized(i.rd.nr(), 128), formatVRegSized(i.rn.nr(), 128))
 	case fpuMov128:
 		str = fmt.Sprintf("mov %s.16b, %s.16b", formatVRegSized(i.rd.nr(), 128), formatVRegSized(i.rn.nr(), 128))
 	case fpuMovFromVec:
@@ -883,9 +903,29 @@ func (i *instruction) String() (str string) {
 	case movToFpu:
 		panic("TODO")
 	case movToVec:
-		panic("TODO")
+		var size byte
+		arr := vecArrangement(i.u1)
+		switch arr {
+		case vecArrangementB:
+			size = 32
+		case vecArrangementD:
+			size = 64
+		default:
+			panic("unsupported arrangement " + arr.String())
+		}
+		str = fmt.Sprintf("ins %s, %s", formatVRegSizedVec(i.rd.nr(), 128, arr, vecIndex(i.u2)), formatVRegSized(i.rn.nr(), size))
 	case movFromVec:
-		panic("TODO")
+		var size byte
+		arr := vecArrangement(i.u1)
+		switch arr {
+		case vecArrangementB:
+			size = 32
+		case vecArrangementD:
+			size = 64
+		default:
+			panic("unsupported arrangement " + arr.String())
+		}
+		str = fmt.Sprintf("mov %s, %s", formatVRegSizedVec(i.rd.nr(), 128, arr, vecIndex(i.u2)), formatVRegSized(i.rd.nr(), size))
 	case movFromVecSigned:
 		panic("TODO")
 	case vecDup:
@@ -899,20 +939,16 @@ func (i *instruction) String() (str string) {
 	case vecMiscNarrow:
 		panic("TODO")
 	case vecRRR:
-		str = fmt.Sprintf("%s %s.%s, %s.%s",
+		str = fmt.Sprintf("%s %s, %s",
 			vecOp(i.u1),
-			formatVRegSized(i.rd.nr(), 64),
-			vecArrangement(i.u2),
-			formatVRegSized(i.rn.nr(), 64),
-			vecArrangement(i.u2),
+			formatVRegSizedVec(i.rd.nr(), 64, vecArrangement(i.u2), vecIndexNone),
+			formatVRegSizedVec(i.rn.nr(), 64, vecArrangement(i.u2), vecIndexNone),
 		)
 	case vecMisc:
-		str = fmt.Sprintf("%s %s.%s, %s.%s",
+		str = fmt.Sprintf("%s %s, %s",
 			vecOp(i.u1),
-			formatVRegSized(i.rd.nr(), 64),
-			vecArrangement(i.u2),
-			formatVRegSized(i.rn.nr(), 64),
-			vecArrangement(i.u2),
+			formatVRegSizedVec(i.rd.nr(), 64, vecArrangement(i.u2), vecIndexNone),
+			formatVRegSizedVec(i.rn.nr(), 64, vecArrangement(i.u2), vecIndexNone),
 		)
 	case vecLanes:
 		panic("TODO")

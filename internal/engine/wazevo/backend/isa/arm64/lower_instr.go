@@ -344,24 +344,26 @@ func (m *machine) lowerPopcnt(x, result ssa.Value) {
 	//   uaddlv h0, v0.8b
 	//   fmov   x3, d0
 
-	freg := m.compiler.AllocateVReg(regalloc.RegTypeFloat)
 	rd := m.compiler.VRegOf(result)
 	rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
 
-	fmov := m.allocateInstr()
-	fmov.asFpuMov64(freg, rn.nr())
-	m.insert(fmov)
+	rf1 := m.compiler.AllocateVReg(regalloc.RegTypeFloat)
+	movv := m.allocateInstr()
+	movv.asMovToVec(rf1, rn.nr(), vecArrangementD, vecIndex(0))
+	m.insert(movv)
 
+	rf2 := m.compiler.AllocateVReg(regalloc.RegTypeFloat)
 	cnt := m.allocateInstr()
-	cnt.asVecMisc(vecOpCnt, freg, freg, vecArrangement16B)
+	cnt.asVecMisc(vecOpCnt, rf2, rf1, vecArrangement16B)
 	m.insert(cnt)
 
+	rf3 := m.compiler.AllocateVReg(regalloc.RegTypeFloat)
 	uaddlv := m.allocateInstr()
-	uaddlv.asVecRRR(vecOpUaddlv, freg, freg, vecArrangement8B)
+	uaddlv.asVecRRR(vecOpUaddlv, rf3, rf2, vecArrangement8B)
 	m.insert(uaddlv)
 
 	fmov2 := m.allocateInstr()
-	fmov2.asFpuMov64(rd, freg)
+	fmov2.asMovFromVec(rd, rf3, vecArrangementD, vecIndex(0))
 	m.insert(fmov2)
 }
 
