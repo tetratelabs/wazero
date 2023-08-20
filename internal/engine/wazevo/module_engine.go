@@ -18,12 +18,18 @@ type (
 		module                 *wasm.ModuleInstance
 		opaque                 moduleContextOpaque
 		localFunctionInstances []*functionInstance
+		importedFunctions      []importedFunction
 	}
 
 	functionInstance struct {
 		executable             *byte
 		moduleContextOpaquePtr *byte
 		typeID                 wasm.FunctionTypeID
+	}
+
+	importedFunction struct {
+		me            *moduleEngine
+		indexInModule wasm.Index
 	}
 
 	// moduleContextOpaque is the opaque byte slice of Module instance specific contents whose size
@@ -98,7 +104,8 @@ func (m *moduleEngine) setupOpaque() {
 func (m *moduleEngine) NewFunction(index wasm.Index) api.Function {
 	localIndex := index
 	if importedFnCount := m.module.Source.ImportFunctionCount; index < importedFnCount {
-		panic("TODO: directly call a imported function.")
+		imported := &m.importedFunctions[index]
+		return imported.me.NewFunction(imported.indexInModule)
 	} else {
 		localIndex -= importedFnCount
 	}
@@ -138,6 +145,9 @@ func (m *moduleEngine) ResolveImportedFunction(index, indexInImportedModule wasm
 	binary.LittleEndian.PutUint64(m.opaque[executableOffset:], uint64(uintptr(unsafe.Pointer(executable))))
 	binary.LittleEndian.PutUint64(m.opaque[moduleCtxOffset:], uint64(uintptr(unsafe.Pointer(importedME.opaquePtr))))
 	binary.LittleEndian.PutUint64(m.opaque[typeIDOffset:], uint64(typeID))
+
+	// Write importedFunction so that it can be used by NewFunction.
+	m.importedFunctions[index] = importedFunction{me: importedME, indexInModule: indexInImportedModule}
 }
 
 func getTypeIDOf(funcIndex wasm.Index, m *wasm.ModuleInstance) wasm.FunctionTypeID {
