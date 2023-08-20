@@ -113,9 +113,13 @@ func TestModuleEngine_setupOpaque(t *testing.T) {
 
 func TestModuleEngine_ResolveImportedFunction(t *testing.T) {
 	const begin = 5000
-	m := &moduleEngine{opaque: make([]byte, 10000), parent: &compiledModule{offsets: wazevoapi.ModuleContextOffsetData{
-		ImportedFunctionsBegin: begin,
-	}}}
+	m := &moduleEngine{
+		opaque:            make([]byte, 10000),
+		importedFunctions: make([]importedFunction, 4),
+		parent: &compiledModule{offsets: wazevoapi.ModuleContextOffsetData{
+			ImportedFunctionsBegin: begin,
+		}},
+	}
 
 	var op1, op2 byte = 0xaa, 0xbb
 	im1 := &moduleEngine{

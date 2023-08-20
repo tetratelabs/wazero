@@ -27,6 +27,7 @@ const (
 
 func TestE2E(t *testing.T) {
 	type callCase struct {
+		funcName           string // defaults to testcases.ExportedFunctionName
 		params, expResults []uint64
 		expErr             string
 	}
@@ -88,14 +89,14 @@ func TestE2E(t *testing.T) {
 				TypeSection:     []wasm.FunctionType{{}},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []wasm.Code{{Body: []byte{wasm.OpcodeCall, 0, wasm.OpcodeEnd}}},
-				ExportSection:   []wasm.Export{{Name: "f", Index: 0, Type: wasm.ExternTypeFunc}},
+				ExportSection:   []wasm.Export{{Name: testcases.ExportedFunctionName, Index: 0, Type: wasm.ExternTypeFunc}},
 			},
 			calls: []callCase{
 				{expErr: "stack overflow"}, {expErr: "stack overflow"}, {expErr: "stack overflow"}, {expErr: "stack overflow"},
 			},
 		},
 		{
-			name:     "call",
+			name:     "imported_function_call",
 			imported: testcases.ImportedFunctionCall.Imported,
 			m:        testcases.ImportedFunctionCall.Module,
 			calls: []callCase{
@@ -104,6 +105,7 @@ func TestE2E(t *testing.T) {
 				{params: []uint64{45}, expResults: []uint64{45 * 45}},
 				{params: []uint64{90}, expResults: []uint64{90 * 90}},
 				{params: []uint64{100}, expResults: []uint64{100 * 100}},
+				{params: []uint64{100, 200}, expResults: []uint64{100 * 200}, funcName: "imported_exported"},
 			},
 		},
 		{
@@ -225,8 +227,12 @@ func TestE2E(t *testing.T) {
 			require.NoError(t, err)
 
 			for _, cc := range tc.calls {
-				t.Run(fmt.Sprintf("call%v", cc.params), func(t *testing.T) {
-					f := inst.ExportedFunction(testcases.ExportName)
+				name := cc.funcName
+				if name == "" {
+					name = testcases.ExportedFunctionName
+				}
+				t.Run(fmt.Sprintf("call_%s%v", name, cc.params), func(t *testing.T) {
+					f := inst.ExportedFunction(name)
 					require.NotNil(t, f)
 					result, err := f.Call(ctx, cc.params...)
 					if cc.expErr != "" {
@@ -331,7 +337,7 @@ func TestE2E_host_functions(t *testing.T) {
 				wasm.OpcodeEnd,
 			},
 		}},
-		ExportSection: []wasm.Export{{Name: "f", Type: wasm.ExternTypeFunc, Index: 2}},
+		ExportSection: []wasm.Export{{Name: testcases.ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 2}},
 	}
 
 	compiled, err := r.CompileModule(ctx, binaryencoding.EncodeModule(m))
@@ -342,7 +348,7 @@ func TestE2E_host_functions(t *testing.T) {
 
 	expectedMod = inst
 
-	f := inst.ExportedFunction("f")
+	f := inst.ExportedFunction(testcases.ExportedFunctionName)
 
 	res, err := f.Call(ctx, []uint64{2, 100, uint64(math.Float32bits(15.0)), math.Float64bits(35.0)}...)
 	require.NoError(t, err)
@@ -370,7 +376,7 @@ func TestE2E_stores(t *testing.T) {
 	inst, err := r.InstantiateModule(ctx, compiled, wazero.NewModuleConfig())
 	require.NoError(t, err)
 
-	f := inst.ExportedFunction("f")
+	f := inst.ExportedFunction(testcases.ExportedFunctionName)
 
 	mem, ok := inst.Memory().Read(0, wasm.MemoryPageSize)
 	require.True(t, ok)

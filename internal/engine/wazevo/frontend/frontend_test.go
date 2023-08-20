@@ -1006,13 +1006,13 @@ blk3: () <-- (blk1,blk2)
 			name: "imported_function_call", m: testcases.ImportedFunctionCall.Module,
 			exp: `
 signatures:
-	sig0: i64i64i32_i32
+	sig1: i64i64i32i32_i32
 
 blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
 	Store module_ctx, exec_ctx, 0x8
 	v3:i64 = Load module_ctx, 0x8
 	v4:i64 = Load module_ctx, 0x10
-	v5:i32 = CallIndirect v3:sig0, exec_ctx, v4, v2
+	v5:i32 = CallIndirect v3:sig1, exec_ctx, v4, v2, v2
 	Jump blk_ret, v5
 `,
 		},

@@ -10,7 +10,6 @@ import (
 // * https://github.com/golang/go/blob/49d42128fd8594c172162961ead19ac95e247d24/src/cmd/compile/abi-internal.md#arm64-architecture
 // * https://developer.arm.com/documentation/102374/0101/Procedure-Call-Standard
 
-// TODO: we could use more than x7 like x15 as in Go's ABI.
 const xArgRetRegMax, vArgRetRegMax = x7, v7 // x0-x7 & v0-v7.
 
 var regInfo = &regalloc.RegisterInfo{

@@ -111,9 +111,6 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []exper
 		typ := &module.TypeSection[module.FunctionSection[i]]
 
 		codeSeg := &module.CodeSection[i]
-		if codeSeg.GoFunc != nil {
-			panic("TODO: host module")
-		}
 
 		// Initializes both frontend and backend compilers.
 		fe.Init(wasm.Index(i), typ, codeSeg.LocalTypes, codeSeg.Body)
@@ -186,6 +183,8 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []exper
 	cm.builtinFunctions = e.builtinFunctions
 
 	// TODO: finalizer.
+
+	e.addCompiledModule(module, cm)
 	return nil
 }
 
@@ -319,6 +318,7 @@ func (e *engine) NewModuleEngine(m *wasm.Module, mi *wasm.ModuleInstance) (wasm.
 	me := &moduleEngine{}
 
 	// Note: imported functions are resolved in moduleEngine.ResolveImportedFunction.
+	me.importedFunctions = make([]importedFunction, m.ImportFunctionCount)
 
 	compiled, ok := e.compiledModules[m.ID]
 	if !ok {

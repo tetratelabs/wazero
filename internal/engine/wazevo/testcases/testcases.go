@@ -7,7 +7,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
-const ExportName = "f"
+const ExportedFunctionName = "f"
 
 var (
 	Empty     = TestCase{Name: "empty", Module: SingleFunctionModule(vv, []byte{wasm.OpcodeEnd}, nil)}
@@ -361,7 +361,7 @@ var (
 				// i32_i32i32: duplicates.
 				{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeLocalGet, 0, wasm.OpcodeEnd}},
 			},
-			ExportSection: []wasm.Export{{Name: ExportName, Index: 0, Type: wasm.ExternTypeFunc}},
+			ExportSection: []wasm.Export{{Name: ExportedFunctionName, Index: 0, Type: wasm.ExternTypeFunc}},
 		},
 	}
 	ManyMiddleValues = TestCase{
@@ -825,11 +825,11 @@ var (
 		Name: "imported_function_call",
 		Imported: &wasm.Module{
 			ExportSection:   []wasm.Export{{Name: "i32_i32", Type: wasm.ExternTypeFunc}},
-			TypeSection:     []wasm.FunctionType{i32_i32},
+			TypeSection:     []wasm.FunctionType{i32i32_i32},
 			FunctionSection: []wasm.Index{0},
 			CodeSection: []wasm.Code{{Body: []byte{
 				wasm.OpcodeLocalGet, 0,
-				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 1,
 				wasm.OpcodeI32Mul,
 				wasm.OpcodeEnd,
 			}}},
@@ -837,11 +837,15 @@ var (
 		},
 		Module: &wasm.Module{
 			ImportFunctionCount: 1,
-			TypeSection:         []wasm.FunctionType{i32_i32},
-			ImportSection:       []wasm.Import{{Type: wasm.ExternTypeFunc, Module: "env", Name: "i32_i32"}},
+			TypeSection:         []wasm.FunctionType{i32_i32, i32i32_i32},
+			ImportSection:       []wasm.Import{{Type: wasm.ExternTypeFunc, Module: "env", Name: "i32_i32", DescFunc: 1}},
 			FunctionSection:     []wasm.Index{0},
-			ExportSection:       []wasm.Export{{Name: ExportName, Type: wasm.ExternTypeFunc, Index: 1}},
+			ExportSection: []wasm.Export{
+				{Name: ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 1},
+				{Name: "imported_exported", Type: wasm.ExternTypeFunc, Index: 0 /* imported */},
+			},
 			CodeSection: []wasm.Code{{Body: []byte{
+				wasm.OpcodeLocalGet, 0,
 				wasm.OpcodeLocalGet, 0,
 				wasm.OpcodeCall, 0,
 				wasm.OpcodeEnd,
@@ -853,7 +857,7 @@ var (
 		Name: "memory_load_basic",
 		Module: &wasm.Module{
 			TypeSection:     []wasm.FunctionType{{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}}},
-			ExportSection:   []wasm.Export{{Name: ExportName, Type: wasm.ExternTypeFunc, Index: 0}},
+			ExportSection:   []wasm.Export{{Name: ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 0}},
 			MemorySection:   &wasm.Memory{Min: 1},
 			FunctionSection: []wasm.Index{0},
 			CodeSection: []wasm.Code{{Body: []byte{
@@ -872,7 +876,7 @@ var (
 		Name: "memory_load_basic",
 		Module: &wasm.Module{
 			TypeSection:     []wasm.FunctionType{{Params: []wasm.ValueType{i32, i64, f32, f64}}},
-			ExportSection:   []wasm.Export{{Name: ExportName, Type: wasm.ExternTypeFunc, Index: 0}},
+			ExportSection:   []wasm.Export{{Name: ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 0}},
 			MemorySection:   &wasm.Memory{Min: 1},
 			FunctionSection: []wasm.Index{0},
 			CodeSection: []wasm.Code{{Body: []byte{
@@ -924,7 +928,7 @@ var (
 				Params:  []wasm.ValueType{i32},
 				Results: []wasm.ValueType{i32},
 			}},
-			ExportSection:   []wasm.Export{{Name: ExportName, Type: wasm.ExternTypeFunc, Index: 0}},
+			ExportSection:   []wasm.Export{{Name: ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 0}},
 			MemorySection:   &wasm.Memory{Min: 1},
 			FunctionSection: []wasm.Index{0},
 			CodeSection: []wasm.Code{{Body: []byte{
@@ -940,7 +944,7 @@ var (
 		Name: "memory_size_grow",
 		Module: &wasm.Module{
 			TypeSection:     []wasm.FunctionType{{Results: []wasm.ValueType{i32, i32, i32}}},
-			ExportSection:   []wasm.Export{{Name: ExportName, Type: wasm.ExternTypeFunc, Index: 0}},
+			ExportSection:   []wasm.Export{{Name: ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 0}},
 			MemorySection:   &wasm.Memory{Min: 1, Max: 2, IsMaxEncoded: true},
 			FunctionSection: []wasm.Index{0},
 			CodeSection: []wasm.Code{{Body: []byte{
@@ -958,7 +962,7 @@ var (
 		Name: "memory_load_basic2",
 		Module: &wasm.Module{
 			TypeSection:     []wasm.FunctionType{i32_i32, {}},
-			ExportSection:   []wasm.Export{{Name: ExportName, Type: wasm.ExternTypeFunc, Index: 0}},
+			ExportSection:   []wasm.Export{{Name: ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 0}},
 			MemorySection:   &wasm.Memory{Min: 1},
 			FunctionSection: []wasm.Index{0, 1},
 			CodeSection: []wasm.Code{
@@ -1005,7 +1009,7 @@ var (
 				{Module: "env", Name: "size", Type: wasm.ExternTypeFunc, DescFunc: 0},
 			},
 			TypeSection:     []wasm.FunctionType{v_i32, {Results: []wasm.ValueType{i32, i32, i32, i32}}},
-			ExportSection:   []wasm.Export{{Name: ExportName, Type: wasm.ExternTypeFunc, Index: 1}},
+			ExportSection:   []wasm.Export{{Name: ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 1}},
 			FunctionSection: []wasm.Index{1},
 			CodeSection: []wasm.Code{
 				{Body: []byte{
@@ -1026,7 +1030,7 @@ var (
 		Name: "globals_get",
 		Module: &wasm.Module{
 			TypeSection:     []wasm.FunctionType{{Results: []wasm.ValueType{i32, i64, f32, f64}}},
-			ExportSection:   []wasm.Export{{Name: ExportName, Type: wasm.ExternTypeFunc, Index: 0}},
+			ExportSection:   []wasm.Export{{Name: ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 0}},
 			FunctionSection: []wasm.Index{0},
 			GlobalSection: []wasm.Global{
 				{
@@ -1062,7 +1066,7 @@ var (
 		Name: "globals_get",
 		Module: &wasm.Module{
 			TypeSection:     []wasm.FunctionType{{Results: []wasm.ValueType{i32, i64, f32, f64}}},
-			ExportSection:   []wasm.Export{{Name: ExportName, Type: wasm.ExternTypeFunc, Index: 0}},
+			ExportSection:   []wasm.Export{{Name: ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 0}},
 			FunctionSection: []wasm.Index{0},
 			GlobalSection: []wasm.Global{
 				{
@@ -1108,7 +1112,7 @@ var (
 				{Results: []wasm.ValueType{i32, i64, f32, f64, i32, i64, f32, f64}},
 				{},
 			},
-			ExportSection:   []wasm.Export{{Name: ExportName, Type: wasm.ExternTypeFunc, Index: 0}},
+			ExportSection:   []wasm.Export{{Name: ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 0}},
 			FunctionSection: []wasm.Index{0, 1},
 			GlobalSection: []wasm.Global{
 				{
@@ -1168,7 +1172,7 @@ var (
 					i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64,
 				},
 			}},
-			ExportSection:   []wasm.Export{{Name: ExportName, Type: wasm.ExternTypeFunc, Index: 0}},
+			ExportSection:   []wasm.Export{{Name: ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 0}},
 			MemorySection:   &wasm.Memory{Min: 1},
 			FunctionSection: []wasm.Index{0},
 			CodeSection: []wasm.Code{{Body: []byte{
@@ -1243,7 +1247,7 @@ var (
 	CallIndirect = TestCase{
 		Module: &wasm.Module{
 			TypeSection:     []wasm.FunctionType{i32_i32, {}, v_i32, v_i32i32},
-			ExportSection:   []wasm.Export{{Name: ExportName, Type: wasm.ExternTypeFunc, Index: 0}},
+			ExportSection:   []wasm.Export{{Name: ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 0}},
 			FunctionSection: []wasm.Index{0, 1, 2, 3},
 			TableSection:    []wasm.Table{{Type: wasm.RefTypeFuncref, Min: 1000}},
 			ElementSection: []wasm.ElementSegment{
@@ -1280,7 +1284,7 @@ func SingleFunctionModule(typ wasm.FunctionType, body []byte, localTypes []wasm.
 			LocalTypes: localTypes,
 			Body:       body,
 		}},
-		ExportSection: []wasm.Export{{Name: ExportName, Type: wasm.ExternTypeFunc, Index: 0}},
+		ExportSection: []wasm.Export{{Name: ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 0}},
 	}
 }
 
