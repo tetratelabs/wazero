@@ -224,6 +224,34 @@ const (
 	vecArrangement8B
 	// vecArrangement16B is an arrangement of 16 bytes (128-bit vector)
 	vecArrangement16B
+	// vecArrangement4H is an arrangement of 4 half precisions (64-bit vector)
+	vecArrangement4H
+	// vecArrangement8H is an arrangement of 8 half precisions (128-bit vector)
+	vecArrangement8H
+	// vecArrangement2S is an arrangement of 2 single precisions (64-bit vector)
+	vecArrangement2S
+	// vecArrangement4S is an arrangement of 4 single precisions (128-bit vector)
+	vecArrangement4S
+	// vecArrangement1D is an arrangement of 1 double precision (64-bit vector)
+	vecArrangement1D
+	// vecArrangement2D is an arrangement of 2 double precisions (128-bit vector)
+	vecArrangement2D
+
+	// Assign each vector size specifier to a vector arrangement ID.
+	// Instructions can only have an arrangement or a size specifier, but not both, so it
+	// simplifies the internal representation of vector instructions by being able to
+	// store either into the same field.
+
+	// vecArrangementB is a size specifier of byte
+	vecArrangementB
+	// vecArrangementH is a size specifier of word (16-bit)
+	vecArrangementH
+	// vecArrangementS is a size specifier of double word (32-bit)
+	vecArrangementS
+	// vecArrangementD is a size specifier of quad word (64-bit)
+	vecArrangementD
+	// vecArrangementQ is a size specifier of the entire vector (128-bit)
+	vecArrangementQ
 )
 
 func (v vecArrangement) String() (ret string) {
@@ -232,6 +260,28 @@ func (v vecArrangement) String() (ret string) {
 		ret = "8B"
 	case vecArrangement16B:
 		ret = "16B"
+	case vecArrangement4H:
+		ret = "4H"
+	case vecArrangement8H:
+		ret = "8H"
+	case vecArrangement2S:
+		ret = "2S"
+	case vecArrangement4S:
+		ret = "4S"
+	case vecArrangement1D:
+		ret = "1D"
+	case vecArrangement2D:
+		ret = "2D"
+	case vecArrangementB:
+		ret = "B"
+	case vecArrangementH:
+		ret = "H"
+	case vecArrangementS:
+		ret = "S"
+	case vecArrangementD:
+		ret = "D"
+	case vecArrangementQ:
+		ret = "Q"
 	case vecArrangementNone:
 		ret = "none"
 	default:
