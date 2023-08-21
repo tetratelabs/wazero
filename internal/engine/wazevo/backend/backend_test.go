@@ -71,7 +71,7 @@ L1 (SSA Block: blk0):
 	fcsel s8, s0, s1, gt
 	fcmp s0, s1
 	fcsel d1, d2, d3, ne
-	mov q0.8b, q8.8b
+	mov v0.8b, v8.8b
 	ldr x30, [sp], #0x10
 	ret
 `,
@@ -122,8 +122,8 @@ L1 (SSA Block: blk0):
 			afterLoweringARM64: `
 L1 (SSA Block: blk0):
 	mov x2?, x2
-	mov q3?.8b, q0.8b
-	mov q4?.8b, q1.8b
+	mov v3?.8b, v0.8b
+	mov v4?.8b, v1.8b
 	add x5?, x2?, x2?
 	sub x6?, x5?, x2?
 	fadd s7?, s3?, s3?
@@ -138,8 +138,8 @@ L1 (SSA Block: blk0):
 	fdiv d16?, d15?, d4?
 	fmax d17?, d16?, d4?
 	fmin d18?, d17?, d4?
-	mov q1.8b, q18?.8b
-	mov q0.8b, q12?.8b
+	mov v1.8b, v18?.8b
+	mov v0.8b, v12?.8b
 	mov x0, x6?
 	ret
 `,
@@ -615,28 +615,28 @@ L1 (SSA Block: blk0):
 	mov x1?, x1
 	mov x2?, x2
 	mov x3?, x3
-	mov q4?.8b, q0.8b
-	mov q5?.8b, q1.8b
+	mov v4?.8b, v0.8b
+	mov v5?.8b, v1.8b
 	str x1?, [x0?, #0x8]
 	sub sp, sp, #0xd0
 	mov x0, x0?
 	mov x1, x1?
 	mov x2, x2?
 	mov x3, x3?
-	mov q0.8b, q4?.8b
-	mov q1.8b, q5?.8b
+	mov v0.8b, v4?.8b
+	mov v1.8b, v5?.8b
 	mov x4, x2?
 	mov x5, x3?
-	mov q2.8b, q4?.8b
-	mov q3.8b, q5?.8b
+	mov v2.8b, v4?.8b
+	mov v3.8b, v5?.8b
 	mov x6, x2?
 	mov x7, x3?
-	mov q4.8b, q4?.8b
-	mov q5.8b, q5?.8b
+	mov v4.8b, v4?.8b
+	mov v5.8b, v5?.8b
 	str w2?, [sp]
 	str x3?, [sp, #0x8]
-	mov q6.8b, q4?.8b
-	mov q7.8b, q5?.8b
+	mov v6.8b, v4?.8b
+	mov v7.8b, v5?.8b
 	str w2?, [sp, #0x10]
 	str x3?, [sp, #0x18]
 	str s4?, [sp, #0x20]
@@ -670,26 +670,26 @@ L1 (SSA Block: blk0):
 	str x30, [sp, #-0x10]!
 	mov x8, x2
 	mov x9, x3
-	mov q8.8b, q0.8b
-	mov q9.8b, q1.8b
+	mov v8.8b, v0.8b
+	mov v9.8b, v1.8b
 	str x1, [x0, #0x8]
 	sub sp, sp, #0xd0
 	mov x2, x8
 	mov x3, x9
-	mov q0.8b, q8.8b
-	mov q1.8b, q9.8b
+	mov v0.8b, v8.8b
+	mov v1.8b, v9.8b
 	mov x4, x8
 	mov x5, x9
-	mov q2.8b, q8.8b
-	mov q3.8b, q9.8b
+	mov v2.8b, v8.8b
+	mov v3.8b, v9.8b
 	mov x6, x8
 	mov x7, x9
-	mov q4.8b, q8.8b
-	mov q5.8b, q9.8b
+	mov v4.8b, v8.8b
+	mov v5.8b, v9.8b
 	str w8, [sp]
 	str x9, [sp, #0x8]
-	mov q6.8b, q8.8b
-	mov q7.8b, q9.8b
+	mov v6.8b, v8.8b
+	mov v7.8b, v9.8b
 	str w8, [sp, #0x10]
 	str x9, [sp, #0x18]
 	str s8, [sp, #0x20]
@@ -728,33 +728,33 @@ L1 (SSA Block: blk0):
 	mov x1?, x1
 	mov x2?, x2
 	mov x3?, x3
-	mov q4?.8b, q0.8b
-	mov q5?.8b, q1.8b
+	mov v4?.8b, v0.8b
+	mov v5?.8b, v1.8b
 	str x1?, [x0?, #0x8]
 	sub sp, sp, #0xc0
 	mov x0, x0?
 	mov x1, x1?
 	mov x2, x2?
 	mov x3, x3?
-	mov q0.8b, q4?.8b
-	mov q1.8b, q5?.8b
+	mov v0.8b, v4?.8b
+	mov v1.8b, v5?.8b
 	bl f1
 	mov x6?, x0
 	mov x7?, x1
-	mov q8?.8b, q0.8b
-	mov q9?.8b, q1.8b
+	mov v8?.8b, v0.8b
+	mov v9?.8b, v1.8b
 	mov x10?, x2
 	mov x11?, x3
-	mov q12?.8b, q2.8b
-	mov q13?.8b, q3.8b
+	mov v12?.8b, v2.8b
+	mov v13?.8b, v3.8b
 	mov x14?, x4
 	mov x15?, x5
-	mov q16?.8b, q4.8b
-	mov q17?.8b, q5.8b
+	mov v16?.8b, v4.8b
+	mov v17?.8b, v5.8b
 	mov x18?, x6
 	mov x19?, x7
-	mov q20?.8b, q6.8b
-	mov q21?.8b, q7.8b
+	mov v20?.8b, v6.8b
+	mov v21?.8b, v7.8b
 	ldr w22?, [sp]
 	ldr x23?, [sp, #0x8]
 	ldr s24?, [sp, #0x10]
@@ -804,20 +804,20 @@ L1 (SSA Block: blk0):
 	str s24?, [#ret_space, #0x10]
 	str x23?, [#ret_space, #0x8]
 	str w22?, [#ret_space, #0x0]
-	mov q7.8b, q21?.8b
-	mov q6.8b, q20?.8b
+	mov v7.8b, v21?.8b
+	mov v6.8b, v20?.8b
 	mov x7, x19?
 	mov x6, x18?
-	mov q5.8b, q17?.8b
-	mov q4.8b, q16?.8b
+	mov v5.8b, v17?.8b
+	mov v4.8b, v16?.8b
 	mov x5, x15?
 	mov x4, x14?
-	mov q3.8b, q13?.8b
-	mov q2.8b, q12?.8b
+	mov v3.8b, v13?.8b
+	mov v2.8b, v12?.8b
 	mov x3, x11?
 	mov x2, x10?
-	mov q1.8b, q9?.8b
-	mov q0.8b, q8?.8b
+	mov v1.8b, v9?.8b
+	mov v0.8b, v8?.8b
 	mov x1, x7?
 	mov x0, x6?
 	ret
@@ -895,8 +895,8 @@ L1 (SSA Block: blk0):
 	mov x11?, x7
 	ldr s20?, [#arg_space, #0x20]
 	ldr d29?, [#arg_space, #0x68]
-	mov q1.8b, q29?.8b
-	mov q0.8b, q20?.8b
+	mov v1.8b, v29?.8b
+	mov v0.8b, v20?.8b
 	mov x1, x11?
 	mov x0, x2?
 	ret
@@ -918,8 +918,8 @@ L1 (SSA Block: blk0):
 L1 (SSA Block: blk0):
 	mov x2?, x2
 	mov x3?, x3
-	mov q4?.8b, q0.8b
-	mov q5?.8b, q1.8b
+	mov v4?.8b, v0.8b
+	mov v5?.8b, v1.8b
 	str d5?, [#ret_space, #0xb8]
 	str s4?, [#ret_space, #0xb0]
 	str x3?, [#ret_space, #0xa8]
@@ -944,20 +944,20 @@ L1 (SSA Block: blk0):
 	str s4?, [#ret_space, #0x10]
 	str x3?, [#ret_space, #0x8]
 	str w2?, [#ret_space, #0x0]
-	mov q7.8b, q5?.8b
-	mov q6.8b, q4?.8b
+	mov v7.8b, v5?.8b
+	mov v6.8b, v4?.8b
 	mov x7, x3?
 	mov x6, x2?
-	mov q5.8b, q5?.8b
-	mov q4.8b, q4?.8b
+	mov v5.8b, v5?.8b
+	mov v4.8b, v4?.8b
 	mov x5, x3?
 	mov x4, x2?
-	mov q3.8b, q5?.8b
-	mov q2.8b, q4?.8b
+	mov v3.8b, v5?.8b
+	mov v2.8b, v4?.8b
 	mov x3, x3?
 	mov x2, x2?
-	mov q1.8b, q5?.8b
-	mov q0.8b, q4?.8b
+	mov v1.8b, v5?.8b
+	mov v0.8b, v4?.8b
 	mov x1, x3?
 	mov x0, x2?
 	ret
@@ -991,16 +991,16 @@ L1 (SSA Block: blk0):
 	str s0, [sp, #0x20]
 	str x1, [sp, #0x18]
 	str w0, [sp, #0x10]
-	mov q7.8b, q1.8b
-	mov q6.8b, q0.8b
+	mov v7.8b, v1.8b
+	mov v6.8b, v0.8b
 	mov x7, x1
 	mov x6, x0
-	mov q5.8b, q1.8b
-	mov q4.8b, q0.8b
+	mov v5.8b, v1.8b
+	mov v4.8b, v0.8b
 	mov x5, x1
 	mov x4, x0
-	mov q3.8b, q1.8b
-	mov q2.8b, q0.8b
+	mov v3.8b, v1.8b
+	mov v2.8b, v0.8b
 	mov x3, x1
 	mov x2, x0
 	ldr x30, [sp], #0x10
@@ -1013,20 +1013,20 @@ L1 (SSA Block: blk0):
 L1 (SSA Block: blk0):
 	mov x2?, x2
 	mov x3?, x3
-	mov q4?.8b, q0.8b
-	mov q5?.8b, q1.8b
+	mov v4?.8b, v0.8b
+	mov v5?.8b, v1.8b
 	mov x6?, x4
 	mov x7?, x5
-	mov q8?.8b, q2.8b
-	mov q9?.8b, q3.8b
+	mov v8?.8b, v2.8b
+	mov v9?.8b, v3.8b
 	mov x10?, x6
 	mov x11?, x7
-	mov q12?.8b, q4.8b
-	mov q13?.8b, q5.8b
+	mov v12?.8b, v4.8b
+	mov v13?.8b, v5.8b
 	ldr w14?, [#arg_space, #0x0]
 	ldr x15?, [#arg_space, #0x8]
-	mov q16?.8b, q6.8b
-	mov q17?.8b, q7.8b
+	mov v16?.8b, v6.8b
+	mov v17?.8b, v7.8b
 	ldr w18?, [#arg_space, #0x10]
 	ldr x19?, [#arg_space, #0x18]
 	ldr s20?, [#arg_space, #0x20]
@@ -1077,20 +1077,20 @@ L1 (SSA Block: blk0):
 	str d25?, [#ret_space, #0x0]
 	mov x7, x26?
 	mov x6, x27?
-	mov q7.8b, q28?.8b
-	mov q6.8b, q29?.8b
+	mov v7.8b, v28?.8b
+	mov v6.8b, v29?.8b
 	mov x5, x30?
 	mov x4, x31?
-	mov q5.8b, q32?.8b
-	mov q4.8b, q33?.8b
+	mov v5.8b, v32?.8b
+	mov v4.8b, v33?.8b
 	mov x3, x34?
 	mov x2, x35?
-	mov q3.8b, q36?.8b
-	mov q2.8b, q37?.8b
+	mov v3.8b, v36?.8b
+	mov v2.8b, v37?.8b
 	mov x1, x38?
 	mov x0, x39?
-	mov q1.8b, q40?.8b
-	mov q0.8b, q41?.8b
+	mov v1.8b, v40?.8b
+	mov v0.8b, v41?.8b
 	ret
 `,
 			afterFinalizeARM64: `
@@ -1101,20 +1101,20 @@ L1 (SSA Block: blk0):
 	str q19, [sp, #-0x10]!
 	mov x8, x2
 	mov x9, x3
-	mov q8.8b, q0.8b
-	mov q9.8b, q1.8b
+	mov v8.8b, v0.8b
+	mov v9.8b, v1.8b
 	mov x10, x4
 	mov x11, x5
-	mov q10.8b, q2.8b
-	mov q11.8b, q3.8b
+	mov v10.8b, v2.8b
+	mov v11.8b, v3.8b
 	mov x12, x6
 	mov x19, x7
-	mov q12.8b, q4.8b
-	mov q13.8b, q5.8b
+	mov v12.8b, v4.8b
+	mov v13.8b, v5.8b
 	ldr w18, [sp, #0x40]
 	ldr x17, [sp, #0x48]
-	mov q14.8b, q6.8b
-	mov q19.8b, q7.8b
+	mov v14.8b, v6.8b
+	mov v19.8b, v7.8b
 	ldr w16, [sp, #0x50]
 	ldr x15, [sp, #0x58]
 	ldr s18, [sp, #0x60]
@@ -1466,10 +1466,10 @@ L1 (SSA Block: blk0):
 			m:    testcases.FloatComparisons.Module,
 			afterLoweringARM64: `
 L1 (SSA Block: blk0):
-	mov q2?.8b, q0.8b
-	mov q3?.8b, q1.8b
-	mov q4?.8b, q2.8b
-	mov q5?.8b, q3.8b
+	mov v2?.8b, v0.8b
+	mov v3?.8b, v1.8b
+	mov v4?.8b, v2.8b
+	mov v5?.8b, v3.8b
 	fcmp s2?, s3?
 	cset x6?, eq
 	fcmp s2?, s3?
@@ -1549,7 +1549,7 @@ L1 (SSA Block: blk0):
 			afterLoweringARM64: `
 L1 (SSA Block: blk0):
 	mov x2?, x2
-	mov q3?.8b, q0.8b
+	mov v3?.8b, v0.8b
 	orr w161?, wzr, #0x1
 	madd w5?, w2?, w161?, wzr
 	orr w160?, wzr, #0x2
@@ -1668,7 +1668,7 @@ L1 (SSA Block: blk0):
 	fadd s119?, s68?, s118?
 	fadd s120?, s66?, s119?
 	fadd s121?, s64?, s120?
-	mov q0.8b, q121?.8b
+	mov v0.8b, v121?.8b
 	mov x0, x62?
 	ret
 `,
@@ -2361,12 +2361,12 @@ L1 (SSA Block: blk0):
 	mov x6, x70?
 	mov x5, x64?
 	mov x4, x58?
-	mov q3.8b, q52?.8b
-	mov q2.8b, q46?.8b
+	mov v3.8b, v52?.8b
+	mov v2.8b, v46?.8b
 	mov x3, x40?
 	mov x2, x34?
-	mov q1.8b, q28?.8b
-	mov q0.8b, q22?.8b
+	mov v1.8b, v28?.8b
+	mov v0.8b, v22?.8b
 	mov x1, x16?
 	mov x0, x10?
 	ret
@@ -2696,12 +2696,12 @@ L1 (SSA Block: blk0):
 	ldr s15?, [x14?, #0x8]
 	ldr x16?, [x1?, #0x20]
 	ldr d17?, [x16?, #0x8]
-	mov q3.8b, q17?.8b
-	mov q2.8b, q15?.8b
+	mov v3.8b, v17?.8b
+	mov v2.8b, v15?.8b
 	mov x3, x13?
 	mov x2, x11?
-	mov q1.8b, q9?.8b
-	mov q0.8b, q7?.8b
+	mov v1.8b, v9?.8b
+	mov v0.8b, v7?.8b
 	mov x1, x5?
 	mov x0, x3?
 	ret
