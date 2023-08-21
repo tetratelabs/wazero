@@ -293,12 +293,24 @@ func formatVRegSized(r regalloc.VReg, size byte) (ret string) {
 	return
 }
 
-func formatVRegSizedVec(r regalloc.VReg, size byte, arr vecArrangement, index vecIndex) (ret string) {
-	c := "?"
+func formatVRegWidthVec(r regalloc.VReg, width vecArrangement) (ret string) {
+	var id string
+	wspec := strings.ToLower(width.String())
 	if r.IsRealReg() {
-		c = ""
+		id = regNames[r.RealReg()][1:]
+	} else {
+		id = fmt.Sprintf("%d?", r.ID())
 	}
-	ret = fmt.Sprintf("v%d%s.%s", r.ID(), c, arr)
+	ret = fmt.Sprintf("%s%s", wspec, id)
+	return
+}
+
+func formatVRegVec(r regalloc.VReg, arr vecArrangement, index vecIndex) (ret string) {
+	id := fmt.Sprintf("v%d?", r.ID())
+	if r.IsRealReg() {
+		id = regNames[r.RealReg()]
+	}
+	ret = fmt.Sprintf("%s.%s", id, strings.ToLower(arr.String()))
 	if index != vecIndexNone {
 		ret += fmt.Sprintf("[%d]", index)
 	}

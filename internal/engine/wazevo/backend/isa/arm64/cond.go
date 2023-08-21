@@ -254,6 +254,7 @@ const (
 	vecArrangementQ
 )
 
+// String implements fmt.Stringer
 func (v vecArrangement) String() (ret string) {
 	switch v {
 	case vecArrangement8B:

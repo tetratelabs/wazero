@@ -92,8 +92,8 @@ var defKinds = [numInstructionKinds]defKind{
 	fpuCSel:         defKindRD,
 	movToVec:        defKindRD,
 	movFromVec:      defKindRD,
-	vecRRR:          defKindRD,
 	vecMisc:         defKindRD,
+	vecLanes:        defKindRD,
 }
 
 // defs returns the list of regalloc.VReg that are defined by the instruction.
@@ -189,7 +189,7 @@ var useKinds = [numInstructionKinds]useKind{
 	movToVec:        useKindRN,
 	movFromVec:      useKindRN,
 	vecMisc:         useKindRN,
-	vecRRR:          useKindRN,
+	vecLanes:        useKindRN,
 }
 
 // uses returns the list of regalloc.VReg that are used by the instruction.
@@ -671,27 +671,25 @@ func (i *instruction) asMovToVec(rd, rn regalloc.VReg, arr vecArrangement, index
 	i.kind = movToVec
 	i.rd = operandNR(rd)
 	i.rn = operandNR(rn)
-	i.u1 = uint64(arr)
-	i.u2 = uint64(index)
+	i.u1, i.u2 = uint64(arr), uint64(index)
 }
 
 func (i *instruction) asMovFromVec(rd, rn regalloc.VReg, arr vecArrangement, index vecIndex) {
 	i.kind = movFromVec
 	i.rd = operandNR(rd)
 	i.rn = operandNR(rn)
-	i.u1 = uint64(arr)
-	i.u2 = uint64(index)
+	i.u1, i.u2 = uint64(arr), uint64(index)
 }
 
-func (i *instruction) asVecRRR(op vecOp, rd, rn regalloc.VReg, arr vecArrangement) {
-	i.kind = vecRRR
+func (i *instruction) asVecMisc(op vecOp, rd, rn regalloc.VReg, arr vecArrangement) {
+	i.kind = vecMisc
 	i.u1 = uint64(op)
 	i.rn, i.rd = operandNR(rn), operandNR(rd)
 	i.u2 = uint64(arr)
 }
 
-func (i *instruction) asVecMisc(op vecOp, rd, rn regalloc.VReg, arr vecArrangement) {
-	i.kind = vecMisc
+func (i *instruction) asVecLanes(op vecOp, rd, rn regalloc.VReg, arr vecArrangement) {
+	i.kind = vecLanes
 	i.u1 = uint64(op)
 	i.rn, i.rd = operandNR(rn), operandNR(rd)
 	i.u2 = uint64(arr)
@@ -906,26 +904,29 @@ func (i *instruction) String() (str string) {
 		var size byte
 		arr := vecArrangement(i.u1)
 		switch arr {
-		case vecArrangementB:
+		case vecArrangementB, vecArrangementH, vecArrangementS:
 			size = 32
 		case vecArrangementD:
 			size = 64
 		default:
 			panic("unsupported arrangement " + arr.String())
 		}
-		str = fmt.Sprintf("ins %s, %s", formatVRegSizedVec(i.rd.nr(), 128, arr, vecIndex(i.u2)), formatVRegSized(i.rn.nr(), size))
+		str = fmt.Sprintf("ins %s, %s", formatVRegVec(i.rd.nr(), arr, vecIndex(i.u2)), formatVRegSized(i.rn.nr(), size))
 	case movFromVec:
 		var size byte
+		var opcode string
 		arr := vecArrangement(i.u1)
 		switch arr {
-		case vecArrangementB:
+		case vecArrangementB, vecArrangementH, vecArrangementS:
 			size = 32
+			opcode = "umov"
 		case vecArrangementD:
 			size = 64
+			opcode = "mov"
 		default:
 			panic("unsupported arrangement " + arr.String())
 		}
-		str = fmt.Sprintf("mov %s, %s", formatVRegSized(i.rd.nr(), size), formatVRegSizedVec(i.rn.nr(), 128, arr, vecIndex(i.u2)))
+		str = fmt.Sprintf("%s %s, %s", opcode, formatVRegSized(i.rd.nr(), size), formatVRegVec(i.rn.nr(), arr, vecIndex(i.u2)))
 	case movFromVecSigned:
 		panic("TODO")
 	case vecDup:
@@ -939,19 +940,29 @@ func (i *instruction) String() (str string) {
 	case vecMiscNarrow:
 		panic("TODO")
 	case vecRRR:
-		str = fmt.Sprintf("%s %s, %s",
-			vecOp(i.u1),
-			formatVRegSizedVec(i.rd.nr(), 64, vecArrangement(i.u2), vecIndexNone),
-			formatVRegSizedVec(i.rn.nr(), 64, vecArrangement(i.u2), vecIndexNone),
-		)
+		panic("TODO")
 	case vecMisc:
 		str = fmt.Sprintf("%s %s, %s",
 			vecOp(i.u1),
-			formatVRegSizedVec(i.rd.nr(), 64, vecArrangement(i.u2), vecIndexNone),
-			formatVRegSizedVec(i.rn.nr(), 64, vecArrangement(i.u2), vecIndexNone),
-		)
+			formatVRegVec(i.rd.nr(), vecArrangement(i.u2), vecIndexNone),
+			formatVRegVec(i.rn.nr(), vecArrangement(i.u2), vecIndexNone))
 	case vecLanes:
-		panic("TODO")
+		arr := vecArrangement(i.u2)
+		var destArr vecArrangement
+		switch arr {
+		case vecArrangement8B, vecArrangement16B:
+			destArr = vecArrangementH
+		case vecArrangement4H, vecArrangement8H:
+			destArr = vecArrangementS
+		case vecArrangement4S:
+			destArr = vecArrangementD
+		default:
+			panic("invalid arrangement " + arr.String())
+		}
+		str = fmt.Sprintf("%s %s, %s",
+			vecOp(i.u1),
+			formatVRegWidthVec(i.rd.nr(), destArr),
+			formatVRegVec(i.rn.nr(), arr, vecIndexNone))
 	case vecTbl:
 		panic("TODO")
 	case vecTbl2:

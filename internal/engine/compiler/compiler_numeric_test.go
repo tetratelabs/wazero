@@ -844,9 +844,6 @@ func TestCompiler_compile_Clz_Ctz_Popcnt(t *testing.T) {
 							// Generate and run the code under test.
 							_, err = compiler.compile(code.NextCodeSection())
 							require.NoError(t, err)
-
-							fmt.Printf("--\n%x\n--", code.Bytes())
-
 							env.exec(code.Bytes())
 
 							// One value must be pushed as a result.

@@ -329,8 +329,8 @@ func (m *machine) lowerCtz(x, result ssa.Value) {
 
 func (m *machine) lowerPopcnt(x, result ssa.Value) {
 	// arm64 doesn't have an instruction for population count on scalar register,
-	// so we use the vector one (VCNT).
-	// This exactly what the official Go implements bits.OneCount.
+	// so we use the vector instruction `cnt`.
+	// This is exactly what the official Go implements bits.OneCount.
 	// For example, "func () int { return bits.OneCount(10) }" is compiled as
 	//
 	//    MOVD    $10, R0 ;; Load 10.
@@ -338,11 +338,15 @@ func (m *machine) lowerPopcnt(x, result ssa.Value) {
 	//    VCNT    V0.B8, V0.B8
 	//    UADDLV  V0.B8, V0
 	//
-
-	//   fmov   d0, x3
-	//   cnt    v0.16b, v0.16b
-	//   uaddlv h0, v0.8b
-	//   fmov   x3, d0
+	// In aarch64 asm, FMOVD is encoded as `ins`, VCNT is `cnt`,
+	// and the registers may use different names. In our encoding we use the following
+	// instructions:
+	//
+	//    ins v0.d[0], x0     ;; mov from GPR to vec (FMOV above) is encoded as INS
+	//    cnt v0.16b, v0.16b  ;; we use vec arrangement 16b
+	//    uaddlv h0, v0.8b    ;; h0 is still v0 with the dest width specifier 'H', implied when src arrangement is 8b
+	//    mov x5, v0.d[0]     ;; finally we mov the result back to a GPR
+	//
 
 	rd := m.compiler.VRegOf(result)
 	rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
@@ -359,7 +363,7 @@ func (m *machine) lowerPopcnt(x, result ssa.Value) {
 
 	rf3 := m.compiler.AllocateVReg(regalloc.RegTypeFloat)
 	uaddlv := m.allocateInstr()
-	uaddlv.asVecRRR(vecOpUaddlv, rf3, rf2, vecArrangement8B)
+	uaddlv.asVecLanes(vecOpUaddlv, rf3, rf2, vecArrangement8B)
 	m.insert(uaddlv)
 
 	mov := m.allocateInstr()
