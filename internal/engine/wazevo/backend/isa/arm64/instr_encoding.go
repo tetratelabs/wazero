@@ -1,6 +1,8 @@
 package arm64
 
 import (
+	"fmt"
+
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
@@ -236,6 +238,34 @@ func (i *instruction) encode(c backend.Compiler) {
 			condFlag(i.u1),
 			i.u3 == 1,
 		))
+	case movToVec:
+		c.Emit4Bytes(encodeMoveToVec(
+			regNumberInEncoding[i.rd.realReg()],
+			regNumberInEncoding[i.rn.realReg()],
+			vecArrangement(byte(i.u1)),
+			vecIndex(i.u2),
+		))
+	case movFromVec:
+		c.Emit4Bytes(encodeMoveFromVec(
+			regNumberInEncoding[i.rd.realReg()],
+			regNumberInEncoding[i.rn.realReg()],
+			vecArrangement(byte(i.u1)),
+			vecIndex(i.u2),
+		))
+	case vecMisc:
+		c.Emit4Bytes(encodeVecMisc(
+			vecOp(i.u1),
+			regNumberInEncoding[i.rd.realReg()],
+			regNumberInEncoding[i.rn.realReg()],
+			vecArrangement(i.u2),
+		))
+	case vecLanes:
+		c.Emit4Bytes(encodeVecLanes(
+			vecOp(i.u1),
+			regNumberInEncoding[i.rd.realReg()],
+			regNumberInEncoding[i.rn.realReg()],
+			vecArrangement(i.u2),
+		))
 	default:
 		panic(i.String())
 	}
@@ -249,6 +279,82 @@ func encodeFpuCSel(rd, rn, rm uint32, c condFlag, _64bit bool) uint32 {
 		ftype = 0b01 // double precision.
 	}
 	return 0b1111<<25 | ftype<<22 | 0b1<<21 | rm<<16 | uint32(c)<<12 | 0b11<<10 | rn<<5 | rd
+}
+
+// encodeMoveToVec encodes as "Move general-purpose register to a vector element" (represented as `ins`) in
+// https://developer.arm.com/documentation/dui0801/g/A64-SIMD-Vector-Instructions/MOV--vector--from-general-
+// https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/MOV--from-general---Move-general-purpose-register-to-a-vector-element--an-alias-of-INS--general--?lang=en
+func encodeMoveToVec(rd, rn uint32, arr vecArrangement, index vecIndex) uint32 {
+	var imm5 uint32
+	switch arr {
+	case vecArrangementB:
+		imm5 |= 0b1
+		imm5 |= uint32(index) << 1
+		if index > 0b1111 {
+			panic(fmt.Sprintf("vector index is larger than the allowed bound: %d > 15", index))
+		}
+	case vecArrangementH:
+		imm5 |= 0b10
+		imm5 |= uint32(index) << 2
+		if index > 0b111 {
+			panic(fmt.Sprintf("vector index is larger than the allowed bound: %d > 7", index))
+		}
+	case vecArrangementS:
+		imm5 |= 0b100
+		imm5 |= uint32(index) << 3
+		if index > 0b11 {
+			panic(fmt.Sprintf("vector index is larger than the allowed bound: %d > 3", index))
+		}
+	case vecArrangementD:
+		imm5 |= 0b1000
+		imm5 |= uint32(index) << 4
+		if index > 0b1 {
+			panic(fmt.Sprintf("vector index is larger than the allowed bound: %d > 1", index))
+		}
+	default:
+		panic("Unsupported arrangement " + arr.String())
+	}
+
+	return 0b01001110000<<21 | imm5<<16 | 0b000111<<10 | rn<<5 | rd
+}
+
+// encodeMoveFromVec encodes as "Move vector element to a general-purpose register"
+// (represented as `umov` when dest is 32-bit, `umov` otherwise) in
+// https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/UMOV--Unsigned-Move-vector-element-to-general-purpose-register-?lang=en
+// https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/MOV--to-general---Move-vector-element-to-general-purpose-register--an-alias-of-UMOV-?lang=en
+func encodeMoveFromVec(rd, rn uint32, arr vecArrangement, index vecIndex) uint32 {
+	var q uint32
+	var imm5 uint32
+	switch arr {
+	case vecArrangementB:
+		imm5 |= 0b1
+		imm5 |= uint32(index) << 1
+		if index > 0b1111 {
+			panic(fmt.Sprintf("vector index is larger than the allowed bound: %d > 15", index))
+		}
+	case vecArrangementH:
+		imm5 |= 0b10
+		imm5 |= uint32(index) << 2
+		if index > 0b111 {
+			panic(fmt.Sprintf("vector index is larger than the allowed bound: %d > 7", index))
+		}
+	case vecArrangementS:
+		imm5 |= 0b100
+		imm5 |= uint32(index) << 3
+		if index > 0b11 {
+			panic(fmt.Sprintf("vector index is larger than the allowed bound: %d > 3", index))
+		}
+	case vecArrangementD:
+		imm5 |= 0b1000
+		imm5 |= uint32(index) << 4
+		q = 0b1
+		if index > 0b1 {
+			panic(fmt.Sprintf("vector index is larger than the allowed bound: %d > 1", index))
+		}
+	default:
+		panic("Unsupported arrangement " + arr.String())
+	}
+	return 0b0_001110000<<21 | q<<30 | imm5<<16 | 0b001111<<10 | rn<<5 | rd
 }
 
 // encodeConditionalSelect encodes as "Conditional select" in
@@ -847,6 +953,54 @@ func encodeAluRRImm(op aluOp, rd, rn, amount, _64bit uint32) uint32 {
 		panic(op.String())
 	}
 	return _64bit<<31 | opc<<29 | 0b100110<<23 | _64bit<<22 | immr<<16 | imms<<10 | rn<<5 | rd
+}
+
+// encodeVecLanes encodes as Data Processing (Advanced SIMD across lanes) depending on vecOp in
+// https://developer.arm.com/documentation/ddi0596/2020-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
+func encodeVecLanes(op vecOp, rd uint32, rn uint32, arr vecArrangement) uint32 {
+	var u, q, size, opcode uint32
+	switch op {
+	case vecOpUaddlv:
+		u, opcode = 1, 0b00011
+		switch arr {
+		case vecArrangement8B:
+			q, size = 0b0, 0b00
+		case vecArrangement16B:
+			q, size = 0b1, 0b00
+		case vecArrangement4H:
+			q, size = 0, 0b01
+		case vecArrangement8H:
+			q, size = 1, 0b01
+		case vecArrangement4S:
+			q, size = 1, 0b10
+		default:
+			panic("unsupported arrangement: " + arr.String())
+		}
+	default:
+		panic("unsupported or illegal vecOp: " + op.String())
+	}
+	return q<<30 | u<<29 | 0b1110<<24 | size<<22 | 0b11000<<17 | opcode<<12 | 0b10<<10 | rn<<5 | rd
+}
+
+// encodeVecMisc encodes as Data Processing (Advanced SIMD two-register miscellaneous) depending on vecOp in
+// https://developer.arm.com/documentation/ddi0596/2020-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en#simd-dp
+func encodeVecMisc(op vecOp, rd, rn uint32, arr vecArrangement) uint32 {
+	var q, u, size, opcode uint32
+	switch op {
+	case vecOpCnt:
+		opcode = 0b00101
+		switch arr {
+		case vecArrangement8B:
+			q, size = 0b0, 0b00
+		case vecArrangement16B:
+			q, size = 0b1, 0b00
+		default:
+			panic("unsupported arrangement: " + arr.String())
+		}
+	default:
+		panic("unsupported or illegal vecOp: " + op.String())
+	}
+	return q<<30 | u<<29 | 0b01110<<24 | size<<22 | 0b10000<<17 | opcode<<12 | 0b10<<10 | rn<<5 | rd
 }
 
 // encodeExitSequence matches the implementation detail of abiImpl.emitGoEntryPreamble.

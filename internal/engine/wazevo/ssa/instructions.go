@@ -838,6 +838,7 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeFadd:               sideEffectFalse,
 	OpcodeClz:                sideEffectFalse,
 	OpcodeCtz:                sideEffectFalse,
+	OpcodePopcnt:             sideEffectFalse,
 	OpcodeLoad:               sideEffectFalse,
 	OpcodeUload8:             sideEffectFalse,
 	OpcodeUload16:            sideEffectFalse,
@@ -937,6 +938,7 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeF64const:           returnTypesFnF64,
 	OpcodeClz:                returnTypesFnSingle,
 	OpcodeCtz:                returnTypesFnSingle,
+	OpcodePopcnt:             returnTypesFnSingle,
 	OpcodeStore:              returnTypesFnNoReturns,
 	OpcodeIstore8:            returnTypesFnNoReturns,
 	OpcodeIstore16:           returnTypesFnNoReturns,
@@ -1320,6 +1322,13 @@ func (i *Instruction) AsCtz(x Value) {
 	i.typ = x.Type()
 }
 
+// AsPopcnt initializes this instruction as a Population Count instruction with OpcodePopcnt.
+func (i *Instruction) AsPopcnt(x Value) {
+	i.opcode = OpcodePopcnt
+	i.v = x
+	i.typ = x.Type()
+}
+
 // UnaryData return the operand for a unary instruction.
 func (i *Instruction) UnaryData() Value {
 	return i.v
@@ -1461,7 +1470,7 @@ func (i *Instruction) Format(b Builder) string {
 	case OpcodeIshl, OpcodeSshr, OpcodeUshr:
 		instSuffix = fmt.Sprintf(" %s, %s", i.v.Format(b), i.v2.Format(b))
 	case OpcodeUndefined:
-	case OpcodeClz, OpcodeCtz:
+	case OpcodeClz, OpcodeCtz, OpcodePopcnt:
 		instSuffix = " " + i.v.Format(b)
 	default:
 		panic(fmt.Sprintf("TODO: format for %s", i.opcode))

@@ -90,6 +90,10 @@ var defKinds = [numInstructionKinds]defKind{
 	udf:             defKindNone,
 	cSel:            defKindRD,
 	fpuCSel:         defKindRD,
+	movToVec:        defKindRD,
+	movFromVec:      defKindRD,
+	vecMisc:         defKindRD,
+	vecLanes:        defKindRD,
 }
 
 // defs returns the list of regalloc.VReg that are defined by the instruction.
@@ -182,6 +186,10 @@ var useKinds = [numInstructionKinds]useKind{
 	loadFpuConst64:  useKindNone,
 	cSel:            useKindRNRM,
 	fpuCSel:         useKindRNRM,
+	movToVec:        useKindRN,
+	movFromVec:      useKindRN,
+	vecMisc:         useKindRN,
+	vecLanes:        useKindRN,
 }
 
 // uses returns the list of regalloc.VReg that are used by the instruction.
@@ -659,6 +667,34 @@ func (i *instruction) asFpuMov128(rd, rn regalloc.VReg) {
 	i.rn, i.rd = operandNR(rn), operandNR(rd)
 }
 
+func (i *instruction) asMovToVec(rd, rn regalloc.VReg, arr vecArrangement, index vecIndex) {
+	i.kind = movToVec
+	i.rd = operandNR(rd)
+	i.rn = operandNR(rn)
+	i.u1, i.u2 = uint64(arr), uint64(index)
+}
+
+func (i *instruction) asMovFromVec(rd, rn regalloc.VReg, arr vecArrangement, index vecIndex) {
+	i.kind = movFromVec
+	i.rd = operandNR(rd)
+	i.rn = operandNR(rn)
+	i.u1, i.u2 = uint64(arr), uint64(index)
+}
+
+func (i *instruction) asVecMisc(op vecOp, rd, rn regalloc.VReg, arr vecArrangement) {
+	i.kind = vecMisc
+	i.u1 = uint64(op)
+	i.rn, i.rd = operandNR(rn), operandNR(rd)
+	i.u2 = uint64(arr)
+}
+
+func (i *instruction) asVecLanes(op vecOp, rd, rn regalloc.VReg, arr vecArrangement) {
+	i.kind = vecLanes
+	i.u1 = uint64(op)
+	i.rn, i.rd = operandNR(rn), operandNR(rd)
+	i.u2 = uint64(arr)
+}
+
 func (i *instruction) isCopy() bool {
 	op := i.kind
 	return op == mov64 || op == mov32 || op == fpuMov64 || op == fpuMov128
@@ -863,9 +899,32 @@ func (i *instruction) String() (str string) {
 	case movToFpu:
 		panic("TODO")
 	case movToVec:
-		panic("TODO")
+		var size byte
+		arr := vecArrangement(i.u1)
+		switch arr {
+		case vecArrangementB, vecArrangementH, vecArrangementS:
+			size = 32
+		case vecArrangementD:
+			size = 64
+		default:
+			panic("unsupported arrangement " + arr.String())
+		}
+		str = fmt.Sprintf("ins %s, %s", formatVRegVec(i.rd.nr(), arr, vecIndex(i.u2)), formatVRegSized(i.rn.nr(), size))
 	case movFromVec:
-		panic("TODO")
+		var size byte
+		var opcode string
+		arr := vecArrangement(i.u1)
+		switch arr {
+		case vecArrangementB, vecArrangementH, vecArrangementS:
+			size = 32
+			opcode = "umov"
+		case vecArrangementD:
+			size = 64
+			opcode = "mov"
+		default:
+			panic("unsupported arrangement " + arr.String())
+		}
+		str = fmt.Sprintf("%s %s, %s", opcode, formatVRegSized(i.rd.nr(), size), formatVRegVec(i.rn.nr(), arr, vecIndex(i.u2)))
 	case movFromVecSigned:
 		panic("TODO")
 	case vecDup:
@@ -881,9 +940,27 @@ func (i *instruction) String() (str string) {
 	case vecRRR:
 		panic("TODO")
 	case vecMisc:
-		panic("TODO")
+		str = fmt.Sprintf("%s %s, %s",
+			vecOp(i.u1),
+			formatVRegVec(i.rd.nr(), vecArrangement(i.u2), vecIndexNone),
+			formatVRegVec(i.rn.nr(), vecArrangement(i.u2), vecIndexNone))
 	case vecLanes:
-		panic("TODO")
+		arr := vecArrangement(i.u2)
+		var destArr vecArrangement
+		switch arr {
+		case vecArrangement8B, vecArrangement16B:
+			destArr = vecArrangementH
+		case vecArrangement4H, vecArrangement8H:
+			destArr = vecArrangementS
+		case vecArrangement4S:
+			destArr = vecArrangementD
+		default:
+			panic("invalid arrangement " + arr.String())
+		}
+		str = fmt.Sprintf("%s %s, %s",
+			vecOp(i.u1),
+			formatVRegWidthVec(i.rd.nr(), destArr),
+			formatVRegVec(i.rn.nr(), arr, vecIndexNone))
 	case vecTbl:
 		panic("TODO")
 	case vecTbl2:
@@ -1234,6 +1311,26 @@ const (
 	// MAdd and MSub are only applicable for aluRRRR.
 	aluOpMAdd
 	aluOpMSub
+)
+
+// vecOp determines the type of vector operation. Instructions whose kind is one of
+// vecOpCnt would use this type.
+type vecOp int
+
+// String implements fmt.Stringer.
+func (b vecOp) String() string {
+	switch b {
+	case vecOpCnt:
+		return "cnt"
+	case vecOpUaddlv:
+		return "uaddlv"
+	}
+	panic(int(b))
+}
+
+const (
+	vecOpCnt vecOp = iota
+	vecOpUaddlv
 )
 
 // bitOp determines the type of bitwise operation. Instructions whose kind is one of

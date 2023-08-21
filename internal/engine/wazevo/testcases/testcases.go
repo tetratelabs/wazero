@@ -735,7 +735,7 @@ var (
 		Name: "integer_bit_counts",
 		Module: SingleFunctionModule(wasm.FunctionType{
 			Params:  []wasm.ValueType{i32, i64},
-			Results: []wasm.ValueType{i32, i32, i64, i64},
+			Results: []wasm.ValueType{i32, i32, i32, i64, i64, i64},
 		}, []byte{
 			wasm.OpcodeLocalGet, 0,
 			wasm.OpcodeI32Clz,
@@ -743,11 +743,17 @@ var (
 			wasm.OpcodeLocalGet, 0,
 			wasm.OpcodeI32Ctz,
 
+			wasm.OpcodeLocalGet, 0,
+			wasm.OpcodeI32Popcnt,
+
 			wasm.OpcodeLocalGet, 1,
 			wasm.OpcodeI64Clz,
 
 			wasm.OpcodeLocalGet, 1,
 			wasm.OpcodeI64Ctz,
+
+			wasm.OpcodeLocalGet, 1,
+			wasm.OpcodeI64Popcnt,
 
 			wasm.OpcodeEnd,
 		}, []wasm.ValueType{}),

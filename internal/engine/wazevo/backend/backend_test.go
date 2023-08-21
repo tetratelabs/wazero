@@ -1420,9 +1420,19 @@ L1 (SSA Block: blk0):
 	clz w4?, w2?
 	rbit w27, w2?
 	clz w5?, w27
-	clz x6?, x3?
+	ins v13?.d[0], x2?
+	cnt v14?.16b, v13?.16b
+	uaddlv h15?, v14?.8b
+	mov x6?, v15?.d[0]
+	clz x7?, x3?
 	rbit x27, x3?
-	clz x7?, x27
+	clz x8?, x27
+	ins v10?.d[0], x3?
+	cnt v11?.16b, v10?.16b
+	uaddlv h12?, v11?.8b
+	mov x9?, v12?.d[0]
+	mov x5, x9?
+	mov x4, x8?
 	mov x3, x7?
 	mov x2, x6?
 	mov x1, x5?
@@ -1432,12 +1442,21 @@ L1 (SSA Block: blk0):
 			afterFinalizeARM64: `
 L1 (SSA Block: blk0):
 	str x30, [sp, #-0x10]!
+	mov x8, x3
 	clz w0, w2
 	rbit w27, w2
 	clz w1, w27
-	clz x2, x3
-	rbit x27, x3
-	clz x3, x27
+	ins v8.d[0], x2
+	cnt v8.16b, v8.16b
+	uaddlv h8, v8.8b
+	mov x2, v8.d[0]
+	clz x3, x8
+	rbit x27, x8
+	clz x4, x27
+	ins v8.d[0], x8
+	cnt v8.16b, v8.16b
+	uaddlv h8, v8.8b
+	mov x5, v8.d[0]
 	ldr x30, [sp], #0x10
 	ret
 `,

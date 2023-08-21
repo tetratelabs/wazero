@@ -153,6 +153,10 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		x := instr.UnaryData()
 		result := instr.Return()
 		m.lowerCtz(x, result)
+	case ssa.OpcodePopcnt:
+		x := instr.UnaryData()
+		result := instr.Return()
+		m.lowerPopcnt(x, result)
 	default:
 		panic("TODO: lowering " + instr.Opcode().String())
 	}
@@ -319,6 +323,50 @@ func (m *machine) lowerCtz(x, result ssa.Value) {
 	clz := m.allocateInstr()
 	clz.asBitRR(bitOpClz, rd, tmpRegVReg, x.Type().Bits() == 64)
 	m.insert(clz)
+}
+
+func (m *machine) lowerPopcnt(x, result ssa.Value) {
+	// arm64 doesn't have an instruction for population count on scalar register,
+	// so we use the vector instruction `cnt`.
+	// This is exactly what the official Go implements bits.OneCount.
+	// For example, "func () int { return bits.OneCount(10) }" is compiled as
+	//
+	//    MOVD    $10, R0 ;; Load 10.
+	//    FMOVD   R0, F0
+	//    VCNT    V0.B8, V0.B8
+	//    UADDLV  V0.B8, V0
+	//
+	// In aarch64 asm, FMOVD is encoded as `ins`, VCNT is `cnt`,
+	// and the registers may use different names. In our encoding we use the following
+	// instructions:
+	//
+	//    ins v0.d[0], x0     ;; mov from GPR to vec (FMOV above) is encoded as INS
+	//    cnt v0.16b, v0.16b  ;; we use vec arrangement 16b
+	//    uaddlv h0, v0.8b    ;; h0 is still v0 with the dest width specifier 'H', implied when src arrangement is 8b
+	//    mov x5, v0.d[0]     ;; finally we mov the result back to a GPR
+	//
+
+	rd := m.compiler.VRegOf(result)
+	rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+
+	rf1 := m.compiler.AllocateVReg(regalloc.RegTypeFloat)
+	ins := m.allocateInstr()
+	ins.asMovToVec(rf1, rn.nr(), vecArrangementD, vecIndex(0))
+	m.insert(ins)
+
+	rf2 := m.compiler.AllocateVReg(regalloc.RegTypeFloat)
+	cnt := m.allocateInstr()
+	cnt.asVecMisc(vecOpCnt, rf2, rf1, vecArrangement16B)
+	m.insert(cnt)
+
+	rf3 := m.compiler.AllocateVReg(regalloc.RegTypeFloat)
+	uaddlv := m.allocateInstr()
+	uaddlv.asVecLanes(vecOpUaddlv, rf3, rf2, vecArrangement8B)
+	m.insert(uaddlv)
+
+	mov := m.allocateInstr()
+	mov.asMovFromVec(rd, rf3, vecArrangementD, vecIndex(0))
+	m.insert(mov)
 }
 
 const exitWithCodeEncodingSize = exitSequenceSize + 8
