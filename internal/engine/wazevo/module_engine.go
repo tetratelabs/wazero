@@ -128,6 +128,7 @@ func (m *moduleEngine) NewFunction(index wasm.Index) api.Function {
 	}
 
 	ce.execCtx.memoryGrowTrampolineAddress = &m.parent.builtinFunctions.memoryGrowExecutable[0]
+	ce.execCtx.stackGrowCallSequenceAddress = &m.parent.builtinFunctions.stackGrowExecutable[0]
 	ce.init()
 	return ce
 }

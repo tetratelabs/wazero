@@ -13,7 +13,7 @@ var calleeSavedRegistersPlusLinkRegSorted = []regalloc.VReg{
 }
 
 // CompileGoFunctionTrampoline implements backend.Machine.
-func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *ssa.Signature, needModuleContextPtr bool) {
+func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *ssa.Signature, needModuleContextPtr bool) []byte {
 	cur := m.allocateInstr()
 	cur.asNop0()
 	m.rootInstr = cur
@@ -145,6 +145,9 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 	ret.asRet(nil)
 	ret.prev = cur
 	cur.next = ret
+
+	m.encode(m.rootInstr)
+	return m.compiler.Buf()
 }
 
 func (m *machine) saveRegistersInExecutionContext(cur *instruction, regs []regalloc.VReg) *instruction {

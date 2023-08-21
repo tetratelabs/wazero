@@ -24,14 +24,17 @@ type mockMachine struct {
 	rinfo                  *regalloc.RegisterInfo
 }
 
+func (m mockMachine) CompileStackGrowCallSequence() []byte {
+	panic("TODO")
+}
+
 // CompileGoFunctionTrampoline implements Machine.CompileGoFunctionTrampoline.
-func (m mockMachine) CompileGoFunctionTrampoline(wazevoapi.ExitCode, *ssa.Signature, bool) {}
+func (m mockMachine) CompileGoFunctionTrampoline(wazevoapi.ExitCode, *ssa.Signature, bool) []byte {
+	panic("TODO")
+}
 
 // Encode implements Machine.Encode.
-func (m mockMachine) Encode() {
-	// TODO implement me
-	panic("implement me")
-}
+func (m mockMachine) Encode() {}
 
 // ResolveRelocations implements Machine.ResolveRelocations.
 func (m mockMachine) ResolveRelocations(map[ssa.FuncRef]int, []byte, []RelocationInfo) {}

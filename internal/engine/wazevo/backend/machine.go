@@ -9,6 +9,7 @@ import (
 type (
 	// Machine is a backend for a specific ISA machine.
 	Machine interface {
+		// DisableStackCheck disables the stack check for the current compilation for debugging/testing.
 		DisableStackCheck()
 
 		// RegisterInfo returns the set of registers that can be used for register allocation.
@@ -97,6 +98,10 @@ type (
 		Encode()
 
 		// CompileGoFunctionTrampoline compiles the trampoline function  to call a Go function of the given exit code and signature.
-		CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *ssa.Signature, needModuleContextPtr bool)
+		CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *ssa.Signature, needModuleContextPtr bool) []byte
+
+		// CompileStackGrowCallSequence returns the sequence of instructions shared by all functions to
+		// call the stack grow builtin function.
+		CompileStackGrowCallSequence() []byte
 	}
 )
