@@ -14,7 +14,9 @@ const xArgRetRegMax, vArgRetRegMax = x7, v7 // x0-x7 & v0-v7.
 
 var regInfo = &regalloc.RegisterInfo{
 	AllocatableRegisters: [regalloc.RegTypeNum][]regalloc.RealReg{
-		// We don't allocate x27(=tmpReg) because of the reason described on tmpReg.
+		// We don't allocate:
+		// - x27(=tmpReg) because of the reason described on tmpReg.
+		// - x18 which is reserved by the macOS: https://developer.apple.com/documentation/xcode/writing-arm64-code-for-apple-platforms#Respect-the-purpose-of-specific-CPU-registers
 		regalloc.RegTypeInt: {
 			x8, x9, x10, x11, x12, x13, x14, x15,
 			x16, x17, x18, x19, x20, x21, x22, x23, x24, x25,
@@ -31,7 +33,7 @@ var regInfo = &regalloc.RegisterInfo{
 		},
 	},
 	CalleeSavedRegisters: map[regalloc.RealReg]struct{}{
-		x18: {}, x19: {}, x20: {}, x21: {}, x22: {}, x23: {}, x24: {}, x25: {}, x26: {}, x28: {},
+		x19: {}, x20: {}, x21: {}, x22: {}, x23: {}, x24: {}, x25: {}, x26: {}, x28: {},
 		v18: {}, v19: {}, v20: {}, v21: {}, v22: {}, v23: {}, v24: {}, v25: {}, v26: {}, v27: {}, v28: {}, v29: {}, v30: {}, v31: {},
 	},
 	CallerSavedRegisters: map[regalloc.RealReg]struct{}{
