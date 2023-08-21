@@ -943,11 +943,9 @@ func encodeVecMisc(op vecOp, rd, rn uint32, arr vecArrangement) uint32 {
 	case vecOpCnt:
 		var q, size uint32
 		if arr == vecArrangement8B {
-			q = uint32(0b0)
-			size = uint32(0b00)
+			q, size = 0b0, 0b00
 		} else {
-			q = uint32(0b1)
-			size = uint32(0b00)
+			q, size = 0b1, 0b00
 		}
 		return q<<30 | 0b001110<<24 | size<<22 | 0b100000010110<<10 | rn<<5 | rd
 
@@ -959,11 +957,9 @@ func encodeVecMisc(op vecOp, rd, rn uint32, arr vecArrangement) uint32 {
 func vecArrangementParams(arr vecArrangement) (q uint32, size uint32) {
 	switch arr {
 	case vecArrangement8B:
-		q = uint32(0b0)
-		size = uint32(0b00)
+		q, size = 0b0, 0b00
 	case vecArrangement16B:
-		q = uint32(0b1)
-		size = uint32(0b00)
+		q, size = 0b1, 0b00
 	default:
 		panic("unsupported arrangement: " + arr.String())
 	}

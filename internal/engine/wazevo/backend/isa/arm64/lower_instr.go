@@ -348,9 +348,9 @@ func (m *machine) lowerPopcnt(x, result ssa.Value) {
 	rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
 
 	rf1 := m.compiler.AllocateVReg(regalloc.RegTypeFloat)
-	movv := m.allocateInstr()
-	movv.asMovToVec(rf1, rn.nr(), vecArrangementD, vecIndex(0))
-	m.insert(movv)
+	ins := m.allocateInstr()
+	ins.asMovToVec(rf1, rn.nr(), vecArrangementD, vecIndex(0))
+	m.insert(ins)
 
 	rf2 := m.compiler.AllocateVReg(regalloc.RegTypeFloat)
 	cnt := m.allocateInstr()
@@ -362,9 +362,9 @@ func (m *machine) lowerPopcnt(x, result ssa.Value) {
 	uaddlv.asVecRRR(vecOpUaddlv, rf3, rf2, vecArrangement8B)
 	m.insert(uaddlv)
 
-	fmov2 := m.allocateInstr()
-	fmov2.asMovFromVec(rd, rf3, vecArrangementD, vecIndex(0))
-	m.insert(fmov2)
+	mov := m.allocateInstr()
+	mov.asMovFromVec(rd, rf3, vecArrangementD, vecIndex(0))
+	m.insert(mov)
 }
 
 const exitWithCodeEncodingSize = exitSequenceSize + 8

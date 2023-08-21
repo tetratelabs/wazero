@@ -1429,14 +1429,14 @@ L1 (SSA Block: blk0):
 	ins v13?.D[0], x2?
 	cnt v14?.16B, v13?.16B
 	uaddlv v15?.8B, v14?.8B
-	mov v6?.D[0], x6?
+	mov x6?, v15?.D[0]
 	clz x7?, x3?
 	rbit x27, x3?
 	clz x8?, x27
 	ins v10?.D[0], x3?
 	cnt v11?.16B, v10?.16B
 	uaddlv v12?.8B, v11?.8B
-	mov v9?.D[0], x9?
+	mov x9?, v12?.D[0]
 	mov x5, x9?
 	mov x4, x8?
 	mov x3, x7?
@@ -1455,14 +1455,14 @@ L1 (SSA Block: blk0):
 	ins v13.D[0], x2
 	cnt v14.16B, v13.16B
 	uaddlv v15.8B, v14.8B
-	mov v6.D[0], x2
+	mov x2, v15.D[0]
 	clz x3, x8
 	rbit x27, x8
 	clz x4, x27
 	ins v10.D[0], x8
 	cnt v11.16B, v10.16B
 	uaddlv v12.8B, v11.8B
-	mov v9.D[0], x5
+	mov x5, v12.D[0]
 	ldr x30, [sp], #0x10
 	ret
 `,

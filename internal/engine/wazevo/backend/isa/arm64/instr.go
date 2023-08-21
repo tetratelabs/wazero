@@ -925,7 +925,7 @@ func (i *instruction) String() (str string) {
 		default:
 			panic("unsupported arrangement " + arr.String())
 		}
-		str = fmt.Sprintf("mov %s, %s", formatVRegSizedVec(i.rd.nr(), 128, arr, vecIndex(i.u2)), formatVRegSized(i.rd.nr(), size))
+		str = fmt.Sprintf("mov %s, %s", formatVRegSized(i.rd.nr(), size), formatVRegSizedVec(i.rn.nr(), 128, arr, vecIndex(i.u2)))
 	case movFromVecSigned:
 		panic("TODO")
 	case vecDup:
