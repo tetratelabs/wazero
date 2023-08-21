@@ -427,3 +427,54 @@ func TestE2E_stores(t *testing.T) {
 		})
 	}
 }
+
+func TestE2E_reexported_memory(t *testing.T) {
+	m1 := &wasm.Module{
+		ExportSection: []wasm.Export{{Name: "mem", Type: wasm.ExternTypeMemory, Index: 0}},
+		MemorySection: &wasm.Memory{Min: 1},
+		NameSection:   &wasm.NameSection{ModuleName: "m1"},
+	}
+	m2 := &wasm.Module{
+		ImportMemoryCount: 1,
+		ExportSection:     []wasm.Export{{Name: "mem2", Type: wasm.ExternTypeMemory, Index: 0}},
+		ImportSection:     []wasm.Import{{Module: "m1", Name: "mem", Type: wasm.ExternTypeMemory, DescMem: &wasm.Memory{Min: 1}}},
+		NameSection:       &wasm.NameSection{ModuleName: "m2"},
+	}
+	m3 := &wasm.Module{
+		ImportMemoryCount: 1,
+		ImportSection:     []wasm.Import{{Module: "m2", Name: "mem2", Type: wasm.ExternTypeMemory, DescMem: &wasm.Memory{Min: 1}}},
+		TypeSection:       []wasm.FunctionType{{Results: []wasm.ValueType{i32}}},
+		ExportSection:     []wasm.Export{{Name: testcases.ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 0}},
+		FunctionSection:   []wasm.Index{0},
+		CodeSection:       []wasm.Code{{Body: []byte{wasm.OpcodeI32Const, 10, wasm.OpcodeMemoryGrow, 0, wasm.OpcodeEnd}}},
+	}
+
+	config := wazero.NewRuntimeConfigCompiler()
+
+	// Configure the new optimizing backend!
+	configureWazevo(config)
+
+	ctx := context.Background()
+	r := wazero.NewRuntimeWithConfig(ctx, config)
+	defer func() {
+		require.NoError(t, r.Close(ctx))
+	}()
+
+	m1Inst, err := r.Instantiate(ctx, binaryencoding.EncodeModule(m1))
+	require.NoError(t, err)
+
+	m2Inst, err := r.Instantiate(ctx, binaryencoding.EncodeModule(m2))
+	require.NoError(t, err)
+
+	m3Inst, err := r.Instantiate(ctx, binaryencoding.EncodeModule(m3))
+	require.NoError(t, err)
+
+	f := m3Inst.ExportedFunction(testcases.ExportedFunctionName)
+	result, err := f.Call(ctx)
+	require.NoError(t, err)
+	require.Equal(t, uint64(1), result[0])
+	mem := m1Inst.Memory()
+	require.Equal(t, mem, m3Inst.Memory())
+	require.Equal(t, mem, m2Inst.Memory())
+	require.Equal(t, uint32(11), mem.Size()/65536)
+}

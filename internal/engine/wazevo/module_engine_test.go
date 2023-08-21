@@ -175,6 +175,28 @@ func TestModuleEngine_ResolveImportedFunction(t *testing.T) {
 	}
 }
 
+func TestModuleEngine_ResolveImportedMemory_reexported(t *testing.T) {
+	m := &moduleEngine{
+		parent: &compiledModule{offsets: wazevoapi.ModuleContextOffsetData{
+			ImportedMemoryBegin: 50,
+		}},
+		opaque: make([]byte, 100),
+	}
+
+	importedME := &moduleEngine{
+		parent: &compiledModule{offsets: wazevoapi.ModuleContextOffsetData{
+			ImportedMemoryBegin: 1000,
+		}},
+		opaque: make([]byte, 2000),
+	}
+	binary.LittleEndian.PutUint64(importedME.opaque[1000:], 0x1234567890abcdef)
+	binary.LittleEndian.PutUint64(importedME.opaque[1000+8:], 0xabcdef1234567890)
+
+	m.ResolveImportedMemory(importedME)
+	require.Equal(t, uint64(0x1234567890abcdef), binary.LittleEndian.Uint64(m.opaque[50:]))
+	require.Equal(t, uint64(0xabcdef1234567890), binary.LittleEndian.Uint64(m.opaque[50+8:]))
+}
+
 func Test_functionInstance_offsets(t *testing.T) {
 	var fi functionInstance
 	require.Equal(t, wazevoapi.FunctionInstanceSize, int(unsafe.Sizeof(fi)))

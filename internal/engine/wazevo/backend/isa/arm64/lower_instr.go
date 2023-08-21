@@ -7,8 +7,6 @@ package arm64
 // and merge the multiple instructions if possible. It can be considered as "N:1" instruction selection.
 
 import (
-	"fmt"
-
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
@@ -379,7 +377,6 @@ func (m *machine) lowerFcmpToFlag(x, y ssa.Value) {
 	rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
 	cmp := m.allocateInstr()
 	cmp.asFpuCmp(rn, rm, x.Type().Bits() == 64)
-	fmt.Println(x.Type())
 	m.insert(cmp)
 }
 
