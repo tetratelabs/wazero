@@ -971,8 +971,6 @@ func (i *instruction) asAdr(rd regalloc.VReg, offset int64) {
 const (
 	// nop0 represents a no-op of zero size.
 	nop0 instructionKind = iota + 1
-	// nop4 represents a no-op that is one instruction large.
-	nop4
 	// aluRRR represents an ALU operation with two register sources and a register destination.
 	aluRRR
 	// aluRRRR represents an ALU operation with three register sources and a register destination.
