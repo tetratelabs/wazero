@@ -463,7 +463,7 @@ func TestE2E_reexported_memory(t *testing.T) {
 	m1Inst, err := r.Instantiate(ctx, binaryencoding.EncodeModule(m1))
 	require.NoError(t, err)
 
-	_, err = r.Instantiate(ctx, binaryencoding.EncodeModule(m2))
+	m2Inst, err := r.Instantiate(ctx, binaryencoding.EncodeModule(m2))
 	require.NoError(t, err)
 
 	m3Inst, err := r.Instantiate(ctx, binaryencoding.EncodeModule(m3))
@@ -473,5 +473,8 @@ func TestE2E_reexported_memory(t *testing.T) {
 	result, err := f.Call(ctx)
 	require.NoError(t, err)
 	require.Equal(t, uint64(1), result[0])
+	require.Equal(t, m1Inst.Memory(), m3Inst.Memory())
+	require.Equal(t, m2Inst.Memory(), m3Inst.Memory())
+	require.Equal(t, uint32(11), m1Inst.Memory().Size()/65536)
 	require.Equal(t, uint32(11), m1Inst.Memory().Size()/65536)
 }
