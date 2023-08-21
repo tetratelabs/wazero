@@ -178,15 +178,18 @@ func (m *moduleEngine) ResolveImportedMemory(importedModuleEngine wasm.ModuleEng
 	inst := importedME.module
 
 	var memInstPtr uint64
+	var memOwnerOpaquePtr uint64
 	if offs := importedME.parent.offsets; offs.ImportedMemoryBegin >= 0 {
 		offset := offs.ImportedMemoryBegin
 		memInstPtr = binary.LittleEndian.Uint64(importedME.opaque[offset:])
+		memOwnerOpaquePtr = binary.LittleEndian.Uint64(importedME.opaque[offset+8:])
 	} else {
 		memInstPtr = uint64(uintptr(unsafe.Pointer(inst.MemoryInstance)))
+		memOwnerOpaquePtr = uint64(uintptr(unsafe.Pointer(importedME.opaquePtr)))
 	}
 	offset := m.parent.offsets.ImportedMemoryBegin
 	binary.LittleEndian.PutUint64(m.opaque[offset:], memInstPtr)
-	binary.LittleEndian.PutUint64(m.opaque[offset+8:], uint64(uintptr(unsafe.Pointer(importedME.opaquePtr))))
+	binary.LittleEndian.PutUint64(m.opaque[offset+8:], memOwnerOpaquePtr)
 }
 
 // DoneInstantiation implements wasm.ModuleEngine.
