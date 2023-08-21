@@ -825,7 +825,6 @@ L1 (SSA Block: blk0):
 			afterFinalizeARM64: `
 L1 (SSA Block: blk0):
 	str x30, [sp, #-0x10]!
-	str x18, [sp, #-0x10]!
 	str x19, [sp, #-0x10]!
 	str q18, [sp, #-0x10]!
 	str q19, [sp, #-0x10]!
@@ -857,34 +856,33 @@ L1 (SSA Block: blk0):
 	ldr s9, [sp, #0xb0]
 	ldr d8, [sp, #0xb8]
 	add sp, sp, #0xc0
-	str d8, [sp, #0x108]
-	str s9, [sp, #0x100]
-	str x8, [sp, #0xf8]
-	str w9, [sp, #0xf0]
-	str d10, [sp, #0xe8]
-	str s11, [sp, #0xe0]
-	str x10, [sp, #0xd8]
-	str w11, [sp, #0xd0]
-	str d12, [sp, #0xc8]
-	str s13, [sp, #0xc0]
-	str x12, [sp, #0xb8]
-	str w13, [sp, #0xb0]
-	str d14, [sp, #0xa8]
-	str s15, [sp, #0xa0]
-	str x14, [sp, #0x98]
-	str w15, [sp, #0x90]
-	str d16, [sp, #0x88]
-	str s17, [sp, #0x80]
-	str x16, [sp, #0x78]
-	str w17, [sp, #0x70]
-	str d18, [sp, #0x68]
-	str s19, [sp, #0x60]
-	str x18, [sp, #0x58]
-	str w19, [sp, #0x50]
+	str d8, [sp, #0xf8]
+	str s9, [sp, #0xf0]
+	str x8, [sp, #0xe8]
+	str w9, [sp, #0xe0]
+	str d10, [sp, #0xd8]
+	str s11, [sp, #0xd0]
+	str x10, [sp, #0xc8]
+	str w11, [sp, #0xc0]
+	str d12, [sp, #0xb8]
+	str s13, [sp, #0xb0]
+	str x12, [sp, #0xa8]
+	str w13, [sp, #0xa0]
+	str d14, [sp, #0x98]
+	str s15, [sp, #0x90]
+	str x14, [sp, #0x88]
+	str w15, [sp, #0x80]
+	str d16, [sp, #0x78]
+	str s17, [sp, #0x70]
+	str x16, [sp, #0x68]
+	str w17, [sp, #0x60]
+	str d18, [sp, #0x58]
+	str s19, [sp, #0x50]
+	str x18, [sp, #0x48]
+	str w19, [sp, #0x40]
 	ldr q19, [sp], #0x10
 	ldr q18, [sp], #0x10
 	ldr x19, [sp], #0x10
-	ldr x18, [sp], #0x10
 	ldr x30, [sp], #0x10
 	ret
 `,
@@ -1098,7 +1096,6 @@ L1 (SSA Block: blk0):
 			afterFinalizeARM64: `
 L1 (SSA Block: blk0):
 	str x30, [sp, #-0x10]!
-	str x18, [sp, #-0x10]!
 	str x19, [sp, #-0x10]!
 	str q18, [sp, #-0x10]!
 	str q19, [sp, #-0x10]!
@@ -1114,62 +1111,61 @@ L1 (SSA Block: blk0):
 	mov x19, x7
 	mov q12.8b, q4.8b
 	mov q13.8b, q5.8b
-	ldr w18, [sp, #0x50]
-	ldr x17, [sp, #0x58]
+	ldr w18, [sp, #0x40]
+	ldr x17, [sp, #0x48]
 	mov q14.8b, q6.8b
 	mov q19.8b, q7.8b
-	ldr w16, [sp, #0x60]
-	ldr x15, [sp, #0x68]
-	ldr s18, [sp, #0x70]
-	ldr d17, [sp, #0x78]
-	ldr w14, [sp, #0x80]
-	ldr x13, [sp, #0x88]
-	ldr s16, [sp, #0x90]
-	ldr d15, [sp, #0x98]
-	ldr w7, [sp, #0xa0]
-	ldr x6, [sp, #0xa8]
-	ldr s7, [sp, #0xb0]
-	ldr d6, [sp, #0xb8]
-	ldr w5, [sp, #0xc0]
-	ldr x4, [sp, #0xc8]
-	ldr s5, [sp, #0xd0]
-	ldr d4, [sp, #0xd8]
-	ldr w3, [sp, #0xe0]
-	ldr x2, [sp, #0xe8]
-	ldr s3, [sp, #0xf0]
-	ldr d2, [sp, #0xf8]
-	ldr w1, [sp, #0x100]
-	ldr x0, [sp, #0x108]
-	ldr s1, [sp, #0x110]
-	ldr d0, [sp, #0x118]
-	str w8, [sp, #0x1d8]
-	str x9, [sp, #0x1d0]
-	str s8, [sp, #0x1c8]
-	str d9, [sp, #0x1c0]
-	str w10, [sp, #0x1b8]
-	str x11, [sp, #0x1b0]
-	str s10, [sp, #0x1a8]
-	str d11, [sp, #0x1a0]
-	str w12, [sp, #0x198]
-	str x19, [sp, #0x190]
-	str s12, [sp, #0x188]
-	str d13, [sp, #0x180]
-	str w18, [sp, #0x178]
-	str x17, [sp, #0x170]
-	str s14, [sp, #0x168]
-	str d19, [sp, #0x160]
-	str w16, [sp, #0x158]
-	str x15, [sp, #0x150]
-	str s18, [sp, #0x148]
-	str d17, [sp, #0x140]
-	str w14, [sp, #0x138]
-	str x13, [sp, #0x130]
-	str s16, [sp, #0x128]
-	str d15, [sp, #0x120]
+	ldr w16, [sp, #0x50]
+	ldr x15, [sp, #0x58]
+	ldr s18, [sp, #0x60]
+	ldr d17, [sp, #0x68]
+	ldr w14, [sp, #0x70]
+	ldr x13, [sp, #0x78]
+	ldr s16, [sp, #0x80]
+	ldr d15, [sp, #0x88]
+	ldr w7, [sp, #0x90]
+	ldr x6, [sp, #0x98]
+	ldr s7, [sp, #0xa0]
+	ldr d6, [sp, #0xa8]
+	ldr w5, [sp, #0xb0]
+	ldr x4, [sp, #0xb8]
+	ldr s5, [sp, #0xc0]
+	ldr d4, [sp, #0xc8]
+	ldr w3, [sp, #0xd0]
+	ldr x2, [sp, #0xd8]
+	ldr s3, [sp, #0xe0]
+	ldr d2, [sp, #0xe8]
+	ldr w1, [sp, #0xf0]
+	ldr x0, [sp, #0xf8]
+	ldr s1, [sp, #0x100]
+	ldr d0, [sp, #0x108]
+	str w8, [sp, #0x1c8]
+	str x9, [sp, #0x1c0]
+	str s8, [sp, #0x1b8]
+	str d9, [sp, #0x1b0]
+	str w10, [sp, #0x1a8]
+	str x11, [sp, #0x1a0]
+	str s10, [sp, #0x198]
+	str d11, [sp, #0x190]
+	str w12, [sp, #0x188]
+	str x19, [sp, #0x180]
+	str s12, [sp, #0x178]
+	str d13, [sp, #0x170]
+	str w18, [sp, #0x168]
+	str x17, [sp, #0x160]
+	str s14, [sp, #0x158]
+	str d19, [sp, #0x150]
+	str w16, [sp, #0x148]
+	str x15, [sp, #0x140]
+	str s18, [sp, #0x138]
+	str d17, [sp, #0x130]
+	str w14, [sp, #0x128]
+	str x13, [sp, #0x120]
+	str s16, [sp, #0x118]
+	str d15, [sp, #0x110]
 	ldr q19, [sp], #0x10
 	ldr q18, [sp], #0x10
 	ldr x19, [sp], #0x10
-	ldr x18, [sp], #0x10
 	ldr x30, [sp], #0x10
 	ret
 `,
@@ -1248,7 +1244,6 @@ L1 (SSA Block: blk0):
 			afterFinalizeARM64: `
 L1 (SSA Block: blk0):
 	str x30, [sp, #-0x10]!
-	str x18, [sp, #-0x10]!
 	str x19, [sp, #-0x10]!
 	str x20, [sp, #-0x10]!
 	str x21, [sp, #-0x10]!
@@ -1296,22 +1291,21 @@ L1 (SSA Block: blk0):
 	cset x8, hs
 	subs xzr, x19, x21
 	cset x19, hs
-	str w19, [sp, #0xa8]
-	str w8, [sp, #0xa0]
-	str w9, [sp, #0x98]
-	str w10, [sp, #0x90]
-	str w11, [sp, #0x88]
-	str w12, [sp, #0x80]
-	str w13, [sp, #0x78]
-	str w14, [sp, #0x70]
-	str w15, [sp, #0x68]
-	str w16, [sp, #0x60]
-	str w17, [sp, #0x58]
-	str w18, [sp, #0x50]
+	str w19, [sp, #0x98]
+	str w8, [sp, #0x90]
+	str w9, [sp, #0x88]
+	str w10, [sp, #0x80]
+	str w11, [sp, #0x78]
+	str w12, [sp, #0x70]
+	str w13, [sp, #0x68]
+	str w14, [sp, #0x60]
+	str w15, [sp, #0x58]
+	str w16, [sp, #0x50]
+	str w17, [sp, #0x48]
+	str w18, [sp, #0x40]
 	ldr x21, [sp], #0x10
 	ldr x20, [sp], #0x10
 	ldr x19, [sp], #0x10
-	ldr x18, [sp], #0x10
 	ldr x30, [sp], #0x10
 	ret
 `,
@@ -1662,7 +1656,6 @@ L1 (SSA Block: blk0):
 			afterFinalizeARM64: `
 L1 (SSA Block: blk0):
 	str x30, [sp, #-0x10]!
-	str x18, [sp, #-0x10]!
 	str x19, [sp, #-0x10]!
 	str x20, [sp, #-0x10]!
 	str x21, [sp, #-0x10]!
@@ -1819,7 +1812,6 @@ L1 (SSA Block: blk0):
 	ldr x21, [sp], #0x10
 	ldr x20, [sp], #0x10
 	ldr x19, [sp], #0x10
-	ldr x18, [sp], #0x10
 	ldr x30, [sp], #0x10
 	ret
 `,
@@ -2364,7 +2356,6 @@ L1 (SSA Block: blk0):
 			afterFinalizeARM64: `
 L1 (SSA Block: blk0):
 	str x30, [sp, #-0x10]!
-	str x18, [sp, #-0x10]!
 	str x19, [sp, #-0x10]!
 	str x20, [sp, #-0x10]!
 	str x21, [sp, #-0x10]!
@@ -2629,22 +2620,22 @@ L1 (SSA Block: blk0):
 	exit_sequence x8
 	add x8, x10, x29
 	ldr w8, [x8, #0xf]
-	str x8, [sp, #0x128]
-	str x26, [sp, #0x120]
-	str x25, [sp, #0x118]
-	str x24, [sp, #0x110]
-	str x23, [sp, #0x108]
-	str x22, [sp, #0x100]
-	str x21, [sp, #0xf8]
-	str x20, [sp, #0xf0]
-	str x19, [sp, #0xe8]
-	str x18, [sp, #0xe0]
-	str x17, [sp, #0xd8]
-	str x16, [sp, #0xd0]
-	str w15, [sp, #0xc8]
-	str w14, [sp, #0xc0]
-	str w13, [sp, #0xb8]
-	str w12, [sp, #0xb0]
+	str x8, [sp, #0x118]
+	str x26, [sp, #0x110]
+	str x25, [sp, #0x108]
+	str x24, [sp, #0x100]
+	str x23, [sp, #0xf8]
+	str x22, [sp, #0xf0]
+	str x21, [sp, #0xe8]
+	str x20, [sp, #0xe0]
+	str x19, [sp, #0xd8]
+	str x18, [sp, #0xd0]
+	str x17, [sp, #0xc8]
+	str x16, [sp, #0xc0]
+	str w15, [sp, #0xb8]
+	str w14, [sp, #0xb0]
+	str w13, [sp, #0xa8]
+	str w12, [sp, #0xa0]
 	mov x2, x11
 	ldr x28, [sp], #0x10
 	ldr x26, [sp], #0x10
@@ -2655,7 +2646,6 @@ L1 (SSA Block: blk0):
 	ldr x21, [sp], #0x10
 	ldr x20, [sp], #0x10
 	ldr x19, [sp], #0x10
-	ldr x18, [sp], #0x10
 	ldr x30, [sp], #0x10
 	ret
 `,

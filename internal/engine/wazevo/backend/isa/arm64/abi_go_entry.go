@@ -22,8 +22,8 @@ func (a *abiImpl) EmitGoEntryPreamble() {
 var (
 	executionContextPtrReg = x0VReg
 	// callee-saved regs so that they can be used in the prologue and epilogue.
-	savedExecutionContextPtr = x18VReg
 	paramResultSlicePtr      = x19VReg
+	savedExecutionContextPtr = x20VReg
 	// goAllocatedStackPtr is not used in the epilogue.
 	goAllocatedStackPtr = x26VReg
 )
@@ -35,7 +35,7 @@ func (a *abiImpl) constructGoEntryPreamble() (root *instruction) {
 	//// ----------------------------------- prologue ----------------------------------- ////
 
 	// First, we save executionContextPtrReg into a callee-saved register so that it can be used in epilogue as well.
-	// 		mov x18, x0
+	// 		mov savedExecutionContextPtr, x0
 	cur := a.move64(savedExecutionContextPtr, executionContextPtrReg, root)
 
 	// Next, save the current FP, SP and LR into the wazevo.executionContext:

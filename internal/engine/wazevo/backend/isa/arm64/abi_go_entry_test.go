@@ -20,17 +20,17 @@ func TestAbiImpl_constructGoEntryPreamble(t *testing.T) {
 			name: "empty",
 			sig:  &ssa.Signature{},
 			exp: `
-	mov x18, x0
-	str x29, [x18, #0x10]
+	mov x20, x0
+	str x29, [x20, #0x10]
 	mov x27, sp
-	str x27, [x18, #0x18]
-	str x30, [x18, #0x20]
+	str x27, [x20, #0x18]
+	str x30, [x20, #0x20]
 	mov sp, x26
 	bl #0x18
-	ldr x29, [x18, #0x10]
-	ldr x27, [x18, #0x18]
+	ldr x29, [x20, #0x10]
+	ldr x27, [x20, #0x18]
 	mov sp, x27
-	ldr x30, [x18, #0x20]
+	ldr x30, [x20, #0x20]
 	ret
 `,
 		},
@@ -43,11 +43,11 @@ func TestAbiImpl_constructGoEntryPreamble(t *testing.T) {
 				},
 			},
 			exp: `
-	mov x18, x0
-	str x29, [x18, #0x10]
+	mov x20, x0
+	str x29, [x20, #0x10]
 	mov x27, sp
-	str x27, [x18, #0x18]
-	str x30, [x18, #0x20]
+	str x27, [x20, #0x18]
+	str x30, [x20, #0x20]
 	mov sp, x26
 	ldr s0, [x19]
 	ldr s1, [x19, #0x8]
@@ -55,10 +55,10 @@ func TestAbiImpl_constructGoEntryPreamble(t *testing.T) {
 	ldr s3, [x19, #0x18]
 	ldr d4, [x19, #0x20]
 	bl #0x18
-	ldr x29, [x18, #0x10]
-	ldr x27, [x18, #0x18]
+	ldr x29, [x20, #0x10]
+	ldr x27, [x20, #0x18]
 	mov sp, x27
-	ldr x30, [x18, #0x20]
+	ldr x30, [x20, #0x20]
 	ret
 `,
 		},
@@ -71,11 +71,11 @@ func TestAbiImpl_constructGoEntryPreamble(t *testing.T) {
 				},
 			},
 			exp: `
-	mov x18, x0
-	str x29, [x18, #0x10]
+	mov x20, x0
+	str x29, [x20, #0x10]
 	mov x27, sp
-	str x27, [x18, #0x18]
-	str x30, [x18, #0x20]
+	str x27, [x20, #0x18]
+	str x30, [x20, #0x20]
 	mov sp, x26
 	ldr w2, [x19]
 	ldr w3, [x19, #0x8]
@@ -83,10 +83,10 @@ func TestAbiImpl_constructGoEntryPreamble(t *testing.T) {
 	ldr x5, [x19, #0x18]
 	ldr w6, [x19, #0x20]
 	bl #0x18
-	ldr x29, [x18, #0x10]
-	ldr x27, [x18, #0x18]
+	ldr x29, [x20, #0x10]
+	ldr x27, [x20, #0x18]
 	mov sp, x27
-	ldr x30, [x18, #0x20]
+	ldr x30, [x20, #0x20]
 	ret
 `,
 		},
@@ -99,11 +99,11 @@ func TestAbiImpl_constructGoEntryPreamble(t *testing.T) {
 				},
 			},
 			exp: `
-	mov x18, x0
-	str x29, [x18, #0x10]
+	mov x20, x0
+	str x29, [x20, #0x10]
 	mov x27, sp
-	str x27, [x18, #0x18]
-	str x30, [x18, #0x20]
+	str x27, [x20, #0x18]
+	str x30, [x20, #0x20]
 	mov sp, x26
 	ldr w2, [x19]
 	ldr d0, [x19, #0x8]
@@ -116,10 +116,10 @@ func TestAbiImpl_constructGoEntryPreamble(t *testing.T) {
 	ldr w7, [x19, #0x40]
 	ldr s3, [x19, #0x48]
 	bl #0x18
-	ldr x29, [x18, #0x10]
-	ldr x27, [x18, #0x18]
+	ldr x29, [x20, #0x10]
+	ldr x27, [x20, #0x18]
 	mov sp, x27
-	ldr x30, [x18, #0x20]
+	ldr x30, [x20, #0x20]
 	ret
 `,
 		},
@@ -133,11 +133,11 @@ func TestAbiImpl_constructGoEntryPreamble(t *testing.T) {
 				Results: []ssa.Type{f32, f64, i32, f32, i64, i32, f64},
 			},
 			exp: `
-	mov x18, x0
-	str x29, [x18, #0x10]
+	mov x20, x0
+	str x29, [x20, #0x10]
 	mov x27, sp
-	str x27, [x18, #0x18]
-	str x30, [x18, #0x20]
+	str x27, [x20, #0x18]
+	str x30, [x20, #0x20]
 	mov sp, x26
 	ldr w2, [x19]
 	ldr d0, [x19, #0x8]
@@ -152,10 +152,10 @@ func TestAbiImpl_constructGoEntryPreamble(t *testing.T) {
 	str x1, [x19], #0x8
 	str w2, [x19], #0x8
 	str d3, [x19], #0x8
-	ldr x29, [x18, #0x10]
-	ldr x27, [x18, #0x18]
+	ldr x29, [x20, #0x10]
+	ldr x27, [x20, #0x18]
 	mov sp, x27
-	ldr x30, [x18, #0x20]
+	ldr x30, [x20, #0x20]
 	ret
 `,
 		},
@@ -168,11 +168,11 @@ func TestAbiImpl_constructGoEntryPreamble(t *testing.T) {
 				},
 			},
 			exp: `
-	mov x18, x0
-	str x29, [x18, #0x10]
+	mov x20, x0
+	str x29, [x20, #0x10]
 	mov x27, sp
-	str x27, [x18, #0x18]
-	str x30, [x18, #0x20]
+	str x27, [x20, #0x18]
+	str x30, [x20, #0x20]
 	sub x26, x26, #0x30
 	mov sp, x26
 	bl #0x80
@@ -202,10 +202,10 @@ func TestAbiImpl_constructGoEntryPreamble(t *testing.T) {
 	str w27, [x19], #0x8
 	ldr x27, [sp, #0x28]
 	str x27, [x19], #0x8
-	ldr x29, [x18, #0x10]
-	ldr x27, [x18, #0x18]
+	ldr x29, [x20, #0x10]
+	ldr x27, [x20, #0x18]
 	mov sp, x27
-	ldr x30, [x18, #0x20]
+	ldr x30, [x20, #0x20]
 	ret
 `,
 		},
