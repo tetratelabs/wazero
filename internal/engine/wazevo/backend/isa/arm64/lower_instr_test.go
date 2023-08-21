@@ -265,7 +265,7 @@ func TestMachine_InsertMove(t *testing.T) {
 			name:        "float",
 			src:         regalloc.VReg(1).SetRegType(regalloc.RegTypeFloat),
 			dst:         regalloc.VReg(2).SetRegType(regalloc.RegTypeFloat),
-			instruction: "mov q1?.8b, q2?.8b",
+			instruction: "mov v1?.8b, v2?.8b",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

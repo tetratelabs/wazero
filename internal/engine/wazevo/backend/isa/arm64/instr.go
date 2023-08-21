@@ -845,9 +845,13 @@ func (i *instruction) String() (str string) {
 	case cCmpImm:
 		panic("TODO")
 	case fpuMov64:
-		str = fmt.Sprintf("mov %s.8b, %s.8b", formatVRegSized(i.rd.nr(), 128), formatVRegSized(i.rn.nr(), 128))
+		str = fmt.Sprintf("mov %s, %s",
+			formatVRegVec(i.rd.nr(), vecArrangement8B, vecIndexNone),
+			formatVRegVec(i.rn.nr(), vecArrangement8B, vecIndexNone))
 	case fpuMov128:
-		str = fmt.Sprintf("mov %s.16b, %s.16b", formatVRegSized(i.rd.nr(), 128), formatVRegSized(i.rn.nr(), 128))
+		str = fmt.Sprintf("mov %s, %s",
+			formatVRegVec(i.rd.nr(), vecArrangement16B, vecIndexNone),
+			formatVRegVec(i.rn.nr(), vecArrangement16B, vecIndexNone))
 	case fpuMovFromVec:
 		panic("TODO")
 	case fpuRR:

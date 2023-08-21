@@ -106,9 +106,9 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 	ldr x27, [x15], #0x8
 	mov x1, x27
 	ldr s17, [x15], #0x8
-	mov q0.8b, q17.8b
+	mov v0.8b, v17.8b
 	ldr d17, [x15], #0x8
-	mov q1.8b, q17.8b
+	mov v1.8b, v17.8b
 	ret
 `,
 		},
