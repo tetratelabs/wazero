@@ -3,6 +3,7 @@ package wazevo
 import (
 	"context"
 	"encoding/binary"
+	"fmt"
 	"reflect"
 	"unsafe"
 
@@ -59,8 +60,11 @@ type (
 		stackGrowRequiredSize uintptr
 		// memoryGrowTrampolineAddress holds the address of memory grow trampoline function.
 		memoryGrowTrampolineAddress *byte
+		// stackGrowCallSequenceAddress holds the address of stack grow call sequence function.
+		stackGrowCallSequenceAddress *byte
 		// savedRegisters is the opaque spaces for save/restore registers.
 		// We want to align 16 bytes for each register, so we use [64][2]uint64.
+		_              uint64
 		savedRegisters [64][2]uint64
 		// goFunctionCallCalleeModuleContextOpaque is the pointer to the target Go function's moduleContextOpaque.
 		goFunctionCallCalleeModuleContextOpaque uintptr
@@ -113,6 +117,8 @@ func (c *callEngine) CallWithStack(ctx context.Context, paramResultStack []uint6
 	if len(paramResultStack) > 0 {
 		paramResultPtr = &paramResultStack[0]
 	}
+
+	fmt.Printf("stackGrowCallSequenceAddress ===== %#x\n", c.execCtx.stackGrowCallSequenceAddress)
 
 	entrypoint(c.executable, c.execCtxPtr, c.parent.opaquePtr, paramResultPtr, c.stackTop)
 	for {

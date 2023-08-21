@@ -12,10 +12,6 @@ func (m *machine) SetupPrologue() {
 	cur := m.rootInstr
 	prevInitInst := cur.next
 
-	if !m.stackBoundsCheckDisabled {
-		cur = m.insertStackBoundsCheck(m.requiredStackSize(), cur)
-	}
-
 	//
 	//                   (high address)                    (high address)
 	//                 +-----------------+               +------------------+
@@ -39,6 +35,10 @@ func (m *machine) SetupPrologue() {
 	cur.next = str
 	str.prev = cur
 	cur = str
+
+	if !m.stackBoundsCheckDisabled {
+		cur = m.insertStackBoundsCheck(m.requiredStackSize(), cur)
+	}
 
 	// Decrement SP if spillSlotSize > 0.
 	if size := m.spillSlotSize; size > 0 {
@@ -251,7 +251,7 @@ func (m *machine) setupEpilogueAfter(cur *instruction) {
 // which always points to the execution context whenever the native code is entered from Go.
 var saveRequiredRegs = []regalloc.VReg{
 	x1VReg, x2VReg, x3VReg, x4VReg, x5VReg, x6VReg, x7VReg,
-	x18VReg, x19VReg, x20VReg, x21VReg, x22VReg, x23VReg, x24VReg, x25VReg, x26VReg, x28VReg, lrVReg,
+	x19VReg, x20VReg, x21VReg, x22VReg, x23VReg, x24VReg, x25VReg, x26VReg, x28VReg, lrVReg,
 	v0VReg, v1VReg, v2VReg, v3VReg, v4VReg, v5VReg, v6VReg, v7VReg,
 	v18VReg, v19VReg, v20VReg, v21VReg, v22VReg, v23VReg, v24VReg, v25VReg, v26VReg, v27VReg, v28VReg, v29VReg, v30VReg, v31VReg,
 }
@@ -319,15 +319,6 @@ func (m *machine) insertStackBoundsCheck(requiredStackSize int64, cur *instructi
 	cur.next = cbr
 	cur = cbr
 
-	// Save the callee saved and argument registers.
-	cur = m.saveRegistersInExecutionContext(cur, saveRequiredRegs)
-
-	// Save the current stack pointer.
-	cur = m.saveCurrentStackPointer(cur, x0VReg)
-
-	// Set the exit status on the execution context.
-	cur = m.setExitCode(cur, x0VReg, wazevoapi.ExitCodeGrowStack)
-
 	// Set the required stack size and set it to the exec context.
 	{
 		// First load the requiredStackSize into the temporary register,
@@ -352,11 +343,23 @@ func (m *machine) insertStackBoundsCheck(requiredStackSize int64, cur *instructi
 		cur = setRequiredStackSize
 	}
 
-	// Exit the execution.
-	cur = m.storeReturnAddressAndExit(cur)
+	ldrAddress := m.allocateInstr()
+	ldrAddress.asULoad(operandNR(tmpRegVReg), addressMode{
+		kind: addressModeKindRegUnsignedImm12,
+		rn:   x0VReg, // execution context is always the first argument
+		imm:  wazevoapi.ExecutionContextOffsets.StackGrowCallSequenceAddress.I64(),
+	}, 64)
+	ldrAddress.prev = cur
+	cur.next = ldrAddress
+	cur = ldrAddress
 
-	// After the exit, restore the saved registers.
-	cur = m.restoreRegistersInExecutionContext(cur, saveRequiredRegs)
+	// Then jumps to the stack grow call sequence's address, meaning
+	// transferring the control to the code compiled by CompileStackGrowCallSequence.
+	bl := m.allocateInstr()
+	bl.asCallIndirect(tmpRegVReg, nil)
+	bl.prev = cur
+	cur.next = bl
+	cur = bl
 
 	// Now that we know the entire code, we can finalize how many bytes
 	// we have to skip when the stack size is sufficient.
@@ -369,4 +372,36 @@ func (m *machine) insertStackBoundsCheck(requiredStackSize int64, cur *instructi
 	}
 	cbr.condBrOffsetResolve(cbrOffset)
 	return cur
+}
+
+// CompileStackGrowCallSequence implements backend.Machine.
+func (m *machine) CompileStackGrowCallSequence() []byte {
+	cur := m.allocateInstr()
+	cur.asNop0()
+	m.rootInstr = cur
+
+	// Save the callee saved and argument registers.
+	cur = m.saveRegistersInExecutionContext(cur, saveRequiredRegs)
+
+	// Save the current stack pointer.
+	cur = m.saveCurrentStackPointer(cur, x0VReg)
+
+	// Set the exit status on the execution context.
+	cur = m.setExitCode(cur, x0VReg, wazevoapi.ExitCodeGrowStack)
+
+	// Exit the execution.
+	cur = m.storeReturnAddressAndExit(cur)
+
+	// After the exit, restore the saved registers.
+	cur = m.restoreRegistersInExecutionContext(cur, saveRequiredRegs)
+
+	// Then goes back the original address of this stack grow call.
+	ret := m.allocateInstr()
+	ret.asRet(nil)
+	ret.prev = cur
+	cur.next = ret
+	cur = ret
+
+	m.encode(m.rootInstr)
+	return m.compiler.Buf()
 }

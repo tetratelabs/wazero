@@ -676,8 +676,6 @@ func (i *instruction) String() (str string) {
 	switch i.kind {
 	case nop0:
 		str = "nop0"
-	case nop4:
-		panic("TODO")
 	case aluRRR:
 		size := is64SizeBitToSize(i.u3)
 		str = fmt.Sprintf("%s %s, %s, %s", aluOp(i.u1).String(),

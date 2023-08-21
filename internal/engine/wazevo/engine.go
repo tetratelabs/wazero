@@ -32,6 +32,8 @@ type (
 	builtinFunctions struct {
 		// memoryGrowExecutable is a compiled executable for memory.grow builtin function.
 		memoryGrowExecutable []byte
+		// stackGrowExecutable is a compiled executable for growing stack builtin function.
+		stackGrowExecutable []byte
 	}
 
 	// compiledModule is a compiled variant of a wasm.Module and ready to be used for instantiation.
@@ -341,34 +343,42 @@ func (e *engine) NewModuleEngine(m *wasm.Module, mi *wasm.ModuleInstance) (wasm.
 }
 
 func (e *engine) compileBuiltinFunctions() {
+	machine := newMachine()
+	be := backend.NewCompiler(machine, ssa.NewBuilder())
 	e.builtinFunctions = &builtinFunctions{}
+
 	{
-		machine := newMachine()
-		be := backend.NewCompiler(machine, ssa.NewBuilder())
-		machine.CompileGoFunctionTrampoline(wazevoapi.ExitCodeGrowMemory, &ssa.Signature{
+		src := machine.CompileGoFunctionTrampoline(wazevoapi.ExitCodeGrowMemory, &ssa.Signature{
 			Params:  []ssa.Type{ssa.TypeI32 /* exec context */, ssa.TypeI32},
 			Results: []ssa.Type{ssa.TypeI32},
 		}, false)
-		be.Encode()
-		src := be.Buf()
-
-		executable, err := platform.MmapCodeSegment(len(src))
-		if err != nil {
-			panic(err)
-		}
-
-		copy(executable, src)
-
-		if runtime.GOARCH == "arm64" {
-			// On arm64, we cannot give all of rwx at the same time, so we change it to exec.
-			if err = platform.MprotectRX(executable); err != nil {
-				panic(err)
-			}
-		}
-		e.builtinFunctions.memoryGrowExecutable = executable
+		e.builtinFunctions.memoryGrowExecutable = mmapExecutable(src)
 	}
 
 	// TODO: table grow, etc.
 
+	be.Init(false)
+	{
+		src := machine.CompileStackGrowCallSequence()
+		e.builtinFunctions.stackGrowExecutable = mmapExecutable(src)
+	}
+
 	// TODO: finalizer.
+}
+
+func mmapExecutable(src []byte) []byte {
+	executable, err := platform.MmapCodeSegment(len(src))
+	if err != nil {
+		panic(err)
+	}
+
+	copy(executable, src)
+
+	if runtime.GOARCH == "arm64" {
+		// On arm64, we cannot give all of rwx at the same time, so we change it to exec.
+		if err = platform.MprotectRX(executable); err != nil {
+			panic(err)
+		}
+	}
+	return executable
 }
