@@ -177,14 +177,15 @@ func (m *moduleEngine) ResolveImportedMemory(importedModuleEngine wasm.ModuleEng
 	importedME := importedModuleEngine.(*moduleEngine)
 	inst := importedME.module
 
-	if importedME.parent.offsets.ImportedMemoryBegin >= 0 {
-		// This case can be resolved by recursively resolving the owner.
-		panic("TODO: support re-exported memory import")
+	var memInstPtr uint64
+	if offs := importedME.parent.offsets; offs.ImportedMemoryBegin >= 0 {
+		offset := offs.ImportedMemoryBegin
+		memInstPtr = binary.LittleEndian.Uint64(importedME.opaque[offset:])
+	} else {
+		memInstPtr = uint64(uintptr(unsafe.Pointer(inst.MemoryInstance)))
 	}
-
 	offset := m.parent.offsets.ImportedMemoryBegin
-	b := uint64(uintptr(unsafe.Pointer(inst.MemoryInstance)))
-	binary.LittleEndian.PutUint64(m.opaque[offset:], b)
+	binary.LittleEndian.PutUint64(m.opaque[offset:], memInstPtr)
 	binary.LittleEndian.PutUint64(m.opaque[offset+8:], uint64(uintptr(unsafe.Pointer(importedME.opaquePtr))))
 }
 
