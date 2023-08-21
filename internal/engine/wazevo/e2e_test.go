@@ -473,8 +473,8 @@ func TestE2E_reexported_memory(t *testing.T) {
 	result, err := f.Call(ctx)
 	require.NoError(t, err)
 	require.Equal(t, uint64(1), result[0])
-	require.Equal(t, m1Inst.Memory(), m3Inst.Memory())
-	require.Equal(t, m2Inst.Memory(), m3Inst.Memory())
-	require.Equal(t, uint32(11), m1Inst.Memory().Size()/65536)
-	require.Equal(t, uint32(11), m1Inst.Memory().Size()/65536)
+	mem := m1Inst.Memory()
+	require.Equal(t, mem, m3Inst.Memory())
+	require.Equal(t, mem, m2Inst.Memory())
+	require.Equal(t, uint32(11), mem.Size()/65536)
 }
