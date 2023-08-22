@@ -265,7 +265,9 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: WebAssembly/wasi-testsuite
-          ref: prod/testsuite-base
+          # prod/testsuite-base branch, as of May 12, 2023.
+          # TODO: once the wasi-testsuite is stable, we should use the latest tag instead of a branch.
+          ref: c9c751586fd86b321d595bbef13f2c7403cfdbc5
           path: wasi-testsuite
 
       - name: Initialize Python environment
