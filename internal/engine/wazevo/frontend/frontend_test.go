@@ -1491,6 +1491,123 @@ blk6: () <-- (blk0,blk0)
 	Return v3
 `,
 		},
+		{
+			name: "br_table_with_arg", m: testcases.BrTableWithArg.Module,
+			exp: `
+blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i32)
+	BrTable v2, [blk7, blk8, blk9, blk10, blk11, blk12, blk13]
+
+blk1: (v4:i32) <-- (blk12)
+	v20:i32 = Iconst_32 0x10
+	v21:i32 = Iadd v4, v20
+	Return v21
+	Exit exec_ctx, unreachable
+
+blk2: (v5:i32) <-- (blk11)
+	v18:i32 = Iconst_32 0xf
+	v19:i32 = Iadd v5, v18
+	Return v19
+
+blk3: (v6:i32) <-- (blk10)
+	v16:i32 = Iconst_32 0xe
+	v17:i32 = Iadd v6, v16
+	Return v17
+
+blk4: (v7:i32) <-- (blk9)
+	v14:i32 = Iconst_32 0xd
+	v15:i32 = Iadd v7, v14
+	Return v15
+
+blk5: (v8:i32) <-- (blk8)
+	v12:i32 = Iconst_32 0xc
+	v13:i32 = Iadd v8, v12
+	Return v13
+
+blk6: (v9:i32) <-- (blk7,blk13)
+	v10:i32 = Iconst_32 0xb
+	v11:i32 = Iadd v9, v10
+	Return v11
+
+blk7: () <-- (blk0)
+	Jump blk6, v3
+
+blk8: () <-- (blk0)
+	Jump blk5, v3
+
+blk9: () <-- (blk0)
+	Jump blk4, v3
+
+blk10: () <-- (blk0)
+	Jump blk3, v3
+
+blk11: () <-- (blk0)
+	Jump blk2, v3
+
+blk12: () <-- (blk0)
+	Jump blk1, v3
+
+blk13: () <-- (blk0)
+	Jump blk6, v3
+`,
+
+			// TODO: these trivial two hop jumps should be optimized away.
+			expAfterOpt: `
+blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i32)
+	BrTable v2, [blk7, blk8, blk9, blk10, blk11, blk12, blk13]
+
+blk1: () <-- (blk12)
+	v20:i32 = Iconst_32 0x10
+	v21:i32 = Iadd v3, v20
+	Return v21
+	Exit exec_ctx, unreachable
+
+blk2: () <-- (blk11)
+	v18:i32 = Iconst_32 0xf
+	v19:i32 = Iadd v3, v18
+	Return v19
+
+blk3: () <-- (blk10)
+	v16:i32 = Iconst_32 0xe
+	v17:i32 = Iadd v3, v16
+	Return v17
+
+blk4: () <-- (blk9)
+	v14:i32 = Iconst_32 0xd
+	v15:i32 = Iadd v3, v14
+	Return v15
+
+blk5: () <-- (blk8)
+	v12:i32 = Iconst_32 0xc
+	v13:i32 = Iadd v3, v12
+	Return v13
+
+blk6: () <-- (blk7,blk13)
+	v10:i32 = Iconst_32 0xb
+	v11:i32 = Iadd v3, v10
+	Return v11
+
+blk7: () <-- (blk0)
+	Jump blk6
+
+blk8: () <-- (blk0)
+	Jump blk5
+
+blk9: () <-- (blk0)
+	Jump blk4
+
+blk10: () <-- (blk0)
+	Jump blk3
+
+blk11: () <-- (blk0)
+	Jump blk2
+
+blk12: () <-- (blk0)
+	Jump blk1
+
+blk13: () <-- (blk0)
+	Jump blk6
+`,
+		},
 	} {
 
 		tc := tc

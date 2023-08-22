@@ -1478,8 +1478,8 @@ func (c *Compiler) lowerBrTable(labels []uint32, index ssa.Value) {
 		numArgs = len(f.blockType.Results)
 	}
 
+	targets := make([]ssa.BasicBlock, len(labels))
 	if numArgs == 0 {
-		targets := make([]ssa.BasicBlock, len(labels))
 		for i, l := range labels {
 			targetBlk, argNum := state.brTargetArgNumFor(l)
 			if argNum != 0 {
@@ -1494,14 +1494,32 @@ func (c *Compiler) lowerBrTable(labels []uint32, index ssa.Value) {
 				panic("TODO")
 			}
 		}
-
-		// If the target block has no arguments, we can just jump to the target block.
-		brTable := builder.AllocateInstruction()
-		brTable.AsBrTable(index, targets)
-		builder.InsertInstruction(brTable)
-
 	} else {
-		panic("TODO")
+		// If this needs to pass arguments, we need trampoline blocks since depending on the target block structure,
+		// we might end up inserting moves before jumps, which cannot be done with br_table. Instead, we can do such
+		// per-block moves in the trampoline blocks.
+
+		args := c.loweringState.nPeekDup(numArgs) // Args are always on the top of the stack.
+		currentBlk := builder.CurrentBlock()
+		for i, l := range labels {
+			targetBlk, _ := state.brTargetArgNumFor(l)
+			trampoline := builder.AllocateBasicBlock()
+			builder.SetCurrentBlock(trampoline)
+			c.insertJumpToBlock(args, targetBlk)
+			targets[i] = trampoline
+		}
+		builder.SetCurrentBlock(currentBlk)
+	}
+
+	// If the target block has no arguments, we can just jump to the target block.
+	brTable := builder.AllocateInstruction()
+	brTable.AsBrTable(index, targets)
+	builder.InsertInstruction(brTable)
+
+	if numArgs > 0 {
+		for _, trampoline := range targets {
+			builder.Seal(trampoline)
+		}
 	}
 }
 
