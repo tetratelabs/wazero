@@ -188,20 +188,13 @@ func (a *Allocator) livenessAnalysis(f Function) {
 				if def.IsRealReg() {
 					info.realRegDefs[def] = append(info.realRegDefs[def], pos)
 				} else {
-					if _, ok := info.defs[def]; ok {
-						// This must be a bug in lowering logic in the ISA-specific code.
-						// In short, a virtual register must be defined only once because that's the invariant of
-						// liveness analysis result used in the current implementation. If you reach here, you can either
-						// use "temporary" physical register (like x27 in AArch64), or simply allocate a new virtual
-						// register for the additional definition. In any ways, such a new virtual register doesn't cost
-						// at all in the final code because they are instantly killed and won't interfere with other
-						// virtual registers later on.
-						//
-						// TODO: this should be enforced globally, not just per block. But that can be costly to check.
-						panic(fmt.Sprintf("BUG: multiple definitions found for a virtual register %s", def.String()))
+					if _, ok := info.defs[def]; !ok {
+						// This means that this VReg is defined multiple times in a series of instructions
+						// e.g. loading arbitrary constant in arm64, and we only need the earliest
+						// definition to construct live range.
+						info.defs[def] = pos
 					}
 
-					info.defs[def] = pos
 					a.vs = append(a.vs, def)
 				}
 			}
@@ -453,7 +446,7 @@ func (a *Allocator) allocateBlockInfo(blockID int) {
 		a.blockInfos = append(a.blockInfos, make([]blockInfo, blockID+1)...)
 	}
 	info := &a.blockInfos[blockID]
-	info.init()
+	a.initBlockInfo(info)
 }
 
 func (a *Allocator) blockInfoAt(blockID int) (info *blockInfo) {
@@ -491,35 +484,52 @@ func (a *Allocator) allocateNode() (n *node) {
 	return
 }
 
-func (i *blockInfo) init() {
+func resetMap[T any](a *Allocator, m map[VReg]T) {
+	a.vs = a.vs[:0]
+	for v := range m {
+		a.vs = append(a.vs, v)
+	}
+	for _, v := range a.vs {
+		delete(m, v)
+	}
+}
+
+func (a *Allocator) initBlockInfo(i *blockInfo) {
 	i.liveNodes = i.liveNodes[:0]
 	if i.liveOuts == nil {
-		// TODO: reuse!!
 		i.liveOuts = make(map[VReg]struct{})
+	} else {
+		resetMap(a, i.liveOuts)
 	}
 	if i.liveIns == nil {
-		// TODO: reuse!!
 		i.liveIns = make(map[VReg]struct{})
+	} else {
+		resetMap(a, i.liveIns)
 	}
 	if i.defs == nil {
-		// TODO: reuse!!
 		i.defs = make(map[VReg]programCounter)
+	} else {
+		resetMap(a, i.defs)
 	}
 	if i.lastUses == nil {
-		// TODO: reuse!!
 		i.lastUses = make(map[VReg]programCounter)
+	} else {
+		resetMap(a, i.lastUses)
 	}
 	if i.kills == nil {
-		// TODO: reuse!!
 		i.kills = make(map[VReg]programCounter)
+	} else {
+		resetMap(a, i.kills)
 	}
 	if i.realRegUses == nil {
-		// TODO: reuse!!
 		i.realRegUses = make(map[VReg][]programCounter)
+	} else {
+		resetMap(a, i.realRegUses)
 	}
 	if i.realRegDefs == nil {
-		// TODO: reuse!!
 		i.realRegDefs = make(map[VReg][]programCounter)
+	} else {
+		resetMap(a, i.realRegDefs)
 	}
 }
 

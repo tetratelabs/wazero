@@ -446,7 +446,7 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 			for blockID := range a.blockInfos {
 				actual := &a.blockInfos[blockID]
 				exp := tc.exp[blockID]
-				exp.init()
+				initMapInInfo(exp)
 				require.Equal(t, exp, actual, "\n[exp for block[%d]]\n%s\n[actual for block[%d]]\n%s", blockID, exp, blockID, actual)
 			}
 
@@ -560,7 +560,7 @@ func TestAllocator_buildLiveRangesForNonReals(t *testing.T) {
 			require.Equal(t, len(tc.exps), a.nodePool.Allocated())
 			for v, exp := range tc.exps {
 				liveNodes := tc.info.liveNodes
-				tc.info.init()
+				initMapInInfo(tc.info)
 				tc.info.liveNodes = liveNodes
 				t.Run(v.String(), func(t *testing.T) {
 					n := a.vRegIDToNode[v.ID()]
@@ -609,7 +609,7 @@ func TestAllocator_buildLiveRangesForReals(t *testing.T) {
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			tc.info.init()
+			initMapInInfo(tc.info)
 			a := NewAllocator(&RegisterInfo{})
 			a.allocatableSet = tc.allocatableRealRegs
 			a.buildLiveRangesForReals(blockID, tc.info)
@@ -681,4 +681,28 @@ func TestAllocator_recordCopyRelation(t *testing.T) {
 		require.Equal(t, RealRegInvalid, n200.copyFromReal)
 		require.Equal(t, RealRegInvalid, n200.copyToReal)
 	})
+}
+
+func initMapInInfo(info *blockInfo) {
+	if info.liveIns == nil {
+		info.liveIns = make(map[VReg]struct{})
+	}
+	if info.liveOuts == nil {
+		info.liveOuts = make(map[VReg]struct{})
+	}
+	if info.defs == nil {
+		info.defs = make(map[VReg]programCounter)
+	}
+	if info.kills == nil {
+		info.kills = make(map[VReg]programCounter)
+	}
+	if info.lastUses == nil {
+		info.lastUses = make(map[VReg]programCounter)
+	}
+	if info.realRegUses == nil {
+		info.realRegUses = make(map[VReg][]programCounter)
+	}
+	if info.realRegDefs == nil {
+		info.realRegDefs = make(map[VReg][]programCounter)
+	}
 }

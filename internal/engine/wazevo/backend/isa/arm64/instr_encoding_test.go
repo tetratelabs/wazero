@@ -226,6 +226,7 @@ func TestInstruction_encode(t *testing.T) {
 		{want: "4f7a40d2", setup: func(i *instruction) { i.asALUBitmaskImm(aluOpEor, x18VReg, x15VReg, 0x7fffffff, true) }},
 		{want: "4f767fd2", setup: func(i *instruction) { i.asALUBitmaskImm(aluOpEor, x18VReg, x15VReg, 0x7ffffffe, true) }},
 		{want: "4fba7fd2", setup: func(i *instruction) { i.asALUBitmaskImm(aluOpEor, x18VReg, x15VReg, 0xfffffffffffe, true) }},
+		{want: "f20300b2", setup: func(i *instruction) { i.asALUBitmaskImm(aluOpOrr, xzrVReg, x18VReg, 0x100000001, true) }},
 		{want: "f21fbf0e", setup: func(i *instruction) { i.asFpuMov64(v18VReg, v31VReg) }},
 		{want: "f21fbf4e", setup: func(i *instruction) { i.asFpuMov128(v18VReg, v31VReg) }},
 		{want: "4000140b", setup: func(i *instruction) {

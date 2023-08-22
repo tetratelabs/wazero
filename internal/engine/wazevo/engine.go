@@ -127,6 +127,10 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []exper
 		// Run SSA-level optimization passes.
 		ssaBuilder.RunPasses()
 
+		if false {
+			fmt.Printf("[[[SSA]]]%s", ssaBuilder.Format())
+		}
+
 		// Finalize the layout of SSA blocks which might use the optimization results.
 		ssaBuilder.LayoutBlocks()
 

@@ -97,7 +97,7 @@ func alignedStackTop(s []byte) uintptr {
 
 // Definition implements api.Function.
 func (c *callEngine) Definition() api.FunctionDefinition {
-	return &c.parent.module.Source.FunctionDefinitionSection[c.indexInModule]
+	return c.parent.module.Source.FunctionDefinition(c.indexInModule)
 }
 
 // Call implements api.Function.
