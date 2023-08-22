@@ -1797,6 +1797,10 @@ func pathReadlinkFn(_ context.Context, mod api.Module, params []uint64) experime
 		return errno
 	}
 
+	if len(dst) > int(bufLen) {
+		return experimentalsys.ERANGE
+	}
+
 	if ok := mem.WriteString(buf, dst); !ok {
 		return experimentalsys.EFAULT
 	}

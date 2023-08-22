@@ -4238,12 +4238,12 @@ func Test_pathReadlink(t *testing.T) {
 			{expectedErrno: wasip1.ErrnoInval, bufLen: 100},
 			{
 				name:          "bufLen too short",
-				expectedErrno: wasip1.ErrnoFault,
+				expectedErrno: wasip1.ErrnoRange,
 				fd:            dirFD,
 				bufLen:        10,
 				path:          destinationPath,
 				pathLen:       uint32(len(destinationPathName)),
-				buf:           math.MaxUint32,
+				buf:           0,
 			},
 			{
 				name:          "path past memory",
