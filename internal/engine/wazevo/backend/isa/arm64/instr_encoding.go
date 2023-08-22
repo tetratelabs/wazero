@@ -41,15 +41,11 @@ func (i *instruction) encode(c backend.Compiler) {
 			c.Emit4Bytes(encodeUnconditionalBranch(true, 0)) // 0 = placeholder
 		}
 	case callInd:
-		// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/BLR--Branch-with-Link-to-Register-
-		rn := regNumberInEncoding[i.rn.realReg()]
-		c.Emit4Bytes(
-			0b1101011<<25 | 0b111111<<16 | rn<<5,
-		)
+		c.Emit4Bytes(encodeUnconditionalBranchReg(regNumberInEncoding[i.rn.realReg()], true))
 	case store8, store16, store32, store64, fpuStore32, fpuStore64, fpuStore128:
-		c.Emit4Bytes(encodeStoreOrStore(i.kind, regNumberInEncoding[i.rn.realReg()], i.amode))
+		c.Emit4Bytes(encodeLoadOrStore(i.kind, regNumberInEncoding[i.rn.realReg()], i.amode))
 	case uLoad8, uLoad16, uLoad32, uLoad64, sLoad8, sLoad16, sLoad32, fpuLoad32, fpuLoad64, fpuLoad128:
-		c.Emit4Bytes(encodeStoreOrStore(i.kind, regNumberInEncoding[i.rd.realReg()], i.amode))
+		c.Emit4Bytes(encodeLoadOrStore(i.kind, regNumberInEncoding[i.rd.realReg()], i.amode))
 	case condBr:
 		imm19 := i.condBrOffset()
 		if imm19%4 != 0 {
@@ -212,15 +208,7 @@ func (i *instruction) encode(c backend.Compiler) {
 		// https://developer.arm.com/documentation/ddi0596/2020-12/Base-Instructions/UDF--Permanently-Undefined-?lang=en
 		c.Emit4Bytes(0)
 	case adr:
-		// https://developer.arm.com/documentation/ddi0602/2022-06/Base-Instructions/ADR--Form-PC-relative-address-
-		rd := regNumberInEncoding[i.rd.realReg()]
-		off := i.u1
-		if off >= 1<<20 {
-			panic("BUG: too large adr instruction")
-		}
-		c.Emit4Bytes(
-			uint32(off&0b11)<<29 | 0b1<<28 | uint32(off&0b1111111111_1111111100)<<3 | rd,
-		)
+		c.Emit4Bytes(encodeAdr(regNumberInEncoding[i.rd.realReg()], uint32(i.u1)))
 	case cSel:
 		c.Emit4Bytes(encodeConditionalSelect(
 			kind,
@@ -266,9 +254,20 @@ func (i *instruction) encode(c backend.Compiler) {
 			regNumberInEncoding[i.rn.realReg()],
 			vecArrangement(i.u2),
 		))
+	case brTableSequence:
+		encodeBrTableSequence(c, i.rn.reg(), len(i.targets))
 	default:
 		panic(i.String())
 	}
+}
+
+// encodeAdr encodes a PC-relative ADR instruction.
+// https://developer.arm.com/documentation/ddi0602/2022-06/Base-Instructions/ADR--Form-PC-relative-address-
+func encodeAdr(rd uint32, offset uint32) uint32 {
+	if offset >= 1<<20 {
+		panic("BUG: too large adr instruction")
+	}
+	return offset&0b11<<29 | 0b1<<28 | offset&0b1111111111_1111111100<<3 | rd
 }
 
 // encodeFpuCSel encodes as "Floating-point conditional select" in
@@ -316,6 +315,16 @@ func encodeMoveToVec(rd, rn uint32, arr vecArrangement, index vecIndex) uint32 {
 	}
 
 	return 0b01001110000<<21 | imm5<<16 | 0b000111<<10 | rn<<5 | rd
+}
+
+// encodeUnconditionalBranchReg encodes as "Unconditional branch (register)" in:
+// https://developer.arm.com/documentation/ddi0596/2020-12/Index-by-Encoding/Branches--Exception-Generating-and-System-instructions?lang=en
+func encodeUnconditionalBranchReg(rn uint32, link bool) uint32 {
+	var opc uint32
+	if link {
+		opc = 0b0001
+	}
+	return 0b1101011<<25 | opc<<21 | 0b11111<<16 | rn<<5
 }
 
 // encodeMoveFromVec encodes as "Move vector element to a general-purpose register"
@@ -481,7 +490,7 @@ func encodeExtend(signed bool, from, to byte, rd, rn uint32) uint32 {
 	return _31to10<<10 | rn<<5 | rd
 }
 
-func encodeStoreOrStore(kind instructionKind, rt uint32, amode addressMode) uint32 {
+func encodeLoadOrStore(kind instructionKind, rt uint32, amode addressMode) uint32 {
 	var _22to31 uint32
 	var bits int64
 	switch kind {
@@ -1003,6 +1012,28 @@ func encodeVecMisc(op vecOp, rd, rn uint32, arr vecArrangement) uint32 {
 	return q<<30 | u<<29 | 0b01110<<24 | size<<22 | 0b10000<<17 | opcode<<12 | 0b10<<10 | rn<<5 | rd
 }
 
+func encodeBrTableSequence(c backend.Compiler, index regalloc.VReg, N int) {
+	tmpRegNumber := regNumberInEncoding[tmp]
+	indexNumber := regNumberInEncoding[index.RealReg()]
+
+	// adr tmpReg, PC+16 (PC+16 is the address of the first label offset)
+	// ldrsw index, [tmpReg, index, UXTW 2] ;; index = uint64(*(tmpReg, index*8))
+	// add tmpReg, tmpReg, index
+	// br tmpReg
+	// [offset_to_l1, offset_to_l2, ..., offset_to_lN]
+	c.Emit4Bytes(encodeAdr(tmpRegNumber, 16))
+	c.Emit4Bytes(encodeLoadOrStore(uLoad32, indexNumber,
+		addressMode{kind: addressModeKindRegScaledExtended, rn: tmpRegVReg, rm: index, extOp: extendOpUXTW},
+	))
+	c.Emit4Bytes(encodeAluRRR(aluOpAdd, tmpRegNumber, tmpRegNumber, indexNumber, true, false))
+	c.Emit4Bytes(encodeUnconditionalBranchReg(tmpRegNumber, false))
+
+	// Label offsets are resolved after the whole function is compiled.
+	for i := 0; i < N; i++ {
+		c.Emit4Bytes(0)
+	}
+}
+
 // encodeExitSequence matches the implementation detail of abiImpl.emitGoEntryPreamble.
 func encodeExitSequence(c backend.Compiler, ctxReg regalloc.VReg) {
 	// Restore the FP, SP and LR, and return to the Go code:
@@ -1012,7 +1043,7 @@ func encodeExitSequence(c backend.Compiler, ctxReg regalloc.VReg) {
 	// 		ldr lr, [savedExecutionContextPtr, #GoReturnAddress]
 	// 		ret ;; --> return to the Go code
 
-	restoreFp := encodeStoreOrStore(
+	restoreFp := encodeLoadOrStore(
 		uLoad64,
 		regNumberInEncoding[fp],
 		addressMode{
@@ -1022,7 +1053,7 @@ func encodeExitSequence(c backend.Compiler, ctxReg regalloc.VReg) {
 		},
 	)
 
-	restoreSpToTmp := encodeStoreOrStore(
+	restoreSpToTmp := encodeLoadOrStore(
 		uLoad64,
 		regNumberInEncoding[tmp],
 		addressMode{
@@ -1035,7 +1066,7 @@ func encodeExitSequence(c backend.Compiler, ctxReg regalloc.VReg) {
 	movTmpToSp := encodeAddSubtractImmediate(0b100, 0, 0,
 		regNumberInEncoding[tmp], regNumberInEncoding[sp])
 
-	restoreLr := encodeStoreOrStore(
+	restoreLr := encodeLoadOrStore(
 		uLoad64,
 		regNumberInEncoding[lr],
 		addressMode{

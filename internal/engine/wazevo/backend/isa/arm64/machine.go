@@ -335,7 +335,7 @@ func (m *machine) ResolveRelativeAddresses() {
 			offsetOfTarget := m.labelPositions[target].binaryOffset
 			diff := offsetOfTarget - currentOffset
 			if diff%4 != 0 {
-				panic("Invalid binary; offsets between b and the target must be a multiple of 4")
+				panic("BUG: offsets between b and the target must be a multiple of 4")
 			}
 			divided := diff >> 2
 			if divided < minSignedInt26 || divided > maxSignedInt26 {
@@ -349,7 +349,7 @@ func (m *machine) ResolveRelativeAddresses() {
 				offsetOfTarget := m.labelPositions[target].binaryOffset
 				diff := offsetOfTarget - currentOffset
 				if diff%4 != 0 {
-					panic("Invalid binary; offsets between b and the target must be a multiple of 4")
+					panic("BUG: offsets between b and the target must be a multiple of 4")
 				}
 				divided := diff >> 2
 				if divided < minSignedInt19 || divided > maxSignedInt19 {

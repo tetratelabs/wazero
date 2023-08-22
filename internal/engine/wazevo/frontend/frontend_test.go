@@ -1489,7 +1489,7 @@ blk5: () <-- (blk0)
 blk6: () <-- (blk0,blk0)
 	v3:i32 = Iconst_32 0xb
 	Return v3
-		`,
+`,
 		},
 	} {
 

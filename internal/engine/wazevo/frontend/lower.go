@@ -140,7 +140,7 @@ func (c *Compiler) lowerBody(entryBlk ssa.BasicBlock) {
 	for c.loweringState.pc < len(c.wasmFunctionBody) {
 		op := c.wasmFunctionBody[c.loweringState.pc]
 		c.lowerOpcode(op)
-		if true {
+		if debug {
 			fmt.Println("--------- Translated " + wasm.InstructionName(op) + " --------")
 			fmt.Println("Stack: " + c.loweringState.String())
 			fmt.Println(c.formatBuilder())
@@ -1513,5 +1513,4 @@ func (l *loweringState) brTargetArgNumFor(labelIndex uint32) (targetBlk ssa.Basi
 		targetBlk, argNum = targetFrame.followingBlock, len(targetFrame.blockType.Results)
 	}
 	return
-
 }

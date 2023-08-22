@@ -2,10 +2,11 @@ package arm64
 
 import (
 	"fmt"
-	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
-	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 	"math"
 	"strings"
+
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 )
 
 type (
@@ -1038,7 +1039,7 @@ func (i *instruction) String() (str string) {
 	case word8:
 		panic("TODO")
 	case brTableSequence:
-		var labels = []string{}
+		labels := []string{}
 		for _, l := range i.targets {
 			labels = append(labels, l.String())
 		}
@@ -1587,6 +1588,8 @@ func (i *instruction) size() int64 {
 		return 4 + 4 + 8
 	case loadFpuConst128:
 		return 4 + 4 + 12
+	case brTableSequence:
+		return 4*4 + int64(len(i.targets))*4
 	default:
 		return 4
 	}
