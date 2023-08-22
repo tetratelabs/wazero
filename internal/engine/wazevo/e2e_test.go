@@ -14,7 +14,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/testcases"
 	"github.com/tetratelabs/wazero/internal/filecache"
 	"github.com/tetratelabs/wazero/internal/integration_test/spectest"
-	"github.com/tetratelabs/wazero/internal/integration_test/spectest/v1"
+	v1 "github.com/tetratelabs/wazero/internal/integration_test/spectest/v1"
 	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -33,7 +33,7 @@ func TestSpectestV1(t *testing.T) {
 	configureWazevo(config)
 
 	// TODO: adds incrementally one by one as we support more test cases. And eventually remove this
-	// 	and migrate to spectest/v2/spec_test.go by the time when closing https://github.com/tetratelabs/wazero/issues/1496
+	// and migrate to integration_test/spectest/v1/spec_test.go by the time when closing https://github.com/tetratelabs/wazero/issues/1496
 	spectest.RunJson(t, v1.Testcases, "binary.json", context.Background(), config)
 }
 
