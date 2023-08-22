@@ -27,7 +27,7 @@ type (
 		rd, rm, rn, ra     operand
 		amode              addressMode
 		abi                *abiImpl
-		targets            []label
+		targets            []uint32
 		addedAfterLowering bool
 	}
 
@@ -494,10 +494,14 @@ func (i *instruction) asBr(target label) {
 	i.u1 = uint64(target)
 }
 
-func (i *instruction) asBrTableSequence(indexReg regalloc.VReg, targets []label) {
+func (i *instruction) asBrTableSequence(indexReg regalloc.VReg, targets []uint32) {
 	i.kind = brTableSequence
 	i.rn = operandNR(indexReg)
 	i.targets = targets
+}
+
+func (i *instruction) brTableSequenceOffsetsResolved() {
+	i.u3 = 1 // indicate that the offsets are resolved, for debugging.
 }
 
 func (i *instruction) brLabel() label {
@@ -1039,14 +1043,28 @@ func (i *instruction) String() (str string) {
 	case word8:
 		panic("TODO")
 	case brTableSequence:
-		labels := []string{}
-		for _, l := range i.targets {
-			labels = append(labels, l.String())
+		if i.u3 == 0 { // The offsets haven't been resolved yet.
+			labels := make([]string, len(i.targets))
+			for index, l := range i.targets {
+				labels[index] = label(l).String()
+			}
+			str = fmt.Sprintf("br_table_sequence %s, [%s]",
+				formatVRegSized(i.rn.nr(), 64),
+				strings.Join(labels, ", "),
+			)
+		} else {
+			// See encodeBrTableSequence for the encoding.
+			offsets := make([]string, len(i.targets))
+			for index, offset := range i.targets {
+				offsets[index] = fmt.Sprintf("%#x", int32(offset))
+			}
+			str = fmt.Sprintf(
+				`adr %[2]s, #16; ldrsw %[1]s, [%[2]s, %[1]s, UXTW 2]; add %[2]s, %[2]s, %[1]s; br %[2]s; %s`,
+				formatVRegSized(i.rn.nr(), 64),
+				formatVRegSized(tmpRegVReg, 64),
+				offsets,
+			)
 		}
-		str = fmt.Sprintf("br_table_sequence %s, [%s]",
-			formatVRegSized(i.rn.nr(), 64),
-			strings.Join(labels, ", "),
-		)
 	case loadAddr:
 		panic("TODO")
 	case exitSequence:

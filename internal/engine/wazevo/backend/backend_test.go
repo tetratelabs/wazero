@@ -2823,7 +2823,7 @@ L1 (SSA Block: blk0):
 	orr w8, wzr, #0x6
 	subs wzr, w2, w8
 	csel w8, w8, w2, hs
-	br_table_sequence x8, [L2, L3, L4, L5, L6, L7, L2]
+	adr x27, #16; ldrsw x8, [x27, x8, UXTW 2]; add x27, x27, x8; br x27; [0x1c 0x28 0x34 0x40 0x4c 0x58 0x1c]
 L2 (SSA Block: blk6):
 	movz w0, #0xb, LSL 0
 	ldr x30, [sp], #0x10

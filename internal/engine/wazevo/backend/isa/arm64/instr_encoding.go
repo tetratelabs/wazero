@@ -255,7 +255,7 @@ func (i *instruction) encode(c backend.Compiler) {
 			vecArrangement(i.u2),
 		))
 	case brTableSequence:
-		encodeBrTableSequence(c, i.rn.reg(), len(i.targets))
+		encodeBrTableSequence(c, i.rn.reg(), i.targets)
 	default:
 		panic(i.String())
 	}
@@ -1012,7 +1012,10 @@ func encodeVecMisc(op vecOp, rd, rn uint32, arr vecArrangement) uint32 {
 	return q<<30 | u<<29 | 0b01110<<24 | size<<22 | 0b10000<<17 | opcode<<12 | 0b10<<10 | rn<<5 | rd
 }
 
-func encodeBrTableSequence(c backend.Compiler, index regalloc.VReg, N int) {
+// brTableSequenceOffsetTableBegin is the offset inside the brTableSequence where the table begins after 4 instructions
+const brTableSequenceOffsetTableBegin = 16
+
+func encodeBrTableSequence(c backend.Compiler, index regalloc.VReg, targets []uint32) {
 	tmpRegNumber := regNumberInEncoding[tmp]
 	indexNumber := regNumberInEncoding[index.RealReg()]
 
@@ -1022,15 +1025,15 @@ func encodeBrTableSequence(c backend.Compiler, index regalloc.VReg, N int) {
 	// br tmpReg
 	// [offset_to_l1, offset_to_l2, ..., offset_to_lN]
 	c.Emit4Bytes(encodeAdr(tmpRegNumber, 16))
-	c.Emit4Bytes(encodeLoadOrStore(uLoad32, indexNumber,
+	c.Emit4Bytes(encodeLoadOrStore(sLoad32, indexNumber,
 		addressMode{kind: addressModeKindRegScaledExtended, rn: tmpRegVReg, rm: index, extOp: extendOpUXTW},
 	))
 	c.Emit4Bytes(encodeAluRRR(aluOpAdd, tmpRegNumber, tmpRegNumber, indexNumber, true, false))
 	c.Emit4Bytes(encodeUnconditionalBranchReg(tmpRegNumber, false))
 
 	// Label offsets are resolved after the whole function is compiled.
-	for i := 0; i < N; i++ {
-		c.Emit4Bytes(0)
+	for _, offset := range targets {
+		c.Emit4Bytes(offset)
 	}
 }
 

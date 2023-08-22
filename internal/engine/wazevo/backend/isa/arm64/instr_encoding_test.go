@@ -873,11 +873,13 @@ func Test_lowerExitWithCodeEncodingSize(t *testing.T) {
 }
 
 func Test_encodeBrTableSequence(t *testing.T) {
-	const N = 10
 	m := &mockCompiler{}
-	encodeBrTableSequence(m, x22VReg, N)
-	require.Equal(t, (&instruction{kind: brTableSequence, targets: make([]label, N)}).size(), int64(len(m.Buf())))
-	require.Equal(t, "9b000010765b76b87b03168b60031fd600000000000000000000000000000000000000000000000000000000000000000000000000000000", hex.EncodeToString(m.buf))
+	i := &instruction{kind: brTableSequence, targets: []uint32{1, 2, 3, 4, 5}}
+	encodeBrTableSequence(m, x22VReg, i.targets)
+	encoded := m.Buf()
+	require.Equal(t, i.size(), int64(len(encoded)))
+	require.Equal(t, "9b000010765bb6b87b03168b60031fd6", hex.EncodeToString(encoded[:brTableSequenceOffsetTableBegin]))
+	require.Equal(t, "0100000002000000030000000400000005000000", hex.EncodeToString(encoded[brTableSequenceOffsetTableBegin:]))
 }
 
 func Test_encodeUnconditionalBranch(t *testing.T) {

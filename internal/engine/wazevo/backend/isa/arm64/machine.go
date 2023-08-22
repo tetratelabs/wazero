@@ -359,6 +359,14 @@ func (m *machine) ResolveRelativeAddresses() {
 				}
 				cur.condBrOffsetResolve(diff)
 			}
+		case brTableSequence:
+			for i := range cur.targets {
+				l := label(cur.targets[i])
+				offsetOfTarget := m.labelPositions[l].binaryOffset
+				diff := offsetOfTarget - (currentOffset + brTableSequenceOffsetTableBegin)
+				cur.targets[i] = uint32(diff)
+			}
+			cur.brTableSequenceOffsetsResolved()
 		}
 		currentOffset += cur.size()
 	}

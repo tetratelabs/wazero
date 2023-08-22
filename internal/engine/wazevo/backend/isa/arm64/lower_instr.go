@@ -58,9 +58,9 @@ func (m *machine) lowerBrTable(i *ssa.Instruction) {
 	brSequence := m.allocateInstr()
 
 	// TODO: reuse the slice!
-	labels := make([]label, len(targets))
+	labels := make([]uint32, len(targets))
 	for j, target := range targets {
-		labels[j] = m.getOrAllocateSSABlockLabel(target)
+		labels[j] = uint32(m.getOrAllocateSSABlockLabel(target))
 	}
 
 	brSequence.asBrTableSequence(adjustedIndex, labels)
