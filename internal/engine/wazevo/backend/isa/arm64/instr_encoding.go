@@ -1020,7 +1020,7 @@ func encodeBrTableSequence(c backend.Compiler, index regalloc.VReg, targets []ui
 	indexNumber := regNumberInEncoding[index.RealReg()]
 
 	// adr tmpReg, PC+16 (PC+16 is the address of the first label offset)
-	// ldrsw index, [tmpReg, index, UXTW 2] ;; index = uint64(*(tmpReg, index*8))
+	// ldrsw index, [tmpReg, index, UXTW 2] ;; index = int64(*(tmpReg + index*8))
 	// add tmpReg, tmpReg, index
 	// br tmpReg
 	// [offset_to_l1, offset_to_l2, ..., offset_to_lN]
@@ -1031,7 +1031,7 @@ func encodeBrTableSequence(c backend.Compiler, index regalloc.VReg, targets []ui
 	c.Emit4Bytes(encodeAluRRR(aluOpAdd, tmpRegNumber, tmpRegNumber, indexNumber, true, false))
 	c.Emit4Bytes(encodeUnconditionalBranchReg(tmpRegNumber, false))
 
-	// Label offsets are resolved after the whole function is compiled.
+	// Offsets are resolved in ResolveRelativeAddress phase.
 	for _, offset := range targets {
 		c.Emit4Bytes(offset)
 	}
