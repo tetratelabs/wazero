@@ -14,7 +14,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/testcases"
 	"github.com/tetratelabs/wazero/internal/filecache"
 	"github.com/tetratelabs/wazero/internal/integration_test/spectest"
-	v1 "github.com/tetratelabs/wazero/internal/integration_test/spectest/v1"
+	"github.com/tetratelabs/wazero/internal/integration_test/spectest/v1"
 	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
