@@ -34,7 +34,8 @@ func TestSpectestV1(t *testing.T) {
 
 	// TODO: adds incrementally one by one as we support more test cases. And eventually remove this
 	// and migrate to integration_test/spectest/v1/spec_test.go by the time when closing https://github.com/tetratelabs/wazero/issues/1496
-	spectest.RunJson(t, v1.Testcases, "binary.json", context.Background(), config)
+	t.Run("address.json", func(t *testing.T) { spectest.RunJson(t, v1.Testcases, "address.json", context.Background(), config) })
+	t.Run("binary.json", func(t *testing.T) { spectest.RunJson(t, v1.Testcases, "binary.json", context.Background(), config) })
 }
 
 func TestE2E(t *testing.T) {

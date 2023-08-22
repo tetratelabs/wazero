@@ -645,7 +645,7 @@ func bitmaskImmediate(c uint64, is64bit bool) (immr, imms, N byte) {
 	}
 
 	var mode byte = 32
-	if is64bit {
+	if is64bit && size == 64 {
 		N, mode = 0b1, 64
 	}
 

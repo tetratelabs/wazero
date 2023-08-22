@@ -143,6 +143,9 @@ type compiler struct {
 // Compile implements Compiler.Compile.
 func (c *compiler) Compile() ([]byte, []RelocationInfo, int, error) {
 	c.Lower()
+	if false {
+		fmt.Printf("[[[after lowering]]]%s", c.Format())
+	}
 	c.RegAlloc()
 	c.Finalize()
 	goPreambleSize := c.Encode()
