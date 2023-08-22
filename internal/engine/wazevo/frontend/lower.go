@@ -21,6 +21,7 @@ type (
 		controlFrames    []controlFrame
 		unreachable      bool
 		unreachableDepth int
+		tmpForBrTable    []uint32
 		pc               int
 	}
 	controlFrame struct {
@@ -835,7 +836,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		} else { // unreachable.
 			if state.unreachableDepth > 0 {
 				state.unreachableDepth--
-				return
+				return // TODO: it seems not necessary return
 			} else {
 				state.unreachable = false
 			}
@@ -866,14 +867,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 			return
 		}
 
-		targetFrame := state.ctrlPeekAt(int(labelIndex))
-		var targetBlk ssa.BasicBlock
-		var argNum int
-		if targetFrame.isLoop() {
-			targetBlk, argNum = targetFrame.blk, len(targetFrame.blockType.Params)
-		} else {
-			targetBlk, argNum = targetFrame.followingBlock, len(targetFrame.blockType.Results)
-		}
+		targetBlk, argNum := state.brTargetArgNumFor(labelIndex)
 		args := c.loweringState.nPeekDup(argNum)
 		c.insertJumpToBlock(args, targetBlk)
 
@@ -887,14 +881,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 
 		v := state.pop()
 
-		targetFrame := state.ctrlPeekAt(int(labelIndex))
-		var targetBlk ssa.BasicBlock
-		var argNum int
-		if targetFrame.isLoop() {
-			targetBlk, argNum = targetFrame.blk, len(targetFrame.blockType.Params)
-		} else {
-			targetBlk, argNum = targetFrame.followingBlock, len(targetFrame.blockType.Results)
-		}
+		targetBlk, argNum := state.brTargetArgNumFor(labelIndex)
 		args := c.loweringState.nPeekDup(argNum)
 
 		// Insert the conditional jump to the target block.
@@ -908,6 +895,22 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 
 		// Now start translating the instructions after br_if.
 		builder.SetCurrentBlock(elseBlk)
+
+	case wasm.OpcodeBrTable:
+		labels := state.tmpForBrTable
+		labels = labels[:0]
+		labelCount := c.readI32u()
+		for i := 0; i < int(labelCount); i++ {
+			labels = append(labels, c.readI32u())
+		}
+		labels = append(labels, c.readI32u()) // default label.
+		if state.unreachable {
+			return
+		}
+
+		index := state.pop()
+		c.lowerBrTable(labels, index)
+		state.unreachable = true
 
 	case wasm.OpcodeNop:
 	case wasm.OpcodeReturn:
@@ -1461,4 +1464,71 @@ func cloneValuesList(in []ssa.Value) (ret []ssa.Value) {
 // results returns the number of results of the current function.
 func (c *Compiler) results() int {
 	return len(c.wasmFunctionTyp.Results)
+}
+
+func (c *Compiler) lowerBrTable(labels []uint32, index ssa.Value) {
+	state := c.state()
+	builder := c.ssaBuilder
+
+	f := state.ctrlPeekAt(int(labels[0]))
+	var numArgs int
+	if f.isLoop() {
+		numArgs = len(f.blockType.Params)
+	} else {
+		numArgs = len(f.blockType.Results)
+	}
+
+	targets := make([]ssa.BasicBlock, len(labels))
+	if numArgs == 0 {
+		for i, l := range labels {
+			targetBlk, argNum := state.brTargetArgNumFor(l)
+			if argNum != 0 {
+				// This must be handled in else block below.
+				panic("BUG: br_table with args must not reach here")
+			}
+			targets[i] = targetBlk
+
+			if targetBlk.ReturnBlock() {
+				// TODO: even when the target block has no arguments, we have to insert the unconditional jump to the return trampoline
+				//  if the target is return.
+				panic("TODO")
+			}
+		}
+	} else {
+		// If this needs to pass arguments, we need trampoline blocks since depending on the target block structure,
+		// we might end up inserting moves before jumps, which cannot be done with br_table. Instead, we can do such
+		// per-block moves in the trampoline blocks.
+
+		args := c.loweringState.nPeekDup(numArgs) // Args are always on the top of the stack.
+		currentBlk := builder.CurrentBlock()
+		for i, l := range labels {
+			targetBlk, _ := state.brTargetArgNumFor(l)
+			trampoline := builder.AllocateBasicBlock()
+			builder.SetCurrentBlock(trampoline)
+			c.insertJumpToBlock(args, targetBlk)
+			targets[i] = trampoline
+		}
+		builder.SetCurrentBlock(currentBlk)
+	}
+
+	// If the target block has no arguments, we can just jump to the target block.
+	brTable := builder.AllocateInstruction()
+	brTable.AsBrTable(index, targets)
+	builder.InsertInstruction(brTable)
+
+	if numArgs > 0 {
+		for _, trampoline := range targets {
+			builder.Seal(trampoline)
+		}
+	}
+}
+
+func (l *loweringState) brTargetArgNumFor(labelIndex uint32) (targetBlk ssa.BasicBlock, argNum int) {
+	targetFrame := l.ctrlPeekAt(int(labelIndex))
+	if targetFrame.isLoop() {
+		targetBlk, argNum = targetFrame.blk, len(targetFrame.blockType.Params)
+	} else {
+		targetBlk, argNum = targetFrame.followingBlock, len(targetFrame.blockType.Results)
+	}
+	return
 }

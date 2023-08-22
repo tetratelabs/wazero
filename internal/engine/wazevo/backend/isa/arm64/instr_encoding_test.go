@@ -1,7 +1,9 @@
 package arm64
 
 import (
+	"encoding/binary"
 	"encoding/hex"
+	"fmt"
 	"math"
 	"testing"
 
@@ -868,4 +870,26 @@ func Test_lowerExitWithCodeEncodingSize(t *testing.T) {
 	require.NotNil(t, m.perBlockHead)
 	m.encode(m.perBlockHead)
 	require.Equal(t, exitWithCodeEncodingSize, len(compiler.Buf()))
+}
+
+func Test_encodeBrTableSequence(t *testing.T) {
+	m := &mockCompiler{}
+	i := &instruction{kind: brTableSequence, targets: []uint32{1, 2, 3, 4, 5}}
+	encodeBrTableSequence(m, x22VReg, i.targets)
+	encoded := m.Buf()
+	require.Equal(t, i.size(), int64(len(encoded)))
+	require.Equal(t, "9b000010765bb6b87b03168b60031fd6", hex.EncodeToString(encoded[:brTableSequenceOffsetTableBegin]))
+	require.Equal(t, "0100000002000000030000000400000005000000", hex.EncodeToString(encoded[brTableSequenceOffsetTableBegin:]))
+}
+
+func Test_encodeUnconditionalBranch(t *testing.T) {
+	buf := make([]byte, 4)
+
+	actual := encodeUnconditionalBranch(true, 4)
+	binary.LittleEndian.PutUint32(buf, actual)
+	require.Equal(t, "0x01000094", fmt.Sprintf("%#x", buf))
+
+	actual = encodeUnconditionalBranch(false, 4*1024)
+	binary.LittleEndian.PutUint32(buf, actual)
+	require.Equal(t, "0x00040014", fmt.Sprintf("%#x", buf))
 }

@@ -2787,6 +2787,69 @@ L1 (SSA Block: blk0):
 	ret
 `,
 		},
+		{
+			name:        "br_table",
+			m:           testcases.BrTable.Module,
+			targetIndex: 0,
+			afterLoweringARM64: `
+L1 (SSA Block: blk0):
+	mov x2?, x2
+	orr w9?, wzr, #0x6
+	subs wzr, w2?, w9?
+	csel w10?, w9?, w2?, hs
+	br_table_sequence x10?, [L2, L3, L4, L5, L6, L7, L2]
+L2 (SSA Block: blk6):
+	movz w0, #0xb, LSL 0
+	ret
+L3 (SSA Block: blk5):
+	orr w0, wzr, #0xc
+	ret
+L4 (SSA Block: blk4):
+	movz w0, #0xd, LSL 0
+	ret
+L5 (SSA Block: blk3):
+	orr w0, wzr, #0xe
+	ret
+L6 (SSA Block: blk2):
+	orr w0, wzr, #0xf
+	ret
+L7 (SSA Block: blk1):
+	orr w0, wzr, #0x10
+	ret
+`,
+			afterFinalizeARM64: `
+L1 (SSA Block: blk0):
+	str x30, [sp, #-0x10]!
+	orr w8, wzr, #0x6
+	subs wzr, w2, w8
+	csel w8, w8, w2, hs
+	adr x27, #16; ldrsw x8, [x27, x8, UXTW 2]; add x27, x27, x8; br x27; [0x1c 0x28 0x34 0x40 0x4c 0x58 0x1c]
+L2 (SSA Block: blk6):
+	movz w0, #0xb, LSL 0
+	ldr x30, [sp], #0x10
+	ret
+L3 (SSA Block: blk5):
+	orr w0, wzr, #0xc
+	ldr x30, [sp], #0x10
+	ret
+L4 (SSA Block: blk4):
+	movz w0, #0xd, LSL 0
+	ldr x30, [sp], #0x10
+	ret
+L5 (SSA Block: blk3):
+	orr w0, wzr, #0xe
+	ldr x30, [sp], #0x10
+	ret
+L6 (SSA Block: blk2):
+	orr w0, wzr, #0xf
+	ldr x30, [sp], #0x10
+	ret
+L7 (SSA Block: blk1):
+	orr w0, wzr, #0x10
+	ldr x30, [sp], #0x10
+	ret
+`,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ssab := ssa.NewBuilder()

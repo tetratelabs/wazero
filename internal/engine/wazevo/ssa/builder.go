@@ -696,6 +696,9 @@ func (b *builder) LayoutBlocks() {
 		if len(blk.success) < 2 {
 			// There won't be critical edge originating from this block.
 			continue
+		} else if blk.currentInstr.opcode == OpcodeBrTable {
+			// We don't split critical edges here, because at the construction site of BrTable, we already split the edges.
+			continue
 		}
 
 		for sidx, succ := range blk.success {

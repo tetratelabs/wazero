@@ -176,7 +176,7 @@ func Test_maybeInvertBranch(t *testing.T) {
 
 func TestBuilder_splitCriticalEdge(t *testing.T) {
 	b := NewBuilder().(*builder)
-	predBlk, dummyBlk := b.allocateBasicBlock(), b.allocateBasicBlock()
+	predBlk, dummyBlk, dummyBlk2 := b.allocateBasicBlock(), b.allocateBasicBlock(), b.allocateBasicBlock()
 	predBlk.reversePostOrder = 100
 	b.SetCurrentBlock(predBlk)
 	inst := b.AllocateInstruction()
@@ -187,7 +187,7 @@ func TestBuilder_splitCriticalEdge(t *testing.T) {
 	originalBrz.AsBrz(v, nil, dummyBlk)
 	b.InsertInstruction(originalBrz)
 	dummyJump := b.AllocateInstruction()
-	dummyJump.AsJump(nil, dummyBlk)
+	dummyJump.AsJump(nil, dummyBlk2)
 	b.InsertInstruction(dummyJump)
 
 	predInfo := &basicBlockPredecessorInfo{blk: predBlk, branch: originalBrz}

@@ -3,6 +3,7 @@ package arm64
 import (
 	"fmt"
 	"math"
+	"strings"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
@@ -26,6 +27,7 @@ type (
 		rd, rm, rn, ra     operand
 		amode              addressMode
 		abi                *abiImpl
+		targets            []uint32
 		addedAfterLowering bool
 	}
 
@@ -69,6 +71,7 @@ var defKinds = [numInstructionKinds]defKind{
 	exitSequence:    defKindNone,
 	condBr:          defKindNone,
 	br:              defKindNone,
+	brTableSequence: defKindNone,
 	cSet:            defKindRD,
 	extend:          defKindRD,
 	fpuCmp:          defKindNone,
@@ -166,6 +169,7 @@ var useKinds = [numInstructionKinds]useKind{
 	exitSequence:    useKindRN,
 	condBr:          useKindCond,
 	br:              useKindNone,
+	brTableSequence: useKindRN,
 	cSet:            useKindNone,
 	extend:          useKindRN,
 	fpuCmp:          useKindRNRM,
@@ -488,6 +492,16 @@ func (i *instruction) asBr(target label) {
 	}
 	i.kind = br
 	i.u1 = uint64(target)
+}
+
+func (i *instruction) asBrTableSequence(indexReg regalloc.VReg, targets []uint32) {
+	i.kind = brTableSequence
+	i.rn = operandNR(indexReg)
+	i.targets = targets
+}
+
+func (i *instruction) brTableSequenceOffsetsResolved() {
+	i.u3 = 1 // indicate that the offsets are resolved, for debugging.
 }
 
 func (i *instruction) brLabel() label {
@@ -1028,8 +1042,29 @@ func (i *instruction) String() (str string) {
 		panic("TODO")
 	case word8:
 		panic("TODO")
-	case jtSequence:
-		panic("TODO")
+	case brTableSequence:
+		if i.u3 == 0 { // The offsets haven't been resolved yet.
+			labels := make([]string, len(i.targets))
+			for index, l := range i.targets {
+				labels[index] = label(l).String()
+			}
+			str = fmt.Sprintf("br_table_sequence %s, [%s]",
+				formatVRegSized(i.rn.nr(), 64),
+				strings.Join(labels, ", "),
+			)
+		} else {
+			// See encodeBrTableSequence for the encoding.
+			offsets := make([]string, len(i.targets))
+			for index, offset := range i.targets {
+				offsets[index] = fmt.Sprintf("%#x", int32(offset))
+			}
+			str = fmt.Sprintf(
+				`adr %[2]s, #16; ldrsw %[1]s, [%[2]s, %[1]s, UXTW 2]; add %[2]s, %[2]s, %[1]s; br %[2]s; %s`,
+				formatVRegSized(i.rn.nr(), 64),
+				formatVRegSized(tmpRegVReg, 64),
+				offsets,
+			)
+		}
 	case loadAddr:
 		panic("TODO")
 	case exitSequence:
@@ -1208,8 +1243,8 @@ const (
 	word4
 	// word8 represents a raw 64-bit word.
 	word8
-	// jtSequence represents a jump-table sequence.
-	jtSequence
+	// brTableSequence represents a jump-table sequence.
+	brTableSequence
 	// loadAddr represents a load address instruction.
 	loadAddr
 	// exitSequence consists of multiple instructions, and exits the execution immediately.
@@ -1571,6 +1606,8 @@ func (i *instruction) size() int64 {
 		return 4 + 4 + 8
 	case loadFpuConst128:
 		return 4 + 4 + 12
+	case brTableSequence:
+		return 4*4 + int64(len(i.targets))*4
 	default:
 		return 4
 	}

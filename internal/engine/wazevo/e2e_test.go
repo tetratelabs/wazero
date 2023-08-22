@@ -198,6 +198,36 @@ func TestE2E(t *testing.T) {
 				{params: []uint64{math.MaxUint32}, expErr: "invalid table access"}, // Out of bounds.
 			},
 		},
+		{
+			name: "br_table",
+			m:    testcases.BrTable.Module,
+			calls: []callCase{
+				{params: []uint64{0}, expResults: []uint64{11}},
+				{params: []uint64{1}, expResults: []uint64{12}},
+				{params: []uint64{2}, expResults: []uint64{13}},
+				{params: []uint64{3}, expResults: []uint64{14}},
+				{params: []uint64{4}, expResults: []uint64{15}},
+				{params: []uint64{5}, expResults: []uint64{16}},
+				// Out of range --> default.
+				{params: []uint64{6}, expResults: []uint64{11}},
+				{params: []uint64{1000}, expResults: []uint64{11}},
+			},
+		},
+		{
+			name: "br_table_with_args",
+			m:    testcases.BrTableWithArg.Module,
+			calls: []callCase{
+				{params: []uint64{0, 100}, expResults: []uint64{11 + 100}},
+				{params: []uint64{1, 100}, expResults: []uint64{12 + 100}},
+				{params: []uint64{2, 100}, expResults: []uint64{13 + 100}},
+				{params: []uint64{3, 100}, expResults: []uint64{14 + 100}},
+				{params: []uint64{4, 100}, expResults: []uint64{15 + 100}},
+				{params: []uint64{5, 100}, expResults: []uint64{16 + 100}},
+				// Out of range --> default.
+				{params: []uint64{6, 200}, expResults: []uint64{11 + 200}},
+				{params: []uint64{1000, 300}, expResults: []uint64{11 + 300}},
+			},
+		},
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {

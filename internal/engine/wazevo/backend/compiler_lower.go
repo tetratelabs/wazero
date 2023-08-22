@@ -97,16 +97,17 @@ func (c *compiler) lowerBranches(br0, br1 *ssa.Instruction) {
 		c.mach.FlushPendingInstructions()
 	}
 
-	_, args, target := br0.BranchData()
-	argExists := len(args) != 0
-	if argExists && br1 != nil {
-		panic("BUG: critical edge split failed")
-	}
-
-	if argExists && target.ReturnBlock() {
-		c.lowerFunctionReturns(args)
-	} else if argExists {
-		c.lowerBlockArguments(args, target)
+	if br0.Opcode() == ssa.OpcodeJump {
+		_, args, target := br0.BranchData()
+		argExists := len(args) != 0
+		if argExists && br1 != nil {
+			panic("BUG: critical edge split failed")
+		}
+		if argExists && target.ReturnBlock() {
+			c.lowerFunctionReturns(args)
+		} else if argExists {
+			c.lowerBlockArguments(args, target)
+		}
 	}
 	c.mach.FlushPendingInstructions()
 }

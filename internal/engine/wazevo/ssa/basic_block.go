@@ -194,7 +194,10 @@ func (bb *basicBlock) InsertInstruction(next *Instruction) {
 		target := next.blk.(*basicBlock)
 		target.addPred(bb, next)
 	case OpcodeBrTable:
-		panic(OpcodeBrTable)
+		for _, _target := range next.targets {
+			target := _target.(*basicBlock)
+			target.addPred(bb, next)
+		}
 	}
 }
 
@@ -252,7 +255,17 @@ func (bb *basicBlock) addPred(blk BasicBlock, branch *Instruction) {
 	if bb.sealed {
 		panic("BUG: trying to add predecessor to a sealed block: " + bb.Name())
 	}
+
 	pred := blk.(*basicBlock)
+	for i := range bb.preds {
+		existingPred := &bb.preds[i]
+		if existingPred.blk == pred && existingPred.branch != branch {
+			// If the target is already added, then this must come from the same BrTable,
+			// otherwise such redundant branch should be eliminated by the frontend. (which should be simpler).
+			panic(fmt.Sprintf("BUG: redundant non BrTable jumps in %s whose targes are the same", bb.Name()))
+		}
+	}
+
 	bb.preds = append(bb.preds, basicBlockPredecessorInfo{
 		blk:    pred,
 		branch: branch,

@@ -39,8 +39,7 @@ type (
 		addendsWorkQueue []ssa.Value
 		addends32        []addend32
 		// addends64 is used during address lowering, defined here for reuse.
-		addends64 []regalloc.VReg
-
+		addends64              []regalloc.VReg
 		unresolvedAddressModes []*instruction
 
 		// spillSlotSize is the size of the stack slot in bytes used for spilling registers.
@@ -334,7 +333,7 @@ func (m *machine) ResolveRelativeAddresses() {
 			offsetOfTarget := m.labelPositions[target].binaryOffset
 			diff := offsetOfTarget - currentOffset
 			if diff%4 != 0 {
-				panic("Invalid binary; offsets between b and the target must be a multiple of 4")
+				panic("BUG: offsets between b and the target must be a multiple of 4")
 			}
 			divided := diff >> 2
 			if divided < minSignedInt26 || divided > maxSignedInt26 {
@@ -348,7 +347,7 @@ func (m *machine) ResolveRelativeAddresses() {
 				offsetOfTarget := m.labelPositions[target].binaryOffset
 				diff := offsetOfTarget - currentOffset
 				if diff%4 != 0 {
-					panic("Invalid binary; offsets between b and the target must be a multiple of 4")
+					panic("BUG: offsets between b and the target must be a multiple of 4")
 				}
 				divided := diff >> 2
 				if divided < minSignedInt19 || divided > maxSignedInt19 {
@@ -358,6 +357,14 @@ func (m *machine) ResolveRelativeAddresses() {
 				}
 				cur.condBrOffsetResolve(diff)
 			}
+		case brTableSequence:
+			for i := range cur.targets {
+				l := label(cur.targets[i])
+				offsetOfTarget := m.labelPositions[l].binaryOffset
+				diff := offsetOfTarget - (currentOffset + brTableSequenceOffsetTableBegin)
+				cur.targets[i] = uint32(diff)
+			}
+			cur.brTableSequenceOffsetsResolved()
 		}
 		currentOffset += cur.size()
 	}

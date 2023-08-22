@@ -23,6 +23,7 @@ type Instruction struct {
 	vs         []Value
 	typ        Type
 	blk        BasicBlock
+	targets    []BasicBlock
 	prev, next *Instruction
 
 	rValue  Value
@@ -129,8 +130,8 @@ const (
 	// OpcodeBrnz branches into `blk` with `args`  if the value `c` is not zero: `Brnz c, blk, args`.
 	OpcodeBrnz
 
-	// OpcodeBrTable ...
-	// `BrTable x, block, JT`.
+	// OpcodeBrTable takes the index value `index`, and branches into `labelX`. If the `index` is out of range,
+	// it branches into the last labelN: `BrTable index, [label1, label2, ... labelN]`.
 	OpcodeBrTable
 
 	// OpcodeExitWithCode exit the execution immediately.
@@ -863,6 +864,7 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeReturn:             sideEffectTrue,
 	OpcodeBrz:                sideEffectTrue,
 	OpcodeBrnz:               sideEffectTrue,
+	OpcodeBrTable:            sideEffectTrue,
 	OpcodeFdiv:               sideEffectFalse,
 	OpcodeFmul:               sideEffectFalse,
 	OpcodeFmax:               sideEffectFalse,
@@ -948,6 +950,7 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeReturn:             returnTypesFnNoReturns,
 	OpcodeBrz:                returnTypesFnNoReturns,
 	OpcodeBrnz:               returnTypesFnNoReturns,
+	OpcodeBrTable:            returnTypesFnNoReturns,
 	OpcodeUload8:             returnTypesFnSingle,
 	OpcodeUload16:            returnTypesFnSingle,
 	OpcodeUload32:            returnTypesFnSingle,
@@ -1228,6 +1231,16 @@ func (i *Instruction) BranchData() (condVal Value, blockArgs []Value, target Bas
 	return
 }
 
+// BrTableData returns the branch table data for this instruction necessary for backends.
+func (i *Instruction) BrTableData() (index Value, targets []BasicBlock) {
+	if i.opcode != OpcodeBrTable {
+		panic("BUG: BrTableData only available for OpcodeBrTable")
+	}
+	index = i.v
+	targets = i.targets
+	return
+}
+
 // AsJump initializes this instruction as a jump instruction with OpcodeJump.
 func (i *Instruction) AsJump(vs []Value, target BasicBlock) {
 	i.opcode = OpcodeJump
@@ -1265,6 +1278,13 @@ func (i *Instruction) AsBrnz(v Value, args []Value, target BasicBlock) {
 	i.v = v
 	i.vs = args
 	i.blk = target
+}
+
+// AsBrTable initializes this instruction as a branch-table instruction with OpcodeBrTable.
+func (i *Instruction) AsBrTable(index Value, targets []BasicBlock) {
+	i.opcode = OpcodeBrTable
+	i.v = index
+	i.targets = targets
 }
 
 // AsCall initializes this instruction as a call instruction with OpcodeCall.
@@ -1467,6 +1487,19 @@ func (i *Instruction) Format(b Builder) string {
 			vs[idx+2] = i.vs[idx].Format(b)
 		}
 		instSuffix = strings.Join(vs, ", ")
+	case OpcodeBrTable:
+		// `BrTable index, [label1, label2, ... labelN]`
+		instSuffix = fmt.Sprintf(" %s", i.v.Format(b))
+		instSuffix += ", ["
+		for i, target := range i.targets {
+			blk := target.(*basicBlock)
+			if i == 0 {
+				instSuffix += blk.Name()
+			} else {
+				instSuffix += ", " + blk.Name()
+			}
+		}
+		instSuffix += "]"
 	case OpcodeIshl, OpcodeSshr, OpcodeUshr:
 		instSuffix = fmt.Sprintf(" %s, %s", i.v.Format(b), i.v2.Format(b))
 	case OpcodeUndefined:
