@@ -134,6 +134,8 @@ func (m *machine) Reset() {
 	m.spillSlotSize = 0
 	m.unresolvedAddressModes = m.unresolvedAddressModes[:0]
 	m.rootInstr = nil
+	m.ssaBlockIDToLabels = m.ssaBlockIDToLabels[:0]
+	m.perBlockHead, m.perBlockEnd = nil, nil
 }
 
 // InitializeABI implements backend.Machine InitializeABI.

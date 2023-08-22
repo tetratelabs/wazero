@@ -192,6 +192,7 @@ func (b *builder) Init(s *Signature) {
 	b.currentSignature = s
 	b.returnBlk.reset()
 	b.instructionsPool.Reset()
+	b.basicBlocksPool.Reset()
 	b.donePasses = false
 	for _, sig := range b.signatures {
 		sig.used = false
