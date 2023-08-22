@@ -909,7 +909,13 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		}
 
 		index := state.pop()
-		c.lowerBrTable(labels, index)
+		if labelCount == 0 { // If this br_table is empty, we can just emit the unconditional jump.
+			targetBlk, argNum := state.brTargetArgNumFor(labels[0])
+			args := c.loweringState.nPeekDup(argNum)
+			c.insertJumpToBlock(args, targetBlk)
+		} else {
+			c.lowerBrTable(labels, index)
+		}
 		state.unreachable = true
 
 	case wasm.OpcodeNop:
