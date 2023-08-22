@@ -39,8 +39,8 @@ type (
 		addendsWorkQueue []ssa.Value
 		addends32        []addend32
 		// addends64 is used during address lowering, defined here for reuse.
-		addends64 []regalloc.VReg
-
+		addends64              []regalloc.VReg
+		brTablesTargets        [][]ssa.BasicBlock
 		unresolvedAddressModes []*instruction
 
 		// spillSlotSize is the size of the stack slot in bytes used for spilling registers.
@@ -135,6 +135,7 @@ func (m *machine) Reset() {
 	m.spillSlotSize = 0
 	m.unresolvedAddressModes = m.unresolvedAddressModes[:0]
 	m.rootInstr = nil
+	m.brTablesTargets = m.brTablesTargets[:0]
 }
 
 // InitializeABI implements backend.Machine InitializeABI.

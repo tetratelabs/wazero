@@ -14,10 +14,9 @@ import (
 
 // LowerSingleBranch implements backend.Machine.
 func (m *machine) LowerSingleBranch(br *ssa.Instruction) {
-	_, _, targetBlk := br.BranchData()
-
 	switch br.Opcode() {
 	case ssa.OpcodeJump:
+		_, _, targetBlk := br.BranchData()
 		if br.IsFallthroughJump() {
 			return
 		}
@@ -30,10 +29,42 @@ func (m *machine) LowerSingleBranch(br *ssa.Instruction) {
 		}
 		m.insert(b)
 	case ssa.OpcodeBrTable:
-		panic("TODO: support OpcodeBrTable")
+		m.lowerBrTable(br)
 	default:
 		panic("BUG: unexpected branch opcode" + br.Opcode().String())
 	}
+}
+
+func (m *machine) lowerBrTable(i *ssa.Instruction) {
+	index, targets := i.BrTableData()
+	indexOperand := m.getOperand_NR(m.compiler.ValueDefinition(index), extModeNone)
+
+	// Firstly, we have to do the bounds check of the index, and
+	// set it to the default target (sitting at the end of the list) if it's out of bounds.
+
+	// mov  maxIndexReg #maximum_index
+	// subs wzr, index, maxIndexReg
+	// csel adjustedIndex, maxIndexReg, index, hs ;; if index is higher or equal than maxIndexReg.
+	maxIndexReg := m.compiler.AllocateVReg(regalloc.RegTypeInt)
+	m.lowerConstantI32(maxIndexReg, int32(len(targets)-1))
+	subs := m.allocateInstr()
+	subs.asALU(aluOpSubS, operandNR(xzrVReg), indexOperand, operandNR(maxIndexReg), false)
+	m.insert(subs)
+	csel := m.allocateInstr()
+	adjustedIndex := m.compiler.AllocateVReg(regalloc.RegTypeInt)
+	csel.asCSel(operandNR(adjustedIndex), operandNR(maxIndexReg), indexOperand, hs, false)
+	m.insert(csel)
+
+	brSequence := m.allocateInstr()
+
+	// TODO: reuse the slice!
+	labels := make([]label, len(targets))
+	for j, target := range targets {
+		labels[j] = m.getOrAllocateSSABlockLabel(target)
+	}
+
+	brSequence.asBrTableSequence(adjustedIndex, labels)
+	m.insert(brSequence)
 }
 
 // LowerConditionalBranch implements backend.Machine.

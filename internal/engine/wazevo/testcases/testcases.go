@@ -1275,6 +1275,69 @@ var (
 			},
 		},
 	}
+
+	BrTable = TestCase{
+		Module: &wasm.Module{
+			TypeSection:     []wasm.FunctionType{i32_i32, {}},
+			ExportSection:   []wasm.Export{{Name: ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 0}},
+			FunctionSection: []wasm.Index{0},
+			CodeSection: []wasm.Code{
+				{Body: []byte{
+					wasm.OpcodeBlock, 1, // Signature v_v,
+					wasm.OpcodeBlock, 1, // Signature v_v,
+					wasm.OpcodeBlock, 1, // Signature v_v,
+					wasm.OpcodeBlock, 1, // Signature v_v,
+					wasm.OpcodeBlock, 1, // Signature v_v,
+					wasm.OpcodeBlock, 1, // Signature v_v,
+					wasm.OpcodeLocalGet, 0,
+					wasm.OpcodeBrTable,
+					6,                // size of label vector
+					0, 1, 2, 3, 4, 5, // labels.
+					0, // default label
+					wasm.OpcodeEnd, wasm.OpcodeI32Const, 11, wasm.OpcodeReturn,
+					wasm.OpcodeEnd, wasm.OpcodeI32Const, 12, wasm.OpcodeReturn,
+					wasm.OpcodeEnd, wasm.OpcodeI32Const, 13, wasm.OpcodeReturn,
+					wasm.OpcodeEnd, wasm.OpcodeI32Const, 14, wasm.OpcodeReturn,
+					wasm.OpcodeEnd, wasm.OpcodeI32Const, 15, wasm.OpcodeReturn,
+					wasm.OpcodeEnd, wasm.OpcodeI32Const, 16, wasm.OpcodeReturn,
+					wasm.OpcodeEnd,
+				}},
+			},
+		},
+	}
+
+	BrTableWithArg = TestCase{
+		Name: "br_table_with_arg",
+		Module: &wasm.Module{
+			TypeSection:     []wasm.FunctionType{i32i32_i32, v_i32},
+			ExportSection:   []wasm.Export{{Name: ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 0}},
+			FunctionSection: []wasm.Index{0},
+			CodeSection: []wasm.Code{
+				{Body: []byte{
+					wasm.OpcodeBlock, 1, // Signature v_i32,
+					wasm.OpcodeBlock, 1, // Signature v_i32,
+					wasm.OpcodeBlock, 1, // Signature v_i32,
+					wasm.OpcodeBlock, 1, // Signature v_i32,
+					wasm.OpcodeBlock, 1, // Signature v_i32,
+					wasm.OpcodeBlock, 1, // Signature v_i32,
+					wasm.OpcodeLocalGet, 1, // Argument to each destination.
+					wasm.OpcodeLocalGet, 0,
+					wasm.OpcodeBrTable,
+					6,                // size of label vector
+					0, 1, 2, 3, 4, 5, // labels.
+					0, // default label
+					wasm.OpcodeEnd, wasm.OpcodeI32Const, 11, wasm.OpcodeI32Add, wasm.OpcodeReturn,
+					wasm.OpcodeEnd, wasm.OpcodeI32Const, 12, wasm.OpcodeI32Add, wasm.OpcodeReturn,
+					wasm.OpcodeEnd, wasm.OpcodeI32Const, 13, wasm.OpcodeI32Add, wasm.OpcodeReturn,
+					wasm.OpcodeEnd, wasm.OpcodeI32Const, 14, wasm.OpcodeI32Add, wasm.OpcodeReturn,
+					wasm.OpcodeEnd, wasm.OpcodeI32Const, 15, wasm.OpcodeI32Add, wasm.OpcodeReturn,
+					wasm.OpcodeEnd, wasm.OpcodeI32Const, 16, wasm.OpcodeI32Add, wasm.OpcodeReturn,
+					wasm.OpcodeUnreachable,
+					wasm.OpcodeEnd,
+				}},
+			},
+		},
+	}
 )
 
 type TestCase struct {

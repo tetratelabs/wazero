@@ -1460,6 +1460,37 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
 	Jump blk_ret, v19
 `,
 		},
+		{
+			name: "br_table", m: testcases.BrTable.Module,
+			exp: `
+blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
+	BrTable v2, [blk6, blk5, blk4, blk3, blk2, blk1, blk6]
+
+blk1: () <-- (blk0)
+	v8:i32 = Iconst_32 0x10
+	Return v8
+
+blk2: () <-- (blk0)
+	v7:i32 = Iconst_32 0xf
+	Return v7
+
+blk3: () <-- (blk0)
+	v6:i32 = Iconst_32 0xe
+	Return v6
+
+blk4: () <-- (blk0)
+	v5:i32 = Iconst_32 0xd
+	Return v5
+
+blk5: () <-- (blk0)
+	v4:i32 = Iconst_32 0xc
+	Return v4
+
+blk6: () <-- (blk0,blk0)
+	v3:i32 = Iconst_32 0xb
+	Return v3
+		`,
+		},
 	} {
 
 		tc := tc

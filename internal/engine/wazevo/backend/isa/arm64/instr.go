@@ -2,10 +2,10 @@ package arm64
 
 import (
 	"fmt"
-	"math"
-
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
+	"math"
+	"strings"
 )
 
 type (
@@ -26,6 +26,7 @@ type (
 		rd, rm, rn, ra     operand
 		amode              addressMode
 		abi                *abiImpl
+		targets            []label
 		addedAfterLowering bool
 	}
 
@@ -69,6 +70,7 @@ var defKinds = [numInstructionKinds]defKind{
 	exitSequence:    defKindNone,
 	condBr:          defKindNone,
 	br:              defKindNone,
+	brTableSequence: defKindNone,
 	cSet:            defKindRD,
 	extend:          defKindRD,
 	fpuCmp:          defKindNone,
@@ -166,6 +168,7 @@ var useKinds = [numInstructionKinds]useKind{
 	exitSequence:    useKindRN,
 	condBr:          useKindCond,
 	br:              useKindNone,
+	brTableSequence: useKindRN,
 	cSet:            useKindNone,
 	extend:          useKindRN,
 	fpuCmp:          useKindRNRM,
@@ -488,6 +491,12 @@ func (i *instruction) asBr(target label) {
 	}
 	i.kind = br
 	i.u1 = uint64(target)
+}
+
+func (i *instruction) asBrTableSequence(indexReg regalloc.VReg, targets []label) {
+	i.kind = brTableSequence
+	i.rn = operandNR(indexReg)
+	i.targets = targets
 }
 
 func (i *instruction) brLabel() label {
@@ -1028,8 +1037,15 @@ func (i *instruction) String() (str string) {
 		panic("TODO")
 	case word8:
 		panic("TODO")
-	case jtSequence:
-		panic("TODO")
+	case brTableSequence:
+		var labels = []string{}
+		for _, l := range i.targets {
+			labels = append(labels, l.String())
+		}
+		str = fmt.Sprintf("br_table_sequence %s, [%s]",
+			formatVRegSized(i.rn.nr(), 64),
+			strings.Join(labels, ", "),
+		)
 	case loadAddr:
 		panic("TODO")
 	case exitSequence:
@@ -1208,8 +1224,8 @@ const (
 	word4
 	// word8 represents a raw 64-bit word.
 	word8
-	// jtSequence represents a jump-table sequence.
-	jtSequence
+	// brTableSequence represents a jump-table sequence.
+	brTableSequence
 	// loadAddr represents a load address instruction.
 	loadAddr
 	// exitSequence consists of multiple instructions, and exits the execution immediately.
