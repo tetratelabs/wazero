@@ -3,7 +3,6 @@ package wazevo
 import (
 	"context"
 	"encoding/binary"
-	"fmt"
 	"reflect"
 	"unsafe"
 
@@ -117,8 +116,6 @@ func (c *callEngine) CallWithStack(ctx context.Context, paramResultStack []uint6
 	if len(paramResultStack) > 0 {
 		paramResultPtr = &paramResultStack[0]
 	}
-
-	fmt.Printf("stackGrowCallSequenceAddress ===== %#x\n", c.execCtx.stackGrowCallSequenceAddress)
 
 	entrypoint(c.executable, c.execCtxPtr, c.parent.opaquePtr, paramResultPtr, c.stackTop)
 	for {
