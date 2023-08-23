@@ -124,21 +124,23 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []exper
 			return fmt.Errorf("wasm->ssa: %v", err)
 		}
 
-		if true {
+		const debug = false
+
+		if debug {
 			fmt.Printf("[[[SSA for %d/%d]]]%s\n", i, len(module.CodeSection)-1, ssaBuilder.Format())
 		}
 
 		// Run SSA-level optimization passes.
 		ssaBuilder.RunPasses()
 
-		if true {
+		if debug {
 			fmt.Printf("[[[optimized SSA for %d/%d]]]%s", i, len(module.CodeSection)-1, ssaBuilder.Format())
 		}
 
 		// Finalize the layout of SSA blocks which might use the optimization results.
 		ssaBuilder.LayoutBlocks()
 
-		if true {
+		if debug {
 			fmt.Printf("[[[laidout SSA for %d/%d]]]%s", i, len(module.CodeSection)-1, ssaBuilder.Format())
 		}
 
