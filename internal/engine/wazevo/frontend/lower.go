@@ -124,7 +124,7 @@ func (l *loweringState) ctrlPeekAt(n int) (ret *controlFrame) {
 	return &l.controlFrames[tail-n]
 }
 
-const debug = true
+const debug = false
 
 // lowerBody lowers the body of the Wasm function to the SSA form.
 func (c *Compiler) lowerBody(entryBlk ssa.BasicBlock) {
