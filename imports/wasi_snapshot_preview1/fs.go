@@ -7,7 +7,6 @@ import (
 	"math"
 	"path"
 	"strings"
-	"syscall"
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/api"
@@ -1463,7 +1462,7 @@ func pathFilestatSetTimesFn(_ context.Context, mod api.Module, params []uint64) 
 		return preopen.Utimens(pathName, atim, mtim)
 	}
 	// Otherwise, we need to emulate don't follow by opening the file by path.
-	if f, errno := preopen.OpenFile(pathName, syscall.O_WRONLY, 0); errno != 0 {
+	if f, errno := preopen.OpenFile(pathName, experimentalsys.O_WRONLY, 0); errno != 0 {
 		return errno
 	} else {
 		defer f.Close()
