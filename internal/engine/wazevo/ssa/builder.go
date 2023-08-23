@@ -861,7 +861,7 @@ invert:
 	return true
 }
 
-const debug = true
+const debug = false
 
 // splitCriticalEdge splits the critical edge between the given predecessor (`pred`) and successor (owning `predInfo`).
 //

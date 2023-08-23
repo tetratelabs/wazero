@@ -16,11 +16,13 @@ func (c *compiler) Lower() {
 	c.mach.EndLoweringFunction()
 }
 
+const debug = false
+
 // lowerBlocks lowers each block in the ssa.Builder.
 func (c *compiler) lowerBlocks() {
 	builder := c.ssaBuilder
 	for blk := builder.BlockIteratorReversePostOrderBegin(); blk != nil; blk = builder.BlockIteratorReversePostOrderNext() {
-		if true {
+		if debug {
 			fmt.Printf("lowering block %s\n", blk.Name())
 		}
 		c.lowerBlock(blk)
@@ -69,7 +71,7 @@ func (c *compiler) lowerBlock(blk ssa.BasicBlock) {
 			continue
 		}
 
-		if true {
+		if debug {
 			fmt.Printf("\tlowering instr %s\n", cur.Format(c.ssaBuilder))
 		}
 
