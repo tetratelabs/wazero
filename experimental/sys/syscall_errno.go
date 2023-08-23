@@ -40,6 +40,8 @@ func syscallToErrno(err error) (Errno, bool) {
 		return ENOSYS, true
 	case syscall.ENOTDIR:
 		return ENOTDIR, true
+	case syscall.ERANGE:
+		return ERANGE, true
 	case syscall.ENOTEMPTY:
 		return ENOTEMPTY, true
 	case syscall.ENOTSOCK:
