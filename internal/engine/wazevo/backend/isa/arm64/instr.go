@@ -98,6 +98,7 @@ var defKinds = [numInstructionKinds]defKind{
 	movFromVec:      defKindRD,
 	vecMisc:         defKindRD,
 	vecLanes:        defKindRD,
+	intToFpu:        defKindRD,
 }
 
 // defs returns the list of regalloc.VReg that are defined by the instruction.
@@ -196,6 +197,7 @@ var useKinds = [numInstructionKinds]useKind{
 	movFromVec:      useKindRN,
 	vecMisc:         useKindRN,
 	vecLanes:        useKindRN,
+	intToFpu:        useKindRN,
 }
 
 // uses returns the list of regalloc.VReg that are used by the instruction.
@@ -683,31 +685,31 @@ func (i *instruction) asFpuMov128(rd, rn regalloc.VReg) {
 	i.rn, i.rd = operandNR(rn), operandNR(rd)
 }
 
-func (i *instruction) asMovToVec(rd, rn regalloc.VReg, arr vecArrangement, index vecIndex) {
+func (i *instruction) asMovToVec(rd, rn operand, arr vecArrangement, index vecIndex) {
 	i.kind = movToVec
-	i.rd = operandNR(rd)
-	i.rn = operandNR(rn)
+	i.rd = rd
+	i.rn = rn
 	i.u1, i.u2 = uint64(arr), uint64(index)
 }
 
-func (i *instruction) asMovFromVec(rd, rn regalloc.VReg, arr vecArrangement, index vecIndex) {
+func (i *instruction) asMovFromVec(rd, rn operand, arr vecArrangement, index vecIndex) {
 	i.kind = movFromVec
-	i.rd = operandNR(rd)
-	i.rn = operandNR(rn)
+	i.rd = rd
+	i.rn = rn
 	i.u1, i.u2 = uint64(arr), uint64(index)
 }
 
-func (i *instruction) asVecMisc(op vecOp, rd, rn regalloc.VReg, arr vecArrangement) {
+func (i *instruction) asVecMisc(op vecOp, rd, rn operand, arr vecArrangement) {
 	i.kind = vecMisc
 	i.u1 = uint64(op)
-	i.rn, i.rd = operandNR(rn), operandNR(rd)
+	i.rn, i.rd = rn, rd
 	i.u2 = uint64(arr)
 }
 
-func (i *instruction) asVecLanes(op vecOp, rd, rn regalloc.VReg, arr vecArrangement) {
+func (i *instruction) asVecLanes(op vecOp, rd, rn operand, arr vecArrangement) {
 	i.kind = vecLanes
 	i.u1 = uint64(op)
-	i.rn, i.rd = operandNR(rn), operandNR(rd)
+	i.rn, i.rd = rn, rd
 	i.u2 = uint64(arr)
 }
 
@@ -905,7 +907,23 @@ func (i *instruction) String() (str string) {
 	case fpuToInt:
 		panic("TODO")
 	case intToFpu:
-		panic("TODO")
+		var op, src, dst string
+		if signed := i.u1 == 1; signed {
+			op = "scvtf"
+		} else {
+			op = "ucvtf"
+		}
+		if src64 := i.u2 == 1; src64 {
+			src = formatVRegSized(i.rn.nr(), 64)
+		} else {
+			src = formatVRegSized(i.rn.nr(), 32)
+		}
+		if dst64 := i.u3 == 1; dst64 {
+			dst = formatVRegWidthVec(i.rd.nr(), vecArrangementD)
+		} else {
+			dst = formatVRegWidthVec(i.rd.nr(), vecArrangementS)
+		}
+		str = fmt.Sprintf("%s %s, %s", op, dst, src)
 	case fpuCSel:
 		size := is64SizeBitToSize(i.u3)
 		str = fmt.Sprintf("fcsel %s, %s, %s, %s",
@@ -960,10 +978,19 @@ func (i *instruction) String() (str string) {
 	case vecRRR:
 		panic("TODO")
 	case vecMisc:
-		str = fmt.Sprintf("%s %s, %s",
-			vecOp(i.u1),
-			formatVRegVec(i.rd.nr(), vecArrangement(i.u2), vecIndexNone),
-			formatVRegVec(i.rn.nr(), vecArrangement(i.u2), vecIndexNone))
+		switch op := vecOp(i.u1); op {
+		case vecOpCvt32To64:
+			str = fmt.Sprintf("%s %s, %s",
+				vecOp(i.u1),
+				formatVRegSized(i.rd.nr(), 64),
+				formatVRegSized(i.rn.nr(), 32),
+			)
+		default:
+			str = fmt.Sprintf("%s %s, %s",
+				vecOp(i.u1),
+				formatVRegVec(i.rd.nr(), vecArrangement(i.u2), vecIndexNone),
+				formatVRegVec(i.rn.nr(), vecArrangement(i.u2), vecIndexNone))
+		}
 	case vecLanes:
 		arr := vecArrangement(i.u2)
 		var destArr vecArrangement
@@ -1263,6 +1290,21 @@ func (i *instruction) asUDF() {
 	i.kind = udf
 }
 
+func (i *instruction) asIntToFpu(rd, rn operand, rnSigned, src64bit, dst64bit bool) {
+	i.kind = intToFpu
+	i.rn = rn
+	i.rd = rd
+	if rnSigned {
+		i.u1 = 1
+	}
+	if src64bit {
+		i.u2 = 1
+	}
+	if dst64bit {
+		i.u3 = 1
+	}
+}
+
 func (i *instruction) asExitSequence(ctx regalloc.VReg) {
 	i.kind = exitSequence
 	i.rn = operandNR(ctx)
@@ -1365,6 +1407,8 @@ func (b vecOp) String() string {
 		return "cnt"
 	case vecOpUaddlv:
 		return "uaddlv"
+	case vecOpCvt32To64:
+		return "fcvt"
 	}
 	panic(int(b))
 }
@@ -1372,6 +1416,7 @@ func (b vecOp) String() string {
 const (
 	vecOpCnt vecOp = iota
 	vecOpUaddlv
+	vecOpCvt32To64
 )
 
 // bitOp determines the type of bitwise operation. Instructions whose kind is one of

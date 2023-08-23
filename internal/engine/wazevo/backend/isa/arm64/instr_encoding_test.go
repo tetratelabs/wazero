@@ -27,14 +27,14 @@ func TestInstruction_encode(t *testing.T) {
 		{want: "41bc631e", setup: func(i *instruction) { i.asFpuCSel(operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), lt, true) }},
 		{want: "41cc231e", setup: func(i *instruction) { i.asFpuCSel(operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), gt, false) }},
 		{want: "41bc231e", setup: func(i *instruction) { i.asFpuCSel(operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), lt, false) }},
-		{want: "411c014e", setup: func(i *instruction) { i.asMovToVec(v1VReg, x2VReg, vecArrangementB, 0) }},
-		{want: "411c024e", setup: func(i *instruction) { i.asMovToVec(v1VReg, x2VReg, vecArrangementH, 0) }},
-		{want: "411c044e", setup: func(i *instruction) { i.asMovToVec(v1VReg, x2VReg, vecArrangementS, 0) }},
-		{want: "411c084e", setup: func(i *instruction) { i.asMovToVec(v1VReg, x2VReg, vecArrangementD, 0) }},
-		{want: "413c010e", setup: func(i *instruction) { i.asMovFromVec(x1VReg, v2VReg, vecArrangementB, 0) }},
-		{want: "413c020e", setup: func(i *instruction) { i.asMovFromVec(x1VReg, v2VReg, vecArrangementH, 0) }},
-		{want: "413c040e", setup: func(i *instruction) { i.asMovFromVec(x1VReg, v2VReg, vecArrangementS, 0) }},
-		{want: "413c084e", setup: func(i *instruction) { i.asMovFromVec(x1VReg, v2VReg, vecArrangementD, 0) }},
+		{want: "411c014e", setup: func(i *instruction) { i.asMovToVec(operandNR(v1VReg), operandNR(x2VReg), vecArrangementB, 0) }},
+		{want: "411c024e", setup: func(i *instruction) { i.asMovToVec(operandNR(v1VReg), operandNR(x2VReg), vecArrangementH, 0) }},
+		{want: "411c044e", setup: func(i *instruction) { i.asMovToVec(operandNR(v1VReg), operandNR(x2VReg), vecArrangementS, 0) }},
+		{want: "411c084e", setup: func(i *instruction) { i.asMovToVec(operandNR(v1VReg), operandNR(x2VReg), vecArrangementD, 0) }},
+		{want: "413c010e", setup: func(i *instruction) { i.asMovFromVec(operandNR(x1VReg), operandNR(v2VReg), vecArrangementB, 0) }},
+		{want: "413c020e", setup: func(i *instruction) { i.asMovFromVec(operandNR(x1VReg), operandNR(v2VReg), vecArrangementH, 0) }},
+		{want: "413c040e", setup: func(i *instruction) { i.asMovFromVec(operandNR(x1VReg), operandNR(v2VReg), vecArrangementS, 0) }},
+		{want: "413c084e", setup: func(i *instruction) { i.asMovFromVec(operandNR(x1VReg), operandNR(v2VReg), vecArrangementD, 0) }},
 		{want: "5b28030b", setup: func(i *instruction) {
 			i.asALU(aluOpAdd, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSL), false)
 		}},
@@ -449,27 +449,56 @@ func TestInstruction_encode(t *testing.T) {
 		{want: "4000c0da", setup: func(i *instruction) { i.asBitRR(bitOpRbit, x0VReg, x2VReg, true) }},
 		{want: "4010c05a", setup: func(i *instruction) { i.asBitRR(bitOpClz, x0VReg, x2VReg, false) }},
 		{want: "4010c0da", setup: func(i *instruction) { i.asBitRR(bitOpClz, x0VReg, x2VReg, true) }},
-		{want: "4138302e", setup: func(i *instruction) { i.asVecLanes(vecOpUaddlv, v1VReg, v2VReg, vecArrangement8B) }},
-		{want: "4138306e", setup: func(i *instruction) { i.asVecLanes(vecOpUaddlv, v1VReg, v2VReg, vecArrangement16B) }},
-		{want: "4138702e", setup: func(i *instruction) { i.asVecLanes(vecOpUaddlv, v1VReg, v2VReg, vecArrangement4H) }},
-		{want: "4138706e", setup: func(i *instruction) { i.asVecLanes(vecOpUaddlv, v1VReg, v2VReg, vecArrangement8H) }},
-		{want: "4138b06e", setup: func(i *instruction) { i.asVecLanes(vecOpUaddlv, v1VReg, v2VReg, vecArrangement4S) }},
-		{want: "4158200e", setup: func(i *instruction) { i.asVecMisc(vecOpCnt, v1VReg, v2VReg, vecArrangement8B) }},
-		{want: "4158204e", setup: func(i *instruction) { i.asVecMisc(vecOpCnt, v1VReg, v2VReg, vecArrangement16B) }},
+		{want: "4138302e", setup: func(i *instruction) {
+			i.asVecLanes(vecOpUaddlv, operandNR(v1VReg), operandNR(v2VReg), vecArrangement8B)
+		}},
+		{want: "4138306e", setup: func(i *instruction) {
+			i.asVecLanes(vecOpUaddlv, operandNR(v1VReg), operandNR(v2VReg), vecArrangement16B)
+		}},
+		{want: "4138702e", setup: func(i *instruction) {
+			i.asVecLanes(vecOpUaddlv, operandNR(v1VReg), operandNR(v2VReg), vecArrangement4H)
+		}},
+		{want: "4138706e", setup: func(i *instruction) {
+			i.asVecLanes(vecOpUaddlv, operandNR(v1VReg), operandNR(v2VReg), vecArrangement8H)
+		}},
+		{want: "4138b06e", setup: func(i *instruction) {
+			i.asVecLanes(vecOpUaddlv, operandNR(v1VReg), operandNR(v2VReg), vecArrangement4S)
+		}},
+		{want: "4158200e", setup: func(i *instruction) { i.asVecMisc(vecOpCnt, operandNR(v1VReg), operandNR(v2VReg), vecArrangement8B) }},
+		{want: "4158204e", setup: func(i *instruction) { i.asVecMisc(vecOpCnt, operandNR(v1VReg), operandNR(v2VReg), vecArrangement16B) }},
+		{want: "41c0221e", setup: func(i *instruction) {
+			i.asVecMisc(vecOpCvt32To64, operandNR(v1VReg), operandNR(v2VReg), vecArrangementNone)
+		}},
+		{want: "4201231e4201631e4201239e4201639e4201221e4201621e4201229e4201629e", setup: func(i *instruction) {
+			i.asNop0()
+			cur := i
+			trueFalse := []bool{false, true}
+			for _, rnSigned := range trueFalse {
+				for _, src64bit := range trueFalse {
+					for _, dst64bit := range trueFalse {
+						i := &instruction{prev: cur}
+						cur.next = i
+						i.asIntToFpu(operandNR(v2VReg), operandNR(x10VReg), rnSigned, src64bit, dst64bit)
+						cur = i
+					}
+				}
+			}
+		}},
 	} {
 		tc := tc
 		t.Run(tc.want, func(t *testing.T) {
 			i := &instruction{}
 			tc.setup(i)
 
-			m := &mockCompiler{}
-			i.encode(m)
+			mc := &mockCompiler{}
+			m := &machine{compiler: mc}
+			m.encode(i)
 			// Note: for quick iteration we can use golang.org/x/arch package to verify the encoding.
 			// 	but wazero doesn't add even a test dependency to it, so commented out.
 			// inst, err := arm64asm.Decode(m.buf)
 			// require.NoError(t, err, hex.EncodeToString(m.buf))
 			// fmt.Println(inst.String())
-			require.Equal(t, tc.want, hex.EncodeToString(m.buf))
+			require.Equal(t, tc.want, hex.EncodeToString(mc.buf))
 		})
 	}
 }

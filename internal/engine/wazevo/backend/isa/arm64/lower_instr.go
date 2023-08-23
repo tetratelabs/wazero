@@ -188,10 +188,33 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		x := instr.UnaryData()
 		result := instr.Return()
 		m.lowerPopcnt(x, result)
+	case ssa.OpcodeFcvtFromSint:
+		x := instr.UnaryData()
+		result := instr.Return()
+		m.lowerIntToFpu(result, x, true, x.Type() == ssa.TypeI64, result.Type().Bits() == 64)
+	case ssa.OpcodeFcvtFromUint:
+		x := instr.UnaryData()
+		result := instr.Return()
+		m.lowerIntToFpu(result, x, false, x.Type() == ssa.TypeI64, result.Type().Bits() == 64)
+	case ssa.OpcodeFpromote:
+		v := instr.UnaryData()
+		rn := m.getOperand_NR(m.compiler.ValueDefinition(v), extModeNone)
+		rd := operandNR(m.compiler.VRegOf(instr.Return()))
+		cnt := m.allocateInstr()
+		cnt.asVecMisc(vecOpCvt32To64, rd, rn, vecArrangementNone)
+		m.insert(cnt)
 	default:
 		panic("TODO: lowering " + instr.Opcode().String())
 	}
 	m.FlushPendingInstructions()
+}
+
+func (m *machine) lowerIntToFpu(dst, src ssa.Value, signed, src64bit, dst64bit bool) {
+	rn := m.getOperand_NR(m.compiler.ValueDefinition(src), extModeNone)
+	rd := operandNR(m.compiler.VRegOf(dst))
+	cvt := m.allocateInstr()
+	cvt.asIntToFpu(rd, rn, signed, src64bit, dst64bit)
+	m.insert(cvt)
 }
 
 func (m *machine) lowerFpuBinOp(si *ssa.Instruction) {
@@ -377,20 +400,20 @@ func (m *machine) lowerPopcnt(x, result ssa.Value) {
 	//    mov x5, v0.d[0]     ;; finally we mov the result back to a GPR
 	//
 
-	rd := m.compiler.VRegOf(result)
+	rd := operandNR(m.compiler.VRegOf(result))
 	rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
 
-	rf1 := m.compiler.AllocateVReg(regalloc.RegTypeFloat)
+	rf1 := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
 	ins := m.allocateInstr()
-	ins.asMovToVec(rf1, rn.nr(), vecArrangementD, vecIndex(0))
+	ins.asMovToVec(rf1, rn, vecArrangementD, vecIndex(0))
 	m.insert(ins)
 
-	rf2 := m.compiler.AllocateVReg(regalloc.RegTypeFloat)
+	rf2 := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
 	cnt := m.allocateInstr()
 	cnt.asVecMisc(vecOpCnt, rf2, rf1, vecArrangement16B)
 	m.insert(cnt)
 
-	rf3 := m.compiler.AllocateVReg(regalloc.RegTypeFloat)
+	rf3 := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
 	uaddlv := m.allocateInstr()
 	uaddlv.asVecLanes(vecOpUaddlv, rf3, rf2, vecArrangement8B)
 	m.insert(uaddlv)

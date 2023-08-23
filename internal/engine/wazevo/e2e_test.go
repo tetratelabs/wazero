@@ -44,6 +44,7 @@ func TestSpectestV1(t *testing.T) {
 		{name: "custom.json"},
 		{name: "const.json"},
 		{name: "data.json"},
+		{name: "local_get.json"},
 		{name: "nop.json"},
 	} {
 		t.Run(tc.name, func(t *testing.T) { spectest.RunJson(t, v1.Testcases, tc.name, context.Background(), config) })

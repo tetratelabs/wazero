@@ -1501,7 +1501,6 @@ blk1: (v4:i32) <-- (blk12)
 	v20:i32 = Iconst_32 0x10
 	v21:i32 = Iadd v4, v20
 	Return v21
-	Exit exec_ctx, unreachable
 
 blk2: (v5:i32) <-- (blk11)
 	v18:i32 = Iconst_32 0xf
@@ -1559,7 +1558,6 @@ blk1: () <-- (blk12)
 	v20:i32 = Iconst_32 0x10
 	v21:i32 = Iadd v3, v20
 	Return v21
-	Exit exec_ctx, unreachable
 
 blk2: () <-- (blk11)
 	v18:i32 = Iconst_32 0xf

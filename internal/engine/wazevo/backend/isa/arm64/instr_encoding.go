@@ -241,12 +241,22 @@ func (i *instruction) encode(c backend.Compiler) {
 			vecIndex(i.u2),
 		))
 	case vecMisc:
-		c.Emit4Bytes(encodeVecMisc(
-			vecOp(i.u1),
-			regNumberInEncoding[i.rd.realReg()],
-			regNumberInEncoding[i.rn.realReg()],
-			vecArrangement(i.u2),
-		))
+		switch op := vecOp(i.u1); op {
+		case vecOpCnt:
+			c.Emit4Bytes(encodeAdvancedSIMDTwoMisc(
+				vecOp(i.u1),
+				regNumberInEncoding[i.rd.realReg()],
+				regNumberInEncoding[i.rn.realReg()],
+				vecArrangement(i.u2),
+			))
+		case vecOpCvt32To64:
+			c.Emit4Bytes(encodeFloatDataOneSource(
+				vecOp(i.u1),
+				regNumberInEncoding[i.rd.realReg()],
+				regNumberInEncoding[i.rn.realReg()],
+				vecArrangement(i.u2),
+			))
+		}
 	case vecLanes:
 		c.Emit4Bytes(encodeVecLanes(
 			vecOp(i.u1),
@@ -256,9 +266,60 @@ func (i *instruction) encode(c backend.Compiler) {
 		))
 	case brTableSequence:
 		encodeBrTableSequence(c, i.rn.reg(), i.targets)
+	case intToFpu:
+		c.Emit4Bytes(encodeCnvBetweenFloatInt(i))
 	default:
 		panic(i.String())
 	}
+}
+
+// encodeFloatDataOneSource encodes as "Floating-point data-processing (1 source)" in
+// https://developer.arm.com/documentation/ddi0596/2020-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en#simd-dp
+func encodeFloatDataOneSource(op vecOp, rd, rn uint32, _ vecArrangement) uint32 {
+	var opcode, ptype uint32
+	switch op {
+	case vecOpCvt32To64:
+		opcode = 0b000101
+	default:
+		panic("BUG")
+	}
+	return 0b1111<<25 | ptype<<22 | 0b1<<21 | opcode<<15 | 0b1<<14 | rn<<5 | rd
+}
+
+// encodeCnvBetweenFloatInt encodes as "Conversion between floating-point and integer" in
+// https://developer.arm.com/documentation/ddi0596/2020-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
+func encodeCnvBetweenFloatInt(i *instruction) uint32 {
+	rd := regNumberInEncoding[i.rd.realReg()]
+	rn := regNumberInEncoding[i.rn.realReg()]
+
+	var opcode uint32
+	var rmode uint32
+	var ptype uint32
+	var sf uint32
+	switch i.kind {
+	case intToFpu: // Either UCVTF or SCVTF.
+		rmode = 0b00
+
+		signed := i.u1 == 1
+		src64bit := i.u2 == 1
+		dst64bit := i.u3 == 1
+		if signed {
+			opcode = 0b010
+		} else {
+			opcode = 0b011
+		}
+		if src64bit {
+			sf = 0b1
+		}
+		if dst64bit {
+			ptype = 0b01
+		} else {
+			ptype = 0b00
+		}
+	case fpuToInt:
+		panic("TODO")
+	}
+	return sf<<31 | 0b1111<<25 | ptype<<22 | 0b1<<21 | rmode<<19 | opcode<<16 | rn<<5 | rd
 }
 
 // encodeAdr encodes a PC-relative ADR instruction.
@@ -993,7 +1054,7 @@ func encodeVecLanes(op vecOp, rd uint32, rn uint32, arr vecArrangement) uint32 {
 
 // encodeVecMisc encodes as Data Processing (Advanced SIMD two-register miscellaneous) depending on vecOp in
 // https://developer.arm.com/documentation/ddi0596/2020-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en#simd-dp
-func encodeVecMisc(op vecOp, rd, rn uint32, arr vecArrangement) uint32 {
+func encodeAdvancedSIMDTwoMisc(op vecOp, rd, rn uint32, arr vecArrangement) uint32 {
 	var q, u, size, opcode uint32
 	switch op {
 	case vecOpCnt:
