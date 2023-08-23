@@ -164,9 +164,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 			return
 		}
 
-		iconst := builder.AllocateInstruction()
-		iconst.AsIconst32(uint32(c))
-		builder.InsertInstruction(iconst)
+		iconst := builder.AllocateInstruction().AsIconst32(uint32(c)).Insert(builder)
 		value := iconst.Return()
 		state.push(value)
 	case wasm.OpcodeI64Const:
@@ -174,9 +172,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		if state.unreachable {
 			return
 		}
-		iconst := builder.AllocateInstruction()
-		iconst.AsIconst64(uint64(c))
-		builder.InsertInstruction(iconst)
+		iconst := builder.AllocateInstruction().AsIconst64(uint64(c)).Insert(builder)
 		value := iconst.Return()
 		state.push(value)
 	case wasm.OpcodeF32Const:
@@ -921,6 +917,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		c.insertJumpToBlock(nil, elseBlk)
 
 		// Now start translating the instructions after br_if.
+		builder.Seal(elseBlk) // Else of br_if has the current block as the only one successor.
 		builder.SetCurrentBlock(elseBlk)
 
 	case wasm.OpcodeBrTable:

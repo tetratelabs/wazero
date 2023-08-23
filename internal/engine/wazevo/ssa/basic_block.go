@@ -285,8 +285,9 @@ func (bb *basicBlock) FormatHeader(b Builder) string {
 		preds := make([]string, 0, len(bb.preds))
 		for _, pred := range bb.preds {
 			if len(pred.branch.vs) != len(bb.params) {
-				panic(fmt.Sprintf("BUG: len(argument) != len(params): %d != %d",
-					len(pred.branch.vs), len(bb.params)))
+				panic(fmt.Sprintf("BUG: len(argument) != len(params): %d != %d: %s",
+					len(pred.branch.vs), len(bb.params), pred.branch.Format(b),
+				))
 			}
 			if pred.blk.invalid {
 				continue

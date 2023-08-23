@@ -1,5 +1,7 @@
 package ssa
 
+import "fmt"
+
 // RunPasses implements Builder.RunPasses.
 //
 // The order here matters; some pass depends on the previous ones.
@@ -38,6 +40,10 @@ func passDeadBlockEliminationOpt(b *builder) {
 		reachableBlk := b.blkStack[len(b.blkStack)-1]
 		b.blkStack = b.blkStack[:len(b.blkStack)-1]
 		b.blkVisited[reachableBlk] = 0 // the value won't be used in this pass.
+
+		if !reachableBlk.sealed && !reachableBlk.ReturnBlock() {
+			panic(fmt.Sprintf("%s is not sealed", reachableBlk))
+		}
 
 		for _, succ := range reachableBlk.success {
 			if _, ok := b.blkVisited[succ]; ok {
@@ -200,7 +206,7 @@ func passDeadCodeEliminationOpt(b *builder) {
 		// Before we walk, we need to resolve the alias first.
 		b.resolveArgumentAlias(live)
 
-		v1, v2, vs := live.Args()
+		v1, v2, v3, vs := live.Args()
 		if v1.Valid() {
 			producingInst := b.valueIDToInstruction[v1.ID()]
 			if producingInst != nil {
@@ -210,6 +216,13 @@ func passDeadCodeEliminationOpt(b *builder) {
 
 		if v2.Valid() {
 			producingInst := b.valueIDToInstruction[v2.ID()]
+			if producingInst != nil {
+				liveInstructions = append(liveInstructions, producingInst)
+			}
+		}
+
+		if v3.Valid() {
+			producingInst := b.valueIDToInstruction[v3.ID()]
 			if producingInst != nil {
 				liveInstructions = append(liveInstructions, producingInst)
 			}
@@ -241,12 +254,15 @@ func passDeadCodeEliminationOpt(b *builder) {
 
 			// If the value alive, we can be sure that arguments are used definitely.
 			// Hence, we can increment the value reference counts.
-			v1, v2, vs := cur.Args()
+			v1, v2, v3, vs := cur.Args()
 			if v1.Valid() {
 				b.valueRefCounts[v1.ID()]++
 			}
 			if v2.Valid() {
 				b.valueRefCounts[v2.ID()]++
+			}
+			if v3.Valid() {
+				b.valueRefCounts[v3.ID()]++
 			}
 			for _, v := range vs {
 				b.valueRefCounts[v.ID()]++

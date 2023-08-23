@@ -20,6 +20,7 @@ type Instruction struct {
 	u64        uint64
 	v          Value
 	v2         Value
+	v3         Value
 	vs         []Value
 	typ        Type
 	blk        BasicBlock
@@ -47,6 +48,7 @@ func (i *Instruction) reset() {
 	*i = Instruction{}
 	i.v = ValueInvalid
 	i.v2 = ValueInvalid
+	i.v3 = ValueInvalid
 	i.rValue = ValueInvalid
 	i.typ = typeInvalid
 }
@@ -78,8 +80,8 @@ func (i *Instruction) Return() (first Value) {
 }
 
 // Args returns the arguments to this instruction.
-func (i *Instruction) Args() (v1, v2 Value, vs []Value) {
-	return i.v, i.v2, i.vs
+func (i *Instruction) Args() (v1, v2, v3 Value, vs []Value) {
+	return i.v, i.v2, i.v3, i.vs
 }
 
 // Arg returns the first argument to this instruction.
@@ -1008,17 +1010,19 @@ func (i *Instruction) StoreData() (value, ptr Value, offset uint32, storeSizeInB
 }
 
 // AsIconst64 initializes this instruction as a 64-bit integer constant instruction with OpcodeIconst.
-func (i *Instruction) AsIconst64(v uint64) {
+func (i *Instruction) AsIconst64(v uint64) *Instruction {
 	i.opcode = OpcodeIconst
 	i.typ = TypeI64
 	i.u64 = v
+	return i
 }
 
 // AsIconst32 initializes this instruction as a 32-bit integer constant instruction with OpcodeIconst.
-func (i *Instruction) AsIconst32(v uint32) {
+func (i *Instruction) AsIconst32(v uint32) *Instruction {
 	i.opcode = OpcodeIconst
 	i.typ = TypeI32
 	i.u64 = uint64(v)
+	return i
 }
 
 // BinaryData return the operands for a binary instruction.
@@ -1027,11 +1031,12 @@ func (i *Instruction) BinaryData() (x, y Value) {
 }
 
 // AsIadd initializes this instruction as an integer addition instruction with OpcodeIadd.
-func (i *Instruction) AsIadd(x, y Value) {
+func (i *Instruction) AsIadd(x, y Value) *Instruction {
 	i.opcode = OpcodeIadd
 	i.v = x
 	i.v2 = y
 	i.typ = x.Type()
+	return i
 }
 
 // AsImul initializes this instruction as an integer addition instruction with OpcodeImul.
@@ -1042,21 +1047,28 @@ func (i *Instruction) AsImul(x, y Value) {
 	i.typ = x.Type()
 }
 
+func (i *Instruction) Insert(b Builder) *Instruction {
+	b.InsertInstruction(i)
+	return i
+}
+
 // AsIsub initializes this instruction as an integer subtraction instruction with OpcodeIsub.
-func (i *Instruction) AsIsub(x, y Value) {
+func (i *Instruction) AsIsub(x, y Value) *Instruction {
 	i.opcode = OpcodeIsub
 	i.v = x
 	i.v2 = y
 	i.typ = x.Type()
+	return i
 }
 
 // AsIcmp initializes this instruction as an integer comparison instruction with OpcodeIcmp.
-func (i *Instruction) AsIcmp(x, y Value, c IntegerCmpCond) {
+func (i *Instruction) AsIcmp(x, y Value, c IntegerCmpCond) *Instruction {
 	i.opcode = OpcodeIcmp
 	i.v = x
 	i.v2 = y
 	i.u64 = uint64(c)
 	i.typ = TypeI32
+	return i
 }
 
 // AsFcmp initializes this instruction as an integer comparison instruction with OpcodeFcmp.
@@ -1418,7 +1430,7 @@ func (i *Instruction) AsSelect(c, x, y Value) {
 	i.opcode = OpcodeSelect
 	i.v = c
 	i.v2 = x
-	i.u64 = uint64(y)
+	i.v3 = y
 	i.typ = x.Type()
 }
 
@@ -1426,7 +1438,7 @@ func (i *Instruction) AsSelect(c, x, y Value) {
 func (i *Instruction) SelectData() (c, x, y Value) {
 	c = i.v
 	x = i.v2
-	y = Value(i.u64)
+	y = i.v3
 	return
 }
 
@@ -1471,7 +1483,7 @@ func (i *Instruction) Format(b Builder) string {
 	case OpcodeUload8, OpcodeUload16, OpcodeUload32, OpcodeSload8, OpcodeSload16, OpcodeSload32:
 		instSuffix = fmt.Sprintf(" %s, %#x", i.v.Format(b), int32(i.u64))
 	case OpcodeSelect:
-		instSuffix = fmt.Sprintf(" %s, %s, %s", i.v.Format(b), i.v2.Format(b), Value(i.u64).Format(b))
+		instSuffix = fmt.Sprintf(" %s, %s, %s", i.v.Format(b), i.v2.Format(b), i.v3.Format(b))
 	case OpcodeIconst:
 		switch i.typ {
 		case TypeI32:

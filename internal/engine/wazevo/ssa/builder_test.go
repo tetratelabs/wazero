@@ -274,21 +274,19 @@ func Test_swapInstruction(t *testing.T) {
 }
 
 func TestBuilder_LayoutBlocks(t *testing.T) {
-	insertJump := func(b *builder, src, dst *basicBlock) {
+	insertJump := func(b *builder, src, dst *basicBlock, vs ...Value) {
 		b.SetCurrentBlock(src)
 		jump := b.AllocateInstruction()
-		jump.AsJump(nil, dst)
+		jump.AsJump(vs, dst)
 		b.InsertInstruction(jump)
 	}
 
-	insertBrz := func(b *builder, src, dst *basicBlock) {
+	insertBrz := func(b *builder, src, dst *basicBlock, condVal Value, vs ...Value) {
 		b.SetCurrentBlock(src)
-		vinst := b.AllocateInstruction()
-		vinst.AsIconst32(0)
+		vinst := b.AllocateInstruction().AsIconst32(0)
 		b.InsertInstruction(vinst)
-		v := vinst.Return()
 		brz := b.AllocateInstruction()
-		brz.AsBrz(v, nil, dst)
+		brz.AsBrz(condVal, vs, dst)
 		b.InsertInstruction(brz)
 	}
 
@@ -304,6 +302,10 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 				insertJump(b, b1, b2)
 				insertJump(b, b2, b3)
 				insertJump(b, b3, b4)
+				b.Seal(b1)
+				b.Seal(b2)
+				b.Seal(b3)
+				b.Seal(b4)
 			},
 			exp: []BasicBlockID{0, 1, 2, 3},
 		},
@@ -314,6 +316,9 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 				insertJump(b, b0, b2)
 				insertJump(b, unreachable, b2)
 				unreachable.invalid = true
+				b.Seal(b0)
+				b.Seal(unreachable)
+				b.Seal(b2)
 			},
 			exp: []BasicBlockID{0, 2},
 		},
@@ -325,10 +330,17 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 			// 2 ---------
 			setup: func(b *builder) {
 				b0, b1, b2, b3 := b.allocateBasicBlock(), b.allocateBasicBlock(), b.allocateBasicBlock(), b.allocateBasicBlock()
-				insertBrz(b, b0, b2)
+				b.SetCurrentBlock(b0)
+				c := b.AllocateInstruction().AsIconst32(0)
+				b.InsertInstruction(c)
+				insertBrz(b, b0, b2, c.Return())
 				insertJump(b, b0, b1)
 				insertJump(b, b1, b3)
 				insertJump(b, b2, b3)
+				b.Seal(b0)
+				b.Seal(b1)
+				b.Seal(b2)
+				b.Seal(b3)
 			},
 			exp: []BasicBlockID{0, 2, 1, 3},
 		},
@@ -355,8 +367,15 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 				b0, b1, b2, b3 := b.allocateBasicBlock(), b.allocateBasicBlock(), b.allocateBasicBlock(), b.allocateBasicBlock()
 				insertJump(b, b0, b1)
 				insertJump(b, b1, b2)
-				insertBrz(b, b2, b1)
+				b.SetCurrentBlock(b2)
+				c := b.AllocateInstruction().AsIconst32(0)
+				b.InsertInstruction(c)
+				insertBrz(b, b2, b1, c.Return())
 				insertJump(b, b2, b3)
+				b.Seal(b0)
+				b.Seal(b1)
+				b.Seal(b2)
+				b.Seal(b3)
 			},
 			// The trampoline 4 is placed right after 2, which is the hot path of the loop.
 			exp: []BasicBlockID{0, 1, 2, 4, 3},
@@ -384,8 +403,15 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 				b0, b1, b2, b3 := b.allocateBasicBlock(), b.allocateBasicBlock(), b.allocateBasicBlock(), b.allocateBasicBlock()
 				insertJump(b, b0, b1)
 				insertJump(b, b1, b2)
-				insertBrz(b, b2, b3)
+				b.SetCurrentBlock(b2)
+				c := b.AllocateInstruction().AsIconst32(0)
+				b.InsertInstruction(c)
+				insertBrz(b, b2, b3, c.Return())
 				insertJump(b, b2, b1)
+				b.Seal(b0)
+				b.Seal(b1)
+				b.Seal(b2)
+				b.Seal(b3)
 			},
 			// The trampoline 4 is placed right after 2, which is the hot path of the loop.
 			exp: []BasicBlockID{0, 1, 2, 4, 3},
@@ -417,12 +443,24 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 				b0, b1, b2, b3, b4, b5 := b.allocateBasicBlock(), b.allocateBasicBlock(), b.allocateBasicBlock(),
 					b.allocateBasicBlock(), b.allocateBasicBlock(), b.allocateBasicBlock()
 				insertJump(b, b0, b1)
-				insertBrz(b, b1, b2)
+				b.SetCurrentBlock(b0)
+				c1 := b.AllocateInstruction().AsIconst32(0)
+				b.InsertInstruction(c1)
+				insertBrz(b, b1, b2, c1.Return())
 				insertJump(b, b1, b3)
 				insertJump(b, b3, b4)
 				insertJump(b, b2, b4)
-				insertBrz(b, b4, b1)
+				b.SetCurrentBlock(b4)
+				c2 := b.AllocateInstruction().AsIconst32(0)
+				b.InsertInstruction(c2)
+				insertBrz(b, b4, b1, c2.Return())
 				insertJump(b, b4, b5)
+				b.Seal(b0)
+				b.Seal(b1)
+				b.Seal(b2)
+				b.Seal(b3)
+				b.Seal(b4)
+				b.Seal(b5)
 			},
 			// The trampoline 6 is placed right after 4, which is the hot path of the loop.
 			exp: []BasicBlockID{0, 1, 2, 3, 4, 6, 5},
@@ -453,12 +491,24 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 				b0, b1, b2, b3, b4 := b.allocateBasicBlock(), b.allocateBasicBlock(), b.allocateBasicBlock(),
 					b.allocateBasicBlock(), b.allocateBasicBlock()
 				insertJump(b, b0, b1)
-				insertBrz(b, b1, b2)
+				b.SetCurrentBlock(b1)
+				c1 := b.AllocateInstruction().AsIconst32(0)
+				b.InsertInstruction(c1)
+				insertBrz(b, b1, b2, c1.Return())
 				insertJump(b, b1, b3)
 
-				insertBrz(b, b2, b1)
+				b.SetCurrentBlock(b2)
+				c2 := b.AllocateInstruction().AsIconst32(0)
+				b.InsertInstruction(c2)
+				insertBrz(b, b2, b1, c2.Return())
 				insertJump(b, b2, b3)
 				insertJump(b, b3, b4)
+
+				b.Seal(b0)
+				b.Seal(b1)
+				b.Seal(b2)
+				b.Seal(b3)
+				b.Seal(b4)
 			},
 			exp: []BasicBlockID{
 				0, 1,
@@ -472,6 +522,51 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 				4,
 			},
 		},
+		{
+			name: "loop with output",
+			exp:  []BasicBlockID{0x0, 0x2, 0x4, 0x1, 0x3, 0x6, 0x5},
+			setup: func(b *builder) {
+				b0, b1, b2, b3 := b.allocateBasicBlock(), b.allocateBasicBlock(), b.allocateBasicBlock(), b.allocateBasicBlock()
+
+				b.SetCurrentBlock(b0)
+				funcParam := b0.AddParam(b, TypeI32)
+				b2Param := b2.AddParam(b, TypeI32)
+				insertJump(b, b0, b2, funcParam)
+
+				b.SetCurrentBlock(b1)
+				{
+					returnParam := b1.AddParam(b, TypeI32)
+					insertJump(b, b1, b.returnBlk, returnParam)
+				}
+
+				b.SetCurrentBlock(b2)
+				{
+					c := b.AllocateInstruction().AsIconst32(100).Insert(b)
+					cmp := b.AllocateInstruction().
+						AsIcmp(b2Param, c.Return(), IntegerCmpCondUnsignedLessThan).
+						Insert(b)
+					insertBrz(b, b2, b1, cmp.Return(), b2Param)
+					insertJump(b, b2, b3)
+				}
+
+				b.SetCurrentBlock(b3)
+				{
+					one := b.AllocateInstruction().AsIconst32(1).Insert(b)
+					minusOned := b.AllocateInstruction().AsIsub(b2Param, one.Return()).Insert(b)
+					c := b.AllocateInstruction().AsIconst32(150).Insert(b)
+					cmp := b.AllocateInstruction().
+						AsIcmp(b2Param, c.Return(), IntegerCmpCondEqual).
+						Insert(b)
+					insertBrz(b, b3, b1, cmp.Return(), minusOned.Return())
+					insertJump(b, b3, b2, minusOned.Return())
+				}
+
+				b.Seal(b0)
+				b.Seal(b1)
+				b.Seal(b2)
+				b.Seal(b3)
+			},
+		},
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
@@ -479,6 +574,8 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 			tc.setup(b)
 
 			b.RunPasses() // LayoutBlocks() must be called after RunPasses().
+			fmt.Println("============ SSA before block layout ============")
+			fmt.Println(b.Format())
 			b.LayoutBlocks()
 			fmt.Println("============ SSA after block layout ============")
 			fmt.Println(b.Format())
