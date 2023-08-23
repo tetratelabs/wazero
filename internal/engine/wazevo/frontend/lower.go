@@ -317,6 +317,23 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 			return
 		}
 		c.insertIntegerExtend(true, 16, 32)
+	case wasm.OpcodeI32Eqz, wasm.OpcodeI64Eqz:
+		if state.unreachable {
+			return
+		}
+		x := state.pop()
+		zero := builder.AllocateInstruction()
+		if op == wasm.OpcodeI32Eqz {
+			zero.AsIconst32(0)
+		} else {
+			zero.AsIconst64(0)
+		}
+		zero.AsIconst32(0)
+		builder.InsertInstruction(zero)
+		icmp := builder.AllocateInstruction()
+		icmp.AsIcmp(x, zero.Return(), ssa.IntegerCmpCondEqual)
+		builder.InsertInstruction(icmp)
+		state.push(icmp.Return())
 	case wasm.OpcodeI32Eq, wasm.OpcodeI64Eq:
 		if state.unreachable {
 			return

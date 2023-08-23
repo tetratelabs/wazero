@@ -1,5 +1,7 @@
 package regalloc
 
+import "fmt"
+
 // These interfaces are implemented by ISA-specific backends to abstract away the details, and allow the register
 // allocators to work on any ISA.
 //
@@ -54,6 +56,8 @@ type (
 
 	// Instr is an instruction in a block, abstracting away the underlying ISA.
 	Instr interface {
+		fmt.Stringer
+
 		// Defs returns the virtual registers defined by this instruction.
 		// Note: multiple returned []VReg will not be held at the same time, so it's safe to use the same slice for this.
 		Defs() []VReg

@@ -224,6 +224,11 @@ func (r *regAllocBlockImpl) instrIteratorNext() *regAllocInstrImpl {
 // Entry implements regalloc.Block Entry.
 func (r *regAllocBlockImpl) Entry() bool { return r.sb.EntryBlock() }
 
+// Format implements regalloc.Instr String.
+func (r *regAllocInstrImpl) String() string {
+	return r.i.String()
+}
+
 // Defs implements regalloc.Instr Defs.
 func (r *regAllocInstrImpl) Defs() []regalloc.VReg {
 	regs := r.f.vs[:0]

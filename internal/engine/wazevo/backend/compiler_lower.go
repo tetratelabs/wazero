@@ -60,7 +60,7 @@ func (c *compiler) lowerBlock(blk ssa.BasicBlock) {
 	// Now start lowering the non-branching instructions.
 	for ; cur != nil; cur = cur.Prev() {
 		c.setCurrentGroupID(cur.GroupID())
-		if _, ok := c.alreadyLowered[cur]; ok {
+		if c.alreadyLowered[cur] {
 			continue
 		}
 

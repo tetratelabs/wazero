@@ -77,7 +77,7 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []exper
 	}
 
 	importedFns, localFns := int(module.ImportFunctionCount), len(module.FunctionSection)
-	if importedFns+localFns == 0 {
+	if localFns == 0 {
 		e.addCompiledModule(module, cm)
 		return nil
 	}
@@ -128,7 +128,7 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []exper
 		ssaBuilder.RunPasses()
 
 		if false {
-			fmt.Printf("[[[SSA]]]%s", ssaBuilder.Format())
+			fmt.Printf("[[[SSA for %d/%d]]]%s", i, len(module.CodeSection)-1, ssaBuilder.Format())
 		}
 
 		// Finalize the layout of SSA blocks which might use the optimization results.

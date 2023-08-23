@@ -58,8 +58,11 @@ type (
 )
 
 func putLocalMemory(opaque []byte, offset wazevoapi.Offset, mem *wasm.MemoryInstance) {
-	b := uint64(uintptr(unsafe.Pointer(&mem.Buffer[0])))
 	s := uint64(len(mem.Buffer))
+	var b uint64
+	if len(mem.Buffer) > 0 {
+		b = uint64(uintptr(unsafe.Pointer(&mem.Buffer[0])))
+	}
 	binary.LittleEndian.PutUint64(opaque[offset:], b)
 	binary.LittleEndian.PutUint64(opaque[offset+8:], s)
 }
@@ -90,7 +93,9 @@ func (m *moduleEngine) setupOpaque() {
 
 	if tableOffset := offsets.TablesBegin; tableOffset >= 0 {
 		// First we write the first element's address of typeIDs.
-		binary.LittleEndian.PutUint64(opaque[offsets.TypeIDs1stElement:], uint64(uintptr(unsafe.Pointer(&inst.TypeIDs[0]))))
+		if len(inst.TypeIDs) > 0 {
+			binary.LittleEndian.PutUint64(opaque[offsets.TypeIDs1stElement:], uint64(uintptr(unsafe.Pointer(&inst.TypeIDs[0]))))
+		}
 
 		// Then we write the table addresses.
 		for _, table := range inst.Tables {

@@ -55,6 +55,9 @@ func (a *Allocator) assignRegistersPerInstr(f Function, pc programCounter, instr
 	a.vs = a.vs[:0]
 	uses := instr.Uses()
 	for _, u := range uses {
+		if false {
+			fmt.Printf("%s uses %d\n", instr, u.ID())
+		}
 		if u.IsRealReg() {
 			a.vs = append(a.vs, u)
 			continue
@@ -87,6 +90,10 @@ func (a *Allocator) assignRegistersPerInstr(f Function, pc programCounter, instr
 	if d.IsRealReg() {
 		return
 	}
+	if false {
+		fmt.Printf("%s defines %d\n", instr, d.ID())
+	}
+
 	n := vRegIDToNode[d.ID()]
 	if !n.spill() {
 		instr.AssignDef(d.SetRealReg(n.r))
