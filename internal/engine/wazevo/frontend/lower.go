@@ -124,7 +124,7 @@ func (l *loweringState) ctrlPeekAt(n int) (ret *controlFrame) {
 	return &l.controlFrames[tail-n]
 }
 
-const debug = false
+const debug = true
 
 // lowerBody lowers the body of the Wasm function to the SSA form.
 func (c *Compiler) lowerBody(entryBlk ssa.BasicBlock) {
@@ -415,6 +415,16 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 			return
 		}
 		c.insertFcmp(ssa.FloatCmpCondGreaterThanOrEqual)
+	case wasm.OpcodeF32Neg, wasm.OpcodeF64Neg:
+		if state.unreachable {
+			return
+		}
+		x := state.pop()
+		neg := builder.AllocateInstruction()
+		neg.AsFneg(x)
+		builder.InsertInstruction(neg)
+		value := neg.Return()
+		state.push(value)
 	case wasm.OpcodeI32Shl, wasm.OpcodeI64Shl:
 		if state.unreachable {
 			return
@@ -937,6 +947,9 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 
 	case wasm.OpcodeNop:
 	case wasm.OpcodeReturn:
+		if state.unreachable {
+			return
+		}
 		results := c.loweringState.nPeekDup(c.results())
 		instr := builder.AllocateInstruction()
 
@@ -945,6 +958,9 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		state.unreachable = true
 
 	case wasm.OpcodeUnreachable:
+		if state.unreachable {
+			return
+		}
 		exit := builder.AllocateInstruction()
 		exit.AsExitWithCode(c.execCtxPtrValue, wazevoapi.ExitCodeUnreachable)
 		builder.InsertInstruction(exit)
@@ -1029,6 +1045,36 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 
 	case wasm.OpcodeDrop:
 		_ = state.pop()
+	case wasm.OpcodeF64ConvertI32S, wasm.OpcodeF64ConvertI64S, wasm.OpcodeF64ConvertI32U, wasm.OpcodeF64ConvertI64U:
+		if state.unreachable {
+			return
+		}
+		cvt := builder.AllocateInstruction()
+		cvt.AsFcvtFromInt(state.pop(),
+			op == wasm.OpcodeF64ConvertI32S || op == wasm.OpcodeF64ConvertI64S,
+			true,
+		)
+		builder.InsertInstruction(cvt)
+		state.push(cvt.Return())
+	case wasm.OpcodeF32ConvertI32S, wasm.OpcodeF32ConvertI64S, wasm.OpcodeF32ConvertI32U, wasm.OpcodeF32ConvertI64U:
+		if state.unreachable {
+			return
+		}
+		cvt := builder.AllocateInstruction()
+		cvt.AsFcvtFromInt(state.pop(),
+			op == wasm.OpcodeF32ConvertI32S || op == wasm.OpcodeF32ConvertI64S,
+			false,
+		)
+		builder.InsertInstruction(cvt)
+		state.push(cvt.Return())
+	case wasm.OpcodeF64PromoteF32:
+		if state.unreachable {
+			return
+		}
+		cvt := builder.AllocateInstruction()
+		cvt.AsFpromote(state.pop())
+		builder.InsertInstruction(cvt)
+		state.push(cvt.Return())
 	default:
 		panic("TODO: unsupported in wazevo yet: " + wasm.InstructionName(op))
 	}

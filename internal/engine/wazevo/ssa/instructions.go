@@ -613,8 +613,7 @@ const (
 	// `v = fma x, y, z`.
 	OpcodeFma
 
-	// OpcodeFneg ...
-	// `v = fneg x`.
+	// OpcodeFneg negates the given floating point value: `v = Fneg x`.
 	OpcodeFneg
 
 	// OpcodeFabs ...
@@ -723,8 +722,7 @@ const (
 	// OpcodeSExtend sign-extends the given integer: `v = SExtend x, from->to`.
 	OpcodeSExtend
 
-	// OpcodeFpromote ...
-	// `v = fpromote x`.
+	// OpcodeFpromote promotes the given floating point value: `v = Fpromote x`.
 	OpcodeFpromote
 
 	// OpcodeFdemote ...
@@ -734,10 +732,6 @@ const (
 	// OpcodeFvdemote ...
 	// `v = fvdemote x`.
 	OpcodeFvdemote
-
-	// OpcodeFvpromoteLow ...
-	// `x = fvpromote_low a`.
-	OpcodeFvpromoteLow
 
 	// OpcodeFcvtToUint ...
 	// `v = fcvt_to_uint x`.
@@ -755,17 +749,11 @@ const (
 	// `v = fcvt_to_sint_sat x`.
 	OpcodeFcvtToSintSat
 
-	// OpcodeFcvtFromUint ...
-	// `v = fcvt_from_uint x`.
+	// OpcodeFcvtFromUint converts an unsigned integer to a floating point value: `v = FcvtFromUint x`.
 	OpcodeFcvtFromUint
 
-	// OpcodeFcvtFromSint ...
-	// `v = fcvt_from_sint x`.
+	// OpcodeFcvtFromSint converts a signed integer to a floating point value: `v = FcvtFromSint x`.
 	OpcodeFcvtFromSint
-
-	// OpcodeFcvtLowFromSint ...
-	// `v = fcvt_low_from_sint x`.
-	OpcodeFcvtLowFromSint
 
 	// OpcodeIsplit ...
 	// `lo, hi = isplit x`.
@@ -870,6 +858,10 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeFmax:               sideEffectFalse,
 	OpcodeSelect:             sideEffectFalse,
 	OpcodeFmin:               sideEffectFalse,
+	OpcodeFneg:               sideEffectFalse,
+	OpcodeFcvtFromSint:       sideEffectFalse,
+	OpcodeFcvtFromUint:       sideEffectFalse,
+	OpcodeFpromote:           sideEffectFalse,
 }
 
 // HasSideEffects returns true if this instruction has side effects.
@@ -957,6 +949,10 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeSload8:             returnTypesFnSingle,
 	OpcodeSload16:            returnTypesFnSingle,
 	OpcodeSload32:            returnTypesFnSingle,
+	OpcodeFcvtFromSint:       returnTypesFnSingle,
+	OpcodeFcvtFromUint:       returnTypesFnSingle,
+	OpcodeFneg:               returnTypesFnSingle,
+	OpcodeFpromote:           returnTypesFnF64,
 }
 
 // AsLoad initializes this instruction as a store instruction with OpcodeLoad.
@@ -1354,6 +1350,35 @@ func (i *Instruction) UnaryData() Value {
 	return i.v
 }
 
+// AsFneg initializes this instruction as an instruction with OpcodeFneg.
+func (i *Instruction) AsFneg(x Value) {
+	i.opcode = OpcodeFneg
+	i.v = x
+	i.typ = x.Type()
+}
+
+// AsFpromote initializes this instruction as an instruction with OpcodeFpromote.
+func (i *Instruction) AsFpromote(x Value) {
+	i.opcode = OpcodeFpromote
+	i.v = x
+	i.typ = TypeF64
+}
+
+// AsFcvtFromInt initializes this instruction as an instruction with either OpcodeFcvtFromUint or OpcodeFcvtFromSint
+func (i *Instruction) AsFcvtFromInt(x Value, signed bool, dst64bit bool) {
+	if signed {
+		i.opcode = OpcodeFcvtFromSint
+	} else {
+		i.opcode = OpcodeFcvtFromUint
+	}
+	i.v = x
+	if dst64bit {
+		i.typ = TypeF64
+	} else {
+		i.typ = TypeF32
+	}
+}
+
 // AsSExtend initializes this instruction as a sign extension instruction with OpcodeSExtend.
 func (i *Instruction) AsSExtend(v Value, from, to byte) {
 	i.opcode = OpcodeSExtend
@@ -1503,7 +1528,7 @@ func (i *Instruction) Format(b Builder) string {
 	case OpcodeIshl, OpcodeSshr, OpcodeUshr:
 		instSuffix = fmt.Sprintf(" %s, %s", i.v.Format(b), i.v2.Format(b))
 	case OpcodeUndefined:
-	case OpcodeClz, OpcodeCtz, OpcodePopcnt:
+	case OpcodeClz, OpcodeCtz, OpcodePopcnt, OpcodeFneg, OpcodeFcvtFromSint, OpcodeFcvtFromUint, OpcodeFpromote:
 		instSuffix = " " + i.v.Format(b)
 	default:
 		panic(fmt.Sprintf("TODO: format for %s", i.opcode))
@@ -1885,8 +1910,6 @@ func (o Opcode) String() (ret string) {
 		return "Fdemote"
 	case OpcodeFvdemote:
 		return "Fvdemote"
-	case OpcodeFvpromoteLow:
-		return "FvpromoteLow"
 	case OpcodeFcvtToUint:
 		return "FcvtToUint"
 	case OpcodeFcvtToSint:
@@ -1899,8 +1922,6 @@ func (o Opcode) String() (ret string) {
 		return "FcvtFromUint"
 	case OpcodeFcvtFromSint:
 		return "FcvtFromSint"
-	case OpcodeFcvtLowFromSint:
-		return "FcvtLowFromSint"
 	case OpcodeIsplit:
 		return "Isplit"
 	case OpcodeIconcat:
