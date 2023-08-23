@@ -302,6 +302,10 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 				insertJump(b, b1, b2)
 				insertJump(b, b2, b3)
 				insertJump(b, b3, b4)
+				b.Seal(b1)
+				b.Seal(b2)
+				b.Seal(b3)
+				b.Seal(b4)
 			},
 			exp: []BasicBlockID{0, 1, 2, 3},
 		},
@@ -312,6 +316,9 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 				insertJump(b, b0, b2)
 				insertJump(b, unreachable, b2)
 				unreachable.invalid = true
+				b.Seal(b0)
+				b.Seal(unreachable)
+				b.Seal(b2)
 			},
 			exp: []BasicBlockID{0, 2},
 		},
@@ -330,6 +337,10 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 				insertJump(b, b0, b1)
 				insertJump(b, b1, b3)
 				insertJump(b, b2, b3)
+				b.Seal(b0)
+				b.Seal(b1)
+				b.Seal(b2)
+				b.Seal(b3)
 			},
 			exp: []BasicBlockID{0, 2, 1, 3},
 		},
@@ -361,6 +372,10 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 				b.InsertInstruction(c)
 				insertBrz(b, b2, b1, c.Return())
 				insertJump(b, b2, b3)
+				b.Seal(b0)
+				b.Seal(b1)
+				b.Seal(b2)
+				b.Seal(b3)
 			},
 			// The trampoline 4 is placed right after 2, which is the hot path of the loop.
 			exp: []BasicBlockID{0, 1, 2, 4, 3},
@@ -393,6 +408,10 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 				b.InsertInstruction(c)
 				insertBrz(b, b2, b3, c.Return())
 				insertJump(b, b2, b1)
+				b.Seal(b0)
+				b.Seal(b1)
+				b.Seal(b2)
+				b.Seal(b3)
 			},
 			// The trampoline 4 is placed right after 2, which is the hot path of the loop.
 			exp: []BasicBlockID{0, 1, 2, 4, 3},
@@ -436,6 +455,12 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 				b.InsertInstruction(c2)
 				insertBrz(b, b4, b1, c2.Return())
 				insertJump(b, b4, b5)
+				b.Seal(b0)
+				b.Seal(b1)
+				b.Seal(b2)
+				b.Seal(b3)
+				b.Seal(b4)
+				b.Seal(b5)
 			},
 			// The trampoline 6 is placed right after 4, which is the hot path of the loop.
 			exp: []BasicBlockID{0, 1, 2, 3, 4, 6, 5},
@@ -478,6 +503,12 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 				insertBrz(b, b2, b1, c2.Return())
 				insertJump(b, b2, b3)
 				insertJump(b, b3, b4)
+
+				b.Seal(b0)
+				b.Seal(b1)
+				b.Seal(b2)
+				b.Seal(b3)
+				b.Seal(b4)
 			},
 			exp: []BasicBlockID{
 				0, 1,
@@ -530,6 +561,11 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 					insertBrz(b, b3, b1, cmp.Return(), minusOned.Return())
 					insertJump(b, b3, b2, minusOned.Return())
 				}
+
+				b.Seal(b0)
+				b.Seal(b1)
+				b.Seal(b2)
+				b.Seal(b3)
 			},
 		},
 	} {

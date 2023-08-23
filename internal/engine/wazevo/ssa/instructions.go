@@ -1008,10 +1008,11 @@ func (i *Instruction) StoreData() (value, ptr Value, offset uint32, storeSizeInB
 }
 
 // AsIconst64 initializes this instruction as a 64-bit integer constant instruction with OpcodeIconst.
-func (i *Instruction) AsIconst64(v uint64) {
+func (i *Instruction) AsIconst64(v uint64) *Instruction {
 	i.opcode = OpcodeIconst
 	i.typ = TypeI64
 	i.u64 = v
+	return i
 }
 
 // AsIconst32 initializes this instruction as a 32-bit integer constant instruction with OpcodeIconst.
@@ -1044,7 +1045,7 @@ func (i *Instruction) AsImul(x, y Value) {
 	i.typ = x.Type()
 }
 
-func (i *Instruction) Insert(b *builder) *Instruction {
+func (i *Instruction) Insert(b Builder) *Instruction {
 	b.InsertInstruction(i)
 	return i
 }

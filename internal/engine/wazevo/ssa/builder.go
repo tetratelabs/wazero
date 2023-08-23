@@ -393,8 +393,7 @@ func (b *builder) findValue(typ Type, variable Variable, blk *basicBlock, must b
 			// and record it as unknown.
 			// The unknown values are resolved when we call seal this block via BasicBlock.Seal().
 			value := b.allocateValue(typ)
-			b.AnnotateValue(value, "unknown_value["+variable.String()+"]")
-			if true {
+			if false {
 				fmt.Printf("adding unknown value placeholder for %s at %d\n", variable, blk.id)
 			}
 			blk.lastDefinitions[variable] = value

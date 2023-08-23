@@ -73,6 +73,11 @@ func TestBuilder_passes(t *testing.T) {
 					jmp.AsJump(nil, middle1)
 					b.InsertInstruction(jmp)
 				}
+
+				b.Seal(entry)
+				b.Seal(middle1)
+				b.Seal(middle2)
+				b.Seal(end)
 				return nil
 			},
 			before: `
