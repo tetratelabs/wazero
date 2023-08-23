@@ -1482,7 +1482,7 @@ func (i *Instruction) Format(b Builder) string {
 	case OpcodeUload8, OpcodeUload16, OpcodeUload32, OpcodeSload8, OpcodeSload16, OpcodeSload32:
 		instSuffix = fmt.Sprintf(" %s, %#x", i.v.Format(b), int32(i.u64))
 	case OpcodeSelect:
-		instSuffix = fmt.Sprintf(" %s, %s, %s", i.v.Format(b), i.v2.Format(b), Value(i.u64).Format(b))
+		instSuffix = fmt.Sprintf(" %s, %s, %s", i.v.Format(b), i.v2.Format(b), i.v3.Format(b))
 	case OpcodeIconst:
 		switch i.typ {
 		case TypeI32:
