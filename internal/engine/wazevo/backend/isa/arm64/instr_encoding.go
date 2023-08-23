@@ -1067,8 +1067,6 @@ func encodeAdvancedSIMDTwoMisc(op vecOp, rd, rn uint32, arr vecArrangement) uint
 		default:
 			panic("unsupported arrangement: " + arr.String())
 		}
-	case vecOpCvt32To64:
-
 	default:
 		panic("unsupported or illegal vecOp: " + op.String())
 	}
