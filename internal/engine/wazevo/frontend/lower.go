@@ -1380,9 +1380,6 @@ func (c *Compiler) insertIcmp(cond ssa.IntegerCmpCond) {
 	state, builder := c.state(), c.ssaBuilder
 	y, x := state.pop(), state.pop()
 	cmp := builder.AllocateInstruction()
-	if x.Type() != y.Type() || (x.Type() != ssa.TypeI32 && x.Type() != ssa.TypeI64) {
-		panic(fmt.Sprintf("BUG"))
-	}
 	cmp.AsIcmp(x, y, cond)
 	builder.InsertInstruction(cmp)
 	value := cmp.Return()

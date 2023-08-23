@@ -526,8 +526,7 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 			name: "loop with output",
 			exp:  []BasicBlockID{0x0, 0x2, 0x4, 0x1, 0x3, 0x6, 0x5},
 			setup: func(b *builder) {
-				b0, b1, b2, b3 :=
-					b.allocateBasicBlock(), b.allocateBasicBlock(), b.allocateBasicBlock(), b.allocateBasicBlock()
+				b0, b1, b2, b3 := b.allocateBasicBlock(), b.allocateBasicBlock(), b.allocateBasicBlock(), b.allocateBasicBlock()
 
 				b.SetCurrentBlock(b0)
 				funcParam := b0.AddParam(b, TypeI32)

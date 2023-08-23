@@ -2,6 +2,7 @@ package backend
 
 import (
 	"fmt"
+
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 )

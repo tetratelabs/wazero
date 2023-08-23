@@ -800,6 +800,7 @@ func maybeInvertBranches(now *basicBlock, nextInRPO *basicBlock) bool {
 	}
 
 	if len(fallthroughBranch.vs) != 0 || len(condBranch.vs) != 0 {
+		// If either one of them has arguments, we don't invert the branches.
 		return false
 	}
 
