@@ -100,6 +100,7 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []exper
 	cm.functionOffsets = make([]compiledFunctionOffset, localFns)
 	bodies := make([][]byte, localFns)
 	for i := range module.CodeSection {
+		fmt.Printf("------------------------------------------ %d/%d ------------------------------------------\n", i, len(module.CodeSection)-1)
 		fidx := wasm.Index(i + importedFns)
 		fref := frontend.FunctionIndexToFuncRef(fidx)
 
@@ -124,24 +125,24 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []exper
 			return fmt.Errorf("wasm->ssa: %v", err)
 		}
 
-		const debug = false
+		const debug = true
 
 		if debug {
-			fmt.Printf("[[[SSA for %d/%d]]]%s\n", i, len(module.CodeSection)-1, ssaBuilder.Format())
+			fmt.Printf("[[[SSA]]]%s\n", ssaBuilder.Format())
 		}
 
 		// Run SSA-level optimization passes.
 		ssaBuilder.RunPasses()
 
 		if debug {
-			fmt.Printf("[[[optimized SSA for %d/%d]]]%s", i, len(module.CodeSection)-1, ssaBuilder.Format())
+			fmt.Printf("[[[optimized SSA]]]%s", ssaBuilder.Format())
 		}
 
 		// Finalize the layout of SSA blocks which might use the optimization results.
 		ssaBuilder.LayoutBlocks()
 
 		if debug {
-			fmt.Printf("[[[laidout SSA for %d/%d]]]%s", i, len(module.CodeSection)-1, ssaBuilder.Format())
+			fmt.Printf("[[[laidout SSA]]]%s", ssaBuilder.Format())
 		}
 
 		// Now our ssaBuilder contains the necessary information to further lower them to

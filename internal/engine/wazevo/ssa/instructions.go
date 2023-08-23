@@ -20,6 +20,7 @@ type Instruction struct {
 	u64        uint64
 	v          Value
 	v2         Value
+	v3         Value
 	vs         []Value
 	typ        Type
 	blk        BasicBlock
@@ -78,8 +79,8 @@ func (i *Instruction) Return() (first Value) {
 }
 
 // Args returns the arguments to this instruction.
-func (i *Instruction) Args() (v1, v2 Value, vs []Value) {
-	return i.v, i.v2, i.vs
+func (i *Instruction) Args() (v1, v2, v3 Value, vs []Value) {
+	return i.v, i.v2, i.v3, i.vs
 }
 
 // Arg returns the first argument to this instruction.
@@ -1428,7 +1429,7 @@ func (i *Instruction) AsSelect(c, x, y Value) {
 	i.opcode = OpcodeSelect
 	i.v = c
 	i.v2 = x
-	i.u64 = uint64(y)
+	i.v3 = y
 	i.typ = x.Type()
 }
 
@@ -1436,7 +1437,7 @@ func (i *Instruction) AsSelect(c, x, y Value) {
 func (i *Instruction) SelectData() (c, x, y Value) {
 	c = i.v
 	x = i.v2
-	y = Value(i.u64)
+	y = i.v3
 	return
 }
 

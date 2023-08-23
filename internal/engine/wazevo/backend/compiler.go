@@ -143,7 +143,7 @@ type compiler struct {
 // Compile implements Compiler.Compile.
 func (c *compiler) Compile() ([]byte, []RelocationInfo, int, error) {
 	c.Lower()
-	if false {
+	if true {
 		fmt.Printf("[[[after lowering]]]%s", c.Format())
 	}
 	c.RegAlloc()
