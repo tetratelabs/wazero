@@ -48,6 +48,7 @@ func (i *Instruction) reset() {
 	*i = Instruction{}
 	i.v = ValueInvalid
 	i.v2 = ValueInvalid
+	i.v3 = ValueInvalid
 	i.rValue = ValueInvalid
 	i.typ = typeInvalid
 }
