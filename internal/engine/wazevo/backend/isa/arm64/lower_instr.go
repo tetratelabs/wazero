@@ -7,6 +7,7 @@ package arm64
 // and merge the multiple instructions if possible. It can be considered as "N:1" instruction selection.
 
 import (
+	"fmt"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
@@ -71,7 +72,11 @@ func (m *machine) lowerBrTable(i *ssa.Instruction) {
 func (m *machine) LowerConditionalBranch(b *ssa.Instruction) {
 	cval, args, targetBlk := b.BranchData()
 	if len(args) > 0 {
-		panic("conditional branch shouldn't have args; likely a bug in critical edge splitting")
+		panic(fmt.Sprintf(
+			"conditional branch shouldn't have args; likely a bug in critical edge splitting: from %s to %s",
+			m.currentSSABlk,
+			targetBlk,
+		))
 	}
 
 	target := m.getOrAllocateSSABlockLabel(targetBlk)

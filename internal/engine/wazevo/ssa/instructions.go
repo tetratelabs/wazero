@@ -1015,10 +1015,11 @@ func (i *Instruction) AsIconst64(v uint64) {
 }
 
 // AsIconst32 initializes this instruction as a 32-bit integer constant instruction with OpcodeIconst.
-func (i *Instruction) AsIconst32(v uint32) {
+func (i *Instruction) AsIconst32(v uint32) *Instruction {
 	i.opcode = OpcodeIconst
 	i.typ = TypeI32
 	i.u64 = uint64(v)
+	return i
 }
 
 // BinaryData return the operands for a binary instruction.
@@ -1027,11 +1028,12 @@ func (i *Instruction) BinaryData() (x, y Value) {
 }
 
 // AsIadd initializes this instruction as an integer addition instruction with OpcodeIadd.
-func (i *Instruction) AsIadd(x, y Value) {
+func (i *Instruction) AsIadd(x, y Value) *Instruction {
 	i.opcode = OpcodeIadd
 	i.v = x
 	i.v2 = y
 	i.typ = x.Type()
+	return i
 }
 
 // AsImul initializes this instruction as an integer addition instruction with OpcodeImul.
@@ -1042,21 +1044,28 @@ func (i *Instruction) AsImul(x, y Value) {
 	i.typ = x.Type()
 }
 
+func (i *Instruction) Insert(b *builder) *Instruction {
+	b.InsertInstruction(i)
+	return i
+}
+
 // AsIsub initializes this instruction as an integer subtraction instruction with OpcodeIsub.
-func (i *Instruction) AsIsub(x, y Value) {
+func (i *Instruction) AsIsub(x, y Value) *Instruction {
 	i.opcode = OpcodeIsub
 	i.v = x
 	i.v2 = y
 	i.typ = x.Type()
+	return i
 }
 
 // AsIcmp initializes this instruction as an integer comparison instruction with OpcodeIcmp.
-func (i *Instruction) AsIcmp(x, y Value, c IntegerCmpCond) {
+func (i *Instruction) AsIcmp(x, y Value, c IntegerCmpCond) *Instruction {
 	i.opcode = OpcodeIcmp
 	i.v = x
 	i.v2 = y
 	i.u64 = uint64(c)
 	i.typ = TypeI32
+	return i
 }
 
 // AsFcmp initializes this instruction as an integer comparison instruction with OpcodeFcmp.

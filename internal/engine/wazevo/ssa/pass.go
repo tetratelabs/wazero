@@ -1,5 +1,7 @@
 package ssa
 
+import "fmt"
+
 // RunPasses implements Builder.RunPasses.
 //
 // The order here matters; some pass depends on the previous ones.
@@ -38,6 +40,10 @@ func passDeadBlockEliminationOpt(b *builder) {
 		reachableBlk := b.blkStack[len(b.blkStack)-1]
 		b.blkStack = b.blkStack[:len(b.blkStack)-1]
 		b.blkVisited[reachableBlk] = 0 // the value won't be used in this pass.
+
+		if !reachableBlk.sealed && !reachableBlk.ReturnBlock() {
+			panic(fmt.Sprintf("%s is not sealed", reachableBlk))
+		}
 
 		for _, succ := range reachableBlk.success {
 			if _, ok := b.blkVisited[succ]; ok {

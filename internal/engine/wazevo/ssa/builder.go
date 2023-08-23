@@ -222,6 +222,8 @@ func (b *builder) Init(s *Signature) {
 	}
 	b.nextValueID = 0
 	b.reversePostOrderedBasicBlocks = b.reversePostOrderedBasicBlocks[:0]
+	b.donePasses = false
+	b.doneBlockLayout = false
 }
 
 // Signature implements Builder.Signature.
@@ -316,6 +318,9 @@ func (b *builder) DefineVariable(variable Variable, value Value, block BasicBloc
 		panic("BUG: trying to define variable " + variable.String() + " but is not declared yet")
 	}
 
+	if b.variables[variable] != value.Type() {
+		panic(fmt.Sprintf("BUG: inconsistent type for variable %d: expected %s but got %s", variable, b.variables[variable], value.Type()))
+	}
 	bb := block.(*basicBlock)
 	bb.lastDefinitions[variable] = value
 }
@@ -388,6 +393,10 @@ func (b *builder) findValue(typ Type, variable Variable, blk *basicBlock, must b
 			// and record it as unknown.
 			// The unknown values are resolved when we call seal this block via BasicBlock.Seal().
 			value := b.allocateValue(typ)
+			b.AnnotateValue(value, "unknown_value["+variable.String()+"]")
+			if true {
+				fmt.Printf("adding unknown value placeholder for %s at %d\n", variable, blk.id)
+			}
 			blk.lastDefinitions[variable] = value
 			blk.unknownValues[variable] = value
 			return value
@@ -729,8 +738,14 @@ func (b *builder) LayoutBlocks() {
 			// Update the successors slice because the target is no longer the original `succ`.
 			blk.success[sidx] = trampoline
 
+			if debug {
+				fmt.Printf("splitting edge from %d->%d at %s as %d->%d->%d \n",
+					blk.ID(), succ.ID(), predInfo.branch.Format(b),
+					blk.ID(), trampoline.ID(), succ.ID())
+			}
+
 			fallthroughBranch := blk.currentInstr
-			if fallthroughBranch.opcode != OpcodeBrTable && fallthroughBranch.blk == trampoline {
+			if fallthroughBranch.opcode == OpcodeJump && fallthroughBranch.blk == trampoline {
 				// This can be lowered as fallthrough at the end of the block.
 				b.reversePostOrderedBasicBlocks = append(b.reversePostOrderedBasicBlocks, trampoline)
 				inserted[trampoline] = 0 // mark as inserted, the value is not used.
@@ -785,6 +800,10 @@ func maybeInvertBranches(now *basicBlock, nextInRPO *basicBlock) bool {
 		return false
 	}
 
+	if len(fallthroughBranch.vs) != 0 || len(condBranch.vs) != 0 {
+		return false
+	}
+
 	// So this block has two branches (a conditional branch followed by an unconditional branch) at the end.
 	// We can invert the condition of the branch if it makes the fallthrough more likely.
 
@@ -834,8 +853,15 @@ invert:
 	condBranch.InvertBrx()
 	condBranch.blk = fallthroughTarget
 	fallthroughBranch.blk = condTarget
+	if debug {
+		fmt.Printf("inverting branches at %d->%d and %d->%d\n",
+			now.ID(), fallthroughTarget.ID(), now.ID(), condTarget.ID())
+	}
+
 	return true
 }
+
+const debug = true
 
 // splitCriticalEdge splits the critical edge between the given predecessor (`pred`) and successor (owning `predInfo`).
 //
