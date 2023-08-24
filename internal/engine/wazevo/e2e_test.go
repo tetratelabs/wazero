@@ -38,8 +38,8 @@ func TestSpectestV1(t *testing.T) {
 		name string
 	}{
 		{name: "address"},
-		{name: "align"},
 		{name: "br"},
+		{name: "br_table"},
 		{name: "break-drop"},
 		{name: "block"},
 		{name: "binary"},
@@ -66,7 +66,6 @@ func TestSpectestV1(t *testing.T) {
 	}
 }
 
-// 458
 func TestE2E(t *testing.T) {
 	type callCase struct {
 		funcName           string // defaults to testcases.ExportedFunctionName
