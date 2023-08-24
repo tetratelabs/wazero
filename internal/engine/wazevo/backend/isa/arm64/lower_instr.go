@@ -209,6 +209,17 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		cnt := m.allocateInstr()
 		cnt.asVecMisc(vecOpCvt32To64, rd, rn, vecArrangementNone)
 		m.insert(cnt)
+	case ssa.OpcodeIreduce:
+		rn := m.getOperand_NR(m.compiler.ValueDefinition(instr.UnaryData()), extModeNone)
+		retVal := instr.Return()
+		rd := m.compiler.VRegOf(retVal)
+
+		if retVal.Type() != ssa.TypeI32 {
+			panic("TODO?: Ireduce to non-i32")
+		}
+		mov := m.allocateInstr()
+		mov.asMove32(rd, rn.reg())
+		m.insert(mov)
 	default:
 		panic("TODO: lowering " + instr.Opcode().String())
 	}

@@ -1464,31 +1464,52 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
 			name: "br_table", m: testcases.BrTable.Module,
 			exp: `
 blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
-	BrTable v2, [blk6, blk5, blk4, blk3, blk2, blk1, blk6]
+	BrTable v2, [blk7, blk8, blk9, blk10, blk11, blk12, blk13]
 
-blk1: () <-- (blk0)
+blk1: () <-- (blk12)
 	v8:i32 = Iconst_32 0x10
 	Return v8
 
-blk2: () <-- (blk0)
+blk2: () <-- (blk11)
 	v7:i32 = Iconst_32 0xf
 	Return v7
 
-blk3: () <-- (blk0)
+blk3: () <-- (blk10)
 	v6:i32 = Iconst_32 0xe
 	Return v6
 
-blk4: () <-- (blk0)
+blk4: () <-- (blk9)
 	v5:i32 = Iconst_32 0xd
 	Return v5
 
-blk5: () <-- (blk0)
+blk5: () <-- (blk8)
 	v4:i32 = Iconst_32 0xc
 	Return v4
 
-blk6: () <-- (blk0,blk0)
+blk6: () <-- (blk7,blk13)
 	v3:i32 = Iconst_32 0xb
 	Return v3
+
+blk7: () <-- (blk0)
+	Jump blk6
+
+blk8: () <-- (blk0)
+	Jump blk5
+
+blk9: () <-- (blk0)
+	Jump blk4
+
+blk10: () <-- (blk0)
+	Jump blk3
+
+blk11: () <-- (blk0)
+	Jump blk2
+
+blk12: () <-- (blk0)
+	Jump blk1
+
+blk13: () <-- (blk0)
+	Jump blk6
 `,
 		},
 		{
