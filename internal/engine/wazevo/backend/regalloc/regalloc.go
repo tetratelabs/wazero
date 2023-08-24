@@ -267,8 +267,16 @@ func (a *Allocator) upAndMarkStack(b Block, v VReg, depth int) {
 
 	// Now we can safely mark v as a part of live-in
 	info.liveIns[v] = struct{}{}
+	preds := b.Preds()
+	if len(preds) == 0 {
+		panic("BUG: block with no predecessors while requiring live-in")
+	}
+
 	// and climb up the CFG.
-	for _, pred := range b.Preds() {
+	for _, pred := range preds {
+		if debug {
+			fmt.Printf("%sadding %v live-out at block[%d]\n", strings.Repeat("\t", depth+1), v, pred.ID())
+		}
 		a.blockInfoAt(pred.ID()).liveOuts[v] = struct{}{}
 		a.upAndMarkStack(pred, v, depth+1)
 	}

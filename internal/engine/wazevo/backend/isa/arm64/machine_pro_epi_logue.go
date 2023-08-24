@@ -41,6 +41,10 @@ func (m *machine) SetupPrologue() {
 	}
 
 	// Decrement SP if spillSlotSize > 0.
+	if m.spillSlotSize == 0 && len(m.spillSlots) != 0 {
+		panic(fmt.Sprintf("BUG: spillSlotSize=%d, spillSlots=%v\n", m.spillSlotSize, m.spillSlots))
+	}
+
 	if size := m.spillSlotSize; size > 0 {
 		// Check if size is 16-byte aligned.
 		if size&0xf != 0 {

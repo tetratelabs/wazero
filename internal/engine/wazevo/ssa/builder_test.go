@@ -523,6 +523,35 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 			},
 		},
 		{
+			name: "brz with arg",
+			setup: func(b *builder) {
+				b0, b1, b2 := b.allocateBasicBlock(), b.allocateBasicBlock(), b.allocateBasicBlock()
+				p := b0.AddParam(b, TypeI32)
+				retval := b1.AddParam(b, TypeI32)
+
+				b.SetCurrentBlock(b0)
+				{
+					arg := b.AllocateInstruction().AsIconst32(1000).Insert(b).Return()
+					insertBrz(b, b0, b1, p, arg)
+					insertJump(b, b0, b2)
+				}
+				b.SetCurrentBlock(b1)
+				{
+					b.AllocateInstruction().AsReturn([]Value{retval}).Insert(b)
+				}
+				b.SetCurrentBlock(b2)
+				{
+					arg := b.AllocateInstruction().AsIconst32(1).Insert(b).Return()
+					insertJump(b, b2, b1, arg)
+				}
+
+				b.Seal(b0)
+				b.Seal(b1)
+				b.Seal(b2)
+			},
+			exp: []BasicBlockID{0x0, 0x3, 0x1, 0x2},
+		},
+		{
 			name: "loop with output",
 			exp:  []BasicBlockID{0x0, 0x2, 0x4, 0x1, 0x3, 0x6, 0x5},
 			setup: func(b *builder) {

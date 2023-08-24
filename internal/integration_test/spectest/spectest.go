@@ -326,26 +326,35 @@ func Run(t *testing.T, testDataFS embed.FS, ctx context.Context, config wazero.R
 	files, err := testDataFS.ReadDir("testdata")
 	require.NoError(t, err)
 
-	jsonfiles := make([]string, 0, len(files))
+	caseNames := make([]string, 0, len(files))
 	for _, f := range files {
 		filename := f.Name()
 		if strings.HasSuffix(filename, ".json") {
-			jsonfiles = append(jsonfiles, filename)
+			caseNames = append(caseNames, strings.TrimSuffix(filename, ".json"))
 		}
 	}
 
 	// If the go:embed path resolution was wrong, this fails.
 	// https://github.com/tetratelabs/wazero/issues/247
-	require.True(t, len(jsonfiles) > 1, "len(jsonfiles)=%d (not greater than one)", len(jsonfiles))
+	require.True(t, len(caseNames) > 1, "len(caseNames)=%d (not greater than one)", len(caseNames))
 
-	for _, f := range jsonfiles {
-		RunJson(t, testDataFS, f, ctx, config)
+	for _, f := range caseNames {
+		RunCase(t, testDataFS, f, ctx, config, -1, 0, math.MaxInt)
 	}
 }
 
-// RunJson runs the test case described by the given spectest JSON file name in the testDataFS file system.
-func RunJson(t *testing.T, testDataFS embed.FS, f string, ctx context.Context, config wazero.RuntimeConfig) {
-	raw, err := testDataFS.ReadFile(testdataPath(f))
+// RunCase runs the test case described by the given spectest file name (without .wast!) in the testDataFS file system.
+// lineBegin and lineEnd are the line numbers to run. If lineBegin == 0 and lineEnd == math.MaxInt, all the lines are run.
+//
+// For example, if you want to run memory_grow.wast:66 to 70, you can do:
+//
+//	RunCase(t, testDataFS, "memory_grow", ctx, config, mandatoryLine, 66, 70)
+//
+// where mandatoryLine is the line number which can be run regardless of the lineBegin and lineEnd. It is useful when
+// we only want to run specific command while running "module" command to instantiate a module. If you don't need it,
+// just pass -1.
+func RunCase(t *testing.T, testDataFS embed.FS, f string, ctx context.Context, config wazero.RuntimeConfig, mandatoryLine, lineBegin, lineEnd int) {
+	raw, err := testDataFS.ReadFile(testdataPath(f + ".json"))
 	require.NoError(t, err)
 
 	var base testbase
@@ -366,6 +375,11 @@ func RunJson(t *testing.T, testDataFS embed.FS, f string, ctx context.Context, c
 		var lastInstantiatedModule api.Module
 		for i := 0; i < len(base.Commands); i++ {
 			c := &base.Commands[i]
+			line := c.Line
+			if mandatoryLine > -1 && c.Line == mandatoryLine {
+			} else if line < lineBegin || line > lineEnd {
+				continue
+			}
 			t.Run(fmt.Sprintf("%s/line:%d", c.CommandType, c.Line), func(t *testing.T) {
 				msg := fmt.Sprintf("%s:%d %s", wastName, c.Line, c.CommandType)
 				switch c.CommandType {

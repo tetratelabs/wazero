@@ -100,7 +100,10 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []exper
 	cm.functionOffsets = make([]compiledFunctionOffset, localFns)
 	bodies := make([][]byte, localFns)
 	for i := range module.CodeSection {
-		fmt.Printf("------------------------------------------ %d/%d ------------------------------------------\n", i, len(module.CodeSection)-1)
+		const debug = false
+		if debug {
+			fmt.Printf("------------------------------------------ %d/%d ------------------------------------------\n", i, len(module.CodeSection)-1)
+		}
 		fidx := wasm.Index(i + importedFns)
 		fref := frontend.FunctionIndexToFuncRef(fidx)
 
@@ -124,8 +127,6 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []exper
 		if err != nil {
 			return fmt.Errorf("wasm->ssa: %v", err)
 		}
-
-		const debug = true
 
 		if debug {
 			fmt.Printf("[[[SSA]]]%s\n", ssaBuilder.Format())

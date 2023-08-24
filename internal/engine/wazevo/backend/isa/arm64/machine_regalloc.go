@@ -178,14 +178,14 @@ func (f *regAllocFunctionImpl) Done() {
 
 // ID implements regalloc.Block ID.
 func (r *regAllocBlockImpl) ID() int {
-	return int(r.l)
+	return int(r.sb.ID())
 }
 
 // Preds implements regalloc.Block Preds.
 func (r *regAllocBlockImpl) Preds() []regalloc.Block {
 	sb := r.sb
 	r.f.predsSlice = r.f.predsSlice[:0]
-	for pred := sb.NextPredIterator(); pred != nil; pred = sb.NextPredIterator() {
+	for pred := sb.BeginPredIterator(); pred != nil; pred = sb.NextPredIterator() {
 		l := r.f.m.ssaBlockIDToLabels[pred.ID()]
 		index := r.f.labelToRegAllocBlockIndex[l]
 		r.f.predsSlice = append(r.f.predsSlice, &r.f.reversePostOrderBlocks[index])

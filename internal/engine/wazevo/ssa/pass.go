@@ -275,8 +275,12 @@ func passDeadCodeEliminationOpt(b *builder) {
 
 // clearBlkVisited clears the b.blkVisited map so that we can reuse it for multiple places.
 func (b *builder) clearBlkVisited() {
-	for i := 0; i < b.basicBlocksPool.Allocated(); i++ {
-		blk := b.basicBlocksPool.View(i)
+	b.blkStack2 = b.blkStack2[:0]
+	for key := range b.blkVisited {
+		b.blkStack2 = append(b.blkStack2, key)
+	}
+	for _, blk := range b.blkStack2 {
 		delete(b.blkVisited, blk)
 	}
+	b.blkStack2 = b.blkStack2[:0]
 }
