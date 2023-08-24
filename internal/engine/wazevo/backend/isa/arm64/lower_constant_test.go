@@ -77,15 +77,15 @@ func TestMachine_lowerConstantI32(t *testing.T) {
 		val uint32
 		exp []string
 	}{
-		{val: 0, exp: []string{"movz w0, #0x0, LSL 0"}},
-		{val: 0xffff, exp: []string{"movz w0, #0xffff, LSL 0"}},
-		{val: 0xffff_0000, exp: []string{"movz w0, #0xffff, LSL 16"}},
-		{val: 0xffff_fffe, exp: []string{"movn w0, #0x1, LSL 0"}},
+		{val: 0, exp: []string{"movz w0, #0x0, lsl 0"}},
+		{val: 0xffff, exp: []string{"movz w0, #0xffff, lsl 0"}},
+		{val: 0xffff_0000, exp: []string{"movz w0, #0xffff, lsl 16"}},
+		{val: 0xffff_fffe, exp: []string{"movn w0, #0x1, lsl 0"}},
 		{val: 0x2, exp: []string{"orr w0, wzr, #0x2"}},
 		{val: 0x80000001, exp: []string{"orr w0, wzr, #0x80000001"}},
 		{val: 0xf00000f, exp: []string{
-			"movz w0, #0xf, LSL 0",
-			"movk w0, #0xf00, LSL 16",
+			"movz w0, #0xf, lsl 0",
+			"movk w0, #0xf00, lsl 16",
 		}},
 	} {
 		tc := tc
@@ -104,43 +104,43 @@ func TestMachine_lowerConstantI64(t *testing.T) {
 		val uint64
 		exp []string
 	}{
-		{val: 0x0, exp: []string{"movz x0, #0x0, LSL 0"}},
+		{val: 0x0, exp: []string{"movz x0, #0x0, lsl 0"}},
 		{val: 0x1, exp: []string{"orr x0, xzr, #0x1"}},
 		{val: 0x3, exp: []string{"orr x0, xzr, #0x3"}},
 		{val: 0xfff000, exp: []string{"orr x0, xzr, #0xfff000"}},
-		{val: 0x8001 << 16, exp: []string{"movz x0, #0x8001, LSL 16"}},
-		{val: 0x8001 << 32, exp: []string{"movz x0, #0x8001, LSL 32"}},
-		{val: 0x8001 << 48, exp: []string{"movz x0, #0x8001, LSL 48"}},
-		{val: invert(0x8001 << 16), exp: []string{"movn x0, #0x8001, LSL 16"}},
-		{val: invert(0x8001 << 32), exp: []string{"movn x0, #0x8001, LSL 32"}},
-		{val: invert(0x8001 << 48), exp: []string{"movn x0, #0x8001, LSL 48"}},
+		{val: 0x8001 << 16, exp: []string{"movz x0, #0x8001, lsl 16"}},
+		{val: 0x8001 << 32, exp: []string{"movz x0, #0x8001, lsl 32"}},
+		{val: 0x8001 << 48, exp: []string{"movz x0, #0x8001, lsl 48"}},
+		{val: invert(0x8001 << 16), exp: []string{"movn x0, #0x8001, lsl 16"}},
+		{val: invert(0x8001 << 32), exp: []string{"movn x0, #0x8001, lsl 32"}},
+		{val: invert(0x8001 << 48), exp: []string{"movn x0, #0x8001, lsl 48"}},
 		{val: 0x80000001 << 16, exp: []string{
-			"movz x0, #0x1, LSL 16",
-			"movk x0, #0x8000, LSL 32",
+			"movz x0, #0x1, lsl 16",
+			"movk x0, #0x8000, lsl 32",
 		}},
 		{val: 0x40000001, exp: []string{
-			"movz x0, #0x1, LSL 0",
-			"movk x0, #0x4000, LSL 16",
+			"movz x0, #0x1, lsl 0",
+			"movk x0, #0x4000, lsl 16",
 		}},
 		{val: 0xffffffffff001000, exp: []string{
-			"movn x0, #0xefff, LSL 0",
-			"movk x0, #0xff00, LSL 16",
+			"movn x0, #0xefff, lsl 0",
+			"movk x0, #0xff00, lsl 16",
 		}},
 		{val: 0xffff0000c466361f, exp: []string{
-			"movz x0, #0x361f, LSL 0",
-			"movk x0, #0xc466, LSL 16",
-			"movk x0, #0xffff, LSL 48",
+			"movz x0, #0x361f, lsl 0",
+			"movk x0, #0xc466, lsl 16",
+			"movk x0, #0xffff, lsl 48",
 		}},
 		{val: 0x89705f4136b4a598, exp: []string{
-			"movz x0, #0xa598, LSL 0",
-			"movk x0, #0x36b4, LSL 16",
-			"movk x0, #0x5f41, LSL 32",
-			"movk x0, #0x8970, LSL 48",
+			"movz x0, #0xa598, lsl 0",
+			"movk x0, #0x36b4, lsl 16",
+			"movk x0, #0x5f41, lsl 32",
+			"movk x0, #0x8970, lsl 48",
 		}},
 		{val: 0xffff_0001_0001_0001, exp: []string{
-			"movn x0, #0xfffe, LSL 0",
-			"movk x0, #0x1, LSL 16",
-			"movk x0, #0x1, LSL 32",
+			"movn x0, #0xfffe, lsl 0",
+			"movk x0, #0x1, lsl 16",
+			"movk x0, #0x1, lsl 32",
 		}},
 	} {
 		tc := tc

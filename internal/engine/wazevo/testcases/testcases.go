@@ -653,6 +653,57 @@ var (
 			wasm.OpcodeEnd,
 		}, []wasm.ValueType{}),
 	}
+	IntegerBitwise = TestCase{
+		Name: "integer_bitwise",
+		Module: SingleFunctionModule(wasm.FunctionType{
+			Params:  []wasm.ValueType{i32, i32, i64, i64},
+			Results: []wasm.ValueType{i32, i32, i32, i32, i64, i64, i64, i64, i64, i64},
+		}, []byte{
+			wasm.OpcodeLocalGet, 0,
+			wasm.OpcodeLocalGet, 1,
+			wasm.OpcodeI32And,
+
+			wasm.OpcodeLocalGet, 0,
+			wasm.OpcodeLocalGet, 1,
+			wasm.OpcodeI32Or,
+
+			wasm.OpcodeLocalGet, 0,
+			wasm.OpcodeLocalGet, 1,
+			wasm.OpcodeI32Xor,
+
+			wasm.OpcodeLocalGet, 0,
+			wasm.OpcodeLocalGet, 1,
+			wasm.OpcodeI32Rotr,
+
+			wasm.OpcodeLocalGet, 2,
+			wasm.OpcodeLocalGet, 3,
+			wasm.OpcodeI64And,
+
+			wasm.OpcodeLocalGet, 2,
+			wasm.OpcodeLocalGet, 3,
+			wasm.OpcodeI64Or,
+
+			wasm.OpcodeLocalGet, 2,
+			wasm.OpcodeLocalGet, 3,
+			wasm.OpcodeI64Xor,
+
+			wasm.OpcodeLocalGet, 2,
+			wasm.OpcodeLocalGet, 3,
+			wasm.OpcodeI64Const, 8,
+			wasm.OpcodeI64Shl,
+			wasm.OpcodeI64Xor,
+
+			wasm.OpcodeLocalGet, 2,
+			wasm.OpcodeLocalGet, 3,
+			wasm.OpcodeI64Rotl,
+
+			wasm.OpcodeLocalGet, 2,
+			wasm.OpcodeLocalGet, 3,
+			wasm.OpcodeI64Rotr,
+
+			wasm.OpcodeEnd,
+		}, []wasm.ValueType{}),
+	}
 	IntegerShift = TestCase{
 		Name: "integer_shift",
 		Module: SingleFunctionModule(wasm.FunctionType{

@@ -40,19 +40,23 @@ const (
 )
 
 // String implements fmt.Stringer for debugging.
-func (o operand) String() string {
+func (o operand) format(size byte) string {
 	switch o.kind {
 	case operandKindNR:
-		return fmt.Sprintf("r%d", o.nr())
+		return formatVRegSized(o.nr(), size)
 	case operandKindSR:
 		r, amt, sop := o.sr()
-		return fmt.Sprintf("r%d, #%d, %s", r, amt, sop)
+		return fmt.Sprintf("%s, %s #%d", formatVRegSized(r, size), sop, amt)
 	case operandKindER:
-		r, eop, to := o.er()
-		return fmt.Sprintf("r%d, %s, %d", r, eop, to)
+		r, eop, _ := o.er()
+		return fmt.Sprintf("%s %s", formatVRegSized(r, size), eop)
 	case operandKindImm12:
 		imm12, shiftBit := o.imm12()
-		return fmt.Sprintf("#%d<<%d", imm12, 12*shiftBit)
+		if shiftBit == 1 {
+			return fmt.Sprintf("#%#x", uint64(imm12)<<12)
+		} else {
+			return fmt.Sprintf("#%#x", imm12)
+		}
 	default:
 		panic(fmt.Sprintf("unknown operand kind: %d", o.kind))
 	}

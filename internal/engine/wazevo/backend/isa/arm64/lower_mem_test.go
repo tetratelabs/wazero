@@ -77,7 +77,7 @@ func TestAddressMode_format(t *testing.T) {
 	})
 	t.Run("addressModeKindRegScaled", func(t *testing.T) {
 		require.Equal(t,
-			"[x1, w0, LSL #0x1]",
+			"[x1, w0, lsl #0x1]",
 			addressMode{
 				kind:  addressModeKindRegScaled,
 				rn:    regalloc.FromRealReg(x1, regalloc.RegTypeInt),
@@ -87,7 +87,7 @@ func TestAddressMode_format(t *testing.T) {
 			}.format(16),
 		)
 		require.Equal(t,
-			"[x1, w0, LSL #0x1]",
+			"[x1, w0, lsl #0x1]",
 			addressMode{
 				kind:  addressModeKindRegScaled,
 				rn:    regalloc.FromRealReg(x1, regalloc.RegTypeInt),
@@ -97,7 +97,7 @@ func TestAddressMode_format(t *testing.T) {
 			}.format(16),
 		)
 		require.Equal(t,
-			"[x1, w0, LSL #0x2]",
+			"[x1, w0, lsl #0x2]",
 			addressMode{
 				kind:  addressModeKindRegScaled,
 				rn:    regalloc.FromRealReg(x1, regalloc.RegTypeInt),
@@ -107,7 +107,7 @@ func TestAddressMode_format(t *testing.T) {
 			}.format(32),
 		)
 		require.Equal(t,
-			"[x1, w0, LSL #0x2]",
+			"[x1, w0, lsl #0x2]",
 			addressMode{
 				kind:  addressModeKindRegScaled,
 				rn:    regalloc.FromRealReg(x1, regalloc.RegTypeInt),
@@ -117,7 +117,7 @@ func TestAddressMode_format(t *testing.T) {
 			}.format(32),
 		)
 		require.Equal(t,
-			"[x1, w0, LSL #0x3]",
+			"[x1, w0, lsl #0x3]",
 			addressMode{
 				kind:  addressModeKindRegScaled,
 				rn:    regalloc.FromRealReg(x1, regalloc.RegTypeInt),
@@ -127,7 +127,7 @@ func TestAddressMode_format(t *testing.T) {
 			}.format(64),
 		)
 		require.Equal(t,
-			"[x1, w0, LSL #0x3]",
+			"[x1, w0, lsl #0x3]",
 			addressMode{
 				kind:  addressModeKindRegScaled,
 				rn:    regalloc.FromRealReg(x1, regalloc.RegTypeInt),
@@ -508,8 +508,8 @@ func TestMachine_addConstToReg64(t *testing.T) {
 		ctx, _, m := newSetupWithMockContext()
 		ctx.vRegCounter = nextVRegID - 1
 		m.addConstToReg64(regalloc.FromRealReg(x15, regalloc.RegTypeInt), c)
-		require.Equal(t, `movz x101?, #0x1, LSL 0
-movk x101?, #0x1, LSL 32
+		require.Equal(t, `movz x101?, #0x1, lsl 0
+movk x101?, #0x1, lsl 32
 add x100?, x15, x101?`, formatEmittedInstructionsInCurrentBlock(m))
 	})
 }

@@ -814,6 +814,7 @@ func encodeAluRRImm12(op aluOp, rd, rn uint32, imm12 uint16, shiftBit byte, _64b
 // https://developer.arm.com/documentation/ddi0596/2020-12/Index-by-Encoding/Data-Processing----Register?lang=en#addsub_shift
 func encodeAluRRRShift(op aluOp, rd, rn, rm, amount uint32, shiftOp shiftOp, _64bit bool) uint32 {
 	var _31to24 uint32
+	var opc, n uint32
 	switch op {
 	case aluOpAdd:
 		_31to24 = 0b00001011
@@ -823,6 +824,17 @@ func encodeAluRRRShift(op aluOp, rd, rn, rm, amount uint32, shiftOp shiftOp, _64
 		_31to24 = 0b01001011
 	case aluOpSubS:
 		_31to24 = 0b01101011
+	case aluOpAnd, aluOpOrr, aluOpEor:
+		// "Logical (shifted register)".
+		switch op {
+		case aluOpAnd:
+			// all zeros
+		case aluOpOrr:
+			opc = 0b01
+		case aluOpEor:
+			opc = 0b10
+		}
+		_31to24 = 0b000_01010
 	default:
 		panic(op.String())
 	}
@@ -842,7 +854,7 @@ func encodeAluRRRShift(op aluOp, rd, rn, rm, amount uint32, shiftOp shiftOp, _64
 	default:
 		panic(shiftOp.String())
 	}
-	return _31to24<<24 | shift<<22 | rm<<16 | (amount << 10) | (rn << 5) | rd
+	return opc<<29 | n<<21 | _31to24<<24 | shift<<22 | rm<<16 | (amount << 10) | (rn << 5) | rd
 }
 
 // encodeAluRRR encodes as Data Processing (register), depending on aluOp.
@@ -880,7 +892,19 @@ func encodeAluRRR(op aluOp, rd, rn, rm uint32, _64bit, isRnSp bool) uint32 {
 		}
 		// "Shifted register" with shift = 0
 		_31to21 = 0b01101011_000
-	case aluOpLsl, aluOpAsr, aluOpLsr:
+	case aluOpAnd, aluOpOrr, aluOpEor:
+		// "Logical (shifted register)".
+		var opc, n uint32
+		switch op {
+		case aluOpAnd:
+			// all zeros
+		case aluOpOrr:
+			opc = 0b01
+		case aluOpEor:
+			opc = 0b10
+		}
+		_31to21 = 0b000_01010_000 | opc<<8 | n
+	case aluOpLsl, aluOpAsr, aluOpLsr, aluOpRotR:
 		// "Data-processing (2 source)".
 		_31to21 = 0b00011010_110
 		switch op {
@@ -890,6 +914,8 @@ func encodeAluRRR(op aluOp, rd, rn, rm uint32, _64bit, isRnSp bool) uint32 {
 			_15to10 = 0b001001
 		case aluOpAsr:
 			_15to10 = 0b001010
+		case aluOpRotR:
+			_15to10 = 0b001011
 		}
 	default:
 		panic(op.String())

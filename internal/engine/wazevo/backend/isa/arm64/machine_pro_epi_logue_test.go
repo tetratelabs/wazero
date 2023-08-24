@@ -170,12 +170,12 @@ func TestMachine_insertStackBoundsCheck(t *testing.T) {
 		{
 			requiredStackSize: 0xfff_0,
 			exp: `
-	movz x27, #0xfff0, LSL 0
+	movz x27, #0xfff0, lsl 0
 	sub x27, sp, x27
 	ldr x11, [x0, #0x28]
 	subs xzr, x27, x11
 	b.ge #0x14
-	movz x27, #0xfff0, LSL 0
+	movz x27, #0xfff0, lsl 0
 	str x27, [x0, #0x40]
 	ldr x27, [x0, #0x50]
 	bl w27

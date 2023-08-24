@@ -249,7 +249,7 @@ func formatVRegSized(r regalloc.VReg, size byte) (ret string) {
 				ret = strings.Replace(ret, "x", "w", 1)
 			case 64:
 			default:
-				panic("BUG: invalid register size")
+				panic("BUG: invalid register size: " + strconv.Itoa(int(size)))
 			}
 		case 'v':
 			switch size {

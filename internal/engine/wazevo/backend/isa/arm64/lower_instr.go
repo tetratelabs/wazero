@@ -151,6 +151,12 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		m.lowerCall(instr)
 	case ssa.OpcodeIcmp:
 		m.lowerIcmp(instr)
+	case ssa.OpcodeBand:
+		m.lowerBitwiseAluOp(instr, aluOpAnd)
+	case ssa.OpcodeBor:
+		m.lowerBitwiseAluOp(instr, aluOpOrr)
+	case ssa.OpcodeBxor:
+		m.lowerBitwiseAluOp(instr, aluOpEor)
 	case ssa.OpcodeIshl:
 		m.lowerShifts(instr, extModeNone, aluOpLsl)
 	case ssa.OpcodeSshr:
@@ -165,6 +171,10 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		} else {
 			m.lowerShifts(instr, extModeZeroExtend32, aluOpAsr)
 		}
+	case ssa.OpcodeRotl:
+		m.lowerRotl(instr)
+	case ssa.OpcodeRotr:
+		m.lowerRotr(instr)
 	case ssa.OpcodeSExtend, ssa.OpcodeUExtend:
 		from, to, signed := instr.ExtendData()
 		m.lowerExtend(instr.Arg(), instr.Return(), from, to, signed)
@@ -340,6 +350,61 @@ func (m *machine) lowerShifts(si *ssa.Instruction, ext extMode, aluOp aluOp) {
 
 	alu := m.allocateInstr()
 	alu.asALUShift(aluOp, rd, rn, rm, x.Type().Bits() == 64)
+	m.insert(alu)
+}
+
+func (m *machine) lowerBitwiseAluOp(si *ssa.Instruction, op aluOp) {
+	x, y := si.BinaryData()
+	if !x.Type().IsInt() {
+		panic("BUG?")
+	}
+
+	xDef, yDef := m.compiler.ValueDefinition(x), m.compiler.ValueDefinition(y)
+	rn := m.getOperand_NR(xDef, extModeNone)
+	rm := m.getOperand_SR_NR(yDef, extModeNone)
+	rd := operandNR(m.compiler.VRegOf(si.Return()))
+
+	alu := m.allocateInstr()
+	alu.asALU(op, rd, rn, rm, si.Return().Type().Bits() == 64)
+	m.insert(alu)
+}
+
+func (m *machine) lowerRotl(si *ssa.Instruction) {
+	x, y := si.BinaryData()
+	if !x.Type().IsInt() {
+		panic("BUG?")
+	}
+
+	// Encode rotl as neg + rotr: neg is really a sub against the zero-reg.
+
+	xDef, yDef := m.compiler.ValueDefinition(x), m.compiler.ValueDefinition(y)
+	rn := m.getOperand_NR(xDef, extModeNone)
+	rm := m.getOperand_NR(yDef, extModeNone)
+	rd := operandNR(m.compiler.VRegOf(si.Return()))
+
+	// Encode neg as sub $reg, xzr, $reg.
+	neg := m.allocateInstr()
+	neg.asALU(aluOpSub, rn, operandNR(xzrVReg), rn, si.Return().Type().Bits() == 64)
+	m.insert(neg)
+
+	alu := m.allocateInstr()
+	alu.asALU(aluOpRotR, rd, rn, rm, si.Return().Type().Bits() == 64)
+	m.insert(alu)
+}
+
+func (m *machine) lowerRotr(si *ssa.Instruction) {
+	x, y := si.BinaryData()
+	if !x.Type().IsInt() {
+		panic("BUG?")
+	}
+
+	xDef, yDef := m.compiler.ValueDefinition(x), m.compiler.ValueDefinition(y)
+	rn := m.getOperand_NR(xDef, extModeNone)
+	rm := m.getOperand_NR(yDef, extModeNone)
+	rd := operandNR(m.compiler.VRegOf(si.Return()))
+
+	alu := m.allocateInstr()
+	alu.asALU(aluOpRotR, rd, rn, rm, si.Return().Type().Bits() == 64)
 	m.insert(alu)
 }
 

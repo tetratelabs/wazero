@@ -116,6 +116,45 @@ func TestInstruction_encode(t *testing.T) {
 		{want: "fb633b8b", setup: func(i *instruction) {
 			i.asALU(aluOpAdd, operandNR(tmpRegVReg), operandNR(spVReg), operandNR(tmpRegVReg), true)
 		}},
+		{want: "2000020a", setup: func(i *instruction) {
+			i.asALU(aluOpAnd, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), false)
+		}},
+		{want: "2000028a", setup: func(i *instruction) {
+			i.asALU(aluOpAnd, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), true)
+		}},
+		{want: "2010028a", setup: func(i *instruction) {
+			i.asALU(aluOpAnd, operandNR(x0VReg), operandNR(x1VReg), operandSR(x2VReg, 4, shiftOpLSL), true)
+		}},
+		{want: "2030428a", setup: func(i *instruction) {
+			i.asALU(aluOpAnd, operandNR(x0VReg), operandNR(x1VReg), operandSR(x2VReg, 12, shiftOpLSR), true)
+		}},
+		{want: "2000022a", setup: func(i *instruction) {
+			i.asALU(aluOpOrr, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), false)
+		}},
+		{want: "200002aa", setup: func(i *instruction) {
+			i.asALU(aluOpOrr, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), true)
+		}},
+		{want: "201002aa", setup: func(i *instruction) {
+			i.asALU(aluOpOrr, operandNR(x0VReg), operandNR(x1VReg), operandSR(x2VReg, 4, shiftOpLSL), true)
+		}},
+		{want: "201082aa", setup: func(i *instruction) {
+			i.asALU(aluOpOrr, operandNR(x0VReg), operandNR(x1VReg), operandSR(x2VReg, 4, shiftOpASR), true)
+		}},
+		{want: "2000024a", setup: func(i *instruction) {
+			i.asALU(aluOpEor, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), false)
+		}},
+		{want: "200002ca", setup: func(i *instruction) {
+			i.asALU(aluOpEor, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), true)
+		}},
+		{want: "201002ca", setup: func(i *instruction) {
+			i.asALU(aluOpEor, operandNR(x0VReg), operandNR(x1VReg), operandSR(x2VReg, 4, shiftOpLSL), true)
+		}},
+		{want: "202cc21a", setup: func(i *instruction) {
+			i.asALU(aluOpRotR, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), false)
+		}},
+		{want: "202cc29a", setup: func(i *instruction) {
+			i.asALU(aluOpRotR, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), true)
+		}},
 		{want: "30000010", setup: func(i *instruction) { i.asAdr(v16VReg, 4) }},
 		{want: "50050030", setup: func(i *instruction) { i.asAdr(v16VReg, 169) }},
 		{want: "5000001c020000140000803f", setup: func(i *instruction) {

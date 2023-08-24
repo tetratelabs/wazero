@@ -573,6 +573,25 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i32, v4:i64, v5:i64)
 `,
 		},
 		{
+			name: "integer bitwise", m: testcases.IntegerBitwise.Module,
+			exp: `
+blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i32, v4:i64, v5:i64)
+	v6:i32 = Band v2, v3
+	v7:i32 = Bor v2, v3
+	v8:i32 = Bxor v2, v3
+	v9:i32 = Rotr v2, v3
+	v10:i64 = Band v4, v5
+	v11:i64 = Bor v4, v5
+	v12:i64 = Bxor v4, v5
+	v13:i64 = Iconst_64 0x8
+	v14:i64 = Ishl v5, v13
+	v15:i64 = Bxor v4, v14
+	v16:i64 = Rotl v4, v5
+	v17:i64 = Rotr v4, v5
+	Jump blk_ret, v6, v7, v8, v9, v10, v11, v12, v15, v16, v17
+`,
+		},
+		{
 			name: "integer shift", m: testcases.IntegerShift.Module,
 			exp: `
 blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i32, v4:i64, v5:i64)
