@@ -108,7 +108,7 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []exper
 		const debug = false
 		if debug {
 			name := exportedFnIndex[fidx]
-			fmt.Printf("%[1]s %d/%d %s %[1]s\n", strings.Repeat("-", 10), i, len(module.CodeSection)-1, name)
+			fmt.Printf("%[1]s %d/%d %s %[1]s\n", strings.Repeat("-", 30), i, len(module.CodeSection)-1, name)
 		}
 
 		_, needGoEntryPreamble := exportedFnIndex[fidx]
