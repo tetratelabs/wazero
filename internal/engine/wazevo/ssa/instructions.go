@@ -1582,7 +1582,7 @@ func (i *Instruction) addArgumentBranchInst(v Value) {
 	case OpcodeJump, OpcodeBrz, OpcodeBrnz:
 		i.vs = append(i.vs, v)
 	default:
-		panic("BUG: " + i.typ.String())
+		panic("BUG: " + i.opcode.String())
 	}
 }
 

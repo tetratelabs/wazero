@@ -47,10 +47,15 @@ func TestSpectestV1(t *testing.T) {
 		{name: "custom"},
 		{name: "const"},
 		{name: "data"},
-		{name: "local_get"},
+		{name: "elem"},
+		{name: "exports"},
+		{name: "globals"},
 		{name: "memory_size"},
 		{name: "memory_grow"},
 		{name: "nop"},
+		{name: "type"},
+		{name: "unreachable"},
+		{name: "unreached-invalid"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			spectest.RunCase(t, v1.Testcases, tc.name, context.Background(), config,
@@ -59,6 +64,7 @@ func TestSpectestV1(t *testing.T) {
 	}
 }
 
+// 458
 func TestE2E(t *testing.T) {
 	type callCase struct {
 		funcName           string // defaults to testcases.ExportedFunctionName
