@@ -248,6 +248,7 @@ func (bb *basicBlock) reset() {
 	// TODO: reuse the map!
 	bb.unknownValues = make(map[Variable]Value)
 	bb.lastDefinitions = make(map[Variable]Value)
+	bb.reversePostOrder = -1
 }
 
 // addPred adds a predecessor to this block specified by the branch instruction.
@@ -285,8 +286,10 @@ func (bb *basicBlock) FormatHeader(b Builder) string {
 		preds := make([]string, 0, len(bb.preds))
 		for _, pred := range bb.preds {
 			if len(pred.branch.vs) != len(bb.params) {
-				panic(fmt.Sprintf("BUG: len(argument) != len(params): %d != %d: %s",
-					len(pred.branch.vs), len(bb.params), pred.branch.Format(b),
+				panic(fmt.Sprintf(
+					"BUG: len(argument at %s) != len(params at %s): %d != %d: %s",
+					pred.blk.Name(), bb.Name(),
+					len(bb.params), len(pred.branch.vs), pred.branch.Format(b),
 				))
 			}
 			if pred.blk.invalid {
@@ -299,6 +302,30 @@ func (bb *basicBlock) FormatHeader(b Builder) string {
 			bb.id, strings.Join(ps, ","), strings.Join(preds, ","))
 	} else {
 		return fmt.Sprintf("blk%d: (%s)", bb.id, strings.Join(ps, ", "))
+	}
+}
+
+// validates validates the basicBlock for debugging purpose.
+func (bb *basicBlock) validate(b *builder) {
+	if bb.invalid {
+		panic("BUG: trying to validate an invalid block: " + bb.Name())
+	}
+	if len(bb.preds) > 0 {
+		for _, pred := range bb.preds {
+			if pred.branch.opcode != OpcodeBrTable {
+				if target := pred.branch.blk; target != bb {
+					panic(fmt.Sprintf("BUG: '%s' is not branch to %s, but to %s",
+						pred.branch.Format(b), bb.Name(), target.Name()))
+				}
+			}
+			if len(pred.branch.vs) != len(bb.params) {
+				panic(fmt.Sprintf(
+					"BUG: len(argument at %s) != len(params at %s): %d != %d: %s",
+					pred.blk.Name(), bb.Name(),
+					len(bb.params), len(pred.branch.vs), pred.branch.Format(b),
+				))
+			}
+		}
 	}
 }
 

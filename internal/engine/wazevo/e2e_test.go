@@ -37,18 +37,22 @@ func TestSpectestV1(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 	}{
-		{name: "address.json"},
-		{name: "binary.json"},
-		{name: "binary-leb128.json"},
-		{name: "comments.json"},
-		{name: "custom.json"},
-		{name: "const.json"},
-		{name: "data.json"},
-		{name: "local_get.json"},
-		{name: "memory_size.json"},
-		{name: "nop.json"},
+		{name: "address"},
+		{name: "binary"},
+		{name: "binary-leb128"},
+		{name: "comments"},
+		{name: "custom"},
+		{name: "const"},
+		{name: "data"},
+		{name: "local_get"},
+		{name: "memory_size"},
+		{name: "memory_grow"},
+		{name: "nop"},
 	} {
-		t.Run(tc.name, func(t *testing.T) { spectest.RunJson(t, v1.Testcases, tc.name, context.Background(), config) })
+		t.Run(tc.name, func(t *testing.T) {
+			spectest.RunCase(t, v1.Testcases, tc.name, context.Background(), config,
+				-1, 0, math.MaxInt)
+		})
 	}
 }
 

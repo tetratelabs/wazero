@@ -129,6 +129,13 @@ func (m *machine) Reset() {
 		v.begin, v.end = nil, nil
 	}
 	m.clobberedRegs = m.clobberedRegs[:0]
+	for key := range m.spillSlots {
+		m.clobberedRegs = append(m.clobberedRegs, regalloc.VReg(key))
+	}
+	for _, key := range m.clobberedRegs {
+		delete(m.spillSlots, regalloc.VRegID(key))
+	}
+	m.clobberedRegs = m.clobberedRegs[:0]
 	m.orderedLabels = m.orderedLabels[:0]
 	m.regAllocFn.reset()
 	m.spillSlotSize = 0

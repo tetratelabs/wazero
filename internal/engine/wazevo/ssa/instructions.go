@@ -51,6 +51,7 @@ func (i *Instruction) reset() {
 	i.v3 = ValueInvalid
 	i.rValue = ValueInvalid
 	i.typ = typeInvalid
+	i.vs = nil
 }
 
 // InstructionGroupID is assigned to each instruction and represents a group of instructions
@@ -1177,9 +1178,10 @@ func (i *Instruction) AsF64const(f float64) {
 }
 
 // AsReturn initializes this instruction as a return instruction with OpcodeReturn.
-func (i *Instruction) AsReturn(vs []Value) {
+func (i *Instruction) AsReturn(vs []Value) *Instruction {
 	i.opcode = OpcodeReturn
 	i.vs = vs
+	return i
 }
 
 // ReturnVals returns the return values of OpcodeReturn.

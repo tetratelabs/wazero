@@ -664,6 +664,8 @@ func (b *builder) LayoutBlocks() {
 		panic("LayoutBlocks must be called after all passes are done")
 	}
 
+	b.clearBlkVisited()
+
 	// We might end up splitting critical edges which adds more basic blocks,
 	// so we store the currently existing basic blocks in nonSplitBlocks temporarily.
 	// That way we can iterate over the original basic blocks while appending new ones into reversePostOrderedBasicBlocks.
@@ -678,8 +680,7 @@ func (b *builder) LayoutBlocks() {
 		}
 	}
 
-	b.clearBlkVisited()
-	inserted := b.blkVisited
+	trampolines := []*basicBlock{}
 
 	// Reset the order slice since we update on the fly by splitting critical edges.
 	b.reversePostOrderedBasicBlocks = b.reversePostOrderedBasicBlocks[:0]
@@ -687,13 +688,13 @@ func (b *builder) LayoutBlocks() {
 	for _, blk := range nonSplitBlocks {
 		for i := range blk.preds {
 			pred := blk.preds[i].blk
-			if _, ok := inserted[pred]; ok || !pred.Valid() {
+			if _, ok := b.blkVisited[pred]; ok || !pred.Valid() {
 				continue
 			} else if pred.reversePostOrder < blk.reversePostOrder {
 				// This means the edge is critical, and this pred is the trampoline and yet to be inserted.
 				// Split edge trampolines must come before the destination in reverse post-order.
 				b.reversePostOrderedBasicBlocks = append(b.reversePostOrderedBasicBlocks, pred)
-				b.blkVisited[blk] = 0 // mark as inserted, the value is not used.
+				b.blkVisited[pred] = 0 // mark as inserted, the value is not used.
 			}
 		}
 
@@ -733,12 +734,19 @@ func (b *builder) LayoutBlocks() {
 				panic("BUG: predecessor info not found while the successor exists in successors list")
 			}
 
+			if debug {
+				fmt.Printf("trying to split edge from %d->%d at %s\n",
+					blk.ID(), succ.ID(), predInfo.branch.Format(b))
+			}
+
 			trampoline := b.splitCriticalEdge(blk, succ, predInfo)
 			// Update the successors slice because the target is no longer the original `succ`.
 			blk.success[sidx] = trampoline
 
+			trampolines = append(trampolines, trampoline)
+
 			if debug {
-				fmt.Printf("splitting edge from %d->%d at %s as %d->%d->%d \n",
+				fmt.Printf("edge split from %d->%d at %s as %d->%d->%d \n",
 					blk.ID(), succ.ID(), predInfo.branch.Format(b),
 					blk.ID(), trampoline.ID(), succ.ID())
 			}
@@ -747,7 +755,7 @@ func (b *builder) LayoutBlocks() {
 			if fallthroughBranch.opcode == OpcodeJump && fallthroughBranch.blk == trampoline {
 				// This can be lowered as fallthrough at the end of the block.
 				b.reversePostOrderedBasicBlocks = append(b.reversePostOrderedBasicBlocks, trampoline)
-				inserted[trampoline] = 0 // mark as inserted, the value is not used.
+				b.blkVisited[trampoline] = 0 // mark as inserted, the value is not used.
 			} else {
 				uninsertedTrampolines = append(uninsertedTrampolines, trampoline)
 			}
@@ -757,10 +765,30 @@ func (b *builder) LayoutBlocks() {
 			if trampoline.success[0].reversePostOrder < trampoline.reversePostOrder {
 				// This means the critical edge was backward, so we insert after the current block immediately.
 				b.reversePostOrderedBasicBlocks = append(b.reversePostOrderedBasicBlocks, trampoline)
-				inserted[trampoline] = 0 // mark as inserted, the value is not used.
+				b.blkVisited[trampoline] = 0 // mark as inserted, the value is not used.
 			} // If the target is forward, we can wait to insert until the target is inserted.
 		}
 		uninsertedTrampolines = uninsertedTrampolines[:0] // Reuse the stack for the next block.
+	}
+
+	if debug {
+		var bs []string
+		for _, blk := range b.reversePostOrderedBasicBlocks {
+			bs = append(bs, blk.Name())
+		}
+		fmt.Println("ordered blocks: ", strings.Join(bs, ", "))
+		bs = bs[:0]
+		for visited := range b.blkVisited {
+			bs = append(bs, visited.Name())
+		}
+		sort.Slice(bs, func(i, j int) bool { return bs[i] < bs[j] })
+		fmt.Println("visited blocks: ", strings.Join(bs, ", "))
+		for _, trampoline := range trampolines {
+			if _, ok := b.blkVisited[trampoline]; !ok {
+				panic("BUG: trampoline block not inserted: " + trampoline.FormatHeader(b))
+			}
+			trampoline.validate(b)
+		}
 	}
 
 	// Reuse the stack for the next iteration.
@@ -914,6 +942,15 @@ func (b *builder) splitCriticalEdge(pred, succ *basicBlock, predInfo *basicBlock
 
 	// Update the original branch to point to the trampoline.
 	predInfo.blk = trampoline
+	predInfo.branch = originalBranch
+
+	if debug {
+		trampoline.validate(b)
+	}
+
+	if len(trampoline.params) > 0 {
+		panic("trampoline should not have params")
+	}
 
 	// Assign the same order as the original block so that this will be placed before the actual destination.
 	trampoline.reversePostOrder = pred.reversePostOrder
