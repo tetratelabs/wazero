@@ -140,14 +140,14 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []exper
 		ssaBuilder.RunPasses()
 
 		if debug {
-			fmt.Printf("[[[optimized SSA]]]%s", ssaBuilder.Format())
+			fmt.Printf("[[[optimized SSA]]]%s\n", ssaBuilder.Format())
 		}
 
 		// Finalize the layout of SSA blocks which might use the optimization results.
 		ssaBuilder.LayoutBlocks()
 
 		if debug {
-			fmt.Printf("[[[laidout SSA]]]%s", ssaBuilder.Format())
+			fmt.Printf("[[[laidout SSA]]]%s\n", ssaBuilder.Format())
 		}
 
 		// Now our ssaBuilder contains the necessary information to further lower them to

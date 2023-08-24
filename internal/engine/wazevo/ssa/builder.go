@@ -16,8 +16,8 @@ type Builder interface {
 	// Signature returns the Signature of the currently-compiled function.
 	Signature() *Signature
 
-	// Blocks returns the number of BasicBlocks(s) existing in the currently-compiled function.
-	Blocks() int
+	// BlockIDMax returns the maximum value of BasicBlocksID existing in the currently-compiled function.
+	BlockIDMax() BasicBlockID
 
 	// AllocateBasicBlock creates a basic block in SSA function.
 	AllocateBasicBlock() BasicBlock
@@ -51,9 +51,8 @@ type Builder interface {
 	// MustFindValue searches the latest definition of the given Variable and returns the result.
 	MustFindValue(variable Variable) Value
 
-	// FindValue is the same as FindValue except that if the Value is not defined anywhere yet,
-	// the given callback `create` is called to create a new Value.
-	FindValue(variable Variable) Value
+	// FindValueInLinearPath TODO
+	FindValueInLinearPath(variable Variable) Value
 
 	// Seal declares that we've known all the predecessors to this block and were added via AddPred.
 	// After calling this, AddPred will be forbidden.
@@ -366,85 +365,81 @@ func (b *builder) allocateValue(typ Type) (v Value) {
 	return
 }
 
-// MustFindValue implements Builder.MustFindValue.
-func (b *builder) MustFindValue(variable Variable) Value {
-	typ := b.definedVariableType(variable)
-	return b.findValue(typ, variable, b.currentBB, true)
+// FindValueInLinearPath implements Builder.FindValue.
+func (b *builder) FindValueInLinearPath(variable Variable) Value {
+	return b.findValueInLinearPath(variable, b.currentBB)
 }
 
-// FindValue implements Builder.FindValue.
-func (b *builder) FindValue(variable Variable) Value {
-	typ := b.definedVariableType(variable)
-	return b.findValue(typ, variable, b.currentBB, false)
-}
-
-// findValue recursively tries to find the latest definition of a `variable`. The algorithm is described in
-// the section 2 of the paper https://link.springer.com/content/pdf/10.1007/978-3-642-37051-9_6.pdf.
-//
-// TODO: reimplement this in iterative, not recursive, to avoid stack overflow.
-func (b *builder) findValue(typ Type, variable Variable, blk *basicBlock, must bool) Value {
+func (b *builder) findValueInLinearPath(variable Variable, blk *basicBlock) Value {
 	if val, ok := blk.lastDefinitions[variable]; ok {
-		// The value is already defined in this block!
 		return val
-	} else if !blk.sealed { // Incomplete CFG as in the paper.
-		if must {
-			// If this is not sealed, that means it might have additional unknown predecessor later on.
-			// So we temporarily define the placeholder value here (not add as a parameter yet!),
-			// and record it as unknown.
-			// The unknown values are resolved when we call seal this block via BasicBlock.Seal().
-			value := b.allocateValue(typ)
-			if debug {
-				fmt.Printf("adding unknown value placeholder for %s at %d\n", variable, blk.id)
-			}
-			blk.lastDefinitions[variable] = value
-			blk.unknownValues[variable] = value
-			return value
-		}
+	} else if !blk.sealed {
 		return ValueInvalid
 	}
 
 	if pred := blk.singlePred; pred != nil {
 		// If this block is sealed and have only one predecessor,
 		// we can use the value in that block without ambiguity on definition.
-		return b.findValue(typ, variable, pred, must)
-	} else if len(blk.preds) == 0 {
-		// This case the value is not defined.
-		if must {
-			panic("BUG: value is not defined for " + variable.String())
+		return b.findValueInLinearPath(variable, pred)
+	}
+	if len(blk.preds) == 1 {
+		panic("BUG")
+	}
+	return ValueInvalid
+}
+
+// MustFindValue implements Builder.MustFindValue.
+func (b *builder) MustFindValue(variable Variable) Value {
+	typ := b.definedVariableType(variable)
+	return b.findValue(typ, variable, b.currentBB)
+}
+
+// findValue recursively tries to find the latest definition of a `variable`. The algorithm is described in
+// the section 2 of the paper https://link.springer.com/content/pdf/10.1007/978-3-642-37051-9_6.pdf.
+//
+// TODO: reimplement this in iterative, not recursive, to avoid stack overflow.
+func (b *builder) findValue(typ Type, variable Variable, blk *basicBlock) Value {
+	if val, ok := blk.lastDefinitions[variable]; ok {
+		// The value is already defined in this block!
+		return val
+	} else if !blk.sealed { // Incomplete CFG as in the paper.
+		// If this is not sealed, that means it might have additional unknown predecessor later on.
+		// So we temporarily define the placeholder value here (not add as a parameter yet!),
+		// and record it as unknown.
+		// The unknown values are resolved when we call seal this block via BasicBlock.Seal().
+		value := b.allocateValue(typ)
+		if debug {
+			fmt.Printf("adding unknown value placeholder for %s at %d\n", variable, blk.id)
 		}
-		return ValueInvalid
+		blk.lastDefinitions[variable] = value
+		blk.unknownValues[variable] = value
+		return value
 	}
 
-	b.vs = b.vs[:0]
+	if pred := blk.singlePred; pred != nil {
+		// If this block is sealed and have only one predecessor,
+		// we can use the value in that block without ambiguity on definition.
+		return b.findValue(typ, variable, pred)
+	} else if len(blk.preds) == 0 {
+		panic("BUG: value is not defined for " + variable.String())
+	}
+
 	// If this block has multiple predecessors, we have to gather the definitions,
 	// and treat them as an argument to this block.
 	//
-	// First gather all the definitions.
-	for i := range blk.preds {
-		pred := &blk.preds[i]
-		// Find the definition in the predecessor recursively.
-		value := b.findValue(typ, variable, pred.blk, must)
-		b.vs = append(b.vs, value)
-	}
-	if !must {
-		// If this is not a must, the value definition might be incomplete.
-		for _, v := range b.vs {
-			if !v.Valid() {
-				// If one of them is invalid, the value is not defined.
-				return ValueInvalid
-			}
-		}
-	}
-	// So the next thing we do now is to define a new parameter to this block which may or may not be redundant, but
-	// later we eliminate trivial params in an optimization pass.
+	// The first thing is to define a new parameter to this block which may or may not be redundant, but
+	// later we eliminate trivial params in an optimization pass. This must be done before finding the
+	// definitions in the predecessors so that we can break the cycle.
 	paramValue := blk.AddParam(b, typ)
 	b.DefineVariable(variable, paramValue, blk)
+
 	// After the new param is added, we have to manipulate the original branching instructions
 	// in predecessors so that they would pass the definition of `variable` as the argument to
 	// the newly added PHI.
 	for i := range blk.preds {
 		pred := &blk.preds[i]
-		pred.branch.addArgumentBranchInst(b.vs[i])
+		value := b.findValue(typ, variable, pred.blk)
+		pred.branch.addArgumentBranchInst(value)
 	}
 	return paramValue
 }
@@ -462,7 +457,7 @@ func (b *builder) Seal(raw BasicBlock) {
 		blk.addParamOn(typ, phiValue)
 		for i := range blk.preds {
 			pred := &blk.preds[i]
-			predValue := b.findValue(typ, variable, pred.blk, false)
+			predValue := b.findValue(typ, variable, pred.blk)
 			if !predValue.Valid() {
 				panic("BUG: value is not defined anywhere in the predecessors in the CFG")
 			}
@@ -602,6 +597,10 @@ func (b *builder) resolveArgumentAlias(instr *Instruction) {
 		instr.v2 = b.resolveAlias(instr.v2)
 	}
 
+	if instr.v3.Valid() {
+		instr.v3 = b.resolveAlias(instr.v3)
+	}
+
 	for i, v := range instr.vs {
 		instr.vs[i] = b.resolveAlias(v)
 	}
@@ -639,9 +638,9 @@ func (b *builder) isDominatedBy(n *basicBlock, d *basicBlock) bool {
 	return n == d
 }
 
-// Blocks implements Builder.Blocks.
-func (b *builder) Blocks() int {
-	return len(b.reversePostOrderedBasicBlocks)
+// BlockIDMax implements Builder.BlockIDMax.
+func (b *builder) BlockIDMax() BasicBlockID {
+	return BasicBlockID(b.basicBlocksPool.Allocated())
 }
 
 // LayoutBlocks implements Builder.LayoutBlocks. This re-organizes builder.reversePostOrderedBasicBlocks.

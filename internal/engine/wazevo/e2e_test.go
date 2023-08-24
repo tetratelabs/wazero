@@ -54,6 +54,7 @@ func TestSpectestV1(t *testing.T) {
 		{name: "if"},
 		{name: "names"},
 		{name: "load"},
+		{name: "loop"},
 		{name: "memory_size"},
 		{name: "memory_grow"},
 		{name: "nop"},

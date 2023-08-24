@@ -328,12 +328,12 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		} else {
 			zero.AsIconst64(0)
 		}
-		zero.AsIconst32(0)
 		builder.InsertInstruction(zero)
-		icmp := builder.AllocateInstruction()
-		icmp.AsIcmp(x, zero.Return(), ssa.IntegerCmpCondEqual)
-		builder.InsertInstruction(icmp)
-		state.push(icmp.Return())
+		icmp := builder.AllocateInstruction().
+			AsIcmp(x, zero.Return(), ssa.IntegerCmpCondEqual).
+			Insert(builder).
+			Return()
+		state.push(icmp)
 	case wasm.OpcodeI32Eq, wasm.OpcodeI64Eq:
 		if state.unreachable {
 			return
@@ -596,10 +596,11 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		v2 := state.pop()
 		v1 := state.pop()
 
-		sl := builder.AllocateInstruction()
-		sl.AsSelect(cond, v1, v2)
-		builder.InsertInstruction(sl)
-		state.push(sl.Return())
+		sl := builder.AllocateInstruction().
+			AsSelect(cond, v1, v2).
+			Insert(builder).
+			Return()
+		state.push(sl)
 
 	case wasm.OpcodeMemorySize:
 		state.pc++ // skips the memory index.
@@ -609,30 +610,30 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 
 		var memSizeInBytes ssa.Value
 		if c.offset.LocalMemoryBegin < 0 {
-			loadMemInstPtr := builder.AllocateInstruction()
-			loadMemInstPtr.AsLoad(c.moduleCtxPtrValue, c.offset.ImportedMemoryBegin.U32(), ssa.TypeI64)
-			builder.InsertInstruction(loadMemInstPtr)
-			memInstPtr := loadMemInstPtr.Return()
+			memInstPtr := builder.AllocateInstruction().
+				AsLoad(c.moduleCtxPtrValue, c.offset.ImportedMemoryBegin.U32(), ssa.TypeI64).
+				Insert(builder).
+				Return()
 
-			loadBufSizePtr := builder.AllocateInstruction()
-			loadBufSizePtr.AsLoad(memInstPtr, memoryInstanceBufSizeOffset, ssa.TypeI64)
-			builder.InsertInstruction(loadBufSizePtr)
-			memSizeInBytes = loadBufSizePtr.Return()
-
+			memSizeInBytes = builder.AllocateInstruction().
+				AsLoad(memInstPtr, memoryInstanceBufSizeOffset, ssa.TypeI64).
+				Insert(builder).
+				Return()
 		} else {
-			load := builder.AllocateInstruction()
-			load.AsLoad(c.moduleCtxPtrValue, c.offset.LocalMemoryLen().U32(), ssa.TypeI32)
-			builder.InsertInstruction(load)
-			memSizeInBytes = load.Return()
+			memSizeInBytes = builder.AllocateInstruction().
+				AsLoad(c.moduleCtxPtrValue, c.offset.LocalMemoryLen().U32(), ssa.TypeI32).
+				Insert(builder).
+				Return()
 		}
 
 		amount := builder.AllocateInstruction()
 		amount.AsIconst32(uint32(wasm.MemoryPageSizeInBits))
 		builder.InsertInstruction(amount)
-		memSize := builder.AllocateInstruction()
-		memSize.AsUshr(memSizeInBytes, amount.Return())
-		builder.InsertInstruction(memSize)
-		state.push(memSize.Return())
+		memSize := builder.AllocateInstruction().
+			AsUshr(memSizeInBytes, amount.Return()).
+			Insert(builder).
+			Return()
+		state.push(memSize)
 
 	case wasm.OpcodeMemoryGrow:
 		state.pc++ // skips the memory index.
@@ -643,18 +644,20 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		c.storeCallerModuleContext()
 
 		pages := state.pop()
-		loadPtr := builder.AllocateInstruction()
-		loadPtr.AsLoad(c.execCtxPtrValue,
-			wazevoapi.ExecutionContextOffsets.MemoryGrowTrampolineAddress.U32(), ssa.TypeI64)
-		builder.InsertInstruction(loadPtr)
+		loadPtr := builder.AllocateInstruction().
+			AsLoad(c.execCtxPtrValue,
+				wazevoapi.ExecutionContextOffsets.MemoryGrowTrampolineAddress.U32(),
+				ssa.TypeI64,
+			).Insert(builder).Return()
 
 		// TODO: reuse the slice.
 		args := []ssa.Value{c.execCtxPtrValue, pages}
-		callGrow := builder.AllocateInstruction()
-		callGrow.AsCallIndirect(loadPtr.Return(), &c.memoryGrowSig, args)
-		builder.InsertInstruction(callGrow)
 
-		state.push(callGrow.Return())
+		callGrowRet := builder.
+			AllocateInstruction().
+			AsCallIndirect(loadPtr, &c.memoryGrowSig, args).
+			Insert(builder).Return()
+		state.push(callGrowRet)
 
 		// After the memory grow, reload the cached memory base and len.
 		c.reloadMemoryBaseLen()
@@ -699,10 +702,9 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		value := state.pop()
 		baseAddr := state.pop()
 		addr := c.memOpSetup(baseAddr, uint64(offset), opSize)
-
-		store := builder.AllocateInstruction()
-		store.AsStore(opcode, value, addr, offset)
-		builder.InsertInstruction(store)
+		builder.AllocateInstruction().
+			AsStore(opcode, value, addr, offset).
+			Insert(builder)
 
 	case wasm.OpcodeI32Load,
 		wasm.OpcodeI64Load,
@@ -1357,7 +1359,7 @@ func (c *Compiler) getWasmGlobalValue(index wasm.Index, forceLoad bool) ssa.Valu
 
 	builder := c.ssaBuilder
 	if !forceLoad {
-		if v := builder.FindValue(variable); v.Valid() {
+		if v := builder.FindValueInLinearPath(variable); v.Valid() {
 			return v
 		}
 	}
@@ -1383,7 +1385,7 @@ func (c *Compiler) getMemoryBaseValue(forceReload bool) ssa.Value {
 	builder := c.ssaBuilder
 	variable := c.memoryBaseVariable
 	if !forceReload {
-		if v := builder.FindValue(variable); v.Valid() {
+		if v := builder.FindValueInLinearPath(variable); v.Valid() {
 			return v
 		}
 	}
@@ -1414,7 +1416,7 @@ func (c *Compiler) getMemoryLenValue(forceReload bool) ssa.Value {
 	variable := c.memoryLenVariable
 	builder := c.ssaBuilder
 	if !forceReload {
-		if v := builder.FindValue(variable); v.Valid() {
+		if v := builder.FindValueInLinearPath(variable); v.Valid() {
 			return v
 		}
 	}

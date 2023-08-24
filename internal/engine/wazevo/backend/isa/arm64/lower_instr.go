@@ -529,7 +529,9 @@ func (m *machine) lowerExitWithCode(execCtxVReg regalloc.VReg, code wazevoapi.Ex
 
 func (m *machine) lowerIcmpToFlag(x, y ssa.Value, signed bool) {
 	if x.Type() != y.Type() {
-		panic("TODO(maybe): support icmp with different types")
+		panic(
+			fmt.Sprintf("TODO(maybe): support icmp with different types: v%d=%s != v%d=%s",
+				x.ID(), x.Type(), y.ID(), y.Type()))
 	}
 
 	extMod := extModeOf(x.Type(), signed)

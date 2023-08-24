@@ -27,8 +27,8 @@ type (
 		SetCompiler(Compiler)
 
 		// StartLoweringFunction is called when the lowering of the given function is started.
-		// numBlks is the number of ssa.BasicBlock(s) existing in the function.
-		StartLoweringFunction(numBlks int)
+		// maximumBlockID is the maximum value of ssa.BasicBlockID existing in the function.
+		StartLoweringFunction(maximumBlockID ssa.BasicBlockID)
 
 		// StartBlock is called when the compilation of the given block is started.
 		// The order of this being called is the reverse post order of the ssa.BasicBlock(s) as we iterate with

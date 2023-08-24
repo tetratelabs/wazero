@@ -971,11 +971,12 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 }
 
 // AsLoad initializes this instruction as a store instruction with OpcodeLoad.
-func (i *Instruction) AsLoad(ptr Value, offset uint32, typ Type) {
+func (i *Instruction) AsLoad(ptr Value, offset uint32, typ Type) *Instruction {
 	i.opcode = OpcodeLoad
 	i.v = ptr
 	i.u64 = uint64(offset)
 	i.typ = typ
+	return i
 }
 
 // AsExtLoad initializes this instruction as a store instruction with OpcodeLoad.
@@ -996,7 +997,7 @@ func (i *Instruction) LoadData() (ptr Value, offset uint32, typ Type) {
 }
 
 // AsStore initializes this instruction as a store instruction with OpcodeStore.
-func (i *Instruction) AsStore(storeOp Opcode, value, ptr Value, offset uint32) {
+func (i *Instruction) AsStore(storeOp Opcode, value, ptr Value, offset uint32) *Instruction {
 	i.opcode = storeOp
 	i.v = value
 	i.v2 = ptr
@@ -1015,6 +1016,7 @@ func (i *Instruction) AsStore(storeOp Opcode, value, ptr Value, offset uint32) {
 		panic("invalid store opcode" + storeOp.String())
 	}
 	i.u64 = uint64(offset) | dstSize<<32
+	return i
 }
 
 // StoreData returns the operands for a store instruction.
@@ -1118,19 +1120,21 @@ func (i *Instruction) AsBxor(x, amount Value) {
 }
 
 // AsIshl initializes this instruction as an integer shift left instruction with OpcodeIshl.
-func (i *Instruction) AsIshl(x, amount Value) {
+func (i *Instruction) AsIshl(x, amount Value) *Instruction {
 	i.opcode = OpcodeIshl
 	i.v = x
 	i.v2 = amount
 	i.typ = x.Type()
+	return i
 }
 
 // AsUshr initializes this instruction as an integer unsigned shift right (logical shift right) instruction with OpcodeUshr.
-func (i *Instruction) AsUshr(x, amount Value) {
+func (i *Instruction) AsUshr(x, amount Value) *Instruction {
 	i.opcode = OpcodeUshr
 	i.v = x
 	i.v2 = amount
 	i.typ = x.Type()
+	return i
 }
 
 // AsSshr initializes this instruction as an integer signed shift right (arithmetic shift right) instruction with OpcodeSshr.
@@ -1380,13 +1384,14 @@ func (i *Instruction) CallData() (ref FuncRef, sigID SignatureID, args []Value) 
 }
 
 // AsCallIndirect initializes this instruction as a call-indirect instruction with OpcodeCallIndirect.
-func (i *Instruction) AsCallIndirect(funcPtr Value, sig *Signature, args []Value) {
+func (i *Instruction) AsCallIndirect(funcPtr Value, sig *Signature, args []Value) *Instruction {
 	i.opcode = OpcodeCallIndirect
 	i.typ = TypeF64
 	i.vs = args
 	i.v = Value(sig.ID)
 	i.v2 = funcPtr
 	sig.used = true
+	return i
 }
 
 // CallIndirectData returns the call indirect data for this instruction necessary for backends.
@@ -1490,12 +1495,13 @@ func (i *Instruction) ExtendData() (from, to byte, signed bool) {
 }
 
 // AsSelect initializes this instruction as an unsigned extension instruction with OpcodeSelect.
-func (i *Instruction) AsSelect(c, x, y Value) {
+func (i *Instruction) AsSelect(c, x, y Value) *Instruction {
 	i.opcode = OpcodeSelect
 	i.v = c
 	i.v2 = x
 	i.v3 = y
 	i.typ = x.Type()
+	return i
 }
 
 // SelectData returns the select data for this instruction necessary for backends.

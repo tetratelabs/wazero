@@ -285,13 +285,6 @@ func (bb *basicBlock) FormatHeader(b Builder) string {
 	if len(bb.preds) > 0 {
 		preds := make([]string, 0, len(bb.preds))
 		for _, pred := range bb.preds {
-			if len(pred.branch.vs) != len(bb.params) {
-				panic(fmt.Sprintf(
-					"BUG: len(argument at %s) != len(params at %s): %d != %d: %s",
-					pred.blk.Name(), bb.Name(),
-					len(bb.params), len(pred.branch.vs), pred.branch.Format(b),
-				))
-			}
 			if pred.blk.invalid {
 				continue
 			}
@@ -318,13 +311,22 @@ func (bb *basicBlock) validate(b *builder) {
 						pred.branch.Format(b), bb.Name(), target.Name()))
 				}
 			}
-			if len(pred.branch.vs) != len(bb.params) {
+
+			var exp int
+			if bb.ReturnBlock() {
+				exp = len(b.currentSignature.Results)
+			} else {
+				exp = len(bb.params)
+			}
+
+			if len(pred.branch.vs) != exp {
 				panic(fmt.Sprintf(
 					"BUG: len(argument at %s) != len(params at %s): %d != %d: %s",
 					pred.blk.Name(), bb.Name(),
-					len(bb.params), len(pred.branch.vs), pred.branch.Format(b),
+					len(pred.branch.vs), len(bb.params), pred.branch.Format(b),
 				))
 			}
+
 		}
 	}
 }
