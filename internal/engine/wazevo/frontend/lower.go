@@ -890,8 +890,6 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 			elseBlk := ctrl.blk
 			builder.SetCurrentBlock(elseBlk)
 			c.insertJumpToBlock(nil, followingBlk)
-		case controlFrameKindBlock:
-			// what to do?
 		}
 
 		builder.Seal(ctrl.followingBlock)

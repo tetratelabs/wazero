@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"runtime"
+	"strings"
 	"sync"
 
 	"github.com/tetratelabs/wazero/api"
@@ -106,13 +107,8 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []exper
 
 		const debug = false
 		if debug {
-			if name := exportedFnIndex[fidx]; name == "" {
-				fmt.Printf("------------------------------------------ %d/%d ------------------------------------------\n",
-					i, len(module.CodeSection)-1)
-			} else {
-				fmt.Printf("------------------------------------------ %d/%d: %s ------------------------------------------\n",
-					i, len(module.CodeSection)-1, name)
-			}
+			name := exportedFnIndex[fidx]
+			fmt.Printf("%[1]s %d/%d %s %[1]s\n", strings.Repeat("-", 10), i, len(module.CodeSection)-1, name)
 		}
 
 		_, needGoEntryPreamble := exportedFnIndex[fidx]
