@@ -58,6 +58,7 @@ func TestSpectestV1(t *testing.T) {
 		{name: "memory_grow"},
 		{name: "nop"},
 		{name: "return"},
+		{name: "select"},
 		{name: "store"},
 		{name: "type"},
 		{name: "unreachable"},

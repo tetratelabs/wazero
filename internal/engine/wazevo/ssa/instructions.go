@@ -865,6 +865,7 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeFcvtFromSint:       sideEffectFalse,
 	OpcodeFcvtFromUint:       sideEffectFalse,
 	OpcodeFpromote:           sideEffectFalse,
+	OpcodeIreduce:            sideEffectFalse,
 }
 
 // HasSideEffects returns true if this instruction has side effects.
@@ -887,6 +888,7 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeSelect:    returnTypesFnSingle,
 	OpcodeSExtend:   returnTypesFnSingle,
 	OpcodeUExtend:   returnTypesFnSingle,
+	OpcodeIreduce:   returnTypesFnSingle,
 	OpcodeCallIndirect: func(b *builder, instr *Instruction) (t1 Type, ts []Type) {
 		sigID := SignatureID(instr.v)
 		sig, ok := b.signatures[sigID]
@@ -1552,7 +1554,8 @@ func (i *Instruction) Format(b Builder) string {
 	case OpcodeIshl, OpcodeSshr, OpcodeUshr:
 		instSuffix = fmt.Sprintf(" %s, %s", i.v.Format(b), i.v2.Format(b))
 	case OpcodeUndefined:
-	case OpcodeClz, OpcodeCtz, OpcodePopcnt, OpcodeFneg, OpcodeFcvtFromSint, OpcodeFcvtFromUint, OpcodeFpromote:
+	case OpcodeClz, OpcodeCtz, OpcodePopcnt, OpcodeFneg, OpcodeFcvtFromSint, OpcodeFcvtFromUint, OpcodeFpromote,
+		OpcodeIreduce:
 		instSuffix = " " + i.v.Format(b)
 	default:
 		panic(fmt.Sprintf("TODO: format for %s", i.opcode))
