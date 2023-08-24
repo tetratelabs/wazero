@@ -38,6 +38,9 @@ func TestSpectestV1(t *testing.T) {
 		name string
 	}{
 		{name: "address"},
+		{name: "br"},
+		{name: "break-drop"},
+		{name: "block"},
 		{name: "binary"},
 		{name: "binary-leb128"},
 		{name: "comments"},

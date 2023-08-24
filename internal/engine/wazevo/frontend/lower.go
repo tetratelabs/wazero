@@ -47,7 +47,9 @@ func (l *loweringState) String() string {
 	for _, v := range l.values {
 		str = append(str, fmt.Sprintf("v%v", v.ID()))
 	}
-	return strings.Join(str, ", ")
+	return fmt.Sprintf("\n\tunreachable=%v(depth=%d), \n\tstack: %s",
+		l.unreachable, l.unreachableDepth,
+		strings.Join(str, ", "))
 }
 
 const (
@@ -142,7 +144,7 @@ func (c *Compiler) lowerBody(entryBlk ssa.BasicBlock) {
 		c.lowerOpcode(op)
 		if debug {
 			fmt.Println("--------- Translated " + wasm.InstructionName(op) + " --------")
-			fmt.Println("Stack: " + c.loweringState.String())
+			fmt.Println("state: " + c.loweringState.String())
 			fmt.Println(c.formatBuilder())
 			fmt.Println("--------------------------")
 		}
@@ -176,23 +178,25 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		value := iconst.Return()
 		state.push(value)
 	case wasm.OpcodeF32Const:
+		f32 := c.readF32()
 		if state.unreachable {
 			return
 		}
-		f32const := builder.AllocateInstruction()
-		f32const.AsF32const(c.readF32())
-		builder.InsertInstruction(f32const)
-		value := f32const.Return()
-		state.push(value)
+		f32const := builder.AllocateInstruction().
+			AsF32const(f32).
+			Insert(builder).
+			Return()
+		state.push(f32const)
 	case wasm.OpcodeF64Const:
+		f64 := c.readF64()
 		if state.unreachable {
 			return
 		}
-		f64const := builder.AllocateInstruction()
-		f64const.AsF64const(c.readF64())
-		builder.InsertInstruction(f64const)
-		value := f64const.Return()
-		state.push(value)
+		f64const := builder.AllocateInstruction().
+			AsF64const(f64).
+			Insert(builder).
+			Return()
+		state.push(f64const)
 	case wasm.OpcodeI32Add, wasm.OpcodeI64Add:
 		if state.unreachable {
 			return
@@ -481,6 +485,14 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		builder.InsertInstruction(popcnt)
 		value := popcnt.Return()
 		state.push(value)
+
+	case wasm.OpcodeI32WrapI64:
+		if state.unreachable {
+			return
+		}
+		x := state.pop()
+		wrap := builder.AllocateInstruction().AsIreduce(x, ssa.TypeI32).Insert(builder).Return()
+		state.push(wrap)
 	case wasm.OpcodeGlobalGet:
 		index := c.readI32u()
 		if state.unreachable {
@@ -847,22 +859,23 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		builder.SetCurrentBlock(elseBlk)
 
 	case wasm.OpcodeEnd:
+		if state.unreachableDepth > 0 {
+			state.unreachableDepth--
+			return
+		}
+
 		ctrl := state.ctrlPop()
 		followingBlk := ctrl.followingBlock
 
-		if !state.unreachable {
+		unreachable := state.unreachable
+		if !unreachable {
 			// Top n-th args will be used as a result of the current control frame.
 			args := c.loweringState.nPeekDup(len(ctrl.blockType.Results))
 
 			// Insert the unconditional branch to the target.
 			c.insertJumpToBlock(args, followingBlk)
-		} else { // unreachable.
-			if state.unreachableDepth > 0 {
-				state.unreachableDepth--
-				return // TODO: it seems not necessary return
-			} else {
-				state.unreachable = false
-			}
+		} else { // recover from the unreachable state.
+			state.unreachable = false
 		}
 
 		switch ctrl.kind {
@@ -877,6 +890,8 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 			elseBlk := ctrl.blk
 			builder.SetCurrentBlock(elseBlk)
 			c.insertJumpToBlock(nil, followingBlk)
+		case controlFrameKindBlock:
+			// what to do?
 		}
 
 		builder.Seal(ctrl.followingBlock)
@@ -1041,6 +1056,9 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		c.reloadAfterCall()
 
 	case wasm.OpcodeDrop:
+		if state.unreachable {
+			return
+		}
 		_ = state.pop()
 	case wasm.OpcodeF64ConvertI32S, wasm.OpcodeF64ConvertI64S, wasm.OpcodeF64ConvertI32U, wasm.OpcodeF64ConvertI64U:
 		if state.unreachable {

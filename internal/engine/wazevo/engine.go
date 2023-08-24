@@ -83,10 +83,11 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []exper
 	}
 
 	// TODO: reuse the map to avoid allocation.
-	exportedFnIndex := make(map[wasm.Index]struct{}, len(module.ExportSection))
+	exportedFnIndex := make(map[wasm.Index]string, len(module.ExportSection))
 	for i := range module.ExportSection {
-		if module.ExportSection[i].Type == wasm.ExternTypeFunc {
-			exportedFnIndex[module.ExportSection[i].Index] = struct{}{}
+		exp := &module.ExportSection[i]
+		if exp.Type == wasm.ExternTypeFunc {
+			exportedFnIndex[module.ExportSection[i].Index] = exp.Name
 		}
 	}
 
@@ -100,12 +101,19 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []exper
 	cm.functionOffsets = make([]compiledFunctionOffset, localFns)
 	bodies := make([][]byte, localFns)
 	for i := range module.CodeSection {
-		const debug = false
-		if debug {
-			fmt.Printf("------------------------------------------ %d/%d ------------------------------------------\n", i, len(module.CodeSection)-1)
-		}
 		fidx := wasm.Index(i + importedFns)
 		fref := frontend.FunctionIndexToFuncRef(fidx)
+
+		const debug = false
+		if debug {
+			if name := exportedFnIndex[fidx]; name == "" {
+				fmt.Printf("------------------------------------------ %d/%d ------------------------------------------\n",
+					i, len(module.CodeSection)-1)
+			} else {
+				fmt.Printf("------------------------------------------ %d/%d: %s ------------------------------------------\n",
+					i, len(module.CodeSection)-1, name)
+			}
+		}
 
 		_, needGoEntryPreamble := exportedFnIndex[fidx]
 

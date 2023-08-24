@@ -1164,23 +1164,33 @@ func (i *Instruction) AsFmax(x, y Value) {
 }
 
 // AsF32const initializes this instruction as a 32-bit floating-point constant instruction with OpcodeF32const.
-func (i *Instruction) AsF32const(f float32) {
+func (i *Instruction) AsF32const(f float32) *Instruction {
 	i.opcode = OpcodeF32const
 	i.typ = TypeF64
 	i.u64 = uint64(math.Float32bits(f))
+	return i
 }
 
 // AsF64const initializes this instruction as a 64-bit floating-point constant instruction with OpcodeF64const.
-func (i *Instruction) AsF64const(f float64) {
+func (i *Instruction) AsF64const(f float64) *Instruction {
 	i.opcode = OpcodeF64const
 	i.typ = TypeF64
 	i.u64 = math.Float64bits(f)
+	return i
 }
 
 // AsReturn initializes this instruction as a return instruction with OpcodeReturn.
 func (i *Instruction) AsReturn(vs []Value) *Instruction {
 	i.opcode = OpcodeReturn
 	i.vs = vs
+	return i
+}
+
+// AsIreduce initializes this instruction as a reduction instruction with OpcodeIreduce.
+func (i *Instruction) AsIreduce(v Value, dstType Type) *Instruction {
+	i.opcode = OpcodeIreduce
+	i.v = v
+	i.typ = dstType
 	return i
 }
 
