@@ -38,6 +38,7 @@ func TestSpectestV1(t *testing.T) {
 		name string
 	}{
 		{name: "address"},
+		{name: "align"},
 		{name: "br"},
 		{name: "break-drop"},
 		{name: "block"},
@@ -53,6 +54,7 @@ func TestSpectestV1(t *testing.T) {
 		{name: "memory_size"},
 		{name: "memory_grow"},
 		{name: "nop"},
+		{name: "return"},
 		{name: "type"},
 		{name: "unreachable"},
 		{name: "unreached-invalid"},
