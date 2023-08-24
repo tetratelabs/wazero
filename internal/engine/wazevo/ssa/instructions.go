@@ -826,6 +826,11 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeImul:               sideEffectFalse,
 	OpcodeIsub:               sideEffectFalse,
 	OpcodeIcmp:               sideEffectFalse,
+	OpcodeBand:               sideEffectFalse,
+	OpcodeBor:                sideEffectFalse,
+	OpcodeBxor:               sideEffectFalse,
+	OpcodeRotl:               sideEffectFalse,
+	OpcodeRotr:               sideEffectFalse,
 	OpcodeFcmp:               sideEffectFalse,
 	OpcodeFadd:               sideEffectFalse,
 	OpcodeClz:                sideEffectFalse,
@@ -879,6 +884,11 @@ func (i *Instruction) HasSideEffects() bool {
 
 // instructionReturnTypes provides the function to determine the return types of an instruction.
 var instructionReturnTypes = [opcodeEnd]returnTypesFn{
+	OpcodeBand:      returnTypesFnSingle,
+	OpcodeBor:       returnTypesFnSingle,
+	OpcodeBxor:      returnTypesFnSingle,
+	OpcodeRotl:      returnTypesFnSingle,
+	OpcodeRotr:      returnTypesFnSingle,
 	OpcodeIshl:      returnTypesFnSingle,
 	OpcodeSshr:      returnTypesFnSingle,
 	OpcodeUshr:      returnTypesFnSingle,
@@ -1083,6 +1093,30 @@ func (i *Instruction) AsFcmp(x, y Value, c FloatCmpCond) {
 	i.typ = TypeI32
 }
 
+// AsBand initializes this instruction as an integer bitwise and instruction with OpcodeBand.
+func (i *Instruction) AsBand(x, amount Value) {
+	i.opcode = OpcodeBand
+	i.v = x
+	i.v2 = amount
+	i.typ = x.Type()
+}
+
+// AsBor initializes this instruction as an integer bitwise or instruction with OpcodeBor.
+func (i *Instruction) AsBor(x, amount Value) {
+	i.opcode = OpcodeBor
+	i.v = x
+	i.v2 = amount
+	i.typ = x.Type()
+}
+
+// AsBxor initializes this instruction as an integer bitwise xor instruction with OpcodeBxor.
+func (i *Instruction) AsBxor(x, amount Value) {
+	i.opcode = OpcodeBxor
+	i.v = x
+	i.v2 = amount
+	i.typ = x.Type()
+}
+
 // AsIshl initializes this instruction as an integer shift left instruction with OpcodeIshl.
 func (i *Instruction) AsIshl(x, amount Value) {
 	i.opcode = OpcodeIshl
@@ -1102,6 +1136,22 @@ func (i *Instruction) AsUshr(x, amount Value) {
 // AsSshr initializes this instruction as an integer signed shift right (arithmetic shift right) instruction with OpcodeSshr.
 func (i *Instruction) AsSshr(x, amount Value) {
 	i.opcode = OpcodeSshr
+	i.v = x
+	i.v2 = amount
+	i.typ = x.Type()
+}
+
+// AsRotl initializes this instruction as a word rotate left instruction with OpcodeRotl.
+func (i *Instruction) AsRotl(x, amount Value) {
+	i.opcode = OpcodeRotl
+	i.v = x
+	i.v2 = amount
+	i.typ = x.Type()
+}
+
+// AsRotr initializes this instruction as a word rotate right instruction with OpcodeRotr.
+func (i *Instruction) AsRotr(x, amount Value) {
+	i.opcode = OpcodeRotr
 	i.v = x
 	i.v2 = amount
 	i.typ = x.Type()
@@ -1551,7 +1601,7 @@ func (i *Instruction) Format(b Builder) string {
 			}
 		}
 		instSuffix += "]"
-	case OpcodeIshl, OpcodeSshr, OpcodeUshr:
+	case OpcodeBand, OpcodeBor, OpcodeBxor, OpcodeRotr, OpcodeRotl, OpcodeIshl, OpcodeSshr, OpcodeUshr:
 		instSuffix = fmt.Sprintf(" %s, %s", i.v.Format(b), i.v2.Format(b))
 	case OpcodeUndefined:
 	case OpcodeClz, OpcodeCtz, OpcodePopcnt, OpcodeFneg, OpcodeFcvtFromSint, OpcodeFcvtFromUint, OpcodeFpromote,

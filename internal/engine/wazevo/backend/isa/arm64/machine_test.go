@@ -69,8 +69,8 @@ func TestMachine_resolveAddressingMode(t *testing.T) {
 		m.rootInstr = root
 		require.Equal(t, `
 	udf
-	movz x27, #0x1, LSL 0
-	movk x27, #0x4000, LSL 16
+	movz x27, #0x1, lsl 0
+	movk x27, #0x4000, lsl 16
 	ldr x17, [sp, x27]
 `, m.Format())
 	})

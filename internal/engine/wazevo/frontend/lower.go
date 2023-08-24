@@ -425,6 +425,36 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		builder.InsertInstruction(neg)
 		value := neg.Return()
 		state.push(value)
+	case wasm.OpcodeI32And, wasm.OpcodeI64And:
+		if state.unreachable {
+			return
+		}
+		y, x := state.pop(), state.pop()
+		and := builder.AllocateInstruction()
+		and.AsBand(x, y)
+		builder.InsertInstruction(and)
+		value := and.Return()
+		state.push(value)
+	case wasm.OpcodeI32Or, wasm.OpcodeI64Or:
+		if state.unreachable {
+			return
+		}
+		y, x := state.pop(), state.pop()
+		or := builder.AllocateInstruction()
+		or.AsBor(x, y)
+		builder.InsertInstruction(or)
+		value := or.Return()
+		state.push(value)
+	case wasm.OpcodeI32Xor, wasm.OpcodeI64Xor:
+		if state.unreachable {
+			return
+		}
+		y, x := state.pop(), state.pop()
+		xor := builder.AllocateInstruction()
+		xor.AsBxor(x, y)
+		builder.InsertInstruction(xor)
+		value := xor.Return()
+		state.push(value)
 	case wasm.OpcodeI32Shl, wasm.OpcodeI64Shl:
 		if state.unreachable {
 			return
@@ -454,6 +484,26 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		ishl.AsSshr(x, y)
 		builder.InsertInstruction(ishl)
 		value := ishl.Return()
+		state.push(value)
+	case wasm.OpcodeI32Rotl, wasm.OpcodeI64Rotl:
+		if state.unreachable {
+			return
+		}
+		y, x := state.pop(), state.pop()
+		rotl := builder.AllocateInstruction()
+		rotl.AsRotl(x, y)
+		builder.InsertInstruction(rotl)
+		value := rotl.Return()
+		state.push(value)
+	case wasm.OpcodeI32Rotr, wasm.OpcodeI64Rotr:
+		if state.unreachable {
+			return
+		}
+		y, x := state.pop(), state.pop()
+		rotr := builder.AllocateInstruction()
+		rotr.AsRotr(x, y)
+		builder.InsertInstruction(rotr)
+		value := rotr.Return()
 		state.push(value)
 	case wasm.OpcodeI32Clz, wasm.OpcodeI64Clz:
 		if state.unreachable {

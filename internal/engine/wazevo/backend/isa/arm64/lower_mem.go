@@ -110,7 +110,7 @@ func (a addressMode) format(dstSizeBits byte) (ret string) {
 		ret = fmt.Sprintf("[%s, %s, %s #%#x]", base, formatVRegSized(a.rm, a.indexRegBits()), a.extOp, amount)
 	case addressModeKindRegScaled:
 		amount := a.sizeInBitsToShiftAmount(dstSizeBits)
-		ret = fmt.Sprintf("[%s, %s, LSL #%#x]", base, formatVRegSized(a.rm, a.indexRegBits()), amount)
+		ret = fmt.Sprintf("[%s, %s, lsl #%#x]", base, formatVRegSized(a.rm, a.indexRegBits()), amount)
 	case addressModeKindRegExtended:
 		ret = fmt.Sprintf("[%s, %s, %s]", base, formatVRegSized(a.rm, a.indexRegBits()), a.extOp)
 	case addressModeKindRegReg:

@@ -79,8 +79,8 @@ func TestMachine_getOperand_NR(t *testing.T) {
 			},
 			exp: operandNR(regalloc.VReg(100).SetRegType(regalloc.RegTypeInt)),
 			instructions: []string{
-				"movz w100?, #0xf, LSL 0",
-				"movk w100?, #0xf00, LSL 16",
+				"movz w100?, #0xf, lsl 0",
+				"movk w100?, #0xf00, lsl 16",
 			},
 		},
 		{

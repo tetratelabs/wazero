@@ -733,21 +733,16 @@ func (i *instruction) String() (str string) {
 	case aluRRR:
 		size := is64SizeBitToSize(i.u3)
 		str = fmt.Sprintf("%s %s, %s, %s", aluOp(i.u1).String(),
-			formatVRegSized(i.rd.nr(), size), formatVRegSized(i.rn.nr(), size), formatVRegSized(i.rm.nr(), size))
+			formatVRegSized(i.rd.nr(), size), formatVRegSized(i.rn.nr(), size),
+			i.rm.format(size))
 	case aluRRRR:
 		size := is64SizeBitToSize(i.u3)
 		str = fmt.Sprintf("%s %s, %s, %s, %s", aluOp(i.u1).String(),
 			formatVRegSized(i.rd.nr(), size), formatVRegSized(i.rn.nr(), size), formatVRegSized(i.rm.nr(), size), formatVRegSized(i.ra.nr(), size))
 	case aluRRImm12:
 		size := is64SizeBitToSize(i.u3)
-		v, shiftBit := i.rm.imm12()
-		if shiftBit == 1 {
-			str = fmt.Sprintf("%s %s, %s, #%#x", aluOp(i.u1).String(),
-				formatVRegSized(i.rd.nr(), size), formatVRegSized(i.rn.nr(), size), uint64(v)<<12)
-		} else {
-			str = fmt.Sprintf("%s %s, %s, #%#x", aluOp(i.u1).String(),
-				formatVRegSized(i.rd.nr(), size), formatVRegSized(i.rn.nr(), size), v)
-		}
+		str = fmt.Sprintf("%s %s, %s, %s", aluOp(i.u1).String(),
+			formatVRegSized(i.rd.nr(), size), formatVRegSized(i.rn.nr(), size), i.rm.format(size))
 	case aluRRBitmaskImm:
 		size := is64SizeBitToSize(i.u3)
 		rd, rn := formatVRegSized(i.rd.nr(), size), formatVRegSized(i.rn.nr(), size)
@@ -770,16 +765,15 @@ func (i *instruction) String() (str string) {
 			aluOp(i.u1).String(),
 			formatVRegSized(i.rd.nr(), size),
 			formatVRegSized(i.rn.nr(), size),
-			formatVRegSized(i.rm.nr(), size),
+			i.rm.format(size),
 		)
 	case aluRRRExtend:
-		rm, e, _ := i.rm.er()
 		size := is64SizeBitToSize(i.u3)
-		str = fmt.Sprintf("%s %s, %s, %s %s", aluOp(i.u1).String(),
+		str = fmt.Sprintf("%s %s, %s, %s", aluOp(i.u1).String(),
 			formatVRegSized(i.rd.nr(), size),
 			formatVRegSized(i.rn.nr(), size),
-			formatVRegSized(rm, e.srcBits()),
-			e,
+			// Regardless of the source size, the register is formatted in 32-bit.
+			i.rm.format(32),
 		)
 	case bitRR:
 		size := is64SizeBitToSize(i.u2)
@@ -824,13 +818,13 @@ func (i *instruction) String() (str string) {
 		str = fmt.Sprintf("mov %s, %s", formatVRegSized(i.rd.nr(), 32), formatVRegSized(i.rn.nr(), 32))
 	case movZ:
 		size := is64SizeBitToSize(i.u3)
-		str = fmt.Sprintf("movz %s, #%#x, LSL %d", formatVRegSized(i.rd.nr(), size), uint16(i.u1), i.u2*16)
+		str = fmt.Sprintf("movz %s, #%#x, lsl %d", formatVRegSized(i.rd.nr(), size), uint16(i.u1), i.u2*16)
 	case movN:
 		size := is64SizeBitToSize(i.u3)
-		str = fmt.Sprintf("movn %s, #%#x, LSL %d", formatVRegSized(i.rd.nr(), size), uint16(i.u1), i.u2*16)
+		str = fmt.Sprintf("movn %s, #%#x, lsl %d", formatVRegSized(i.rd.nr(), size), uint16(i.u1), i.u2*16)
 	case movK:
 		size := is64SizeBitToSize(i.u3)
-		str = fmt.Sprintf("movk %s, #%#x, LSL %d", formatVRegSized(i.rd.nr(), size), uint16(i.u1), i.u2*16)
+		str = fmt.Sprintf("movk %s, #%#x, lsl %d", formatVRegSized(i.rd.nr(), size), uint16(i.u1), i.u2*16)
 	case extend:
 		fromBits, toBits := byte(i.u1), byte(i.u2)
 
@@ -1342,7 +1336,7 @@ func (a aluOp) String() string {
 	case aluOpUDiv64:
 		return "uDiv64"
 	case aluOpRotR:
-		return "rotR"
+		return "ror"
 	case aluOpLsr:
 		return "lsr"
 	case aluOpAsr:
@@ -1617,13 +1611,13 @@ const (
 func (s shiftOp) String() string {
 	switch s {
 	case shiftOpLSL:
-		return "LSL"
+		return "lsl"
 	case shiftOpLSR:
-		return "LSR"
+		return "lsr"
 	case shiftOpASR:
-		return "ASR"
+		return "asr"
 	case shiftOpROR:
-		return "ROR"
+		return "ror"
 	}
 	panic(int(s))
 }
