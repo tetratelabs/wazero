@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"runtime"
+	"strings"
 	"sync"
 
 	"github.com/tetratelabs/wazero/api"
@@ -83,10 +84,11 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []exper
 	}
 
 	// TODO: reuse the map to avoid allocation.
-	exportedFnIndex := make(map[wasm.Index]struct{}, len(module.ExportSection))
+	exportedFnIndex := make(map[wasm.Index]string, len(module.ExportSection))
 	for i := range module.ExportSection {
-		if module.ExportSection[i].Type == wasm.ExternTypeFunc {
-			exportedFnIndex[module.ExportSection[i].Index] = struct{}{}
+		exp := &module.ExportSection[i]
+		if exp.Type == wasm.ExternTypeFunc {
+			exportedFnIndex[module.ExportSection[i].Index] = exp.Name
 		}
 	}
 
@@ -100,12 +102,14 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []exper
 	cm.functionOffsets = make([]compiledFunctionOffset, localFns)
 	bodies := make([][]byte, localFns)
 	for i := range module.CodeSection {
-		const debug = false
-		if debug {
-			fmt.Printf("------------------------------------------ %d/%d ------------------------------------------\n", i, len(module.CodeSection)-1)
-		}
 		fidx := wasm.Index(i + importedFns)
 		fref := frontend.FunctionIndexToFuncRef(fidx)
+
+		const debug = false
+		if debug {
+			name := exportedFnIndex[fidx]
+			fmt.Printf("%[1]s %d/%d %s %[1]s\n", strings.Repeat("-", 10), i, len(module.CodeSection)-1, name)
+		}
 
 		_, needGoEntryPreamble := exportedFnIndex[fidx]
 
