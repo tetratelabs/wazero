@@ -125,22 +125,28 @@ func TestInstruction_encode(t *testing.T) {
 		{want: "2010028a", setup: func(i *instruction) {
 			i.asALU(aluOpAnd, operandNR(x0VReg), operandNR(x1VReg), operandSR(x2VReg, 4, shiftOpLSL), true)
 		}},
-		{want: "2000022a", setup: func(i *instruction) { // 2000020a
+		{want: "2030428a", setup: func(i *instruction) {
+			i.asALU(aluOpAnd, operandNR(x0VReg), operandNR(x1VReg), operandSR(x2VReg, 12, shiftOpLSR), true)
+		}},
+		{want: "2000022a", setup: func(i *instruction) {
 			i.asALU(aluOpOrr, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), false)
 		}},
-		{want: "200002aa", setup: func(i *instruction) { // 2000020a
+		{want: "200002aa", setup: func(i *instruction) {
 			i.asALU(aluOpOrr, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), true)
 		}},
 		{want: "201002aa", setup: func(i *instruction) {
 			i.asALU(aluOpOrr, operandNR(x0VReg), operandNR(x1VReg), operandSR(x2VReg, 4, shiftOpLSL), true)
 		}},
-		{want: "2000024a", setup: func(i *instruction) { // 2000020a
+		{want: "201082aa", setup: func(i *instruction) {
+			i.asALU(aluOpOrr, operandNR(x0VReg), operandNR(x1VReg), operandSR(x2VReg, 4, shiftOpASR), true)
+		}},
+		{want: "2000024a", setup: func(i *instruction) {
 			i.asALU(aluOpEor, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), false)
 		}},
-		{want: "200002ca", setup: func(i *instruction) { // 2000020a
+		{want: "200002ca", setup: func(i *instruction) {
 			i.asALU(aluOpEor, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), true)
 		}},
-		{want: "201002ca", setup: func(i *instruction) { // 2000020a
+		{want: "201002ca", setup: func(i *instruction) {
 			i.asALU(aluOpEor, operandNR(x0VReg), operandNR(x1VReg), operandSR(x2VReg, 4, shiftOpLSL), true)
 		}},
 		{want: "202cc21a", setup: func(i *instruction) {

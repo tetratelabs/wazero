@@ -673,7 +673,7 @@ var (
 
 			wasm.OpcodeLocalGet, 0,
 			wasm.OpcodeLocalGet, 1,
-			wasm.OpcodeI32Rotr, // Rotl needs also Neg
+			wasm.OpcodeI32Rotr,
 
 			wasm.OpcodeLocalGet, 2,
 			wasm.OpcodeLocalGet, 3,
