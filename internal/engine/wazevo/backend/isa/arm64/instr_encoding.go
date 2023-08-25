@@ -308,6 +308,11 @@ func encodeFloatDataOneSource(op fpuUniOp, rd, rn uint32, dst64bit bool) uint32 
 		if dst64bit {
 			ptype = 0b01
 		}
+	case fpuUniOpAbs:
+		opcode = 0b000001
+		if dst64bit {
+			ptype = 0b01
+		}
 	default:
 		panic("BUG")
 	}

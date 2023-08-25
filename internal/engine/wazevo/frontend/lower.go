@@ -436,6 +436,14 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		x := state.pop()
 		v := builder.AllocateInstruction().AsFabs(x).Insert(builder).Return()
 		state.push(v)
+	case wasm.OpcodeF32Copysign, wasm.OpcodeF64Copysign:
+		if state.unreachable {
+			return
+		}
+		y, x := state.pop(), state.pop()
+		v := builder.AllocateInstruction().AsFcopysign(x, y).Insert(builder).Return()
+		state.push(v)
+
 	case wasm.OpcodeF32Ceil, wasm.OpcodeF64Ceil:
 		if state.unreachable {
 			return

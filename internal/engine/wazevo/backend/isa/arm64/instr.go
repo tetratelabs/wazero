@@ -1443,6 +1443,7 @@ const (
 	fpuUniOpMinus
 	fpuUniOpZero
 	fpuUniOpNearest
+	fpuUniOpAbs
 )
 
 // String implements the fmt.Stringer.
@@ -1462,6 +1463,8 @@ func (f fpuUniOp) String() string {
 		return "frintz"
 	case fpuUniOpNearest:
 		return "frintn"
+	case fpuUniOpAbs:
+		return "fabs"
 	}
 	panic(int(f))
 }

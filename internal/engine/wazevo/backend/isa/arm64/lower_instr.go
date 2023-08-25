@@ -242,8 +242,12 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		m.lowerFpuUniOp(fpuUniOpZero, instr.Arg(), instr.Return())
 	case ssa.OpcodeNearest:
 		m.lowerFpuUniOp(fpuUniOpNearest, instr.Arg(), instr.Return())
+	case ssa.OpcodeFabs:
+		m.lowerFpuUniOp(fpuUniOpAbs, instr.Arg(), instr.Return())
 	case ssa.OpcodeBitcast:
 		m.lowerBitcast(instr)
+	case ssa.OpcodeFcopysign:
+		panic("TODO")
 	default:
 		panic("TODO: lowering " + instr.Opcode().String())
 	}
