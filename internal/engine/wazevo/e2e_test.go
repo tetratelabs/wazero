@@ -68,6 +68,7 @@ func TestSpectestV1(t *testing.T) {
 		{name: "globals"},
 		{name: "if"},
 		{name: "imports"},
+		{name: "i32"},
 		//{name: "int_exprs"},
 		//{name: "int_literals"},
 		{name: "labels"},

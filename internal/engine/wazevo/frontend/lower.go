@@ -503,6 +503,38 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 			Insert(builder).Return()
 		state.push(reinterpret)
 
+	case wasm.OpcodeI32DivS, wasm.OpcodeI64DivS:
+		if state.unreachable {
+			return
+		}
+		y, x := state.pop(), state.pop()
+		result := builder.AllocateInstruction().AsSDiv(x, y).Insert(builder).Return()
+		state.push(result)
+
+	case wasm.OpcodeI32DivU, wasm.OpcodeI64DivU:
+		if state.unreachable {
+			return
+		}
+		y, x := state.pop(), state.pop()
+		result := builder.AllocateInstruction().AsUDiv(x, y).Insert(builder).Return()
+		state.push(result)
+
+	case wasm.OpcodeI32RemS, wasm.OpcodeI64RemS:
+		if state.unreachable {
+			return
+		}
+		y, x := state.pop(), state.pop()
+		result := builder.AllocateInstruction().AsSRem(x, y).Insert(builder).Return()
+		state.push(result)
+
+	case wasm.OpcodeI32RemU, wasm.OpcodeI64RemU:
+		if state.unreachable {
+			return
+		}
+		y, x := state.pop(), state.pop()
+		result := builder.AllocateInstruction().AsURem(x, y).Insert(builder).Return()
+		state.push(result)
+
 	case wasm.OpcodeI32And, wasm.OpcodeI64And:
 		if state.unreachable {
 			return

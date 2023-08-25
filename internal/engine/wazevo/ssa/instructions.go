@@ -877,6 +877,8 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeFloor:              sideEffectFalse,
 	OpcodeTrunc:              sideEffectFalse,
 	OpcodeNearest:            sideEffectFalse,
+	OpcodeSdiv:               sideEffectFalse,
+	OpcodeUdiv:               sideEffectFalse,
 }
 
 // HasSideEffects returns true if this instruction has side effects.
@@ -898,6 +900,8 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeRotr:      returnTypesFnSingle,
 	OpcodeIshl:      returnTypesFnSingle,
 	OpcodeSshr:      returnTypesFnSingle,
+	OpcodeSdiv:      returnTypesFnSingle,
+	OpcodeUdiv:      returnTypesFnSingle,
 	OpcodeUshr:      returnTypesFnSingle,
 	OpcodeJump:      returnTypesFnNoReturns,
 	OpcodeUndefined: returnTypesFnNoReturns,
@@ -1105,6 +1109,42 @@ func (i *Instruction) AsFcmp(x, y Value, c FloatCmpCond) {
 	i.v2 = y
 	i.u64 = uint64(c)
 	i.typ = TypeI32
+}
+
+// AsSDiv initializes this instruction as an integer bitwise and instruction with OpcodeSdiv.
+func (i *Instruction) AsSDiv(x, y Value) *Instruction {
+	i.opcode = OpcodeSdiv
+	i.v = x
+	i.v2 = y
+	i.typ = x.Type()
+	return i
+}
+
+// AsUDiv initializes this instruction as an integer bitwise and instruction with OpcodeUdiv.
+func (i *Instruction) AsUDiv(x, y Value) *Instruction {
+	i.opcode = OpcodeUdiv
+	i.v = x
+	i.v2 = y
+	i.typ = x.Type()
+	return i
+}
+
+// AsSRem initializes this instruction as an integer bitwise and instruction with OpcodeSrem.
+func (i *Instruction) AsSRem(x, y Value) *Instruction {
+	i.opcode = OpcodeSrem
+	i.v = x
+	i.v2 = y
+	i.typ = x.Type()
+	return i
+}
+
+// AsURem initializes this instruction as an integer bitwise and instruction with OpcodeUrem.
+func (i *Instruction) AsURem(x, y Value) *Instruction {
+	i.opcode = OpcodeUrem
+	i.v = x
+	i.v2 = y
+	i.typ = x.Type()
+	return i
 }
 
 // AsBand initializes this instruction as an integer bitwise and instruction with OpcodeBand.
@@ -1681,7 +1721,8 @@ func (i *Instruction) Format(b Builder) string {
 			}
 		}
 		instSuffix += "]"
-	case OpcodeBand, OpcodeBor, OpcodeBxor, OpcodeRotr, OpcodeRotl, OpcodeIshl, OpcodeSshr, OpcodeUshr:
+	case OpcodeBand, OpcodeBor, OpcodeBxor, OpcodeRotr, OpcodeRotl, OpcodeIshl, OpcodeSshr, OpcodeUshr,
+		OpcodeSdiv, OpcodeUdiv:
 		instSuffix = fmt.Sprintf(" %s, %s", i.v.Format(b), i.v2.Format(b))
 	case OpcodeUndefined:
 	case OpcodeClz, OpcodeCtz, OpcodePopcnt, OpcodeFneg, OpcodeFcvtFromSint, OpcodeFcvtFromUint, OpcodeFpromote,
