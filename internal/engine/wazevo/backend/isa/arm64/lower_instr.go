@@ -217,7 +217,7 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		rn := m.getOperand_NR(m.compiler.ValueDefinition(v), extModeNone)
 		rd := operandNR(m.compiler.VRegOf(instr.Return()))
 		cnt := m.allocateInstr()
-		cnt.asFpuRR(fpuUniCvt32To64, rd, rn, true)
+		cnt.asFpuRR(fpuUniOpCvt32To64, rd, rn, true)
 		m.insert(cnt)
 	case ssa.OpcodeIreduce:
 		rn := m.getOperand_NR(m.compiler.ValueDefinition(instr.UnaryData()), extModeNone)
@@ -231,7 +231,17 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		mov.asMove32(rd, rn.reg())
 		m.insert(mov)
 	case ssa.OpcodeFneg:
-		m.lowerFneg(instr)
+		m.lowerFpuUniOp(fpuUniOpNeg, instr.Arg(), instr.Return())
+	case ssa.OpcodeSqrt:
+		m.lowerFpuUniOp(fpuUniOpSqrt, instr.Arg(), instr.Return())
+	case ssa.OpcodeCeil:
+		m.lowerFpuUniOp(fpuUniOpPlus, instr.Arg(), instr.Return())
+	case ssa.OpcodeFloor:
+		m.lowerFpuUniOp(fpuUniOpMinus, instr.Arg(), instr.Return())
+	case ssa.OpcodeTrunc:
+		m.lowerFpuUniOp(fpuUniOpZero, instr.Arg(), instr.Return())
+	case ssa.OpcodeNearest:
+		m.lowerFpuUniOp(fpuUniOpNearest, instr.Arg(), instr.Return())
 	case ssa.OpcodeBitcast:
 		m.lowerBitcast(instr)
 	default:
@@ -273,18 +283,12 @@ func (m *machine) lowerBitcast(instr *ssa.Instruction) {
 	}
 }
 
-func (m *machine) lowerFneg(instr *ssa.Instruction) {
-	x := instr.UnaryData()
-	rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
-	rd := operandNR(m.compiler.VRegOf(instr.Return()))
+func (m *machine) lowerFpuUniOp(op fpuUniOp, in, out ssa.Value) {
+	rn := m.getOperand_NR(m.compiler.ValueDefinition(in), extModeNone)
+	rd := operandNR(m.compiler.VRegOf(out))
 
 	neg := m.allocateInstr()
-	switch x.Type() {
-	case ssa.TypeF32, ssa.TypeF64:
-		neg.asFpuRR(fpuUniOpNeg, rd, rn, x.Type().Bits() == 64)
-	default:
-		panic("TODO: vector neg")
-	}
+	neg.asFpuRR(op, rd, rn, in.Type().Bits() == 64)
 	m.insert(neg)
 }
 

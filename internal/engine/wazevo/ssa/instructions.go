@@ -872,6 +872,11 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeFpromote:           sideEffectFalse,
 	OpcodeBitcast:            sideEffectFalse,
 	OpcodeIreduce:            sideEffectFalse,
+	OpcodeSqrt:               sideEffectFalse,
+	OpcodeCeil:               sideEffectFalse,
+	OpcodeFloor:              sideEffectFalse,
+	OpcodeTrunc:              sideEffectFalse,
+	OpcodeNearest:            sideEffectFalse,
 }
 
 // HasSideEffects returns true if this instruction has side effects.
@@ -901,6 +906,11 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeSExtend:   returnTypesFnSingle,
 	OpcodeUExtend:   returnTypesFnSingle,
 	OpcodeIreduce:   returnTypesFnSingle,
+	OpcodeSqrt:      returnTypesFnSingle,
+	OpcodeCeil:      returnTypesFnSingle,
+	OpcodeFloor:     returnTypesFnSingle,
+	OpcodeTrunc:     returnTypesFnSingle,
+	OpcodeNearest:   returnTypesFnSingle,
 	OpcodeCallIndirect: func(b *builder, instr *Instruction) (t1 Type, ts []Type) {
 		sigID := SignatureID(instr.v)
 		sig, ok := b.signatures[sigID]
@@ -1441,6 +1451,54 @@ func (i *Instruction) AsFneg(x Value) *Instruction {
 	return i
 }
 
+// AsSqrt initializes this instruction as an instruction with OpcodeSqrt.
+func (i *Instruction) AsSqrt(x Value) *Instruction {
+	i.opcode = OpcodeSqrt
+	i.v = x
+	i.typ = x.Type()
+	return i
+}
+
+// AsFabs initializes this instruction as an instruction with OpcodeFabs.
+func (i *Instruction) AsFabs(x Value) *Instruction {
+	i.opcode = OpcodeFabs
+	i.v = x
+	i.typ = x.Type()
+	return i
+}
+
+// AsCeil initializes this instruction as an instruction with OpcodeCeil.
+func (i *Instruction) AsCeil(x Value) *Instruction {
+	i.opcode = OpcodeCeil
+	i.v = x
+	i.typ = x.Type()
+	return i
+}
+
+// AsFloor initializes this instruction as an instruction with OpcodeFloor.
+func (i *Instruction) AsFloor(x Value) *Instruction {
+	i.opcode = OpcodeFloor
+	i.v = x
+	i.typ = x.Type()
+	return i
+}
+
+// AsTrunc initializes this instruction as an instruction with OpcodeTrunc.
+func (i *Instruction) AsTrunc(x Value) *Instruction {
+	i.opcode = OpcodeTrunc
+	i.v = x
+	i.typ = x.Type()
+	return i
+}
+
+// AsNearest initializes this instruction as an instruction with OpcodeNearest.
+func (i *Instruction) AsNearest(x Value) *Instruction {
+	i.opcode = OpcodeNearest
+	i.v = x
+	i.typ = x.Type()
+	return i
+}
+
 // AsBitcast initializes this instruction as an instruction with OpcodeBitcast.
 func (i *Instruction) AsBitcast(x Value, dstType Type) *Instruction {
 	i.opcode = OpcodeBitcast
@@ -1627,7 +1685,7 @@ func (i *Instruction) Format(b Builder) string {
 		instSuffix = fmt.Sprintf(" %s, %s", i.v.Format(b), i.v2.Format(b))
 	case OpcodeUndefined:
 	case OpcodeClz, OpcodeCtz, OpcodePopcnt, OpcodeFneg, OpcodeFcvtFromSint, OpcodeFcvtFromUint, OpcodeFpromote,
-		OpcodeIreduce, OpcodeBitcast:
+		OpcodeIreduce, OpcodeBitcast, OpcodeSqrt, OpcodeFabs, OpcodeCeil, OpcodeFloor, OpcodeTrunc, OpcodeNearest:
 		instSuffix = " " + i.v.Format(b)
 	default:
 		panic(fmt.Sprintf("TODO: format for %s", i.opcode))
