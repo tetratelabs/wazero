@@ -420,9 +420,53 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 			return
 		}
 		x := state.pop()
-		negated := builder.AllocateInstruction().AsFneg(x).Insert(builder).Return()
-		state.push(negated)
+		v := builder.AllocateInstruction().AsFneg(x).Insert(builder).Return()
+		state.push(v)
+	case wasm.OpcodeF32Sqrt, wasm.OpcodeF64Sqrt:
+		if state.unreachable {
+			return
+		}
+		x := state.pop()
+		v := builder.AllocateInstruction().AsSqrt(x).Insert(builder).Return()
+		state.push(v)
+	case wasm.OpcodeF32Abs, wasm.OpcodeF64Abs:
+		if state.unreachable {
+			return
+		}
+		x := state.pop()
+		v := builder.AllocateInstruction().AsFabs(x).Insert(builder).Return()
+		state.push(v)
+	case wasm.OpcodeF32Ceil, wasm.OpcodeF64Ceil:
+		if state.unreachable {
+			return
+		}
+		x := state.pop()
+		v := builder.AllocateInstruction().AsCeil(x).Insert(builder).Return()
+		state.push(v)
+	case wasm.OpcodeF32Floor, wasm.OpcodeF64Floor:
+		if state.unreachable {
+			return
+		}
+		x := state.pop()
+		v := builder.AllocateInstruction().AsFloor(x).Insert(builder).Return()
+		state.push(v)
+	case wasm.OpcodeF32Trunc, wasm.OpcodeF64Trunc:
+		if state.unreachable {
+			return
+		}
+		x := state.pop()
+		v := builder.AllocateInstruction().AsTrunc(x).Insert(builder).Return()
+		state.push(v)
+	case wasm.OpcodeF32Nearest, wasm.OpcodeF64Nearest:
+		if state.unreachable {
+			return
+		}
+		x := state.pop()
+		v := builder.AllocateInstruction().AsNearest(x).Insert(builder).Return()
+		state.push(v)
+
 	case wasm.OpcodeI64TruncF64S:
+		panic("TODO")
 	case wasm.OpcodeI32ReinterpretF32:
 		if state.unreachable {
 			return

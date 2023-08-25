@@ -261,7 +261,7 @@ func (i *instruction) encode(c backend.Compiler) {
 		c.Emit4Bytes(encodeCnvBetweenFloatInt(i))
 	case fpuRR:
 		c.Emit4Bytes(encodeFloatDataOneSource(
-			vecOp(i.u1),
+			fpuUniOp(i.u1),
 			regNumberInEncoding[i.rd.realReg()],
 			regNumberInEncoding[i.rn.realReg()],
 			i.u3 == 1,
@@ -273,13 +273,38 @@ func (i *instruction) encode(c backend.Compiler) {
 
 // encodeFloatDataOneSource encodes as "Floating-point data-processing (1 source)" in
 // https://developer.arm.com/documentation/ddi0596/2020-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en#simd-dp
-func encodeFloatDataOneSource(op vecOp, rd, rn uint32, dst64bit bool) uint32 {
+func encodeFloatDataOneSource(op fpuUniOp, rd, rn uint32, dst64bit bool) uint32 {
 	var opcode, ptype uint32
 	switch op {
-	case fpuUniCvt32To64:
+	case fpuUniOpCvt32To64:
 		opcode = 0b000101
 	case fpuUniOpNeg:
 		opcode = 0b000010
+		if dst64bit {
+			ptype = 0b01
+		}
+	case fpuUniOpSqrt:
+		opcode = 0b000011
+		if dst64bit {
+			ptype = 0b01
+		}
+	case fpuUniOpPlus:
+		opcode = 0b001001
+		if dst64bit {
+			ptype = 0b01
+		}
+	case fpuUniOpMinus:
+		opcode = 0b001010
+		if dst64bit {
+			ptype = 0b01
+		}
+	case fpuUniOpZero:
+		opcode = 0b001011
+		if dst64bit {
+			ptype = 0b01
+		}
+	case fpuUniOpNearest:
+		opcode = 0b001000
 		if dst64bit {
 			ptype = 0b01
 		}

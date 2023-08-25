@@ -939,8 +939,6 @@ func (i *instruction) String() (str string) {
 			formatVRegSized(i.rm.nr(), size),
 			condFlag(i.u1),
 		)
-	case fpuRound:
-		panic("TODO")
 	case movToFpu:
 		panic("TODO")
 	case movToVec:
@@ -1214,8 +1212,6 @@ const (
 	intToFpu
 	// fpuCSel represents a 32/64-bit FP conditional select.
 	fpuCSel
-	// fpuRound represents a rounding to integer operation.
-	fpuRound
 	// movToFpu represents a move from a GPR to a scalar FP register.
 	movToFpu
 	// movToVec represents a move to a vector element from a GPR.
@@ -1440,8 +1436,13 @@ const (
 type fpuUniOp byte
 
 const (
-	fpuUniOpNeg = iota
-	fpuUniCvt32To64
+	fpuUniOpNeg fpuUniOp = iota
+	fpuUniOpCvt32To64
+	fpuUniOpSqrt
+	fpuUniOpPlus
+	fpuUniOpMinus
+	fpuUniOpZero
+	fpuUniOpNearest
 )
 
 // String implements the fmt.Stringer.
@@ -1449,8 +1450,18 @@ func (f fpuUniOp) String() string {
 	switch f {
 	case fpuUniOpNeg:
 		return "fneg"
-	case fpuUniCvt32To64:
+	case fpuUniOpCvt32To64:
 		return "fcvt"
+	case fpuUniOpSqrt:
+		return "fsqrt"
+	case fpuUniOpPlus:
+		return "frintp"
+	case fpuUniOpMinus:
+		return "frintm"
+	case fpuUniOpZero:
+		return "frintz"
+	case fpuUniOpNearest:
+		return "frintn"
 	}
 	panic(int(f))
 }

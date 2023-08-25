@@ -51,7 +51,8 @@ type Builder interface {
 	// MustFindValue searches the latest definition of the given Variable and returns the result.
 	MustFindValue(variable Variable) Value
 
-	// FindValueInLinearPath TODO
+	// FindValueInLinearPath tries to find the latest definition of the given Variable in the linear path to the current BasicBlock.
+	// If it cannot find the definition, or it's not sealed yet, it returns ValueInvalid.
 	FindValueInLinearPath(variable Variable) Value
 
 	// Seal declares that we've known all the predecessors to this block and were added via AddPred.
@@ -362,7 +363,7 @@ func (b *builder) allocateValue(typ Type) (v Value) {
 	return
 }
 
-// FindValueInLinearPath implements Builder.FindValue.
+// FindValueInLinearPath implements Builder.FindValueInLinearPath.
 func (b *builder) FindValueInLinearPath(variable Variable) Value {
 	return b.findValueInLinearPath(variable, b.currentBB)
 }
