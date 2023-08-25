@@ -505,6 +505,9 @@ func TestInstruction_encode(t *testing.T) {
 		}},
 		{want: "4158200e", setup: func(i *instruction) { i.asVecMisc(vecOpCnt, operandNR(v1VReg), operandNR(v2VReg), vecArrangement8B) }},
 		{want: "4158204e", setup: func(i *instruction) { i.asVecMisc(vecOpCnt, operandNR(v1VReg), operandNR(v2VReg), vecArrangement16B) }},
+		{want: "41c0221e", setup: func(i *instruction) {
+			i.asFpuRR(fpuUniCvt32To64, operandNR(v1VReg), operandNR(v2VReg), true)
+		}},
 		{want: "4140211e", setup: func(i *instruction) {
 			i.asFpuRR(fpuUniOpNeg, operandNR(v1VReg), operandNR(v2VReg), false)
 		}},
