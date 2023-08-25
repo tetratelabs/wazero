@@ -870,6 +870,7 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeFcvtFromSint:       sideEffectFalse,
 	OpcodeFcvtFromUint:       sideEffectFalse,
 	OpcodeFpromote:           sideEffectFalse,
+	OpcodeBitcast:            sideEffectFalse,
 	OpcodeIreduce:            sideEffectFalse,
 }
 
@@ -885,6 +886,7 @@ func (i *Instruction) HasSideEffects() bool {
 // instructionReturnTypes provides the function to determine the return types of an instruction.
 var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeBand:      returnTypesFnSingle,
+	OpcodeBitcast:   returnTypesFnSingle,
 	OpcodeBor:       returnTypesFnSingle,
 	OpcodeBxor:      returnTypesFnSingle,
 	OpcodeRotl:      returnTypesFnSingle,
@@ -971,11 +973,12 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 }
 
 // AsLoad initializes this instruction as a store instruction with OpcodeLoad.
-func (i *Instruction) AsLoad(ptr Value, offset uint32, typ Type) {
+func (i *Instruction) AsLoad(ptr Value, offset uint32, typ Type) *Instruction {
 	i.opcode = OpcodeLoad
 	i.v = ptr
 	i.u64 = uint64(offset)
 	i.typ = typ
+	return i
 }
 
 // AsExtLoad initializes this instruction as a store instruction with OpcodeLoad.
@@ -996,7 +999,7 @@ func (i *Instruction) LoadData() (ptr Value, offset uint32, typ Type) {
 }
 
 // AsStore initializes this instruction as a store instruction with OpcodeStore.
-func (i *Instruction) AsStore(storeOp Opcode, value, ptr Value, offset uint32) {
+func (i *Instruction) AsStore(storeOp Opcode, value, ptr Value, offset uint32) *Instruction {
 	i.opcode = storeOp
 	i.v = value
 	i.v2 = ptr
@@ -1015,6 +1018,7 @@ func (i *Instruction) AsStore(storeOp Opcode, value, ptr Value, offset uint32) {
 		panic("invalid store opcode" + storeOp.String())
 	}
 	i.u64 = uint64(offset) | dstSize<<32
+	return i
 }
 
 // StoreData returns the operands for a store instruction.
@@ -1118,19 +1122,21 @@ func (i *Instruction) AsBxor(x, amount Value) {
 }
 
 // AsIshl initializes this instruction as an integer shift left instruction with OpcodeIshl.
-func (i *Instruction) AsIshl(x, amount Value) {
+func (i *Instruction) AsIshl(x, amount Value) *Instruction {
 	i.opcode = OpcodeIshl
 	i.v = x
 	i.v2 = amount
 	i.typ = x.Type()
+	return i
 }
 
 // AsUshr initializes this instruction as an integer unsigned shift right (logical shift right) instruction with OpcodeUshr.
-func (i *Instruction) AsUshr(x, amount Value) {
+func (i *Instruction) AsUshr(x, amount Value) *Instruction {
 	i.opcode = OpcodeUshr
 	i.v = x
 	i.v2 = amount
 	i.typ = x.Type()
+	return i
 }
 
 // AsSshr initializes this instruction as an integer signed shift right (arithmetic shift right) instruction with OpcodeSshr.
@@ -1380,13 +1386,14 @@ func (i *Instruction) CallData() (ref FuncRef, sigID SignatureID, args []Value) 
 }
 
 // AsCallIndirect initializes this instruction as a call-indirect instruction with OpcodeCallIndirect.
-func (i *Instruction) AsCallIndirect(funcPtr Value, sig *Signature, args []Value) {
+func (i *Instruction) AsCallIndirect(funcPtr Value, sig *Signature, args []Value) *Instruction {
 	i.opcode = OpcodeCallIndirect
 	i.typ = TypeF64
 	i.vs = args
 	i.v = Value(sig.ID)
 	i.v2 = funcPtr
 	sig.used = true
+	return i
 }
 
 // CallIndirectData returns the call indirect data for this instruction necessary for backends.
@@ -1427,10 +1434,24 @@ func (i *Instruction) UnaryData() Value {
 }
 
 // AsFneg initializes this instruction as an instruction with OpcodeFneg.
-func (i *Instruction) AsFneg(x Value) {
+func (i *Instruction) AsFneg(x Value) *Instruction {
 	i.opcode = OpcodeFneg
 	i.v = x
 	i.typ = x.Type()
+	return i
+}
+
+// AsBitcast initializes this instruction as an instruction with OpcodeBitcast.
+func (i *Instruction) AsBitcast(x Value, dstType Type) *Instruction {
+	i.opcode = OpcodeBitcast
+	i.v = x
+	i.typ = dstType
+	return i
+}
+
+// BitcastData returns the operands for a bitcast instruction.
+func (i *Instruction) BitcastData() (x Value, dstType Type) {
+	return i.v, i.typ
 }
 
 // AsFpromote initializes this instruction as an instruction with OpcodeFpromote.
@@ -1490,12 +1511,13 @@ func (i *Instruction) ExtendData() (from, to byte, signed bool) {
 }
 
 // AsSelect initializes this instruction as an unsigned extension instruction with OpcodeSelect.
-func (i *Instruction) AsSelect(c, x, y Value) {
+func (i *Instruction) AsSelect(c, x, y Value) *Instruction {
 	i.opcode = OpcodeSelect
 	i.v = c
 	i.v2 = x
 	i.v3 = y
 	i.typ = x.Type()
+	return i
 }
 
 // SelectData returns the select data for this instruction necessary for backends.
@@ -1605,7 +1627,7 @@ func (i *Instruction) Format(b Builder) string {
 		instSuffix = fmt.Sprintf(" %s, %s", i.v.Format(b), i.v2.Format(b))
 	case OpcodeUndefined:
 	case OpcodeClz, OpcodeCtz, OpcodePopcnt, OpcodeFneg, OpcodeFcvtFromSint, OpcodeFcvtFromUint, OpcodeFpromote,
-		OpcodeIreduce:
+		OpcodeIreduce, OpcodeBitcast:
 		instSuffix = " " + i.v.Format(b)
 	default:
 		panic(fmt.Sprintf("TODO: format for %s", i.opcode))

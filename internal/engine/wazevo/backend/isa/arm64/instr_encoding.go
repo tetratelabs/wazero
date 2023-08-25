@@ -241,22 +241,13 @@ func (i *instruction) encode(c backend.Compiler) {
 			vecIndex(i.u2),
 		))
 	case vecMisc:
-		switch op := vecOp(i.u1); op {
-		case vecOpCnt:
-			c.Emit4Bytes(encodeAdvancedSIMDTwoMisc(
-				vecOp(i.u1),
-				regNumberInEncoding[i.rd.realReg()],
-				regNumberInEncoding[i.rn.realReg()],
-				vecArrangement(i.u2),
-			))
-		case vecOpCvt32To64:
-			c.Emit4Bytes(encodeFloatDataOneSource(
-				vecOp(i.u1),
-				regNumberInEncoding[i.rd.realReg()],
-				regNumberInEncoding[i.rn.realReg()],
-				vecArrangement(i.u2),
-			))
-		}
+		c.Emit4Bytes(encodeAdvancedSIMDTwoMisc(
+			vecOp(i.u1),
+			regNumberInEncoding[i.rd.realReg()],
+			regNumberInEncoding[i.rn.realReg()],
+			vecArrangement(i.u2),
+		))
+
 	case vecLanes:
 		c.Emit4Bytes(encodeVecLanes(
 			vecOp(i.u1),
@@ -268,6 +259,13 @@ func (i *instruction) encode(c backend.Compiler) {
 		encodeBrTableSequence(c, i.rn.reg(), i.targets)
 	case intToFpu:
 		c.Emit4Bytes(encodeCnvBetweenFloatInt(i))
+	case fpuRR:
+		c.Emit4Bytes(encodeFloatDataOneSource(
+			vecOp(i.u1),
+			regNumberInEncoding[i.rd.realReg()],
+			regNumberInEncoding[i.rn.realReg()],
+			i.u3 == 1,
+		))
 	default:
 		panic(i.String())
 	}
@@ -275,11 +273,16 @@ func (i *instruction) encode(c backend.Compiler) {
 
 // encodeFloatDataOneSource encodes as "Floating-point data-processing (1 source)" in
 // https://developer.arm.com/documentation/ddi0596/2020-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en#simd-dp
-func encodeFloatDataOneSource(op vecOp, rd, rn uint32, _ vecArrangement) uint32 {
+func encodeFloatDataOneSource(op vecOp, rd, rn uint32, dst64bit bool) uint32 {
 	var opcode, ptype uint32
 	switch op {
-	case vecOpCvt32To64:
+	case fpuUniCvt32To64:
 		opcode = 0b000101
+	case fpuUniOpNeg:
+		opcode = 0b000010
+		if dst64bit {
+			ptype = 0b01
+		}
 	default:
 		panic("BUG")
 	}

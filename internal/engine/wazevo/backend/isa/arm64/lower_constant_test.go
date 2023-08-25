@@ -82,7 +82,10 @@ func TestMachine_lowerConstantI32(t *testing.T) {
 		{val: 0xffff_0000, exp: []string{"movz w0, #0xffff, lsl 16"}},
 		{val: 0xffff_fffe, exp: []string{"movn w0, #0x1, lsl 0"}},
 		{val: 0x2, exp: []string{"orr w0, wzr, #0x2"}},
-		{val: 0x80000001, exp: []string{"orr w0, wzr, #0x80000001"}},
+		{val: 0x80000001, exp: []string{
+			"movz w0, #0x1, lsl 0",
+			"movk w0, #0x8000, lsl 16",
+		}},
 		{val: 0xf00000f, exp: []string{
 			"movz w0, #0xf, lsl 0",
 			"movk w0, #0xf00, lsl 16",

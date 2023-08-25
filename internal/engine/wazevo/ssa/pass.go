@@ -45,6 +45,10 @@ func passDeadBlockEliminationOpt(b *builder) {
 			panic(fmt.Sprintf("%s is not sealed", reachableBlk))
 		}
 
+		if true {
+			reachableBlk.validate(b)
+		}
+
 		for _, succ := range reachableBlk.success {
 			if _, ok := b.blkVisited[succ]; ok {
 				continue

@@ -60,6 +60,7 @@ var defKinds = [numInstructionKinds]defKind{
 	mov64:           defKindRD,
 	fpuMov64:        defKindRD,
 	fpuMov128:       defKindRD,
+	fpuRR:           defKindRD,
 	fpuRRR:          defKindRD,
 	nop0:            defKindNone,
 	call:            defKindCall,
@@ -160,6 +161,7 @@ var useKinds = [numInstructionKinds]useKind{
 	mov64:           useKindRN,
 	fpuMov64:        useKindRN,
 	fpuMov128:       useKindRN,
+	fpuRR:           useKindRN,
 	fpuRRR:          useKindRNRM,
 	nop0:            useKindNone,
 	call:            useKindCall,
@@ -655,6 +657,15 @@ func (i *instruction) asFpuRRR(op fpuBinOp, rd, rn, rm operand, dst64bit bool) {
 	}
 }
 
+func (i *instruction) asFpuRR(op fpuUniOp, rd, rn operand, dst64bit bool) {
+	i.kind = fpuRR
+	i.u1 = uint64(op)
+	i.rd, i.rn = rd, rn
+	if dst64bit {
+		i.u3 = 1
+	}
+}
+
 func (i *instruction) asExtend(rd, rn regalloc.VReg, fromBits, toBits byte, signed bool) {
 	i.kind = extend
 	i.rn, i.rd = operandNR(rn), operandNR(rd)
@@ -867,7 +878,9 @@ func (i *instruction) String() (str string) {
 	case fpuMovFromVec:
 		panic("TODO")
 	case fpuRR:
-		panic("TODO")
+		size := is64SizeBitToSize(i.u3)
+		str = fmt.Sprintf("%s %s, %s", fpuUniOp(i.u1).String(),
+			formatVRegSized(i.rd.nr(), size), formatVRegSized(i.rn.nr(), size))
 	case fpuRRR:
 		size := is64SizeBitToSize(i.u3)
 		str = fmt.Sprintf("%s %s, %s, %s", fpuBinOp(i.u1).String(),
@@ -972,19 +985,10 @@ func (i *instruction) String() (str string) {
 	case vecRRR:
 		panic("TODO")
 	case vecMisc:
-		switch op := vecOp(i.u1); op {
-		case vecOpCvt32To64:
-			str = fmt.Sprintf("%s %s, %s",
-				vecOp(i.u1),
-				formatVRegSized(i.rd.nr(), 64),
-				formatVRegSized(i.rn.nr(), 32),
-			)
-		default:
-			str = fmt.Sprintf("%s %s, %s",
-				vecOp(i.u1),
-				formatVRegVec(i.rd.nr(), vecArrangement(i.u2), vecIndexNone),
-				formatVRegVec(i.rn.nr(), vecArrangement(i.u2), vecIndexNone))
-		}
+		str = fmt.Sprintf("%s %s, %s",
+			vecOp(i.u1),
+			formatVRegVec(i.rd.nr(), vecArrangement(i.u2), vecIndexNone),
+			formatVRegVec(i.rn.nr(), vecArrangement(i.u2), vecIndexNone))
 	case vecLanes:
 		arr := vecArrangement(i.u2)
 		var destArr vecArrangement
@@ -1401,8 +1405,6 @@ func (b vecOp) String() string {
 		return "cnt"
 	case vecOpUaddlv:
 		return "uaddlv"
-	case vecOpCvt32To64:
-		return "fcvt"
 	}
 	panic(int(b))
 }
@@ -1410,7 +1412,6 @@ func (b vecOp) String() string {
 const (
 	vecOpCnt vecOp = iota
 	vecOpUaddlv
-	vecOpCvt32To64
 )
 
 // bitOp determines the type of bitwise operation. Instructions whose kind is one of
@@ -1434,6 +1435,25 @@ const (
 	// 32/64-bit Clz.
 	bitOpClz
 )
+
+// fpuUniOp represents a unary floating-point unit (FPU) operation.
+type fpuUniOp byte
+
+const (
+	fpuUniOpNeg = iota
+	fpuUniCvt32To64
+)
+
+// String implements the fmt.Stringer.
+func (f fpuUniOp) String() string {
+	switch f {
+	case fpuUniOpNeg:
+		return "fneg"
+	case fpuUniCvt32To64:
+		return "fcvt"
+	}
+	panic(int(f))
+}
 
 // fpuBinOp represents a binary floating-point unit (FPU) operation.
 type fpuBinOp byte

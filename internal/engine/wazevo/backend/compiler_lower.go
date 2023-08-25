@@ -11,7 +11,7 @@ import (
 func (c *compiler) Lower() {
 	c.assignVirtualRegisters()
 	c.mach.InitializeABI(c.ssaBuilder.Signature())
-	c.mach.StartLoweringFunction(c.ssaBuilder.Blocks())
+	c.mach.StartLoweringFunction(c.ssaBuilder.BlockIDMax())
 	c.lowerBlocks()
 	c.mach.EndLoweringFunction()
 }

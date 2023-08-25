@@ -172,10 +172,11 @@ func (m *machine) SetCompiler(ctx backend.Compiler) {
 }
 
 // StartLoweringFunction implements backend.Machine.
-func (m *machine) StartLoweringFunction(n int) {
-	if len(m.ssaBlockIDToLabels) <= n {
+func (m *machine) StartLoweringFunction(max ssa.BasicBlockID) {
+	imax := int(max)
+	if len(m.ssaBlockIDToLabels) <= imax {
 		// Eagerly allocate labels for the blocks since the underlying slice will be used for the next iteration.
-		m.ssaBlockIDToLabels = append(m.ssaBlockIDToLabels, make([]label, n+1)...)
+		m.ssaBlockIDToLabels = append(m.ssaBlockIDToLabels, make([]label, imax+1)...)
 	}
 }
 

@@ -9,7 +9,7 @@ import (
 // mockMachine implements Machine for testing.
 type mockMachine struct {
 	abi                    mockABI
-	startLoweringFunction  func(numBlks int)
+	startLoweringFunction  func(id ssa.BasicBlockID)
 	startBlock             func(block ssa.BasicBlock)
 	lowerSingleBranch      func(b *ssa.Instruction)
 	lowerConditionalBranch func(b *ssa.Instruction)
@@ -75,8 +75,8 @@ func (m mockMachine) ABI() FunctionABI { return m.abi }
 func (m mockMachine) SetCompiler(Compiler) {}
 
 // StartLoweringFunction implements Machine.StartLoweringFunction.
-func (m mockMachine) StartLoweringFunction(numBlks int) {
-	m.startLoweringFunction(numBlks)
+func (m mockMachine) StartLoweringFunction(id ssa.BasicBlockID) {
+	m.startLoweringFunction(id)
 }
 
 // StartBlock implements Machine.StartBlock.

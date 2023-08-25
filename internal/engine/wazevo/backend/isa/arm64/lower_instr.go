@@ -217,7 +217,7 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		rn := m.getOperand_NR(m.compiler.ValueDefinition(v), extModeNone)
 		rd := operandNR(m.compiler.VRegOf(instr.Return()))
 		cnt := m.allocateInstr()
-		cnt.asVecMisc(vecOpCvt32To64, rd, rn, vecArrangementNone)
+		cnt.asFpuRR(fpuUniCvt32To64, rd, rn, true)
 		m.insert(cnt)
 	case ssa.OpcodeIreduce:
 		rn := m.getOperand_NR(m.compiler.ValueDefinition(instr.UnaryData()), extModeNone)
@@ -230,10 +230,62 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		mov := m.allocateInstr()
 		mov.asMove32(rd, rn.reg())
 		m.insert(mov)
+	case ssa.OpcodeFneg:
+		m.lowerFneg(instr)
+	case ssa.OpcodeBitcast:
+		m.lowerBitcast(instr)
 	default:
 		panic("TODO: lowering " + instr.Opcode().String())
 	}
 	m.FlushPendingInstructions()
+}
+
+func (m *machine) lowerBitcast(instr *ssa.Instruction) {
+	v, dstType := instr.BitcastData()
+	srcType := v.Type()
+	rn := m.getOperand_NR(m.compiler.ValueDefinition(v), extModeNone)
+	rd := operandNR(m.compiler.VRegOf(instr.Return()))
+	srcInt := srcType.IsInt()
+	dstInt := dstType.IsInt()
+	switch {
+	case srcInt && !dstInt: // Int to Float:
+		mov := m.allocateInstr()
+		var arr vecArrangement
+		if srcType.Bits() == 64 {
+			arr = vecArrangementD
+		} else {
+			arr = vecArrangementS
+		}
+		mov.asMovToVec(rd, rn, arr, vecIndex(0))
+		m.insert(mov)
+	case !srcInt && dstInt: // Float to Int:
+		mov := m.allocateInstr()
+		var arr vecArrangement
+		if dstType.Bits() == 64 {
+			arr = vecArrangementD
+		} else {
+			arr = vecArrangementS
+		}
+		mov.asMovFromVec(rd, rn, arr, vecIndex(0))
+		m.insert(mov)
+	default:
+		panic("TODO?BUG?")
+	}
+}
+
+func (m *machine) lowerFneg(instr *ssa.Instruction) {
+	x := instr.UnaryData()
+	rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+	rd := operandNR(m.compiler.VRegOf(instr.Return()))
+
+	neg := m.allocateInstr()
+	switch x.Type() {
+	case ssa.TypeF32, ssa.TypeF64:
+		neg.asFpuRR(fpuUniOpNeg, rd, rn, x.Type().Bits() == 64)
+	default:
+		panic("TODO: vector neg")
+	}
+	m.insert(neg)
 }
 
 func (m *machine) lowerIntToFpu(dst, src ssa.Value, signed, src64bit, dst64bit bool) {
@@ -529,7 +581,9 @@ func (m *machine) lowerExitWithCode(execCtxVReg regalloc.VReg, code wazevoapi.Ex
 
 func (m *machine) lowerIcmpToFlag(x, y ssa.Value, signed bool) {
 	if x.Type() != y.Type() {
-		panic("TODO(maybe): support icmp with different types")
+		panic(
+			fmt.Sprintf("TODO(maybe): support icmp with different types: v%d=%s != v%d=%s",
+				x.ID(), x.Type(), y.ID(), y.Type()))
 	}
 
 	extMod := extModeOf(x.Type(), signed)
