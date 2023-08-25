@@ -176,6 +176,9 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []exper
 		copy(copied, body)
 		bodies[i] = copied
 		totalSize += len(body)
+		if debug {
+			fmt.Println(hex.EncodeToString(body))
+		}
 	}
 
 	// Allocate executable memory and then copy the generated machine code.
@@ -192,8 +195,6 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []exper
 
 	// Resolve relocations for local function calls.
 	machine.ResolveRelocations(e.refToBinaryOffset, executable, e.rels)
-
-	fmt.Println(hex.EncodeToString(executable))
 
 	if runtime.GOARCH == "arm64" {
 		// On arm64, we cannot give all of rwx at the same time, so we change it to exec.

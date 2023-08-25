@@ -176,9 +176,6 @@ type builder struct {
 	donePasses bool
 	// doneBlockLayout is true if LayoutBlocks is called.
 	doneBlockLayout bool
-
-	// vs is reused by builder.FindValue.
-	vs []Value
 }
 
 // ReturnBlock implements Builder.ReturnBlock.

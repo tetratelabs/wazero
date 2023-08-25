@@ -72,7 +72,7 @@ func (m *machine) lowerConstantI32(dst regalloc.VReg, c int32) {
 	} else if t := const16bitAligned(int64(^c)); t >= 0 {
 		// Also, if the inverse of the const can fit within 16-bit range, do the same ^^.
 		m.insertMOVN(dst, uint64(^c>>(16*t)), t, false)
-	} else if isBitMaskImmediate(uint64(c)) {
+	} else if isBitMaskImmediate(uint64(uint32(c))) {
 		m.lowerConstViaBitMaskImmediate(uint64(c), dst, false)
 	} else {
 		// Otherwise, we use MOVZ and MOVK to load it.
