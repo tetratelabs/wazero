@@ -420,11 +420,9 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 			return
 		}
 		x := state.pop()
-		neg := builder.AllocateInstruction()
-		neg.AsFneg(x)
-		builder.InsertInstruction(neg)
-		value := neg.Return()
-		state.push(value)
+		negated := builder.AllocateInstruction().AsFneg(x).Insert(builder).Return()
+		state.push(negated)
+	case wasm.OpcodeI64TruncF64S:
 	case wasm.OpcodeI32And, wasm.OpcodeI64And:
 		if state.unreachable {
 			return
@@ -564,6 +562,9 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		}
 		variable := c.localVariable(index)
 		v := builder.MustFindValue(variable)
+		if false {
+			builder.AnnotateValue(v, fmt.Sprintf("v%d@local[%d]", v.ID(), index))
+		}
 		state.push(v)
 	case wasm.OpcodeLocalSet:
 		index := c.readI32u()

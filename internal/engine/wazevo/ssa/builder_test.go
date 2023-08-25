@@ -555,6 +555,7 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 			name: "loop with output",
 			exp:  []BasicBlockID{0x0, 0x2, 0x4, 0x1, 0x3, 0x6, 0x5},
 			setup: func(b *builder) {
+				b.currentSignature = &Signature{Results: []Type{TypeI32}}
 				b0, b1, b2, b3 := b.allocateBasicBlock(), b.allocateBasicBlock(), b.allocateBasicBlock(), b.allocateBasicBlock()
 
 				b.SetCurrentBlock(b0)

@@ -1432,10 +1432,11 @@ func (i *Instruction) UnaryData() Value {
 }
 
 // AsFneg initializes this instruction as an instruction with OpcodeFneg.
-func (i *Instruction) AsFneg(x Value) {
+func (i *Instruction) AsFneg(x Value) *Instruction {
 	i.opcode = OpcodeFneg
 	i.v = x
 	i.typ = x.Type()
+	return i
 }
 
 // AsFpromote initializes this instruction as an instruction with OpcodeFpromote.

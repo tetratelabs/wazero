@@ -217,7 +217,7 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		rn := m.getOperand_NR(m.compiler.ValueDefinition(v), extModeNone)
 		rd := operandNR(m.compiler.VRegOf(instr.Return()))
 		cnt := m.allocateInstr()
-		cnt.asVecMisc(vecOpCvt32To64, rd, rn, vecArrangementNone)
+		cnt.asFpuRR(fpuUniCvt32To64, rd, rn, true)
 		m.insert(cnt)
 	case ssa.OpcodeIreduce:
 		rn := m.getOperand_NR(m.compiler.ValueDefinition(instr.UnaryData()), extModeNone)
@@ -230,10 +230,27 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		mov := m.allocateInstr()
 		mov.asMove32(rd, rn.reg())
 		m.insert(mov)
+	case ssa.OpcodeFneg:
+		m.lowerFneg(instr)
 	default:
 		panic("TODO: lowering " + instr.Opcode().String())
 	}
 	m.FlushPendingInstructions()
+}
+
+func (m *machine) lowerFneg(instr *ssa.Instruction) {
+	x := instr.UnaryData()
+	rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+	rd := operandNR(m.compiler.VRegOf(instr.Return()))
+
+	neg := m.allocateInstr()
+	switch x.Type() {
+	case ssa.TypeF32, ssa.TypeF64:
+		neg.asFpuRR(fpuUniOpNeg, rd, rn, x.Type().Bits() == 64)
+	default:
+		panic("TODO: vector neg")
+	}
+	m.insert(neg)
 }
 
 func (m *machine) lowerIntToFpu(dst, src ssa.Value, signed, src64bit, dst64bit bool) {
