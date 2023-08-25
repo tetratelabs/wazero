@@ -62,6 +62,8 @@ func TestSpectestV1(t *testing.T) {
 		{name: "memory"},
 		{name: "memory_size"},
 		{name: "memory_grow"},
+		{name: "memory_redundancy"},
+		{name: "memory_trap"},
 		{name: "nop"},
 		{name: "return"},
 		{name: "select"},
@@ -73,7 +75,7 @@ func TestSpectestV1(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			spectest.RunCase(t, v1.Testcases, tc.name, context.Background(), config,
-				-1, 77, 77)
+				-1, 0, math.MaxInt)
 		})
 	}
 }
