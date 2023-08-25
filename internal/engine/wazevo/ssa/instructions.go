@@ -870,6 +870,7 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeFcvtFromSint:       sideEffectFalse,
 	OpcodeFcvtFromUint:       sideEffectFalse,
 	OpcodeFpromote:           sideEffectFalse,
+	OpcodeBitcast:            sideEffectFalse,
 	OpcodeIreduce:            sideEffectFalse,
 }
 
@@ -885,6 +886,7 @@ func (i *Instruction) HasSideEffects() bool {
 // instructionReturnTypes provides the function to determine the return types of an instruction.
 var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeBand:      returnTypesFnSingle,
+	OpcodeBitcast:   returnTypesFnSingle,
 	OpcodeBor:       returnTypesFnSingle,
 	OpcodeBxor:      returnTypesFnSingle,
 	OpcodeRotl:      returnTypesFnSingle,
@@ -1439,6 +1441,19 @@ func (i *Instruction) AsFneg(x Value) *Instruction {
 	return i
 }
 
+// AsBitcast initializes this instruction as an instruction with OpcodeBitcast.
+func (i *Instruction) AsBitcast(x Value, dstType Type) *Instruction {
+	i.opcode = OpcodeBitcast
+	i.v = x
+	i.typ = dstType
+	return i
+}
+
+// BitcastData returns the operands for a bitcast instruction.
+func (i *Instruction) BitcastData() (x Value, dstType Type) {
+	return i.v, i.typ
+}
+
 // AsFpromote initializes this instruction as an instruction with OpcodeFpromote.
 func (i *Instruction) AsFpromote(x Value) {
 	i.opcode = OpcodeFpromote
@@ -1612,7 +1627,7 @@ func (i *Instruction) Format(b Builder) string {
 		instSuffix = fmt.Sprintf(" %s, %s", i.v.Format(b), i.v2.Format(b))
 	case OpcodeUndefined:
 	case OpcodeClz, OpcodeCtz, OpcodePopcnt, OpcodeFneg, OpcodeFcvtFromSint, OpcodeFcvtFromUint, OpcodeFpromote,
-		OpcodeIreduce:
+		OpcodeIreduce, OpcodeBitcast:
 		instSuffix = " " + i.v.Format(b)
 	default:
 		panic(fmt.Sprintf("TODO: format for %s", i.opcode))

@@ -423,6 +423,42 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		negated := builder.AllocateInstruction().AsFneg(x).Insert(builder).Return()
 		state.push(negated)
 	case wasm.OpcodeI64TruncF64S:
+	case wasm.OpcodeI32ReinterpretF32:
+		if state.unreachable {
+			return
+		}
+		reinterpret := builder.AllocateInstruction().
+			AsBitcast(state.pop(), ssa.TypeI32).
+			Insert(builder).Return()
+		state.push(reinterpret)
+
+	case wasm.OpcodeI64ReinterpretF64:
+		if state.unreachable {
+			return
+		}
+		reinterpret := builder.AllocateInstruction().
+			AsBitcast(state.pop(), ssa.TypeI64).
+			Insert(builder).Return()
+		state.push(reinterpret)
+
+	case wasm.OpcodeF32ReinterpretI32:
+		if state.unreachable {
+			return
+		}
+		reinterpret := builder.AllocateInstruction().
+			AsBitcast(state.pop(), ssa.TypeF32).
+			Insert(builder).Return()
+		state.push(reinterpret)
+
+	case wasm.OpcodeF64ReinterpretI64:
+		if state.unreachable {
+			return
+		}
+		reinterpret := builder.AllocateInstruction().
+			AsBitcast(state.pop(), ssa.TypeF64).
+			Insert(builder).Return()
+		state.push(reinterpret)
+
 	case wasm.OpcodeI32And, wasm.OpcodeI64And:
 		if state.unreachable {
 			return

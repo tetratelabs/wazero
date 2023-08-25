@@ -59,6 +59,7 @@ func TestSpectestV1(t *testing.T) {
 		{name: "local_get"},
 		//{name: "local_set"},
 		//{name: "local_tee"},
+		{name: "memory"},
 		{name: "memory_size"},
 		{name: "memory_grow"},
 		{name: "nop"},
@@ -72,7 +73,7 @@ func TestSpectestV1(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			spectest.RunCase(t, v1.Testcases, tc.name, context.Background(), config,
-				-1, 0, math.MaxInt)
+				-1, 77, 77)
 		})
 	}
 }

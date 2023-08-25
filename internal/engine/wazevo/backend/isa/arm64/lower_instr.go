@@ -232,10 +232,45 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		m.insert(mov)
 	case ssa.OpcodeFneg:
 		m.lowerFneg(instr)
+	case ssa.OpcodeBitcast:
+		m.lowerBitcast(instr)
 	default:
 		panic("TODO: lowering " + instr.Opcode().String())
 	}
 	m.FlushPendingInstructions()
+}
+
+func (m *machine) lowerBitcast(instr *ssa.Instruction) {
+	v, dstType := instr.BitcastData()
+	srcType := v.Type()
+	rn := m.getOperand_NR(m.compiler.ValueDefinition(v), extModeNone)
+	rd := operandNR(m.compiler.VRegOf(instr.Return()))
+	srcInt := srcType.IsInt()
+	dstInt := dstType.IsInt()
+	switch {
+	case srcInt && !dstInt: // Int to Float:
+		mov := m.allocateInstr()
+		var arr vecArrangement
+		if srcType.Bits() == 64 {
+			arr = vecArrangementD
+		} else {
+			arr = vecArrangementS
+		}
+		mov.asMovToVec(rd, rn, arr, vecIndex(0))
+		m.insert(mov)
+	case !srcInt && dstInt: // Float to Int:
+		mov := m.allocateInstr()
+		var arr vecArrangement
+		if dstType.Bits() == 64 {
+			arr = vecArrangementD
+		} else {
+			arr = vecArrangementS
+		}
+		mov.asMovFromVec(rd, rn, arr, vecIndex(0))
+		m.insert(mov)
+	default:
+		panic("TODO?BUG?")
+	}
 }
 
 func (m *machine) lowerFneg(instr *ssa.Instruction) {
