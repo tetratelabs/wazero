@@ -877,6 +877,10 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeFloor:              sideEffectFalse,
 	OpcodeTrunc:              sideEffectFalse,
 	OpcodeNearest:            sideEffectFalse,
+	OpcodeSdiv:               sideEffectFalse,
+	OpcodeUdiv:               sideEffectFalse,
+	OpcodeFabs:               sideEffectFalse,
+	OpcodeFcopysign:          sideEffectFalse,
 }
 
 // HasSideEffects returns true if this instruction has side effects.
@@ -891,6 +895,7 @@ func (i *Instruction) HasSideEffects() bool {
 // instructionReturnTypes provides the function to determine the return types of an instruction.
 var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeBand:      returnTypesFnSingle,
+	OpcodeFcopysign: returnTypesFnSingle,
 	OpcodeBitcast:   returnTypesFnSingle,
 	OpcodeBor:       returnTypesFnSingle,
 	OpcodeBxor:      returnTypesFnSingle,
@@ -898,6 +903,8 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeRotr:      returnTypesFnSingle,
 	OpcodeIshl:      returnTypesFnSingle,
 	OpcodeSshr:      returnTypesFnSingle,
+	OpcodeSdiv:      returnTypesFnSingle,
+	OpcodeUdiv:      returnTypesFnSingle,
 	OpcodeUshr:      returnTypesFnSingle,
 	OpcodeJump:      returnTypesFnNoReturns,
 	OpcodeUndefined: returnTypesFnNoReturns,
@@ -906,6 +913,7 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeSExtend:   returnTypesFnSingle,
 	OpcodeUExtend:   returnTypesFnSingle,
 	OpcodeIreduce:   returnTypesFnSingle,
+	OpcodeFabs:      returnTypesFnSingle,
 	OpcodeSqrt:      returnTypesFnSingle,
 	OpcodeCeil:      returnTypesFnSingle,
 	OpcodeFloor:     returnTypesFnSingle,
@@ -1105,6 +1113,42 @@ func (i *Instruction) AsFcmp(x, y Value, c FloatCmpCond) {
 	i.v2 = y
 	i.u64 = uint64(c)
 	i.typ = TypeI32
+}
+
+// AsSDiv initializes this instruction as an integer bitwise and instruction with OpcodeSdiv.
+func (i *Instruction) AsSDiv(x, y Value) *Instruction {
+	i.opcode = OpcodeSdiv
+	i.v = x
+	i.v2 = y
+	i.typ = x.Type()
+	return i
+}
+
+// AsUDiv initializes this instruction as an integer bitwise and instruction with OpcodeUdiv.
+func (i *Instruction) AsUDiv(x, y Value) *Instruction {
+	i.opcode = OpcodeUdiv
+	i.v = x
+	i.v2 = y
+	i.typ = x.Type()
+	return i
+}
+
+// AsSRem initializes this instruction as an integer bitwise and instruction with OpcodeSrem.
+func (i *Instruction) AsSRem(x, y Value) *Instruction {
+	i.opcode = OpcodeSrem
+	i.v = x
+	i.v2 = y
+	i.typ = x.Type()
+	return i
+}
+
+// AsURem initializes this instruction as an integer bitwise and instruction with OpcodeUrem.
+func (i *Instruction) AsURem(x, y Value) *Instruction {
+	i.opcode = OpcodeUrem
+	i.v = x
+	i.v2 = y
+	i.typ = x.Type()
+	return i
 }
 
 // AsBand initializes this instruction as an integer bitwise and instruction with OpcodeBand.
@@ -1467,6 +1511,15 @@ func (i *Instruction) AsFabs(x Value) *Instruction {
 	return i
 }
 
+// AsFcopysign initializes this instruction as an instruction with OpcodeFcopysign.
+func (i *Instruction) AsFcopysign(x, y Value) *Instruction {
+	i.opcode = OpcodeFcopysign
+	i.v = x
+	i.v2 = y
+	i.typ = x.Type()
+	return i
+}
+
 // AsCeil initializes this instruction as an instruction with OpcodeCeil.
 func (i *Instruction) AsCeil(x Value) *Instruction {
 	i.opcode = OpcodeCeil
@@ -1681,7 +1734,8 @@ func (i *Instruction) Format(b Builder) string {
 			}
 		}
 		instSuffix += "]"
-	case OpcodeBand, OpcodeBor, OpcodeBxor, OpcodeRotr, OpcodeRotl, OpcodeIshl, OpcodeSshr, OpcodeUshr:
+	case OpcodeBand, OpcodeBor, OpcodeBxor, OpcodeRotr, OpcodeRotl, OpcodeIshl, OpcodeSshr, OpcodeUshr,
+		OpcodeSdiv, OpcodeUdiv, OpcodeFcopysign:
 		instSuffix = fmt.Sprintf(" %s, %s", i.v.Format(b), i.v2.Format(b))
 	case OpcodeUndefined:
 	case OpcodeClz, OpcodeCtz, OpcodePopcnt, OpcodeFneg, OpcodeFcvtFromSint, OpcodeFcvtFromUint, OpcodeFpromote,

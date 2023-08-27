@@ -436,6 +436,14 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		x := state.pop()
 		v := builder.AllocateInstruction().AsFabs(x).Insert(builder).Return()
 		state.push(v)
+	case wasm.OpcodeF32Copysign, wasm.OpcodeF64Copysign:
+		if state.unreachable {
+			return
+		}
+		y, x := state.pop(), state.pop()
+		v := builder.AllocateInstruction().AsFcopysign(x, y).Insert(builder).Return()
+		state.push(v)
+
 	case wasm.OpcodeF32Ceil, wasm.OpcodeF64Ceil:
 		if state.unreachable {
 			return
@@ -502,6 +510,38 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 			AsBitcast(state.pop(), ssa.TypeF64).
 			Insert(builder).Return()
 		state.push(reinterpret)
+
+	case wasm.OpcodeI32DivS, wasm.OpcodeI64DivS:
+		if state.unreachable {
+			return
+		}
+		y, x := state.pop(), state.pop()
+		result := builder.AllocateInstruction().AsSDiv(x, y).Insert(builder).Return()
+		state.push(result)
+
+	case wasm.OpcodeI32DivU, wasm.OpcodeI64DivU:
+		if state.unreachable {
+			return
+		}
+		y, x := state.pop(), state.pop()
+		result := builder.AllocateInstruction().AsUDiv(x, y).Insert(builder).Return()
+		state.push(result)
+
+	case wasm.OpcodeI32RemS, wasm.OpcodeI64RemS:
+		if state.unreachable {
+			return
+		}
+		y, x := state.pop(), state.pop()
+		result := builder.AllocateInstruction().AsSRem(x, y).Insert(builder).Return()
+		state.push(result)
+
+	case wasm.OpcodeI32RemU, wasm.OpcodeI64RemU:
+		if state.unreachable {
+			return
+		}
+		y, x := state.pop(), state.pop()
+		result := builder.AllocateInstruction().AsURem(x, y).Insert(builder).Return()
+		state.push(result)
 
 	case wasm.OpcodeI32And, wasm.OpcodeI64And:
 		if state.unreachable {

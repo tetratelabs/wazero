@@ -99,6 +99,7 @@ var defKinds = [numInstructionKinds]defKind{
 	movFromVec:      defKindRD,
 	vecMisc:         defKindRD,
 	vecLanes:        defKindRD,
+	vecRRR:          defKindRD,
 	intToFpu:        defKindRD,
 }
 
@@ -199,6 +200,7 @@ var useKinds = [numInstructionKinds]useKind{
 	movFromVec:      useKindRN,
 	vecMisc:         useKindRN,
 	vecLanes:        useKindRN,
+	vecRRR:          useKindRNRM,
 	intToFpu:        useKindRN,
 }
 
@@ -724,6 +726,13 @@ func (i *instruction) asVecLanes(op vecOp, rd, rn operand, arr vecArrangement) {
 	i.u2 = uint64(arr)
 }
 
+func (i *instruction) asVecRRR(op vecOp, rd, rn, rm operand, arr vecArrangement) {
+	i.kind = vecRRR
+	i.u1 = uint64(op)
+	i.rn, i.rd, i.rm = rn, rd, rm
+	i.u2 = uint64(arr)
+}
+
 func (i *instruction) isCopy() bool {
 	op := i.kind
 	return op == mov64 || op == mov32 || op == fpuMov64 || op == fpuMov128
@@ -981,7 +990,12 @@ func (i *instruction) String() (str string) {
 	case vecMiscNarrow:
 		panic("TODO")
 	case vecRRR:
-		panic("TODO")
+		str = fmt.Sprintf("%s %s, %s, %s",
+			vecOp(i.u1),
+			formatVRegVec(i.rd.nr(), vecArrangement(i.u2), vecIndexNone),
+			formatVRegVec(i.rn.nr(), vecArrangement(i.u2), vecIndexNone),
+			formatVRegVec(i.rm.nr(), vecArrangement(i.u2), vecIndexNone),
+		)
 	case vecMisc:
 		str = fmt.Sprintf("%s %s, %s",
 			vecOp(i.u1),
@@ -1401,6 +1415,8 @@ func (b vecOp) String() string {
 		return "cnt"
 	case vecOpUaddlv:
 		return "uaddlv"
+	case vecOpBit:
+		return "bit"
 	}
 	panic(int(b))
 }
@@ -1408,6 +1424,7 @@ func (b vecOp) String() string {
 const (
 	vecOpCnt vecOp = iota
 	vecOpUaddlv
+	vecOpBit
 )
 
 // bitOp determines the type of bitwise operation. Instructions whose kind is one of
@@ -1439,10 +1456,11 @@ const (
 	fpuUniOpNeg fpuUniOp = iota
 	fpuUniOpCvt32To64
 	fpuUniOpSqrt
-	fpuUniOpPlus
-	fpuUniOpMinus
-	fpuUniOpZero
-	fpuUniOpNearest
+	fpuUniOpRoundPlus
+	fpuUniOpRoundMinus
+	fpuUniOpRoundZero
+	fpuUniOpRoundNearest
+	fpuUniOpAbs
 )
 
 // String implements the fmt.Stringer.
@@ -1454,14 +1472,16 @@ func (f fpuUniOp) String() string {
 		return "fcvt"
 	case fpuUniOpSqrt:
 		return "fsqrt"
-	case fpuUniOpPlus:
+	case fpuUniOpRoundPlus:
 		return "frintp"
-	case fpuUniOpMinus:
+	case fpuUniOpRoundMinus:
 		return "frintm"
-	case fpuUniOpZero:
+	case fpuUniOpRoundZero:
 		return "frintz"
-	case fpuUniOpNearest:
+	case fpuUniOpRoundNearest:
 		return "frintn"
+	case fpuUniOpAbs:
+		return "fabs"
 	}
 	panic(int(f))
 }

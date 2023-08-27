@@ -8,6 +8,7 @@ package arm64
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
@@ -235,19 +236,55 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 	case ssa.OpcodeSqrt:
 		m.lowerFpuUniOp(fpuUniOpSqrt, instr.Arg(), instr.Return())
 	case ssa.OpcodeCeil:
-		m.lowerFpuUniOp(fpuUniOpPlus, instr.Arg(), instr.Return())
+		m.lowerFpuUniOp(fpuUniOpRoundPlus, instr.Arg(), instr.Return())
 	case ssa.OpcodeFloor:
-		m.lowerFpuUniOp(fpuUniOpMinus, instr.Arg(), instr.Return())
+		m.lowerFpuUniOp(fpuUniOpRoundMinus, instr.Arg(), instr.Return())
 	case ssa.OpcodeTrunc:
-		m.lowerFpuUniOp(fpuUniOpZero, instr.Arg(), instr.Return())
+		m.lowerFpuUniOp(fpuUniOpRoundZero, instr.Arg(), instr.Return())
 	case ssa.OpcodeNearest:
-		m.lowerFpuUniOp(fpuUniOpNearest, instr.Arg(), instr.Return())
+		m.lowerFpuUniOp(fpuUniOpRoundNearest, instr.Arg(), instr.Return())
+	case ssa.OpcodeFabs:
+		m.lowerFpuUniOp(fpuUniOpAbs, instr.Arg(), instr.Return())
 	case ssa.OpcodeBitcast:
 		m.lowerBitcast(instr)
+	case ssa.OpcodeFcopysign:
+		x, y := instr.BinaryData()
+		m.lowerFcopysign(x, y, instr.Return())
 	default:
 		panic("TODO: lowering " + instr.Opcode().String())
 	}
 	m.FlushPendingInstructions()
+}
+
+func (m *machine) lowerFcopysign(x, y, ret ssa.Value) {
+	rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+	rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
+	tmpF := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
+
+	// This is exactly the same code emitted by GCC for "__builtin_copysign":
+	//
+	//    mov     x0, -9223372036854775808
+	//    fmov    d2, x0
+	//    vbit    v0.8b, v1.8b, v2.8b
+	//
+
+	setMSB := m.allocateInstr()
+	if x.Type() == ssa.TypeF32 {
+		m.lowerConstantI32(tmpRegVReg, math.MinInt32)
+		setMSB.asMovToVec(tmpF, operandNR(tmpRegVReg), vecArrangementS, vecIndex(0))
+	} else {
+		m.lowerConstantI64(tmpRegVReg, math.MinInt64)
+		setMSB.asMovToVec(tmpF, operandNR(tmpRegVReg), vecArrangementD, vecIndex(0))
+	}
+	m.insert(setMSB)
+
+	vbit := m.allocateInstr()
+	vbit.asVecRRR(vecOpBit, rn, rm, tmpF, vecArrangement8B)
+	m.insert(vbit)
+
+	mov := m.allocateInstr()
+	mov.asFpuMov64(m.compiler.VRegOf(ret), rn.nr())
+	m.insert(mov)
 }
 
 func (m *machine) lowerBitcast(instr *ssa.Instruction) {
