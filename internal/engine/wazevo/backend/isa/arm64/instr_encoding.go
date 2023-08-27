@@ -266,9 +266,42 @@ func (i *instruction) encode(c backend.Compiler) {
 			regNumberInEncoding[i.rn.realReg()],
 			i.u3 == 1,
 		))
+	case vecRRR:
+		c.Emit4Bytes(encodeVecRRR(
+			vecOp(i.u1),
+			regNumberInEncoding[i.rd.realReg()],
+			regNumberInEncoding[i.rn.realReg()],
+			regNumberInEncoding[i.rm.realReg()],
+			vecArrangement(i.u2),
+		))
 	default:
 		panic(i.String())
 	}
+}
+
+// encodeVecRRR encodes as either "Advanced SIMD three *" in
+// https://developer.arm.com/documentation/ddi0596/2020-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
+func encodeVecRRR(op vecOp, rd, rn, rm uint32, arr vecArrangement) uint32 {
+	switch op {
+	case vecOpBit:
+		var q uint32
+		switch arr {
+		case vecArrangement8B:
+			q = 0b0
+		case vecArrangement16B:
+			q = 0b1
+		default:
+			panic("BUG")
+		}
+		return encodeAdvancedSIMDThreeSame(rd, rn, rm, 0b00011, 0b10, 0b1, q)
+	default:
+		panic("TODO")
+	}
+}
+
+// encodeVecThreeSame
+func encodeAdvancedSIMDThreeSame(rd, rn, rm, opcode, size, U, Q uint32) uint32 {
+	return Q<<30 | U<<29 | 0b111<<25 | size<<22 | 0b1<<21 | rm<<16 | opcode<<11 | 0b1<<10 | rn<<5 | rd
 }
 
 // encodeFloatDataOneSource encodes as "Floating-point data-processing (1 source)" in
@@ -288,22 +321,22 @@ func encodeFloatDataOneSource(op fpuUniOp, rd, rn uint32, dst64bit bool) uint32 
 		if dst64bit {
 			ptype = 0b01
 		}
-	case fpuUniOpPlus:
+	case fpuUniOpRoundPlus:
 		opcode = 0b001001
 		if dst64bit {
 			ptype = 0b01
 		}
-	case fpuUniOpMinus:
+	case fpuUniOpRoundMinus:
 		opcode = 0b001010
 		if dst64bit {
 			ptype = 0b01
 		}
-	case fpuUniOpZero:
+	case fpuUniOpRoundZero:
 		opcode = 0b001011
 		if dst64bit {
 			ptype = 0b01
 		}
-	case fpuUniOpNearest:
+	case fpuUniOpRoundNearest:
 		opcode = 0b001000
 		if dst64bit {
 			ptype = 0b01

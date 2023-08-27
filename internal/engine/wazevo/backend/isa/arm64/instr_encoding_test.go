@@ -19,6 +19,12 @@ func TestInstruction_encode(t *testing.T) {
 		setup func(*instruction)
 		want  string
 	}{
+		{want: "411ca32e", setup: func(i *instruction) {
+			i.asVecRRR(vecOpBit, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
+		}},
+		{want: "411ca36e", setup: func(i *instruction) {
+			i.asVecRRR(vecOpBit, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
+		}},
 		{want: "4100839a", setup: func(i *instruction) { i.asCSel(operandNR(x1VReg), operandNR(x2VReg), operandNR(x3VReg), eq, true) }},
 		{want: "4110839a", setup: func(i *instruction) { i.asCSel(operandNR(x1VReg), operandNR(x2VReg), operandNR(x3VReg), ne, true) }},
 		{want: "4100831a", setup: func(i *instruction) { i.asCSel(operandNR(x1VReg), operandNR(x2VReg), operandNR(x3VReg), eq, false) }},
@@ -519,28 +525,28 @@ func TestInstruction_encode(t *testing.T) {
 			i.asFpuRR(fpuUniOpSqrt, operandNR(v1VReg), operandNR(v2VReg), true)
 		}},
 		{want: "41c0241e", setup: func(i *instruction) {
-			i.asFpuRR(fpuUniOpPlus, operandNR(v1VReg), operandNR(v2VReg), false)
+			i.asFpuRR(fpuUniOpRoundPlus, operandNR(v1VReg), operandNR(v2VReg), false)
 		}},
 		{want: "41c0641e", setup: func(i *instruction) {
-			i.asFpuRR(fpuUniOpPlus, operandNR(v1VReg), operandNR(v2VReg), true)
+			i.asFpuRR(fpuUniOpRoundPlus, operandNR(v1VReg), operandNR(v2VReg), true)
 		}},
 		{want: "4140251e", setup: func(i *instruction) {
-			i.asFpuRR(fpuUniOpMinus, operandNR(v1VReg), operandNR(v2VReg), false)
+			i.asFpuRR(fpuUniOpRoundMinus, operandNR(v1VReg), operandNR(v2VReg), false)
 		}},
 		{want: "4140651e", setup: func(i *instruction) {
-			i.asFpuRR(fpuUniOpMinus, operandNR(v1VReg), operandNR(v2VReg), true)
+			i.asFpuRR(fpuUniOpRoundMinus, operandNR(v1VReg), operandNR(v2VReg), true)
 		}},
 		{want: "41c0251e", setup: func(i *instruction) {
-			i.asFpuRR(fpuUniOpZero, operandNR(v1VReg), operandNR(v2VReg), false)
+			i.asFpuRR(fpuUniOpRoundZero, operandNR(v1VReg), operandNR(v2VReg), false)
 		}},
 		{want: "41c0651e", setup: func(i *instruction) {
-			i.asFpuRR(fpuUniOpZero, operandNR(v1VReg), operandNR(v2VReg), true)
+			i.asFpuRR(fpuUniOpRoundZero, operandNR(v1VReg), operandNR(v2VReg), true)
 		}},
 		{want: "4140241e", setup: func(i *instruction) {
-			i.asFpuRR(fpuUniOpNearest, operandNR(v1VReg), operandNR(v2VReg), false)
+			i.asFpuRR(fpuUniOpRoundNearest, operandNR(v1VReg), operandNR(v2VReg), false)
 		}},
 		{want: "4140641e", setup: func(i *instruction) {
-			i.asFpuRR(fpuUniOpNearest, operandNR(v1VReg), operandNR(v2VReg), true)
+			i.asFpuRR(fpuUniOpRoundNearest, operandNR(v1VReg), operandNR(v2VReg), true)
 		}},
 		{want: "4140611e", setup: func(i *instruction) { i.asFpuRR(fpuUniOpNeg, operandNR(v1VReg), operandNR(v2VReg), true) }},
 		{want: "4201231e4201631e4201239e4201639e4201221e4201621e4201229e4201629e", setup: func(i *instruction) {
