@@ -101,6 +101,7 @@ var defKinds = [numInstructionKinds]defKind{
 	vecLanes:        defKindRD,
 	vecRRR:          defKindRD,
 	intToFpu:        defKindRD,
+	cCmpImm:         defKindNone,
 }
 
 // defs returns the list of regalloc.VReg that are defined by the instruction.
@@ -198,6 +199,7 @@ var useKinds = [numInstructionKinds]useKind{
 	fpuCSel:         useKindRNRM,
 	movToVec:        useKindRN,
 	movFromVec:      useKindRN,
+	cCmpImm:         useKindRN,
 	vecMisc:         useKindRN,
 	vecLanes:        useKindRN,
 	vecRRR:          useKindRNRM,
@@ -583,6 +585,17 @@ func (i *instruction) asFpuCmp(rn, rm operand, is64bit bool) {
 	}
 }
 
+func (i *instruction) asCCmpImm(rn operand, imm uint64, c condFlag, flag byte, is64bit bool) {
+	i.kind = cCmpImm
+	i.rn = rn
+	i.rm.data = imm
+	i.u1 = uint64(c)
+	i.u2 = uint64(flag)
+	if is64bit {
+		i.u3 = 1
+	}
+}
+
 // asALU setups a basic ALU instruction.
 func (i *instruction) asALU(aluOp aluOp, rd, rn, rm operand, dst64bit bool) {
 	switch rm.kind {
@@ -875,7 +888,11 @@ func (i *instruction) String() (str string) {
 	case cSet:
 		str = fmt.Sprintf("cset %s, %s", formatVRegSized(i.rd.nr(), 64), condFlag(i.u1))
 	case cCmpImm:
-		panic("TODO")
+		size := is64SizeBitToSize(i.u3)
+		str = fmt.Sprintf("ccmp %s, #%#x, #%#x, %s",
+			formatVRegSized(i.rn.nr(), size), i.rm.data,
+			i.u2&0b1111,
+			condFlag(i.u1))
 	case fpuMov64:
 		str = fmt.Sprintf("mov %s, %s",
 			formatVRegVec(i.rd.nr(), vecArrangement8B, vecIndexNone),
@@ -1345,10 +1362,10 @@ func (a aluOp) String() string {
 		return "sMulH"
 	case aluOpUMulH:
 		return "uMulH"
-	case aluOpSDiv64:
-		return "sDiv64"
-	case aluOpUDiv64:
-		return "uDiv64"
+	case aluOpSDiv:
+		return "sdiv"
+	case aluOpUDiv:
+		return "udiv"
 	case aluOpRotR:
 		return "ror"
 	case aluOpLsr:
@@ -1387,9 +1404,9 @@ const (
 	// Unsigned multiply, high-word result.
 	aluOpUMulH
 	// 64-bit Signed divide.
-	aluOpSDiv64
+	aluOpSDiv
 	// 64-bit Unsigned divide.
-	aluOpUDiv64
+	aluOpUDiv
 	// 32/64-bit Rotate right.
 	aluOpRotR
 	// 32/64-bit Logical shift right.
@@ -1704,3 +1721,86 @@ func (i *instruction) size() int64 {
 		return 4
 	}
 }
+
+// vecArrangement is the arrangement of data within a vector register.
+type vecArrangement byte
+
+const (
+	// vecArrangementNone is an arrangement indicating no data is stored.
+	vecArrangementNone vecArrangement = iota
+	// vecArrangement8B is an arrangement of 8 bytes (64-bit vector)
+	vecArrangement8B
+	// vecArrangement16B is an arrangement of 16 bytes (128-bit vector)
+	vecArrangement16B
+	// vecArrangement4H is an arrangement of 4 half precisions (64-bit vector)
+	vecArrangement4H
+	// vecArrangement8H is an arrangement of 8 half precisions (128-bit vector)
+	vecArrangement8H
+	// vecArrangement2S is an arrangement of 2 single precisions (64-bit vector)
+	vecArrangement2S
+	// vecArrangement4S is an arrangement of 4 single precisions (128-bit vector)
+	vecArrangement4S
+	// vecArrangement1D is an arrangement of 1 double precision (64-bit vector)
+	vecArrangement1D
+	// vecArrangement2D is an arrangement of 2 double precisions (128-bit vector)
+	vecArrangement2D
+
+	// Assign each vector size specifier to a vector arrangement ID.
+	// Instructions can only have an arrangement or a size specifier, but not both, so it
+	// simplifies the internal representation of vector instructions by being able to
+	// store either into the same field.
+
+	// vecArrangementB is a size specifier of byte
+	vecArrangementB
+	// vecArrangementH is a size specifier of word (16-bit)
+	vecArrangementH
+	// vecArrangementS is a size specifier of double word (32-bit)
+	vecArrangementS
+	// vecArrangementD is a size specifier of quad word (64-bit)
+	vecArrangementD
+	// vecArrangementQ is a size specifier of the entire vector (128-bit)
+	vecArrangementQ
+)
+
+// String implements fmt.Stringer
+func (v vecArrangement) String() (ret string) {
+	switch v {
+	case vecArrangement8B:
+		ret = "8B"
+	case vecArrangement16B:
+		ret = "16B"
+	case vecArrangement4H:
+		ret = "4H"
+	case vecArrangement8H:
+		ret = "8H"
+	case vecArrangement2S:
+		ret = "2S"
+	case vecArrangement4S:
+		ret = "4S"
+	case vecArrangement1D:
+		ret = "1D"
+	case vecArrangement2D:
+		ret = "2D"
+	case vecArrangementB:
+		ret = "B"
+	case vecArrangementH:
+		ret = "H"
+	case vecArrangementS:
+		ret = "S"
+	case vecArrangementD:
+		ret = "D"
+	case vecArrangementQ:
+		ret = "Q"
+	case vecArrangementNone:
+		ret = "none"
+	default:
+		panic(v)
+	}
+	return
+}
+
+// vecIndex is the index of an element of a vector register
+type vecIndex byte
+
+// vecIndexNone indicates no vector index specified.
+const vecIndexNone = ^vecIndex(0)

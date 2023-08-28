@@ -25,6 +25,9 @@ type Builder interface {
 	// CurrentBlock returns the currently handled BasicBlock which is set by the latest call to SetCurrentBlock.
 	CurrentBlock() BasicBlock
 
+	// EntryBlock returns the entry BasicBlock of the currently-compiled function.
+	EntryBlock() BasicBlock
+
 	// SetCurrentBlock sets the instruction insertion target to the BasicBlock `b`.
 	SetCurrentBlock(b BasicBlock)
 
@@ -335,6 +338,11 @@ func (b *builder) SetCurrentBlock(bb BasicBlock) {
 // CurrentBlock implements Builder.CurrentBlock.
 func (b *builder) CurrentBlock() BasicBlock {
 	return b.currentBB
+}
+
+// EntryBlock implements Builder.EntryBlock.
+func (b *builder) EntryBlock() BasicBlock {
+	return b.entryBlk()
 }
 
 // DeclareVariable implements Builder.DeclareVariable.

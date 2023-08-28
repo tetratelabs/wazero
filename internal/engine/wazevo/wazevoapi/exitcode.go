@@ -16,6 +16,8 @@ const (
 	ExitCodeTableOutOfBounds
 	ExitCodeIndirectCallNullPointer
 	ExitCodeIndirectCallTypeMismatch
+	ExitCodeIntegerDivisionByZero
+	ExitCodeIntegerOverflow
 	exitCodeMax
 )
 
@@ -42,6 +44,10 @@ func (e ExitCode) String() string {
 		return "indirect_call_null_pointer"
 	case ExitCodeIndirectCallTypeMismatch:
 		return "indirect_call_type_mismatch"
+	case ExitCodeIntegerDivisionByZero:
+		return "integer_division_by_zero"
+	case ExitCodeIntegerOverflow:
+		return "integer_overflow"
 	}
 	panic("TODO")
 }

@@ -338,7 +338,7 @@ func (m *machine) collectAddends(ptr ssa.Value) (addends32 []addend32, addends64
 		switch op := m.compiler.MatchInstrOneOf(def, addendsMatchOpcodes[:]); op {
 		case ssa.OpcodeIadd:
 			// If the addend is an add, we recursively collect its operands.
-			x, y := def.Instr.BinaryData()
+			x, y := def.Instr.Arg2()
 			m.addendsWorkQueue = append(m.addendsWorkQueue, x, y)
 			m.compiler.MarkLowered(def.Instr)
 		case ssa.OpcodeIconst:
