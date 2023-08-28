@@ -727,8 +727,7 @@ const (
 	// OpcodeFpromote promotes the given floating point value: `v = Fpromote x`.
 	OpcodeFpromote
 
-	// OpcodeFdemote ...
-	// `v = fdemote x`.
+	// OpcodeFdemote demotes the given float point value: `v = Fdemote x`.
 	OpcodeFdemote
 
 	// OpcodeFvdemote ...
@@ -866,8 +865,11 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeSelect:             sideEffectFalse,
 	OpcodeFmin:               sideEffectFalse,
 	OpcodeFneg:               sideEffectFalse,
+	OpcodeFcvtToSint:         sideEffectFalse,
+	OpcodeFcvtToUint:         sideEffectFalse,
 	OpcodeFcvtFromSint:       sideEffectFalse,
 	OpcodeFcvtFromUint:       sideEffectFalse,
+	OpcodeFdemote:            sideEffectFalse, // fixme check
 	OpcodeFpromote:           sideEffectFalse,
 	OpcodeBitcast:            sideEffectFalse,
 	OpcodeIreduce:            sideEffectFalse,
@@ -987,9 +989,12 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeSload8:             returnTypesFnSingle,
 	OpcodeSload16:            returnTypesFnSingle,
 	OpcodeSload32:            returnTypesFnSingle,
+	OpcodeFcvtToSint:         returnTypesFnSingle,
+	OpcodeFcvtToUint:         returnTypesFnSingle,
 	OpcodeFcvtFromSint:       returnTypesFnSingle,
 	OpcodeFcvtFromUint:       returnTypesFnSingle,
 	OpcodeFneg:               returnTypesFnSingle,
+	OpcodeFdemote:            returnTypesFnF32,
 	OpcodeFpromote:           returnTypesFnF64,
 }
 
@@ -1562,6 +1567,13 @@ func (i *Instruction) BitcastData() (x Value, dstType Type) {
 	return i.v, i.typ
 }
 
+// AsFdemote initializes this instruction as an instruction with OpcodeFdemote.
+func (i *Instruction) AsFdemote(x Value) {
+	i.opcode = OpcodeFdemote
+	i.v = x
+	i.typ = TypeF32
+}
+
 // AsFpromote initializes this instruction as an instruction with OpcodeFpromote.
 func (i *Instruction) AsFpromote(x Value) {
 	i.opcode = OpcodeFpromote
@@ -1581,6 +1593,21 @@ func (i *Instruction) AsFcvtFromInt(x Value, signed bool, dst64bit bool) {
 		i.typ = TypeF64
 	} else {
 		i.typ = TypeF32
+	}
+}
+
+// AsFcvtToInt initializes this instruction as an instruction with either OpcodeFcvtToUint or OpcodeFcvtToSint
+func (i *Instruction) AsFcvtToInt(x Value, signed bool, dst64bit bool) {
+	if signed {
+		i.opcode = OpcodeFcvtToSint
+	} else {
+		i.opcode = OpcodeFcvtToUint
+	}
+	i.v = x
+	if dst64bit {
+		i.typ = TypeI64
+	} else {
+		i.typ = TypeI32
 	}
 }
 
@@ -1735,8 +1762,9 @@ func (i *Instruction) Format(b Builder) string {
 		OpcodeSdiv, OpcodeUdiv, OpcodeFcopysign, OpcodeSrem, OpcodeUrem:
 		instSuffix = fmt.Sprintf(" %s, %s", i.v.Format(b), i.v2.Format(b))
 	case OpcodeUndefined:
-	case OpcodeClz, OpcodeCtz, OpcodePopcnt, OpcodeFneg, OpcodeFcvtFromSint, OpcodeFcvtFromUint, OpcodeFpromote,
-		OpcodeIreduce, OpcodeBitcast, OpcodeSqrt, OpcodeFabs, OpcodeCeil, OpcodeFloor, OpcodeTrunc, OpcodeNearest:
+	case OpcodeClz, OpcodeCtz, OpcodePopcnt, OpcodeFneg, OpcodeFcvtToSint, OpcodeFcvtToUint, OpcodeFcvtFromSint,
+		OpcodeFcvtFromUint, OpcodeFdemote, OpcodeFpromote, OpcodeIreduce, OpcodeBitcast, OpcodeSqrt, OpcodeFabs,
+		OpcodeCeil, OpcodeFloor, OpcodeTrunc, OpcodeNearest:
 		instSuffix = " " + i.v.Format(b)
 	default:
 		panic(fmt.Sprintf("TODO: format for %s", i.opcode))

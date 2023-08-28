@@ -257,7 +257,7 @@ func (i *instruction) encode(c backend.Compiler) {
 		))
 	case brTableSequence:
 		encodeBrTableSequence(c, i.rn.reg(), i.targets)
-	case intToFpu:
+	case fpuToInt, intToFpu:
 		c.Emit4Bytes(encodeCnvBetweenFloatInt(i))
 	case fpuRR:
 		c.Emit4Bytes(encodeFloatDataOneSource(
@@ -322,6 +322,9 @@ func encodeFloatDataOneSource(op fpuUniOp, rd, rn uint32, dst64bit bool) uint32 
 	switch op {
 	case fpuUniOpCvt32To64:
 		opcode = 0b000101
+	case fpuUniOpCvt64To32:
+		opcode = 0b000100
+		ptype = 0b01
 	case fpuUniOpNeg:
 		opcode = 0b000010
 		if dst64bit {
@@ -393,8 +396,26 @@ func encodeCnvBetweenFloatInt(i *instruction) uint32 {
 		} else {
 			ptype = 0b00
 		}
-	case fpuToInt:
-		panic("TODO")
+	case fpuToInt: // Either FCVTZU or FCVTZS.
+		rmode = 0b11
+
+		signed := i.u1 == 1
+		src64bit := i.u2 == 1
+		dst64bit := i.u3 == 1
+
+		if signed {
+			opcode = 0b000
+		} else {
+			opcode = 0b001
+		}
+		if dst64bit {
+			sf = 0b1
+		}
+		if src64bit {
+			ptype = 0b01
+		} else {
+			ptype = 0b00
+		}
 	}
 	return sf<<31 | 0b1111<<25 | ptype<<22 | 0b1<<21 | rmode<<19 | opcode<<16 | rn<<5 | rd
 }

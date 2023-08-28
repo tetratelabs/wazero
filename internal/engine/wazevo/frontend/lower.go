@@ -472,9 +472,20 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		x := state.pop()
 		v := builder.AllocateInstruction().AsNearest(x).Insert(builder).Return()
 		state.push(v)
-
-	case wasm.OpcodeI64TruncF64S:
-		panic("TODO")
+	case wasm.OpcodeI64TruncF64S, wasm.OpcodeI64TruncF32S,
+		wasm.OpcodeI32TruncF64S, wasm.OpcodeI32TruncF32S,
+		wasm.OpcodeI64TruncF64U, wasm.OpcodeI64TruncF32U,
+		wasm.OpcodeI32TruncF64U, wasm.OpcodeI32TruncF32U:
+		if state.unreachable {
+			return
+		}
+		x := state.pop()
+		trunc := builder.AllocateInstruction()
+		trunc.AsFcvtToInt(x,
+			op == wasm.OpcodeI64TruncF64S || op == wasm.OpcodeI64TruncF32S || op == wasm.OpcodeI32TruncF32S || op == wasm.OpcodeI32TruncF64S,
+			op == wasm.OpcodeI64TruncF64S || op == wasm.OpcodeI64TruncF32S || op == wasm.OpcodeI64TruncF64U || op == wasm.OpcodeI64TruncF32U,
+		)
+		state.push(trunc.Insert(builder).Return())
 	case wasm.OpcodeI32ReinterpretF32:
 		if state.unreachable {
 			return
@@ -1251,6 +1262,14 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 			op == wasm.OpcodeF32ConvertI32S || op == wasm.OpcodeF32ConvertI64S,
 			false,
 		)
+		builder.InsertInstruction(cvt)
+		state.push(cvt.Return())
+	case wasm.OpcodeF32DemoteF64:
+		if state.unreachable {
+			return
+		}
+		cvt := builder.AllocateInstruction()
+		cvt.AsFdemote(state.pop())
 		builder.InsertInstruction(cvt)
 		state.push(cvt.Return())
 	case wasm.OpcodeF64PromoteF32:

@@ -100,6 +100,7 @@ var defKinds = [numInstructionKinds]defKind{
 	vecMisc:         defKindRD,
 	vecLanes:        defKindRD,
 	vecRRR:          defKindRD,
+	fpuToInt:        defKindRD,
 	intToFpu:        defKindRD,
 	cCmpImm:         defKindNone,
 }
@@ -203,6 +204,7 @@ var useKinds = [numInstructionKinds]useKind{
 	vecMisc:         useKindRN,
 	vecLanes:        useKindRN,
 	vecRRR:          useKindRNRM,
+	fpuToInt:        useKindRN,
 	intToFpu:        useKindRN,
 }
 
@@ -904,9 +906,17 @@ func (i *instruction) String() (str string) {
 	case fpuMovFromVec:
 		panic("TODO")
 	case fpuRR:
-		size := is64SizeBitToSize(i.u3)
-		str = fmt.Sprintf("%s %s, %s", fpuUniOp(i.u1).String(),
-			formatVRegSized(i.rd.nr(), size), formatVRegSized(i.rn.nr(), size))
+		dstSz := is64SizeBitToSize(i.u3)
+		srcSz := dstSz
+		op := fpuUniOp(i.u1)
+		switch op {
+		case fpuUniOpCvt32To64:
+			srcSz = 32
+		case fpuUniOpCvt64To32:
+			srcSz = 64
+		}
+		str = fmt.Sprintf("%s %s, %s", op.String(),
+			formatVRegSized(i.rd.nr(), dstSz), formatVRegSized(i.rn.nr(), srcSz))
 	case fpuRRR:
 		size := is64SizeBitToSize(i.u3)
 		str = fmt.Sprintf("%s %s, %s, %s", fpuBinOp(i.u1).String(),
@@ -938,7 +948,24 @@ func (i *instruction) String() (str string) {
 	case loadFpuConst128:
 		panic("TODO")
 	case fpuToInt:
-		panic("TODO")
+		var op, src, dst string
+		if signed := i.u1 == 1; signed {
+			op = "fcvtzs"
+		} else {
+			op = "fcvtzu"
+		}
+		if src64 := i.u2 == 1; src64 {
+			src = formatVRegWidthVec(i.rn.nr(), vecArrangementD)
+		} else {
+			src = formatVRegWidthVec(i.rn.nr(), vecArrangementS)
+		}
+		if dst64 := i.u3 == 1; dst64 {
+			dst = formatVRegSized(i.rd.nr(), 64)
+		} else {
+			dst = formatVRegSized(i.rd.nr(), 32)
+		}
+		str = fmt.Sprintf("%s %s, %s", op, dst, src)
+
 	case intToFpu:
 		var op, src, dst string
 		if signed := i.u1 == 1; signed {
@@ -1315,6 +1342,21 @@ func (i *instruction) asUDF() {
 	i.kind = udf
 }
 
+func (i *instruction) asFpuToInt(rd, rn operand, rdSigned, src64bit, dst64bit bool) {
+	i.kind = fpuToInt
+	i.rn = rn
+	i.rd = rd
+	if rdSigned {
+		i.u1 = 1
+	}
+	if src64bit {
+		i.u2 = 1
+	}
+	if dst64bit {
+		i.u3 = 1
+	}
+}
+
 func (i *instruction) asIntToFpu(rd, rn operand, rnSigned, src64bit, dst64bit bool) {
 	i.kind = intToFpu
 	i.rn = rn
@@ -1472,6 +1514,7 @@ type fpuUniOp byte
 const (
 	fpuUniOpNeg fpuUniOp = iota
 	fpuUniOpCvt32To64
+	fpuUniOpCvt64To32
 	fpuUniOpSqrt
 	fpuUniOpRoundPlus
 	fpuUniOpRoundMinus
@@ -1486,6 +1529,8 @@ func (f fpuUniOp) String() string {
 	case fpuUniOpNeg:
 		return "fneg"
 	case fpuUniOpCvt32To64:
+		return "fcvt"
+	case fpuUniOpCvt64To32:
 		return "fcvt"
 	case fpuUniOpSqrt:
 		return "fsqrt"
