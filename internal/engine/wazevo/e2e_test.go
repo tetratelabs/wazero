@@ -93,11 +93,14 @@ func TestSpectestV1(t *testing.T) {
 		{name: "nop"},
 		{name: "return"},
 		{name: "select"},
+		{name: "stack"},
 		{name: "store"},
 		{name: "switch"},
+		{name: "token"},
 		{name: "type"},
 		{name: "unreachable"},
 		{name: "unreached-invalid"},
+		{name: "unwind"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			spectest.RunCase(t, v1.Testcases, tc.name, context.Background(), config,
