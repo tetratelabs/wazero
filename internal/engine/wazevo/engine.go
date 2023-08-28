@@ -112,6 +112,9 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []exper
 		}
 
 		_, needGoEntryPreamble := exportedFnIndex[fidx]
+		if sf := module.StartSection; sf != nil && *sf == fidx {
+			needGoEntryPreamble = true
+		}
 
 		// Align 16-bytes boundary.
 		totalSize = (totalSize + 15) &^ 15

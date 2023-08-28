@@ -375,6 +375,8 @@ func (s *Store) instantiate(
 
 	m.applyElements(module.ElementSection)
 
+	m.Engine.DoneInstantiation()
+
 	// Execute the start function.
 	if module.StartSection != nil {
 		funcIdx := *module.StartSection
@@ -386,8 +388,6 @@ func (s *Store) instantiate(
 			return nil, fmt.Errorf("start %s failed: %w", module.funcDesc(SectionIDFunction, funcIdx), err)
 		}
 	}
-
-	m.Engine.DoneInstantiation()
 	return
 }
 
