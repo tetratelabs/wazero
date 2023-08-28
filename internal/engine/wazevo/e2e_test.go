@@ -61,7 +61,7 @@ func TestSpectestV1(t *testing.T) {
 		{name: "f64"},
 		{name: "f64_bitwise"},
 		{name: "f64_cmp"},
-		//{name: "fac"},
+		{name: "fac"},
 		//{name: "float_exprs"},
 		{name: "float_literals"},
 		{name: "float_memory"},

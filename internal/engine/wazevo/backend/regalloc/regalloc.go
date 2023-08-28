@@ -218,6 +218,9 @@ func (a *Allocator) livenessAnalysis(f Function) {
 			panic("BUG")
 		}
 		for blk := f.PostOrderBlockIteratorBegin(); blk != nil; blk = f.PostOrderBlockIteratorNext() {
+			if len(blk.Preds()) == 0 && !blk.Entry() {
+				panic(fmt.Sprintf("block without predecessor must be optimized out by the compiler: %d", blk.ID()))
+			}
 			info := a.blockInfoAt(blk.ID())
 			if _, ok := info.lastUses[v]; !ok {
 				continue
@@ -269,7 +272,7 @@ func (a *Allocator) upAndMarkStack(b Block, v VReg, depth int) {
 	info.liveIns[v] = struct{}{}
 	preds := b.Preds()
 	if len(preds) == 0 {
-		panic("BUG: block with no predecessors while requiring live-in")
+		panic(fmt.Sprintf("BUG: block has no predecessors while requiring live-in: blk%d", b.ID()))
 	}
 
 	// and climb up the CFG.
@@ -444,6 +447,13 @@ func (a *Allocator) Reset() {
 	}
 
 	a.vs = a.vs[:0]
+	a.nodes1 = a.nodes1[:0]
+	for n := range a.nodeSet {
+		a.nodes1 = append(a.nodes1, n)
+	}
+	for _, n := range a.nodes1 {
+		delete(a.nodeSet, n)
+	}
 	a.nodes1 = a.nodes1[:0]
 	a.nodes2 = a.nodes2[:0]
 	a.realRegs = rr[:0]

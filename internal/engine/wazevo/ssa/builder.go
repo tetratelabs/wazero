@@ -164,7 +164,7 @@ type builder struct {
 	// The index is blockID of the BasicBlock.
 	dominators []*basicBlock
 
-	// The followings are used for optimization passes.
+	// The followings are used for optimization passes/deterministic compilation.
 	instStack                      []*Instruction
 	blkVisited                     map[*basicBlock]int
 	valueIDToInstruction           []*Instruction
@@ -172,6 +172,7 @@ type builder struct {
 	blkStack2                      []*basicBlock
 	ints                           []int
 	redundantParameterIndexToValue map[int]Value
+	vars                           []Variable
 
 	// blockIterCur is used to implement blockIteratorBegin and blockIteratorNext.
 	blockIterCur int
@@ -458,7 +459,18 @@ func (b *builder) Seal(raw BasicBlock) {
 	}
 	blk.sealed = true
 
-	for variable, phiValue := range blk.unknownValues {
+	// To get the deterministic compilation,
+	// we need to sort the parameters in the order of the variable index.
+	b.vars = b.vars[:0]
+	for v := range blk.unknownValues {
+		b.vars = append(b.vars, v)
+	}
+	sort.Slice(b.vars, func(i, j int) bool {
+		return b.vars[i] < b.vars[j]
+	})
+
+	for _, variable := range b.vars {
+		phiValue := blk.unknownValues[variable]
 		typ := b.definedVariableType(variable)
 		blk.addParamOn(typ, phiValue)
 		for i := range blk.preds {
@@ -767,7 +779,7 @@ func (b *builder) LayoutBlocks() {
 		}
 
 		for _, trampoline := range uninsertedTrampolines {
-			if trampoline.success[0].reversePostOrder < trampoline.reversePostOrder {
+			if trampoline.success[0].reversePostOrder <= trampoline.reversePostOrder { // "<=", not "<" because the target might be itself.
 				// This means the critical edge was backward, so we insert after the current block immediately.
 				b.reversePostOrderedBasicBlocks = append(b.reversePostOrderedBasicBlocks, trampoline)
 				b.blkVisited[trampoline] = 0 // mark as inserted, the value is not used.
