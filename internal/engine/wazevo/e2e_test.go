@@ -100,6 +100,7 @@ func TestSpectestV1(t *testing.T) {
 		{name: "switch"},
 		{name: "token"},
 		{name: "type"},
+		//{name: "traps"},
 		{name: "unreachable"},
 		{name: "unreached-invalid"},
 		{name: "unwind"},

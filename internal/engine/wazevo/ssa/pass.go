@@ -179,9 +179,13 @@ func passDeadCodeEliminationOpt(b *builder) {
 	for blk := b.blockIteratorBegin(); blk != nil; blk = b.blockIteratorNext() {
 		for cur := blk.rootInstr; cur != nil; cur = cur.next {
 			cur.gid = gid
-			if cur.HasSideEffects() {
+			switch cur.sideEffect() {
+			case sideEffectTraps:
+				// The trappable should always be alive.
 				liveInstructions = append(liveInstructions, cur)
-				// Side effects create different instruction groups.
+			case sideEffectStrict:
+				liveInstructions = append(liveInstructions, cur)
+				// The strict side effect should create different instruction groups.
 				gid++
 			}
 

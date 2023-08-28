@@ -804,94 +804,100 @@ var (
 	returnTypesFnF64                     = func(b *builder, instr *Instruction) (t1 Type, ts []Type) { return TypeF64, nil }
 )
 
-type sideEffect int
+// sideEffect provides the info to determine if an instruction has side effects which
+// is used to determine if it can be optimized out, interchanged with others, etc.
+type sideEffect byte
 
 const (
 	sideEffectUnknown sideEffect = iota
-	sideEffectTrue
-	sideEffectFalse
+	// sideEffectStrict represents an instruction with side effects, and should be always alive plus cannot be reordered.
+	sideEffectStrict
+	// sideEffectTraps represents an instruction that can trap, and should be always alive but can be reordered within the group.
+	sideEffectTraps
+	// sideEffectNone represents an instruction without side effects, and can be eliminated if the result is not used, plus can be reordered within the group.
+	sideEffectNone
 )
 
 // instructionSideEffects provides the info to determine if an instruction has side effects.
 // Instructions with side effects must not be eliminated regardless whether the result is used or not.
 var instructionSideEffects = [opcodeEnd]sideEffect{
-	OpcodeUndefined:          sideEffectTrue,
-	OpcodeJump:               sideEffectTrue,
-	OpcodeIconst:             sideEffectFalse,
-	OpcodeCall:               sideEffectTrue,
-	OpcodeCallIndirect:       sideEffectTrue,
-	OpcodeIadd:               sideEffectFalse,
-	OpcodeImul:               sideEffectFalse,
-	OpcodeIsub:               sideEffectFalse,
-	OpcodeIcmp:               sideEffectFalse,
-	OpcodeBand:               sideEffectFalse,
-	OpcodeBor:                sideEffectFalse,
-	OpcodeBxor:               sideEffectFalse,
-	OpcodeRotl:               sideEffectFalse,
-	OpcodeRotr:               sideEffectFalse,
-	OpcodeFcmp:               sideEffectFalse,
-	OpcodeFadd:               sideEffectFalse,
-	OpcodeClz:                sideEffectFalse,
-	OpcodeCtz:                sideEffectFalse,
-	OpcodePopcnt:             sideEffectFalse,
-	OpcodeLoad:               sideEffectFalse,
-	OpcodeUload8:             sideEffectFalse,
-	OpcodeUload16:            sideEffectFalse,
-	OpcodeUload32:            sideEffectFalse,
-	OpcodeSload8:             sideEffectFalse,
-	OpcodeSload16:            sideEffectFalse,
-	OpcodeSload32:            sideEffectFalse,
-	OpcodeSExtend:            sideEffectFalse,
-	OpcodeUExtend:            sideEffectFalse,
-	OpcodeFsub:               sideEffectFalse,
-	OpcodeF32const:           sideEffectFalse,
-	OpcodeF64const:           sideEffectFalse,
-	OpcodeIshl:               sideEffectFalse,
-	OpcodeSshr:               sideEffectFalse,
-	OpcodeUshr:               sideEffectFalse,
-	OpcodeStore:              sideEffectTrue,
-	OpcodeIstore8:            sideEffectTrue,
-	OpcodeIstore16:           sideEffectTrue,
-	OpcodeIstore32:           sideEffectTrue,
-	OpcodeExitWithCode:       sideEffectTrue,
-	OpcodeExitIfTrueWithCode: sideEffectTrue,
-	OpcodeReturn:             sideEffectTrue,
-	OpcodeBrz:                sideEffectTrue,
-	OpcodeBrnz:               sideEffectTrue,
-	OpcodeBrTable:            sideEffectTrue,
-	OpcodeFdiv:               sideEffectFalse,
-	OpcodeFmul:               sideEffectFalse,
-	OpcodeFmax:               sideEffectFalse,
-	OpcodeSelect:             sideEffectFalse,
-	OpcodeFmin:               sideEffectFalse,
-	OpcodeFneg:               sideEffectFalse,
-	OpcodeFcvtToSint:         sideEffectFalse,
-	OpcodeFcvtToUint:         sideEffectFalse,
-	OpcodeFcvtFromSint:       sideEffectFalse,
-	OpcodeFcvtFromUint:       sideEffectFalse,
-	OpcodeFdemote:            sideEffectFalse, // fixme check
-	OpcodeFpromote:           sideEffectFalse,
-	OpcodeBitcast:            sideEffectFalse,
-	OpcodeIreduce:            sideEffectFalse,
-	OpcodeSqrt:               sideEffectFalse,
-	OpcodeCeil:               sideEffectFalse,
-	OpcodeFloor:              sideEffectFalse,
-	OpcodeTrunc:              sideEffectFalse,
-	OpcodeNearest:            sideEffectFalse,
-	OpcodeSdiv:               sideEffectFalse,
-	OpcodeSrem:               sideEffectFalse,
-	OpcodeUdiv:               sideEffectFalse,
-	OpcodeUrem:               sideEffectFalse,
-	OpcodeFabs:               sideEffectFalse,
-	OpcodeFcopysign:          sideEffectFalse,
+	OpcodeUndefined:          sideEffectStrict,
+	OpcodeJump:               sideEffectStrict,
+	OpcodeIconst:             sideEffectNone,
+	OpcodeCall:               sideEffectStrict,
+	OpcodeCallIndirect:       sideEffectStrict,
+	OpcodeIadd:               sideEffectNone,
+	OpcodeImul:               sideEffectNone,
+	OpcodeIsub:               sideEffectNone,
+	OpcodeIcmp:               sideEffectNone,
+	OpcodeBand:               sideEffectNone,
+	OpcodeBor:                sideEffectNone,
+	OpcodeBxor:               sideEffectNone,
+	OpcodeRotl:               sideEffectNone,
+	OpcodeRotr:               sideEffectNone,
+	OpcodeFcmp:               sideEffectNone,
+	OpcodeFadd:               sideEffectNone,
+	OpcodeClz:                sideEffectNone,
+	OpcodeCtz:                sideEffectNone,
+	OpcodePopcnt:             sideEffectNone,
+	OpcodeLoad:               sideEffectNone,
+	OpcodeUload8:             sideEffectNone,
+	OpcodeUload16:            sideEffectNone,
+	OpcodeUload32:            sideEffectNone,
+	OpcodeSload8:             sideEffectNone,
+	OpcodeSload16:            sideEffectNone,
+	OpcodeSload32:            sideEffectNone,
+	OpcodeSExtend:            sideEffectNone,
+	OpcodeUExtend:            sideEffectNone,
+	OpcodeFsub:               sideEffectNone,
+	OpcodeF32const:           sideEffectNone,
+	OpcodeF64const:           sideEffectNone,
+	OpcodeIshl:               sideEffectNone,
+	OpcodeSshr:               sideEffectNone,
+	OpcodeUshr:               sideEffectNone,
+	OpcodeStore:              sideEffectStrict,
+	OpcodeIstore8:            sideEffectStrict,
+	OpcodeIstore16:           sideEffectStrict,
+	OpcodeIstore32:           sideEffectStrict,
+	OpcodeExitWithCode:       sideEffectStrict,
+	OpcodeExitIfTrueWithCode: sideEffectStrict,
+	OpcodeReturn:             sideEffectStrict,
+	OpcodeBrz:                sideEffectStrict,
+	OpcodeBrnz:               sideEffectStrict,
+	OpcodeBrTable:            sideEffectStrict,
+	OpcodeFdiv:               sideEffectNone,
+	OpcodeFmul:               sideEffectNone,
+	OpcodeFmax:               sideEffectNone,
+	OpcodeSelect:             sideEffectNone,
+	OpcodeFmin:               sideEffectNone,
+	OpcodeFneg:               sideEffectNone,
+	OpcodeFcvtToSint:         sideEffectNone,
+	OpcodeFcvtToUint:         sideEffectNone,
+	OpcodeFcvtFromSint:       sideEffectNone,
+	OpcodeFcvtFromUint:       sideEffectNone,
+	OpcodeFdemote:            sideEffectNone,
+	OpcodeFpromote:           sideEffectNone,
+	OpcodeBitcast:            sideEffectNone,
+	OpcodeIreduce:            sideEffectNone,
+	OpcodeSqrt:               sideEffectNone,
+	OpcodeCeil:               sideEffectNone,
+	OpcodeFloor:              sideEffectNone,
+	OpcodeTrunc:              sideEffectNone,
+	OpcodeNearest:            sideEffectNone,
+	OpcodeSdiv:               sideEffectTraps,
+	OpcodeSrem:               sideEffectTraps,
+	OpcodeUdiv:               sideEffectTraps,
+	OpcodeUrem:               sideEffectTraps,
+	OpcodeFabs:               sideEffectNone,
+	OpcodeFcopysign:          sideEffectNone,
 }
 
-// HasSideEffects returns true if this instruction has side effects.
-func (i *Instruction) HasSideEffects() bool {
+// sideEffect returns true if this instruction has side effects.
+func (i *Instruction) sideEffect() sideEffect {
 	if e := instructionSideEffects[i.opcode]; e == sideEffectUnknown {
 		panic("BUG: side effect info not registered for " + i.opcode.String())
 	} else {
-		return e == sideEffectTrue
+		return e
 	}
 }
 
