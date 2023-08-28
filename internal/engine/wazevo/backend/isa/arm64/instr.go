@@ -1075,7 +1075,7 @@ func (i *instruction) String() (str string) {
 			str = fmt.Sprintf("bl %s", ssa.FuncRef(i.u1))
 		}
 	case callInd:
-		str = fmt.Sprintf("bl %s", formatVRegSized(i.rn.nr(), 32))
+		str = fmt.Sprintf("bl %s", formatVRegSized(i.rn.nr(), 64))
 	case ret:
 		str = "ret"
 	case br:

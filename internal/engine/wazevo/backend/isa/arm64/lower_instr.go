@@ -216,11 +216,15 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 	case ssa.OpcodeFcvtFromSint:
 		x := instr.Arg()
 		result := instr.Return()
-		m.lowerIntToFpu(result, x, true, x.Type() == ssa.TypeI64, result.Type().Bits() == 64)
+		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+		rd := operandNR(m.compiler.VRegOf(result))
+		m.lowerIntToFpu(rd, rn, true, x.Type() == ssa.TypeI64, result.Type().Bits() == 64)
 	case ssa.OpcodeFcvtFromUint:
 		x := instr.Arg()
 		result := instr.Return()
-		m.lowerIntToFpu(result, x, false, x.Type() == ssa.TypeI64, result.Type().Bits() == 64)
+		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+		rd := operandNR(m.compiler.VRegOf(result))
+		m.lowerIntToFpu(rd, rn, false, x.Type() == ssa.TypeI64, result.Type().Bits() == 64)
 	case ssa.OpcodeFdemote:
 		v := instr.Arg()
 		rn := m.getOperand_NR(m.compiler.ValueDefinition(v), extModeNone)
@@ -423,9 +427,7 @@ func (m *machine) lowerFpuToInt(dst, src ssa.Value, signed, src64bit, dst64bit b
 	m.insert(cvt)
 }
 
-func (m *machine) lowerIntToFpu(dst, src ssa.Value, signed, src64bit, dst64bit bool) {
-	rn := m.getOperand_NR(m.compiler.ValueDefinition(src), extModeNone)
-	rd := operandNR(m.compiler.VRegOf(dst))
+func (m *machine) lowerIntToFpu(rd, rn operand, signed, src64bit, dst64bit bool) {
 	cvt := m.allocateInstr()
 	cvt.asIntToFpu(rd, rn, signed, src64bit, dst64bit)
 	m.insert(cvt)

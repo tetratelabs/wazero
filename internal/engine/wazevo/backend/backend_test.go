@@ -2023,7 +2023,7 @@ L1 (SSA Block: blk0):
 	mov x1, x4?
 	mov x2, x2?
 	mov x3, x2?
-	bl w3?
+	bl x3?
 	mov x5?, x0
 	mov x0, x5?
 	ret
@@ -2036,7 +2036,7 @@ L1 (SSA Block: blk0):
 	ldr x8, [x1, #0x8]
 	ldr x1, [x1, #0x10]
 	mov x2, x3
-	bl w8
+	bl x8
 	ldr x30, [sp], #0x10
 	ret
 `,
