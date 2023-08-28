@@ -23,7 +23,7 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 					newMockBlock(0,
 						newMockInstr().def(1),
 						newMockInstr().use(1).def(2),
-					),
+					).entry(),
 				)
 			},
 			exp: map[int]*blockInfo{
@@ -42,7 +42,7 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 					newMockInstr().def(1000, 1, 2),
 					newMockInstr().use(1000),
 					newMockInstr().use(1, 2).def(3),
-				)
+				).entry()
 				b1 := newMockBlock(1,
 					newMockInstr().def(realReg),
 					newMockInstr().use(3).def(4, 5),
@@ -111,7 +111,7 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 					newMockInstr().def(1000),
 					newMockInstr().def(1),
 					newMockInstr().def(2),
-				)
+				).entry()
 				b1 := newMockBlock(1,
 					newMockInstr().def(realReg).use(1),
 					newMockInstr().use(realReg),
@@ -182,7 +182,7 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 			setup: func() Function {
 				b0 := newMockBlock(0,
 					newMockInstr().def(1000, 2000, 3000),
-				)
+				).entry()
 				b1 := newMockBlock(1,
 					newMockInstr().def(phiVReg).use(2000),
 				)
@@ -240,7 +240,7 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 				b0 := newMockBlock(0,
 					newMockInstr().def(1),
 					newMockInstr().def(phiVReg).use(1),
-				)
+				).entry()
 				b1 := newMockBlock(1,
 					newMockInstr().def(9999),
 				)
@@ -320,7 +320,7 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 			//      +----+
 			name: "Fig. 9.2 in paper",
 			setup: func() Function {
-				b0 := newMockBlock(0, newMockInstr().def(99999))
+				b0 := newMockBlock(0, newMockInstr().def(99999)).entry()
 				b1 := newMockBlock(1, newMockInstr().use(99999))
 				b2 := newMockBlock(2)
 				b3 := newMockBlock(3)
@@ -367,7 +367,7 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 		{
 			name: "Fig. 9.1 in paper",
 			setup: func() Function {
-				b0 := newMockBlock(0)
+				b0 := newMockBlock(0).entry()
 				b1 := newMockBlock(1)
 				b2 := newMockBlock(2)
 				b3 := newMockBlock(3,
@@ -461,7 +461,7 @@ func TestAllocator_livenessAnalysis_copy(t *testing.T) {
 		newMockBlock(0,
 			newMockInstr().def(1),
 			newMockInstr().use(1).def(2).asCopy(),
-		),
+		).entry(),
 	)
 	a := NewAllocator(&RegisterInfo{})
 	a.livenessAnalysis(f)

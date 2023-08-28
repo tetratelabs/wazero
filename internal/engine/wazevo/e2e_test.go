@@ -61,7 +61,7 @@ func TestSpectestV1(t *testing.T) {
 		{name: "f64"},
 		{name: "f64_bitwise"},
 		{name: "f64_cmp"},
-		//{name: "fac"},
+		{name: "fac"},
 		//{name: "float_exprs"},
 		{name: "float_literals"},
 		{name: "float_memory"},
@@ -93,11 +93,14 @@ func TestSpectestV1(t *testing.T) {
 		{name: "nop"},
 		{name: "return"},
 		{name: "select"},
+		{name: "stack"},
 		{name: "store"},
 		{name: "switch"},
+		{name: "token"},
 		{name: "type"},
 		{name: "unreachable"},
 		{name: "unreached-invalid"},
+		{name: "unwind"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			spectest.RunCase(t, v1.Testcases, tc.name, context.Background(), config,

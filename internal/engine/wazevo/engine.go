@@ -122,6 +122,32 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []exper
 
 		codeSeg := &module.CodeSection[i]
 
+		const checkDeterministicSSACompilation = false
+		if checkDeterministicSSACompilation {
+			existingResults := map[string]struct{}{}
+			for i := 0; i < 100; i++ {
+				fe.Init(wasm.Index(i), typ, codeSeg.LocalTypes, codeSeg.Body)
+				be.Init(needGoEntryPreamble)
+
+				// Lower Wasm to SSA.
+				err := fe.LowerToSSA()
+				if err != nil {
+					return fmt.Errorf("wasm->ssa: %v", err)
+				}
+				ssaBuilder.RunPasses()
+				ssaBuilder.LayoutBlocks()
+
+				existingResults[ssaBuilder.Format()] = struct{}{}
+				if len(existingResults) > 1 {
+					for f := range existingResults {
+						fmt.Println(f)
+						fmt.Println("----------------")
+					}
+					panic("BUG: SSA format is not deterministic")
+				}
+			}
+		}
+
 		// Initializes both frontend and backend compilers.
 		fe.Init(wasm.Index(i), typ, codeSeg.LocalTypes, codeSeg.Body)
 		be.Init(needGoEntryPreamble)
