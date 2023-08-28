@@ -284,14 +284,16 @@ func TestMachine_lowerIDiv(t *testing.T) {
 		signed bool
 		exp    string
 	}{
-		{name: "32bit unsigned", _64bit: false, signed: false,
+		{
+			name: "32bit unsigned", _64bit: false, signed: false,
 			exp: `
 udiv w1?, w2?, w3?
 cbnz w3?, #0x20 (L0)
 movz x27, #0xa, lsl 0
 str w27, [x65535?]
 exit_sequence x65535?
-`},
+`,
+		},
 		{name: "32bit signed", _64bit: false, signed: true, exp: `
 sdiv w1?, w2?, w3?
 cbnz w3?, #0x20 (L0)
@@ -326,11 +328,9 @@ str w27, [x65535?]
 exit_sequence x65535?
 `},
 	} {
-
 		t.Run(tc.name, func(t *testing.T) {
 			execCtx := regalloc.VReg(0xffff).SetRegType(regalloc.RegTypeInt)
-			rd, rn, rm :=
-				regalloc.VReg(1).SetRegType(regalloc.RegTypeInt),
+			rd, rn, rm := regalloc.VReg(1).SetRegType(regalloc.RegTypeInt),
 				regalloc.VReg(2).SetRegType(regalloc.RegTypeInt),
 				regalloc.VReg(3).SetRegType(regalloc.RegTypeInt)
 			_, _, m := newSetupWithMockContext()
