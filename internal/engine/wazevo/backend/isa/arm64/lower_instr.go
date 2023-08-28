@@ -162,15 +162,15 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		m.lowerShifts(instr, extModeNone, aluOpLsl)
 	case ssa.OpcodeSshr:
 		if instr.Return().Type().Bits() == 64 {
-			m.lowerShifts(instr, extModeSignExtend64, aluOpLsr)
+			m.lowerShifts(instr, extModeSignExtend64, aluOpAsr)
 		} else {
-			m.lowerShifts(instr, extModeSignExtend32, aluOpLsr)
+			m.lowerShifts(instr, extModeSignExtend32, aluOpAsr)
 		}
 	case ssa.OpcodeUshr:
 		if instr.Return().Type().Bits() == 64 {
-			m.lowerShifts(instr, extModeZeroExtend64, aluOpAsr)
+			m.lowerShifts(instr, extModeZeroExtend64, aluOpLsr)
 		} else {
-			m.lowerShifts(instr, extModeZeroExtend32, aluOpAsr)
+			m.lowerShifts(instr, extModeZeroExtend32, aluOpLsr)
 		}
 	case ssa.OpcodeRotl:
 		m.lowerRotl(instr)
@@ -183,7 +183,7 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		x, y, c := instr.FcmpData()
 		m.lowerFcmp(x, y, instr.Return(), c)
 	case ssa.OpcodeImul:
-		x, y := instr.BinaryData()
+		x, y := instr.Arg2()
 		result := instr.Return()
 		m.lowerImul(x, y, result)
 	case ssa.OpcodeUndefined:
@@ -194,34 +194,34 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		c, x, y := instr.SelectData()
 		m.lowerSelect(c, x, y, instr.Return())
 	case ssa.OpcodeClz:
-		x := instr.UnaryData()
+		x := instr.Arg()
 		result := instr.Return()
 		m.lowerClz(x, result)
 	case ssa.OpcodeCtz:
-		x := instr.UnaryData()
+		x := instr.Arg()
 		result := instr.Return()
 		m.lowerCtz(x, result)
 	case ssa.OpcodePopcnt:
-		x := instr.UnaryData()
+		x := instr.Arg()
 		result := instr.Return()
 		m.lowerPopcnt(x, result)
 	case ssa.OpcodeFcvtFromSint:
-		x := instr.UnaryData()
+		x := instr.Arg()
 		result := instr.Return()
 		m.lowerIntToFpu(result, x, true, x.Type() == ssa.TypeI64, result.Type().Bits() == 64)
 	case ssa.OpcodeFcvtFromUint:
-		x := instr.UnaryData()
+		x := instr.Arg()
 		result := instr.Return()
 		m.lowerIntToFpu(result, x, false, x.Type() == ssa.TypeI64, result.Type().Bits() == 64)
 	case ssa.OpcodeFpromote:
-		v := instr.UnaryData()
+		v := instr.Arg()
 		rn := m.getOperand_NR(m.compiler.ValueDefinition(v), extModeNone)
 		rd := operandNR(m.compiler.VRegOf(instr.Return()))
 		cnt := m.allocateInstr()
 		cnt.asFpuRR(fpuUniOpCvt32To64, rd, rn, true)
 		m.insert(cnt)
 	case ssa.OpcodeIreduce:
-		rn := m.getOperand_NR(m.compiler.ValueDefinition(instr.UnaryData()), extModeNone)
+		rn := m.getOperand_NR(m.compiler.ValueDefinition(instr.Arg()), extModeNone)
 		retVal := instr.Return()
 		rd := m.compiler.VRegOf(retVal)
 
@@ -248,12 +248,83 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 	case ssa.OpcodeBitcast:
 		m.lowerBitcast(instr)
 	case ssa.OpcodeFcopysign:
-		x, y := instr.BinaryData()
+		x, y := instr.Arg2()
 		m.lowerFcopysign(x, y, instr.Return())
+	case ssa.OpcodeSdiv, ssa.OpcodeUdiv:
+		x, y, ctx := instr.Arg3()
+		ctxVReg := m.compiler.VRegOf(ctx)
+		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+		rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
+		rd := operandNR(m.compiler.VRegOf(instr.Return()))
+		m.lowerIDiv(ctxVReg, rd, rn, rm, x.Type() == ssa.TypeI64, op == ssa.OpcodeSdiv)
+	case ssa.OpcodeSrem, ssa.OpcodeUrem:
+		x, y, ctx := instr.Arg3()
+		ctxVReg := m.compiler.VRegOf(ctx)
+		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+		rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
+		rd := operandNR(m.compiler.VRegOf(instr.Return()))
+		m.lowerIRem(ctxVReg, rd, rn, rm, x.Type() == ssa.TypeI64, op == ssa.OpcodeSrem)
 	default:
-		panic("TODO: lowering " + instr.Opcode().String())
+		panic("TODO: lowering " + op.String())
 	}
 	m.FlushPendingInstructions()
+}
+
+func (m *machine) lowerIRem(execCtxVReg regalloc.VReg, rd, rn, rm operand, _64bit, signed bool) {
+	div := m.allocateInstr()
+
+	if signed {
+		div.asALU(aluOpSDiv, rd, rn, rm, _64bit)
+	} else {
+		div.asALU(aluOpUDiv, rd, rn, rm, _64bit)
+	}
+	m.insert(div)
+
+	// Check if rm is zero:
+	m.exitIfNot(execCtxVReg, registerAsRegNotZeroCond(rm.nr()), wazevoapi.ExitCodeIntegerDivisionByZero)
+
+	// rd = rn-rd*rm by MSUB instruction.
+	msub := m.allocateInstr()
+	msub.asALURRRR(aluOpMSub, rd, rd, rm, rn, _64bit)
+	m.insert(msub)
+}
+
+func (m *machine) lowerIDiv(execCtxVReg regalloc.VReg, rd, rn, rm operand, _64bit, signed bool) {
+	div := m.allocateInstr()
+
+	if signed {
+		div.asALU(aluOpSDiv, rd, rn, rm, _64bit)
+	} else {
+		div.asALU(aluOpUDiv, rd, rn, rm, _64bit)
+	}
+	m.insert(div)
+
+	// Check if rm is zero:
+	m.exitIfNot(execCtxVReg, registerAsRegNotZeroCond(rm.nr()), wazevoapi.ExitCodeIntegerDivisionByZero)
+
+	if signed {
+		// We need to check the signed overflow which happens iff "math.MinInt{32,64} / -1"
+		minusOneCheck := m.allocateInstr()
+		// Sets eq condition if rm == -1.
+		minusOneCheck.asALU(aluOpAddS, operandNR(xzrVReg), rm, operandImm12(1, 0), _64bit)
+		m.insert(minusOneCheck)
+
+		ccmp := m.allocateInstr()
+		// If eq condition is set, sets the flag by the result based on "rn - 1", otherwise clears the flag.
+		ccmp.asCCmpImm(rn, 1, eq, 0, _64bit)
+		m.insert(ccmp)
+
+		// Check the overflow flag.
+		m.exitIfNot(execCtxVReg, vs.invert().asCond(), wazevoapi.ExitCodeIntegerOverflow)
+	}
+}
+
+func (m *machine) exitIfNot(execCtxVReg regalloc.VReg, c cond, code wazevoapi.ExitCode) {
+	cbr := m.allocateInstr()
+	cbr.asCondBr(c, invalidLabel, false /* ignored */)
+	cbr.condBrOffsetResolve(exitWithCodeEncodingSize + 4 /* br offset is from the beginning of this instruction */)
+	m.insert(cbr)
+	m.lowerExitWithCode(execCtxVReg, code)
 }
 
 func (m *machine) lowerFcopysign(x, y, ret ssa.Value) {
@@ -354,7 +425,7 @@ func (m *machine) lowerFpuBinOp(si *ssa.Instruction) {
 	case ssa.OpcodeFmin:
 		op = fpuBinOpMin
 	}
-	x, y := si.BinaryData()
+	x, y := si.Arg2()
 	xDef, yDef := m.compiler.ValueDefinition(x), m.compiler.ValueDefinition(y)
 	rn := m.getOperand_NR(xDef, extModeNone)
 	rm := m.getOperand_NR(yDef, extModeNone)
@@ -364,7 +435,7 @@ func (m *machine) lowerFpuBinOp(si *ssa.Instruction) {
 }
 
 func (m *machine) lowerSubOrAdd(si *ssa.Instruction, add bool) {
-	x, y := si.BinaryData()
+	x, y := si.Arg2()
 	if !x.Type().IsInt() {
 		panic("BUG?")
 	}
@@ -436,7 +507,7 @@ func (m *machine) lowerIcmp(si *ssa.Instruction) {
 }
 
 func (m *machine) lowerShifts(si *ssa.Instruction, ext extMode, aluOp aluOp) {
-	x, amount := si.BinaryData()
+	x, amount := si.Arg2()
 	rn := m.getOperand_NR(m.compiler.ValueDefinition(x), ext)
 	rm := m.getOperand_ShiftImm_NR(m.compiler.ValueDefinition(amount), ext, x.Type().Bits())
 	rd := operandNR(m.compiler.VRegOf(si.Return()))
@@ -447,7 +518,7 @@ func (m *machine) lowerShifts(si *ssa.Instruction, ext extMode, aluOp aluOp) {
 }
 
 func (m *machine) lowerBitwiseAluOp(si *ssa.Instruction, op aluOp) {
-	x, y := si.BinaryData()
+	x, y := si.Arg2()
 	if !x.Type().IsInt() {
 		panic("BUG?")
 	}
@@ -463,33 +534,25 @@ func (m *machine) lowerBitwiseAluOp(si *ssa.Instruction, op aluOp) {
 }
 
 func (m *machine) lowerRotl(si *ssa.Instruction) {
-	x, y := si.BinaryData()
-	if !x.Type().IsInt() {
-		panic("BUG?")
-	}
+	x, y := si.Arg2()
+	r := si.Return()
+	_64 := r.Type().Bits() == 64
 
-	// Encode rotl as neg + rotr: neg is really a sub against the zero-reg.
+	rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+	rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
+	rd := operandNR(m.compiler.VRegOf(r))
 
-	xDef, yDef := m.compiler.ValueDefinition(x), m.compiler.ValueDefinition(y)
-	rn := m.getOperand_NR(xDef, extModeNone)
-	rm := m.getOperand_NR(yDef, extModeNone)
-	rd := operandNR(m.compiler.VRegOf(si.Return()))
-
-	// Encode neg as sub $reg, xzr, $reg.
+	// Encode rotl as neg + rotr: neg is a sub against the zero-reg.
 	neg := m.allocateInstr()
-	neg.asALU(aluOpSub, rn, operandNR(xzrVReg), rn, si.Return().Type().Bits() == 64)
+	neg.asALU(aluOpSub, rm, operandNR(xzrVReg), rm, _64)
 	m.insert(neg)
-
 	alu := m.allocateInstr()
-	alu.asALU(aluOpRotR, rd, rn, rm, si.Return().Type().Bits() == 64)
+	alu.asALU(aluOpRotR, rd, rn, rm, _64)
 	m.insert(alu)
 }
 
 func (m *machine) lowerRotr(si *ssa.Instruction) {
-	x, y := si.BinaryData()
-	if !x.Type().IsInt() {
-		panic("BUG?")
-	}
+	x, y := si.Arg2()
 
 	xDef, yDef := m.compiler.ValueDefinition(x), m.compiler.ValueDefinition(y)
 	rn := m.getOperand_NR(xDef, extModeNone)

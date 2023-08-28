@@ -516,7 +516,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 			return
 		}
 		y, x := state.pop(), state.pop()
-		result := builder.AllocateInstruction().AsSDiv(x, y).Insert(builder).Return()
+		result := builder.AllocateInstruction().AsSDiv(x, y, c.execCtxPtrValue).Insert(builder).Return()
 		state.push(result)
 
 	case wasm.OpcodeI32DivU, wasm.OpcodeI64DivU:
@@ -524,7 +524,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 			return
 		}
 		y, x := state.pop(), state.pop()
-		result := builder.AllocateInstruction().AsUDiv(x, y).Insert(builder).Return()
+		result := builder.AllocateInstruction().AsUDiv(x, y, c.execCtxPtrValue).Insert(builder).Return()
 		state.push(result)
 
 	case wasm.OpcodeI32RemS, wasm.OpcodeI64RemS:
@@ -532,7 +532,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 			return
 		}
 		y, x := state.pop(), state.pop()
-		result := builder.AllocateInstruction().AsSRem(x, y).Insert(builder).Return()
+		result := builder.AllocateInstruction().AsSRem(x, y, c.execCtxPtrValue).Insert(builder).Return()
 		state.push(result)
 
 	case wasm.OpcodeI32RemU, wasm.OpcodeI64RemU:
@@ -540,7 +540,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 			return
 		}
 		y, x := state.pop(), state.pop()
-		result := builder.AllocateInstruction().AsURem(x, y).Insert(builder).Return()
+		result := builder.AllocateInstruction().AsURem(x, y, c.execCtxPtrValue).Insert(builder).Return()
 		state.push(result)
 
 	case wasm.OpcodeI32And, wasm.OpcodeI64And:

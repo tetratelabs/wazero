@@ -1,6 +1,7 @@
 package arm64
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -272,6 +273,70 @@ func TestMachine_InsertMove(t *testing.T) {
 			_, _, m := newSetupWithMockContext()
 			m.InsertMove(tc.src, tc.dst)
 			require.Equal(t, tc.instruction, formatEmittedInstructionsInCurrentBlock(m))
+		})
+	}
+}
+
+func TestMachine_lowerIDiv(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		_64bit bool
+		signed bool
+		exp    string
+	}{
+		{name: "32bit unsigned", _64bit: false, signed: false,
+			exp: `
+udiv w1?, w2?, w3?
+cbnz w3?, #0x20 (L0)
+movz x27, #0xa, lsl 0
+str w27, [x65535?]
+exit_sequence x65535?
+`},
+		{name: "32bit signed", _64bit: false, signed: true, exp: `
+sdiv w1?, w2?, w3?
+cbnz w3?, #0x20 (L0)
+movz x27, #0xa, lsl 0
+str w27, [x65535?]
+exit_sequence x65535?
+adds wzr, w3?, #0x1
+ccmp w2?, #0x1, #0x0, eq
+b.vc #0x20
+movz x27, #0xb, lsl 0
+str w27, [x65535?]
+exit_sequence x65535?
+`},
+		{name: "64bit unsigned", _64bit: true, signed: false, exp: `
+udiv x1?, x2?, x3?
+cbnz w3?, #0x20 (L0)
+movz x27, #0xa, lsl 0
+str w27, [x65535?]
+exit_sequence x65535?
+`},
+		{name: "64bit signed", _64bit: true, signed: true, exp: `
+sdiv x1?, x2?, x3?
+cbnz w3?, #0x20 (L0)
+movz x27, #0xa, lsl 0
+str w27, [x65535?]
+exit_sequence x65535?
+adds xzr, x3?, #0x1
+ccmp x2?, #0x1, #0x0, eq
+b.vc #0x20
+movz x27, #0xb, lsl 0
+str w27, [x65535?]
+exit_sequence x65535?
+`},
+	} {
+
+		t.Run(tc.name, func(t *testing.T) {
+			execCtx := regalloc.VReg(0xffff).SetRegType(regalloc.RegTypeInt)
+			rd, rn, rm :=
+				regalloc.VReg(1).SetRegType(regalloc.RegTypeInt),
+				regalloc.VReg(2).SetRegType(regalloc.RegTypeInt),
+				regalloc.VReg(3).SetRegType(regalloc.RegTypeInt)
+			_, _, m := newSetupWithMockContext()
+			m.lowerIDiv(execCtx, operandNR(rd), operandNR(rn), operandNR(rm), tc._64bit, tc.signed)
+			fmt.Println(formatEmittedInstructionsInCurrentBlock(m))
+			require.Equal(t, tc.exp, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
 		})
 	}
 }

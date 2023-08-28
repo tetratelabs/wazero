@@ -274,6 +274,16 @@ func (i *instruction) encode(c backend.Compiler) {
 			regNumberInEncoding[i.rm.realReg()],
 			vecArrangement(i.u2),
 		))
+	case cCmpImm:
+		// Conditional compare (immediate) in https://developer.arm.com/documentation/ddi0596/2020-12/Index-by-Encoding/Data-Processing----Register?lang=en
+		sf := uint32(i.u3 & 0b1)
+		nzcv := uint32(i.u2 & 0b1111)
+		cond := uint32(condFlag(i.u1))
+		imm := uint32(i.rm.data & 0b11111)
+		rn := regNumberInEncoding[i.rn.realReg()]
+		c.Emit4Bytes(
+			sf<<31 | 0b111101001<<22 | imm<<16 | cond<<12 | 0b1<<11 | rn<<5 | nzcv,
+		)
 	default:
 		panic(i.String())
 	}
@@ -984,6 +994,14 @@ func encodeAluRRR(op aluOp, rd, rn, rm uint32, _64bit, isRnSp bool) uint32 {
 		case aluOpRotR:
 			_15to10 = 0b001011
 		}
+	case aluOpSDiv:
+		// "Data-processing (2 source)".
+		_31to21 = 0b11010110
+		_15to10 = 0b000011
+	case aluOpUDiv:
+		// "Data-processing (2 source)".
+		_31to21 = 0b11010110
+		_15to10 = 0b000010
 	default:
 		panic(op.String())
 	}

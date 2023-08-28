@@ -73,7 +73,8 @@ func TestSpectestV1(t *testing.T) {
 		{name: "if"},
 		{name: "imports"},
 		{name: "inline-module"},
-		//{name: "i32"},
+		{name: "i32"},
+		{name: "i64"},
 		//{name: "int_exprs"},
 		//{name: "int_literals"},
 		{name: "labels"},
@@ -409,7 +410,6 @@ func TestE2E_host_functions(t *testing.T) {
 	b := r.NewHostModuleBuilder("env")
 	b.NewFunctionBuilder().WithFunc(func(ctx2 context.Context, d float64) float64 {
 		require.Equal(t, ctx, ctx2)
-		fmt.Printf("%#x\n", math.Float64bits(d))
 		require.Equal(t, 35.0, d)
 		return math.Sqrt(d)
 	}).Export("root")

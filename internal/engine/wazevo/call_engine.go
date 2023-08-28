@@ -172,6 +172,10 @@ func (c *callEngine) CallWithStack(ctx context.Context, paramResultStack []uint6
 			return wasmruntime.ErrRuntimeInvalidTableAccess
 		case wazevoapi.ExitCodeIndirectCallTypeMismatch:
 			return wasmruntime.ErrRuntimeIndirectCallTypeMismatch
+		case wazevoapi.ExitCodeIntegerOverflow:
+			return wasmruntime.ErrRuntimeIntegerOverflow
+		case wazevoapi.ExitCodeIntegerDivisionByZero:
+			return wasmruntime.ErrRuntimeIntegerDivideByZero
 		default:
 			panic("BUG")
 		}

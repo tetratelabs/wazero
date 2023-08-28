@@ -19,6 +19,8 @@ func TestInstruction_encode(t *testing.T) {
 		setup func(*instruction)
 		want  string
 	}{
+		{want: "2f08417a", setup: func(i *instruction) { i.asCCmpImm(operandNR(x1VReg), 1, eq, 0b1111, false) }},
+		{want: "201841fa", setup: func(i *instruction) { i.asCCmpImm(operandNR(x1VReg), 1, ne, 0, true) }},
 		{want: "411ca32e", setup: func(i *instruction) {
 			i.asVecRRR(vecOpBit, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
 		}},
@@ -444,6 +446,18 @@ func TestInstruction_encode(t *testing.T) {
 		}},
 		{want: "4028d49a", setup: func(i *instruction) {
 			i.asALU(aluOpAsr, operandNR(x0VReg), operandNR(x2VReg), operandNR(x20VReg), true)
+		}},
+		{want: "400cd49a", setup: func(i *instruction) {
+			i.asALU(aluOpSDiv, operandNR(x0VReg), operandNR(x2VReg), operandNR(x20VReg), true)
+		}},
+		{want: "400cd41a", setup: func(i *instruction) {
+			i.asALU(aluOpSDiv, operandNR(x0VReg), operandNR(x2VReg), operandNR(x20VReg), false)
+		}},
+		{want: "4008d49a", setup: func(i *instruction) {
+			i.asALU(aluOpUDiv, operandNR(x0VReg), operandNR(x2VReg), operandNR(x20VReg), true)
+		}},
+		{want: "4008d41a", setup: func(i *instruction) {
+			i.asALU(aluOpUDiv, operandNR(x0VReg), operandNR(x2VReg), operandNR(x20VReg), false)
 		}},
 		{want: "407c0113", setup: func(i *instruction) {
 			i.asALUShift(aluOpAsr, operandNR(x0VReg), operandNR(x2VReg), operandShiftImm(1), false)

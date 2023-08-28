@@ -90,9 +90,14 @@ func (i *Instruction) Arg() Value {
 	return i.v
 }
 
-// Arg2 returns the first two argument2 to this instruction.
+// Arg2 returns the first two arguments to this instruction.
 func (i *Instruction) Arg2() (Value, Value) {
 	return i.v, i.v2
+}
+
+// Arg3 returns the first three arguments to this instruction.
+func (i *Instruction) Arg3() (Value, Value, Value) {
+	return i.v, i.v2, i.v3
 }
 
 // Next returns the next instruction laid out next to itself.
@@ -389,20 +394,16 @@ const (
 	// `v = sqmul_round_sat x, y`.
 	OpcodeSqmulRoundSat
 
-	// OpcodeUdiv ...
-	// `v = udiv x, y`.
+	// OpcodeUdiv performs the unsigned integer division `v = Udiv x, y`.
 	OpcodeUdiv
 
-	// OpcodeSdiv ...
-	// `v = sdiv x, y`.
+	// OpcodeSdiv performs the signed integer division `v = Sdiv x, y`.
 	OpcodeSdiv
 
-	// OpcodeUrem ...
-	// `v = urem x, y`.
+	// OpcodeUrem computes the remainder of the unsigned integer division `v = Urem x, y`.
 	OpcodeUrem
 
-	// OpcodeSrem ...
-	// `v = srem x, y`.
+	// OpcodeSrem computes the remainder of the signed integer division `v = Srem x, y`.
 	OpcodeSrem
 
 	// OpcodeIaddImm ...
@@ -878,7 +879,9 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeTrunc:              sideEffectFalse,
 	OpcodeNearest:            sideEffectFalse,
 	OpcodeSdiv:               sideEffectFalse,
+	OpcodeSrem:               sideEffectFalse,
 	OpcodeUdiv:               sideEffectFalse,
+	OpcodeUrem:               sideEffectFalse,
 	OpcodeFabs:               sideEffectFalse,
 	OpcodeFcopysign:          sideEffectFalse,
 }
@@ -904,7 +907,9 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeIshl:      returnTypesFnSingle,
 	OpcodeSshr:      returnTypesFnSingle,
 	OpcodeSdiv:      returnTypesFnSingle,
+	OpcodeSrem:      returnTypesFnSingle,
 	OpcodeUdiv:      returnTypesFnSingle,
+	OpcodeUrem:      returnTypesFnSingle,
 	OpcodeUshr:      returnTypesFnSingle,
 	OpcodeJump:      returnTypesFnNoReturns,
 	OpcodeUndefined: returnTypesFnNoReturns,
@@ -1060,11 +1065,6 @@ func (i *Instruction) AsIconst32(v uint32) *Instruction {
 	return i
 }
 
-// BinaryData return the operands for a binary instruction.
-func (i *Instruction) BinaryData() (x, y Value) {
-	return i.v, i.v2
-}
-
 // AsIadd initializes this instruction as an integer addition instruction with OpcodeIadd.
 func (i *Instruction) AsIadd(x, y Value) *Instruction {
 	i.opcode = OpcodeIadd
@@ -1116,37 +1116,41 @@ func (i *Instruction) AsFcmp(x, y Value, c FloatCmpCond) {
 }
 
 // AsSDiv initializes this instruction as an integer bitwise and instruction with OpcodeSdiv.
-func (i *Instruction) AsSDiv(x, y Value) *Instruction {
+func (i *Instruction) AsSDiv(x, y, ctx Value) *Instruction {
 	i.opcode = OpcodeSdiv
 	i.v = x
 	i.v2 = y
+	i.v3 = ctx
 	i.typ = x.Type()
 	return i
 }
 
 // AsUDiv initializes this instruction as an integer bitwise and instruction with OpcodeUdiv.
-func (i *Instruction) AsUDiv(x, y Value) *Instruction {
+func (i *Instruction) AsUDiv(x, y, ctx Value) *Instruction {
 	i.opcode = OpcodeUdiv
 	i.v = x
 	i.v2 = y
+	i.v3 = ctx
 	i.typ = x.Type()
 	return i
 }
 
 // AsSRem initializes this instruction as an integer bitwise and instruction with OpcodeSrem.
-func (i *Instruction) AsSRem(x, y Value) *Instruction {
+func (i *Instruction) AsSRem(x, y, ctx Value) *Instruction {
 	i.opcode = OpcodeSrem
 	i.v = x
 	i.v2 = y
+	i.v3 = ctx
 	i.typ = x.Type()
 	return i
 }
 
 // AsURem initializes this instruction as an integer bitwise and instruction with OpcodeUrem.
-func (i *Instruction) AsURem(x, y Value) *Instruction {
+func (i *Instruction) AsURem(x, y, ctx Value) *Instruction {
 	i.opcode = OpcodeUrem
 	i.v = x
 	i.v2 = y
+	i.v3 = ctx
 	i.typ = x.Type()
 	return i
 }
@@ -1482,11 +1486,6 @@ func (i *Instruction) AsPopcnt(x Value) {
 	i.typ = x.Type()
 }
 
-// UnaryData return the operand for a unary instruction.
-func (i *Instruction) UnaryData() Value {
-	return i.v
-}
-
 // AsFneg initializes this instruction as an instruction with OpcodeFneg.
 func (i *Instruction) AsFneg(x Value) *Instruction {
 	i.opcode = OpcodeFneg
@@ -1735,7 +1734,7 @@ func (i *Instruction) Format(b Builder) string {
 		}
 		instSuffix += "]"
 	case OpcodeBand, OpcodeBor, OpcodeBxor, OpcodeRotr, OpcodeRotl, OpcodeIshl, OpcodeSshr, OpcodeUshr,
-		OpcodeSdiv, OpcodeUdiv, OpcodeFcopysign:
+		OpcodeSdiv, OpcodeUdiv, OpcodeFcopysign, OpcodeSrem, OpcodeUrem:
 		instSuffix = fmt.Sprintf(" %s, %s", i.v.Format(b), i.v2.Format(b))
 	case OpcodeUndefined:
 	case OpcodeClz, OpcodeCtz, OpcodePopcnt, OpcodeFneg, OpcodeFcvtFromSint, OpcodeFcvtFromUint, OpcodeFpromote,
