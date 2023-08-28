@@ -1327,7 +1327,7 @@ L1 (SSA Block: blk0):
 	orr x11?, x4?, x5?
 	eor x12?, x4?, x5?
 	eor x15?, x4?, x5?, lsl #8
-	sub x4?, xzr, x4?
+	sub x5?, xzr, x5?
 	ror x16?, x4?, x5?
 	ror x17?, x4?, x5?
 	str x17?, [#ret_space, #0x8]
@@ -1356,7 +1356,7 @@ L1 (SSA Block: blk0):
 	orr x5, x8, x9
 	eor x6, x8, x9
 	eor x7, x8, x9, lsl #8
-	sub x8, xzr, x8
+	sub x9, xzr, x9
 	ror x10, x8, x9
 	ror x8, x8, x9
 	str x8, [sp, #0x18]
@@ -1378,14 +1378,14 @@ L1 (SSA Block: blk0):
 	lsl w8?, w2?, 0x1f
 	lsl x9?, x4?, x5?
 	lsl x11?, x4?, 0x20
-	asr w12?, w2?, w3?
-	asr w14?, w2?, 0x1f
-	asr x15?, x4?, x5?
-	asr x17?, x4?, 0x20
-	lsr w18?, w2?, w3?
-	lsr w20?, w2?, 0x1f
-	lsr x21?, x4?, x5?
-	lsr x23?, x4?, 0x20
+	lsr w12?, w2?, w3?
+	lsr w14?, w2?, 0x1f
+	lsr x15?, x4?, x5?
+	lsr x17?, x4?, 0x20
+	asr w18?, w2?, w3?
+	asr w20?, w2?, 0x1f
+	asr x21?, x4?, x5?
+	asr x23?, x4?, 0x20
 	str x23?, [#ret_space, #0x18]
 	str x21?, [#ret_space, #0x10]
 	str w20?, [#ret_space, #0x8]
@@ -1411,14 +1411,14 @@ L1 (SSA Block: blk0):
 	lsl w1, w9, 0x1f
 	lsl x2, x8, x11
 	lsl x3, x8, 0x20
-	asr w4, w9, w10
-	asr w5, w9, 0x1f
-	asr x6, x8, x11
-	asr x7, x8, 0x20
-	lsr w10, w9, w10
-	lsr w9, w9, 0x1f
-	lsr x11, x8, x11
-	lsr x8, x8, 0x20
+	lsr w4, w9, w10
+	lsr w5, w9, 0x1f
+	lsr x6, x8, x11
+	lsr x7, x8, 0x20
+	asr w10, w9, w10
+	asr w9, w9, 0x1f
+	asr x11, x8, x11
+	asr x8, x8, 0x20
 	str x8, [sp, #0x28]
 	str x11, [sp, #0x20]
 	str w9, [sp, #0x18]

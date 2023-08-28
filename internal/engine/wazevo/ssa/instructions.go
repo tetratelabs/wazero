@@ -526,12 +526,10 @@ const (
 	// `v = bxor_imm x, Y`. (BinaryImm64)
 	OpcodeBxorImm
 
-	// OpcodeRotl ...
-	// `v = rotl x, y`.
+	// OpcodeRotl rotates the given integer value to the left: `v = Rotl x, y`.
 	OpcodeRotl
 
-	// OpcodeRotr ...
-	// `v = rotr x, y`.
+	// OpcodeRotr rotates the given integer value to the right: `v = Rotr x, y`.
 	OpcodeRotr
 
 	// OpcodeRotlImm ...
