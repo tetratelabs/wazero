@@ -528,6 +528,9 @@ func TestInstruction_encode(t *testing.T) {
 		{want: "41c0221e", setup: func(i *instruction) {
 			i.asFpuRR(fpuUniOpCvt32To64, operandNR(v1VReg), operandNR(v2VReg), true)
 		}},
+		{want: "4140621e", setup: func(i *instruction) {
+			i.asFpuRR(fpuUniOpCvt64To32, operandNR(v1VReg), operandNR(v2VReg), true)
+		}},
 		{want: "4140211e", setup: func(i *instruction) {
 			i.asFpuRR(fpuUniOpNeg, operandNR(v1VReg), operandNR(v2VReg), false)
 		}},
@@ -573,6 +576,21 @@ func TestInstruction_encode(t *testing.T) {
 						i := &instruction{prev: cur}
 						cur.next = i
 						i.asIntToFpu(operandNR(v2VReg), operandNR(x10VReg), rnSigned, src64bit, dst64bit)
+						cur = i
+					}
+				}
+			}
+		}},
+		{want: "4201391e4201399e4201791e4201799e4201381e4201389e4201781e4201789e", setup: func(i *instruction) {
+			i.asNop0()
+			cur := i
+			trueFalse := []bool{false, true}
+			for _, rnSigned := range trueFalse {
+				for _, src64bit := range trueFalse {
+					for _, dst64bit := range trueFalse {
+						i := &instruction{prev: cur}
+						cur.next = i
+						i.asFpuToInt(operandNR(v2VReg), operandNR(x10VReg), rnSigned, src64bit, dst64bit)
 						cur = i
 					}
 				}

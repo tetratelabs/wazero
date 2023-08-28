@@ -1599,6 +1599,52 @@ L1 (SSA Block: blk0):
 `,
 		},
 		{
+			name: "float_conversions",
+			m:    testcases.FloatConversions.Module,
+			afterLoweringARM64: `
+L1 (SSA Block: blk0):
+	mov v2?.8b, v0.8b
+	mov v3?.8b, v1.8b
+	fcvtzs x4?, d2?
+	fcvtzs x5?, s3?
+	fcvtzs w6?, d2?
+	fcvtzs w7?, s3?
+	fcvtzu x8?, d2?
+	fcvtzu x9?, s3?
+	fcvtzu w10?, d2?
+	fcvtzu w11?, s3?
+	fcvt s12?, d2?
+	fcvt d13?, s3?
+	mov v1.8b, v13?.8b
+	mov v0.8b, v12?.8b
+	mov x7, x11?
+	mov x6, x10?
+	mov x5, x9?
+	mov x4, x8?
+	mov x3, x7?
+	mov x2, x6?
+	mov x1, x5?
+	mov x0, x4?
+	ret
+`,
+			afterFinalizeARM64: `
+L1 (SSA Block: blk0):
+	str x30, [sp, #-0x10]!
+	fcvtzs x0, d0
+	fcvtzs x1, s1
+	fcvtzs w2, d0
+	fcvtzs w3, s1
+	fcvtzu x4, d0
+	fcvtzu x5, s1
+	fcvtzu w6, d0
+	fcvtzu w7, s1
+	fcvt s0, d0
+	fcvt d1, s1
+	ldr x30, [sp], #0x10
+	ret
+`,
+		},
+		{
 			name: "many_middle_values",
 			m:    testcases.ManyMiddleValues.Module,
 			afterLoweringARM64: `
