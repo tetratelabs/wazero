@@ -93,6 +93,7 @@ func TestSpectestV1(t *testing.T) {
 		{name: "nop"},
 		{name: "return"},
 		{name: "select"},
+		{name: "start"},
 		{name: "stack"},
 		{name: "store"},
 		{name: "switch"},
