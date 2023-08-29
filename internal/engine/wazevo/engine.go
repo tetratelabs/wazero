@@ -58,6 +58,11 @@ type (
 	}
 )
 
+// nativeBegin returns the offset of the beginning of the function in the executable after the Go preamble if any.
+func (c compiledFunctionOffset) nativeBegin() int {
+	return c.offset + c.goPreambleSize
+}
+
 var _ wasm.Engine = (*engine)(nil)
 
 // NewEngine returns the implementation of wasm.Engine.
