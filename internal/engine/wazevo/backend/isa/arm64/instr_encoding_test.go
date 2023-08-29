@@ -13,6 +13,10 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
+func Test_dummy(t *testing.T) {
+	require.Equal(t, dummyInstruction, encodeUnconditionalBranch(false, 0))
+}
+
 func TestInstruction_encode(t *testing.T) {
 	dummyLabel := label(1)
 	for _, tc := range []struct {
