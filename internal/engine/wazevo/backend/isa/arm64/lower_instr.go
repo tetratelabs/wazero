@@ -790,8 +790,7 @@ func (m *machine) lowerFcmpToFlag(x, y ssa.Value) {
 func (m *machine) lowerExitIfTrueWithCode(execCtxVReg regalloc.VReg, cond ssa.Value, code wazevoapi.ExitCode) {
 	condDef := m.compiler.ValueDefinition(cond)
 	if !m.compiler.MatchInstr(condDef, ssa.OpcodeIcmp) {
-		// We can have general case just like cachine.LowerConditionalBranch.
-		panic("TODO: OpcodeExitIfTrueWithCode must come after Icmp at the moment")
+		panic("TODO: OpcodeExitIfTrueWithCode must come after Icmp at the moment: " + condDef.Instr.Opcode().String())
 	}
 	m.compiler.MarkLowered(condDef.Instr)
 

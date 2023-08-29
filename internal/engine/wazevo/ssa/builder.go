@@ -225,6 +225,9 @@ func (b *builder) Init(s *Signature) {
 	b.reversePostOrderedBasicBlocks = b.reversePostOrderedBasicBlocks[:0]
 	b.donePasses = false
 	b.doneBlockLayout = false
+	for i := range b.valueRefCounts {
+		b.valueRefCounts[i] = 0
+	}
 }
 
 // Signature implements Builder.Signature.

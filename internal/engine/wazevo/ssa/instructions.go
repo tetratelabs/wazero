@@ -17,7 +17,7 @@ type Opcode uint32
 // depending on Opcode.
 type Instruction struct {
 	opcode     Opcode
-	u64        uint64
+	u1, u2     uint64
 	v          Value
 	v2         Value
 	v3         Value
@@ -929,7 +929,7 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeTrunc:     returnTypesFnSingle,
 	OpcodeNearest:   returnTypesFnSingle,
 	OpcodeCallIndirect: func(b *builder, instr *Instruction) (t1 Type, ts []Type) {
-		sigID := SignatureID(instr.v)
+		sigID := SignatureID(instr.u1)
 		sig, ok := b.signatures[sigID]
 		if !ok {
 			panic("BUG")
@@ -945,7 +945,7 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 		return
 	},
 	OpcodeCall: func(b *builder, instr *Instruction) (t1 Type, ts []Type) {
-		sigID := SignatureID(instr.v)
+		sigID := SignatureID(instr.u2)
 		sig, ok := b.signatures[sigID]
 		if !ok {
 			panic("BUG")
@@ -1006,7 +1006,7 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 func (i *Instruction) AsLoad(ptr Value, offset uint32, typ Type) *Instruction {
 	i.opcode = OpcodeLoad
 	i.v = ptr
-	i.u64 = uint64(offset)
+	i.u1 = uint64(offset)
 	i.typ = typ
 	return i
 }
@@ -1015,7 +1015,7 @@ func (i *Instruction) AsLoad(ptr Value, offset uint32, typ Type) *Instruction {
 func (i *Instruction) AsExtLoad(op Opcode, ptr Value, offset uint32, dst64bit bool) {
 	i.opcode = op
 	i.v = ptr
-	i.u64 = uint64(offset)
+	i.u1 = uint64(offset)
 	if dst64bit {
 		i.typ = TypeI64
 	} else {
@@ -1025,7 +1025,7 @@ func (i *Instruction) AsExtLoad(op Opcode, ptr Value, offset uint32, dst64bit bo
 
 // LoadData returns the operands for a load instruction.
 func (i *Instruction) LoadData() (ptr Value, offset uint32, typ Type) {
-	return i.v, uint32(i.u64), i.typ
+	return i.v, uint32(i.u1), i.typ
 }
 
 // AsStore initializes this instruction as a store instruction with OpcodeStore.
@@ -1047,20 +1047,20 @@ func (i *Instruction) AsStore(storeOp Opcode, value, ptr Value, offset uint32) *
 	default:
 		panic("invalid store opcode" + storeOp.String())
 	}
-	i.u64 = uint64(offset) | dstSize<<32
+	i.u1 = uint64(offset) | dstSize<<32
 	return i
 }
 
 // StoreData returns the operands for a store instruction.
 func (i *Instruction) StoreData() (value, ptr Value, offset uint32, storeSizeInBits byte) {
-	return i.v, i.v2, uint32(i.u64), byte(i.u64 >> 32)
+	return i.v, i.v2, uint32(i.u1), byte(i.u1 >> 32)
 }
 
 // AsIconst64 initializes this instruction as a 64-bit integer constant instruction with OpcodeIconst.
 func (i *Instruction) AsIconst64(v uint64) *Instruction {
 	i.opcode = OpcodeIconst
 	i.typ = TypeI64
-	i.u64 = v
+	i.u1 = v
 	return i
 }
 
@@ -1068,7 +1068,7 @@ func (i *Instruction) AsIconst64(v uint64) *Instruction {
 func (i *Instruction) AsIconst32(v uint32) *Instruction {
 	i.opcode = OpcodeIconst
 	i.typ = TypeI32
-	i.u64 = uint64(v)
+	i.u1 = uint64(v)
 	return i
 }
 
@@ -1108,7 +1108,7 @@ func (i *Instruction) AsIcmp(x, y Value, c IntegerCmpCond) *Instruction {
 	i.opcode = OpcodeIcmp
 	i.v = x
 	i.v2 = y
-	i.u64 = uint64(c)
+	i.u1 = uint64(c)
 	i.typ = TypeI32
 	return i
 }
@@ -1118,7 +1118,7 @@ func (i *Instruction) AsFcmp(x, y Value, c FloatCmpCond) {
 	i.opcode = OpcodeFcmp
 	i.v = x
 	i.v2 = y
-	i.u64 = uint64(c)
+	i.u1 = uint64(c)
 	i.typ = TypeI32
 }
 
@@ -1230,12 +1230,12 @@ func (i *Instruction) AsRotr(x, amount Value) {
 
 // IcmpData returns the operands and comparison condition of this integer comparison instruction.
 func (i *Instruction) IcmpData() (x, y Value, c IntegerCmpCond) {
-	return i.v, i.v2, IntegerCmpCond(i.u64)
+	return i.v, i.v2, IntegerCmpCond(i.u1)
 }
 
 // FcmpData returns the operands and comparison condition of this floating-point comparison instruction.
 func (i *Instruction) FcmpData() (x, y Value, c FloatCmpCond) {
-	return i.v, i.v2, FloatCmpCond(i.u64)
+	return i.v, i.v2, FloatCmpCond(i.u1)
 }
 
 // AsFadd initializes this instruction as a floating-point addition instruction with OpcodeFadd.
@@ -1290,7 +1290,7 @@ func (i *Instruction) AsFmax(x, y Value) {
 func (i *Instruction) AsF32const(f float32) *Instruction {
 	i.opcode = OpcodeF32const
 	i.typ = TypeF64
-	i.u64 = uint64(math.Float32bits(f))
+	i.u1 = uint64(math.Float32bits(f))
 	return i
 }
 
@@ -1298,7 +1298,7 @@ func (i *Instruction) AsF32const(f float32) *Instruction {
 func (i *Instruction) AsF64const(f float64) *Instruction {
 	i.opcode = OpcodeF64const
 	i.typ = TypeF64
-	i.u64 = math.Float64bits(f)
+	i.u1 = math.Float64bits(f)
 	return i
 }
 
@@ -1326,7 +1326,7 @@ func (i *Instruction) ReturnVals() []Value {
 func (i *Instruction) AsExitWithCode(ctx Value, code wazevoapi.ExitCode) {
 	i.opcode = OpcodeExitWithCode
 	i.v = ctx
-	i.u64 = uint64(code)
+	i.u1 = uint64(code)
 }
 
 // AsExitIfTrueWithCode initializes this instruction as a trap instruction with OpcodeExitIfTrueWithCode.
@@ -1334,17 +1334,17 @@ func (i *Instruction) AsExitIfTrueWithCode(ctx, c Value, code wazevoapi.ExitCode
 	i.opcode = OpcodeExitIfTrueWithCode
 	i.v = ctx
 	i.v2 = c
-	i.u64 = uint64(code)
+	i.u1 = uint64(code)
 }
 
 // ExitWithCodeData returns the context and exit code of OpcodeExitWithCode.
 func (i *Instruction) ExitWithCodeData() (ctx Value, code wazevoapi.ExitCode) {
-	return i.v, wazevoapi.ExitCode(i.u64)
+	return i.v, wazevoapi.ExitCode(i.u1)
 }
 
 // ExitIfTrueWithCodeData returns the context and exit code of OpcodeExitWithCode.
 func (i *Instruction) ExitIfTrueWithCodeData() (ctx, c Value, code wazevoapi.ExitCode) {
-	return i.v, i.v2, wazevoapi.ExitCode(i.u64)
+	return i.v, i.v2, wazevoapi.ExitCode(i.u1)
 }
 
 // InvertBrx inverts either OpcodeBrz or OpcodeBrnz to the other.
@@ -1396,7 +1396,7 @@ func (i *Instruction) IsFallthroughJump() bool {
 	if i.opcode != OpcodeJump {
 		panic("BUG: IsFallthrough only available for OpcodeJump")
 	}
-	return i.opcode == OpcodeJump && i.u64 != 0
+	return i.opcode == OpcodeJump && i.u1 != 0
 }
 
 // AsFallthroughJump marks this instruction as a fallthrough jump.
@@ -1404,7 +1404,7 @@ func (i *Instruction) AsFallthroughJump() {
 	if i.opcode != OpcodeJump {
 		panic("BUG: AsFallthroughJump only available for OpcodeJump")
 	}
-	i.u64 = 1
+	i.u1 = 1
 }
 
 // AsBrz initializes this instruction as a branch-if-zero instruction with OpcodeBrz.
@@ -1433,9 +1433,9 @@ func (i *Instruction) AsBrTable(index Value, targets []BasicBlock) {
 // AsCall initializes this instruction as a call instruction with OpcodeCall.
 func (i *Instruction) AsCall(ref FuncRef, sig *Signature, args []Value) {
 	i.opcode = OpcodeCall
-	i.u64 = uint64(ref)
+	i.u1 = uint64(ref)
 	i.vs = args
-	i.v = Value(sig.ID)
+	i.u2 = uint64(sig.ID)
 	sig.used = true
 }
 
@@ -1444,8 +1444,8 @@ func (i *Instruction) CallData() (ref FuncRef, sigID SignatureID, args []Value) 
 	if i.opcode != OpcodeCall {
 		panic("BUG: CallData only available for OpcodeCall")
 	}
-	ref = FuncRef(i.u64)
-	sigID = SignatureID(i.v)
+	ref = FuncRef(i.u1)
+	sigID = SignatureID(i.u2)
 	args = i.vs
 	return
 }
@@ -1455,8 +1455,8 @@ func (i *Instruction) AsCallIndirect(funcPtr Value, sig *Signature, args []Value
 	i.opcode = OpcodeCallIndirect
 	i.typ = TypeF64
 	i.vs = args
-	i.v = Value(sig.ID)
-	i.v2 = funcPtr
+	i.v = funcPtr
+	i.u1 = uint64(sig.ID)
 	sig.used = true
 	return i
 }
@@ -1466,8 +1466,8 @@ func (i *Instruction) CallIndirectData() (funcPtr Value, sigID SignatureID, args
 	if i.opcode != OpcodeCallIndirect {
 		panic("BUG: CallIndirectData only available for OpcodeCallIndirect")
 	}
-	funcPtr = i.v2
-	sigID = SignatureID(i.v)
+	funcPtr = i.v
+	sigID = SignatureID(i.u1)
 	args = i.vs
 	return
 }
@@ -1622,7 +1622,7 @@ func (i *Instruction) AsFcvtToInt(x, ctx Value, signed bool, dst64bit bool) *Ins
 func (i *Instruction) AsSExtend(v Value, from, to byte) {
 	i.opcode = OpcodeSExtend
 	i.v = v
-	i.u64 = uint64(from)<<8 | uint64(to)
+	i.u1 = uint64(from)<<8 | uint64(to)
 	if to == 64 {
 		i.typ = TypeI64
 	} else {
@@ -1634,7 +1634,7 @@ func (i *Instruction) AsSExtend(v Value, from, to byte) {
 func (i *Instruction) AsUExtend(v Value, from, to byte) {
 	i.opcode = OpcodeUExtend
 	i.v = v
-	i.u64 = uint64(from)<<8 | uint64(to)
+	i.u1 = uint64(from)<<8 | uint64(to)
 	if to == 64 {
 		i.typ = TypeI64
 	} else {
@@ -1646,8 +1646,8 @@ func (i *Instruction) ExtendData() (from, to byte, signed bool) {
 	if i.opcode != OpcodeSExtend && i.opcode != OpcodeUExtend {
 		panic("BUG: ExtendData only available for OpcodeSExtend and OpcodeUExtend")
 	}
-	from = byte(i.u64 >> 8)
-	to = byte(i.u64)
+	from = byte(i.u1 >> 8)
+	to = byte(i.u1)
 	signed = i.opcode == OpcodeSExtend
 	return
 }
@@ -1672,8 +1672,8 @@ func (i *Instruction) SelectData() (c, x, y Value) {
 
 // ExtendFromToBits returns the from and to bit size for the extension instruction.
 func (i *Instruction) ExtendFromToBits() (from, to byte) {
-	from = byte(i.u64 >> 8)
-	to = byte(i.u64)
+	from = byte(i.u1 >> 8)
+	to = byte(i.u1)
 	return
 }
 
@@ -1683,17 +1683,17 @@ func (i *Instruction) Format(b Builder) string {
 	var instSuffix string
 	switch i.opcode {
 	case OpcodeExitWithCode:
-		instSuffix = fmt.Sprintf(" %s, %s", i.v.Format(b), wazevoapi.ExitCode(i.u64))
+		instSuffix = fmt.Sprintf(" %s, %s", i.v.Format(b), wazevoapi.ExitCode(i.u1))
 	case OpcodeExitIfTrueWithCode:
-		instSuffix = fmt.Sprintf(" %s, %s, %s", i.v2.Format(b), i.v.Format(b), wazevoapi.ExitCode(i.u64))
+		instSuffix = fmt.Sprintf(" %s, %s, %s", i.v2.Format(b), i.v.Format(b), wazevoapi.ExitCode(i.u1))
 	case OpcodeIadd, OpcodeIsub, OpcodeImul, OpcodeFadd, OpcodeFsub, OpcodeFmin, OpcodeFmax, OpcodeFdiv, OpcodeFmul:
 		instSuffix = fmt.Sprintf(" %s, %s", i.v.Format(b), i.v2.Format(b))
 	case OpcodeIcmp:
-		instSuffix = fmt.Sprintf(" %s, %s, %s", IntegerCmpCond(i.u64), i.v.Format(b), i.v2.Format(b))
+		instSuffix = fmt.Sprintf(" %s, %s, %s", IntegerCmpCond(i.u1), i.v.Format(b), i.v2.Format(b))
 	case OpcodeFcmp:
-		instSuffix = fmt.Sprintf(" %s, %s, %s", FloatCmpCond(i.u64), i.v.Format(b), i.v2.Format(b))
+		instSuffix = fmt.Sprintf(" %s, %s, %s", FloatCmpCond(i.u1), i.v.Format(b), i.v2.Format(b))
 	case OpcodeSExtend, OpcodeUExtend:
-		instSuffix = fmt.Sprintf(" %s, %d->%d", i.v.Format(b), i.u64>>8, i.u64&0xff)
+		instSuffix = fmt.Sprintf(" %s, %d->%d", i.v.Format(b), i.u1>>8, i.u1&0xff)
 	case OpcodeCall, OpcodeCallIndirect:
 		vs := make([]string, len(i.vs))
 		for idx := range vs {
@@ -1702,27 +1702,27 @@ func (i *Instruction) Format(b Builder) string {
 		if i.opcode == OpcodeCallIndirect {
 			instSuffix = fmt.Sprintf(" %s:%s, %s", i.v2.Format(b), SignatureID(i.v), strings.Join(vs, ", "))
 		} else {
-			instSuffix = fmt.Sprintf(" %s:%s, %s", FuncRef(i.u64), SignatureID(i.v), strings.Join(vs, ", "))
+			instSuffix = fmt.Sprintf(" %s:%s, %s", FuncRef(i.u1), SignatureID(i.v), strings.Join(vs, ", "))
 		}
 	case OpcodeStore, OpcodeIstore8, OpcodeIstore16, OpcodeIstore32:
-		instSuffix = fmt.Sprintf(" %s, %s, %#x", i.v.Format(b), i.v2.Format(b), int32(i.u64))
+		instSuffix = fmt.Sprintf(" %s, %s, %#x", i.v.Format(b), i.v2.Format(b), int32(i.u1))
 	case OpcodeLoad:
-		instSuffix = fmt.Sprintf(" %s, %#x", i.v.Format(b), int32(i.u64))
+		instSuffix = fmt.Sprintf(" %s, %#x", i.v.Format(b), int32(i.u1))
 	case OpcodeUload8, OpcodeUload16, OpcodeUload32, OpcodeSload8, OpcodeSload16, OpcodeSload32:
-		instSuffix = fmt.Sprintf(" %s, %#x", i.v.Format(b), int32(i.u64))
+		instSuffix = fmt.Sprintf(" %s, %#x", i.v.Format(b), int32(i.u1))
 	case OpcodeSelect:
 		instSuffix = fmt.Sprintf(" %s, %s, %s", i.v.Format(b), i.v2.Format(b), i.v3.Format(b))
 	case OpcodeIconst:
 		switch i.typ {
 		case TypeI32:
-			instSuffix = fmt.Sprintf("_32 %#x", uint32(i.u64))
+			instSuffix = fmt.Sprintf("_32 %#x", uint32(i.u1))
 		case TypeI64:
-			instSuffix = fmt.Sprintf("_64 %#x", i.u64)
+			instSuffix = fmt.Sprintf("_64 %#x", i.u1)
 		}
 	case OpcodeF32const:
-		instSuffix = fmt.Sprintf(" %f", math.Float32frombits(uint32(i.u64)))
+		instSuffix = fmt.Sprintf(" %f", math.Float32frombits(uint32(i.u1)))
 	case OpcodeF64const:
-		instSuffix = fmt.Sprintf(" %f", math.Float64frombits(i.u64))
+		instSuffix = fmt.Sprintf(" %f", math.Float64frombits(i.u1))
 	case OpcodeReturn:
 		if len(i.vs) == 0 {
 			break
@@ -1819,7 +1819,7 @@ func (i *Instruction) Constant() bool {
 func (i *Instruction) ConstantVal() (ret uint64) {
 	switch i.opcode {
 	case OpcodeIconst, OpcodeF32const, OpcodeF64const:
-		ret = i.u64
+		ret = i.u1
 	default:
 		panic("TODO")
 	}

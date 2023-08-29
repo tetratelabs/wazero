@@ -264,15 +264,19 @@ func passDeadCodeEliminationOpt(b *builder) {
 			// Hence, we can increment the value reference counts.
 			v1, v2, v3, vs := cur.Args()
 			if v1.Valid() {
+				fmt.Printf("[1] v%d referenced from %v\n", v1.ID(), cur.Format(b))
 				b.valueRefCounts[v1.ID()]++
 			}
 			if v2.Valid() {
+				fmt.Printf("[2] v%d referenced from %v\n", v2.ID(), cur.Format(b))
 				b.valueRefCounts[v2.ID()]++
 			}
 			if v3.Valid() {
+				fmt.Printf("[3] v%d referenced from %v\n", v3.ID(), cur.Format(b))
 				b.valueRefCounts[v3.ID()]++
 			}
 			for _, v := range vs {
+				fmt.Printf("[vs] v%d referenced from %v\n", v.ID(), cur.Format(b))
 				b.valueRefCounts[v.ID()]++
 			}
 		}
