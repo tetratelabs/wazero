@@ -1,6 +1,10 @@
 package ssa
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
+)
 
 // RunPasses implements Builder.RunPasses.
 //
@@ -45,7 +49,7 @@ func passDeadBlockEliminationOpt(b *builder) {
 			panic(fmt.Sprintf("%s is not sealed", reachableBlk))
 		}
 
-		if true {
+		if wazevoapi.SSAValidationEnabled {
 			reachableBlk.validate(b)
 		}
 
@@ -282,7 +286,7 @@ func passDeadCodeEliminationOpt(b *builder) {
 }
 
 func (b *builder) incRefCount(id ValueID, from *Instruction) {
-	if debug {
+	if wazevoapi.SSALoggingEnabled {
 		fmt.Printf("v%d referenced from %v\n", id, from.Format(b))
 	}
 	b.valueRefCounts[id]++

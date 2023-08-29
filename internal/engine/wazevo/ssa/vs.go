@@ -3,6 +3,8 @@ package ssa
 import (
 	"fmt"
 	"math"
+
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 )
 
 // Variable is a unique identifier for a source program's variable and will correspond to
@@ -49,7 +51,7 @@ func (v Value) formatWithType(b Builder) (ret string) {
 		ret = fmt.Sprintf("v%d:%s", v.ID(), v.Type())
 	}
 
-	if debug { // This is useful to check live value analysis bugs.
+	if wazevoapi.SSALoggingEnabled { // This is useful to check live value analysis bugs.
 		if bd := b.(*builder); bd.donePasses {
 			id := v.ID()
 			ret += fmt.Sprintf("(ref=%d)", bd.valueRefCounts[id])

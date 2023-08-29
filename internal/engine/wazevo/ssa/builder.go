@@ -418,7 +418,7 @@ func (b *builder) findValue(typ Type, variable Variable, blk *basicBlock) Value 
 		// and record it as unknown.
 		// The unknown values are resolved when we call seal this block via BasicBlock.Seal().
 		value := b.allocateValue(typ)
-		if debug {
+		if wazevoapi.SSALoggingEnabled {
 			fmt.Printf("adding unknown value placeholder for %s at %d\n", variable, blk.id)
 		}
 		blk.lastDefinitions[variable] = value
@@ -700,7 +700,7 @@ func (b *builder) LayoutBlocks() {
 		}
 	}
 
-	trampolines := []*basicBlock{}
+	var trampolines []*basicBlock
 
 	// Reset the order slice since we update on the fly by splitting critical edges.
 	b.reversePostOrderedBasicBlocks = b.reversePostOrderedBasicBlocks[:0]
@@ -754,7 +754,7 @@ func (b *builder) LayoutBlocks() {
 				panic("BUG: predecessor info not found while the successor exists in successors list")
 			}
 
-			if debug {
+			if wazevoapi.SSALoggingEnabled {
 				fmt.Printf("trying to split edge from %d->%d at %s\n",
 					blk.ID(), succ.ID(), predInfo.branch.Format(b))
 			}
@@ -763,9 +763,11 @@ func (b *builder) LayoutBlocks() {
 			// Update the successors slice because the target is no longer the original `succ`.
 			blk.success[sidx] = trampoline
 
-			trampolines = append(trampolines, trampoline)
+			if wazevoapi.SSAValidationEnabled {
+				trampolines = append(trampolines, trampoline)
+			}
 
-			if debug {
+			if wazevoapi.SSALoggingEnabled {
 				fmt.Printf("edge split from %d->%d at %s as %d->%d->%d \n",
 					blk.ID(), succ.ID(), predInfo.branch.Format(b),
 					blk.ID(), trampoline.ID(), succ.ID())
@@ -791,7 +793,7 @@ func (b *builder) LayoutBlocks() {
 		uninsertedTrampolines = uninsertedTrampolines[:0] // Reuse the stack for the next block.
 	}
 
-	if debug {
+	if wazevoapi.SSALoggingEnabled {
 		var bs []string
 		for _, blk := range b.reversePostOrderedBasicBlocks {
 			bs = append(bs, blk.Name())
@@ -803,6 +805,9 @@ func (b *builder) LayoutBlocks() {
 		}
 		sort.Slice(bs, func(i, j int) bool { return bs[i] < bs[j] })
 		fmt.Println("visited blocks: ", strings.Join(bs, ", "))
+	}
+
+	if wazevoapi.SSAValidationEnabled {
 		for _, trampoline := range trampolines {
 			if _, ok := b.blkVisited[trampoline]; !ok {
 				panic("BUG: trampoline block not inserted: " + trampoline.FormatHeader(b))
@@ -901,15 +906,13 @@ invert:
 	condBranch.InvertBrx()
 	condBranch.blk = fallthroughTarget
 	fallthroughBranch.blk = condTarget
-	if debug {
+	if wazevoapi.SSALoggingEnabled {
 		fmt.Printf("inverting branches at %d->%d and %d->%d\n",
 			now.ID(), fallthroughTarget.ID(), now.ID(), condTarget.ID())
 	}
 
 	return true
 }
-
-const debug = false
 
 // splitCriticalEdge splits the critical edge between the given predecessor (`pred`) and successor (owning `predInfo`).
 //
@@ -964,7 +967,7 @@ func (b *builder) splitCriticalEdge(pred, succ *basicBlock, predInfo *basicBlock
 	predInfo.blk = trampoline
 	predInfo.branch = originalBranch
 
-	if debug {
+	if wazevoapi.SSAValidationEnabled {
 		trampoline.validate(b)
 	}
 

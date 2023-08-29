@@ -5,6 +5,7 @@ import (
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 )
 
 // NewCompiler returns a new Compiler that can generate a machine code.
@@ -143,15 +144,15 @@ type compiler struct {
 // Compile implements Compiler.Compile.
 func (c *compiler) Compile() ([]byte, []RelocationInfo, int, error) {
 	c.Lower()
-	if false {
+	if wazevoapi.PrintSSAToBackendIRLowering {
 		fmt.Printf("[[[after lowering]]]%s\n", c.Format())
 	}
 	c.RegAlloc()
-	if false {
+	if wazevoapi.PrintRegisterAllocated {
 		fmt.Printf("[[[after regalloc]]]%s\n", c.Format())
 	}
 	c.Finalize()
-	if false {
+	if wazevoapi.PrintFinalizedMachineCode {
 		fmt.Printf("[[[after finalize]]]%s\n", c.Format())
 	}
 	goPreambleSize := c.Encode()
