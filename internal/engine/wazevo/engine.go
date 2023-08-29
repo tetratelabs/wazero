@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"runtime"
-	"strings"
 	"sync"
 
 	"github.com/tetratelabs/wazero/api"
@@ -110,12 +109,6 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []exper
 		fidx := wasm.Index(i + importedFns)
 		fref := frontend.FunctionIndexToFuncRef(fidx)
 
-		const debug = false
-		if debug {
-			name := exportedFnIndex[fidx]
-			fmt.Printf("%[1]s %d/%d %s %[1]s\n", strings.Repeat("-", 30), i, len(module.CodeSection)-1, name)
-		}
-
 		_, needGoEntryPreamble := exportedFnIndex[fidx]
 		if sf := module.StartSection; sf != nil && *sf == fidx {
 			needGoEntryPreamble = true
@@ -166,22 +159,22 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []exper
 			return fmt.Errorf("wasm->ssa: %v", err)
 		}
 
-		if debug {
-			fmt.Printf("[[[SSA]]]%s\n", ssaBuilder.Format())
+		if wazevoapi.PrintSSA {
+			fmt.Printf("[[[SSA for %d/%d %s]]]%s\n", i, len(module.CodeSection)-1, exportedFnIndex[fidx], ssaBuilder.Format())
 		}
 
 		// Run SSA-level optimization passes.
 		ssaBuilder.RunPasses()
 
-		if debug {
-			fmt.Printf("[[[optimized SSA]]]%s\n", ssaBuilder.Format())
+		if wazevoapi.PrintOptimizedSSA {
+			fmt.Printf("[[[optimized SSA for %d/%d %s]]]%s\n", i, len(module.CodeSection)-1, exportedFnIndex[fidx], ssaBuilder.Format())
 		}
 
 		// Finalize the layout of SSA blocks which might use the optimization results.
 		ssaBuilder.LayoutBlocks()
 
-		if debug {
-			fmt.Printf("[[[laidout SSA]]]%s\n", ssaBuilder.Format())
+		if wazevoapi.PrintBlockLaidOutSSA {
+			fmt.Printf("[[[laidout SSA for %d/%d %s]]]%s\n", i, len(module.CodeSection)-1, exportedFnIndex[fidx], ssaBuilder.Format())
 		}
 
 		// Now our ssaBuilder contains the necessary information to further lower them to
@@ -210,7 +203,7 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []exper
 		copy(copied, body)
 		bodies[i] = copied
 		totalSize += len(body)
-		if debug {
+		if wazevoapi.PrintMachineCodeHexPerFunction {
 			fmt.Println(hex.EncodeToString(body))
 		}
 	}

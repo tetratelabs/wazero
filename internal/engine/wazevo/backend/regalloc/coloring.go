@@ -3,6 +3,8 @@ package regalloc
 import (
 	"fmt"
 	"sort"
+
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 )
 
 // buildNeighbors builds the neighbors for each node in the interference graph.
@@ -87,7 +89,7 @@ func (a *Allocator) coloringFor(allocatable []RealReg) {
 			return currentDegrees[degreeSortedNodes[i]] < currentDegrees[degreeSortedNodes[j]]
 		})
 
-		if debug {
+		if wazevoapi.RegAllocLoggingEnabled {
 			fmt.Println("-------------------------------")
 			fmt.Printf("coloringStack: ")
 			for _, c := range coloringStack {
@@ -122,7 +124,7 @@ func (a *Allocator) coloringFor(allocatable []RealReg) {
 			degreeSortedNodes[0], degreeSortedNodes[tail] = degreeSortedNodes[tail], degreeSortedNodes[0]
 
 			popNum++
-			if debug {
+			if wazevoapi.RegAllocLoggingEnabled {
 				fmt.Printf("Forcibly pop one node %s as a spill target\n", degreeSortedNodes[0].v)
 			}
 		}
@@ -139,7 +141,7 @@ func (a *Allocator) coloringFor(allocatable []RealReg) {
 			}
 		}
 
-		if debug {
+		if wazevoapi.RegAllocLoggingEnabled {
 			if len(coloringStack) == total {
 				fmt.Println("-------------------------------")
 				fmt.Printf("coloringStack: ")
@@ -159,10 +161,13 @@ func (a *Allocator) coloringFor(allocatable []RealReg) {
 		}
 	}
 
-	if debug {
+	if wazevoapi.RegAllocValidationEnabled {
 		if len(degreeSortedNodes) != 0 {
 			panic("BUG")
 		}
+	}
+
+	if wazevoapi.RegAllocLoggingEnabled {
 		fmt.Println("-------------------------------")
 	}
 
@@ -177,7 +182,7 @@ func (a *Allocator) coloringFor(allocatable []RealReg) {
 			continue
 		}
 
-		if debug {
+		if wazevoapi.RegAllocLoggingEnabled {
 			fmt.Printf("coloring %s\n", n)
 		}
 
@@ -189,13 +194,13 @@ func (a *Allocator) coloringFor(allocatable []RealReg) {
 			}
 		}
 
-		if debug {
+		if wazevoapi.RegAllocLoggingEnabled {
 			fmt.Printf("\tneighborColors: %v\n", neighborColors)
 		}
 
 		a.assignColor(n, neighborColorsSet, allocatable)
 
-		if debug {
+		if wazevoapi.RegAllocLoggingEnabled {
 			fmt.Printf("\tassigned color: %s\n", n.r)
 		}
 
@@ -206,7 +211,7 @@ func (a *Allocator) coloringFor(allocatable []RealReg) {
 		neighborColors = neighborColors[:0]
 	}
 
-	if debug {
+	if wazevoapi.RegAllocValidationEnabled {
 		for _, n := range coloringStack {
 			if n.r == RealRegInvalid {
 				continue

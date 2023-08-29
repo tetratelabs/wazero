@@ -1,8 +1,6 @@
 package backend
 
 import (
-	"fmt"
-
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 )
@@ -16,15 +14,10 @@ func (c *compiler) Lower() {
 	c.mach.EndLoweringFunction()
 }
 
-const debug = false
-
 // lowerBlocks lowers each block in the ssa.Builder.
 func (c *compiler) lowerBlocks() {
 	builder := c.ssaBuilder
 	for blk := builder.BlockIteratorReversePostOrderBegin(); blk != nil; blk = builder.BlockIteratorReversePostOrderNext() {
-		if debug {
-			fmt.Printf("lowering block %s\n", blk.Name())
-		}
 		c.lowerBlock(blk)
 	}
 	// After lowering all blocks, we need to link adjacent blocks to layout one single instruction list.
@@ -69,10 +62,6 @@ func (c *compiler) lowerBlock(blk ssa.BasicBlock) {
 		c.setCurrentGroupID(cur.GroupID())
 		if c.alreadyLowered[cur] {
 			continue
-		}
-
-		if debug {
-			fmt.Printf("\tlowering instr %s\n", cur.Format(c.ssaBuilder))
 		}
 
 		switch cur.Opcode() {

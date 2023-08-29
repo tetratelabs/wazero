@@ -126,8 +126,6 @@ func (l *loweringState) ctrlPeekAt(n int) (ret *controlFrame) {
 	return &l.controlFrames[tail-n]
 }
 
-const debug = false
-
 // lowerBody lowers the body of the Wasm function to the SSA form.
 func (c *Compiler) lowerBody(entryBlk ssa.BasicBlock) {
 	c.ssaBuilder.Seal(entryBlk)
@@ -142,7 +140,7 @@ func (c *Compiler) lowerBody(entryBlk ssa.BasicBlock) {
 	for c.loweringState.pc < len(c.wasmFunctionBody) {
 		op := c.wasmFunctionBody[c.loweringState.pc]
 		c.lowerOpcode(op)
-		if debug {
+		if wazevoapi.FrontEndLoggingEnabled {
 			fmt.Println("--------- Translated " + wasm.InstructionName(op) + " --------")
 			fmt.Println("state: " + c.loweringState.String())
 			fmt.Println(c.formatBuilder())
@@ -693,9 +691,6 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		}
 		variable := c.localVariable(index)
 		v := builder.MustFindValue(variable)
-		if false {
-			builder.AnnotateValue(v, fmt.Sprintf("v%d@local[%d]", v.ID(), index))
-		}
 		state.push(v)
 	case wasm.OpcodeLocalSet:
 		index := c.readI32u()

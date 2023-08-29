@@ -121,7 +121,6 @@ func (i *Instruction) IsBranching() bool {
 }
 
 // TODO: complete opcode comments.
-// TODO: there should be unnecessary opcodes.
 const (
 	OpcodeInvalid Opcode = iota
 
@@ -159,10 +158,6 @@ const (
 	// OpcodeCallIndirect calls a function specified by `callee` which is a function address: `returnvals = call_indirect SIG, callee, args`.
 	// Note that this is different from call_indirect in Wasm, which also does type checking, etc.
 	OpcodeCallIndirect
-
-	// OpcodeFuncAddr ...
-	// `addr = func_addr FN`.
-	OpcodeFuncAddr
 
 	// OpcodeSplat ...
 	// `v = splat x`.
@@ -273,34 +268,6 @@ const (
 	// `v = sload32x2 MemFlags, p, Offset`.
 	OpcodeSload32x2
 
-	// OpcodeGlobalValue ...
-	// `v = global_value GV`.
-	OpcodeGlobalValue
-
-	// OpcodeSymbolValue ...
-	// `v = symbol_value GV`.
-	OpcodeSymbolValue
-
-	// OpcodeHeapAddr ...
-	// `addr = heap_addr H, index, Offset, Size`.
-	OpcodeHeapAddr
-
-	// OpcodeHeapLoad ...
-	// `v = heap_load heap_imm, index`.
-	OpcodeHeapLoad
-
-	// OpcodeHeapStore ...
-	// `heap_store heap_imm, index, a`.
-	OpcodeHeapStore
-
-	// OpcodeGetReturnAddress ...
-	// `addr = get_return_address`.
-	OpcodeGetReturnAddress
-
-	// OpcodeTableAddr ...
-	// `addr = table_addr T, p, Offset`.
-	OpcodeTableAddr
-
 	// OpcodeIconst represents the integer const.
 	OpcodeIconst
 
@@ -319,14 +286,6 @@ const (
 	// OpcodeShuffle ...
 	// `v = shuffle a, b, mask`.
 	OpcodeShuffle
-
-	// OpcodeNull ...
-	// `v = null`.
-	OpcodeNull
-
-	// OpcodeNop ...
-	// `nop`.
-	OpcodeNop
 
 	// OpcodeSelect chooses between two values based on a condition `c`: `v = Select c, x, y`.
 	OpcodeSelect
@@ -370,14 +329,6 @@ const (
 
 	// OpcodeIsub performs an integer subtraction: `v = Isub x, y`.
 	OpcodeIsub
-
-	// OpcodeIneg ...
-	// `v = ineg x`.
-	OpcodeIneg
-
-	// OpcodeIabs ...
-	// `v = iabs x`.
-	OpcodeIabs
 
 	// OpcodeImul performs an integer multiplication: `v = Imul x, y`.
 	OpcodeImul
@@ -568,106 +519,62 @@ const (
 	// `v = bitrev x`.
 	OpcodeBitrev
 
-	// OpcodeClz ...
-	// `v = clz x`.
+	// OpcodeClz counts the number of leading zeros: `v = clz x`.
 	OpcodeClz
 
-	// OpcodeCls ...
-	// `v = cls x`.
-	OpcodeCls
-
-	// OpcodeCtz ...
-	// `v = ctz x`.
+	// OpcodeCtz counts the number of trailing zeros: `v = ctz x`.
 	OpcodeCtz
 
-	// OpcodeBswap ...
-	// `v = bswap x`.
-	OpcodeBswap
-
-	// OpcodePopcnt ...
-	// `v = popcnt x`.
+	// OpcodePopcnt counts the number of 1-bits: `v = popcnt x`.
 	OpcodePopcnt
 
 	// OpcodeFcmp compares two floating point values: `v = fcmp Cond, x, y`.
 	OpcodeFcmp
 
-	// OpcodeFadd performs an floating point addition.
-	// `v = Fadd x, y`.
+	// OpcodeFadd performs a floating point addition: / `v = Fadd x, y`.
 	OpcodeFadd
 
-	// OpcodeFsub performs an floating point subtraction.
-	// `v = Fsub x, y`.
+	// OpcodeFsub performs a floating point subtraction: `v = Fsub x, y`.
 	OpcodeFsub
 
-	// OpcodeFmul ...
-	// `v = fmul x, y`.
+	// OpcodeFmul performs a floating point multiplication: `v = Fmul x, y`.
 	OpcodeFmul
 
-	// OpcodeFdiv ...
-	// `v = fdiv x, y`.
+	// OpcodeFdiv performs a floating point division: `v = Fdiv x, y`.
 	OpcodeFdiv
 
-	// OpcodeSqrt ...
-	// `v = sqrt x`.
+	// OpcodeSqrt takes the square root of the given floating point value: `v = sqrt x`.
 	OpcodeSqrt
-
-	// OpcodeFma ...
-	// `v = fma x, y, z`.
-	OpcodeFma
 
 	// OpcodeFneg negates the given floating point value: `v = Fneg x`.
 	OpcodeFneg
 
-	// OpcodeFabs ...
-	// `v = fabs x`.
+	// OpcodeFabs takes the absolute value of the given floating point value: `v = fabs x`.
 	OpcodeFabs
 
 	// OpcodeFcopysign ...
 	// `v = fcopysign x, y`.
 	OpcodeFcopysign
 
-	// OpcodeFmin ...
-	// `v = fmin x, y`.
+	// OpcodeFmin takes the minimum of two floating point values: `v = fmin x, y`.
 	OpcodeFmin
 
-	// OpcodeFminPseudo ...
-	// `v = fmin_pseudo x, y`.
-	OpcodeFminPseudo
-
-	// OpcodeFmax ...
-	// `v = fmax x, y`.
+	// OpcodeFmax takes the maximum of two floating point values: `v = fmax x, y`.
 	OpcodeFmax
 
-	// OpcodeFmaxPseudo ...
-	// `v = fmax_pseudo x, y`.
-	OpcodeFmaxPseudo
-
-	// OpcodeCeil ...
-	// `v = ceil x`.
+	// OpcodeCeil takes the ceiling of the given floating point value: `v = ceil x`.
 	OpcodeCeil
 
-	// OpcodeFloor ...
-	// `v = floor x`.
+	// OpcodeFloor takes the floor of the given floating point value: `v = floor x`.
 	OpcodeFloor
 
-	// OpcodeTrunc ...
-	// `v = trunc x`.
+	// OpcodeTrunc takes the truncation of the given floating point value: `v = trunc x`.
 	OpcodeTrunc
 
-	// OpcodeNearest ...
-	// `v = nearest x`.
+	// OpcodeNearest takes the nearest integer of the given floating point value: `v = nearest x`.
 	OpcodeNearest
 
-	// OpcodeIsNull ...
-	// `v = is_null x`.
-	OpcodeIsNull
-
-	// OpcodeIsInvalid ...
-	// `v = is_invalid x`.
-	OpcodeIsInvalid
-
-	// OpcodeBitcast ...
-	// `v = bitcast MemFlags, x`.
+	// OpcodeBitcast is a bitcast operation: `v = bitcast MemFlags, x`.
 	OpcodeBitcast
 
 	// OpcodeScalarToVector ...
@@ -1851,8 +1758,6 @@ func (o Opcode) String() (ret string) {
 		return "Call"
 	case OpcodeCallIndirect:
 		return "CallIndirect"
-	case OpcodeFuncAddr:
-		return "FuncAddr"
 	case OpcodeSplat:
 		return "Splat"
 	case OpcodeSwizzle:
@@ -1913,20 +1818,6 @@ func (o Opcode) String() (ret string) {
 		return "Uload32x2"
 	case OpcodeSload32x2:
 		return "Sload32x2"
-	case OpcodeGlobalValue:
-		return "GlobalValue"
-	case OpcodeSymbolValue:
-		return "SymbolValue"
-	case OpcodeHeapAddr:
-		return "HeapAddr"
-	case OpcodeHeapLoad:
-		return "HeapLoad"
-	case OpcodeHeapStore:
-		return "HeapStore"
-	case OpcodeGetReturnAddress:
-		return "GetReturnAddress"
-	case OpcodeTableAddr:
-		return "TableAddr"
 	case OpcodeIconst:
 		return "Iconst"
 	case OpcodeF32const:
@@ -1937,10 +1828,6 @@ func (o Opcode) String() (ret string) {
 		return "Vconst"
 	case OpcodeShuffle:
 		return "Shuffle"
-	case OpcodeNull:
-		return "Null"
-	case OpcodeNop:
-		return "Nop"
 	case OpcodeSelect:
 		return "Select"
 	case OpcodeBitselect:
@@ -1965,10 +1852,6 @@ func (o Opcode) String() (ret string) {
 		return "Iadd"
 	case OpcodeIsub:
 		return "Isub"
-	case OpcodeIneg:
-		return "Ineg"
-	case OpcodeIabs:
-		return "Iabs"
 	case OpcodeImul:
 		return "Imul"
 	case OpcodeUmulhi:
@@ -2069,12 +1952,8 @@ func (o Opcode) String() (ret string) {
 		return "Bitrev"
 	case OpcodeClz:
 		return "Clz"
-	case OpcodeCls:
-		return "Cls"
 	case OpcodeCtz:
 		return "Ctz"
-	case OpcodeBswap:
-		return "Bswap"
 	case OpcodePopcnt:
 		return "Popcnt"
 	case OpcodeFcmp:
@@ -2089,8 +1968,6 @@ func (o Opcode) String() (ret string) {
 		return "Fdiv"
 	case OpcodeSqrt:
 		return "Sqrt"
-	case OpcodeFma:
-		return "Fma"
 	case OpcodeFneg:
 		return "Fneg"
 	case OpcodeFabs:
@@ -2099,12 +1976,8 @@ func (o Opcode) String() (ret string) {
 		return "Fcopysign"
 	case OpcodeFmin:
 		return "Fmin"
-	case OpcodeFminPseudo:
-		return "FminPseudo"
 	case OpcodeFmax:
 		return "Fmax"
-	case OpcodeFmaxPseudo:
-		return "FmaxPseudo"
 	case OpcodeCeil:
 		return "Ceil"
 	case OpcodeFloor:
@@ -2113,10 +1986,6 @@ func (o Opcode) String() (ret string) {
 		return "Trunc"
 	case OpcodeNearest:
 		return "Nearest"
-	case OpcodeIsNull:
-		return "IsNull"
-	case OpcodeIsInvalid:
-		return "IsInvalid"
 	case OpcodeBitcast:
 		return "Bitcast"
 	case OpcodeScalarToVector:

@@ -3,6 +3,8 @@ package regalloc
 import (
 	"fmt"
 	"sort"
+
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 )
 
 // assignRegisters assigns real registers to virtual registers on each instruction.
@@ -20,7 +22,7 @@ func (a *Allocator) assignRegisters(f Function) {
 
 // assignRegistersPerBlock assigns real registers to virtual registers on each instruction in a block.
 func (a *Allocator) assignRegistersPerBlock(f Function, blk Block, vRegIDToNode []*node, liveNodes []liveNodeInBlock) {
-	if debug {
+	if wazevoapi.RegAllocLoggingEnabled {
 		fmt.Println("---------------------- assigning registers for block", blk.ID(), "----------------------")
 	}
 
@@ -59,7 +61,7 @@ func (a *Allocator) assignRegistersPerInstr(f Function, pc programCounter, instr
 			a.vs = append(a.vs, u)
 			continue
 		}
-		if false {
+		if wazevoapi.RegAllocLoggingEnabled {
 			fmt.Printf("%s uses %d\n", instr, u.ID())
 		}
 		n := vRegIDToNode[u.ID()]
@@ -90,7 +92,7 @@ func (a *Allocator) assignRegistersPerInstr(f Function, pc programCounter, instr
 	if d.IsRealReg() {
 		return
 	}
-	if false {
+	if wazevoapi.RegAllocLoggingEnabled {
 		fmt.Printf("%s defines %d\n", instr, d.ID())
 	}
 

@@ -17,8 +17,6 @@ import (
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 )
 
-const debug = false
-
 // NewAllocator returns a new Allocator.
 func NewAllocator(allocatableRegs *RegisterInfo) Allocator {
 	a := Allocator{
@@ -204,7 +202,7 @@ func (a *Allocator) livenessAnalysis(f Function) {
 			pc += pcStride
 		}
 
-		if debug {
+		if wazevoapi.RegAllocLoggingEnabled {
 			fmt.Printf("constructed block info for block[%d]:\n%s\n\n", blkID, info)
 		}
 	}
@@ -241,7 +239,7 @@ func (a *Allocator) livenessAnalysis(f Function) {
 			}
 		}
 
-		if debug {
+		if wazevoapi.RegAllocLoggingEnabled {
 			fmt.Printf("\nfinalized info for block[%d]:\n%s\n", blk.ID(), info)
 		}
 	}
@@ -252,7 +250,7 @@ func (a *Allocator) livenessAnalysis(f Function) {
 //
 // We recursively call this, so passing `depth` for debugging.
 func (a *Allocator) upAndMarkStack(b Block, v VReg, depth int) {
-	if debug {
+	if wazevoapi.RegAllocLoggingEnabled {
 		fmt.Printf("%supAndMarkStack for %v at %v\n", strings.Repeat("\t", depth), v, b.ID())
 	}
 
@@ -264,7 +262,7 @@ func (a *Allocator) upAndMarkStack(b Block, v VReg, depth int) {
 	if _, ok := info.liveIns[v]; ok {
 		return // But this case, it is already visited. (maybe by, for example, sibling blocks).
 	}
-	if debug {
+	if wazevoapi.RegAllocLoggingEnabled {
 		fmt.Printf("%sadding %v live-in at block[%d]\n", strings.Repeat("\t", depth), v, b.ID())
 	}
 
@@ -277,7 +275,7 @@ func (a *Allocator) upAndMarkStack(b Block, v VReg, depth int) {
 
 	// and climb up the CFG.
 	for _, pred := range preds {
-		if debug {
+		if wazevoapi.RegAllocLoggingEnabled {
 			fmt.Printf("%sadding %v live-out at block[%d]\n", strings.Repeat("\t", depth+1), v, pred.ID())
 		}
 		a.blockInfoAt(pred.ID()).liveOuts[v] = struct{}{}
@@ -369,7 +367,7 @@ func (a *Allocator) buildLiveRangesForNonReals(blkID int, info *blockInfo) {
 	// Reuse for the next block.
 	a.vs = vs[:0]
 
-	if debug {
+	if wazevoapi.RegAllocValidationEnabled {
 		for u := range kills {
 			if !u.IsRealReg() {
 				_, defined := defs[u]
