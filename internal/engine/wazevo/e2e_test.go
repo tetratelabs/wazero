@@ -80,7 +80,7 @@ func TestSpectestV1(t *testing.T) {
 		{name: "int_literals"},
 		{name: "labels"},
 		{name: "left-to-right"},
-		//{name: "linking"},
+		{name: "linking"},
 		{name: "load"},
 		//{name: "loop"},
 		{name: "local_get"},

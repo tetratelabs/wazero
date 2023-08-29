@@ -211,7 +211,7 @@ func (m *moduleEngine) FunctionInstanceReference(funcIndex wasm.Index) wasm.Refe
 		begin, _, _ := m.parent.offsets.ImportedFunctionOffset(funcIndex)
 		return uintptr(unsafe.Pointer(&m.opaque[begin]))
 	}
-
+	funcIndex -= m.module.Source.ImportFunctionCount
 	p := m.parent
 	executable := &p.executable[p.functionOffsets[funcIndex].nativeBegin()]
 	typeID := m.module.TypeIDs[m.module.Source.FunctionSection[funcIndex]]
