@@ -103,6 +103,8 @@ var defKinds = [numInstructionKinds]defKind{
 	fpuToInt:        defKindRD,
 	intToFpu:        defKindRD,
 	cCmpImm:         defKindNone,
+	movToFPSR:       defKindNone,
+	movFromFPSR:     defKindRD,
 }
 
 // defs returns the list of regalloc.VReg that are defined by the instruction.
@@ -206,6 +208,8 @@ var useKinds = [numInstructionKinds]useKind{
 	vecRRR:          useKindRNRM,
 	fpuToInt:        useKindRN,
 	intToFpu:        useKindRN,
+	movToFPSR:       useKindRN,
+	movFromFPSR:     useKindNone,
 }
 
 // uses returns the list of regalloc.VReg that are used by the instruction.
@@ -656,6 +660,16 @@ func (i *instruction) asALUBitmaskImm(aluOp aluOp, rn, rd regalloc.VReg, imm uin
 	}
 }
 
+func (i *instruction) asMovToFPSR(rn regalloc.VReg) {
+	i.kind = movToFPSR
+	i.rn = operandNR(rn)
+}
+
+func (i *instruction) asMovFromFPSR(rd regalloc.VReg) {
+	i.kind = movFromFPSR
+	i.rd = operandNR(rd)
+}
+
 func (i *instruction) asBitRR(bitOp bitOp, rd, rn regalloc.VReg, is64bit bool) {
 	i.kind = bitRR
 	i.rn, i.rd = operandNR(rn), operandNR(rd)
@@ -1064,10 +1078,10 @@ func (i *instruction) String() (str string) {
 		panic("TODO")
 	case vecTbl2:
 		panic("TODO")
-	case movToNZCV:
-		panic("TODO")
-	case movFromNZCV:
-		panic("TODO")
+	case movToFPSR:
+		str = fmt.Sprintf("msr fpsr, %s", formatVRegSized(i.rn.nr(), 64))
+	case movFromFPSR:
+		str = fmt.Sprintf("mrs %s fpsr", formatVRegSized(i.rd.nr(), 64))
 	case call:
 		if i.u2 > 0 {
 			str = fmt.Sprintf("bl #%#x", i.u2)
@@ -1284,10 +1298,10 @@ const (
 	vecTbl
 	// vecTbl2 represents a table vector lookup - two register table.
 	vecTbl2
-	// movToNZCV represents a move to the NZCV flags.
-	movToNZCV
-	// movFromNZCV represents a move from the NZCV flags.
-	movFromNZCV
+	// movToNZCV represents a move to the FPSR.
+	movToFPSR
+	// movFromNZCV represents a move from the FPSR.
+	movFromFPSR
 	// call represents a machine call instruction.
 	call
 	// callInd represents a machine indirect-call instruction.
