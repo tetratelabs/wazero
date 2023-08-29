@@ -1326,8 +1326,9 @@ const (
 	numInstructionKinds
 )
 
-func (i *instruction) asUDF() {
+func (i *instruction) asUDF() *instruction {
 	i.kind = udf
+	return i
 }
 
 func (i *instruction) asFpuToInt(rd, rn operand, rdSigned, src64bit, dst64bit bool) {

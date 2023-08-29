@@ -1194,8 +1194,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 				}
 			}
 		} else {
-			fnIndex -= c.m.ImportFunctionCount
-			typIndex = c.m.FunctionSection[fnIndex]
+			typIndex = c.m.FunctionSection[fnIndex-c.m.ImportFunctionCount]
 		}
 		typ := &c.m.TypeSection[typIndex]
 

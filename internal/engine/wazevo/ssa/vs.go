@@ -42,12 +42,20 @@ func (v Value) Format(b Builder) string {
 	return fmt.Sprintf("v%d", v.ID())
 }
 
-func (v Value) formatWithType(b Builder) string {
+func (v Value) formatWithType(b Builder) (ret string) {
 	if annotation, ok := b.(*builder).valueAnnotations[v.ID()]; ok {
-		return annotation + ":" + v.Type().String()
+		ret = annotation + ":" + v.Type().String()
 	} else {
-		return fmt.Sprintf("v%d:%s", v.ID(), v.Type())
+		ret = fmt.Sprintf("v%d:%s", v.ID(), v.Type())
 	}
+
+	if debug { // This is useful to check live value analysis bugs.
+		if bd := b.(*builder); bd.donePasses {
+			id := v.ID()
+			ret += fmt.Sprintf("(ref=%d)", bd.valueRefCounts[id])
+		}
+	}
+	return ret
 }
 
 // Valid returns true if this value is valid.
