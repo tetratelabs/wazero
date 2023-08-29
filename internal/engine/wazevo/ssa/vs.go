@@ -49,7 +49,7 @@ func (v Value) formatWithType(b Builder) (ret string) {
 		ret = fmt.Sprintf("v%d:%s", v.ID(), v.Type())
 	}
 
-	if false { // This is useful to check live value analysis bugs.
+	if debug { // This is useful to check live value analysis bugs.
 		if bd := b.(*builder); bd.donePasses {
 			id := v.ID()
 			ret += fmt.Sprintf("(ref=%d)", bd.valueRefCounts[id])

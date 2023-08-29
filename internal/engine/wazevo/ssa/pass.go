@@ -264,25 +264,28 @@ func passDeadCodeEliminationOpt(b *builder) {
 			// Hence, we can increment the value reference counts.
 			v1, v2, v3, vs := cur.Args()
 			if v1.Valid() {
-				fmt.Printf("[1] v%d referenced from %v\n", v1.ID(), cur.Format(b))
-				b.valueRefCounts[v1.ID()]++
+				b.incRefCount(v1.ID(), cur)
 			}
 			if v2.Valid() {
-				fmt.Printf("[2] v%d referenced from %v\n", v2.ID(), cur.Format(b))
-				b.valueRefCounts[v2.ID()]++
+				b.incRefCount(v2.ID(), cur)
 			}
 			if v3.Valid() {
-				fmt.Printf("[3] v%d referenced from %v\n", v3.ID(), cur.Format(b))
-				b.valueRefCounts[v3.ID()]++
+				b.incRefCount(v3.ID(), cur)
 			}
 			for _, v := range vs {
-				fmt.Printf("[vs] v%d referenced from %v\n", v.ID(), cur.Format(b))
-				b.valueRefCounts[v.ID()]++
+				b.incRefCount(v.ID(), cur)
 			}
 		}
 	}
 
 	b.instStack = liveInstructions // we reuse the stack for the next iteration.
+}
+
+func (b *builder) incRefCount(id ValueID, from *Instruction) {
+	if debug {
+		fmt.Printf("v%d referenced from %v\n", id, from.Format(b))
+	}
+	b.valueRefCounts[id]++
 }
 
 // clearBlkVisited clears the b.blkVisited map so that we can reuse it for multiple places.
