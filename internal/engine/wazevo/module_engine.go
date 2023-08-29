@@ -107,6 +107,10 @@ func (m *moduleEngine) setupOpaque() {
 
 // NewFunction implements wasm.ModuleEngine.
 func (m *moduleEngine) NewFunction(index wasm.Index) api.Function {
+	if wazevoapi.PrintMachineCodeHexPerFunctionDisassemblable {
+		panic("When PrintMachineCodeHexPerFunctionDisassemblable enabled, functions must not be called")
+	}
+
 	localIndex := index
 	if importedFnCount := m.module.Source.ImportFunctionCount; index < importedFnCount {
 		imported := &m.importedFunctions[index]

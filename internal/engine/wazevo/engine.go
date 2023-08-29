@@ -204,7 +204,8 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []exper
 		bodies[i] = copied
 		totalSize += len(body)
 		if wazevoapi.PrintMachineCodeHexPerFunction {
-			fmt.Println(hex.EncodeToString(body))
+			fmt.Printf("[[[machine code SSA for %d/%d %s]]]\n%s\n",
+				i, len(module.CodeSection)-1, exportedFnIndex[fidx], hex.EncodeToString(body))
 		}
 	}
 

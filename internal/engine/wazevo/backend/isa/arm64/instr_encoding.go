@@ -557,6 +557,8 @@ func encodeConditionalSelect(kind instructionKind, rd, rn, rm uint32, c condFlag
 	return ret
 }
 
+const dummyInstruction uint32 = 0x14000000 // "b 0"
+
 // encodeLoadFpuConst32 encodes the following three instructions:
 //
 //	ldr s8, #8  ;; literal load of data.f32
@@ -568,7 +570,12 @@ func encodeLoadFpuConst32(c backend.Compiler, rd uint32, rawF32 uint64) {
 		0b111<<26 | (0x8/4)<<5 | rd,
 	)
 	c.Emit4Bytes(encodeUnconditionalBranch(false, 8)) // b 8
-	c.Emit4Bytes(uint32(rawF32))                      // data.f32 xxxxxxx
+	if wazevoapi.PrintMachineCodeHexPerFunctionDisassemblable {
+		// Inlined data.f32 cannot be disassembled, so we add a dummy instruction here.
+		c.Emit4Bytes(dummyInstruction)
+	} else {
+		c.Emit4Bytes(uint32(rawF32)) // data.f32 xxxxxxx
+	}
 }
 
 // encodeLoadFpuConst64 encodes the following three instructions:
@@ -582,9 +589,15 @@ func encodeLoadFpuConst64(c backend.Compiler, rd uint32, rawF64 uint64) {
 		0b1<<30 | 0b111<<26 | (0x8/4)<<5 | rd,
 	)
 	c.Emit4Bytes(encodeUnconditionalBranch(false, 12)) // b 12
-	// data.f64 xxxxxxx
-	c.Emit4Bytes(uint32(rawF64))
-	c.Emit4Bytes(uint32(rawF64 >> 32))
+	if wazevoapi.PrintMachineCodeHexPerFunctionDisassemblable {
+		// Inlined data.f64 cannot be disassembled, so we add dummy instructions here.
+		c.Emit4Bytes(dummyInstruction)
+		c.Emit4Bytes(dummyInstruction)
+	} else {
+		// data.f64 xxxxxxx
+		c.Emit4Bytes(uint32(rawF64))
+		c.Emit4Bytes(uint32(rawF64 >> 32))
+	}
 }
 
 // encodeAluRRRR encodes as Data-processing (3 source) in
@@ -1244,7 +1257,12 @@ func encodeBrTableSequence(c backend.Compiler, index regalloc.VReg, targets []ui
 
 	// Offsets are resolved in ResolveRelativeAddress phase.
 	for _, offset := range targets {
-		c.Emit4Bytes(offset)
+		if wazevoapi.PrintMachineCodeHexPerFunctionDisassemblable {
+			// Inlined offset tables cannot be disassembled properly, so pad dummy instructions to make the debugging easier.
+			c.Emit4Bytes(dummyInstruction)
+		} else {
+			c.Emit4Bytes(offset)
+		}
 	}
 }
 
