@@ -1,6 +1,7 @@
 package arm64
 
 import (
+	"encoding/hex"
 	"fmt"
 	"strings"
 	"testing"
@@ -8,6 +9,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
@@ -339,4 +341,49 @@ exit_sequence x65535?
 			require.Equal(t, tc.exp, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
 		})
 	}
+}
+
+func Test_exitWithCodeEncodingSize(t *testing.T) {
+	_, _, m := newSetupWithMockContext()
+	m.lowerExitWithCode(x1VReg, wazevoapi.ExitCodeGrowStack)
+	m.FlushPendingInstructions()
+	m.encode(m.perBlockHead)
+	buf := m.compiler.Buf()
+	require.Equal(t, "3b0080d23b0000b93d0840f93b0c40f97f0300913e1040f9c0035fd6", hex.EncodeToString(buf))
+	require.Equal(t, exitWithCodeEncodingSize, len(buf))
+}
+
+func Test_exitIfNotSequenceEncodingSize(t *testing.T) {
+	_, _, m := newSetupWithMockContext()
+	m.exitIfNot(x1VReg, ne.asCond(), wazevoapi.ExitCodeGrowStack)
+	m.FlushPendingInstructions()
+	m.encode(m.perBlockHead)
+	buf := m.compiler.Buf()
+	require.Equal(t, "010100543b0080d23b0000b93d0840f93b0c40f97f0300913e1040f9c0035fd6", hex.EncodeToString(buf))
+	require.Equal(t, exitIfNotSequenceEncodingSize, len(buf))
+}
+
+func TestMachine_lowerFpuToInt(t *testing.T) {
+	_, _, m := newSetupWithMockContext()
+	m.lowerFpuToInt(operandNR(x1VReg), operandNR(x2VReg), x15VReg, false, false, false)
+	require.Equal(t, `
+msr fpsr, xzr
+fcvtzu w1, s2
+mrs x27 fpsr
+subs xzr, x27, #0x1
+b.ne #0x44
+fcmp w2, w2
+b.vc #0x20
+movz x27, #0xc, lsl 0
+str w27, [x15]
+exit_sequence x15
+movz x27, #0xb, lsl 0
+str w27, [x15]
+exit_sequence x15
+`, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
+
+	m.FlushPendingInstructions()
+	m.encode(m.perBlockHead)
+	buf := m.compiler.Buf()
+	require.Equal(t, "3f441bd54100391e3b443bd57f0700f1210200544020221e070100549b0180d2fb0100b9fd0940f9fb0d40f97f030091fe1140f9c0035fd67b0180d2fb0100b9fd0940f9fb0d40f97f030091fe1140f9c0035fd6", hex.EncodeToString(buf))
 }

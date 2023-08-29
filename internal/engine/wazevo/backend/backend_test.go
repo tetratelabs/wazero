@@ -1615,7 +1615,7 @@ L1 (SSA Block: blk0):
 	movz x27, #0xc, lsl 0
 	str w27, [x8]
 	exit_sequence x8
-	movz x27, #0xc, lsl 0
+	movz x27, #0xb, lsl 0
 	str w27, [x8]
 	exit_sequence x8
 	msr fpsr, xzr
@@ -1628,7 +1628,7 @@ L1 (SSA Block: blk0):
 	movz x27, #0xc, lsl 0
 	str w27, [x8]
 	exit_sequence x8
-	movz x27, #0xc, lsl 0
+	movz x27, #0xb, lsl 0
 	str w27, [x8]
 	exit_sequence x8
 	msr fpsr, xzr
@@ -1641,7 +1641,7 @@ L1 (SSA Block: blk0):
 	movz x27, #0xc, lsl 0
 	str w27, [x8]
 	exit_sequence x8
-	movz x27, #0xc, lsl 0
+	movz x27, #0xb, lsl 0
 	str w27, [x8]
 	exit_sequence x8
 	msr fpsr, xzr
@@ -1654,7 +1654,7 @@ L1 (SSA Block: blk0):
 	movz x27, #0xc, lsl 0
 	str w27, [x8]
 	exit_sequence x8
-	movz x27, #0xc, lsl 0
+	movz x27, #0xb, lsl 0
 	str w27, [x8]
 	exit_sequence x8
 	msr fpsr, xzr
@@ -1667,7 +1667,7 @@ L1 (SSA Block: blk0):
 	movz x27, #0xc, lsl 0
 	str w27, [x8]
 	exit_sequence x8
-	movz x27, #0xc, lsl 0
+	movz x27, #0xb, lsl 0
 	str w27, [x8]
 	exit_sequence x8
 	msr fpsr, xzr
@@ -1680,7 +1680,7 @@ L1 (SSA Block: blk0):
 	movz x27, #0xc, lsl 0
 	str w27, [x8]
 	exit_sequence x8
-	movz x27, #0xc, lsl 0
+	movz x27, #0xb, lsl 0
 	str w27, [x8]
 	exit_sequence x8
 	msr fpsr, xzr
@@ -1693,7 +1693,7 @@ L1 (SSA Block: blk0):
 	movz x27, #0xc, lsl 0
 	str w27, [x8]
 	exit_sequence x8
-	movz x27, #0xc, lsl 0
+	movz x27, #0xb, lsl 0
 	str w27, [x8]
 	exit_sequence x8
 	msr fpsr, xzr
@@ -1706,7 +1706,7 @@ L1 (SSA Block: blk0):
 	movz x27, #0xc, lsl 0
 	str w27, [x8]
 	exit_sequence x8
-	movz x27, #0xc, lsl 0
+	movz x27, #0xb, lsl 0
 	str w27, [x8]
 	exit_sequence x8
 	fcvt s0, d0

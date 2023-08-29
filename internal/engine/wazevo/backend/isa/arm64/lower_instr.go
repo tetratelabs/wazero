@@ -464,7 +464,7 @@ func (m *machine) lowerFpuToInt(rd, rn operand, ctx regalloc.VReg, signed, src64
 	// If the VC flag is not set (== VS flag is set), it is a NaN.
 	m.exitIfNot(ctx, vc.asCond(), wazevoapi.ExitCodeInvalidConversionToInteger)
 	// Otherwise, it is an overflow.
-	m.lowerExitWithCode(ctx, wazevoapi.ExitCodeInvalidConversionToInteger)
+	m.lowerExitWithCode(ctx, wazevoapi.ExitCodeIntegerOverflow)
 }
 
 func (m *machine) lowerIntToFpu(rd, rn operand, signed, src64bit, dst64bit bool) {

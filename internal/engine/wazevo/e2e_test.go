@@ -50,6 +50,7 @@ func TestSpectestV1(t *testing.T) {
 		//{name: "call_indirect"},
 		{name: "comments"},
 		{name: "custom"},
+		{name: "conversions"},
 		{name: "const"},
 		{name: "data"},
 		{name: "elem"},
