@@ -213,7 +213,8 @@ func (m *moduleEngine) FunctionInstanceReference(funcIndex wasm.Index) wasm.Refe
 	}
 
 	p := m.parent
-	executable := &p.executable[p.functionOffsets[funcIndex].offset]
+	offset := p.functionOffsets[funcIndex]
+	executable := &p.executable[offset.offset+offset.goPreambleSize]
 	typeID := m.module.TypeIDs[m.module.Source.FunctionSection[funcIndex]]
 
 	lf := &functionInstance{

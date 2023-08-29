@@ -1700,9 +1700,9 @@ func (i *Instruction) Format(b Builder) string {
 			vs[idx] = i.vs[idx].Format(b)
 		}
 		if i.opcode == OpcodeCallIndirect {
-			instSuffix = fmt.Sprintf(" %s:%s, %s", i.v2.Format(b), SignatureID(i.v), strings.Join(vs, ", "))
+			instSuffix = fmt.Sprintf(" %s:%s, %s", i.v.Format(b), SignatureID(i.u1), strings.Join(vs, ", "))
 		} else {
-			instSuffix = fmt.Sprintf(" %s:%s, %s", FuncRef(i.u1), SignatureID(i.v), strings.Join(vs, ", "))
+			instSuffix = fmt.Sprintf(" %s:%s, %s", FuncRef(i.u1), SignatureID(i.u2), strings.Join(vs, ", "))
 		}
 	case OpcodeStore, OpcodeIstore8, OpcodeIstore16, OpcodeIstore32:
 		instSuffix = fmt.Sprintf(" %s, %s, %#x", i.v.Format(b), i.v2.Format(b), int32(i.u1))
