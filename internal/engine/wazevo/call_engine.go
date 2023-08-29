@@ -176,6 +176,8 @@ func (c *callEngine) CallWithStack(ctx context.Context, paramResultStack []uint6
 			return wasmruntime.ErrRuntimeIntegerOverflow
 		case wazevoapi.ExitCodeIntegerDivisionByZero:
 			return wasmruntime.ErrRuntimeIntegerDivideByZero
+		case wazevoapi.ExitCodeInvalidConversionToInteger:
+			return wasmruntime.ErrRuntimeInvalidConversionToInteger
 		default:
 			panic("BUG")
 		}

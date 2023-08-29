@@ -738,12 +738,10 @@ const (
 	// `v = fcvt_to_uint x`.
 	OpcodeFcvtToUint
 
-	// OpcodeFcvtToSint ...
-	// `v = fcvt_to_sint x`.
+	// OpcodeFcvtToSint converts a floating point value to a signed integer: `v = FcvtToSint x`.
 	OpcodeFcvtToSint
 
-	// OpcodeFcvtToUintSat ...
-	// `v = fcvt_to_uint_sat x`.
+	// OpcodeFcvtToUintSat converts a floating point value to an unsigned integer: `v = FcvtToUintSat x`.
 	OpcodeFcvtToUintSat
 
 	// OpcodeFcvtToSintSat ...
@@ -871,8 +869,8 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeSelect:             sideEffectNone,
 	OpcodeFmin:               sideEffectNone,
 	OpcodeFneg:               sideEffectNone,
-	OpcodeFcvtToSint:         sideEffectNone,
-	OpcodeFcvtToUint:         sideEffectNone,
+	OpcodeFcvtToSint:         sideEffectTraps,
+	OpcodeFcvtToUint:         sideEffectTraps,
 	OpcodeFcvtFromSint:       sideEffectNone,
 	OpcodeFcvtFromUint:       sideEffectNone,
 	OpcodeFdemote:            sideEffectNone,
@@ -1588,7 +1586,7 @@ func (i *Instruction) AsFpromote(x Value) {
 }
 
 // AsFcvtFromInt initializes this instruction as an instruction with either OpcodeFcvtFromUint or OpcodeFcvtFromSint
-func (i *Instruction) AsFcvtFromInt(x Value, signed bool, dst64bit bool) {
+func (i *Instruction) AsFcvtFromInt(x Value, signed bool, dst64bit bool) *Instruction {
 	if signed {
 		i.opcode = OpcodeFcvtFromSint
 	} else {
@@ -1600,21 +1598,24 @@ func (i *Instruction) AsFcvtFromInt(x Value, signed bool, dst64bit bool) {
 	} else {
 		i.typ = TypeF32
 	}
+	return i
 }
 
 // AsFcvtToInt initializes this instruction as an instruction with either OpcodeFcvtToUint or OpcodeFcvtToSint
-func (i *Instruction) AsFcvtToInt(x Value, signed bool, dst64bit bool) {
+func (i *Instruction) AsFcvtToInt(x, ctx Value, signed bool, dst64bit bool) *Instruction {
 	if signed {
 		i.opcode = OpcodeFcvtToSint
 	} else {
 		i.opcode = OpcodeFcvtToUint
 	}
 	i.v = x
+	i.v2 = ctx
 	if dst64bit {
 		i.typ = TypeI64
 	} else {
 		i.typ = TypeI32
 	}
+	return i
 }
 
 // AsSExtend initializes this instruction as a sign extension instruction with OpcodeSExtend.

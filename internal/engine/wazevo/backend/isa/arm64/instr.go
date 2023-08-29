@@ -103,6 +103,8 @@ var defKinds = [numInstructionKinds]defKind{
 	fpuToInt:        defKindRD,
 	intToFpu:        defKindRD,
 	cCmpImm:         defKindNone,
+	movToFPSR:       defKindNone,
+	movFromFPSR:     defKindRD,
 }
 
 // defs returns the list of regalloc.VReg that are defined by the instruction.
@@ -206,6 +208,8 @@ var useKinds = [numInstructionKinds]useKind{
 	vecRRR:          useKindRNRM,
 	fpuToInt:        useKindRN,
 	intToFpu:        useKindRN,
+	movToFPSR:       useKindRN,
+	movFromFPSR:     useKindNone,
 }
 
 // uses returns the list of regalloc.VReg that are used by the instruction.
@@ -656,6 +660,16 @@ func (i *instruction) asALUBitmaskImm(aluOp aluOp, rn, rd regalloc.VReg, imm uin
 	}
 }
 
+func (i *instruction) asMovToFPSR(rn regalloc.VReg) {
+	i.kind = movToFPSR
+	i.rn = operandNR(rn)
+}
+
+func (i *instruction) asMovFromFPSR(rd regalloc.VReg) {
+	i.kind = movFromFPSR
+	i.rd = operandNR(rd)
+}
+
 func (i *instruction) asBitRR(bitOp bitOp, rd, rn regalloc.VReg, is64bit bool) {
 	i.kind = bitRR
 	i.rn, i.rd = operandNR(rn), operandNR(rd)
@@ -992,8 +1006,6 @@ func (i *instruction) String() (str string) {
 			formatVRegSized(i.rm.nr(), size),
 			condFlag(i.u1),
 		)
-	case movToFpu:
-		panic("TODO")
 	case movToVec:
 		var size byte
 		arr := vecArrangement(i.u1)
@@ -1066,10 +1078,10 @@ func (i *instruction) String() (str string) {
 		panic("TODO")
 	case vecTbl2:
 		panic("TODO")
-	case movToNZCV:
-		panic("TODO")
-	case movFromNZCV:
-		panic("TODO")
+	case movToFPSR:
+		str = fmt.Sprintf("msr fpsr, %s", formatVRegSized(i.rn.nr(), 64))
+	case movFromFPSR:
+		str = fmt.Sprintf("mrs %s fpsr", formatVRegSized(i.rd.nr(), 64))
 	case call:
 		if i.u2 > 0 {
 			str = fmt.Sprintf("bl #%#x", i.u2)
@@ -1077,11 +1089,9 @@ func (i *instruction) String() (str string) {
 			str = fmt.Sprintf("bl %s", ssa.FuncRef(i.u1))
 		}
 	case callInd:
-		str = fmt.Sprintf("bl %s", formatVRegSized(i.rn.nr(), 32))
+		str = fmt.Sprintf("bl %s", formatVRegSized(i.rn.nr(), 64))
 	case ret:
 		str = "ret"
-	case epiloguePlaceholder:
-		panic("TODO")
 	case br:
 		target := label(i.u1)
 		if i.u3 != 0 {
@@ -1117,14 +1127,8 @@ func (i *instruction) String() (str string) {
 				str = fmt.Sprintf("b.%s %s", c.flag(), target.String())
 			}
 		}
-	case indirectBr:
-		panic("TODO")
 	case adr:
 		str = fmt.Sprintf("adr %s, #%#x", formatVRegSized(i.rd.nr(), 64), int64(i.u1))
-	case word4:
-		panic("TODO")
-	case word8:
-		panic("TODO")
 	case brTableSequence:
 		if i.u3 == 0 { // The offsets haven't been resolved yet.
 			labels := make([]string, len(i.targets))
@@ -1148,8 +1152,6 @@ func (i *instruction) String() (str string) {
 				offsets,
 			)
 		}
-	case loadAddr:
-		panic("TODO")
 	case exitSequence:
 		str = fmt.Sprintf("exit_sequence %s", formatVRegSized(i.rn.nr(), 64))
 	case udf:
@@ -1270,8 +1272,6 @@ const (
 	intToFpu
 	// fpuCSel represents a 32/64-bit FP conditional select.
 	fpuCSel
-	// movToFpu represents a move from a GPR to a scalar FP register.
-	movToFpu
 	// movToVec represents a move to a vector element from a GPR.
 	movToVec
 	// movFromVec represents an unsigned move from a vector element to a GPR.
@@ -1298,36 +1298,24 @@ const (
 	vecTbl
 	// vecTbl2 represents a table vector lookup - two register table.
 	vecTbl2
-	// movToNZCV represents a move to the NZCV flags.
-	movToNZCV
-	// movFromNZCV represents a move from the NZCV flags.
-	movFromNZCV
+	// movToNZCV represents a move to the FPSR.
+	movToFPSR
+	// movFromNZCV represents a move from the FPSR.
+	movFromFPSR
 	// call represents a machine call instruction.
 	call
 	// callInd represents a machine indirect-call instruction.
 	callInd
 	// ret represents a machine return instruction.
 	ret
-	// epiloguePlaceholder is a placeholder instruction, generating no code, meaning that a function epilogue must be
-	// inserted there.
-	epiloguePlaceholder
 	// br represents an unconditional branch.
 	br
 	// condBr represents a conditional branch.
 	condBr
-	// trapIf represents a conditional trap.
-	// indirectBr represents an indirect branch through a register.
-	indirectBr
 	// adr represents a compute the address (using a PC-relative offset) of a memory location.
 	adr
-	// word4 represents a raw 32-bit word.
-	word4
-	// word8 represents a raw 64-bit word.
-	word8
 	// brTableSequence represents a jump-table sequence.
 	brTableSequence
-	// loadAddr represents a load address instruction.
-	loadAddr
 	// exitSequence consists of multiple instructions, and exits the execution immediately.
 	// See encodeExitSequence.
 	exitSequence

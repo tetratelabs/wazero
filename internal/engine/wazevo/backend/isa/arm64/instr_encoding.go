@@ -284,9 +284,27 @@ func (i *instruction) encode(c backend.Compiler) {
 		c.Emit4Bytes(
 			sf<<31 | 0b111101001<<22 | imm<<16 | cond<<12 | 0b1<<11 | rn<<5 | nzcv,
 		)
+	case movFromFPSR:
+		rt := regNumberInEncoding[i.rd.realReg()]
+		c.Emit4Bytes(encodeSystemRegisterMove(rt, true))
+	case movToFPSR:
+		rt := regNumberInEncoding[i.rn.realReg()]
+		c.Emit4Bytes(encodeSystemRegisterMove(rt, false))
 	default:
 		panic(i.String())
 	}
+}
+
+// encodeSystemRegisterMove encodes as "System register move" in
+// https://developer.arm.com/documentation/ddi0596/2020-12/Index-by-Encoding/Branches--Exception-Generating-and-System-instructions?lang=en
+//
+// Note that currently we only supports read/write of FPSR.
+func encodeSystemRegisterMove(rt uint32, fromSystem bool) uint32 {
+	ret := 0b11010101<<24 | 0b11011<<16 | 0b01000100<<8 | 0b001<<5 | rt
+	if fromSystem {
+		ret |= 0b1 << 21
+	}
+	return ret
 }
 
 // encodeVecRRR encodes as either "Advanced SIMD three *" in

@@ -18,6 +18,7 @@ const (
 	ExitCodeIndirectCallTypeMismatch
 	ExitCodeIntegerDivisionByZero
 	ExitCodeIntegerOverflow
+	ExitCodeInvalidConversionToInteger
 	exitCodeMax
 )
 
@@ -48,6 +49,8 @@ func (e ExitCode) String() string {
 		return "integer_division_by_zero"
 	case ExitCodeIntegerOverflow:
 		return "integer_overflow"
+	case ExitCodeInvalidConversionToInteger:
+		return "invalid_conversion_to_integer"
 	}
 	panic("TODO")
 }

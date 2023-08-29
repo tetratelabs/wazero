@@ -178,7 +178,7 @@ func TestMachine_insertStackBoundsCheck(t *testing.T) {
 	movz x27, #0xfff0, lsl 0
 	str x27, [x0, #0x40]
 	ldr x27, [x0, #0x50]
-	bl w27
+	bl x27
 `,
 		},
 		{
@@ -191,7 +191,7 @@ func TestMachine_insertStackBoundsCheck(t *testing.T) {
 	orr x27, xzr, #0x10
 	str x27, [x0, #0x40]
 	ldr x27, [x0, #0x50]
-	bl w27
+	bl x27
 `,
 		},
 	} {

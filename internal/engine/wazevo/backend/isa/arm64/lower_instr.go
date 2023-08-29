@@ -206,21 +206,31 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		result := instr.Return()
 		m.lowerPopcnt(x, result)
 	case ssa.OpcodeFcvtToSint:
-		x := instr.Arg()
+		x, ctx := instr.Arg2()
 		result := instr.Return()
-		m.lowerFpuToInt(result, x, true, x.Type() == ssa.TypeF64, result.Type().Bits() == 64)
+		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+		rd := operandNR(m.compiler.VRegOf(result))
+		ctxVReg := m.compiler.VRegOf(ctx)
+		m.lowerFpuToInt(rd, rn, ctxVReg, true, x.Type() == ssa.TypeF64, result.Type().Bits() == 64)
 	case ssa.OpcodeFcvtToUint:
-		x := instr.Arg()
+		x, ctx := instr.Arg2()
 		result := instr.Return()
-		m.lowerFpuToInt(result, x, false, x.Type() == ssa.TypeF64, result.Type().Bits() == 64)
+		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+		rd := operandNR(m.compiler.VRegOf(result))
+		ctxVReg := m.compiler.VRegOf(ctx)
+		m.lowerFpuToInt(rd, rn, ctxVReg, false, x.Type() == ssa.TypeF64, result.Type().Bits() == 64)
 	case ssa.OpcodeFcvtFromSint:
 		x := instr.Arg()
 		result := instr.Return()
-		m.lowerIntToFpu(result, x, true, x.Type() == ssa.TypeI64, result.Type().Bits() == 64)
+		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+		rd := operandNR(m.compiler.VRegOf(result))
+		m.lowerIntToFpu(rd, rn, true, x.Type() == ssa.TypeI64, result.Type().Bits() == 64)
 	case ssa.OpcodeFcvtFromUint:
 		x := instr.Arg()
 		result := instr.Return()
-		m.lowerIntToFpu(result, x, false, x.Type() == ssa.TypeI64, result.Type().Bits() == 64)
+		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+		rd := operandNR(m.compiler.VRegOf(result))
+		m.lowerIntToFpu(rd, rn, false, x.Type() == ssa.TypeI64, result.Type().Bits() == 64)
 	case ssa.OpcodeFdemote:
 		v := instr.Arg()
 		rn := m.getOperand_NR(m.compiler.ValueDefinition(v), extModeNone)
@@ -334,6 +344,8 @@ func (m *machine) lowerIDiv(execCtxVReg regalloc.VReg, rd, rn, rm operand, _64bi
 	}
 }
 
+const exitIfNotSequenceEncodingSize = 4 + exitWithCodeEncodingSize
+
 func (m *machine) exitIfNot(execCtxVReg regalloc.VReg, c cond, code wazevoapi.ExitCode) {
 	cbr := m.allocateInstr()
 	cbr.asCondBr(c, invalidLabel, false /* ignored */)
@@ -415,17 +427,47 @@ func (m *machine) lowerFpuUniOp(op fpuUniOp, in, out ssa.Value) {
 	m.insert(neg)
 }
 
-func (m *machine) lowerFpuToInt(dst, src ssa.Value, signed, src64bit, dst64bit bool) {
-	rn := m.getOperand_NR(m.compiler.ValueDefinition(src), extModeNone)
-	rd := operandNR(m.compiler.VRegOf(dst))
+func (m *machine) lowerFpuToInt(rd, rn operand, ctx regalloc.VReg, signed, src64bit, dst64bit bool) {
+	// First of all, we have to clear the FPU flags.
+	flagClear := m.allocateInstr()
+	flagClear.asMovToFPSR(xzrVReg)
+	m.insert(flagClear)
+
+	// Then, do the conversion which doesn't trap inherently.
 	cvt := m.allocateInstr()
 	cvt.asFpuToInt(rd, rn, signed, src64bit, dst64bit)
 	m.insert(cvt)
+
+	// After the conversion, check the FPU flags.
+	getFlag := m.allocateInstr()
+	getFlag.asMovFromFPSR(tmpRegVReg)
+	m.insert(getFlag)
+
+	// Check if the conversion was undefined by comparing the status with 1.
+	// See https://developer.arm.com/documentation/ddi0595/2020-12/AArch64-Registers/FPSR--Floating-point-Status-Register
+	alu := m.allocateInstr()
+	alu.asALU(aluOpSubS, operandNR(xzrVReg), operandNR(tmpRegVReg), operandImm12(1, 0), true)
+	m.insert(alu)
+
+	// If it is not undefined, we can return the result.
+	ok := m.allocateInstr()
+	ok.asCondBr(ne.asCond(), invalidLabel, false /* ignored */)
+	ok.condBrOffsetResolve(4 /* fpuCmp */ + exitIfNotSequenceEncodingSize + exitWithCodeEncodingSize + 4)
+	m.insert(ok)
+
+	// Otherwise, we have to choose the status depending on it is overflow or NaN conversion.
+
+	// Comparing itself to check if it is a NaN.
+	fpuCmp := m.allocateInstr()
+	fpuCmp.asFpuCmp(rn, rn, src64bit)
+	m.insert(fpuCmp)
+	// If the VC flag is not set (== VS flag is set), it is a NaN.
+	m.exitIfNot(ctx, vc.asCond(), wazevoapi.ExitCodeInvalidConversionToInteger)
+	// Otherwise, it is an overflow.
+	m.lowerExitWithCode(ctx, wazevoapi.ExitCodeIntegerOverflow)
 }
 
-func (m *machine) lowerIntToFpu(dst, src ssa.Value, signed, src64bit, dst64bit bool) {
-	rn := m.getOperand_NR(m.compiler.ValueDefinition(src), extModeNone)
-	rd := operandNR(m.compiler.VRegOf(dst))
+func (m *machine) lowerIntToFpu(rd, rn operand, signed, src64bit, dst64bit bool) {
 	cvt := m.allocateInstr()
 	cvt.asIntToFpu(rd, rn, signed, src64bit, dst64bit)
 	m.insert(cvt)

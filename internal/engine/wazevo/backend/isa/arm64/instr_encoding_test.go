@@ -19,6 +19,9 @@ func TestInstruction_encode(t *testing.T) {
 		setup func(*instruction)
 		want  string
 	}{
+		{want: "3f441bd5", setup: func(i *instruction) { i.asMovToFPSR(xzrVReg) }},
+		{want: "21441bd5", setup: func(i *instruction) { i.asMovToFPSR(x1VReg) }},
+		{want: "21443bd5", setup: func(i *instruction) { i.asMovFromFPSR(x1VReg) }},
 		{want: "2f08417a", setup: func(i *instruction) { i.asCCmpImm(operandNR(x1VReg), 1, eq, 0b1111, false) }},
 		{want: "201841fa", setup: func(i *instruction) { i.asCCmpImm(operandNR(x1VReg), 1, ne, 0, true) }},
 		{want: "411ca32e", setup: func(i *instruction) {
