@@ -141,8 +141,7 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 			needGoEntryPreamble = true
 		}
 
-		body, rels, goPreambleSize, err :=
-			e.compileLocalWasmFunction(ctx, module, wasm.Index(i), fidx, needGoEntryPreamble, fe, ssaBuilder, be, listeners, ensureTermination)
+		body, rels, goPreambleSize, err := e.compileLocalWasmFunction(ctx, module, wasm.Index(i), fidx, needGoEntryPreamble, fe, ssaBuilder, be, listeners, ensureTermination)
 		if err != nil {
 			return nil, fmt.Errorf("compile function %d/%d: %v", i, len(module.CodeSection)-1, err)
 		}
