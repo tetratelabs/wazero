@@ -1,6 +1,7 @@
 package arm64
 
 import (
+	"context"
 	"strings"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
@@ -143,6 +144,6 @@ func (m *mockCompiler) MatchInstrOneOf(def *backend.SSAValueDefinition, opcodes 
 }
 
 // Compile implements backend.Compiler.
-func (m *mockCompiler) Compile() (_ []byte, _ []backend.RelocationInfo, goPreambleSize int, _ error) {
+func (m *mockCompiler) Compile(context.Context) (_ []byte, _ []backend.RelocationInfo, goPreambleSize int, _ error) {
 	return
 }

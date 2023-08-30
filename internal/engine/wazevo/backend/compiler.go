@@ -1,6 +1,8 @@
 package backend
 
 import (
+	"context"
+	"encoding/hex"
 	"fmt"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
@@ -39,7 +41,7 @@ type Compiler interface {
 	//
 	// The returned byte slices are the machine code and the relocation information for the machine code.
 	// The caller is responsible for copying them immediately since the compiler may reuse the buffer.
-	Compile() (_ []byte, _ []RelocationInfo, goPreambleSize int, _ error)
+	Compile(ctx context.Context) (_ []byte, _ []RelocationInfo, goPreambleSize int, _ error)
 
 	// Lower lowers the given ssa.Instruction to the machine-specific instructions.
 	Lower()
@@ -142,20 +144,32 @@ type compiler struct {
 }
 
 // Compile implements Compiler.Compile.
-func (c *compiler) Compile() ([]byte, []RelocationInfo, int, error) {
+func (c *compiler) Compile(ctx context.Context) ([]byte, []RelocationInfo, int, error) {
 	c.Lower()
 	if wazevoapi.PrintSSAToBackendIRLowering {
 		fmt.Printf("[[[after lowering]]]%s\n", c.Format())
+	}
+	if wazevoapi.DeterministicCompilationVerifierEnabled {
+		wazevoapi.VerifyOrSetDeterministicCompilationContextValue(ctx, "After lowering to ISA specific IR", c.Format())
 	}
 	c.RegAlloc()
 	if wazevoapi.PrintRegisterAllocated {
 		fmt.Printf("[[[after regalloc]]]%s\n", c.Format())
 	}
+	if wazevoapi.DeterministicCompilationVerifierEnabled {
+		wazevoapi.VerifyOrSetDeterministicCompilationContextValue(ctx, "After Register Allocation", c.Format())
+	}
 	c.Finalize()
 	if wazevoapi.PrintFinalizedMachineCode {
 		fmt.Printf("[[[after finalize]]]%s\n", c.Format())
 	}
+	if wazevoapi.DeterministicCompilationVerifierEnabled {
+		wazevoapi.VerifyOrSetDeterministicCompilationContextValue(ctx, "After Finalization", c.Format())
+	}
 	goPreambleSize := c.Encode()
+	if wazevoapi.DeterministicCompilationVerifierEnabled {
+		wazevoapi.VerifyOrSetDeterministicCompilationContextValue(ctx, "Encoded Machine code", hex.EncodeToString(c.buf))
+	}
 	return c.buf, c.relocations, goPreambleSize, nil
 }
 
