@@ -57,13 +57,13 @@ const (
 )
 
 type (
-	verifierContext struct {
+	verifierState struct {
 		randomizedIndexes []int
 		r                 *rand.Rand
 		values            map[string]string
 	}
-	existingValuesContextKey struct{}
-	currentFunctionNameKey   struct{}
+	verifierStateContextKey struct{}
+	currentFunctionNameKey  struct{}
 )
 
 // NewDeterministicCompilationVerifierContext creates a new context with the deterministic compilation verifier used per wasm.Module.
@@ -73,7 +73,7 @@ func NewDeterministicCompilationVerifierContext(ctx context.Context, localFuncti
 		randomizedIndexes[i] = i
 	}
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	return context.WithValue(ctx, existingValuesContextKey{}, &verifierContext{
+	return context.WithValue(ctx, verifierStateContextKey{}, &verifierState{
 		r: r, randomizedIndexes: randomizedIndexes, values: map[string]string{},
 	})
 }
@@ -81,7 +81,7 @@ func NewDeterministicCompilationVerifierContext(ctx context.Context, localFuncti
 // DeterministicCompilationVerifierRandomizeIndexes randomizes the indexes for the deterministic compilation verifier.
 // To get the randomized index, use DeterministicCompilationVerifierGetRandomizedLocalFunctionIndex.
 func DeterministicCompilationVerifierRandomizeIndexes(ctx context.Context) {
-	verifierCtx := ctx.Value(existingValuesContextKey{}).(*verifierContext)
+	verifierCtx := ctx.Value(verifierStateContextKey{}).(*verifierState)
 	r := verifierCtx.r
 	r.Shuffle(len(verifierCtx.randomizedIndexes), func(i, j int) {
 		verifierCtx.randomizedIndexes[i], verifierCtx.randomizedIndexes[j] = verifierCtx.randomizedIndexes[j], verifierCtx.randomizedIndexes[i]
@@ -91,7 +91,7 @@ func DeterministicCompilationVerifierRandomizeIndexes(ctx context.Context) {
 // DeterministicCompilationVerifierGetRandomizedLocalFunctionIndex returns the randomized index for the given `index`
 // which is assigned by DeterministicCompilationVerifierRandomizeIndexes.
 func DeterministicCompilationVerifierGetRandomizedLocalFunctionIndex(ctx context.Context, index int) int {
-	verifierCtx := ctx.Value(existingValuesContextKey{}).(*verifierContext)
+	verifierCtx := ctx.Value(verifierStateContextKey{}).(*verifierState)
 	ret := verifierCtx.randomizedIndexes[index]
 	return ret
 }
@@ -108,7 +108,7 @@ func DeterministicCompilationVerifierSetCurrentFunctionName(ctx context.Context,
 func VerifyOrSetDeterministicCompilationContextValue(ctx context.Context, scope string, newValue string) {
 	fn := ctx.Value(currentFunctionNameKey{}).(string)
 	key := fn + ": " + scope
-	verifierCtx := ctx.Value(existingValuesContextKey{}).(*verifierContext)
+	verifierCtx := ctx.Value(verifierStateContextKey{}).(*verifierState)
 	oldValue, ok := verifierCtx.values[key]
 	if !ok {
 		verifierCtx.values[key] = newValue
@@ -118,7 +118,7 @@ func VerifyOrSetDeterministicCompilationContextValue(ctx context.Context, scope 
 		fmt.Printf(
 			`BUG: Deterministic compilation failed for function%s at scope="%s".
 
-This is mostly due to (but might not be not limited to):
+This is mostly due to (but might not be limited to):
 	* Resetting ssa.Builder, backend.Compiler or frontend.Compiler, etc doens't work as expected, and the compilation has been affected by the previous iterations.
 	* Using a map with non-deterministic iteration order.
 
@@ -128,8 +128,7 @@ This is mostly due to (but might not be not limited to):
 ---------- [new] ----------
 %s
 `,
-			fn,
-			scope, oldValue, newValue,
+			fn, scope, oldValue, newValue,
 		)
 		os.Exit(1)
 	}

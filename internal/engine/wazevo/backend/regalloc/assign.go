@@ -2,7 +2,6 @@ package regalloc
 
 import (
 	"fmt"
-	"sort"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 )
@@ -13,9 +12,6 @@ func (a *Allocator) assignRegisters(f Function) {
 	for blk := f.ReversePostOrderBlockIteratorBegin(); blk != nil; blk = f.ReversePostOrderBlockIteratorNext() {
 		info := a.blockInfoAt(blk.ID())
 		lns := info.liveNodes
-		sort.SliceStable(lns, func(i, j int) bool {
-			return lns[i].n.v.ID() < lns[j].n.v.ID()
-		})
 		a.assignRegistersPerBlock(f, blk, a.vRegIDToNode, lns)
 	}
 }
@@ -34,11 +30,26 @@ func (a *Allocator) assignRegistersPerBlock(f Function, blk Block, vRegIDToNode 
 }
 
 func (a *Allocator) assignRegistersPerInstr(f Function, pc programCounter, instr Instr, vRegIDToNode []*node, liveNodes []liveNodeInBlock) {
+	if wazevoapi.RegAllocValidationEnabled {
+		// Check if the liveNodes are sorted by the start program counter.
+		for i := 1; i < len(liveNodes); i++ {
+			n, m := liveNodes[i-1], liveNodes[i]
+			if n.n.ranges[n.rangeIndex].begin > m.n.ranges[m.rangeIndex].begin {
+				panic(fmt.Sprintf("BUG: liveNodes are not sorted by the start program counter: %d > %d",
+					n.n.ranges[n.rangeIndex].begin, m.n.ranges[m.rangeIndex].begin,
+				))
+			}
+		}
+	}
+
 	if direct := instr.IsCall(); direct || instr.IsIndirectCall() {
 		// Only take care of non-real VRegs (e.g. VReg.IsRealReg() == false) since
 		// the real VRegs are already placed in the right registers at this point.
-		actives := a.activeNonRealVRegsAt(pc+pcUseOffset, liveNodes)
-		for _, active := range actives {
+		a.nodes2 = a.collectActiveNonRealVRegsAt(a.nodes2,
+			// To find the all the live registers "after" call, we need to add pcDefOffset for search.
+			pc+pcDefOffset,
+			liveNodes)
+		for _, active := range a.nodes2 {
 			if r := active.r; a.regInfo.isCallerSaved(r) {
 				v := active.v.SetRealReg(r)
 				f.StoreRegisterBefore(v, instr)
@@ -104,20 +115,24 @@ func (a *Allocator) assignRegistersPerInstr(f Function, pc programCounter, instr
 	}
 }
 
-// activeRegistersAt returns the set of active registers at the given program counter.
-// This excludes the VRegs backed by a real register since this is used to list the registers
+// collectActiveNonRealVRegsAt collects the set of active registers at the given program counter into `nodes` slice by appending
+// the found registers from its beginning. This excludes the VRegs backed by a real register since this is used to list the registers
 // alive but not used by a call instruction.
-func (a *Allocator) activeNonRealVRegsAt(pc programCounter, liveNodes []liveNodeInBlock) []*node {
-	a.nodes1 = a.nodes1[:0]
+func (a *Allocator) collectActiveNonRealVRegsAt(nodes []*node, pc programCounter, liveNodes []liveNodeInBlock) []*node {
+	nodes = nodes[:0]
 	for _, live := range liveNodes {
 		n := live.n
 		if n.spill() || n.v.IsRealReg() {
 			continue
 		}
 		r := &n.ranges[live.rangeIndex]
-		if r.contains(pc) {
-			a.nodes1 = append(a.nodes1, n)
+		if r.begin > pc {
+			// liveNodes are sorted by the start program counter, so we can break here.
+			break
+		}
+		if pc <= r.end { // pc is in the range.
+			nodes = append(nodes, n)
 		}
 	}
-	return a.nodes1
+	return nodes
 }
