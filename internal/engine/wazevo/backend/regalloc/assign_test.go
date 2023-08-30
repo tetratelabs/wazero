@@ -70,8 +70,8 @@ func TestAllocator_activeNonRealVRegsAt(t *testing.T) {
 			name: "one live",
 			pc:   10,
 			lives: []liveNodeInBlock{
-				{n: &node{r: 1, v: 0xa, ranges: []liveRange{{begin: 100, end: 2000}}}},
 				{n: &node{r: 2, v: 0xf, ranges: []liveRange{{begin: 5, end: 20}}}},
+				{n: &node{r: 1, v: 0xa, ranges: []liveRange{{begin: 100, end: 2000}}}},
 			},
 			want: []VReg{0xf},
 		},
@@ -99,7 +99,7 @@ func TestAllocator_activeNonRealVRegsAt(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			a := NewAllocator(&RegisterInfo{})
-			ans := a.activeNonRealVRegsAt(tc.pc, tc.lives)
+			ans := a.collectActiveNonRealVRegsAt(nil, tc.pc, tc.lives)
 
 			actual := make([]VReg, len(ans))
 			for i, n := range ans {

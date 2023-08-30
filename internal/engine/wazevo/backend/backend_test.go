@@ -2054,13 +2054,13 @@ L4 (SSA Block: blk3):
 	str x8, [x9, #0x8]
 	mov x0, x9
 	mov x1, x8
-	str x9, [sp]
-	str x8, [sp, #0x8]
-	str w11, [sp, #0x10]
+	str w11, [sp]
+	str x9, [sp, #0x4]
+	str x8, [sp, #0xc]
 	bl f0
-	ldr w11, [sp, #0x10]
-	ldr x8, [sp, #0x8]
-	ldr x9, [sp]
+	ldr x8, [sp, #0xc]
+	ldr x9, [sp, #0x4]
+	ldr w11, [sp]
 	mov x10, x0
 	sub w2, w11, #0x2
 	str x8, [x9, #0x8]

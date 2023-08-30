@@ -289,6 +289,15 @@ func (a *Allocator) buildLiveRanges(f Function) {
 		info := a.blockInfoAt(blkID)
 		a.buildLiveRangesForNonReals(blkID, info)
 		a.buildLiveRangesForReals(blkID, info)
+		// Sort the live range for a fast lookup to find live registers at a given program counter.
+		sort.Slice(info.liveNodes, func(i, j int) bool {
+			inode, jnode := &info.liveNodes[i], &info.liveNodes[j]
+			irange, jrange := inode.n.ranges[inode.rangeIndex], jnode.n.ranges[jnode.rangeIndex]
+			if irange.begin == jrange.begin {
+				return irange.end < jrange.end
+			}
+			return irange.begin < jrange.begin
+		})
 	}
 }
 
@@ -622,11 +631,6 @@ func (n *node) spill() bool {
 // Note that this doesn't compare the block ID because this is called to compare two intervals in the same block.
 func (l *liveRange) intersects(other *liveRange) bool {
 	return other.begin <= l.end && l.begin <= other.end
-}
-
-// contains returns true if the live range contains the given program counter.
-func (l *liveRange) contains(pc programCounter) bool {
-	return l.begin <= pc && pc < l.end
 }
 
 func (r *RegisterInfo) isCalleeSaved(reg RealReg) bool {
