@@ -1,5 +1,13 @@
 package wazevoapi
 
+import (
+	"context"
+	"fmt"
+	"math/rand"
+	"os"
+	"time"
+)
+
 // These consts are used various places in the wazevo implementations.
 // Instead of defining them in each file, we define them here so that we can quickly iterate on
 // debugging without spending "where do we have debug logging?" time.
@@ -38,3 +46,91 @@ const (
 	RegAllocValidationEnabled = true
 	SSAValidationEnabled      = true
 )
+
+// ----- Deterministic compilation verifier -----
+
+const (
+	// DeterministicCompilationVerifierEnabled enables the deterministic compilation verifier. This is disabled by default
+	// since the operation is expensive. But when in doubt, enable this to make sure the compilation is deterministic.
+	DeterministicCompilationVerifierEnabled = true
+	DeterministicCompilationVerifyingIter   = 5
+)
+
+type (
+	verifierContext struct {
+		randomizedIndexes []int
+		r                 *rand.Rand
+		values            map[string]string
+	}
+	existingValuesContextKey struct{}
+	currentFunctionNameKey   struct{}
+)
+
+// NewDeterministicCompilationVerifierContext creates a new context with the deterministic compilation verifier used per wasm.Module.
+func NewDeterministicCompilationVerifierContext(ctx context.Context, localFunctions int) context.Context {
+	randomizedIndexes := make([]int, localFunctions)
+	for i := range randomizedIndexes {
+		randomizedIndexes[i] = i
+	}
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	return context.WithValue(ctx, existingValuesContextKey{}, &verifierContext{
+		r: r, randomizedIndexes: randomizedIndexes, values: map[string]string{},
+	})
+}
+
+// DeterministicCompilationVerifierRandomizeIndexes randomizes the indexes for the deterministic compilation verifier.
+// To get the randomized index, use DeterministicCompilationVerifierGetRandomizedLocalFunctionIndex.
+func DeterministicCompilationVerifierRandomizeIndexes(ctx context.Context) {
+	verifierCtx := ctx.Value(existingValuesContextKey{}).(*verifierContext)
+	r := verifierCtx.r
+	r.Shuffle(len(verifierCtx.randomizedIndexes), func(i, j int) {
+		verifierCtx.randomizedIndexes[i], verifierCtx.randomizedIndexes[j] = verifierCtx.randomizedIndexes[j], verifierCtx.randomizedIndexes[i]
+	})
+}
+
+// DeterministicCompilationVerifierGetRandomizedLocalFunctionIndex returns the randomized index for the given `index`
+// which is assigned by DeterministicCompilationVerifierRandomizeIndexes.
+func DeterministicCompilationVerifierGetRandomizedLocalFunctionIndex(ctx context.Context, index int) int {
+	verifierCtx := ctx.Value(existingValuesContextKey{}).(*verifierContext)
+	ret := verifierCtx.randomizedIndexes[index]
+	return ret
+}
+
+// DeterministicCompilationVerifierSetCurrentFunctionName sets the current function name to the given `functionName`.
+func DeterministicCompilationVerifierSetCurrentFunctionName(ctx context.Context, functionName string) context.Context {
+	return context.WithValue(ctx, currentFunctionNameKey{}, functionName)
+}
+
+// VerifyOrSetDeterministicCompilationContextValue verifies that the `newValue` is the same as the previous value for the given `scope`
+// and the current function name. If the previous value doesn't exist, it sets the value to the given `newValue`.
+//
+// If the verification fails, this prints the diff and exits the process.
+func VerifyOrSetDeterministicCompilationContextValue(ctx context.Context, scope string, newValue string) {
+	fn := ctx.Value(currentFunctionNameKey{}).(string)
+	key := fn + ": " + scope
+	verifierCtx := ctx.Value(existingValuesContextKey{}).(*verifierContext)
+	oldValue, ok := verifierCtx.values[key]
+	if !ok {
+		verifierCtx.values[key] = newValue
+		return
+	}
+	if oldValue != newValue {
+		fmt.Printf(
+			`BUG: Deterministic compilation failed for function%s at scope="%s".
+
+This is mostly due to (but might not be not limited to):
+	* Resetting ssa.Builder, backend.Compiler or frontend.Compiler, etc doens't work as expected, and the compilation has been affected by the previous iterations.
+	* Using a map with non-deterministic iteration order.
+
+---------- [old] ----------
+%s
+
+---------- [new] ----------
+%s
+`,
+			fn,
+			scope, oldValue, newValue,
+		)
+		os.Exit(1)
+	}
+}

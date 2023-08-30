@@ -67,13 +67,33 @@ var _ wasm.Engine = (*engine)(nil)
 // NewEngine returns the implementation of wasm.Engine.
 func NewEngine(_ context.Context, _ api.CoreFeatures, _ filecache.Cache) wasm.Engine {
 	e := &engine{compiledModules: make(map[wasm.ModuleID]*compiledModule), refToBinaryOffset: make(map[ssa.FuncRef]int)}
-
 	e.compileBuiltinFunctions()
 	return e
 }
 
 // CompileModule implements wasm.Engine.
-func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []experimental.FunctionListener, _ bool) error {
+func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listeners []experimental.FunctionListener, ensureTermination bool) error {
+	if wazevoapi.DeterministicCompilationVerifierEnabled {
+		ctx = wazevoapi.NewDeterministicCompilationVerifierContext(ctx, len(module.CodeSection))
+	}
+	cm, err := e.compileModule(ctx, module, listeners, ensureTermination)
+	if err != nil {
+		return err
+	}
+	e.addCompiledModule(module, cm)
+
+	if wazevoapi.DeterministicCompilationVerifierEnabled {
+		for i := 0; i < wazevoapi.DeterministicCompilationVerifyingIter; i++ {
+			_, err = e.compileModule(ctx, module, listeners, ensureTermination)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listeners []experimental.FunctionListener, ensureTermination bool) (*compiledModule, error) {
 	e.rels = e.rels[:0]
 	cm := &compiledModule{offsets: wazevoapi.NewModuleContextOffsetData(module)}
 
@@ -83,8 +103,12 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []exper
 
 	importedFns, localFns := int(module.ImportFunctionCount), len(module.FunctionSection)
 	if localFns == 0 {
-		e.addCompiledModule(module, cm)
-		return nil
+		return cm, nil
+	}
+
+	if wazevoapi.DeterministicCompilationVerifierEnabled {
+		// The compilation must be deterministic regardless of the order of functions being compiled.
+		wazevoapi.DeterministicCompilationVerifierRandomizeIndexes(ctx)
 	}
 
 	// TODO: reuse the map to avoid allocation.
@@ -106,12 +130,21 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []exper
 	cm.functionOffsets = make([]compiledFunctionOffset, localFns)
 	bodies := make([][]byte, localFns)
 	for i := range module.CodeSection {
+		if wazevoapi.DeterministicCompilationVerifierEnabled {
+			i = wazevoapi.DeterministicCompilationVerifierGetRandomizedLocalFunctionIndex(ctx, i)
+		}
+
 		fidx := wasm.Index(i + importedFns)
-		fref := frontend.FunctionIndexToFuncRef(fidx)
 
 		_, needGoEntryPreamble := exportedFnIndex[fidx]
 		if sf := module.StartSection; sf != nil && *sf == fidx {
 			needGoEntryPreamble = true
+		}
+
+		body, rels, goPreambleSize, err :=
+			e.compileLocalWasmFunction(ctx, module, wasm.Index(i), fidx, needGoEntryPreamble, fe, ssaBuilder, be, listeners, ensureTermination)
+		if err != nil {
+			return nil, fmt.Errorf("compile function %d/%d: %v", i, len(module.CodeSection)-1, err)
 		}
 
 		// Align 16-bytes boundary.
@@ -119,71 +152,7 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []exper
 		compiledFuncOffset := &cm.functionOffsets[i]
 		compiledFuncOffset.offset = totalSize
 
-		typ := &module.TypeSection[module.FunctionSection[i]]
-
-		codeSeg := &module.CodeSection[i]
-
-		const checkDeterministicSSACompilation = false
-		if checkDeterministicSSACompilation {
-			existingResults := map[string]struct{}{}
-			for i := 0; i < 100; i++ {
-				fe.Init(wasm.Index(i), typ, codeSeg.LocalTypes, codeSeg.Body)
-				be.Init(needGoEntryPreamble)
-
-				// Lower Wasm to SSA.
-				err := fe.LowerToSSA()
-				if err != nil {
-					return fmt.Errorf("wasm->ssa: %v", err)
-				}
-				ssaBuilder.RunPasses()
-				ssaBuilder.LayoutBlocks()
-
-				existingResults[ssaBuilder.Format()] = struct{}{}
-				if len(existingResults) > 1 {
-					for f := range existingResults {
-						fmt.Println(f)
-						fmt.Println("----------------")
-					}
-					panic("BUG: SSA format is not deterministic")
-				}
-			}
-		}
-
-		// Initializes both frontend and backend compilers.
-		fe.Init(wasm.Index(i), typ, codeSeg.LocalTypes, codeSeg.Body)
-		be.Init(needGoEntryPreamble)
-
-		// Lower Wasm to SSA.
-		err := fe.LowerToSSA()
-		if err != nil {
-			return fmt.Errorf("wasm->ssa: %v", err)
-		}
-
-		if wazevoapi.PrintSSA {
-			fmt.Printf("[[[SSA for %d/%d %s]]]%s\n", i, len(module.CodeSection)-1, exportedFnIndex[fidx], ssaBuilder.Format())
-		}
-
-		// Run SSA-level optimization passes.
-		ssaBuilder.RunPasses()
-
-		if wazevoapi.PrintOptimizedSSA {
-			fmt.Printf("[[[optimized SSA for %d/%d %s]]]%s\n", i, len(module.CodeSection)-1, exportedFnIndex[fidx], ssaBuilder.Format())
-		}
-
-		// Finalize the layout of SSA blocks which might use the optimization results.
-		ssaBuilder.LayoutBlocks()
-
-		if wazevoapi.PrintBlockLaidOutSSA {
-			fmt.Printf("[[[laidout SSA for %d/%d %s]]]%s\n", i, len(module.CodeSection)-1, exportedFnIndex[fidx], ssaBuilder.Format())
-		}
-
-		// Now our ssaBuilder contains the necessary information to further lower them to
-		// machine code.
-		body, rels, goPreambleSize, err := be.Compile()
-		if err != nil {
-			return fmt.Errorf("ssa->machine code: %v", err)
-		}
-
+		fref := frontend.FunctionIndexToFuncRef(fidx)
 		e.refToBinaryOffset[fref] = totalSize +
 			// During the relocation, call target needs to be the beginning of function after Go entry preamble.
 			goPreambleSize
@@ -198,10 +167,7 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []exper
 			e.rels = append(e.rels, r)
 		}
 
-		// TODO: optimize as zero copy.
-		copied := make([]byte, len(body))
-		copy(copied, body)
-		bodies[i] = copied
+		bodies[i] = body
 		totalSize += len(body)
 		if wazevoapi.PrintMachineCodeHexPerFunction {
 			fmt.Printf("[[[machine code SSA for %d/%d %s]]]\n%s\n",
@@ -227,7 +193,7 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []exper
 	if runtime.GOARCH == "arm64" {
 		// On arm64, we cannot give all of rwx at the same time, so we change it to exec.
 		if err = platform.MprotectRX(executable); err != nil {
-			return err
+			return nil, err
 		}
 	}
 	e.compiledModules[module.ID] = cm
@@ -235,11 +201,86 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, _ []exper
 
 	// TODO: finalizer.
 
-	e.addCompiledModule(module, cm)
-	return nil
+	return cm, nil
 }
 
-func (e *engine) compileHostModule(module *wasm.Module) error {
+func (e *engine) compileLocalWasmFunction(
+	ctx context.Context,
+	module *wasm.Module,
+	localFunctionIndex,
+	functionIndex wasm.Index,
+	needGoEntryPreamble bool,
+	fe *frontend.Compiler,
+	ssaBuilder ssa.Builder,
+	be backend.Compiler,
+	_ []experimental.FunctionListener, _ bool,
+) (body []byte, rels []backend.RelocationInfo, goPreambleSize int, err error) {
+	typ := &module.TypeSection[module.FunctionSection[localFunctionIndex]]
+	codeSeg := &module.CodeSection[localFunctionIndex]
+
+	// Initializes both frontend and backend compilers.
+	fe.Init(localFunctionIndex, typ, codeSeg.LocalTypes, codeSeg.Body)
+	be.Init(needGoEntryPreamble)
+
+	// Lower Wasm to SSA.
+	err = fe.LowerToSSA()
+	if err != nil {
+		return nil, nil, 0, fmt.Errorf("wasm->ssa: %v", err)
+	}
+
+	if wazevoapi.PrintSSA {
+		def := module.FunctionDefinition(functionIndex)
+		fmt.Printf("[[[SSA for %d/%d %s]]]%s\n", localFunctionIndex, len(module.CodeSection)-1, def.Debugname, ssaBuilder.Format())
+	}
+
+	if wazevoapi.DeterministicCompilationVerifierEnabled {
+		def := module.FunctionDefinition(functionIndex)
+		name := def.DebugName()
+		if len(def.ExportNames()) > 0 {
+			name = def.ExportNames()[0]
+		}
+		ctx = wazevoapi.DeterministicCompilationVerifierSetCurrentFunctionName(ctx, fmt.Sprintf("[%d/%d]:\"%s\"", localFunctionIndex, len(module.CodeSection)-1, name))
+		wazevoapi.VerifyOrSetDeterministicCompilationContextValue(ctx, "SSA", ssaBuilder.Format())
+	}
+
+	// Run SSA-level optimization passes.
+	ssaBuilder.RunPasses()
+
+	if wazevoapi.PrintOptimizedSSA {
+		def := module.FunctionDefinition(functionIndex)
+		fmt.Printf("[[[Optimized SSA for %d/%d %s]]]%s\n", localFunctionIndex, len(module.CodeSection)-1, def.Debugname, ssaBuilder.Format())
+	}
+
+	if wazevoapi.DeterministicCompilationVerifierEnabled {
+		wazevoapi.VerifyOrSetDeterministicCompilationContextValue(ctx, "Optimized SSA", ssaBuilder.Format())
+	}
+
+	// Finalize the layout of SSA blocks which might use the optimization results.
+	ssaBuilder.LayoutBlocks()
+
+	if wazevoapi.PrintBlockLaidOutSSA {
+		def := module.FunctionDefinition(functionIndex)
+		fmt.Printf("[[[Laidout SSA for %d/%d %s]]]%s\n", localFunctionIndex, len(module.CodeSection)-1, def.Debugname, ssaBuilder.Format())
+	}
+
+	if wazevoapi.DeterministicCompilationVerifierEnabled {
+		wazevoapi.VerifyOrSetDeterministicCompilationContextValue(ctx, "Block laid out SSA", ssaBuilder.Format())
+	}
+
+	// Now our ssaBuilder contains the necessary information to further lower them to
+	// machine code.
+	original, rels, goPreambleSize, err := be.Compile(ctx)
+	if err != nil {
+		return nil, nil, 0, fmt.Errorf("ssa->machine code: %v", err)
+	}
+
+	// TODO: optimize as zero copy.
+	copied := make([]byte, len(original))
+	copy(copied, original)
+	return copied, rels, goPreambleSize, nil
+}
+
+func (e *engine) compileHostModule(module *wasm.Module) (*compiledModule, error) {
 	machine := newMachine()
 	be := backend.NewCompiler(machine, ssa.NewBuilder())
 
@@ -256,7 +297,7 @@ func (e *engine) compileHostModule(module *wasm.Module) error {
 		typIndex := module.FunctionSection[i]
 		typ := &module.TypeSection[typIndex]
 		if typ.ParamNumInUint64 >= goFunctionCallStackSize || typ.ResultNumInUint64 >= goFunctionCallStackSize {
-			return fmt.Errorf("too many params or results for a host function (maximum %d): %v",
+			return nil, fmt.Errorf("too many params or results for a host function (maximum %d): %v",
 				goFunctionCallStackSize, typ)
 		}
 
@@ -264,7 +305,7 @@ func (e *engine) compileHostModule(module *wasm.Module) error {
 		// However, 1 << 16 should be large enough for a real use case.
 		const hostFunctionNumMaximum = 1 << 16
 		if i >= hostFunctionNumMaximum {
-			return fmt.Errorf("too many host functions (maximum %d)", hostFunctionNumMaximum)
+			return nil, fmt.Errorf("too many host functions (maximum %d)", hostFunctionNumMaximum)
 		}
 
 		sig.ID = ssa.SignatureID(typIndex) // This is important since we reuse the `machine` which caches the ABI based on the SignatureID.
@@ -322,12 +363,10 @@ func (e *engine) compileHostModule(module *wasm.Module) error {
 	if runtime.GOARCH == "arm64" {
 		// On arm64, we cannot give all of rwx at the same time, so we change it to exec.
 		if err = platform.MprotectRX(executable); err != nil {
-			return err
+			return nil, err
 		}
 	}
-
-	e.compiledModules[module.ID] = cm
-	return nil
+	return cm, nil
 }
 
 // Close implements wasm.Engine.
