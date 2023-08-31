@@ -107,13 +107,13 @@ func (f *regAllocFunctionImpl) ClobberedRegisters(regs []regalloc.VReg) {
 // StoreRegisterAfter implements regalloc.Function StoreRegisterAfter.
 func (f *regAllocFunctionImpl) StoreRegisterAfter(v regalloc.VReg, instr regalloc.Instr) {
 	m := f.m
-	m.storeRegisterBefore(v, instr.(*regAllocInstrImpl).i.next)
+	m.insertStoreRegisterAt(v, instr.(*regAllocInstrImpl).i, true)
 }
 
 // StoreRegisterBefore implements regalloc.Function StoreRegisterBefore.
 func (f *regAllocFunctionImpl) StoreRegisterBefore(v regalloc.VReg, instr regalloc.Instr) {
 	m := f.m
-	m.storeRegisterBefore(v, instr.(*regAllocInstrImpl).i)
+	m.insertStoreRegisterAt(v, instr.(*regAllocInstrImpl).i, false)
 }
 
 // ReloadRegisterBefore implements regalloc.Function ReloadRegisterBefore.
@@ -244,7 +244,7 @@ func (r *regAllocInstrImpl) AssignDef(v regalloc.VReg) {
 	r.i.assignDef(v)
 }
 
-func (m *machine) storeRegisterBefore(v regalloc.VReg, instr *instruction) {
+func (m *machine) insertStoreRegisterAt(v regalloc.VReg, instr *instruction, after bool) {
 	if !v.IsRealReg() {
 		panic("BUG: VReg must be backed by real reg to be stored")
 	}
@@ -257,13 +257,18 @@ func (m *machine) storeRegisterBefore(v regalloc.VReg, instr *instruction) {
 	store := m.allocateInstrAfterLowering()
 	store.asStore(operandNR(v), admode, typ.Bits())
 
-	prevNext := instr
-	cur := instr.prev
+	var prevNext, cur *instruction
+	if after {
+		cur, prevNext = instr, instr.next
+	} else {
+		cur, prevNext = instr.prev, instr
+	}
 
 	// If the offset is large, we might end up with having multiple instructions inserted in resolveAddressModeForOffset.
 	for _, instr := range m.pendingInstructions {
-		cur.prev = instr
-		instr.next = cur
+		instr.addedAfterLowering = true
+		cur.next = instr
+		instr.prev = cur
 		cur = instr
 	}
 
@@ -299,6 +304,7 @@ func (m *machine) reloadRegisterAfter(v regalloc.VReg, instr *instruction) {
 
 	// If the offset is large, we might end up with having multiple instructions inserted in resolveAddressModeForOffset.
 	for _, instr := range m.pendingInstructions {
+		instr.addedAfterLowering = true
 		cur.next = instr
 		instr.prev = cur
 		cur = instr

@@ -122,17 +122,59 @@ func TestRegAllocFunctionImpl_StoreRegisterBefore(t *testing.T) {
 `, m.Format())
 }
 
+func TestMachine_StoreRegisterAfter(t *testing.T) {
+	ctx, _, m := newSetupWithMockContext()
+	m.spillSlotSize = 0xffff
+
+	ctx.typeOf = map[regalloc.VReg]ssa.Type{x1VReg: ssa.TypeI64, v1VReg: ssa.TypeF64}
+	i1, i2 := m.allocateInstr().asUDF(), m.allocateInstr().asUDF()
+	i1.next = i2
+	i2.prev = i1
+
+	f := &regAllocFunctionImpl{m: m}
+	f.StoreRegisterAfter(x1VReg, &regAllocInstrImpl{i: i1})
+	f.StoreRegisterAfter(v1VReg, &regAllocInstrImpl{i: i1})
+
+	m.rootInstr = i1
+	require.Equal(t, `
+	udf
+	movz x27, #0x7, lsl 0
+	movk x27, #0x1, lsl 16
+	str d1, [sp, x27]
+	movz x27, #0xffff, lsl 0
+	str x1, [sp, x27]
+	udf
+`, m.Format())
+}
+
+func TestMachine_ReloadRegisterBefore(t *testing.T) {
+	ctx, _, m := newSetupWithMockContext()
+	m.spillSlotSize = 0xffff
+
+	ctx.typeOf = map[regalloc.VReg]ssa.Type{x1VReg: ssa.TypeI64, v1VReg: ssa.TypeF64}
+	i1, i2 := m.allocateInstr().asUDF(), m.allocateInstr().asUDF()
+	i1.next = i2
+	i2.prev = i1
+
+	f := &regAllocFunctionImpl{m: m}
+	f.ReloadRegisterBefore(x1VReg, &regAllocInstrImpl{i: i2})
+	f.ReloadRegisterBefore(v1VReg, &regAllocInstrImpl{i: i2})
+
+	m.rootInstr = i1
+	require.Equal(t, `
+	udf
+	movz x27, #0xffff, lsl 0
+	ldr x1, [sp, x27]
+	movz x27, #0x7, lsl 0
+	movk x27, #0x1, lsl 16
+	ldr d1, [sp, x27]
+	udf
+`, m.Format())
+}
+
 func TestRegAllocFunctionImpl_ClobberedRegisters(t *testing.T) {
 	_, _, m := newSetupWithMockContext()
 	f := &regAllocFunctionImpl{m: m}
 	f.ClobberedRegisters([]regalloc.VReg{v19VReg, v19VReg, v19VReg, v19VReg})
 	require.Equal(t, []regalloc.VReg{v19VReg, v19VReg, v19VReg, v19VReg}, m.clobberedRegs)
-}
-
-func TestMachine_reloadRegisterAfter(t *testing.T) {
-	t.Skip("TODO")
-}
-
-func TestMachine_storeRegisterBefore(t *testing.T) {
-	t.Skip("TODO")
 }
