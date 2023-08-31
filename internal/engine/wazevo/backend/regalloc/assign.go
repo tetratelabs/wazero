@@ -45,11 +45,11 @@ func (a *Allocator) assignRegistersPerInstr(f Function, pc programCounter, instr
 	if indirect := instr.IsIndirectCall(); instr.IsCall() || indirect {
 		// Only take care of non-real VRegs (e.g. VReg.IsRealReg() == false) since
 		// the real VRegs are already placed in the right registers at this point.
-		a.nodes2 = a.collectActiveNonRealVRegsAt(a.nodes2,
+		a.collectActiveNonRealVRegsAt(
 			// To find the all the live registers "after" call, we need to add pcDefOffset for search.
 			pc+pcDefOffset,
 			liveNodes)
-		for _, active := range a.nodes2 {
+		for _, active := range a.nodes1 {
 			if r := active.r; a.regInfo.isCallerSaved(r) {
 				v := active.v.SetRealReg(r)
 				f.StoreRegisterBefore(v, instr)
@@ -73,10 +73,9 @@ func (a *Allocator) assignRegistersPerInstr(f Function, pc programCounter, instr
 		return
 	}
 
-	a.nodes1 = a.nodes1[:0]
-	a.vs = a.vs[:0]
+	usesSpills := a.vs[:0]
 	uses := instr.Uses()
-	for _, u := range uses {
+	for i, u := range uses {
 		if u.IsRealReg() {
 			a.vs = append(a.vs, u)
 			continue
@@ -86,42 +85,46 @@ func (a *Allocator) assignRegistersPerInstr(f Function, pc programCounter, instr
 		}
 		n := vRegIDToNode[u.ID()]
 		if !n.spill() {
-			a.vs = append(a.vs, u.SetRealReg(n.r))
+			instr.AssignUse(i, u.SetRealReg(n.r))
 		} else {
-			a.nodes1 = append(a.nodes1, n)
+			usesSpills = append(usesSpills, u)
 		}
 	}
 
-	if len(a.nodes1) == 0 { // no spill.
-		instr.AssignUses(a.vs)
-	} else {
-		panic("TODO: handle spills.")
-	}
-
 	defs := instr.Defs()
+	defSpill := VRegInvalid
 	switch len(defs) {
 	case 0:
-		return
 	case 1:
+		d := defs[0]
+		if !d.IsRealReg() {
+			if wazevoapi.RegAllocLoggingEnabled {
+				fmt.Printf("%s defines %d\n", instr, d.ID())
+			}
+
+			n := vRegIDToNode[d.ID()]
+			if !n.spill() {
+				instr.AssignDef(d.SetRealReg(n.r))
+			} else {
+				defSpill = n.v
+			}
+		}
 	default:
-		// multiple defs (== call instruction) can be special cased, and no need to assign (already real regs following the calling convention.
-		return
+		panic("BUG: multiple def instructions must be special cased")
 	}
 
-	d := defs[0]
-	if d.IsRealReg() {
+	a.handleSpills(f, pc, instr, vRegIDToNode, liveNodes, usesSpills, defSpill)
+	a.vs = usesSpills[:0] // for reuse.
+}
+
+func (a *Allocator) handleSpills(
+	f Function, pc programCounter, instr Instr, vRegIDToNode []*node, liveNodes []liveNodeInBlock,
+	usesSpills []VReg, defSpill VReg,
+) {
+	if len(usesSpills) == 0 && !defSpill.Valid() {
 		return
 	}
-	if wazevoapi.RegAllocLoggingEnabled {
-		fmt.Printf("%s defines %d\n", instr, d.ID())
-	}
-
-	n := vRegIDToNode[d.ID()]
-	if !n.spill() {
-		instr.AssignDef(d.SetRealReg(n.r))
-	} else {
-		panic("TODO: handle spills.")
-	}
+	panic("TODO")
 }
 
 func (a *Allocator) assignIndirectCall(f Function, instr Instr, vRegIDToNode []*node) {
@@ -165,16 +168,14 @@ func (a *Allocator) assignIndirectCall(f Function, instr Instr, vRegIDToNode []*
 	} else {
 		v = v.SetRealReg(n.r)
 	}
-	a.vs = a.vs[:0]
-	a.vs = append(a.vs, v)
-	instr.AssignUses(a.vs)
+	instr.AssignUse(0, v)
 }
 
-// collectActiveNonRealVRegsAt collects the set of active registers at the given program counter into `nodes` slice by appending
+// collectActiveNonRealVRegsAt collects the set of active registers at the given program counter into `a.nodes1` slice by appending
 // the found registers from its beginning. This excludes the VRegs backed by a real register since this is used to list the registers
 // alive but not used by a call instruction.
-func (a *Allocator) collectActiveNonRealVRegsAt(nodes []*node, pc programCounter, liveNodes []liveNodeInBlock) []*node {
-	nodes = nodes[:0]
+func (a *Allocator) collectActiveNonRealVRegsAt(pc programCounter, liveNodes []liveNodeInBlock) {
+	nodes := a.nodes1[:0]
 	for _, live := range liveNodes {
 		n := live.n
 		if n.spill() || n.v.IsRealReg() {
@@ -189,5 +190,5 @@ func (a *Allocator) collectActiveNonRealVRegsAt(nodes []*node, pc programCounter
 			nodes = append(nodes, n)
 		}
 	}
-	return nodes
+	a.nodes1 = nodes
 }

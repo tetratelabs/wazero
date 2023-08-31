@@ -271,59 +271,73 @@ func (i *instruction) uses(regs []regalloc.VReg) []regalloc.VReg {
 	return regs
 }
 
-func (i *instruction) assignUses(regs []regalloc.VReg) {
+func (i *instruction) assignUse(index int, reg regalloc.VReg) {
 	switch useKinds[i.kind] {
 	case useKindNone:
 	case useKindRN:
 		if rn := i.rn.reg(); rn.Valid() {
-			i.rn = i.rn.assignReg(regs[0])
+			i.rn = i.rn.assignReg(reg)
 		}
 	case useKindRNRM:
-		if rn := i.rn.reg(); rn.Valid() {
-			i.rn = i.rn.assignReg(regs[0])
-		}
-		if rm := i.rm.reg(); rm.Valid() {
-			i.rm = i.rm.assignReg(regs[1])
+		if index == 0 {
+			if rn := i.rn.reg(); rn.Valid() {
+				i.rn = i.rn.assignReg(reg)
+			}
+		} else {
+			if rm := i.rm.reg(); rm.Valid() {
+				i.rm = i.rm.assignReg(reg)
+			}
 		}
 	case useKindRNRMRA:
-		if rn := i.rn.reg(); rn.Valid() {
-			i.rn = i.rn.assignReg(regs[0])
-		}
-		if rm := i.rm.reg(); rm.Valid() {
-			i.rm = i.rm.assignReg(regs[1])
-		}
-		if ra := i.ra.reg(); ra.Valid() {
-			i.ra = i.ra.assignReg(regs[2])
+		if index == 0 {
+			if rn := i.rn.reg(); rn.Valid() {
+				i.rn = i.rn.assignReg(reg)
+			}
+		} else if index == 1 {
+			if rm := i.rm.reg(); rm.Valid() {
+				i.rm = i.rm.assignReg(reg)
+			}
+		} else {
+			if ra := i.ra.reg(); ra.Valid() {
+				i.ra = i.ra.assignReg(reg)
+			}
 		}
 	case useKindRet:
 		panic("BUG: ret instructions shouldn't be assigned")
 	case useKindAMode:
-		if amodeRN := i.amode.rn; amodeRN.Valid() {
-			i.amode.rn = regs[0]
-		}
-		if amodeRM := i.amode.rm; amodeRM.Valid() {
-			i.amode.rm = regs[1]
+		if index == 0 {
+			if amodeRN := i.amode.rn; amodeRN.Valid() {
+				i.amode.rn = reg
+			}
+		} else {
+			if amodeRM := i.amode.rm; amodeRM.Valid() {
+				i.amode.rm = reg
+			}
 		}
 	case useKindRNAMode:
-		i.rn = i.rn.assignReg(regs[0])
-		if amodeRN := i.amode.rn; amodeRN.Valid() {
-			i.amode.rn = regs[1]
-		}
-		if amodeRM := i.amode.rm; amodeRM.Valid() {
-			i.amode.rm = regs[2]
+		if index == 0 {
+			i.rn = i.rn.assignReg(reg)
+		} else if index == 1 {
+			if amodeRN := i.amode.rn; amodeRN.Valid() {
+				i.amode.rn = reg
+			}
+		} else {
+			if amodeRM := i.amode.rm; amodeRM.Valid() {
+				i.amode.rm = reg
+			}
 		}
 	case useKindCond:
 		c := cond(i.u1)
 		switch c.kind() {
 		case condKindRegisterZero:
-			i.u1 = uint64(registerAsRegZeroCond(regs[0]))
+			i.u1 = uint64(registerAsRegZeroCond(reg))
 		case condKindRegisterNotZero:
-			i.u1 = uint64(registerAsRegNotZeroCond(regs[0]))
+			i.u1 = uint64(registerAsRegNotZeroCond(reg))
 		}
 	case useKindCall:
 		panic("BUG: call instructions shouldn't be assigned")
 	case useKindCallInd:
-		i.rn = i.rn.assignReg(regs[0])
+		i.rn = i.rn.assignReg(reg)
 	default:
 		panic(fmt.Sprintf("useKind for %v not defined", i))
 	}

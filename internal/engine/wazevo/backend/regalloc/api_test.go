@@ -225,9 +225,11 @@ func (m *mockInstr) IsReturn() bool { return false }
 func (m *mockBlock) Entry() bool { return m._entry }
 
 // AssignUses implements Instr.
-func (m *mockInstr) AssignUses(regs []VReg) {
-	m.uses = make([]VReg, len(regs))
-	copy(m.uses, regs)
+func (m *mockInstr) AssignUse(index int, reg VReg) {
+	if index >= len(m.uses) {
+		m.uses = append(m.uses, make([]VReg, 100)...)
+	}
+	m.uses[index] = reg
 }
 
 // AssignDef implements Instr.

@@ -234,9 +234,9 @@ func (r *regAllocInstrImpl) IsReturn() bool {
 	return r.i.kind == ret
 }
 
-// AssignUses implements regalloc.Instr AssignUses.
-func (r *regAllocInstrImpl) AssignUses(vs []regalloc.VReg) {
-	r.i.assignUses(vs)
+// AssignUse implements regalloc.Instr AssignUse.
+func (r *regAllocInstrImpl) AssignUse(i int, v regalloc.VReg) {
+	r.i.assignUse(i, v)
 }
 
 // AssignDef implements regalloc.Instr AssignDef.
