@@ -52,7 +52,7 @@ const (
 const (
 	// DeterministicCompilationVerifierEnabled enables the deterministic compilation verifier. This is disabled by default
 	// since the operation is expensive. But when in doubt, enable this to make sure the compilation is deterministic.
-	DeterministicCompilationVerifierEnabled = true
+	DeterministicCompilationVerifierEnabled = false
 	DeterministicCompilationVerifyingIter   = 20
 )
 
