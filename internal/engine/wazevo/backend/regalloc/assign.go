@@ -73,9 +73,8 @@ func (a *Allocator) assignRegistersPerInstr(f Function, pc programCounter, instr
 		return
 	}
 
-	spills := a.vs[:0]
+	usesSpills := a.vs[:0]
 	uses := instr.Uses()
-	var spillCounts int
 	for i, u := range uses {
 		if u.IsRealReg() {
 			a.vs = append(a.vs, u)
@@ -87,41 +86,45 @@ func (a *Allocator) assignRegistersPerInstr(f Function, pc programCounter, instr
 		n := vRegIDToNode[u.ID()]
 		if !n.spill() {
 			instr.AssignUse(i, u.SetRealReg(n.r))
+		} else {
+			usesSpills = append(usesSpills, u)
 		}
-		spills = append(spills, u)
-	}
-
-	if spillCounts > 0 {
-		if spillCounts > 3 {
-			panic("BUG: instruction using more than three registers should be handled differently") // == call / indirect call.
-		}
-		panic("TODO: handle spills")
 	}
 
 	defs := instr.Defs()
+	var defSpill = VRegInvalid
 	switch len(defs) {
 	case 0:
-		return
 	case 1:
+		d := defs[0]
+		if !d.IsRealReg() {
+			if wazevoapi.RegAllocLoggingEnabled {
+				fmt.Printf("%s defines %d\n", instr, d.ID())
+			}
+
+			n := vRegIDToNode[d.ID()]
+			if !n.spill() {
+				instr.AssignDef(d.SetRealReg(n.r))
+			} else {
+				defSpill = n.v
+			}
+		}
 	default:
 		// multiple defs (== call instruction) are special cased, and no need to assign (already real regs following the calling convention.
-		return
 	}
 
-	d := defs[0]
-	if d.IsRealReg() {
+	a.handleSpills(f, pc, instr, vRegIDToNode, liveNodes, usesSpills, defSpill)
+	a.vs = usesSpills[:0] // for reuse.
+}
+
+func (a *Allocator) handleSpills(
+	f Function, pc programCounter, instr Instr, vRegIDToNode []*node, liveNodes []liveNodeInBlock,
+	usesSpills []VReg, defSpill VReg,
+) {
+	if len(usesSpills) == 0 && !defSpill.Valid() {
 		return
 	}
-	if wazevoapi.RegAllocLoggingEnabled {
-		fmt.Printf("%s defines %d\n", instr, d.ID())
-	}
-
-	n := vRegIDToNode[d.ID()]
-	if !n.spill() {
-		instr.AssignDef(d.SetRealReg(n.r))
-	} else {
-		panic("TODO: handle spills.")
-	}
+	panic("TODO")
 }
 
 func (a *Allocator) assignIndirectCall(f Function, instr Instr, vRegIDToNode []*node) {
