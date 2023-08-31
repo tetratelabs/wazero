@@ -47,6 +47,8 @@ func TestAllocator_assignRegistersPerInstr(t *testing.T) {
 
 		require.Equal(t, 2, len(f.storeRegisterBefore))
 		require.Equal(t, 2, len(f.reloadRegisterAfter))
+		require.True(t, callInd.uses[0].IsRealReg())
+		require.Equal(t, functionPtrVReg.SetRealReg(0xff), callInd.uses[0])
 	})
 	t.Run("call_indirect/func_ptr spilled", func(t *testing.T) {
 		a := NewAllocator(&RegisterInfo{
@@ -74,6 +76,8 @@ func TestAllocator_assignRegistersPerInstr(t *testing.T) {
 		require.Equal(t, 1, len(f.reloadRegisterBefore))
 		require.Equal(t, callInd, f.reloadRegisterBefore[0].instr)
 		require.Equal(t, functionPtrVReg.SetRealReg(0xbb), f.reloadRegisterBefore[0].v)
+		require.True(t, callInd.uses[0].IsRealReg())
+		require.Equal(t, functionPtrVReg.SetRealReg(0xbb), callInd.uses[0])
 	})
 	t.Run("no spills", func(t *testing.T) {
 		r := FromRealReg(1, RegTypeInt)

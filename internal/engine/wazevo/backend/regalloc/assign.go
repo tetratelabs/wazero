@@ -157,15 +157,17 @@ func (a *Allocator) assignIndirectCall(f Function, instr Instr, vRegIDToNode []*
 		// But at this point, all the caller-saved registers are saved, we can use a callee-saved register to reload.
 		for _, r := range a.regInfo.AllocatableRegisters[RegTypeInt] {
 			if a.regInfo.isCallerSaved(r) {
-				f.ReloadRegisterBefore(v.SetRealReg(r), instr)
+				v = v.SetRealReg(r)
+				f.ReloadRegisterBefore(v, instr)
 				break
 			}
 		}
 	} else {
-		a.vs = a.vs[:0]
-		a.vs = append(a.vs, v.SetRealReg(n.r))
-		instr.AssignUses(a.vs)
+		v = v.SetRealReg(n.r)
 	}
+	a.vs = a.vs[:0]
+	a.vs = append(a.vs, v)
+	instr.AssignUses(a.vs)
 }
 
 // collectActiveNonRealVRegsAt collects the set of active registers at the given program counter into `nodes` slice by appending
