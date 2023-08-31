@@ -104,28 +104,28 @@ func (f *regAllocFunctionImpl) ClobberedRegisters(regs []regalloc.VReg) {
 	m.clobberedRegs = append(m.clobberedRegs[:0], regs...)
 }
 
-// StoreRegisterAfter implements regalloc.Function StoreRegisterAfter.
-func (f *regAllocFunctionImpl) StoreRegisterAfter(v regalloc.VReg, instr regalloc.Instr) {
-	m := f.m
-	m.insertStoreRegisterAt(v, instr.(*regAllocInstrImpl).i, true)
-}
-
 // StoreRegisterBefore implements regalloc.Function StoreRegisterBefore.
 func (f *regAllocFunctionImpl) StoreRegisterBefore(v regalloc.VReg, instr regalloc.Instr) {
 	m := f.m
 	m.insertStoreRegisterAt(v, instr.(*regAllocInstrImpl).i, false)
 }
 
+// StoreRegisterAfter implements regalloc.Function StoreRegisterAfter.
+func (f *regAllocFunctionImpl) StoreRegisterAfter(v regalloc.VReg, instr regalloc.Instr) {
+	m := f.m
+	m.insertStoreRegisterAt(v, instr.(*regAllocInstrImpl).i, true)
+}
+
 // ReloadRegisterBefore implements regalloc.Function ReloadRegisterBefore.
 func (f *regAllocFunctionImpl) ReloadRegisterBefore(v regalloc.VReg, instr regalloc.Instr) {
 	m := f.m
-	m.reloadRegisterAfter(v, instr.(*regAllocInstrImpl).i.prev)
+	m.reloadRegister(v, instr.(*regAllocInstrImpl).i, false)
 }
 
 // ReloadRegisterAfter implements regalloc.Function ReloadRegisterAfter.
 func (f *regAllocFunctionImpl) ReloadRegisterAfter(v regalloc.VReg, instr regalloc.Instr) {
 	m := f.m
-	m.reloadRegisterAfter(v, instr.(*regAllocInstrImpl).i)
+	m.reloadRegister(v, instr.(*regAllocInstrImpl).i, true)
 }
 
 // Done implements regalloc.Function Done.
@@ -279,7 +279,7 @@ func (m *machine) insertStoreRegisterAt(v regalloc.VReg, instr *instruction, aft
 	prevNext.prev = store
 }
 
-func (m *machine) reloadRegisterAfter(v regalloc.VReg, instr *instruction) {
+func (m *machine) reloadRegister(v regalloc.VReg, instr *instruction, after bool) {
 	if !v.IsRealReg() {
 		panic("BUG: VReg must be backed by real reg to be stored")
 	}
@@ -299,8 +299,12 @@ func (m *machine) reloadRegisterAfter(v regalloc.VReg, instr *instruction) {
 		panic("TODO")
 	}
 
-	cur := instr
-	prevNext := cur.next
+	var prevNext, cur *instruction
+	if after {
+		cur, prevNext = instr, instr.next
+	} else {
+		cur, prevNext = instr.prev, instr
+	}
 
 	// If the offset is large, we might end up with having multiple instructions inserted in resolveAddressModeForOffset.
 	for _, instr := range m.pendingInstructions {
