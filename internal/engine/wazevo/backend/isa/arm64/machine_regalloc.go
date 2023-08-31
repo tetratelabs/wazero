@@ -105,68 +105,27 @@ func (f *regAllocFunctionImpl) ClobberedRegisters(regs []regalloc.VReg) {
 }
 
 // StoreRegisterBefore implements regalloc.Function StoreRegisterBefore.
-func (f *regAllocFunctionImpl) StoreRegisterBefore(v regalloc.VReg, _instr regalloc.Instr) {
-	if !v.IsRealReg() {
-		panic("BUG: VReg must be backed by real reg to be stored")
-	}
-
+func (f *regAllocFunctionImpl) StoreRegisterBefore(v regalloc.VReg, instr regalloc.Instr) {
 	m := f.m
-	typ := m.compiler.TypeOf(v)
+	m.insertStoreRegisterAt(v, instr.(*regAllocInstrImpl).i, false)
+}
 
-	offsetFromSP := m.getVRegSpillSlotOffset(v.ID(), typ.Size()) + m.clobberedRegSlotSize()
-	admode := m.resolveAddressModeForOffset(offsetFromSP, typ.Bits(), spVReg)
-	store := m.allocateInstrAfterLowering()
-	store.asStore(operandNR(v), admode, typ.Bits())
-
-	instr := _instr.(*regAllocInstrImpl).i
-	prev := instr.prev
-
-	prev.next = store
-	store.prev = prev
-
-	store.next = instr
-	instr.prev = store
+// StoreRegisterAfter implements regalloc.Function StoreRegisterAfter.
+func (f *regAllocFunctionImpl) StoreRegisterAfter(v regalloc.VReg, instr regalloc.Instr) {
+	m := f.m
+	m.insertStoreRegisterAt(v, instr.(*regAllocInstrImpl).i, true)
 }
 
 // ReloadRegisterBefore implements regalloc.Function ReloadRegisterBefore.
 func (f *regAllocFunctionImpl) ReloadRegisterBefore(v regalloc.VReg, instr regalloc.Instr) {
-	panic("TODO")
+	m := f.m
+	m.reloadRegister(v, instr.(*regAllocInstrImpl).i, false)
 }
 
 // ReloadRegisterAfter implements regalloc.Function ReloadRegisterAfter.
-func (f *regAllocFunctionImpl) ReloadRegisterAfter(v regalloc.VReg, _instr regalloc.Instr) {
-	if !v.IsRealReg() {
-		panic("BUG: VReg must be backed by real reg to be stored")
-	}
-
+func (f *regAllocFunctionImpl) ReloadRegisterAfter(v regalloc.VReg, instr regalloc.Instr) {
 	m := f.m
-	typ := m.compiler.TypeOf(v)
-
-	offsetFromSP := m.getVRegSpillSlotOffset(v.ID(), typ.Size()) + m.clobberedRegSlotSize()
-	admode := m.resolveAddressModeForOffset(offsetFromSP, typ.Bits(), spVReg)
-	load := m.allocateInstrAfterLowering()
-	switch typ {
-	case ssa.TypeI32, ssa.TypeI64:
-		load.asULoad(operandNR(v), admode, typ.Bits())
-	case ssa.TypeF32, ssa.TypeF64:
-		load.asFpuLoad(operandNR(v), admode, typ.Bits())
-	default:
-		panic("TODO")
-	}
-
-	instr := _instr.(*regAllocInstrImpl).i
-	next := instr.next
-
-	instr.next = load
-	load.prev = instr
-
-	load.next = next
-	next.prev = load
-}
-
-// StoreRegisterAfter implements regalloc.Function StoreRegisterAfter.
-func (f *regAllocFunctionImpl) StoreRegisterAfter(v regalloc.VReg, _instr regalloc.Instr) {
-	panic("TODO")
+	m.reloadRegister(v, instr.(*regAllocInstrImpl).i, true)
 }
 
 // Done implements regalloc.Function Done.
@@ -283,4 +242,81 @@ func (r *regAllocInstrImpl) AssignUses(vs []regalloc.VReg) {
 // AssignDef implements regalloc.Instr AssignDef.
 func (r *regAllocInstrImpl) AssignDef(v regalloc.VReg) {
 	r.i.assignDef(v)
+}
+
+func (m *machine) insertStoreRegisterAt(v regalloc.VReg, instr *instruction, after bool) {
+	if !v.IsRealReg() {
+		panic("BUG: VReg must be backed by real reg to be stored")
+	}
+
+	typ := m.compiler.TypeOf(v)
+
+	offsetFromSP := m.getVRegSpillSlotOffset(v.ID(), typ.Size()) + m.clobberedRegSlotSize()
+	m.pendingInstructions = m.pendingInstructions[:0]
+	admode := m.resolveAddressModeForOffset(offsetFromSP, typ.Bits(), spVReg)
+	store := m.allocateInstrAfterLowering()
+	store.asStore(operandNR(v), admode, typ.Bits())
+
+	var prevNext, cur *instruction
+	if after {
+		cur, prevNext = instr, instr.next
+	} else {
+		cur, prevNext = instr.prev, instr
+	}
+
+	// If the offset is large, we might end up with having multiple instructions inserted in resolveAddressModeForOffset.
+	for _, instr := range m.pendingInstructions {
+		instr.addedAfterLowering = true
+		cur.next = instr
+		instr.prev = cur
+		cur = instr
+	}
+
+	cur.next = store
+	store.prev = cur
+
+	store.next = prevNext
+	prevNext.prev = store
+}
+
+func (m *machine) reloadRegister(v regalloc.VReg, instr *instruction, after bool) {
+	if !v.IsRealReg() {
+		panic("BUG: VReg must be backed by real reg to be stored")
+	}
+
+	typ := m.compiler.TypeOf(v)
+
+	offsetFromSP := m.getVRegSpillSlotOffset(v.ID(), typ.Size()) + m.clobberedRegSlotSize()
+	m.pendingInstructions = m.pendingInstructions[:0]
+	admode := m.resolveAddressModeForOffset(offsetFromSP, typ.Bits(), spVReg)
+	load := m.allocateInstrAfterLowering()
+	switch typ {
+	case ssa.TypeI32, ssa.TypeI64:
+		load.asULoad(operandNR(v), admode, typ.Bits())
+	case ssa.TypeF32, ssa.TypeF64:
+		load.asFpuLoad(operandNR(v), admode, typ.Bits())
+	default:
+		panic("TODO")
+	}
+
+	var prevNext, cur *instruction
+	if after {
+		cur, prevNext = instr, instr.next
+	} else {
+		cur, prevNext = instr.prev, instr
+	}
+
+	// If the offset is large, we might end up with having multiple instructions inserted in resolveAddressModeForOffset.
+	for _, instr := range m.pendingInstructions {
+		instr.addedAfterLowering = true
+		cur.next = instr
+		instr.prev = cur
+		cur = instr
+	}
+
+	cur.next = load
+	load.prev = cur
+
+	load.next = prevNext
+	prevNext.prev = load
 }
