@@ -64,7 +64,7 @@ type (
 		blockInfos   [] /* blockID to */ blockInfo
 		vs           []VReg
 
-		// Followings are re-used during coloring and activeRegistersAt
+		// Followings are re-used during various places e.g. coloring.
 		realRegSet map[RealReg]struct{}
 		realRegs   []RealReg
 		nodeSet    map[*node]int

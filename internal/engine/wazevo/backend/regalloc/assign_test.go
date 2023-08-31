@@ -153,7 +153,8 @@ func TestAllocator_activeNonRealVRegsAt(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			a := NewAllocator(&RegisterInfo{})
-			ans := a.collectActiveNonRealVRegsAt(nil, tc.pc, tc.lives)
+			a.collectActiveNonRealVRegsAt(tc.pc, tc.lives)
+			ans := a.nodes1
 
 			actual := make([]VReg, len(ans))
 			for i, n := range ans {

@@ -64,9 +64,9 @@ type (
 		// Uses returns the virtual registers used by this instruction.
 		// Note: multiple returned []VReg will not be held at the same time, so it's safe to use the same slice for this.
 		Uses() []VReg
-		// AssignUses assigns the RealReg-allocated virtual registers used by this instruction.
+		// AssignUse assigns the RealReg-allocated virtual register used by this instruction at the given index.
 		// Note: input []VReg is reused, so it's not safe to hold reference to it after the end of this call.
-		AssignUses([]VReg)
+		AssignUse(index int, v VReg)
 		// AssignDef assigns a RealReg-allocated virtual register defined by this instruction.
 		// This only accepts one register because we don't allocate registers for multi-def instructions (i.e. call instruction)
 		AssignDef(VReg)
