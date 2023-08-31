@@ -104,69 +104,28 @@ func (f *regAllocFunctionImpl) ClobberedRegisters(regs []regalloc.VReg) {
 	m.clobberedRegs = append(m.clobberedRegs[:0], regs...)
 }
 
-// StoreRegisterBefore implements regalloc.Function StoreRegisterBefore.
-func (f *regAllocFunctionImpl) StoreRegisterBefore(v regalloc.VReg, _instr regalloc.Instr) {
-	if !v.IsRealReg() {
-		panic("BUG: VReg must be backed by real reg to be stored")
-	}
-
+// StoreRegisterAfter implements regalloc.Function StoreRegisterAfter.
+func (f *regAllocFunctionImpl) StoreRegisterAfter(v regalloc.VReg, instr regalloc.Instr) {
 	m := f.m
-	typ := m.compiler.TypeOf(v)
+	m.storeRegisterBefore(v, instr.(*regAllocInstrImpl).i.next)
+}
 
-	offsetFromSP := m.getVRegSpillSlotOffset(v.ID(), typ.Size()) + m.clobberedRegSlotSize()
-	admode := m.resolveAddressModeForOffset(offsetFromSP, typ.Bits(), spVReg)
-	store := m.allocateInstrAfterLowering()
-	store.asStore(operandNR(v), admode, typ.Bits())
-
-	instr := _instr.(*regAllocInstrImpl).i
-	prev := instr.prev
-
-	prev.next = store
-	store.prev = prev
-
-	store.next = instr
-	instr.prev = store
+// StoreRegisterBefore implements regalloc.Function StoreRegisterBefore.
+func (f *regAllocFunctionImpl) StoreRegisterBefore(v regalloc.VReg, instr regalloc.Instr) {
+	m := f.m
+	m.storeRegisterBefore(v, instr.(*regAllocInstrImpl).i)
 }
 
 // ReloadRegisterBefore implements regalloc.Function ReloadRegisterBefore.
 func (f *regAllocFunctionImpl) ReloadRegisterBefore(v regalloc.VReg, instr regalloc.Instr) {
-	panic("TODO")
+	m := f.m
+	m.reloadRegisterAfter(v, instr.(*regAllocInstrImpl).i.prev)
 }
 
 // ReloadRegisterAfter implements regalloc.Function ReloadRegisterAfter.
-func (f *regAllocFunctionImpl) ReloadRegisterAfter(v regalloc.VReg, _instr regalloc.Instr) {
-	if !v.IsRealReg() {
-		panic("BUG: VReg must be backed by real reg to be stored")
-	}
-
+func (f *regAllocFunctionImpl) ReloadRegisterAfter(v regalloc.VReg, instr regalloc.Instr) {
 	m := f.m
-	typ := m.compiler.TypeOf(v)
-
-	offsetFromSP := m.getVRegSpillSlotOffset(v.ID(), typ.Size()) + m.clobberedRegSlotSize()
-	admode := m.resolveAddressModeForOffset(offsetFromSP, typ.Bits(), spVReg)
-	load := m.allocateInstrAfterLowering()
-	switch typ {
-	case ssa.TypeI32, ssa.TypeI64:
-		load.asULoad(operandNR(v), admode, typ.Bits())
-	case ssa.TypeF32, ssa.TypeF64:
-		load.asFpuLoad(operandNR(v), admode, typ.Bits())
-	default:
-		panic("TODO")
-	}
-
-	instr := _instr.(*regAllocInstrImpl).i
-	next := instr.next
-
-	instr.next = load
-	load.prev = instr
-
-	load.next = next
-	next.prev = load
-}
-
-// StoreRegisterAfter implements regalloc.Function StoreRegisterAfter.
-func (f *regAllocFunctionImpl) StoreRegisterAfter(v regalloc.VReg, _instr regalloc.Instr) {
-	panic("TODO")
+	m.reloadRegisterAfter(v, instr.(*regAllocInstrImpl).i)
 }
 
 // Done implements regalloc.Function Done.
@@ -283,4 +242,53 @@ func (r *regAllocInstrImpl) AssignUses(vs []regalloc.VReg) {
 // AssignDef implements regalloc.Instr AssignDef.
 func (r *regAllocInstrImpl) AssignDef(v regalloc.VReg) {
 	r.i.assignDef(v)
+}
+
+func (m *machine) storeRegisterBefore(v regalloc.VReg, instr *instruction) {
+	if !v.IsRealReg() {
+		panic("BUG: VReg must be backed by real reg to be stored")
+	}
+
+	typ := m.compiler.TypeOf(v)
+
+	offsetFromSP := m.getVRegSpillSlotOffset(v.ID(), typ.Size()) + m.clobberedRegSlotSize()
+	admode := m.resolveAddressModeForOffset(offsetFromSP, typ.Bits(), spVReg)
+	store := m.allocateInstrAfterLowering()
+	store.asStore(operandNR(v), admode, typ.Bits())
+
+	prev := instr.prev
+
+	prev.next = store
+	store.prev = prev
+
+	store.next = instr
+	instr.prev = store
+}
+
+func (m *machine) reloadRegisterAfter(v regalloc.VReg, instr *instruction) {
+	if !v.IsRealReg() {
+		panic("BUG: VReg must be backed by real reg to be stored")
+	}
+
+	typ := m.compiler.TypeOf(v)
+
+	offsetFromSP := m.getVRegSpillSlotOffset(v.ID(), typ.Size()) + m.clobberedRegSlotSize()
+	admode := m.resolveAddressModeForOffset(offsetFromSP, typ.Bits(), spVReg)
+	load := m.allocateInstrAfterLowering()
+	switch typ {
+	case ssa.TypeI32, ssa.TypeI64:
+		load.asULoad(operandNR(v), admode, typ.Bits())
+	case ssa.TypeF32, ssa.TypeF64:
+		load.asFpuLoad(operandNR(v), admode, typ.Bits())
+	default:
+		panic("TODO")
+	}
+
+	next := instr.next
+
+	instr.next = load
+	load.prev = instr
+
+	load.next = next
+	next.prev = load
 }
