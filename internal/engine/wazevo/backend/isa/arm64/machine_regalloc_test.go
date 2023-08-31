@@ -128,3 +128,11 @@ func TestRegAllocFunctionImpl_ClobberedRegisters(t *testing.T) {
 	f.ClobberedRegisters([]regalloc.VReg{v19VReg, v19VReg, v19VReg, v19VReg})
 	require.Equal(t, []regalloc.VReg{v19VReg, v19VReg, v19VReg, v19VReg}, m.clobberedRegs)
 }
+
+func TestMachine_reloadRegisterAfter(t *testing.T) {
+	t.Skip("TODO")
+}
+
+func TestMachine_storeRegisterBefore(t *testing.T) {
+	t.Skip("TODO")
+}

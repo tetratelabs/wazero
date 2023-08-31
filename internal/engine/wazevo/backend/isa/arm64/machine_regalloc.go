@@ -252,17 +252,26 @@ func (m *machine) storeRegisterBefore(v regalloc.VReg, instr *instruction) {
 	typ := m.compiler.TypeOf(v)
 
 	offsetFromSP := m.getVRegSpillSlotOffset(v.ID(), typ.Size()) + m.clobberedRegSlotSize()
+	m.pendingInstructions = m.pendingInstructions[:0]
 	admode := m.resolveAddressModeForOffset(offsetFromSP, typ.Bits(), spVReg)
 	store := m.allocateInstrAfterLowering()
 	store.asStore(operandNR(v), admode, typ.Bits())
 
-	prev := instr.prev
+	prevNext := instr
+	cur := instr.prev
 
-	prev.next = store
-	store.prev = prev
+	// If the offset is large, we might end up with having multiple instructions inserted in resolveAddressModeForOffset.
+	for _, instr := range m.pendingInstructions {
+		cur.prev = instr
+		instr.next = cur
+		cur = instr
+	}
 
-	store.next = instr
-	instr.prev = store
+	cur.next = store
+	store.prev = cur
+
+	store.next = prevNext
+	prevNext.prev = store
 }
 
 func (m *machine) reloadRegisterAfter(v regalloc.VReg, instr *instruction) {
@@ -273,6 +282,7 @@ func (m *machine) reloadRegisterAfter(v regalloc.VReg, instr *instruction) {
 	typ := m.compiler.TypeOf(v)
 
 	offsetFromSP := m.getVRegSpillSlotOffset(v.ID(), typ.Size()) + m.clobberedRegSlotSize()
+	m.pendingInstructions = m.pendingInstructions[:0]
 	admode := m.resolveAddressModeForOffset(offsetFromSP, typ.Bits(), spVReg)
 	load := m.allocateInstrAfterLowering()
 	switch typ {
@@ -284,11 +294,19 @@ func (m *machine) reloadRegisterAfter(v regalloc.VReg, instr *instruction) {
 		panic("TODO")
 	}
 
-	next := instr.next
+	cur := instr
+	prevNext := cur.next
 
-	instr.next = load
-	load.prev = instr
+	// If the offset is large, we might end up with having multiple instructions inserted in resolveAddressModeForOffset.
+	for _, instr := range m.pendingInstructions {
+		cur.next = instr
+		instr.prev = cur
+		cur = instr
+	}
 
-	load.next = next
-	next.prev = load
+	cur.next = load
+	load.prev = cur
+
+	load.next = prevNext
+	prevNext.prev = load
 }
