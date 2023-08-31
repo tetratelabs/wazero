@@ -25,13 +25,13 @@ type (
 		ReversePostOrderBlockIteratorNext() Block
 		// ClobberedRegisters tell the clobbered registers by this function.
 		ClobberedRegisters([]VReg)
-		// StoreRegisterBefore ... TODO
+		// StoreRegisterBefore inserts store instruction(s) before the given instruction for the given virtual register.
 		StoreRegisterBefore(v VReg, instr Instr)
-		// StoreRegisterAfter ... TODO
+		// StoreRegisterAfter inserts store instruction(s) after the given instruction for the given virtual register.
 		StoreRegisterAfter(v VReg, instr Instr)
-		// ReloadRegisterBefore ... TODO
+		// ReloadRegisterBefore inserts reload instruction(s) before the given instruction for the given virtual register.
 		ReloadRegisterBefore(v VReg, instr Instr)
-		// ReloadRegisterAfter ... TODO
+		// ReloadRegisterAfter inserts reload instruction(s) after the given instruction for the given virtual register.
 		ReloadRegisterAfter(v VReg, instr Instr)
 		// Done tells the implementation that register allocation is done, and it can finalize the stack
 		Done()
@@ -77,7 +77,8 @@ type (
 		// IsCall returns true if this instruction is a call instruction. The result is used to insert
 		// caller saved register spills and restores.
 		IsCall() bool
-		// IsIndirectCall returns true if this instruction is an indirect call instruction.
+		// IsIndirectCall returns true if this instruction is an indirect call instruction which calls a function pointer.
+		//  The result is used to insert caller saved register spills and restores.
 		IsIndirectCall() bool
 		// IsReturn returns true if this instruction is a return instruction.
 		IsReturn() bool
