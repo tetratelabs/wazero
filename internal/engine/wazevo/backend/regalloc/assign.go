@@ -92,7 +92,7 @@ func (a *Allocator) assignRegistersPerInstr(f Function, pc programCounter, instr
 	}
 
 	defs := instr.Defs()
-	var defSpill = VRegInvalid
+	defSpill := VRegInvalid
 	switch len(defs) {
 	case 0:
 	case 1:
