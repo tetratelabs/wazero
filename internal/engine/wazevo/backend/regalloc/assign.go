@@ -110,7 +110,7 @@ func (a *Allocator) assignRegistersPerInstr(f Function, pc programCounter, instr
 			}
 		}
 	default:
-		// multiple defs (== call instruction) are special cased, and no need to assign (already real regs following the calling convention.
+		panic("BUG: multiple def instructions must be special cased")
 	}
 
 	a.handleSpills(f, pc, instr, vRegIDToNode, liveNodes, usesSpills, defSpill)
