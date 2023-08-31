@@ -32,8 +32,8 @@ type (
 
 	// mockInstr implements Instr.
 	mockInstr struct {
-		defs, uses     []VReg
-		isCopy, isCall bool
+		defs, uses                 []VReg
+		isCopy, isCall, isIndirect bool
 	}
 )
 
@@ -99,6 +99,11 @@ func (m *mockInstr) asCopy() *mockInstr {
 
 func (m *mockInstr) asCall() *mockInstr {
 	m.isCall = true
+	return m
+}
+
+func (m *mockInstr) asIndirectCall() *mockInstr {
+	m.isIndirect = true
 	return m
 }
 
@@ -211,7 +216,7 @@ func (m *mockInstr) IsCopy() bool { return m.isCopy }
 func (m *mockInstr) IsCall() bool { return m.isCall }
 
 // IsIndirectCall implements Instr.
-func (m *mockInstr) IsIndirectCall() bool { return m.isCall }
+func (m *mockInstr) IsIndirectCall() bool { return m.isIndirect }
 
 // IsReturn implements Instr.
 func (m *mockInstr) IsReturn() bool { return false }

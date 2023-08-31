@@ -42,7 +42,7 @@ func (a *Allocator) assignRegistersPerInstr(f Function, pc programCounter, instr
 		}
 	}
 
-	if direct := instr.IsCall(); direct || instr.IsIndirectCall() {
+	if indirect := instr.IsIndirectCall(); instr.IsCall() || indirect {
 		// Only take care of non-real VRegs (e.g. VReg.IsRealReg() == false) since
 		// the real VRegs are already placed in the right registers at this point.
 		a.nodes2 = a.collectActiveNonRealVRegsAt(a.nodes2,
@@ -56,10 +56,19 @@ func (a *Allocator) assignRegistersPerInstr(f Function, pc programCounter, instr
 				f.ReloadRegisterAfter(v, instr)
 			}
 		}
-		// Direct function calls do not need assignment, while indirect one needs the assignment on the function pointer.
-		if direct {
-			return
+		if indirect {
+			// Direct function calls do not need assignment, while indirect one needs the assignment on the function pointer.
+			a.assignIndirectCall(f, instr, vRegIDToNode)
 		}
+
+		if wazevoapi.RegAllocValidationEnabled {
+			for _, def := range instr.Defs() {
+				if !def.IsRealReg() {
+					panic(fmt.Sprintf("BUG: call/indirect call instruction must define only real registers: %s", def))
+				}
+			}
+		}
+		return
 	} else if instr.IsReturn() {
 		return
 	}
@@ -113,6 +122,52 @@ func (a *Allocator) assignRegistersPerInstr(f Function, pc programCounter, instr
 	} else {
 		panic("TODO: handle spills.")
 	}
+}
+
+func (a *Allocator) assignIndirectCall(f Function, instr Instr, vRegIDToNode []*node) {
+	a.nodes1 = a.nodes1[:0]
+	uses := instr.Uses()
+	if wazevoapi.RegAllocValidationEnabled {
+		var nonRealRegs int
+		for _, u := range uses {
+			if !u.IsRealReg() {
+				nonRealRegs++
+			}
+		}
+		if nonRealRegs != 1 {
+			panic(fmt.Sprintf("BUG: indirect call must have only one non-real register (for function pointer): %d", nonRealRegs))
+		}
+	}
+
+	var v VReg
+	for _, u := range uses {
+		if !u.IsRealReg() {
+			v = u
+			break
+		}
+	}
+
+	if v.RegType() != RegTypeInt {
+		panic(fmt.Sprintf("BUG: function pointer for indirect call must be an integer register: %s", v))
+	}
+
+	n := vRegIDToNode[v.ID()]
+	if n.spill() {
+		// If the function pointer is spilled, we need to reload it to a register.
+		// But at this point, all the caller-saved registers are saved, we can use a callee-saved register to reload.
+		for _, r := range a.regInfo.AllocatableRegisters[RegTypeInt] {
+			if a.regInfo.isCallerSaved(r) {
+				v = v.SetRealReg(r)
+				f.ReloadRegisterBefore(v, instr)
+				break
+			}
+		}
+	} else {
+		v = v.SetRealReg(n.r)
+	}
+	a.vs = a.vs[:0]
+	a.vs = append(a.vs, v)
+	instr.AssignUses(a.vs)
 }
 
 // collectActiveNonRealVRegsAt collects the set of active registers at the given program counter into `nodes` slice by appending
