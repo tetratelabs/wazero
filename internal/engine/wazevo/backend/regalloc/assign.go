@@ -60,6 +60,14 @@ func (a *Allocator) assignRegistersPerInstr(f Function, pc programCounter, instr
 			// Direct function calls do not need assignment, while indirect one needs the assignment on the function pointer.
 			a.assignIndirectCall(f, instr, vRegIDToNode)
 		}
+
+		if wazevoapi.RegAllocValidationEnabled {
+			for _, def := range instr.Defs() {
+				if !def.IsRealReg() {
+					panic(fmt.Sprintf("BUG: call/indirect call instruction must define only real registers: %s", def))
+				}
+			}
+		}
 		return
 	} else if instr.IsReturn() {
 		return
