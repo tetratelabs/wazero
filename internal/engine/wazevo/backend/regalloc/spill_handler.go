@@ -3,6 +3,7 @@ package regalloc
 // spillHandler is a helper to handle the spill and reload of registers at some point in the program.
 type spillHandler struct {
 	activeRegs map[RealReg]spillHandlerRegState
+	deleteTemp []RealReg
 }
 
 type spillHandlerRegState struct {
@@ -21,7 +22,11 @@ func (s *spillHandler) init(activeNodes []*node) {
 	if s.activeRegs == nil {
 		s.activeRegs = make(map[RealReg]spillHandlerRegState)
 	} else {
+		s.deleteTemp = s.deleteTemp[:0]
 		for r := range s.activeRegs {
+			s.deleteTemp = append(s.deleteTemp, r)
+		}
+		for _, r := range s.deleteTemp {
 			delete(s.activeRegs, r)
 		}
 	}
