@@ -51,10 +51,7 @@ func (m *machine) SetupPrologue() {
 			panic(fmt.Errorf("BUG: spill slot size %d is not 16-byte aligned", size))
 		}
 
-		decSP := m.allocateAddOrSubStackPointer(spVReg, size, false, true)
-		cur.next = decSP
-		decSP.prev = cur
-		cur = decSP
+		cur = m.addsAddOrSubStackPointer(cur, spVReg, size, false, true)
 
 		// At this point, the stack looks like:
 		//
@@ -219,10 +216,7 @@ func (m *machine) setupEpilogueAfter(cur *instruction) {
 		//   SP---> +-----------------+
 		//             (low address)
 		//
-		addSP := m.allocateAddOrSubStackPointer(spVReg, s, true, true)
-		cur.next = addSP
-		addSP.prev = cur
-		cur = addSP
+		cur = m.addsAddOrSubStackPointer(cur, spVReg, s, true, true)
 	}
 
 	// Reload the return address (lr).
@@ -408,4 +402,16 @@ func (m *machine) CompileStackGrowCallSequence() []byte {
 
 	m.encode(m.rootInstr)
 	return m.compiler.Buf()
+}
+
+func (m *machine) addsAddOrSubStackPointer(cur *instruction, rd regalloc.VReg, diff int64, add bool, afterLowering bool) *instruction {
+	m.pendingInstructions = m.pendingInstructions[:0]
+	m.insertAddOrSubStackPointer(rd, diff, add, afterLowering)
+	for _, inserted := range m.pendingInstructions {
+		cur.next = inserted
+		inserted.prev = cur
+		cur = inserted
+	}
+	m.pendingInstructions = m.pendingInstructions[:0]
+	return cur
 }

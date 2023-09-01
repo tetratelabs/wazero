@@ -113,18 +113,93 @@ func (a *Allocator) assignRegistersPerInstr(f Function, pc programCounter, instr
 		panic("BUG: multiple def instructions must be special cased")
 	}
 
-	a.handleSpills(f, pc, instr, vRegIDToNode, liveNodes, usesSpills, defSpill)
+	a.handleSpills(f, pc, instr, liveNodes, usesSpills, defSpill)
 	a.vs = usesSpills[:0] // for reuse.
 }
 
 func (a *Allocator) handleSpills(
-	f Function, pc programCounter, instr Instr, vRegIDToNode []*node, liveNodes []liveNodeInBlock,
+	f Function, pc programCounter, instr Instr, liveNodes []liveNodeInBlock,
 	usesSpills []VReg, defSpill VReg,
 ) {
-	if len(usesSpills) == 0 && !defSpill.Valid() {
-		return
+	_usesSpills, _defSpill := len(usesSpills) > 0, defSpill.Valid()
+	switch {
+	case !_usesSpills && !_defSpill: // Nothing to do.
+	case !_usesSpills && _defSpill: // Only definition is spilled.
+		a.collectActiveNodesAt(pc+pcDefOffset, liveNodes)
+		a.spillHandler.init(a.nodes1)
+
+		r, evictedNode := a.spillHandler.getUnusedOrEvictReg(defSpill.RegType(), a.regInfo)
+		if evictedNode != nil {
+			evictedNodeV := evictedNode.v.SetRealReg(evictedNode.assignedRealReg())
+			f.StoreRegisterBefore(evictedNodeV, instr)
+			f.ReloadRegisterAfter(evictedNodeV, instr)
+		}
+
+		defSpill = defSpill.SetRealReg(r)
+		instr.AssignDef(defSpill)
+
+		f.StoreRegisterAfter(defSpill, instr)
+
+	case _usesSpills:
+		a.collectActiveNodesAt(pc, liveNodes)
+		a.spillHandler.init(a.nodes1)
+
+		var evicted [3]*node
+		var evictedCount int
+		for i, u := range usesSpills {
+			r, evictedNode := a.spillHandler.getUnusedOrEvictReg(u.RegType(), a.regInfo)
+			if evictedNode != nil {
+				evicted[evictedCount] = evictedNode
+				evictedCount++
+			}
+			usesSpills[i] = u.SetRealReg(r)
+		}
+
+		for i := 0; i < evictedCount; i++ {
+			evictedNode := evicted[i]
+			evictedNodeV := evictedNode.v.SetRealReg(evictedNode.assignedRealReg())
+			f.StoreRegisterBefore(evictedNodeV, instr)
+			f.ReloadRegisterAfter(evictedNodeV, instr)
+		}
+
+		for _, u := range usesSpills {
+			f.ReloadRegisterBefore(u, instr)
+		}
+
+		for useIndex, v := range instr.Uses() {
+			for _, u := range usesSpills {
+				if v.ID() == u.ID() {
+					instr.AssignUse(useIndex, u)
+				}
+			}
+		}
+
+		if _defSpill {
+			// We can reuse the register in usesSpills for the definition.
+			for _, u := range usesSpills {
+				if defSpill.RegType() == u.RegType() {
+					defSpill = defSpill.SetRealReg(u.RealReg())
+					break
+				}
+			}
+
+			if !defSpill.IsRealReg() {
+				// This case, the destination register type is different from the source registers.
+				a.collectActiveNodesAt(pc+pcDefOffset, liveNodes)
+				a.spillHandler.init(a.nodes1)
+				r, evictedNode := a.spillHandler.getUnusedOrEvictReg(defSpill.RegType(), a.regInfo)
+				if evictedNode != nil {
+					evictedNodeV := evictedNode.v.SetRealReg(evictedNode.assignedRealReg())
+					f.StoreRegisterBefore(evictedNodeV, instr)
+					f.ReloadRegisterAfter(evictedNodeV, instr)
+				}
+				defSpill = defSpill.SetRealReg(r)
+			}
+
+			instr.AssignDef(defSpill)
+			f.StoreRegisterAfter(defSpill, instr)
+		}
 	}
-	panic("TODO")
 }
 
 func (a *Allocator) assignIndirectCall(f Function, instr Instr, vRegIDToNode []*node) {
@@ -188,6 +263,24 @@ func (a *Allocator) collectActiveNonRealVRegsAt(pc programCounter, liveNodes []l
 		}
 		if pc <= r.end { // pc is in the range.
 			nodes = append(nodes, n)
+		}
+	}
+	a.nodes1 = nodes
+}
+
+func (a *Allocator) collectActiveNodesAt(pc programCounter, liveNodes []liveNodeInBlock) {
+	nodes := a.nodes1[:0]
+	for _, live := range liveNodes {
+		n := live.n
+		if n.assignedRealReg() != RealRegInvalid {
+			r := &n.ranges[live.rangeIndex]
+			if r.begin > pc {
+				// liveNodes are sorted by the start program counter, so we can break here.
+				break
+			}
+			if pc <= r.end { // pc is in the range.
+				nodes = append(nodes, n)
+			}
 		}
 	}
 	a.nodes1 = nodes

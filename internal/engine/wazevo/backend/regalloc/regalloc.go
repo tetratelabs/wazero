@@ -63,6 +63,7 @@ type (
 		vRegIDToNode [] /* VRegID to */ *node
 		blockInfos   [] /* blockID to */ blockInfo
 		vs           []VReg
+		spillHandler spillHandler
 
 		// Followings are re-used during various places e.g. coloring.
 		realRegSet map[RealReg]struct{}
@@ -665,4 +666,13 @@ func (a *Allocator) recordCopyRelation(dst, src VReg) {
 		srcN := a.getOrAllocateNode(src)
 		srcN.copyToReal = dst.RealReg()
 	}
+}
+
+// assignedRealReg returns either the assigned RealReg to this node or precolored RealReg.
+func (n *node) assignedRealReg() RealReg {
+	r := n.r
+	if r != RealRegInvalid {
+		return r
+	}
+	return n.v.RealReg()
 }

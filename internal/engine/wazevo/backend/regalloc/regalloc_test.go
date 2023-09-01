@@ -706,3 +706,9 @@ func initMapInInfo(info *blockInfo) {
 		info.realRegDefs = make(map[VReg][]programCounter)
 	}
 }
+
+func TestNode_assignedRealReg(t *testing.T) {
+	require.Equal(t, RealRegInvalid, (&node{}).assignedRealReg())
+	require.Equal(t, RealReg(100), (&node{r: 100}).assignedRealReg())
+	require.Equal(t, RealReg(200), (&node{v: VReg(1).SetRealReg(200)}).assignedRealReg())
+}

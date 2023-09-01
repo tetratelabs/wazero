@@ -99,7 +99,7 @@ func TestSpectestV1(t *testing.T) {
 		{name: "stack"},
 		{name: "store"},
 		{name: "switch"},
-		//{name: "skip-stack-guard-page"},
+		{name: "skip-stack-guard-page"},
 		{name: "token"},
 		{name: "type"},
 		{name: "traps"},

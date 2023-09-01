@@ -234,3 +234,28 @@ func TestAbiImpl_init(t *testing.T) {
 		})
 	}
 }
+
+func TestMachine_insertAddOrSubStackPointer(t *testing.T) {
+	t.Run("add/small", func(t *testing.T) {
+		_, _, m := newSetupWithMockContext()
+		m.insertAddOrSubStackPointer(spVReg, 0x10, true, false)
+		require.Equal(t, `add sp, sp, #0x10`, formatEmittedInstructionsInCurrentBlock(m))
+	})
+	t.Run("add/large stack", func(t *testing.T) {
+		_, _, m := newSetupWithMockContext()
+		m.insertAddOrSubStackPointer(spVReg, 0xffffffff_8, true, false)
+		require.Equal(t, `orr x27, xzr, #0xffffffff8
+add sp, sp, x27`, formatEmittedInstructionsInCurrentBlock(m))
+	})
+	t.Run("sub/small", func(t *testing.T) {
+		_, _, m := newSetupWithMockContext()
+		m.insertAddOrSubStackPointer(spVReg, 0x10, false, false)
+		require.Equal(t, `sub sp, sp, #0x10`, formatEmittedInstructionsInCurrentBlock(m))
+	})
+	t.Run("sub/large stack", func(t *testing.T) {
+		_, _, m := newSetupWithMockContext()
+		m.insertAddOrSubStackPointer(spVReg, 0xffffffff_8, false, false)
+		require.Equal(t, `orr x27, xzr, #0xffffffff8
+sub sp, sp, x27`, formatEmittedInstructionsInCurrentBlock(m))
+	})
+}

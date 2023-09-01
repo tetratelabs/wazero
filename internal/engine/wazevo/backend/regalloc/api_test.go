@@ -9,15 +9,15 @@ import (
 type (
 	// mockFunction implements Function.
 	mockFunction struct {
-		iter   int
-		blocks []*mockBlock
-		storeRegisterAfter, reloadRegisterAfter,
-		storeRegisterBefore, reloadRegisterBefore []storeOrReloadInfo
+		iter            int
+		blocks          []*mockBlock
+		befores, afters []storeOrReloadInfo
 	}
 
 	storeOrReloadInfo struct {
-		v     VReg
-		instr Instr
+		reload bool
+		v      VReg
+		instr  Instr
 	}
 
 	// mockBlock implements Block.
@@ -109,22 +109,22 @@ func (m *mockInstr) asIndirectCall() *mockInstr {
 
 // StoreRegisterAfter implements Function.StoreRegisterAfter.
 func (m *mockFunction) StoreRegisterAfter(v VReg, instr Instr) {
-	m.storeRegisterAfter = append(m.storeRegisterAfter, storeOrReloadInfo{v, instr})
+	m.afters = append(m.afters, storeOrReloadInfo{false, v, instr})
 }
 
 // ReloadRegisterBefore implements Function.ReloadRegisterBefore.
 func (m *mockFunction) ReloadRegisterBefore(v VReg, instr Instr) {
-	m.reloadRegisterBefore = append(m.reloadRegisterBefore, storeOrReloadInfo{v, instr})
+	m.befores = append(m.befores, storeOrReloadInfo{true, v, instr})
 }
 
 // StoreRegisterBefore implements Function.StoreRegisterBefore.
 func (m *mockFunction) StoreRegisterBefore(v VReg, instr Instr) {
-	m.storeRegisterBefore = append(m.storeRegisterBefore, storeOrReloadInfo{v, instr})
+	m.befores = append(m.befores, storeOrReloadInfo{false, v, instr})
 }
 
 // ReloadRegisterAfter implements Function.ReloadRegisterAfter.
 func (m *mockFunction) ReloadRegisterAfter(v VReg, instr Instr) {
-	m.reloadRegisterAfter = append(m.reloadRegisterAfter, storeOrReloadInfo{v, instr})
+	m.afters = append(m.afters, storeOrReloadInfo{true, v, instr})
 }
 
 // ClobberedRegisters implements Function.ClobberedRegisters.
@@ -227,7 +227,7 @@ func (m *mockBlock) Entry() bool { return m._entry }
 // AssignUses implements Instr.
 func (m *mockInstr) AssignUse(index int, reg VReg) {
 	if index >= len(m.uses) {
-		m.uses = append(m.uses, make([]VReg, 100)...)
+		m.uses = append(m.uses, make([]VReg, 5)...)
 	}
 	m.uses[index] = reg
 }
