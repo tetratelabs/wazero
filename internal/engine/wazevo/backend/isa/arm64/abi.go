@@ -339,7 +339,7 @@ func (m *machine) lowerCall(si *ssa.Instruction) {
 
 	stackSlotSize := calleeABI.alignedStackSlotSize()
 	if stackSlotSize > 0 {
-		m.insertAddOrSubStackPointer(spVReg, stackSlotSize, false /* == sub */)
+		m.insertAddOrSubStackPointer(spVReg, stackSlotSize, false /* == sub */, false)
 	}
 
 	if m.maxRequiredStackSizeForCalls < stackSlotSize {
@@ -376,17 +376,13 @@ func (m *machine) lowerCall(si *ssa.Instruction) {
 	}
 
 	if stackSlotSize > 0 {
-		m.insertAddOrSubStackPointer(spVReg, stackSlotSize, true /* = add */)
+		m.insertAddOrSubStackPointer(spVReg, stackSlotSize, true /* add */, false)
 	}
 }
 
-func (m *machine) insertAddOrSubStackPointer(rd regalloc.VReg, diff int64, add bool) {
-	i := m.allocateAddOrSubStackPointer(rd, diff, add, false)
-	m.insert(i)
-}
-
-func (m *machine) allocateAddOrSubStackPointer(rd regalloc.VReg, diff int64, add bool, afterLowering bool) (alu *instruction) {
+func (m *machine) insertAddOrSubStackPointer(rd regalloc.VReg, diff int64, add bool, afterLowering bool) {
 	if imm12Operand, ok := asImm12Operand(uint64(diff)); ok {
+		var alu *instruction
 		if afterLowering {
 			alu = m.allocateInstrAfterLowering()
 		} else {
@@ -399,8 +395,22 @@ func (m *machine) allocateAddOrSubStackPointer(rd regalloc.VReg, diff int64, add
 			ao = aluOpSub
 		}
 		alu.asALU(ao, operandNR(rd), operandNR(spVReg), imm12Operand, true)
-		return
+		m.insert(alu)
 	} else {
-		panic("TODO: large stack pointer add/sub") // tmpRegVReg can be used for this.
+		m.lowerConstantI64(tmpRegVReg, diff)
+		var alu *instruction
+		if afterLowering {
+			alu = m.allocateInstrAfterLowering()
+		} else {
+			alu = m.allocateInstr()
+		}
+		var ao aluOp
+		if add {
+			ao = aluOpAdd
+		} else {
+			ao = aluOpSub
+		}
+		alu.asALU(ao, operandNR(rd), operandNR(spVReg), operandNR(tmpRegVReg), true)
+		m.insert(alu)
 	}
 }
