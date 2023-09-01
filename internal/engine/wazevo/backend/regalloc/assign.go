@@ -130,8 +130,9 @@ func (a *Allocator) handleSpills(
 
 		r, evictedNode := a.spillHandler.getUnusedOrEvictReg(defSpill.RegType(), a.regInfo)
 		if evictedNode != nil {
-			f.StoreRegisterBefore(evictedNode.v, instr)
-			f.ReloadRegisterAfter(evictedNode.v, instr)
+			evictedNodeV := evictedNode.v.SetRealReg(evictedNode.assignedRealReg())
+			f.StoreRegisterBefore(evictedNodeV, instr)
+			f.ReloadRegisterAfter(evictedNodeV, instr)
 		}
 
 		defSpill = defSpill.SetRealReg(r)
@@ -156,8 +157,9 @@ func (a *Allocator) handleSpills(
 
 		for i := 0; i < evictedCount; i++ {
 			evictedNode := evicted[i]
-			f.StoreRegisterBefore(evictedNode.v, instr)
-			f.ReloadRegisterAfter(evictedNode.v, instr)
+			evictedNodeV := evictedNode.v.SetRealReg(evictedNode.assignedRealReg())
+			f.StoreRegisterBefore(evictedNodeV, instr)
+			f.ReloadRegisterAfter(evictedNodeV, instr)
 		}
 
 		for _, u := range usesSpills {
@@ -187,8 +189,9 @@ func (a *Allocator) handleSpills(
 				a.spillHandler.init(a.nodes1)
 				r, evictedNode := a.spillHandler.getUnusedOrEvictReg(defSpill.RegType(), a.regInfo)
 				if evictedNode != nil {
-					f.StoreRegisterBefore(evictedNode.v, instr)
-					f.ReloadRegisterAfter(evictedNode.v, instr)
+					evictedNodeV := evictedNode.v.SetRealReg(evictedNode.assignedRealReg())
+					f.StoreRegisterBefore(evictedNodeV, instr)
+					f.ReloadRegisterAfter(evictedNodeV, instr)
 				}
 				defSpill = defSpill.SetRealReg(r)
 			}
