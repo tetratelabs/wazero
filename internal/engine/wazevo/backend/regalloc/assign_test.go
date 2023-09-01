@@ -229,10 +229,10 @@ func TestAllocator_handleSpills(t *testing.T) {
 		require.Equal(t, RealReg(0xb), instr.defs[0].RealReg())
 
 		require.Equal(t, 1, len(f.befores))
-		requireInsertedInst(t, f, true, 0, instr, false, liveNodes[0].n.v)
+		requireInsertedInst(t, f, true, 0, instr, false, liveNodes[0].n.v.SetRealReg(0xb))
 
 		require.Equal(t, 2, len(f.afters))
-		requireInsertedInst(t, f, false, 0, instr, true, liveNodes[0].n.v)
+		requireInsertedInst(t, f, false, 0, instr, true, liveNodes[0].n.v.SetRealReg(0xb))
 		requireInsertedInst(t, f, false, 1, instr, false, vr.SetRealReg(0xb))
 	})
 
@@ -316,9 +316,9 @@ func TestAllocator_handleSpills(t *testing.T) {
 
 		require.Equal(t, 2, len(f.befores))
 		requireInsertedInst(t, f, true, 0, instr, true, u1.SetRealReg(0xaa))
-		requireInsertedInst(t, f, true, 1, instr, false, liveNodes[1].n.v)
+		requireInsertedInst(t, f, true, 1, instr, false, liveNodes[1].n.v.SetRealReg(0xff))
 		require.Equal(t, 2, len(f.afters))
-		requireInsertedInst(t, f, false, 0, instr, true, liveNodes[1].n.v)
+		requireInsertedInst(t, f, false, 0, instr, true, liveNodes[1].n.v.SetRealReg(0xff))
 		requireInsertedInst(t, f, false, 1, instr, false, d1.SetRealReg(0xff))
 	})
 
@@ -346,12 +346,12 @@ func TestAllocator_handleSpills(t *testing.T) {
 		require.Equal(t, []VReg{d1.SetRealReg(0xff)}, instr.defs)
 
 		require.Equal(t, 3, len(f.befores))
-		requireInsertedInst(t, f, true, 0, instr, false, liveNodes[0].n.v)
+		requireInsertedInst(t, f, true, 0, instr, false, liveNodes[0].n.v.SetRealReg(0xb))
 		requireInsertedInst(t, f, true, 1, instr, true, u1.SetRealReg(0xb))
-		requireInsertedInst(t, f, true, 2, instr, false, liveNodes[2].n.v)
+		requireInsertedInst(t, f, true, 2, instr, false, liveNodes[2].n.v.SetRealReg(0xff))
 		require.Equal(t, 3, len(f.afters))
-		requireInsertedInst(t, f, false, 0, instr, true, liveNodes[0].n.v)
-		requireInsertedInst(t, f, false, 1, instr, true, liveNodes[2].n.v)
+		requireInsertedInst(t, f, false, 0, instr, true, liveNodes[0].n.v.SetRealReg(0xb))
+		requireInsertedInst(t, f, false, 1, instr, true, liveNodes[2].n.v.SetRealReg(0xff))
 		requireInsertedInst(t, f, false, 2, instr, false, d1.SetRealReg(0xff))
 	})
 }
