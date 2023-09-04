@@ -1479,6 +1479,8 @@ func (b vecOp) String() string {
 		return "uaddlv"
 	case vecOpBit:
 		return "bit"
+	case vecOpEOR:
+		return "eor"
 	}
 	panic(int(b))
 }
@@ -1487,6 +1489,7 @@ const (
 	vecOpCnt vecOp = iota
 	vecOpUaddlv
 	vecOpBit
+	vecOpEOR
 )
 
 // bitOp determines the type of bitwise operation. Instructions whose kind is one of

@@ -322,6 +322,17 @@ func encodeVecRRR(op vecOp, rd, rn, rm uint32, arr vecArrangement) uint32 {
 			panic("BUG")
 		}
 		return encodeAdvancedSIMDThreeSame(rd, rn, rm, 0b00011, 0b10, 0b1, q)
+	case vecOpEOR:
+		var q uint32
+		switch arr {
+		case vecArrangement8B:
+			q = 0b0
+		case vecArrangement16B:
+			q = 0b1
+		default:
+			panic("BUG")
+		}
+		return encodeAdvancedSIMDThreeSame(rd, rn, rm, 0b00011, 0b00, 0b1, q)
 	default:
 		panic("TODO")
 	}
