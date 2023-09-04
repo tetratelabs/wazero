@@ -16,8 +16,6 @@ type (
 		reversePostOrderBlocks []regAllocBlockImpl
 		// labelToRegAllocBlockIndex maps label to the index of reversePostOrderBlocks.
 		labelToRegAllocBlockIndex map[label]int
-		// predsSlice is used for regalloc.Block Preds() method, defined here for reuse.
-		predsSlice []regalloc.Block
 		// vs is used for regalloc.Instr Defs() and Uses() methods, defined here for reuse.
 		vs []regalloc.VReg
 	}
@@ -55,7 +53,6 @@ func (f *regAllocFunctionImpl) addBlock(sb ssa.BasicBlock, l label, pos *labelPo
 
 func (f *regAllocFunctionImpl) reset() {
 	f.reversePostOrderBlocks = f.reversePostOrderBlocks[:0]
-	f.predsSlice = f.predsSlice[:0]
 	f.vs = f.vs[:0]
 	f.iter = 0
 }
@@ -141,15 +138,17 @@ func (r *regAllocBlockImpl) ID() int {
 }
 
 // Preds implements regalloc.Block Preds.
-func (r *regAllocBlockImpl) Preds() []regalloc.Block {
+func (r *regAllocBlockImpl) Preds() int {
+	return r.sb.Preds()
+}
+
+// Pred implements regalloc.Block Pred.
+func (r *regAllocBlockImpl) Pred(i int) regalloc.Block {
 	sb := r.sb
-	r.f.predsSlice = r.f.predsSlice[:0]
-	for pred := sb.BeginPredIterator(); pred != nil; pred = sb.NextPredIterator() {
-		l := r.f.m.ssaBlockIDToLabels[pred.ID()]
-		index := r.f.labelToRegAllocBlockIndex[l]
-		r.f.predsSlice = append(r.f.predsSlice, &r.f.reversePostOrderBlocks[index])
-	}
-	return r.f.predsSlice
+	pred := sb.Pred(i)
+	l := r.f.m.ssaBlockIDToLabels[pred.ID()]
+	index := r.f.labelToRegAllocBlockIndex[l]
+	return &r.f.reversePostOrderBlocks[index]
 }
 
 // InstrIteratorBegin implements regalloc.Block InstrIteratorBegin.
@@ -169,6 +168,17 @@ func (r *regAllocBlockImpl) InstrIteratorNext() regalloc.Instr {
 			return instr
 		}
 	}
+}
+
+// BlockParams implements regalloc.Block BlockParams.
+func (r *regAllocBlockImpl) BlockParams() []regalloc.VReg {
+	c := r.f.m.compiler
+	regs := r.f.vs[:0]
+	for i := 0; i < r.sb.Params(); i++ {
+		v := c.VRegOf(r.sb.Param(i))
+		regs = append(regs, v)
+	}
+	return regs
 }
 
 func (r *regAllocBlockImpl) instrIteratorNext() *regAllocInstrImpl {

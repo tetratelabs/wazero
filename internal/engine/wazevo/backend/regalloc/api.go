@@ -41,15 +41,17 @@ type (
 	Block interface {
 		// ID returns the unique identifier of this block.
 		ID() int
+		BlockParams() []VReg
 		// InstrIteratorBegin returns the first instruction in this block. Instructions added after lowering must be skipped.
 		// Note: multiple Instr(s) will not be held at the same time, so it's safe to use the same impl for the return Instr.
 		InstrIteratorBegin() Instr
 		// InstrIteratorNext returns the next instruction in this block. Instructions added after lowering must be skipped.
 		// Note: multiple Instr(s) will not be held at the same time, so it's safe to use the same impl for the return Instr.
 		InstrIteratorNext() Instr
-		// Preds returns the predecessors of this block in the CFG.
-		// Note: multiple returned []Block will not be used at the same time, so it's safe to use the same slice for []Block.
-		Preds() []Block
+		// Preds returns the number of predecessors of this block in the CFG.
+		Preds() int
+		// Pred returns the i-th predecessor of this block in the CFG.
+		Pred(i int) Block
 		// Entry returns true if the block is for the entry block.
 		Entry() bool
 	}
