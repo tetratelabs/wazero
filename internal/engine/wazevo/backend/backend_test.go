@@ -1725,6 +1725,63 @@ L1 (SSA Block: blk0):
 `,
 		},
 		{
+			name: "nontrapping_float_conversions",
+			m:    testcases.NonTrappingFloatConversions.Module,
+			afterLoweringARM64: `
+L1 (SSA Block: blk0):
+	mov x0?, x0
+	mov v2?.8b, v0.8b
+	mov v3?.8b, v1.8b
+	msr fpsr, xzr
+	fcvtzs x4?, d2?
+	msr fpsr, xzr
+	fcvtzs x5?, s3?
+	msr fpsr, xzr
+	fcvtzs w6?, d2?
+	msr fpsr, xzr
+	fcvtzs w7?, s3?
+	msr fpsr, xzr
+	fcvtzu x8?, d2?
+	msr fpsr, xzr
+	fcvtzu x9?, s3?
+	msr fpsr, xzr
+	fcvtzu w10?, d2?
+	msr fpsr, xzr
+	fcvtzu w11?, s3?
+	mov x7, x11?
+	mov x6, x10?
+	mov x5, x9?
+	mov x4, x8?
+	mov x3, x7?
+	mov x2, x6?
+	mov x1, x5?
+	mov x0, x4?
+	ret
+`,
+			afterFinalizeARM64: `
+L1 (SSA Block: blk0):
+	str x30, [sp, #-0x10]!
+	msr fpsr, xzr
+	fcvtzs x0, d0
+	msr fpsr, xzr
+	fcvtzs x1, s1
+	msr fpsr, xzr
+	fcvtzs w2, d0
+	msr fpsr, xzr
+	fcvtzs w3, s1
+	msr fpsr, xzr
+	fcvtzu x4, d0
+	msr fpsr, xzr
+	fcvtzu x5, s1
+	msr fpsr, xzr
+	fcvtzu w6, d0
+	msr fpsr, xzr
+	fcvtzu w7, s1
+	ldr x30, [sp], #0x10
+	ret
+`,
+		},
+		{
 			name: "many_middle_values",
 			m:    testcases.ManyMiddleValues.Module,
 			afterLoweringARM64: `

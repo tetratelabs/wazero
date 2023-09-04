@@ -780,6 +780,8 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeFcvtToUint:         sideEffectTraps,
 	OpcodeFcvtFromSint:       sideEffectNone,
 	OpcodeFcvtFromUint:       sideEffectNone,
+	OpcodeFcvtToSintSat:      sideEffectNone,
+	OpcodeFcvtToUintSat:      sideEffectNone,
 	OpcodeFdemote:            sideEffectNone,
 	OpcodeFpromote:           sideEffectNone,
 	OpcodeBitcast:            sideEffectNone,
@@ -904,6 +906,8 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeFcvtToUint:         returnTypesFnSingle,
 	OpcodeFcvtFromSint:       returnTypesFnSingle,
 	OpcodeFcvtFromUint:       returnTypesFnSingle,
+	OpcodeFcvtToSintSat:      returnTypesFnSingle,
+	OpcodeFcvtToUintSat:      returnTypesFnSingle,
 	OpcodeFneg:               returnTypesFnSingle,
 	OpcodeFdemote:            returnTypesFnF32,
 	OpcodeFpromote:           returnTypesFnF64,
@@ -1509,11 +1513,16 @@ func (i *Instruction) AsFcvtFromInt(x Value, signed bool, dst64bit bool) *Instru
 }
 
 // AsFcvtToInt initializes this instruction as an instruction with either OpcodeFcvtToUint or OpcodeFcvtToSint
-func (i *Instruction) AsFcvtToInt(x, ctx Value, signed bool, dst64bit bool) *Instruction {
-	if signed {
+func (i *Instruction) AsFcvtToInt(x, ctx Value, signed bool, dst64bit bool, sat bool) *Instruction {
+	switch {
+	case signed && !sat:
 		i.opcode = OpcodeFcvtToSint
-	} else {
+	case !signed && !sat:
 		i.opcode = OpcodeFcvtToUint
+	case signed && sat:
+		i.opcode = OpcodeFcvtToSintSat
+	case !signed && sat:
+		i.opcode = OpcodeFcvtToUintSat
 	}
 	i.v = x
 	i.v2 = ctx
@@ -1677,7 +1686,7 @@ func (i *Instruction) Format(b Builder) string {
 		instSuffix = fmt.Sprintf(" %s, %s", i.v.Format(b), i.v2.Format(b))
 	case OpcodeUndefined:
 	case OpcodeClz, OpcodeCtz, OpcodePopcnt, OpcodeFneg, OpcodeFcvtToSint, OpcodeFcvtToUint, OpcodeFcvtFromSint,
-		OpcodeFcvtFromUint, OpcodeFdemote, OpcodeFpromote, OpcodeIreduce, OpcodeBitcast, OpcodeSqrt, OpcodeFabs,
+		OpcodeFcvtFromUint, OpcodeFcvtToSintSat, OpcodeFcvtToUintSat, OpcodeFdemote, OpcodeFpromote, OpcodeIreduce, OpcodeBitcast, OpcodeSqrt, OpcodeFabs,
 		OpcodeCeil, OpcodeFloor, OpcodeTrunc, OpcodeNearest:
 		instSuffix = " " + i.v.Format(b)
 	default:
