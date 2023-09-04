@@ -65,7 +65,8 @@ type (
 		blockInfos   [] /* blockID to */ blockInfo
 		vs           []VReg
 		spillHandler spillHandler
-		phis         map[VReg]struct{}
+		// phis keeps track of the VRegs that are defined by phi functions.
+		phis map[VReg]struct{}
 
 		// Followings are re-used during various places e.g. coloring.
 		realRegSet map[RealReg]struct{}
@@ -169,9 +170,10 @@ func (a *Allocator) livenessAnalysis(f Function) {
 		if blk.Entry() {
 			continue
 		}
+		// If this is not the entry block, we should define phi nodes, which are not defined by instructions.
 		for _, p := range blk.BlockParams() {
-			info.phiDefs[p] = struct{}{}
-			info.defs[p] = 0
+			info.phiDefs[p] = struct{}{} // Mark this block has the definition of this phi `p`.
+			info.defs[p] = 0             // Earliest definition is at the beginning of the block.
 			a.phis[p] = struct{}{}
 		}
 	}
@@ -211,6 +213,7 @@ func (a *Allocator) livenessAnalysis(f Function) {
 			}
 			if instr.IsCopy() {
 				if _, ok := a.phis[dstVR]; ok {
+					// This is the phi move at the end of the block, so srcVR is the phi use (input to the phi function).
 					info.phiUses[srcVR] = struct{}{}
 				}
 				a.recordCopyRelation(dstVR, srcVR)
@@ -237,6 +240,7 @@ func (a *Allocator) livenessAnalysis(f Function) {
 			if _, ok := info.lastUses[v]; !ok {
 				continue
 			}
+			// Phi uses are always live-outs because it is the new value coming out to the successor.
 			if _, ok := info.phiUses[v]; ok {
 				info.liveOuts[v] = struct{}{}
 			}
@@ -285,6 +289,8 @@ func (a *Allocator) upAndMarkStack(b Block, v VReg, depth int) {
 
 	// Now we can safely mark v as a part of live-in
 	info.liveIns[v] = struct{}{}
+
+	// Plus if this is this block has the definition of this phi, we can stop climbing up.
 	if _, ok := info.phiDefs[v]; ok {
 		return
 	}
