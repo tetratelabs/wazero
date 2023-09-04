@@ -15,6 +15,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/filecache"
 	"github.com/tetratelabs/wazero/internal/integration_test/spectest"
 	v1 "github.com/tetratelabs/wazero/internal/integration_test/spectest/v1"
+	v2 "github.com/tetratelabs/wazero/internal/integration_test/spectest/v2"
 	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -108,6 +109,22 @@ func TestSpectestV1(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			spectest.RunCase(t, v1.Testcases, tc.name, context.Background(), config,
+				-1, 0, math.MaxInt)
+		})
+	}
+}
+func TestSpectestV2(t *testing.T) {
+	config := wazero.NewRuntimeConfigCompiler().WithCoreFeatures(api.CoreFeaturesV2)
+	// Configure the new optimizing backend!
+	configureWazevo(config)
+
+	for _, tc := range []struct {
+		name string
+	}{
+		// {"conversions"}, includes non-trapping conversions.
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			spectest.RunCase(t, v2.Testcases, tc.name, context.Background(), config,
 				-1, 0, math.MaxInt)
 		})
 	}
