@@ -29,8 +29,8 @@ func (m *machine) InsertLoadConstant(instr *ssa.Instruction, vr regalloc.VReg) {
 	case ssa.TypeF32:
 		loadF := m.allocateInstr()
 		if v == 0 {
-			// Fast path for zero.
-			loadF.asVecRRR(vecOpEOR, operandNR(vr), operandNR(vr), operandNR(vr), vecArrangement8B)
+			// Fast path for zero. Use v30VReg (least likely to be allocated real register) so that we don't put pressure on the register allocator.
+			loadF.asVecRRR(vecOpEOR, operandNR(vr), operandNR(v30VReg), operandNR(v30VReg), vecArrangement8B)
 		} else {
 			loadF.asLoadFpuConst32(vr, v)
 		}
@@ -38,8 +38,8 @@ func (m *machine) InsertLoadConstant(instr *ssa.Instruction, vr regalloc.VReg) {
 	case ssa.TypeF64:
 		loadF := m.allocateInstr()
 		if v == 0 {
-			// Fast path for zero.
-			loadF.asVecRRR(vecOpEOR, operandNR(vr), operandNR(vr), operandNR(vr), vecArrangement8B)
+			// Fast path for zero. Use v30VReg (least likely to be allocated real register) so that we don't put pressure on the register allocator.
+			loadF.asVecRRR(vecOpEOR, operandNR(vr), operandNR(v30VReg), operandNR(v30VReg), vecArrangement8B)
 		} else {
 			loadF.asLoadFpuConst64(vr, v)
 		}
