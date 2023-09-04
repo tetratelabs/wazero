@@ -58,6 +58,8 @@ type BasicBlock interface {
 	NextPredIterator() BasicBlock
 	// Preds returns the number of predecessors of this block.
 	Preds() int
+	// Pred returns the i-th predecessor of this block.
+	Pred(i int) BasicBlock
 }
 
 type (
@@ -225,6 +227,11 @@ func (bb *basicBlock) NextPredIterator() BasicBlock {
 // Preds implements BasicBlock.Preds.
 func (bb *basicBlock) Preds() int {
 	return len(bb.preds)
+}
+
+// Pred implements BasicBlock.Pred.
+func (bb *basicBlock) Pred(i int) BasicBlock {
+	return bb.preds[i].blk
 }
 
 // Root implements BasicBlock.Root.

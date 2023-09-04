@@ -32,8 +32,7 @@ func TestSpectestV1(t *testing.T) {
 	// Configure the new optimizing backend!
 	configureWazevo(config)
 
-	// TODO: adds incrementally one by one as we support more test cases. And eventually remove this
-	// and migrate to integration_test/spectest/v1/spec_test.go by the time when closing https://github.com/tetratelabs/wazero/issues/1496
+	// TODO: migrate to integration_test/spectest/v1/spec_test.go by the time when closing https://github.com/tetratelabs/wazero/issues/1496
 	for _, tc := range []struct {
 		name string
 	}{
@@ -82,7 +81,7 @@ func TestSpectestV1(t *testing.T) {
 		{name: "left-to-right"},
 		{name: "linking"},
 		{name: "load"},
-		//{name: "loop"},
+		{name: "loop"},
 		{name: "local_get"},
 		{name: "local_set"},
 		{name: "local_tee"},
@@ -315,6 +314,15 @@ func TestE2E(t *testing.T) {
 				// Out of range --> default.
 				{params: []uint64{6, 200}, expResults: []uint64{11 + 200}},
 				{params: []uint64{1000, 300}, expResults: []uint64{11 + 300}},
+			},
+		},
+		{
+			name: "multi_predecessor_local_ref",
+			m:    testcases.MultiPredecessorLocalRef.Module,
+			calls: []callCase{
+				{params: []uint64{0, 100}, expResults: []uint64{100}},
+				{params: []uint64{1, 100}, expResults: []uint64{1}},
+				{params: []uint64{1, 200}, expResults: []uint64{1}},
 			},
 		},
 	} {

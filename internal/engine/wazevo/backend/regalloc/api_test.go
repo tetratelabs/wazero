@@ -194,10 +194,16 @@ func (m *mockBlock) InstrIteratorNext() Instr {
 	return ret
 }
 
-// Preds implements Instr.
-func (m *mockBlock) Preds() []Block {
-	return m._preds
+// Preds implements Block.
+func (m *mockBlock) Preds() int {
+	return len(m._preds)
 }
+
+// BlockParams implements Block.
+func (m *mockBlock) BlockParams() []VReg { return nil }
+
+// Pred implements Instr.
+func (m *mockBlock) Pred(i int) Block { return m._preds[i] }
 
 // Defs implements Instr.
 func (m *mockInstr) Defs() []VReg {

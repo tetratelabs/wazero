@@ -152,9 +152,8 @@ func (c *compiler) lowerBlockArguments(args []ssa.Value, succ ssa.BasicBlock) {
 			}{cInst: srcDef.Instr, dst: dstReg})
 		} else {
 			srcReg := c.VRegOf(src)
-			if srcReg != dstReg { // Self-assignment can be no-op. This happens when, for example, passing a param as-is to the loop from the body.
-				c.varEdges = append(c.varEdges, [2]regalloc.VReg{srcReg, dstReg})
-			}
+			// Even when the src=dst, insert the move so that we can keep such registers keep-alive.
+			c.varEdges = append(c.varEdges, [2]regalloc.VReg{srcReg, dstReg})
 		}
 	}
 

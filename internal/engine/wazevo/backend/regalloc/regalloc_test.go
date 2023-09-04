@@ -705,6 +705,12 @@ func initMapInInfo(info *blockInfo) {
 	if info.realRegDefs == nil {
 		info.realRegDefs = make(map[VReg][]programCounter)
 	}
+	if info.phiDefs == nil {
+		info.phiDefs = make(map[VReg]struct{})
+	}
+	if info.phiUses == nil {
+		info.phiUses = make(map[VReg]struct{})
+	}
 }
 
 func TestNode_assignedRealReg(t *testing.T) {

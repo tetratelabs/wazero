@@ -25,6 +25,7 @@ func NewAllocator(allocatableRegs *RegisterInfo) Allocator {
 		realRegSet:      make(map[RealReg]struct{}),
 		nodeSet:         make(map[*node]int),
 		allocatedRegSet: make(map[RealReg]struct{}),
+		phis:            make(map[VReg]struct{}),
 	}
 	allocatableSet := make(map[RealReg]struct{},
 		len(allocatableRegs.AllocatableRegisters[RegTypeInt])+len(allocatableRegs.AllocatableRegisters[RegTypeFloat]),
@@ -64,6 +65,7 @@ type (
 		blockInfos   [] /* blockID to */ blockInfo
 		vs           []VReg
 		spillHandler spillHandler
+		phis         map[VReg]struct{}
 
 		// Followings are re-used during various places e.g. coloring.
 		realRegSet map[RealReg]struct{}
@@ -75,12 +77,15 @@ type (
 
 	// blockInfo is a per-block information used during the register allocation.
 	blockInfo struct {
-		// TODO: reuse!!!
 		liveOuts map[VReg]struct{}
 		liveIns  map[VReg]struct{}
 		defs     map[VReg]programCounter
 		lastUses map[VReg]programCounter
 		kills    map[VReg]programCounter
+		// phiUses are the set of VRegs that are used in a phi function.
+		phiUses map[VReg]struct{}
+		// phiDefs are the set of VRegs that are defined in a phi function.
+		phiDefs map[VReg]struct{}
 		// Pre-colored real registers can have multiple live ranges in one block.
 		realRegUses map[VReg][]programCounter
 		realRegDefs map[VReg][]programCounter
@@ -160,14 +165,21 @@ const (
 func (a *Allocator) livenessAnalysis(f Function) {
 	// First, we need to allocate blockInfos.
 	for blk := f.PostOrderBlockIteratorBegin(); blk != nil; blk = f.PostOrderBlockIteratorNext() { // Order doesn't matter.
-		a.allocateBlockInfo(blk.ID())
+		info := a.allocateBlockInfo(blk.ID())
+		if blk.Entry() {
+			continue
+		}
+		for _, p := range blk.BlockParams() {
+			info.phiDefs[p] = struct{}{}
+			info.defs[p] = 0
+			a.phis[p] = struct{}{}
+		}
 	}
 
 	// Gathers all defs, lastUses, and VRegs in use (into a.vs).
 	a.vs = a.vs[:0]
 	for blk := f.PostOrderBlockIteratorBegin(); blk != nil; blk = f.PostOrderBlockIteratorNext() {
-		blkID := blk.ID()
-		info := a.blockInfoAt(blkID)
+		info := a.blockInfoAt(blk.ID())
 
 		var pc programCounter
 		for instr := blk.InstrIteratorBegin(); instr != nil; instr = blk.InstrIteratorNext() {
@@ -198,31 +210,35 @@ func (a *Allocator) livenessAnalysis(f Function) {
 				}
 			}
 			if instr.IsCopy() {
+				if _, ok := a.phis[dstVR]; ok {
+					info.phiUses[srcVR] = struct{}{}
+				}
 				a.recordCopyRelation(dstVR, srcVR)
 			}
 			pc += pcStride
 		}
 
 		if wazevoapi.RegAllocLoggingEnabled {
-			fmt.Printf("constructed block info for block[%d]:\n%s\n\n", blkID, info)
+			fmt.Printf("constructed block info for block[%d]:\n%s\n\n", blk.ID(), info)
 		}
 	}
 
 	// Run the Algorithm 9.9. in the book. This will construct blockInfo.liveIns and blockInfo.liveOuts.
-	// Note that we don't have "phi"s at this point, but rather they are lowered to special VRegs which
-	// have multiple defs.
 	for _, v := range a.vs {
 		if v.IsRealReg() {
 			// Real registers do not need to be tracked in liveOuts and liveIns because they are not allocation targets.
 			panic("BUG")
 		}
 		for blk := f.PostOrderBlockIteratorBegin(); blk != nil; blk = f.PostOrderBlockIteratorNext() {
-			if len(blk.Preds()) == 0 && !blk.Entry() {
+			if blk.Preds() == 0 && !blk.Entry() {
 				panic(fmt.Sprintf("block without predecessor must be optimized out by the compiler: %d", blk.ID()))
 			}
 			info := a.blockInfoAt(blk.ID())
 			if _, ok := info.lastUses[v]; !ok {
 				continue
+			}
+			if _, ok := info.phiUses[v]; ok {
+				info.liveOuts[v] = struct{}{}
 			}
 			// TODO: we might want to avoid recursion here.
 			a.upAndMarkStack(blk, v, 0)
@@ -247,7 +263,6 @@ func (a *Allocator) livenessAnalysis(f Function) {
 }
 
 // upAndMarkStack is the Algorithm 9.10. in the book named Up_and_Mark_Stack(B, v).
-// The only difference is that we don't have phis; instead, we have multiple defs in predecessors for such a VReg.
 //
 // We recursively call this, so passing `depth` for debugging.
 func (a *Allocator) upAndMarkStack(b Block, v VReg, depth int) {
@@ -256,7 +271,8 @@ func (a *Allocator) upAndMarkStack(b Block, v VReg, depth int) {
 	}
 
 	info := a.blockInfoAt(b.ID())
-	if _, ok := info.defs[v]; ok {
+	_, isPhi := a.phis[v]
+	if _, ok := info.defs[v]; ok && !isPhi {
 		return // Defined in this block, so no need to go further climbing up.
 	}
 	// v must be in liveIns.
@@ -269,13 +285,18 @@ func (a *Allocator) upAndMarkStack(b Block, v VReg, depth int) {
 
 	// Now we can safely mark v as a part of live-in
 	info.liveIns[v] = struct{}{}
+	if _, ok := info.phiDefs[v]; ok {
+		return
+	}
+
 	preds := b.Preds()
-	if len(preds) == 0 {
+	if preds == 0 {
 		panic(fmt.Sprintf("BUG: block has no predecessors while requiring live-in: blk%d", b.ID()))
 	}
 
 	// and climb up the CFG.
-	for _, pred := range preds {
+	for i := 0; i < preds; i++ {
+		pred := b.Pred(i)
 		if wazevoapi.RegAllocLoggingEnabled {
 			fmt.Printf("%sadding %v live-out at block[%d]\n", strings.Repeat("\t", depth+1), v, pred.ID())
 		}
@@ -351,6 +372,12 @@ func (a *Allocator) buildLiveRangesForNonReals(blkID int, info *blockInfo) {
 		if v.IsRealReg() {
 			panic("BUG: real registers should not be in defs")
 		}
+
+		if _, ok := ins[v]; ok {
+			// This case, phi value is coming in (used somewhere) but re-defined at the end.
+			continue
+		}
+
 		var end programCounter
 		if _, ok := outs[v]; ok {
 			// v is defined here and live-out, so it is live-through.
@@ -454,7 +481,6 @@ func (a *Allocator) Reset() {
 		delete(a.allocatedRegSet, r)
 	}
 
-	a.vs = a.vs[:0]
 	a.nodes1 = a.nodes1[:0]
 	for n := range a.nodeSet {
 		a.nodes1 = append(a.nodes1, n)
@@ -465,14 +491,17 @@ func (a *Allocator) Reset() {
 	a.nodes1 = a.nodes1[:0]
 	a.nodes2 = a.nodes2[:0]
 	a.realRegs = rr[:0]
+	resetMap(a, a.phis)
+	a.vs = a.vs[:0]
 }
 
-func (a *Allocator) allocateBlockInfo(blockID int) {
+func (a *Allocator) allocateBlockInfo(blockID int) *blockInfo {
 	if blockID >= len(a.blockInfos) {
 		a.blockInfos = append(a.blockInfos, make([]blockInfo, blockID+1)...)
 	}
 	info := &a.blockInfos[blockID]
 	a.initBlockInfo(info)
+	return info
 }
 
 func (a *Allocator) blockInfoAt(blockID int) (info *blockInfo) {
@@ -556,6 +585,16 @@ func (a *Allocator) initBlockInfo(i *blockInfo) {
 		i.realRegDefs = make(map[VReg][]programCounter)
 	} else {
 		resetMap(a, i.realRegDefs)
+	}
+	if i.phiDefs == nil {
+		i.phiDefs = make(map[VReg]struct{})
+	} else {
+		resetMap(a, i.phiDefs)
+	}
+	if i.phiUses == nil {
+		i.phiUses = make(map[VReg]struct{})
+	} else {
+		resetMap(a, i.phiUses)
 	}
 }
 

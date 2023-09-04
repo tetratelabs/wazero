@@ -24,8 +24,8 @@ func (a *Allocator) buildNeighborsByLiveNodes(lives []liveNodeInBlock) {
 	for i, src := range lives[:len(lives)-1] {
 		srcRange := &src.n.ranges[src.rangeIndex]
 		for _, dst := range lives[i+1:] {
-			if dst == src {
-				panic("BUG: dup entry in liveNodes")
+			if dst == src || dst.n == src.n {
+				panic(fmt.Sprintf("BUG: %s and %s are the same node", src.n.v, dst.n.v))
 			}
 			dstRange := &dst.n.ranges[dst.rangeIndex]
 			if src.n.v.RegType() == dst.n.v.RegType() && // Interfere only if they are the same type.
@@ -218,7 +218,7 @@ func (a *Allocator) coloringFor(allocatable []RealReg) {
 			}
 			for neighbor := range n.neighbors {
 				if n.r == neighbor.r {
-					panic("BUG color conflict")
+					panic(fmt.Sprintf("BUG color conflict: %s vs %s", n.v, neighbor.v))
 				}
 			}
 		}
