@@ -113,6 +113,7 @@ func TestSpectestV1(t *testing.T) {
 		})
 	}
 }
+
 func TestSpectestV2(t *testing.T) {
 	config := wazero.NewRuntimeConfigCompiler().WithCoreFeatures(api.CoreFeaturesV2)
 	// Configure the new optimizing backend!
