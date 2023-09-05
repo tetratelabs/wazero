@@ -96,11 +96,6 @@ func DeterministicCompilationVerifierGetRandomizedLocalFunctionIndex(ctx context
 	return ret
 }
 
-// DeterministicCompilationVerifierSetCurrentFunctionName sets the current function name to the given `functionName`.
-func DeterministicCompilationVerifierSetCurrentFunctionName(ctx context.Context, functionName string) context.Context {
-	return context.WithValue(ctx, currentFunctionNameKey{}, functionName)
-}
-
 // VerifyOrSetDeterministicCompilationContextValue verifies that the `newValue` is the same as the previous value for the given `scope`
 // and the current function name. If the previous value doesn't exist, it sets the value to the given `newValue`.
 //
@@ -132,4 +127,39 @@ This is mostly due to (but might not be limited to):
 		)
 		os.Exit(1)
 	}
+}
+
+// nolint
+const NeedFunctionNameInContext = PrintSSA ||
+	PrintOptimizedSSA ||
+	PrintBlockLaidOutSSA ||
+	PrintSSAToBackendIRLowering ||
+	PrintRegisterAllocated ||
+	PrintFinalizedMachineCode ||
+	PrintMachineCodeHexPerFunction ||
+	DeterministicCompilationVerifierEnabled
+
+// SetCurrentFunctionName sets the current function name to the given `functionName`.
+func SetCurrentFunctionName(ctx context.Context, functionName string) context.Context {
+	return context.WithValue(ctx, currentFunctionNameKey{}, functionName)
+}
+
+// GetCurrentFunctionName returns the current function name.
+func GetCurrentFunctionName(ctx context.Context) string {
+	return ctx.Value(currentFunctionNameKey{}).(string)
+}
+
+// ----- High Register Pressure -----
+
+type highRegisterPressureContextKey struct{}
+
+// EnableHighRegisterPressure enables the high register pressure mode.
+func EnableHighRegisterPressure(ctx context.Context) context.Context {
+	ctx = context.WithValue(ctx, highRegisterPressureContextKey{}, true)
+	return ctx
+}
+
+// IsHighRegisterPressure returns true if the current compilation is under high register pressure.
+func IsHighRegisterPressure(ctx context.Context) bool {
+	return ctx.Value(highRegisterPressureContextKey{}) != nil
 }

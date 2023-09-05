@@ -106,9 +106,19 @@ func (i *instruction) encode(c backend.Compiler) {
 		}
 		c.Emit4Bytes(encodePreOrPostIndexLoadStorePair64(pre, kind == loadP64, rn, rt, rt2, amode.imm))
 	case loadFpuConst32:
-		encodeLoadFpuConst32(c, regNumberInEncoding[i.rd.realReg()], i.u1)
+		rd := regNumberInEncoding[i.rd.realReg()]
+		if i.u1 == 0 {
+			c.Emit4Bytes(encodeVecRRR(vecOpEOR, rd, rd, rd, vecArrangement8B))
+		} else {
+			encodeLoadFpuConst32(c, rd, i.u1)
+		}
 	case loadFpuConst64:
-		encodeLoadFpuConst64(c, regNumberInEncoding[i.rd.realReg()], i.u1)
+		rd := regNumberInEncoding[i.rd.realReg()]
+		if i.u1 == 0 {
+			c.Emit4Bytes(encodeVecRRR(vecOpEOR, rd, rd, rd, vecArrangement8B))
+		} else {
+			encodeLoadFpuConst64(c, regNumberInEncoding[i.rd.realReg()], i.u1)
+		}
 	case aluRRRR:
 		c.Emit4Bytes(encodeAluRRRR(
 			aluOp(i.u1),
@@ -591,7 +601,7 @@ func encodeLoadFpuConst32(c backend.Compiler, rd uint32, rawF32 uint64) {
 
 // encodeLoadFpuConst64 encodes the following three instructions:
 //
-//	ldr x8, #8  ;; literal load of data.f64
+//	ldr d8, #8  ;; literal load of data.f64
 //	b 12           ;; skip the data
 //	data.f64 xxxxxxx
 func encodeLoadFpuConst64(c backend.Compiler, rd uint32, rawF64 uint64) {

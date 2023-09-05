@@ -14,7 +14,9 @@ type (
 
 		// RegisterInfo returns the set of registers that can be used for register allocation.
 		// This is only called once, and the result is shared across all compilations.
-		RegisterInfo() *regalloc.RegisterInfo
+		//
+		// If debug is true, this returns the register set for debugging purpose.
+		RegisterInfo(debug bool) *regalloc.RegisterInfo
 
 		// InitializeABI initializes the FunctionABI for the given signature.
 		InitializeABI(sig *ssa.Signature)

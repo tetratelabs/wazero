@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"context"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
@@ -51,7 +52,7 @@ func TestCompiler_lowerBlockArguments(t *testing.T) {
 					},
 				}
 
-				c := newCompiler(m, builder)
+				c := newCompiler(context.Background(), m, builder)
 				c.ssaValueDefinitions = []SSAValueDefinition{{Instr: i1}, {Instr: i2}, {Instr: f1}, {Instr: f2}}
 				c.ssaValueToVRegs = []regalloc.VReg{0, 1, 2, 3, 4, 5, 6, 7}
 				return c, []ssa.Value{i1.Return(), i2.Return(), f1.Return(), f2.Return()}, succ, func(t *testing.T) {
@@ -79,7 +80,7 @@ func TestCompiler_lowerBlockArguments(t *testing.T) {
 				m := &mockMachine{insertMove: func(dst, src regalloc.VReg) {
 					insertMoves = append(insertMoves, struct{ src, dst regalloc.VReg }{src: src, dst: dst})
 				}}
-				c := newCompiler(m, builder)
+				c := newCompiler(context.Background(), m, builder)
 				c.ssaValueDefinitions = []SSAValueDefinition{{}, {}, {}, {}}
 				c.ssaValueToVRegs = []regalloc.VReg{0, 1, 2, 3}
 				c.nextVRegID = 100 // Temporary reg should start with 100.
@@ -117,7 +118,7 @@ func TestCompiler_lowerBlockArguments(t *testing.T) {
 				m := &mockMachine{insertMove: func(dst, src regalloc.VReg) {
 					insertMoves = append(insertMoves, struct{ src, dst regalloc.VReg }{src: src, dst: dst})
 				}}
-				c := newCompiler(m, builder)
+				c := newCompiler(context.Background(), m, builder)
 				c.ssaValueDefinitions = []SSAValueDefinition{{}, {}}
 				c.ssaValueToVRegs = []regalloc.VReg{0, 1}
 				return c, []ssa.Value{add.Return()}, blk, func(t *testing.T) {

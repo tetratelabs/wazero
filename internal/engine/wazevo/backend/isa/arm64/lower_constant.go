@@ -28,21 +28,11 @@ func (m *machine) InsertLoadConstant(instr *ssa.Instruction, vr regalloc.VReg) {
 	switch valType {
 	case ssa.TypeF32:
 		loadF := m.allocateInstr()
-		if v == 0 {
-			// Fast path for zero. Use v30VReg (least likely to be allocated real register) so that we don't put pressure on the register allocator.
-			loadF.asVecRRR(vecOpEOR, operandNR(vr), operandNR(v30VReg), operandNR(v30VReg), vecArrangement8B)
-		} else {
-			loadF.asLoadFpuConst32(vr, v)
-		}
+		loadF.asLoadFpuConst32(vr, v)
 		m.insert(loadF)
 	case ssa.TypeF64:
 		loadF := m.allocateInstr()
-		if v == 0 {
-			// Fast path for zero. Use v30VReg (least likely to be allocated real register) so that we don't put pressure on the register allocator.
-			loadF.asVecRRR(vecOpEOR, operandNR(vr), operandNR(v30VReg), operandNR(v30VReg), vecArrangement8B)
-		} else {
-			loadF.asLoadFpuConst64(vr, v)
-		}
+		loadF.asLoadFpuConst64(vr, v)
 		m.insert(loadF)
 	case ssa.TypeI32:
 		if v == 0 {

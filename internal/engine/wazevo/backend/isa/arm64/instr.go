@@ -1761,11 +1761,17 @@ func (i *instruction) size() int64 {
 	case nop0:
 		return 0
 	case loadFpuConst32:
+		if i.u1 == 0 {
+			return 4 // zero loading can be encoded as a single instruction.
+		}
 		return 4 + 4 + 4
 	case loadFpuConst64:
+		if i.u1 == 0 {
+			return 4 // zero loading can be encoded as a single instruction.
+		}
 		return 4 + 4 + 8
 	case loadFpuConst128:
-		return 4 + 4 + 12
+		panic("TODO")
 	case brTableSequence:
 		return 4*4 + int64(len(i.targets))*4
 	default:

@@ -178,9 +178,11 @@ func TestInstruction_encode(t *testing.T) {
 		}},
 		{want: "30000010", setup: func(i *instruction) { i.asAdr(v16VReg, 4) }},
 		{want: "50050030", setup: func(i *instruction) { i.asAdr(v16VReg, 169) }},
+		{want: "101e302e", setup: func(i *instruction) { i.asLoadFpuConst32(v16VReg, uint64(math.Float32bits(0))) }},
 		{want: "5000001c020000140000803f", setup: func(i *instruction) {
 			i.asLoadFpuConst32(v16VReg, uint64(math.Float32bits(1.0)))
 		}},
+		{want: "101e302e", setup: func(i *instruction) { i.asLoadFpuConst64(v16VReg, uint64(math.Float32bits(0))) }},
 		{want: "5000005c03000014000000000000f03f", setup: func(i *instruction) {
 			i.asLoadFpuConst64(v16VReg, math.Float64bits(1.0))
 		}},

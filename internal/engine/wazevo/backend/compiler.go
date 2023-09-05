@@ -11,18 +11,23 @@ import (
 )
 
 // NewCompiler returns a new Compiler that can generate a machine code.
-func NewCompiler(mach Machine, builder ssa.Builder) Compiler {
-	return newCompiler(mach, builder)
+func NewCompiler(ctx context.Context, mach Machine, builder ssa.Builder) Compiler {
+	return newCompiler(ctx, mach, builder)
 }
 
-func newCompiler(mach Machine, builder ssa.Builder) *compiler {
+func newCompiler(ctx context.Context, mach Machine, builder ssa.Builder) *compiler {
+	registerSetDebug := false
+	if wazevoapi.RegAllocValidationEnabled {
+		registerSetDebug = wazevoapi.IsHighRegisterPressure(ctx)
+	}
+
 	c := &compiler{
 		mach: mach, ssaBuilder: builder,
 		alreadyLowered:  make(map[*ssa.Instruction]bool),
 		vRegSet:         make(map[regalloc.VReg]bool),
 		ssaTypeOfVRegID: make(map[regalloc.VRegID]ssa.Type),
 		nextVRegID:      0,
-		regAlloc:        regalloc.NewAllocator(mach.RegisterInfo()),
+		regAlloc:        regalloc.NewAllocator(mach.RegisterInfo(registerSetDebug)),
 	}
 	mach.SetCompiler(c)
 	return c
@@ -147,21 +152,21 @@ type compiler struct {
 func (c *compiler) Compile(ctx context.Context) ([]byte, []RelocationInfo, int, error) {
 	c.Lower()
 	if wazevoapi.PrintSSAToBackendIRLowering {
-		fmt.Printf("[[[after lowering]]]%s\n", c.Format())
+		fmt.Printf("[[[after lowering for %s ]]]%s\n", wazevoapi.GetCurrentFunctionName(ctx), c.Format())
 	}
 	if wazevoapi.DeterministicCompilationVerifierEnabled {
 		wazevoapi.VerifyOrSetDeterministicCompilationContextValue(ctx, "After lowering to ISA specific IR", c.Format())
 	}
 	c.RegAlloc()
 	if wazevoapi.PrintRegisterAllocated {
-		fmt.Printf("[[[after regalloc]]]%s\n", c.Format())
+		fmt.Printf("[[[after regalloc for %s]]]%s\n", wazevoapi.GetCurrentFunctionName(ctx), c.Format())
 	}
 	if wazevoapi.DeterministicCompilationVerifierEnabled {
 		wazevoapi.VerifyOrSetDeterministicCompilationContextValue(ctx, "After Register Allocation", c.Format())
 	}
 	c.Finalize()
 	if wazevoapi.PrintFinalizedMachineCode {
-		fmt.Printf("[[[after finalize]]]%s\n", c.Format())
+		fmt.Printf("[[[after finalize for %s]]]%s\n", wazevoapi.GetCurrentFunctionName(ctx), c.Format())
 	}
 	if wazevoapi.DeterministicCompilationVerifierEnabled {
 		wazevoapi.VerifyOrSetDeterministicCompilationContextValue(ctx, "After Finalization", c.Format())

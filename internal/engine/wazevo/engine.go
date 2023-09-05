@@ -65,9 +65,9 @@ func (c compiledFunctionOffset) nativeBegin() int {
 var _ wasm.Engine = (*engine)(nil)
 
 // NewEngine returns the implementation of wasm.Engine.
-func NewEngine(_ context.Context, _ api.CoreFeatures, _ filecache.Cache) wasm.Engine {
+func NewEngine(ctx context.Context, _ api.CoreFeatures, _ filecache.Cache) wasm.Engine {
 	e := &engine{compiledModules: make(map[wasm.ModuleID]*compiledModule), refToBinaryOffset: make(map[ssa.FuncRef]int)}
-	e.compileBuiltinFunctions()
+	e.compileBuiltinFunctions(ctx)
 	return e
 }
 
@@ -98,7 +98,7 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 	cm := &compiledModule{offsets: wazevoapi.NewModuleContextOffsetData(module)}
 
 	if module.IsHostModule {
-		return e.compileHostModule(module)
+		return e.compileHostModule(ctx, module)
 	}
 
 	importedFns, localFns := int(module.ImportFunctionCount), len(module.FunctionSection)
@@ -124,7 +124,7 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 	ssaBuilder := ssa.NewBuilder()
 	fe := frontend.NewFrontendCompiler(module, ssaBuilder, &cm.offsets)
 	machine := newMachine()
-	be := backend.NewCompiler(machine, ssaBuilder)
+	be := backend.NewCompiler(ctx, machine, ssaBuilder)
 
 	totalSize := 0 // Total binary size of the executable.
 	cm.functionOffsets = make([]compiledFunctionOffset, localFns)
@@ -135,6 +135,15 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 		}
 
 		fidx := wasm.Index(i + importedFns)
+
+		if wazevoapi.NeedFunctionNameInContext {
+			def := module.FunctionDefinition(fidx)
+			name := def.DebugName()
+			if len(def.ExportNames()) > 0 {
+				name = def.ExportNames()[0]
+			}
+			ctx = wazevoapi.SetCurrentFunctionName(ctx, fmt.Sprintf("[%d/%d] \"%s\"", i, len(module.CodeSection)-1, name))
+		}
 
 		_, needGoEntryPreamble := exportedFnIndex[fidx]
 		if sf := module.StartSection; sf != nil && *sf == fidx {
@@ -169,8 +178,7 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 		bodies[i] = body
 		totalSize += len(body)
 		if wazevoapi.PrintMachineCodeHexPerFunction {
-			fmt.Printf("[[[machine code SSA for %d/%d %s]]]\n%s\n",
-				i, len(module.CodeSection)-1, exportedFnIndex[fidx], hex.EncodeToString(body))
+			fmt.Printf("[[[machine code for %s]]]\n%s\n\n", wazevoapi.GetCurrentFunctionName(ctx), hex.EncodeToString(body))
 		}
 	}
 
@@ -228,17 +236,10 @@ func (e *engine) compileLocalWasmFunction(
 	}
 
 	if wazevoapi.PrintSSA {
-		def := module.FunctionDefinition(functionIndex)
-		fmt.Printf("[[[SSA for %d/%d %s]]]%s\n", localFunctionIndex, len(module.CodeSection)-1, def.Debugname, ssaBuilder.Format())
+		fmt.Printf("[[[SSA for %s]]]%s\n", wazevoapi.GetCurrentFunctionName(ctx), ssaBuilder.Format())
 	}
 
 	if wazevoapi.DeterministicCompilationVerifierEnabled {
-		def := module.FunctionDefinition(functionIndex)
-		name := def.DebugName()
-		if len(def.ExportNames()) > 0 {
-			name = def.ExportNames()[0]
-		}
-		ctx = wazevoapi.DeterministicCompilationVerifierSetCurrentFunctionName(ctx, fmt.Sprintf("[%d/%d]:\"%s\"", localFunctionIndex, len(module.CodeSection)-1, name))
 		wazevoapi.VerifyOrSetDeterministicCompilationContextValue(ctx, "SSA", ssaBuilder.Format())
 	}
 
@@ -246,8 +247,7 @@ func (e *engine) compileLocalWasmFunction(
 	ssaBuilder.RunPasses()
 
 	if wazevoapi.PrintOptimizedSSA {
-		def := module.FunctionDefinition(functionIndex)
-		fmt.Printf("[[[Optimized SSA for %d/%d %s]]]%s\n", localFunctionIndex, len(module.CodeSection)-1, def.Debugname, ssaBuilder.Format())
+		fmt.Printf("[[[Optimized SSA for %s]]]%s\n", wazevoapi.GetCurrentFunctionName(ctx), ssaBuilder.Format())
 	}
 
 	if wazevoapi.DeterministicCompilationVerifierEnabled {
@@ -258,8 +258,7 @@ func (e *engine) compileLocalWasmFunction(
 	ssaBuilder.LayoutBlocks()
 
 	if wazevoapi.PrintBlockLaidOutSSA {
-		def := module.FunctionDefinition(functionIndex)
-		fmt.Printf("[[[Laidout SSA for %d/%d %s]]]%s\n", localFunctionIndex, len(module.CodeSection)-1, def.Debugname, ssaBuilder.Format())
+		fmt.Printf("[[[Laidout SSA for %s]]]%s\n", wazevoapi.GetCurrentFunctionName(ctx), ssaBuilder.Format())
 	}
 
 	if wazevoapi.DeterministicCompilationVerifierEnabled {
@@ -279,9 +278,9 @@ func (e *engine) compileLocalWasmFunction(
 	return copied, rels, goPreambleSize, nil
 }
 
-func (e *engine) compileHostModule(module *wasm.Module) (*compiledModule, error) {
+func (e *engine) compileHostModule(ctx context.Context, module *wasm.Module) (*compiledModule, error) {
 	machine := newMachine()
-	be := backend.NewCompiler(machine, ssa.NewBuilder())
+	be := backend.NewCompiler(ctx, machine, ssa.NewBuilder())
 
 	num := len(module.CodeSection)
 	cm := &compiledModule{}
@@ -429,9 +428,9 @@ func (e *engine) NewModuleEngine(m *wasm.Module, mi *wasm.ModuleInstance) (wasm.
 	return me, nil
 }
 
-func (e *engine) compileBuiltinFunctions() {
+func (e *engine) compileBuiltinFunctions(ctx context.Context) {
 	machine := newMachine()
-	be := backend.NewCompiler(machine, ssa.NewBuilder())
+	be := backend.NewCompiler(ctx, machine, ssa.NewBuilder())
 	e.builtinFunctions = &builtinFunctions{}
 
 	{

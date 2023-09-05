@@ -210,8 +210,7 @@ func (a *abiImpl) CalleeGenVRegsToFunctionReturns(rets []ssa.Value) {
 		if def := a.m.compiler.ValueDefinition(ret); def.IsFromInstr() {
 			// Constant instructions are inlined.
 			if inst := def.Instr; inst.Constant() {
-				a.m.InsertLoadConstant(inst, r.Reg)
-				continue
+				a.m.InsertLoadConstant(inst, reg)
 			}
 		}
 		if r.Kind == backend.ABIArgKindReg {
