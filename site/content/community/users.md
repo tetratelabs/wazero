@@ -44,10 +44,11 @@ considering their efforts before starting your own!
 
 ### Security
 
-| Name            | Description                                                          |
-|:----------------|----------------------------------------------------------------------|
-| [trivy][17]     | implements 3rd party extension via [wasm modules][18]                |
-| [RunReveal][34] | Security data platform which uses Wazero for transforms and alerting |
+| Name                  | Description                                                                                        |
+|:----------------------|----------------------------------------------------------------------------------------------------|
+| [trivy][17]           | implements 3rd party extension via [wasm modules][18]                                              |
+| [RunReveal][34]       | Security data platform which uses Wazero for transforms and alerting                               |
+| [Impart Security][35] | API security solution with a WASM based rules engine using wazero as part of a security mesh layer |
 
 ### Cloud Platforms
 
@@ -134,3 +135,5 @@ experience.
 [33]: https://github.com/stealthrocket/wasi-go
 
 [34]: https://runreveal.com/
+
+[35]: https://impart.security/
