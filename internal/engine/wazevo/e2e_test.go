@@ -12,6 +12,7 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/testcases"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 	"github.com/tetratelabs/wazero/internal/filecache"
 	"github.com/tetratelabs/wazero/internal/integration_test/spectest"
 	v1 "github.com/tetratelabs/wazero/internal/integration_test/spectest/v1"
@@ -108,8 +109,15 @@ func TestSpectestV1(t *testing.T) {
 		{name: "unwind"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			spectest.RunCase(t, v1.Testcases, tc.name, context.Background(), config,
-				-1, 0, math.MaxInt)
+			t.Run("normal", func(t *testing.T) {
+				spectest.RunCase(t, v1.Testcases, tc.name, context.Background(), config,
+					-1, 0, math.MaxInt)
+			})
+			t.Run("reg high pressure", func(t *testing.T) {
+				ctx := wazevoapi.EnableHighRegisterPressure(context.Background())
+				spectest.RunCase(t, v1.Testcases, tc.name, ctx, config,
+					-1, 0, math.MaxInt)
+			})
 		})
 	}
 }

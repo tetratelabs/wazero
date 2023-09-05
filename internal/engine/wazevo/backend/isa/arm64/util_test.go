@@ -25,7 +25,7 @@ func formatEmittedInstructionsInCurrentBlock(m *machine) string {
 func newSetup() (ssa.Builder, *machine) {
 	m := NewBackend().(*machine)
 	ssaB := ssa.NewBuilder()
-	backend.NewCompiler(m, ssaB)
+	backend.NewCompiler(context.Background(), m, ssaB)
 	blk := ssaB.AllocateBasicBlock()
 	ssaB.SetCurrentBlock(blk)
 	return ssaB, m

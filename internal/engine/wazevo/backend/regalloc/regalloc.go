@@ -55,8 +55,10 @@ type (
 	// Allocator is a register allocator.
 	Allocator struct {
 		// regInfo is static per ABI/ISA, and is initialized by the machine during Machine.PrepareRegisterAllocator.
-		regInfo                  *RegisterInfo
-		allocatableSet           map[RealReg]struct{}
+		regInfo *RegisterInfo
+		// allocatableSet is a set of allocatable RealReg derived from regInfo. Static per ABI/ISA.
+		allocatableSet map[RealReg]struct{}
+		// allocatedRegSet is a set of RealReg that are allocated during the allocation phase. This is reset per function.
 		allocatedRegSet          map[RealReg]struct{}
 		allocatedCalleeSavedRegs []VReg
 		nodePool                 wazevoapi.Pool[node]
@@ -473,13 +475,6 @@ func (a *Allocator) Reset() {
 		a.vRegIDToNode[i] = nil
 	}
 	rr := a.realRegs[:0]
-	for r := range a.allocatableSet {
-		rr = append(rr, r)
-	}
-	for _, r := range rr {
-		delete(a.allocatableSet, r)
-	}
-	rr = rr[:0]
 	for r := range a.allocatedRegSet {
 		rr = append(rr, r)
 	}

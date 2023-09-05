@@ -220,7 +220,20 @@ func (r *regAllocInstrImpl) IsCopy() bool {
 }
 
 // RegisterInfo implements backend.Machine.
-func (m *machine) RegisterInfo() *regalloc.RegisterInfo {
+func (m *machine) RegisterInfo(debug bool) *regalloc.RegisterInfo {
+	if debug {
+		regInfoDebug := &regalloc.RegisterInfo{}
+		regInfoDebug.CalleeSavedRegisters = regInfo.CalleeSavedRegisters
+		regInfoDebug.CallerSavedRegisters = regInfo.CallerSavedRegisters
+		regInfoDebug.RealRegToVReg = regInfo.RealRegToVReg
+		regInfoDebug.RealRegName = regInfo.RealRegName
+		regInfoDebug.AllocatableRegisters[regalloc.RegTypeFloat] = []regalloc.RealReg{
+			v7, v6, v5, v4, v3, v2, v1, v0, // Allocatable sets == Argument registers.
+		}
+		// TODO: tests for high pressured int registers.
+		regInfoDebug.AllocatableRegisters[regalloc.RegTypeInt] = regInfo.AllocatableRegisters[regalloc.RegTypeInt]
+		return regInfoDebug
+	}
 	return regInfo
 }
 

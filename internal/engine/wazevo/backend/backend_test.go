@@ -1,6 +1,7 @@
 package backend_test
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
 	"os"
@@ -80,10 +81,14 @@ L1 (SSA Block: blk0):
 			name: "consts", m: testcases.Constants.Module,
 			afterLoweringARM64: `
 L1 (SSA Block: blk0):
-	ldr d1, #8; b 16; data.f64 64.000000
-	ldr s0, #8; b 8; data.f32 32.000000
-	orr x1, xzr, #0x2
-	orr w0, wzr, #0x1
+	ldr d5?, #8; b 16; data.f64 64.000000
+	mov v1.8b, v5?.8b
+	ldr s4?, #8; b 8; data.f32 32.000000
+	mov v0.8b, v4?.8b
+	orr x3?, xzr, #0x2
+	mov x1, x3?
+	orr w2?, wzr, #0x1
+	mov x0, x2?
 	ret
 `,
 			afterFinalizeARM64: `
@@ -169,7 +174,8 @@ L1 (SSA Block: blk0):
 			afterLoweringARM64: `
 L1 (SSA Block: blk0):
 	mov x2?, x2
-	mov x1, xzr
+	mov x3?, xzr
+	mov x1, x3?
 	mov x0, x2?
 	ret
 `,
@@ -411,10 +417,12 @@ L1 (SSA Block: blk0):
 	cbnz w4?, L2
 L3 (SSA Block: blk2):
 L4 (SSA Block: blk3):
-	mov x0, xzr
+	mov x2?, xzr
+	mov x0, x2?
 	ret
 L2 (SSA Block: blk1):
-	mov x0, xzr
+	mov x3?, xzr
+	mov x0, x3?
 	ret
 `,
 			afterFinalizeARM64: `
@@ -493,7 +501,8 @@ L4 (SSA Block: blk5):
 L3 (SSA Block: blk4):
 L5 (SSA Block: blk3):
 L6 (SSA Block: blk2):
-	mov x0, xzr
+	mov x3?, xzr
+	mov x0, x3?
 	ret
 `,
 			afterFinalizeARM64: `
@@ -2974,27 +2983,33 @@ L2 (SSA Block: blk7):
 	b L9
 L3 (SSA Block: blk8):
 L10 (SSA Block: blk5):
-	orr w0, wzr, #0xc
+	orr w3?, wzr, #0xc
+	mov x0, x3?
 	ret
 L4 (SSA Block: blk9):
 L11 (SSA Block: blk4):
-	movz w0, #0xd, lsl 0
+	movz w4?, #0xd, lsl 0
+	mov x0, x4?
 	ret
 L5 (SSA Block: blk10):
 L12 (SSA Block: blk3):
-	orr w0, wzr, #0xe
+	orr w5?, wzr, #0xe
+	mov x0, x5?
 	ret
 L6 (SSA Block: blk11):
 L13 (SSA Block: blk2):
-	orr w0, wzr, #0xf
+	orr w6?, wzr, #0xf
+	mov x0, x6?
 	ret
 L7 (SSA Block: blk12):
 L14 (SSA Block: blk1):
-	orr w0, wzr, #0x10
+	orr w7?, wzr, #0x10
+	mov x0, x7?
 	ret
 L8 (SSA Block: blk13):
 L9 (SSA Block: blk6):
-	movz w0, #0xb, lsl 0
+	movz w8?, #0xb, lsl 0
+	mov x0, x8?
 	ret
 `,
 			afterFinalizeARM64: `
@@ -3045,7 +3060,7 @@ L9 (SSA Block: blk6):
 			fc := frontend.NewFrontendCompiler(tc.m, ssab, &offset)
 			machine := newMachine()
 			machine.DisableStackCheck()
-			be := backend.NewCompiler(machine, ssab)
+			be := backend.NewCompiler(context.Background(), machine, ssab)
 
 			// Lowers the Wasm to SSA.
 			typeIndex := tc.m.FunctionSection[tc.targetIndex]
