@@ -1725,6 +1725,24 @@ L1 (SSA Block: blk0):
 `,
 		},
 		{
+			name: "nontrapping_float_conversions",
+			m:    testcases.NonTrappingFloatConversions.Module,
+			afterFinalizeARM64: `
+L1 (SSA Block: blk0):
+	str x30, [sp, #-0x10]!
+	fcvtzs x0, d0
+	fcvtzs x1, s1
+	fcvtzs w2, d0
+	fcvtzs w3, s1
+	fcvtzu x4, d0
+	fcvtzu x5, s1
+	fcvtzu w6, d0
+	fcvtzu w7, s1
+	ldr x30, [sp], #0x10
+	ret
+`,
+		},
+		{
 			name: "many_middle_values",
 			m:    testcases.ManyMiddleValues.Module,
 			afterLoweringARM64: `

@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
+	"strconv"
 	"strings"
 
 	"github.com/tetratelabs/wazero/api"
@@ -138,15 +139,7 @@ func (c *Compiler) lowerBody(entryBlk ssa.BasicBlock) {
 	})
 
 	for c.loweringState.pc < len(c.wasmFunctionBody) {
-		op := c.wasmFunctionBody[c.loweringState.pc]
-		c.lowerOpcode(op)
-		if wazevoapi.FrontEndLoggingEnabled {
-			fmt.Println("--------- Translated " + wasm.InstructionName(op) + " --------")
-			fmt.Println("state: " + c.loweringState.String())
-			fmt.Println(c.formatBuilder())
-			fmt.Println("--------------------------")
-		}
-		c.loweringState.pc++
+		c.lowerCurrentOpcode()
 	}
 }
 
@@ -154,14 +147,16 @@ func (c *Compiler) state() *loweringState {
 	return &c.loweringState
 }
 
-func (c *Compiler) lowerOpcode(op wasm.Opcode) {
+func (c *Compiler) lowerCurrentOpcode() {
+	op := c.wasmFunctionBody[c.loweringState.pc]
+
 	builder := c.ssaBuilder
 	state := c.state()
 	switch op {
 	case wasm.OpcodeI32Const:
 		c := c.readI32s()
 		if state.unreachable {
-			return
+			break
 		}
 
 		iconst := builder.AllocateInstruction().AsIconst32(uint32(c)).Insert(builder)
@@ -170,7 +165,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 	case wasm.OpcodeI64Const:
 		c := c.readI64s()
 		if state.unreachable {
-			return
+			break
 		}
 		iconst := builder.AllocateInstruction().AsIconst64(uint64(c)).Insert(builder)
 		value := iconst.Return()
@@ -178,7 +173,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 	case wasm.OpcodeF32Const:
 		f32 := c.readF32()
 		if state.unreachable {
-			return
+			break
 		}
 		f32const := builder.AllocateInstruction().
 			AsF32const(f32).
@@ -188,7 +183,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 	case wasm.OpcodeF64Const:
 		f64 := c.readF64()
 		if state.unreachable {
-			return
+			break
 		}
 		f64const := builder.AllocateInstruction().
 			AsF64const(f64).
@@ -197,7 +192,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		state.push(f64const)
 	case wasm.OpcodeI32Add, wasm.OpcodeI64Add:
 		if state.unreachable {
-			return
+			break
 		}
 		y, x := state.pop(), state.pop()
 		iadd := builder.AllocateInstruction()
@@ -207,7 +202,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		state.push(value)
 	case wasm.OpcodeI32Sub, wasm.OpcodeI64Sub:
 		if state.unreachable {
-			return
+			break
 		}
 		y, x := state.pop(), state.pop()
 		isub := builder.AllocateInstruction()
@@ -217,7 +212,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		state.push(value)
 	case wasm.OpcodeF32Add, wasm.OpcodeF64Add:
 		if state.unreachable {
-			return
+			break
 		}
 		y, x := state.pop(), state.pop()
 		iadd := builder.AllocateInstruction()
@@ -227,7 +222,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		state.push(value)
 	case wasm.OpcodeI32Mul, wasm.OpcodeI64Mul:
 		if state.unreachable {
-			return
+			break
 		}
 		y, x := state.pop(), state.pop()
 		imul := builder.AllocateInstruction()
@@ -237,7 +232,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		state.push(value)
 	case wasm.OpcodeF32Sub, wasm.OpcodeF64Sub:
 		if state.unreachable {
-			return
+			break
 		}
 		y, x := state.pop(), state.pop()
 		isub := builder.AllocateInstruction()
@@ -247,7 +242,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		state.push(value)
 	case wasm.OpcodeF32Mul, wasm.OpcodeF64Mul:
 		if state.unreachable {
-			return
+			break
 		}
 		y, x := state.pop(), state.pop()
 		isub := builder.AllocateInstruction()
@@ -257,7 +252,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		state.push(value)
 	case wasm.OpcodeF32Div, wasm.OpcodeF64Div:
 		if state.unreachable {
-			return
+			break
 		}
 		y, x := state.pop(), state.pop()
 		isub := builder.AllocateInstruction()
@@ -267,7 +262,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		state.push(value)
 	case wasm.OpcodeF32Max, wasm.OpcodeF64Max:
 		if state.unreachable {
-			return
+			break
 		}
 		y, x := state.pop(), state.pop()
 		isub := builder.AllocateInstruction()
@@ -277,7 +272,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		state.push(value)
 	case wasm.OpcodeF32Min, wasm.OpcodeF64Min:
 		if state.unreachable {
-			return
+			break
 		}
 		y, x := state.pop(), state.pop()
 		isub := builder.AllocateInstruction()
@@ -287,37 +282,37 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		state.push(value)
 	case wasm.OpcodeI64Extend8S:
 		if state.unreachable {
-			return
+			break
 		}
 		c.insertIntegerExtend(true, 8, 64)
 	case wasm.OpcodeI64Extend16S:
 		if state.unreachable {
-			return
+			break
 		}
 		c.insertIntegerExtend(true, 16, 64)
 	case wasm.OpcodeI64Extend32S, wasm.OpcodeI64ExtendI32S:
 		if state.unreachable {
-			return
+			break
 		}
 		c.insertIntegerExtend(true, 32, 64)
 	case wasm.OpcodeI64ExtendI32U:
 		if state.unreachable {
-			return
+			break
 		}
 		c.insertIntegerExtend(false, 32, 64)
 	case wasm.OpcodeI32Extend8S:
 		if state.unreachable {
-			return
+			break
 		}
 		c.insertIntegerExtend(true, 8, 32)
 	case wasm.OpcodeI32Extend16S:
 		if state.unreachable {
-			return
+			break
 		}
 		c.insertIntegerExtend(true, 16, 32)
 	case wasm.OpcodeI32Eqz, wasm.OpcodeI64Eqz:
 		if state.unreachable {
-			return
+			break
 		}
 		x := state.pop()
 		zero := builder.AllocateInstruction()
@@ -334,109 +329,109 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		state.push(icmp)
 	case wasm.OpcodeI32Eq, wasm.OpcodeI64Eq:
 		if state.unreachable {
-			return
+			break
 		}
 		c.insertIcmp(ssa.IntegerCmpCondEqual)
 	case wasm.OpcodeI32Ne, wasm.OpcodeI64Ne:
 		if state.unreachable {
-			return
+			break
 		}
 		c.insertIcmp(ssa.IntegerCmpCondNotEqual)
 	case wasm.OpcodeI32LtS, wasm.OpcodeI64LtS:
 		if state.unreachable {
-			return
+			break
 		}
 		c.insertIcmp(ssa.IntegerCmpCondSignedLessThan)
 	case wasm.OpcodeI32LtU, wasm.OpcodeI64LtU:
 		if state.unreachable {
-			return
+			break
 		}
 		c.insertIcmp(ssa.IntegerCmpCondUnsignedLessThan)
 	case wasm.OpcodeI32GtS, wasm.OpcodeI64GtS:
 		if state.unreachable {
-			return
+			break
 		}
 		c.insertIcmp(ssa.IntegerCmpCondSignedGreaterThan)
 	case wasm.OpcodeI32GtU, wasm.OpcodeI64GtU:
 		if state.unreachable {
-			return
+			break
 		}
 		c.insertIcmp(ssa.IntegerCmpCondUnsignedGreaterThan)
 	case wasm.OpcodeI32LeS, wasm.OpcodeI64LeS:
 		if state.unreachable {
-			return
+			break
 		}
 		c.insertIcmp(ssa.IntegerCmpCondSignedLessThanOrEqual)
 	case wasm.OpcodeI32LeU, wasm.OpcodeI64LeU:
 		if state.unreachable {
-			return
+			break
 		}
 		c.insertIcmp(ssa.IntegerCmpCondUnsignedLessThanOrEqual)
 	case wasm.OpcodeI32GeS, wasm.OpcodeI64GeS:
 		if state.unreachable {
-			return
+			break
 		}
 		c.insertIcmp(ssa.IntegerCmpCondSignedGreaterThanOrEqual)
 	case wasm.OpcodeI32GeU, wasm.OpcodeI64GeU:
 		if state.unreachable {
-			return
+			break
 		}
 		c.insertIcmp(ssa.IntegerCmpCondUnsignedGreaterThanOrEqual)
 
 	case wasm.OpcodeF32Eq, wasm.OpcodeF64Eq:
 		if state.unreachable {
-			return
+			break
 		}
 		c.insertFcmp(ssa.FloatCmpCondEqual)
 	case wasm.OpcodeF32Ne, wasm.OpcodeF64Ne:
 		if state.unreachable {
-			return
+			break
 		}
 		c.insertFcmp(ssa.FloatCmpCondNotEqual)
 	case wasm.OpcodeF32Lt, wasm.OpcodeF64Lt:
 		if state.unreachable {
-			return
+			break
 		}
 		c.insertFcmp(ssa.FloatCmpCondLessThan)
 	case wasm.OpcodeF32Gt, wasm.OpcodeF64Gt:
 		if state.unreachable {
-			return
+			break
 		}
 		c.insertFcmp(ssa.FloatCmpCondGreaterThan)
 	case wasm.OpcodeF32Le, wasm.OpcodeF64Le:
 		if state.unreachable {
-			return
+			break
 		}
 		c.insertFcmp(ssa.FloatCmpCondLessThanOrEqual)
 	case wasm.OpcodeF32Ge, wasm.OpcodeF64Ge:
 		if state.unreachable {
-			return
+			break
 		}
 		c.insertFcmp(ssa.FloatCmpCondGreaterThanOrEqual)
 	case wasm.OpcodeF32Neg, wasm.OpcodeF64Neg:
 		if state.unreachable {
-			return
+			break
 		}
 		x := state.pop()
 		v := builder.AllocateInstruction().AsFneg(x).Insert(builder).Return()
 		state.push(v)
 	case wasm.OpcodeF32Sqrt, wasm.OpcodeF64Sqrt:
 		if state.unreachable {
-			return
+			break
 		}
 		x := state.pop()
 		v := builder.AllocateInstruction().AsSqrt(x).Insert(builder).Return()
 		state.push(v)
 	case wasm.OpcodeF32Abs, wasm.OpcodeF64Abs:
 		if state.unreachable {
-			return
+			break
 		}
 		x := state.pop()
 		v := builder.AllocateInstruction().AsFabs(x).Insert(builder).Return()
 		state.push(v)
 	case wasm.OpcodeF32Copysign, wasm.OpcodeF64Copysign:
 		if state.unreachable {
-			return
+			break
 		}
 		y, x := state.pop(), state.pop()
 		v := builder.AllocateInstruction().AsFcopysign(x, y).Insert(builder).Return()
@@ -444,28 +439,28 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 
 	case wasm.OpcodeF32Ceil, wasm.OpcodeF64Ceil:
 		if state.unreachable {
-			return
+			break
 		}
 		x := state.pop()
 		v := builder.AllocateInstruction().AsCeil(x).Insert(builder).Return()
 		state.push(v)
 	case wasm.OpcodeF32Floor, wasm.OpcodeF64Floor:
 		if state.unreachable {
-			return
+			break
 		}
 		x := state.pop()
 		v := builder.AllocateInstruction().AsFloor(x).Insert(builder).Return()
 		state.push(v)
 	case wasm.OpcodeF32Trunc, wasm.OpcodeF64Trunc:
 		if state.unreachable {
-			return
+			break
 		}
 		x := state.pop()
 		v := builder.AllocateInstruction().AsTrunc(x).Insert(builder).Return()
 		state.push(v)
 	case wasm.OpcodeF32Nearest, wasm.OpcodeF64Nearest:
 		if state.unreachable {
-			return
+			break
 		}
 		x := state.pop()
 		v := builder.AllocateInstruction().AsNearest(x).Insert(builder).Return()
@@ -475,18 +470,49 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		wasm.OpcodeI64TruncF64U, wasm.OpcodeI64TruncF32U,
 		wasm.OpcodeI32TruncF64U, wasm.OpcodeI32TruncF32U:
 		if state.unreachable {
-			return
+			break
 		}
 		ret := builder.AllocateInstruction().AsFcvtToInt(
 			state.pop(),
 			c.execCtxPtrValue,
 			op == wasm.OpcodeI64TruncF64S || op == wasm.OpcodeI64TruncF32S || op == wasm.OpcodeI32TruncF32S || op == wasm.OpcodeI32TruncF64S,
 			op == wasm.OpcodeI64TruncF64S || op == wasm.OpcodeI64TruncF32S || op == wasm.OpcodeI64TruncF64U || op == wasm.OpcodeI64TruncF32U,
+			false,
 		).Insert(builder).Return()
 		state.push(ret)
+	case wasm.OpcodeMiscPrefix:
+		c.loweringState.pc++
+		// A misc opcode is encoded as an unsigned variable 32-bit integer.
+		miscOpUint, num, err := leb128.LoadUint32(c.wasmFunctionBody[c.loweringState.pc:])
+		if err != nil {
+			// In normal conditions this should never happen because the function has passed validation.
+			panic(fmt.Sprintf("failed to read misc opcode: %v", err))
+		}
+		c.loweringState.pc += int(num - 1)
+		miscOp := wasm.OpcodeMisc(miscOpUint)
+		switch miscOp {
+		case wasm.OpcodeMiscI64TruncSatF64S, wasm.OpcodeMiscI64TruncSatF32S,
+			wasm.OpcodeMiscI32TruncSatF64S, wasm.OpcodeMiscI32TruncSatF32S,
+			wasm.OpcodeMiscI64TruncSatF64U, wasm.OpcodeMiscI64TruncSatF32U,
+			wasm.OpcodeMiscI32TruncSatF64U, wasm.OpcodeMiscI32TruncSatF32U:
+			if state.unreachable {
+				break
+			}
+			ret := builder.AllocateInstruction().AsFcvtToInt(
+				state.pop(),
+				c.execCtxPtrValue,
+				miscOp == wasm.OpcodeMiscI64TruncSatF64S || miscOp == wasm.OpcodeMiscI64TruncSatF32S || miscOp == wasm.OpcodeMiscI32TruncSatF32S || miscOp == wasm.OpcodeMiscI32TruncSatF64S,
+				miscOp == wasm.OpcodeMiscI64TruncSatF64S || miscOp == wasm.OpcodeMiscI64TruncSatF32S || miscOp == wasm.OpcodeMiscI64TruncSatF64U || miscOp == wasm.OpcodeMiscI64TruncSatF32U,
+				true,
+			).Insert(builder).Return()
+			state.push(ret)
+		default:
+			panic("Unknown MiscOp " + strconv.Itoa(int(miscOpUint)))
+		}
+
 	case wasm.OpcodeI32ReinterpretF32:
 		if state.unreachable {
-			return
+			break
 		}
 		reinterpret := builder.AllocateInstruction().
 			AsBitcast(state.pop(), ssa.TypeI32).
@@ -495,7 +521,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 
 	case wasm.OpcodeI64ReinterpretF64:
 		if state.unreachable {
-			return
+			break
 		}
 		reinterpret := builder.AllocateInstruction().
 			AsBitcast(state.pop(), ssa.TypeI64).
@@ -504,7 +530,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 
 	case wasm.OpcodeF32ReinterpretI32:
 		if state.unreachable {
-			return
+			break
 		}
 		reinterpret := builder.AllocateInstruction().
 			AsBitcast(state.pop(), ssa.TypeF32).
@@ -513,7 +539,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 
 	case wasm.OpcodeF64ReinterpretI64:
 		if state.unreachable {
-			return
+			break
 		}
 		reinterpret := builder.AllocateInstruction().
 			AsBitcast(state.pop(), ssa.TypeF64).
@@ -522,7 +548,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 
 	case wasm.OpcodeI32DivS, wasm.OpcodeI64DivS:
 		if state.unreachable {
-			return
+			break
 		}
 		y, x := state.pop(), state.pop()
 		result := builder.AllocateInstruction().AsSDiv(x, y, c.execCtxPtrValue).Insert(builder).Return()
@@ -530,7 +556,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 
 	case wasm.OpcodeI32DivU, wasm.OpcodeI64DivU:
 		if state.unreachable {
-			return
+			break
 		}
 		y, x := state.pop(), state.pop()
 		result := builder.AllocateInstruction().AsUDiv(x, y, c.execCtxPtrValue).Insert(builder).Return()
@@ -538,7 +564,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 
 	case wasm.OpcodeI32RemS, wasm.OpcodeI64RemS:
 		if state.unreachable {
-			return
+			break
 		}
 		y, x := state.pop(), state.pop()
 		result := builder.AllocateInstruction().AsSRem(x, y, c.execCtxPtrValue).Insert(builder).Return()
@@ -546,7 +572,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 
 	case wasm.OpcodeI32RemU, wasm.OpcodeI64RemU:
 		if state.unreachable {
-			return
+			break
 		}
 		y, x := state.pop(), state.pop()
 		result := builder.AllocateInstruction().AsURem(x, y, c.execCtxPtrValue).Insert(builder).Return()
@@ -554,7 +580,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 
 	case wasm.OpcodeI32And, wasm.OpcodeI64And:
 		if state.unreachable {
-			return
+			break
 		}
 		y, x := state.pop(), state.pop()
 		and := builder.AllocateInstruction()
@@ -564,7 +590,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		state.push(value)
 	case wasm.OpcodeI32Or, wasm.OpcodeI64Or:
 		if state.unreachable {
-			return
+			break
 		}
 		y, x := state.pop(), state.pop()
 		or := builder.AllocateInstruction()
@@ -574,7 +600,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		state.push(value)
 	case wasm.OpcodeI32Xor, wasm.OpcodeI64Xor:
 		if state.unreachable {
-			return
+			break
 		}
 		y, x := state.pop(), state.pop()
 		xor := builder.AllocateInstruction()
@@ -584,7 +610,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		state.push(value)
 	case wasm.OpcodeI32Shl, wasm.OpcodeI64Shl:
 		if state.unreachable {
-			return
+			break
 		}
 		y, x := state.pop(), state.pop()
 		ishl := builder.AllocateInstruction()
@@ -594,7 +620,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		state.push(value)
 	case wasm.OpcodeI32ShrU, wasm.OpcodeI64ShrU:
 		if state.unreachable {
-			return
+			break
 		}
 		y, x := state.pop(), state.pop()
 		ishl := builder.AllocateInstruction()
@@ -604,7 +630,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		state.push(value)
 	case wasm.OpcodeI32ShrS, wasm.OpcodeI64ShrS:
 		if state.unreachable {
-			return
+			break
 		}
 		y, x := state.pop(), state.pop()
 		ishl := builder.AllocateInstruction()
@@ -614,7 +640,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		state.push(value)
 	case wasm.OpcodeI32Rotl, wasm.OpcodeI64Rotl:
 		if state.unreachable {
-			return
+			break
 		}
 		y, x := state.pop(), state.pop()
 		rotl := builder.AllocateInstruction()
@@ -624,7 +650,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		state.push(value)
 	case wasm.OpcodeI32Rotr, wasm.OpcodeI64Rotr:
 		if state.unreachable {
-			return
+			break
 		}
 		y, x := state.pop(), state.pop()
 		rotr := builder.AllocateInstruction()
@@ -634,7 +660,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		state.push(value)
 	case wasm.OpcodeI32Clz, wasm.OpcodeI64Clz:
 		if state.unreachable {
-			return
+			break
 		}
 		x := state.pop()
 		clz := builder.AllocateInstruction()
@@ -644,7 +670,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		state.push(value)
 	case wasm.OpcodeI32Ctz, wasm.OpcodeI64Ctz:
 		if state.unreachable {
-			return
+			break
 		}
 		x := state.pop()
 		ctz := builder.AllocateInstruction()
@@ -654,7 +680,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		state.push(value)
 	case wasm.OpcodeI32Popcnt, wasm.OpcodeI64Popcnt:
 		if state.unreachable {
-			return
+			break
 		}
 		x := state.pop()
 		popcnt := builder.AllocateInstruction()
@@ -665,7 +691,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 
 	case wasm.OpcodeI32WrapI64:
 		if state.unreachable {
-			return
+			break
 		}
 		x := state.pop()
 		wrap := builder.AllocateInstruction().AsIreduce(x, ssa.TypeI32).Insert(builder).Return()
@@ -673,21 +699,21 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 	case wasm.OpcodeGlobalGet:
 		index := c.readI32u()
 		if state.unreachable {
-			return
+			break
 		}
 		v := c.getWasmGlobalValue(index, false)
 		state.push(v)
 	case wasm.OpcodeGlobalSet:
 		index := c.readI32u()
 		if state.unreachable {
-			return
+			break
 		}
 		v := state.pop()
 		c.setWasmGlobalValue(index, v)
 	case wasm.OpcodeLocalGet:
 		index := c.readI32u()
 		if state.unreachable {
-			return
+			break
 		}
 		variable := c.localVariable(index)
 		v := builder.MustFindValue(variable)
@@ -695,7 +721,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 	case wasm.OpcodeLocalSet:
 		index := c.readI32u()
 		if state.unreachable {
-			return
+			break
 		}
 		variable := c.localVariable(index)
 		newValue := state.pop()
@@ -704,7 +730,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 	case wasm.OpcodeLocalTee:
 		index := c.readI32u()
 		if state.unreachable {
-			return
+			break
 		}
 		variable := c.localVariable(index)
 		newValue := state.peek()
@@ -716,7 +742,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		}
 
 		if state.unreachable {
-			return
+			break
 		}
 
 		cond := state.pop()
@@ -732,7 +758,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 	case wasm.OpcodeMemorySize:
 		state.pc++ // skips the memory index.
 		if state.unreachable {
-			return
+			break
 		}
 
 		var memSizeInBytes ssa.Value
@@ -765,7 +791,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 	case wasm.OpcodeMemoryGrow:
 		state.pc++ // skips the memory index.
 		if state.unreachable {
-			return
+			break
 		}
 
 		c.storeCallerModuleContext()
@@ -801,7 +827,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 
 		_, offset := c.readMemArg()
 		if state.unreachable {
-			return
+			break
 		}
 
 		var opSize uint64
@@ -849,7 +875,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		wasm.OpcodeI64Load32U:
 		_, offset := c.readMemArg()
 		if state.unreachable {
-			return
+			break
 		}
 
 		var opSize uint64
@@ -917,7 +943,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 
 		if state.unreachable {
 			state.unreachableDepth++
-			return
+			break
 		}
 
 		followingBlk := builder.AllocateBasicBlock()
@@ -934,7 +960,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 
 		if state.unreachable {
 			state.unreachableDepth++
-			return
+			break
 		}
 
 		loopHeader, afterLoopBlock := builder.AllocateBasicBlock(), builder.AllocateBasicBlock()
@@ -967,7 +993,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 
 		if state.unreachable {
 			state.unreachableDepth++
-			return
+			break
 		}
 
 		v := state.pop()
@@ -1016,7 +1042,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		if unreachable := state.unreachable; unreachable && state.unreachableDepth > 0 {
 			// If it is currently in unreachable and is a nested if,
 			// we just remove the entire else block.
-			return
+			break
 		}
 
 		if !state.unreachable {
@@ -1040,7 +1066,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 	case wasm.OpcodeEnd:
 		if state.unreachableDepth > 0 {
 			state.unreachableDepth--
-			return
+			break
 		}
 
 		ctrl := state.ctrlPop()
@@ -1059,7 +1085,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 
 		switch ctrl.kind {
 		case controlFrameKindFunction:
-			return // This is the very end of function.
+			break // This is the very end of function.
 		case controlFrameKindLoop:
 			// Loop header block can be reached from any br/br_table contained in the loop,
 			// so now that we've reached End of it, we can seal it.
@@ -1079,7 +1105,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 	case wasm.OpcodeBr:
 		labelIndex := c.readI32u()
 		if state.unreachable {
-			return
+			break
 		}
 
 		targetBlk, argNum := state.brTargetArgNumFor(labelIndex)
@@ -1091,7 +1117,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 	case wasm.OpcodeBrIf:
 		labelIndex := c.readI32u()
 		if state.unreachable {
-			return
+			break
 		}
 
 		v := state.pop()
@@ -1121,7 +1147,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		}
 		labels = append(labels, c.readI32u()) // default label.
 		if state.unreachable {
-			return
+			break
 		}
 
 		index := state.pop()
@@ -1137,7 +1163,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 	case wasm.OpcodeNop:
 	case wasm.OpcodeReturn:
 		if state.unreachable {
-			return
+			break
 		}
 		results := c.loweringState.nPeekDup(c.results())
 		instr := builder.AllocateInstruction()
@@ -1148,7 +1174,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 
 	case wasm.OpcodeUnreachable:
 		if state.unreachable {
-			return
+			break
 		}
 		exit := builder.AllocateInstruction()
 		exit.AsExitWithCode(c.execCtxPtrValue, wazevoapi.ExitCodeUnreachable)
@@ -1159,14 +1185,14 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		typeIndex := c.readI32u()
 		tableIndex := c.readI32u()
 		if state.unreachable {
-			return
+			break
 		}
 		c.lowerCallIndirect(typeIndex, tableIndex)
 
 	case wasm.OpcodeCall:
 		fnIndex := c.readI32u()
 		if state.unreachable {
-			return
+			break
 		}
 
 		// Before transfer the control to the callee, we have to store the current module's moduleContextPtr
@@ -1233,12 +1259,12 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 
 	case wasm.OpcodeDrop:
 		if state.unreachable {
-			return
+			break
 		}
 		_ = state.pop()
 	case wasm.OpcodeF64ConvertI32S, wasm.OpcodeF64ConvertI64S, wasm.OpcodeF64ConvertI32U, wasm.OpcodeF64ConvertI64U:
 		if state.unreachable {
-			return
+			break
 		}
 		result := builder.AllocateInstruction().AsFcvtFromInt(
 			state.pop(),
@@ -1248,7 +1274,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		state.push(result)
 	case wasm.OpcodeF32ConvertI32S, wasm.OpcodeF32ConvertI64S, wasm.OpcodeF32ConvertI32U, wasm.OpcodeF32ConvertI64U:
 		if state.unreachable {
-			return
+			break
 		}
 		result := builder.AllocateInstruction().AsFcvtFromInt(
 			state.pop(),
@@ -1258,7 +1284,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		state.push(result)
 	case wasm.OpcodeF32DemoteF64:
 		if state.unreachable {
-			return
+			break
 		}
 		cvt := builder.AllocateInstruction()
 		cvt.AsFdemote(state.pop())
@@ -1266,7 +1292,7 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 		state.push(cvt.Return())
 	case wasm.OpcodeF64PromoteF32:
 		if state.unreachable {
-			return
+			break
 		}
 		cvt := builder.AllocateInstruction()
 		cvt.AsFpromote(state.pop())
@@ -1275,6 +1301,14 @@ func (c *Compiler) lowerOpcode(op wasm.Opcode) {
 	default:
 		panic("TODO: unsupported in wazevo yet: " + wasm.InstructionName(op))
 	}
+
+	if wazevoapi.FrontEndLoggingEnabled {
+		fmt.Println("--------- Translated " + wasm.InstructionName(op) + " --------")
+		fmt.Println("state: " + c.loweringState.String())
+		fmt.Println(c.formatBuilder())
+		fmt.Println("--------------------------")
+	}
+	c.loweringState.pc++
 }
 
 const (

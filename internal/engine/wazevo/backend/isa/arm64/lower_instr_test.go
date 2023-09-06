@@ -364,9 +364,16 @@ func Test_exitIfNotSequenceEncodingSize(t *testing.T) {
 }
 
 func TestMachine_lowerFpuToInt(t *testing.T) {
-	_, _, m := newSetupWithMockContext()
-	m.lowerFpuToInt(operandNR(x1VReg), operandNR(x2VReg), x15VReg, false, false, false)
-	require.Equal(t, `
+	for _, tc := range []struct {
+		name          string
+		nontrapping   bool
+		expectedAsm   string
+		expectedBytes string
+	}{
+		{
+			name:        "trapping",
+			nontrapping: false,
+			expectedAsm: `
 msr fpsr, xzr
 fcvtzu w1, s2
 mrs x27 fpsr
@@ -380,10 +387,27 @@ exit_sequence x15
 movz x27, #0xb, lsl 0
 str w27, [x15]
 exit_sequence x15
-`, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
+`,
+			expectedBytes: "3f441bd54100391e3b443bd57f0700f1210200544020221e070100549b0180d2fb0100b9fd0940f9fb0d40f97f030091fe1140f9c0035fd67b0180d2fb0100b9fd0940f9fb0d40f97f030091fe1140f9c0035fd6",
+		},
+		{
+			name:        "nontrapping",
+			nontrapping: true,
+			expectedAsm: `
+fcvtzu w1, s2
+`,
+			expectedBytes: "4100391e",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, _, m := newSetupWithMockContext()
+			m.lowerFpuToInt(operandNR(x1VReg), operandNR(x2VReg), x15VReg, false, false, false, tc.nontrapping)
+			require.Equal(t, tc.expectedAsm, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
 
-	m.FlushPendingInstructions()
-	m.encode(m.perBlockHead)
-	buf := m.compiler.Buf()
-	require.Equal(t, "3f441bd54100391e3b443bd57f0700f1210200544020221e070100549b0180d2fb0100b9fd0940f9fb0d40f97f030091fe1140f9c0035fd67b0180d2fb0100b9fd0940f9fb0d40f97f030091fe1140f9c0035fd6", hex.EncodeToString(buf))
+			m.FlushPendingInstructions()
+			m.encode(m.perBlockHead)
+			buf := m.compiler.Buf()
+			require.Equal(t, tc.expectedBytes, hex.EncodeToString(buf))
+		})
+	}
 }

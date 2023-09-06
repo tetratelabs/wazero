@@ -895,6 +895,39 @@ var (
 			wasm.OpcodeEnd,
 		}, []wasm.ValueType{}),
 	}
+	NonTrappingFloatConversions = TestCase{
+		Name: "float_conversions",
+		Module: SingleFunctionModule(wasm.FunctionType{
+			Params:  []wasm.ValueType{f64, f32},
+			Results: []wasm.ValueType{i64, i64, i32, i32, i64, i64, i32, i32},
+		}, []byte{
+			wasm.OpcodeLocalGet, 0,
+			wasm.OpcodeMiscPrefix, wasm.OpcodeMiscI64TruncSatF64S,
+
+			wasm.OpcodeLocalGet, 1,
+			wasm.OpcodeMiscPrefix, wasm.OpcodeMiscI64TruncSatF32S,
+
+			wasm.OpcodeLocalGet, 0,
+			wasm.OpcodeMiscPrefix, wasm.OpcodeMiscI32TruncSatF64S,
+
+			wasm.OpcodeLocalGet, 1,
+			wasm.OpcodeMiscPrefix, wasm.OpcodeMiscI32TruncSatF32S,
+
+			wasm.OpcodeLocalGet, 0,
+			wasm.OpcodeMiscPrefix, wasm.OpcodeMiscI64TruncSatF64U,
+
+			wasm.OpcodeLocalGet, 1,
+			wasm.OpcodeMiscPrefix, wasm.OpcodeMiscI64TruncSatF32U,
+
+			wasm.OpcodeLocalGet, 0,
+			wasm.OpcodeMiscPrefix, wasm.OpcodeMiscI32TruncSatF64U,
+
+			wasm.OpcodeLocalGet, 1,
+			wasm.OpcodeMiscPrefix, wasm.OpcodeMiscI32TruncSatF32U,
+
+			wasm.OpcodeEnd,
+		}, []wasm.ValueType{}),
+	}
 	FibonacciRecursive = TestCase{
 		Name: "recursive_fibonacci",
 		Module: SingleFunctionModule(i32_i32, []byte{

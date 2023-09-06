@@ -680,6 +680,21 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:f64, v3:f32)
 `,
 		},
 		{
+			name: "non-trapping float conversions", m: testcases.NonTrappingFloatConversions.Module,
+			exp: `
+blk0: (exec_ctx:i64, module_ctx:i64, v2:f64, v3:f32)
+	v4:i64 = FcvtToSintSat v2
+	v5:i64 = FcvtToSintSat v3
+	v6:i32 = FcvtToSintSat v2
+	v7:i32 = FcvtToSintSat v3
+	v8:i64 = FcvtToUintSat v2
+	v9:i64 = FcvtToUintSat v3
+	v10:i32 = FcvtToUintSat v2
+	v11:i32 = FcvtToUintSat v3
+	Jump blk_ret, v4, v5, v6, v7, v8, v9, v10, v11
+`,
+		},
+		{
 			name: "loop with param and results", m: testcases.LoopBrWithParamResults.Module,
 			exp: `
 blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i32)

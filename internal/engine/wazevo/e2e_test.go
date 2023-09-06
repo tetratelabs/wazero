@@ -130,7 +130,7 @@ func TestSpectestV2(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 	}{
-		// {"conversions"}, includes non-trapping conversions.
+		{"conversions"}, // includes non-trapping conversions.
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			spectest.RunCase(t, v2.Testcases, tc.name, context.Background(), config,
