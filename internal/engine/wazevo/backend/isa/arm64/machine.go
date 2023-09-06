@@ -129,9 +129,6 @@ func (m *machine) Reset() {
 	for l := label(0); l <= m.nextLabel; l++ {
 		delete(m.labelPositions, l)
 	}
-	if len(m.labelPositions) > 0 {
-		panic("")
-	}
 	m.pendingInstructions = m.pendingInstructions[:0]
 	m.clobberedRegs = m.clobberedRegs[:0]
 	for key := range m.spillSlots {
