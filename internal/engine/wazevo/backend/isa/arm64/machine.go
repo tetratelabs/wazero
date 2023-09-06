@@ -276,6 +276,7 @@ func (l label) String() string {
 // allocateInstr allocates an instruction.
 func (m *machine) allocateInstr() *instruction {
 	instr := m.instrPool.Allocate()
+	*instr = instruction{}
 	return instr
 }
 
