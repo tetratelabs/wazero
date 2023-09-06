@@ -355,7 +355,7 @@ func Test_exitWithCodeEncodingSize(t *testing.T) {
 	m.FlushPendingInstructions()
 	m.encode(m.perBlockHead)
 	buf := m.compiler.Buf()
-	require.Equal(t, "3b0080d23b0000b93d0840f93b0c40f97f0300913e1040f9c0035fd6", hex.EncodeToString(buf))
+	require.Equal(t, "3b0080d23b0000b93d0840f93e1040f93b0c40f97f030091c0035fd600000014", hex.EncodeToString(buf))
 	require.Equal(t, exitWithCodeEncodingSize, len(buf))
 }
 
@@ -386,7 +386,7 @@ str w27, [x15]
 exit_sequence x15
 L2:
 `,
-			expectedBytes: "3f441bd54100391e3b443bd57f0700f1010000544020221e070000549b0180d2fb0100b9fd0940f9fb0d40f97f030091fe1140f9c0035fd67b0180d2fb0100b9fd0940f9fb0d40f97f030091fe1140f9c0035fd6",
+			expectedBytes: "3f441bd54100391e3b443bd57f0700f1010000544020221e070000549b0180d2fb0100b9fd0940f9fe1140f9fb0d40f97f030091c0035fd6000000147b0180d2fb0100b9fd0940f9fe1140f9fb0d40f97f030091c0035fd600000014",
 		},
 		{
 			name:        "nontrapping",

@@ -1755,7 +1755,7 @@ func (s shiftOp) String() string {
 	panic(int(s))
 }
 
-const exitSequenceSize = 5 * 4 // 5 instructions as in encodeExitSequence.
+const exitSequenceSize = 6 * 4 // 7 instructions as in encodeExitSequence.
 
 // size returns the size of the instruction in encoded bytes.
 func (i *instruction) size() int64 {

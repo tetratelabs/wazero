@@ -228,11 +228,13 @@ func (m *machine) RegisterInfo(debug bool) *regalloc.RegisterInfo {
 		regInfoDebug.RealRegToVReg = regInfo.RealRegToVReg
 		regInfoDebug.RealRegName = regInfo.RealRegName
 		regInfoDebug.AllocatableRegisters[regalloc.RegTypeFloat] = []regalloc.RealReg{
+			v18,                            // One callee saved.
 			v7, v6, v5, v4, v3, v2, v1, v0, // Allocatable sets == Argument registers.
 		}
 		regInfoDebug.AllocatableRegisters[regalloc.RegTypeInt] = []regalloc.RealReg{
-			// TODO: investigate why we are failing when x28, x29, x30 are used.
-			x7, x6, x5, x4, x3, x2, x1, x0, // Allocatable sets == Argument registers.
+			x29, x30, // Caller saved, and special ones. But they should be able to get allocated.
+			x19,                            // One callee saved.
+			x7, x6, x5, x4, x3, x2, x1, x0, // Argument registers (all caller saved).
 		}
 		return regInfoDebug
 	}

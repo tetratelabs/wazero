@@ -1009,15 +1009,42 @@ func TestInstruction_encoding_store(t *testing.T) {
 }
 
 func Test_encodeExitSequence(t *testing.T) {
-	m := &mockCompiler{}
-	encodeExitSequence(m, x22VReg)
-	// ldr x29, [x22, #0x10]
-	// ldr x27, [x22, #0x18]
-	// mov sp, x27
-	// ldr x30, [x22, #0x20]
-	// ret
-	require.Equal(t, "dd0a40f9db0e40f97f030091de1240f9c0035fd6", hex.EncodeToString(m.buf))
-	require.Equal(t, len(m.buf), exitSequenceSize)
+	t.Run("no overlap", func(t *testing.T) {
+		m := &mockCompiler{}
+		encodeExitSequence(m, x22VReg)
+		// ldr x29, [x22, #0x10]
+		// ldr x30, [x22, #0x20]
+		// ldr x27, [x22, #0x18]
+		// mov sp, x27
+		// ret
+		// b   #0x14 ;; dummy
+		require.Equal(t, "dd0a40f9de1240f9db0e40f97f030091c0035fd600000014", hex.EncodeToString(m.buf))
+		require.Equal(t, len(m.buf), exitSequenceSize)
+	})
+	t.Run("fp", func(t *testing.T) {
+		m := &mockCompiler{}
+		encodeExitSequence(m, fpVReg)
+		// mov x27, x29
+		// ldr x29, [x27, #0x10]
+		// ldr x30, [x27, #0x20]
+		// ldr x27, [x27, #0x18]
+		// mov sp, x27
+		// ret
+		require.Equal(t, "fb031daa7d0b40f97e1340f97b0f40f97f030091c0035fd6", hex.EncodeToString(m.buf))
+		require.Equal(t, len(m.buf), exitSequenceSize)
+	})
+	t.Run("lr", func(t *testing.T) {
+		m := &mockCompiler{}
+		encodeExitSequence(m, lrVReg)
+		// mov x27, x30
+		// ldr x29, [x27, #0x10]
+		// ldr x30, [x27, #0x20]
+		// ldr x27, [x27, #0x18]
+		// mov sp, x27
+		// ret
+		require.Equal(t, "fb031eaa7d0b40f97e1340f97b0f40f97f030091c0035fd6", hex.EncodeToString(m.buf))
+		require.Equal(t, len(m.buf), exitSequenceSize)
+	})
 }
 
 func Test_lowerExitWithCodeEncodingSize(t *testing.T) {
