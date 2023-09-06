@@ -430,10 +430,12 @@ func (m *machine) lowerFpuUniOp(op fpuUniOp, in, out ssa.Value) {
 }
 
 func (m *machine) lowerFpuToInt(rd, rn operand, ctx regalloc.VReg, signed, src64bit, dst64bit, nonTrapping bool) {
-	// First of all, we have to clear the FPU flags.
-	flagClear := m.allocateInstr()
-	flagClear.asMovToFPSR(xzrVReg)
-	m.insert(flagClear)
+	if !nonTrapping {
+		// First of all, we have to clear the FPU flags.
+		flagClear := m.allocateInstr()
+		flagClear.asMovToFPSR(xzrVReg)
+		m.insert(flagClear)
+	}
 
 	// Then, do the conversion which doesn't trap inherently.
 	cvt := m.allocateInstr()

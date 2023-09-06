@@ -1730,21 +1730,13 @@ L1 (SSA Block: blk0):
 			afterFinalizeARM64: `
 L1 (SSA Block: blk0):
 	str x30, [sp, #-0x10]!
-	msr fpsr, xzr
 	fcvtzs x0, d0
-	msr fpsr, xzr
 	fcvtzs x1, s1
-	msr fpsr, xzr
 	fcvtzs w2, d0
-	msr fpsr, xzr
 	fcvtzs w3, s1
-	msr fpsr, xzr
 	fcvtzu x4, d0
-	msr fpsr, xzr
 	fcvtzu x5, s1
-	msr fpsr, xzr
 	fcvtzu w6, d0
-	msr fpsr, xzr
 	fcvtzu w7, s1
 	ldr x30, [sp], #0x10
 	ret

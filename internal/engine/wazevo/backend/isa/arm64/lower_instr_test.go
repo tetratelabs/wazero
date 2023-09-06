@@ -394,10 +394,9 @@ exit_sequence x15
 			name:        "nontrapping",
 			nontrapping: true,
 			expectedAsm: `
-msr fpsr, xzr
 fcvtzu w1, s2
 `,
-			expectedBytes: "3f441bd54100391e",
+			expectedBytes: "4100391e",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
