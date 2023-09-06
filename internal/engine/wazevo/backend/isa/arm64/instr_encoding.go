@@ -81,17 +81,7 @@ func (i *instruction) encode(c backend.Compiler) {
 		to, from := i.rd.realReg(), i.rn.realReg()
 		toIsSp := to == sp
 		fromIsSp := from == sp
-		if toIsSp || fromIsSp {
-			// This is an alias of ADD (immediate):
-			// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/MOV--to-from-SP---Move-between-register-and-stack-pointer--an-alias-of-ADD--immediate--
-			c.Emit4Bytes(encodeAddSubtractImmediate(0b100, 0, 0,
-				regNumberInEncoding[from], regNumberInEncoding[to]),
-			)
-		} else {
-			// This is an alias of ORR (shifted register):
-			// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/MOV--register---Move--register---an-alias-of-ORR--shifted-register--
-			c.Emit4Bytes(encodeLogicalShiftedRegister(0b101, 0, regNumberInEncoding[from], 0, regNumberInEncoding[xzr], regNumberInEncoding[to]))
-		}
+		c.Emit4Bytes(encodeMov64(regNumberInEncoding[to], regNumberInEncoding[from], toIsSp, fromIsSp))
 	case loadP64, storeP64:
 		rt, rt2 := regNumberInEncoding[i.rn.realReg()], regNumberInEncoding[i.rm.realReg()]
 		amode := i.amode
@@ -216,7 +206,11 @@ func (i *instruction) encode(c backend.Compiler) {
 		c.Emit4Bytes(0b1111<<25 | ftype<<22 | 1<<21 | rm<<16 | 0b1<<13 | rn<<5)
 	case udf:
 		// https://developer.arm.com/documentation/ddi0596/2020-12/Base-Instructions/UDF--Permanently-Undefined-?lang=en
-		c.Emit4Bytes(0)
+		if wazevoapi.PrintMachineCodeHexPerFunctionDisassemblable {
+			c.Emit4Bytes(dummyInstruction)
+		} else {
+			c.Emit4Bytes(0)
+		}
 	case adr:
 		c.Emit4Bytes(encodeAdr(regNumberInEncoding[i.rd.realReg()], uint32(i.u1)))
 	case cSel:
@@ -302,6 +296,18 @@ func (i *instruction) encode(c backend.Compiler) {
 		c.Emit4Bytes(encodeSystemRegisterMove(rt, false))
 	default:
 		panic(i.String())
+	}
+}
+
+func encodeMov64(rd, rn uint32, toIsSp, fromIsSp bool) uint32 {
+	if toIsSp || fromIsSp {
+		// This is an alias of ADD (immediate):
+		// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/MOV--to-from-SP---Move-between-register-and-stack-pointer--an-alias-of-ADD--immediate--
+		return encodeAddSubtractImmediate(0b100, 0, 0, rn, rd)
+	} else {
+		// This is an alias of ORR (shifted register):
+		// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/MOV--register---Move--register---an-alias-of-ORR--shifted-register--
+		return encodeLogicalShiftedRegister(0b101, 0, rn, 0, regNumberInEncoding[xzr], rd)
 	}
 }
 
@@ -1290,11 +1296,29 @@ func encodeBrTableSequence(c backend.Compiler, index regalloc.VReg, targets []ui
 // encodeExitSequence matches the implementation detail of abiImpl.emitGoEntryPreamble.
 func encodeExitSequence(c backend.Compiler, ctxReg regalloc.VReg) {
 	// Restore the FP, SP and LR, and return to the Go code:
-	// 		ldr fp, [savedExecutionContextPtr, #OriginalFramePointer]
-	// 		ldr tmp, [savedExecutionContextPtr, #OriginalStackPointer]
+	// 		ldr lr,  [ctxReg, #GoReturnAddress]
+	// 		ldr fp,  [ctxReg, #OriginalFramePointer]
+	// 		ldr tmp, [ctxReg, #OriginalStackPointer]
 	//      mov sp, tmp ;; sp cannot be str'ed directly.
-	// 		ldr lr, [savedExecutionContextPtr, #GoReturnAddress]
 	// 		ret ;; --> return to the Go code
+
+	var ctxEvicted bool
+	if ctx := ctxReg.RealReg(); ctx == fp || ctx == lr {
+		// In order to avoid overwriting the context register, we move ctxReg to tmp.
+		c.Emit4Bytes(encodeMov64(regNumberInEncoding[tmp], regNumberInEncoding[ctx], false, false))
+		ctxReg = tmpRegVReg
+		ctxEvicted = true
+	}
+
+	restoreLr := encodeLoadOrStore(
+		uLoad64,
+		regNumberInEncoding[lr],
+		addressMode{
+			kind: addressModeKindRegUnsignedImm12,
+			rn:   ctxReg,
+			imm:  wazevoapi.ExecutionContextOffsets.GoReturnAddress.I64(),
+		},
+	)
 
 	restoreFp := encodeLoadOrStore(
 		uLoad64,
@@ -1319,21 +1343,16 @@ func encodeExitSequence(c backend.Compiler, ctxReg regalloc.VReg) {
 	movTmpToSp := encodeAddSubtractImmediate(0b100, 0, 0,
 		regNumberInEncoding[tmp], regNumberInEncoding[sp])
 
-	restoreLr := encodeLoadOrStore(
-		uLoad64,
-		regNumberInEncoding[lr],
-		addressMode{
-			kind: addressModeKindRegUnsignedImm12,
-			rn:   ctxReg,
-			imm:  wazevoapi.ExecutionContextOffsets.GoReturnAddress.I64(),
-		},
-	)
-
 	c.Emit4Bytes(restoreFp)
+	c.Emit4Bytes(restoreLr)
 	c.Emit4Bytes(restoreSpToTmp)
 	c.Emit4Bytes(movTmpToSp)
-	c.Emit4Bytes(restoreLr)
 	c.Emit4Bytes(encodeRet())
+	if !ctxEvicted {
+		// In order to have the fixed-length exit sequence, we need to padd the binary.
+		// Since this will never be reached, we insert a dummy instruction.
+		c.Emit4Bytes(dummyInstruction)
+	}
 }
 
 func encodeRet() uint32 {

@@ -346,14 +346,13 @@ func (m *machine) lowerIDiv(execCtxVReg regalloc.VReg, rd, rn, rm operand, _64bi
 	}
 }
 
-const exitIfNotSequenceEncodingSize = 4 + exitWithCodeEncodingSize
-
 func (m *machine) exitIfNot(execCtxVReg regalloc.VReg, c cond, code wazevoapi.ExitCode) {
 	cbr := m.allocateInstr()
-	cbr.asCondBr(c, invalidLabel, false /* ignored */)
-	cbr.condBrOffsetResolve(exitWithCodeEncodingSize + 4 /* br offset is from the beginning of this instruction */)
 	m.insert(cbr)
 	m.lowerExitWithCode(execCtxVReg, code)
+	// Conditional branch target is after exit.
+	l := m.insertBrTargetLabel()
+	cbr.asCondBr(c, l, false /* ignored */)
 }
 
 func (m *machine) lowerFcopysign(x, y, ret ssa.Value) {
@@ -456,8 +455,6 @@ func (m *machine) lowerFpuToInt(rd, rn operand, ctx regalloc.VReg, signed, src64
 
 		// If it is not undefined, we can return the result.
 		ok := m.allocateInstr()
-		ok.asCondBr(ne.asCond(), invalidLabel, false /* ignored */)
-		ok.condBrOffsetResolve(4 /* fpuCmp */ + exitIfNotSequenceEncodingSize + exitWithCodeEncodingSize + 4)
 		m.insert(ok)
 
 		// Otherwise, we have to choose the status depending on it is overflow or NaN conversion.
@@ -470,6 +467,10 @@ func (m *machine) lowerFpuToInt(rd, rn operand, ctx regalloc.VReg, signed, src64
 		m.exitIfNot(ctx, vc.asCond(), wazevoapi.ExitCodeInvalidConversionToInteger)
 		// Otherwise, it is an overflow.
 		m.lowerExitWithCode(ctx, wazevoapi.ExitCodeIntegerOverflow)
+
+		// Conditional branch target is after exit.
+		l := m.insertBrTargetLabel()
+		ok.asCondBr(ne.asCond(), l, false /* ignored */)
 	}
 }
 
@@ -807,10 +808,11 @@ func (m *machine) lowerExitIfTrueWithCode(execCtxVReg regalloc.VReg, cond ssa.Va
 
 	// We have to skip the entire exit sequence if the condition is false.
 	cbr := m.allocateInstr()
-	cbr.asCondBr(condFlagFromSSAIntegerCmpCond(c).invert().asCond(), invalidLabel, false /* ignored */)
-	cbr.condBrOffsetResolve(exitWithCodeEncodingSize + 4 /* br offset is from the beginning of this instruction */)
 	m.insert(cbr)
 	m.lowerExitWithCode(execCtxVReg, code)
+	// conditional branch target is after exit.
+	l := m.insertBrTargetLabel()
+	cbr.asCondBr(condFlagFromSSAIntegerCmpCond(c).invert().asCond(), l, false /* ignored */)
 }
 
 func (m *machine) lowerSelect(c, x, y, result ssa.Value) {

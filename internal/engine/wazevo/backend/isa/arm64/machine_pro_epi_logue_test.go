@@ -258,7 +258,7 @@ func TestMachine_CompileStackGrowCallSequence(t *testing.T) {
 	str x27, [x0, #0x38]
 	orr w17, wzr, #0x1
 	str w17, [x0]
-	adr x27, #0x1c
+	adr x27, #0x20
 	str x27, [x0, #0x30]
 	exit_sequence x0
 	ldr x1, [x0, #0x60]

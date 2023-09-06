@@ -15,13 +15,13 @@ const xArgRetRegMax, vArgRetRegMax = x7, v7 // x0-x7 & v0-v7.
 var regInfo = &regalloc.RegisterInfo{
 	AllocatableRegisters: [regalloc.RegTypeNum][]regalloc.RealReg{
 		// We don't allocate:
-		// - x27(=tmpReg) because of the reason described on tmpReg.
-		// - x18 which is reserved by the macOS: https://developer.apple.com/documentation/xcode/writing-arm64-code-for-apple-platforms#Respect-the-purpose-of-specific-CPU-registers
+		// - x18: Reserved by the macOS: https://developer.apple.com/documentation/xcode/writing-arm64-code-for-apple-platforms#Respect-the-purpose-of-specific-CPU-registers
+		// - x28: Reserved by Go runtime.
+		// - x27(=tmpReg): because of the reason described on tmpReg.
 		regalloc.RegTypeInt: {
 			x8, x9, x10, x11, x12, x13, x14, x15,
 			x16, x17, x18, x19, x20, x21, x22, x23, x24, x25,
-			// No x27 here.
-			x26, x28, x29, x30,
+			x26, x29, x30,
 			// These are the argument/return registers. Less preferred in the allocation.
 			x7, x6, x5, x4, x3, x2, x1, x0,
 		},
@@ -37,7 +37,7 @@ var regInfo = &regalloc.RegisterInfo{
 		v18: {}, v19: {}, v20: {}, v21: {}, v22: {}, v23: {}, v24: {}, v25: {}, v26: {}, v27: {}, v28: {}, v29: {}, v30: {}, v31: {},
 	},
 	CallerSavedRegisters: map[regalloc.RealReg]struct{}{
-		x0: {}, x1: {}, x2: {}, x3: {}, x4: {}, x5: {}, x6: {}, x7: {}, x8: {}, x9: {}, x10: {}, x11: {}, x12: {}, x13: {}, x14: {}, x15: {}, x16: {}, x17: {},
+		x0: {}, x1: {}, x2: {}, x3: {}, x4: {}, x5: {}, x6: {}, x7: {}, x8: {}, x9: {}, x10: {}, x11: {}, x12: {}, x13: {}, x14: {}, x15: {}, x16: {}, x17: {}, x29: {}, x30: {},
 		v0: {}, v1: {}, v2: {}, v3: {}, v4: {}, v5: {}, v6: {}, v7: {}, v8: {}, v9: {}, v10: {}, v11: {}, v12: {}, v13: {}, v14: {}, v15: {}, v16: {}, v17: {},
 	},
 	RealRegToVReg: []regalloc.VReg{

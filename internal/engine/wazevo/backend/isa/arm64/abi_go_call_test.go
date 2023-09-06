@@ -73,7 +73,7 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 	str w17, [x0]
 	mov x27, sp
 	str x27, [x0, #0x38]
-	adr x27, #0x1c
+	adr x27, #0x20
 	str x27, [x0, #0x30]
 	exit_sequence x0
 	ldr x19, [x0, #0x60]
@@ -155,7 +155,7 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 	str w17, [x0]
 	mov x27, sp
 	str x27, [x0, #0x38]
-	adr x27, #0x1c
+	adr x27, #0x20
 	str x27, [x0, #0x30]
 	exit_sequence x0
 	ldr x19, [x0, #0x60]
@@ -224,7 +224,7 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 	str w17, [x0]
 	mov x27, sp
 	str x27, [x0, #0x38]
-	adr x27, #0x1c
+	adr x27, #0x20
 	str x27, [x0, #0x30]
 	exit_sequence x0
 	ldr x19, [x0, #0x60]
