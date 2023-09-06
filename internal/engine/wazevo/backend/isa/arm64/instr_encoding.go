@@ -216,7 +216,11 @@ func (i *instruction) encode(c backend.Compiler) {
 		c.Emit4Bytes(0b1111<<25 | ftype<<22 | 1<<21 | rm<<16 | 0b1<<13 | rn<<5)
 	case udf:
 		// https://developer.arm.com/documentation/ddi0596/2020-12/Base-Instructions/UDF--Permanently-Undefined-?lang=en
-		c.Emit4Bytes(0)
+		if wazevoapi.PrintMachineCodeHexPerFunctionDisassemblable {
+			c.Emit4Bytes(dummyInstruction)
+		} else {
+			c.Emit4Bytes(0)
+		}
 	case adr:
 		c.Emit4Bytes(encodeAdr(regNumberInEncoding[i.rd.realReg()], uint32(i.u1)))
 	case cSel:

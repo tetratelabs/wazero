@@ -230,8 +230,10 @@ func (m *machine) RegisterInfo(debug bool) *regalloc.RegisterInfo {
 		regInfoDebug.AllocatableRegisters[regalloc.RegTypeFloat] = []regalloc.RealReg{
 			v7, v6, v5, v4, v3, v2, v1, v0, // Allocatable sets == Argument registers.
 		}
-		// TODO: tests for high pressured int registers.
-		regInfoDebug.AllocatableRegisters[regalloc.RegTypeInt] = regInfo.AllocatableRegisters[regalloc.RegTypeInt]
+		regInfoDebug.AllocatableRegisters[regalloc.RegTypeInt] = []regalloc.RealReg{
+			// TODO: investigate why we are failing when x28, x29, x30 are used.
+			x7, x6, x5, x4, x3, x2, x1, x0, // Allocatable sets == Argument registers.
+		}
 		return regInfoDebug
 	}
 	return regInfo

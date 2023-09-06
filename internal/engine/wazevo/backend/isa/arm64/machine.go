@@ -32,8 +32,9 @@ type (
 		// ssaBlockIDToLabels maps an SSA block ID to the label.
 		ssaBlockIDToLabels []label
 		// labelToInstructions maps a label to the instructions of the region which the label represents.
-		labelPositions map[label]*labelPosition
-		orderedLabels  []*labelPosition
+		labelPositions     map[label]*labelPosition
+		orderedBlockLabels []*labelPosition
+		labelPositionPool  wazevoapi.Pool[labelPosition]
 
 		// addendsWorkQueue is used during address lowering, defined here for reuse.
 		addendsWorkQueue []ssa.Value
@@ -109,10 +110,11 @@ const (
 // NewBackend returns a new backend for arm64.
 func NewBackend() backend.Machine {
 	m := &machine{
-		instrPool:      wazevoapi.NewPool[instruction](),
-		labelPositions: make(map[label]*labelPosition),
-		spillSlots:     make(map[regalloc.VRegID]int64),
-		nextLabel:      invalidLabel,
+		instrPool:         wazevoapi.NewPool[instruction](),
+		labelPositionPool: wazevoapi.NewPool[labelPosition](),
+		labelPositions:    make(map[label]*labelPosition),
+		spillSlots:        make(map[regalloc.VRegID]int64),
+		nextLabel:         invalidLabel,
 	}
 	m.regAllocFn.m = m
 	m.regAllocFn.labelToRegAllocBlockIndex = make(map[label]int)
@@ -122,12 +124,15 @@ func NewBackend() backend.Machine {
 // Reset implements backend.Machine.
 func (m *machine) Reset() {
 	m.instrPool.Reset()
+	m.labelPositionPool.Reset()
 	m.currentSSABlk = nil
-	m.nextLabel = invalidLabel
-	m.pendingInstructions = m.pendingInstructions[:0]
-	for _, v := range m.labelPositions {
-		v.begin, v.end = nil, nil
+	for l := label(0); l <= m.nextLabel; l++ {
+		delete(m.labelPositions, l)
 	}
+	if len(m.labelPositions) > 0 {
+		panic("")
+	}
+	m.pendingInstructions = m.pendingInstructions[:0]
 	m.clobberedRegs = m.clobberedRegs[:0]
 	for key := range m.spillSlots {
 		m.clobberedRegs = append(m.clobberedRegs, regalloc.VReg(key))
@@ -136,13 +141,14 @@ func (m *machine) Reset() {
 		delete(m.spillSlots, regalloc.VRegID(key))
 	}
 	m.clobberedRegs = m.clobberedRegs[:0]
-	m.orderedLabels = m.orderedLabels[:0]
+	m.orderedBlockLabels = m.orderedBlockLabels[:0]
 	m.regAllocFn.reset()
 	m.spillSlotSize = 0
 	m.unresolvedAddressModes = m.unresolvedAddressModes[:0]
 	m.rootInstr = nil
 	m.ssaBlockIDToLabels = m.ssaBlockIDToLabels[:0]
 	m.perBlockHead, m.perBlockEnd = nil, nil
+	m.nextLabel = invalidLabel
 }
 
 // InitializeABI implements backend.Machine InitializeABI.
@@ -198,10 +204,10 @@ func (m *machine) StartBlock(blk ssa.BasicBlock) {
 
 	labelPos, ok := m.labelPositions[l]
 	if !ok {
-		labelPos = &labelPosition{}
+		labelPos = m.allocateLabelPosition()
 		m.labelPositions[l] = labelPos
 	}
-	m.orderedLabels = append(m.orderedLabels, labelPos)
+	m.orderedBlockLabels = append(m.orderedBlockLabels, labelPos)
 	labelPos.begin, labelPos.end = end, end
 	m.regAllocFn.addBlock(blk, l, labelPos)
 }
@@ -221,6 +227,23 @@ func (m *machine) EndBlock() {
 
 func (m *machine) insert(i *instruction) {
 	m.pendingInstructions = append(m.pendingInstructions, i)
+}
+
+func (m *machine) insertBrTargetLabel() label {
+	l := m.allocateLabel()
+	nop := m.allocateInstr()
+	nop.asNop0WithLabel(l)
+	m.insert(nop)
+	pos := m.allocateLabelPosition()
+	pos.begin, pos.end = nop, nop
+	m.labelPositions[l] = pos
+	return l
+}
+
+func (m *machine) allocateLabelPosition() *labelPosition {
+	l := m.labelPositionPool.Allocate()
+	*l = labelPosition{}
+	return l
 }
 
 func (m *machine) FlushPendingInstructions() {
@@ -328,9 +351,21 @@ func (m *machine) ResolveRelativeAddresses() {
 
 	// Next, in order to determine the offsets of relative jumps, we have to calculate the size of each label.
 	var offset int64
-	for _, pos := range m.orderedLabels {
+	for _, pos := range m.orderedBlockLabels {
 		pos.binaryOffset = offset
-		size := binarySize(pos.begin, pos.end)
+		var size int64
+		for cur := pos.begin; ; cur = cur.next {
+			if cur.kind == nop0 {
+				l := cur.nop0Label()
+				if pos, ok := m.labelPositions[l]; ok {
+					pos.binaryOffset = offset + size
+				}
+			}
+			size += cur.size()
+			if cur == pos.end {
+				break
+			}
+		}
 		pos.binarySize = size
 		offset += size
 	}

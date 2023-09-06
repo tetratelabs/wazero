@@ -401,6 +401,15 @@ func (i *instruction) asNop0() {
 	i.kind = nop0
 }
 
+func (i *instruction) asNop0WithLabel(l label) {
+	i.kind = nop0
+	i.u1 = uint64(l)
+}
+
+func (i *instruction) nop0Label() label {
+	return label(i.u1)
+}
+
 func (i *instruction) asRet(abi *abiImpl) {
 	i.kind = ret
 	i.abi = abi
@@ -792,7 +801,12 @@ func (i *instruction) String() (str string) {
 
 	switch i.kind {
 	case nop0:
-		str = "nop0"
+		if i.u1 != 0 {
+			l := label(i.u1)
+			str = fmt.Sprintf("%s:", l)
+		} else {
+			str = "nop0"
+		}
 	case aluRRR:
 		size := is64SizeBitToSize(i.u3)
 		str = fmt.Sprintf("%s %s, %s, %s", aluOp(i.u1).String(),
@@ -1739,16 +1753,6 @@ func (s shiftOp) String() string {
 		return "ror"
 	}
 	panic(int(s))
-}
-
-func binarySize(begin, end *instruction) (size int64) {
-	for cur := begin; ; cur = cur.next {
-		size += cur.size()
-		if cur == end {
-			break
-		}
-	}
-	return size
 }
 
 const exitSequenceSize = 5 * 4 // 5 instructions as in encodeExitSequence.
