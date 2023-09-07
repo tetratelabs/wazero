@@ -26,37 +26,7 @@ test = false
 doc = false
 
 [[bin]]
-name = "basic"
-path = "fuzz_targets/basic.rs"
+name = "no_diff"
+path = "fuzz_targets/no_diff.rs"
 test = false
 doc = false
-
-# Note: having different bin target for each architecture in order to have separate corpus and artifacts and
-# to run both fuzzing on M1 Mac.
-[[bin]]
-name = "basic-x86_64-apple-darwin"
-path = "fuzz_targets/basic.rs"
-test = false
-doc = false
-target = "x86_64-apple-darwin"
-
-[[bin]]
-name = "basic-aarch64-apple-darwin"
-path = "fuzz_targets/basic.rs"
-test = false
-doc = false
-target = "aarch64-apple-darwin"
-
-[[bin]]
-name = "basic-x86_64-unknown-linux-gnu"
-path = "fuzz_targets/basic.rs"
-test = false
-doc = false
-target = "x86_64-unknown-linux-gnu"
-
-[[bin]]
-name = "basic-aarch64-unknown-linux-gnu"
-path = "fuzz_targets/basic.rs"
-test = false
-doc = false
-target = "aarch64-unknown-linux-gnu"

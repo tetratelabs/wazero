@@ -80,7 +80,7 @@ func requireNoDiff(wasmBin []byte, checkMemory bool, requireNoError func(err err
 	// Choose the context to use for function calls.
 	ctx := context.Background()
 
-	compiler := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigCompiler())
+	compiler := wazero.NewRuntimeWithConfig(ctx, newCompilerConfig())
 	interpreter := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigInterpreter())
 	defer compiler.Close(ctx)
 	defer interpreter.Close(ctx)

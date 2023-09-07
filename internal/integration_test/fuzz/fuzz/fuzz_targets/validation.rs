@@ -6,7 +6,7 @@ use libfuzzer_sys::fuzz_target;
 mod wazero_abi;
 
 fuzz_target!(|data: &[u8]| {
-    drop(run(data));
+    let _ = run(data);
 });
 
 fn run(data: &[u8]) -> Result<()> {

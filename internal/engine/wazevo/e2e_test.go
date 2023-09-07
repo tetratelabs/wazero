@@ -6,14 +6,12 @@ import (
 	"fmt"
 	"math"
 	"testing"
-	"unsafe"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/testcases"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
-	"github.com/tetratelabs/wazero/internal/filecache"
 	"github.com/tetratelabs/wazero/internal/integration_test/spectest"
 	v1 "github.com/tetratelabs/wazero/internal/integration_test/spectest/v1"
 	v2 "github.com/tetratelabs/wazero/internal/integration_test/spectest/v2"
@@ -32,7 +30,7 @@ const (
 func TestSpectestV1(t *testing.T) {
 	config := wazero.NewRuntimeConfigCompiler().WithCoreFeatures(api.CoreFeaturesV1)
 	// Configure the new optimizing backend!
-	configureWazevo(config)
+	wazevo.ConfigureWazevo(config)
 
 	// TODO: migrate to integration_test/spectest/v1/spec_test.go by the time when closing https://github.com/tetratelabs/wazero/issues/1496
 	for _, tc := range []struct {
@@ -125,7 +123,7 @@ func TestSpectestV1(t *testing.T) {
 func TestSpectestV2(t *testing.T) {
 	config := wazero.NewRuntimeConfigCompiler().WithCoreFeatures(api.CoreFeaturesV2)
 	// Configure the new optimizing backend!
-	configureWazevo(config)
+	wazevo.ConfigureWazevo(config)
 
 	for _, tc := range []struct {
 		name string
@@ -357,7 +355,7 @@ func TestE2E(t *testing.T) {
 			config := wazero.NewRuntimeConfigCompiler()
 
 			// Configure the new optimizing backend!
-			configureWazevo(config)
+			wazevo.ConfigureWazevo(config)
 
 			ctx := context.Background()
 			r := wazero.NewRuntimeWithConfig(ctx, config)
@@ -406,40 +404,11 @@ func TestE2E(t *testing.T) {
 	}
 }
 
-// configureWazevo modifies wazero.RuntimeConfig and sets the wazevo implementation.
-// This is a hack to avoid modifying outside the wazevo package while testing it end-to-end.
-func configureWazevo(config wazero.RuntimeConfig) {
-	// This is the internal representation of interface in Go.
-	// https://research.swtch.com/interfaces
-	type iface struct {
-		_    *byte
-		data unsafe.Pointer
-	}
-
-	configInterface := (*iface)(unsafe.Pointer(&config))
-
-	// This corresponds to the unexported wazero.runtimeConfig, and the target field newEngine exists
-	// in the middle of the implementation.
-	type newEngine func(context.Context, api.CoreFeatures, filecache.Cache) wasm.Engine
-	type runtimeConfig struct {
-		enabledFeatures       api.CoreFeatures
-		memoryLimitPages      uint32
-		memoryCapacityFromMax bool
-		engineKind            int
-		dwarfDisabled         bool
-		newEngine
-		// Other fields follow, but we don't care.
-	}
-	cm := (*runtimeConfig)(configInterface.data)
-	// Insert the wazevo implementation.
-	cm.newEngine = wazevo.NewEngine
-}
-
 func TestE2E_host_functions(t *testing.T) {
 	config := wazero.NewRuntimeConfigCompiler()
 
 	// Configure the new optimizing backend!
-	configureWazevo(config)
+	wazevo.ConfigureWazevo(config)
 
 	ctx := context.Background()
 	r := wazero.NewRuntimeWithConfig(ctx, config)
@@ -514,7 +483,7 @@ func TestE2E_stores(t *testing.T) {
 	config := wazero.NewRuntimeConfigCompiler()
 
 	// Configure the new optimizing backend!
-	configureWazevo(config)
+	wazevo.ConfigureWazevo(config)
 
 	ctx := context.Background()
 	r := wazero.NewRuntimeWithConfig(ctx, config)
@@ -604,7 +573,7 @@ func TestE2E_reexported_memory(t *testing.T) {
 	config := wazero.NewRuntimeConfigCompiler()
 
 	// Configure the new optimizing backend!
-	configureWazevo(config)
+	wazevo.ConfigureWazevo(config)
 
 	ctx := context.Background()
 	r := wazero.NewRuntimeWithConfig(ctx, config)
