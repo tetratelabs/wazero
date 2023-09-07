@@ -336,47 +336,45 @@ func encodeSystemRegisterMove(rt uint32, fromSystem bool) uint32 {
 func encodeVecRRR(op vecOp, rd, rn, rm uint32, arr vecArrangement) uint32 {
 	switch op {
 	case vecOpBit:
-		var q uint32
-		switch arr {
-		case vecArrangement8B:
-			q = 0b0
-		case vecArrangement16B:
-			q = 0b1
-		default:
-			panic("BUG")
-		}
-		return encodeAdvancedSIMDThreeSame(rd, rn, rm, 0b00011, 0b10, 0b1, q)
+		_, q := arrToSizeQEncoded(arr)
+		return encodeAdvancedSIMDThreeSame(rd, rn, rm, 0b00011, 0b10 /* always has size 0b10*/, 0b1, q)
 	case vecOpEOR:
-		var q uint32
-		switch arr {
-		case vecArrangement8B:
-			q = 0b0
-		case vecArrangement16B:
-			q = 0b1
-		default:
-			panic("BUG")
-		}
-		return encodeAdvancedSIMDThreeSame(rd, rn, rm, 0b00011, 0b00, 0b1, q)
+		size, q := arrToSizeQEncoded(arr)
+		return encodeAdvancedSIMDThreeSame(rd, rn, rm, 0b00011, size, 0b1, q)
 	case vecOpAdd:
-		return encodeAdvancedSIMDThreeSame(rd, rn, rm, 0b10000, arrToSizeEncoded(arr), 0b0, 1 /* we always use the full-width */)
+		size, q := arrToSizeQEncoded(arr)
+		return encodeAdvancedSIMDThreeSame(rd, rn, rm, 0b10000, size, 0b0, q)
 	default:
 		panic("TODO")
 	}
 }
 
-func arrToSizeEncoded(arr vecArrangement) uint32 {
+func arrToSizeQEncoded(arr vecArrangement) (size, q uint32) {
 	switch arr {
-	case vecArrangement8B, vecArrangement16B:
-		return 0b00
-	case vecArrangement4H, vecArrangement8H:
-		return 0b01
-	case vecArrangement2S, vecArrangement4S:
-		return 0b10
-	case vecArrangement1D, vecArrangement2D:
-		return 0b11
+	case vecArrangement16B:
+		q = 0b1
+		fallthrough
+	case vecArrangement8B:
+		size = 0b00
+	case vecArrangement8H:
+		q = 0b1
+		fallthrough
+	case vecArrangement4H:
+		size = 0b01
+	case vecArrangement4S:
+		q = 0b1
+		fallthrough
+	case vecArrangement2S:
+		size = 0b10
+	case vecArrangement2D:
+		q = 0b1
+		fallthrough
+	case vecArrangement1D:
+		size = 0b11
 	default:
 		panic("BUG")
 	}
+	return
 }
 
 // encodeAdvancedSIMDThreeSame encodes as "Advanced SIMD three same" in
@@ -664,7 +662,7 @@ func encodeLoadFpuConst128(c backend.Compiler, rd uint32, lo, hi uint64) {
 	)
 	c.Emit4Bytes(encodeUnconditionalBranch(false, 20)) // b 20
 	if wazevoapi.PrintMachineCodeHexPerFunctionDisassemblable {
-		// Inlined data.f64 cannot be disassembled, so we add dummy instructions here.
+		// Inlined data.v128 cannot be disassembled, so we add dummy instructions here.
 		c.Emit4Bytes(dummyInstruction)
 		c.Emit4Bytes(dummyInstruction)
 		c.Emit4Bytes(dummyInstruction)
