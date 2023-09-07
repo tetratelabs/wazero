@@ -135,6 +135,7 @@ type compiler struct {
 	alreadyLowered map[*ssa.Instruction]bool
 	regAlloc       regalloc.Allocator
 	varEdges       [][2]regalloc.VReg
+	varEdgeTypes   []ssa.Type
 	constEdges     []struct {
 		cInst *ssa.Instruction
 		dst   regalloc.VReg

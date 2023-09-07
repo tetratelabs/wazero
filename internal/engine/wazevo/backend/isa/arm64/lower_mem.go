@@ -219,6 +219,8 @@ func (m *machine) lowerLoad(si *ssa.Instruction) {
 		load.asULoad(operandNR(dst), amode, typ.Bits())
 	case ssa.TypeF32, ssa.TypeF64:
 		load.asFpuLoad(operandNR(dst), amode, typ.Bits())
+	case ssa.TypeV128:
+		load.asFpuLoad(operandNR(dst), amode, 128)
 	default:
 		panic("TODO")
 	}

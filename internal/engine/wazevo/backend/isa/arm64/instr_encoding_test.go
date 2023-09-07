@@ -40,6 +40,15 @@ func TestInstruction_encode(t *testing.T) {
 		{want: "411c232e", setup: func(i *instruction) {
 			i.asVecRRR(vecOpEOR, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
 		}},
+		{want: "4184234e", setup: func(i *instruction) {
+			i.asVecRRR(vecOpAdd, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
+		}},
+		{want: "4184a34e", setup: func(i *instruction) {
+			i.asVecRRR(vecOpAdd, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
+		}},
+		{want: "4184e34e", setup: func(i *instruction) {
+			i.asVecRRR(vecOpAdd, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
+		}},
 		{want: "4100839a", setup: func(i *instruction) { i.asCSel(operandNR(x1VReg), operandNR(x2VReg), operandNR(x3VReg), eq, true) }},
 		{want: "4110839a", setup: func(i *instruction) { i.asCSel(operandNR(x1VReg), operandNR(x2VReg), operandNR(x3VReg), ne, true) }},
 		{want: "4100831a", setup: func(i *instruction) { i.asCSel(operandNR(x1VReg), operandNR(x2VReg), operandNR(x3VReg), eq, false) }},
@@ -186,6 +195,8 @@ func TestInstruction_encode(t *testing.T) {
 		{want: "5000005c03000014000000000000f03f", setup: func(i *instruction) {
 			i.asLoadFpuConst64(v16VReg, math.Float64bits(1.0))
 		}},
+		{want: "101e306e", setup: func(i *instruction) { i.asLoadFpuConst128(v16VReg, 0, 0) }},
+		{want: "5000009c05000014ffffffffffffffffaaaaaaaaaaaaaaaa", setup: func(i *instruction) { i.asLoadFpuConst128(v16VReg, 0xffffffff_ffffffff, 0xaaaaaaaa_aaaaaaaa) }},
 		{want: "8220061b", setup: func(i *instruction) {
 			i.asALURRRR(aluOpMAdd, operandNR(x2VReg), operandNR(x4VReg), operandNR(x6VReg), operandNR(x8VReg), false)
 		}},
@@ -626,6 +637,12 @@ func TestInstruction_encode(t *testing.T) {
 			// require.NoError(t, err, hex.EncodeToString(m.buf))
 			// fmt.Println(inst.String())
 			require.Equal(t, tc.want, hex.EncodeToString(mc.buf))
+
+			var actualSize int
+			for cur := i; cur != nil; cur = cur.next {
+				actualSize += int(cur.size())
+			}
+			require.Equal(t, len(tc.want)/2, actualSize)
 		})
 	}
 }

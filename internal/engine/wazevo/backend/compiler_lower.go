@@ -138,6 +138,7 @@ func (c *compiler) lowerBlockArguments(args []ssa.Value, succ ssa.BasicBlock) {
 	}
 
 	c.varEdges = c.varEdges[:0]
+	c.varEdgeTypes = c.varEdgeTypes[:0]
 	c.constEdges = c.constEdges[:0]
 	for i := 0; i < len(args); i++ {
 		dst := succ.Param(i)
@@ -154,6 +155,7 @@ func (c *compiler) lowerBlockArguments(args []ssa.Value, succ ssa.BasicBlock) {
 			srcReg := c.VRegOf(src)
 			// Even when the src=dst, insert the move so that we can keep such registers keep-alive.
 			c.varEdges = append(c.varEdges, [2]regalloc.VReg{srcReg, dstReg})
+			c.varEdgeTypes = append(c.varEdgeTypes, src.Type())
 		}
 	}
 
@@ -174,26 +176,26 @@ func (c *compiler) lowerBlockArguments(args []ssa.Value, succ ssa.BasicBlock) {
 
 	if separated {
 		// If there's no overlap, we can simply move the source to destination.
-		for _, edge := range c.varEdges {
+		for i, edge := range c.varEdges {
 			src, dst := edge[0], edge[1]
-			c.mach.InsertMove(dst, src)
+			c.mach.InsertMove(dst, src, c.varEdgeTypes[i])
 		}
 	} else {
 		// Otherwise, we allocate a temporary registers and move the source to the temporary register,
 		//
 		// First move all of them to temporary registers.
 		c.tempRegs = c.tempRegs[:0]
-		for _, edge := range c.varEdges {
+		for i, edge := range c.varEdges {
 			src := edge[0]
 			temp := c.AllocateVReg(src.RegType())
 			c.tempRegs = append(c.tempRegs, temp)
-			c.mach.InsertMove(temp, src)
+			c.mach.InsertMove(temp, src, c.varEdgeTypes[i])
 		}
 		// Then move the temporary registers to the destination.
 		for i, edge := range c.varEdges {
 			temp := c.tempRegs[i]
 			dst := edge[1]
-			c.mach.InsertMove(dst, temp)
+			c.mach.InsertMove(dst, temp, c.varEdgeTypes[i])
 		}
 	}
 

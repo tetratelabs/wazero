@@ -129,6 +129,7 @@ func TestSpectestV2(t *testing.T) {
 		name string
 	}{
 		{"conversions"}, // includes non-trapping conversions.
+		{"simd_const"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			spectest.RunCase(t, v2.Testcases, tc.name, context.Background(), config,

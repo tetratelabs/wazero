@@ -256,6 +256,7 @@ func TestMachine_InsertMove(t *testing.T) {
 	for _, tc := range []struct {
 		name        string
 		src, dst    regalloc.VReg
+		typ         ssa.Type
 		instruction string
 	}{
 		{
@@ -263,17 +264,26 @@ func TestMachine_InsertMove(t *testing.T) {
 			src:         regalloc.VReg(1).SetRegType(regalloc.RegTypeInt),
 			dst:         regalloc.VReg(2).SetRegType(regalloc.RegTypeInt),
 			instruction: "mov x1?, x2?",
+			typ:         ssa.TypeI64,
 		},
 		{
 			name:        "float",
 			src:         regalloc.VReg(1).SetRegType(regalloc.RegTypeFloat),
 			dst:         regalloc.VReg(2).SetRegType(regalloc.RegTypeFloat),
 			instruction: "mov v1?.8b, v2?.8b",
+			typ:         ssa.TypeF64,
+		},
+		{
+			name:        "vector",
+			src:         regalloc.VReg(1).SetRegType(regalloc.RegTypeFloat),
+			dst:         regalloc.VReg(2).SetRegType(regalloc.RegTypeFloat),
+			instruction: "mov v1?.16b, v2?.16b",
+			typ:         ssa.TypeV128,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, _, m := newSetupWithMockContext()
-			m.InsertMove(tc.src, tc.dst)
+			m.InsertMove(tc.src, tc.dst, tc.typ)
 			require.Equal(t, tc.instruction, formatEmittedInstructionsInCurrentBlock(m))
 		})
 	}

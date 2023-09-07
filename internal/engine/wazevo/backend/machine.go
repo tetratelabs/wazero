@@ -66,8 +66,8 @@ type (
 		// This will be called after the lowering of each SSA Instruction.
 		FlushPendingInstructions()
 
-		// InsertMove inserts a move instruction from src to dst.
-		InsertMove(dst, src regalloc.VReg)
+		// InsertMove inserts a move instruction from src to dst whose type is typ.
+		InsertMove(dst, src regalloc.VReg, typ ssa.Type)
 
 		// InsertReturn inserts the return instruction to return from the current function.
 		InsertReturn()

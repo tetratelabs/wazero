@@ -153,7 +153,7 @@ func (a *abiImpl) CalleeGenFunctionArgsToVRegs(args []ssa.Value) {
 		reg := a.m.compiler.VRegOf(ssaArg)
 		arg := &a.args[i]
 		if arg.Kind == backend.ABIArgKindReg {
-			a.m.InsertMove(reg, arg.Reg)
+			a.m.InsertMove(reg, arg.Reg, arg.Type)
 		} else {
 			// TODO: we could use pair load if there's consecutive loads for the same type.
 			//
@@ -214,7 +214,7 @@ func (a *abiImpl) CalleeGenVRegsToFunctionReturns(rets []ssa.Value) {
 			}
 		}
 		if r.Kind == backend.ABIArgKindReg {
-			a.m.InsertMove(r.Reg, reg)
+			a.m.InsertMove(r.Reg, reg, ret.Type())
 		} else {
 			// TODO: we could use pair store if there's consecutive stores for the same type.
 			//
@@ -267,7 +267,7 @@ func (a *abiImpl) callerGenVRegToFunctionArg(argIndex int, reg regalloc.VReg, de
 		}
 	}
 	if arg.Kind == backend.ABIArgKindReg {
-		a.m.InsertMove(arg.Reg, reg)
+		a.m.InsertMove(arg.Reg, reg, arg.Type)
 	} else {
 		// TODO: we could use pair store if there's consecutive stores for the same type.
 		//
@@ -283,7 +283,7 @@ func (a *abiImpl) callerGenVRegToFunctionArg(argIndex int, reg regalloc.VReg, de
 func (a *abiImpl) callerGenFunctionReturnVReg(retIndex int, reg regalloc.VReg) {
 	r := &a.rets[retIndex]
 	if r.Kind == backend.ABIArgKindReg {
-		a.m.InsertMove(reg, r.Reg)
+		a.m.InsertMove(reg, r.Reg, r.Type)
 	} else {
 		// TODO: we could use pair load if there's consecutive loads for the same type.
 		amode := a.m.resolveAddressModeForOffset(r.Offset, r.Type.Bits(), spVReg)

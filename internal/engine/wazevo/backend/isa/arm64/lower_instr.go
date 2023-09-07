@@ -291,6 +291,21 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
 		rd := operandNR(m.compiler.VRegOf(instr.Return()))
 		m.lowerIRem(ctxVReg, rd, rn, rm, x.Type() == ssa.TypeI64, op == ssa.OpcodeSrem)
+	case ssa.OpcodeVconst:
+		result := m.compiler.VRegOf(instr.Return())
+		lo, hi := instr.VconstData()
+		v := m.allocateInstr()
+		v.asLoadFpuConst128(result, lo, hi)
+		m.insert(v)
+	case ssa.OpcodeVIadd:
+		x, y, lane := instr.Arg2WithLane()
+		arr := ssaLeneToArrangement(lane)
+		add := m.allocateInstr()
+		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+		rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
+		rd := operandNR(m.compiler.VRegOf(instr.Return()))
+		add.asVecRRR(vecOpAdd, rd, rn, rm, arr)
+		m.insert(add)
 	default:
 		panic("TODO: lowering " + op.String())
 	}
@@ -534,13 +549,15 @@ func (m *machine) lowerSubOrAdd(si *ssa.Instruction, add bool) {
 }
 
 // InsertMove implements backend.Machine.
-func (m *machine) InsertMove(dst, src regalloc.VReg) {
+func (m *machine) InsertMove(dst, src regalloc.VReg, typ ssa.Type) {
 	instr := m.allocateInstr()
-	switch src.RegType() {
-	case regalloc.RegTypeInt:
+	switch typ {
+	case ssa.TypeI32, ssa.TypeI64:
 		instr.asMove64(dst, src)
-	case regalloc.RegTypeFloat:
+	case ssa.TypeF32, ssa.TypeF64:
 		instr.asFpuMov64(dst, src)
+	case ssa.TypeV128:
+		instr.asFpuMov128(dst, src)
 	default:
 		panic("TODO")
 	}

@@ -95,6 +95,11 @@ func (i *Instruction) Arg2() (Value, Value) {
 	return i.v, i.v2
 }
 
+// Arg2WithLane returns the first two arguments to this instruction, and the lane type.
+func (i *Instruction) Arg2WithLane() (Value, Value, VecLane) {
+	return i.v, i.v2, VecLane(i.u1)
+}
+
 // Arg3 returns the first three arguments to this instruction.
 func (i *Instruction) Arg3() (Value, Value, Value) {
 	return i.v, i.v2, i.v3
@@ -271,16 +276,13 @@ const (
 	// OpcodeIconst represents the integer const.
 	OpcodeIconst
 
-	// OpcodeF32const ...
-	// `v = f32const N`. (UnaryIeee32)
+	// OpcodeF32const represents the single-precision const.
 	OpcodeF32const
 
-	// OpcodeF64const ...
-	// `v = f64const N`. (UnaryIeee64)
+	// OpcodeF64const represents the double-precision const.
 	OpcodeF64const
 
-	// OpcodeVconst ...
-	// `v = vconst N`.
+	// OpcodeVconst represents the 128bit vector const.
 	OpcodeVconst
 
 	// OpcodeShuffle ...
@@ -326,6 +328,9 @@ const (
 
 	// OpcodeIadd performs an integer addition: `v = Iadd x, y`.
 	OpcodeIadd
+
+	// OpcodeVIadd performs an integer addition: `v = IVadd.lane x, y` on vector.
+	OpcodeVIadd
 
 	// OpcodeIsub performs an integer subtraction: `v = Isub x, y`.
 	OpcodeIsub
@@ -707,6 +712,7 @@ var (
 	returnTypesFnI32                     = func(b *builder, instr *Instruction) (t1 Type, ts []Type) { return TypeI32, nil }
 	returnTypesFnF32                     = func(b *builder, instr *Instruction) (t1 Type, ts []Type) { return TypeF32, nil }
 	returnTypesFnF64                     = func(b *builder, instr *Instruction) (t1 Type, ts []Type) { return TypeF64, nil }
+	returnTypesFnV128                    = func(b *builder, instr *Instruction) (t1 Type, ts []Type) { return TypeV128, nil }
 )
 
 // sideEffect provides the info to determine if an instruction has side effects which
@@ -797,6 +803,8 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeUrem:               sideEffectTraps,
 	OpcodeFabs:               sideEffectNone,
 	OpcodeFcopysign:          sideEffectNone,
+	OpcodeVconst:             sideEffectNone,
+	OpcodeVIadd:              sideEffectNone,
 }
 
 // sideEffect returns true if this instruction has side effects.
@@ -810,6 +818,7 @@ func (i *Instruction) sideEffect() sideEffect {
 
 // instructionReturnTypes provides the function to determine the return types of an instruction.
 var instructionReturnTypes = [opcodeEnd]returnTypesFn{
+	OpcodeVIadd:     returnTypesFnV128,
 	OpcodeBand:      returnTypesFnSingle,
 	OpcodeFcopysign: returnTypesFnSingle,
 	OpcodeBitcast:   returnTypesFnSingle,
@@ -911,6 +920,7 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeFneg:               returnTypesFnSingle,
 	OpcodeFdemote:            returnTypesFnF32,
 	OpcodeFpromote:           returnTypesFnF64,
+	OpcodeVconst:             returnTypesFnV128,
 }
 
 // AsLoad initializes this instruction as a store instruction with OpcodeLoad.
@@ -989,6 +999,16 @@ func (i *Instruction) AsIadd(x, y Value) *Instruction {
 	i.v = x
 	i.v2 = y
 	i.typ = x.Type()
+	return i
+}
+
+// AsVIadd initializes this instruction as an integer addition instruction with OpcodeVIadd on a vector.
+func (i *Instruction) AsVIadd(x, y Value, lane VecLane) *Instruction {
+	i.opcode = OpcodeVIadd
+	i.v = x
+	i.v2 = y
+	i.u1 = uint64(lane)
+	i.typ = TypeV128
 	return i
 }
 
@@ -1211,6 +1231,20 @@ func (i *Instruction) AsF64const(f float64) *Instruction {
 	i.typ = TypeF64
 	i.u1 = math.Float64bits(f)
 	return i
+}
+
+// AsVconst initializes this instruction as a vector constant instruction with OpcodeVconst.
+func (i *Instruction) AsVconst(lo, hi uint64) *Instruction {
+	i.opcode = OpcodeVconst
+	i.typ = TypeV128
+	i.u1 = lo
+	i.u2 = hi
+	return i
+}
+
+// VconstData returns the operands of this vector constant instruction.
+func (i *Instruction) VconstData() (lo, hi uint64) {
+	return i.u1, i.u2
 }
 
 // AsReturn initializes this instruction as a return instruction with OpcodeReturn.
@@ -1635,6 +1669,8 @@ func (i *Instruction) Format(b Builder) string {
 		case TypeI64:
 			instSuffix = fmt.Sprintf("_64 %#x", i.u1)
 		}
+	case OpcodeVconst:
+		instSuffix = fmt.Sprintf(" %016x %016x", i.u1, i.u2)
 	case OpcodeF32const:
 		instSuffix = fmt.Sprintf(" %f", math.Float32frombits(uint32(i.u1)))
 	case OpcodeF64const:
@@ -1689,6 +1725,8 @@ func (i *Instruction) Format(b Builder) string {
 		OpcodeFcvtFromUint, OpcodeFcvtToSintSat, OpcodeFcvtToUintSat, OpcodeFdemote, OpcodeFpromote, OpcodeIreduce, OpcodeBitcast, OpcodeSqrt, OpcodeFabs,
 		OpcodeCeil, OpcodeFloor, OpcodeTrunc, OpcodeNearest:
 		instSuffix = " " + i.v.Format(b)
+	case OpcodeVIadd:
+		instSuffix = fmt.Sprintf(".%s %s, %s", VecLane(i.u1), i.v.Format(b), i.v2.Format(b))
 	default:
 		panic(fmt.Sprintf("TODO: format for %s", i.opcode))
 	}
@@ -2059,6 +2097,8 @@ func (o Opcode) String() (ret string) {
 		return "Fence"
 	case OpcodeExtractVector:
 		return "ExtractVector"
+	case OpcodeVIadd:
+		return "VIadd"
 	}
 	panic(fmt.Sprintf("unknown opcode %d", o))
 }

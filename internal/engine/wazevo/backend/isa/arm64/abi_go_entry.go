@@ -65,12 +65,12 @@ func (a *abiImpl) constructGoEntryPreamble() (root *instruction) {
 	// 		mov sp, x28
 	cur = a.move64(spVReg, goAllocatedStackPtr, cur)
 
+	var offset int64
 	for i := range a.args {
 		if i < 2 {
 			// module context ptr and execution context ptr are passed in x0 and x1 by the Go assembly function.
 			continue
 		}
-		offset := int64((i - 2) * 8) // Each param is passed in as uint64, so *8.
 		arg := &a.args[i]
 		switch arg.Kind {
 		case backend.ABIArgKindReg:
@@ -91,10 +91,17 @@ func (a *abiImpl) constructGoEntryPreamble() (root *instruction) {
 				instr.asFpuLoad(rd, mode, 32)
 			case ssa.TypeF64:
 				instr.asFpuLoad(rd, mode, 64)
+			case ssa.TypeV128:
+				instr.asFpuLoad(rd, mode, 128)
 			}
 			cur = linkInstr(cur, instr)
 		case backend.ABIArgKindStack:
 			panic("TODO")
+		}
+		if arg.Type == ssa.TypeV128 {
+			offset += 16
+		} else {
+			offset += 8
 		}
 	}
 

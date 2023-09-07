@@ -481,14 +481,14 @@ func (c *Compiler) lowerCurrentOpcode() {
 		).Insert(builder).Return()
 		state.push(ret)
 	case wasm.OpcodeMiscPrefix:
-		c.loweringState.pc++
+		state.pc++
 		// A misc opcode is encoded as an unsigned variable 32-bit integer.
-		miscOpUint, num, err := leb128.LoadUint32(c.wasmFunctionBody[c.loweringState.pc:])
+		miscOpUint, num, err := leb128.LoadUint32(c.wasmFunctionBody[state.pc:])
 		if err != nil {
 			// In normal conditions this should never happen because the function has passed validation.
 			panic(fmt.Sprintf("failed to read misc opcode: %v", err))
 		}
-		c.loweringState.pc += int(num - 1)
+		state.pc += int(num - 1)
 		miscOp := wasm.OpcodeMisc(miscOpUint)
 		switch miscOp {
 		case wasm.OpcodeMiscI64TruncSatF64S, wasm.OpcodeMiscI64TruncSatF32S,
@@ -1298,6 +1298,37 @@ func (c *Compiler) lowerCurrentOpcode() {
 		cvt.AsFpromote(state.pop())
 		builder.InsertInstruction(cvt)
 		state.push(cvt.Return())
+
+	case wasm.OpcodeVecPrefix:
+		state.pc++
+		vecOp := c.wasmFunctionBody[state.pc]
+		state.pc++
+		switch vecOp {
+		case wasm.OpcodeVecV128Const:
+			lo := binary.LittleEndian.Uint64(c.wasmFunctionBody[state.pc:])
+			state.pc += 8
+			hi := binary.LittleEndian.Uint64(c.wasmFunctionBody[state.pc:])
+			state.pc += 7
+			ret := builder.AllocateInstruction().AsVconst(lo, hi).Insert(builder).Return()
+			state.push(ret)
+		case wasm.OpcodeVecI32x4Add, wasm.OpcodeVecI64x2Add:
+			if state.unreachable {
+				break
+			}
+			var lane ssa.VecLane
+			switch vecOp {
+			case wasm.OpcodeVecI32x4Add:
+				lane = ssa.VecLaneI32x4
+			case wasm.OpcodeVecI64x2Add:
+				lane = ssa.VecLaneI64x2
+			}
+			v2 := state.pop()
+			v1 := state.pop()
+			ret := builder.AllocateInstruction().AsVIadd(v1, v2, lane).Insert(builder).Return()
+			state.push(ret)
+		default:
+			panic("TODO: unsupported vector instruction: " + wasm.VectorInstructionName(vecOp))
+		}
 	default:
 		panic("TODO: unsupported in wazevo yet: " + wasm.InstructionName(op))
 	}
