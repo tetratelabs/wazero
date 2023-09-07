@@ -109,6 +109,14 @@ func (i *instruction) encode(c backend.Compiler) {
 		} else {
 			encodeLoadFpuConst64(c, regNumberInEncoding[i.rd.realReg()], i.u1)
 		}
+	case loadFpuConst128:
+		rd := regNumberInEncoding[i.rd.realReg()]
+		lo, hi := i.u1, i.u2
+		if lo == 0 && hi == 0 {
+			c.Emit4Bytes(encodeVecRRR(vecOpEOR, rd, rd, rd, vecArrangement16B))
+		} else {
+			encodeLoadFpuConst128(c, rd, lo, hi)
+		}
 	case aluRRRR:
 		c.Emit4Bytes(encodeAluRRRR(
 			aluOp(i.u1),
@@ -349,6 +357,8 @@ func encodeVecRRR(op vecOp, rd, rn, rm uint32, arr vecArrangement) uint32 {
 			panic("BUG")
 		}
 		return encodeAdvancedSIMDThreeSame(rd, rn, rm, 0b00011, 0b00, 0b1, q)
+	case vecOpAdd:
+		return encodeAdvancedSIMDThreeSame(rd, rn, rm, 0b10000, 0b00, 0b1, 0)
 	default:
 		panic("TODO")
 	}
@@ -624,6 +634,32 @@ func encodeLoadFpuConst64(c backend.Compiler, rd uint32, rawF64 uint64) {
 		// data.f64 xxxxxxx
 		c.Emit4Bytes(uint32(rawF64))
 		c.Emit4Bytes(uint32(rawF64 >> 32))
+	}
+}
+
+// encodeLoadFpuConst128 encodes the following three instructions:
+//
+//	ldr v8, #8  ;; literal load of data.f64
+//	b 20           ;; skip the data
+//	data.v128 xxxxxxx
+func encodeLoadFpuConst128(c backend.Compiler, rd uint32, lo, hi uint64) {
+	c.Emit4Bytes(
+		// https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/LDR--literal--SIMD-FP---Load-SIMD-FP-Register--PC-relative-literal--?lang=en
+		0b1<<31 | 0b111<<26 | (0x8/4)<<5 | rd,
+	)
+	c.Emit4Bytes(encodeUnconditionalBranch(false, 20)) // b 20
+	if wazevoapi.PrintMachineCodeHexPerFunctionDisassemblable {
+		// Inlined data.f64 cannot be disassembled, so we add dummy instructions here.
+		c.Emit4Bytes(dummyInstruction)
+		c.Emit4Bytes(dummyInstruction)
+		c.Emit4Bytes(dummyInstruction)
+		c.Emit4Bytes(dummyInstruction)
+	} else {
+		// data.v128 xxxxxxx
+		c.Emit4Bytes(uint32(lo))
+		c.Emit4Bytes(uint32(lo >> 32))
+		c.Emit4Bytes(uint32(hi))
+		c.Emit4Bytes(uint32(hi >> 32))
 	}
 }
 

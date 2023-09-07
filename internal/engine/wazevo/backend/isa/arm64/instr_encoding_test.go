@@ -186,6 +186,9 @@ func TestInstruction_encode(t *testing.T) {
 		{want: "5000005c03000014000000000000f03f", setup: func(i *instruction) {
 			i.asLoadFpuConst64(v16VReg, math.Float64bits(1.0))
 		}},
+		{want: "101e306e", setup: func(i *instruction) { i.asLoadFpuConst128(v16VReg, 0, 0) }},
+		{want: "101e306e", setup: func(i *instruction) { i.asLoadFpuConst128(v16VReg, 0xffffffff_ffffffff, 0xaaaaaaaa_aaaaaaaa) }},
+
 		{want: "8220061b", setup: func(i *instruction) {
 			i.asALURRRR(aluOpMAdd, operandNR(x2VReg), operandNR(x4VReg), operandNR(x6VReg), operandNR(x8VReg), false)
 		}},

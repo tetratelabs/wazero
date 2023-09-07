@@ -117,7 +117,7 @@ func RegTypeOf(p ssa.Type) RegType {
 	switch p {
 	case ssa.TypeI32, ssa.TypeI64:
 		return RegTypeInt
-	case ssa.TypeF32, ssa.TypeF64:
+	case ssa.TypeF32, ssa.TypeF64, ssa.TypeV128:
 		return RegTypeFloat
 	default:
 		panic("invalid type")

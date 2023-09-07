@@ -121,8 +121,8 @@ func (m *moduleEngine) NewFunction(index wasm.Index) api.Function {
 
 	src := m.module.Source
 	typ := src.TypeSection[src.FunctionSection[localIndex]]
-	sizeOfParamResultSlice := len(typ.Results)
-	if ps := len(typ.Params); ps > sizeOfParamResultSlice {
+	sizeOfParamResultSlice := typ.ResultNumInUint64
+	if ps := typ.ParamNumInUint64; ps > sizeOfParamResultSlice {
 		sizeOfParamResultSlice = ps
 	}
 	p := m.parent

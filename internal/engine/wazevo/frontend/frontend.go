@@ -170,6 +170,8 @@ func (c *Compiler) declareWasmLocals(entry ssa.BasicBlock) {
 			zeroInst.AsF32const(0)
 		case ssa.TypeF64:
 			zeroInst.AsF64const(0)
+		case ssa.TypeV128:
+			zeroInst.AsVconst(0, 0)
 		default:
 			panic("TODO: " + wasm.ValueTypeName(typ))
 		}
@@ -215,6 +217,8 @@ func (c *Compiler) declareWasmGlobal(typ wasm.ValueType, mutable bool) {
 		st = ssa.TypeF32
 	case wasm.ValueTypeF64:
 		st = ssa.TypeF64
+	case wasm.ValueTypeV128:
+		st = ssa.TypeV128
 	default:
 		panic("TODO: " + wasm.ValueTypeName(typ))
 	}
@@ -238,6 +242,8 @@ func WasmTypeToSSAType(vt wasm.ValueType) ssa.Type {
 		return ssa.TypeF32
 	case wasm.ValueTypeF64:
 		return ssa.TypeF64
+	case wasm.ValueTypeV128:
+		return ssa.TypeV128
 	default:
 		panic("TODO: " + wasm.ValueTypeName(vt))
 	}

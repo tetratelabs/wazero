@@ -322,6 +322,8 @@ func (m *machine) reloadRegister(v regalloc.VReg, instr *instruction, after bool
 		load.asULoad(operandNR(v), admode, typ.Bits())
 	case ssa.TypeF32, ssa.TypeF64:
 		load.asFpuLoad(operandNR(v), admode, typ.Bits())
+	case ssa.TypeV128:
+		load.asFpuLoad(operandNR(v), admode, 128)
 	default:
 		panic("TODO")
 	}

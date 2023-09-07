@@ -89,6 +89,7 @@ var defKinds = [numInstructionKinds]defKind{
 	fpuLoad128:      defKindRD,
 	loadFpuConst32:  defKindRD,
 	loadFpuConst64:  defKindRD,
+	loadFpuConst128: defKindRD,
 	fpuStore32:      defKindNone,
 	fpuStore64:      defKindNone,
 	fpuStore128:     defKindNone,
@@ -198,6 +199,7 @@ var useKinds = [numInstructionKinds]useKind{
 	fpuStore128:     useKindRNAMode,
 	loadFpuConst32:  useKindNone,
 	loadFpuConst64:  useKindNone,
+	loadFpuConst128: useKindNone,
 	cSel:            useKindRNRM,
 	fpuCSel:         useKindRNRM,
 	movToVec:        useKindRN,
@@ -606,6 +608,13 @@ func (i *instruction) asLoadFpuConst64(rd regalloc.VReg, raw uint64) {
 	i.rd = operandNR(rd)
 }
 
+func (i *instruction) asLoadFpuConst128(rd regalloc.VReg, lo, hi uint64) {
+	i.kind = loadFpuConst128
+	i.u1 = lo
+	i.u2 = hi
+	i.rd = operandNR(rd)
+}
+
 func (i *instruction) asFpuCmp(rn, rm operand, is64bit bool) {
 	i.kind = fpuCmp
 	i.rn, i.rm = rn, rm
@@ -988,7 +997,8 @@ func (i *instruction) String() (str string) {
 	case loadFpuConst64:
 		str = fmt.Sprintf("ldr %s, #8; b 16; data.f64 %f", formatVRegSized(i.rd.nr(), 64), math.Float64frombits(i.u1))
 	case loadFpuConst128:
-		panic("TODO")
+		str = fmt.Sprintf("ldr %s, #8; b 32; data.v128  %016x %016x",
+			formatVRegSized(i.rd.nr(), 128), i.u1, i.u2)
 	case fpuToInt:
 		var op, src, dst string
 		if signed := i.u1 == 1; signed {
@@ -1504,6 +1514,7 @@ const (
 	vecOpUaddlv
 	vecOpBit
 	vecOpEOR
+	vecOpAdd
 )
 
 // bitOp determines the type of bitwise operation. Instructions whose kind is one of
@@ -1775,7 +1786,10 @@ func (i *instruction) size() int64 {
 		}
 		return 4 + 4 + 8
 	case loadFpuConst128:
-		panic("TODO")
+		if i.u1 == 0 && i.u2 == 0 {
+			return 4 // zero loading can be encoded as a single instruction.
+		}
+		return 4 + 4 + 12
 	case brTableSequence:
 		return 4*4 + int64(len(i.targets))*4
 	default:
@@ -1865,3 +1879,22 @@ type vecIndex byte
 
 // vecIndexNone indicates no vector index specified.
 const vecIndexNone = ^vecIndex(0)
+
+func ssaLeneToArrangement(lane ssa.VecLane) vecArrangement {
+	switch lane {
+	case ssa.VecLaneI8x16:
+		return vecArrangement16B
+	case ssa.VecLaneI16x8:
+		return vecArrangement8H
+	case ssa.VecLaneI32x4:
+		return vecArrangement4S
+	case ssa.VecLaneI64x2:
+		return vecArrangement2D
+	case ssa.VecLaneF32x4:
+		return vecArrangement4S
+	case ssa.VecLaneF64x2:
+		return vecArrangement2D
+	default:
+		panic(lane)
+	}
+}
