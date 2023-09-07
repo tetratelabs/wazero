@@ -337,7 +337,7 @@ func encodeVecRRR(op vecOp, rd, rn, rm uint32, arr vecArrangement) uint32 {
 	switch op {
 	case vecOpBit:
 		_, q := arrToSizeQEncoded(arr)
-		return encodeAdvancedSIMDThreeSame(rd, rn, rm, 0b00011, 0b10 /* always has size 0b10*/, 0b1, q)
+		return encodeAdvancedSIMDThreeSame(rd, rn, rm, 0b00011, 0b10 /* always has size 0b10 */, 0b1, q)
 	case vecOpEOR:
 		size, q := arrToSizeQEncoded(arr)
 		return encodeAdvancedSIMDThreeSame(rd, rn, rm, 0b00011, size, 0b1, q)

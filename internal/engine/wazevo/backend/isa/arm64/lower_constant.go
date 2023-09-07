@@ -36,13 +36,13 @@ func (m *machine) InsertLoadConstant(instr *ssa.Instruction, vr regalloc.VReg) {
 		m.insert(loadF)
 	case ssa.TypeI32:
 		if v == 0 {
-			m.InsertMove(vr, xzrVReg)
+			m.InsertMove(vr, xzrVReg, ssa.TypeI32)
 		} else {
 			m.lowerConstantI32(vr, int32(v))
 		}
 	case ssa.TypeI64:
 		if v == 0 {
-			m.InsertMove(vr, xzrVReg)
+			m.InsertMove(vr, xzrVReg, ssa.TypeI64)
 		} else {
 			m.lowerConstantI64(vr, int64(v))
 		}
