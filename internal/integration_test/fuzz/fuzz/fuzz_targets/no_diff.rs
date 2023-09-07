@@ -7,7 +7,7 @@ use wasm_smith::SwarmConfig;
 mod wazero_abi;
 
 fuzz_target!(|data: &[u8]| {
-    drop(run(data));
+    let _ = run(data);
 });
 
 fn run(data: &[u8]) -> Result<()> {
@@ -42,6 +42,8 @@ fn run(data: &[u8]) -> Result<()> {
     // Ensures that at least one function exists.
     config.min_funcs = 1;
     config.max_funcs = config.max_funcs.max(1);
+
+    wazero_abi::maybe_disable_v2(&mut config);
 
     // Generate the random module via wasm-smith.
     let mut module = wasm_smith::Module::new(config.clone(), &mut u)?;
