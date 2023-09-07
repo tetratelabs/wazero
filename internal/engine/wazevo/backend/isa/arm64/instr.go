@@ -1789,7 +1789,7 @@ func (i *instruction) size() int64 {
 		if i.u1 == 0 && i.u2 == 0 {
 			return 4 // zero loading can be encoded as a single instruction.
 		}
-		return 4 + 4 + 12
+		return 4 + 4 + 16
 	case brTableSequence:
 		return 4*4 + int64(len(i.targets))*4
 	default:

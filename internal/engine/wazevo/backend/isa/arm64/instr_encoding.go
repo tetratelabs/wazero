@@ -358,9 +358,24 @@ func encodeVecRRR(op vecOp, rd, rn, rm uint32, arr vecArrangement) uint32 {
 		}
 		return encodeAdvancedSIMDThreeSame(rd, rn, rm, 0b00011, 0b00, 0b1, q)
 	case vecOpAdd:
-		return encodeAdvancedSIMDThreeSame(rd, rn, rm, 0b10000, 0b00, 0b1, 0)
+		return encodeAdvancedSIMDThreeSame(rd, rn, rm, 0b10000, arrToSizeEncoded(arr), 0b0, 1 /* we always use the full-width */)
 	default:
 		panic("TODO")
+	}
+}
+
+func arrToSizeEncoded(arr vecArrangement) uint32 {
+	switch arr {
+	case vecArrangement8B, vecArrangement16B:
+		return 0b00
+	case vecArrangement4H, vecArrangement8H:
+		return 0b01
+	case vecArrangement2S, vecArrangement4S:
+		return 0b10
+	case vecArrangement1D, vecArrangement2D:
+		return 0b11
+	default:
+		panic("BUG")
 	}
 }
 
