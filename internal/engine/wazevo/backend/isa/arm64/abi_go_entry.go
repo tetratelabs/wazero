@@ -26,20 +26,20 @@ var (
 	savedExecutionContextPtr = x20VReg
 	// goAllocatedStackPtr is not used in the epilogue.
 	goAllocatedStackPtr = x26VReg
+	// paramResultSliceCopied is not used in the epilogue.
+	paramResultSliceCopied = x25VReg
 )
 
-func (a *abiImpl) goEntryPreamblePassArg(cur *instruction, paramSlicePtr regalloc.VReg, paramOffset int64, arg *backend.ABIArg) *instruction {
-	m := a.m
-	var loadMode addressMode
-	cur, loadMode = m.resolveAddressModeForOffsetAndInsert(cur, paramOffset, arg.Type.Bits(), paramSlicePtr)
-
+func (m *machine) goEntryPreamblePassArg(cur *instruction, paramSlicePtr regalloc.VReg, arg *backend.ABIArg) *instruction {
+	typ := arg.Type
+	bits := typ.Bits()
 	isStackArg := arg.Kind == backend.ABIArgKindStack
 
 	var loadTargetReg operand
 	if !isStackArg {
 		loadTargetReg = operandNR(arg.Reg)
 	} else {
-		switch arg.Type {
+		switch typ {
 		case ssa.TypeI32, ssa.TypeI64:
 			loadTargetReg = operandNR(tmpRegVReg)
 		case ssa.TypeF32, ssa.TypeF64, ssa.TypeV128:
@@ -49,8 +49,16 @@ func (a *abiImpl) goEntryPreamblePassArg(cur *instruction, paramSlicePtr regallo
 		}
 	}
 
+	var postIndexImm int64
+	if typ == ssa.TypeV128 {
+		postIndexImm = 16 // v128 is represented as 2x64-bit in Go slice.
+	} else {
+		postIndexImm = 8
+	}
+	loadMode := addressMode{kind: addressModeKindPostIndex, rn: paramSlicePtr, imm: postIndexImm}
+
 	instr := m.allocateInstr()
-	switch arg.Type {
+	switch typ {
 	case ssa.TypeI32:
 		instr.asULoad(loadTargetReg, loadMode, 32)
 	case ssa.TypeI64:
@@ -66,9 +74,9 @@ func (a *abiImpl) goEntryPreamblePassArg(cur *instruction, paramSlicePtr regallo
 
 	if isStackArg {
 		var storeMode addressMode
-		cur, storeMode = m.resolveAddressModeForOffsetAndInsert(cur, arg.Offset, arg.Type.Bits(), spVReg)
+		cur, storeMode = m.resolveAddressModeForOffsetAndInsert(cur, arg.Offset, bits, spVReg)
 		toStack := m.allocateInstr()
-		toStack.asStore(loadTargetReg, storeMode, arg.Type.Bits())
+		toStack.asStore(loadTargetReg, storeMode, bits)
 		cur = linkInstr(cur, toStack)
 	}
 	return cur
@@ -81,21 +89,24 @@ func (a *abiImpl) goEntryPreamblePassResult(cur *instruction, resultSlicePtr reg
 
 	m := a.m
 	var storeTargetReg operand
-	var postIndexImm int64 = 8
 	if !isStackArg {
 		storeTargetReg = operandNR(result.Reg)
 	} else {
 		switch typ {
 		case ssa.TypeI32, ssa.TypeI64:
 			storeTargetReg = operandNR(tmpRegVReg)
-		case ssa.TypeV128:
-			postIndexImm = 16 // v128 is represented as 2x64-bit in Go slice.
-			fallthrough
-		case ssa.TypeF32, ssa.TypeF64:
+		case ssa.TypeF32, ssa.TypeF64, ssa.TypeV128:
 			storeTargetReg = operandNR(v15VReg)
 		default:
 			panic("TODO?")
 		}
+	}
+
+	var postIndexImm int64
+	if typ == ssa.TypeV128 {
+		postIndexImm = 16 // v128 is represented as 2x64-bit in Go slice.
+	} else {
+		postIndexImm = 8
 	}
 
 	if isStackArg {
@@ -155,20 +166,20 @@ func (a *abiImpl) constructGoEntryPreamble() (root *instruction) {
 	// 		mov sp, x28
 	cur = a.move64(spVReg, goAllocatedStackPtr, cur)
 
-	var offsetInParamResultSlicePtr int64
+	var prReg = paramResultSlicePtr
+	if len(a.args) > 2 && len(a.rets) > 0 {
+		// paramResultSlicePtr is modified during the execution of goEntryPreamblePassArg,
+		// so copy it to another reg.
+		cur = a.move64(paramResultSliceCopied, paramResultSlicePtr, cur)
+		prReg = paramResultSliceCopied
+	}
 	for i := range a.args {
 		if i < 2 {
 			// module context ptr and execution context ptr are passed in x0 and x1 by the Go assembly function.
 			continue
 		}
 		arg := &a.args[i]
-
-		cur = a.goEntryPreamblePassArg(cur, paramResultSlicePtr, offsetInParamResultSlicePtr, arg)
-		if arg.Type == ssa.TypeV128 {
-			offsetInParamResultSlicePtr += 16
-		} else {
-			offsetInParamResultSlicePtr += 8
-		}
+		cur = m.goEntryPreamblePassArg(cur, prReg, arg)
 	}
 
 	// Call the real function coming after epilogue:
