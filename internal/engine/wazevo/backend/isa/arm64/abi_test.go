@@ -259,3 +259,17 @@ add sp, sp, x27`, formatEmittedInstructionsInCurrentBlock(m))
 sub sp, sp, x27`, formatEmittedInstructionsInCurrentBlock(m))
 	})
 }
+
+func TestAbiImpl_callerGenVRegToFunctionArg_constant_inlining(t *testing.T) {
+	_, builder, m := newSetupWithMockContext()
+
+	i64 := builder.AllocateInstruction().AsIconst64(10).Insert(builder)
+	f64 := builder.AllocateInstruction().AsF64const(3.14).Insert(builder)
+	abi := m.getOrCreateABIImpl(&ssa.Signature{Params: []ssa.Type{ssa.TypeI64, ssa.TypeF64}})
+	abi.callerGenVRegToFunctionArg(0, regalloc.VReg(100).SetRegType(regalloc.RegTypeInt), &backend.SSAValueDefinition{Instr: i64, RefCount: 1})
+	abi.callerGenVRegToFunctionArg(1, regalloc.VReg(50).SetRegType(regalloc.RegTypeFloat), &backend.SSAValueDefinition{Instr: f64, RefCount: 1})
+	require.Equal(t, `movz x100?, #0xa, lsl 0
+mov x0, x100?
+ldr d50?, #8; b 16; data.f64 3.140000
+mov v0.8b, v50?.8b`, formatEmittedInstructionsInCurrentBlock(m))
+}
