@@ -82,12 +82,11 @@ func (m *machine) goEntryPreamblePassArg(cur *instruction, paramSlicePtr regallo
 	return cur
 }
 
-func (a *abiImpl) goEntryPreamblePassResult(cur *instruction, resultSlicePtr regalloc.VReg, result *backend.ABIArg) *instruction {
+func (m *machine) goEntryPreamblePassResult(cur *instruction, resultSlicePtr regalloc.VReg, result *backend.ABIArg) *instruction {
 	isStackArg := result.Kind == backend.ABIArgKindStack
 	typ := result.Type
 	bits := typ.Bits()
 
-	m := a.m
 	var storeTargetReg operand
 	if !isStackArg {
 		storeTargetReg = operandNR(result.Reg)
@@ -166,7 +165,7 @@ func (a *abiImpl) constructGoEntryPreamble() (root *instruction) {
 	// 		mov sp, x28
 	cur = a.move64(spVReg, goAllocatedStackPtr, cur)
 
-	var prReg = paramResultSlicePtr
+	prReg := paramResultSlicePtr
 	if len(a.args) > 2 && len(a.rets) > 0 {
 		// paramResultSlicePtr is modified during the execution of goEntryPreamblePassArg,
 		// so copy it to another reg.
@@ -192,7 +191,7 @@ func (a *abiImpl) constructGoEntryPreamble() (root *instruction) {
 
 	// Store the register results into paramResultSlicePtr.
 	for i := range a.rets {
-		cur = a.goEntryPreamblePassResult(cur, paramResultSlicePtr, &a.rets[i])
+		cur = m.goEntryPreamblePassResult(cur, paramResultSlicePtr, &a.rets[i])
 	}
 
 	// Finally, restore the FP, SP and LR, and return to the Go code.
