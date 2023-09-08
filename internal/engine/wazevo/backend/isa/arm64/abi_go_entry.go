@@ -28,6 +28,96 @@ var (
 	goAllocatedStackPtr = x26VReg
 )
 
+func (a *abiImpl) goEntryPreamblePassArg(cur *instruction, paramSlicePtr regalloc.VReg, paramOffset int64, arg *backend.ABIArg) *instruction {
+	m := a.m
+	var loadMode addressMode
+	cur, loadMode = m.resolveAddressModeForOffsetAndInsert(cur, paramOffset, arg.Type.Bits(), paramSlicePtr)
+
+	isStackArg := arg.Kind == backend.ABIArgKindStack
+
+	var loadTargetReg operand
+	if !isStackArg {
+		loadTargetReg = operandNR(arg.Reg)
+	} else {
+		switch arg.Type {
+		case ssa.TypeI32, ssa.TypeI64:
+			loadTargetReg = operandNR(tmpRegVReg)
+		case ssa.TypeF32, ssa.TypeF64, ssa.TypeV128:
+			loadTargetReg = operandNR(v15VReg)
+		default:
+			panic("TODO?")
+		}
+	}
+
+	instr := m.allocateInstr()
+	switch arg.Type {
+	case ssa.TypeI32:
+		instr.asULoad(loadTargetReg, loadMode, 32)
+	case ssa.TypeI64:
+		instr.asULoad(loadTargetReg, loadMode, 64)
+	case ssa.TypeF32:
+		instr.asFpuLoad(loadTargetReg, loadMode, 32)
+	case ssa.TypeF64:
+		instr.asFpuLoad(loadTargetReg, loadMode, 64)
+	case ssa.TypeV128:
+		instr.asFpuLoad(loadTargetReg, loadMode, 128)
+	}
+	cur = linkInstr(cur, instr)
+
+	if isStackArg {
+		var storeMode addressMode
+		cur, storeMode = m.resolveAddressModeForOffsetAndInsert(cur, arg.Offset, arg.Type.Bits(), spVReg)
+		toStack := m.allocateInstr()
+		toStack.asStore(loadTargetReg, storeMode, arg.Type.Bits())
+		cur = linkInstr(cur, toStack)
+	}
+	return cur
+}
+
+func (a *abiImpl) goEntryPreamblePassResult(cur *instruction, resultSlicePtr regalloc.VReg, result *backend.ABIArg) *instruction {
+	isStackArg := result.Kind == backend.ABIArgKindStack
+	typ := result.Type
+	bits := typ.Bits()
+
+	m := a.m
+	var storeTargetReg operand
+	var postIndexImm int64 = 8
+	if !isStackArg {
+		storeTargetReg = operandNR(result.Reg)
+	} else {
+		switch typ {
+		case ssa.TypeI32, ssa.TypeI64:
+			storeTargetReg = operandNR(tmpRegVReg)
+		case ssa.TypeV128:
+			postIndexImm = 16 // v128 is represented as 2x64-bit in Go slice.
+			fallthrough
+		case ssa.TypeF32, ssa.TypeF64:
+			storeTargetReg = operandNR(v15VReg)
+		default:
+			panic("TODO?")
+		}
+	}
+
+	if isStackArg {
+		var loadMode addressMode
+		cur, loadMode = m.resolveAddressModeForOffsetAndInsert(cur, result.Offset, bits, spVReg)
+		toReg := m.allocateInstr()
+		switch typ {
+		case ssa.TypeI32, ssa.TypeI64:
+			toReg.asULoad(storeTargetReg, loadMode, bits)
+		case ssa.TypeF32, ssa.TypeF64, ssa.TypeV128:
+			toReg.asFpuLoad(storeTargetReg, loadMode, bits)
+		}
+		cur = linkInstr(cur, toReg)
+	}
+
+	mode := addressMode{kind: addressModeKindPostIndex, rn: resultSlicePtr, imm: postIndexImm}
+	instr := m.allocateInstr()
+	instr.asStore(storeTargetReg, mode, bits)
+	cur = linkInstr(cur, instr)
+	return cur
+}
+
 func (a *abiImpl) constructGoEntryPreamble() (root *instruction) {
 	m := a.m
 	root = m.allocateNop()
@@ -50,7 +140,7 @@ func (a *abiImpl) constructGoEntryPreamble() (root *instruction) {
 
 	// Next, adjust the Go-allocated stack pointer to reserve the arg/result spaces.
 	// 		sub x28, x28, #stackSlotSize
-	if stackSlotSize := a.alignedStackSlotSize(); stackSlotSize > 0 {
+	if stackSlotSize := a.alignedArgResultStackSlotSize(); stackSlotSize > 0 {
 		if imm12Operand, ok := asImm12Operand(uint64(stackSlotSize)); ok {
 			instr := m.allocateInstr()
 			rd := operandNR(goAllocatedStackPtr)
@@ -65,43 +155,19 @@ func (a *abiImpl) constructGoEntryPreamble() (root *instruction) {
 	// 		mov sp, x28
 	cur = a.move64(spVReg, goAllocatedStackPtr, cur)
 
-	var offset int64
+	var offsetInParamResultSlicePtr int64
 	for i := range a.args {
 		if i < 2 {
 			// module context ptr and execution context ptr are passed in x0 and x1 by the Go assembly function.
 			continue
 		}
 		arg := &a.args[i]
-		switch arg.Kind {
-		case backend.ABIArgKindReg:
-			r := arg.Reg
-			rd, mode := operandNR(r), addressMode{
-				kind: addressModeKindRegUnsignedImm12,
-				rn:   paramResultSlicePtr,
-				imm:  offset,
-			}
 
-			instr := m.allocateInstr()
-			switch arg.Type {
-			case ssa.TypeI32:
-				instr.asULoad(rd, mode, 32)
-			case ssa.TypeI64:
-				instr.asULoad(rd, mode, 64)
-			case ssa.TypeF32:
-				instr.asFpuLoad(rd, mode, 32)
-			case ssa.TypeF64:
-				instr.asFpuLoad(rd, mode, 64)
-			case ssa.TypeV128:
-				instr.asFpuLoad(rd, mode, 128)
-			}
-			cur = linkInstr(cur, instr)
-		case backend.ABIArgKindStack:
-			panic("TODO")
-		}
+		cur = a.goEntryPreamblePassArg(cur, paramResultSlicePtr, offsetInParamResultSlicePtr, arg)
 		if arg.Type == ssa.TypeV128 {
-			offset += 16
+			offsetInParamResultSlicePtr += 16
 		} else {
-			offset += 8
+			offsetInParamResultSlicePtr += 8
 		}
 	}
 
@@ -115,43 +181,9 @@ func (a *abiImpl) constructGoEntryPreamble() (root *instruction) {
 
 	// Store the register results into paramResultSlicePtr.
 	for i := range a.rets {
-		ret := &a.rets[i]
-		switch ret.Kind {
-		case backend.ABIArgKindReg:
-			rd := operandNR(ret.Reg)
-			mode := addressMode{kind: addressModeKindPostIndex, rn: paramResultSlicePtr, imm: 8}
-			instr := m.allocateInstr()
-			instr.asStore(rd, mode, ret.Type.Bits())
-			cur = linkInstr(cur, instr)
-		case backend.ABIArgKindStack:
-			offset, typ := ret.Offset, ret.Type
-			if offset != 0 && !offsetFitsInAddressModeKindRegUnsignedImm12(typ.Bits(), ret.Offset) {
-				// Do we really want to support?
-				panic("TODO: too many parameters")
-			}
-
-			tmpOperand := operandNR(tmpRegVReg)
-
-			// First load the value from the Go-allocated stack into temporary.
-			mode := addressMode{kind: addressModeKindRegUnsignedImm12, rn: spVReg, imm: offset}
-			toTmp := m.allocateInstr()
-			switch ret.Type {
-			case ssa.TypeI32, ssa.TypeI64:
-				toTmp.asULoad(tmpOperand, mode, typ.Bits())
-			case ssa.TypeF32, ssa.TypeF64:
-				toTmp.asFpuLoad(tmpOperand, mode, typ.Bits())
-			default:
-				panic("TODO")
-			}
-			cur = linkInstr(cur, toTmp)
-
-			// Then write it back to the paramResultSlicePtr.
-			mode = addressMode{kind: addressModeKindPostIndex, rn: paramResultSlicePtr, imm: 8}
-			storeTmp := m.allocateInstr()
-			storeTmp.asStore(tmpOperand, mode, ret.Type.Bits())
-			cur = linkInstr(cur, storeTmp)
-		}
+		cur = a.goEntryPreamblePassResult(cur, paramResultSlicePtr, &a.rets[i])
 	}
+
 	// Finally, restore the FP, SP and LR, and return to the Go code.
 	// 		ldr fp, [savedExecutionContextPtr, #OriginalFramePointer]
 	// 		ldr tmp, [savedExecutionContextPtr, #OriginalStackPointer]

@@ -278,18 +278,18 @@ func (m *machine) insertStoreRegisterAt(v regalloc.VReg, instr *instruction, aft
 
 	typ := m.compiler.TypeOf(v)
 
-	offsetFromSP := m.getVRegSpillSlotOffset(v.ID(), typ.Size()) + m.clobberedRegSlotSize()
-	m.pendingInstructions = m.pendingInstructions[:0]
-	admode := m.resolveAddressModeForOffset(offsetFromSP, typ.Bits(), spVReg)
-	store := m.allocateInstrAfterLowering()
-	store.asStore(operandNR(v), admode, typ.Bits())
-
 	var prevNext, cur *instruction
 	if after {
 		cur, prevNext = instr, instr.next
 	} else {
 		cur, prevNext = instr.prev, instr
 	}
+
+	offsetFromSP := m.getVRegSpillSlotOffset(v.ID(), typ.Size()) + m.clobberedRegSlotSize()
+	var amode addressMode
+	cur, amode = m.resolveAddressModeForOffsetAndInsert(cur, offsetFromSP, typ.Bits(), spVReg)
+	store := m.allocateInstrAfterLowering()
+	store.asStore(operandNR(v), amode, typ.Bits())
 
 	// If the offset is large, we might end up with having multiple instructions inserted in resolveAddressModeForOffset.
 	for _, instr := range m.pendingInstructions {
@@ -313,26 +313,26 @@ func (m *machine) reloadRegister(v regalloc.VReg, instr *instruction, after bool
 
 	typ := m.compiler.TypeOf(v)
 
-	offsetFromSP := m.getVRegSpillSlotOffset(v.ID(), typ.Size()) + m.clobberedRegSlotSize()
-	m.pendingInstructions = m.pendingInstructions[:0]
-	admode := m.resolveAddressModeForOffset(offsetFromSP, typ.Bits(), spVReg)
-	load := m.allocateInstrAfterLowering()
-	switch typ {
-	case ssa.TypeI32, ssa.TypeI64:
-		load.asULoad(operandNR(v), admode, typ.Bits())
-	case ssa.TypeF32, ssa.TypeF64:
-		load.asFpuLoad(operandNR(v), admode, typ.Bits())
-	case ssa.TypeV128:
-		load.asFpuLoad(operandNR(v), admode, 128)
-	default:
-		panic("TODO")
-	}
-
 	var prevNext, cur *instruction
 	if after {
 		cur, prevNext = instr, instr.next
 	} else {
 		cur, prevNext = instr.prev, instr
+	}
+
+	offsetFromSP := m.getVRegSpillSlotOffset(v.ID(), typ.Size()) + m.clobberedRegSlotSize()
+	var amode addressMode
+	cur, amode = m.resolveAddressModeForOffsetAndInsert(cur, offsetFromSP, typ.Bits(), spVReg)
+	load := m.allocateInstrAfterLowering()
+	switch typ {
+	case ssa.TypeI32, ssa.TypeI64:
+		load.asULoad(operandNR(v), amode, typ.Bits())
+	case ssa.TypeF32, ssa.TypeF64:
+		load.asFpuLoad(operandNR(v), amode, typ.Bits())
+	case ssa.TypeV128:
+		load.asFpuLoad(operandNR(v), amode, 128)
+	default:
+		panic("TODO")
 	}
 
 	// If the offset is large, we might end up with having multiple instructions inserted in resolveAddressModeForOffset.

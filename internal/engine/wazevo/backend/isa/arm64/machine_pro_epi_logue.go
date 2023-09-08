@@ -268,26 +268,14 @@ func (m *machine) insertStackBoundsCheck(requiredStackSize int64, cur *instructi
 		// sub tmp, sp, #requiredStackSize
 		sub := m.allocateInstrAfterLowering()
 		sub.asALU(aluOpSub, operandNR(tmpRegVReg), operandNR(spVReg), immm12op, true)
-		sub.prev = cur
-		cur.next = sub
-		cur = sub
+		cur = linkInstr(cur, sub)
 	} else {
 		// This case, we first load the requiredStackSize into the temporary register,
-		m.lowerConstantI64(tmpRegVReg, requiredStackSize)
-		// lowerConstantI64 adds instructions into m.pendingInstructions,
-		// so we manually link them together.
-		for _, inserted := range m.pendingInstructions {
-			cur.next = inserted
-			inserted.prev = cur
-			cur = inserted
-		}
-		m.pendingInstructions = m.pendingInstructions[:0]
+		cur = m.lowerConstantI64AndInsert(cur, tmpRegVReg, requiredStackSize)
 		// Then subtract it.
 		sub := m.allocateInstrAfterLowering()
 		sub.asALU(aluOpSub, operandNR(tmpRegVReg), operandNR(spVReg), operandNR(tmpRegVReg), true)
-		sub.prev = cur
-		cur.next = sub
-		cur = sub
+		cur = linkInstr(cur, sub)
 	}
 
 	tmp2 := x11VReg // Callee save, so it is safe to use it here in the prologue.
@@ -320,15 +308,7 @@ func (m *machine) insertStackBoundsCheck(requiredStackSize int64, cur *instructi
 	// Set the required stack size and set it to the exec context.
 	{
 		// First load the requiredStackSize into the temporary register,
-		m.pendingInstructions = m.pendingInstructions[:0]
-		m.lowerConstantI64(tmpRegVReg, requiredStackSize)
-		// lowerConstantI64 adds instructions into m.pendingInstructions,
-		// so we manually link them together.
-		for _, inserted := range m.pendingInstructions {
-			cur.next = inserted
-			inserted.prev = cur
-			cur = inserted
-		}
+		cur = m.lowerConstantI64AndInsert(cur, tmpRegVReg, requiredStackSize)
 		setRequiredStackSize := m.allocateInstrAfterLowering()
 		setRequiredStackSize.asStore(operandNR(tmpRegVReg),
 			addressMode{
@@ -408,10 +388,7 @@ func (m *machine) addsAddOrSubStackPointer(cur *instruction, rd regalloc.VReg, d
 	m.pendingInstructions = m.pendingInstructions[:0]
 	m.insertAddOrSubStackPointer(rd, diff, add, afterLowering)
 	for _, inserted := range m.pendingInstructions {
-		cur.next = inserted
-		inserted.prev = cur
-		cur = inserted
+		cur = linkInstr(cur, inserted)
 	}
-	m.pendingInstructions = m.pendingInstructions[:0]
 	return cur
 }

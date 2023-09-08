@@ -38,9 +38,7 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 		store := m.allocateInstr()
 		amode := addressMode{kind: addressModeKindRegUnsignedImm12, rn: execCtrPtr, imm: offset}
 		store.asStore(operandNR(moduleCtrPtr), amode, 64)
-		store.prev = cur
-		cur.next = store
-		cur = store
+		cur = linkInstr(cur, store)
 
 		argBegin++
 	}
@@ -53,9 +51,7 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 
 	goCallStackPtrCalc := m.allocateInstr()
 	goCallStackPtrCalc.asALU(aluOpAdd, operandNR(stackPtrReg), operandNR(execCtrPtr), imm12Op, true)
-	goCallStackPtrCalc.prev = cur
-	cur.next = goCallStackPtrCalc
-	cur = goCallStackPtrCalc
+	cur = linkInstr(cur, goCallStackPtrCalc)
 
 	abi := m.getOrCreateABIImpl(sig)
 	for _, arg := range abi.args[argBegin:] {
@@ -74,9 +70,7 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 					kind: addressModeKindPostIndex,
 					rn:   stackPtrReg, imm: int64(sizeInBits / 8),
 				}, sizeInBits)
-			store.prev = cur
-			cur.next = store
-			cur = store
+			cur = linkInstr(cur, store)
 		} else {
 			// We can temporarily load the argument to the tmp register, and then store it to the stack.
 			panic("TODO: many params for Go function call")
@@ -128,13 +122,8 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 				loadIntoTmp.asFpuLoad(operandNR(tmpRegVRegVec), mode, 64)
 				movTmpToReg.asFpuMov64(r.Reg, tmpRegVRegVec)
 			}
-			loadIntoTmp.prev = cur
-			cur.next = loadIntoTmp
-			cur = loadIntoTmp
-
-			movTmpToReg.prev = cur
-			cur.next = movTmpToReg
-			cur = movTmpToReg
+			cur = linkInstr(cur, loadIntoTmp)
+			cur = linkInstr(cur, movTmpToReg)
 		} else {
 			// We can temporarily load the argument to the tmp register, and then store it to the stack.
 			panic("TODO: many params for Go function call")
@@ -143,8 +132,7 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 
 	ret := m.allocateInstrAfterLowering()
 	ret.asRet(nil)
-	ret.prev = cur
-	cur.next = ret
+	cur = linkInstr(cur, ret)
 
 	m.encode(m.rootInstr)
 	return m.compiler.Buf()
@@ -195,24 +183,33 @@ func (m *machine) restoreRegistersInExecutionContext(cur *instruction, regs []re
 				// Execution context is always the first argument.
 				rn: x0VReg, imm: offset,
 			}, sizeInBits)
-		load.prev = cur
-		cur.next = load
-		cur = load
+		cur = linkInstr(cur, load)
 		offset += 16 // Imm12 must be aligned 16 for vector regs, so we unconditionally load regs at the offset of multiple of 16.
+	}
+	return cur
+}
+
+func (m *machine) lowerConstantI64AndInsert(cur *instruction, dst regalloc.VReg, v int64) *instruction {
+	m.pendingInstructions = m.pendingInstructions[:0]
+	m.lowerConstantI64(dst, v)
+	for _, instr := range m.pendingInstructions {
+		cur = linkInstr(cur, instr)
+	}
+	return cur
+}
+
+func (m *machine) lowerConstantI32AndInsert(cur *instruction, dst regalloc.VReg, v int32) *instruction {
+	m.pendingInstructions = m.pendingInstructions[:0]
+	m.lowerConstantI32(dst, v)
+	for _, instr := range m.pendingInstructions {
+		cur = linkInstr(cur, instr)
 	}
 	return cur
 }
 
 func (m *machine) setExitCode(cur *instruction, execCtr regalloc.VReg, exitCode wazevoapi.ExitCode) *instruction {
 	constReg := x17VReg // caller-saved, so we can use it.
-
-	m.pendingInstructions = m.pendingInstructions[:0]
-	m.lowerConstantI32(x17VReg, int32(exitCode))
-	for _, instr := range m.pendingInstructions {
-		instr.prev = cur
-		cur.next = instr
-		cur = instr
-	}
+	cur = m.lowerConstantI32AndInsert(cur, constReg, int32(exitCode))
 
 	// Set the exit status on the execution context.
 	setExistStatus := m.allocateInstrAfterLowering()
@@ -221,9 +218,7 @@ func (m *machine) setExitCode(cur *instruction, execCtr regalloc.VReg, exitCode 
 			kind: addressModeKindRegUnsignedImm12,
 			rn:   execCtr, imm: wazevoapi.ExecutionContextOffsets.ExitCodeOffset.I64(),
 		}, 32)
-	setExistStatus.prev = cur
-	cur.next = setExistStatus
-	cur = setExistStatus
+	cur = linkInstr(cur, setExistStatus)
 	return cur
 }
 
@@ -231,9 +226,8 @@ func (m *machine) storeReturnAddressAndExit(cur *instruction) *instruction {
 	// Read the return address into tmp, and store it in the execution context.
 	adr := m.allocateInstrAfterLowering()
 	adr.asAdr(tmpRegVReg, exitSequenceSize+8)
-	adr.prev = cur
-	cur.next = adr
-	cur = adr
+	cur = linkInstr(cur, adr)
+
 	storeReturnAddr := m.allocateInstrAfterLowering()
 	storeReturnAddr.asStore(operandNR(tmpRegVReg),
 		addressMode{
@@ -241,16 +235,12 @@ func (m *machine) storeReturnAddressAndExit(cur *instruction) *instruction {
 			// Execution context is always the first argument.
 			rn: x0VReg, imm: wazevoapi.ExecutionContextOffsets.GoCallReturnAddress.I64(),
 		}, 64)
-	storeReturnAddr.prev = cur
-	cur.next = storeReturnAddr
-	cur = storeReturnAddr
+	cur = linkInstr(cur, storeReturnAddr)
 
 	// Exit the execution.
 	trapSeq := m.allocateInstrAfterLowering()
 	trapSeq.asExitSequence(x0VReg)
-	trapSeq.prev = cur
-	cur.next = trapSeq
-	cur = trapSeq
+	cur = linkInstr(cur, trapSeq)
 	return cur
 }
 
@@ -260,17 +250,14 @@ func (m *machine) saveCurrentStackPointer(cur *instruction, execCtr regalloc.VRe
 	// 	str tmp, [exec_ctx, #stackPointerBeforeGoCall]
 	movSp := m.allocateInstrAfterLowering()
 	movSp.asMove64(tmpRegVReg, spVReg)
-	movSp.prev = cur
-	cur.next = movSp
-	cur = movSp
+	cur = linkInstr(cur, movSp)
+
 	strSp := m.allocateInstrAfterLowering()
 	strSp.asStore(operandNR(tmpRegVReg),
 		addressMode{
 			kind: addressModeKindRegUnsignedImm12,
 			rn:   execCtr, imm: wazevoapi.ExecutionContextOffsets.StackPointerBeforeGrow.I64(),
 		}, 64)
-	strSp.prev = cur
-	cur.next = strSp
-	cur = strSp
+	cur = linkInstr(cur, strSp)
 	return cur
 }

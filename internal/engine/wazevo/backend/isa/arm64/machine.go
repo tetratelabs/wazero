@@ -322,18 +322,8 @@ func (m *machine) resolveAddressingMode(arg0offset, ret0offset int64, i *instruc
 	} else {
 		// This case, we load the offset into the temporary register,
 		// and then use it as the index register.
-		m.lowerConstantI64(tmpRegVReg, amode.imm)
-		// lowerConstantI64 adds instructions into m.pendingInstructions,
-		// so we manually link them together.
-		cur := i.prev
-		for _, inserted := range m.pendingInstructions {
-			cur.next = inserted
-			inserted.prev = cur
-			cur = inserted
-		}
-		cur.next = i
-		i.prev = cur
-		m.pendingInstructions = m.pendingInstructions[:0]
+		newPrev := m.lowerConstantI64AndInsert(i.prev, tmpRegVReg, amode.imm)
+		linkInstr(newPrev, i)
 		*amode = addressMode{kind: addressModeKindRegReg, rn: amode.rn, rm: tmpRegVReg, extOp: extendOpUXTX /* indicates rm reg is 64-bit */}
 	}
 }
