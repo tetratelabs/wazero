@@ -399,8 +399,9 @@ func (i *instruction) asMOVN(dst regalloc.VReg, imm uint64, shift uint64, dst64b
 	}
 }
 
-func (i *instruction) asNop0() {
+func (i *instruction) asNop0() *instruction {
 	i.kind = nop0
+	return i
 }
 
 func (i *instruction) asNop0WithLabel(l label) {
@@ -1399,9 +1400,10 @@ func (i *instruction) asIntToFpu(rd, rn operand, rnSigned, src64bit, dst64bit bo
 	}
 }
 
-func (i *instruction) asExitSequence(ctx regalloc.VReg) {
+func (i *instruction) asExitSequence(ctx regalloc.VReg) *instruction {
 	i.kind = exitSequence
 	i.rn = operandNR(ctx)
+	return i
 }
 
 // aluOp determines the type of ALU operation. Instructions whose kind is one of

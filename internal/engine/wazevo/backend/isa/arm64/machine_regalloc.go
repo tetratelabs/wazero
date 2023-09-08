@@ -116,13 +116,13 @@ func (f *regAllocFunctionImpl) StoreRegisterAfter(v regalloc.VReg, instr regallo
 // ReloadRegisterBefore implements regalloc.Function ReloadRegisterBefore.
 func (f *regAllocFunctionImpl) ReloadRegisterBefore(v regalloc.VReg, instr regalloc.Instr) {
 	m := f.m
-	m.reloadRegister(v, instr.(*regAllocInstrImpl).i, false)
+	m.insertReloadRegisterAt(v, instr.(*regAllocInstrImpl).i, false)
 }
 
 // ReloadRegisterAfter implements regalloc.Function ReloadRegisterAfter.
 func (f *regAllocFunctionImpl) ReloadRegisterAfter(v regalloc.VReg, instr regalloc.Instr) {
 	m := f.m
-	m.reloadRegister(v, instr.(*regAllocInstrImpl).i, true)
+	m.insertReloadRegisterAt(v, instr.(*regAllocInstrImpl).i, true)
 }
 
 // Done implements regalloc.Function Done.
@@ -291,22 +291,11 @@ func (m *machine) insertStoreRegisterAt(v regalloc.VReg, instr *instruction, aft
 	store := m.allocateInstrAfterLowering()
 	store.asStore(operandNR(v), amode, typ.Bits())
 
-	// If the offset is large, we might end up with having multiple instructions inserted in resolveAddressModeForOffset.
-	for _, instr := range m.pendingInstructions {
-		instr.addedAfterLowering = true
-		cur.next = instr
-		instr.prev = cur
-		cur = instr
-	}
-
-	cur.next = store
-	store.prev = cur
-
-	store.next = prevNext
-	prevNext.prev = store
+	cur = linkInstr(cur, store)
+	linkInstr(cur, prevNext)
 }
 
-func (m *machine) reloadRegister(v regalloc.VReg, instr *instruction, after bool) {
+func (m *machine) insertReloadRegisterAt(v regalloc.VReg, instr *instruction, after bool) {
 	if !v.IsRealReg() {
 		panic("BUG: VReg must be backed by real reg to be stored")
 	}
@@ -335,17 +324,8 @@ func (m *machine) reloadRegister(v regalloc.VReg, instr *instruction, after bool
 		panic("TODO")
 	}
 
-	// If the offset is large, we might end up with having multiple instructions inserted in resolveAddressModeForOffset.
-	for _, instr := range m.pendingInstructions {
-		instr.addedAfterLowering = true
-		cur.next = instr
-		instr.prev = cur
-		cur = instr
-	}
-
 	cur.next = load
 	load.prev = cur
-
-	load.next = prevNext
-	prevNext.prev = load
+	cur = linkInstr(cur, load)
+	linkInstr(cur, prevNext)
 }
