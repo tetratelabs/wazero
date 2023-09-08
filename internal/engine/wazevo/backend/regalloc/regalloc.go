@@ -224,7 +224,7 @@ func (a *Allocator) livenessAnalysis(f Function) {
 		}
 
 		if wazevoapi.RegAllocLoggingEnabled {
-			fmt.Printf("constructed block info for block[%d]:\n%s\n\n", blk.ID(), info)
+			fmt.Printf("prepared block info for block[%d]:\n%s\n\n", blk.ID(), info.Format(a.regInfo))
 		}
 	}
 
@@ -263,7 +263,7 @@ func (a *Allocator) livenessAnalysis(f Function) {
 		}
 
 		if wazevoapi.RegAllocLoggingEnabled {
-			fmt.Printf("\nfinalized info for block[%d]:\n%s\n", blk.ID(), info)
+			fmt.Printf("\nfinalized info for block[%d]:\n%s\n", blk.ID(), info.Format(a.regInfo))
 		}
 	}
 }
@@ -610,7 +610,7 @@ func (i *blockInfo) addRealRegUsage(v VReg, pc programCounter) {
 }
 
 // String implements fmt.Stringer for debugging.
-func (i *blockInfo) String() string {
+func (i *blockInfo) Format(ri *RegisterInfo) string {
 	var buf strings.Builder
 	buf.WriteString("\tliveOuts: ")
 	for v := range i.liveOuts {
@@ -634,11 +634,11 @@ func (i *blockInfo) String() string {
 	}
 	buf.WriteString("\n\trealRegUses: ")
 	for v, pos := range i.realRegUses {
-		buf.WriteString(fmt.Sprintf("%v@%v ", v, pos))
+		buf.WriteString(fmt.Sprintf("%s@%v ", ri.RealRegName(v.RealReg()), pos))
 	}
 	buf.WriteString("\n\trealRegDefs: ")
 	for v, pos := range i.realRegDefs {
-		buf.WriteString(fmt.Sprintf("%v@%v ", v, pos))
+		buf.WriteString(fmt.Sprintf("%s@%v ", ri.RealRegName(v.RealReg()), pos))
 	}
 	return buf.String()
 }

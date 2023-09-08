@@ -262,8 +262,7 @@ func (a *abiImpl) callerGenVRegToFunctionArg(argIndex int, reg regalloc.VReg, de
 	if def != nil && def.IsFromInstr() {
 		// Constant instructions are inlined.
 		if inst := def.Instr; inst.Constant() {
-			a.m.InsertLoadConstant(inst, arg.Reg)
-			return
+			a.m.InsertLoadConstant(inst, reg)
 		}
 	}
 	if arg.Kind == backend.ABIArgKindReg {
