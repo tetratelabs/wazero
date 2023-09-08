@@ -63,7 +63,7 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 			case ssa.TypeI32, ssa.TypeF32, ssa.TypeI64, ssa.TypeF64:
 				sizeInBits = 64 // We use uint64 for all basic types, except SIMD v128.
 			default:
-				panic("TODO")
+				panic("TODO? do you really need to pass v128 to host function?")
 			}
 			store.asStore(operandNR(v),
 				addressMode{
@@ -121,6 +121,8 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 				mode.imm = 8 // We use uint64 for all basic types, except SIMD v128.
 				loadIntoTmp.asFpuLoad(operandNR(tmpRegVRegVec), mode, 64)
 				movTmpToReg.asFpuMov64(r.Reg, tmpRegVRegVec)
+			default:
+				panic("Do you really need to return v128 from host function?")
 			}
 			cur = linkInstr(cur, loadIntoTmp)
 			cur = linkInstr(cur, movTmpToReg)
@@ -132,7 +134,7 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 
 	ret := m.allocateInstrAfterLowering()
 	ret.asRet(nil)
-	cur = linkInstr(cur, ret)
+	linkInstr(cur, ret)
 
 	m.encode(m.rootInstr)
 	return m.compiler.Buf()
