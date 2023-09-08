@@ -148,20 +148,13 @@ func TestMachine_StoreRegisterAfter(t *testing.T) {
 }
 
 func TestMachine_ReloadRegisterBefore(t *testing.T) {
-	ctx, _, m := newSetupWithMockContext()
-	m.spillSlotSize = 0xffff
-
-	ctx.typeOf = map[regalloc.VReg]ssa.Type{x1VReg: ssa.TypeI64, v1VReg: ssa.TypeF64}
-	i1, i2 := m.allocateInstr().asUDF(), m.allocateInstr().asUDF()
-	i1.next = i2
-	i2.prev = i1
-
-	f := &regAllocFunctionImpl{m: m}
-	f.ReloadRegisterBefore(x1VReg, &regAllocInstrImpl{i: i2})
-	f.ReloadRegisterBefore(v1VReg, &regAllocInstrImpl{i: i2})
-
-	m.rootInstr = i1
-	require.Equal(t, `
+	for _, tc := range []struct {
+		spillSlotSize int64
+		expected      string
+	}{
+		{
+			spillSlotSize: 0xffff,
+			expected: `
 	udf
 	movz x27, #0xffff, lsl 0
 	ldr x1, [sp, x27]
@@ -169,7 +162,37 @@ func TestMachine_ReloadRegisterBefore(t *testing.T) {
 	movk x27, #0x1, lsl 16
 	ldr d1, [sp, x27]
 	udf
-`, m.Format())
+`,
+		},
+		{
+			spillSlotSize: 0xffff_00,
+			expected: `
+	udf
+	orr x27, xzr, #0xffff00
+	ldr x1, [sp, x27]
+	movz x27, #0xff08, lsl 0
+	movk x27, #0xff, lsl 16
+	ldr d1, [sp, x27]
+	udf
+`,
+		},
+	} {
+		t.Run(tc.expected, func(t *testing.T) {
+			ctx, _, m := newSetupWithMockContext()
+			m.spillSlotSize = tc.spillSlotSize
+
+			ctx.typeOf = map[regalloc.VReg]ssa.Type{x1VReg: ssa.TypeI64, v1VReg: ssa.TypeF64}
+			i1, i2 := m.allocateInstr().asUDF(), m.allocateInstr().asUDF()
+			i1.next = i2
+			i2.prev = i1
+
+			f := &regAllocFunctionImpl{m: m}
+			f.ReloadRegisterBefore(x1VReg, &regAllocInstrImpl{i: i2})
+			f.ReloadRegisterBefore(v1VReg, &regAllocInstrImpl{i: i2})
+			m.rootInstr = i1
+			require.Equal(t, tc.expected, m.Format())
+		})
+	}
 }
 
 func TestRegAllocFunctionImpl_ClobberedRegisters(t *testing.T) {
