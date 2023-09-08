@@ -300,6 +300,15 @@ func (a *abiImpl) callerGenFunctionReturnVReg(retIndex int, reg regalloc.VReg) {
 	}
 }
 
+func (m *machine) resolveAddressModeForOffsetAndInsert(cur *instruction, offset int64, dstBits byte, rn regalloc.VReg) (*instruction, addressMode) {
+	m.pendingInstructions = m.pendingInstructions[:0]
+	mode := m.resolveAddressModeForOffset(offset, dstBits, rn)
+	for _, instr := range m.pendingInstructions {
+		cur = linkInstr(cur, instr)
+	}
+	return cur, mode
+}
+
 func (m *machine) resolveAddressModeForOffset(offset int64, dstBits byte, rn regalloc.VReg) addressMode {
 	if rn.RegType() != regalloc.RegTypeInt {
 		panic("BUG: rn should be a pointer: " + formatVRegSized(rn, 64))
@@ -316,7 +325,7 @@ func (m *machine) resolveAddressModeForOffset(offset int64, dstBits byte, rn reg
 	return amode
 }
 
-func (a *abiImpl) alignedStackSlotSize() int64 {
+func (a *abiImpl) alignedArgResultStackSlotSize() int64 {
 	stackSlotSize := a.retStackSize + a.argStackSize
 	// Align stackSlotSize to 16 bytes.
 	stackSlotSize = (stackSlotSize + 15) &^ 15
@@ -336,7 +345,7 @@ func (m *machine) lowerCall(si *ssa.Instruction) {
 	}
 	calleeABI := m.getOrCreateABIImpl(m.compiler.ResolveSignature(sigID))
 
-	stackSlotSize := calleeABI.alignedStackSlotSize()
+	stackSlotSize := calleeABI.alignedArgResultStackSlotSize()
 	if stackSlotSize > 0 {
 		m.insertAddOrSubStackPointer(spVReg, stackSlotSize, false /* == sub */, false)
 	}

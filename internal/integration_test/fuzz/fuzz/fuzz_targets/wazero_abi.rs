@@ -18,6 +18,7 @@ extern "C" {
     pub fn validate(binary_ptr: *const u8, binary_size: usize);
 }
 
+#[allow(dead_code)]
 pub fn maybe_disable_v2(config: &mut SwarmConfig) {
     if std::env::var("WAZERO_FUZZ_WAZEVO").is_ok() {
         config.simd_enabled = false;

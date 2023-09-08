@@ -116,13 +116,13 @@ func (f *regAllocFunctionImpl) StoreRegisterAfter(v regalloc.VReg, instr regallo
 // ReloadRegisterBefore implements regalloc.Function ReloadRegisterBefore.
 func (f *regAllocFunctionImpl) ReloadRegisterBefore(v regalloc.VReg, instr regalloc.Instr) {
 	m := f.m
-	m.reloadRegister(v, instr.(*regAllocInstrImpl).i, false)
+	m.insertReloadRegisterAt(v, instr.(*regAllocInstrImpl).i, false)
 }
 
 // ReloadRegisterAfter implements regalloc.Function ReloadRegisterAfter.
 func (f *regAllocFunctionImpl) ReloadRegisterAfter(v regalloc.VReg, instr regalloc.Instr) {
 	m := f.m
-	m.reloadRegister(v, instr.(*regAllocInstrImpl).i, true)
+	m.insertReloadRegisterAt(v, instr.(*regAllocInstrImpl).i, true)
 }
 
 // Done implements regalloc.Function Done.
@@ -278,12 +278,6 @@ func (m *machine) insertStoreRegisterAt(v regalloc.VReg, instr *instruction, aft
 
 	typ := m.compiler.TypeOf(v)
 
-	offsetFromSP := m.getVRegSpillSlotOffset(v.ID(), typ.Size()) + m.clobberedRegSlotSize()
-	m.pendingInstructions = m.pendingInstructions[:0]
-	admode := m.resolveAddressModeForOffset(offsetFromSP, typ.Bits(), spVReg)
-	store := m.allocateInstrAfterLowering()
-	store.asStore(operandNR(v), admode, typ.Bits())
-
 	var prevNext, cur *instruction
 	if after {
 		cur, prevNext = instr, instr.next
@@ -291,43 +285,23 @@ func (m *machine) insertStoreRegisterAt(v regalloc.VReg, instr *instruction, aft
 		cur, prevNext = instr.prev, instr
 	}
 
-	// If the offset is large, we might end up with having multiple instructions inserted in resolveAddressModeForOffset.
-	for _, instr := range m.pendingInstructions {
-		instr.addedAfterLowering = true
-		cur.next = instr
-		instr.prev = cur
-		cur = instr
-	}
+	offsetFromSP := m.getVRegSpillSlotOffset(v.ID(), typ.Size()) + m.clobberedRegSlotSize()
+	var amode addressMode
+	cur, amode = m.resolveAddressModeForOffsetAndInsert(cur, offsetFromSP, typ.Bits(), spVReg)
+	store := m.allocateInstrAfterLowering()
+	store.asStore(operandNR(v), amode, typ.Bits())
 
-	cur.next = store
-	store.prev = cur
-
-	store.next = prevNext
-	prevNext.prev = store
+	cur = linkInstr(cur, store)
+	linkInstr(cur, prevNext)
 }
 
-func (m *machine) reloadRegister(v regalloc.VReg, instr *instruction, after bool) {
+func (m *machine) insertReloadRegisterAt(v regalloc.VReg, instr *instruction, after bool) {
 	if !v.IsRealReg() {
 		panic("BUG: VReg must be backed by real reg to be stored")
 	}
 
 	typ := m.compiler.TypeOf(v)
 
-	offsetFromSP := m.getVRegSpillSlotOffset(v.ID(), typ.Size()) + m.clobberedRegSlotSize()
-	m.pendingInstructions = m.pendingInstructions[:0]
-	admode := m.resolveAddressModeForOffset(offsetFromSP, typ.Bits(), spVReg)
-	load := m.allocateInstrAfterLowering()
-	switch typ {
-	case ssa.TypeI32, ssa.TypeI64:
-		load.asULoad(operandNR(v), admode, typ.Bits())
-	case ssa.TypeF32, ssa.TypeF64:
-		load.asFpuLoad(operandNR(v), admode, typ.Bits())
-	case ssa.TypeV128:
-		load.asFpuLoad(operandNR(v), admode, 128)
-	default:
-		panic("TODO")
-	}
-
 	var prevNext, cur *instruction
 	if after {
 		cur, prevNext = instr, instr.next
@@ -335,17 +309,23 @@ func (m *machine) reloadRegister(v regalloc.VReg, instr *instruction, after bool
 		cur, prevNext = instr.prev, instr
 	}
 
-	// If the offset is large, we might end up with having multiple instructions inserted in resolveAddressModeForOffset.
-	for _, instr := range m.pendingInstructions {
-		instr.addedAfterLowering = true
-		cur.next = instr
-		instr.prev = cur
-		cur = instr
+	offsetFromSP := m.getVRegSpillSlotOffset(v.ID(), typ.Size()) + m.clobberedRegSlotSize()
+	var amode addressMode
+	cur, amode = m.resolveAddressModeForOffsetAndInsert(cur, offsetFromSP, typ.Bits(), spVReg)
+	load := m.allocateInstrAfterLowering()
+	switch typ {
+	case ssa.TypeI32, ssa.TypeI64:
+		load.asULoad(operandNR(v), amode, typ.Bits())
+	case ssa.TypeF32, ssa.TypeF64:
+		load.asFpuLoad(operandNR(v), amode, typ.Bits())
+	case ssa.TypeV128:
+		load.asFpuLoad(operandNR(v), amode, 128)
+	default:
+		panic("TODO")
 	}
 
 	cur.next = load
 	load.prev = cur
-
-	load.next = prevNext
-	prevNext.prev = load
+	cur = linkInstr(cur, load)
+	linkInstr(cur, prevNext)
 }

@@ -122,54 +122,146 @@ func TestRegAllocFunctionImpl_StoreRegisterBefore(t *testing.T) {
 `, m.Format())
 }
 
-func TestMachine_StoreRegisterAfter(t *testing.T) {
-	ctx, _, m := newSetupWithMockContext()
-	m.spillSlotSize = 0xffff
-
-	ctx.typeOf = map[regalloc.VReg]ssa.Type{x1VReg: ssa.TypeI64, v1VReg: ssa.TypeF64}
-	i1, i2 := m.allocateInstr().asUDF(), m.allocateInstr().asUDF()
-	i1.next = i2
-	i2.prev = i1
-
-	f := &regAllocFunctionImpl{m: m}
-	f.StoreRegisterAfter(x1VReg, &regAllocInstrImpl{i: i1})
-	f.StoreRegisterAfter(v1VReg, &regAllocInstrImpl{i: i1})
-
-	m.rootInstr = i1
-	require.Equal(t, `
+func TestMachine_insertStoreRegisterAt(t *testing.T) {
+	for _, tc := range []struct {
+		spillSlotSize int64
+		expected      string
+	}{
+		{
+			spillSlotSize: 0,
+			expected: `
 	udf
+	str x1, [sp]
+	str d1, [sp, #0x8]
+	exit_sequence x30
+`,
+		},
+		{
+			spillSlotSize: 0xffff,
+			expected: `
+	udf
+	movz x27, #0xffff, lsl 0
+	str x1, [sp, x27]
 	movz x27, #0x7, lsl 0
 	movk x27, #0x1, lsl 16
 	str d1, [sp, x27]
-	movz x27, #0xffff, lsl 0
-	str x1, [sp, x27]
+	exit_sequence x30
+`,
+		},
+		{
+			spillSlotSize: 0xffff_00,
+			expected: `
 	udf
-`, m.Format())
+	orr x27, xzr, #0xffff00
+	str x1, [sp, x27]
+	movz x27, #0xff08, lsl 0
+	movk x27, #0xff, lsl 16
+	str d1, [sp, x27]
+	exit_sequence x30
+`,
+		},
+	} {
+		t.Run(tc.expected, func(t *testing.T) {
+			ctx, _, m := newSetupWithMockContext()
+			m.spillSlotSize = tc.spillSlotSize
+
+			for _, after := range []bool{false, true} {
+				var name string
+				if after {
+					name = "after"
+				} else {
+					name = "before"
+				}
+				t.Run(name, func(t *testing.T) {
+					ctx.typeOf = map[regalloc.VReg]ssa.Type{x1VReg: ssa.TypeI64, v1VReg: ssa.TypeF64}
+					i1, i2 := m.allocateInstr().asUDF(), m.allocateInstr().asExitSequence(x30VReg)
+					i1.next = i2
+					i2.prev = i1
+
+					if after {
+						m.insertStoreRegisterAt(v1VReg, i1, after)
+						m.insertStoreRegisterAt(x1VReg, i1, after)
+					} else {
+						m.insertStoreRegisterAt(x1VReg, i2, after)
+						m.insertStoreRegisterAt(v1VReg, i2, after)
+					}
+					m.rootInstr = i1
+					require.Equal(t, tc.expected, m.Format())
+				})
+			}
+		})
+	}
 }
 
-func TestMachine_ReloadRegisterBefore(t *testing.T) {
-	ctx, _, m := newSetupWithMockContext()
-	m.spillSlotSize = 0xffff
-
-	ctx.typeOf = map[regalloc.VReg]ssa.Type{x1VReg: ssa.TypeI64, v1VReg: ssa.TypeF64}
-	i1, i2 := m.allocateInstr().asUDF(), m.allocateInstr().asUDF()
-	i1.next = i2
-	i2.prev = i1
-
-	f := &regAllocFunctionImpl{m: m}
-	f.ReloadRegisterBefore(x1VReg, &regAllocInstrImpl{i: i2})
-	f.ReloadRegisterBefore(v1VReg, &regAllocInstrImpl{i: i2})
-
-	m.rootInstr = i1
-	require.Equal(t, `
+func TestMachine_insertReloadRegisterAt(t *testing.T) {
+	for _, tc := range []struct {
+		spillSlotSize int64
+		expected      string
+	}{
+		{
+			spillSlotSize: 0,
+			expected: `
+	udf
+	ldr x1, [sp]
+	ldr d1, [sp, #0x8]
+	exit_sequence x30
+`,
+		},
+		{
+			spillSlotSize: 0xffff,
+			expected: `
 	udf
 	movz x27, #0xffff, lsl 0
 	ldr x1, [sp, x27]
 	movz x27, #0x7, lsl 0
 	movk x27, #0x1, lsl 16
 	ldr d1, [sp, x27]
+	exit_sequence x30
+`,
+		},
+		{
+			spillSlotSize: 0xffff_00,
+			expected: `
 	udf
-`, m.Format())
+	orr x27, xzr, #0xffff00
+	ldr x1, [sp, x27]
+	movz x27, #0xff08, lsl 0
+	movk x27, #0xff, lsl 16
+	ldr d1, [sp, x27]
+	exit_sequence x30
+`,
+		},
+	} {
+		t.Run(tc.expected, func(t *testing.T) {
+			ctx, _, m := newSetupWithMockContext()
+			m.spillSlotSize = tc.spillSlotSize
+
+			for _, after := range []bool{false, true} {
+				var name string
+				if after {
+					name = "after"
+				} else {
+					name = "before"
+				}
+				t.Run(name, func(t *testing.T) {
+					ctx.typeOf = map[regalloc.VReg]ssa.Type{x1VReg: ssa.TypeI64, v1VReg: ssa.TypeF64}
+					i1, i2 := m.allocateInstr().asUDF(), m.allocateInstr().asExitSequence(x30VReg)
+					i1.next = i2
+					i2.prev = i1
+
+					if after {
+						m.insertReloadRegisterAt(v1VReg, i1, after)
+						m.insertReloadRegisterAt(x1VReg, i1, after)
+					} else {
+						m.insertReloadRegisterAt(x1VReg, i2, after)
+						m.insertReloadRegisterAt(v1VReg, i2, after)
+					}
+					m.rootInstr = i1
+					require.Equal(t, tc.expected, m.Format())
+				})
+			}
+		})
+	}
 }
 
 func TestRegAllocFunctionImpl_ClobberedRegisters(t *testing.T) {
