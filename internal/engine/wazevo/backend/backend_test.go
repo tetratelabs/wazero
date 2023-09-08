@@ -568,7 +568,8 @@ L1 (SSA Block: blk0):
 	mov x0, x0?
 	mov x1, x1?
 	mov x2, x2?
-	movz w3, #0x5, lsl 0
+	movz w3?, #0x5, lsl 0
+	mov x3, x3?
 	bl f2
 	mov x4?, x0
 	str x1?, [x0?, #0x8]
