@@ -317,6 +317,23 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		rd := operandNR(m.compiler.VRegOf(instr.Return()))
 		sub.asVecRRR(vecOpSub, rd, rn, rm, arr)
 		m.insert(sub)
+	case ssa.OpcodeVImul:
+		x, y, lane := instr.Arg2WithLane()
+		arr := ssaLeneToArrangement(lane)
+		mul := m.allocateInstr()
+		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+		rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
+		rd := operandNR(m.compiler.VRegOf(instr.Return()))
+		mul.asVecRRR(vecOpMul, rd, rn, rm, arr)
+		m.insert(mul)
+	case ssa.OpcodeVIneg:
+		x, lane := instr.ArgWithLane()
+		arr := ssaLeneToArrangement(lane)
+		neg := m.allocateInstr()
+		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+		rd := operandNR(m.compiler.VRegOf(instr.Return()))
+		neg.asVecMisc(vecOpNeg, rd, rn, arr)
+		m.insert(neg)
 	default:
 		panic("TODO: lowering " + op.String())
 	}

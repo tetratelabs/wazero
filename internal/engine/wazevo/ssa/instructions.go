@@ -95,6 +95,11 @@ func (i *Instruction) Arg2() (Value, Value) {
 	return i.v, i.v2
 }
 
+// ArgWithLane returns the first argument to this instruction, and the lane type.
+func (i *Instruction) ArgWithLane() (Value, VecLane) {
+	return i.v, VecLane(i.u1)
+}
+
 // Arg2WithLane returns the first two arguments to this instruction, and the lane type.
 func (i *Instruction) Arg2WithLane() (Value, Value, VecLane) {
 	return i.v, i.v2, VecLane(i.u1)
@@ -337,6 +342,12 @@ const (
 
 	// OpcodeVIsub performs an integer subtraction: `v = IVsub.lane x, y` on vector.
 	OpcodeVIsub
+
+	// OpcodeVImul performs an integer multiplication: `v = IVmul.lane x, y` on vector.
+	OpcodeVImul
+
+	// OpcodeVIneg negates the given vector value: `v = VIneg x`.
+	OpcodeVIneg
 
 	// OpcodeImul performs an integer multiplication: `v = Imul x, y`.
 	OpcodeImul
@@ -809,6 +820,8 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeVconst:             sideEffectNone,
 	OpcodeVIadd:              sideEffectNone,
 	OpcodeVIsub:              sideEffectNone,
+	OpcodeVImul:              sideEffectNone,
+	OpcodeVIneg:              sideEffectNone,
 }
 
 // sideEffect returns true if this instruction has side effects.
@@ -824,6 +837,8 @@ func (i *Instruction) sideEffect() sideEffect {
 var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeVIadd:     returnTypesFnV128,
 	OpcodeVIsub:     returnTypesFnV128,
+	OpcodeVImul:     returnTypesFnV128,
+	OpcodeVIneg:     returnTypesFnV128,
 	OpcodeBand:      returnTypesFnSingle,
 	OpcodeFcopysign: returnTypesFnSingle,
 	OpcodeBitcast:   returnTypesFnSingle,
@@ -1030,6 +1045,25 @@ func (i *Instruction) AsVIsub(x, y Value, lane VecLane) *Instruction {
 	i.opcode = OpcodeVIsub
 	i.v = x
 	i.v2 = y
+	i.u1 = uint64(lane)
+	i.typ = TypeV128
+	return i
+}
+
+// AsVImul initializes this instruction as an integer subtraction multiplication with OpcodeVImul on a vector.
+func (i *Instruction) AsVImul(x, y Value, lane VecLane) *Instruction {
+	i.opcode = OpcodeVImul
+	i.v = x
+	i.v2 = y
+	i.u1 = uint64(lane)
+	i.typ = TypeV128
+	return i
+}
+
+// AsVIneg initializes this instruction as a vector negation with OpcodeVIneg.
+func (i *Instruction) AsVIneg(x Value, lane VecLane) *Instruction {
+	i.opcode = OpcodeVIneg
+	i.v = x
 	i.u1 = uint64(lane)
 	i.typ = TypeV128
 	return i
@@ -1748,8 +1782,10 @@ func (i *Instruction) Format(b Builder) string {
 		OpcodeFcvtFromUint, OpcodeFcvtToSintSat, OpcodeFcvtToUintSat, OpcodeFdemote, OpcodeFpromote, OpcodeIreduce, OpcodeBitcast, OpcodeSqrt, OpcodeFabs,
 		OpcodeCeil, OpcodeFloor, OpcodeTrunc, OpcodeNearest:
 		instSuffix = " " + i.v.Format(b)
-	case OpcodeVIadd | OpcodeVIsub:
+	case OpcodeVIadd, OpcodeVIsub, OpcodeVImul:
 		instSuffix = fmt.Sprintf(".%s %s, %s", VecLane(i.u1), i.v.Format(b), i.v2.Format(b))
+	case OpcodeVIneg:
+		instSuffix = fmt.Sprintf(".%s %s", VecLane(i.u1), i.v.Format(b))
 	default:
 		panic(fmt.Sprintf("TODO: format for %s", i.opcode))
 	}
@@ -2124,6 +2160,10 @@ func (o Opcode) String() (ret string) {
 		return "VIadd"
 	case OpcodeVIsub:
 		return "VIsub"
+	case OpcodeVImul:
+		return "VImul"
+	case OpcodeVIneg:
+		return "VIneg"
 	}
 	panic(fmt.Sprintf("unknown opcode %d", o))
 }
