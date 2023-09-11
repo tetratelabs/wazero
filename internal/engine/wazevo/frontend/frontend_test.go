@@ -1678,6 +1678,53 @@ blk13: () <-- (blk0)
 	Jump blk6
 `,
 		},
+		{
+			name: "if_then_end_nesting_unreachable_if_then_else_end", m: testcases.IfThenEndNestingUnreachableIfThenElseEnd.Module,
+			exp: `
+blk0: (exec_ctx:i64, module_ctx:i64, v2:f64, v3:f64, v4:f64)
+	v6:i32 = Load module_ctx, 0x10
+	v7:i32 = Iconst_32 0x10
+	v8:i32 = Ushr v6, v7
+	Brz v8, blk3
+	Jump blk2
+
+blk1: (v5:i64) <-- (blk4)
+	Jump blk_ret
+
+blk2: () <-- (blk0)
+	v9:i32 = Load module_ctx, 0x10
+	v10:i32 = Iconst_32 0x10
+	v11:i32 = Ushr v9, v10
+	Jump blk4
+
+blk3: () <-- (blk0)
+	Jump blk4
+
+blk4: () <-- (blk2,blk3)
+	v12:i64 = Iconst_64 0x0
+	Jump blk1, v12
+`,
+			expAfterOpt: `
+blk0: (exec_ctx:i64, module_ctx:i64, v2:f64, v3:f64, v4:f64)
+	v6:i32 = Load module_ctx, 0x10
+	v7:i32 = Iconst_32 0x10
+	v8:i32 = Ushr v6, v7
+	Brz v8, blk3
+	Jump blk2
+
+blk1: () <-- (blk4)
+	Jump blk_ret
+
+blk2: () <-- (blk0)
+	Jump blk4
+
+blk3: () <-- (blk0)
+	Jump blk4
+
+blk4: () <-- (blk2,blk3)
+	Jump blk1
+`,
+		},
 	} {
 
 		tc := tc

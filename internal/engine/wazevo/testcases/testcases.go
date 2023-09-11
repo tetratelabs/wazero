@@ -1461,6 +1461,57 @@ var (
 			},
 		},
 	}
+
+	IfThenEndNestingUnreachableIfThenElseEnd = TestCase{
+		// This has been detected by fuzzing. This should belong to internal/integration_test/fuzzcases eventually,
+		// but for now, wazevo should have its own cases under engine/wazevo.
+		Name: "if_then_end_nesting_unreachable_if_then_else_end",
+		// (module
+		//  (type (;0;) (func (param f64 f64 f64)))
+		//  (func (;0;) (type 0) (param f64 f64 f64)
+		//    block (result i64) ;; label = @1
+		//      memory.size
+		//      if ;; label = @2
+		//        memory.size
+		//        br 0 (;@2;)
+		//        if ;; label = @3
+		//        else
+		//        end
+		//        drop
+		//      end
+		//      i64.const 0
+		//    end
+		//    drop
+		//  )
+		//  (memory (;0;) 4554)
+		//)
+		Module: &wasm.Module{
+			TypeSection: []wasm.FunctionType{
+				{Params: []wasm.ValueType{f64, f64, f64}},
+				{Results: []wasm.ValueType{i64}},
+			},
+
+			ExportSection:   []wasm.Export{{Name: ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 0}},
+			MemorySection:   &wasm.Memory{Min: 4554},
+			FunctionSection: []wasm.Index{0},
+			CodeSection: []wasm.Code{{Body: []byte{
+				wasm.OpcodeBlock, 1, // Signature v_i64,
+				wasm.OpcodeMemorySize, 0,
+				wasm.OpcodeIf, blockSignature_vv,
+				wasm.OpcodeMemorySize, 0,
+				wasm.OpcodeBr, 0x0, // label=0
+				wasm.OpcodeIf, blockSignature_vv,
+				wasm.OpcodeElse,
+				wasm.OpcodeEnd,
+				wasm.OpcodeDrop,
+				wasm.OpcodeEnd,
+				wasm.OpcodeI64Const, 0,
+				wasm.OpcodeEnd,
+				wasm.OpcodeDrop,
+				wasm.OpcodeEnd,
+			}}},
+		},
+	}
 )
 
 type TestCase struct {

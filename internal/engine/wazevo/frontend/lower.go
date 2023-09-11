@@ -48,9 +48,15 @@ func (l *loweringState) String() string {
 	for _, v := range l.values {
 		str = append(str, fmt.Sprintf("v%v", v.ID()))
 	}
-	return fmt.Sprintf("\n\tunreachable=%v(depth=%d), \n\tstack: %s",
+	var frames []string
+	for i := range l.controlFrames {
+		frames = append(frames, l.controlFrames[i].kind.String())
+	}
+	return fmt.Sprintf("\n\tunreachable=%v(depth=%d)\n\tstack: %s\n\tcontrol frames: %s",
 		l.unreachable, l.unreachableDepth,
-		strings.Join(str, ", "))
+		strings.Join(str, ", "),
+		strings.Join(frames, ", "),
+	)
 }
 
 const (
@@ -60,6 +66,24 @@ const (
 	controlFrameKindIfWithoutElse
 	controlFrameKindBlock
 )
+
+// String implements fmt.Stringer for debugging.
+func (k controlFrameKind) String() string {
+	switch k {
+	case controlFrameKindFunction:
+		return "function"
+	case controlFrameKindLoop:
+		return "loop"
+	case controlFrameKindIfWithElse:
+		return "if_with_else"
+	case controlFrameKindIfWithoutElse:
+		return "if_without_else"
+	case controlFrameKindBlock:
+		return "block"
+	default:
+		panic(k)
+	}
+}
 
 // isLoop returns true if this is a loop frame.
 func (ctrl *controlFrame) isLoop() bool {
@@ -1037,14 +1061,13 @@ func (c *Compiler) lowerCurrentOpcode() {
 		builder.Seal(elseBlk)
 	case wasm.OpcodeElse:
 		ifctrl := state.ctrlPeekAt(0)
-		ifctrl.kind = controlFrameKindIfWithElse
-
 		if unreachable := state.unreachable; unreachable && state.unreachableDepth > 0 {
 			// If it is currently in unreachable and is a nested if,
 			// we just remove the entire else block.
 			break
 		}
 
+		ifctrl.kind = controlFrameKindIfWithElse
 		if !state.unreachable {
 			// If this Then block is currently reachable, we have to insert the branching to the following BB.
 			followingBlk := ifctrl.followingBlock // == the BB after if-then-else.

@@ -404,8 +404,6 @@ func TestMachine_getOperand_ER_SR_NR(t *testing.T) {
 				extArgConst:  true,
 				instructions: []string{"movz w100?, #0xffff, lsl 0"},
 			},
-
-			///////////
 			{
 				name: "8(VReg)->64->64: signed",
 				from: 8, to: 64, signed: true, mode: extModeZeroExtend64,
