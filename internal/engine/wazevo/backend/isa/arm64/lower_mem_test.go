@@ -835,3 +835,22 @@ func TestMachine_lowerToAddressModeFromAddends(t *testing.T) {
 		})
 	}
 }
+
+func Test_extLoadSizeSign(t *testing.T) {
+	for _, tc := range []struct {
+		op      ssa.Opcode
+		expSize byte
+		signed  bool
+	}{
+		{op: ssa.OpcodeUload8, expSize: 8, signed: false},
+		{op: ssa.OpcodeUload16, expSize: 16, signed: false},
+		{op: ssa.OpcodeUload32, expSize: 32, signed: false},
+		{op: ssa.OpcodeSload8, expSize: 8, signed: true},
+		{op: ssa.OpcodeSload16, expSize: 16, signed: true},
+		{op: ssa.OpcodeSload32, expSize: 32, signed: true},
+	} {
+		size, signed := extLoadSignSize(tc.op)
+		require.Equal(t, tc.expSize, size)
+		require.Equal(t, tc.signed, signed)
+	}
+}

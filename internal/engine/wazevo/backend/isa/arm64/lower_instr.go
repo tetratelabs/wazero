@@ -147,7 +147,9 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 	case ssa.OpcodeLoad:
 		m.lowerLoad(instr)
 	case ssa.OpcodeUload8, ssa.OpcodeUload16, ssa.OpcodeUload32, ssa.OpcodeSload8, ssa.OpcodeSload16, ssa.OpcodeSload32:
-		m.lowerExtLoad(instr)
+		ptr, offset, _ := instr.LoadData()
+		ret := m.compiler.VRegOf(instr.Return())
+		m.lowerExtLoad(op, ptr, offset, ret)
 	case ssa.OpcodeCall, ssa.OpcodeCallIndirect:
 		m.lowerCall(instr)
 	case ssa.OpcodeIcmp:

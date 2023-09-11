@@ -181,28 +181,34 @@ func (a addressMode) sizeInBitsToShiftAmount(sizeInBits byte) (lsl byte) {
 	return
 }
 
-func (m *machine) lowerExtLoad(si *ssa.Instruction) {
-	ptr, offset, _ := si.LoadData()
-
-	// Extension loads are always 64 bit destination.
-	amode := m.lowerToAddressMode(ptr, offset, 64)
-
-	load := m.allocateInstr()
-	switch si.Opcode() {
+func extLoadSignSize(op ssa.Opcode) (size byte, signed bool) {
+	switch op {
 	case ssa.OpcodeUload8:
-		load.asULoad(operandNR(m.compiler.VRegOf(si.Return())), amode, 8)
+		size, signed = 8, false
 	case ssa.OpcodeUload16:
-		load.asULoad(operandNR(m.compiler.VRegOf(si.Return())), amode, 16)
+		size, signed = 16, false
 	case ssa.OpcodeUload32:
-		load.asULoad(operandNR(m.compiler.VRegOf(si.Return())), amode, 32)
+		size, signed = 32, false
 	case ssa.OpcodeSload8:
-		load.asSLoad(operandNR(m.compiler.VRegOf(si.Return())), amode, 8)
+		size, signed = 8, true
 	case ssa.OpcodeSload16:
-		load.asSLoad(operandNR(m.compiler.VRegOf(si.Return())), amode, 16)
+		size, signed = 16, true
 	case ssa.OpcodeSload32:
-		load.asSLoad(operandNR(m.compiler.VRegOf(si.Return())), amode, 32)
+		size, signed = 32, true
 	default:
 		panic("BUG")
+	}
+	return
+}
+
+func (m *machine) lowerExtLoad(op ssa.Opcode, ptr ssa.Value, offset uint32, ret regalloc.VReg) {
+	size, signed := extLoadSignSize(op)
+	amode := m.lowerToAddressMode(ptr, offset, size)
+	load := m.allocateInstr()
+	if signed {
+		load.asSLoad(operandNR(ret), amode, size)
+	} else {
+		load.asULoad(operandNR(ret), amode, size)
 	}
 	m.insert(load)
 }
@@ -239,21 +245,21 @@ func (m *machine) lowerStore(si *ssa.Instruction) {
 }
 
 // lowerToAddressMode converts a pointer to an addressMode that can be used as an operand for load/store instructions.
-func (m *machine) lowerToAddressMode(ptr ssa.Value, offsetBase uint32, dstSizeInBits byte) (amode addressMode) {
+func (m *machine) lowerToAddressMode(ptr ssa.Value, offsetBase uint32, size byte) (amode addressMode) {
 	// TODO: currently the instruction selection logic doesn't support addressModeKindRegScaledExtended and
 	// addressModeKindRegScaled since collectAddends doesn't take ssa.OpcodeIshl into account. This should be fixed
 	// to support more efficient address resolution.
 
 	a32s, a64s, offset := m.collectAddends(ptr)
 	offset += int64(offsetBase)
-	return m.lowerToAddressModeFromAddends(a32s, a64s, dstSizeInBits, offset)
+	return m.lowerToAddressModeFromAddends(a32s, a64s, size, offset)
 }
 
 // lowerToAddressModeFromAddends creates an addressMode from a list of addends collected by collectAddends.
 // During the construction, this might emit additional instructions.
 //
 // Extracted as a separate function for easy testing.
-func (m *machine) lowerToAddressModeFromAddends(a32s []addend32, a64s []regalloc.VReg, dstSizeInBits byte, offset int64) (amode addressMode) {
+func (m *machine) lowerToAddressModeFromAddends(a32s []addend32, a64s []regalloc.VReg, size byte, offset int64) (amode addressMode) {
 	switch a64sExist, a32sExist := len(a64s) > 0, len(a32s) > 0; {
 	case a64sExist && a32sExist:
 		var base regalloc.VReg
@@ -261,7 +267,7 @@ func (m *machine) lowerToAddressModeFromAddends(a32s []addend32, a64s []regalloc
 		var a32 addend32
 		a32, a32s = dequeue(a32s)
 		amode = addressMode{kind: addressModeKindRegExtended, rn: base, rm: a32.r, extOp: a32.ext}
-	case a64sExist && offsetFitsInAddressModeKindRegUnsignedImm12(dstSizeInBits, offset):
+	case a64sExist && offsetFitsInAddressModeKindRegUnsignedImm12(size, offset):
 		var base regalloc.VReg
 		base, a64s = dequeue(a64s)
 		amode = addressMode{kind: addressModeKindRegUnsignedImm12, rn: base, imm: offset}
