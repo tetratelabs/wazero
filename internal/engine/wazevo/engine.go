@@ -27,6 +27,8 @@ type (
 		refToBinaryOffset map[ssa.FuncRef]int
 		// builtinFunctions is hods compiled builtin function trampolines.
 		builtinFunctions *builtinFunctions
+		// setFinalizer defaults to runtime.SetFinalizer, but overridable for tests.
+		setFinalizer func(obj interface{}, finalizer interface{})
 	}
 
 	builtinFunctions struct {
@@ -66,7 +68,10 @@ var _ wasm.Engine = (*engine)(nil)
 
 // NewEngine returns the implementation of wasm.Engine.
 func NewEngine(ctx context.Context, _ api.CoreFeatures, _ filecache.Cache) wasm.Engine {
-	e := &engine{compiledModules: make(map[wasm.ModuleID]*compiledModule), refToBinaryOffset: make(map[ssa.FuncRef]int)}
+	e := &engine{
+		compiledModules: make(map[wasm.ModuleID]*compiledModule), refToBinaryOffset: make(map[ssa.FuncRef]int),
+		setFinalizer: runtime.SetFinalizer,
+	}
 	e.compileBuiltinFunctions(ctx)
 	return e
 }
@@ -205,9 +210,7 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 	}
 	e.compiledModules[module.ID] = cm
 	cm.builtinFunctions = e.builtinFunctions
-
-	// TODO: finalizer.
-
+	e.setFinalizer(cm, compiledModuleFinalizer)
 	return cm, nil
 }
 
@@ -449,7 +452,28 @@ func (e *engine) compileBuiltinFunctions(ctx context.Context) {
 		e.builtinFunctions.stackGrowExecutable = mmapExecutable(src)
 	}
 
-	// TODO: finalizer.
+	e.setFinalizer(e.builtinFunctions, builtinFunctionFinalizer)
+}
+
+func builtinFunctionFinalizer(bf *builtinFunctions) {
+	if err := platform.MunmapCodeSegment(bf.memoryGrowExecutable); err != nil {
+		panic(err)
+	}
+	if err := platform.MunmapCodeSegment(bf.stackGrowExecutable); err != nil {
+		panic(err)
+	}
+
+	bf.memoryGrowExecutable = nil
+	bf.stackGrowExecutable = nil
+}
+
+func compiledModuleFinalizer(cm *compiledModule) {
+	if len(cm.executable) > 0 {
+		if err := platform.MunmapCodeSegment(cm.executable); err != nil {
+			panic(err)
+		}
+	}
+	cm.executable = nil
 }
 
 func mmapExecutable(src []byte) []byte {
