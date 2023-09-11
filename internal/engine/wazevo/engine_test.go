@@ -3,10 +3,11 @@ package wazevo
 import (
 	"context"
 	"fmt"
+	"testing"
+
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
-	"testing"
 )
 
 func Test_builtinFunctionFinalizer(t *testing.T) {
