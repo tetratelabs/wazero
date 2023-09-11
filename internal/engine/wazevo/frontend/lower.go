@@ -769,7 +769,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 				Return()
 
 			memSizeInBytes = builder.AllocateInstruction().
-				AsLoad(memInstPtr, memoryInstanceBufSizeOffset, ssa.TypeI64).
+				AsLoad(memInstPtr, memoryInstanceBufSizeOffset, ssa.TypeI32).
 				Insert(builder).
 				Return()
 		} else {
