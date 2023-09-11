@@ -354,6 +354,9 @@ func encodeVecRRR(op vecOp, rd, rn, rm uint32, arr vecArrangement) uint32 {
 	case vecOpAdd:
 		size, q := arrToSizeQEncoded(arr)
 		return encodeAdvancedSIMDThreeSame(rd, rn, rm, 0b10000, size, 0b0, q)
+	case vecOpSub:
+		size, q := arrToSizeQEncoded(arr)
+		return encodeAdvancedSIMDThreeSame(rd, rn, rm, 0b10000, size, 0b1, q)
 	default:
 		panic("TODO")
 	}

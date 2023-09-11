@@ -335,6 +335,9 @@ const (
 	// OpcodeIsub performs an integer subtraction: `v = Isub x, y`.
 	OpcodeIsub
 
+	// OpcodeVIsub performs an integer subtraction: `v = IVsub.lane x, y` on vector.
+	OpcodeVIsub
+
 	// OpcodeImul performs an integer multiplication: `v = Imul x, y`.
 	OpcodeImul
 
@@ -805,6 +808,7 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeFcopysign:          sideEffectNone,
 	OpcodeVconst:             sideEffectNone,
 	OpcodeVIadd:              sideEffectNone,
+	OpcodeVIsub:              sideEffectNone,
 }
 
 // sideEffect returns true if this instruction has side effects.
@@ -819,6 +823,7 @@ func (i *Instruction) sideEffect() sideEffect {
 // instructionReturnTypes provides the function to determine the return types of an instruction.
 var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeVIadd:     returnTypesFnV128,
+	OpcodeVIsub:     returnTypesFnV128,
 	OpcodeBand:      returnTypesFnSingle,
 	OpcodeFcopysign: returnTypesFnSingle,
 	OpcodeBitcast:   returnTypesFnSingle,
@@ -944,6 +949,14 @@ func (i *Instruction) AsExtLoad(op Opcode, ptr Value, offset uint32, dst64bit bo
 	}
 }
 
+// AsSimdLoad initializes this instruction as a load instruction with OpcodeLoad 128 bit.
+func (i *Instruction) AsSimdLoad(op Opcode, ptr Value, offset uint32) {
+	i.opcode = op
+	i.v = ptr
+	i.u1 = uint64(offset)
+	i.typ = TypeV128
+}
+
 // LoadData returns the operands for a load instruction.
 func (i *Instruction) LoadData() (ptr Value, offset uint32, typ Type) {
 	return i.v, uint32(i.u1), i.typ
@@ -1005,6 +1018,16 @@ func (i *Instruction) AsIadd(x, y Value) *Instruction {
 // AsVIadd initializes this instruction as an integer addition instruction with OpcodeVIadd on a vector.
 func (i *Instruction) AsVIadd(x, y Value, lane VecLane) *Instruction {
 	i.opcode = OpcodeVIadd
+	i.v = x
+	i.v2 = y
+	i.u1 = uint64(lane)
+	i.typ = TypeV128
+	return i
+}
+
+// AsVIsub initializes this instruction as an integer subtraction instruction with OpcodeVIsub on a vector.
+func (i *Instruction) AsVIsub(x, y Value, lane VecLane) *Instruction {
+	i.opcode = OpcodeVIsub
 	i.v = x
 	i.v2 = y
 	i.u1 = uint64(lane)
@@ -1725,7 +1748,7 @@ func (i *Instruction) Format(b Builder) string {
 		OpcodeFcvtFromUint, OpcodeFcvtToSintSat, OpcodeFcvtToUintSat, OpcodeFdemote, OpcodeFpromote, OpcodeIreduce, OpcodeBitcast, OpcodeSqrt, OpcodeFabs,
 		OpcodeCeil, OpcodeFloor, OpcodeTrunc, OpcodeNearest:
 		instSuffix = " " + i.v.Format(b)
-	case OpcodeVIadd:
+	case OpcodeVIadd | OpcodeVIsub:
 		instSuffix = fmt.Sprintf(".%s %s, %s", VecLane(i.u1), i.v.Format(b), i.v2.Format(b))
 	default:
 		panic(fmt.Sprintf("TODO: format for %s", i.opcode))
@@ -2099,6 +2122,8 @@ func (o Opcode) String() (ret string) {
 		return "ExtractVector"
 	case OpcodeVIadd:
 		return "VIadd"
+	case OpcodeVIsub:
+		return "VIsub"
 	}
 	panic(fmt.Sprintf("unknown opcode %d", o))
 }

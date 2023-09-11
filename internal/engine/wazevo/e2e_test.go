@@ -137,6 +137,7 @@ func TestSpectestV2(t *testing.T) {
 		{"if"},
 		{"loop"},
 		{"simd_const"},
+		{"simd_i16x8_arith"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Run("normal", func(t *testing.T) {

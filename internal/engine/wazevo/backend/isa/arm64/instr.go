@@ -1514,6 +1514,7 @@ const (
 	vecOpBit
 	vecOpEOR
 	vecOpAdd
+	vecOpSub
 )
 
 // bitOp determines the type of bitwise operation. Instructions whose kind is one of
