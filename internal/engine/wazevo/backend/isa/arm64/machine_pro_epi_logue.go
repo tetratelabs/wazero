@@ -32,9 +32,7 @@ func (m *machine) SetupPrologue() {
 	str := m.allocateInstrAfterLowering()
 	amode := addressModePreOrPostIndex(spVReg, -16 /* stack pointer must be 16-byte aligned. */, true /* decrement before store */)
 	str.asStore(operandNR(lrVReg), amode, 64)
-	cur.next = str
-	str.prev = cur
-	cur = str
+	cur = linkInstr(cur, str)
 
 	if !m.stackBoundsCheckDisabled {
 		cur = m.insertStackBoundsCheck(m.requiredStackSize(), cur)
@@ -111,15 +109,11 @@ func (m *machine) SetupPrologue() {
 			// TODO: pair stores to reduce the number of instructions.
 			store := m.allocateInstrAfterLowering()
 			store.asStore(operandNR(vr), _amode, regTypeToRegisterSizeInBits(vr.RegType()))
-			cur.next = store
-			store.prev = cur
-			cur = store
+			cur = linkInstr(cur, store)
 		}
 	}
 
-	cur.next = prevInitInst
-
-	prevInitInst.prev = cur
+	linkInstr(cur, prevInitInst)
 }
 
 // SetupEpilogue implements backend.Machine.
@@ -187,9 +181,7 @@ func (m *machine) setupEpilogueAfter(cur *instruction) {
 			case 128: // save vector reg.
 				load.asFpuLoad(operandNR(vr), amode, 128)
 			}
-			cur.next = load
-			load.prev = cur
-			cur = load
+			cur = linkInstr(cur, load)
 		}
 	}
 
@@ -237,11 +229,9 @@ func (m *machine) setupEpilogueAfter(cur *instruction) {
 	ldr := m.allocateInstrAfterLowering()
 	amode := addressModePreOrPostIndex(spVReg, 16 /* stack pointer must be 16-byte aligned. */, false /* increment after loads */)
 	ldr.asULoad(operandNR(lrVReg), amode, 64)
-	cur.next = ldr
-	ldr.prev = cur
+	cur = linkInstr(cur, ldr)
 
-	ldr.next = prevNext
-	prevNext.prev = ldr
+	linkInstr(cur, prevNext)
 }
 
 // saveRequiredRegs is the set of registers that must be saved/restored during growing stack when there's insufficient
@@ -287,23 +277,17 @@ func (m *machine) insertStackBoundsCheck(requiredStackSize int64, cur *instructi
 		rn:   x0VReg, // execution context is always the first argument.
 		imm:  wazevoapi.ExecutionContextOffsets.StackBottomPtr.I64(),
 	}, 64)
-	ldr.prev = cur
-	cur.next = ldr
-	cur = ldr
+	cur = linkInstr(cur, ldr)
 
 	// subs xzr, tmp, tmp2
 	subs := m.allocateInstrAfterLowering()
 	subs.asALU(aluOpSubS, operandNR(xzrVReg), operandNR(tmpRegVReg), operandNR(tmp2), true)
-	subs.prev = cur
-	cur.next = subs
-	cur = subs
+	cur = linkInstr(cur, subs)
 
 	// b.ge #imm
 	cbr := m.allocateInstr()
 	cbr.asCondBr(ge.asCond(), invalidLabel, false /* ignored */)
-	cbr.prev = cur
-	cur.next = cbr
-	cur = cbr
+	cur = linkInstr(cur, cbr)
 
 	// Set the required stack size and set it to the exec context.
 	{
@@ -316,9 +300,8 @@ func (m *machine) insertStackBoundsCheck(requiredStackSize int64, cur *instructi
 				// Execution context is always the first argument.
 				rn: x0VReg, imm: wazevoapi.ExecutionContextOffsets.StackGrowRequiredSize.I64(),
 			}, 64)
-		setRequiredStackSize.prev = cur
-		cur.next = setRequiredStackSize
-		cur = setRequiredStackSize
+
+		cur = linkInstr(cur, setRequiredStackSize)
 	}
 
 	ldrAddress := m.allocateInstr()
@@ -327,17 +310,13 @@ func (m *machine) insertStackBoundsCheck(requiredStackSize int64, cur *instructi
 		rn:   x0VReg, // execution context is always the first argument
 		imm:  wazevoapi.ExecutionContextOffsets.StackGrowCallSequenceAddress.I64(),
 	}, 64)
-	ldrAddress.prev = cur
-	cur.next = ldrAddress
-	cur = ldrAddress
+	cur = linkInstr(cur, ldrAddress)
 
 	// Then jumps to the stack grow call sequence's address, meaning
 	// transferring the control to the code compiled by CompileStackGrowCallSequence.
 	bl := m.allocateInstr()
 	bl.asCallIndirect(tmpRegVReg, nil)
-	bl.prev = cur
-	cur.next = bl
-	cur = bl
+	cur = linkInstr(cur, bl)
 
 	// Now that we know the entire code, we can finalize how many bytes
 	// we have to skip when the stack size is sufficient.
@@ -376,9 +355,7 @@ func (m *machine) CompileStackGrowCallSequence() []byte {
 	// Then goes back the original address of this stack grow call.
 	ret := m.allocateInstr()
 	ret.asRet(nil)
-	ret.prev = cur
-	cur.next = ret
-	cur = ret
+	cur = linkInstr(cur, ret)
 
 	m.encode(m.rootInstr)
 	return m.compiler.Buf()
