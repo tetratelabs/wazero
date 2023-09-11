@@ -259,14 +259,14 @@ func (m *machine) getOperand_SR_NR(def *backend.SSAValueDefinition, mode extMode
 	if m.compiler.MatchInstr(def, ssa.OpcodeIshl) {
 		// Check if the shift amount is constant instruction.
 		targetVal, amountVal := def.Instr.Arg2()
+		targetVReg := m.getOperand_NR(m.compiler.ValueDefinition(targetVal), extModeNone).nr()
 		amountDef := m.compiler.ValueDefinition(amountVal)
 		if amountDef.IsFromInstr() && amountDef.Instr.Constant() {
 			// If that is the case, we can use the shifted register operand (SR).
 			c := amountDef.Instr.ConstantVal() & 63 // Clears the unnecessary bits.
-			vreg := m.compiler.VRegOf(targetVal)
 			m.compiler.MarkLowered(def.Instr)
 			m.compiler.MarkLowered(amountDef.Instr)
-			return operandSR(vreg, byte(c), shiftOpLSL)
+			return operandSR(targetVReg, byte(c), shiftOpLSL)
 		}
 	}
 	return m.getOperand_NR(def, mode)

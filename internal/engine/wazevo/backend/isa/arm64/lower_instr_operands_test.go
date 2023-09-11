@@ -187,7 +187,7 @@ func TestMachine_getOperand_SR_NR(t *testing.T) {
 				ctx.definitions[p2] = &backend.SSAValueDefinition{BlkParamVReg: regalloc.VReg(2), BlockParamValue: p2}
 				ctx.definitions[p3] = &backend.SSAValueDefinition{BlkParamVReg: regalloc.VReg(3), BlockParamValue: p3}
 				ctx.definitions[addResult] = &backend.SSAValueDefinition{Instr: add, N: 0}
-
+				ctx.vRegMap[addResult] = regalloc.VReg(1234) // whatever is fine.
 				ctx.vRegMap[ishl.Return()] = regalloc.VReg(10)
 				def = &backend.SSAValueDefinition{Instr: ishl, N: 0}
 				return def, extModeNone, func(t *testing.T) {}
@@ -198,6 +198,39 @@ func TestMachine_getOperand_SR_NR(t *testing.T) {
 			name:  "ishl with const amount",
 			setup: ishlWithConstAmount,
 			exp:   operandSR(regalloc.VReg(1234), 14, shiftOpLSL),
+		},
+		{
+			name: "ishl with const amount with const shift target",
+			setup: func(
+				ctx *mockCompiler, builder ssa.Builder, m *machine,
+			) (def *backend.SSAValueDefinition, mode extMode, verify func(t *testing.T)) {
+				const nextVReg = 100
+				ctx.vRegCounter = nextVReg - 1
+
+				target := builder.AllocateInstruction().AsIconst64(0xff).Insert(builder)
+				amount := builder.AllocateInstruction().AsIconst32(14).Insert(builder)
+				targetVal, amountVal := target.Return(), amount.Return()
+
+				ishl := builder.AllocateInstruction()
+				ishl.AsIshl(target.Return(), amountVal)
+				builder.InsertInstruction(ishl)
+
+				ctx.definitions[targetVal] = &backend.SSAValueDefinition{Instr: target, N: 0}
+				ctx.definitions[amountVal] = &backend.SSAValueDefinition{Instr: amount, N: 0}
+				ctx.vRegMap[targetVal] = regalloc.VReg(1234)
+				ctx.vRegMap[ishl.Return()] = regalloc.VReg(10)
+				def = &backend.SSAValueDefinition{Instr: ishl, N: 0}
+				mode = extModeNone
+				verify = func(t *testing.T) {
+					_, ok := ctx.lowered[ishl]
+					require.True(t, ok)
+					_, ok = ctx.lowered[amount]
+					require.True(t, ok)
+				}
+				return
+			},
+			exp:          operandSR(regalloc.VReg(100).SetRegType(regalloc.RegTypeInt), 14, shiftOpLSL),
+			instructions: []string{"orr x100?, xzr, #0xff"},
 		},
 		{
 			name: "ishl with const amount but group id is different",
