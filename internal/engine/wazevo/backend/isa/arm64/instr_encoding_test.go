@@ -695,7 +695,7 @@ func TestInstruction_encode_br_condflag(t *testing.T) {
 	}
 }
 
-func TestInstruction_encoding_store(t *testing.T) {
+func TestInstruction_encoding_store_encoding(t *testing.T) {
 	amodeRegScaledExtended1 := addressMode{kind: addressModeKindRegScaledExtended, rn: x30VReg, rm: x1VReg, extOp: extendOpUXTW}
 	amodeRegScaledExtended2 := addressMode{kind: addressModeKindRegScaledExtended, rn: spVReg, rm: x1VReg, extOp: extendOpSXTW}
 	amodeRegScaled1 := addressMode{kind: addressModeKindRegScaled, rn: x30VReg, rm: x1VReg}
