@@ -74,12 +74,15 @@ func (o operand) nr() regalloc.VReg {
 
 // operandER encodes the given VReg as an operand of operandKindER.
 func operandER(r regalloc.VReg, eop extendOp, to byte) operand {
+	if to < 32 {
+		panic("TODO?BUG?: when we need to extend to less than 32 bits?")
+	}
 	return operand{kind: operandKindER, data: uint64(r), data2: uint64(eop)<<32 | uint64(to)}
 }
 
 // er decodes the underlying VReg, extend operation, and the target size assuming the operand is of operandKindER.
 func (o operand) er() (r regalloc.VReg, eop extendOp, to byte) {
-	return regalloc.VReg(o.data), extendOp(o.data2>>32) & 0xff, byte(o.data) & 0xff
+	return regalloc.VReg(o.data), extendOp(o.data2>>32) & 0xff, byte(o.data2 & 0xff)
 }
 
 // operandSR encodes the given VReg as an operand of operandKindSR.
@@ -215,15 +218,16 @@ func (m *machine) getOperand_ER_SR_NR(def *backend.SSAValueDefinition, mode extM
 
 		signed := extInstr.Opcode() == ssa.OpcodeSExtend
 		innerExtFromBits, innerExtToBits := extInstr.ExtendFromToBits()
-		if mode == extModeNone {
+		modeBits, modeSigned := mode.bits(), mode.signed()
+		if mode == extModeNone || innerExtToBits == modeBits {
 			eop := extendOpFrom(signed, innerExtFromBits)
-			op = operandER(m.compiler.VRegOf(extInstr.Arg()), eop, innerExtToBits)
+			extArg := m.getOperand_NR(m.compiler.ValueDefinition(extInstr.Arg()), extModeNone)
+			op = operandER(extArg.nr(), eop, innerExtToBits)
 			m.compiler.MarkLowered(extInstr) // We merged the instruction in the operand.
 			return
 		}
 
-		modeBits, modeSigned := mode.bits(), mode.signed()
-		if innerExtToBits >= modeBits {
+		if innerExtToBits > modeBits {
 			panic("BUG?TODO?: need the results of inner extension to be larger than the mode")
 		}
 

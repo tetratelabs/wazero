@@ -232,6 +232,7 @@ func TestMachine_getOperand_SR_NR(t *testing.T) {
 }
 
 func TestMachine_getOperand_ER_SR_NR(t *testing.T) {
+	const nextVReg = 100
 	type testCase struct {
 		setup        func(*mockCompiler, ssa.Builder, *machine) (def *backend.SSAValueDefinition, mode extMode, verify func(t *testing.T))
 		exp          operand
@@ -239,6 +240,7 @@ func TestMachine_getOperand_ER_SR_NR(t *testing.T) {
 	}
 	runner := func(tc testCase) {
 		ctx, b, m := newSetupWithMockContext()
+		ctx.vRegCounter = nextVReg - 1
 		def, mode, verify := tc.setup(ctx, b, m)
 		actual := m.getOperand_ER_SR_NR(def, mode)
 		require.Equal(t, tc.exp, actual)
@@ -286,7 +288,9 @@ func TestMachine_getOperand_ER_SR_NR(t *testing.T) {
 						ext.AsUExtend(v, c.from, c.to)
 					}
 					builder.InsertInstruction(ext)
+					extArg := ext.Arg()
 					ctx.vRegMap[ext.Arg()] = regalloc.VReg(10)
+					ctx.definitions[v] = &backend.SSAValueDefinition{BlkParamVReg: regalloc.VReg(10), BlockParamValue: extArg}
 					def = &backend.SSAValueDefinition{Instr: ext, N: 0}
 					return def, extModeNone, func(t *testing.T) {
 						_, ok := ctx.lowered[ext]
@@ -301,12 +305,14 @@ func TestMachine_getOperand_ER_SR_NR(t *testing.T) {
 	t.Run("valid mode", func(t *testing.T) {
 		const argVReg, resultVReg = regalloc.VReg(10), regalloc.VReg(11)
 		for _, c := range []struct {
-			name     string
-			from, to byte
-			signed   bool
-			mode     extMode
-			exp      operand
-			lowered  bool
+			name         string
+			from, to     byte
+			signed       bool
+			mode         extMode
+			exp          operand
+			lowered      bool
+			extArgConst  bool
+			instructions []string
 		}{
 			{
 				name: "8->16->32: signed",
@@ -356,6 +362,93 @@ func TestMachine_getOperand_ER_SR_NR(t *testing.T) {
 				exp:     operandER(argVReg, extendOpUXTB, 64),
 				lowered: true,
 			},
+			{
+				name: "8(VReg)->64->64: unsigned",
+				from: 8, to: 64, signed: false, mode: extModeZeroExtend64,
+				exp:     operandER(argVReg, extendOpUXTB, 64),
+				lowered: true,
+			},
+			{
+				name: "8(VReg,Const)->64->64: unsigned",
+				from: 8, to: 64, signed: false, mode: extModeZeroExtend64,
+				exp:          operandER(regalloc.VReg(nextVReg).SetRegType(regalloc.RegTypeInt), extendOpUXTB, 64),
+				lowered:      true,
+				extArgConst:  true,
+				instructions: []string{"movz w100?, #0xffff, lsl 0"},
+			},
+			{
+				name: "16(VReg)->64->64: unsigned",
+				from: 16, to: 64, signed: false, mode: extModeZeroExtend64,
+				exp:     operandER(argVReg, extendOpUXTH, 64),
+				lowered: true,
+			},
+			{
+				name: "16(VReg,Const)->64->64: unsigned",
+				from: 16, to: 64, signed: false, mode: extModeZeroExtend64,
+				exp:          operandER(regalloc.VReg(nextVReg).SetRegType(regalloc.RegTypeInt), extendOpUXTH, 64),
+				lowered:      true,
+				extArgConst:  true,
+				instructions: []string{"movz w100?, #0xffff, lsl 0"},
+			},
+			{
+				name: "32(VReg)->64->64: unsigned",
+				from: 32, to: 64, signed: false, mode: extModeZeroExtend64,
+				exp:     operandER(argVReg, extendOpUXTW, 64),
+				lowered: true,
+			},
+			{
+				name: "32(VReg,Const)->64->64: unsigned",
+				from: 32, to: 64, signed: false, mode: extModeZeroExtend64,
+				exp:          operandER(regalloc.VReg(nextVReg).SetRegType(regalloc.RegTypeInt), extendOpUXTW, 64),
+				lowered:      true,
+				extArgConst:  true,
+				instructions: []string{"movz w100?, #0xffff, lsl 0"},
+			},
+
+			///////////
+			{
+				name: "8(VReg)->64->64: signed",
+				from: 8, to: 64, signed: true, mode: extModeZeroExtend64,
+				exp:     operandER(argVReg, extendOpSXTB, 64),
+				lowered: true,
+			},
+			{
+				name: "8(VReg,Const)->64->64: signed",
+				from: 8, to: 64, signed: true, mode: extModeZeroExtend64,
+				exp:          operandER(regalloc.VReg(nextVReg).SetRegType(regalloc.RegTypeInt), extendOpSXTB, 64),
+				lowered:      true,
+				extArgConst:  true,
+				instructions: []string{"movz w100?, #0xffff, lsl 0"},
+			},
+			{
+				name: "16(VReg)->64->64: signed",
+				from: 16, to: 64, signed: true, mode: extModeZeroExtend64,
+				exp:     operandER(argVReg, extendOpSXTH, 64),
+				lowered: true,
+			},
+			{
+				name: "16(VReg,Const)->64->64: signed",
+				from: 16, to: 64, signed: true, mode: extModeZeroExtend64,
+				exp:          operandER(regalloc.VReg(nextVReg).SetRegType(regalloc.RegTypeInt), extendOpSXTH, 64),
+				lowered:      true,
+				extArgConst:  true,
+				instructions: []string{"movz w100?, #0xffff, lsl 0"},
+			},
+			{
+				name: "32(VReg)->64->64: signed",
+				from: 32, to: 64, signed: true, mode: extModeZeroExtend64,
+				exp:     operandER(argVReg, extendOpSXTW, 64),
+				lowered: true,
+			},
+			{
+				name: "32(VReg,Const)->64->64: signed",
+				from: 32, to: 64, signed: true, mode: extModeZeroExtend64,
+				exp:          operandER(regalloc.VReg(nextVReg).SetRegType(regalloc.RegTypeInt), extendOpSXTW, 64),
+				lowered:      true,
+				extArgConst:  true,
+				instructions: []string{"movz w100?, #0xffff, lsl 0"},
+			},
+
 			// Not lowered cases.
 			{
 				name: "8-signed->16-zero->64",
@@ -406,15 +499,28 @@ func TestMachine_getOperand_ER_SR_NR(t *testing.T) {
 							ext.AsUExtend(v, c.from, c.to)
 						}
 						builder.InsertInstruction(ext)
-						ctx.vRegMap[ext.Arg()] = argVReg
+						extArg := ext.Arg()
+						ctx.vRegMap[extArg] = argVReg
 						ctx.vRegMap[ext.Return()] = resultVReg
+						if c.extArgConst {
+							iconst := builder.AllocateInstruction().AsIconst32(0xffff).Insert(builder)
+							m.compiler.(*mockCompiler).definitions[extArg] = &backend.SSAValueDefinition{
+								Instr: iconst,
+							}
+						} else {
+							m.compiler.(*mockCompiler).definitions[extArg] = &backend.SSAValueDefinition{
+								BlkParamVReg:    argVReg,
+								BlockParamValue: extArg,
+							}
+						}
 						def = &backend.SSAValueDefinition{Instr: ext, N: 0}
 						return def, c.mode, func(t *testing.T) {
 							_, ok := ctx.lowered[ext]
 							require.Equal(t, c.lowered, ok)
 						}
 					},
-					exp: c.exp,
+					exp:          c.exp,
+					instructions: c.instructions,
 				})
 			})
 		}

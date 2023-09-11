@@ -144,6 +144,16 @@ func (i *instruction) encode(c backend.Compiler) {
 			i.u3 == 1,
 			rn == sp,
 		))
+	case aluRRRExtend:
+		rm, exo, to := i.rm.er()
+		c.Emit4Bytes(encodeAluRRRExtend(
+			aluOp(i.u1),
+			regNumberInEncoding[i.rd.realReg()],
+			regNumberInEncoding[i.rn.realReg()],
+			regNumberInEncoding[rm.RealReg()],
+			exo,
+			to,
+		))
 	case aluRRRShift:
 		r, amt, sop := i.rm.sr()
 		c.Emit4Bytes(encodeAluRRRShift(
@@ -1060,6 +1070,48 @@ func encodeAluRRRShift(op aluOp, rd, rn, rm, amount uint32, shiftOp shiftOp, _64
 		panic(shiftOp.String())
 	}
 	return opc<<29 | n<<21 | _31to24<<24 | shift<<22 | rm<<16 | (amount << 10) | (rn << 5) | rd
+}
+
+// "Add/subtract (extended register)" in
+// https://developer.arm.com/documentation/ddi0596/2020-12/Index-by-Encoding/Data-Processing----Register?lang=en#addsub_ext
+func encodeAluRRRExtend(ao aluOp, rd, rn, rm uint32, extOp extendOp, to byte) uint32 {
+	var s, op uint32
+	switch ao {
+	case aluOpAdd:
+		op = 0b0
+	case aluOpAddS:
+		op, s = 0b0, 0b1
+	case aluOpSub:
+		op = 0b1
+	case aluOpSubS:
+		op, s = 0b1, 0b1
+	default:
+		panic("BUG: extended register operand can be used only for add/sub")
+	}
+
+	var sf uint32
+	if to == 64 {
+		sf = 0b1
+	}
+
+	var option uint32
+	switch extOp {
+	case extendOpUXTB:
+		option = 0b000
+	case extendOpUXTH:
+		option = 0b001
+	case extendOpUXTW:
+		option = 0b010
+	case extendOpSXTB:
+		option = 0b100
+	case extendOpSXTH:
+		option = 0b101
+	case extendOpSXTW:
+		option = 0b110
+	case extendOpSXTX, extendOpUXTX:
+		panic(fmt.Sprintf("%s is essentially noop, and should be handled much earlier than encoding", extOp.String()))
+	}
+	return sf<<31 | op<<30 | s<<29 | 0b1011001<<21 | rm<<16 | option<<13 | rn<<5 | rd
 }
 
 // encodeAluRRR encodes as Data Processing (register), depending on aluOp.

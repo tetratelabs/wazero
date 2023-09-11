@@ -302,6 +302,48 @@ func TestInstruction_encode(t *testing.T) {
 		{want: "f20300b2", setup: func(i *instruction) { i.asALUBitmaskImm(aluOpOrr, xzrVReg, x18VReg, 0x100000001, true) }},
 		{want: "f21fbf0e", setup: func(i *instruction) { i.asFpuMov64(v18VReg, v31VReg) }},
 		{want: "f21fbf4e", setup: func(i *instruction) { i.asFpuMov128(v18VReg, v31VReg) }},
+		{want: "40a034ab", setup: func(i *instruction) {
+			i.asALU(aluOpAddS, operandNR(x0VReg), operandNR(x2VReg), operandER(x20VReg, extendOpSXTH, 64), false)
+		}},
+		{want: "4080348b", setup: func(i *instruction) {
+			i.asALU(aluOpAdd, operandNR(x0VReg), operandNR(x2VReg), operandER(x20VReg, extendOpSXTB, 64), false)
+		}},
+		{want: "40a0348b", setup: func(i *instruction) {
+			i.asALU(aluOpAdd, operandNR(x0VReg), operandNR(x2VReg), operandER(x20VReg, extendOpSXTH, 64), false)
+		}},
+		{want: "40c0348b", setup: func(i *instruction) {
+			i.asALU(aluOpAdd, operandNR(x0VReg), operandNR(x2VReg), operandER(x20VReg, extendOpSXTW, 64), false)
+		}},
+		{want: "4080340b", setup: func(i *instruction) {
+			i.asALU(aluOpAdd, operandNR(x0VReg), operandNR(x2VReg), operandER(x20VReg, extendOpSXTB, 32), false)
+		}},
+		{want: "40a0340b", setup: func(i *instruction) {
+			i.asALU(aluOpAdd, operandNR(x0VReg), operandNR(x2VReg), operandER(x20VReg, extendOpSXTH, 32), false)
+		}},
+		{want: "40c0340b", setup: func(i *instruction) {
+			i.asALU(aluOpAdd, operandNR(x0VReg), operandNR(x2VReg), operandER(x20VReg, extendOpSXTW, 32), false)
+		}},
+		{want: "400034eb", setup: func(i *instruction) {
+			i.asALU(aluOpSubS, operandNR(x0VReg), operandNR(x2VReg), operandER(x20VReg, extendOpUXTB, 64), false)
+		}},
+		{want: "400034cb", setup: func(i *instruction) {
+			i.asALU(aluOpSub, operandNR(x0VReg), operandNR(x2VReg), operandER(x20VReg, extendOpUXTB, 64), false)
+		}},
+		{want: "402034cb", setup: func(i *instruction) {
+			i.asALU(aluOpSub, operandNR(x0VReg), operandNR(x2VReg), operandER(x20VReg, extendOpUXTH, 64), false)
+		}},
+		{want: "404034cb", setup: func(i *instruction) {
+			i.asALU(aluOpSub, operandNR(x0VReg), operandNR(x2VReg), operandER(x20VReg, extendOpUXTW, 64), false)
+		}},
+		{want: "4000344b", setup: func(i *instruction) {
+			i.asALU(aluOpSub, operandNR(x0VReg), operandNR(x2VReg), operandER(x20VReg, extendOpUXTB, 32), false)
+		}},
+		{want: "4020344b", setup: func(i *instruction) {
+			i.asALU(aluOpSub, operandNR(x0VReg), operandNR(x2VReg), operandER(x20VReg, extendOpUXTH, 32), false)
+		}},
+		{want: "4040344b", setup: func(i *instruction) {
+			i.asALU(aluOpSub, operandNR(x0VReg), operandNR(x2VReg), operandER(x20VReg, extendOpUXTW, 32), false)
+		}},
 		{want: "4000140b", setup: func(i *instruction) {
 			i.asALU(aluOpAdd, operandNR(x0VReg), operandNR(x2VReg), operandNR(x20VReg), false)
 		}},

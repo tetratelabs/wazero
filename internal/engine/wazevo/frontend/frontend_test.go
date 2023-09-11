@@ -1382,9 +1382,9 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 	v7:i64 = Load module_ctx, 0x8
 	v8:i64 = Load v7, 0x8
 	v9:i64 = Load module_ctx, 0x8
-	v10:i64 = Load v9, 0x8
+	v10:i32 = Load v9, 0x8
 	v11:i32 = Iconst_32 0x10
-	v12:i64 = Ushr v10, v11
+	v12:i32 = Ushr v10, v11
 	v13:i32 = Iconst_32 0xa
 	Store module_ctx, exec_ctx, 0x8
 	v14:i64 = Load exec_ctx, 0x48
@@ -1402,9 +1402,9 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 	v25:i64 = Load module_ctx, 0x8
 	v26:i64 = Load v25, 0x8
 	v27:i64 = Load module_ctx, 0x8
-	v28:i64 = Load v27, 0x8
+	v28:i32 = Load v27, 0x8
 	v29:i32 = Iconst_32 0x10
-	v30:i64 = Ushr v28, v29
+	v30:i32 = Ushr v28, v29
 	Jump blk_ret, v4, v12, v22, v30
 `,
 			expAfterOpt: `
@@ -1418,9 +1418,9 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 	v3:i64 = Load module_ctx, 0x20
 	v4:i32 = CallIndirect v2:sig0, exec_ctx, v3
 	v9:i64 = Load module_ctx, 0x8
-	v10:i64 = Load v9, 0x8
+	v10:i32 = Load v9, 0x8
 	v11:i32 = Iconst_32 0x10
-	v12:i64 = Ushr v10, v11
+	v12:i32 = Ushr v10, v11
 	v13:i32 = Iconst_32 0xa
 	Store module_ctx, exec_ctx, 0x8
 	v14:i64 = Load exec_ctx, 0x48
@@ -1430,9 +1430,9 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 	v21:i64 = Load module_ctx, 0x20
 	v22:i32 = CallIndirect v20:sig0, exec_ctx, v21
 	v27:i64 = Load module_ctx, 0x8
-	v28:i64 = Load v27, 0x8
+	v28:i32 = Load v27, 0x8
 	v29:i32 = Iconst_32 0x10
-	v30:i64 = Ushr v28, v29
+	v30:i32 = Ushr v28, v29
 	Jump blk_ret, v4, v12, v22, v30
 `,
 		},
