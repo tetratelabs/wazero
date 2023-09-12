@@ -354,12 +354,18 @@ func encodeVecRRR(op vecOp, rd, rn, rm uint32, arr vecArrangement) uint32 {
 	case vecOpAdd:
 		size, q := arrToSizeQEncoded(arr)
 		return encodeAdvancedSIMDThreeSame(rd, rn, rm, 0b10000, size, 0b0, q)
+	case vecOpAddp:
+		size, q := arrToSizeQEncoded(arr)
+		return encodeAdvancedSIMDThreeSame(rd, rn, rm, 0b10111, size, 0b0, q)
 	case vecOpSub:
 		size, q := arrToSizeQEncoded(arr)
 		return encodeAdvancedSIMDThreeSame(rd, rn, rm, 0b10000, size, 0b1, q)
 	case vecOpMul:
 		size, q := arrToSizeQEncoded(arr)
 		return encodeAdvancedSIMDThreeSame(rd, rn, rm, 0b10011, size, 0b0, q)
+	case vecOpUmlal:
+		size, q := arrToSizeQEncoded(arr)
+		return encodeAdvancedSIMDThreeDifferent(rd, rn, rm, 0b1000, size, 0b0, q)
 	default:
 		panic("TODO")
 	}
@@ -397,6 +403,12 @@ func arrToSizeQEncoded(arr vecArrangement) (size, q uint32) {
 // https://developer.arm.com/documentation/ddi0596/2020-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
 func encodeAdvancedSIMDThreeSame(rd, rn, rm, opcode, size, U, Q uint32) uint32 {
 	return Q<<30 | U<<29 | 0b111<<25 | size<<22 | 0b1<<21 | rm<<16 | opcode<<11 | 0b1<<10 | rn<<5 | rd
+}
+
+// encodeAdvancedSIMDThreeSame encodes as "Advanced SIMD three different" in
+// https://developer.arm.com/documentation/ddi0596/2020-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
+func encodeAdvancedSIMDThreeDifferent(rd, rn, rm, opcode, size, U, Q uint32) uint32 {
+	return Q<<30 | U<<29 | 0b111<<25 | size<<22 | 0b1<<21 | rm<<16 | opcode<<12 | rn<<5 | rd
 }
 
 // encodeFloatDataOneSource encodes as "Floating-point data-processing (1 source)" in
@@ -1366,7 +1378,7 @@ func encodeAdvancedSIMDTwoMisc(op vecOp, rd, rn uint32, arr vecArrangement) uint
 		}
 	case vecOpNeg:
 		opcode = 0b01011
-		u = 1
+		u = 0b1
 		switch arr {
 		case vecArrangement8B:
 			q, size = 0b0, 0b11
@@ -1382,6 +1394,52 @@ func encodeAdvancedSIMDTwoMisc(op vecOp, rd, rn uint32, arr vecArrangement) uint
 			q, size = 0b1, 0b10
 		case vecArrangement2D:
 			q, size = 0b1, 0b11
+		default:
+			panic("unsupported arrangement: " + arr.String())
+		}
+	case vecOpRev64:
+		opcode = 0b00000
+		switch arr {
+		case vecArrangement8B:
+			q, size = 0b0, 0b11
+		case vecArrangement16B:
+			q, size = 0b1, 0b00
+		case vecArrangement4H:
+			q, size = 0b0, 0b01
+		case vecArrangement8H:
+			q, size = 0b1, 0b01
+		case vecArrangement2S:
+			q, size = 0b0, 0b10
+		case vecArrangement4S:
+			q, size = 0b1, 0b10
+		case vecArrangement2D:
+			q, size = 0b1, 0b11
+		default:
+			panic("unsupported arrangement: " + arr.String())
+		}
+	case vecOpXtn:
+		u = 0b0
+		opcode = 0b10010
+		switch arr {
+		case vecArrangement2D:
+			q, size = 0b0, 0b10
+		case vecArrangement4S:
+			q, size = 0b0, 0b01
+		case vecArrangement8H:
+			q, size = 0b0, 0b00
+		default:
+			panic("unsupported arrangement: " + arr.String())
+		}
+	case vecOpShll:
+		u = 0b1
+		opcode = 0b10011
+		switch arr {
+		case vecArrangement8B:
+			q, size = 0b0, 0b00
+		case vecArrangement4H:
+			q, size = 0b0, 0b01
+		case vecArrangement2S:
+			q, size = 0b0, 0b10
 		default:
 			panic("unsupported arrangement: " + arr.String())
 		}

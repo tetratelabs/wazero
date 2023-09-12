@@ -320,12 +320,49 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 	case ssa.OpcodeVImul:
 		x, y, lane := instr.Arg2WithLane()
 		arr := ssaLeneToArrangement(lane)
-		mul := m.allocateInstr()
 		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
 		rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
 		rd := operandNR(m.compiler.VRegOf(instr.Return()))
-		mul.asVecRRR(vecOpMul, rd, rn, rm, arr)
-		m.insert(mul)
+		if lane != ssa.VecLaneI64x2 {
+			mul := m.allocateInstr()
+			mul.asVecRRR(vecOpMul, rd, rn, rm, arr)
+			m.insert(mul)
+		} else {
+			const arrI32x4 = vecArrangement4S
+			const arrI32x2 = vecArrangement2S
+
+			tmp1 := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
+			tmp2 := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
+
+			// Following the algorithm in https://chromium-review.googlesource.com/c/v8/v8/+/1781696
+			rev64 := m.allocateInstr()
+			rev64.asVecMisc(vecOpRev64, rd, rm, arrI32x4)
+			m.insert(rev64)
+
+			mul := m.allocateInstr()
+			mul.asVecRRR(vecOpMul, rd, rd, rn, arrI32x4)
+			m.insert(mul)
+
+			xtn1 := m.allocateInstr()
+			xtn1.asVecMisc(vecOpXtn, tmp1, rn, vecArrangement2D) // narrow low_half:true
+			m.insert(xtn1)
+
+			addp := m.allocateInstr()
+			addp.asVecRRR(vecOpAddp, rd, rd, rd, arrI32x4)
+			m.insert(addp)
+
+			xtn2 := m.allocateInstr()
+			xtn2.asVecMisc(vecOpXtn, tmp2, rn, vecArrangement2D) // narrow low_half:true
+			m.insert(xtn2)
+
+			shll := m.allocateInstr()
+			shll.asVecMisc(vecOpShll, rd, rd, arrI32x2)
+			m.insert(shll)
+
+			umlal := m.allocateInstr()
+			umlal.asVecRRR(vecOpUmlal, rd, tmp2, tmp1, arrI32x2)
+			m.insert(umlal)
+		}
 	case ssa.OpcodeVIneg:
 		x, lane := instr.ArgWithLane()
 		arr := ssaLeneToArrangement(lane)

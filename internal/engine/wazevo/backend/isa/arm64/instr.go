@@ -1504,8 +1504,24 @@ func (b vecOp) String() string {
 		return "bit"
 	case vecOpEOR:
 		return "eor"
+	case vecOpAdd:
+		return "add"
+	case vecOpAddp:
+		return "addp"
+	case vecOpSub:
+		return "sub"
+	case vecOpMul:
+		return "mul"
+	case vecOpUmlal:
+		return "umlal"
 	case vecOpNeg:
 		return "neg"
+	case vecOpRev64:
+		return "rev64"
+	case vecOpXtn:
+		return "xtn"
+	case vecOpShll:
+		return "shll"
 	}
 	panic(int(b))
 }
@@ -1516,9 +1532,14 @@ const (
 	vecOpBit
 	vecOpEOR
 	vecOpAdd
+	vecOpAddp
 	vecOpSub
 	vecOpMul
+	vecOpUmlal
 	vecOpNeg
+	vecOpRev64
+	vecOpXtn
+	vecOpShll
 )
 
 // bitOp determines the type of bitwise operation. Instructions whose kind is one of

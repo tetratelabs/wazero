@@ -1052,9 +1052,9 @@ func (i *Instruction) AsVIsub(x, y Value, lane VecLane) *Instruction {
 
 // AsVImul initializes this instruction as an integer subtraction multiplication with OpcodeVImul on a vector.
 func (i *Instruction) AsVImul(x, y Value, lane VecLane) *Instruction {
-	if lane == VecLaneI64x2 {
-		panic("FIXME: VecLaneI64x2 not yet implemented for VImul") // see arm64Compiler.compileV128Mul
-	}
+	//if lane == VecLaneI64x2 {
+	//	panic("FIXME: VecLaneI64x2 not yet implemented for VImul") // see arm64Compiler.compileV128Mul
+	//}
 	i.opcode = OpcodeVImul
 	i.v = x
 	i.v2 = y
