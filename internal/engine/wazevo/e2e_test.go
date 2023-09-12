@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 	"math"
 	"testing"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/testcases"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 	"github.com/tetratelabs/wazero/internal/integration_test/spectest"
 	v1 "github.com/tetratelabs/wazero/internal/integration_test/spectest/v1"
 	v2 "github.com/tetratelabs/wazero/internal/integration_test/spectest/v2"
