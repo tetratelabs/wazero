@@ -19,15 +19,18 @@ func TestMachine_SetupPrologue(t *testing.T) {
 		{
 			spillSlotSize: 0,
 			exp: `
-	str x30, [sp, #-0x10]!
+	stp x30, xzr, [sp, #-0x10]!
+	str xzr, [sp, #-0x10]!
 	udf
 `,
 		},
 		{
 			spillSlotSize: 16,
 			exp: `
-	str x30, [sp, #-0x10]!
+	stp x30, xzr, [sp, #-0x10]!
 	sub sp, sp, #0x10
+	orr x27, xzr, #0x10
+	str x27, [sp, #-0x10]!
 	udf
 `,
 		},
@@ -35,11 +38,13 @@ func TestMachine_SetupPrologue(t *testing.T) {
 			spillSlotSize: 0,
 			clobberedRegs: []regalloc.VReg{v18VReg, v19VReg, x18VReg, x25VReg},
 			exp: `
-	str x30, [sp, #-0x10]!
+	stp x30, xzr, [sp, #-0x10]!
 	str q18, [sp, #-0x10]!
 	str q19, [sp, #-0x10]!
 	str x18, [sp, #-0x10]!
 	str x25, [sp, #-0x10]!
+	orr x27, xzr, #0x40
+	str x27, [sp, #-0x10]!
 	udf
 `,
 		},
@@ -47,12 +52,14 @@ func TestMachine_SetupPrologue(t *testing.T) {
 			spillSlotSize: 320,
 			clobberedRegs: []regalloc.VReg{v18VReg, v19VReg, x18VReg, x25VReg},
 			exp: `
-	str x30, [sp, #-0x10]!
+	stp x30, xzr, [sp, #-0x10]!
 	sub sp, sp, #0x140
 	str q18, [sp, #-0x10]!
 	str q19, [sp, #-0x10]!
 	str x18, [sp, #-0x10]!
 	str x25, [sp, #-0x10]!
+	orr x27, xzr, #0x180
+	str x27, [sp, #-0x10]!
 	udf
 `,
 		},
@@ -90,6 +97,7 @@ func TestMachine_SetupEpilogue(t *testing.T) {
 	}{
 		{
 			exp: `
+	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
 	ret
 `,
@@ -98,6 +106,7 @@ func TestMachine_SetupEpilogue(t *testing.T) {
 		},
 		{
 			exp: `
+	add sp, sp, #0x10
 	add sp, sp, #0x50
 	ldr x30, [sp], #0x10
 	ret
@@ -107,6 +116,7 @@ func TestMachine_SetupEpilogue(t *testing.T) {
 		},
 		{
 			exp: `
+	add sp, sp, #0x10
 	ldr q27, [sp], #0x10
 	ldr q18, [sp], #0x10
 	ldr x30, [sp], #0x10
@@ -116,6 +126,7 @@ func TestMachine_SetupEpilogue(t *testing.T) {
 		},
 		{
 			exp: `
+	add sp, sp, #0x10
 	ldr x25, [sp], #0x10
 	ldr x18, [sp], #0x10
 	ldr q27, [sp], #0x10
@@ -127,6 +138,7 @@ func TestMachine_SetupEpilogue(t *testing.T) {
 		},
 		{
 			exp: `
+	add sp, sp, #0x10
 	ldr x25, [sp], #0x10
 	ldr x18, [sp], #0x10
 	ldr q27, [sp], #0x10

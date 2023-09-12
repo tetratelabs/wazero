@@ -468,7 +468,7 @@ func (m *machine) InsertReturn() {
 	m.insert(i)
 }
 
-func (m *machine) getVRegSpillSlotOffset(id regalloc.VRegID, size byte) int64 {
+func (m *machine) getVRegSpillSlotOffsetFromSP(id regalloc.VRegID, size byte) int64 {
 	offset, ok := m.spillSlots[id]
 	if !ok {
 		offset = m.spillSlotSize
@@ -476,7 +476,7 @@ func (m *machine) getVRegSpillSlotOffset(id regalloc.VRegID, size byte) int64 {
 		m.spillSlots[id] = offset
 		m.spillSlotSize += int64(size)
 	}
-	return offset
+	return offset + m.clobberedRegSlotSize() + 16 // spill slot starts above the clobbered registers and the frame size.
 }
 
 func (m *machine) clobberedRegSlotSize() int64 {
@@ -484,7 +484,9 @@ func (m *machine) clobberedRegSlotSize() int64 {
 }
 
 func (m *machine) arg0OffsetFromSP() int64 {
-	return m.spillSlotSize + m.clobberedRegSlotSize() + 16 /* 16-byte aligned return address */
+	return m.frameSize() +
+		16 + // 16-byte aligned return address
+		16 // frame size saved below the clobbered registers.
 }
 
 func (m *machine) ret0OffsetFromSP() int64 {
@@ -493,7 +495,15 @@ func (m *machine) ret0OffsetFromSP() int64 {
 
 func (m *machine) requiredStackSize() int64 {
 	return m.maxRequiredStackSizeForCalls +
-		m.clobberedRegSlotSize() +
-		m.spillSlotSize +
-		16 // 16-byte aligned return address.
+		m.frameSize() +
+		16 + // 16-byte aligned return address.
+		16 // frame size saved below the clobbered registers.
+}
+
+func (m *machine) frameSize() int64 {
+	s := m.clobberedRegSlotSize() + m.spillSlotSize
+	if s&0xf != 0 {
+		panic(fmt.Errorf("BUG: frame size %d is not 16-byte aligned", s))
+	}
+	return s
 }

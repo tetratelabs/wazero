@@ -14,12 +14,20 @@ var calleeSavedRegistersPlusLinkRegSorted = []regalloc.VReg{
 
 // CompileGoFunctionTrampoline implements backend.Machine.
 func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *ssa.Signature, needModuleContextPtr bool) []byte {
+	abi := m.getOrCreateABIImpl(sig)
+	m.currentABI = abi
+
 	cur := m.allocateInstr()
 	cur.asNop0()
 	m.rootInstr = cur
 
 	// Execution context is always the first argument.
 	execCtrPtr := x0VReg
+
+	// To properly unwind the stack, we need to create a function frame though it's not necessary for the Go function call.
+	cur = m.createReturnAddrAndSizeOfArgRetSlot(cur)
+	cur = m.createFrameSizeSlot(cur)
+	// ^^ In total, 32 bytes are allocated for the frame.
 
 	// Save the callee saved registers.
 	cur = m.saveRegistersInExecutionContext(cur, calleeSavedRegistersPlusLinkRegSorted)
@@ -53,7 +61,6 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 	goCallStackPtrCalc.asALU(aluOpAdd, operandNR(stackPtrReg), operandNR(execCtrPtr), imm12Op, true)
 	cur = linkInstr(cur, goCallStackPtrCalc)
 
-	abi := m.getOrCreateABIImpl(sig)
 	for _, arg := range abi.args[argBegin:] {
 		if arg.Kind == backend.ABIArgKindReg {
 			store := m.allocateInstr()
@@ -131,6 +138,9 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 			panic("TODO: many params for Go function call")
 		}
 	}
+
+	// Removes the stack frame!
+	cur = m.addsAddOrSubStackPointer(cur, spVReg, 32, true, true)
 
 	ret := m.allocateInstrAfterLowering()
 	ret.asRet(nil)
@@ -258,7 +268,7 @@ func (m *machine) saveCurrentStackPointer(cur *instruction, execCtr regalloc.VRe
 	strSp.asStore(operandNR(tmpRegVReg),
 		addressMode{
 			kind: addressModeKindRegUnsignedImm12,
-			rn:   execCtr, imm: wazevoapi.ExecutionContextOffsets.StackPointerBeforeGrow.I64(),
+			rn:   execCtr, imm: wazevoapi.ExecutionContextOffsets.StackPointerBeforeGoCall.I64(),
 		}, 64)
 	cur = linkInstr(cur, strSp)
 	return cur

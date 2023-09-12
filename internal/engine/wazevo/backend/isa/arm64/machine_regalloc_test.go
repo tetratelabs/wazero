@@ -1,6 +1,7 @@
 package arm64
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
@@ -62,7 +63,7 @@ func TestRegAllocFunctionImpl_ReversePostOrderBlockIterator(t *testing.T) {
 
 func TestRegAllocFunctionImpl_ReloadRegisterAfter(t *testing.T) {
 	ctx, _, m := newSetupWithMockContext()
-	m.clobberedRegs = make([]regalloc.VReg, 4) // This will make the beginning of the spill slot at 4 * 16 bytes = 64.
+	m.clobberedRegs = make([]regalloc.VReg, 3) // This will make the beginning of the spill slot at (3 + 1(frame size))* 16 bytes = 64.
 
 	ctx.typeOf = map[regalloc.VReg]ssa.Type{x1VReg: ssa.TypeI64, v1VReg: ssa.TypeF64}
 	i1, i2 := m.allocateNop(), m.allocateNop()
@@ -93,7 +94,7 @@ func TestRegAllocFunctionImpl_ReloadRegisterAfter(t *testing.T) {
 
 func TestRegAllocFunctionImpl_StoreRegisterBefore(t *testing.T) {
 	ctx, _, m := newSetupWithMockContext()
-	m.clobberedRegs = make([]regalloc.VReg, 4) // This will make the beginning of the spill slot at 4 * 16 bytes = 64.
+	m.clobberedRegs = make([]regalloc.VReg, 3) // This will make the beginning of the spill slot at (3 + 1(frame size))* 16 bytes = 64.
 
 	ctx.typeOf = map[regalloc.VReg]ssa.Type{x1VReg: ssa.TypeI64, v1VReg: ssa.TypeF64}
 	i1, i2 := m.allocateNop(), m.allocateNop()
@@ -131,8 +132,8 @@ func TestMachine_insertStoreRegisterAt(t *testing.T) {
 			spillSlotSize: 0,
 			expected: `
 	udf
-	str x1, [sp]
-	str d1, [sp, #0x8]
+	str x1, [sp, #0x10]
+	str d1, [sp, #0x18]
 	exit_sequence x30
 `,
 		},
@@ -140,9 +141,10 @@ func TestMachine_insertStoreRegisterAt(t *testing.T) {
 			spillSlotSize: 0xffff,
 			expected: `
 	udf
-	movz x27, #0xffff, lsl 0
+	movz x27, #0xf, lsl 0
+	movk x27, #0x1, lsl 16
 	str x1, [sp, x27]
-	movz x27, #0x7, lsl 0
+	movz x27, #0x17, lsl 0
 	movk x27, #0x1, lsl 16
 	str d1, [sp, x27]
 	exit_sequence x30
@@ -152,9 +154,10 @@ func TestMachine_insertStoreRegisterAt(t *testing.T) {
 			spillSlotSize: 0xffff_00,
 			expected: `
 	udf
-	orr x27, xzr, #0xffff00
+	movz x27, #0xff10, lsl 0
+	movk x27, #0xff, lsl 16
 	str x1, [sp, x27]
-	movz x27, #0xff08, lsl 0
+	movz x27, #0xff18, lsl 0
 	movk x27, #0xff, lsl 16
 	str d1, [sp, x27]
 	exit_sequence x30
@@ -186,6 +189,7 @@ func TestMachine_insertStoreRegisterAt(t *testing.T) {
 						m.insertStoreRegisterAt(v1VReg, i2, after)
 					}
 					m.rootInstr = i1
+					fmt.Println(m.Format())
 					require.Equal(t, tc.expected, m.Format())
 				})
 			}
@@ -202,8 +206,8 @@ func TestMachine_insertReloadRegisterAt(t *testing.T) {
 			spillSlotSize: 0,
 			expected: `
 	udf
-	ldr x1, [sp]
-	ldr d1, [sp, #0x8]
+	ldr x1, [sp, #0x10]
+	ldr d1, [sp, #0x18]
 	exit_sequence x30
 `,
 		},
@@ -211,9 +215,10 @@ func TestMachine_insertReloadRegisterAt(t *testing.T) {
 			spillSlotSize: 0xffff,
 			expected: `
 	udf
-	movz x27, #0xffff, lsl 0
+	movz x27, #0xf, lsl 0
+	movk x27, #0x1, lsl 16
 	ldr x1, [sp, x27]
-	movz x27, #0x7, lsl 0
+	movz x27, #0x17, lsl 0
 	movk x27, #0x1, lsl 16
 	ldr d1, [sp, x27]
 	exit_sequence x30
@@ -223,9 +228,10 @@ func TestMachine_insertReloadRegisterAt(t *testing.T) {
 			spillSlotSize: 0xffff_00,
 			expected: `
 	udf
-	orr x27, xzr, #0xffff00
+	movz x27, #0xff10, lsl 0
+	movk x27, #0xff, lsl 16
 	ldr x1, [sp, x27]
-	movz x27, #0xff08, lsl 0
+	movz x27, #0xff18, lsl 0
 	movk x27, #0xff, lsl 16
 	ldr d1, [sp, x27]
 	exit_sequence x30
@@ -257,6 +263,8 @@ func TestMachine_insertReloadRegisterAt(t *testing.T) {
 						m.insertReloadRegisterAt(v1VReg, i2, after)
 					}
 					m.rootInstr = i1
+
+					fmt.Println(m.Format())
 					require.Equal(t, tc.expected, m.Format())
 				})
 			}

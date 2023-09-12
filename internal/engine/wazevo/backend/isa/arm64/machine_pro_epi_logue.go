@@ -16,25 +16,21 @@ func (m *machine) SetupPrologue() {
 	//                   (high address)                    (high address)
 	//                 +-----------------+               +------------------+
 	//                 |     .......     |               |     .......      |
-	//                 |      ret Y      |               |      ret Y       |
-	//                 |     .......     |               |     .......      |
-	//                 |      ret 0      |               |      ret 0       |
-	//                 |      arg X      |               |      arg X       |
-	//                 |     .......     |     ====>     |     .......      |
-	//                 |      arg 1      |               |      arg 1       |
-	//                 |      arg 0      |               |      arg 0       |
-	//         SP----> |-----------------|               |      xxxxx       |
-	//                                                   |   ret address    |
+	//                 |      ret Y      |               |      ret Y       | <----+
+	//                 |     .......     |               |     .......      |      |
+	//                 |      ret 0      |               |      ret 0       |      |
+	//                 |      arg X      |               |      arg X       |      |  size_of_arg_ret.
+	//                 |     .......     |     ====>     |     .......      |      |
+	//                 |      arg 1      |               |      arg 1       |      |
+	//                 |      arg 0      |               |      arg 0       | <----+
+	//         SP----> |-----------------|               |  size_of_arg_ret |
+	//                                                   |  return address  |
 	//                                                   +------------------+ <---- SP
 	//                    (low address)                     (low address)
 
-	// Saves the return address (lr) and below the SP.
-	str := m.allocateInstrAfterLowering()
-	amode := addressModePreOrPostIndex(spVReg, -16 /* stack pointer must be 16-byte aligned. */, true /* decrement before store */)
-	str.asStore(operandNR(lrVReg), amode, 64)
-	cur.next = str
-	str.prev = cur
-	cur = str
+	// Saves the return address (lr) and the size_of_arg_ret below the SP.
+	// size_of_arg_ret is used for stack unwinding.
+	cur = m.createReturnAddrAndSizeOfArgRetSlot(cur)
 
 	if !m.stackBoundsCheckDisabled {
 		cur = m.insertStackBoundsCheck(m.requiredStackSize(), cur)
@@ -65,7 +61,7 @@ func (m *machine) SetupPrologue() {
 		//          |     .......      |
 		//          |      arg 1       |
 		//          |      arg 0       |
-		//          |      xxxxx       |
+		//          |  size_of_arg_ret |
 		//          |   ReturnAddress  |
 		//          +------------------+
 		//          |   spill slot M   |
@@ -88,7 +84,7 @@ func (m *machine) SetupPrologue() {
 		//          |     .......     |             |     .......     |
 		//          |      arg 1      |             |      arg 1      |
 		//          |      arg 0      |             |      arg 0      |
-		//          |      xxxxx      |             |      xxxxx      |
+		//          | size_of_arg_ret |             | size_of_arg_ret |
 		//          |   ReturnAddress |             |  ReturnAddress  |
 		//          +-----------------+    ====>    +-----------------+
 		//          |   ...........   |             |   ...........   |
@@ -101,7 +97,7 @@ func (m *machine) SetupPrologue() {
 		//                                          |   ............  |
 		//                                          |   clobbered 0   |
 		//                                          +-----------------+
-		//                                              (high address)
+		//                                             (low address)
 		//
 		_amode := addressModePreOrPostIndex(spVReg,
 			-16,  // stack pointer must be 16-byte aligned.
@@ -111,15 +107,78 @@ func (m *machine) SetupPrologue() {
 			// TODO: pair stores to reduce the number of instructions.
 			store := m.allocateInstrAfterLowering()
 			store.asStore(operandNR(vr), _amode, regTypeToRegisterSizeInBits(vr.RegType()))
-			cur.next = store
-			store.prev = cur
-			cur = store
+			cur = linkInstr(cur, store)
 		}
 	}
 
-	cur.next = prevInitInst
+	// We push the frame size into the stack to make it possible to unwind stack:
+	//
+	//
+	//            (high address)                  (high address)
+	//         +-----------------+                +-----------------+
+	//         |     .......     |                |     .......     |
+	//         |      ret Y      |                |      ret Y      |
+	//         |     .......     |                |     .......     |
+	//         |      ret 0      |                |      ret 0      |
+	//         |      arg X      |                |      arg X      |
+	//         |     .......     |                |     .......     |
+	//         |      arg 1      |                |      arg 1      |
+	//         |      arg 0      |                |      arg 0      |
+	//         | size_of_arg_ret |                | size_of_arg_ret |
+	//         |  ReturnAddress  |                |  ReturnAddress  |
+	//         +-----------------+      ==>       +-----------------+ <----+
+	//         |   ...........   |                |   ...........   |      |
+	//         |   spill slot M  |                |   spill slot M  |      |
+	//         |   ............  |                |   ............  |      |
+	//         |   spill slot 2  |                |   spill slot 2  |      |
+	//         |   spill slot 1  |                |   spill slot 1  |      | frame size
+	//         |   spill slot 1  |                |   spill slot 1  |      |
+	//         |   clobbered N   |                |   clobbered N   |      |
+	//         |   ............  |                |   ............  |      |
+	//         |   clobbered 0   |                |   clobbered 0   | <----+
+	// SP--->  +-----------------+                |     xxxxxx      |  ;; unused space to make it 16-byte aligned.
+	//                                            |   frame_size    |
+	//                                            +-----------------+ <---- SP
+	//            (low address)
+	//
+	cur = m.createFrameSizeSlot(cur)
 
-	prevInitInst.prev = cur
+	linkInstr(cur, prevInitInst)
+}
+
+func (m *machine) createReturnAddrAndSizeOfArgRetSlot(cur *instruction) *instruction {
+	// Saves the return address (lr) and the size_of_arg_ret below the SP.
+	// size_of_arg_ret is used for stack unwinding.
+	var sizeOfArgRetReg regalloc.VReg
+	if s := m.currentABI.alignedArgResultStackSlotSize(); s > 0 {
+		cur = m.lowerConstantI64AndInsert(cur, tmpRegVReg, s)
+		sizeOfArgRetReg = tmpRegVReg
+	} else {
+		sizeOfArgRetReg = xzrVReg
+	}
+	pstr := m.allocateInstrAfterLowering()
+	amode := addressModePreOrPostIndex(spVReg, -16, true /* decrement before store */)
+	pstr.asStorePair64(lrVReg, sizeOfArgRetReg, amode)
+	cur = linkInstr(cur, pstr)
+	return cur
+}
+
+func (m *machine) createFrameSizeSlot(cur *instruction) *instruction {
+	var frameSizeReg regalloc.VReg
+	if s := m.frameSize(); s > 0 {
+		cur = m.lowerConstantI64AndInsert(cur, tmpRegVReg, s)
+		frameSizeReg = tmpRegVReg
+	} else {
+		frameSizeReg = xzrVReg
+	}
+	_amode := addressModePreOrPostIndex(spVReg,
+		-16,  // stack pointer must be 16-byte aligned.
+		true, // Decrement before store.
+	)
+	store := m.allocateInstrAfterLowering()
+	store.asStore(operandNR(frameSizeReg), _amode, 64)
+	cur = linkInstr(cur, store)
+	return cur
 }
 
 // SetupEpilogue implements backend.Machine.
@@ -145,6 +204,9 @@ func (m *machine) SetupEpilogue() {
 
 func (m *machine) setupEpilogueAfter(cur *instruction) {
 	prevNext := cur.next
+
+	// We've stored the frame size in the prologue, and now that we are about to return from this function, we won't need it anymore.
+	cur = m.addsAddOrSubStackPointer(cur, spVReg, 16, true, true)
 
 	// First we need to restore the clobbered registers.
 	if len(m.clobberedRegs) > 0 {
@@ -187,9 +249,7 @@ func (m *machine) setupEpilogueAfter(cur *instruction) {
 			case 128: // save vector reg.
 				load.asFpuLoad(operandNR(vr), amode, 128)
 			}
-			cur.next = load
-			load.prev = cur
-			cur = load
+			cur = linkInstr(cur, load)
 		}
 	}
 
@@ -237,11 +297,9 @@ func (m *machine) setupEpilogueAfter(cur *instruction) {
 	ldr := m.allocateInstrAfterLowering()
 	amode := addressModePreOrPostIndex(spVReg, 16 /* stack pointer must be 16-byte aligned. */, false /* increment after loads */)
 	ldr.asULoad(operandNR(lrVReg), amode, 64)
-	cur.next = ldr
-	ldr.prev = cur
+	cur = linkInstr(cur, ldr)
 
-	ldr.next = prevNext
-	prevNext.prev = ldr
+	linkInstr(cur, prevNext)
 }
 
 // saveRequiredRegs is the set of registers that must be saved/restored during growing stack when there's insufficient
@@ -287,23 +345,17 @@ func (m *machine) insertStackBoundsCheck(requiredStackSize int64, cur *instructi
 		rn:   x0VReg, // execution context is always the first argument.
 		imm:  wazevoapi.ExecutionContextOffsets.StackBottomPtr.I64(),
 	}, 64)
-	ldr.prev = cur
-	cur.next = ldr
-	cur = ldr
+	cur = linkInstr(cur, ldr)
 
 	// subs xzr, tmp, tmp2
 	subs := m.allocateInstrAfterLowering()
 	subs.asALU(aluOpSubS, operandNR(xzrVReg), operandNR(tmpRegVReg), operandNR(tmp2), true)
-	subs.prev = cur
-	cur.next = subs
-	cur = subs
+	cur = linkInstr(cur, subs)
 
 	// b.ge #imm
 	cbr := m.allocateInstr()
 	cbr.asCondBr(ge.asCond(), invalidLabel, false /* ignored */)
-	cbr.prev = cur
-	cur.next = cbr
-	cur = cbr
+	cur = linkInstr(cur, cbr)
 
 	// Set the required stack size and set it to the exec context.
 	{
@@ -316,9 +368,8 @@ func (m *machine) insertStackBoundsCheck(requiredStackSize int64, cur *instructi
 				// Execution context is always the first argument.
 				rn: x0VReg, imm: wazevoapi.ExecutionContextOffsets.StackGrowRequiredSize.I64(),
 			}, 64)
-		setRequiredStackSize.prev = cur
-		cur.next = setRequiredStackSize
-		cur = setRequiredStackSize
+
+		cur = linkInstr(cur, setRequiredStackSize)
 	}
 
 	ldrAddress := m.allocateInstr()
@@ -327,17 +378,13 @@ func (m *machine) insertStackBoundsCheck(requiredStackSize int64, cur *instructi
 		rn:   x0VReg, // execution context is always the first argument
 		imm:  wazevoapi.ExecutionContextOffsets.StackGrowCallSequenceAddress.I64(),
 	}, 64)
-	ldrAddress.prev = cur
-	cur.next = ldrAddress
-	cur = ldrAddress
+	cur = linkInstr(cur, ldrAddress)
 
 	// Then jumps to the stack grow call sequence's address, meaning
 	// transferring the control to the code compiled by CompileStackGrowCallSequence.
 	bl := m.allocateInstr()
 	bl.asCallIndirect(tmpRegVReg, nil)
-	bl.prev = cur
-	cur.next = bl
-	cur = bl
+	cur = linkInstr(cur, bl)
 
 	// Now that we know the entire code, we can finalize how many bytes
 	// we have to skip when the stack size is sufficient.
@@ -376,9 +423,7 @@ func (m *machine) CompileStackGrowCallSequence() []byte {
 	// Then goes back the original address of this stack grow call.
 	ret := m.allocateInstr()
 	ret.asRet(nil)
-	ret.prev = cur
-	cur.next = ret
-	cur = ret
+	linkInstr(cur, ret)
 
 	m.encode(m.rootInstr)
 	return m.compiler.Buf()

@@ -45,6 +45,7 @@ const (
 )
 
 var defKinds = [numInstructionKinds]defKind{
+	adr:             defKindRD,
 	aluRRR:          defKindRD,
 	aluRRRR:         defKindRD,
 	aluRRImm12:      defKindRD,
@@ -212,6 +213,7 @@ var useKinds = [numInstructionKinds]useKind{
 	intToFpu:        useKindRN,
 	movToFPSR:       useKindRN,
 	movFromFPSR:     useKindNone,
+	adr:             useKindNone,
 }
 
 // uses returns the list of regalloc.VReg that are used by the instruction.

@@ -5,7 +5,9 @@ import (
 	"encoding/hex"
 	"fmt"
 	"runtime"
+	"sort"
 	"sync"
+	"unsafe"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
@@ -21,9 +23,13 @@ import (
 type (
 	// engine implements wasm.Engine.
 	engine struct {
-		compiledModules   map[wasm.ModuleID]*compiledModule
-		mux               sync.RWMutex
-		rels              []backend.RelocationInfo
+		compiledModules map[wasm.ModuleID]*compiledModule
+		// sortedCompiledModules is a list of compiled modules sorted by the initial address of the executable.
+		sortedCompiledModules []*compiledModule
+		mux                   sync.RWMutex
+		// rels is a list of relocations to be resolved. This is reused for each compilation to avoid allocation.
+		rels []backend.RelocationInfo
+		// refToBinaryOffset is reused for each compilation to avoid allocation.
 		refToBinaryOffset map[ssa.FuncRef]int
 		// builtinFunctions is hods compiled builtin function trampolines.
 		builtinFunctions *builtinFunctions
@@ -40,8 +46,11 @@ type (
 
 	// compiledModule is a compiled variant of a wasm.Module and ready to be used for instantiation.
 	compiledModule struct {
-		executable      []byte
+		executable []byte
+		// functionOffsets maps a local function index to compiledFunctionOffset.
 		functionOffsets []compiledFunctionOffset
+		parent          *engine
+		module          *wasm.Module
 
 		// The followings are only available for non host modules.
 
@@ -100,7 +109,7 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listene
 
 func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listeners []experimental.FunctionListener, ensureTermination bool) (*compiledModule, error) {
 	e.rels = e.rels[:0]
-	cm := &compiledModule{offsets: wazevoapi.NewModuleContextOffsetData(module)}
+	cm := &compiledModule{offsets: wazevoapi.NewModuleContextOffsetData(module), parent: e, module: module}
 
 	if module.IsHostModule {
 		return e.compileHostModule(ctx, module)
@@ -286,7 +295,7 @@ func (e *engine) compileHostModule(ctx context.Context, module *wasm.Module) (*c
 	be := backend.NewCompiler(ctx, machine, ssa.NewBuilder())
 
 	num := len(module.CodeSection)
-	cm := &compiledModule{}
+	cm := &compiledModule{module: module}
 	cm.functionOffsets = make([]compiledFunctionOffset, num)
 	totalSize := 0 // Total binary size of the executable.
 	bodies := make([][]byte, num)
@@ -379,6 +388,7 @@ func (e *engine) Close() (err error) {
 		cm.executable = nil
 		cm.functionOffsets = nil
 	}
+	e.sortedCompiledModules = nil
 	e.compiledModules = nil
 	e.builtinFunctions = nil
 	return nil
@@ -395,13 +405,58 @@ func (e *engine) CompiledModuleCount() uint32 {
 func (e *engine) DeleteCompiledModule(m *wasm.Module) {
 	e.mux.Lock()
 	defer e.mux.Unlock()
-	delete(e.compiledModules, m.ID)
+	cm, ok := e.compiledModules[m.ID]
+	if ok {
+		cm.parent = nil
+		if len(cm.executable) > 0 {
+			e.deleteCompiledModuleFromSortedList(cm)
+		}
+		delete(e.compiledModules, m.ID)
+	}
 }
 
 func (e *engine) addCompiledModule(m *wasm.Module, cm *compiledModule) {
 	e.mux.Lock()
 	defer e.mux.Unlock()
 	e.compiledModules[m.ID] = cm
+	if len(cm.executable) > 0 {
+		e.addCompiledModuleToSortedList(cm)
+	}
+}
+
+func (e *engine) addCompiledModuleToSortedList(cm *compiledModule) {
+	ptr := uintptr(unsafe.Pointer(&cm.executable[0]))
+
+	index := sort.Search(len(e.sortedCompiledModules), func(i int) bool {
+		return uintptr(unsafe.Pointer(&e.sortedCompiledModules[i].executable[0])) >= ptr
+	})
+	e.sortedCompiledModules = append(e.sortedCompiledModules, nil)
+	copy(e.sortedCompiledModules[index+1:], e.sortedCompiledModules[index:])
+	e.sortedCompiledModules[index] = cm
+}
+
+func (e *engine) deleteCompiledModuleFromSortedList(cm *compiledModule) {
+	ptr := uintptr(unsafe.Pointer(&cm.executable[0]))
+
+	index := sort.Search(len(e.sortedCompiledModules), func(i int) bool {
+		return uintptr(unsafe.Pointer(&e.sortedCompiledModules[i].executable[0])) >= ptr
+	})
+	copy(e.sortedCompiledModules[index:], e.sortedCompiledModules[index+1:])
+	e.sortedCompiledModules = e.sortedCompiledModules[:len(e.sortedCompiledModules)-1]
+}
+
+func (e *engine) compiledModuleOfAddr(addr uintptr) *compiledModule {
+	e.mux.RLock()
+	defer e.mux.RUnlock()
+
+	index := sort.Search(len(e.sortedCompiledModules), func(i int) bool {
+		return uintptr(unsafe.Pointer(&e.sortedCompiledModules[i].executable[0])) > addr
+	})
+	index -= 1
+	if index < 0 {
+		return nil
+	}
+	return e.sortedCompiledModules[index]
 }
 
 // NewModuleEngine implements wasm.Engine.
@@ -491,4 +546,17 @@ func mmapExecutable(src []byte) []byte {
 		}
 	}
 	return executable
+}
+
+func (cm *compiledModule) functionIndexOf(addr uintptr) wasm.Index {
+	addr -= uintptr(unsafe.Pointer(&cm.executable[0]))
+	offset := cm.functionOffsets
+	index := sort.Search(len(offset), func(i int) bool {
+		return offset[i].offset > int(addr)
+	})
+	index -= 1
+	if index < 0 {
+		panic("BUG")
+	}
+	return wasm.Index(index)
 }

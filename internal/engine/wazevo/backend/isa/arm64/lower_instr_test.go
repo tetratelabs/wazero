@@ -1,7 +1,6 @@
 package arm64
 
 import (
-	"encoding/hex"
 	"fmt"
 	"strings"
 	"testing"
@@ -301,8 +300,12 @@ func TestMachine_lowerIDiv(t *testing.T) {
 			exp: `
 udiv w1?, w2?, w3?
 cbnz w3?, L1
-movz x27, #0xa, lsl 0
-str w27, [x65535?]
+movz x1?, #0xa, lsl 0
+str w1?, [x65535?]
+mov x2?, sp
+str x2?, [x65535?, #0x38]
+adr x3?, #0x0
+str x3?, [x65535?, #0x30]
 exit_sequence x65535?
 L1:
 `,
@@ -310,38 +313,58 @@ L1:
 		{name: "32bit signed", _64bit: false, signed: true, exp: `
 sdiv w1?, w2?, w3?
 cbnz w3?, L1
-movz x27, #0xa, lsl 0
-str w27, [x65535?]
+movz x1?, #0xa, lsl 0
+str w1?, [x65535?]
+mov x2?, sp
+str x2?, [x65535?, #0x38]
+adr x3?, #0x0
+str x3?, [x65535?, #0x30]
 exit_sequence x65535?
 L1:
 adds wzr, w3?, #0x1
 ccmp w2?, #0x1, #0x0, eq
 b.vc L2
-movz x27, #0xb, lsl 0
-str w27, [x65535?]
+movz x4?, #0xb, lsl 0
+str w4?, [x65535?]
+mov x5?, sp
+str x5?, [x65535?, #0x38]
+adr x6?, #0x0
+str x6?, [x65535?, #0x30]
 exit_sequence x65535?
 L2:
 `},
 		{name: "64bit unsigned", _64bit: true, signed: false, exp: `
 udiv x1?, x2?, x3?
 cbnz w3?, L1
-movz x27, #0xa, lsl 0
-str w27, [x65535?]
+movz x1?, #0xa, lsl 0
+str w1?, [x65535?]
+mov x2?, sp
+str x2?, [x65535?, #0x38]
+adr x3?, #0x0
+str x3?, [x65535?, #0x30]
 exit_sequence x65535?
 L1:
 `},
 		{name: "64bit signed", _64bit: true, signed: true, exp: `
 sdiv x1?, x2?, x3?
 cbnz w3?, L1
-movz x27, #0xa, lsl 0
-str w27, [x65535?]
+movz x1?, #0xa, lsl 0
+str w1?, [x65535?]
+mov x2?, sp
+str x2?, [x65535?, #0x38]
+adr x3?, #0x0
+str x3?, [x65535?, #0x30]
 exit_sequence x65535?
 L1:
 adds xzr, x3?, #0x1
 ccmp x2?, #0x1, #0x0, eq
 b.vc L2
-movz x27, #0xb, lsl 0
-str w27, [x65535?]
+movz x4?, #0xb, lsl 0
+str w4?, [x65535?]
+mov x5?, sp
+str x5?, [x65535?, #0x38]
+adr x6?, #0x0
+str x6?, [x65535?, #0x30]
 exit_sequence x65535?
 L2:
 `},
@@ -359,22 +382,27 @@ L2:
 	}
 }
 
-func Test_exitWithCodeEncodingSize(t *testing.T) {
+func TestMachine_exitWithCode(t *testing.T) {
 	_, _, m := newSetupWithMockContext()
 	m.lowerExitWithCode(x1VReg, wazevoapi.ExitCodeGrowStack)
 	m.FlushPendingInstructions()
 	m.encode(m.perBlockHead)
-	buf := m.compiler.Buf()
-	require.Equal(t, "3b0080d23b0000b93d0840f93e1040f93b0c40f97f030091c0035fd600000014", hex.EncodeToString(buf))
-	require.Equal(t, exitWithCodeEncodingSize, len(buf))
+	require.Equal(t, `
+movz x1?, #0x1, lsl 0
+str w1?, [x1]
+mov x2?, sp
+str x2?, [x1, #0x38]
+adr x3?, #0x0
+str x3?, [x1, #0x30]
+exit_sequence x1
+`, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
 }
 
 func TestMachine_lowerFpuToInt(t *testing.T) {
 	for _, tc := range []struct {
-		name          string
-		nontrapping   bool
-		expectedAsm   string
-		expectedBytes string
+		name        string
+		nontrapping bool
+		expectedAsm string
 	}{
 		{
 			name:        "trapping",
@@ -382,21 +410,28 @@ func TestMachine_lowerFpuToInt(t *testing.T) {
 			expectedAsm: `
 msr fpsr, xzr
 fcvtzu w1, s2
-mrs x27 fpsr
-subs xzr, x27, #0x1
+mrs x1? fpsr
+subs xzr, x1?, #0x1
 b.ne L2
 fcmp w2, w2
 b.vc L1
-movz x27, #0xc, lsl 0
-str w27, [x15]
+movz x2?, #0xc, lsl 0
+str w2?, [x15]
+mov x3?, sp
+str x3?, [x15, #0x38]
+adr x4?, #0x0
+str x4?, [x15, #0x30]
 exit_sequence x15
 L1:
-movz x27, #0xb, lsl 0
-str w27, [x15]
+movz x5?, #0xb, lsl 0
+str w5?, [x15]
+mov x6?, sp
+str x6?, [x15, #0x38]
+adr x7?, #0x0
+str x7?, [x15, #0x30]
 exit_sequence x15
 L2:
 `,
-			expectedBytes: "3f441bd54100391e3b443bd57f0700f1010000544020221e070000549b0180d2fb0100b9fd0940f9fe1140f9fb0d40f97f030091c0035fd6000000147b0180d2fb0100b9fd0940f9fe1140f9fb0d40f97f030091c0035fd600000014",
 		},
 		{
 			name:        "nontrapping",
@@ -404,7 +439,6 @@ L2:
 			expectedAsm: `
 fcvtzu w1, s2
 `,
-			expectedBytes: "4100391e",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -414,8 +448,6 @@ fcvtzu w1, s2
 
 			m.FlushPendingInstructions()
 			m.encode(m.perBlockHead)
-			buf := m.compiler.Buf()
-			require.Equal(t, tc.expectedBytes, hex.EncodeToString(buf))
 		})
 	}
 }

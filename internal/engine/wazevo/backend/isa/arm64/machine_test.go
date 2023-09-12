@@ -3,6 +3,7 @@ package arm64
 import (
 	"testing"
 
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
@@ -74,4 +75,52 @@ func TestMachine_resolveAddressingMode(t *testing.T) {
 	ldr x17, [sp, x27]
 `, m.Format())
 	})
+}
+
+func TestMachine_clobberedRegSlotSize(t *testing.T) {
+	m := &machine{clobberedRegs: make([]regalloc.VReg, 10)}
+	require.Equal(t, int64(160), m.clobberedRegSlotSize())
+}
+
+func TestMachine_frameSize(t *testing.T) {
+	m := &machine{clobberedRegs: make([]regalloc.VReg, 10), spillSlotSize: 16 * 8}
+	require.Equal(t, int64(16*18), m.frameSize())
+}
+
+func TestMachine_requiredStackSize(t *testing.T) {
+	m := &machine{
+		clobberedRegs: make([]regalloc.VReg, 10), spillSlotSize: 16 * 8,
+		maxRequiredStackSizeForCalls: 320,
+	}
+	require.Equal(t, int64(16*18)+int64(320)+32, m.requiredStackSize())
+}
+
+func TestMachine_arg0OffsetFromSP(t *testing.T) {
+	m := &machine{clobberedRegs: make([]regalloc.VReg, 10), spillSlotSize: 16 * 8}
+	require.Equal(t, int64(16*18)+32, m.arg0OffsetFromSP())
+}
+
+func TestMachine_ret0OffsetFromSP(t *testing.T) {
+	m := &machine{
+		clobberedRegs: make([]regalloc.VReg, 10), spillSlotSize: 16 * 8,
+		currentABI: &abiImpl{argStackSize: 180},
+	}
+	require.Equal(t, int64(16*18)+32+180, m.ret0OffsetFromSP())
+}
+
+func TestMachine_getVRegSpillSlotOffsetFromSP(t *testing.T) {
+	m := &machine{clobberedRegs: make([]regalloc.VReg, 10), spillSlots: make(map[regalloc.VRegID]int64)}
+	id := regalloc.VRegID(1)
+	offset := m.getVRegSpillSlotOffsetFromSP(id, 8)
+	require.Equal(t, int64(160)+16, offset)
+	require.Equal(t, int64(8), m.spillSlotSize)
+	_, ok := m.spillSlots[id]
+	require.True(t, ok)
+
+	id = 100
+	offset = m.getVRegSpillSlotOffsetFromSP(id, 16)
+	require.Equal(t, int64(160)+16+8, offset)
+	require.Equal(t, int64(24), m.spillSlotSize)
+	_, ok = m.spillSlots[id]
+	require.True(t, ok)
 }

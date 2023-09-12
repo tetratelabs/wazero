@@ -15,3 +15,12 @@ func newMachine() backend.Machine {
 		panic("unsupported architecture")
 	}
 }
+
+func unwindStack(sp, top uintptr) (returnAddresses []uintptr) {
+	switch runtime.GOARCH {
+	case "arm64":
+		return arm64.UnwindStack(sp, top)
+	default:
+		panic("unsupported architecture")
+	}
+}

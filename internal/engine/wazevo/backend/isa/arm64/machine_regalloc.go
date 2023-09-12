@@ -285,7 +285,7 @@ func (m *machine) insertStoreRegisterAt(v regalloc.VReg, instr *instruction, aft
 		cur, prevNext = instr.prev, instr
 	}
 
-	offsetFromSP := m.getVRegSpillSlotOffset(v.ID(), typ.Size()) + m.clobberedRegSlotSize()
+	offsetFromSP := m.getVRegSpillSlotOffsetFromSP(v.ID(), typ.Size())
 	var amode addressMode
 	cur, amode = m.resolveAddressModeForOffsetAndInsert(cur, offsetFromSP, typ.Bits(), spVReg)
 	store := m.allocateInstrAfterLowering()
@@ -309,7 +309,7 @@ func (m *machine) insertReloadRegisterAt(v regalloc.VReg, instr *instruction, af
 		cur, prevNext = instr.prev, instr
 	}
 
-	offsetFromSP := m.getVRegSpillSlotOffset(v.ID(), typ.Size()) + m.clobberedRegSlotSize()
+	offsetFromSP := m.getVRegSpillSlotOffsetFromSP(v.ID(), typ.Size())
 	var amode addressMode
 	cur, amode = m.resolveAddressModeForOffsetAndInsert(cur, offsetFromSP, typ.Bits(), spVReg)
 	load := m.allocateInstrAfterLowering()

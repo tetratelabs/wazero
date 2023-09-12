@@ -21,7 +21,7 @@ var ExecutionContextOffsets = ExecutionContextOffsetData{
 	GoReturnAddress:                         32,
 	StackBottomPtr:                          40,
 	GoCallReturnAddress:                     48,
-	StackPointerBeforeGrow:                  56,
+	StackPointerBeforeGoCall:                56,
 	StackGrowRequiredSize:                   64,
 	MemoryGrowTrampolineAddress:             72,
 	StackGrowCallSequenceAddress:            80,
@@ -47,8 +47,8 @@ type ExecutionContextOffsetData struct {
 	StackBottomPtr Offset
 	// GoCallReturnAddress is an offset of `goCallReturnAddress` field in wazevo.executionContext
 	GoCallReturnAddress Offset
-	// GoCallReturnAddress is an offset of `stackPointerBeforeGoCall` field in wazevo.executionContext
-	StackPointerBeforeGrow Offset
+	// StackPointerBeforeGoCall is an offset of `StackPointerBeforeGoCall` field in wazevo.executionContext
+	StackPointerBeforeGoCall Offset
 	// StackGrowRequiredSize is an offset of `stackGrowRequiredSize` field in wazevo.executionContext
 	StackGrowRequiredSize Offset
 	// MemoryGrowTrampolineAddress is an offset of `memoryGrowTrampolineAddress` field in wazevo.executionContext
