@@ -468,7 +468,7 @@ func (m *machine) InsertReturn() {
 	m.insert(i)
 }
 
-func (m *machine) getVRegSpillSlotOffset(id regalloc.VRegID, size byte) int64 {
+func (m *machine) getVRegSpillSlotOffsetFromSP(id regalloc.VRegID, size byte) int64 {
 	offset, ok := m.spillSlots[id]
 	if !ok {
 		offset = m.spillSlotSize
@@ -476,7 +476,7 @@ func (m *machine) getVRegSpillSlotOffset(id regalloc.VRegID, size byte) int64 {
 		m.spillSlots[id] = offset
 		m.spillSlotSize += int64(size)
 	}
-	return offset + 16
+	return offset + m.clobberedRegSlotSize() + 16 // spill slot starts above the clobbered registers and the frame size.
 }
 
 func (m *machine) clobberedRegSlotSize() int64 {
