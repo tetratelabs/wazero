@@ -10,6 +10,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 	"github.com/tetratelabs/wazero/internal/internalapi"
 	"github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasmdebug"
 	"github.com/tetratelabs/wazero/internal/wasmruntime"
 )
 
@@ -111,11 +112,28 @@ func (c *callEngine) Call(ctx context.Context, params ...uint64) ([]uint64, erro
 }
 
 // CallWithStack implements api.Function.
-func (c *callEngine) CallWithStack(ctx context.Context, paramResultStack []uint64) error {
+func (c *callEngine) CallWithStack(ctx context.Context, paramResultStack []uint64) (err error) {
 	var paramResultPtr *uint64
 	if len(paramResultStack) > 0 {
 		paramResultPtr = &paramResultStack[0]
 	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			eng := c.parent.parent.parent
+			builder := wasmdebug.NewErrorBuilder()
+			for _, retAddr := range stackUnwinder()(c.execCtx.stackPointerBeforeGoCall, c.stackTop) {
+				cm := eng.compiledModuleOfAddr(retAddr)
+				index := cm.functionIndexOf(retAddr)
+				def := cm.module.FunctionDefinition(cm.module.ImportFunctionCount + index)
+				// TODO: DWARF.
+				builder.AddFrame(def.DebugName(), def.ParamTypes(), def.ResultTypes(), nil)
+			}
+			err = builder.FromRecovered(r)
+
+			// TODO: Abort listener.
+		}
+	}()
 
 	entrypoint(c.executable, c.execCtxPtr, c.parent.opaquePtr, paramResultPtr, c.stackTop)
 	for {
@@ -129,10 +147,6 @@ func (c *callEngine) CallWithStack(ctx context.Context, paramResultStack []uint6
 			}
 			c.execCtx.exitCode = wazevoapi.ExitCodeOK
 			afterGoFunctionCallEntrypoint(c.execCtx.goCallReturnAddress, c.execCtxPtr, newsp)
-		case wazevoapi.ExitCodeUnreachable:
-			return wasmruntime.ErrRuntimeUnreachable
-		case wazevoapi.ExitCodeMemoryOutOfBounds:
-			return wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess
 		case wazevoapi.ExitCodeGrowMemory:
 			mod := c.callerModuleInstance()
 			mem := mod.MemoryInstance
@@ -166,18 +180,22 @@ func (c *callEngine) CallWithStack(ctx context.Context, paramResultStack []uint6
 			f.Call(ctx, mod, c.execCtx.goFunctionCallStack[:])
 			c.execCtx.exitCode = wazevoapi.ExitCodeOK
 			afterGoFunctionCallEntrypoint(c.execCtx.goCallReturnAddress, c.execCtxPtr, c.execCtx.stackPointerBeforeGoCall)
+		case wazevoapi.ExitCodeUnreachable:
+			panic(wasmruntime.ErrRuntimeUnreachable)
+		case wazevoapi.ExitCodeMemoryOutOfBounds:
+			panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 		case wazevoapi.ExitCodeTableOutOfBounds:
-			return wasmruntime.ErrRuntimeInvalidTableAccess
+			panic(wasmruntime.ErrRuntimeInvalidTableAccess)
 		case wazevoapi.ExitCodeIndirectCallNullPointer:
-			return wasmruntime.ErrRuntimeInvalidTableAccess
+			panic(wasmruntime.ErrRuntimeInvalidTableAccess)
 		case wazevoapi.ExitCodeIndirectCallTypeMismatch:
-			return wasmruntime.ErrRuntimeIndirectCallTypeMismatch
+			panic(wasmruntime.ErrRuntimeIndirectCallTypeMismatch)
 		case wazevoapi.ExitCodeIntegerOverflow:
-			return wasmruntime.ErrRuntimeIntegerOverflow
+			panic(wasmruntime.ErrRuntimeIntegerOverflow)
 		case wazevoapi.ExitCodeIntegerDivisionByZero:
-			return wasmruntime.ErrRuntimeIntegerDivideByZero
+			panic(wasmruntime.ErrRuntimeIntegerDivideByZero)
 		case wazevoapi.ExitCodeInvalidConversionToInteger:
-			return wasmruntime.ErrRuntimeInvalidConversionToInteger
+			panic(wasmruntime.ErrRuntimeInvalidConversionToInteger)
 		default:
 			panic("BUG")
 		}

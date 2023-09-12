@@ -388,7 +388,7 @@ func TestE2E(t *testing.T) {
 					require.NotNil(t, f)
 					result, err := f.Call(ctx, cc.params...)
 					if cc.expErr != "" {
-						require.EqualError(t, err, cc.expErr)
+						require.Contains(t, err.Error(), cc.expErr)
 					} else {
 						require.NoError(t, err)
 						require.Equal(t, len(cc.expResults), len(result))

@@ -258,7 +258,7 @@ func (m *machine) saveCurrentStackPointer(cur *instruction, execCtr regalloc.VRe
 	strSp.asStore(operandNR(tmpRegVReg),
 		addressMode{
 			kind: addressModeKindRegUnsignedImm12,
-			rn:   execCtr, imm: wazevoapi.ExecutionContextOffsets.StackPointerBeforeGrow.I64(),
+			rn:   execCtr, imm: wazevoapi.ExecutionContextOffsets.StackPointerBeforeGoCall.I64(),
 		}, 64)
 	cur = linkInstr(cur, strSp)
 	return cur

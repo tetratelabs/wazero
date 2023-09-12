@@ -752,8 +752,6 @@ func (m *machine) lowerPopcnt(x, result ssa.Value) {
 	m.insert(mov)
 }
 
-const exitWithCodeEncodingSize = exitSequenceSize + 8
-
 // lowerExitWithCode lowers the lowerExitWithCode takes a context pointer as argument.
 func (m *machine) lowerExitWithCode(execCtxVReg regalloc.VReg, code wazevoapi.ExitCode) {
 	loadExitCodeConst := m.allocateInstr()
@@ -766,11 +764,23 @@ func (m *machine) lowerExitWithCode(execCtxVReg regalloc.VReg, code wazevoapi.Ex
 			rn:   execCtxVReg, imm: wazevoapi.ExecutionContextOffsets.ExitCodeOffset.I64(),
 		}, 32)
 
+	// In order to unwind the stack, we also need to push the current stack pointer:
+	movSpToTmp := m.allocateInstr()
+	movSpToTmp.asMove64(tmpRegVReg, spVReg)
+	strSpToExecCtx := m.allocateInstr()
+	strSpToExecCtx.asStore(operandNR(tmpRegVReg),
+		addressMode{
+			kind: addressModeKindRegUnsignedImm12,
+			rn:   execCtxVReg, imm: wazevoapi.ExecutionContextOffsets.StackPointerBeforeGoCall.I64(),
+		}, 64)
+
 	exitSeq := m.allocateInstr()
 	exitSeq.asExitSequence(execCtxVReg)
 
 	m.insert(loadExitCodeConst)
 	m.insert(setExitCode)
+	m.insert(movSpToTmp)
+	m.insert(strSpToExecCtx)
 	m.insert(exitSeq)
 }
 

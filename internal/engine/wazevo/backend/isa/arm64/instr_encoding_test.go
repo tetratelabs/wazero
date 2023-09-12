@@ -9,7 +9,6 @@ import (
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
-	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
@@ -1108,15 +1107,6 @@ func Test_encodeExitSequence(t *testing.T) {
 		require.Equal(t, "fb031eaa7d0b40f97e1340f97b0f40f97f030091c0035fd6", hex.EncodeToString(m.buf))
 		require.Equal(t, len(m.buf), exitSequenceSize)
 	})
-}
-
-func Test_lowerExitWithCodeEncodingSize(t *testing.T) {
-	compiler, _, m := newSetupWithMockContext()
-	m.lowerExitWithCode(x10VReg, wazevoapi.ExitCodeGrowStack)
-	m.FlushPendingInstructions()
-	require.NotNil(t, m.perBlockHead)
-	m.encode(m.perBlockHead)
-	require.Equal(t, exitWithCodeEncodingSize, len(compiler.Buf()))
 }
 
 func Test_encodeBrTableSequence(t *testing.T) {

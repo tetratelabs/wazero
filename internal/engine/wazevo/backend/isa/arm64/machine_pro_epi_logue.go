@@ -412,7 +412,7 @@ func (m *machine) CompileStackGrowCallSequence() []byte {
 	// Then goes back the original address of this stack grow call.
 	ret := m.allocateInstr()
 	ret.asRet(nil)
-	cur = linkInstr(cur, ret)
+	linkInstr(cur, ret)
 
 	m.encode(m.rootInstr)
 	return m.compiler.Buf()

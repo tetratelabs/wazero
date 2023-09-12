@@ -6,10 +6,10 @@ import (
 	"unsafe"
 )
 
-// StackUnwinder is a function to unwind the stack.
+// UnwindStack is a function to unwind the stack.
 // The implementation must be aligned with the ABI/Calling convention as in machine_pro_epi_logue.go/abi.go.
-func StackUnwinder(sp, top uintptr) (returnAddresses []uintptr) {
-	l := int(top-sp) + 1
+func UnwindStack(sp, top uintptr) (returnAddresses []uintptr) {
+	l := int(top - sp)
 
 	var stackBuf []byte
 	{

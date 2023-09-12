@@ -39,7 +39,7 @@ func TestEngine_DeleteCompiledModule(t *testing.T) {
 	e, ok := NewEngine(ctx, api.CoreFeaturesV1, nil).(*engine)
 	require.True(t, ok)
 	id := wasm.ModuleID{0xaa}
-	e.compiledModules[id] = &compiledModule{}
+	e.addCompiledModule(&wasm.Module{ID: id}, &compiledModule{executable: make([]byte, 1)})
 	require.Equal(t, uint32(1), e.CompiledModuleCount())
 	e.DeleteCompiledModule(&wasm.Module{ID: id})
 	require.Equal(t, uint32(0), e.CompiledModuleCount())
@@ -55,7 +55,7 @@ func Test_ExecutionContextOffsets(t *testing.T) {
 	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.originalStackPointer)), offsets.OriginalStackPointer)
 	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.goReturnAddress)), offsets.GoReturnAddress)
 	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.goCallReturnAddress)), offsets.GoCallReturnAddress)
-	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.stackPointerBeforeGoCall)), offsets.StackPointerBeforeGrow)
+	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.stackPointerBeforeGoCall)), offsets.StackPointerBeforeGoCall)
 	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.stackGrowRequiredSize)), offsets.StackGrowRequiredSize)
 	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.memoryGrowTrampolineAddress)), offsets.MemoryGrowTrampolineAddress)
 	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.stackGrowCallSequenceAddress)), offsets.StackGrowCallSequenceAddress)
