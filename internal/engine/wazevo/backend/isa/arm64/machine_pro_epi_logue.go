@@ -107,7 +107,7 @@ func (m *machine) SetupPrologue() {
 		//                                          |   ............  |
 		//                                          |   clobbered 0   |
 		//                                          +-----------------+
-		//                                             (high address)
+		//                                             (low address)
 		//
 		_amode := addressModePreOrPostIndex(spVReg,
 			-16,  // stack pointer must be 16-byte aligned.
@@ -149,7 +149,7 @@ func (m *machine) SetupPrologue() {
 	// SP--->  +-----------------+                |     xxxxxx      |  ;; unused space to make it 16-byte aligned.
 	//                                            |   frame_size    |
 	//                                            +-----------------+ <---- SP
-	//            (high address)
+	//            (low address)
 	//
 
 	var frameSizeReg regalloc.VReg

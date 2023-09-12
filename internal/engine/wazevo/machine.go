@@ -16,7 +16,7 @@ func newMachine() backend.Machine {
 	}
 }
 
-func newStackUnwinder() func(sp, bottom *byte) {
+func newStackUnwinder() func(sp, top *byte) (returnAddresses []uintptr) {
 	switch runtime.GOARCH {
 	case "arm64":
 		return arm64.StackUnwinder

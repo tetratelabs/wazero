@@ -501,5 +501,9 @@ func (m *machine) requiredStackSize() int64 {
 }
 
 func (m *machine) frameSize() int64 {
-	return m.clobberedRegSlotSize() + m.spillSlotSize
+	s := m.clobberedRegSlotSize() + m.spillSlotSize
+	if s&0xf != 0 {
+		panic(fmt.Errorf("BUG: frame size %d is not 16-byte aligned", s))
+	}
+	return s
 }
