@@ -486,7 +486,7 @@ func (m *machine) clobberedRegSlotSize() int64 {
 func (m *machine) arg0OffsetFromSP() int64 {
 	return m.frameSize() +
 		16 + // 16-byte aligned return address
-		16 // frame size coming below the clobbered registers.
+		16 // frame size saved below the clobbered registers.
 }
 
 func (m *machine) ret0OffsetFromSP() int64 {
@@ -497,7 +497,7 @@ func (m *machine) requiredStackSize() int64 {
 	return m.maxRequiredStackSizeForCalls +
 		m.frameSize() +
 		16 + // 16-byte aligned return address.
-		16 // frame size coming below the clobbered registers.
+		16 // frame size saved below the clobbered registers.
 }
 
 func (m *machine) frameSize() int64 {
