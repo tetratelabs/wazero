@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
-	"os"
 	"testing"
 
 	"github.com/tetratelabs/wazero"
@@ -623,8 +622,6 @@ func TestStackUnwind(t *testing.T) {
 			},
 		},
 	}
-
-	os.WriteFile("tmp2.wasm", binaryencoding.EncodeModule(unreachable), 0o644)
 
 	config := wazero.NewRuntimeConfigCompiler()
 
