@@ -305,6 +305,8 @@ movz x27, #0xa, lsl 0
 str w27, [x65535?]
 mov x27, sp
 str x27, [x65535?, #0x38]
+adr x27, #0x0
+str x27, [x65535?, #0x30]
 exit_sequence x65535?
 L1:
 `,
@@ -316,6 +318,8 @@ movz x27, #0xa, lsl 0
 str w27, [x65535?]
 mov x27, sp
 str x27, [x65535?, #0x38]
+adr x27, #0x0
+str x27, [x65535?, #0x30]
 exit_sequence x65535?
 L1:
 adds wzr, w3?, #0x1
@@ -325,6 +329,8 @@ movz x27, #0xb, lsl 0
 str w27, [x65535?]
 mov x27, sp
 str x27, [x65535?, #0x38]
+adr x27, #0x0
+str x27, [x65535?, #0x30]
 exit_sequence x65535?
 L2:
 `},
@@ -335,6 +341,8 @@ movz x27, #0xa, lsl 0
 str w27, [x65535?]
 mov x27, sp
 str x27, [x65535?, #0x38]
+adr x27, #0x0
+str x27, [x65535?, #0x30]
 exit_sequence x65535?
 L1:
 `},
@@ -345,6 +353,8 @@ movz x27, #0xa, lsl 0
 str w27, [x65535?]
 mov x27, sp
 str x27, [x65535?, #0x38]
+adr x27, #0x0
+str x27, [x65535?, #0x30]
 exit_sequence x65535?
 L1:
 adds xzr, x3?, #0x1
@@ -354,6 +364,8 @@ movz x27, #0xb, lsl 0
 str w27, [x65535?]
 mov x27, sp
 str x27, [x65535?, #0x38]
+adr x27, #0x0
+str x27, [x65535?, #0x30]
 exit_sequence x65535?
 L2:
 `},
@@ -371,13 +383,13 @@ L2:
 	}
 }
 
-func Test_exitWithCodeEncodingSize(t *testing.T) {
+func Test_exitWithCode(t *testing.T) {
 	_, _, m := newSetupWithMockContext()
 	m.lowerExitWithCode(x1VReg, wazevoapi.ExitCodeGrowStack)
 	m.FlushPendingInstructions()
 	m.encode(m.perBlockHead)
 	buf := m.compiler.Buf()
-	require.Equal(t, "3b0080d23b0000b9fb0300913b1c00f93d0840f93e1040f93b0c40f97f030091c0035fd600000014", hex.EncodeToString(buf))
+	require.Equal(t, "3b0080d23b0000b9fb0300913b1c00f91b0000103b1800f93d0840f93e1040f93b0c40f97f030091c0035fd600000014", hex.EncodeToString(buf))
 }
 
 func TestMachine_lowerFpuToInt(t *testing.T) {
@@ -402,16 +414,20 @@ movz x27, #0xc, lsl 0
 str w27, [x15]
 mov x27, sp
 str x27, [x15, #0x38]
+adr x27, #0x0
+str x27, [x15, #0x30]
 exit_sequence x15
 L1:
 movz x27, #0xb, lsl 0
 str w27, [x15]
 mov x27, sp
 str x27, [x15, #0x38]
+adr x27, #0x0
+str x27, [x15, #0x30]
 exit_sequence x15
 L2:
 `,
-			expectedBytes: "3f441bd54100391e3b443bd57f0700f1010000544020221e070000549b0180d2fb0100b9fb030091fb1d00f9fd0940f9fe1140f9fb0d40f97f030091c0035fd6000000147b0180d2fb0100b9fb030091fb1d00f9fd0940f9fe1140f9fb0d40f97f030091c0035fd600000014",
+			expectedBytes: "3f441bd54100391e3b443bd57f0700f1010000544020221e070000549b0180d2fb0100b9fb030091fb1d00f91b000010fb1900f9fd0940f9fe1140f9fb0d40f97f030091c0035fd6000000147b0180d2fb0100b9fb030091fb1d00f91b000010fb1900f9fd0940f9fe1140f9fb0d40f97f030091c0035fd600000014",
 		},
 		{
 			name:        "nontrapping",

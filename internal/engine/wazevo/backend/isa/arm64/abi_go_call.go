@@ -139,7 +139,7 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 		}
 	}
 
-	// We've stored the frame size in the prologue, and now that we are about to return from this function, we won't need it anymore.
+	// Removes the stack frame!
 	cur = m.addsAddOrSubStackPointer(cur, spVReg, 32, true, true)
 
 	ret := m.allocateInstrAfterLowering()

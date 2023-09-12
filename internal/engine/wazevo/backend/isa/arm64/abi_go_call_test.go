@@ -42,6 +42,8 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 			},
 			needModuleContextPtr: true,
 			exp: `
+	stp x30, xzr, [sp, #-0x10]!
+	str xzr, [sp, #-0x10]!
 	str x19, [x0, #0x60]
 	str x20, [x0, #0x70]
 	str x21, [x0, #0x80]
@@ -109,6 +111,7 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 	mov v0.8b, v17.8b
 	ldr d17, [x15], #0x8
 	mov v1.8b, v17.8b
+	add sp, sp, #0x20
 	ret
 `,
 		},
@@ -121,6 +124,8 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 			},
 			needModuleContextPtr: true,
 			exp: `
+	stp x30, xzr, [sp, #-0x10]!
+	str xzr, [sp, #-0x10]!
 	str x19, [x0, #0x60]
 	str x20, [x0, #0x70]
 	str x21, [x0, #0x80]
@@ -183,6 +188,7 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 	ldr q30, [x0, #0x1c0]
 	ldr q31, [x0, #0x1d0]
 	add x15, x0, #0x468
+	add sp, sp, #0x20
 	ret
 `,
 		},
@@ -194,6 +200,8 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 				Results: []ssa.Type{ssa.TypeI32},
 			},
 			exp: `
+	stp x30, xzr, [sp, #-0x10]!
+	str xzr, [sp, #-0x10]!
 	str x19, [x0, #0x60]
 	str x20, [x0, #0x70]
 	str x21, [x0, #0x80]
@@ -254,6 +262,7 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 	add x15, x0, #0x468
 	ldr w27, [x15], #0x8
 	mov w0, w27
+	add sp, sp, #0x20
 	ret
 `,
 		},
