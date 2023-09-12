@@ -385,12 +385,13 @@ func (m *machine) lowerFcopysign(x, y, ret ssa.Value) {
 	//
 
 	setMSB := m.allocateInstr()
+	tmpReg := m.compiler.AllocateVReg(regalloc.RegTypeInt)
 	if x.Type() == ssa.TypeF32 {
-		m.lowerConstantI32(tmpRegVReg, math.MinInt32)
-		setMSB.asMovToVec(tmpF, operandNR(tmpRegVReg), vecArrangementS, vecIndex(0))
+		m.lowerConstantI32(tmpReg, math.MinInt32)
+		setMSB.asMovToVec(tmpF, operandNR(tmpReg), vecArrangementS, vecIndex(0))
 	} else {
-		m.lowerConstantI64(tmpRegVReg, math.MinInt64)
-		setMSB.asMovToVec(tmpF, operandNR(tmpRegVReg), vecArrangementD, vecIndex(0))
+		m.lowerConstantI64(tmpReg, math.MinInt64)
+		setMSB.asMovToVec(tmpF, operandNR(tmpReg), vecArrangementD, vecIndex(0))
 	}
 	m.insert(setMSB)
 
@@ -459,15 +460,17 @@ func (m *machine) lowerFpuToInt(rd, rn operand, ctx regalloc.VReg, signed, src64
 	m.insert(cvt)
 
 	if !nonTrapping {
+		tmpReg := m.compiler.AllocateVReg(regalloc.RegTypeInt)
+
 		// After the conversion, check the FPU flags.
 		getFlag := m.allocateInstr()
-		getFlag.asMovFromFPSR(tmpRegVReg)
+		getFlag.asMovFromFPSR(tmpReg)
 		m.insert(getFlag)
 
 		// Check if the conversion was undefined by comparing the status with 1.
 		// See https://developer.arm.com/documentation/ddi0595/2020-12/AArch64-Registers/FPSR--Floating-point-Status-Register
 		alu := m.allocateInstr()
-		alu.asALU(aluOpSubS, operandNR(xzrVReg), operandNR(tmpRegVReg), operandImm12(1, 0), true)
+		alu.asALU(aluOpSubS, operandNR(xzrVReg), operandNR(tmpReg), operandImm12(1, 0), true)
 		m.insert(alu)
 
 		// If it is not undefined, we can return the result.
@@ -700,11 +703,12 @@ func (m *machine) lowerCtz(x, result ssa.Value) {
 	rd := m.compiler.VRegOf(result)
 	rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
 	rbit := m.allocateInstr()
-	rbit.asBitRR(bitOpRbit, tmpRegVReg, rn.nr(), x.Type().Bits() == 64)
+	tmpReg := m.compiler.AllocateVReg(regalloc.RegTypeInt)
+	rbit.asBitRR(bitOpRbit, tmpReg, rn.nr(), x.Type().Bits() == 64)
 	m.insert(rbit)
 
 	clz := m.allocateInstr()
-	clz.asBitRR(bitOpClz, rd, tmpRegVReg, x.Type().Bits() == 64)
+	clz.asBitRR(bitOpClz, rd, tmpReg, x.Type().Bits() == 64)
 	m.insert(clz)
 }
 
@@ -754,34 +758,33 @@ func (m *machine) lowerPopcnt(x, result ssa.Value) {
 
 // lowerExitWithCode lowers the lowerExitWithCode takes a context pointer as argument.
 func (m *machine) lowerExitWithCode(execCtxVReg regalloc.VReg, code wazevoapi.ExitCode) {
-	// TODO: we shouldn't abuse tmpRegVReg below. What if execCtxVReg is spill, and
-	// 	the slot offset is huge, which results in using tmpReg when reloading it?
-	// 	Instead, we should simply allocate new temporary VReg for the median results.
-
+	tmpReg1 := m.compiler.AllocateVReg(regalloc.RegTypeInt)
 	loadExitCodeConst := m.allocateInstr()
-	loadExitCodeConst.asMOVZ(tmpRegVReg, uint64(code), 0, true)
+	loadExitCodeConst.asMOVZ(tmpReg1, uint64(code), 0, true)
 
 	setExitCode := m.allocateInstr()
-	setExitCode.asStore(operandNR(tmpRegVReg),
+	setExitCode.asStore(operandNR(tmpReg1),
 		addressMode{
 			kind: addressModeKindRegUnsignedImm12,
 			rn:   execCtxVReg, imm: wazevoapi.ExecutionContextOffsets.ExitCodeOffset.I64(),
 		}, 32)
 
 	// In order to unwind the stack, we also need to push the current stack pointer:
+	tmp2 := m.compiler.AllocateVReg(regalloc.RegTypeInt)
 	movSpToTmp := m.allocateInstr()
-	movSpToTmp.asMove64(tmpRegVReg, spVReg)
+	movSpToTmp.asMove64(tmp2, spVReg)
 	strSpToExecCtx := m.allocateInstr()
-	strSpToExecCtx.asStore(operandNR(tmpRegVReg),
+	strSpToExecCtx.asStore(operandNR(tmp2),
 		addressMode{
 			kind: addressModeKindRegUnsignedImm12,
 			rn:   execCtxVReg, imm: wazevoapi.ExecutionContextOffsets.StackPointerBeforeGoCall.I64(),
 		}, 64)
 	// Also the address of this exit.
+	tmp3 := m.compiler.AllocateVReg(regalloc.RegTypeInt)
 	currentAddrToTmp := m.allocateInstr()
-	currentAddrToTmp.asAdr(tmpRegVReg, 0)
+	currentAddrToTmp.asAdr(tmp3, 0)
 	storeCurrentAddrToExecCtx := m.allocateInstr()
-	storeCurrentAddrToExecCtx.asStore(operandNR(tmpRegVReg),
+	storeCurrentAddrToExecCtx.asStore(operandNR(tmp3),
 		addressMode{
 			kind: addressModeKindRegUnsignedImm12,
 			rn:   execCtxVReg, imm: wazevoapi.ExecutionContextOffsets.GoCallReturnAddress.I64(),
