@@ -601,7 +601,7 @@ func TestE2E_reexported_memory(t *testing.T) {
 	require.Equal(t, uint32(11), mem.Size()/65536)
 }
 
-func TestStackUnwind(t *testing.T) {
+func TestStackUnwind_panic_in_host(t *testing.T) {
 	unreachable := &wasm.Module{
 		ImportFunctionCount: 1,
 		ImportSection:       []wasm.Import{{Module: "host", Name: "cause_unreachable", Type: wasm.ExternTypeFunc, DescFunc: 0}},
@@ -651,6 +651,49 @@ func TestStackUnwind(t *testing.T) {
 	exp := `panic in host function (recovered by wazero)
 wasm stack trace:
 	host.cause_unreachable()
+	.two()
+	.one()
+	.main()`
+	require.Equal(t, exp, err.Error())
+}
+
+func TestStackUnwind_unreachable(t *testing.T) {
+	unreachable := &wasm.Module{
+		TypeSection:     []wasm.FunctionType{{}},
+		ExportSection:   []wasm.Export{{Name: "main", Type: wasm.ExternTypeFunc, Index: 0}},
+		FunctionSection: []wasm.Index{0, 0, 0},
+		CodeSection: []wasm.Code{
+			{Body: []byte{wasm.OpcodeCall, 1, wasm.OpcodeEnd}},
+			{Body: []byte{wasm.OpcodeCall, 2, wasm.OpcodeEnd}},
+			{Body: []byte{wasm.OpcodeUnreachable, wasm.OpcodeEnd}},
+		},
+		NameSection: &wasm.NameSection{
+			FunctionNames: wasm.NameMap{
+				wasm.NameAssoc{Index: 0, Name: "main"},
+				wasm.NameAssoc{Index: 1, Name: "one"},
+				wasm.NameAssoc{Index: 2, Name: "two"},
+			},
+		},
+	}
+
+	config := wazero.NewRuntimeConfigCompiler()
+
+	// Configure the new optimizing backend!
+	wazevo.ConfigureWazevo(config)
+
+	ctx := context.Background()
+	r := wazero.NewRuntimeWithConfig(ctx, config)
+	defer func() {
+		require.NoError(t, r.Close(ctx))
+	}()
+
+	module, err := r.Instantiate(ctx, binaryencoding.EncodeModule(unreachable))
+	require.NoError(t, err)
+	defer module.Close(ctx)
+
+	_, err = module.ExportedFunction("main").Call(ctx)
+	exp := `wasm error: unreachable
+wasm stack trace:
 	.two()
 	.one()
 	.main()`

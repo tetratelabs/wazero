@@ -773,6 +773,15 @@ func (m *machine) lowerExitWithCode(execCtxVReg regalloc.VReg, code wazevoapi.Ex
 			kind: addressModeKindRegUnsignedImm12,
 			rn:   execCtxVReg, imm: wazevoapi.ExecutionContextOffsets.StackPointerBeforeGoCall.I64(),
 		}, 64)
+	// Also the address of this exit.
+	currentAddrToTmp := m.allocateInstrAfterLowering()
+	currentAddrToTmp.asAdr(tmpRegVReg, 0)
+	storeCurrentAddrToExecCtx := m.allocateInstrAfterLowering()
+	storeCurrentAddrToExecCtx.asStore(operandNR(tmpRegVReg),
+		addressMode{
+			kind: addressModeKindRegUnsignedImm12,
+			rn:   execCtxVReg, imm: wazevoapi.ExecutionContextOffsets.GoCallReturnAddress.I64(),
+		}, 64)
 
 	exitSeq := m.allocateInstr()
 	exitSeq.asExitSequence(execCtxVReg)
@@ -781,6 +790,8 @@ func (m *machine) lowerExitWithCode(execCtxVReg regalloc.VReg, code wazevoapi.Ex
 	m.insert(setExitCode)
 	m.insert(movSpToTmp)
 	m.insert(strSpToExecCtx)
+	m.insert(currentAddrToTmp)
+	m.insert(storeCurrentAddrToExecCtx)
 	m.insert(exitSeq)
 }
 

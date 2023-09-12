@@ -30,17 +30,7 @@ func (m *machine) SetupPrologue() {
 
 	// Saves the return address (lr) and the size_of_arg_ret below the SP.
 	// size_of_arg_ret is used for stack unwinding.
-	var sizeOfArgRetReg regalloc.VReg
-	if s := m.currentABI.alignedArgResultStackSlotSize(); s > 0 {
-		cur = m.lowerConstantI64AndInsert(cur, tmpRegVReg, s)
-		sizeOfArgRetReg = tmpRegVReg
-	} else {
-		sizeOfArgRetReg = xzrVReg
-	}
-	pstr := m.allocateInstrAfterLowering()
-	amode := addressModePreOrPostIndex(spVReg, -16, true /* decrement before store */)
-	pstr.asStorePair64(lrVReg, sizeOfArgRetReg, amode)
-	cur = linkInstr(cur, pstr)
+	cur = m.createReturnAddrAndSizeOfArgRetSlot(cur)
 
 	if !m.stackBoundsCheckDisabled {
 		cur = m.insertStackBoundsCheck(m.requiredStackSize(), cur)
@@ -151,7 +141,29 @@ func (m *machine) SetupPrologue() {
 	//                                            +-----------------+ <---- SP
 	//            (low address)
 	//
+	cur = m.createFrameSizeSlot(cur)
 
+	linkInstr(cur, prevInitInst)
+}
+
+func (m *machine) createReturnAddrAndSizeOfArgRetSlot(cur *instruction) *instruction {
+	// Saves the return address (lr) and the size_of_arg_ret below the SP.
+	// size_of_arg_ret is used for stack unwinding.
+	var sizeOfArgRetReg regalloc.VReg
+	if s := m.currentABI.alignedArgResultStackSlotSize(); s > 0 {
+		cur = m.lowerConstantI64AndInsert(cur, tmpRegVReg, s)
+		sizeOfArgRetReg = tmpRegVReg
+	} else {
+		sizeOfArgRetReg = xzrVReg
+	}
+	pstr := m.allocateInstrAfterLowering()
+	amode := addressModePreOrPostIndex(spVReg, -16, true /* decrement before store */)
+	pstr.asStorePair64(lrVReg, sizeOfArgRetReg, amode)
+	cur = linkInstr(cur, pstr)
+	return cur
+}
+
+func (m *machine) createFrameSizeSlot(cur *instruction) *instruction {
 	var frameSizeReg regalloc.VReg
 	if s := m.frameSize(); s > 0 {
 		cur = m.lowerConstantI64AndInsert(cur, tmpRegVReg, s)
@@ -166,8 +178,7 @@ func (m *machine) SetupPrologue() {
 	store := m.allocateInstrAfterLowering()
 	store.asStore(operandNR(frameSizeReg), _amode, 64)
 	cur = linkInstr(cur, store)
-
-	linkInstr(cur, prevInitInst)
+	return cur
 }
 
 // SetupEpilogue implements backend.Machine.

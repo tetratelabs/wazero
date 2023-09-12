@@ -133,7 +133,8 @@ func (c *callEngine) CallWithStack(ctx context.Context, paramResultStack []uint6
 		if r := recover(); r != nil {
 			builder := wasmdebug.NewErrorBuilder()
 			c.addFrame(builder, uintptr(unsafe.Pointer(c.execCtx.goCallReturnAddress)))
-			for _, retAddr := range stackUnwinder()(c.execCtx.stackPointerBeforeGoCall, c.stackTop) {
+			returnAddrs := unwindStack(c.execCtx.stackPointerBeforeGoCall, c.stackTop)
+			for _, retAddr := range returnAddrs[:len(returnAddrs)-1] { // the last return addr is the trampoline, so we skip it.
 				c.addFrame(builder, retAddr)
 			}
 			err = builder.FromRecovered(r)
