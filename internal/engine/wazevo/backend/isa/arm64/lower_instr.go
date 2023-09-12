@@ -754,6 +754,10 @@ func (m *machine) lowerPopcnt(x, result ssa.Value) {
 
 // lowerExitWithCode lowers the lowerExitWithCode takes a context pointer as argument.
 func (m *machine) lowerExitWithCode(execCtxVReg regalloc.VReg, code wazevoapi.ExitCode) {
+	// TODO: we shouldn't abuse tmpRegVReg below. What if execCtxVReg is spill, and
+	// 	the slot offset is huge, which results in using tmpReg when reloading it?
+	// 	Instead, we should simply allocate new temporary VReg for the median results.
+
 	loadExitCodeConst := m.allocateInstr()
 	loadExitCodeConst.asMOVZ(tmpRegVReg, uint64(code), 0, true)
 
