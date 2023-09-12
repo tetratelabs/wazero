@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
+	"os"
 	"testing"
 
 	"github.com/tetratelabs/wazero"
@@ -599,4 +600,62 @@ func TestE2E_reexported_memory(t *testing.T) {
 	require.Equal(t, mem, m3Inst.Memory())
 	require.Equal(t, mem, m2Inst.Memory())
 	require.Equal(t, uint32(11), mem.Size()/65536)
+}
+
+func TestStackUnwind(t *testing.T) {
+	unreachable := &wasm.Module{
+		ImportFunctionCount: 1,
+		ImportSection:       []wasm.Import{{Module: "host", Name: "cause_unreachable", Type: wasm.ExternTypeFunc, DescFunc: 0}},
+		TypeSection:         []wasm.FunctionType{{}},
+		ExportSection:       []wasm.Export{{Name: "main", Type: wasm.ExternTypeFunc, Index: 1}},
+		FunctionSection:     []wasm.Index{0, 0, 0},
+		CodeSection: []wasm.Code{
+			{Body: []byte{wasm.OpcodeCall, 2, wasm.OpcodeEnd}},
+			{Body: []byte{wasm.OpcodeCall, 3, wasm.OpcodeEnd}},
+			{Body: []byte{wasm.OpcodeCall, 0, wasm.OpcodeEnd}}, // call host.cause_unreachable.
+		},
+		NameSection: &wasm.NameSection{
+			FunctionNames: wasm.NameMap{
+				wasm.NameAssoc{Index: 0, Name: "host.unreachable"},
+				wasm.NameAssoc{Index: 1, Name: "main"},
+				wasm.NameAssoc{Index: 2, Name: "one"},
+				wasm.NameAssoc{Index: 3, Name: "two"},
+			},
+		},
+	}
+
+	os.WriteFile("tmp2.wasm", binaryencoding.EncodeModule(unreachable), 0o644)
+
+	config := wazero.NewRuntimeConfigCompiler()
+
+	// Configure the new optimizing backend!
+	wazevo.ConfigureWazevo(config)
+
+	ctx := context.Background()
+	r := wazero.NewRuntimeWithConfig(ctx, config)
+	defer func() {
+		require.NoError(t, r.Close(ctx))
+	}()
+
+	callUnreachable := func() {
+		panic("panic in host function")
+	}
+
+	_, err := r.NewHostModuleBuilder("host").
+		NewFunctionBuilder().WithFunc(callUnreachable).Export("cause_unreachable").
+		Instantiate(ctx)
+	require.NoError(t, err)
+
+	module, err := r.Instantiate(ctx, binaryencoding.EncodeModule(unreachable))
+	require.NoError(t, err)
+	defer module.Close(ctx)
+
+	_, err = module.ExportedFunction("main").Call(ctx)
+	exp := `panic in host function (recovered by wazero)
+wasm stack trace:
+	host.cause_unreachable()
+	.two()
+	.one()
+	.main()`
+	require.Equal(t, exp, err.Error())
 }

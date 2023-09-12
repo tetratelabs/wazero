@@ -111,6 +111,17 @@ func (c *callEngine) Call(ctx context.Context, params ...uint64) ([]uint64, erro
 	return paramResultSlice[:c.numberOfResults], nil
 }
 
+func (c *callEngine) addFrame(builder wasmdebug.ErrorBuilder, addr uintptr) {
+	eng := c.parent.parent.parent
+	cm := eng.compiledModuleOfAddr(addr)
+	if cm != nil {
+		index := cm.functionIndexOf(addr)
+		def := cm.module.FunctionDefinition(cm.module.ImportFunctionCount + index)
+		// TODO: DWARF.
+		builder.AddFrame(def.DebugName(), def.ParamTypes(), def.ResultTypes(), nil)
+	}
+}
+
 // CallWithStack implements api.Function.
 func (c *callEngine) CallWithStack(ctx context.Context, paramResultStack []uint64) (err error) {
 	var paramResultPtr *uint64
@@ -120,14 +131,10 @@ func (c *callEngine) CallWithStack(ctx context.Context, paramResultStack []uint6
 
 	defer func() {
 		if r := recover(); r != nil {
-			eng := c.parent.parent.parent
 			builder := wasmdebug.NewErrorBuilder()
+			c.addFrame(builder, uintptr(unsafe.Pointer(c.execCtx.goCallReturnAddress)))
 			for _, retAddr := range stackUnwinder()(c.execCtx.stackPointerBeforeGoCall, c.stackTop) {
-				cm := eng.compiledModuleOfAddr(retAddr)
-				index := cm.functionIndexOf(retAddr)
-				def := cm.module.FunctionDefinition(cm.module.ImportFunctionCount + index)
-				// TODO: DWARF.
-				builder.AddFrame(def.DebugName(), def.ParamTypes(), def.ResultTypes(), nil)
+				c.addFrame(builder, retAddr)
 			}
 			err = builder.FromRecovered(r)
 

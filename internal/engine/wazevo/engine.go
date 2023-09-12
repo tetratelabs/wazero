@@ -295,7 +295,7 @@ func (e *engine) compileHostModule(ctx context.Context, module *wasm.Module) (*c
 	be := backend.NewCompiler(ctx, machine, ssa.NewBuilder())
 
 	num := len(module.CodeSection)
-	cm := &compiledModule{}
+	cm := &compiledModule{module: module}
 	cm.functionOffsets = make([]compiledFunctionOffset, num)
 	totalSize := 0 // Total binary size of the executable.
 	bodies := make([][]byte, num)
