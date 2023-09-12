@@ -393,6 +393,9 @@ func TestInstruction_encode(t *testing.T) {
 		{want: "e17b81a9", setup: func(i *instruction) {
 			i.asStorePair64(x1VReg, x30VReg, addressModePreOrPostIndex(spVReg, 16, true))
 		}},
+		{want: "e17f81a9", setup: func(i *instruction) {
+			i.asStorePair64(x1VReg, xzrVReg, addressModePreOrPostIndex(spVReg, 16, true))
+		}},
 		{want: "20000014", setup: func(i *instruction) {
 			i.asBr(dummyLabel)
 			i.brOffsetResolved(0x80)
@@ -983,6 +986,7 @@ func TestInstruction_encoding_store_encoding(t *testing.T) {
 		{k: store32, amode: amodePreIndex2, rn: x5VReg, want: "e50f10b8"},
 		{k: store64, amode: amodePreIndex1, rn: x5VReg, want: "c5af00f8"},
 		{k: store64, amode: amodePreIndex2, rn: x5VReg, want: "e50f10f8"},
+		{k: store64, amode: amodePreIndex2, rn: xzrVReg, want: "ff0f10f8"},
 		{k: fpuStore32, amode: amodePreIndex1, rn: v5VReg, want: "c5af00bc"},
 		{k: fpuStore32, amode: amodePreIndex2, rn: v5VReg, want: "e50f10bc"},
 		{k: fpuStore64, amode: amodePreIndex1, rn: v5VReg, want: "c5af00fc"},

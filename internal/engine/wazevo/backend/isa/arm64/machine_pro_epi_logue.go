@@ -16,23 +16,31 @@ func (m *machine) SetupPrologue() {
 	//                   (high address)                    (high address)
 	//                 +-----------------+               +------------------+
 	//                 |     .......     |               |     .......      |
-	//                 |      ret Y      |               |      ret Y       |
-	//                 |     .......     |               |     .......      |
-	//                 |      ret 0      |               |      ret 0       |
-	//                 |      arg X      |               |      arg X       |
-	//                 |     .......     |     ====>     |     .......      |
-	//                 |      arg 1      |               |      arg 1       |
-	//                 |      arg 0      |               |      arg 0       |
-	//         SP----> |-----------------|               |      xxxxx       |
-	//                                                   |   ret address    |
+	//                 |      ret Y      |               |      ret Y       | <----+
+	//                 |     .......     |               |     .......      |      |
+	//                 |      ret 0      |               |      ret 0       |      |
+	//                 |      arg X      |               |      arg X       |      |  size_of_arg_ret.
+	//                 |     .......     |     ====>     |     .......      |      |
+	//                 |      arg 1      |               |      arg 1       |      |
+	//                 |      arg 0      |               |      arg 0       | <----+
+	//         SP----> |-----------------|               |  size_of_arg_ret |
+	//                                                   |  return address  |
 	//                                                   +------------------+ <---- SP
 	//                    (low address)                     (low address)
 
-	// Saves the return address (lr) and below the SP.
-	str := m.allocateInstrAfterLowering()
-	amode := addressModePreOrPostIndex(spVReg, -16 /* stack pointer must be 16-byte aligned. */, true /* decrement before store */)
-	str.asStore(operandNR(lrVReg), amode, 64)
-	cur = linkInstr(cur, str)
+	// Saves the return address (lr) and the size_of_arg_ret below the SP.
+	// size_of_arg_ret is used for stack unwinding.
+	var sizeOfArgRetReg regalloc.VReg
+	if s := m.currentABI.alignedArgResultStackSlotSize(); s > 0 {
+		cur = m.lowerConstantI64AndInsert(cur, tmpRegVReg, s)
+		sizeOfArgRetReg = tmpRegVReg
+	} else {
+		sizeOfArgRetReg = xzrVReg
+	}
+	pstr := m.allocateInstrAfterLowering()
+	amode := addressModePreOrPostIndex(spVReg, -16, true /* decrement before store */)
+	pstr.asStorePair64(lrVReg, sizeOfArgRetReg, amode)
+	cur = linkInstr(cur, pstr)
 
 	if !m.stackBoundsCheckDisabled {
 		cur = m.insertStackBoundsCheck(m.requiredStackSize(), cur)
@@ -63,7 +71,7 @@ func (m *machine) SetupPrologue() {
 		//          |     .......      |
 		//          |      arg 1       |
 		//          |      arg 0       |
-		//          |      xxxxx       |
+		//          |  size_of_arg_ret |
 		//          |   ReturnAddress  |
 		//          +------------------+
 		//          |   spill slot M   |
@@ -86,7 +94,7 @@ func (m *machine) SetupPrologue() {
 		//          |     .......     |             |     .......     |
 		//          |      arg 1      |             |      arg 1      |
 		//          |      arg 0      |             |      arg 0      |
-		//          |      xxxxx      |             |      xxxxx      |
+		//          | size_of_arg_ret |             | size_of_arg_ret |
 		//          |   ReturnAddress |             |  ReturnAddress  |
 		//          +-----------------+    ====>    +-----------------+
 		//          |   ...........   |             |   ...........   |
@@ -99,7 +107,7 @@ func (m *machine) SetupPrologue() {
 		//                                          |   ............  |
 		//                                          |   clobbered 0   |
 		//                                          +-----------------+
-		//                                              (high address)
+		//                                             (high address)
 		//
 		_amode := addressModePreOrPostIndex(spVReg,
 			-16,  // stack pointer must be 16-byte aligned.
@@ -112,6 +120,52 @@ func (m *machine) SetupPrologue() {
 			cur = linkInstr(cur, store)
 		}
 	}
+
+	// We push the frame size into the stack to make it possible to unwind stack:
+	//
+	//
+	//            (high address)                  (high address)
+	//         +-----------------+                +-----------------+
+	//         |     .......     |                |     .......     |
+	//         |      ret Y      |                |      ret Y      |
+	//         |     .......     |                |     .......     |
+	//         |      ret 0      |                |      ret 0      |
+	//         |      arg X      |                |      arg X      |
+	//         |     .......     |                |     .......     |
+	//         |      arg 1      |                |      arg 1      |
+	//         |      arg 0      |                |      arg 0      |
+	//         | size_of_arg_ret |                | size_of_arg_ret |
+	//         |  ReturnAddress  |                |  ReturnAddress  |
+	//         +-----------------+      ==>       +-----------------+ <----+
+	//         |   ...........   |                |   ...........   |      |
+	//         |   spill slot M  |                |   spill slot M  |      |
+	//         |   ............  |                |   ............  |      |
+	//         |   spill slot 2  |                |   spill slot 2  |      |
+	//         |   spill slot 1  |                |   spill slot 1  |      | frame size
+	//         |   spill slot 1  |                |   spill slot 1  |      |
+	//         |   clobbered N   |                |   clobbered N   |      |
+	//         |   ............  |                |   ............  |      |
+	//         |   clobbered 0   |                |   clobbered 0   | <----+
+	// SP--->  +-----------------+                |     xxxxxx      |  ;; unused space to make it 16-byte aligned.
+	//                                            |   frame_size    |
+	//                                            +-----------------+ <---- SP
+	//            (high address)
+	//
+
+	var frameSizeReg regalloc.VReg
+	if s := m.frameSize(); s > 0 {
+		cur = m.lowerConstantI64AndInsert(cur, tmpRegVReg, s)
+		frameSizeReg = tmpRegVReg
+	} else {
+		frameSizeReg = xzrVReg
+	}
+	_amode := addressModePreOrPostIndex(spVReg,
+		-16,  // stack pointer must be 16-byte aligned.
+		true, // Decrement before store.
+	)
+	store := m.allocateInstrAfterLowering()
+	store.asStore(operandNR(frameSizeReg), _amode, 64)
+	cur = linkInstr(cur, store)
 
 	linkInstr(cur, prevInitInst)
 }
@@ -139,6 +193,9 @@ func (m *machine) SetupEpilogue() {
 
 func (m *machine) setupEpilogueAfter(cur *instruction) {
 	prevNext := cur.next
+
+	// We've stored the frame size in the prologue, and now that we are about to return from this function, we won't need it anymore.
+	cur = m.addsAddOrSubStackPointer(cur, spVReg, 16, true, true)
 
 	// First we need to restore the clobbered registers.
 	if len(m.clobberedRegs) > 0 {
