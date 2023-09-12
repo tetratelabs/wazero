@@ -1325,9 +1325,9 @@ func (c *Compiler) lowerCurrentOpcode() {
 	case wasm.OpcodeVecPrefix:
 		state.pc++
 		vecOp := c.wasmFunctionBody[state.pc]
-		state.pc++
 		switch vecOp {
 		case wasm.OpcodeVecV128Const:
+			state.pc++
 			lo := binary.LittleEndian.Uint64(c.wasmFunctionBody[state.pc:])
 			state.pc += 8
 			hi := binary.LittleEndian.Uint64(c.wasmFunctionBody[state.pc:])
