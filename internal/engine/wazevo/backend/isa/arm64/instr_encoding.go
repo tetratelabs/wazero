@@ -352,18 +352,33 @@ func encodeVecRRR(op vecOp, rd, rn, rm uint32, arr vecArrangement) uint32 {
 		size, q := arrToSizeQEncoded(arr)
 		return encodeAdvancedSIMDThreeSame(rd, rn, rm, 0b00011, size, 0b1, q)
 	case vecOpAdd:
+		if arr == vecArrangement1D {
+			panic("unsupported arrangement: " + arr.String())
+		}
 		size, q := arrToSizeQEncoded(arr)
 		return encodeAdvancedSIMDThreeSame(rd, rn, rm, 0b10000, size, 0b0, q)
 	case vecOpAddp:
+		if arr == vecArrangement1D {
+			panic("unsupported arrangement: " + arr.String())
+		}
 		size, q := arrToSizeQEncoded(arr)
 		return encodeAdvancedSIMDThreeSame(rd, rn, rm, 0b10111, size, 0b0, q)
 	case vecOpSub:
+		if arr == vecArrangement1D {
+			panic("unsupported arrangement: " + arr.String())
+		}
 		size, q := arrToSizeQEncoded(arr)
 		return encodeAdvancedSIMDThreeSame(rd, rn, rm, 0b10000, size, 0b1, q)
 	case vecOpMul:
+		if arr > vecArrangement4S {
+			panic("unsupported arrangement: " + arr.String())
+		}
 		size, q := arrToSizeQEncoded(arr)
 		return encodeAdvancedSIMDThreeSame(rd, rn, rm, 0b10011, size, 0b0, q)
 	case vecOpUmlal:
+		if arr > vecArrangement4S {
+			panic("unsupported arrangement: " + arr.String())
+		}
 		size, q := arrToSizeQEncoded(arr)
 		return encodeAdvancedSIMDThreeDifferent(rd, rn, rm, 0b1000, size, 0b0, q)
 	default:
@@ -405,7 +420,7 @@ func encodeAdvancedSIMDThreeSame(rd, rn, rm, opcode, size, U, Q uint32) uint32 {
 	return Q<<30 | U<<29 | 0b111<<25 | size<<22 | 0b1<<21 | rm<<16 | opcode<<11 | 0b1<<10 | rn<<5 | rd
 }
 
-// encodeAdvancedSIMDThreeSame encodes as "Advanced SIMD three different" in
+// encodeAdvancedSIMDThreeDifferent encodes as "Advanced SIMD three different" in
 // https://developer.arm.com/documentation/ddi0596/2020-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
 func encodeAdvancedSIMDThreeDifferent(rd, rn, rm, opcode, size, U, Q uint32) uint32 {
 	return Q<<30 | U<<29 | 0b111<<25 | size<<22 | 0b1<<21 | rm<<16 | opcode<<12 | rn<<5 | rd
@@ -1377,46 +1392,15 @@ func encodeAdvancedSIMDTwoMisc(op vecOp, rd, rn uint32, arr vecArrangement) uint
 			panic("unsupported arrangement: " + arr.String())
 		}
 	case vecOpNeg:
+		if arr == vecArrangement1D {
+			panic("unsupported arrangement: " + arr.String())
+		}
 		opcode = 0b01011
 		u = 0b1
-		switch arr {
-		case vecArrangement8B:
-			q, size = 0b0, 0b11
-		case vecArrangement16B:
-			q, size = 0b1, 0b00
-		case vecArrangement4H:
-			q, size = 0b0, 0b01
-		case vecArrangement8H:
-			q, size = 0b1, 0b01
-		case vecArrangement2S:
-			q, size = 0b0, 0b10
-		case vecArrangement4S:
-			q, size = 0b1, 0b10
-		case vecArrangement2D:
-			q, size = 0b1, 0b11
-		default:
-			panic("unsupported arrangement: " + arr.String())
-		}
+		size, q = arrToSizeQEncoded(arr)
 	case vecOpRev64:
 		opcode = 0b00000
-		switch arr {
-		case vecArrangement8B:
-			q, size = 0b0, 0b11
-		case vecArrangement16B:
-			q, size = 0b1, 0b00
-		case vecArrangement4H:
-			q, size = 0b0, 0b01
-		case vecArrangement8H:
-			q, size = 0b1, 0b01
-		case vecArrangement2S:
-			q, size = 0b0, 0b10
-		case vecArrangement4S:
-			q, size = 0b1, 0b10
-		case vecArrangement2D:
-			q, size = 0b1, 0b11
-		default:
-			panic("unsupported arrangement: " + arr.String())
-		}
+		size, q = arrToSizeQEncoded(arr)
 	case vecOpXtn:
 		u = 0b0
 		opcode = 0b10010
