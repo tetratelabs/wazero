@@ -1032,7 +1032,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 
 		var args []ssa.Value
 		if len(bt.Params) > 0 {
-			args = cloneValuesList(state.values[len(state.values)-1-len(bt.Params):])
+			args = cloneValuesList(state.values[len(state.values)-len(bt.Params):])
 		}
 
 		// Insert the conditional jump to the Else block.
@@ -1117,7 +1117,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			// If this is the end of Then block, we have to emit the empty Else block.
 			elseBlk := ctrl.blk
 			builder.SetCurrentBlock(elseBlk)
-			c.insertJumpToBlock(nil, followingBlk)
+			c.insertJumpToBlock(ctrl.clonedArgs, followingBlk)
 		}
 
 		builder.Seal(ctrl.followingBlock)

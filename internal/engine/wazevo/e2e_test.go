@@ -128,12 +128,25 @@ func TestSpectestV2(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 	}{
-		{"conversions"}, // includes non-trapping conversions.
+		{"block"},
+		{"br"},
+		{"call"},
+		{"call_indirect"},
+		{"conversions"},
+		{"if"},
+		{"loop"},
 		{"simd_const"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			spectest.RunCase(t, v2.Testcases, tc.name, context.Background(), config,
-				-1, 0, math.MaxInt)
+			t.Run("normal", func(t *testing.T) {
+				spectest.RunCase(t, v2.Testcases, tc.name, context.Background(), config,
+					-1, 0, math.MaxInt)
+			})
+			t.Run("reg high pressure", func(t *testing.T) {
+				ctx := wazevoapi.EnableHighRegisterPressure(context.Background())
+				spectest.RunCase(t, v2.Testcases, tc.name, ctx, config,
+					-1, 0, math.MaxInt)
+			})
 		})
 	}
 }

@@ -237,6 +237,7 @@ func (c *compiler) assignVirtualRegisters() {
 		// Assigns each value to a virtual register produced by instructions.
 		for cur := blk.Root(); cur != nil; cur = cur.Next() {
 			r, rs := cur.Returns()
+			var N int
 			if r.Valid() {
 				id := r.ID()
 				ssaTyp := r.Type()
@@ -248,18 +249,20 @@ func (c *compiler) assignVirtualRegisters() {
 					RefCount: refCounts[id],
 				}
 				c.ssaTypeOfVRegID[vReg.ID()] = ssaTyp
+				N++
 			}
-			for i, r := range rs {
+			for _, r := range rs {
 				id := r.ID()
 				ssaTyp := r.Type()
 				vReg := c.AllocateVReg(regalloc.RegTypeOf(ssaTyp))
 				c.ssaValueToVRegs[id] = vReg
 				c.ssaValueDefinitions[id] = SSAValueDefinition{
 					Instr:    cur,
-					N:        i,
+					N:        N,
 					RefCount: refCounts[id],
 				}
 				c.ssaTypeOfVRegID[vReg.ID()] = ssaTyp
+				N++
 			}
 		}
 	}
