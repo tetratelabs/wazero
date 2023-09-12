@@ -53,9 +53,9 @@ jobs:
             ~/go/bin
           key: check-${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum', 'Makefile') }}
 
-      - run: make check
-
       - run: make build.spectest
+
+      - run: make check
 
   test_amd64:
     name: amd64, ${{ matrix.os }}, Go-${{ matrix.go-version }}
