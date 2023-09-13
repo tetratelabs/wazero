@@ -70,7 +70,7 @@ func (m *mockCompiler) Emit4Bytes(b uint32) {
 	m.buf = append(m.buf, byte(b), byte(b>>8), byte(b>>16), byte(b>>24))
 }
 
-func (m *mockCompiler) Encode() int                                                      { return 0 }
+func (m *mockCompiler) Encode()                                                          {}
 func (m *mockCompiler) Buf() []byte                                                      { return m.buf }
 func (m *mockCompiler) AllocateVRegWithSSAType(regalloc.RegType, ssa.Type) regalloc.VReg { return 0 }
 func (m *mockCompiler) TypeOf(v regalloc.VReg) (ret ssa.Type) {
@@ -80,7 +80,7 @@ func (m *mockCompiler) Finalize()      {}
 func (m *mockCompiler) RegAlloc()      {}
 func (m *mockCompiler) Lower()         {}
 func (m *mockCompiler) Format() string { return "" }
-func (m *mockCompiler) Init(bool)      {}
+func (m *mockCompiler) Init()          {}
 
 func newMockCompilationContext() *mockCompiler {
 	return &mockCompiler{
@@ -144,6 +144,6 @@ func (m *mockCompiler) MatchInstrOneOf(def *backend.SSAValueDefinition, opcodes 
 }
 
 // Compile implements backend.Compiler.
-func (m *mockCompiler) Compile(context.Context) (_ []byte, _ []backend.RelocationInfo, goPreambleSize int, _ error) {
+func (m *mockCompiler) Compile(context.Context) (_ []byte, _ []backend.RelocationInfo, _ error) {
 	return
 }

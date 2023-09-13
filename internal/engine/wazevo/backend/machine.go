@@ -105,5 +105,9 @@ type (
 		// CompileStackGrowCallSequence returns the sequence of instructions shared by all functions to
 		// call the stack grow builtin function.
 		CompileStackGrowCallSequence() []byte
+
+		// CompileEntryPreamble returns the sequence of instructions shared by multiple functions to
+		// enter the function from Go.
+		CompileEntryPreamble(signature *ssa.Signature) []byte
 	}
 )

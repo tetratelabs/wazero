@@ -46,7 +46,7 @@ type Compiler interface {
 	//
 	// The returned byte slices are the machine code and the relocation information for the machine code.
 	// The caller is responsible for copying them immediately since the compiler may reuse the buffer.
-	Compile(ctx context.Context) (_ []byte, _ []RelocationInfo, goPreambleSize int, _ error)
+	Compile(ctx context.Context) (_ []byte, _ []RelocationInfo, _ error)
 
 	// Lower lowers the given ssa.Instruction to the machine-specific instructions.
 	Lower()
@@ -57,8 +57,8 @@ type Compiler interface {
 	// Finalize performs the finalization of the compilation. This must be called after RegAlloc.
 	Finalize()
 
-	// Encode encodes the machine code to the buffer. This returns the size of Go entry preamble if it is needed.
-	Encode() int
+	// Encode encodes the machine code to the buffer.
+	Encode()
 
 	// Buf returns the buffer of the encoded machine code. This is only used for testing purpose.
 	Buf() []byte
@@ -67,8 +67,7 @@ type Compiler interface {
 	Format() string
 
 	// Init initializes the internal state of the compiler for the next compilation.
-	// `needGoEntryPreamble` is true if the preamble to call the function from Go.
-	Init(needGoEntryPreamble bool)
+	Init()
 
 	// ResolveSignature returns the ssa.Signature of the given ssa.SignatureID.
 	ResolveSignature(id ssa.SignatureID) *ssa.Signature
@@ -140,17 +139,16 @@ type compiler struct {
 		cInst *ssa.Instruction
 		dst   regalloc.VReg
 	}
-	vRegSet             map[regalloc.VReg]bool
-	tempRegs            []regalloc.VReg
-	tmpVals             []ssa.Value
-	ssaTypeOfVRegID     map[regalloc.VRegID]ssa.Type
-	buf                 []byte
-	relocations         []RelocationInfo
-	needGoEntryPreamble bool
+	vRegSet         map[regalloc.VReg]bool
+	tempRegs        []regalloc.VReg
+	tmpVals         []ssa.Value
+	ssaTypeOfVRegID map[regalloc.VRegID]ssa.Type
+	buf             []byte
+	relocations     []RelocationInfo
 }
 
 // Compile implements Compiler.Compile.
-func (c *compiler) Compile(ctx context.Context) ([]byte, []RelocationInfo, int, error) {
+func (c *compiler) Compile(ctx context.Context) ([]byte, []RelocationInfo, error) {
 	c.Lower()
 	if wazevoapi.PrintSSAToBackendIRLowering {
 		fmt.Printf("[[[after lowering for %s ]]]%s\n", wazevoapi.GetCurrentFunctionName(ctx), c.Format())
@@ -172,11 +170,11 @@ func (c *compiler) Compile(ctx context.Context) ([]byte, []RelocationInfo, int, 
 	if wazevoapi.DeterministicCompilationVerifierEnabled {
 		wazevoapi.VerifyOrSetDeterministicCompilationContextValue(ctx, "After Finalization", c.Format())
 	}
-	goPreambleSize := c.Encode()
+	c.Encode()
 	if wazevoapi.DeterministicCompilationVerifierEnabled {
 		wazevoapi.VerifyOrSetDeterministicCompilationContextValue(ctx, "Encoded Machine code", hex.EncodeToString(c.buf))
 	}
-	return c.buf, c.relocations, goPreambleSize, nil
+	return c.buf, c.relocations, nil
 }
 
 // RegAlloc implements Compiler.RegAlloc.
@@ -193,15 +191,8 @@ func (c *compiler) Finalize() {
 }
 
 // Encode implements Compiler.Encode.
-func (c *compiler) Encode() int {
-	var goEntryPreambleSize int
-	if c.needGoEntryPreamble {
-		abi := c.mach.ABI()
-		abi.EmitGoEntryPreamble()
-		goEntryPreambleSize = len(c.buf)
-	}
+func (c *compiler) Encode() {
 	c.mach.Encode()
-	return goEntryPreambleSize
 }
 
 // setCurrentGroupID sets the current instruction group ID.
@@ -291,7 +282,7 @@ func (c *compiler) AllocateVRegWithSSAType(regType regalloc.RegType, typ ssa.Typ
 }
 
 // Init implements Compiler.Init.
-func (c *compiler) Init(needGoEntryPreamble bool) {
+func (c *compiler) Init() {
 	for i, v := range c.ssaValueToVRegs {
 		c.ssaValueToVRegs[i] = regalloc.VRegInvalid
 		delete(c.ssaTypeOfVRegID, v.ID())
@@ -310,7 +301,6 @@ func (c *compiler) Init(needGoEntryPreamble bool) {
 	c.regAlloc.Reset()
 	c.buf = c.buf[:0]
 	c.relocations = c.relocations[:0]
-	c.needGoEntryPreamble = needGoEntryPreamble
 }
 
 func (c *compiler) resetVRegSet() {

@@ -6,7 +6,7 @@ import (
 	"runtime"
 )
 
-func entrypoint(executable *byte, executionContextPtr uintptr, moduleContextPtr *byte, paramResultStackPtr *uint64, goAllocatedStackSlicePtr uintptr) {
+func entrypoint(preambleExecutable, functionExecutable *byte, executionContextPtr uintptr, moduleContextPtr *byte, paramResultStackPtr *uint64, goAllocatedStackSlicePtr uintptr) {
 	panic(runtime.GOARCH)
 }
 

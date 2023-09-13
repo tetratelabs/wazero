@@ -13,8 +13,6 @@ type FunctionABI interface {
 	CalleeGenFunctionArgsToVRegs(regs []ssa.Value)
 	// CalleeGenVRegsToFunctionReturns generates instructions to move virtual registers to a return value locations.
 	CalleeGenVRegsToFunctionReturns(regs []ssa.Value)
-	// EmitGoEntryPreamble emits a preamble machine codes for the given function to call this function from Go.
-	EmitGoEntryPreamble()
 }
 
 type (

@@ -31,17 +31,22 @@ type (
 		rels []backend.RelocationInfo
 		// refToBinaryOffset is reused for each compilation to avoid allocation.
 		refToBinaryOffset map[ssa.FuncRef]int
-		// builtinFunctions is hods compiled builtin function trampolines.
-		builtinFunctions *builtinFunctions
+		// sharedFunctions is compiled functions shared by all modules.
+		sharedFunctions *sharedFunctions
 		// setFinalizer defaults to runtime.SetFinalizer, but overridable for tests.
 		setFinalizer func(obj interface{}, finalizer interface{})
+
+		// The followings are reused for compiling shared functions.
+		machine backend.Machine
+		be      backend.Compiler
 	}
 
-	builtinFunctions struct {
+	sharedFunctions struct {
 		// memoryGrowExecutable is a compiled executable for memory.grow builtin function.
 		memoryGrowExecutable []byte
 		// stackGrowExecutable is a compiled executable for growing stack builtin function.
 		stackGrowExecutable []byte
+		entryPreambles      map[*wasm.FunctionType][]byte
 	}
 
 	// compiledModule is a compiled variant of a wasm.Module and ready to be used for instantiation.
@@ -51,11 +56,12 @@ type (
 		functionOffsets []compiledFunctionOffset
 		parent          *engine
 		module          *wasm.Module
+		entryPreambles  []*byte // indexed-correlated with the type index.
 
 		// The followings are only available for non host modules.
 
-		offsets          wazevoapi.ModuleContextOffsetData
-		builtinFunctions *builtinFunctions
+		offsets         wazevoapi.ModuleContextOffsetData
+		sharedFunctions *sharedFunctions
 	}
 
 	// compiledFunctionOffset tells us that where in the executable a function begins.
@@ -77,11 +83,15 @@ var _ wasm.Engine = (*engine)(nil)
 
 // NewEngine returns the implementation of wasm.Engine.
 func NewEngine(ctx context.Context, _ api.CoreFeatures, _ filecache.Cache) wasm.Engine {
+	machine := newMachine()
+	be := backend.NewCompiler(ctx, machine, ssa.NewBuilder())
 	e := &engine{
 		compiledModules: make(map[wasm.ModuleID]*compiledModule), refToBinaryOffset: make(map[ssa.FuncRef]int),
 		setFinalizer: runtime.SetFinalizer,
+		machine:      machine,
+		be:           be,
 	}
-	e.compileBuiltinFunctions(ctx)
+	e.compileBuiltinFunctions()
 	return e
 }
 
@@ -109,10 +119,17 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listene
 
 func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listeners []experimental.FunctionListener, ensureTermination bool) (*compiledModule, error) {
 	e.rels = e.rels[:0]
-	cm := &compiledModule{offsets: wazevoapi.NewModuleContextOffsetData(module), parent: e, module: module}
+	cm := &compiledModule{
+		offsets: wazevoapi.NewModuleContextOffsetData(module), parent: e, module: module,
+	}
 
 	if module.IsHostModule {
 		return e.compileHostModule(ctx, module)
+	}
+
+	cm.entryPreambles = make([]*byte, len(module.TypeSection))
+	for i := range cm.entryPreambles {
+		cm.entryPreambles[i] = e.getEntryPreambleForType(&module.TypeSection[i])
 	}
 
 	importedFns, localFns := int(module.ImportFunctionCount), len(module.FunctionSection)
@@ -123,15 +140,6 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 	if wazevoapi.DeterministicCompilationVerifierEnabled {
 		// The compilation must be deterministic regardless of the order of functions being compiled.
 		wazevoapi.DeterministicCompilationVerifierRandomizeIndexes(ctx)
-	}
-
-	// TODO: reuse the map to avoid allocation.
-	exportedFnIndex := make(map[wasm.Index]string, len(module.ExportSection))
-	for i := range module.ExportSection {
-		exp := &module.ExportSection[i]
-		if exp.Type == wasm.ExternTypeFunc {
-			exportedFnIndex[module.ExportSection[i].Index] = exp.Name
-		}
 	}
 
 	// Creates new compiler instances which are reused for each function.
@@ -159,12 +167,7 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 			ctx = wazevoapi.SetCurrentFunctionName(ctx, fmt.Sprintf("[%d/%d] \"%s\"", i, len(module.CodeSection)-1, name))
 		}
 
-		_, needGoEntryPreamble := exportedFnIndex[fidx]
-		if sf := module.StartSection; sf != nil && *sf == fidx {
-			needGoEntryPreamble = true
-		}
-
-		body, rels, goPreambleSize, err := e.compileLocalWasmFunction(ctx, module, wasm.Index(i), fidx, needGoEntryPreamble, fe, ssaBuilder, be, listeners, ensureTermination)
+		body, rels, err := e.compileLocalWasmFunction(ctx, module, wasm.Index(i), fe, ssaBuilder, be, listeners, ensureTermination)
 		if err != nil {
 			return nil, fmt.Errorf("compile function %d/%d: %v", i, len(module.CodeSection)-1, err)
 		}
@@ -175,12 +178,7 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 		compiledFuncOffset.offset = totalSize
 
 		fref := frontend.FunctionIndexToFuncRef(fidx)
-		e.refToBinaryOffset[fref] = totalSize +
-			// During the relocation, call target needs to be the beginning of function after Go entry preamble.
-			goPreambleSize
-		if needGoEntryPreamble {
-			compiledFuncOffset.goPreambleSize = goPreambleSize
-		}
+		e.refToBinaryOffset[fref] = totalSize
 
 		// At this point, relocation offsets are relative to the start of the function body,
 		// so we adjust it to the start of the executable.
@@ -218,7 +216,7 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 		}
 	}
 	e.compiledModules[module.ID] = cm
-	cm.builtinFunctions = e.builtinFunctions
+	cm.sharedFunctions = e.sharedFunctions
 	e.setFinalizer(cm, compiledModuleFinalizer)
 	return cm, nil
 }
@@ -226,27 +224,21 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 func (e *engine) compileLocalWasmFunction(
 	ctx context.Context,
 	module *wasm.Module,
-	localFunctionIndex,
-	functionIndex wasm.Index,
-	needGoEntryPreamble bool,
+	localFunctionIndex wasm.Index,
 	fe *frontend.Compiler,
 	ssaBuilder ssa.Builder,
 	be backend.Compiler,
 	_ []experimental.FunctionListener, _ bool,
-) (body []byte, rels []backend.RelocationInfo, goPreambleSize int, err error) {
+) (body []byte, rels []backend.RelocationInfo, err error) {
 	typ := &module.TypeSection[module.FunctionSection[localFunctionIndex]]
 	codeSeg := &module.CodeSection[localFunctionIndex]
 
 	// Initializes both frontend and backend compilers.
 	fe.Init(localFunctionIndex, typ, codeSeg.LocalTypes, codeSeg.Body)
-	be.Init(needGoEntryPreamble)
+	be.Init()
 
 	// Lower Wasm to SSA.
-	err = fe.LowerToSSA()
-	if err != nil {
-		return nil, nil, 0, fmt.Errorf("wasm->ssa: %v", err)
-	}
-
+	fe.LowerToSSA()
 	if wazevoapi.PrintSSA {
 		fmt.Printf("[[[SSA for %s]]]%s\n", wazevoapi.GetCurrentFunctionName(ctx), ssaBuilder.Format())
 	}
@@ -279,15 +271,15 @@ func (e *engine) compileLocalWasmFunction(
 
 	// Now our ssaBuilder contains the necessary information to further lower them to
 	// machine code.
-	original, rels, goPreambleSize, err := be.Compile(ctx)
+	original, rels, err := be.Compile(ctx)
 	if err != nil {
-		return nil, nil, 0, fmt.Errorf("ssa->machine code: %v", err)
+		return nil, nil, fmt.Errorf("ssa->machine code: %v", err)
 	}
 
 	// TODO: optimize as zero copy.
 	copied := make([]byte, len(original))
 	copy(copied, original)
-	return copied, rels, goPreambleSize, nil
+	return copied, rels, nil
 }
 
 func (e *engine) compileHostModule(ctx context.Context, module *wasm.Module) (*compiledModule, error) {
@@ -346,7 +338,7 @@ func (e *engine) compileHostModule(ctx context.Context, module *wasm.Module) (*c
 			exitCode = wazevoapi.ExitCodeCallGoFunctionWithIndex(i)
 		}
 
-		be.Init(false)
+		be.Init()
 		machine.CompileGoFunctionTrampoline(exitCode, &sig, true)
 		be.Encode()
 		body := be.Buf()
@@ -392,7 +384,7 @@ func (e *engine) Close() (err error) {
 	}
 	e.sortedCompiledModules = nil
 	e.compiledModules = nil
-	e.builtinFunctions = nil
+	e.sharedFunctions = nil
 	return nil
 }
 
@@ -490,36 +482,40 @@ func (e *engine) NewModuleEngine(m *wasm.Module, mi *wasm.ModuleInstance) (wasm.
 	return me, nil
 }
 
-func (e *engine) compileBuiltinFunctions(ctx context.Context) {
-	machine := newMachine()
-	be := backend.NewCompiler(ctx, machine, ssa.NewBuilder())
-	e.builtinFunctions = &builtinFunctions{}
+func (e *engine) compileBuiltinFunctions() {
+	e.sharedFunctions = &sharedFunctions{entryPreambles: make(map[*wasm.FunctionType][]byte)}
 
+	e.be.Init()
 	{
-		src := machine.CompileGoFunctionTrampoline(wazevoapi.ExitCodeGrowMemory, &ssa.Signature{
+		src := e.machine.CompileGoFunctionTrampoline(wazevoapi.ExitCodeGrowMemory, &ssa.Signature{
 			Params:  []ssa.Type{ssa.TypeI32 /* exec context */, ssa.TypeI32},
 			Results: []ssa.Type{ssa.TypeI32},
 		}, false)
-		e.builtinFunctions.memoryGrowExecutable = mmapExecutable(src)
+		e.sharedFunctions.memoryGrowExecutable = mmapExecutable(src)
 	}
 
 	// TODO: table grow, etc.
 
-	be.Init(false)
+	e.be.Init()
 	{
-		src := machine.CompileStackGrowCallSequence()
-		e.builtinFunctions.stackGrowExecutable = mmapExecutable(src)
+		src := e.machine.CompileStackGrowCallSequence()
+		e.sharedFunctions.stackGrowExecutable = mmapExecutable(src)
 	}
 
-	e.setFinalizer(e.builtinFunctions, builtinFunctionFinalizer)
+	e.setFinalizer(e.sharedFunctions, sharedFunctionsFinalizer)
 }
 
-func builtinFunctionFinalizer(bf *builtinFunctions) {
+func sharedFunctionsFinalizer(bf *sharedFunctions) {
 	if err := platform.MunmapCodeSegment(bf.memoryGrowExecutable); err != nil {
 		panic(err)
 	}
 	if err := platform.MunmapCodeSegment(bf.stackGrowExecutable); err != nil {
 		panic(err)
+	}
+	for _, f := range bf.entryPreambles {
+		if err := platform.MunmapCodeSegment(f); err != nil {
+			panic(err)
+		}
 	}
 
 	bf.memoryGrowExecutable = nil
@@ -563,4 +559,22 @@ func (cm *compiledModule) functionIndexOf(addr uintptr) wasm.Index {
 		panic("BUG")
 	}
 	return wasm.Index(index)
+}
+
+func (e *engine) getEntryPreambleForType(functionType *wasm.FunctionType) *byte {
+	e.mux.RLock()
+	executable, ok := e.sharedFunctions.entryPreambles[functionType]
+	e.mux.RUnlock()
+	if ok {
+		return &executable[0]
+	}
+
+	sig := frontend.SignatureForWasmFunctionType(functionType)
+	e.be.Init()
+	buf := e.machine.CompileEntryPreamble(&sig)
+	executable = mmapExecutable(buf)
+	e.mux.Lock()
+	defer e.mux.Unlock()
+	e.sharedFunctions.entryPreambles[functionType] = executable
+	return &executable[0]
 }

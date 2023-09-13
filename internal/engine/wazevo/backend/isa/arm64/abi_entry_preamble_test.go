@@ -9,7 +9,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
-func TestAbiImpl_constructGoEntryPreamble(t *testing.T) {
+func TestAbiImpl_constructEntryPreamble(t *testing.T) {
 	const i32, f32, i64, f64, v128 = ssa.TypeI32, ssa.TypeF32, ssa.TypeI64, ssa.TypeF64, ssa.TypeV128
 
 	for _, tc := range []struct {
@@ -27,7 +27,7 @@ func TestAbiImpl_constructGoEntryPreamble(t *testing.T) {
 	str x27, [x20, #0x18]
 	str x30, [x20, #0x20]
 	mov sp, x26
-	bl #0x18
+	bl x24
 	ldr x29, [x20, #0x10]
 	ldr x27, [x20, #0x18]
 	mov sp, x27
@@ -55,7 +55,7 @@ func TestAbiImpl_constructGoEntryPreamble(t *testing.T) {
 	ldr s2, [x19], #0x8
 	ldr s3, [x19], #0x8
 	ldr d4, [x19], #0x8
-	bl #0x18
+	bl x24
 	ldr x29, [x20, #0x10]
 	ldr x27, [x20, #0x18]
 	mov sp, x27
@@ -83,7 +83,7 @@ func TestAbiImpl_constructGoEntryPreamble(t *testing.T) {
 	ldr w4, [x19], #0x8
 	ldr x5, [x19], #0x8
 	ldr w6, [x19], #0x8
-	bl #0x18
+	bl x24
 	ldr x29, [x20, #0x10]
 	ldr x27, [x20, #0x18]
 	mov sp, x27
@@ -118,7 +118,7 @@ func TestAbiImpl_constructGoEntryPreamble(t *testing.T) {
 	ldr s3, [x19], #0x8
 	ldr q4, [x19], #0x10
 	ldr s5, [x19], #0x8
-	bl #0x18
+	bl x24
 	ldr x29, [x20, #0x10]
 	ldr x27, [x20, #0x18]
 	mov sp, x27
@@ -148,7 +148,7 @@ func TestAbiImpl_constructGoEntryPreamble(t *testing.T) {
 	ldr w3, [x25], #0x8
 	ldr s1, [x25], #0x8
 	ldr x4, [x25], #0x8
-	bl #0x34
+	bl x24
 	str s0, [x19], #0x8
 	str d1, [x19], #0x8
 	str w0, [x19], #0x8
@@ -180,7 +180,7 @@ func TestAbiImpl_constructGoEntryPreamble(t *testing.T) {
 	str x30, [x20, #0x20]
 	sub x26, x26, #0x70
 	mov sp, x26
-	bl #0xb0
+	bl x24
 	str s0, [x19], #0x8
 	str d1, [x19], #0x8
 	str w0, [x19], #0x8
@@ -287,7 +287,7 @@ func TestAbiImpl_constructGoEntryPreamble(t *testing.T) {
 	str q15, [sp, #0x80]
 	ldr q15, [x19], #0x10
 	str q15, [sp, #0x90]
-	bl #0x18
+	bl x24
 	ldr x29, [x20, #0x10]
 	ldr x27, [x20, #0x18]
 	mov sp, x27
@@ -361,7 +361,7 @@ func TestAbiImpl_constructGoEntryPreamble(t *testing.T) {
 	str q15, [sp, #0x80]
 	ldr q15, [x25], #0x10
 	str q15, [sp, #0x90]
-	bl #0x88
+	bl x24
 	str s0, [x19], #0x8
 	str d1, [x19], #0x8
 	str w0, [x19], #0x8
@@ -401,7 +401,7 @@ func TestAbiImpl_constructGoEntryPreamble(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			_, _, m := newSetupWithMockContext()
 			abi := m.getOrCreateABIImpl(tc.sig)
-			m.rootInstr = abi.constructGoEntryPreamble()
+			m.rootInstr = abi.constructEntryPreamble()
 			fmt.Println(m.Format())
 			require.Equal(t, tc.exp, m.Format())
 		})

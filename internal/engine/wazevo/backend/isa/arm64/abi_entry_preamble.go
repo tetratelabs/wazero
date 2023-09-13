@@ -7,16 +7,21 @@ import (
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 )
 
-// EmitGoEntryPreamble implements backend.FunctionABI. This assumes `entrypoint` function (in abi_go_entry_arm64.s) passes:
+// CompileEntryPreamble implements backend.Machine. This assumes `entrypoint` function (in abi_go_entry_arm64.s) passes:
 //
 //  1. First (execution context ptr) and Second arguments are already passed in x0, and x1.
 //  2. param/result slice ptr in x19; the pointer to []uint64{} which is used to pass arguments and accept return values.
 //  3. Go-allocated stack slice ptr in x26.
+//  4. Function executable in x24.
 //
 // also SP and FP are correct Go-runtime-based values, and LR is the return address to the Go-side caller.
-func (a *abiImpl) EmitGoEntryPreamble() {
-	root := a.constructGoEntryPreamble()
-	a.m.encode(root)
+func (m *machine) CompileEntryPreamble(signature *ssa.Signature) []byte {
+	abi := abiImpl{}
+	abi.m = m
+	abi.init(signature)
+	root := abi.constructEntryPreamble()
+	m.encode(root)
+	return m.compiler.Buf()
 }
 
 var (
@@ -28,6 +33,8 @@ var (
 	goAllocatedStackPtr = x26VReg
 	// paramResultSliceCopied is not used in the epilogue.
 	paramResultSliceCopied = x25VReg
+	// tmpRegVReg is not used in the epilogue.
+	functionExecutable = x24VReg
 )
 
 func (m *machine) goEntryPreamblePassArg(cur *instruction, paramSlicePtr regalloc.VReg, arg *backend.ABIArg) *instruction {
@@ -128,7 +135,7 @@ func (m *machine) goEntryPreamblePassResult(cur *instruction, resultSlicePtr reg
 	return cur
 }
 
-func (a *abiImpl) constructGoEntryPreamble() (root *instruction) {
+func (a *abiImpl) constructEntryPreamble() (root *instruction) {
 	m := a.m
 	root = m.allocateNop()
 
@@ -185,6 +192,7 @@ func (a *abiImpl) constructGoEntryPreamble() (root *instruction) {
 	// 		bl #<offset of real function from this instruction>
 	// But at this point, we don't know the size of epilogue, so we emit a placeholder.
 	bl := m.allocateInstr()
+	bl.asCallIndirect(functionExecutable, a)
 	cur = linkInstr(cur, bl)
 
 	///// ----------------------------------- epilogue ----------------------------------- /////
@@ -207,19 +215,6 @@ func (a *abiImpl) constructGoEntryPreamble() (root *instruction) {
 	retInst := a.m.allocateInstr()
 	retInst.asRet(nil)
 	linkInstr(cur, retInst)
-
-	///// ----------------------------------- epilogue end / real function begins ----------------------------------- /////
-
-	// Now that we allocated all instructions needed, we can calculate the size of epilogue, and finalize the
-	// bl instruction to call the real function coming after epilogue.
-	var blAt, realFuncAt int64
-	for _cur := root; _cur != nil; _cur = _cur.next {
-		if _cur == bl {
-			blAt = realFuncAt
-		}
-		realFuncAt += _cur.size()
-	}
-	bl.asCallImm(realFuncAt - blAt)
 	return
 }
 

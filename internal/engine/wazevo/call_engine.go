@@ -24,7 +24,8 @@ type (
 		// at the very beginning of api.Function Call/CallWithStack.
 		stackTop uintptr
 		// executable is the pointer to the executable code for this function.
-		executable *byte
+		executable         *byte
+		preambleExecutable *byte
 		// parent is the *moduleEngine from which this callEngine is created.
 		parent *moduleEngine
 		// indexInModule is the index of the function in the module.
@@ -143,7 +144,7 @@ func (c *callEngine) CallWithStack(ctx context.Context, paramResultStack []uint6
 		}
 	}()
 
-	entrypoint(c.executable, c.execCtxPtr, c.parent.opaquePtr, paramResultPtr, c.stackTop)
+	entrypoint(c.preambleExecutable, c.executable, c.execCtxPtr, c.parent.opaquePtr, paramResultPtr, c.stackTop)
 	for {
 		switch ec := c.execCtx.exitCode; ec & wazevoapi.ExitCodeMask {
 		case wazevoapi.ExitCodeOK:
