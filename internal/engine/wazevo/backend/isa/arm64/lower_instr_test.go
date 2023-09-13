@@ -1,6 +1,7 @@
 package arm64
 
 import (
+	"encoding/hex"
 	"fmt"
 	"strings"
 	"testing"
