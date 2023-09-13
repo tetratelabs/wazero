@@ -73,6 +73,7 @@ func NewFrontendCompiler(m *wasm.Module, ssaBuilder ssa.Builder, offset *wazevoa
 	return c
 }
 
+// SignatureForWasmFunctionType returns the ssa.Signature for the given wasm.FunctionType.
 func SignatureForWasmFunctionType(typ *wasm.FunctionType) ssa.Signature {
 	sig := ssa.Signature{
 		// +2 to pass moduleContextPtr and executionContextPtr. See the inline comment LowerToSSA.
