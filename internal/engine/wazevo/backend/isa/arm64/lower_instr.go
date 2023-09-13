@@ -323,44 +323,7 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
 		rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
 		rd := operandNR(m.compiler.VRegOf(instr.Return()))
-		if lane != ssa.VecLaneI64x2 {
-			mul := m.allocateInstr()
-			mul.asVecRRR(vecOpMul, rd, rn, rm, arr)
-			m.insert(mul)
-		} else {
-			tmp1 := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
-			tmp2 := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
-			tmp3 := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
-
-			// Following the algorithm in https://chromium-review.googlesource.com/c/v8/v8/+/1781696
-			rev64 := m.allocateInstr()
-			rev64.asVecMisc(vecOpRev64, tmp2, rm, vecArrangement4S)
-			m.insert(rev64)
-
-			mul := m.allocateInstr()
-			mul.asVecRRR(vecOpMul, tmp2, tmp2, rn, vecArrangement4S)
-			m.insert(mul)
-
-			xtn1 := m.allocateInstr()
-			xtn1.asVecMisc(vecOpXtn, tmp1, rn, vecArrangement2S)
-			m.insert(xtn1)
-
-			addp := m.allocateInstr()
-			addp.asVecRRR(vecOpAddp, tmp2, tmp2, tmp2, vecArrangement4S)
-			m.insert(addp)
-
-			xtn2 := m.allocateInstr()
-			xtn2.asVecMisc(vecOpXtn, tmp3, rm, vecArrangement2S)
-			m.insert(xtn2)
-
-			shll := m.allocateInstr()
-			shll.asVecMisc(vecOpShll, rd, tmp2, vecArrangement2S)
-			m.insert(shll)
-
-			umlal := m.allocateInstr()
-			umlal.asVecRRR(vecOpUmlal, rd, tmp3, tmp1, vecArrangement2S)
-			m.insert(umlal)
-		}
+		m.lowerVIMul(rd, rn, rm, arr)
 	case ssa.OpcodeVIneg:
 		x, lane := instr.ArgWithLane()
 		arr := ssaLeneToArrangement(lane)
@@ -373,6 +336,47 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		panic("TODO: lowering " + op.String())
 	}
 	m.FlushPendingInstructions()
+}
+
+func (m *machine) lowerVIMul(rd, rn, rm operand, arr vecArrangement) {
+	if arr != vecArrangement2D { // ssa.VecLaneI64x2
+		mul := m.allocateInstr()
+		mul.asVecRRR(vecOpMul, rd, rn, rm, arr)
+		m.insert(mul)
+	} else {
+		tmp1 := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
+		tmp2 := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
+		tmp3 := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
+
+		// Following the algorithm in https://chromium-review.googlesource.com/c/v8/v8/+/1781696
+		rev64 := m.allocateInstr()
+		rev64.asVecMisc(vecOpRev64, tmp2, rm, vecArrangement4S)
+		m.insert(rev64)
+
+		mul := m.allocateInstr()
+		mul.asVecRRR(vecOpMul, tmp2, tmp2, rn, vecArrangement4S)
+		m.insert(mul)
+
+		xtn1 := m.allocateInstr()
+		xtn1.asVecMisc(vecOpXtn, tmp1, rn, vecArrangement2S)
+		m.insert(xtn1)
+
+		addp := m.allocateInstr()
+		addp.asVecRRR(vecOpAddp, tmp2, tmp2, tmp2, vecArrangement4S)
+		m.insert(addp)
+
+		xtn2 := m.allocateInstr()
+		xtn2.asVecMisc(vecOpXtn, tmp3, rm, vecArrangement2S)
+		m.insert(xtn2)
+
+		shll := m.allocateInstr()
+		shll.asVecMisc(vecOpShll, rd, tmp2, vecArrangement2S)
+		m.insert(shll)
+
+		umlal := m.allocateInstr()
+		umlal.asVecRRR(vecOpUmlal, rd, tmp3, tmp1, vecArrangement2S)
+		m.insert(umlal)
+	}
 }
 
 func (m *machine) lowerIRem(execCtxVReg regalloc.VReg, rd, rn, rm operand, _64bit, signed bool) {
