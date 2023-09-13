@@ -1,6 +1,7 @@
 package binaryencoding
 
 import (
+	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -43,6 +44,9 @@ func EncodeModule(m *wasm.Module) (bytes []byte) {
 	}
 	if m.SectionElementCount(wasm.SectionIDData) > 0 {
 		bytes = append(bytes, encodeDataSection(m.DataSection)...)
+	}
+	if dc := m.DataCountSection; dc != nil {
+		bytes = append(bytes, encodeSection(wasm.SectionIDDataCount, leb128.EncodeUint32(*dc))...)
 	}
 	if m.SectionElementCount(wasm.SectionIDCustom) > 0 {
 		// >> The name section should appear only once in a module, and only after the data section.

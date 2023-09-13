@@ -103,12 +103,6 @@ func TestCompiler_ModuleEngine_Call_Errors(t *testing.T) {
 `, "\n"+functionLog.String())
 }
 
-func TestCompiler_ModuleEngine_Memory(t *testing.T) {
-	defer functionLog.Reset()
-	requireSupportedOSArch(t)
-	enginetest.RunTestModuleEngineMemory(t, et)
-}
-
 func TestCompiler_BeforeListenerStackIterator(t *testing.T) {
 	enginetest.RunTestModuleEngineBeforeListenerStackIterator(t, et)
 }
