@@ -57,6 +57,9 @@ var tests = map[string]testCase{
 	"ensures invocations terminate on module close":     {f: testEnsureTerminationOnClose, wazevoSkip: true},
 	"call host function indirectly":                     {f: callHostFunctionIndirect, wazevoSkip: true},
 	"lookup function":                                   {f: testLookupFunction},
+	"memory grow in recursive call":                     {f: testMemoryGrowInRecursiveCall},
+	"call":                                              {f: testCall},
+	"module memory":                                     {f: testModuleMemory, wazevoSkip: true},
 }
 
 func TestEngineCompiler(t *testing.T) {
@@ -878,4 +881,213 @@ func testLookupFunction(t *testing.T, r wazero.Runtime) {
 		require.NoError(t, err)
 		require.Equal(t, uint64(1), res[0])
 	})
+}
+
+func testMemoryGrowInRecursiveCall(t *testing.T, r wazero.Runtime) {
+	const hostModuleName = "env"
+	const hostFnName = "grow_memory"
+	var growFn api.Function
+	hostCompiled, err := r.NewHostModuleBuilder(hostModuleName).NewFunctionBuilder().
+		WithFunc(func() {
+			// Does the recursive call into Wasm, which grows memory.
+			_, err := growFn.Call(testCtx)
+			require.NoError(t, err)
+		}).Export(hostFnName).Compile(testCtx)
+	require.NoError(t, err)
+
+	_, err = r.InstantiateModule(testCtx, hostCompiled, wazero.NewModuleConfig())
+	require.NoError(t, err)
+
+	bin := binaryencoding.EncodeModule(&wasm.Module{
+		ImportFunctionCount: 1,
+		TypeSection:         []wasm.FunctionType{{Params: []wasm.ValueType{}, Results: []wasm.ValueType{}}},
+		FunctionSection:     []wasm.Index{0, 0},
+		CodeSection: []wasm.Code{
+			{
+				Body: []byte{
+					// Calls the imported host function, which in turn calls the next in-Wasm function recursively.
+					wasm.OpcodeCall, 0,
+					// Access the memory and this should succeed as we already had memory grown at this point.
+					wasm.OpcodeI32Const, 0,
+					wasm.OpcodeI32Load, 0x2, 0x0,
+					wasm.OpcodeDrop,
+					wasm.OpcodeEnd,
+				},
+			},
+			{
+				// Grows memory by 1 page.
+				Body: []byte{wasm.OpcodeI32Const, 1, wasm.OpcodeMemoryGrow, 0, wasm.OpcodeDrop, wasm.OpcodeEnd},
+			},
+		},
+		MemorySection:   &wasm.Memory{Max: 1000},
+		ImportSection:   []wasm.Import{{Module: hostModuleName, Name: hostFnName, DescFunc: 0}},
+		ImportPerModule: map[string][]*wasm.Import{hostModuleName: {{Module: hostModuleName, Name: hostFnName, DescFunc: 0}}},
+		ExportSection: []wasm.Export{
+			{Name: "main", Type: wasm.ExternTypeFunc, Index: 1},
+			{Name: "grow_memory", Type: wasm.ExternTypeFunc, Index: 2},
+		},
+	})
+
+	inst, err := r.Instantiate(testCtx, bin)
+	require.NoError(t, err)
+
+	growFn = inst.ExportedFunction("grow_memory")
+	require.NotNil(t, growFn)
+	main := inst.ExportedFunction("main")
+	require.NotNil(t, main)
+
+	_, err = main.Call(testCtx)
+	require.NoError(t, err)
+}
+
+func testCall(t *testing.T, r wazero.Runtime) {
+	// Define a basic function which defines two parameters and two results.
+	// This is used to test results when incorrect arity is used.
+	bin := binaryencoding.EncodeModule(&wasm.Module{
+		TypeSection: []wasm.FunctionType{
+			{
+				Params:            []wasm.ValueType{i64, i64},
+				Results:           []wasm.ValueType{i64, i64},
+				ParamNumInUint64:  2,
+				ResultNumInUint64: 2,
+			},
+		},
+		FunctionSection: []wasm.Index{0},
+		CodeSection: []wasm.Code{
+			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeLocalGet, 1, wasm.OpcodeEnd}},
+		},
+		ExportSection: []wasm.Export{{Name: "func", Type: wasm.ExternTypeFunc, Index: 0}},
+	})
+
+	inst, err := r.Instantiate(testCtx, bin)
+	require.NoError(t, err)
+
+	// Ensure the base case doesn't fail: A single parameter should work as that matches the function signature.
+	f := inst.ExportedFunction("func")
+	require.NotNil(t, f)
+
+	t.Run("call with stack", func(t *testing.T) {
+		stack := []uint64{1, 2}
+		err = f.CallWithStack(testCtx, stack)
+		require.NoError(t, err)
+		require.Equal(t, []uint64{1, 2}, stack)
+
+		t.Run("errs when not enough parameters", func(t *testing.T) {
+			err = f.CallWithStack(testCtx, nil)
+			require.EqualError(t, err, "need 2 params, but stack size is 0")
+		})
+	})
+
+	t.Run("errs when not enough parameters", func(t *testing.T) {
+		_, err = f.Call(testCtx)
+		require.EqualError(t, err, "expected 2 params, but passed 0")
+	})
+
+	t.Run("errs when too many parameters", func(t *testing.T) {
+		_, err = f.Call(testCtx, 1, 2, 3)
+		require.EqualError(t, err, "expected 2 params, but passed 3")
+	})
+}
+
+// RunTestModuleEngineMemory shows that the byte slice returned from api.Memory Read is not a copy, rather a re-slice
+// of the underlying memory. This allows both host and Wasm to see each other's writes, unless one side changes the
+// capacity of the slice.
+//
+// Known cases that change the slice capacity:
+// * Host code calls append on a byte slice returned by api.Memory Read
+// * Wasm code calls wasm.OpcodeMemoryGrowName and this changes the capacity (by default, it will).
+func testModuleMemory(t *testing.T, r wazero.Runtime) {
+	wasmPhrase := "Well, that'll be the day when you say goodbye."
+	wasmPhraseSize := uint32(len(wasmPhrase))
+
+	// Define a basic function which defines one parameter. This is used to test results when incorrect arity is used.
+	one := uint32(1)
+
+	bin := binaryencoding.EncodeModule(&wasm.Module{
+		TypeSection:     []wasm.FunctionType{{Params: []api.ValueType{api.ValueTypeI32}, ParamNumInUint64: 1}, {}},
+		FunctionSection: []wasm.Index{0, 1},
+		MemorySection:   &wasm.Memory{Min: 1, Cap: 1, Max: 2},
+		DataSection: []wasm.DataSegment{
+			{
+				Passive: true,
+				Init:    []byte(wasmPhrase),
+			},
+		},
+		DataCountSection: &one,
+		CodeSection: []wasm.Code{
+			{Body: []byte{ // "grow"
+				wasm.OpcodeLocalGet, 0, // how many pages to grow (param)
+				wasm.OpcodeMemoryGrow, 0, // memory index zero
+				wasm.OpcodeDrop, // drop the previous page count (or -1 if grow failed)
+				wasm.OpcodeEnd,
+			}},
+			{Body: []byte{ // "init"
+				wasm.OpcodeI32Const, 0, // target offset
+				wasm.OpcodeI32Const, 0, // source offset
+				wasm.OpcodeI32Const, byte(wasmPhraseSize), // len
+				wasm.OpcodeMiscPrefix, wasm.OpcodeMiscMemoryInit, 0, 0, // segment 0, memory 0
+				wasm.OpcodeEnd,
+			}},
+		},
+		ExportSection: []wasm.Export{
+			{Name: "grow", Type: wasm.ExternTypeFunc, Index: 0},
+			{Name: "init", Type: wasm.ExternTypeFunc, Index: 1},
+		},
+	})
+
+	inst, err := r.Instantiate(testCtx, bin)
+	require.NoError(t, err)
+
+	memory := inst.Memory()
+
+	buf, ok := memory.Read(0, wasmPhraseSize)
+	require.True(t, ok)
+	require.Equal(t, make([]byte, wasmPhraseSize), buf)
+
+	// Initialize the memory using Wasm. This copies the test phrase.
+	initCallEngine := inst.ExportedFunction("init")
+	_, err = initCallEngine.Call(testCtx)
+	require.NoError(t, err)
+
+	// We expect the same []byte read earlier to now include the phrase in wasm.
+	require.Equal(t, wasmPhrase, string(buf))
+
+	hostPhrase := "Goodbye, cruel world. I'm off to join the circus." // Intentionally slightly longer.
+	hostPhraseSize := uint32(len(hostPhrase))
+
+	// Copy over the buffer, which should stop at the current length.
+	copy(buf, hostPhrase)
+	require.Equal(t, "Goodbye, cruel world. I'm off to join the circ", string(buf))
+
+	// The underlying memory should be updated. This proves that Memory.Read returns a re-slice, not a copy, and that
+	// programs can rely on this (for example, to update shared state in Wasm and view that in Go and visa versa).
+	buf2, ok := memory.Read(0, wasmPhraseSize)
+	require.True(t, ok)
+	require.Equal(t, buf, buf2)
+
+	// Now, append to the buffer we got from Wasm. As this changes capacity, it should result in a new byte slice.
+	buf = append(buf, 'u', 's', '.')
+	require.Equal(t, hostPhrase, string(buf))
+
+	// To prove the above, we re-read the memory and should not see the appended bytes (rather zeros instead).
+	buf2, ok = memory.Read(0, hostPhraseSize)
+	require.True(t, ok)
+	hostPhraseTruncated := "Goodbye, cruel world. I'm off to join the circ" + string([]byte{0, 0, 0})
+	require.Equal(t, hostPhraseTruncated, string(buf2))
+
+	// Now, we need to prove the other direction, that when Wasm changes the capacity, the host's buffer is unaffected.
+	growCallEngine := inst.ExportedFunction("grow")
+	_, err = growCallEngine.Call(testCtx, 1)
+	require.NoError(t, err)
+
+	// The host buffer should still contain the same bytes as before grow
+	require.Equal(t, hostPhraseTruncated, string(buf2))
+
+	// Re-initialize the memory in wasm, which overwrites the region.
+	initCallEngine2 := inst.ExportedFunction("init")
+	_, err = initCallEngine2.Call(testCtx)
+	require.NoError(t, err)
+
+	// The host was not affected because it is a different slice due to "memory.grow" affecting the underlying memory.
+	require.Equal(t, hostPhraseTruncated, string(buf2))
 }

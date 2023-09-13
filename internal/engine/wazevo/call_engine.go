@@ -3,6 +3,7 @@ package wazevo
 import (
 	"context"
 	"encoding/binary"
+	"fmt"
 	"reflect"
 	"unsafe"
 
@@ -32,6 +33,7 @@ type (
 		indexInModule wasm.Index
 		// sizeOfParamResultSlice is the size of the parameter/result slice.
 		sizeOfParamResultSlice int
+		requiredParams         int
 		// execCtx holds various information to be read/written by assembly functions.
 		execCtx executionContext
 		// execCtxPtr holds the pointer to the executionContext which doesn't change after callEngine is created.
@@ -104,9 +106,12 @@ func (c *callEngine) Definition() api.FunctionDefinition {
 
 // Call implements api.Function.
 func (c *callEngine) Call(ctx context.Context, params ...uint64) ([]uint64, error) {
+	if c.requiredParams != len(params) {
+		return nil, fmt.Errorf("expected %d params, but passed %d", c.requiredParams, len(params))
+	}
 	paramResultSlice := make([]uint64, c.sizeOfParamResultSlice)
 	copy(paramResultSlice, params)
-	if err := c.CallWithStack(ctx, paramResultSlice); err != nil {
+	if err := c.callWithStack(ctx, paramResultSlice); err != nil {
 		return nil, err
 	}
 	return paramResultSlice[:c.numberOfResults], nil
@@ -125,11 +130,18 @@ func (c *callEngine) addFrame(builder wasmdebug.ErrorBuilder, addr uintptr) {
 
 // CallWithStack implements api.Function.
 func (c *callEngine) CallWithStack(ctx context.Context, paramResultStack []uint64) (err error) {
+	if c.sizeOfParamResultSlice > len(paramResultStack) {
+		return fmt.Errorf("need %d params, but stack size is %d", c.sizeOfParamResultSlice, len(paramResultStack))
+	}
+	return c.callWithStack(ctx, paramResultStack)
+}
+
+// CallWithStack implements api.Function.
+func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint64) (err error) {
 	var paramResultPtr *uint64
 	if len(paramResultStack) > 0 {
 		paramResultPtr = &paramResultStack[0]
 	}
-
 	defer func() {
 		if r := recover(); r != nil {
 			builder := wasmdebug.NewErrorBuilder()

@@ -243,7 +243,7 @@ func TestE2E(t *testing.T) {
 				{params: []uint64{256, 0xff}, expResults: []uint64{0xff}},
 				{params: []uint64{100, 0xffffffff}, expResults: []uint64{0xffffffff}},
 				// We load I32, so we can't load from the last 3 bytes.
-				{params: []uint64{uint64(wasm.MemoryPageSize) - 3}, expErr: "out of bounds memory access"},
+				{params: []uint64{uint64(wasm.MemoryPageSize) - 3, 0}, expErr: "out of bounds memory access"},
 			},
 		},
 
