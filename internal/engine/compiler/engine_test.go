@@ -53,11 +53,6 @@ func TestCompiler_MemoryGrowInRecursiveCall(t *testing.T) {
 	enginetest.RunTestEngineMemoryGrowInRecursiveCall(t, et)
 }
 
-func TestCompiler_ModuleEngine_LookupFunction(t *testing.T) {
-	defer functionLog.Reset()
-	enginetest.RunTestModuleEngineLookupFunction(t, et)
-}
-
 func TestCompiler_ModuleEngine_Call(t *testing.T) {
 	defer functionLog.Reset()
 	requireSupportedOSArch(t)

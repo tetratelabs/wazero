@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"math"
+	"runtime"
 	"strconv"
 	"testing"
 	"time"
@@ -11,11 +12,14 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/experimental/table"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
 	"github.com/tetratelabs/wazero/internal/testing/proxy"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasmruntime"
 	"github.com/tetratelabs/wazero/sys"
 )
 
@@ -30,43 +34,62 @@ var memoryCapacityPages = uint32(2)
 
 var moduleConfig = wazero.NewModuleConfig()
 
-var tests = map[string]func(t *testing.T, r wazero.Runtime){
-	"huge stack":                                        testHugeStack,
-	"unreachable":                                       testUnreachable,
-	"recursive entry":                                   testRecursiveEntry,
-	"host func memory":                                  testHostFuncMemory,
-	"host function with context parameter":              testHostFunctionContextParameter,
-	"host function with nested context":                 testNestedGoContext,
-	"host function with numeric parameter":              testHostFunctionNumericParameter,
-	"close module with in-flight calls":                 testCloseInFlight,
-	"multiple instantiation from same source":           testMultipleInstantiation,
-	"exported function that grows memory":               testMemOps,
-	"import functions with reference type in signature": testReftypeImports,
-	"overflow integer addition":                         testOverflow,
-	"un-signed extend global":                           testGlobalExtend,
-	"user-defined primitive in host func":               testUserDefinedPrimitiveHostFunc,
-	"ensures invocations terminate on module close":     testEnsureTerminationOnClose,
-	"call host function indirectly":                     callHostFunctionIndirect,
+type testCase struct {
+	f          func(t *testing.T, r wazero.Runtime)
+	wazevoSkip bool
+}
+
+var tests = map[string]testCase{
+	"huge stack":                                        {f: testHugeStack, wazevoSkip: true},
+	"unreachable":                                       {f: testUnreachable},
+	"recursive entry":                                   {f: testRecursiveEntry},
+	"host func memory":                                  {f: testHostFuncMemory},
+	"host function with context parameter":              {f: testHostFunctionContextParameter},
+	"host function with nested context":                 {f: testNestedGoContext},
+	"host function with numeric parameter":              {f: testHostFunctionNumericParameter},
+	"close module with in-flight calls":                 {f: testCloseInFlight},
+	"multiple instantiation from same source":           {f: testMultipleInstantiation},
+	"exported function that grows memory":               {f: testMemOps, wazevoSkip: true},
+	"import functions with reference type in signature": {f: testReftypeImports, wazevoSkip: true},
+	"overflow integer addition":                         {f: testOverflow},
+	"un-signed extend global":                           {f: testGlobalExtend},
+	"user-defined primitive in host func":               {f: testUserDefinedPrimitiveHostFunc},
+	"ensures invocations terminate on module close":     {f: testEnsureTerminationOnClose, wazevoSkip: true},
+	"call host function indirectly":                     {f: callHostFunctionIndirect, wazevoSkip: true},
+	"lookup function":                                   {f: testLookupFunction},
 }
 
 func TestEngineCompiler(t *testing.T) {
 	if !platform.CompilerSupported() {
 		t.Skip()
 	}
-	runAllTests(t, tests, wazero.NewRuntimeConfigCompiler().WithCloseOnContextDone(true))
+	runAllTests(t, tests, wazero.NewRuntimeConfigCompiler().WithCloseOnContextDone(true), false)
 }
 
 func TestEngineInterpreter(t *testing.T) {
-	runAllTests(t, tests, wazero.NewRuntimeConfigInterpreter().WithCloseOnContextDone(true))
+	runAllTests(t, tests, wazero.NewRuntimeConfigInterpreter().WithCloseOnContextDone(true), false)
 }
 
-func runAllTests(t *testing.T, tests map[string]func(t *testing.T, r wazero.Runtime), config wazero.RuntimeConfig) {
-	for name, testf := range tests {
-		name := name   // pin
-		testf := testf // pin
+func TestEngineWazevo(t *testing.T) {
+	if runtime.GOARCH != "arm64" {
+		t.Skip()
+	}
+	config := wazero.NewRuntimeConfigInterpreter()
+	wazevo.ConfigureWazevo(config)
+	runAllTests(t, tests, config.WithCloseOnContextDone(true), true)
+}
+
+func runAllTests(t *testing.T, tests map[string]testCase, config wazero.RuntimeConfig, isWazevo bool) {
+	for name, tc := range tests {
+		name := name
+		tc := tc
+		if isWazevo && tc.wazevoSkip {
+			t.Logf("skipping %s because it is not supported by wazevo", name)
+			continue
+		}
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			testf(t, wazero.NewRuntimeWithConfig(testCtx, config))
+			tc.f(t, wazero.NewRuntimeWithConfig(testCtx, config))
 		})
 	}
 }
@@ -797,4 +820,62 @@ func testMultipleInstantiation(t *testing.T, r wazero.Runtime) {
 		require.True(t, ok)
 		require.Equal(t, uint64(1000), after)
 	}
+}
+
+func testLookupFunction(t *testing.T, r wazero.Runtime) {
+	bin := binaryencoding.EncodeModule(&wasm.Module{
+		TypeSection:     []wasm.FunctionType{{Results: []wasm.ValueType{i32}}},
+		FunctionSection: []wasm.Index{0, 0, 0},
+		CodeSection: []wasm.Code{
+			{Body: []byte{wasm.OpcodeI32Const, 1, wasm.OpcodeEnd}},
+			{Body: []byte{wasm.OpcodeI32Const, 2, wasm.OpcodeEnd}},
+			{Body: []byte{wasm.OpcodeI32Const, 3, wasm.OpcodeEnd}},
+		},
+		TableSection: []wasm.Table{{Min: 10, Type: wasm.RefTypeFuncref}},
+		ElementSection: []wasm.ElementSegment{
+			{
+				OffsetExpr: wasm.ConstantExpression{
+					Opcode: wasm.OpcodeI32Const,
+					Data:   []byte{0},
+				},
+				TableIndex: 0,
+				Init:       []wasm.Index{2, 0},
+			},
+		},
+	})
+
+	inst, err := r.Instantiate(testCtx, bin)
+	require.NoError(t, err)
+
+	t.Run("null reference", func(t *testing.T) {
+		err = require.CapturePanic(func() {
+			table.LookupFunction(inst, 0, 3, nil, []wasm.ValueType{i32})
+		})
+		require.Equal(t, wasmruntime.ErrRuntimeInvalidTableAccess, err)
+	})
+
+	t.Run("out of range", func(t *testing.T) {
+		err = require.CapturePanic(func() {
+			table.LookupFunction(inst, 0, 1000, nil, []wasm.ValueType{i32})
+		})
+		require.Equal(t, wasmruntime.ErrRuntimeInvalidTableAccess, err)
+	})
+
+	t.Run("type mismatch", func(t *testing.T) {
+		err = require.CapturePanic(func() {
+			table.LookupFunction(inst, 0, 0, []wasm.ValueType{i32}, nil)
+		})
+		require.Equal(t, wasmruntime.ErrRuntimeIndirectCallTypeMismatch, err)
+	})
+	t.Run("ok", func(t *testing.T) {
+		f2 := table.LookupFunction(inst, 0, 0, nil, []wasm.ValueType{i32})
+		res, err := f2.Call(testCtx)
+		require.NoError(t, err)
+		require.Equal(t, uint64(3), res[0])
+
+		f0 := table.LookupFunction(inst, 0, 1, nil, []wasm.ValueType{i32})
+		res, err = f0.Call(testCtx)
+		require.NoError(t, err)
+		require.Equal(t, uint64(1), res[0])
+	})
 }

@@ -16,6 +16,9 @@
 //
 // Note: These tests intentionally avoid using wasm.Store as it is important to know both the dependencies and
 // the capabilities at the wasm.Engine abstraction.
+//
+// TODO: the purpose of enginetest overlaps with the purpose of internal/integration_test/engine. We should
+// migrate there since the tests here are costly maintenance-wise.
 package enginetest
 
 import (
@@ -33,7 +36,6 @@ import (
 	"github.com/tetratelabs/wazero/internal/u64"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasmdebug"
-	"github.com/tetratelabs/wazero/internal/wasmruntime"
 )
 
 const (
@@ -232,89 +234,6 @@ func RunTestModuleEngineCallWithStack(t *testing.T, et EngineTester) {
 		ce := me.NewFunction(funcIndex)
 		err = ce.CallWithStack(testCtx, nil)
 		require.EqualError(t, err, "need 2 params, but stack size is 0")
-	})
-}
-
-func RunTestModuleEngineLookupFunction(t *testing.T, et EngineTester) {
-	e := et.NewEngine(api.CoreFeaturesV1)
-
-	mod := &wasm.Module{
-		TypeSection:     []wasm.FunctionType{{}, {Params: []wasm.ValueType{wasm.ValueTypeV128}}},
-		FunctionSection: []wasm.Index{0, 0, 0},
-		CodeSection: []wasm.Code{
-			{
-				Body: []byte{wasm.OpcodeEnd},
-			}, {Body: []byte{wasm.OpcodeEnd}}, {Body: []byte{wasm.OpcodeEnd}},
-		},
-	}
-
-	err := e.CompileModule(testCtx, mod, nil, false)
-	require.NoError(t, err)
-	m := &wasm.ModuleInstance{
-		TypeIDs: []wasm.FunctionTypeID{0, 1},
-		Source:  mod,
-	}
-	m.Tables = []*wasm.TableInstance{
-		{Min: 2, References: make([]wasm.Reference, 2), Type: wasm.RefTypeFuncref},
-		{Min: 2, References: make([]wasm.Reference, 2), Type: wasm.RefTypeExternref},
-		{Min: 10, References: make([]wasm.Reference, 10), Type: wasm.RefTypeFuncref},
-	}
-
-	me, err := e.NewModuleEngine(mod, m)
-	require.NoError(t, err)
-	linkModuleToEngine(m, me)
-
-	t.Run("null reference", func(t *testing.T) {
-		err = require.CapturePanic(func() {
-			m.LookupFunction(m.Tables[0], m.TypeIDs[0], 0) // offset 0 is not initialized yet.
-		})
-		require.Equal(t, wasmruntime.ErrRuntimeInvalidTableAccess, err)
-		err = require.CapturePanic(func() {
-			m.LookupFunction(m.Tables[0], m.TypeIDs[0], 1) // offset 1 is not initialized yet.
-		})
-		require.Equal(t, wasmruntime.ErrRuntimeInvalidTableAccess, err)
-	})
-
-	m.Tables[0].References[0] = me.FunctionInstanceReference(2)
-	m.Tables[0].References[1] = me.FunctionInstanceReference(0)
-
-	t.Run("initialized", func(t *testing.T) {
-		f1 := m.LookupFunction(m.Tables[0], m.TypeIDs[0], 0) // offset 0 is now initialized.
-		require.Equal(t, wasm.Index(2), f1.Definition().Index())
-		f2 := m.LookupFunction(m.Tables[0], m.TypeIDs[0], 1) // offset 1 is now initialized.
-		require.Equal(t, wasm.Index(0), f2.Definition().Index())
-	})
-
-	t.Run("out of range", func(t *testing.T) {
-		err = require.CapturePanic(func() {
-			me.LookupFunction(m.Tables[0], m.TypeIDs[0], 100 /* out of range */)
-		})
-		require.Equal(t, wasmruntime.ErrRuntimeInvalidTableAccess, err)
-	})
-
-	t.Run("access to externref table", func(t *testing.T) {
-		err := require.CapturePanic(func() {
-			m.LookupFunction(m.Tables[1], /* table[1] has externref type. */
-				m.TypeIDs[0], 0)
-		})
-		require.Equal(t, wasmruntime.ErrRuntimeInvalidTableAccess, err)
-	})
-
-	t.Run("access to externref table", func(t *testing.T) {
-		err = require.CapturePanic(func() {
-			me.LookupFunction(m.Tables[0], /* type mismatch */
-				m.TypeIDs[1], 0)
-		})
-		require.Equal(t, wasmruntime.ErrRuntimeIndirectCallTypeMismatch, err)
-	})
-
-	m.Tables[2].References[0] = me.FunctionInstanceReference(1)
-	m.Tables[2].References[5] = me.FunctionInstanceReference(2)
-	t.Run("initialized - tables[2]", func(t *testing.T) {
-		f1 := m.LookupFunction(m.Tables[2], m.TypeIDs[0], 0)
-		require.Equal(t, wasm.Index(1), f1.Definition().Index())
-		f2 := m.LookupFunction(m.Tables[2], m.TypeIDs[0], 5)
-		require.Equal(t, wasm.Index(2), f2.Definition().Index())
 	})
 }
 
@@ -1188,7 +1107,10 @@ func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experime
 	lns := buildFunctionListeners(fnlf, hostModule)
 	err := e.CompileModule(testCtx, hostModule, lns, false)
 	require.NoError(t, err)
-	host := &wasm.ModuleInstance{ModuleName: hostModule.NameSection.ModuleName, TypeIDs: []wasm.FunctionTypeID{0}}
+	host := &wasm.ModuleInstance{
+		ModuleName: hostModule.NameSection.ModuleName, TypeIDs: []wasm.FunctionTypeID{0},
+		Source: hostModule,
+	}
 	host.Exports = exportMap(hostModule)
 
 	hostME, err := e.NewModuleEngine(hostModule, host)
@@ -1223,6 +1145,7 @@ func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experime
 	require.NoError(t, err)
 
 	imported := &wasm.ModuleInstance{
+		Source:     importedModule,
 		ModuleName: importedModule.NameSection.ModuleName, TypeIDs: []wasm.FunctionTypeID{0},
 	}
 	imported.Exports = exportMap(importedModule)
@@ -1256,7 +1179,10 @@ func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experime
 	require.NoError(t, err)
 
 	// Add the exported function.
-	importing := &wasm.ModuleInstance{ModuleName: importingModule.NameSection.ModuleName, TypeIDs: []wasm.FunctionTypeID{0}}
+	importing := &wasm.ModuleInstance{
+		ModuleName: importingModule.NameSection.ModuleName, TypeIDs: []wasm.FunctionTypeID{0},
+		Source: importingModule,
+	}
 	importing.Exports = exportMap(importingModule)
 
 	// Compile the importing module

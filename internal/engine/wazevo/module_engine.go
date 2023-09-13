@@ -7,6 +7,7 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 	"github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasmruntime"
 )
 
 type (
@@ -25,6 +26,7 @@ type (
 		executable             *byte
 		moduleContextOpaquePtr *byte
 		typeID                 wasm.FunctionTypeID
+		indexInModule          wasm.Index
 	}
 
 	importedFunction struct {
@@ -217,15 +219,16 @@ func (m *moduleEngine) FunctionInstanceReference(funcIndex wasm.Index) wasm.Refe
 		begin, _, _ := m.parent.offsets.ImportedFunctionOffset(funcIndex)
 		return uintptr(unsafe.Pointer(&m.opaque[begin]))
 	}
-	funcIndex -= m.module.Source.ImportFunctionCount
+	localIndex := funcIndex - m.module.Source.ImportFunctionCount
 	p := m.parent
-	executable := &p.executable[p.functionOffsets[funcIndex].nativeBegin()]
-	typeID := m.module.TypeIDs[m.module.Source.FunctionSection[funcIndex]]
+	executable := &p.executable[p.functionOffsets[localIndex].nativeBegin()]
+	typeID := m.module.TypeIDs[m.module.Source.FunctionSection[localIndex]]
 
 	lf := &functionInstance{
 		executable:             executable,
 		moduleContextOpaquePtr: m.opaquePtr,
 		typeID:                 typeID,
+		indexInModule:          funcIndex,
 	}
 	m.localFunctionInstances = append(m.localFunctionInstances, lf)
 	return uintptr(unsafe.Pointer(lf))
@@ -233,5 +236,33 @@ func (m *moduleEngine) FunctionInstanceReference(funcIndex wasm.Index) wasm.Refe
 
 // LookupFunction implements wasm.ModuleEngine.
 func (m *moduleEngine) LookupFunction(t *wasm.TableInstance, typeId wasm.FunctionTypeID, tableOffset wasm.Index) (*wasm.ModuleInstance, wasm.Index) {
-	panic("TODO")
+	if tableOffset >= uint32(len(t.References)) || t.Type != wasm.RefTypeFuncref {
+		panic(wasmruntime.ErrRuntimeInvalidTableAccess)
+	}
+	rawPtr := t.References[tableOffset]
+	if rawPtr == 0 {
+		panic(wasmruntime.ErrRuntimeInvalidTableAccess)
+	}
+
+	tf := functionFromUintptr(rawPtr)
+	if tf.typeID != typeId {
+		panic(wasmruntime.ErrRuntimeIndirectCallTypeMismatch)
+	}
+	return moduleInstanceFromOpaquePtr(tf.moduleContextOpaquePtr), tf.indexInModule
+}
+
+// functionFromUintptr resurrects the original *function from the given uintptr
+// which comes from either funcref table or OpcodeRefFunc instruction.
+func functionFromUintptr(ptr uintptr) *functionInstance {
+	// Wraps ptrs as the double pointer in order to avoid the unsafe access as detected by race detector.
+	//
+	// For example, if we have (*function)(unsafe.Pointer(ptr)) instead, then the race detector's "checkptr"
+	// subroutine wanrs as "checkptr: pointer arithmetic result points to invalid allocation"
+	// https://github.com/golang/go/blob/1ce7fcf139417d618c2730010ede2afb41664211/src/runtime/checkptr.go#L69
+	var wrapped *uintptr = &ptr
+	return *(**functionInstance)(unsafe.Pointer(wrapped))
+}
+
+func moduleInstanceFromOpaquePtr(ptr *byte) *wasm.ModuleInstance {
+	return *(**wasm.ModuleInstance)(unsafe.Pointer(ptr))
 }

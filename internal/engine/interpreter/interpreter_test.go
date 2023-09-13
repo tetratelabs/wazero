@@ -92,10 +92,6 @@ func TestInterpreter_Engine_NewModuleEngine(t *testing.T) {
 	enginetest.RunTestEngineNewModuleEngine(t, et)
 }
 
-func TestInterpreter_ModuleEngine_LookupFunction(t *testing.T) {
-	enginetest.RunTestModuleEngineLookupFunction(t, et)
-}
-
 func TestInterpreter_ModuleEngine_Call(t *testing.T) {
 	defer functionLog.Reset()
 	enginetest.RunTestModuleEngineCall(t, et)

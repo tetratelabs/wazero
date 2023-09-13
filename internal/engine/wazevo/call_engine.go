@@ -141,6 +141,10 @@ func (c *callEngine) CallWithStack(ctx context.Context, paramResultStack []uint6
 			err = builder.FromRecovered(r)
 
 			// TODO: Abort listener.
+		} else {
+			if err != wasmruntime.ErrRuntimeStackOverflow { // Stackoverflow case shouldn't be panic (to avoid extreme stack unwinding).
+				err = c.parent.module.FailIfClosed()
+			}
 		}
 	}()
 
@@ -212,7 +216,7 @@ func (c *callEngine) CallWithStack(ctx context.Context, paramResultStack []uint6
 }
 
 func (c *callEngine) callerModuleInstance() *wasm.ModuleInstance {
-	return *(**wasm.ModuleInstance)(unsafe.Pointer(c.execCtx.callerModuleContextPtr))
+	return moduleInstanceFromOpaquePtr(c.execCtx.callerModuleContextPtr)
 }
 
 func opaqueViewFromPtr(ptr uintptr) []byte {

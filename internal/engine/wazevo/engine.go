@@ -3,6 +3,7 @@ package wazevo
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"runtime"
 	"sort"
@@ -464,7 +465,7 @@ func (e *engine) NewModuleEngine(m *wasm.Module, mi *wasm.ModuleInstance) (wasm.
 
 	compiled, ok := e.compiledModules[m.ID]
 	if !ok {
-		return nil, fmt.Errorf("binary of module %q is not compiled", mi.ModuleName)
+		return nil, errors.New("source module must be compiled before instantiation")
 	}
 	me.parent = compiled
 	me.module = mi

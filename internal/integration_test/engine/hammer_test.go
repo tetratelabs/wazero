@@ -2,32 +2,43 @@ package adhoc
 
 import (
 	"context"
+	"runtime"
 	"sync"
 	"testing"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/hammer"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/sys"
 )
 
-var hammers = map[string]func(t *testing.T, r wazero.Runtime){
+var hammers = map[string]testCase{
 	// Tests here are similar to what's described in /RATIONALE.md, but deviate as they involve blocking functions.
-	"close importing module while in use": closeImportingModuleWhileInUse,
-	"close imported module while in use":  closeImportedModuleWhileInUse,
+	"close importing module while in use": {f: closeImportingModuleWhileInUse, wazevoSkip: true},
+	"close imported module while in use":  {f: closeImportedModuleWhileInUse, wazevoSkip: true},
 }
 
 func TestEngineCompiler_hammer(t *testing.T) {
 	if !platform.CompilerSupported() {
 		t.Skip()
 	}
-	runAllTests(t, hammers, wazero.NewRuntimeConfigCompiler())
+	runAllTests(t, hammers, wazero.NewRuntimeConfigCompiler(), false)
 }
 
 func TestEngineInterpreter_hammer(t *testing.T) {
-	runAllTests(t, hammers, wazero.NewRuntimeConfigInterpreter())
+	runAllTests(t, hammers, wazero.NewRuntimeConfigInterpreter(), false)
+}
+
+func TestEngineWazevo_hammer(t *testing.T) {
+	if runtime.GOARCH != "arm64" {
+		t.Skip()
+	}
+	c := wazero.NewRuntimeConfigInterpreter()
+	wazevo.ConfigureWazevo(c)
+	runAllTests(t, hammers, c, true)
 }
 
 func closeImportingModuleWhileInUse(t *testing.T, r wazero.Runtime) {
