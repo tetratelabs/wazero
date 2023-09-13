@@ -27,12 +27,12 @@ const (
 	f64 = wasm.ValueTypeF64
 )
 
+// TODO: migrate to integration_test/spectest/v1/spec_test.go by the time when closing https://github.com/tetratelabs/wazero/issues/1496
 func TestSpectestV1(t *testing.T) {
 	config := wazero.NewRuntimeConfigCompiler().WithCoreFeatures(api.CoreFeaturesV1)
 	// Configure the new optimizing backend!
 	wazevo.ConfigureWazevo(config)
 
-	// TODO: migrate to integration_test/spectest/v1/spec_test.go by the time when closing https://github.com/tetratelabs/wazero/issues/1496
 	for _, tc := range []struct {
 		name string
 	}{
@@ -120,6 +120,7 @@ func TestSpectestV1(t *testing.T) {
 	}
 }
 
+// TODO: migrate to integration_test/spectest/v2/spec_test.go by the time when closing https://github.com/tetratelabs/wazero/issues/1496
 func TestSpectestV2(t *testing.T) {
 	config := wazero.NewRuntimeConfigCompiler().WithCoreFeatures(api.CoreFeaturesV2)
 	// Configure the new optimizing backend!
