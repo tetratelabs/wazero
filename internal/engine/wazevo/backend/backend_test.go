@@ -3109,8 +3109,7 @@ L9 (SSA Block: blk6):
 			typeIndex := tc.m.FunctionSection[tc.targetIndex]
 			code := &tc.m.CodeSection[tc.targetIndex]
 			fc.Init(tc.targetIndex, &tc.m.TypeSection[typeIndex], code.LocalTypes, code.Body)
-			err := fc.LowerToSSA()
-			require.NoError(t, err)
+			fc.LowerToSSA()
 			if verbose {
 				fmt.Println("============ SSA before passes ============")
 				fmt.Println(ssab.Format())

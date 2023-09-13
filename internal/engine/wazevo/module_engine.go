@@ -120,7 +120,8 @@ func (m *moduleEngine) NewFunction(index wasm.Index) api.Function {
 	}
 
 	src := m.module.Source
-	typ := src.TypeSection[src.FunctionSection[localIndex]]
+	typIndex := src.FunctionSection[localIndex]
+	typ := src.TypeSection[typIndex]
 	sizeOfParamResultSlice := typ.ResultNumInUint64
 	if ps := typ.ParamNumInUint64; ps > sizeOfParamResultSlice {
 		sizeOfParamResultSlice = ps
@@ -132,12 +133,13 @@ func (m *moduleEngine) NewFunction(index wasm.Index) api.Function {
 		indexInModule:          index,
 		executable:             &p.executable[offset.offset],
 		parent:                 m,
+		preambleExecutable:     m.parent.entryPreambles[typIndex],
 		sizeOfParamResultSlice: sizeOfParamResultSlice,
 		numberOfResults:        typ.ResultNumInUint64,
 	}
 
-	ce.execCtx.memoryGrowTrampolineAddress = &m.parent.builtinFunctions.memoryGrowExecutable[0]
-	ce.execCtx.stackGrowCallSequenceAddress = &m.parent.builtinFunctions.stackGrowExecutable[0]
+	ce.execCtx.memoryGrowTrampolineAddress = &m.parent.sharedFunctions.memoryGrowExecutable[0]
+	ce.execCtx.stackGrowCallSequenceAddress = &m.parent.sharedFunctions.stackGrowExecutable[0]
 	ce.init()
 	return ce
 }

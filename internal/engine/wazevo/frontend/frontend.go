@@ -55,22 +55,10 @@ func NewFrontendCompiler(m *wasm.Module, ssaBuilder ssa.Builder, offset *wazevoa
 	c.signatures = make(map[*wasm.FunctionType]*ssa.Signature, len(m.TypeSection)+1)
 	for i := range m.TypeSection {
 		wasmSig := &m.TypeSection[i]
-		sig := &ssa.Signature{
-			ID: ssa.SignatureID(i),
-			// +2 to pass moduleContextPtr and executionContextPtr. See the inline comment LowerToSSA.
-			Params:  make([]ssa.Type, len(wasmSig.Params)+2),
-			Results: make([]ssa.Type, len(wasmSig.Results)),
-		}
-		sig.Params[0] = executionContextPtrTyp
-		sig.Params[1] = moduleContextPtrTyp
-		for j, typ := range wasmSig.Params {
-			sig.Params[j+2] = WasmTypeToSSAType(typ)
-		}
-		for j, typ := range wasmSig.Results {
-			sig.Results[j] = WasmTypeToSSAType(typ)
-		}
-		c.signatures[wasmSig] = sig
-		c.ssaBuilder.DeclareSignature(sig)
+		sig := SignatureForWasmFunctionType(wasmSig)
+		sig.ID = ssa.SignatureID(i)
+		c.signatures[wasmSig] = &sig
+		c.ssaBuilder.DeclareSignature(&sig)
 	}
 
 	c.memoryGrowSig = ssa.Signature{
@@ -83,6 +71,23 @@ func NewFrontendCompiler(m *wasm.Module, ssaBuilder ssa.Builder, offset *wazevoa
 	c.ssaBuilder.DeclareSignature(&c.memoryGrowSig)
 
 	return c
+}
+
+func SignatureForWasmFunctionType(typ *wasm.FunctionType) ssa.Signature {
+	sig := ssa.Signature{
+		// +2 to pass moduleContextPtr and executionContextPtr. See the inline comment LowerToSSA.
+		Params:  make([]ssa.Type, len(typ.Params)+2),
+		Results: make([]ssa.Type, len(typ.Results)),
+	}
+	sig.Params[0] = executionContextPtrTyp
+	sig.Params[1] = moduleContextPtrTyp
+	for j, typ := range typ.Params {
+		sig.Params[j+2] = WasmTypeToSSAType(typ)
+	}
+	for j, typ := range typ.Results {
+		sig.Results[j] = WasmTypeToSSAType(typ)
+	}
+	return sig
 }
 
 // Init initializes the state of frontendCompiler and make it ready for a next function.
@@ -103,7 +108,7 @@ const executionContextPtrTyp, moduleContextPtrTyp = ssa.TypeI64, ssa.TypeI64
 // After calling this, the caller will be able to access the SSA info in *Compiler.ssaBuilder.
 //
 // Note that this only does the naive lowering, and do not do any optimization, instead the caller is expected to do so.
-func (c *Compiler) LowerToSSA() error {
+func (c *Compiler) LowerToSSA() {
 	builder := c.ssaBuilder
 
 	// Set up the entry block.
@@ -144,7 +149,6 @@ func (c *Compiler) LowerToSSA() error {
 	c.declareNecessaryVariables()
 
 	c.lowerBody(entryBlock)
-	return nil
 }
 
 // localVariable returns the SSA variable for the given Wasm local index.

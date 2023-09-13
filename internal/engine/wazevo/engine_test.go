@@ -12,8 +12,8 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
-func Test_builtinFunctionFinalizer(t *testing.T) {
-	bf := &builtinFunctions{}
+func Test_sharedFunctionsFinalizer(t *testing.T) {
+	bf := &sharedFunctions{}
 
 	b1, err := platform.MmapCodeSegment(100)
 	require.NoError(t, err)
@@ -23,7 +23,7 @@ func Test_builtinFunctionFinalizer(t *testing.T) {
 	bf.memoryGrowExecutable = b1
 	bf.stackGrowExecutable = b2
 
-	builtinFunctionFinalizer(bf)
+	sharedFunctionsFinalizer(bf)
 	require.Nil(t, bf.memoryGrowExecutable)
 	require.Nil(t, bf.stackGrowExecutable)
 }

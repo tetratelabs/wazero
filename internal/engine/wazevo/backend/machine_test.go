@@ -24,6 +24,10 @@ type mockMachine struct {
 	rinfo                  *regalloc.RegisterInfo
 }
 
+func (m mockMachine) CompileEntryPreamble(signature *ssa.Signature) []byte {
+	panic("TODO")
+}
+
 func (m mockMachine) CompileStackGrowCallSequence() []byte {
 	panic("TODO")
 }

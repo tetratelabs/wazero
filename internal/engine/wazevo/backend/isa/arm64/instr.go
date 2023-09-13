@@ -353,11 +353,6 @@ func (i *instruction) asCall(ref ssa.FuncRef, abi *abiImpl) {
 	i.abi = abi
 }
 
-func (i *instruction) asCallImm(imm int64) {
-	i.kind = call
-	i.u2 = uint64(imm)
-}
-
 func (i *instruction) asCallIndirect(ptr regalloc.VReg, abi *abiImpl) {
 	i.kind = callInd
 	i.rn = operandNR(ptr)

@@ -4,12 +4,13 @@
 #include "textflag.h"
 
 // See the comments on EmitGoEntryPreamble for what this function is supposed to do.
-TEXT ·entrypoint(SB), NOSPLIT|NOFRAME, $0-40
-	MOVD executable+0(FP), R27
-	MOVD executionContextPtr+8(FP), R0
-	MOVD moduleContextPtr+16(FP), R1
-	MOVD paramResultSlicePtr+24(FP), R19
-	MOVD goAllocatedStackSlicePtr+32(FP), R26
+TEXT ·entrypoint(SB), NOSPLIT|NOFRAME, $0-48
+	MOVD preambleExecutable+0(FP), R27
+	MOVD functionExectuable+8(FP), R24
+	MOVD executionContextPtr+16(FP), R0
+	MOVD moduleContextPtr+24(FP), R1
+	MOVD paramResultSlicePtr+32(FP), R19
+	MOVD goAllocatedStackSlicePtr+40(FP), R26
 	JMP  (R27)
 
 TEXT ·afterGoFunctionCallEntrypoint(SB), NOSPLIT|NOFRAME, $0-24

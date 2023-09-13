@@ -1741,8 +1741,7 @@ blk4: () <-- (blk2,blk3)
 			code := &tc.m.CodeSection[tc.targetIndex]
 			fc.Init(tc.targetIndex, &tc.m.TypeSection[typeIndex], code.LocalTypes, code.Body)
 
-			err = fc.LowerToSSA()
-			require.NoError(t, err)
+			fc.LowerToSSA()
 
 			actual := fc.formatBuilder()
 			fmt.Println(actual)
