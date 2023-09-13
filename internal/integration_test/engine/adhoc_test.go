@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"math"
+	"runtime"
 	"strconv"
 	"testing"
 	"time"
@@ -70,6 +71,9 @@ func TestEngineInterpreter(t *testing.T) {
 }
 
 func TestEngineWazevo(t *testing.T) {
+	if runtime.GOARCH != "arm64" {
+		t.Skip()
+	}
 	config := wazero.NewRuntimeConfigInterpreter()
 	wazevo.ConfigureWazevo(config)
 	runAllTests(t, tests, config.WithCloseOnContextDone(true), true)
