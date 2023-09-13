@@ -340,10 +340,10 @@ const (
 	// OpcodeIsub performs an integer subtraction: `v = Isub x, y`.
 	OpcodeIsub
 
-	// OpcodeVIsub performs an integer subtraction: `v = IVsub.lane x, y` on vector.
+	// OpcodeVIsub performs an integer subtraction: `v = VIsub.lane x, y` on vector.
 	OpcodeVIsub
 
-	// OpcodeVImul performs an integer multiplication: `v = IVmul.lane x, y` on vector.
+	// OpcodeVImul performs an integer multiplication: `v = VImul.lane x, y` on vector.
 	OpcodeVImul
 
 	// OpcodeVIneg negates the given vector value: `v = VIneg x`.

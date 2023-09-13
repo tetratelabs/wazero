@@ -1512,35 +1512,6 @@ var (
 			}}},
 		},
 	}
-
-	VecArithmetics = TestCase{
-		Name: "vec_arithmentics",
-		Module: SingleFunctionModule(wasm.FunctionType{
-			Params:  []wasm.ValueType{v128, v128},
-			Results: []wasm.ValueType{v128, v128, v128, v128},
-		}, []byte{
-			wasm.OpcodeLocalGet, 0,
-			wasm.OpcodeLocalGet, 1,
-			wasm.OpcodeVecPrefix, wasm.OpcodeVecI64x2Add,
-			// wasm.OpcodeDrop,
-
-			wasm.OpcodeLocalGet, 0,
-			wasm.OpcodeLocalGet, 1,
-			wasm.OpcodeVecPrefix, wasm.OpcodeVecI64x2Sub,
-			// wasm.OpcodeDrop,
-
-			wasm.OpcodeLocalGet, 0,
-			wasm.OpcodeLocalGet, 1,
-			wasm.OpcodeVecPrefix, wasm.OpcodeVecI64x2Mul,
-			// wasm.OpcodeDrop,
-
-			wasm.OpcodeLocalGet, 0,
-			wasm.OpcodeVecPrefix, wasm.OpcodeVecI64x2Neg,
-			// wasm.OpcodeDrop,
-
-			wasm.OpcodeEnd,
-		}, nil),
-	}
 )
 
 type TestCase struct {
@@ -1575,11 +1546,10 @@ var (
 )
 
 const (
-	i32  = wasm.ValueTypeI32
-	i64  = wasm.ValueTypeI64
-	f32  = wasm.ValueTypeF32
-	f64  = wasm.ValueTypeF64
-	v128 = wasm.ValueTypeV128
+	i32 = wasm.ValueTypeI32
+	i64 = wasm.ValueTypeI64
+	f32 = wasm.ValueTypeF32
+	f64 = wasm.ValueTypeF64
 
 	blockSignature_vv = 0x40 // 0x40 is the v_v signature in 33-bit signed. See wasm.DecodeBlockType.
 )

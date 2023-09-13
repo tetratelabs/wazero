@@ -30,9 +30,9 @@ const (
 	PrintBlockLaidOutSSA                     = false
 	PrintSSAToBackendIRLowering              = false
 	PrintRegisterAllocated                   = false
-	PrintFinalizedMachineCode                = false
+	PrintFinalizedMachineCode                = true
 	PrintMachineCodeHexPerFunction           = printMachineCodeHexPerFunctionUnmodified || PrintMachineCodeHexPerFunctionDisassemblable //nolint
-	printMachineCodeHexPerFunctionUnmodified = false
+	printMachineCodeHexPerFunctionUnmodified = true
 	// PrintMachineCodeHexPerFunctionDisassemblable prints the machine code while modifying the actual result
 	// to make it disassemblable. This is useful when debugging the final machine code. See the places where this is used for detail.
 	// When this is enabled, functions must not be called.

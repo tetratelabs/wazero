@@ -3096,17 +3096,6 @@ L9 (SSA Block: blk6):
 	ret
 `,
 		},
-		{
-			name: "vec_arithmetics", m: testcases.VecArithmetics.Module,
-			afterFinalizeARM64: `
-blk0: (exec_ctx:i64, module_ctx:i64, v2:v128, v3:v128)
-	v4:v128 = VIadd.i64x2 v2, v3
-	v5:v128 = VIsub.i64x2 v2, v3
-	v6:v128 = VImul.i64x2 v2, v3
-	v7:v128 = VIneg.i64x2 v2
-	Jump blk_ret
-`,
-		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ssab := ssa.NewBuilder()

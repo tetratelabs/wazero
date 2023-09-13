@@ -380,7 +380,7 @@ func encodeVecRRR(op vecOp, rd, rn, rm uint32, arr vecArrangement) uint32 {
 			panic("unsupported arrangement: " + arr.String())
 		}
 		size, q := arrToSizeQEncoded(arr)
-		return encodeAdvancedSIMDThreeDifferent(rd, rn, rm, 0b1000, size, 0b0, q)
+		return encodeAdvancedSIMDThreeDifferent(rd, rn, rm, 0b1000, size, 0b1, q)
 	default:
 		panic("TODO")
 	}
@@ -1404,16 +1404,7 @@ func encodeAdvancedSIMDTwoMisc(op vecOp, rd, rn uint32, arr vecArrangement) uint
 	case vecOpXtn:
 		u = 0b0
 		opcode = 0b10010
-		switch arr {
-		case vecArrangement2D:
-			q, size = 0b0, 0b10
-		case vecArrangement4S:
-			q, size = 0b0, 0b01
-		case vecArrangement8H:
-			q, size = 0b0, 0b00
-		default:
-			panic("unsupported arrangement: " + arr.String())
-		}
+		size, q = arrToSizeQEncoded(arr)
 	case vecOpShll:
 		u = 0b1
 		opcode = 0b10011

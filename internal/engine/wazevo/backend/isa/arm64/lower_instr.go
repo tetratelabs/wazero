@@ -328,39 +328,37 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 			mul.asVecRRR(vecOpMul, rd, rn, rm, arr)
 			m.insert(mul)
 		} else {
-			const arrI32x4 = vecArrangement4S
-			const arrI32x2 = vecArrangement2S
-
 			tmp1 := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
 			tmp2 := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
+			tmp3 := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
 
 			// Following the algorithm in https://chromium-review.googlesource.com/c/v8/v8/+/1781696
 			rev64 := m.allocateInstr()
-			rev64.asVecMisc(vecOpRev64, rd, rm, arrI32x4)
+			rev64.asVecMisc(vecOpRev64, tmp2, rm, vecArrangement4S)
 			m.insert(rev64)
 
 			mul := m.allocateInstr()
-			mul.asVecRRR(vecOpMul, rd, rd, rn, arrI32x4)
+			mul.asVecRRR(vecOpMul, tmp2, tmp2, rn, vecArrangement4S)
 			m.insert(mul)
 
 			xtn1 := m.allocateInstr()
-			xtn1.asVecMisc(vecOpXtn, tmp1, rn, vecArrangement2D) // narrow low_half:true
+			xtn1.asVecMisc(vecOpXtn, tmp1, rn, vecArrangement2S)
 			m.insert(xtn1)
 
 			addp := m.allocateInstr()
-			addp.asVecRRR(vecOpAddp, rd, rd, rd, arrI32x4)
+			addp.asVecRRR(vecOpAddp, tmp2, tmp2, tmp2, vecArrangement4S)
 			m.insert(addp)
 
 			xtn2 := m.allocateInstr()
-			xtn2.asVecMisc(vecOpXtn, tmp2, rn, vecArrangement2D) // narrow low_half:true
+			xtn2.asVecMisc(vecOpXtn, tmp3, rm, vecArrangement2S)
 			m.insert(xtn2)
 
 			shll := m.allocateInstr()
-			shll.asVecMisc(vecOpShll, rd, rd, arrI32x2)
+			shll.asVecMisc(vecOpShll, rd, tmp2, vecArrangement2S)
 			m.insert(shll)
 
 			umlal := m.allocateInstr()
-			umlal.asVecRRR(vecOpUmlal, rd, tmp2, tmp1, arrI32x2)
+			umlal.asVecRRR(vecOpUmlal, rd, tmp3, tmp1, vecArrangement2S)
 			m.insert(umlal)
 		}
 	case ssa.OpcodeVIneg:

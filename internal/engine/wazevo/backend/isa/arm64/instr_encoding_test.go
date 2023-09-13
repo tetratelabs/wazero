@@ -129,6 +129,9 @@ func TestInstruction_encode(t *testing.T) {
 		{want: "41b8e06e", setup: func(i *instruction) {
 			i.asVecMisc(vecOpNeg, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2D)
 		}},
+		{want: "4128a10e", setup: func(i *instruction) {
+			i.asVecMisc(vecOpXtn, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2S)
+		}},
 		{want: "4100839a", setup: func(i *instruction) { i.asCSel(operandNR(x1VReg), operandNR(x2VReg), operandNR(x3VReg), eq, true) }},
 		{want: "4110839a", setup: func(i *instruction) { i.asCSel(operandNR(x1VReg), operandNR(x2VReg), operandNR(x3VReg), ne, true) }},
 		{want: "4100831a", setup: func(i *instruction) { i.asCSel(operandNR(x1VReg), operandNR(x2VReg), operandNR(x3VReg), eq, false) }},
