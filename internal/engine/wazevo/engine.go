@@ -387,6 +387,8 @@ func (e *engine) Close() (err error) {
 	for _, cm := range e.compiledModules {
 		cm.executable = nil
 		cm.functionOffsets = nil
+		cm.module = nil
+		cm.parent = nil
 	}
 	e.sortedCompiledModules = nil
 	e.compiledModules = nil
@@ -408,6 +410,8 @@ func (e *engine) DeleteCompiledModule(m *wasm.Module) {
 	cm, ok := e.compiledModules[m.ID]
 	if ok {
 		cm.parent = nil
+		cm.module = nil
+		cm.functionOffsets = nil
 		if len(cm.executable) > 0 {
 			e.deleteCompiledModuleFromSortedList(cm)
 		}
