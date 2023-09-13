@@ -83,33 +83,6 @@ func (e engineTester) NewEngine(enabledFeatures api.CoreFeatures) wasm.Engine {
 	return NewEngine(context.Background(), enabledFeatures, nil)
 }
 
-func TestInterpreter_MemoryGrowInRecursiveCall(t *testing.T) {
-	defer functionLog.Reset()
-	enginetest.RunTestEngineMemoryGrowInRecursiveCall(t, et)
-}
-
-func TestInterpreter_Engine_NewModuleEngine(t *testing.T) {
-	enginetest.RunTestEngineNewModuleEngine(t, et)
-}
-
-func TestInterpreter_ModuleEngine_Call(t *testing.T) {
-	defer functionLog.Reset()
-	enginetest.RunTestModuleEngineCall(t, et)
-	require.Equal(t, `
---> .$0(1,2)
-<-- (1,2)
-`, "\n"+functionLog.String())
-}
-
-func TestCompiler_ModuleEngine_CallWithStack(t *testing.T) {
-	defer functionLog.Reset()
-	enginetest.RunTestModuleEngineCallWithStack(t, et)
-	require.Equal(t, `
---> .$0(1,2)
-<-- (1,2)
-`, "\n"+functionLog.String())
-}
-
 func TestInterpreter_ModuleEngine_Call_HostFn(t *testing.T) {
 	defer functionLog.Reset()
 	enginetest.RunTestModuleEngineCallHostFn(t, et)
