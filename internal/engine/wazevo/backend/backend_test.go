@@ -3100,7 +3100,7 @@ L9 (SSA Block: blk6):
 		t.Run(tc.name, func(t *testing.T) {
 			ssab := ssa.NewBuilder()
 			offset := wazevoapi.NewModuleContextOffsetData(tc.m)
-			fc := frontend.NewFrontendCompiler(tc.m, ssab, &offset)
+			fc := frontend.NewFrontendCompiler(tc.m, ssab, &offset, false)
 			machine := newMachine()
 			machine.DisableStackCheck()
 			be := backend.NewCompiler(context.Background(), machine, ssab)

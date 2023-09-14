@@ -1012,6 +1012,19 @@ func (c *Compiler) lowerCurrentOpcode() {
 
 		c.switchTo(originalLen, loopHeader)
 
+		if c.ensureTermination {
+			checkModuleExitCodePtr := builder.AllocateInstruction().
+				AsLoad(c.execCtxPtrValue,
+					wazevoapi.ExecutionContextOffsets.CheckModuleExitCodeTrampolineAddress.U32(),
+					ssa.TypeI64,
+				).Insert(builder).Return()
+
+			c.checkModuleExitCodeArg[0] = c.execCtxPtrValue
+
+			builder.AllocateInstruction().
+				AsCallIndirect(checkModuleExitCodePtr, &c.checkModuleExitCodeSig, c.checkModuleExitCodeArg[:]).
+				Insert(builder)
+		}
 	case wasm.OpcodeIf:
 		bt := c.readBlockType()
 

@@ -19,6 +19,7 @@ const (
 	ExitCodeIntegerDivisionByZero
 	ExitCodeIntegerOverflow
 	ExitCodeInvalidConversionToInteger
+	ExitCodeCheckModuleExitCode
 	exitCodeMax
 )
 
@@ -51,6 +52,8 @@ func (e ExitCode) String() string {
 		return "integer_overflow"
 	case ExitCodeInvalidConversionToInteger:
 		return "invalid_conversion_to_integer"
+	case ExitCodeCheckModuleExitCode:
+		return "check_module_exit_code"
 	}
 	panic("TODO")
 }
