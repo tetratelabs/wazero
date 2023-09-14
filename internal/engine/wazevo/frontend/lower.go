@@ -1455,9 +1455,9 @@ func (c *Compiler) lowerCurrentOpcode() {
 			switch vecOp {
 			case wasm.OpcodeVecI8x16MinU:
 				lane = ssa.VecLaneI8x16
-			case wasm.OpcodeVecI16x8MinS:
+			case wasm.OpcodeVecI16x8MinU:
 				lane = ssa.VecLaneI16x8
-			case wasm.OpcodeVecI32x4MinS:
+			case wasm.OpcodeVecI32x4MinU:
 				lane = ssa.VecLaneI32x4
 			}
 			v2 := state.pop()
@@ -1489,9 +1489,9 @@ func (c *Compiler) lowerCurrentOpcode() {
 			switch vecOp {
 			case wasm.OpcodeVecI8x16MaxU:
 				lane = ssa.VecLaneI8x16
-			case wasm.OpcodeVecI16x8MaxS:
+			case wasm.OpcodeVecI16x8MaxU:
 				lane = ssa.VecLaneI16x8
-			case wasm.OpcodeVecI32x4MaxS:
+			case wasm.OpcodeVecI32x4MaxU:
 				lane = ssa.VecLaneI32x4
 			}
 			v2 := state.pop()
