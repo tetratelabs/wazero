@@ -300,42 +300,65 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		v.asLoadFpuConst128(result, lo, hi)
 		m.insert(v)
 	case ssa.OpcodeVIadd:
-		x, y, lane := instr.Arg2WithLane()
-		arr := ssaLeneToArrangement(lane)
-		add := m.allocateInstr()
-		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
-		rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
-		rd := operandNR(m.compiler.VRegOf(instr.Return()))
-		add.asVecRRR(vecOpAdd, rd, rn, rm, arr)
-		m.insert(add)
+		m.lowerVecRRR(vecOpAdd, instr)
+	case ssa.OpcodeVSaddSat:
+		m.lowerVecRRR(vecOpSqadd, instr)
+	case ssa.OpcodeVUaddSat:
+		m.lowerVecRRR(vecOpUqadd, instr)
 	case ssa.OpcodeVIsub:
-		x, y, lane := instr.Arg2WithLane()
-		arr := ssaLeneToArrangement(lane)
-		sub := m.allocateInstr()
-		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
-		rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
-		rd := operandNR(m.compiler.VRegOf(instr.Return()))
-		sub.asVecRRR(vecOpSub, rd, rn, rm, arr)
-		m.insert(sub)
+		m.lowerVecRRR(vecOpSub, instr)
+	case ssa.OpcodeVSsubSat:
+		m.lowerVecRRR(vecOpSqsub, instr)
+	case ssa.OpcodeVUsubSat:
+		m.lowerVecRRR(vecOpUqsub, instr)
+	case ssa.OpcodeVImin:
+		m.lowerVecRRR(vecOpSmin, instr)
+	case ssa.OpcodeVUmin:
+		m.lowerVecRRR(vecOpUmin, instr)
+	case ssa.OpcodeVImax:
+		m.lowerVecRRR(vecOpSmax, instr)
+	case ssa.OpcodeVUmax:
+		m.lowerVecRRR(vecOpUmax, instr)
+	case ssa.OpcodeVAvgRound:
+		m.lowerVecRRR(vecOpUrhadd, instr)
 	case ssa.OpcodeVImul:
 		x, y, lane := instr.Arg2WithLane()
-		arr := ssaLeneToArrangement(lane)
+		arr := ssaLaneToArrangement(lane)
 		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
 		rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
 		rd := operandNR(m.compiler.VRegOf(instr.Return()))
 		m.lowerVIMul(rd, rn, rm, arr)
+	case ssa.OpcodeVIabs:
+		m.lowerVecMisc(vecOpAbs, instr)
 	case ssa.OpcodeVIneg:
-		x, lane := instr.ArgWithLane()
-		arr := ssaLeneToArrangement(lane)
-		neg := m.allocateInstr()
-		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
-		rd := operandNR(m.compiler.VRegOf(instr.Return()))
-		neg.asVecMisc(vecOpNeg, rd, rn, arr)
-		m.insert(neg)
+		m.lowerVecMisc(vecOpNeg, instr)
+	case ssa.OpcodeVIpopcnt:
+		m.lowerVecMisc(vecOpCnt, instr)
 	default:
 		panic("TODO: lowering " + op.String())
 	}
 	m.FlushPendingInstructions()
+}
+
+func (m *machine) lowerVecMisc(op vecOp, instr *ssa.Instruction) {
+	x, lane := instr.ArgWithLane()
+	arr := ssaLaneToArrangement(lane)
+	ins := m.allocateInstr()
+	rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+	rd := operandNR(m.compiler.VRegOf(instr.Return()))
+	ins.asVecMisc(op, rd, rn, arr)
+	m.insert(ins)
+}
+
+func (m *machine) lowerVecRRR(op vecOp, instr *ssa.Instruction) {
+	x, y, lane := instr.Arg2WithLane()
+	arr := ssaLaneToArrangement(lane)
+	ins := m.allocateInstr()
+	rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+	rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
+	rd := operandNR(m.compiler.VRegOf(instr.Return()))
+	ins.asVecRRR(op, rd, rn, rm, arr)
+	m.insert(ins)
 }
 
 func (m *machine) lowerVIMul(rd, rn, rm operand, arr vecArrangement) {

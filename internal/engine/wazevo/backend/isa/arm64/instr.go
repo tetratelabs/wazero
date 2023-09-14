@@ -1510,6 +1510,16 @@ func (b vecOp) String() string {
 		return "addp"
 	case vecOpSub:
 		return "sub"
+	case vecOpSmin:
+		return "smin"
+	case vecOpUmin:
+		return "umin"
+	case vecOpSmax:
+		return "smax"
+	case vecOpUmax:
+		return "umax"
+	case vecOpUrhadd:
+		return "urhadd"
 	case vecOpMul:
 		return "mul"
 	case vecOpUmlal:
@@ -1532,10 +1542,20 @@ const (
 	vecOpBit
 	vecOpEOR
 	vecOpAdd
+	vecOpSqadd
+	vecOpUqadd
 	vecOpAddp
 	vecOpSub
+	vecOpSqsub
+	vecOpUqsub
+	vecOpSmin
+	vecOpUmin
+	vecOpSmax
+	vecOpUmax
+	vecOpUrhadd
 	vecOpMul
 	vecOpUmlal
+	vecOpAbs
 	vecOpNeg
 	vecOpRev64
 	vecOpXtn
@@ -1905,7 +1925,7 @@ type vecIndex byte
 // vecIndexNone indicates no vector index specified.
 const vecIndexNone = ^vecIndex(0)
 
-func ssaLeneToArrangement(lane ssa.VecLane) vecArrangement {
+func ssaLaneToArrangement(lane ssa.VecLane) vecArrangement {
 	switch lane {
 	case ssa.VecLaneI8x16:
 		return vecArrangement16B
