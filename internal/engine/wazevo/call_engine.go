@@ -63,11 +63,12 @@ type (
 		stackGrowRequiredSize uintptr
 		// memoryGrowTrampolineAddress holds the address of memory grow trampoline function.
 		memoryGrowTrampolineAddress *byte
-		// stackGrowCallSequenceAddress holds the address of stack grow call sequence function.
-		stackGrowCallSequenceAddress *byte
+		// stackGrowCallTrampolineAddress holds the address of stack grow trampoline function.
+		stackGrowCallTrampolineAddress *byte
+		// checkModuleExitCodeTrampolineAddress holds the address of check-module-exit-code function.
+		checkModuleExitCodeTrampolineAddress *byte
 		// savedRegisters is the opaque spaces for save/restore registers.
 		// We want to align 16 bytes for each register, so we use [64][2]uint64.
-		_              uint64
 		savedRegisters [64][2]uint64
 		// goFunctionCallCalleeModuleContextOpaque is the pointer to the target Go function's moduleContextOpaque.
 		goFunctionCallCalleeModuleContextOpaque uintptr
@@ -138,6 +139,19 @@ func (c *callEngine) CallWithStack(ctx context.Context, paramResultStack []uint6
 
 // CallWithStack implements api.Function.
 func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint64) (err error) {
+	p := c.parent
+	ensureTermination := p.parent.ensureTermination
+	m := p.module
+	if ensureTermination {
+		select {
+		case <-ctx.Done():
+			// If the provided context is already done, close the module and return the error.
+			m.CloseWithCtxErr(ctx)
+			return m.FailIfClosed()
+		default:
+		}
+	}
+
 	var paramResultPtr *uint64
 	if len(paramResultStack) > 0 {
 		paramResultPtr = &paramResultStack[0]
@@ -164,6 +178,11 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 			c.execCtx.exitCode = wazevoapi.ExitCodeOK
 		}
 	}()
+
+	if ensureTermination {
+		done := m.CloseModuleOnCanceledOrTimeout(ctx)
+		defer done()
+	}
 
 	entrypoint(c.preambleExecutable, c.executable, c.execCtxPtr, c.parent.opaquePtr, paramResultPtr, c.stackTop)
 	for {
@@ -208,6 +227,15 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 			f := hostModuleGoFuncFromOpaque[api.GoModuleFunction](index, c.execCtx.goFunctionCallCalleeModuleContextOpaque)
 			mod := c.callerModuleInstance()
 			f.Call(ctx, mod, c.execCtx.goFunctionCallStack[:])
+			c.execCtx.exitCode = wazevoapi.ExitCodeOK
+			afterGoFunctionCallEntrypoint(c.execCtx.goCallReturnAddress, c.execCtxPtr, c.execCtx.stackPointerBeforeGoCall)
+		case wazevoapi.ExitCodeCheckModuleExitCode:
+			// Note: this operation must be done in Go, not native code. The reason is that
+			// native code cannot be preempted and that means it can block forever if there are not
+			// enough OS threads (which we don't have control over).
+			if err := m.FailIfClosed(); err != nil {
+				panic(err)
+			}
 			c.execCtx.exitCode = wazevoapi.ExitCodeOK
 			afterGoFunctionCallEntrypoint(c.execCtx.goCallReturnAddress, c.execCtxPtr, c.execCtx.stackPointerBeforeGoCall)
 		case wazevoapi.ExitCodeUnreachable:

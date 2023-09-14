@@ -45,6 +45,9 @@ type (
 	sharedFunctions struct {
 		// memoryGrowExecutable is a compiled executable for memory.grow builtin function.
 		memoryGrowExecutable []byte
+		// checkModuleExitCode is a compiled executable for checking module instance exit code. This
+		// is used when ensureTermination is true.
+		checkModuleExitCode []byte
 		// stackGrowExecutable is a compiled executable for growing stack builtin function.
 		stackGrowExecutable []byte
 		entryPreambles      map[*wasm.FunctionType][]byte
@@ -54,10 +57,11 @@ type (
 	compiledModule struct {
 		executable []byte
 		// functionOffsets maps a local function index to the offset in the executable.
-		functionOffsets []int
-		parent          *engine
-		module          *wasm.Module
-		entryPreambles  []*byte // indexed-correlated with the type index.
+		functionOffsets   []int
+		parent            *engine
+		module            *wasm.Module
+		entryPreambles    []*byte // indexed-correlated with the type index.
+		ensureTermination bool
 
 		// The followings are only available for non host modules.
 
@@ -78,7 +82,7 @@ func NewEngine(ctx context.Context, _ api.CoreFeatures, _ filecache.Cache) wasm.
 		machine:      machine,
 		be:           be,
 	}
-	e.compileBuiltinFunctions()
+	e.compileSharedFunctions()
 	return e
 }
 
@@ -108,6 +112,7 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 	e.rels = e.rels[:0]
 	cm := &compiledModule{
 		offsets: wazevoapi.NewModuleContextOffsetData(module), parent: e, module: module,
+		ensureTermination: ensureTermination,
 	}
 
 	if module.IsHostModule {
@@ -131,7 +136,7 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 
 	// Creates new compiler instances which are reused for each function.
 	ssaBuilder := ssa.NewBuilder()
-	fe := frontend.NewFrontendCompiler(module, ssaBuilder, &cm.offsets)
+	fe := frontend.NewFrontendCompiler(module, ssaBuilder, &cm.offsets, ensureTermination)
 	machine := newMachine()
 	be := backend.NewCompiler(ctx, machine, ssaBuilder)
 
@@ -154,7 +159,7 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 			ctx = wazevoapi.SetCurrentFunctionName(ctx, fmt.Sprintf("[%d/%d] \"%s\"", i, len(module.CodeSection)-1, name))
 		}
 
-		body, rels, err := e.compileLocalWasmFunction(ctx, module, wasm.Index(i), fe, ssaBuilder, be, listeners, ensureTermination)
+		body, rels, err := e.compileLocalWasmFunction(ctx, module, wasm.Index(i), fe, ssaBuilder, be, listeners)
 		if err != nil {
 			return nil, fmt.Errorf("compile function %d/%d: %v", i, len(module.CodeSection)-1, err)
 		}
@@ -214,7 +219,7 @@ func (e *engine) compileLocalWasmFunction(
 	fe *frontend.Compiler,
 	ssaBuilder ssa.Builder,
 	be backend.Compiler,
-	_ []experimental.FunctionListener, _ bool,
+	_ []experimental.FunctionListener,
 ) (body []byte, rels []backend.RelocationInfo, err error) {
 	typ := &module.TypeSection[module.FunctionSection[localFunctionIndex]]
 	codeSeg := &module.CodeSection[localFunctionIndex]
@@ -468,7 +473,7 @@ func (e *engine) NewModuleEngine(m *wasm.Module, mi *wasm.ModuleInstance) (wasm.
 	return me, nil
 }
 
-func (e *engine) compileBuiltinFunctions() {
+func (e *engine) compileSharedFunctions() {
 	e.sharedFunctions = &sharedFunctions{entryPreambles: make(map[*wasm.FunctionType][]byte)}
 
 	e.be.Init()
@@ -478,6 +483,15 @@ func (e *engine) compileBuiltinFunctions() {
 			Results: []ssa.Type{ssa.TypeI32},
 		}, false)
 		e.sharedFunctions.memoryGrowExecutable = mmapExecutable(src)
+	}
+
+	e.be.Init()
+	{
+		src := e.machine.CompileGoFunctionTrampoline(wazevoapi.ExitCodeCheckModuleExitCode, &ssa.Signature{
+			Params:  []ssa.Type{ssa.TypeI32 /* exec context */},
+			Results: []ssa.Type{ssa.TypeI32},
+		}, false)
+		e.sharedFunctions.checkModuleExitCode = mmapExecutable(src)
 	}
 
 	// TODO: table grow, etc.
@@ -491,21 +505,26 @@ func (e *engine) compileBuiltinFunctions() {
 	e.setFinalizer(e.sharedFunctions, sharedFunctionsFinalizer)
 }
 
-func sharedFunctionsFinalizer(bf *sharedFunctions) {
-	if err := platform.MunmapCodeSegment(bf.memoryGrowExecutable); err != nil {
+func sharedFunctionsFinalizer(sf *sharedFunctions) {
+	if err := platform.MunmapCodeSegment(sf.memoryGrowExecutable); err != nil {
 		panic(err)
 	}
-	if err := platform.MunmapCodeSegment(bf.stackGrowExecutable); err != nil {
+	if err := platform.MunmapCodeSegment(sf.checkModuleExitCode); err != nil {
 		panic(err)
 	}
-	for _, f := range bf.entryPreambles {
+	if err := platform.MunmapCodeSegment(sf.stackGrowExecutable); err != nil {
+		panic(err)
+	}
+	for _, f := range sf.entryPreambles {
 		if err := platform.MunmapCodeSegment(f); err != nil {
 			panic(err)
 		}
 	}
 
-	bf.memoryGrowExecutable = nil
-	bf.stackGrowExecutable = nil
+	sf.memoryGrowExecutable = nil
+	sf.checkModuleExitCode = nil
+	sf.stackGrowExecutable = nil
+	sf.entryPreambles = nil
 }
 
 func compiledModuleFinalizer(cm *compiledModule) {

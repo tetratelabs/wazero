@@ -17,7 +17,8 @@ func TestCompiler_LowerToSSA(t *testing.T) {
 	// what output should look like, you can run:
 	// `~/wasmtime/target/debug/clif-util wasm --target aarch64-apple-darwin testcase.wat -p -t`
 	for _, tc := range []struct {
-		name string
+		name              string
+		ensureTermination bool
 		// m is the *wasm.Module to be compiled in this test.
 		m *wasm.Module
 		// targetIndex is the index of a local function to be compiled in this test.
@@ -218,6 +219,36 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 	Jump blk1
 
 blk1: () <-- (blk0,blk1)
+	Jump blk1
+`,
+		},
+		{
+			name: "loop - br / ensure termination", m: testcases.LoopBr.Module,
+			ensureTermination: true,
+			exp: `
+signatures:
+	sig2: i64_v
+
+blk0: (exec_ctx:i64, module_ctx:i64)
+	Jump blk1
+
+blk1: () <-- (blk0,blk1)
+	v2:i64 = Load exec_ctx, 0x58
+	CallIndirect v2:sig2, exec_ctx
+	Jump blk1
+
+blk2: ()
+`,
+			expAfterOpt: `
+signatures:
+	sig2: i64_v
+
+blk0: (exec_ctx:i64, module_ctx:i64)
+	Jump blk1
+
+blk1: () <-- (blk0,blk1)
+	v2:i64 = Load exec_ctx, 0x58
+	CallIndirect v2:sig2, exec_ctx
 	Jump blk1
 `,
 		},
@@ -1736,7 +1767,7 @@ blk4: () <-- (blk2,blk3)
 			b := ssa.NewBuilder()
 
 			offset := wazevoapi.NewModuleContextOffsetData(tc.m)
-			fc := NewFrontendCompiler(tc.m, b, &offset)
+			fc := NewFrontendCompiler(tc.m, b, &offset, tc.ensureTermination)
 			typeIndex := tc.m.FunctionSection[tc.targetIndex]
 			code := &tc.m.CodeSection[tc.targetIndex]
 			fc.Init(tc.targetIndex, &tc.m.TypeSection[typeIndex], code.LocalTypes, code.Body)

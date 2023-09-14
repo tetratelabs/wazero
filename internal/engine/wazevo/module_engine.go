@@ -142,7 +142,8 @@ func (m *moduleEngine) NewFunction(index wasm.Index) api.Function {
 	}
 
 	ce.execCtx.memoryGrowTrampolineAddress = &m.parent.sharedFunctions.memoryGrowExecutable[0]
-	ce.execCtx.stackGrowCallSequenceAddress = &m.parent.sharedFunctions.stackGrowExecutable[0]
+	ce.execCtx.stackGrowCallTrampolineAddress = &m.parent.sharedFunctions.stackGrowExecutable[0]
+	ce.execCtx.checkModuleExitCodeTrampolineAddress = &m.parent.sharedFunctions.checkModuleExitCode[0]
 	ce.init()
 	return ce
 }

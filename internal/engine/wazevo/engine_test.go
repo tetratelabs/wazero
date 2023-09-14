@@ -13,19 +13,37 @@ import (
 )
 
 func Test_sharedFunctionsFinalizer(t *testing.T) {
-	bf := &sharedFunctions{}
+	sf := &sharedFunctions{}
 
 	b1, err := platform.MmapCodeSegment(100)
 	require.NoError(t, err)
 
 	b2, err := platform.MmapCodeSegment(100)
 	require.NoError(t, err)
-	bf.memoryGrowExecutable = b1
-	bf.stackGrowExecutable = b2
 
-	sharedFunctionsFinalizer(bf)
-	require.Nil(t, bf.memoryGrowExecutable)
-	require.Nil(t, bf.stackGrowExecutable)
+	b3, err := platform.MmapCodeSegment(100)
+	require.NoError(t, err)
+
+	b4, err := platform.MmapCodeSegment(100)
+	require.NoError(t, err)
+	b5, err := platform.MmapCodeSegment(100)
+	require.NoError(t, err)
+
+	preabmles := map[*wasm.FunctionType][]byte{
+		{Params: []wasm.ValueType{}}:                  b4,
+		{Params: []wasm.ValueType{wasm.ValueTypeI32}}: b5,
+	}
+
+	sf.memoryGrowExecutable = b1
+	sf.stackGrowExecutable = b2
+	sf.checkModuleExitCode = b3
+	sf.entryPreambles = preabmles
+
+	sharedFunctionsFinalizer(sf)
+	require.Nil(t, sf.memoryGrowExecutable)
+	require.Nil(t, sf.stackGrowExecutable)
+	require.Nil(t, sf.checkModuleExitCode)
+	require.Nil(t, sf.entryPreambles)
 }
 
 func Test_compiledModuleFinalizer(t *testing.T) {

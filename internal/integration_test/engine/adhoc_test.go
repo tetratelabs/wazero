@@ -51,7 +51,7 @@ var tests = map[string]testCase{
 	"overflow integer addition":                         {f: testOverflow},
 	"un-signed extend global":                           {f: testGlobalExtend},
 	"user-defined primitive in host func":               {f: testUserDefinedPrimitiveHostFunc},
-	"ensures invocations terminate on module close":     {f: testEnsureTerminationOnClose, wazevoSkip: true},
+	"ensures invocations terminate on module close":     {f: testEnsureTerminationOnClose},
 	"call host function indirectly":                     {f: callHostFunctionIndirect, wazevoSkip: true},
 	"lookup function":                                   {f: testLookupFunction},
 	"memory grow in recursive call":                     {f: testMemoryGrowInRecursiveCall},

@@ -376,7 +376,7 @@ func (m *machine) insertStackBoundsCheck(requiredStackSize int64, cur *instructi
 	ldrAddress.asULoad(operandNR(tmpRegVReg), addressMode{
 		kind: addressModeKindRegUnsignedImm12,
 		rn:   x0VReg, // execution context is always the first argument
-		imm:  wazevoapi.ExecutionContextOffsets.StackGrowCallSequenceAddress.I64(),
+		imm:  wazevoapi.ExecutionContextOffsets.StackGrowCallTrampolineAddress.I64(),
 	}, 64)
 	cur = linkInstr(cur, ldrAddress)
 
