@@ -1518,6 +1518,8 @@ func (b vecOp) String() string {
 		return "smax"
 	case vecOpUmax:
 		return "umax"
+	case vecOpUrhadd:
+		return "urhadd"
 	case vecOpMul:
 		return "mul"
 	case vecOpUmlal:
@@ -1546,6 +1548,7 @@ const (
 	vecOpUmin
 	vecOpSmax
 	vecOpUmax
+	vecOpUrhadd
 	vecOpMul
 	vecOpUmlal
 	vecOpNeg

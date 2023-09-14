@@ -355,6 +355,9 @@ const (
 	// OpcodeVUmax performs an unsigned integer max: `v = VUmax.lane x, y` on vector.
 	OpcodeVUmax
 
+	// OpcodeVAvgRound performs an unsigned integer avg, truncating to zero: `v = VAvgRound.lane x, y` on vector.
+	OpcodeVAvgRound
+
 	// OpcodeVImul performs an integer multiplication: `v = VImul.lane x, y` on vector.
 	OpcodeVImul
 
@@ -836,6 +839,7 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeVUmin:              sideEffectNone,
 	OpcodeVImax:              sideEffectNone,
 	OpcodeVUmax:              sideEffectNone,
+	OpcodeVAvgRound:          sideEffectNone,
 	OpcodeVImul:              sideEffectNone,
 	OpcodeVIneg:              sideEffectNone,
 }
@@ -858,6 +862,7 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeVImax:     returnTypesFnV128,
 	OpcodeVUmax:     returnTypesFnV128,
 	OpcodeVImul:     returnTypesFnV128,
+	OpcodeVAvgRound: returnTypesFnV128,
 	OpcodeVIneg:     returnTypesFnV128,
 	OpcodeBand:      returnTypesFnSingle,
 	OpcodeFcopysign: returnTypesFnSingle,
@@ -1103,6 +1108,16 @@ func (i *Instruction) AsVImax(x, y Value, lane VecLane) *Instruction {
 // AsVUmax initializes this instruction as an unsigned integer max instruction with OpcodeVUmax on a vector.
 func (i *Instruction) AsVUmax(x, y Value, lane VecLane) *Instruction {
 	i.opcode = OpcodeVUmax
+	i.v = x
+	i.v2 = y
+	i.u1 = uint64(lane)
+	i.typ = TypeV128
+	return i
+}
+
+// AsVAvgRound initializes this instruction as an unsigned integer avg instruction, truncating to zero with OpcodeVAvgRound on a vector.
+func (i *Instruction) AsVAvgRound(x, y Value, lane VecLane) *Instruction {
+	i.opcode = OpcodeVAvgRound
 	i.v = x
 	i.v2 = y
 	i.u1 = uint64(lane)
