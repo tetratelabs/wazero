@@ -163,6 +163,10 @@ wasm stack trace:
 }
 
 func runDWARFTest(t *testing.T, r wazero.Runtime, bin []byte, exp string) {
+	if len(bin) == 0 {
+		t.Skip() // Skip if the binary is empty which can happen when xz is not installed on the system
+	}
+
 	_, err := wasi_snapshot_preview1.Instantiate(testCtx, r)
 	require.NoError(t, err)
 	_, err = r.Instantiate(testCtx, bin)
