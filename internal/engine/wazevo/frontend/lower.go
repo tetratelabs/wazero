@@ -1347,12 +1347,32 @@ func (c *Compiler) lowerCurrentOpcode() {
 			state.pc += 7
 			ret := builder.AllocateInstruction().AsVconst(lo, hi).Insert(builder).Return()
 			state.push(ret)
-		case wasm.OpcodeVecI16x8Add, wasm.OpcodeVecI32x4Add, wasm.OpcodeVecI64x2Add:
+		case wasm.OpcodeVecI8x16Neg, wasm.OpcodeVecI16x8Neg, wasm.OpcodeVecI32x4Neg, wasm.OpcodeVecI64x2Neg:
 			if state.unreachable {
 				break
 			}
 			var lane ssa.VecLane
 			switch vecOp {
+			case wasm.OpcodeVecI8x16Neg:
+				lane = ssa.VecLaneI8x16
+			case wasm.OpcodeVecI16x8Neg:
+				lane = ssa.VecLaneI16x8
+			case wasm.OpcodeVecI32x4Neg:
+				lane = ssa.VecLaneI32x4
+			case wasm.OpcodeVecI64x2Neg:
+				lane = ssa.VecLaneI64x2
+			}
+			v1 := state.pop()
+			ret := builder.AllocateInstruction().AsVIneg(v1, lane).Insert(builder).Return()
+			state.push(ret)
+		case wasm.OpcodeVecI8x16Add, wasm.OpcodeVecI16x8Add, wasm.OpcodeVecI32x4Add, wasm.OpcodeVecI64x2Add:
+			if state.unreachable {
+				break
+			}
+			var lane ssa.VecLane
+			switch vecOp {
+			case wasm.OpcodeVecI8x16Add:
+				lane = ssa.VecLaneI8x16
 			case wasm.OpcodeVecI16x8Add:
 				lane = ssa.VecLaneI16x8
 			case wasm.OpcodeVecI32x4Add:
@@ -1364,12 +1384,14 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVIadd(v1, v2, lane).Insert(builder).Return()
 			state.push(ret)
-		case wasm.OpcodeVecI16x8Sub, wasm.OpcodeVecI32x4Sub, wasm.OpcodeVecI64x2Sub:
+		case wasm.OpcodeVecI8x16Sub, wasm.OpcodeVecI16x8Sub, wasm.OpcodeVecI32x4Sub, wasm.OpcodeVecI64x2Sub:
 			if state.unreachable {
 				break
 			}
 			var lane ssa.VecLane
 			switch vecOp {
+			case wasm.OpcodeVecI8x16Sub:
+				lane = ssa.VecLaneI8x16
 			case wasm.OpcodeVecI16x8Sub:
 				lane = ssa.VecLaneI16x8
 			case wasm.OpcodeVecI32x4Sub:
@@ -1397,22 +1419,6 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v2 := state.pop()
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVImul(v1, v2, lane).Insert(builder).Return()
-			state.push(ret)
-		case wasm.OpcodeVecI16x8Neg, wasm.OpcodeVecI32x4Neg, wasm.OpcodeVecI64x2Neg:
-			if state.unreachable {
-				break
-			}
-			var lane ssa.VecLane
-			switch vecOp {
-			case wasm.OpcodeVecI16x8Neg:
-				lane = ssa.VecLaneI16x8
-			case wasm.OpcodeVecI32x4Neg:
-				lane = ssa.VecLaneI32x4
-			case wasm.OpcodeVecI64x2Neg:
-				lane = ssa.VecLaneI64x2
-			}
-			v1 := state.pop()
-			ret := builder.AllocateInstruction().AsVIneg(v1, lane).Insert(builder).Return()
 			state.push(ret)
 		default:
 			panic("TODO: unsupported vector instruction: " + wasm.VectorInstructionName(vecOp))

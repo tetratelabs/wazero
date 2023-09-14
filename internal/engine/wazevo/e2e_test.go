@@ -137,6 +137,7 @@ func TestSpectestV2(t *testing.T) {
 		{"if"},
 		{"loop"},
 		{"simd_const"},
+		{"simd_i8x16_arith"},
 		{"simd_i16x8_arith"},
 		{"simd_i32x4_arith"},
 		{"simd_i64x2_arith"},
