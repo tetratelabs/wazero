@@ -335,7 +335,8 @@ jobs:
           - "1.21"  # Current Go version && The only version that supports wasip1.
 
     steps:
-      - uses: actions/setup-go@v4
+      - id: setup-go
+        uses: actions/setup-go@v4
         with:
           go-version: ${{ matrix.go-version }}
 
@@ -344,7 +345,8 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ~/tests
-          key: go-wasip1-binaries-${{ matrix.os }}-${{ matrix.go-version }}
+          # Use precise Go version from setup-go as patch version differences can effect tests.
+          key: go-wasip1-binaries-${{ matrix.os }}-${{ steps.setup-go.outputs.go-version }}
 
       - if: ${{ steps.cache-go-test-binaries.outputs.cache-hit != 'true' }}
         name: Build Test Binaries
