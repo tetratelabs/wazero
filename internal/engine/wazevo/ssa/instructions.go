@@ -364,6 +364,9 @@ const (
 	// OpcodeVIneg negates the given vector value: `v = VIneg x`.
 	OpcodeVIneg
 
+	// OpcodeVIabs returns the absolute value for the given vector value: `v = VIabs x`.
+	OpcodeVIabs
+
 	// OpcodeImul performs an integer multiplication: `v = Imul x, y`.
 	OpcodeImul
 
@@ -841,6 +844,7 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeVUmax:              sideEffectNone,
 	OpcodeVAvgRound:          sideEffectNone,
 	OpcodeVImul:              sideEffectNone,
+	OpcodeVIabs:              sideEffectNone,
 	OpcodeVIneg:              sideEffectNone,
 }
 
@@ -863,6 +867,7 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeVUmax:     returnTypesFnV128,
 	OpcodeVImul:     returnTypesFnV128,
 	OpcodeVAvgRound: returnTypesFnV128,
+	OpcodeVIabs:     returnTypesFnV128,
 	OpcodeVIneg:     returnTypesFnV128,
 	OpcodeBand:      returnTypesFnSingle,
 	OpcodeFcopysign: returnTypesFnSingle,
@@ -1130,6 +1135,15 @@ func (i *Instruction) AsVImul(x, y Value, lane VecLane) *Instruction {
 	i.opcode = OpcodeVImul
 	i.v = x
 	i.v2 = y
+	i.u1 = uint64(lane)
+	i.typ = TypeV128
+	return i
+}
+
+// AsVIabs initializes this instruction as a vector absolute value with OpcodeVIabs.
+func (i *Instruction) AsVIabs(x Value, lane VecLane) *Instruction {
+	i.opcode = OpcodeVIabs
+	i.v = x
 	i.u1 = uint64(lane)
 	i.typ = TypeV128
 	return i
@@ -1859,7 +1873,7 @@ func (i *Instruction) Format(b Builder) string {
 		instSuffix = " " + i.v.Format(b)
 	case OpcodeVIadd, OpcodeVIsub, OpcodeVImin, OpcodeVUmin, OpcodeVImax, OpcodeVUmax, OpcodeVImul:
 		instSuffix = fmt.Sprintf(".%s %s, %s", VecLane(i.u1), i.v.Format(b), i.v2.Format(b))
-	case OpcodeVIneg:
+	case OpcodeVIabs, OpcodeVIneg:
 		instSuffix = fmt.Sprintf(".%s %s", VecLane(i.u1), i.v.Format(b))
 	default:
 		panic(fmt.Sprintf("TODO: format for %s", i.opcode))
@@ -2245,6 +2259,8 @@ func (o Opcode) String() (ret string) {
 		return "VUmax"
 	case OpcodeVImul:
 		return "VImul"
+	case OpcodeVIabs:
+		return "VIabs"
 	case OpcodeVIneg:
 		return "VIneg"
 	}

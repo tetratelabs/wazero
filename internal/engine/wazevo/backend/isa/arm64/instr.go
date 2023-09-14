@@ -1551,6 +1551,7 @@ const (
 	vecOpUrhadd
 	vecOpMul
 	vecOpUmlal
+	vecOpAbs
 	vecOpNeg
 	vecOpRev64
 	vecOpXtn

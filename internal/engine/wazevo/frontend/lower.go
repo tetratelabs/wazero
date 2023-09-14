@@ -1347,6 +1347,24 @@ func (c *Compiler) lowerCurrentOpcode() {
 			state.pc += 7
 			ret := builder.AllocateInstruction().AsVconst(lo, hi).Insert(builder).Return()
 			state.push(ret)
+		case wasm.OpcodeVecI8x16Abs, wasm.OpcodeVecI16x8Abs, wasm.OpcodeVecI32x4Abs, wasm.OpcodeVecI64x2Abs:
+			if state.unreachable {
+				break
+			}
+			var lane ssa.VecLane
+			switch vecOp {
+			case wasm.OpcodeVecI8x16Abs:
+				lane = ssa.VecLaneI8x16
+			case wasm.OpcodeVecI16x8Abs:
+				lane = ssa.VecLaneI16x8
+			case wasm.OpcodeVecI32x4Abs:
+				lane = ssa.VecLaneI32x4
+			case wasm.OpcodeVecI64x2Abs:
+				lane = ssa.VecLaneI64x2
+			}
+			v1 := state.pop()
+			ret := builder.AllocateInstruction().AsVIabs(v1, lane).Insert(builder).Return()
+			state.push(ret)
 		case wasm.OpcodeVecI8x16Neg, wasm.OpcodeVecI16x8Neg, wasm.OpcodeVecI32x4Neg, wasm.OpcodeVecI64x2Neg:
 			if state.unreachable {
 				break

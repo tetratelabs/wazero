@@ -369,6 +369,14 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
 		rd := operandNR(m.compiler.VRegOf(instr.Return()))
 		m.lowerVIMul(rd, rn, rm, arr)
+	case ssa.OpcodeVIabs:
+		x, lane := instr.ArgWithLane()
+		arr := ssaLeneToArrangement(lane)
+		neg := m.allocateInstr()
+		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+		rd := operandNR(m.compiler.VRegOf(instr.Return()))
+		neg.asVecMisc(vecOpAbs, rd, rn, arr)
+		m.insert(neg)
 	case ssa.OpcodeVIneg:
 		x, lane := instr.ArgWithLane()
 		arr := ssaLeneToArrangement(lane)
