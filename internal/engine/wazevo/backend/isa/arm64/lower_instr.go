@@ -315,7 +315,7 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		m.lowerVecRRR(vecOpUrhadd, instr)
 	case ssa.OpcodeVImul:
 		x, y, lane := instr.Arg2WithLane()
-		arr := ssaLeneToArrangement(lane)
+		arr := ssaLaneToArrangement(lane)
 		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
 		rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
 		rd := operandNR(m.compiler.VRegOf(instr.Return()))
@@ -334,7 +334,7 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 
 func (m *machine) lowerVecMisc(op vecOp, instr *ssa.Instruction) {
 	x, lane := instr.ArgWithLane()
-	arr := ssaLeneToArrangement(lane)
+	arr := ssaLaneToArrangement(lane)
 	ins := m.allocateInstr()
 	rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
 	rd := operandNR(m.compiler.VRegOf(instr.Return()))
@@ -344,7 +344,7 @@ func (m *machine) lowerVecMisc(op vecOp, instr *ssa.Instruction) {
 
 func (m *machine) lowerVecRRR(op vecOp, instr *ssa.Instruction) {
 	x, y, lane := instr.Arg2WithLane()
-	arr := ssaLeneToArrangement(lane)
+	arr := ssaLaneToArrangement(lane)
 	ins := m.allocateInstr()
 	rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
 	rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)

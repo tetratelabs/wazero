@@ -1921,7 +1921,7 @@ type vecIndex byte
 // vecIndexNone indicates no vector index specified.
 const vecIndexNone = ^vecIndex(0)
 
-func ssaLeneToArrangement(lane ssa.VecLane) vecArrangement {
+func ssaLaneToArrangement(lane ssa.VecLane) vecArrangement {
 	switch lane {
 	case ssa.VecLaneI8x16:
 		return vecArrangement16B
