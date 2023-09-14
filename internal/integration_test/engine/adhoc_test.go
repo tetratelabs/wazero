@@ -1,38 +1,35 @@
 package adhoc
 
 import (
+	"bytes"
 	"context"
 	_ "embed"
+	"errors"
 	"math"
 	"runtime"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 	"unsafe"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/experimental/logging"
 	"github.com/tetratelabs/wazero/experimental/table"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo"
+	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
 	"github.com/tetratelabs/wazero/internal/testing/proxy"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasm/binary"
+	"github.com/tetratelabs/wazero/internal/wasmdebug"
 	"github.com/tetratelabs/wazero/internal/wasmruntime"
 	"github.com/tetratelabs/wazero/sys"
 )
-
-// testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
-var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
-
-const (
-	i32, i64 = wasm.ValueTypeI32, wasm.ValueTypeI64
-)
-
-var memoryCapacityPages = uint32(2)
-
-var moduleConfig = wazero.NewModuleConfig()
 
 type testCase struct {
 	f          func(t *testing.T, r wazero.Runtime)
@@ -60,6 +57,10 @@ var tests = map[string]testCase{
 	"memory grow in recursive call":                     {f: testMemoryGrowInRecursiveCall},
 	"call":                                              {f: testCall},
 	"module memory":                                     {f: testModuleMemory, wazevoSkip: true},
+	"two indirection to host":                           {f: testTwoIndirection, wazevoSkip: true},
+	"before listener globals":                           {f: testBeforeListenerGlobals, wazevoSkip: true},
+	"before listener stack iterator":                    {f: testBeforeListenerStackIterator, wazevoSkip: true},
+	"before listener stack iterator offsets":            {f: testListenerStackIteratorOffset, wazevoSkip: true},
 }
 
 func TestEngineCompiler(t *testing.T) {
@@ -72,6 +73,13 @@ func TestEngineCompiler(t *testing.T) {
 func TestEngineInterpreter(t *testing.T) {
 	runAllTests(t, tests, wazero.NewRuntimeConfigInterpreter().WithCloseOnContextDone(true), false)
 }
+
+// testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
+var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
+
+const i32, i64 = wasm.ValueTypeI32, wasm.ValueTypeI64
+
+var memoryCapacityPages = uint32(2)
 
 func TestEngineWazevo(t *testing.T) {
 	if runtime.GOARCH != "arm64" {
@@ -697,7 +705,7 @@ func testCloseInFlight(t *testing.T, r wazero.Runtime) {
 				Compile(testCtx)
 			require.NoError(t, err)
 
-			imported, err = r.InstantiateModule(testCtx, importedCode, moduleConfig)
+			imported, err = r.InstantiateModule(testCtx, importedCode, wazero.NewModuleConfig())
 			require.NoError(t, err)
 			defer imported.Close(testCtx)
 
@@ -706,7 +714,7 @@ func testCloseInFlight(t *testing.T, r wazero.Runtime) {
 			importingCode, err = r.CompileModule(testCtx, binary)
 			require.NoError(t, err)
 
-			importing, err = r.InstantiateModule(testCtx, importingCode, moduleConfig)
+			importing, err = r.InstantiateModule(testCtx, importingCode, wazero.NewModuleConfig())
 			require.NoError(t, err)
 			defer importing.Close(testCtx)
 
@@ -1000,7 +1008,6 @@ func testModuleMemory(t *testing.T, r wazero.Runtime) {
 	wasmPhrase := "Well, that'll be the day when you say goodbye."
 	wasmPhraseSize := uint32(len(wasmPhrase))
 
-	// Define a basic function which defines one parameter. This is used to test results when incorrect arity is used.
 	one := uint32(1)
 
 	bin := binaryencoding.EncodeModule(&wasm.Module{
@@ -1090,4 +1097,483 @@ func testModuleMemory(t *testing.T, r wazero.Runtime) {
 
 	// The host was not affected because it is a different slice due to "memory.grow" affecting the underlying memory.
 	require.Equal(t, hostPhraseTruncated, string(buf2))
+}
+
+func testTwoIndirection(t *testing.T, r wazero.Runtime) {
+	var buf bytes.Buffer
+	ctx := context.WithValue(testCtx, experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
+	_, err := r.NewHostModuleBuilder("host").NewFunctionBuilder().WithFunc(func(d uint32) uint32 {
+		if d == math.MaxUint32 {
+			panic(errors.New("host-function panic"))
+		}
+		return 1 / d // panics if d ==0.
+	}).Export("div").Instantiate(ctx)
+	require.NoError(t, err)
+
+	ft := wasm.FunctionType{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32}}
+	hostImporter := binaryencoding.EncodeModule(&wasm.Module{
+		ImportSection:   []wasm.Import{{Module: "host", Name: "div", DescFunc: 0}},
+		TypeSection:     []wasm.FunctionType{ft},
+		FunctionSection: []wasm.Index{0},
+		CodeSection: []wasm.Code{
+			// Calling imported host function ^.
+			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeCall, 0, wasm.OpcodeEnd}},
+		},
+		ExportSection: []wasm.Export{{Name: "call_host_div", Type: wasm.ExternTypeFunc, Index: 1}},
+		NameSection: &wasm.NameSection{
+			ModuleName:    "host_importer",
+			FunctionNames: wasm.NameMap{{Index: wasm.Index(1), Name: "call_host_div"}},
+		},
+	})
+
+	_, err = r.Instantiate(ctx, hostImporter)
+	require.NoError(t, err)
+
+	main := binaryencoding.EncodeModule(&wasm.Module{
+		ImportFunctionCount: 1,
+		TypeSection:         []wasm.FunctionType{ft},
+		ImportSection:       []wasm.Import{{Module: "host_importer", Name: "call_host_div", DescFunc: 0}},
+		FunctionSection:     []wasm.Index{0},
+		CodeSection:         []wasm.Code{{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeCall, 0, wasm.OpcodeEnd}}},
+		ExportSection:       []wasm.Export{{Name: "main", Type: wasm.ExternTypeFunc, Index: 1}},
+		NameSection:         &wasm.NameSection{ModuleName: "main", FunctionNames: wasm.NameMap{{Index: wasm.Index(1), Name: "main"}}},
+	})
+
+	inst, err := r.Instantiate(ctx, main)
+	require.NoError(t, err)
+
+	t.Run("ok", func(t *testing.T) {
+		mainFn := inst.ExportedFunction("main")
+		require.NotNil(t, mainFn)
+
+		result1, err := mainFn.Call(testCtx, 1)
+		require.NoError(t, err)
+
+		result2, err := mainFn.Call(testCtx, 2)
+		require.NoError(t, err)
+
+		require.Equal(t, uint64(1), result1[0])
+		require.Equal(t, uint64(0), result2[0])
+	})
+
+	t.Run("errors", func(t *testing.T) {
+		for _, tc := range []struct {
+			name   string
+			input  uint64
+			expErr string
+		}{
+			{name: "host panic", input: math.MaxUint32, expErr: `host-function panic (recovered by wazero)
+wasm stack trace:
+	host.div(i32) i32
+	host_importer.call_host_div(i32) i32
+	main.main(i32) i32`},
+			{name: "go runtime panic", input: 0, expErr: `runtime error: integer divide by zero (recovered by wazero)
+wasm stack trace:
+	host.div(i32) i32
+	host_importer.call_host_div(i32) i32
+	main.main(i32) i32`},
+		} {
+			tc := tc
+			t.Run(tc.name, func(t *testing.T) {
+				mainFn := inst.ExportedFunction("main")
+				require.NotNil(t, mainFn)
+
+				_, err := mainFn.Call(testCtx, tc.input)
+				require.Error(t, err)
+				errStr := err.Error()
+				// If this faces a Go runtime error, the error includes the Go stack trace which makes the test unstable,
+				// so we trim them here.
+				if index := strings.Index(errStr, wasmdebug.GoRuntimeErrorTracePrefix); index > -1 {
+					errStr = strings.TrimSpace(errStr[:index])
+				}
+				require.Equal(t, errStr, tc.expErr)
+			})
+		}
+	})
+
+	require.Equal(t, `
+--> main.main(1)
+	--> host_importer.call_host_div(1)
+		==> host.div(1)
+		<== 1
+	<-- 1
+<-- 1
+--> main.main(2)
+	--> host_importer.call_host_div(2)
+		==> host.div(2)
+		<== 0
+	<-- 0
+<-- 0
+--> main.main(-1)
+	--> host_importer.call_host_div(-1)
+		==> host.div(-1)
+--> main.main(0)
+	--> host_importer.call_host_div(0)
+		==> host.div(0)
+`, "\n"+buf.String())
+}
+
+func testBeforeListenerGlobals(t *testing.T, r wazero.Runtime) {
+	type globals struct {
+		values []uint64
+		types  []api.ValueType
+	}
+
+	expectedGlobals := []globals{
+		{values: []uint64{100, 200}, types: []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}},
+		{values: []uint64{42, 11}, types: []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}},
+	}
+
+	fnListener := &fnListener{
+		beforeFn: func(ctx context.Context, mod api.Module, def api.FunctionDefinition, params []uint64, si experimental.StackIterator) {
+			require.True(t, len(expectedGlobals) > 0)
+
+			imod := mod.(experimental.InternalModule)
+			expected := expectedGlobals[0]
+
+			require.Equal(t, len(expected.values), imod.NumGlobal())
+			for i := 0; i < imod.NumGlobal(); i++ {
+				global := imod.Global(i)
+				require.Equal(t, expected.types[i], global.Type())
+				require.Equal(t, expected.values[i], global.Get())
+			}
+
+			expectedGlobals = expectedGlobals[1:]
+		},
+	}
+
+	buf := binaryencoding.EncodeModule(&wasm.Module{
+		TypeSection:     []wasm.FunctionType{{}},
+		FunctionSection: []wasm.Index{0, 0},
+		GlobalSection: []wasm.Global{
+			{
+				Type: wasm.GlobalType{ValType: wasm.ValueTypeI32, Mutable: true},
+				Init: wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeInt32(100)},
+			},
+			{
+				Type: wasm.GlobalType{ValType: wasm.ValueTypeI32, Mutable: true},
+				Init: wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeInt32(200)},
+			},
+		},
+		CodeSection: []wasm.Code{
+			{
+				Body: []byte{
+					wasm.OpcodeI32Const, 42,
+					wasm.OpcodeGlobalSet, 0, // store 42 in global 0
+					wasm.OpcodeI32Const, 11,
+					wasm.OpcodeGlobalSet, 1, // store 11 in global 1
+					wasm.OpcodeCall, 1, // call f2
+					wasm.OpcodeEnd,
+				},
+			},
+			{Body: []byte{wasm.OpcodeEnd}},
+		},
+		ExportSection: []wasm.Export{{Name: "f", Type: wasm.ExternTypeFunc, Index: 0}},
+	})
+
+	ctx := context.WithValue(testCtx, experimental.FunctionListenerFactoryKey{}, fnListener)
+	inst, err := r.Instantiate(ctx, buf)
+	require.NoError(t, err)
+
+	f := inst.ExportedFunction("f")
+	require.NotNil(t, f)
+
+	_, err = f.Call(ctx)
+	require.NoError(t, err)
+	require.True(t, len(expectedGlobals) == 0)
+}
+
+// testBeforeListenerStackIterator tests that the StackIterator provided by the Engine to the Before hook
+// of the listener is properly able to walk the stack.
+func testBeforeListenerStackIterator(t *testing.T, r wazero.Runtime) {
+	type stackEntry struct {
+		debugName string
+		args      []uint64
+	}
+
+	expectedCallstacks := [][]stackEntry{
+		{ // when calling f1
+			{debugName: "whatever.f1", args: []uint64{2, 3, 4}},
+		},
+		{ // when calling f2
+			{debugName: "whatever.f2", args: []uint64{}},
+			{debugName: "whatever.f1", args: []uint64{2, 3, 4}},
+		},
+		{ // when calling f3
+			{debugName: "whatever.f3", args: []uint64{5}},
+			{debugName: "whatever.f2", args: []uint64{}},
+			{debugName: "whatever.f1", args: []uint64{2, 3, 4}},
+		},
+		{ // when calling f4
+			{debugName: "host.f4", args: []uint64{6}},
+			{debugName: "whatever.f3", args: []uint64{5}},
+			{debugName: "whatever.f2", args: []uint64{}},
+			{debugName: "whatever.f1", args: []uint64{2, 3, 4}},
+		},
+	}
+
+	fnListener := &fnListener{
+		beforeFn: func(ctx context.Context, mod api.Module, def api.FunctionDefinition, params []uint64, si experimental.StackIterator) {
+			require.True(t, len(expectedCallstacks) > 0)
+			expectedCallstack := expectedCallstacks[0]
+			for si.Next() {
+				require.True(t, len(expectedCallstack) > 0)
+				require.Equal(t, expectedCallstack[0].debugName, si.Function().Definition().DebugName())
+				require.Equal(t, expectedCallstack[0].args, si.Parameters())
+				expectedCallstack = expectedCallstack[1:]
+			}
+			require.Equal(t, 0, len(expectedCallstack))
+			expectedCallstacks = expectedCallstacks[1:]
+		},
+	}
+
+	ctx := context.WithValue(testCtx, experimental.FunctionListenerFactoryKey{}, fnListener)
+	_, err := r.NewHostModuleBuilder("host").NewFunctionBuilder().WithFunc(func(x int32) int32 {
+		return x + 100
+	}).Export("f4").Instantiate(ctx)
+	require.NoError(t, err)
+
+	m := binaryencoding.EncodeModule(&wasm.Module{
+		TypeSection: []wasm.FunctionType{
+			// f1 type
+			{
+				Params:  []api.ValueType{api.ValueTypeI32, api.ValueTypeI32, api.ValueTypeI32},
+				Results: []api.ValueType{},
+			},
+			// f2 type
+			{
+				Params:  []api.ValueType{},
+				Results: []api.ValueType{api.ValueTypeI32},
+			},
+			// f3 type
+			{
+				Params:  []api.ValueType{api.ValueTypeI32},
+				Results: []api.ValueType{api.ValueTypeI32},
+			},
+			// f4 type
+			{
+				Params:  []api.ValueType{api.ValueTypeI32},
+				Results: []api.ValueType{api.ValueTypeI32},
+			},
+		},
+		ImportFunctionCount: 1,
+		ImportSection:       []wasm.Import{{Name: "f4", Module: "host", DescFunc: 3}},
+		FunctionSection:     []wasm.Index{0, 1, 2},
+		NameSection: &wasm.NameSection{
+			ModuleName: "whatever",
+			FunctionNames: wasm.NameMap{
+				{Index: wasm.Index(1), Name: "f1"},
+				{Index: wasm.Index(2), Name: "f2"},
+				{Index: wasm.Index(3), Name: "f3"},
+				{Index: wasm.Index(0), Name: "f4"},
+			},
+		},
+		CodeSection: []wasm.Code{
+			{ // f1
+				Body: []byte{
+					wasm.OpcodeCall,
+					2, // call f2
+					wasm.OpcodeDrop,
+					wasm.OpcodeEnd,
+				},
+			},
+			{ // f2
+				LocalTypes: []wasm.ValueType{wasm.ValueTypeI32},
+				Body: []byte{
+					wasm.OpcodeI32Const, 42, // local for f2
+					wasm.OpcodeLocalSet, 0,
+					wasm.OpcodeI32Const, 5, // argument of f3
+					wasm.OpcodeCall,
+					3, // call f3
+					wasm.OpcodeEnd,
+				},
+			},
+			{ // f3
+				Body: []byte{
+					wasm.OpcodeI32Const, 6,
+					wasm.OpcodeCall,
+					0, // call host function
+					wasm.OpcodeEnd,
+				},
+			},
+		},
+		ExportSection: []wasm.Export{{Name: "f1", Type: wasm.ExternTypeFunc, Index: 1}},
+	})
+
+	inst, err := r.Instantiate(ctx, m)
+	require.NoError(t, err)
+
+	f1 := inst.ExportedFunction("f1")
+	require.NotNil(t, f1)
+
+	_, err = f1.Call(ctx, 2, 3, 4)
+	require.NoError(t, err)
+	require.Equal(t, 0, len(expectedCallstacks))
+}
+
+func testListenerStackIteratorOffset(t *testing.T, r wazero.Runtime) {
+	type frame struct {
+		function api.FunctionDefinition
+		offset   uint64
+	}
+
+	var tape [][]frame
+	fnListener := &fnListener{
+		beforeFn: func(ctx context.Context, mod api.Module, def api.FunctionDefinition, params []uint64, si experimental.StackIterator) {
+			var stack []frame
+			for si.Next() {
+				fn := si.Function()
+				pc := si.ProgramCounter()
+				stack = append(stack, frame{fn.Definition(), fn.SourceOffsetForPC(pc)})
+			}
+			tape = append(tape, stack)
+		},
+	}
+	ctx := context.WithValue(testCtx, experimental.FunctionListenerFactoryKey{}, fnListener)
+
+	// Minimal DWARF info section to make debug/dwarf.New() happy.
+	// Necessary to make the compiler emit source offset maps.
+	minimalDWARFInfo := []byte{
+		0x7, 0x0, 0x0, 0x0, // length (len(info) - 4)
+		0x3, 0x0, // version (between 3 and 5 makes it easier)
+		0x0, 0x0, 0x0, 0x0, // abbrev offset
+		0x0, // asize
+	}
+
+	encoded := binaryencoding.EncodeModule(&wasm.Module{
+		TypeSection: []wasm.FunctionType{
+			// f1 type
+			{Params: []api.ValueType{api.ValueTypeI32, api.ValueTypeI32, api.ValueTypeI32}},
+			// f2 type
+			{Results: []api.ValueType{api.ValueTypeI32}},
+			// f3 type
+			{Params: []api.ValueType{api.ValueTypeI32}, Results: []api.ValueType{api.ValueTypeI32}},
+		},
+		FunctionSection: []wasm.Index{0, 1, 2},
+		NameSection: &wasm.NameSection{
+			ModuleName: "whatever",
+			FunctionNames: wasm.NameMap{
+				{Index: wasm.Index(0), Name: "f1"},
+				{Index: wasm.Index(1), Name: "f2"},
+				{Index: wasm.Index(2), Name: "f3"},
+			},
+		},
+		CodeSection: []wasm.Code{
+			{ // f1
+				Body: []byte{
+					wasm.OpcodeI32Const, 42,
+					wasm.OpcodeLocalSet, 0,
+					wasm.OpcodeI32Const, 11,
+					wasm.OpcodeLocalSet, 1,
+					wasm.OpcodeCall, 1, // call f2
+					wasm.OpcodeDrop,
+					wasm.OpcodeEnd,
+				},
+			},
+			{
+				Body: []byte{
+					wasm.OpcodeI32Const, 6,
+					wasm.OpcodeCall, 2, // call f3
+					wasm.OpcodeEnd,
+				},
+			},
+			{Body: []byte{wasm.OpcodeI32Const, 15, wasm.OpcodeEnd}},
+		},
+		ExportSection: []wasm.Export{
+			{Name: "f1", Type: wasm.ExternTypeFunc, Index: 0},
+			{Name: "f2", Type: wasm.ExternTypeFunc, Index: 1},
+			{Name: "f3", Type: wasm.ExternTypeFunc, Index: 2},
+		},
+		CustomSections: []*wasm.CustomSection{{Name: ".debug_info", Data: minimalDWARFInfo}},
+	})
+	decoded, err := binary.DecodeModule(encoded, api.CoreFeaturesV2, 0, false, true, true)
+	require.NoError(t, err)
+
+	f1offset := decoded.CodeSection[0].BodyOffsetInCodeSection
+	f2offset := decoded.CodeSection[1].BodyOffsetInCodeSection
+	f3offset := decoded.CodeSection[2].BodyOffsetInCodeSection
+
+	inst, err := r.Instantiate(ctx, encoded)
+	require.NoError(t, err)
+
+	f1Fn := inst.ExportedFunction("f1")
+	require.NotNil(t, f1Fn)
+
+	_, err = f1Fn.Call(ctx, 2, 3, 4)
+	require.NoError(t, err)
+
+	module, ok := inst.(*wasm.ModuleInstance)
+	require.True(t, ok)
+
+	defs := module.ExportedFunctionDefinitions()
+	f1 := defs["f1"]
+	f2 := defs["f2"]
+	f3 := defs["f3"]
+	t.Logf("f1 offset: %#x", f1offset)
+	t.Logf("f2 offset: %#x", f2offset)
+	t.Logf("f3 offset: %#x", f3offset)
+
+	expectedStacks := [][]frame{
+		{
+			{f1, f1offset + 0},
+		},
+		{
+			{f2, f2offset + 0},
+			{f1, f1offset + 8}, // index of call opcode in f1's code
+		},
+		{
+			{f3, f3offset},     // host functions don't have a wasm code offset
+			{f2, f2offset + 2}, // index of call opcode in f2's code
+			{f1, f1offset + 8}, // index of call opcode in f1's code
+		},
+	}
+
+	for si, stack := range tape {
+		t.Log("Recorded stack", si, ":")
+		require.True(t, len(expectedStacks) > 0, "more recorded stacks than expected stacks")
+		expectedStack := expectedStacks[0]
+		expectedStacks = expectedStacks[1:]
+		for fi, frame := range stack {
+			t.Logf("\t%d -> %s :: %#x", fi, frame.function.Name(), frame.offset)
+			require.True(t, len(expectedStack) > 0, "more frames in stack than expected")
+			expectedFrame := expectedStack[0]
+			expectedStack = expectedStack[1:]
+			require.Equal(t, expectedFrame, frame)
+		}
+		require.Zero(t, len(expectedStack), "expected more frames in stack")
+	}
+	require.Zero(t, len(expectedStacks), "expected more stacks")
+}
+
+// fnListener implements both experimental.FunctionListenerFactory and experimental.FunctionListener for testing.
+type fnListener struct {
+	beforeFn func(context.Context, api.Module, api.FunctionDefinition, []uint64, experimental.StackIterator)
+	afterFn  func(context.Context, api.Module, api.FunctionDefinition, []uint64)
+	abortFn  func(context.Context, api.Module, api.FunctionDefinition, any)
+}
+
+// NewFunctionListener implements experimental.FunctionListenerFactory.
+func (f *fnListener) NewFunctionListener(api.FunctionDefinition) experimental.FunctionListener {
+	return f
+}
+
+// Before implements experimental.FunctionListener.
+func (f *fnListener) Before(ctx context.Context, mod api.Module, def api.FunctionDefinition, params []uint64, stackIterator experimental.StackIterator) {
+	if f.beforeFn != nil {
+		f.beforeFn(ctx, mod, def, params, stackIterator)
+	}
+}
+
+// After implements experimental.FunctionListener.
+func (f *fnListener) After(ctx context.Context, mod api.Module, def api.FunctionDefinition, results []uint64) {
+	if f.afterFn != nil {
+		f.afterFn(ctx, mod, def, results)
+	}
+}
+
+// Abort implements experimental.FunctionListener.
+func (f *fnListener) Abort(ctx context.Context, mod api.Module, def api.FunctionDefinition, err error) {
+	if f.abortFn != nil {
+		f.abortFn(ctx, mod, def, err)
+	}
 }

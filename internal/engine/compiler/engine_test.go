@@ -1,7 +1,6 @@
 package compiler
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -11,109 +10,14 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
-	"github.com/tetratelabs/wazero/experimental/logging"
 	"github.com/tetratelabs/wazero/internal/bitpack"
 	"github.com/tetratelabs/wazero/internal/platform"
-	"github.com/tetratelabs/wazero/internal/testing/enginetest"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 // testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
 var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
-
-var (
-	// et is used for tests defined in the enginetest package.
-	et              = &engineTester{}
-	functionLog     bytes.Buffer
-	listenerFactory = logging.NewLoggingListenerFactory(&functionLog)
-)
-
-// engineTester implements enginetest.EngineTester.
-type engineTester struct{}
-
-// ListenerFactory implements the same method as documented on enginetest.EngineTester.
-func (e engineTester) ListenerFactory() experimental.FunctionListenerFactory {
-	return listenerFactory
-}
-
-// NewEngine implements the same method as documented on enginetest.EngineTester.
-func (e engineTester) NewEngine(enabledFeatures api.CoreFeatures) wasm.Engine {
-	return newEngine(enabledFeatures, nil)
-}
-
-func TestCompiler_ModuleEngine_Call_HostFn(t *testing.T) {
-	defer functionLog.Reset()
-	requireSupportedOSArch(t)
-	enginetest.RunTestModuleEngineCallHostFn(t, et)
-}
-
-func TestCompiler_ModuleEngine_Call_Errors(t *testing.T) {
-	defer functionLog.Reset()
-	requireSupportedOSArch(t)
-	enginetest.RunTestModuleEngine_Call_Errors(t, et)
-
-	// TODO: Currently, the listener doesn't get notified on errors as they are
-	// implemented with panic. This means the end hooks aren't make resulting
-	// in dangling logs like this:
-	//	==> host.host_div_by(-1)
-	// instead of seeing a return like
-	//	<== DivByZero
-	require.Equal(t, `
---> imported.div_by.wasm(1)
-<-- 1
---> imported.div_by.wasm(1)
-<-- 1
---> imported.div_by.wasm(0)
---> imported.div_by.wasm(1)
-<-- 1
---> imported.call->div_by.go(-1)
-	==> host.div_by.go(-1)
---> imported.call->div_by.go(1)
-	==> host.div_by.go(1)
-	<== 1
-<-- 1
---> importing.call_import->call->div_by.go(0)
-	--> imported.call->div_by.go(0)
-		==> host.div_by.go(0)
---> importing.call_import->call->div_by.go(1)
-	--> imported.call->div_by.go(1)
-		==> host.div_by.go(1)
-		<== 1
-	<-- 1
-<-- 1
---> importing.call_import->call->div_by.go(-1)
-	--> imported.call->div_by.go(-1)
-		==> host.div_by.go(-1)
---> importing.call_import->call->div_by.go(1)
-	--> imported.call->div_by.go(1)
-		==> host.div_by.go(1)
-		<== 1
-	<-- 1
-<-- 1
---> importing.call_import->call->div_by.go(0)
-	--> imported.call->div_by.go(0)
-		==> host.div_by.go(0)
---> importing.call_import->call->div_by.go(1)
-	--> imported.call->div_by.go(1)
-		==> host.div_by.go(1)
-		<== 1
-	<-- 1
-<-- 1
-`, "\n"+functionLog.String())
-}
-
-func TestCompiler_BeforeListenerStackIterator(t *testing.T) {
-	enginetest.RunTestModuleEngineBeforeListenerStackIterator(t, et)
-}
-
-func TestCompiler_BeforeListenerStackIteratorSourceOffset(t *testing.T) {
-	enginetest.RunTestModuleEngineStackIteratorOffset(t, et)
-}
-
-func TestCompiler_BeforeListenerGlobals(t *testing.T) {
-	enginetest.RunTestModuleEngineBeforeListenerGlobals(t, et)
-}
 
 // requireSupportedOSArch is duplicated also in the platform package to ensure no cyclic dependency.
 func requireSupportedOSArch(t *testing.T) {
@@ -134,7 +38,7 @@ func (f fakeFinalizer) setFinalizer(obj interface{}, finalizer interface{}) {
 
 func TestCompiler_CompileModule(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
-		e := et.NewEngine(api.CoreFeaturesV1).(*engine)
+		e := NewEngine(testCtx, api.CoreFeaturesV1, nil).(*engine)
 		ff := fakeFinalizer{}
 		e.setFinalizer = ff.setFinalizer
 
@@ -179,7 +83,7 @@ func TestCompiler_CompileModule(t *testing.T) {
 			ID: wasm.ModuleID{},
 		}
 
-		e := et.NewEngine(api.CoreFeaturesV1).(*engine)
+		e := NewEngine(testCtx, api.CoreFeaturesV1, nil).(*engine)
 		err := e.CompileModule(testCtx, errModule, nil, false)
 		require.EqualError(t, err, "failed to lower func[2]: handling instruction: apply stack failed for call: reading immediates: EOF")
 

@@ -55,6 +55,15 @@ func EncodeModule(m *wasm.Module) (bytes []byte) {
 			nameSection := append(sizePrefixedName, EncodeNameSectionData(m.NameSection)...)
 			bytes = append(bytes, encodeSection(wasm.SectionIDCustom, nameSection)...)
 		}
+		for _, custom := range m.CustomSections {
+			bytes = append(bytes, encodeCustomSection(custom)...)
+		}
 	}
 	return
+}
+
+func encodeCustomSection(c *wasm.CustomSection) []byte {
+	content := append(leb128.EncodeUint32(uint32(len(c.Name))), c.Name...)
+	content = append(content, c.Data...)
+	return encodeSection(wasm.SectionIDCustom, content)
 }
