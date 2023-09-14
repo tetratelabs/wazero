@@ -53,8 +53,8 @@ type (
 	// compiledModule is a compiled variant of a wasm.Module and ready to be used for instantiation.
 	compiledModule struct {
 		executable []byte
-		// functionOffsets maps a local function index to compiledFunctionOffset.
-		functionOffsets []compiledFunctionOffset
+		// functionOffsets maps a local function index to the offset in the executable.
+		functionOffsets []int
 		parent          *engine
 		module          *wasm.Module
 		entryPreambles  []*byte // indexed-correlated with the type index.
@@ -64,21 +64,7 @@ type (
 		offsets         wazevoapi.ModuleContextOffsetData
 		sharedFunctions *sharedFunctions
 	}
-
-	// compiledFunctionOffset tells us that where in the executable a function begins.
-	compiledFunctionOffset struct {
-		// offset is the beginning of the function.
-		offset int
-		// goPreambleSize is the size of Go preamble of the function.
-		// This is only needed for non host modules.
-		goPreambleSize int
-	}
 )
-
-// nativeBegin returns the offset of the beginning of the function in the executable after the Go preamble if any.
-func (c compiledFunctionOffset) nativeBegin() int {
-	return c.offset + c.goPreambleSize
-}
 
 var _ wasm.Engine = (*engine)(nil)
 
@@ -150,7 +136,7 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 	be := backend.NewCompiler(ctx, machine, ssaBuilder)
 
 	totalSize := 0 // Total binary size of the executable.
-	cm.functionOffsets = make([]compiledFunctionOffset, localFns)
+	cm.functionOffsets = make([]int, localFns)
 	bodies := make([][]byte, localFns)
 	for i := range module.CodeSection {
 		if wazevoapi.DeterministicCompilationVerifierEnabled {
@@ -175,8 +161,7 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 
 		// Align 16-bytes boundary.
 		totalSize = (totalSize + 15) &^ 15
-		compiledFuncOffset := &cm.functionOffsets[i]
-		compiledFuncOffset.offset = totalSize
+		cm.functionOffsets[i] = totalSize
 
 		fref := frontend.FunctionIndexToFuncRef(fidx)
 		e.refToBinaryOffset[fref] = totalSize
@@ -204,7 +189,7 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 
 	for i, b := range bodies {
 		offset := cm.functionOffsets[i]
-		copy(executable[offset.offset:], b)
+		copy(executable[offset:], b)
 	}
 
 	// Resolve relocations for local function calls.
@@ -289,13 +274,13 @@ func (e *engine) compileHostModule(ctx context.Context, module *wasm.Module) (*c
 
 	num := len(module.CodeSection)
 	cm := &compiledModule{module: module}
-	cm.functionOffsets = make([]compiledFunctionOffset, num)
+	cm.functionOffsets = make([]int, num)
 	totalSize := 0 // Total binary size of the executable.
 	bodies := make([][]byte, num)
 	var sig ssa.Signature
 	for i := range module.CodeSection {
 		totalSize = (totalSize + 15) &^ 15
-		cm.functionOffsets[i].offset = totalSize
+		cm.functionOffsets[i] = totalSize
 
 		typIndex := module.FunctionSection[i]
 		typ := &module.TypeSection[typIndex]
@@ -360,7 +345,7 @@ func (e *engine) compileHostModule(ctx context.Context, module *wasm.Module) (*c
 
 	for i, b := range bodies {
 		offset := cm.functionOffsets[i]
-		copy(executable[offset.offset:], b)
+		copy(executable[offset:], b)
 	}
 
 	if runtime.GOARCH == "arm64" {
@@ -553,7 +538,7 @@ func (cm *compiledModule) functionIndexOf(addr uintptr) wasm.Index {
 	addr -= uintptr(unsafe.Pointer(&cm.executable[0]))
 	offset := cm.functionOffsets
 	index := sort.Search(len(offset), func(i int) bool {
-		return offset[i].offset > int(addr)
+		return offset[i] > int(addr)
 	})
 	index -= 1
 	if index < 0 {

@@ -165,13 +165,8 @@ func TestCompiledModule_functionIndexOf(t *testing.T) {
 	}
 
 	cm := &compiledModule{
-		executable: executable,
-		functionOffsets: []compiledFunctionOffset{
-			{offset: 0, goPreambleSize: 100},
-			{offset: 500, goPreambleSize: 200},
-			{offset: 1000, goPreambleSize: 0},
-			{offset: 2000, goPreambleSize: 0},
-		},
+		executable:      executable,
+		functionOffsets: []int{0, 500, 1000, 2000},
 	}
 	require.Equal(t, wasm.Index(0), cm.functionIndexOf(executableAddr))
 	require.Equal(t, wasm.Index(0), cm.functionIndexOf(executableAddr+499))

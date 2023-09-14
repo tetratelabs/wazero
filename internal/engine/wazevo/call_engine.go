@@ -158,6 +158,11 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 				err = c.parent.module.FailIfClosed()
 			}
 		}
+
+		if err != nil {
+			// Ensures that we can reuse this callEngine even after an error.
+			c.execCtx.exitCode = wazevoapi.ExitCodeOK
+		}
 	}()
 
 	entrypoint(c.preambleExecutable, c.executable, c.execCtxPtr, c.parent.opaquePtr, paramResultPtr, c.stackTop)
