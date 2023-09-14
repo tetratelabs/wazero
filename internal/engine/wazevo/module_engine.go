@@ -133,7 +133,7 @@ func (m *moduleEngine) NewFunction(index wasm.Index) api.Function {
 
 	ce := &callEngine{
 		indexInModule:          index,
-		executable:             &p.executable[offset.offset],
+		executable:             &p.executable[offset],
 		parent:                 m,
 		preambleExecutable:     m.parent.entryPreambles[typIndex],
 		sizeOfParamResultSlice: sizeOfParamResultSlice,
@@ -152,10 +152,17 @@ func (m *moduleEngine) ResolveImportedFunction(index, indexInImportedModule wasm
 	executableOffset, moduleCtxOffset, typeIDOffset := m.parent.offsets.ImportedFunctionOffset(index)
 	importedME := importedModuleEngine.(*moduleEngine)
 
+	if int(indexInImportedModule) >= len(importedME.importedFunctions) {
+		indexInImportedModule -= wasm.Index(len(importedME.importedFunctions))
+	} else {
+		imported := &importedME.importedFunctions[indexInImportedModule]
+		m.ResolveImportedFunction(index, imported.indexInModule, imported.me)
+		return // Recursively resolve the imported function.
+	}
+
 	offset := importedME.parent.functionOffsets[indexInImportedModule]
 	typeID := getTypeIDOf(indexInImportedModule, importedME.module)
-	// When calling imported function from the machine code, we need to skip the Go preamble.
-	executable := &importedME.parent.executable[offset.nativeBegin()]
+	executable := &importedME.parent.executable[offset]
 	// Write functionInstance.
 	binary.LittleEndian.PutUint64(m.opaque[executableOffset:], uint64(uintptr(unsafe.Pointer(executable))))
 	binary.LittleEndian.PutUint64(m.opaque[moduleCtxOffset:], uint64(uintptr(unsafe.Pointer(importedME.opaquePtr))))
@@ -222,7 +229,7 @@ func (m *moduleEngine) FunctionInstanceReference(funcIndex wasm.Index) wasm.Refe
 	}
 	localIndex := funcIndex - m.module.Source.ImportFunctionCount
 	p := m.parent
-	executable := &p.executable[p.functionOffsets[localIndex].nativeBegin()]
+	executable := &p.executable[p.functionOffsets[localIndex]]
 	typeID := m.module.TypeIDs[m.module.Source.FunctionSection[localIndex]]
 
 	lf := &functionInstance{

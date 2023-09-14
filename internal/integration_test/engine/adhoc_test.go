@@ -46,7 +46,7 @@ var tests = map[string]testCase{
 	"host function with numeric parameter":              {f: testHostFunctionNumericParameter},
 	"close module with in-flight calls":                 {f: testCloseInFlight},
 	"multiple instantiation from same source":           {f: testMultipleInstantiation},
-	"exported function that grows memory":               {f: testMemOps, wazevoSkip: true},
+	"exported function that grows memory":               {f: testMemOps},
 	"import functions with reference type in signature": {f: testReftypeImports, wazevoSkip: true},
 	"overflow integer addition":                         {f: testOverflow},
 	"un-signed extend global":                           {f: testGlobalExtend},
