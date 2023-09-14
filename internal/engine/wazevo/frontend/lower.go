@@ -1403,6 +1403,74 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVIsub(v1, v2, lane).Insert(builder).Return()
 			state.push(ret)
+		case wasm.OpcodeVecI8x16MinS, wasm.OpcodeVecI16x8MinS, wasm.OpcodeVecI32x4MinS:
+			if state.unreachable {
+				break
+			}
+			var lane ssa.VecLane
+			switch vecOp {
+			case wasm.OpcodeVecI8x16MinS:
+				lane = ssa.VecLaneI8x16
+			case wasm.OpcodeVecI16x8MinS:
+				lane = ssa.VecLaneI16x8
+			case wasm.OpcodeVecI32x4MinS:
+				lane = ssa.VecLaneI32x4
+			}
+			v2 := state.pop()
+			v1 := state.pop()
+			ret := builder.AllocateInstruction().AsVImin(v1, v2, lane).Insert(builder).Return()
+			state.push(ret)
+		case wasm.OpcodeVecI8x16MinU, wasm.OpcodeVecI16x8MinU, wasm.OpcodeVecI32x4MinU:
+			if state.unreachable {
+				break
+			}
+			var lane ssa.VecLane
+			switch vecOp {
+			case wasm.OpcodeVecI8x16MinU:
+				lane = ssa.VecLaneI8x16
+			case wasm.OpcodeVecI16x8MinS:
+				lane = ssa.VecLaneI16x8
+			case wasm.OpcodeVecI32x4MinS:
+				lane = ssa.VecLaneI32x4
+			}
+			v2 := state.pop()
+			v1 := state.pop()
+			ret := builder.AllocateInstruction().AsVUmin(v1, v2, lane).Insert(builder).Return()
+			state.push(ret)
+		case wasm.OpcodeVecI8x16MaxS, wasm.OpcodeVecI16x8MaxS, wasm.OpcodeVecI32x4MaxS:
+			if state.unreachable {
+				break
+			}
+			var lane ssa.VecLane
+			switch vecOp {
+			case wasm.OpcodeVecI8x16MaxS:
+				lane = ssa.VecLaneI8x16
+			case wasm.OpcodeVecI16x8MaxS:
+				lane = ssa.VecLaneI16x8
+			case wasm.OpcodeVecI32x4MaxS:
+				lane = ssa.VecLaneI32x4
+			}
+			v2 := state.pop()
+			v1 := state.pop()
+			ret := builder.AllocateInstruction().AsVImax(v1, v2, lane).Insert(builder).Return()
+			state.push(ret)
+		case wasm.OpcodeVecI8x16MaxU, wasm.OpcodeVecI16x8MaxU, wasm.OpcodeVecI32x4MaxU:
+			if state.unreachable {
+				break
+			}
+			var lane ssa.VecLane
+			switch vecOp {
+			case wasm.OpcodeVecI8x16MaxU:
+				lane = ssa.VecLaneI8x16
+			case wasm.OpcodeVecI16x8MaxS:
+				lane = ssa.VecLaneI16x8
+			case wasm.OpcodeVecI32x4MaxS:
+				lane = ssa.VecLaneI32x4
+			}
+			v2 := state.pop()
+			v1 := state.pop()
+			ret := builder.AllocateInstruction().AsVUmax(v1, v2, lane).Insert(builder).Return()
+			state.push(ret)
 		case wasm.OpcodeVecI16x8Mul, wasm.OpcodeVecI32x4Mul, wasm.OpcodeVecI64x2Mul:
 			if state.unreachable {
 				break

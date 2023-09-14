@@ -1510,6 +1510,14 @@ func (b vecOp) String() string {
 		return "addp"
 	case vecOpSub:
 		return "sub"
+	case vecOpSmin:
+		return "smin"
+	case vecOpUmin:
+		return "umin"
+	case vecOpSmax:
+		return "smax"
+	case vecOpUmax:
+		return "umax"
 	case vecOpMul:
 		return "mul"
 	case vecOpUmlal:
@@ -1534,6 +1542,10 @@ const (
 	vecOpAdd
 	vecOpAddp
 	vecOpSub
+	vecOpSmin
+	vecOpUmin
+	vecOpSmax
+	vecOpUmax
 	vecOpMul
 	vecOpUmlal
 	vecOpNeg

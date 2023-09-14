@@ -343,6 +343,18 @@ const (
 	// OpcodeVIsub performs an integer subtraction: `v = VIsub.lane x, y` on vector.
 	OpcodeVIsub
 
+	// OpcodeVImin performs a signed integer min: `v = VImin.lane x, y` on vector.
+	OpcodeVImin
+
+	// OpcodeVUmin performs an unsigned integer min: `v = VUmin.lane x, y` on vector.
+	OpcodeVUmin
+
+	// OpcodeVImax performs a signed integer max: `v = VImax.lane x, y` on vector.
+	OpcodeVImax
+
+	// OpcodeVUmax performs an unsigned integer max: `v = VUmax.lane x, y` on vector.
+	OpcodeVUmax
+
 	// OpcodeVImul performs an integer multiplication: `v = VImul.lane x, y` on vector.
 	OpcodeVImul
 
@@ -820,6 +832,10 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeVconst:             sideEffectNone,
 	OpcodeVIadd:              sideEffectNone,
 	OpcodeVIsub:              sideEffectNone,
+	OpcodeVImin:              sideEffectNone,
+	OpcodeVUmin:              sideEffectNone,
+	OpcodeVImax:              sideEffectNone,
+	OpcodeVUmax:              sideEffectNone,
 	OpcodeVImul:              sideEffectNone,
 	OpcodeVIneg:              sideEffectNone,
 }
@@ -837,6 +853,10 @@ func (i *Instruction) sideEffect() sideEffect {
 var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeVIadd:     returnTypesFnV128,
 	OpcodeVIsub:     returnTypesFnV128,
+	OpcodeVImin:     returnTypesFnV128,
+	OpcodeVUmin:     returnTypesFnV128,
+	OpcodeVImax:     returnTypesFnV128,
+	OpcodeVUmax:     returnTypesFnV128,
 	OpcodeVImul:     returnTypesFnV128,
 	OpcodeVIneg:     returnTypesFnV128,
 	OpcodeBand:      returnTypesFnSingle,
@@ -1043,6 +1063,46 @@ func (i *Instruction) AsVIadd(x, y Value, lane VecLane) *Instruction {
 // AsVIsub initializes this instruction as an integer subtraction instruction with OpcodeVIsub on a vector.
 func (i *Instruction) AsVIsub(x, y Value, lane VecLane) *Instruction {
 	i.opcode = OpcodeVIsub
+	i.v = x
+	i.v2 = y
+	i.u1 = uint64(lane)
+	i.typ = TypeV128
+	return i
+}
+
+// AsVImin initializes this instruction as a signed integer min instruction with OpcodeVImin on a vector.
+func (i *Instruction) AsVImin(x, y Value, lane VecLane) *Instruction {
+	i.opcode = OpcodeVImin
+	i.v = x
+	i.v2 = y
+	i.u1 = uint64(lane)
+	i.typ = TypeV128
+	return i
+}
+
+// AsVUmin initializes this instruction as an unsigned integer min instruction with OpcodeVUmin on a vector.
+func (i *Instruction) AsVUmin(x, y Value, lane VecLane) *Instruction {
+	i.opcode = OpcodeVUmin
+	i.v = x
+	i.v2 = y
+	i.u1 = uint64(lane)
+	i.typ = TypeV128
+	return i
+}
+
+// AsVImax initializes this instruction as a signed integer max instruction with OpcodeVImax on a vector.
+func (i *Instruction) AsVImax(x, y Value, lane VecLane) *Instruction {
+	i.opcode = OpcodeVImax
+	i.v = x
+	i.v2 = y
+	i.u1 = uint64(lane)
+	i.typ = TypeV128
+	return i
+}
+
+// AsVUmax initializes this instruction as an unsigned integer max instruction with OpcodeVUmax on a vector.
+func (i *Instruction) AsVUmax(x, y Value, lane VecLane) *Instruction {
+	i.opcode = OpcodeVUmax
 	i.v = x
 	i.v2 = y
 	i.u1 = uint64(lane)
@@ -1782,7 +1842,7 @@ func (i *Instruction) Format(b Builder) string {
 		OpcodeFcvtFromUint, OpcodeFcvtToSintSat, OpcodeFcvtToUintSat, OpcodeFdemote, OpcodeFpromote, OpcodeIreduce, OpcodeBitcast, OpcodeSqrt, OpcodeFabs,
 		OpcodeCeil, OpcodeFloor, OpcodeTrunc, OpcodeNearest:
 		instSuffix = " " + i.v.Format(b)
-	case OpcodeVIadd, OpcodeVIsub, OpcodeVImul:
+	case OpcodeVIadd, OpcodeVIsub, OpcodeVImin, OpcodeVUmin, OpcodeVImax, OpcodeVUmax, OpcodeVImul:
 		instSuffix = fmt.Sprintf(".%s %s, %s", VecLane(i.u1), i.v.Format(b), i.v2.Format(b))
 	case OpcodeVIneg:
 		instSuffix = fmt.Sprintf(".%s %s", VecLane(i.u1), i.v.Format(b))
@@ -2160,6 +2220,14 @@ func (o Opcode) String() (ret string) {
 		return "VIadd"
 	case OpcodeVIsub:
 		return "VIsub"
+	case OpcodeVImin:
+		return "VImin"
+	case OpcodeVUmin:
+		return "VUmin"
+	case OpcodeVImax:
+		return "VImax"
+	case OpcodeVUmax:
+		return "VUmax"
 	case OpcodeVImul:
 		return "VImul"
 	case OpcodeVIneg:
