@@ -385,6 +385,14 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		rd := operandNR(m.compiler.VRegOf(instr.Return()))
 		neg.asVecMisc(vecOpNeg, rd, rn, arr)
 		m.insert(neg)
+	case ssa.OpcodeVIpopcnt:
+		x, lane := instr.ArgWithLane()
+		arr := ssaLeneToArrangement(lane)
+		neg := m.allocateInstr()
+		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+		rd := operandNR(m.compiler.VRegOf(instr.Return()))
+		neg.asVecMisc(vecOpCnt, rd, rn, arr)
+		m.insert(neg)
 	default:
 		panic("TODO: lowering " + op.String())
 	}

@@ -364,6 +364,9 @@ const (
 	// OpcodeVIneg negates the given vector value: `v = VIneg x`.
 	OpcodeVIneg
 
+	// OpcodeVIpopcnt counts the number of 1-bits in the given vector: `v = VIpopcnt x`.
+	OpcodeVIpopcnt
+
 	// OpcodeVIabs returns the absolute value for the given vector value: `v = VIabs x`.
 	OpcodeVIabs
 
@@ -846,6 +849,7 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeVImul:              sideEffectNone,
 	OpcodeVIabs:              sideEffectNone,
 	OpcodeVIneg:              sideEffectNone,
+	OpcodeVIpopcnt:           sideEffectNone,
 }
 
 // sideEffect returns true if this instruction has side effects.
@@ -869,6 +873,7 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeVAvgRound: returnTypesFnV128,
 	OpcodeVIabs:     returnTypesFnV128,
 	OpcodeVIneg:     returnTypesFnV128,
+	OpcodeVIpopcnt:  returnTypesFnV128,
 	OpcodeBand:      returnTypesFnSingle,
 	OpcodeFcopysign: returnTypesFnSingle,
 	OpcodeBitcast:   returnTypesFnSingle,
@@ -1152,6 +1157,18 @@ func (i *Instruction) AsVIabs(x Value, lane VecLane) *Instruction {
 // AsVIneg initializes this instruction as a vector negation with OpcodeVIneg.
 func (i *Instruction) AsVIneg(x Value, lane VecLane) *Instruction {
 	i.opcode = OpcodeVIneg
+	i.v = x
+	i.u1 = uint64(lane)
+	i.typ = TypeV128
+	return i
+}
+
+// AsVIpopcnt initializes this instruction as a Population Count instruction with OpcodeVIpopcnt on a vector.
+func (i *Instruction) AsVIpopcnt(x Value, lane VecLane) *Instruction {
+	if lane != VecLaneI8x16 {
+		panic("Unsupported lane type " + lane.String())
+	}
+	i.opcode = OpcodeVIpopcnt
 	i.v = x
 	i.u1 = uint64(lane)
 	i.typ = TypeV128
@@ -1873,7 +1890,7 @@ func (i *Instruction) Format(b Builder) string {
 		instSuffix = " " + i.v.Format(b)
 	case OpcodeVIadd, OpcodeVIsub, OpcodeVImin, OpcodeVUmin, OpcodeVImax, OpcodeVUmax, OpcodeVImul:
 		instSuffix = fmt.Sprintf(".%s %s, %s", VecLane(i.u1), i.v.Format(b), i.v2.Format(b))
-	case OpcodeVIabs, OpcodeVIneg:
+	case OpcodeVIabs, OpcodeVIneg, OpcodeVIpopcnt:
 		instSuffix = fmt.Sprintf(".%s %s", VecLane(i.u1), i.v.Format(b))
 	default:
 		panic(fmt.Sprintf("TODO: format for %s", i.opcode))
@@ -2263,6 +2280,8 @@ func (o Opcode) String() (ret string) {
 		return "VIabs"
 	case OpcodeVIneg:
 		return "VIneg"
+	case OpcodeVIpopcnt:
+		return "VIpopcnt"
 	}
 	panic(fmt.Sprintf("unknown opcode %d", o))
 }

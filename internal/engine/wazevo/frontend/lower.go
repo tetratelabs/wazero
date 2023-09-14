@@ -1383,6 +1383,15 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVIneg(v1, lane).Insert(builder).Return()
 			state.push(ret)
+		case wasm.OpcodeVecI8x16Popcnt:
+			if state.unreachable {
+				break
+			}
+			lane := ssa.VecLaneI8x16
+			v1 := state.pop()
+
+			ret := builder.AllocateInstruction().AsVIpopcnt(v1, lane).Insert(builder).Return()
+			state.push(ret)
 		case wasm.OpcodeVecI8x16Add, wasm.OpcodeVecI16x8Add, wasm.OpcodeVecI32x4Add, wasm.OpcodeVecI64x2Add:
 			if state.unreachable {
 				break
