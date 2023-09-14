@@ -1,8 +1,7 @@
-package wazero_test
+package adhoc
 
 import (
 	"bufio"
-	"context"
 	_ "embed"
 	"strings"
 	"testing"
@@ -14,41 +13,30 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
-func TestWithDebugInfo(t *testing.T) {
-	ctx := context.Background()
+var dwarfTests = map[string]testCase{
+	"tinygo": {f: testTinyGoDWARF, wazevoSkip: true},
+	"zig":    {f: testZigDWARF, wazevoSkip: true},
+	"cc":     {f: testCCDWARF, wazevoSkip: true},
+	"rust":   {f: testRustDWARF, wazevoSkip: true},
+}
 
-	type testCase struct {
-		name string
-		r    wazero.Runtime
+func TestEngineCompiler_DWARF(t *testing.T) {
+	if !platform.CompilerSupported() {
+		t.Skip()
 	}
+	runAllTests(t, dwarfTests, wazero.NewRuntimeConfigCompiler(), false)
+}
 
-	tests := []testCase{{
-		name: "interpreter",
-		r:    wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigInterpreter()),
-	}}
+func TestEngineInterpreter_DWARF(t *testing.T) {
+	runAllTests(t, dwarfTests, wazero.NewRuntimeConfigInterpreter(), false)
+}
 
-	if platform.CompilerSupported() {
-		tests = append(tests, testCase{
-			name: "compiler", r: wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigCompiler()),
-		})
-	}
+func TestEngineWazevo_DWARF(t *testing.T) {
+	t.Skip("TODO")
+}
 
-	for _, tc := range tests {
-		tc := tc
-		t.Run(tc.name, func(t *testing.T) {
-			r := tc.r
-			defer r.Close(ctx) // This closes everything this Runtime created.
-			wasi_snapshot_preview1.MustInstantiate(ctx, r)
-
-			for _, lang := range []struct {
-				name string
-				bin  []byte
-				exp  string
-			}{
-				{
-					name: "tinygo",
-					bin:  dwarftestdata.TinyGoWasm,
-					exp: `module[] function[_start] failed: wasm error: unreachable
+func testTinyGoDWARF(t *testing.T, r wazero.Runtime) {
+	runDWARFTest(t, r, dwarftestdata.TinyGoWasm, `module[] function[_start] failed: wasm error: unreachable
 wasm stack trace:
 	.runtime._panic(i32)
 		0x18f3: /runtime_tinygowasm.go:70:6
@@ -72,12 +60,11 @@ wasm stack trace:
 	.runtime.run()
 		0x1d92: /scheduler_any.go:28:11
 	._start()
-		0x1d12: /runtime_wasm_wasi.go:21:5`,
-				},
-				{
-					name: "zig",
-					bin:  dwarftestdata.ZigWasm,
-					exp: `module[] function[_start] failed: wasm error: unreachable
+		0x1d12: /runtime_wasm_wasi.go:21:5`)
+}
+
+func testZigDWARF(t *testing.T, r wazero.Runtime) {
+	runDWARFTest(t, r, dwarftestdata.ZigWasm, `module[] function[_start] failed: wasm error: unreachable
 wasm stack trace:
 	.builtin.default_panic(i32,i32,i32,i32)
 		0x63: /builtin.zig:889:17
@@ -87,24 +74,22 @@ wasm stack trace:
 		      /main.zig:2:5
 	._start()
 		0x6a: /start.zig:609:37 (inlined)
-		      /start.zig:224:5`,
-				},
-				{
-					name: "cc",
-					bin:  dwarftestdata.ZigCCWasm,
-					exp: `module[] function[_start] failed: wasm error: unreachable
+		      /start.zig:224:5`)
+}
+
+func testCCDWARF(t *testing.T, r wazero.Runtime) {
+	runDWARFTest(t, r, dwarftestdata.ZigCCWasm, `module[] function[_start] failed: wasm error: unreachable
 wasm stack trace:
 	.a()
 		0x312: /main.c:7:18
 	.__original_main() i32
 		0x47c: /main.c:11:3
 	._start()
-	._start.command_export()`,
-				},
-				{
-					name: "rust",
-					bin:  dwarftestdata.RustWasm,
-					exp: `module[] function[_start] failed: wasm error: unreachable
+	._start.command_export()`)
+}
+
+func testRustDWARF(t *testing.T, r wazero.Runtime) {
+	runDWARFTest(t, r, dwarftestdata.RustWasm, `module[] function[_start] failed: wasm error: unreachable
 wasm stack trace:
 	.__rust_start_panic(i32) i32
 		0xc474: /index.rs:286:39 (inlined)
@@ -174,40 +159,34 @@ wasm stack trace:
 		        /iterator.rs:3347:9 (inlined)
 		        /count.rs:135:5 (inlined)
 		        /count.rs:135:5 (inlined)
-		        /count.rs:71:21`,
-				},
-			} {
-				t.Run(lang.name, func(t *testing.T) {
-					if len(lang.bin) == 0 {
-						t.Skip()
-					}
+		        /count.rs:71:21`)
+}
 
-					_, err := r.Instantiate(ctx, lang.bin)
-					require.Error(t, err)
+func runDWARFTest(t *testing.T, r wazero.Runtime, bin []byte, exp string) {
+	_, err := wasi_snapshot_preview1.Instantiate(testCtx, r)
+	require.NoError(t, err)
+	_, err = r.Instantiate(testCtx, bin)
+	require.Error(t, err)
 
-					errStr := err.Error()
+	errStr := err.Error()
 
-					// Since stack traces change where the binary is compiled, we sanitize each line
-					// so that it doesn't contain any file system dependent info.
-					scanner := bufio.NewScanner(strings.NewReader(errStr))
-					scanner.Split(bufio.ScanLines)
-					var sanitizedLines []string
-					for scanner.Scan() {
-						line := scanner.Text()
-						start, last := strings.Index(line, "/"), strings.LastIndex(line, "/")
-						if start >= 0 {
-							l := len(line) - last
-							buf := []byte(line)
-							copy(buf[start:], buf[last:])
-							line = string(buf[:start+l])
-						}
-						sanitizedLines = append(sanitizedLines, line)
-					}
-
-					sanitizedTraces := strings.Join(sanitizedLines, "\n")
-					require.Equal(t, lang.exp, sanitizedTraces)
-				})
-			}
-		})
+	// Since stack traces change where the binary is compiled, we sanitize each line
+	// so that it doesn't contain any file system dependent info.
+	scanner := bufio.NewScanner(strings.NewReader(errStr))
+	scanner.Split(bufio.ScanLines)
+	var sanitizedLines []string
+	for scanner.Scan() {
+		line := scanner.Text()
+		start, last := strings.Index(line, "/"), strings.LastIndex(line, "/")
+		if start >= 0 {
+			l := len(line) - last
+			buf := []byte(line)
+			copy(buf[start:], buf[last:])
+			line = string(buf[:start+l])
+		}
+		sanitizedLines = append(sanitizedLines, line)
 	}
+
+	sanitizedTraces := strings.Join(sanitizedLines, "\n")
+	require.Equal(t, exp, sanitizedTraces)
 }
