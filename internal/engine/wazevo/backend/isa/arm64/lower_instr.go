@@ -301,8 +301,16 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		m.insert(v)
 	case ssa.OpcodeVIadd:
 		m.lowerVecRRR(vecOpAdd, instr)
+	case ssa.OpcodeVSaddSat:
+		m.lowerVecRRR(vecOpSqadd, instr)
+	case ssa.OpcodeVUaddSat:
+		m.lowerVecRRR(vecOpUqadd, instr)
 	case ssa.OpcodeVIsub:
 		m.lowerVecRRR(vecOpSub, instr)
+	case ssa.OpcodeVSsubSat:
+		m.lowerVecRRR(vecOpSqsub, instr)
+	case ssa.OpcodeVUsubSat:
+		m.lowerVecRRR(vecOpUqsub, instr)
 	case ssa.OpcodeVImin:
 		m.lowerVecRRR(vecOpSmin, instr)
 	case ssa.OpcodeVUmin:

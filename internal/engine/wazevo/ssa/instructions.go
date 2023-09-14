@@ -334,14 +334,26 @@ const (
 	// OpcodeIadd performs an integer addition: `v = Iadd x, y`.
 	OpcodeIadd
 
-	// OpcodeVIadd performs an integer addition: `v = IVadd.lane x, y` on vector.
+	// OpcodeVIadd performs an integer addition: `v = VIadd.lane x, y` on vector.
 	OpcodeVIadd
+
+	// OpcodeVSaddSat performs a signed saturating vector addition: `v = VSaddSat.lane x, y` on vector.
+	OpcodeVSaddSat
+
+	// OpcodeVUaddSat performs an unsigned saturating vector addition: `v = VUaddSat.lane x, y` on vector.
+	OpcodeVUaddSat
 
 	// OpcodeIsub performs an integer subtraction: `v = Isub x, y`.
 	OpcodeIsub
 
 	// OpcodeVIsub performs an integer subtraction: `v = VIsub.lane x, y` on vector.
 	OpcodeVIsub
+
+	// OpcodeVSsubSat performs a signed saturating vector subtraction: `v = VSsubSat.lane x, y` on vector.
+	OpcodeVSsubSat
+
+	// OpcodeVUsubSat performs an unsigned saturating vector subtraction: `v = VUsubSat.lane x, y` on vector.
+	OpcodeVUsubSat
 
 	// OpcodeVImin performs a signed integer min: `v = VImin.lane x, y` on vector.
 	OpcodeVImin
@@ -840,7 +852,11 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeFcopysign:          sideEffectNone,
 	OpcodeVconst:             sideEffectNone,
 	OpcodeVIadd:              sideEffectNone,
+	OpcodeVSaddSat:           sideEffectNone,
+	OpcodeVUaddSat:           sideEffectNone,
 	OpcodeVIsub:              sideEffectNone,
+	OpcodeVSsubSat:           sideEffectNone,
+	OpcodeVUsubSat:           sideEffectNone,
 	OpcodeVImin:              sideEffectNone,
 	OpcodeVUmin:              sideEffectNone,
 	OpcodeVImax:              sideEffectNone,
@@ -864,7 +880,11 @@ func (i *Instruction) sideEffect() sideEffect {
 // instructionReturnTypes provides the function to determine the return types of an instruction.
 var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeVIadd:     returnTypesFnV128,
+	OpcodeVSaddSat:  returnTypesFnV128,
+	OpcodeVUaddSat:  returnTypesFnV128,
 	OpcodeVIsub:     returnTypesFnV128,
+	OpcodeVSsubSat:  returnTypesFnV128,
+	OpcodeVUsubSat:  returnTypesFnV128,
 	OpcodeVImin:     returnTypesFnV128,
 	OpcodeVUmin:     returnTypesFnV128,
 	OpcodeVImax:     returnTypesFnV128,
@@ -1075,9 +1095,49 @@ func (i *Instruction) AsVIadd(x, y Value, lane VecLane) *Instruction {
 	return i
 }
 
+// AsVSaddSat initializes this instruction as a vector addition with saturation instruction with OpcodeVSaddSat on a vector.
+func (i *Instruction) AsVSaddSat(x, y Value, lane VecLane) *Instruction {
+	i.opcode = OpcodeVSaddSat
+	i.v = x
+	i.v2 = y
+	i.u1 = uint64(lane)
+	i.typ = TypeV128
+	return i
+}
+
+// AsVUaddSat initializes this instruction as a vector addition with saturation instruction with OpcodeVUaddSat on a vector.
+func (i *Instruction) AsVUaddSat(x, y Value, lane VecLane) *Instruction {
+	i.opcode = OpcodeVUaddSat
+	i.v = x
+	i.v2 = y
+	i.u1 = uint64(lane)
+	i.typ = TypeV128
+	return i
+}
+
 // AsVIsub initializes this instruction as an integer subtraction instruction with OpcodeVIsub on a vector.
 func (i *Instruction) AsVIsub(x, y Value, lane VecLane) *Instruction {
 	i.opcode = OpcodeVIsub
+	i.v = x
+	i.v2 = y
+	i.u1 = uint64(lane)
+	i.typ = TypeV128
+	return i
+}
+
+// AsVSsubSat initializes this instruction as a vector addition with saturation instruction with OpcodeVSsubSat on a vector.
+func (i *Instruction) AsVSsubSat(x, y Value, lane VecLane) *Instruction {
+	i.opcode = OpcodeVSsubSat
+	i.v = x
+	i.v2 = y
+	i.u1 = uint64(lane)
+	i.typ = TypeV128
+	return i
+}
+
+// AsVUsubSat initializes this instruction as a vector addition with saturation instruction with OpcodeVUsubSat on a vector.
+func (i *Instruction) AsVUsubSat(x, y Value, lane VecLane) *Instruction {
+	i.opcode = OpcodeVUsubSat
 	i.v = x
 	i.v2 = y
 	i.u1 = uint64(lane)
@@ -1888,7 +1948,7 @@ func (i *Instruction) Format(b Builder) string {
 		OpcodeFcvtFromUint, OpcodeFcvtToSintSat, OpcodeFcvtToUintSat, OpcodeFdemote, OpcodeFpromote, OpcodeIreduce, OpcodeBitcast, OpcodeSqrt, OpcodeFabs,
 		OpcodeCeil, OpcodeFloor, OpcodeTrunc, OpcodeNearest:
 		instSuffix = " " + i.v.Format(b)
-	case OpcodeVIadd, OpcodeVIsub, OpcodeVImin, OpcodeVUmin, OpcodeVImax, OpcodeVUmax, OpcodeVImul:
+	case OpcodeVIadd, OpcodeVSaddSat, OpcodeVUaddSat, OpcodeVIsub, OpcodeVSsubSat, OpcodeVUsubSat, OpcodeVImin, OpcodeVUmin, OpcodeVImax, OpcodeVUmax, OpcodeVImul:
 		instSuffix = fmt.Sprintf(".%s %s, %s", VecLane(i.u1), i.v.Format(b), i.v2.Format(b))
 	case OpcodeVIabs, OpcodeVIneg, OpcodeVIpopcnt:
 		instSuffix = fmt.Sprintf(".%s %s", VecLane(i.u1), i.v.Format(b))
@@ -2264,6 +2324,14 @@ func (o Opcode) String() (ret string) {
 		return "ExtractVector"
 	case OpcodeVIadd:
 		return "VIadd"
+	case OpcodeVSaddSat:
+		return "VSaddSat"
+	case OpcodeVUaddSat:
+		return "VUaddSat"
+	case OpcodeVSsubSat:
+		return "VSsubSat"
+	case OpcodeVUsubSat:
+		return "VUsubSat"
 	case OpcodeVIsub:
 		return "VIsub"
 	case OpcodeVImin:

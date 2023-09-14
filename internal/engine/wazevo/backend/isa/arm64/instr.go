@@ -1542,8 +1542,12 @@ const (
 	vecOpBit
 	vecOpEOR
 	vecOpAdd
+	vecOpSqadd
+	vecOpUqadd
 	vecOpAddp
 	vecOpSub
+	vecOpSqsub
+	vecOpUqsub
 	vecOpSmin
 	vecOpUmin
 	vecOpSmax
