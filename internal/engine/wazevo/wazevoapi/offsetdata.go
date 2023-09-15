@@ -1,6 +1,8 @@
 package wazevoapi
 
-import "github.com/tetratelabs/wazero/internal/wasm"
+import (
+	"github.com/tetratelabs/wazero/internal/wasm"
+)
 
 const (
 	// FunctionInstanceSize is the size of wazevo.functionInstance.
@@ -13,58 +15,36 @@ const (
 	FunctionInstanceTypeIDOffset = 16
 )
 
-var ExecutionContextOffsets = ExecutionContextOffsetData{
-	ExitCodeOffset:                          0,
-	CallerModuleContextPtr:                  8,
-	OriginalFramePointer:                    16,
-	OriginalStackPointer:                    24,
-	GoReturnAddress:                         32,
-	StackBottomPtr:                          40,
-	GoCallReturnAddress:                     48,
-	StackPointerBeforeGoCall:                56,
-	StackGrowRequiredSize:                   64,
-	MemoryGrowTrampolineAddress:             72,
-	StackGrowCallTrampolineAddress:          80,
-	CheckModuleExitCodeTrampolineAddress:    88,
-	SavedRegistersBegin:                     96,
-	GoFunctionCallCalleeModuleContextOpaque: 1120,
-	GoFunctionCallStackBegin:                1128,
-}
-
-// ExecutionContextOffsetData allows the compilers to get the information about offsets to the fields of wazevo.executionContext,
-// which are necessary for compiling various instructions. This is globally unique.
-type ExecutionContextOffsetData struct {
-	// ExitCodeOffset is an offset of `exitCode` field in wazevo.executionContext
-	ExitCodeOffset Offset
-	// CallerModuleContextPtr is an offset of `callerModuleContextPtr` field in wazevo.executionContext
-	CallerModuleContextPtr Offset
-	// CallerModuleContextPtr is an offset of `originalFramePointer` field in wazevo.executionContext
-	OriginalFramePointer Offset
-	// OriginalStackPointer is an offset of `originalStackPointer` field in wazevo.executionContext
-	OriginalStackPointer Offset
-	// GoReturnAddress is an offset of `goReturnAddress` field in wazevo.executionContext
-	GoReturnAddress Offset
-	// StackBottomPtr is an offset of `stackBottomPtr` field in wazevo.executionContext
-	StackBottomPtr Offset
-	// GoCallReturnAddress is an offset of `goCallReturnAddress` field in wazevo.executionContext
-	GoCallReturnAddress Offset
-	// StackPointerBeforeGoCall is an offset of `StackPointerBeforeGoCall` field in wazevo.executionContext
-	StackPointerBeforeGoCall Offset
-	// StackGrowRequiredSize is an offset of `stackGrowRequiredSize` field in wazevo.executionContext
-	StackGrowRequiredSize Offset
-	// MemoryGrowTrampolineAddress is an offset of `memoryGrowTrampolineAddress` field in wazevo.executionContext
-	MemoryGrowTrampolineAddress Offset
-	// stackGrowCallTrampolineAddress is an offset of `stackGrowCallTrampolineAddress` field in wazevo.executionContext.
-	StackGrowCallTrampolineAddress Offset
-	// CheckModuleExitCodeTrampolineAddress is an offset of `checkModuleExitCodeTrampolineAddress` field in wazevo.executionContext.
-	CheckModuleExitCodeTrampolineAddress Offset
-	// GoCallReturnAddress is an offset of the first element of `savedRegisters` field in wazevo.executionContext
-	SavedRegistersBegin Offset
-	// GoFunctionCallCalleeModuleContextOpaque is an offset of `goFunctionCallCalleeModuleContextOpaque` field in wazevo.executionContext
-	GoFunctionCallCalleeModuleContextOpaque Offset
-	// GoFunctionCallStackBegin is an offset of the first element of `goFunctionCallStack` field in wazevo.executionContext
-	GoFunctionCallStackBegin Offset
-}
+const (
+	// ExecutionContextOffsetExitCodeOffset is an offset of `exitCode` field in wazevo.executionContext
+	ExecutionContextOffsetExitCodeOffset Offset = 0
+	// ExecutionContextOffsetCallerModuleContextPtr is an offset of `callerModuleContextPtr` field in wazevo.executionContext
+	ExecutionContextOffsetCallerModuleContextPtr Offset = 8
+	// ExecutionContextOffsetOriginalFramePointer is an offset of `originalFramePointer` field in wazevo.executionContext
+	ExecutionContextOffsetOriginalFramePointer Offset = 16
+	// ExecutionContextOffsetOriginalStackPointer is an offset of `originalStackPointer` field in wazevo.executionContext
+	ExecutionContextOffsetOriginalStackPointer Offset = 24
+	// ExecutionContextOffsetGoReturnAddress is an offset of `goReturnAddress` field in wazevo.executionContext
+	ExecutionContextOffsetGoReturnAddress Offset = 32
+	// ExecutionContextOffsetStackBottomPtr is an offset of `stackBottomPtr` field in wazevo.executionContext
+	ExecutionContextOffsetStackBottomPtr Offset = 40
+	// ExecutionContextOffsetGoCallReturnAddress is an offset of `goCallReturnAddress` field in wazevo.executionContext
+	ExecutionContextOffsetGoCallReturnAddress Offset = 48
+	// ExecutionContextOffsetStackPointerBeforeGoCall is an offset of `StackPointerBeforeGoCall` field in wazevo.executionContext
+	ExecutionContextOffsetStackPointerBeforeGoCall Offset = 56
+	// ExecutionContextOffsetStackGrowRequiredSize is an offset of `stackGrowRequiredSize` field in wazevo.executionContext
+	ExecutionContextOffsetStackGrowRequiredSize Offset = 64
+	// ExecutionContextOffsetMemoryGrowTrampolineAddress is an offset of `memoryGrowTrampolineAddress` field in wazevo.executionContext
+	ExecutionContextOffsetMemoryGrowTrampolineAddress Offset = 72
+	// ExecutionContextOffsetStackGrowCallTrampolineAddress is an offset of `stackGrowCallTrampolineAddress` field in wazevo.executionContext.
+	ExecutionContextOffsetStackGrowCallTrampolineAddress Offset = 80
+	// ExecutionContextOffsetCheckModuleExitCodeTrampolineAddress is an offset of `checkModuleExitCodeTrampolineAddress` field in wazevo.executionContext.
+	ExecutionContextOffsetCheckModuleExitCodeTrampolineAddress Offset = 88
+	// ExecutionContextOffsetSavedRegistersBegin is an offset of the first element of `savedRegisters` field in wazevo.executionContext
+	ExecutionContextOffsetSavedRegistersBegin Offset = 96
+	// ExecutionContextOffsetGoFunctionCallCalleeModuleContextOpaque is an offset of `goFunctionCallCalleeModuleContextOpaque` field in wazevo.executionContext
+	ExecutionContextOffsetGoFunctionCallCalleeModuleContextOpaque Offset = 1120
+)
 
 // ModuleContextOffsetData allows the compilers to get the information about offsets to the fields of wazevo.moduleContextOpaque,
 // This is unique per module.

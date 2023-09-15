@@ -1538,7 +1538,7 @@ func encodeExitSequence(c backend.Compiler, ctxReg regalloc.VReg) {
 		addressMode{
 			kind: addressModeKindRegUnsignedImm12,
 			rn:   ctxReg,
-			imm:  wazevoapi.ExecutionContextOffsets.GoReturnAddress.I64(),
+			imm:  wazevoapi.ExecutionContextOffsetGoReturnAddress.I64(),
 		},
 	)
 
@@ -1548,7 +1548,7 @@ func encodeExitSequence(c backend.Compiler, ctxReg regalloc.VReg) {
 		addressMode{
 			kind: addressModeKindRegUnsignedImm12,
 			rn:   ctxReg,
-			imm:  wazevoapi.ExecutionContextOffsets.OriginalFramePointer.I64(),
+			imm:  wazevoapi.ExecutionContextOffsetOriginalFramePointer.I64(),
 		},
 	)
 
@@ -1558,7 +1558,7 @@ func encodeExitSequence(c backend.Compiler, ctxReg regalloc.VReg) {
 		addressMode{
 			kind: addressModeKindRegUnsignedImm12,
 			rn:   ctxReg,
-			imm:  wazevoapi.ExecutionContextOffsets.OriginalStackPointer.I64(),
+			imm:  wazevoapi.ExecutionContextOffsetOriginalStackPointer.I64(),
 		},
 	)
 

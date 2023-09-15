@@ -46,23 +46,20 @@ func TestEngine_DeleteCompiledModule(t *testing.T) {
 }
 
 func Test_ExecutionContextOffsets(t *testing.T) {
-	offsets := wazevoapi.ExecutionContextOffsets
-
 	var execCtx executionContext
-	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.exitCode)), offsets.ExitCodeOffset)
-	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.callerModuleContextPtr)), offsets.CallerModuleContextPtr)
-	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.originalFramePointer)), offsets.OriginalFramePointer)
-	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.originalStackPointer)), offsets.OriginalStackPointer)
-	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.goReturnAddress)), offsets.GoReturnAddress)
-	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.goCallReturnAddress)), offsets.GoCallReturnAddress)
-	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.stackPointerBeforeGoCall)), offsets.StackPointerBeforeGoCall)
-	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.stackGrowRequiredSize)), offsets.StackGrowRequiredSize)
-	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.memoryGrowTrampolineAddress)), offsets.MemoryGrowTrampolineAddress)
-	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.stackGrowCallTrampolineAddress)), offsets.StackGrowCallTrampolineAddress)
-	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.checkModuleExitCodeTrampolineAddress)), offsets.CheckModuleExitCodeTrampolineAddress)
+	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.exitCode)), wazevoapi.ExecutionContextOffsetExitCodeOffset)
+	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.callerModuleContextPtr)), wazevoapi.ExecutionContextOffsetCallerModuleContextPtr)
+	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.originalFramePointer)), wazevoapi.ExecutionContextOffsetOriginalFramePointer)
+	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.originalStackPointer)), wazevoapi.ExecutionContextOffsetOriginalStackPointer)
+	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.goReturnAddress)), wazevoapi.ExecutionContextOffsetGoReturnAddress)
+	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.goCallReturnAddress)), wazevoapi.ExecutionContextOffsetGoCallReturnAddress)
+	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.stackPointerBeforeGoCall)), wazevoapi.ExecutionContextOffsetStackPointerBeforeGoCall)
+	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.stackGrowRequiredSize)), wazevoapi.ExecutionContextOffsetStackGrowRequiredSize)
+	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.memoryGrowTrampolineAddress)), wazevoapi.ExecutionContextOffsetMemoryGrowTrampolineAddress)
+	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.stackGrowCallTrampolineAddress)), wazevoapi.ExecutionContextOffsetStackGrowCallTrampolineAddress)
+	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.checkModuleExitCodeTrampolineAddress)), wazevoapi.ExecutionContextOffsetCheckModuleExitCodeTrampolineAddress)
 	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.savedRegisters))%16, wazevoapi.Offset(0),
 		"SavedRegistersBegin must be aligned to 16 bytes")
-	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.savedRegisters)), offsets.SavedRegistersBegin)
-	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.goFunctionCallCalleeModuleContextOpaque)), offsets.GoFunctionCallCalleeModuleContextOpaque)
-	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.goFunctionCallStack)), offsets.GoFunctionCallStackBegin)
+	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.savedRegisters)), wazevoapi.ExecutionContextOffsetSavedRegistersBegin)
+	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.goFunctionCallCalleeModuleContextOpaque)), wazevoapi.ExecutionContextOffsetGoFunctionCallCalleeModuleContextOpaque)
 }

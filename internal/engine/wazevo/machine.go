@@ -24,3 +24,12 @@ func unwindStack(sp, top uintptr) (returnAddresses []uintptr) {
 		panic("unsupported architecture")
 	}
 }
+
+func goCallStackView(stackPointerBeforeGoCall *uint64) []uint64 {
+	switch runtime.GOARCH {
+	case "arm64":
+		return arm64.GoCallStackView(stackPointerBeforeGoCall)
+	default:
+		panic("unsupported architecture")
+	}
+}

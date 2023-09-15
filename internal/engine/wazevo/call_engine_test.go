@@ -32,7 +32,7 @@ func TestCallEngine_growStack(t *testing.T) {
 			stackTop: uintptr(unsafe.Pointer(&s[15])),
 			execCtx: executionContext{
 				stackGrowRequiredSize:    160,
-				stackPointerBeforeGoCall: uintptr(unsafe.Pointer(&s[10])),
+				stackPointerBeforeGoCall: (*uint64)(unsafe.Pointer(&s[10])),
 			},
 		}
 		newSP, err := c.growStack()

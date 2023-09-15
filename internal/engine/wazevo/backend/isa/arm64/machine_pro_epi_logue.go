@@ -141,7 +141,7 @@ func (m *machine) SetupPrologue() {
 	//                                            +-----------------+ <---- SP
 	//            (low address)
 	//
-	cur = m.createFrameSizeSlot(cur)
+	cur = m.createFrameSizeSlot(cur, m.frameSize())
 
 	linkInstr(cur, prevInitInst)
 }
@@ -163,9 +163,9 @@ func (m *machine) createReturnAddrAndSizeOfArgRetSlot(cur *instruction) *instruc
 	return cur
 }
 
-func (m *machine) createFrameSizeSlot(cur *instruction) *instruction {
+func (m *machine) createFrameSizeSlot(cur *instruction, s int64) *instruction {
 	var frameSizeReg regalloc.VReg
-	if s := m.frameSize(); s > 0 {
+	if s > 0 {
 		cur = m.lowerConstantI64AndInsert(cur, tmpRegVReg, s)
 		frameSizeReg = tmpRegVReg
 	} else {
@@ -343,7 +343,7 @@ func (m *machine) insertStackBoundsCheck(requiredStackSize int64, cur *instructi
 	ldr.asULoad(operandNR(tmp2), addressMode{
 		kind: addressModeKindRegUnsignedImm12,
 		rn:   x0VReg, // execution context is always the first argument.
-		imm:  wazevoapi.ExecutionContextOffsets.StackBottomPtr.I64(),
+		imm:  wazevoapi.ExecutionContextOffsetStackBottomPtr.I64(),
 	}, 64)
 	cur = linkInstr(cur, ldr)
 
@@ -366,7 +366,7 @@ func (m *machine) insertStackBoundsCheck(requiredStackSize int64, cur *instructi
 			addressMode{
 				kind: addressModeKindRegUnsignedImm12,
 				// Execution context is always the first argument.
-				rn: x0VReg, imm: wazevoapi.ExecutionContextOffsets.StackGrowRequiredSize.I64(),
+				rn: x0VReg, imm: wazevoapi.ExecutionContextOffsetStackGrowRequiredSize.I64(),
 			}, 64)
 
 		cur = linkInstr(cur, setRequiredStackSize)
@@ -376,7 +376,7 @@ func (m *machine) insertStackBoundsCheck(requiredStackSize int64, cur *instructi
 	ldrAddress.asULoad(operandNR(tmpRegVReg), addressMode{
 		kind: addressModeKindRegUnsignedImm12,
 		rn:   x0VReg, // execution context is always the first argument
-		imm:  wazevoapi.ExecutionContextOffsets.StackGrowCallTrampolineAddress.I64(),
+		imm:  wazevoapi.ExecutionContextOffsetStackGrowCallTrampolineAddress.I64(),
 	}, 64)
 	cur = linkInstr(cur, ldrAddress)
 

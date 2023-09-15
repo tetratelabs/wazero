@@ -289,10 +289,6 @@ func (e *engine) compileHostModule(ctx context.Context, module *wasm.Module) (*c
 
 		typIndex := module.FunctionSection[i]
 		typ := &module.TypeSection[typIndex]
-		if typ.ParamNumInUint64 >= goFunctionCallStackSize || typ.ResultNumInUint64 >= goFunctionCallStackSize {
-			return nil, fmt.Errorf("too many params or results for a host function (maximum %d): %v",
-				goFunctionCallStackSize, typ)
-		}
 
 		// We can relax until the index fits together in ExitCode as we do in wazevoapi.ExitCodeCallGoModuleFunctionWithIndex.
 		// However, 1 << 16 should be large enough for a real use case.
