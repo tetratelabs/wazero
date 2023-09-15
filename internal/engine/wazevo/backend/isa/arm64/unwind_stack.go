@@ -73,7 +73,7 @@ func GoCallStackView(stackPointerBeforeGoCall *uint64) []uint64 {
 	//            |   frame_size    |
 	//            +-----------------+ <---- stackPointerBeforeGoCall
 	//               (low address)
-	size := *stackPointerBeforeGoCall
+	size := *stackPointerBeforeGoCall // TODO: shouldn't this be divide by 8?
 	var view []uint64
 	{
 		sh := (*reflect.SliceHeader)(unsafe.Pointer(&view))

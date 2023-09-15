@@ -759,7 +759,37 @@ func TestListener_local(t *testing.T) {
 }
 
 func TestListener_imported(t *testing.T) {
-	t.Skip("TODO")
+	var buf bytes.Buffer
+	config := wazero.NewRuntimeConfigCompiler()
+	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
+
+	// Configure the new optimizing backend!
+	wazevo.ConfigureWazevo(config)
+
+	r := wazero.NewRuntimeWithConfig(ctx, config)
+	defer func() {
+		require.NoError(t, r.Close(ctx))
+	}()
+
+	_, err := r.Instantiate(ctx, binaryencoding.EncodeModule(testcases.ImportedFunctionCall.Imported))
+	require.NoError(t, err)
+
+	compiled, err := r.CompileModule(ctx, binaryencoding.EncodeModule(testcases.ImportedFunctionCall.Module))
+	require.NoError(t, err)
+
+	inst, err := r.InstantiateModule(ctx, compiled, wazero.NewModuleConfig())
+	require.NoError(t, err)
+
+	res, err := inst.ExportedFunction(testcases.ExportedFunctionName).Call(ctx, 100)
+	require.NoError(t, err)
+	require.Equal(t, []uint64{10000}, res)
+
+	require.Equal(t, `
+--> .$1(100)
+	--> env.$0(100,100)
+	<-- 10000
+<-- 10000
+`, "\n"+buf.String())
 }
 
 func TestListener_imported_host(t *testing.T) {

@@ -272,7 +272,7 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 			mod := c.callerModuleInstance()
 			listener := mod.Engine.(*moduleEngine).listeners[index]
 			def := mod.Source.FunctionDefinition(wasm.Index(index))
-			listener.Before(ctx, mod, def, stack[1:], nil)
+			listener.Before(ctx, mod, def, stack[1:def.Functype.ParamNumInUint64+1], nil)
 			c.execCtx.exitCode = wazevoapi.ExitCodeOK
 			afterGoFunctionCallEntrypoint(c.execCtx.goCallReturnAddress, c.execCtxPtr, uintptr(unsafe.Pointer(c.execCtx.stackPointerBeforeGoCall)))
 		case wazevoapi.ExitCodeCallListenerAfter:
@@ -281,7 +281,7 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 			mod := c.callerModuleInstance()
 			listener := mod.Engine.(*moduleEngine).listeners[index]
 			def := mod.Source.FunctionDefinition(wasm.Index(index))
-			listener.After(ctx, mod, def, stack[1:])
+			listener.After(ctx, mod, def, stack[1:def.Functype.ResultNumInUint64+1])
 			c.execCtx.exitCode = wazevoapi.ExitCodeOK
 			afterGoFunctionCallEntrypoint(c.execCtx.goCallReturnAddress, c.execCtxPtr, uintptr(unsafe.Pointer(c.execCtx.stackPointerBeforeGoCall)))
 		case wazevoapi.ExitCodeCheckModuleExitCode:
