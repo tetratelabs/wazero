@@ -823,7 +823,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 		pages := state.pop()
 		loadPtr := builder.AllocateInstruction().
 			AsLoad(c.execCtxPtrValue,
-				wazevoapi.ExecutionContextOffsets.MemoryGrowTrampolineAddress.U32(),
+				wazevoapi.ExecutionContextOffsetMemoryGrowTrampolineAddress.U32(),
 				ssa.TypeI64,
 			).Insert(builder).Return()
 
@@ -1015,7 +1015,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 		if c.ensureTermination {
 			checkModuleExitCodePtr := builder.AllocateInstruction().
 				AsLoad(c.execCtxPtrValue,
-					wazevoapi.ExecutionContextOffsets.CheckModuleExitCodeTrampolineAddress.U32(),
+					wazevoapi.ExecutionContextOffsetCheckModuleExitCodeTrampolineAddress.U32(),
 					ssa.TypeI64,
 				).Insert(builder).Return()
 
@@ -1932,7 +1932,7 @@ func (c *Compiler) storeCallerModuleContext() {
 	execCtx := c.execCtxPtrValue
 	store := builder.AllocateInstruction()
 	store.AsStore(ssa.OpcodeStore,
-		c.moduleCtxPtrValue, execCtx, wazevoapi.ExecutionContextOffsets.CallerModuleContextPtr.U32())
+		c.moduleCtxPtrValue, execCtx, wazevoapi.ExecutionContextOffsetCallerModuleContextPtr.U32())
 	builder.InsertInstruction(store)
 }
 

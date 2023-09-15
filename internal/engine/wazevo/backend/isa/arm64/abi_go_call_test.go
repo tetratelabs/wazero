@@ -42,8 +42,15 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 			},
 			needModuleContextPtr: true,
 			exp: `
+	sub x27, sp, #0x40
+	ldr x11, [x0, #0x28]
+	subs xzr, x27, x11
+	b.ge #0x14
+	orr x27, xzr, #0x40
+	str x27, [x0, #0x40]
+	ldr x27, [x0, #0x50]
+	bl x27
 	stp x30, xzr, [sp, #-0x10]!
-	str xzr, [sp, #-0x10]!
 	str x19, [x0, #0x60]
 	str x20, [x0, #0x70]
 	str x21, [x0, #0x80]
@@ -69,8 +76,11 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 	str q30, [x0, #0x1c0]
 	str q31, [x0, #0x1d0]
 	str x1, [x0, #0x460]
-	add x15, x0, #0x468
+	sub sp, sp, #0x20
+	mov x15, sp
 	str d0, [x15], #0x8
+	orr x27, xzr, #0x20
+	str x27, [sp, #-0x10]!
 	movz w17, #0x6406, lsl 0
 	str w17, [x0]
 	mov x27, sp
@@ -102,7 +112,7 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 	ldr q29, [x0, #0x1b0]
 	ldr q30, [x0, #0x1c0]
 	ldr q31, [x0, #0x1d0]
-	add x15, x0, #0x468
+	add x15, sp, #0x10
 	ldr w27, [x15], #0x8
 	mov w0, w27
 	ldr x27, [x15], #0x8
@@ -111,7 +121,7 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 	mov v0.8b, v17.8b
 	ldr d17, [x15], #0x8
 	mov v1.8b, v17.8b
-	add sp, sp, #0x20
+	add sp, sp, #0x40
 	ret
 `,
 		},
@@ -124,8 +134,15 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 			},
 			needModuleContextPtr: true,
 			exp: `
+	sub x27, sp, #0x40
+	ldr x11, [x0, #0x28]
+	subs xzr, x27, x11
+	b.ge #0x14
+	orr x27, xzr, #0x40
+	str x27, [x0, #0x40]
+	ldr x27, [x0, #0x50]
+	bl x27
 	stp x30, xzr, [sp, #-0x10]!
-	str xzr, [sp, #-0x10]!
 	str x19, [x0, #0x60]
 	str x20, [x0, #0x70]
 	str x21, [x0, #0x80]
@@ -151,11 +168,14 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 	str q30, [x0, #0x1c0]
 	str q31, [x0, #0x1d0]
 	str x1, [x0, #0x460]
-	add x15, x0, #0x468
+	sub sp, sp, #0x20
+	mov x15, sp
 	str d0, [x15], #0x8
 	str d1, [x15], #0x8
 	str x2, [x15], #0x8
 	str x3, [x15], #0x8
+	orr x27, xzr, #0x20
+	str x27, [sp, #-0x10]!
 	movz w17, #0x6406, lsl 0
 	str w17, [x0]
 	mov x27, sp
@@ -187,8 +207,7 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 	ldr q29, [x0, #0x1b0]
 	ldr q30, [x0, #0x1c0]
 	ldr q31, [x0, #0x1d0]
-	add x15, x0, #0x468
-	add sp, sp, #0x20
+	add sp, sp, #0x40
 	ret
 `,
 		},
@@ -200,8 +219,15 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 				Results: []ssa.Type{ssa.TypeI32},
 			},
 			exp: `
+	sub x27, sp, #0x30
+	ldr x11, [x0, #0x28]
+	subs xzr, x27, x11
+	b.ge #0x14
+	orr x27, xzr, #0x30
+	str x27, [x0, #0x40]
+	ldr x27, [x0, #0x50]
+	bl x27
 	stp x30, xzr, [sp, #-0x10]!
-	str xzr, [sp, #-0x10]!
 	str x19, [x0, #0x60]
 	str x20, [x0, #0x70]
 	str x21, [x0, #0x80]
@@ -226,8 +252,11 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 	str q29, [x0, #0x1b0]
 	str q30, [x0, #0x1c0]
 	str q31, [x0, #0x1d0]
-	add x15, x0, #0x468
+	sub sp, sp, #0x10
+	mov x15, sp
 	str x1, [x15], #0x8
+	orr x27, xzr, #0x10
+	str x27, [sp, #-0x10]!
 	orr w17, wzr, #0x2
 	str w17, [x0]
 	mov x27, sp
@@ -259,10 +288,10 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 	ldr q29, [x0, #0x1b0]
 	ldr q30, [x0, #0x1c0]
 	ldr q31, [x0, #0x1d0]
-	add x15, x0, #0x468
+	add x15, sp, #0x10
 	ldr w27, [x15], #0x8
 	mov w0, w27
-	add sp, sp, #0x20
+	add sp, sp, #0x30
 	ret
 `,
 		},
@@ -276,6 +305,53 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 
 			m.Encode()
 			fmt.Println(hex.EncodeToString(m.compiler.Buf()))
+		})
+	}
+}
+
+func Test_goFunctionCallRequiredStackSize(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		sig      *ssa.Signature
+		argBegin int
+		exp      int64
+	}{
+		{
+			name: "no param",
+			sig:  &ssa.Signature{},
+			exp:  0,
+		},
+		{
+			name: "only param",
+			sig:  &ssa.Signature{Params: []ssa.Type{ssa.TypeI64, ssa.TypeV128}},
+			exp:  32,
+		},
+		{
+			name: "only result",
+			sig:  &ssa.Signature{Results: []ssa.Type{ssa.TypeI64, ssa.TypeV128, ssa.TypeI32}},
+			exp:  32,
+		},
+		{
+			name: "param < result",
+			sig:  &ssa.Signature{Params: []ssa.Type{ssa.TypeI64, ssa.TypeV128}, Results: []ssa.Type{ssa.TypeI64, ssa.TypeV128, ssa.TypeI32}},
+			exp:  32,
+		},
+		{
+			name: "param > result",
+			sig:  &ssa.Signature{Params: []ssa.Type{ssa.TypeI64, ssa.TypeV128, ssa.TypeI32}, Results: []ssa.Type{ssa.TypeI64, ssa.TypeV128}},
+			exp:  32,
+		},
+		{
+			name:     "param < result / argBegin=2",
+			argBegin: 2,
+			sig:      &ssa.Signature{Params: []ssa.Type{ssa.TypeI64, ssa.TypeV128, ssa.TypeI32}, Results: []ssa.Type{ssa.TypeI64, ssa.TypeV128}},
+			exp:      32,
+		},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			requiredSize := goFunctionCallRequiredStackSize(tc.sig, tc.argBegin)
+			require.Equal(t, tc.exp, requiredSize)
 		})
 	}
 }

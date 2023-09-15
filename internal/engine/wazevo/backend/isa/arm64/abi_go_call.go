@@ -14,6 +14,11 @@ var calleeSavedRegistersPlusLinkRegSorted = []regalloc.VReg{
 
 // CompileGoFunctionTrampoline implements backend.Machine.
 func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *ssa.Signature, needModuleContextPtr bool) []byte {
+	argBegin := 1 // Skips exec context by default.
+	if needModuleContextPtr {
+		argBegin++
+	}
+
 	abi := m.getOrCreateABIImpl(sig)
 	m.currentABI = abi
 
@@ -24,19 +29,49 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 	// Execution context is always the first argument.
 	execCtrPtr := x0VReg
 
-	// To properly unwind the stack, we need to create a function frame though it's not necessary for the Go function call.
+	// In the following, we create the following stack frame:
+	//
+	//                   (high address)
+	//                +-----------------+
+	//                |     .......     |
+	//                |      ret Y      |  <----+
+	//                |     .......     |       |
+	//                |      ret 0      |       |
+	//                |      arg X      |       |  size_of_arg_ret
+	//                |     .......     |       |
+	//                |      arg 1      |       |
+	//     SP ------> |      arg 0      |  <----+
+	//                | size_of_arg_ret |
+	//                |  ReturnAddress  |
+	//                +-----------------+ <----+
+	//                |  arg[N]/ret[M]  |      |
+	//                |   ............  |      | goCallStackSize
+	//                |  arg[1]/ret[1]  |      |
+	//                |  arg[0]/ret[0]  | <----+
+	//                |     xxxxxx      |  ;; unused space to make it 16-byte aligned.
+	//                |   frame_size    |
+	//                +-----------------+
+	//                   (low address)
+	//
+	// where the region of "arg[0]/ret[0] ... arg[N]/ret[M]" is the stack used by the Go functions,
+	// therefore will be accessed as the usual []uint64. So that's where we need to pass/receive
+	// the arguments/return values.
+
+	const callFrameSize = 32 // == frame_size + xxxxxx + ReturnAddress + size_of_arg_ret.
+
+	// First of all, we should allocate the stack for the Go function call if necessary.
+	goCallStackSize := goFunctionCallRequiredStackSize(sig, argBegin)
+	cur = m.insertStackBoundsCheck(goCallStackSize+callFrameSize, cur)
+
+	// Next is to create "ReturnAddress + size_of_arg_ret".
 	cur = m.createReturnAddrAndSizeOfArgRetSlot(cur)
-	cur = m.createFrameSizeSlot(cur)
-	// ^^ In total, 32 bytes are allocated for the frame.
 
 	// Save the callee saved registers.
 	cur = m.saveRegistersInExecutionContext(cur, calleeSavedRegistersPlusLinkRegSorted)
 
-	// Next, we need to store all the arguments to the execution context.
-
-	argBegin := 1 // Skips exec context by default.
+	// Next, we need to store all the arguments to the stack in the typical Wasm stack style.
 	if needModuleContextPtr {
-		offset := wazevoapi.ExecutionContextOffsets.GoFunctionCallCalleeModuleContextOpaque.I64()
+		offset := wazevoapi.ExecutionContextOffsetGoFunctionCallCalleeModuleContextOpaque.I64()
 		if !offsetFitsInAddressModeKindRegUnsignedImm12(64, offset) {
 			panic("BUG: too large or un-aligned offset for goFunctionCallCalleeModuleContextOpaque in execution context")
 		}
@@ -47,19 +82,16 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 		amode := addressMode{kind: addressModeKindRegUnsignedImm12, rn: execCtrPtr, imm: offset}
 		store.asStore(operandNR(moduleCtrPtr), amode, 64)
 		cur = linkInstr(cur, store)
-
-		argBegin++
 	}
 
+	// Advances the stack pointer.
+	cur = m.addsAddOrSubStackPointer(cur, spVReg, goCallStackSize, false, true)
+
+	// Copy the pointer to x15VReg.
 	stackPtrReg := x15VReg // Caller save, so we can use it for whatever we want.
-	imm12Op, ok := asImm12Operand(wazevoapi.ExecutionContextOffsets.GoFunctionCallStackBegin.U64())
-	if !ok {
-		panic("BUG: too large or un-aligned offset for Go function call stack in execution context")
-	}
-
-	goCallStackPtrCalc := m.allocateInstr()
-	goCallStackPtrCalc.asALU(aluOpAdd, operandNR(stackPtrReg), operandNR(execCtrPtr), imm12Op, true)
-	cur = linkInstr(cur, goCallStackPtrCalc)
+	copySp := m.allocateInstr()
+	copySp.asMove64(stackPtrReg, spVReg)
+	cur = linkInstr(cur, copySp)
 
 	for _, arg := range abi.args[argBegin:] {
 		if arg.Kind == backend.ABIArgKindReg {
@@ -84,6 +116,9 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 		}
 	}
 
+	// Finally, now that we've advanced SP to arg[0]/ret[0], we allocate `frame_size + xxxxxx `.
+	cur = m.createFrameSizeSlot(cur, goCallStackSize)
+
 	// Set the exit status on the execution context.
 	cur = m.setExitCode(cur, x0VReg, exitCode)
 
@@ -96,12 +131,10 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 	// After the call, we need to restore the callee saved registers.
 	cur = m.restoreRegistersInExecutionContext(cur, calleeSavedRegistersPlusLinkRegSorted)
 
-	// Finally, we move the results into the right places from the execution context's Go function call stack.
-	goCallStackPtrCalc2 := m.allocateInstr()
-	goCallStackPtrCalc2.asALU(aluOpAdd, operandNR(stackPtrReg), operandNR(execCtrPtr), imm12Op, true)
-	goCallStackPtrCalc2.prev = cur
-	cur.next = goCallStackPtrCalc2
-	cur = goCallStackPtrCalc2
+	// Get the pointer to the arg[0]/ret[0]: We need to skip `frame_size + xxxxxx `.
+	if len(abi.rets) > 0 {
+		cur = m.addsAddOrSubStackPointer(cur, stackPtrReg, 16, true, true)
+	}
 
 	for i := range abi.rets {
 		r := &abi.rets[i]
@@ -140,7 +173,7 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 	}
 
 	// Removes the stack frame!
-	cur = m.addsAddOrSubStackPointer(cur, spVReg, 32, true, true)
+	cur = m.addsAddOrSubStackPointer(cur, spVReg, goCallStackSize+callFrameSize, true, true)
 
 	ret := m.allocateInstrAfterLowering()
 	ret.asRet(nil)
@@ -151,7 +184,7 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 }
 
 func (m *machine) saveRegistersInExecutionContext(cur *instruction, regs []regalloc.VReg) *instruction {
-	offset := wazevoapi.ExecutionContextOffsets.SavedRegistersBegin.I64()
+	offset := wazevoapi.ExecutionContextOffsetSavedRegistersBegin.I64()
 	for _, v := range regs {
 		store := m.allocateInstrAfterLowering()
 		var sizeInBits byte
@@ -176,7 +209,7 @@ func (m *machine) saveRegistersInExecutionContext(cur *instruction, regs []regal
 }
 
 func (m *machine) restoreRegistersInExecutionContext(cur *instruction, regs []regalloc.VReg) *instruction {
-	offset := wazevoapi.ExecutionContextOffsets.SavedRegistersBegin.I64()
+	offset := wazevoapi.ExecutionContextOffsetSavedRegistersBegin.I64()
 	for _, v := range regs {
 		load := m.allocateInstrAfterLowering()
 		var as func(dst operand, amode addressMode, sizeInBits byte)
@@ -228,7 +261,7 @@ func (m *machine) setExitCode(cur *instruction, execCtr regalloc.VReg, exitCode 
 	setExistStatus.asStore(operandNR(constReg),
 		addressMode{
 			kind: addressModeKindRegUnsignedImm12,
-			rn:   execCtr, imm: wazevoapi.ExecutionContextOffsets.ExitCodeOffset.I64(),
+			rn:   execCtr, imm: wazevoapi.ExecutionContextOffsetExitCodeOffset.I64(),
 		}, 32)
 	cur = linkInstr(cur, setExistStatus)
 	return cur
@@ -245,7 +278,7 @@ func (m *machine) storeReturnAddressAndExit(cur *instruction) *instruction {
 		addressMode{
 			kind: addressModeKindRegUnsignedImm12,
 			// Execution context is always the first argument.
-			rn: x0VReg, imm: wazevoapi.ExecutionContextOffsets.GoCallReturnAddress.I64(),
+			rn: x0VReg, imm: wazevoapi.ExecutionContextOffsetGoCallReturnAddress.I64(),
 		}, 64)
 	cur = linkInstr(cur, storeReturnAddr)
 
@@ -268,8 +301,36 @@ func (m *machine) saveCurrentStackPointer(cur *instruction, execCtr regalloc.VRe
 	strSp.asStore(operandNR(tmpRegVReg),
 		addressMode{
 			kind: addressModeKindRegUnsignedImm12,
-			rn:   execCtr, imm: wazevoapi.ExecutionContextOffsets.StackPointerBeforeGoCall.I64(),
+			rn:   execCtr, imm: wazevoapi.ExecutionContextOffsetStackPointerBeforeGoCall.I64(),
 		}, 64)
 	cur = linkInstr(cur, strSp)
 	return cur
+}
+
+// goFunctionCallRequiredStackSize returns the size of the stack required for the Go function call.
+func goFunctionCallRequiredStackSize(sig *ssa.Signature, argBegin int) (ret int64) {
+	var paramNeededInBytes, resultNeededInBytes int64
+	for _, p := range sig.Params[argBegin:] {
+		s := int64(p.Size())
+		if s < 8 {
+			s = 8 // We use uint64 for all basic types, except SIMD v128.
+		}
+		paramNeededInBytes += s
+	}
+	for _, r := range sig.Results {
+		s := int64(r.Size())
+		if s < 8 {
+			s = 8 // We use uint64 for all basic types, except SIMD v128.
+		}
+		resultNeededInBytes += s
+	}
+
+	if paramNeededInBytes > resultNeededInBytes {
+		ret = paramNeededInBytes
+	} else {
+		ret = resultNeededInBytes
+	}
+	// Align to 16 bytes.
+	ret = (ret + 15) &^ 15
+	return
 }

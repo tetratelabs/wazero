@@ -854,7 +854,7 @@ func (m *machine) lowerExitWithCode(execCtxVReg regalloc.VReg, code wazevoapi.Ex
 	setExitCode.asStore(operandNR(tmpReg1),
 		addressMode{
 			kind: addressModeKindRegUnsignedImm12,
-			rn:   execCtxVReg, imm: wazevoapi.ExecutionContextOffsets.ExitCodeOffset.I64(),
+			rn:   execCtxVReg, imm: wazevoapi.ExecutionContextOffsetExitCodeOffset.I64(),
 		}, 32)
 
 	// In order to unwind the stack, we also need to push the current stack pointer:
@@ -865,7 +865,7 @@ func (m *machine) lowerExitWithCode(execCtxVReg regalloc.VReg, code wazevoapi.Ex
 	strSpToExecCtx.asStore(operandNR(tmp2),
 		addressMode{
 			kind: addressModeKindRegUnsignedImm12,
-			rn:   execCtxVReg, imm: wazevoapi.ExecutionContextOffsets.StackPointerBeforeGoCall.I64(),
+			rn:   execCtxVReg, imm: wazevoapi.ExecutionContextOffsetStackPointerBeforeGoCall.I64(),
 		}, 64)
 	// Also the address of this exit.
 	tmp3 := m.compiler.AllocateVReg(regalloc.RegTypeInt)
@@ -875,7 +875,7 @@ func (m *machine) lowerExitWithCode(execCtxVReg regalloc.VReg, code wazevoapi.Ex
 	storeCurrentAddrToExecCtx.asStore(operandNR(tmp3),
 		addressMode{
 			kind: addressModeKindRegUnsignedImm12,
-			rn:   execCtxVReg, imm: wazevoapi.ExecutionContextOffsets.GoCallReturnAddress.I64(),
+			rn:   execCtxVReg, imm: wazevoapi.ExecutionContextOffsetGoCallReturnAddress.I64(),
 		}, 64)
 
 	exitSeq := m.allocateInstr()

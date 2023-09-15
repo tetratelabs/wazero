@@ -150,10 +150,10 @@ func (a *abiImpl) constructEntryPreamble() (root *instruction) {
 	//      mov tmp, sp ;; sp cannot be str'ed directly.
 	// 		str sp, [savedExecutionContextPtr, #OriginalStackPointer]
 	// 		str lr, [savedExecutionContextPtr, #GoReturnAddress]
-	cur = a.loadOrStoreAtExecutionContext(fpVReg, wazevoapi.ExecutionContextOffsets.OriginalFramePointer, true, cur)
+	cur = a.loadOrStoreAtExecutionContext(fpVReg, wazevoapi.ExecutionContextOffsetOriginalFramePointer, true, cur)
 	cur = a.move64(tmpRegVReg, spVReg, cur)
-	cur = a.loadOrStoreAtExecutionContext(tmpRegVReg, wazevoapi.ExecutionContextOffsets.OriginalStackPointer, true, cur)
-	cur = a.loadOrStoreAtExecutionContext(lrVReg, wazevoapi.ExecutionContextOffsets.GoReturnAddress, true, cur)
+	cur = a.loadOrStoreAtExecutionContext(tmpRegVReg, wazevoapi.ExecutionContextOffsetOriginalStackPointer, true, cur)
+	cur = a.loadOrStoreAtExecutionContext(lrVReg, wazevoapi.ExecutionContextOffsetGoReturnAddress, true, cur)
 
 	// Next, adjust the Go-allocated stack pointer to reserve the arg/result spaces.
 	// 		sub x28, x28, #stackSlotSize
@@ -208,10 +208,10 @@ func (a *abiImpl) constructEntryPreamble() (root *instruction) {
 	//      mov sp, tmp ;; sp cannot be str'ed directly.
 	// 		ldr lr, [savedExecutionContextPtr, #GoReturnAddress]
 	// 		ret ;; --> return to the Go code
-	cur = a.loadOrStoreAtExecutionContext(fpVReg, wazevoapi.ExecutionContextOffsets.OriginalFramePointer, false, cur)
-	cur = a.loadOrStoreAtExecutionContext(tmpRegVReg, wazevoapi.ExecutionContextOffsets.OriginalStackPointer, false, cur)
+	cur = a.loadOrStoreAtExecutionContext(fpVReg, wazevoapi.ExecutionContextOffsetOriginalFramePointer, false, cur)
+	cur = a.loadOrStoreAtExecutionContext(tmpRegVReg, wazevoapi.ExecutionContextOffsetOriginalStackPointer, false, cur)
 	cur = a.move64(spVReg, tmpRegVReg, cur)
-	cur = a.loadOrStoreAtExecutionContext(lrVReg, wazevoapi.ExecutionContextOffsets.GoReturnAddress, false, cur)
+	cur = a.loadOrStoreAtExecutionContext(lrVReg, wazevoapi.ExecutionContextOffsetGoReturnAddress, false, cur)
 	retInst := a.m.allocateInstr()
 	retInst.asRet(nil)
 	linkInstr(cur, retInst)
