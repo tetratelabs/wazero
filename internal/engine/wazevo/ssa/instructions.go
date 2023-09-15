@@ -290,6 +290,24 @@ const (
 	// OpcodeVconst represents the 128bit vector const.
 	OpcodeVconst
 
+	// OpcodeVbor computes binary or between two 128bit vectors: `v = bor x, y`.
+	OpcodeVbor
+
+	// OpcodeVbxor computes binary xor between two 128bit vectors: `v = bxor x, y`.
+	OpcodeVbxor
+
+	// OpcodeVband computes binary and between two 128bit vectors: `v = band x, y`.
+	OpcodeVband
+
+	// OpcodeVbandnot computes binary and-not between two 128bit vectors: `v = bandnot x, y`.
+	OpcodeVbandnot
+
+	// OpcodeVbnot negates a 128bit vector: `v = bnot x`.
+	OpcodeVbnot
+
+	// OpcodeVbxor computes binary xor between two 128bit vectors: `v = bxor x, y`.
+	OpcodeVbitselect
+
 	// OpcodeShuffle ...
 	// `v = shuffle a, b, mask`.
 	OpcodeShuffle
@@ -851,6 +869,11 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeFabs:               sideEffectNone,
 	OpcodeFcopysign:          sideEffectNone,
 	OpcodeVconst:             sideEffectNone,
+	OpcodeVbor:               sideEffectNone,
+	OpcodeVbxor:              sideEffectNone,
+	OpcodeVband:              sideEffectNone,
+	OpcodeVbandnot:           sideEffectNone,
+	OpcodeVbnot:              sideEffectNone,
 	OpcodeVIadd:              sideEffectNone,
 	OpcodeVSaddSat:           sideEffectNone,
 	OpcodeVUaddSat:           sideEffectNone,
@@ -879,6 +902,11 @@ func (i *Instruction) sideEffect() sideEffect {
 
 // instructionReturnTypes provides the function to determine the return types of an instruction.
 var instructionReturnTypes = [opcodeEnd]returnTypesFn{
+	OpcodeVbor:      returnTypesFnV128,
+	OpcodeVbxor:     returnTypesFnV128,
+	OpcodeVband:     returnTypesFnV128,
+	OpcodeVbnot:     returnTypesFnV128,
+	OpcodeVbandnot:  returnTypesFnV128,
 	OpcodeVIadd:     returnTypesFnV128,
 	OpcodeVSaddSat:  returnTypesFnV128,
 	OpcodeVUaddSat:  returnTypesFnV128,
@@ -1462,6 +1490,86 @@ func (i *Instruction) AsVconst(lo, hi uint64) *Instruction {
 	i.typ = TypeV128
 	i.u1 = lo
 	i.u2 = hi
+	return i
+}
+
+// AsVbnot initializes this instruction as a vector negation instruction with OpcodeVbnot.
+func (i *Instruction) AsVbnot(v Value) *Instruction {
+	i.opcode = OpcodeVbnot
+	i.typ = TypeV128
+	i.v = v
+	return i
+}
+
+// AsVband initializes this instruction as an and vector instruction with OpcodeVband.
+func (i *Instruction) AsVband(x, y Value) *Instruction {
+	i.opcode = OpcodeVband
+	i.typ = TypeV128
+	i.v = x
+	i.v2 = y
+	return i
+}
+
+// AsVbor initializes this instruction as an or vector instruction with OpcodeVbor.
+func (i *Instruction) AsVbor(x, y Value) *Instruction {
+	i.opcode = OpcodeVbor
+	i.typ = TypeV128
+	i.v = x
+	i.v2 = y
+	return i
+}
+
+// AsVbxor initializes this instruction as a xor vector instruction with OpcodeVbxor.
+func (i *Instruction) AsVbxor(x, y Value) *Instruction {
+	i.opcode = OpcodeVbxor
+	i.typ = TypeV128
+	i.v = x
+	i.v2 = y
+	return i
+}
+
+// AsVbandnot initializes this instruction as an and-not vector instruction with OpcodeVbandnot.
+func (i *Instruction) AsVbandnot(x, y Value) *Instruction {
+	i.opcode = OpcodeVbandnot
+	i.typ = TypeV128
+	i.v = x
+	i.v2 = y
+	return i
+}
+
+// AsVbitselect initializes this instruction as a bit select vector instruction with OpcodeVbitselect.
+func (i *Instruction) AsVbitselect(c, x, y Value) *Instruction {
+	i.opcode = OpcodeVbitselect
+	i.typ = TypeV128
+	i.v = c
+	i.v2 = x
+	i.v3 = y
+	return i
+}
+
+// AsVanyTrue initializes this instruction as an anyTrue vector instruction with OpcodeVanyTrue.
+func (i *Instruction) AsVanyTrue(x Value) *Instruction {
+	i.opcode = OpcodeVanyTrue
+	i.typ = TypeV128
+	i.v = x
+	return i
+}
+
+// AsVallTrue initializes this instruction as an allTrue vector instruction with OpcodeVallTrue.
+func (i *Instruction) AsVallTrue(x Value, lane VecLane) *Instruction {
+	i.opcode = OpcodeVallTrue
+	i.typ = TypeV128
+	i.v = x
+	i.u1 = uint64(lane)
+	return i
+}
+
+// AsVhighBits initializes this instruction as a highBits vector instruction with OpcodeVhighBits.
+func (i *Instruction) AsVhighBits(x Value, t Type) *Instruction {
+	i.opcode = OpcodeVhighBits
+	i.typ = TypeV128
+	i.v = x
+	i.typ = t
 	return i
 }
 
