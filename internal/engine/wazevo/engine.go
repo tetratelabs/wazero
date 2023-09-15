@@ -49,19 +49,24 @@ type (
 		// is used when ensureTermination is true.
 		checkModuleExitCode []byte
 		// stackGrowExecutable is a compiled executable for growing stack builtin function.
-		stackGrowExecutable []byte
-		entryPreambles      map[*wasm.FunctionType][]byte
+		stackGrowExecutable       []byte
+		entryPreambles            map[*wasm.FunctionType][]byte
+		listenerBeforeTrampolines map[*wasm.FunctionType][]byte
+		listenerAfterTrampolines  map[*wasm.FunctionType][]byte
 	}
 
 	// compiledModule is a compiled variant of a wasm.Module and ready to be used for instantiation.
 	compiledModule struct {
 		executable []byte
 		// functionOffsets maps a local function index to the offset in the executable.
-		functionOffsets   []int
-		parent            *engine
-		module            *wasm.Module
-		entryPreambles    []*byte // indexed-correlated with the type index.
-		ensureTermination bool
+		functionOffsets           []int
+		parent                    *engine
+		module                    *wasm.Module
+		entryPreambles            []*byte // indexed-correlated with the type index.
+		ensureTermination         bool
+		listeners                 []experimental.FunctionListener
+		listenerBeforeTrampolines []*byte
+		listenerAfterTrampolines  []*byte
 
 		// The followings are only available for non host modules.
 
@@ -105,6 +110,18 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listene
 			}
 		}
 	}
+
+	if len(listeners) > 0 {
+		cm.listeners = listeners
+		cm.listenerBeforeTrampolines = make([]*byte, len(module.TypeSection))
+		cm.listenerAfterTrampolines = make([]*byte, len(module.TypeSection))
+		for i := range module.TypeSection {
+			typ := &module.TypeSection[i]
+			before, after := e.getListenerTrampolineForType(typ)
+			cm.listenerBeforeTrampolines[i] = before
+			cm.listenerAfterTrampolines[i] = after
+		}
+	}
 	return nil
 }
 
@@ -116,7 +133,7 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 	}
 
 	if module.IsHostModule {
-		return e.compileHostModule(ctx, module)
+		return e.compileHostModule(ctx, module, listeners)
 	}
 
 	cm.entryPreambles = make([]*byte, len(module.TypeSection))
@@ -136,7 +153,7 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 
 	// Creates new compiler instances which are reused for each function.
 	ssaBuilder := ssa.NewBuilder()
-	fe := frontend.NewFrontendCompiler(module, ssaBuilder, &cm.offsets, ensureTermination)
+	fe := frontend.NewFrontendCompiler(module, ssaBuilder, &cm.offsets, ensureTermination, len(listeners) > 0)
 	machine := newMachine()
 	be := backend.NewCompiler(ctx, machine, ssaBuilder)
 
@@ -159,7 +176,8 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 			ctx = wazevoapi.SetCurrentFunctionName(ctx, fmt.Sprintf("[%d/%d] \"%s\"", i, len(module.CodeSection)-1, name))
 		}
 
-		body, rels, err := e.compileLocalWasmFunction(ctx, module, wasm.Index(i), fe, ssaBuilder, be, listeners)
+		needListener := len(listeners) > 0 && listeners[i] != nil
+		body, rels, err := e.compileLocalWasmFunction(ctx, module, wasm.Index(i), fe, ssaBuilder, be, needListener)
 		if err != nil {
 			return nil, fmt.Errorf("compile function %d/%d: %v", i, len(module.CodeSection)-1, err)
 		}
@@ -219,13 +237,14 @@ func (e *engine) compileLocalWasmFunction(
 	fe *frontend.Compiler,
 	ssaBuilder ssa.Builder,
 	be backend.Compiler,
-	_ []experimental.FunctionListener,
+	needListener bool,
 ) (body []byte, rels []backend.RelocationInfo, err error) {
-	typ := &module.TypeSection[module.FunctionSection[localFunctionIndex]]
+	typIndex := module.FunctionSection[localFunctionIndex]
+	typ := &module.TypeSection[typIndex]
 	codeSeg := &module.CodeSection[localFunctionIndex]
 
 	// Initializes both frontend and backend compilers.
-	fe.Init(localFunctionIndex, typ, codeSeg.LocalTypes, codeSeg.Body)
+	fe.Init(localFunctionIndex, typIndex, typ, codeSeg.LocalTypes, codeSeg.Body, needListener)
 	be.Init()
 
 	// Lower Wasm to SSA.
@@ -273,12 +292,12 @@ func (e *engine) compileLocalWasmFunction(
 	return copied, rels, nil
 }
 
-func (e *engine) compileHostModule(ctx context.Context, module *wasm.Module) (*compiledModule, error) {
+func (e *engine) compileHostModule(ctx context.Context, module *wasm.Module, listeners []experimental.FunctionListener) (*compiledModule, error) {
 	machine := newMachine()
 	be := backend.NewCompiler(ctx, machine, ssa.NewBuilder())
 
 	num := len(module.CodeSection)
-	cm := &compiledModule{module: module}
+	cm := &compiledModule{module: module, listeners: listeners}
 	cm.functionOffsets = make([]int, num)
 	totalSize := 0 // Total binary size of the executable.
 	bodies := make([][]byte, num)
@@ -316,13 +335,14 @@ func (e *engine) compileHostModule(ctx context.Context, module *wasm.Module) (*c
 			panic("BUG: GoFunc must be set for host module")
 		}
 
+		withListener := len(listeners) > 0 && listeners[i] != nil
 		var exitCode wazevoapi.ExitCode
 		fn := c.GoFunc
 		switch fn.(type) {
 		case api.GoModuleFunction:
-			exitCode = wazevoapi.ExitCodeCallGoModuleFunctionWithIndex(i)
+			exitCode = wazevoapi.ExitCodeCallGoModuleFunctionWithIndex(i, withListener)
 		case api.GoFunction:
-			exitCode = wazevoapi.ExitCodeCallGoFunctionWithIndex(i)
+			exitCode = wazevoapi.ExitCodeCallGoFunctionWithIndex(i, withListener)
 		}
 
 		be.Init()
@@ -455,6 +475,7 @@ func (e *engine) NewModuleEngine(m *wasm.Module, mi *wasm.ModuleInstance) (wasm.
 	}
 	me.parent = compiled
 	me.module = mi
+	me.listeners = compiled.listeners
 
 	if m.IsHostModule {
 		me.opaque = buildHostModuleOpaque(m)
@@ -470,7 +491,11 @@ func (e *engine) NewModuleEngine(m *wasm.Module, mi *wasm.ModuleInstance) (wasm.
 }
 
 func (e *engine) compileSharedFunctions() {
-	e.sharedFunctions = &sharedFunctions{entryPreambles: make(map[*wasm.FunctionType][]byte)}
+	e.sharedFunctions = &sharedFunctions{
+		entryPreambles:            make(map[*wasm.FunctionType][]byte),
+		listenerBeforeTrampolines: make(map[*wasm.FunctionType][]byte),
+		listenerAfterTrampolines:  make(map[*wasm.FunctionType][]byte),
+	}
 
 	e.be.Init()
 	{
@@ -516,11 +541,23 @@ func sharedFunctionsFinalizer(sf *sharedFunctions) {
 			panic(err)
 		}
 	}
+	for _, f := range sf.listenerBeforeTrampolines {
+		if err := platform.MunmapCodeSegment(f); err != nil {
+			panic(err)
+		}
+	}
+	for _, f := range sf.listenerAfterTrampolines {
+		if err := platform.MunmapCodeSegment(f); err != nil {
+			panic(err)
+		}
+	}
 
 	sf.memoryGrowExecutable = nil
 	sf.checkModuleExitCode = nil
 	sf.stackGrowExecutable = nil
 	sf.entryPreambles = nil
+	sf.listenerBeforeTrampolines = nil
+	sf.listenerAfterTrampolines = nil
 }
 
 func compiledModuleFinalizer(cm *compiledModule) {
@@ -578,4 +615,29 @@ func (e *engine) getEntryPreambleForType(functionType *wasm.FunctionType) *byte 
 	defer e.mux.Unlock()
 	e.sharedFunctions.entryPreambles[functionType] = executable
 	return &executable[0]
+}
+
+func (e *engine) getListenerTrampolineForType(functionType *wasm.FunctionType) (before, after *byte) {
+	e.mux.RLock()
+	beforeBuf, ok := e.sharedFunctions.listenerBeforeTrampolines[functionType]
+	e.mux.RUnlock()
+	if ok {
+		return &beforeBuf[0], &e.sharedFunctions.listenerAfterTrampolines[functionType][0]
+	}
+
+	beforeSig, afterSig := frontend.SignatureForListener(functionType)
+
+	e.be.Init()
+	buf := e.machine.CompileGoFunctionTrampoline(wazevoapi.ExitCodeCallListenerBefore, beforeSig, false)
+	beforeBuf = mmapExecutable(buf)
+
+	e.be.Init()
+	buf = e.machine.CompileGoFunctionTrampoline(wazevoapi.ExitCodeCallListenerAfter, afterSig, false)
+	afterBuf := mmapExecutable(buf)
+
+	e.mux.Lock()
+	defer e.mux.Unlock()
+	e.sharedFunctions.listenerBeforeTrampolines[functionType] = beforeBuf
+	e.sharedFunctions.listenerAfterTrampolines[functionType] = afterBuf
+	return &beforeBuf[0], &afterBuf[0]
 }

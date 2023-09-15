@@ -19,6 +19,7 @@ func TestCompiler_LowerToSSA(t *testing.T) {
 	for _, tc := range []struct {
 		name              string
 		ensureTermination bool
+		needListener      bool
 		// m is the *wasm.Module to be compiled in this test.
 		m *wasm.Module
 		// targetIndex is the index of a local function to be compiled in this test.
@@ -63,6 +64,30 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i32)
 	v4:i32 = Iadd v2, v3
 	v5:i32 = Isub v4, v2
 	Jump blk_ret, v5
+`,
+		},
+		{
+			name: "add/sub params return / listener", m: testcases.AddSubParamsReturn.Module,
+			needListener: true,
+			exp: `
+signatures:
+	sig1: i64i32i32i32_v
+	sig2: i64i32i32_v
+
+blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i32)
+	Store module_ctx, exec_ctx, 0x8
+	v4:i64 = Load exec_ctx, 0x468
+	v5:i64 = Load v4, 0x0
+	v6:i32 = Iconst_32 0x0
+	CallIndirect v5:sig1, exec_ctx, v6, v2, v3
+	v7:i32 = Iadd v2, v3
+	v8:i32 = Isub v7, v2
+	Store module_ctx, exec_ctx, 0x8
+	v9:i64 = Load exec_ctx, 0x470
+	v10:i64 = Load v9, 0x0
+	v11:i32 = Iconst_32 0x0
+	CallIndirect v10:sig2, exec_ctx, v11, v8
+	Jump blk_ret, v8
 `,
 		},
 		{
@@ -227,28 +252,28 @@ blk1: () <-- (blk0,blk1)
 			ensureTermination: true,
 			exp: `
 signatures:
-	sig2: i64_v
+	sig5: i64_v
 
 blk0: (exec_ctx:i64, module_ctx:i64)
 	Jump blk1
 
 blk1: () <-- (blk0,blk1)
 	v2:i64 = Load exec_ctx, 0x58
-	CallIndirect v2:sig2, exec_ctx
+	CallIndirect v2:sig5, exec_ctx
 	Jump blk1
 
 blk2: ()
 `,
 			expAfterOpt: `
 signatures:
-	sig2: i64_v
+	sig5: i64_v
 
 blk0: (exec_ctx:i64, module_ctx:i64)
 	Jump blk1
 
 blk1: () <-- (blk0,blk1)
 	v2:i64 = Load exec_ctx, 0x58
-	CallIndirect v2:sig2, exec_ctx
+	CallIndirect v2:sig5, exec_ctx
 	Jump blk1
 `,
 		},
@@ -1401,7 +1426,7 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 			exp: `
 signatures:
 	sig0: i64i64_i32
-	sig2: i64i32_i32
+	sig8: i64i32_i32
 
 blk0: (exec_ctx:i64, module_ctx:i64)
 	Store module_ctx, exec_ctx, 0x8
@@ -1419,7 +1444,7 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 	v13:i32 = Iconst_32 0xa
 	Store module_ctx, exec_ctx, 0x8
 	v14:i64 = Load exec_ctx, 0x48
-	v15:i32 = CallIndirect v14:sig2, exec_ctx, v13
+	v15:i32 = CallIndirect v14:sig8, exec_ctx, v13
 	v16:i64 = Load module_ctx, 0x8
 	v17:i64 = Load v16, 0x0
 	v18:i64 = Load module_ctx, 0x8
@@ -1441,7 +1466,7 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 			expAfterOpt: `
 signatures:
 	sig0: i64i64_i32
-	sig2: i64i32_i32
+	sig8: i64i32_i32
 
 blk0: (exec_ctx:i64, module_ctx:i64)
 	Store module_ctx, exec_ctx, 0x8
@@ -1455,7 +1480,7 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 	v13:i32 = Iconst_32 0xa
 	Store module_ctx, exec_ctx, 0x8
 	v14:i64 = Load exec_ctx, 0x48
-	v15:i32 = CallIndirect v14:sig2, exec_ctx, v13
+	v15:i32 = CallIndirect v14:sig8, exec_ctx, v13
 	Store module_ctx, exec_ctx, 0x8
 	v20:i64 = Load module_ctx, 0x18
 	v21:i64 = Load module_ctx, 0x20
@@ -1472,13 +1497,13 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 			m:    testcases.MemorySizeGrow.Module,
 			exp: `
 signatures:
-	sig1: i64i32_i32
+	sig4: i64i32_i32
 
 blk0: (exec_ctx:i64, module_ctx:i64)
 	v2:i32 = Iconst_32 0x1
 	Store module_ctx, exec_ctx, 0x8
 	v3:i64 = Load exec_ctx, 0x48
-	v4:i32 = CallIndirect v3:sig1, exec_ctx, v2
+	v4:i32 = CallIndirect v3:sig4, exec_ctx, v2
 	v5:i64 = Load module_ctx, 0x8
 	v6:i64 = Uload32 module_ctx, 0x10
 	v7:i32 = Load module_ctx, 0x10
@@ -1487,27 +1512,27 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 	v10:i32 = Iconst_32 0x1
 	Store module_ctx, exec_ctx, 0x8
 	v11:i64 = Load exec_ctx, 0x48
-	v12:i32 = CallIndirect v11:sig1, exec_ctx, v10
+	v12:i32 = CallIndirect v11:sig4, exec_ctx, v10
 	v13:i64 = Load module_ctx, 0x8
 	v14:i64 = Uload32 module_ctx, 0x10
 	Jump blk_ret, v4, v9, v12
 `,
 			expAfterOpt: `
 signatures:
-	sig1: i64i32_i32
+	sig4: i64i32_i32
 
 blk0: (exec_ctx:i64, module_ctx:i64)
 	v2:i32 = Iconst_32 0x1
 	Store module_ctx, exec_ctx, 0x8
 	v3:i64 = Load exec_ctx, 0x48
-	v4:i32 = CallIndirect v3:sig1, exec_ctx, v2
+	v4:i32 = CallIndirect v3:sig4, exec_ctx, v2
 	v7:i32 = Load module_ctx, 0x10
 	v8:i32 = Iconst_32 0x10
 	v9:i32 = Ushr v7, v8
 	v10:i32 = Iconst_32 0x1
 	Store module_ctx, exec_ctx, 0x8
 	v11:i64 = Load exec_ctx, 0x48
-	v12:i32 = CallIndirect v11:sig1, exec_ctx, v10
+	v12:i32 = CallIndirect v11:sig4, exec_ctx, v10
 	Jump blk_ret, v4, v9, v12
 `,
 		},
@@ -1767,10 +1792,10 @@ blk4: () <-- (blk2,blk3)
 			b := ssa.NewBuilder()
 
 			offset := wazevoapi.NewModuleContextOffsetData(tc.m)
-			fc := NewFrontendCompiler(tc.m, b, &offset, tc.ensureTermination)
+			fc := NewFrontendCompiler(tc.m, b, &offset, tc.ensureTermination, tc.needListener)
 			typeIndex := tc.m.FunctionSection[tc.targetIndex]
 			code := &tc.m.CodeSection[tc.targetIndex]
-			fc.Init(tc.targetIndex, &tc.m.TypeSection[typeIndex], code.LocalTypes, code.Body)
+			fc.Init(tc.targetIndex, typeIndex, &tc.m.TypeSection[typeIndex], code.LocalTypes, code.Body, tc.needListener)
 
 			fc.LowerToSSA()
 

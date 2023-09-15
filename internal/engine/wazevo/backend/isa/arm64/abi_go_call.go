@@ -19,7 +19,8 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 		argBegin++
 	}
 
-	abi := m.getOrCreateABIImpl(sig)
+	abi := &abiImpl{m: m}
+	abi.init(sig)
 	m.currentABI = abi
 
 	cur := m.allocateInstr()

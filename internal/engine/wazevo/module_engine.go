@@ -5,6 +5,7 @@ import (
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasmruntime"
@@ -20,6 +21,7 @@ type (
 		opaque                 moduleContextOpaque
 		localFunctionInstances []*functionInstance
 		importedFunctions      []importedFunction
+		listeners              []experimental.FunctionListener
 	}
 
 	functionInstance struct {
@@ -141,6 +143,10 @@ func (m *moduleEngine) NewFunction(index wasm.Index) api.Function {
 		numberOfResults:        typ.ResultNumInUint64,
 	}
 
+	if len(m.listeners) > 0 {
+		ce.execCtx.beforeListenerTrampolines1stElement = &m.parent.listenerBeforeTrampolines[0]
+		ce.execCtx.afterListenerTrampolines1stElement = &m.parent.listenerAfterTrampolines[0]
+	}
 	ce.execCtx.memoryGrowTrampolineAddress = &m.parent.sharedFunctions.memoryGrowExecutable[0]
 	ce.execCtx.stackGrowCallTrampolineAddress = &m.parent.sharedFunctions.stackGrowExecutable[0]
 	ce.execCtx.checkModuleExitCodeTrampolineAddress = &m.parent.sharedFunctions.checkModuleExitCode[0]

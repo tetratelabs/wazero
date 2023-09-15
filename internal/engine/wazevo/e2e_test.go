@@ -1,6 +1,7 @@
 package wazevo_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"fmt"
@@ -9,6 +10,8 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/experimental/logging"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/testcases"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
@@ -722,4 +725,43 @@ wasm stack trace:
 	.one()
 	.main()`
 	require.Equal(t, exp, err.Error())
+}
+
+func TestListener_local(t *testing.T) {
+	var buf bytes.Buffer
+	config := wazero.NewRuntimeConfigCompiler()
+	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
+
+	// Configure the new optimizing backend!
+	wazevo.ConfigureWazevo(config)
+
+	r := wazero.NewRuntimeWithConfig(ctx, config)
+	defer func() {
+		require.NoError(t, r.Close(ctx))
+	}()
+
+	compiled, err := r.CompileModule(ctx, binaryencoding.EncodeModule(testcases.CallIndirect.Module))
+	require.NoError(t, err)
+
+	inst, err := r.InstantiateModule(ctx, compiled, wazero.NewModuleConfig())
+	require.NoError(t, err)
+
+	res, err := inst.ExportedFunction(testcases.ExportedFunctionName).Call(ctx, 1)
+	require.NoError(t, err)
+	require.Equal(t, []uint64{10}, res)
+
+	require.Equal(t, `
+--> .$0(1)
+	--> .$2()
+	<-- 10
+<-- 10
+`, "\n"+buf.String())
+}
+
+func TestListener_imported(t *testing.T) {
+	t.Skip("TODO")
+}
+
+func TestListener_imported_host(t *testing.T) {
+	t.Skip("TODO")
 }
