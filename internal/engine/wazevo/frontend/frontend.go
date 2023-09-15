@@ -3,7 +3,6 @@ package frontend
 
 import (
 	"bytes"
-
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -58,7 +57,12 @@ func NewFrontendCompiler(m *wasm.Module, ssaBuilder ssa.Builder, offset *wazevoa
 		offset:              offset,
 		ensureTermination:   ensureTermination,
 	}
+	c.declareSignatures(listenerOn)
+	return c
+}
 
+func (c *Compiler) declareSignatures(listenerOn bool) {
+	m := c.m
 	c.signatures = make(map[*wasm.FunctionType]*ssa.Signature, len(m.TypeSection)+2)
 	if listenerOn {
 		c.listenerSignatures = make(map[*wasm.FunctionType][2]*ssa.Signature, len(m.TypeSection))
@@ -80,8 +84,12 @@ func NewFrontendCompiler(m *wasm.Module, ssaBuilder ssa.Builder, offset *wazevoa
 		}
 	}
 
+	begin := ssa.SignatureID(len(m.TypeSection))
+	if listenerOn {
+		begin *= 3
+	}
 	c.memoryGrowSig = ssa.Signature{
-		ID: ssa.SignatureID(len(m.TypeSection)*2+len(c.listenerSignatures)) * 2,
+		ID: begin,
 		// Takes execution context and the page size to grow.
 		Params: []ssa.Type{ssa.TypeI64, ssa.TypeI32},
 		// Returns the new size.
@@ -95,7 +103,6 @@ func NewFrontendCompiler(m *wasm.Module, ssaBuilder ssa.Builder, offset *wazevoa
 		Params: []ssa.Type{ssa.TypeI64},
 	}
 	c.ssaBuilder.DeclareSignature(&c.checkModuleExitCodeSig)
-	return c
 }
 
 // SignatureForWasmFunctionType returns the ssa.Signature for the given wasm.FunctionType.
@@ -294,6 +301,7 @@ func (c *Compiler) formatBuilder() string {
 	return c.ssaBuilder.Format()
 }
 
+// SignatureForListener returns the signatures for the listener functions.
 func SignatureForListener(wasmSig *wasm.FunctionType) (*ssa.Signature, *ssa.Signature) {
 	beforeSig := &ssa.Signature{}
 	beforeSig.Params = make([]ssa.Type, len(wasmSig.Params)+2)

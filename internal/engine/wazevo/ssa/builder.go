@@ -68,8 +68,8 @@ type Builder interface {
 	// DeclareSignature appends the *Signature to be referenced by various instructions (e.g. OpcodeCall).
 	DeclareSignature(signature *Signature)
 
-	// UsedSignatures returns the slice of Signatures which are used/referenced by the currently-compiled function.
-	UsedSignatures() []*Signature
+	// Signatures returns the slice of declared Signatures.
+	Signatures() []*Signature
 
 	// ResolveSignature returns the Signature which corresponds to SignatureID.
 	ResolveSignature(id SignatureID) *Signature
@@ -253,8 +253,18 @@ func (b *builder) DeclareSignature(s *Signature) {
 	s.used = false
 }
 
-// UsedSignatures implements Builder.UsedSignatures.
-func (b *builder) UsedSignatures() (ret []*Signature) {
+// Signatures implements Builder.Signatures.
+func (b *builder) Signatures() (ret []*Signature) {
+	for _, sig := range b.signatures {
+		ret = append(ret, sig)
+	}
+	sort.Slice(ret, func(i, j int) bool {
+		return ret[i].ID < ret[j].ID
+	})
+	return
+}
+
+func (b *builder) usedSignatures() (ret []*Signature) {
 	for _, sig := range b.signatures {
 		if sig.used {
 			ret = append(ret, sig)
@@ -263,7 +273,6 @@ func (b *builder) UsedSignatures() (ret []*Signature) {
 	sort.Slice(ret, func(i, j int) bool {
 		return ret[i].ID < ret[j].ID
 	})
-
 	return
 }
 
@@ -499,7 +508,7 @@ func (b *builder) definedVariableType(variable Variable) Type {
 // Format implements Builder.Format.
 func (b *builder) Format() string {
 	str := strings.Builder{}
-	usedSigs := b.UsedSignatures()
+	usedSigs := b.usedSignatures()
 	if len(usedSigs) > 0 {
 		str.WriteByte('\n')
 		str.WriteString("signatures:\n")

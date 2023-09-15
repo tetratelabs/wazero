@@ -35,7 +35,7 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 	}{
 		{
 			name:     "go call",
-			exitCode: wazevoapi.ExitCodeCallGoFunctionWithIndex(100),
+			exitCode: wazevoapi.ExitCodeCallGoFunctionWithIndex(100, false),
 			sig: &ssa.Signature{
 				Params:  []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeF64},
 				Results: []ssa.Type{ssa.TypeI32, ssa.TypeI64, ssa.TypeF32, ssa.TypeF64},
@@ -127,7 +127,7 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 		},
 		{
 			name:     "go call",
-			exitCode: wazevoapi.ExitCodeCallGoFunctionWithIndex(100),
+			exitCode: wazevoapi.ExitCodeCallGoFunctionWithIndex(100, false),
 			sig: &ssa.Signature{
 				Params:  []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeF64, ssa.TypeF64, ssa.TypeI32, ssa.TypeI32},
 				Results: []ssa.Type{},

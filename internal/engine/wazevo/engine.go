@@ -620,9 +620,10 @@ func (e *engine) getEntryPreambleForType(functionType *wasm.FunctionType) *byte 
 func (e *engine) getListenerTrampolineForType(functionType *wasm.FunctionType) (before, after *byte) {
 	e.mux.RLock()
 	beforeBuf, ok := e.sharedFunctions.listenerBeforeTrampolines[functionType]
+	afterBuf := e.sharedFunctions.listenerAfterTrampolines[functionType]
 	e.mux.RUnlock()
 	if ok {
-		return &beforeBuf[0], &e.sharedFunctions.listenerAfterTrampolines[functionType][0]
+		return &beforeBuf[0], &afterBuf[0]
 	}
 
 	beforeSig, afterSig := frontend.SignatureForListener(functionType)
@@ -633,7 +634,7 @@ func (e *engine) getListenerTrampolineForType(functionType *wasm.FunctionType) (
 
 	e.be.Init()
 	buf = e.machine.CompileGoFunctionTrampoline(wazevoapi.ExitCodeCallListenerAfter, afterSig, false)
-	afterBuf := mmapExecutable(buf)
+	afterBuf = mmapExecutable(buf)
 
 	e.mux.Lock()
 	defer e.mux.Unlock()
