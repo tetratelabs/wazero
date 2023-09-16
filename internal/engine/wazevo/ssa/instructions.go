@@ -874,6 +874,10 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeVband:              sideEffectNone,
 	OpcodeVbandnot:           sideEffectNone,
 	OpcodeVbnot:              sideEffectNone,
+	OpcodeVbitselect:         sideEffectNone,
+	OpcodeVanyTrue:           sideEffectNone,
+	OpcodeVallTrue:           sideEffectNone,
+	OpcodeVhighBits:          sideEffectNone,
 	OpcodeVIadd:              sideEffectNone,
 	OpcodeVSaddSat:           sideEffectNone,
 	OpcodeVUaddSat:           sideEffectNone,
@@ -902,53 +906,57 @@ func (i *Instruction) sideEffect() sideEffect {
 
 // instructionReturnTypes provides the function to determine the return types of an instruction.
 var instructionReturnTypes = [opcodeEnd]returnTypesFn{
-	OpcodeVbor:      returnTypesFnV128,
-	OpcodeVbxor:     returnTypesFnV128,
-	OpcodeVband:     returnTypesFnV128,
-	OpcodeVbnot:     returnTypesFnV128,
-	OpcodeVbandnot:  returnTypesFnV128,
-	OpcodeVIadd:     returnTypesFnV128,
-	OpcodeVSaddSat:  returnTypesFnV128,
-	OpcodeVUaddSat:  returnTypesFnV128,
-	OpcodeVIsub:     returnTypesFnV128,
-	OpcodeVSsubSat:  returnTypesFnV128,
-	OpcodeVUsubSat:  returnTypesFnV128,
-	OpcodeVImin:     returnTypesFnV128,
-	OpcodeVUmin:     returnTypesFnV128,
-	OpcodeVImax:     returnTypesFnV128,
-	OpcodeVUmax:     returnTypesFnV128,
-	OpcodeVImul:     returnTypesFnV128,
-	OpcodeVAvgRound: returnTypesFnV128,
-	OpcodeVIabs:     returnTypesFnV128,
-	OpcodeVIneg:     returnTypesFnV128,
-	OpcodeVIpopcnt:  returnTypesFnV128,
-	OpcodeBand:      returnTypesFnSingle,
-	OpcodeFcopysign: returnTypesFnSingle,
-	OpcodeBitcast:   returnTypesFnSingle,
-	OpcodeBor:       returnTypesFnSingle,
-	OpcodeBxor:      returnTypesFnSingle,
-	OpcodeRotl:      returnTypesFnSingle,
-	OpcodeRotr:      returnTypesFnSingle,
-	OpcodeIshl:      returnTypesFnSingle,
-	OpcodeSshr:      returnTypesFnSingle,
-	OpcodeSdiv:      returnTypesFnSingle,
-	OpcodeSrem:      returnTypesFnSingle,
-	OpcodeUdiv:      returnTypesFnSingle,
-	OpcodeUrem:      returnTypesFnSingle,
-	OpcodeUshr:      returnTypesFnSingle,
-	OpcodeJump:      returnTypesFnNoReturns,
-	OpcodeUndefined: returnTypesFnNoReturns,
-	OpcodeIconst:    returnTypesFnSingle,
-	OpcodeSelect:    returnTypesFnSingle,
-	OpcodeSExtend:   returnTypesFnSingle,
-	OpcodeUExtend:   returnTypesFnSingle,
-	OpcodeIreduce:   returnTypesFnSingle,
-	OpcodeFabs:      returnTypesFnSingle,
-	OpcodeSqrt:      returnTypesFnSingle,
-	OpcodeCeil:      returnTypesFnSingle,
-	OpcodeFloor:     returnTypesFnSingle,
-	OpcodeTrunc:     returnTypesFnSingle,
-	OpcodeNearest:   returnTypesFnSingle,
+	OpcodeVbor:       returnTypesFnV128,
+	OpcodeVbxor:      returnTypesFnV128,
+	OpcodeVband:      returnTypesFnV128,
+	OpcodeVbnot:      returnTypesFnV128,
+	OpcodeVbandnot:   returnTypesFnV128,
+	OpcodeVbitselect: returnTypesFnV128,
+	OpcodeVanyTrue:   returnTypesFnV128,
+	OpcodeVallTrue:   returnTypesFnV128,
+	OpcodeVhighBits:  returnTypesFnV128,
+	OpcodeVIadd:      returnTypesFnV128,
+	OpcodeVSaddSat:   returnTypesFnV128,
+	OpcodeVUaddSat:   returnTypesFnV128,
+	OpcodeVIsub:      returnTypesFnV128,
+	OpcodeVSsubSat:   returnTypesFnV128,
+	OpcodeVUsubSat:   returnTypesFnV128,
+	OpcodeVImin:      returnTypesFnV128,
+	OpcodeVUmin:      returnTypesFnV128,
+	OpcodeVImax:      returnTypesFnV128,
+	OpcodeVUmax:      returnTypesFnV128,
+	OpcodeVImul:      returnTypesFnV128,
+	OpcodeVAvgRound:  returnTypesFnV128,
+	OpcodeVIabs:      returnTypesFnV128,
+	OpcodeVIneg:      returnTypesFnV128,
+	OpcodeVIpopcnt:   returnTypesFnV128,
+	OpcodeBand:       returnTypesFnSingle,
+	OpcodeFcopysign:  returnTypesFnSingle,
+	OpcodeBitcast:    returnTypesFnSingle,
+	OpcodeBor:        returnTypesFnSingle,
+	OpcodeBxor:       returnTypesFnSingle,
+	OpcodeRotl:       returnTypesFnSingle,
+	OpcodeRotr:       returnTypesFnSingle,
+	OpcodeIshl:       returnTypesFnSingle,
+	OpcodeSshr:       returnTypesFnSingle,
+	OpcodeSdiv:       returnTypesFnSingle,
+	OpcodeSrem:       returnTypesFnSingle,
+	OpcodeUdiv:       returnTypesFnSingle,
+	OpcodeUrem:       returnTypesFnSingle,
+	OpcodeUshr:       returnTypesFnSingle,
+	OpcodeJump:       returnTypesFnNoReturns,
+	OpcodeUndefined:  returnTypesFnNoReturns,
+	OpcodeIconst:     returnTypesFnSingle,
+	OpcodeSelect:     returnTypesFnSingle,
+	OpcodeSExtend:    returnTypesFnSingle,
+	OpcodeUExtend:    returnTypesFnSingle,
+	OpcodeIreduce:    returnTypesFnSingle,
+	OpcodeFabs:       returnTypesFnSingle,
+	OpcodeSqrt:       returnTypesFnSingle,
+	OpcodeCeil:       returnTypesFnSingle,
+	OpcodeFloor:      returnTypesFnSingle,
+	OpcodeTrunc:      returnTypesFnSingle,
+	OpcodeNearest:    returnTypesFnSingle,
 	OpcodeCallIndirect: func(b *builder, instr *Instruction) (t1 Type, ts []Type) {
 		sigID := SignatureID(instr.u1)
 		sig, ok := b.signatures[sigID]
@@ -1556,11 +1564,10 @@ func (i *Instruction) AsVanyTrue(x Value) *Instruction {
 }
 
 // AsVallTrue initializes this instruction as an allTrue vector instruction with OpcodeVallTrue.
-func (i *Instruction) AsVallTrue(x Value, lane VecLane) *Instruction {
+func (i *Instruction) AsVallTrue(x Value) *Instruction {
 	i.opcode = OpcodeVallTrue
 	i.typ = TypeV128
 	i.v = x
-	i.u1 = uint64(lane)
 	return i
 }
 
@@ -2056,9 +2063,11 @@ func (i *Instruction) Format(b Builder) string {
 		OpcodeFcvtFromUint, OpcodeFcvtToSintSat, OpcodeFcvtToUintSat, OpcodeFdemote, OpcodeFpromote, OpcodeIreduce, OpcodeBitcast, OpcodeSqrt, OpcodeFabs,
 		OpcodeCeil, OpcodeFloor, OpcodeTrunc, OpcodeNearest:
 		instSuffix = " " + i.v.Format(b)
-	case OpcodeVIadd, OpcodeVSaddSat, OpcodeVUaddSat, OpcodeVIsub, OpcodeVSsubSat, OpcodeVUsubSat, OpcodeVImin, OpcodeVUmin, OpcodeVImax, OpcodeVUmax, OpcodeVImul:
+	case OpcodeVIadd, OpcodeVSaddSat, OpcodeVUaddSat, OpcodeVIsub, OpcodeVSsubSat, OpcodeVUsubSat,
+		OpcodeVImin, OpcodeVUmin, OpcodeVImax, OpcodeVUmax, OpcodeVImul,
+		OpcodeVbxor, OpcodeVbor, OpcodeVband, OpcodeVbandnot:
 		instSuffix = fmt.Sprintf(".%s %s, %s", VecLane(i.u1), i.v.Format(b), i.v2.Format(b))
-	case OpcodeVIabs, OpcodeVIneg, OpcodeVIpopcnt:
+	case OpcodeVIabs, OpcodeVIneg, OpcodeVIpopcnt, OpcodeVbitselect, OpcodeVbnot, OpcodeVhighBits, OpcodeVallTrue, OpcodeVanyTrue:
 		instSuffix = fmt.Sprintf(".%s %s", VecLane(i.u1), i.v.Format(b))
 	default:
 		panic(fmt.Sprintf("TODO: format for %s", i.opcode))

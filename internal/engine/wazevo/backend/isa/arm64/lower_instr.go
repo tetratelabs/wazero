@@ -299,6 +299,24 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		v := m.allocateInstr()
 		v.asLoadFpuConst128(result, lo, hi)
 		m.insert(v)
+	case ssa.OpcodeVbnot:
+		m.lowerVecMisc(vecOpNot, instr)
+	case ssa.OpcodeVbxor:
+		m.lowerVecMisc(vecOpEOR, instr)
+	case ssa.OpcodeVbor:
+		m.lowerVecMisc(vecOpOrr, instr)
+	case ssa.OpcodeVband:
+		m.lowerVecMisc(vecOpAnd, instr)
+	case ssa.OpcodeVbandnot:
+		m.lowerVecRRR(vecOpBic, instr)
+	case ssa.OpcodeVbitselect:
+		m.lowerVecRRR(vecOpBsl, instr)
+	case ssa.OpcodeVanyTrue:
+		m.lowerVanyTrue(instr)
+	case ssa.OpcodeVallTrue:
+		panic("wip")
+	case ssa.OpcodeVhighBits:
+		panic("wip")
 	case ssa.OpcodeVIadd:
 		m.lowerVecRRR(vecOpAdd, instr)
 	case ssa.OpcodeVSaddSat:
@@ -338,6 +356,26 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		panic("TODO: lowering " + op.String())
 	}
 	m.FlushPendingInstructions()
+}
+
+func (m *machine) lowerVanyTrue(instr *ssa.Instruction) {
+	x := instr.Arg()
+
+	rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+	tmp := operandNR(m.compiler.VRegOf(instr.Return()))
+	rd := operandNR(m.compiler.VRegOf(instr.Return()))
+
+	umaxp := m.allocateInstr()
+	umaxp.asVecRRR(vecOpUmaxp, tmp, rn, rn, vecArrangement16B)
+	m.insert(umaxp)
+
+	movv := m.allocateInstr()
+	movv.asMovFromVec(rd, tmp, vecArrangementD, vecIndex(0))
+	m.insert(movv)
+
+	ccmp := m.allocateInstr()
+	ccmp.asCCmpImm(rd, 0, ne, 0, true)
+	m.insert(ccmp)
 }
 
 func (m *machine) lowerVecMisc(op vecOp, instr *ssa.Instruction) {

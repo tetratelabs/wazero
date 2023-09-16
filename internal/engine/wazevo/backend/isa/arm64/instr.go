@@ -1540,6 +1540,11 @@ const (
 	vecOpCnt vecOp = iota
 	vecOpUaddlv
 	vecOpBit
+	vecOpBic
+	vecOpBsl
+	vecOpNot
+	vecOpAnd
+	vecOpOrr
 	vecOpEOR
 	vecOpAdd
 	vecOpSqadd
@@ -1552,6 +1557,7 @@ const (
 	vecOpUmin
 	vecOpSmax
 	vecOpUmax
+	vecOpUmaxp
 	vecOpUrhadd
 	vecOpMul
 	vecOpUmlal
