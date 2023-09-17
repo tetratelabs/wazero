@@ -305,7 +305,7 @@ const (
 	// OpcodeVbnot negates a 128bit vector: `v = bnot x`.
 	OpcodeVbnot
 
-	// OpcodeVbxor computes binary xor between two 128bit vectors: `v = bxor x, y`.
+	// OpcodeVbitselect computes ...: `v = bitselect c, x, y`.
 	OpcodeVbitselect
 
 	// OpcodeShuffle ...
@@ -874,7 +874,7 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeVband:              sideEffectNone,
 	OpcodeVbandnot:           sideEffectNone,
 	OpcodeVbnot:              sideEffectNone,
-	OpcodeVbitselect:         sideEffectNone,
+	OpcodeVbitselect:         sideEffectStrict,
 	OpcodeVanyTrue:           sideEffectNone,
 	OpcodeVallTrue:           sideEffectNone,
 	OpcodeVhighBits:          sideEffectNone,

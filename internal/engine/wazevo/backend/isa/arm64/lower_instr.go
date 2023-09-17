@@ -339,7 +339,7 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		ins.asVecRRR(vecOpBic, rd, rn, rm, vecArrangement16B)
 		m.insert(ins)
 	case ssa.OpcodeVbitselect:
-		c, x, y := instr.Arg3()
+		c, x, y := instr.SelectData()
 		ins := m.allocateInstr()
 		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
 		rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
@@ -402,7 +402,6 @@ func (m *machine) lowerVcheckTrue(instr *ssa.Instruction) {
 	if instr.Opcode() == ssa.OpcodeVanyTrue {
 		ins.asVecRRR(vecOpUmaxp, tmp, rm, rm, vecArrangement16B)
 	} else {
-
 		ins.asVecLanes(vecOpUminv, tmp, rm, vecArrangement16B)
 	}
 	m.insert(ins)

@@ -25,7 +25,7 @@ const (
 // These consts must be disabled by default. Enable them only when debugging.
 
 const (
-	PrintSSA                                 = true
+	PrintSSA                                 = false
 	PrintOptimizedSSA                        = false
 	PrintBlockLaidOutSSA                     = false
 	PrintSSAToBackendIRLowering              = false

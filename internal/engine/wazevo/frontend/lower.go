@@ -1347,6 +1347,18 @@ func (c *Compiler) lowerCurrentOpcode() {
 			state.pc += 7
 			ret := builder.AllocateInstruction().AsVconst(lo, hi).Insert(builder).Return()
 			state.push(ret)
+		case wasm.OpcodeVecV128Load:
+			_, offset := c.readMemArg()
+			if state.unreachable {
+				break
+			}
+			opSize := uint64(16)
+			baseAddr := state.pop()
+			addr := c.memOpSetup(baseAddr, uint64(offset), opSize)
+			load := builder.AllocateInstruction()
+			load.AsLoad(addr, offset, ssa.TypeV128)
+			builder.InsertInstruction(load)
+			state.push(load.Return())
 		case wasm.OpcodeVecV128Not:
 			if state.unreachable {
 				break
