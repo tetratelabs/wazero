@@ -1998,7 +1998,7 @@ func (i *Instruction) Format(b Builder) string {
 		instSuffix = fmt.Sprintf(" %s, %#x", i.v.Format(b), int32(i.u1))
 	case OpcodeUload8, OpcodeUload16, OpcodeUload32, OpcodeSload8, OpcodeSload16, OpcodeSload32:
 		instSuffix = fmt.Sprintf(" %s, %#x", i.v.Format(b), int32(i.u1))
-	case OpcodeSelect:
+	case OpcodeSelect, OpcodeVbitselect:
 		instSuffix = fmt.Sprintf(" %s, %s, %s", i.v.Format(b), i.v2.Format(b), i.v3.Format(b))
 	case OpcodeIconst:
 		switch i.typ {
@@ -2056,7 +2056,8 @@ func (i *Instruction) Format(b Builder) string {
 		}
 		instSuffix += "]"
 	case OpcodeBand, OpcodeBor, OpcodeBxor, OpcodeRotr, OpcodeRotl, OpcodeIshl, OpcodeSshr, OpcodeUshr,
-		OpcodeSdiv, OpcodeUdiv, OpcodeFcopysign, OpcodeSrem, OpcodeUrem:
+		OpcodeSdiv, OpcodeUdiv, OpcodeFcopysign, OpcodeSrem, OpcodeUrem,
+		OpcodeVbnot, OpcodeVbxor, OpcodeVbor, OpcodeVband, OpcodeVbandnot:
 		instSuffix = fmt.Sprintf(" %s, %s", i.v.Format(b), i.v2.Format(b))
 	case OpcodeUndefined:
 	case OpcodeClz, OpcodeCtz, OpcodePopcnt, OpcodeFneg, OpcodeFcvtToSint, OpcodeFcvtToUint, OpcodeFcvtFromSint,
@@ -2064,10 +2065,9 @@ func (i *Instruction) Format(b Builder) string {
 		OpcodeCeil, OpcodeFloor, OpcodeTrunc, OpcodeNearest:
 		instSuffix = " " + i.v.Format(b)
 	case OpcodeVIadd, OpcodeVSaddSat, OpcodeVUaddSat, OpcodeVIsub, OpcodeVSsubSat, OpcodeVUsubSat,
-		OpcodeVImin, OpcodeVUmin, OpcodeVImax, OpcodeVUmax, OpcodeVImul,
-		OpcodeVbxor, OpcodeVbor, OpcodeVband, OpcodeVbandnot:
+		OpcodeVImin, OpcodeVUmin, OpcodeVImax, OpcodeVUmax, OpcodeVImul:
 		instSuffix = fmt.Sprintf(".%s %s, %s", VecLane(i.u1), i.v.Format(b), i.v2.Format(b))
-	case OpcodeVIabs, OpcodeVIneg, OpcodeVIpopcnt, OpcodeVbitselect, OpcodeVbnot, OpcodeVhighBits, OpcodeVallTrue, OpcodeVanyTrue:
+	case OpcodeVIabs, OpcodeVIneg, OpcodeVIpopcnt, OpcodeVhighBits, OpcodeVallTrue, OpcodeVanyTrue:
 		instSuffix = fmt.Sprintf(".%s %s", VecLane(i.u1), i.v.Format(b))
 	default:
 		panic(fmt.Sprintf("TODO: format for %s", i.opcode))
@@ -2439,6 +2439,18 @@ func (o Opcode) String() (ret string) {
 		return "Fence"
 	case OpcodeExtractVector:
 		return "ExtractVector"
+	case OpcodeVbor:
+		return "Vbor"
+	case OpcodeVbxor:
+		return "Vbxor"
+	case OpcodeVband:
+		return "Vband"
+	case OpcodeVbandnot:
+		return "Vbandnot"
+	case OpcodeVbnot:
+		return "Vbnot"
+	case OpcodeVbitselect:
+		return "Vbitselect"
 	case OpcodeVIadd:
 		return "VIadd"
 	case OpcodeVSaddSat:
