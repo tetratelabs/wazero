@@ -1524,8 +1524,6 @@ func (b vecOp) String() string {
 		return "smin"
 	case vecOpUmin:
 		return "umin"
-	case vecOpUminv:
-		return "uminv"
 	case vecOpSmax:
 		return "smax"
 	case vecOpUmax:
@@ -1567,7 +1565,6 @@ const (
 	vecOpUqsub
 	vecOpSmin
 	vecOpUmin
-	vecOpUminv
 	vecOpSmax
 	vecOpUmax
 	vecOpUmaxp

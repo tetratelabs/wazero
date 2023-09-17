@@ -1425,25 +1425,23 @@ func encodeAluRRImm(op aluOp, rd, rn, amount, _64bit uint32) uint32 {
 // https://developer.arm.com/documentation/ddi0596/2020-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
 func encodeVecLanes(op vecOp, rd uint32, rn uint32, arr vecArrangement) uint32 {
 	var u, q, size, opcode uint32
-	switch arr {
-	case vecArrangement8B:
-		q, size = 0b0, 0b00
-	case vecArrangement16B:
-		q, size = 0b1, 0b00
-	case vecArrangement4H:
-		q, size = 0, 0b01
-	case vecArrangement8H:
-		q, size = 1, 0b01
-	case vecArrangement4S:
-		q, size = 1, 0b10
-	default:
-		panic("unsupported arrangement: " + arr.String())
-	}
 	switch op {
 	case vecOpUaddlv:
 		u, opcode = 1, 0b00011
-	case vecOpUminv:
-		u, opcode = 1, 0b11010
+		switch arr {
+		case vecArrangement8B:
+			q, size = 0b0, 0b00
+		case vecArrangement16B:
+			q, size = 0b1, 0b00
+		case vecArrangement4H:
+			q, size = 0, 0b01
+		case vecArrangement8H:
+			q, size = 1, 0b01
+		case vecArrangement4S:
+			q, size = 1, 0b10
+		default:
+			panic("unsupported arrangement: " + arr.String())
+		}
 	default:
 		panic("unsupported or illegal vecOp: " + op.String())
 	}
