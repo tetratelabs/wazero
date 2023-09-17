@@ -1406,31 +1406,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v2 := state.pop()
 			v1 := state.pop()
 			builder.AllocateInstruction().AsVbitselect(c, v1, v2).Insert(builder)
-			// fixme +uextend
 			state.push(c)
-		case wasm.OpcodeVecV128AnyTrue:
-			if state.unreachable {
-				break
-			}
-			v1 := state.pop()
-			ret := builder.AllocateInstruction().AsVanyTrue(v1).Insert(builder).Return()
-			// fixme +uextend
-			state.push(ret)
-		case wasm.OpcodeVecI8x16AllTrue, wasm.OpcodeVecI16x8AllTrue, wasm.OpcodeVecI32x4AllTrue, wasm.OpcodeVecI64x2AllTrue:
-			if state.unreachable {
-				break
-			}
-			v1 := state.pop()
-			ret := builder.AllocateInstruction().AsVallTrue(v1).Insert(builder).Return()
-			// fixme +uextend
-			state.push(ret)
-		case wasm.OpcodeVecI8x16BitMask, wasm.OpcodeVecI16x8BitMask, wasm.OpcodeVecI32x4BitMask, wasm.OpcodeVecI64x2BitMask:
-			if state.unreachable {
-				break
-			}
-			v1 := state.pop()
-			ret := builder.AllocateInstruction().AsVhighBits(v1, ssa.TypeI32).Insert(builder).Return()
-			state.push(ret)
 		case wasm.OpcodeVecI8x16Abs, wasm.OpcodeVecI16x8Abs, wasm.OpcodeVecI32x4Abs, wasm.OpcodeVecI64x2Abs:
 			if state.unreachable {
 				break

@@ -1555,31 +1555,6 @@ func (i *Instruction) AsVbitselect(c, x, y Value) *Instruction {
 	return i
 }
 
-// AsVanyTrue initializes this instruction as an anyTrue vector instruction with OpcodeVanyTrue.
-func (i *Instruction) AsVanyTrue(x Value) *Instruction {
-	i.opcode = OpcodeVanyTrue
-	i.typ = TypeV128
-	i.v = x
-	return i
-}
-
-// AsVallTrue initializes this instruction as an allTrue vector instruction with OpcodeVallTrue.
-func (i *Instruction) AsVallTrue(x Value) *Instruction {
-	i.opcode = OpcodeVallTrue
-	i.typ = TypeV128
-	i.v = x
-	return i
-}
-
-// AsVhighBits initializes this instruction as a highBits vector instruction with OpcodeVhighBits.
-func (i *Instruction) AsVhighBits(x Value, t Type) *Instruction {
-	i.opcode = OpcodeVhighBits
-	i.typ = TypeV128
-	i.v = x
-	i.typ = t
-	return i
-}
-
 // VconstData returns the operands of this vector constant instruction.
 func (i *Instruction) VconstData() (lo, hi uint64) {
 	return i.u1, i.u2

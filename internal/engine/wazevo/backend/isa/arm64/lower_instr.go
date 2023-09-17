@@ -346,10 +346,6 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		rd := m.getOperand_NR(m.compiler.ValueDefinition(c), extModeNone)
 		ins.asVecRRR(vecOpBsl, rd, rn, rm, vecArrangement16B)
 		m.insert(ins)
-	case ssa.OpcodeVanyTrue, ssa.OpcodeVallTrue:
-		m.lowerVcheckTrue(instr)
-	case ssa.OpcodeVhighBits:
-		panic("wip")
 	case ssa.OpcodeVIadd:
 		m.lowerVecRRR(vecOpAdd, instr)
 	case ssa.OpcodeVSaddSat:
@@ -389,33 +385,6 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		panic("TODO: lowering " + op.String())
 	}
 	m.FlushPendingInstructions()
-}
-
-func (m *machine) lowerVcheckTrue(instr *ssa.Instruction) {
-	x := instr.Arg()
-
-	rm := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
-	tmp := operandNR(m.compiler.VRegOf(instr.Return()))
-	rd := operandNR(m.compiler.VRegOf(instr.Return()))
-
-	ins := m.allocateInstr()
-	if instr.Opcode() == ssa.OpcodeVanyTrue {
-		ins.asVecRRR(vecOpUmaxp, tmp, rm, rm, vecArrangement16B)
-	} else {
-		ins.asVecLanes(vecOpUminv, tmp, rm, vecArrangement16B)
-	}
-	m.insert(ins)
-
-	movv := m.allocateInstr()
-	movv.asMovFromVec(rd, tmp, vecArrangementD, vecIndex(0))
-	m.insert(movv)
-
-	subs := m.allocateInstr()
-	subs.asALU(aluOpSubS, rd, operandNR(xzrVReg), operandImm12(0b0, 1), true)
-	m.insert(subs)
-
-	cset := m.allocateInstr()
-	cset.asCSet(rd.nr(), ne)
 }
 
 func (m *machine) lowerVecMisc(op vecOp, instr *ssa.Instruction) {

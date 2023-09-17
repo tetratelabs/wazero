@@ -1550,7 +1550,6 @@ func (b vecOp) String() string {
 
 const (
 	vecOpCnt vecOp = iota
-	vecOpCmeqZero
 	vecOpUaddlv
 	vecOpBit
 	vecOpBic
