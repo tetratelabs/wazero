@@ -38,8 +38,9 @@ type (
 		// execCtx holds various information to be read/written by assembly functions.
 		execCtx executionContext
 		// execCtxPtr holds the pointer to the executionContext which doesn't change after callEngine is created.
-		execCtxPtr      uintptr
-		numberOfResults int
+		execCtxPtr        uintptr
+		numberOfResults   int
+		stackIteratorImpl stackIterator
 	}
 
 	// executionContext is the struct to be read/written by assembly functions.
@@ -170,7 +171,7 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 			if lsn != nil {
 				listeners = append(listeners, listenerForAbort{def, lsn})
 			}
-			returnAddrs := unwindStack(uintptr(unsafe.Pointer(c.execCtx.stackPointerBeforeGoCall)), c.stackTop)
+			returnAddrs := unwindStack(uintptr(unsafe.Pointer(c.execCtx.stackPointerBeforeGoCall)), c.stackTop, nil)
 			for _, retAddr := range returnAddrs[:len(returnAddrs)-1] { // the last return addr is the trampoline, so we skip it.
 				def, lsn = c.addFrame(builder, retAddr)
 				if lsn != nil {
@@ -249,7 +250,7 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 			listener := listeners[index]
 			hostModule := hostModuleFromOpaque(c.execCtx.goFunctionCallCalleeModuleContextOpaque)
 			def := hostModule.FunctionDefinition(wasm.Index(index))
-			listener.Before(ctx, callerModule, def, s, nil)
+			listener.Before(ctx, callerModule, def, s, c.stackIterator(true))
 			// Call into the Go function.
 			f.Call(ctx, s)
 			// Call Listener.After.
@@ -275,7 +276,7 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 			listener := listeners[index]
 			hostModule := hostModuleFromOpaque(c.execCtx.goFunctionCallCalleeModuleContextOpaque)
 			def := hostModule.FunctionDefinition(wasm.Index(index))
-			listener.Before(ctx, callerModule, def, s, nil)
+			listener.Before(ctx, callerModule, def, s, c.stackIterator(true))
 			// Call into the Go function.
 			f.Call(ctx, callerModule, s)
 			// Call Listener.After.
@@ -289,7 +290,7 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 			mod := c.callerModuleInstance()
 			listener := mod.Engine.(*moduleEngine).listeners[index]
 			def := mod.Source.FunctionDefinition(wasm.Index(index))
-			listener.Before(ctx, mod, def, stack[1:], nil)
+			listener.Before(ctx, mod, def, stack[1:], c.stackIterator(false))
 			c.execCtx.exitCode = wazevoapi.ExitCodeOK
 			afterGoFunctionCallEntrypoint(c.execCtx.goCallReturnAddress, c.execCtxPtr, uintptr(unsafe.Pointer(c.execCtx.stackPointerBeforeGoCall)))
 		case wazevoapi.ExitCodeCallListenerAfter:
@@ -382,4 +383,71 @@ func (c *callEngine) growStack() (newSP uintptr, err error) {
 	c.stackTop = newTop
 	c.execCtx.stackBottomPtr = &newStack[0]
 	return
+}
+
+func (c *callEngine) stackIterator(onHostCall bool) experimental.StackIterator {
+	c.stackIteratorImpl.reset(c, onHostCall)
+	return &c.stackIteratorImpl
+}
+
+// stackIterator implements experimental.StackIterator.
+type stackIterator struct {
+	retAddrs      []uintptr
+	retAddrCursor int
+	eng           *engine
+	pc            uint64
+
+	currentDef *wasm.FunctionDefinition
+}
+
+func (si *stackIterator) reset(c *callEngine, onHostCall bool) {
+	if onHostCall {
+		si.retAddrs = append(si.retAddrs[:0], uintptr(unsafe.Pointer(c.execCtx.goCallReturnAddress)))
+	} else {
+		si.retAddrs = si.retAddrs[:0]
+	}
+	si.retAddrs = unwindStack(uintptr(unsafe.Pointer(c.execCtx.stackPointerBeforeGoCall)), c.stackTop, si.retAddrs)
+	si.retAddrs = si.retAddrs[:len(si.retAddrs)-1] // the last return addr is the trampoline, so we skip it.
+	si.retAddrCursor = 0
+	si.eng = c.parent.parent.parent
+}
+
+// Next implements the same method as documented on experimental.StackIterator.
+func (si *stackIterator) Next() bool {
+	if si.retAddrCursor >= len(si.retAddrs) {
+		return false
+	}
+
+	addr := si.retAddrs[si.retAddrCursor]
+	cm := si.eng.compiledModuleOfAddr(addr)
+	if cm != nil {
+		index := cm.functionIndexOf(addr)
+		def := cm.module.FunctionDefinition(cm.module.ImportFunctionCount + index)
+		si.currentDef = def
+		si.retAddrCursor++
+		si.pc = uint64(addr)
+		return true
+	}
+	return false
+}
+
+// ProgramCounter implements the same method as documented on experimental.StackIterator.
+func (si *stackIterator) ProgramCounter() experimental.ProgramCounter {
+	return experimental.ProgramCounter(si.pc)
+}
+
+// Function implements the same method as documented on experimental.StackIterator.
+func (si *stackIterator) Function() experimental.InternalFunction {
+	return si
+}
+
+// Definition implements the same method as documented on experimental.InternalFunction.
+func (si *stackIterator) Definition() api.FunctionDefinition {
+	return si.currentDef
+}
+
+// SourceOffsetForPC implements the same method as documented on experimental.InternalFunction.
+func (si *stackIterator) SourceOffsetForPC(experimental.ProgramCounter) uint64 {
+	// TODO: DWARF.
+	return 0
 }
