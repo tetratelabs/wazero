@@ -226,11 +226,15 @@ func testReftypeImports(t *testing.T, r wazero.Runtime) {
 		Export("externref").
 		Instantiate(testCtx)
 	require.NoError(t, err)
-	defer host.Close(testCtx)
+	defer func() {
+		require.NoError(t, host.Close(testCtx))
+	}()
 
 	module, err := r.Instantiate(testCtx, reftypeImportsWasm)
 	require.NoError(t, err)
-	defer module.Close(testCtx)
+	defer func() {
+		require.NoError(t, module.Close(testCtx))
+	}()
 
 	actual, err := module.ExportedFunction("get_externref_by_host").Call(testCtx)
 	require.NoError(t, err)
@@ -242,7 +246,9 @@ func testReftypeImports(t *testing.T, r wazero.Runtime) {
 func testHugeStack(t *testing.T, r wazero.Runtime) {
 	module, err := r.Instantiate(testCtx, hugestackWasm)
 	require.NoError(t, err)
-	defer module.Close(testCtx)
+	defer func() {
+		require.NoError(t, module.Close(testCtx))
+	}()
 
 	fn := module.ExportedFunction("main")
 	require.NotNil(t, fn)
@@ -262,7 +268,9 @@ func testHugeStack(t *testing.T, r wazero.Runtime) {
 func testOverflow(t *testing.T, r wazero.Runtime) {
 	module, err := r.Instantiate(testCtx, overflowWasm)
 	require.NoError(t, err)
-	defer module.Close(testCtx)
+	defer func() {
+		require.NoError(t, module.Close(testCtx))
+	}()
 
 	for _, name := range []string{"i32", "i64"} {
 		i32 := module.ExportedFunction(name)
@@ -279,7 +287,9 @@ func testOverflow(t *testing.T, r wazero.Runtime) {
 func testGlobalExtend(t *testing.T, r wazero.Runtime) {
 	module, err := r.Instantiate(testCtx, globalExtendWasm)
 	require.NoError(t, err)
-	defer module.Close(testCtx)
+	defer func() {
+		require.NoError(t, module.Close(testCtx))
+	}()
 
 	extend := module.ExportedFunction("extend")
 	require.NotNil(t, extend)
@@ -302,7 +312,9 @@ func testUnreachable(t *testing.T, r wazero.Runtime) {
 
 	module, err := r.Instantiate(testCtx, unreachableWasm)
 	require.NoError(t, err)
-	defer module.Close(testCtx)
+	defer func() {
+		require.NoError(t, module.Close(testCtx))
+	}()
 
 	_, err = module.ExportedFunction("main").Call(testCtx)
 	exp := `panic in host function (recovered by wazero)
@@ -327,7 +339,9 @@ func testRecursiveEntry(t *testing.T, r wazero.Runtime) {
 
 	module, err := r.Instantiate(testCtx, recursiveWasm)
 	require.NoError(t, err)
-	defer module.Close(testCtx)
+	defer func() {
+		require.NoError(t, module.Close(testCtx))
+	}()
 
 	_, err = module.ExportedFunction("main").Call(testCtx, 1)
 	require.NoError(t, err)
@@ -349,11 +363,15 @@ func testHostFuncMemory(t *testing.T, r wazero.Runtime) {
 		NewFunctionBuilder().WithFunc(storeInt).Export("store_int").
 		Instantiate(testCtx)
 	require.NoError(t, err)
-	defer host.Close(testCtx)
+	defer func() {
+		require.NoError(t, host.Close(testCtx))
+	}()
 
 	module, err := r.Instantiate(testCtx, hostMemoryWasm)
 	require.NoError(t, err)
-	defer module.Close(testCtx)
+	defer func() {
+		require.NoError(t, module.Close(testCtx))
+	}()
 
 	// Call store_int and ensure it didn't return an error code.
 	fn := module.ExportedFunction("store_int")
@@ -392,12 +410,16 @@ func testNestedGoContext(t *testing.T, r wazero.Runtime) {
 		Export("outer").
 		Instantiate(testCtx)
 	require.NoError(t, err)
-	defer imported.Close(testCtx)
+	defer func() {
+		require.NoError(t, imported.Close(testCtx))
+	}()
 
 	// Instantiate a module that uses Wasm code to call the host function.
 	importing, err = r.Instantiate(testCtx, callOuterInnerWasm(t, importedName, importingName))
 	require.NoError(t, err)
-	defer importing.Close(testCtx)
+	defer func() {
+		require.NoError(t, importing.Close(testCtx))
+	}()
 
 	input := uint64(math.MaxUint32 - 2) // We expect two calls where each increment by one.
 	results, err := importing.ExportedFunction("call->outer").Call(testCtx, input)
@@ -428,13 +450,17 @@ func testHostFunctionContextParameter(t *testing.T, r wazero.Runtime) {
 				NewFunctionBuilder().WithFunc(fns[test]).Export("return_input").
 				Instantiate(testCtx)
 			require.NoError(t, err)
-			defer imported.Close(testCtx)
+			defer func() {
+				require.NoError(t, imported.Close(testCtx))
+			}()
 
 			// Instantiate a module that uses Wasm code to call the host function.
 			importing, err = r.Instantiate(testCtx,
 				callReturnImportWasm(t, importedName, importingName, i32))
 			require.NoError(t, err)
-			defer importing.Close(testCtx)
+			defer func() {
+				require.NoError(t, importing.Close(testCtx))
+			}()
 
 			results, err := importing.ExportedFunction("call_return_input").Call(testCtx, math.MaxUint32-1)
 			require.NoError(t, err)
@@ -498,13 +524,17 @@ func testHostFunctionNumericParameter(t *testing.T, r wazero.Runtime) {
 				NewFunctionBuilder().WithFunc(fns[test.name]).Export("return_input").
 				Instantiate(testCtx)
 			require.NoError(t, err)
-			defer imported.Close(testCtx)
+			defer func() {
+				require.NoError(t, imported.Close(testCtx))
+			}()
 
 			// Instantiate a module that uses Wasm code to call the host function.
 			importing, err := r.Instantiate(testCtx,
 				callReturnImportWasm(t, importedName, importingName, test.vt))
 			require.NoError(t, err)
-			defer importing.Close(testCtx)
+			defer func() {
+				require.NoError(t, importing.Close(testCtx))
+			}()
 
 			results, err := importing.ExportedFunction("call_return_input").Call(testCtx, test.input)
 			require.NoError(t, err)
@@ -691,10 +721,12 @@ func testCloseInFlight(t *testing.T, r wazero.Runtime) {
 					require.NoError(t, imported.CloseWithExitCode(ctx, tc.closeImported))
 				}
 				if tc.closeImportedCode {
-					importedCode.Close(testCtx)
+					err = importedCode.Close(testCtx)
+					require.NoError(t, err)
 				}
 				if tc.closeImportingCode {
-					importingCode.Close(testCtx)
+					err = importingCode.Close(testCtx)
+					require.NoError(t, err)
 				}
 				return x
 			}
@@ -707,16 +739,20 @@ func testCloseInFlight(t *testing.T, r wazero.Runtime) {
 
 			imported, err = r.InstantiateModule(testCtx, importedCode, wazero.NewModuleConfig())
 			require.NoError(t, err)
-			defer imported.Close(testCtx)
+			defer func() {
+				require.NoError(t, imported.Close(testCtx))
+			}()
 
 			// Import that module.
-			binary := callReturnImportWasm(t, imported.Name(), t.Name()+"-importing", i32)
-			importingCode, err = r.CompileModule(testCtx, binary)
+			bin := callReturnImportWasm(t, imported.Name(), t.Name()+"-importing", i32)
+			importingCode, err = r.CompileModule(testCtx, bin)
 			require.NoError(t, err)
 
 			importing, err = r.InstantiateModule(testCtx, importingCode, wazero.NewModuleConfig())
 			require.NoError(t, err)
-			defer importing.Close(testCtx)
+			defer func() {
+				require.NoError(t, importing.Close(testCtx))
+			}()
 
 			var expectedErr error
 			if tc.closeImported != 0 && tc.closeImporting != 0 {
@@ -741,7 +777,9 @@ func testMemOps(t *testing.T, r wazero.Runtime) {
 	// Instantiate a module that manages its memory
 	mod, err := r.Instantiate(testCtx, memoryWasm)
 	require.NoError(t, err)
-	defer mod.Close(testCtx)
+	defer func() {
+		require.NoError(t, mod.Close(testCtx))
+	}()
 
 	// Check the export worked
 	require.Equal(t, mod.Memory(), mod.ExportedMemory("memory"))
@@ -806,13 +844,14 @@ func testMultipleInstantiation(t *testing.T, r wazero.Runtime) {
 	})
 	compiled, err := r.CompileModule(testCtx, bin)
 	require.NoError(t, err)
-	defer compiled.Close(testCtx)
+	defer func() {
+		require.NoError(t, compiled.Close(testCtx))
+	}()
 
 	// Instantiate multiple modules with the same source (*CompiledModule).
 	for i := 0; i < 100; i++ {
 		module, err := r.InstantiateModule(testCtx, compiled, wazero.NewModuleConfig().WithName(strconv.Itoa(i)))
 		require.NoError(t, err)
-		defer module.Close(testCtx)
 
 		// Ensure that compilation cache doesn't cause race on memory instance.
 		before, ok := module.Memory().ReadUint64Le(1)
@@ -830,6 +869,8 @@ func testMultipleInstantiation(t *testing.T, r wazero.Runtime) {
 		after, ok := module.Memory().ReadUint64Le(1)
 		require.True(t, ok)
 		require.Equal(t, uint64(1000), after)
+
+		require.NoError(t, module.Close(testCtx))
 	}
 }
 
