@@ -19,11 +19,13 @@ func TestModuleEngine_setupOpaque(t *testing.T) {
 	}{
 		{
 			offset: wazevoapi.ModuleContextOffsetData{
-				LocalMemoryBegin:       10,
-				ImportedMemoryBegin:    -1,
-				ImportedFunctionsBegin: -1,
-				TablesBegin:            -1,
-				GlobalsBegin:           -1,
+				LocalMemoryBegin:                    10,
+				ImportedMemoryBegin:                 -1,
+				ImportedFunctionsBegin:              -1,
+				TablesBegin:                         -1,
+				BeforeListenerTrampolines1stElement: -1,
+				AfterListenerTrampolines1stElement:  -1,
+				GlobalsBegin:                        -1,
 			},
 			m: &wasm.ModuleInstance{MemoryInstance: &wasm.MemoryInstance{
 				Buffer: make([]byte, 0xff),
@@ -31,11 +33,13 @@ func TestModuleEngine_setupOpaque(t *testing.T) {
 		},
 		{
 			offset: wazevoapi.ModuleContextOffsetData{
-				LocalMemoryBegin:       -1,
-				ImportedMemoryBegin:    30,
-				GlobalsBegin:           -1,
-				TablesBegin:            -1,
-				ImportedFunctionsBegin: -1,
+				LocalMemoryBegin:                    -1,
+				ImportedMemoryBegin:                 30,
+				GlobalsBegin:                        -1,
+				TablesBegin:                         -1,
+				BeforeListenerTrampolines1stElement: -1,
+				AfterListenerTrampolines1stElement:  -1,
+				ImportedFunctionsBegin:              -1,
 			},
 			m: &wasm.ModuleInstance{MemoryInstance: &wasm.MemoryInstance{
 				Buffer: make([]byte, 0xff),
@@ -43,11 +47,13 @@ func TestModuleEngine_setupOpaque(t *testing.T) {
 		},
 		{
 			offset: wazevoapi.ModuleContextOffsetData{
-				LocalMemoryBegin:       -1,
-				ImportedMemoryBegin:    -1,
-				ImportedFunctionsBegin: -1,
-				GlobalsBegin:           30,
-				TablesBegin:            100,
+				LocalMemoryBegin:                    -1,
+				ImportedMemoryBegin:                 -1,
+				ImportedFunctionsBegin:              -1,
+				GlobalsBegin:                        30,
+				TablesBegin:                         100,
+				BeforeListenerTrampolines1stElement: 200,
+				AfterListenerTrampolines1stElement:  208,
 			},
 			m: &wasm.ModuleInstance{
 				Globals: []*wasm.GlobalInstance{{}, {}, {}, {}, {}, {}},
@@ -59,7 +65,11 @@ func TestModuleEngine_setupOpaque(t *testing.T) {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			tc.offset.TotalSize = 1000 // arbitrary large number to ensure we don't panic.
 			m := &moduleEngine{
-				parent: &compiledModule{offsets: tc.offset},
+				parent: &compiledModule{
+					offsets:                   tc.offset,
+					listenerBeforeTrampolines: make([]*byte, 100),
+					listenerAfterTrampolines:  make([]*byte, 200),
+				},
 				module: tc.m,
 				opaque: make([]byte, tc.offset.TotalSize),
 			}
@@ -106,6 +116,16 @@ func TestModuleEngine_setupOpaque(t *testing.T) {
 					expPtr := uintptr(unsafe.Pointer(table))
 					require.Equal(t, expPtr, actualPtr)
 				}
+			}
+			if tc.offset.BeforeListenerTrampolines1stElement >= 0 {
+				actualPtr := uintptr(binary.LittleEndian.Uint64(m.opaque[int(tc.offset.BeforeListenerTrampolines1stElement):]))
+				expPtr := uintptr(unsafe.Pointer(&m.parent.listenerBeforeTrampolines[0]))
+				require.Equal(t, expPtr, actualPtr)
+			}
+			if tc.offset.AfterListenerTrampolines1stElement >= 0 {
+				actualPtr := uintptr(binary.LittleEndian.Uint64(m.opaque[int(tc.offset.AfterListenerTrampolines1stElement):]))
+				expPtr := uintptr(unsafe.Pointer(&m.parent.listenerAfterTrampolines[0]))
+				require.Equal(t, expPtr, actualPtr)
 			}
 		})
 	}

@@ -126,9 +126,10 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listene
 }
 
 func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listeners []experimental.FunctionListener, ensureTermination bool) (*compiledModule, error) {
+	withListener := len(listeners) > 0
 	e.rels = e.rels[:0]
 	cm := &compiledModule{
-		offsets: wazevoapi.NewModuleContextOffsetData(module), parent: e, module: module,
+		offsets: wazevoapi.NewModuleContextOffsetData(module, withListener), parent: e, module: module,
 		ensureTermination: ensureTermination,
 	}
 
@@ -153,7 +154,7 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 
 	// Creates new compiler instances which are reused for each function.
 	ssaBuilder := ssa.NewBuilder()
-	fe := frontend.NewFrontendCompiler(module, ssaBuilder, &cm.offsets, ensureTermination, len(listeners) > 0)
+	fe := frontend.NewFrontendCompiler(module, ssaBuilder, &cm.offsets, ensureTermination, withListener)
 	machine := newMachine()
 	be := backend.NewCompiler(ctx, machine, ssaBuilder)
 

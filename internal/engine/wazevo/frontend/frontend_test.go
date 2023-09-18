@@ -76,14 +76,14 @@ signatures:
 
 blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i32)
 	Store module_ctx, exec_ctx, 0x8
-	v4:i64 = Load exec_ctx, 0x468
+	v4:i64 = Load module_ctx, 0x8
 	v5:i64 = Load v4, 0x0
 	v6:i32 = Iconst_32 0x0
 	CallIndirect v5:sig1, exec_ctx, v6, v2, v3
 	v7:i32 = Iadd v2, v3
 	v8:i32 = Isub v7, v2
 	Store module_ctx, exec_ctx, 0x8
-	v9:i64 = Load exec_ctx, 0x470
+	v9:i64 = Load module_ctx, 0x10
 	v10:i64 = Load v9, 0x0
 	v11:i32 = Iconst_32 0x0
 	CallIndirect v10:sig2, exec_ctx, v11, v8
@@ -1791,7 +1791,7 @@ blk4: () <-- (blk2,blk3)
 
 			b := ssa.NewBuilder()
 
-			offset := wazevoapi.NewModuleContextOffsetData(tc.m)
+			offset := wazevoapi.NewModuleContextOffsetData(tc.m, tc.needListener)
 			fc := NewFrontendCompiler(tc.m, b, &offset, tc.ensureTermination, tc.needListener)
 			typeIndex := tc.m.FunctionSection[tc.targetIndex]
 			code := &tc.m.CodeSection[tc.targetIndex]

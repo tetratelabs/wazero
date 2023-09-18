@@ -45,11 +45,12 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 	//                | size_of_arg_ret |
 	//                |  ReturnAddress  |
 	//                +-----------------+ <----+
-	//                |  arg[N]/ret[M]  |      |
-	//                |   ............  |      | goCallStackSize
-	//                |  arg[1]/ret[1]  |      |
-	//                |  arg[0]/ret[0]  | <----+
-	//                |     xxxxxx      |  ;; unused space to make it 16-byte aligned.
+	//                |      xxxx       |      |  ;; might be padded to make it 16-byte aligned.
+	//           +--->|  arg[N]/ret[M]  |      |
+	//  sliceSize|    |   ............  |      | goCallStackSize
+	//           |    |  arg[1]/ret[1]  |      |
+	//           +--->|  arg[0]/ret[0]  | <----+
+	//                |    sliceSize    |
 	//                |   frame_size    |
 	//                +-----------------+
 	//                   (low address)
@@ -58,10 +59,10 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 	// therefore will be accessed as the usual []uint64. So that's where we need to pass/receive
 	// the arguments/return values.
 
-	const callFrameSize = 32 // == frame_size + xxxxxx + ReturnAddress + size_of_arg_ret.
+	const callFrameSize = 32 // == frame_size + sliceSize + ReturnAddress + size_of_arg_ret.
 
 	// First of all, we should allocate the stack for the Go function call if necessary.
-	goCallStackSize := goFunctionCallRequiredStackSize(sig, argBegin)
+	goCallStackSize, sliceSizeInBytes := goFunctionCallRequiredStackSize(sig, argBegin)
 	cur = m.insertStackBoundsCheck(goCallStackSize+callFrameSize, cur)
 
 	// Next is to create "ReturnAddress + size_of_arg_ret".
@@ -117,8 +118,21 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 		}
 	}
 
-	// Finally, now that we've advanced SP to arg[0]/ret[0], we allocate `frame_size + xxxxxx `.
-	cur = m.createFrameSizeSlot(cur, goCallStackSize)
+	// Finally, now that we've advanced SP to arg[0]/ret[0], we allocate `frame_size + sliceSize`.
+	var frameSizeReg, sliceSizeReg regalloc.VReg
+	if goCallStackSize > 0 {
+		cur = m.lowerConstantI64AndInsert(cur, tmpRegVReg, goCallStackSize)
+		frameSizeReg = tmpRegVReg
+		cur = m.lowerConstantI64AndInsert(cur, x16VReg, sliceSizeInBytes/8)
+		sliceSizeReg = x16VReg
+	} else {
+		frameSizeReg = xzrVReg
+		sliceSizeReg = xzrVReg
+	}
+	_amode := addressModePreOrPostIndex(spVReg, -16, true)
+	storeP := m.allocateInstr()
+	storeP.asStorePair64(frameSizeReg, sliceSizeReg, _amode)
+	cur = linkInstr(cur, storeP)
 
 	// Set the exit status on the execution context.
 	cur = m.setExitCode(cur, x0VReg, exitCode)
@@ -309,7 +323,7 @@ func (m *machine) saveCurrentStackPointer(cur *instruction, execCtr regalloc.VRe
 }
 
 // goFunctionCallRequiredStackSize returns the size of the stack required for the Go function call.
-func goFunctionCallRequiredStackSize(sig *ssa.Signature, argBegin int) (ret int64) {
+func goFunctionCallRequiredStackSize(sig *ssa.Signature, argBegin int) (ret, retUnaligned int64) {
 	var paramNeededInBytes, resultNeededInBytes int64
 	for _, p := range sig.Params[argBegin:] {
 		s := int64(p.Size())
@@ -331,6 +345,7 @@ func goFunctionCallRequiredStackSize(sig *ssa.Signature, argBegin int) (ret int6
 	} else {
 		ret = resultNeededInBytes
 	}
+	retUnaligned = ret
 	// Align to 16 bytes.
 	ret = (ret + 15) &^ 15
 	return

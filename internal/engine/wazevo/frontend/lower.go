@@ -2129,8 +2129,8 @@ func (c *Compiler) callListenerBefore() {
 
 	builder := c.ssaBuilder
 	beforeListeners1stElement := builder.AllocateInstruction().
-		AsLoad(c.execCtxPtrValue,
-			wazevoapi.ExecutionContextOffsetBeforeListenerTrampolines1stElement.U32(),
+		AsLoad(c.moduleCtxPtrValue,
+			c.offset.BeforeListenerTrampolines1stElement.U32(),
 			ssa.TypeI64,
 		).Insert(builder).Return()
 
@@ -2159,8 +2159,8 @@ func (c *Compiler) callListenerAfter() {
 
 	builder := c.ssaBuilder
 	afterListeners1stElement := builder.AllocateInstruction().
-		AsLoad(c.execCtxPtrValue,
-			wazevoapi.ExecutionContextOffsetAfterListenerTrampolines1stElement.U32(),
+		AsLoad(c.moduleCtxPtrValue,
+			c.offset.AfterListenerTrampolines1stElement.U32(),
 			ssa.TypeI64,
 		).Insert(builder).Return()
 

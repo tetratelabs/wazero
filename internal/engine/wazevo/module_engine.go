@@ -107,6 +107,13 @@ func (m *moduleEngine) setupOpaque() {
 			tableOffset += 8
 		}
 	}
+
+	if beforeListenerOffset := offsets.BeforeListenerTrampolines1stElement; beforeListenerOffset >= 0 {
+		binary.LittleEndian.PutUint64(opaque[beforeListenerOffset:], uint64(uintptr(unsafe.Pointer(&m.parent.listenerBeforeTrampolines[0]))))
+	}
+	if afterListenerOffset := offsets.AfterListenerTrampolines1stElement; afterListenerOffset >= 0 {
+		binary.LittleEndian.PutUint64(opaque[afterListenerOffset:], uint64(uintptr(unsafe.Pointer(&m.parent.listenerAfterTrampolines[0]))))
+	}
 }
 
 // NewFunction implements wasm.ModuleEngine.
@@ -143,10 +150,6 @@ func (m *moduleEngine) NewFunction(index wasm.Index) api.Function {
 		numberOfResults:        typ.ResultNumInUint64,
 	}
 
-	if len(m.listeners) > 0 {
-		ce.execCtx.beforeListenerTrampolines1stElement = &m.parent.listenerBeforeTrampolines[0]
-		ce.execCtx.afterListenerTrampolines1stElement = &m.parent.listenerAfterTrampolines[0]
-	}
 	ce.execCtx.memoryGrowTrampolineAddress = &m.parent.sharedFunctions.memoryGrowExecutable[0]
 	ce.execCtx.stackGrowCallTrampolineAddress = &m.parent.sharedFunctions.stackGrowExecutable[0]
 	ce.execCtx.checkModuleExitCodeTrampolineAddress = &m.parent.sharedFunctions.checkModuleExitCode[0]

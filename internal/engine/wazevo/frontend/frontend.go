@@ -3,6 +3,7 @@ package frontend
 
 import (
 	"bytes"
+
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 	"github.com/tetratelabs/wazero/internal/wasm"

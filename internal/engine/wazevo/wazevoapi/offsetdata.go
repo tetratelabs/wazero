@@ -44,10 +44,6 @@ const (
 	ExecutionContextOffsetSavedRegistersBegin Offset = 96
 	// ExecutionContextOffsetGoFunctionCallCalleeModuleContextOpaque is an offset of `goFunctionCallCalleeModuleContextOpaque` field in wazevo.executionContext
 	ExecutionContextOffsetGoFunctionCallCalleeModuleContextOpaque Offset = 1120
-	// ExecutionContextOffsetBeforeListenerTrampolines1stElement is an offset of `beforeListenerTrampolines1stElement` field in wazevo.executionContext
-	ExecutionContextOffsetBeforeListenerTrampolines1stElement Offset = 1128
-	// ExecutionContextOffsetAfterListenerTrampolines1stElement is an offset of `afterListenerTrampolines1stElement` field in wazevo.executionContext
-	ExecutionContextOffsetAfterListenerTrampolines1stElement Offset = 1136
 )
 
 // ModuleContextOffsetData allows the compilers to get the information about offsets to the fields of wazevo.moduleContextOpaque,
@@ -60,7 +56,9 @@ type ModuleContextOffsetData struct {
 	ImportedFunctionsBegin,
 	GlobalsBegin,
 	TypeIDs1stElement,
-	TablesBegin Offset
+	TablesBegin,
+	BeforeListenerTrampolines1stElement,
+	AfterListenerTrampolines1stElement Offset
 }
 
 // ImportedFunctionOffset returns an offset of the i-th imported function.
@@ -115,7 +113,7 @@ func (m *ModuleContextOffsetData) TableOffset(tableIndex int) Offset {
 
 // NewModuleContextOffsetData creates a ModuleContextOffsetData determining the structure of moduleContextOpaque for the given Module.
 // The structure is described in the comment of wazevo.moduleContextOpaque.
-func NewModuleContextOffsetData(m *wasm.Module) ModuleContextOffsetData {
+func NewModuleContextOffsetData(m *wasm.Module, withListener bool) ModuleContextOffsetData {
 	ret := ModuleContextOffsetData{}
 	var offset Offset
 
@@ -169,6 +167,17 @@ func NewModuleContextOffsetData(m *wasm.Module) ModuleContextOffsetData {
 	} else {
 		ret.TypeIDs1stElement = -1
 		ret.TablesBegin = -1
+	}
+
+	if withListener {
+		ret.BeforeListenerTrampolines1stElement = offset
+		offset += 8 // First element of BeforeListenerTrampolines.
+
+		ret.AfterListenerTrampolines1stElement = offset
+		offset += 8 // First element of AfterListenerTrampolines.
+	} else {
+		ret.BeforeListenerTrampolines1stElement = -1
+		ret.AfterListenerTrampolines1stElement = -1
 	}
 
 	ret.TotalSize = int(offset)

@@ -66,6 +66,8 @@ func (e ExitCode) String() string {
 		return "call_go_module_function_with_listener"
 	case ExitCodeCallGoFunctionWithListener:
 		return "call_go_function_with_listener"
+	case ExitCodeGrowMemory:
+		return "grow_memory"
 	}
 	panic("TODO")
 }
