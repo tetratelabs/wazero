@@ -190,30 +190,6 @@ func (multi *multiFunctionListener) Abort(ctx context.Context, mod api.Module, d
 	}
 }
 
-type parameters struct {
-	values []uint64
-	limits []uint8
-}
-
-func (ps *parameters) append(values []uint64) {
-	ps.values = append(ps.values, values...)
-	ps.limits = append(ps.limits, uint8(len(ps.values)))
-}
-
-func (ps *parameters) clear() {
-	ps.values = ps.values[:0]
-	ps.limits = ps.limits[:0]
-}
-
-func (ps *parameters) index(i int) []uint64 {
-	j := uint8(0)
-	k := ps.limits[i]
-	if i > 0 {
-		j = ps.limits[i-1]
-	}
-	return ps.values[j:k:k]
-}
-
 type stackIterator struct {
 	base  StackIterator
 	index int
