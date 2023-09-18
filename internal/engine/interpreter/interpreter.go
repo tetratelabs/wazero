@@ -271,14 +271,6 @@ func (si *stackIterator) ProgramCounter() experimental.ProgramCounter {
 	return experimental.ProgramCounter(si.pc)
 }
 
-// Parameters implements the same method as documented on
-// experimental.StackIterator.
-func (si *stackIterator) Parameters() []uint64 {
-	paramsCount := si.fn.funcType.ParamNumInUint64
-	top := len(si.stack)
-	return si.stack[top-paramsCount:]
-}
-
 // internalFunction implements experimental.InternalFunction.
 type internalFunction struct{ *function }
 

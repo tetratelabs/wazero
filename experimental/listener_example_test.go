@@ -94,22 +94,18 @@ func Example_stackIterator() {
 		fn := it.Function()
 		pc := it.ProgramCounter()
 		fmt.Println("function:", fn.Definition().DebugName())
-		fmt.Println("\tparameters:", it.Parameters())
 		fmt.Println("\tprogram counter:", pc)
 		fmt.Println("\tsource offset:", fn.SourceOffsetForPC(pc))
 	}
 
 	// Output:
 	// function: fn0
-	// 	parameters: [1 2 3]
 	// 	program counter: 5890831
 	// 	source offset: 1234
 	// function: fn1
-	// 	parameters: []
 	// 	program counter: 5899822
 	// 	source offset: 7286
 	// function: fn2
-	// 	parameters: [4]
 	// 	program counter: 6820312
 	// 	source offset: 935891
 }
@@ -151,10 +147,6 @@ func (s *fakeStackIterator) Function() experimental.InternalFunction {
 		definition:   s.def,
 		sourceOffset: s.sourceOffset,
 	}
-}
-
-func (s *fakeStackIterator) Parameters() []uint64 {
-	return s.args
 }
 
 func (s *fakeStackIterator) ProgramCounter() experimental.ProgramCounter {

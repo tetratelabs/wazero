@@ -1329,27 +1329,26 @@ func testBeforeListenerGlobals(t *testing.T, r wazero.Runtime) {
 func testBeforeListenerStackIterator(t *testing.T, r wazero.Runtime) {
 	type stackEntry struct {
 		debugName string
-		args      []uint64
 	}
 
 	expectedCallstacks := [][]stackEntry{
 		{ // when calling f1
-			{debugName: "whatever.f1", args: []uint64{2, 3, 4}},
+			{debugName: "whatever.f1"},
 		},
 		{ // when calling f2
-			{debugName: "whatever.f2", args: []uint64{}},
-			{debugName: "whatever.f1", args: []uint64{2, 3, 4}},
+			{debugName: "whatever.f2"},
+			{debugName: "whatever.f1"},
 		},
-		{ // when calling f3
-			{debugName: "whatever.f3", args: []uint64{5}},
-			{debugName: "whatever.f2", args: []uint64{}},
-			{debugName: "whatever.f1", args: []uint64{2, 3, 4}},
+		{ // when calling
+			{debugName: "whatever.f3"},
+			{debugName: "whatever.f2"},
+			{debugName: "whatever.f1"},
 		},
 		{ // when calling f4
-			{debugName: "host.f4", args: []uint64{6}},
-			{debugName: "whatever.f3", args: []uint64{5}},
-			{debugName: "whatever.f2", args: []uint64{}},
-			{debugName: "whatever.f1", args: []uint64{2, 3, 4}},
+			{debugName: "host.f4"},
+			{debugName: "whatever.f3"},
+			{debugName: "whatever.f2"},
+			{debugName: "whatever.f1"},
 		},
 	}
 
@@ -1360,7 +1359,6 @@ func testBeforeListenerStackIterator(t *testing.T, r wazero.Runtime) {
 			for si.Next() {
 				require.True(t, len(expectedCallstack) > 0)
 				require.Equal(t, expectedCallstack[0].debugName, si.Function().Definition().DebugName())
-				require.Equal(t, expectedCallstack[0].args, si.Parameters())
 				expectedCallstack = expectedCallstack[1:]
 			}
 			require.Equal(t, 0, len(expectedCallstack))

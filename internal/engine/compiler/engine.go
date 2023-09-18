@@ -1195,11 +1195,6 @@ func (si *stackIterator) Function() experimental.InternalFunction {
 	return internalFunction{si.fn}
 }
 
-// Parameters implements the same method as documented on experimental.StackIterator.
-func (si *stackIterator) Parameters() []uint64 {
-	return si.stack[si.base : si.base+si.fn.funcType.ParamNumInUint64]
-}
-
 // internalFunction implements experimental.InternalFunction.
 type internalFunction struct{ *function }
 

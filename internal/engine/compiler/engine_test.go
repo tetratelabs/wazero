@@ -436,14 +436,13 @@ func Test_callFrameOffset(t *testing.T) {
 }
 
 type stackEntry struct {
-	def  api.FunctionDefinition
-	args []uint64
+	def api.FunctionDefinition
 }
 
 func assertStackIterator(t *testing.T, it experimental.StackIterator, expected []stackEntry) {
 	var actual []stackEntry
 	for it.Next() {
-		actual = append(actual, stackEntry{def: it.Function().Definition(), args: it.Parameters()})
+		actual = append(actual, stackEntry{def: it.Function().Definition()})
 	}
 	require.Equal(t, expected, actual)
 }
@@ -458,7 +457,7 @@ func TestCallEngine_builtinFunctionFunctionListenerBefore(t *testing.T) {
 				before: func(ctx context.Context, _ api.Module, def api.FunctionDefinition, params []uint64, stackIterator experimental.StackIterator) {
 					require.Equal(t, currentContext, ctx)
 					require.Equal(t, []uint64{2, 3, 4}, params)
-					assertStackIterator(t, stackIterator, []stackEntry{{def: def, args: []uint64{2, 3, 4}}})
+					assertStackIterator(t, stackIterator, []stackEntry{{def: def}})
 				},
 			},
 			index: 0,
