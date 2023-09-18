@@ -299,28 +299,83 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		v := m.allocateInstr()
 		v.asLoadFpuConst128(result, lo, hi)
 		m.insert(v)
+	case ssa.OpcodeVbnot:
+		x := instr.Arg()
+		ins := m.allocateInstr()
+		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+		rd := operandNR(m.compiler.VRegOf(instr.Return()))
+		ins.asVecMisc(vecOpNot, rd, rn, vecArrangement16B)
+		m.insert(ins)
+	case ssa.OpcodeVbxor:
+		x, y := instr.Arg2()
+		m.lowerVecRRR(vecOpEOR, x, y, instr.Return(), vecArrangement16B)
+	case ssa.OpcodeVbor:
+		x, y := instr.Arg2()
+		m.lowerVecRRR(vecOpOrr, x, y, instr.Return(), vecArrangement16B)
+	case ssa.OpcodeVband:
+		x, y := instr.Arg2()
+		m.lowerVecRRR(vecOpAnd, x, y, instr.Return(), vecArrangement16B)
+	case ssa.OpcodeVbandnot:
+		x, y := instr.Arg2()
+		m.lowerVecRRR(vecOpBic, x, y, instr.Return(), vecArrangement16B)
+	case ssa.OpcodeVbitselect:
+		c, x, y := instr.SelectData()
+		ins := m.allocateInstr()
+		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+		rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
+		creg := m.getOperand_NR(m.compiler.ValueDefinition(c), extModeNone)
+		ins.asVecRRR(vecOpBsl, creg, rn, rm, vecArrangement16B)
+		m.insert(ins)
+
+		rd := m.compiler.VRegOf(instr.Return())
+		mov := m.allocateInstr()
+		mov.asFpuMov128(rd, creg.nr())
+
+		m.insert(mov)
 	case ssa.OpcodeVIadd:
-		m.lowerVecRRR(vecOpAdd, instr)
+		x, y, lane := instr.Arg2WithLane()
+		arr := ssaLaneToArrangement(lane)
+		m.lowerVecRRR(vecOpAdd, x, y, instr.Return(), arr)
 	case ssa.OpcodeVSaddSat:
-		m.lowerVecRRR(vecOpSqadd, instr)
+		x, y, lane := instr.Arg2WithLane()
+		arr := ssaLaneToArrangement(lane)
+		m.lowerVecRRR(vecOpSqadd, x, y, instr.Return(), arr)
 	case ssa.OpcodeVUaddSat:
-		m.lowerVecRRR(vecOpUqadd, instr)
+		x, y, lane := instr.Arg2WithLane()
+		arr := ssaLaneToArrangement(lane)
+		m.lowerVecRRR(vecOpUqadd, x, y, instr.Return(), arr)
 	case ssa.OpcodeVIsub:
-		m.lowerVecRRR(vecOpSub, instr)
+		x, y, lane := instr.Arg2WithLane()
+		arr := ssaLaneToArrangement(lane)
+		m.lowerVecRRR(vecOpSub, x, y, instr.Return(), arr)
 	case ssa.OpcodeVSsubSat:
-		m.lowerVecRRR(vecOpSqsub, instr)
+		x, y, lane := instr.Arg2WithLane()
+		arr := ssaLaneToArrangement(lane)
+		m.lowerVecRRR(vecOpSqsub, x, y, instr.Return(), arr)
 	case ssa.OpcodeVUsubSat:
-		m.lowerVecRRR(vecOpUqsub, instr)
+		x, y, lane := instr.Arg2WithLane()
+		arr := ssaLaneToArrangement(lane)
+		m.lowerVecRRR(vecOpUqsub, x, y, instr.Return(), arr)
 	case ssa.OpcodeVImin:
-		m.lowerVecRRR(vecOpSmin, instr)
+		x, y, lane := instr.Arg2WithLane()
+		arr := ssaLaneToArrangement(lane)
+		m.lowerVecRRR(vecOpSmin, x, y, instr.Return(), arr)
 	case ssa.OpcodeVUmin:
-		m.lowerVecRRR(vecOpUmin, instr)
+		x, y, lane := instr.Arg2WithLane()
+		arr := ssaLaneToArrangement(lane)
+		m.lowerVecRRR(vecOpUmin, x, y, instr.Return(), arr)
 	case ssa.OpcodeVImax:
-		m.lowerVecRRR(vecOpSmax, instr)
+		x, y, lane := instr.Arg2WithLane()
+		arr := ssaLaneToArrangement(lane)
+		m.lowerVecRRR(vecOpSmax, x, y, instr.Return(), arr)
 	case ssa.OpcodeVUmax:
-		m.lowerVecRRR(vecOpUmax, instr)
+		x, y, lane := instr.Arg2WithLane()
+		arr := ssaLaneToArrangement(lane)
+		m.lowerVecRRR(vecOpUmax, x, y, instr.Return(), arr)
 	case ssa.OpcodeVAvgRound:
-		m.lowerVecRRR(vecOpUrhadd, instr)
+		x, y, lane := instr.Arg2WithLane()
+		arr := ssaLaneToArrangement(lane)
+		m.lowerVecRRR(vecOpUrhadd, x, y, instr.Return(), arr)
 	case ssa.OpcodeVImul:
 		x, y, lane := instr.Arg2WithLane()
 		arr := ssaLaneToArrangement(lane)
@@ -350,13 +405,11 @@ func (m *machine) lowerVecMisc(op vecOp, instr *ssa.Instruction) {
 	m.insert(ins)
 }
 
-func (m *machine) lowerVecRRR(op vecOp, instr *ssa.Instruction) {
-	x, y, lane := instr.Arg2WithLane()
-	arr := ssaLaneToArrangement(lane)
+func (m *machine) lowerVecRRR(op vecOp, x, y, ret ssa.Value, arr vecArrangement) {
 	ins := m.allocateInstr()
 	rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
 	rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
-	rd := operandNR(m.compiler.VRegOf(instr.Return()))
+	rd := operandNR(m.compiler.VRegOf(ret))
 	ins.asVecRRR(op, rd, rn, rm, arr)
 	m.insert(ins)
 }

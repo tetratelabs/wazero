@@ -290,6 +290,25 @@ const (
 	// OpcodeVconst represents the 128bit vector const.
 	OpcodeVconst
 
+	// OpcodeVbor computes binary or between two 128bit vectors: `v = bor x, y`.
+	OpcodeVbor
+
+	// OpcodeVbxor computes binary xor between two 128bit vectors: `v = bxor x, y`.
+	OpcodeVbxor
+
+	// OpcodeVband computes binary and between two 128bit vectors: `v = band x, y`.
+	OpcodeVband
+
+	// OpcodeVbandnot computes binary and-not between two 128bit vectors: `v = bandnot x, y`.
+	OpcodeVbandnot
+
+	// OpcodeVbnot negates a 128bit vector: `v = bnot x`.
+	OpcodeVbnot
+
+	// OpcodeVbitselect uses the bits in the control mask c to select the corresponding bit from x when 1
+	// and y when 0: `v = bitselect c, x, y`.
+	OpcodeVbitselect
+
 	// OpcodeShuffle ...
 	// `v = shuffle a, b, mask`.
 	OpcodeShuffle
@@ -851,6 +870,15 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeFabs:               sideEffectNone,
 	OpcodeFcopysign:          sideEffectNone,
 	OpcodeVconst:             sideEffectNone,
+	OpcodeVbor:               sideEffectNone,
+	OpcodeVbxor:              sideEffectNone,
+	OpcodeVband:              sideEffectNone,
+	OpcodeVbandnot:           sideEffectNone,
+	OpcodeVbnot:              sideEffectNone,
+	OpcodeVbitselect:         sideEffectTraps,
+	OpcodeVanyTrue:           sideEffectNone,
+	OpcodeVallTrue:           sideEffectNone,
+	OpcodeVhighBits:          sideEffectNone,
 	OpcodeVIadd:              sideEffectNone,
 	OpcodeVSaddSat:           sideEffectNone,
 	OpcodeVUaddSat:           sideEffectNone,
@@ -879,48 +907,57 @@ func (i *Instruction) sideEffect() sideEffect {
 
 // instructionReturnTypes provides the function to determine the return types of an instruction.
 var instructionReturnTypes = [opcodeEnd]returnTypesFn{
-	OpcodeVIadd:     returnTypesFnV128,
-	OpcodeVSaddSat:  returnTypesFnV128,
-	OpcodeVUaddSat:  returnTypesFnV128,
-	OpcodeVIsub:     returnTypesFnV128,
-	OpcodeVSsubSat:  returnTypesFnV128,
-	OpcodeVUsubSat:  returnTypesFnV128,
-	OpcodeVImin:     returnTypesFnV128,
-	OpcodeVUmin:     returnTypesFnV128,
-	OpcodeVImax:     returnTypesFnV128,
-	OpcodeVUmax:     returnTypesFnV128,
-	OpcodeVImul:     returnTypesFnV128,
-	OpcodeVAvgRound: returnTypesFnV128,
-	OpcodeVIabs:     returnTypesFnV128,
-	OpcodeVIneg:     returnTypesFnV128,
-	OpcodeVIpopcnt:  returnTypesFnV128,
-	OpcodeBand:      returnTypesFnSingle,
-	OpcodeFcopysign: returnTypesFnSingle,
-	OpcodeBitcast:   returnTypesFnSingle,
-	OpcodeBor:       returnTypesFnSingle,
-	OpcodeBxor:      returnTypesFnSingle,
-	OpcodeRotl:      returnTypesFnSingle,
-	OpcodeRotr:      returnTypesFnSingle,
-	OpcodeIshl:      returnTypesFnSingle,
-	OpcodeSshr:      returnTypesFnSingle,
-	OpcodeSdiv:      returnTypesFnSingle,
-	OpcodeSrem:      returnTypesFnSingle,
-	OpcodeUdiv:      returnTypesFnSingle,
-	OpcodeUrem:      returnTypesFnSingle,
-	OpcodeUshr:      returnTypesFnSingle,
-	OpcodeJump:      returnTypesFnNoReturns,
-	OpcodeUndefined: returnTypesFnNoReturns,
-	OpcodeIconst:    returnTypesFnSingle,
-	OpcodeSelect:    returnTypesFnSingle,
-	OpcodeSExtend:   returnTypesFnSingle,
-	OpcodeUExtend:   returnTypesFnSingle,
-	OpcodeIreduce:   returnTypesFnSingle,
-	OpcodeFabs:      returnTypesFnSingle,
-	OpcodeSqrt:      returnTypesFnSingle,
-	OpcodeCeil:      returnTypesFnSingle,
-	OpcodeFloor:     returnTypesFnSingle,
-	OpcodeTrunc:     returnTypesFnSingle,
-	OpcodeNearest:   returnTypesFnSingle,
+	OpcodeVbor:       returnTypesFnV128,
+	OpcodeVbxor:      returnTypesFnV128,
+	OpcodeVband:      returnTypesFnV128,
+	OpcodeVbnot:      returnTypesFnV128,
+	OpcodeVbandnot:   returnTypesFnV128,
+	OpcodeVbitselect: returnTypesFnV128,
+	OpcodeVanyTrue:   returnTypesFnV128,
+	OpcodeVallTrue:   returnTypesFnV128,
+	OpcodeVhighBits:  returnTypesFnV128,
+	OpcodeVIadd:      returnTypesFnV128,
+	OpcodeVSaddSat:   returnTypesFnV128,
+	OpcodeVUaddSat:   returnTypesFnV128,
+	OpcodeVIsub:      returnTypesFnV128,
+	OpcodeVSsubSat:   returnTypesFnV128,
+	OpcodeVUsubSat:   returnTypesFnV128,
+	OpcodeVImin:      returnTypesFnV128,
+	OpcodeVUmin:      returnTypesFnV128,
+	OpcodeVImax:      returnTypesFnV128,
+	OpcodeVUmax:      returnTypesFnV128,
+	OpcodeVImul:      returnTypesFnV128,
+	OpcodeVAvgRound:  returnTypesFnV128,
+	OpcodeVIabs:      returnTypesFnV128,
+	OpcodeVIneg:      returnTypesFnV128,
+	OpcodeVIpopcnt:   returnTypesFnV128,
+	OpcodeBand:       returnTypesFnSingle,
+	OpcodeFcopysign:  returnTypesFnSingle,
+	OpcodeBitcast:    returnTypesFnSingle,
+	OpcodeBor:        returnTypesFnSingle,
+	OpcodeBxor:       returnTypesFnSingle,
+	OpcodeRotl:       returnTypesFnSingle,
+	OpcodeRotr:       returnTypesFnSingle,
+	OpcodeIshl:       returnTypesFnSingle,
+	OpcodeSshr:       returnTypesFnSingle,
+	OpcodeSdiv:       returnTypesFnSingle,
+	OpcodeSrem:       returnTypesFnSingle,
+	OpcodeUdiv:       returnTypesFnSingle,
+	OpcodeUrem:       returnTypesFnSingle,
+	OpcodeUshr:       returnTypesFnSingle,
+	OpcodeJump:       returnTypesFnNoReturns,
+	OpcodeUndefined:  returnTypesFnNoReturns,
+	OpcodeIconst:     returnTypesFnSingle,
+	OpcodeSelect:     returnTypesFnSingle,
+	OpcodeSExtend:    returnTypesFnSingle,
+	OpcodeUExtend:    returnTypesFnSingle,
+	OpcodeIreduce:    returnTypesFnSingle,
+	OpcodeFabs:       returnTypesFnSingle,
+	OpcodeSqrt:       returnTypesFnSingle,
+	OpcodeCeil:       returnTypesFnSingle,
+	OpcodeFloor:      returnTypesFnSingle,
+	OpcodeTrunc:      returnTypesFnSingle,
+	OpcodeNearest:    returnTypesFnSingle,
 	OpcodeCallIndirect: func(b *builder, instr *Instruction) (t1 Type, ts []Type) {
 		sigID := SignatureID(instr.u1)
 		sig, ok := b.signatures[sigID]
@@ -1465,6 +1502,60 @@ func (i *Instruction) AsVconst(lo, hi uint64) *Instruction {
 	return i
 }
 
+// AsVbnot initializes this instruction as a vector negation instruction with OpcodeVbnot.
+func (i *Instruction) AsVbnot(v Value) *Instruction {
+	i.opcode = OpcodeVbnot
+	i.typ = TypeV128
+	i.v = v
+	return i
+}
+
+// AsVband initializes this instruction as an and vector instruction with OpcodeVband.
+func (i *Instruction) AsVband(x, y Value) *Instruction {
+	i.opcode = OpcodeVband
+	i.typ = TypeV128
+	i.v = x
+	i.v2 = y
+	return i
+}
+
+// AsVbor initializes this instruction as an or vector instruction with OpcodeVbor.
+func (i *Instruction) AsVbor(x, y Value) *Instruction {
+	i.opcode = OpcodeVbor
+	i.typ = TypeV128
+	i.v = x
+	i.v2 = y
+	return i
+}
+
+// AsVbxor initializes this instruction as a xor vector instruction with OpcodeVbxor.
+func (i *Instruction) AsVbxor(x, y Value) *Instruction {
+	i.opcode = OpcodeVbxor
+	i.typ = TypeV128
+	i.v = x
+	i.v2 = y
+	return i
+}
+
+// AsVbandnot initializes this instruction as an and-not vector instruction with OpcodeVbandnot.
+func (i *Instruction) AsVbandnot(x, y Value) *Instruction {
+	i.opcode = OpcodeVbandnot
+	i.typ = TypeV128
+	i.v = x
+	i.v2 = y
+	return i
+}
+
+// AsVbitselect initializes this instruction as a bit select vector instruction with OpcodeVbitselect.
+func (i *Instruction) AsVbitselect(c, x, y Value) *Instruction {
+	i.opcode = OpcodeVbitselect
+	i.typ = TypeV128
+	i.v = c
+	i.v2 = x
+	i.v3 = y
+	return i
+}
+
 // VconstData returns the operands of this vector constant instruction.
 func (i *Instruction) VconstData() (lo, hi uint64) {
 	return i.u1, i.u2
@@ -1883,7 +1974,7 @@ func (i *Instruction) Format(b Builder) string {
 		instSuffix = fmt.Sprintf(" %s, %#x", i.v.Format(b), int32(i.u1))
 	case OpcodeUload8, OpcodeUload16, OpcodeUload32, OpcodeSload8, OpcodeSload16, OpcodeSload32:
 		instSuffix = fmt.Sprintf(" %s, %#x", i.v.Format(b), int32(i.u1))
-	case OpcodeSelect:
+	case OpcodeSelect, OpcodeVbitselect:
 		instSuffix = fmt.Sprintf(" %s, %s, %s", i.v.Format(b), i.v2.Format(b), i.v3.Format(b))
 	case OpcodeIconst:
 		switch i.typ {
@@ -1941,16 +2032,18 @@ func (i *Instruction) Format(b Builder) string {
 		}
 		instSuffix += "]"
 	case OpcodeBand, OpcodeBor, OpcodeBxor, OpcodeRotr, OpcodeRotl, OpcodeIshl, OpcodeSshr, OpcodeUshr,
-		OpcodeSdiv, OpcodeUdiv, OpcodeFcopysign, OpcodeSrem, OpcodeUrem:
+		OpcodeSdiv, OpcodeUdiv, OpcodeFcopysign, OpcodeSrem, OpcodeUrem,
+		OpcodeVbnot, OpcodeVbxor, OpcodeVbor, OpcodeVband, OpcodeVbandnot:
 		instSuffix = fmt.Sprintf(" %s, %s", i.v.Format(b), i.v2.Format(b))
 	case OpcodeUndefined:
 	case OpcodeClz, OpcodeCtz, OpcodePopcnt, OpcodeFneg, OpcodeFcvtToSint, OpcodeFcvtToUint, OpcodeFcvtFromSint,
 		OpcodeFcvtFromUint, OpcodeFcvtToSintSat, OpcodeFcvtToUintSat, OpcodeFdemote, OpcodeFpromote, OpcodeIreduce, OpcodeBitcast, OpcodeSqrt, OpcodeFabs,
 		OpcodeCeil, OpcodeFloor, OpcodeTrunc, OpcodeNearest:
 		instSuffix = " " + i.v.Format(b)
-	case OpcodeVIadd, OpcodeVSaddSat, OpcodeVUaddSat, OpcodeVIsub, OpcodeVSsubSat, OpcodeVUsubSat, OpcodeVImin, OpcodeVUmin, OpcodeVImax, OpcodeVUmax, OpcodeVImul:
+	case OpcodeVIadd, OpcodeVSaddSat, OpcodeVUaddSat, OpcodeVIsub, OpcodeVSsubSat, OpcodeVUsubSat,
+		OpcodeVImin, OpcodeVUmin, OpcodeVImax, OpcodeVUmax, OpcodeVImul:
 		instSuffix = fmt.Sprintf(".%s %s, %s", VecLane(i.u1), i.v.Format(b), i.v2.Format(b))
-	case OpcodeVIabs, OpcodeVIneg, OpcodeVIpopcnt:
+	case OpcodeVIabs, OpcodeVIneg, OpcodeVIpopcnt, OpcodeVhighBits, OpcodeVallTrue, OpcodeVanyTrue:
 		instSuffix = fmt.Sprintf(".%s %s", VecLane(i.u1), i.v.Format(b))
 	default:
 		panic(fmt.Sprintf("TODO: format for %s", i.opcode))
@@ -2322,6 +2415,18 @@ func (o Opcode) String() (ret string) {
 		return "Fence"
 	case OpcodeExtractVector:
 		return "ExtractVector"
+	case OpcodeVbor:
+		return "Vbor"
+	case OpcodeVbxor:
+		return "Vbxor"
+	case OpcodeVband:
+		return "Vband"
+	case OpcodeVbandnot:
+		return "Vbandnot"
+	case OpcodeVbnot:
+		return "Vbnot"
+	case OpcodeVbitselect:
+		return "Vbitselect"
 	case OpcodeVIadd:
 		return "VIadd"
 	case OpcodeVSaddSat:

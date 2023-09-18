@@ -1502,6 +1502,16 @@ func (b vecOp) String() string {
 		return "uaddlv"
 	case vecOpBit:
 		return "bit"
+	case vecOpBic:
+		return "bic"
+	case vecOpBsl:
+		return "bsl"
+	case vecOpNot:
+		return "not"
+	case vecOpAnd:
+		return "and"
+	case vecOpOrr:
+		return "orr"
 	case vecOpEOR:
 		return "eor"
 	case vecOpAdd:
@@ -1540,6 +1550,11 @@ const (
 	vecOpCnt vecOp = iota
 	vecOpUaddlv
 	vecOpBit
+	vecOpBic
+	vecOpBsl
+	vecOpNot
+	vecOpAnd
+	vecOpOrr
 	vecOpEOR
 	vecOpAdd
 	vecOpSqadd
@@ -1552,6 +1567,7 @@ const (
 	vecOpUmin
 	vecOpSmax
 	vecOpUmax
+	vecOpUmaxp
 	vecOpUrhadd
 	vecOpMul
 	vecOpUmlal

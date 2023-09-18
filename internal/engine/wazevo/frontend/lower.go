@@ -1355,6 +1355,65 @@ func (c *Compiler) lowerCurrentOpcode() {
 			state.pc += 7
 			ret := builder.AllocateInstruction().AsVconst(lo, hi).Insert(builder).Return()
 			state.push(ret)
+		case wasm.OpcodeVecV128Load:
+			_, offset := c.readMemArg()
+			if state.unreachable {
+				break
+			}
+			baseAddr := state.pop()
+			addr := c.memOpSetup(baseAddr, uint64(offset), 16)
+			load := builder.AllocateInstruction()
+			load.AsLoad(addr, offset, ssa.TypeV128)
+			builder.InsertInstruction(load)
+			state.push(load.Return())
+		case wasm.OpcodeVecV128Not:
+			if state.unreachable {
+				break
+			}
+			v1 := state.pop()
+			ret := builder.AllocateInstruction().AsVbnot(v1).Insert(builder).Return()
+			state.push(ret)
+		case wasm.OpcodeVecV128And:
+			if state.unreachable {
+				break
+			}
+			v2 := state.pop()
+			v1 := state.pop()
+			ret := builder.AllocateInstruction().AsVband(v1, v2).Insert(builder).Return()
+			state.push(ret)
+		case wasm.OpcodeVecV128AndNot:
+			if state.unreachable {
+				break
+			}
+			v2 := state.pop()
+			v1 := state.pop()
+			ret := builder.AllocateInstruction().AsVbandnot(v1, v2).Insert(builder).Return()
+			state.push(ret)
+		case wasm.OpcodeVecV128Or:
+			if state.unreachable {
+				break
+			}
+			v2 := state.pop()
+			v1 := state.pop()
+			ret := builder.AllocateInstruction().AsVbor(v1, v2).Insert(builder).Return()
+			state.push(ret)
+		case wasm.OpcodeVecV128Xor:
+			if state.unreachable {
+				break
+			}
+			v2 := state.pop()
+			v1 := state.pop()
+			ret := builder.AllocateInstruction().AsVbxor(v1, v2).Insert(builder).Return()
+			state.push(ret)
+		case wasm.OpcodeVecV128Bitselect:
+			if state.unreachable {
+				break
+			}
+			c := state.pop()
+			v2 := state.pop()
+			v1 := state.pop()
+			ret := builder.AllocateInstruction().AsVbitselect(c, v1, v2).Insert(builder).Return()
+			state.push(ret)
 		case wasm.OpcodeVecI8x16Abs, wasm.OpcodeVecI16x8Abs, wasm.OpcodeVecI32x4Abs, wasm.OpcodeVecI64x2Abs:
 			if state.unreachable {
 				break
