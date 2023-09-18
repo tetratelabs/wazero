@@ -3,6 +3,7 @@ package arm64
 import (
 	"encoding/hex"
 	"fmt"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"sort"
 	"testing"
 
@@ -53,15 +54,17 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 				},
 			},
 			exp: `
-	sub x27, sp, #0x70
+	sub x27, sp, #0x140
 	ldr x11, [x0, #0x28]
 	subs xzr, x27, x11
 	b.ge #0x14
-	orr x27, xzr, #0x70
+	movz x27, #0x140, lsl 0
 	str x27, [x0, #0x40]
 	ldr x27, [x0, #0x50]
 	bl x27
-	stp x30, xzr, [sp, #-0x10]!
+	mov x17, sp
+	orr x27, xzr, #0xc0
+	stp x30, x27, [sp, #-0x10]!
 	str x19, [x0, #0x60]
 	str x20, [x0, #0x70]
 	str x21, [x0, #0x80]
@@ -87,13 +90,36 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 	str q30, [x0, #0x1c0]
 	str q31, [x0, #0x1d0]
 	str x1, [x0, #0x460]
-	sub sp, sp, #0x50
+	sub sp, sp, #0x120
 	mov x15, sp
 	str q0, [x15], #0x10
 	str d1, [x15], #0x8
 	str q2, [x15], #0x10
-	movz x27, #0x50, lsl 0
-	movz x16, #0xa, lsl 0
+	str x2, [x15], #0x8
+	str x3, [x15], #0x8
+	str q3, [x15], #0x10
+	str d4, [x15], #0x8
+	str q5, [x15], #0x10
+	str x4, [x15], #0x8
+	str x5, [x15], #0x8
+	str q6, [x15], #0x10
+	str d7, [x15], #0x8
+	add x11, x17, #0x0
+	ldr q11, [x11, #0x10]
+	str q11, [x15], #0x10
+	str x6, [x15], #0x8
+	str x7, [x15], #0x8
+	add x11, x17, #0x10
+	ldr q11, [x11, #0x10]
+	str q11, [x15], #0x10
+	add x11, x17, #0x20
+	ldr s11, [x11, #0x8]
+	str d11, [x15], #0x8
+	add x11, x17, #0x30
+	ldr q11, [x11, #0x10]
+	str q11, [x15], #0x10
+	movz x27, #0x120, lsl 0
+	movz x16, #0x23, lsl 0
 	stp x27, x16, [sp, #-0x10]!
 	orr w17, wzr, #0xe
 	str w17, [x0]
@@ -127,19 +153,50 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 	ldr q30, [x0, #0x1c0]
 	ldr q31, [x0, #0x1d0]
 	add x15, sp, #0x10
-	ldr q17, [x15], #0x10
-	mov v0.16b, v17.16b
-	ldr s17, [x15], #0x8
-	mov v1.8b, v17.8b
-	ldr q17, [x15], #0x10
-	mov v2.16b, v17.16b
-	ldr q17, [x15], #0x10
-	mov v3.16b, v17.16b
-	ldr s17, [x15], #0x8
-	mov v4.8b, v17.8b
-	ldr q17, [x15], #0x10
-	mov v5.16b, v17.16b
-	add sp, sp, #0x70
+	add sp, sp, #0x140
+	ldr q0, [x15], #0x10
+	ldr w0, [x15], #0x8
+	ldr x1, [x15], #0x8
+	ldr q1, [x15], #0x10
+	ldr s2, [x15], #0x8
+	ldr q3, [x15], #0x10
+	ldr w2, [x15], #0x8
+	ldr x3, [x15], #0x8
+	ldr q4, [x15], #0x10
+	ldr s5, [x15], #0x8
+	ldr q6, [x15], #0x10
+	ldr w4, [x15], #0x8
+	ldr x5, [x15], #0x8
+	ldr q7, [x15], #0x10
+	ldr s11, [x15], #0x8
+	add x27, sp, #0x40
+	str s11, [x27]
+	ldr q11, [x15], #0x10
+	add x27, sp, #0x50
+	str q11, [x27]
+	ldr w6, [x15], #0x8
+	ldr x7, [x15], #0x8
+	ldr q11, [x15], #0x10
+	add x27, sp, #0x60
+	str q11, [x27]
+	ldr s11, [x15], #0x8
+	add x27, sp, #0x70
+	str s11, [x27]
+	ldr q11, [x15], #0x10
+	add x27, sp, #0x80
+	str q11, [x27]
+	ldr w11, [x15], #0x8
+	add x27, sp, #0x90
+	str w11, [x27]
+	ldr x11, [x15], #0x8
+	add x27, sp, #0x98
+	str x11, [x27]
+	ldr q11, [x15], #0x10
+	add x27, sp, #0xa0
+	str q11, [x27]
+	ldr s11, [x15], #0x8
+	add x27, sp, #0xb0
+	str s11, [x27]
 	ret
 `,
 		},
@@ -224,15 +281,11 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 	ldr q30, [x0, #0x1c0]
 	ldr q31, [x0, #0x1d0]
 	add x15, sp, #0x10
-	ldr w27, [x15], #0x8
-	mov w0, w27
-	ldr x27, [x15], #0x8
-	mov x1, x27
-	ldr s17, [x15], #0x8
-	mov v0.8b, v17.8b
-	ldr d17, [x15], #0x8
-	mov v1.8b, v17.8b
 	add sp, sp, #0x40
+	ldr w0, [x15], #0x8
+	ldr x1, [x15], #0x8
+	ldr s0, [x15], #0x8
+	ldr d1, [x15], #0x8
 	ret
 `,
 		},
@@ -402,9 +455,8 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 	ldr q30, [x0, #0x1c0]
 	ldr q31, [x0, #0x1d0]
 	add x15, sp, #0x10
-	ldr w27, [x15], #0x8
-	mov w0, w27
 	add sp, sp, #0x30
+	ldr w0, [x15], #0x8
 	ret
 `,
 		},
@@ -465,6 +517,257 @@ func Test_goFunctionCallRequiredStackSize(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			requiredSize, _ := goFunctionCallRequiredStackSize(tc.sig, tc.argBegin)
 			require.Equal(t, tc.exp, requiredSize)
+		})
+	}
+}
+
+func Test_goFunctionCallLoadStackArg(t *testing.T) {
+	originalArg0Reg := x17VReg
+	intVReg := x11VReg
+	floatVReg := v11VReg
+	for _, tc := range []struct {
+		name         string
+		arg          *backend.ABIArg
+		expResultReg regalloc.VReg
+		exp          string
+	}{
+		{
+			name:         "i32 / small offset",
+			arg:          &backend.ABIArg{Offset: 16 * 3, Type: ssa.TypeI32},
+			expResultReg: x11VReg,
+			exp: `
+	add x11, x17, #0x30
+	ldr w11, [x11, #0x8]
+`,
+		},
+		{
+			name:         "i64 / small offset",
+			arg:          &backend.ABIArg{Offset: 16 * 3, Type: ssa.TypeI64},
+			expResultReg: x11VReg,
+			exp: `
+	add x11, x17, #0x30
+	ldr x11, [x11, #0x8]
+`,
+		},
+		{
+			name:         "i32 / large offset",
+			arg:          &backend.ABIArg{Offset: 16 * 300, Type: ssa.TypeI32},
+			expResultReg: x11VReg,
+			exp: `
+	movz x27, #0x12c0, lsl 0
+	add x11, x17, x27
+	ldr w11, [x11, #0x8]
+`,
+		},
+		{
+			name:         "i64 / large offset",
+			arg:          &backend.ABIArg{Offset: 16 * 300, Type: ssa.TypeI64},
+			expResultReg: x11VReg,
+			exp: `
+	movz x27, #0x12c0, lsl 0
+	add x11, x17, x27
+	ldr x11, [x11, #0x8]
+`,
+		},
+		{
+			name:         "f32 / small offset",
+			arg:          &backend.ABIArg{Offset: 16 * 3, Type: ssa.TypeF32},
+			expResultReg: v11VReg,
+			exp: `
+	add x11, x17, #0x30
+	ldr s11, [x11, #0x8]
+`,
+		},
+		{
+			name:         "f64 / small offset",
+			arg:          &backend.ABIArg{Offset: 16 * 3, Type: ssa.TypeF64},
+			expResultReg: v11VReg,
+			exp: `
+	add x11, x17, #0x30
+	ldr d11, [x11, #0x8]
+`,
+		},
+		{
+			name:         "f32 / large offset",
+			arg:          &backend.ABIArg{Offset: 16 * 300, Type: ssa.TypeF32},
+			expResultReg: v11VReg,
+			exp: `
+	movz x27, #0x12c0, lsl 0
+	add x11, x17, x27
+	ldr s11, [x11, #0x8]
+`,
+		},
+		{
+			name:         "f64 / large offset",
+			arg:          &backend.ABIArg{Offset: 16 * 300, Type: ssa.TypeF64},
+			expResultReg: v11VReg,
+			exp: `
+	movz x27, #0x12c0, lsl 0
+	add x11, x17, x27
+	ldr d11, [x11, #0x8]
+`,
+		},
+		{
+			name:         "v128 / small offset",
+			arg:          &backend.ABIArg{Offset: 16 * 3, Type: ssa.TypeV128},
+			expResultReg: v11VReg,
+			exp: `
+	add x11, x17, #0x30
+	ldr q11, [x11, #0x10]
+`,
+		},
+		{
+			name:         "v128 / large offset",
+			arg:          &backend.ABIArg{Offset: 16 * 300, Type: ssa.TypeV128},
+			expResultReg: v11VReg,
+			exp: `
+	movz x27, #0x12c0, lsl 0
+	add x11, x17, x27
+	ldr q11, [x11, #0x10]
+`,
+		},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Run(tc.name, func(t *testing.T) {
+				_, _, m := newSetupWithMockContext()
+
+				nop := m.allocateNop()
+				_, result := m.goFunctionCallLoadStackArg(nop, originalArg0Reg, tc.arg, intVReg, floatVReg)
+				require.Equal(t, tc.expResultReg, result)
+
+				m.rootInstr = nop
+
+				fmt.Println(m.Format())
+				require.Equal(t, tc.exp, m.Format())
+
+				m.Encode()
+				fmt.Println(hex.EncodeToString(m.compiler.Buf()))
+			})
+		})
+	}
+}
+
+func Test_goFunctionCallStoreStackResult(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		result    *backend.ABIArg
+		resultReg regalloc.VReg
+		exp       string
+	}{
+		{
+			name:      "i32",
+			result:    &backend.ABIArg{Offset: 16 * 3, Type: ssa.TypeI32},
+			resultReg: x11VReg,
+			exp: `
+	add x27, sp, #0x38
+	str w11, [x27]
+`,
+		},
+		{
+			name:      "i32 / large offset",
+			result:    &backend.ABIArg{Offset: 16 * 400, Type: ssa.TypeI32},
+			resultReg: x11VReg,
+			exp: `
+	movz x27, #0x1908, lsl 0
+	add x27, sp, x27
+	str w11, [x27]
+`,
+		},
+		{
+			name:      "i64",
+			result:    &backend.ABIArg{Offset: 16 * 3, Type: ssa.TypeI64},
+			resultReg: x11VReg,
+			exp: `
+	add x27, sp, #0x38
+	str x11, [x27]
+`,
+		},
+		{
+			name:      "i64 / large offset",
+			result:    &backend.ABIArg{Offset: 16 * 400, Type: ssa.TypeI64},
+			resultReg: x11VReg,
+			exp: `
+	movz x27, #0x1908, lsl 0
+	add x27, sp, x27
+	str x11, [x27]
+`,
+		},
+		{
+			name:      "f32",
+			result:    &backend.ABIArg{Offset: 16 * 3, Type: ssa.TypeF32},
+			resultReg: v11VReg,
+			exp: `
+	add x27, sp, #0x38
+	str s11, [x27]
+`,
+		},
+		{
+			name:      "f32 / large offset",
+			result:    &backend.ABIArg{Offset: 16 * 400, Type: ssa.TypeF32},
+			resultReg: v11VReg,
+			exp: `
+	movz x27, #0x1908, lsl 0
+	add x27, sp, x27
+	str s11, [x27]
+`,
+		},
+		{
+			name:      "f64",
+			result:    &backend.ABIArg{Offset: 16 * 3, Type: ssa.TypeF64},
+			resultReg: v11VReg,
+			exp: `
+	add x27, sp, #0x38
+	str d11, [x27]
+`,
+		},
+		{
+			name:      "f64 / large offset",
+			result:    &backend.ABIArg{Offset: 16 * 400, Type: ssa.TypeF64},
+			resultReg: v11VReg,
+			exp: `
+	movz x27, #0x1908, lsl 0
+	add x27, sp, x27
+	str d11, [x27]
+`,
+		},
+		{
+			name:      "v128",
+			result:    &backend.ABIArg{Offset: 16 * 3, Type: ssa.TypeV128},
+			resultReg: v11VReg,
+			exp: `
+	add x27, sp, #0x38
+	str q11, [x27]
+`,
+		},
+		{
+			name:      "v128 / large offset",
+			result:    &backend.ABIArg{Offset: 16 * 400, Type: ssa.TypeV128},
+			resultReg: v11VReg,
+			exp: `
+	movz x27, #0x1908, lsl 0
+	add x27, sp, x27
+	str q11, [x27]
+`,
+		},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Run(tc.name, func(t *testing.T) {
+				_, _, m := newSetupWithMockContext()
+				m.currentABI = &abiImpl{argStackSize: 8}
+
+				nop := m.allocateNop()
+				m.goFunctionCallStoreStackResult(nop, spVReg, tc.result, tc.resultReg)
+
+				m.rootInstr = nop
+
+				fmt.Println(m.Format())
+				require.Equal(t, tc.exp, m.Format())
+
+				m.Encode()
+				fmt.Println(hex.EncodeToString(m.compiler.Buf()))
+			})
 		})
 	}
 }
