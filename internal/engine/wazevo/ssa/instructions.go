@@ -305,7 +305,8 @@ const (
 	// OpcodeVbnot negates a 128bit vector: `v = bnot x`.
 	OpcodeVbnot
 
-	// OpcodeVbitselect computes ...: `v = bitselect c, x, y`.
+	// OpcodeVbitselect uses the bits in the control mask c to select the corresponding bit from x when 1
+	// and y when 0: `v = bitselect c, x, y`.
 	OpcodeVbitselect
 
 	// OpcodeShuffle ...
