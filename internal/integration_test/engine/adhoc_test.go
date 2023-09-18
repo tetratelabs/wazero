@@ -57,7 +57,7 @@ var tests = map[string]testCase{
 	"memory grow in recursive call":                     {f: testMemoryGrowInRecursiveCall},
 	"call":                                              {f: testCall},
 	"module memory":                                     {f: testModuleMemory, wazevoSkip: true},
-	"two indirection to host":                           {f: testTwoIndirection, wazevoSkip: true}, // TODO:
+	"two indirection to host":                           {f: testTwoIndirection},
 	"before listener globals":                           {f: testBeforeListenerGlobals, wazevoSkip: true},
 	"before listener stack iterator":                    {f: testBeforeListenerStackIterator, wazevoSkip: true},
 	"before listener stack iterator offsets":            {f: testListenerStackIteratorOffset, wazevoSkip: true},

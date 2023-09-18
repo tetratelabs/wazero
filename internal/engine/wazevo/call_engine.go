@@ -8,6 +8,7 @@ import (
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 	"github.com/tetratelabs/wazero/internal/internalapi"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -114,15 +115,19 @@ func (c *callEngine) Call(ctx context.Context, params ...uint64) ([]uint64, erro
 	return paramResultSlice[:c.numberOfResults], nil
 }
 
-func (c *callEngine) addFrame(builder wasmdebug.ErrorBuilder, addr uintptr) {
+func (c *callEngine) addFrame(builder wasmdebug.ErrorBuilder, addr uintptr) (def api.FunctionDefinition, listener experimental.FunctionListener) {
 	eng := c.parent.parent.parent
 	cm := eng.compiledModuleOfAddr(addr)
 	if cm != nil {
 		index := cm.functionIndexOf(addr)
-		def := cm.module.FunctionDefinition(cm.module.ImportFunctionCount + index)
+		def = cm.module.FunctionDefinition(cm.module.ImportFunctionCount + index)
 		// TODO: DWARF.
 		builder.AddFrame(def.DebugName(), def.ParamTypes(), def.ResultTypes(), nil)
+		if len(cm.listeners) > 0 {
+			listener = cm.listeners[index]
+		}
 	}
+	return
 }
 
 // CallWithStack implements api.Function.
@@ -154,15 +159,29 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 	}
 	defer func() {
 		if r := recover(); r != nil {
+			type listenerForAbort struct {
+				def api.FunctionDefinition
+				lsn experimental.FunctionListener
+			}
+
+			var listeners []listenerForAbort
 			builder := wasmdebug.NewErrorBuilder()
-			c.addFrame(builder, uintptr(unsafe.Pointer(c.execCtx.goCallReturnAddress)))
+			def, lsn := c.addFrame(builder, uintptr(unsafe.Pointer(c.execCtx.goCallReturnAddress)))
+			if lsn != nil {
+				listeners = append(listeners, listenerForAbort{def, lsn})
+			}
 			returnAddrs := unwindStack(uintptr(unsafe.Pointer(c.execCtx.stackPointerBeforeGoCall)), c.stackTop)
 			for _, retAddr := range returnAddrs[:len(returnAddrs)-1] { // the last return addr is the trampoline, so we skip it.
-				c.addFrame(builder, retAddr)
+				def, lsn = c.addFrame(builder, retAddr)
+				if lsn != nil {
+					listeners = append(listeners, listenerForAbort{def, lsn})
+				}
 			}
 			err = builder.FromRecovered(r)
 
-			// TODO: Abort listener.
+			for _, lsn := range listeners {
+				lsn.lsn.Abort(ctx, m, lsn.def, err)
+			}
 		} else {
 			if err != wasmruntime.ErrRuntimeStackOverflow { // Stackoverflow case shouldn't be panic (to avoid extreme stack unwinding).
 				err = c.parent.module.FailIfClosed()
@@ -223,16 +242,18 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 		case wazevoapi.ExitCodeCallGoFunctionWithListener:
 			index := wazevoapi.GoFunctionIndexFromExitCode(ec)
 			f := hostModuleGoFuncFromOpaque[api.GoFunction](index, c.execCtx.goFunctionCallCalleeModuleContextOpaque)
+			listeners := hostModuleListenersSliceFromOpaque(c.execCtx.goFunctionCallCalleeModuleContextOpaque)
 			s := goCallStackView(c.execCtx.stackPointerBeforeGoCall)
 			// Call Listener.Before.
-			mod := c.callerModuleInstance()
-			listener := mod.Engine.(*moduleEngine).listeners[index]
-			def := mod.Source.FunctionDefinition(wasm.Index(index))
-			listener.Before(ctx, mod, def, s, nil)
+			callerModule := c.callerModuleInstance()
+			listener := listeners[index]
+			hostModule := hostModuleFromOpaque(c.execCtx.goFunctionCallCalleeModuleContextOpaque)
+			def := hostModule.FunctionDefinition(wasm.Index(index))
+			listener.Before(ctx, callerModule, def, s, nil)
 			// Call into the Go function.
 			f.Call(ctx, s)
 			// Call Listener.After.
-			listener.After(ctx, mod, def, s)
+			listener.After(ctx, callerModule, def, s)
 			// Back to the native code.
 			c.execCtx.exitCode = wazevoapi.ExitCodeOK
 			afterGoFunctionCallEntrypoint(c.execCtx.goCallReturnAddress, c.execCtxPtr, uintptr(unsafe.Pointer(c.execCtx.stackPointerBeforeGoCall)))
@@ -247,16 +268,18 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 		case wazevoapi.ExitCodeCallGoModuleFunctionWithListener:
 			index := wazevoapi.GoFunctionIndexFromExitCode(ec)
 			f := hostModuleGoFuncFromOpaque[api.GoModuleFunction](index, c.execCtx.goFunctionCallCalleeModuleContextOpaque)
+			listeners := hostModuleListenersSliceFromOpaque(c.execCtx.goFunctionCallCalleeModuleContextOpaque)
 			s := goCallStackView(c.execCtx.stackPointerBeforeGoCall)
 			// Call Listener.Before.
-			mod := c.callerModuleInstance()
-			listener := mod.Engine.(*moduleEngine).listeners[index]
-			def := mod.Source.FunctionDefinition(wasm.Index(index))
-			listener.Before(ctx, mod, def, s, nil)
+			callerModule := c.callerModuleInstance()
+			listener := listeners[index]
+			hostModule := hostModuleFromOpaque(c.execCtx.goFunctionCallCalleeModuleContextOpaque)
+			def := hostModule.FunctionDefinition(wasm.Index(index))
+			listener.Before(ctx, callerModule, def, s, nil)
 			// Call into the Go function.
-			f.Call(ctx, mod, s)
+			f.Call(ctx, callerModule, s)
 			// Call Listener.After.
-			listener.After(ctx, mod, def, s)
+			listener.After(ctx, callerModule, def, s)
 			// Back to the native code.
 			c.execCtx.exitCode = wazevoapi.ExitCodeOK
 			afterGoFunctionCallEntrypoint(c.execCtx.goCallReturnAddress, c.execCtxPtr, uintptr(unsafe.Pointer(c.execCtx.stackPointerBeforeGoCall)))
@@ -266,7 +289,6 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 			mod := c.callerModuleInstance()
 			listener := mod.Engine.(*moduleEngine).listeners[index]
 			def := mod.Source.FunctionDefinition(wasm.Index(index))
-			fmt.Println("before", stack[1:], def.Debugname)
 			listener.Before(ctx, mod, def, stack[1:], nil)
 			c.execCtx.exitCode = wazevoapi.ExitCodeOK
 			afterGoFunctionCallEntrypoint(c.execCtx.goCallReturnAddress, c.execCtxPtr, uintptr(unsafe.Pointer(c.execCtx.stackPointerBeforeGoCall)))
@@ -276,7 +298,6 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 			mod := c.callerModuleInstance()
 			listener := mod.Engine.(*moduleEngine).listeners[index]
 			def := mod.Source.FunctionDefinition(wasm.Index(index))
-			fmt.Println("after", stack[1:], def.Debugname)
 			listener.After(ctx, mod, def, stack[1:])
 			c.execCtx.exitCode = wazevoapi.ExitCodeOK
 			afterGoFunctionCallEntrypoint(c.execCtx.goCallReturnAddress, c.execCtxPtr, uintptr(unsafe.Pointer(c.execCtx.stackPointerBeforeGoCall)))

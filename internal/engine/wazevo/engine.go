@@ -479,7 +479,7 @@ func (e *engine) NewModuleEngine(m *wasm.Module, mi *wasm.ModuleInstance) (wasm.
 	me.listeners = compiled.listeners
 
 	if m.IsHostModule {
-		me.opaque = buildHostModuleOpaque(m)
+		me.opaque = buildHostModuleOpaque(m, compiled.listeners)
 		me.opaquePtr = &me.opaque[0]
 	} else {
 		if size := compiled.offsets.TotalSize; size != 0 {
@@ -601,9 +601,9 @@ func (cm *compiledModule) functionIndexOf(addr uintptr) wasm.Index {
 }
 
 func (e *engine) getEntryPreambleForType(functionType *wasm.FunctionType) *byte {
-	e.mux.RLock()
+	e.mux.Lock()
+	defer e.mux.Unlock()
 	executable, ok := e.sharedFunctions.entryPreambles[functionType]
-	e.mux.RUnlock()
 	if ok {
 		return &executable[0]
 	}
@@ -612,17 +612,17 @@ func (e *engine) getEntryPreambleForType(functionType *wasm.FunctionType) *byte 
 	e.be.Init()
 	buf := e.machine.CompileEntryPreamble(&sig)
 	executable = mmapExecutable(buf)
-	e.mux.Lock()
-	defer e.mux.Unlock()
+
 	e.sharedFunctions.entryPreambles[functionType] = executable
 	return &executable[0]
 }
 
 func (e *engine) getListenerTrampolineForType(functionType *wasm.FunctionType) (before, after *byte) {
-	e.mux.RLock()
+	e.mux.Lock()
+	defer e.mux.Unlock()
+
 	beforeBuf, ok := e.sharedFunctions.listenerBeforeTrampolines[functionType]
 	afterBuf := e.sharedFunctions.listenerAfterTrampolines[functionType]
-	e.mux.RUnlock()
 	if ok {
 		return &beforeBuf[0], &afterBuf[0]
 	}
@@ -637,8 +637,6 @@ func (e *engine) getListenerTrampolineForType(functionType *wasm.FunctionType) (
 	buf = e.machine.CompileGoFunctionTrampoline(wazevoapi.ExitCodeCallListenerAfter, afterSig, false)
 	afterBuf = mmapExecutable(buf)
 
-	e.mux.Lock()
-	defer e.mux.Unlock()
 	e.sharedFunctions.listenerBeforeTrampolines[functionType] = beforeBuf
 	e.sharedFunctions.listenerAfterTrampolines[functionType] = afterBuf
 	return &beforeBuf[0], &afterBuf[0]

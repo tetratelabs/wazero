@@ -433,78 +433,102 @@ func TestE2E(t *testing.T) {
 }
 
 func TestE2E_host_functions(t *testing.T) {
-	config := wazero.NewRuntimeConfigCompiler()
+	var buf bytes.Buffer
+	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
 
-	// Configure the new optimizing backend!
-	wazevo.ConfigureWazevo(config)
+	for _, tc := range []struct {
+		name string
+		ctx  context.Context
+	}{
+		{name: "listener", ctx: ctx},
+		{name: "no listener", ctx: context.Background()},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := tc.ctx
 
-	ctx := context.Background()
-	r := wazero.NewRuntimeWithConfig(ctx, config)
-	defer func() {
-		require.NoError(t, r.Close(ctx))
-	}()
+			config := wazero.NewRuntimeConfigCompiler()
 
-	var expectedMod api.Module
+			// Configure the new optimizing backend!
+			wazevo.ConfigureWazevo(config)
 
-	b := r.NewHostModuleBuilder("env")
-	b.NewFunctionBuilder().WithFunc(func(ctx2 context.Context, d float64) float64 {
-		require.Equal(t, ctx, ctx2)
-		require.Equal(t, 35.0, d)
-		return math.Sqrt(d)
-	}).Export("root")
-	b.NewFunctionBuilder().WithFunc(func(ctx2 context.Context, mod api.Module, a uint32, b uint64, c float32, d float64) (uint32, uint64, float32, float64) {
-		require.Equal(t, expectedMod, mod)
-		require.Equal(t, ctx, ctx2)
-		require.Equal(t, uint32(2), a)
-		require.Equal(t, uint64(100), b)
-		require.Equal(t, float32(15.0), c)
-		require.Equal(t, 35.0, d)
-		return a * a, b * b, c * c, d * d
-	}).Export("square")
+			r := wazero.NewRuntimeWithConfig(ctx, config)
+			defer func() {
+				require.NoError(t, r.Close(ctx))
+			}()
 
-	_, err := b.Instantiate(ctx)
-	require.NoError(t, err)
+			var expectedMod api.Module
 
-	m := &wasm.Module{
-		ImportFunctionCount: 2,
-		ImportSection: []wasm.Import{
-			{Module: "env", Name: "root", Type: wasm.ExternTypeFunc, DescFunc: 0},
-			{Module: "env", Name: "square", Type: wasm.ExternTypeFunc, DescFunc: 1},
-		},
-		TypeSection: []wasm.FunctionType{
-			{Results: []wasm.ValueType{f64}, Params: []wasm.ValueType{f64}},
-			{Results: []wasm.ValueType{i32, i64, f32, f64}, Params: []wasm.ValueType{i32, i64, f32, f64}},
-			{Results: []wasm.ValueType{i32, i64, f32, f64, f64}, Params: []wasm.ValueType{i32, i64, f32, f64}},
-		},
-		FunctionSection: []wasm.Index{2},
-		CodeSection: []wasm.Code{{
-			Body: []byte{
-				wasm.OpcodeLocalGet, 0, wasm.OpcodeLocalGet, 1, wasm.OpcodeLocalGet, 2, wasm.OpcodeLocalGet, 3,
-				wasm.OpcodeCall, 1,
-				wasm.OpcodeLocalGet, 3,
-				wasm.OpcodeCall, 0,
-				wasm.OpcodeEnd,
-			},
-		}},
-		ExportSection: []wasm.Export{{Name: testcases.ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 2}},
+			b := r.NewHostModuleBuilder("env")
+			b.NewFunctionBuilder().WithFunc(func(ctx2 context.Context, d float64) float64 {
+				require.Equal(t, ctx, ctx2)
+				require.Equal(t, 35.0, d)
+				return math.Sqrt(d)
+			}).Export("root")
+			b.NewFunctionBuilder().WithFunc(func(ctx2 context.Context, mod api.Module, a uint32, b uint64, c float32, d float64) (uint32, uint64, float32, float64) {
+				require.Equal(t, expectedMod, mod)
+				require.Equal(t, ctx, ctx2)
+				require.Equal(t, uint32(2), a)
+				require.Equal(t, uint64(100), b)
+				require.Equal(t, float32(15.0), c)
+				require.Equal(t, 35.0, d)
+				return a * a, b * b, c * c, d * d
+			}).Export("square")
+
+			_, err := b.Instantiate(ctx)
+			require.NoError(t, err)
+
+			m := &wasm.Module{
+				ImportFunctionCount: 2,
+				ImportSection: []wasm.Import{
+					{Module: "env", Name: "root", Type: wasm.ExternTypeFunc, DescFunc: 0},
+					{Module: "env", Name: "square", Type: wasm.ExternTypeFunc, DescFunc: 1},
+				},
+				TypeSection: []wasm.FunctionType{
+					{Results: []wasm.ValueType{f64}, Params: []wasm.ValueType{f64}},
+					{Results: []wasm.ValueType{i32, i64, f32, f64}, Params: []wasm.ValueType{i32, i64, f32, f64}},
+					{Results: []wasm.ValueType{i32, i64, f32, f64, f64}, Params: []wasm.ValueType{i32, i64, f32, f64}},
+				},
+				FunctionSection: []wasm.Index{2},
+				CodeSection: []wasm.Code{{
+					Body: []byte{
+						wasm.OpcodeLocalGet, 0, wasm.OpcodeLocalGet, 1, wasm.OpcodeLocalGet, 2, wasm.OpcodeLocalGet, 3,
+						wasm.OpcodeCall, 1,
+						wasm.OpcodeLocalGet, 3,
+						wasm.OpcodeCall, 0,
+						wasm.OpcodeEnd,
+					},
+				}},
+				ExportSection: []wasm.Export{{Name: testcases.ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 2}},
+			}
+
+			compiled, err := r.CompileModule(ctx, binaryencoding.EncodeModule(m))
+			require.NoError(t, err)
+
+			inst, err := r.InstantiateModule(ctx, compiled, wazero.NewModuleConfig())
+			require.NoError(t, err)
+
+			expectedMod = inst
+
+			f := inst.ExportedFunction(testcases.ExportedFunctionName)
+
+			res, err := f.Call(ctx, []uint64{2, 100, uint64(math.Float32bits(15.0)), math.Float64bits(35.0)}...)
+			require.NoError(t, err)
+			require.Equal(t, []uint64{
+				2 * 2, 100 * 100, uint64(math.Float32bits(15.0 * 15.0)), math.Float64bits(35.0 * 35.0),
+				math.Float64bits(math.Sqrt(35.0)),
+			}, res)
+		})
 	}
 
-	compiled, err := r.CompileModule(ctx, binaryencoding.EncodeModule(m))
-	require.NoError(t, err)
-
-	inst, err := r.InstantiateModule(ctx, compiled, wazero.NewModuleConfig())
-	require.NoError(t, err)
-
-	expectedMod = inst
-
-	f := inst.ExportedFunction(testcases.ExportedFunctionName)
-
-	res, err := f.Call(ctx, []uint64{2, 100, uint64(math.Float32bits(15.0)), math.Float64bits(35.0)}...)
-	require.NoError(t, err)
-	require.Equal(t, []uint64{
-		2 * 2, 100 * 100, uint64(math.Float32bits(15.0 * 15.0)), math.Float64bits(35.0 * 35.0),
-		math.Float64bits(math.Sqrt(35.0)),
-	}, res)
+	require.Equal(t, `
+--> .$2(2,100,15,35)
+	==> env.square(2,100,15,35)
+	<== (4,10000,225,1225)
+	==> env.root(35)
+	<== 5.916079783099616
+<-- (4,10000,225,1225,5.916079783099616)
+`, "\n"+buf.String())
 }
 
 func TestE2E_stores(t *testing.T) {
@@ -790,8 +814,4 @@ func TestListener_imported(t *testing.T) {
 	<-- 10000
 <-- 10000
 `, "\n"+buf.String())
-}
-
-func TestListener_imported_host(t *testing.T) {
-	t.Skip("TODO")
 }
