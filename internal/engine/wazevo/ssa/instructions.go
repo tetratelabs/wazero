@@ -875,7 +875,7 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeVband:              sideEffectNone,
 	OpcodeVbandnot:           sideEffectNone,
 	OpcodeVbnot:              sideEffectNone,
-	OpcodeVbitselect:         sideEffectStrict,
+	OpcodeVbitselect:         sideEffectTraps,
 	OpcodeVanyTrue:           sideEffectNone,
 	OpcodeVallTrue:           sideEffectNone,
 	OpcodeVhighBits:          sideEffectNone,

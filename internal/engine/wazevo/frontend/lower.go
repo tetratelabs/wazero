@@ -1352,9 +1352,8 @@ func (c *Compiler) lowerCurrentOpcode() {
 			if state.unreachable {
 				break
 			}
-			opSize := uint64(16)
 			baseAddr := state.pop()
-			addr := c.memOpSetup(baseAddr, uint64(offset), opSize)
+			addr := c.memOpSetup(baseAddr, uint64(offset), 16)
 			load := builder.AllocateInstruction()
 			load.AsLoad(addr, offset, ssa.TypeV128)
 			builder.InsertInstruction(load)
