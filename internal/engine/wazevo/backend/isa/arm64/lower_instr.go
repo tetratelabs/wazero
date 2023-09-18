@@ -323,7 +323,7 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
 		rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
 		creg := m.getOperand_NR(m.compiler.ValueDefinition(c), extModeNone)
-		// creg is overwritten by the result, so we need to move it to the result register before BLS
+		// creg is overwritten by BSL, so we need to move it to the result register before the instruction
 		// in case when it is used somewhere else.
 		rd := m.compiler.VRegOf(instr.Return())
 		mov := m.allocateInstr()

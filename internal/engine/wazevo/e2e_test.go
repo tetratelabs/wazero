@@ -261,7 +261,6 @@ func TestE2E(t *testing.T) {
 				{params: []uint64{uint64(wasm.MemoryPageSize) - 3, 0}, expErr: "out of bounds memory access"},
 			},
 		},
-
 		{
 			name: "memory_load_basic",
 			m:    testcases.MemoryLoadBasic.Module,
@@ -377,6 +376,13 @@ func TestE2E(t *testing.T) {
 				{params: []uint64{0, 100}, expResults: []uint64{100}},
 				{params: []uint64{1, 100}, expResults: []uint64{1}},
 				{params: []uint64{1, 200}, expResults: []uint64{1}},
+			},
+		},
+		{
+			name: "vector_bit_select",
+			m:    testcases.VecBitSelect.Module,
+			calls: []callCase{
+				{params: []uint64{1, 2, 3, 4, 5, 6}, expResults: []uint64{0x3, 0x2, 0x5, 0x6}},
 			},
 		},
 	} {
