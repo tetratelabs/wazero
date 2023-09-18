@@ -5,6 +5,7 @@ import (
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasmruntime"
@@ -20,6 +21,7 @@ type (
 		opaque                 moduleContextOpaque
 		localFunctionInstances []*functionInstance
 		importedFunctions      []importedFunction
+		listeners              []experimental.FunctionListener
 	}
 
 	functionInstance struct {
@@ -104,6 +106,13 @@ func (m *moduleEngine) setupOpaque() {
 			binary.LittleEndian.PutUint64(opaque[tableOffset:], uint64(uintptr(unsafe.Pointer(table))))
 			tableOffset += 8
 		}
+	}
+
+	if beforeListenerOffset := offsets.BeforeListenerTrampolines1stElement; beforeListenerOffset >= 0 {
+		binary.LittleEndian.PutUint64(opaque[beforeListenerOffset:], uint64(uintptr(unsafe.Pointer(&m.parent.listenerBeforeTrampolines[0]))))
+	}
+	if afterListenerOffset := offsets.AfterListenerTrampolines1stElement; afterListenerOffset >= 0 {
+		binary.LittleEndian.PutUint64(opaque[afterListenerOffset:], uint64(uintptr(unsafe.Pointer(&m.parent.listenerAfterTrampolines[0]))))
 	}
 }
 

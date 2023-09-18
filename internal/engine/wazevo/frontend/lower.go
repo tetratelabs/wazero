@@ -155,6 +155,10 @@ func (l *loweringState) ctrlPeekAt(n int) (ret *controlFrame) {
 func (c *Compiler) lowerBody(entryBlk ssa.BasicBlock) {
 	c.ssaBuilder.Seal(entryBlk)
 
+	if c.needListener {
+		c.callListenerBefore()
+	}
+
 	// Pushes the empty control frame which corresponds to the function return.
 	c.loweringState.ctrlPush(controlFrame{
 		kind:           controlFrameKindFunction,
@@ -1201,6 +1205,10 @@ func (c *Compiler) lowerCurrentOpcode() {
 		if state.unreachable {
 			break
 		}
+		if c.needListener {
+			c.callListenerAfter()
+		}
+
 		results := c.loweringState.nPeekDup(c.results())
 		instr := builder.AllocateInstruction()
 
@@ -2009,6 +2017,12 @@ func (c *Compiler) readMemArg() (align, offset uint32) {
 
 // insertJumpToBlock inserts a jump instruction to the given block in the current block.
 func (c *Compiler) insertJumpToBlock(args []ssa.Value, targetBlk ssa.BasicBlock) {
+	if targetBlk.ReturnBlock() {
+		if c.needListener {
+			c.callListenerAfter()
+		}
+	}
+
 	builder := c.ssaBuilder
 	jmp := builder.AllocateInstruction()
 	jmp.AsJump(args, targetBlk)
@@ -2108,4 +2122,64 @@ func (l *loweringState) brTargetArgNumFor(labelIndex uint32) (targetBlk ssa.Basi
 		targetBlk, argNum = targetFrame.followingBlock, len(targetFrame.blockType.Results)
 	}
 	return
+}
+
+func (c *Compiler) callListenerBefore() {
+	c.storeCallerModuleContext()
+
+	builder := c.ssaBuilder
+	beforeListeners1stElement := builder.AllocateInstruction().
+		AsLoad(c.moduleCtxPtrValue,
+			c.offset.BeforeListenerTrampolines1stElement.U32(),
+			ssa.TypeI64,
+		).Insert(builder).Return()
+
+	beforeListenerPtr := builder.AllocateInstruction().
+		AsLoad(beforeListeners1stElement, uint32(c.wasmFunctionTypeIndex)*8 /* 8 bytes per index */, ssa.TypeI64).Insert(builder).Return()
+
+	entry := builder.EntryBlock()
+	ps := entry.Params()
+	// TODO: reuse!
+	args := make([]ssa.Value, ps)
+	args[0] = c.execCtxPtrValue
+	args[1] = builder.AllocateInstruction().AsIconst32(c.wasmLocalFunctionIndex).Insert(builder).Return()
+	for i := 2; i < ps; i++ {
+		args[i] = entry.Param(i)
+	}
+
+	beforeSig := c.listenerSignatures[c.wasmFunctionTyp][0]
+	builder.AllocateInstruction().
+		AsCallIndirect(beforeListenerPtr, beforeSig, args).
+		Insert(builder)
+}
+
+func (c *Compiler) callListenerAfter() {
+	c.storeCallerModuleContext()
+
+	builder := c.ssaBuilder
+	afterListeners1stElement := builder.AllocateInstruction().
+		AsLoad(c.moduleCtxPtrValue,
+			c.offset.AfterListenerTrampolines1stElement.U32(),
+			ssa.TypeI64,
+		).Insert(builder).Return()
+
+	afterListenerPtr := builder.AllocateInstruction().
+		AsLoad(afterListeners1stElement,
+			uint32(c.wasmFunctionTypeIndex)*8 /* 8 bytes per index */, ssa.TypeI64).
+		Insert(builder).
+		Return()
+
+	afterSig := c.listenerSignatures[c.wasmFunctionTyp][1]
+	results := c.loweringState.nPeekDup(c.results())
+
+	// TODO: reuse!
+	args := make([]ssa.Value, len(results)+2)
+	args[0] = c.execCtxPtrValue
+	args[1] = builder.AllocateInstruction().AsIconst32(c.wasmLocalFunctionIndex).Insert(builder).Return()
+	for i, r := range results {
+		args[i+2] = r
+	}
+	builder.AllocateInstruction().
+		AsCallIndirect(afterListenerPtr, afterSig, args).
+		Insert(builder)
 }

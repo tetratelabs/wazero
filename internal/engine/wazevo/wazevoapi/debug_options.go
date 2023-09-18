@@ -53,7 +53,7 @@ const (
 	// DeterministicCompilationVerifierEnabled enables the deterministic compilation verifier. This is disabled by default
 	// since the operation is expensive. But when in doubt, enable this to make sure the compilation is deterministic.
 	DeterministicCompilationVerifierEnabled = false
-	DeterministicCompilationVerifyingIter   = 20
+	DeterministicCompilationVerifyingIter   = 5
 )
 
 type (

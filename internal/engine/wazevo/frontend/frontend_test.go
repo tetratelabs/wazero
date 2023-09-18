@@ -19,6 +19,7 @@ func TestCompiler_LowerToSSA(t *testing.T) {
 	for _, tc := range []struct {
 		name              string
 		ensureTermination bool
+		needListener      bool
 		// m is the *wasm.Module to be compiled in this test.
 		m *wasm.Module
 		// targetIndex is the index of a local function to be compiled in this test.
@@ -63,6 +64,30 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i32)
 	v4:i32 = Iadd v2, v3
 	v5:i32 = Isub v4, v2
 	Jump blk_ret, v5
+`,
+		},
+		{
+			name: "add/sub params return / listener", m: testcases.AddSubParamsReturn.Module,
+			needListener: true,
+			exp: `
+signatures:
+	sig1: i64i32i32i32_v
+	sig2: i64i32i32_v
+
+blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i32)
+	Store module_ctx, exec_ctx, 0x8
+	v4:i64 = Load module_ctx, 0x8
+	v5:i64 = Load v4, 0x0
+	v6:i32 = Iconst_32 0x0
+	CallIndirect v5:sig1, exec_ctx, v6, v2, v3
+	v7:i32 = Iadd v2, v3
+	v8:i32 = Isub v7, v2
+	Store module_ctx, exec_ctx, 0x8
+	v9:i64 = Load module_ctx, 0x10
+	v10:i64 = Load v9, 0x0
+	v11:i32 = Iconst_32 0x0
+	CallIndirect v10:sig2, exec_ctx, v11, v8
+	Jump blk_ret, v8
 `,
 		},
 		{
@@ -1766,11 +1791,11 @@ blk4: () <-- (blk2,blk3)
 
 			b := ssa.NewBuilder()
 
-			offset := wazevoapi.NewModuleContextOffsetData(tc.m)
-			fc := NewFrontendCompiler(tc.m, b, &offset, tc.ensureTermination)
+			offset := wazevoapi.NewModuleContextOffsetData(tc.m, tc.needListener)
+			fc := NewFrontendCompiler(tc.m, b, &offset, tc.ensureTermination, tc.needListener)
 			typeIndex := tc.m.FunctionSection[tc.targetIndex]
 			code := &tc.m.CodeSection[tc.targetIndex]
-			fc.Init(tc.targetIndex, &tc.m.TypeSection[typeIndex], code.LocalTypes, code.Body)
+			fc.Init(tc.targetIndex, typeIndex, &tc.m.TypeSection[typeIndex], code.LocalTypes, code.Body, tc.needListener)
 
 			fc.LowerToSSA()
 
@@ -1789,4 +1814,121 @@ blk4: () <-- (blk2,blk3)
 			b.LayoutBlocks()
 		})
 	}
+}
+
+func TestSignatureForListener(t *testing.T) {
+	for _, tc := range []struct {
+		name          string
+		sig           *wasm.FunctionType
+		before, after *ssa.Signature
+	}{
+		{
+			name:   "empty",
+			sig:    &wasm.FunctionType{},
+			before: &ssa.Signature{Params: []ssa.Type{ssa.TypeI64, ssa.TypeI32}},
+			after:  &ssa.Signature{Params: []ssa.Type{ssa.TypeI64, ssa.TypeI32}},
+		},
+		{
+			name: "multi",
+			sig: &wasm.FunctionType{
+				Params: []wasm.ValueType{wasm.ValueTypeF64, wasm.ValueTypeI32},
+				Results: []wasm.ValueType{
+					wasm.ValueTypeI64, wasm.ValueTypeI32, wasm.ValueTypeF32, wasm.ValueTypeF64, wasm.ValueTypeV128,
+				},
+			},
+			before: &ssa.Signature{
+				Params: []ssa.Type{
+					ssa.TypeI64, ssa.TypeI32,
+					ssa.TypeF64, ssa.TypeI32,
+				},
+			},
+			after: &ssa.Signature{
+				Params: []ssa.Type{
+					ssa.TypeI64, ssa.TypeI32,
+					ssa.TypeI64, ssa.TypeI32, ssa.TypeF32, ssa.TypeF64, ssa.TypeV128,
+				},
+			},
+		},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			before, after := SignatureForListener(tc.sig)
+			require.Equal(t, tc.before, before)
+			require.Equal(t, tc.after, after)
+		})
+	}
+}
+
+func TestCompiler_declareSignatures(t *testing.T) {
+	m := &wasm.Module{
+		TypeSection: []wasm.FunctionType{
+			{},
+			{Params: []wasm.ValueType{wasm.ValueTypeI64, wasm.ValueTypeI32}},
+			{Params: []wasm.ValueType{wasm.ValueTypeF64, wasm.ValueTypeI32}},
+			{Results: []wasm.ValueType{wasm.ValueTypeI64, wasm.ValueTypeI32}},
+		},
+	}
+
+	t.Run("listener=false", func(t *testing.T) {
+		builder := ssa.NewBuilder()
+		c := &Compiler{m: m, ssaBuilder: builder}
+		c.declareSignatures(false)
+
+		declaredSigs := builder.Signatures()
+		require.Equal(t,
+			4+
+				2, // memoryGrowSig and checkModuleExitCodeSig.
+			len(declaredSigs),
+		)
+
+		expected := []*ssa.Signature{
+			{ID: 0, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64}},
+			{ID: 1, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI64, ssa.TypeI32}},
+			{ID: 2, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeF64, ssa.TypeI32}},
+			{ID: 3, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64}, Results: []ssa.Type{ssa.TypeI64, ssa.TypeI32}},
+			{ID: 4, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI32}, Results: []ssa.Type{ssa.TypeI32}},
+			{ID: 5, Params: []ssa.Type{ssa.TypeI64}},
+		}
+
+		for i := 0; i < 6; i++ {
+			require.Equal(t, expected[i].String(), declaredSigs[i].String(), i)
+		}
+	})
+
+	t.Run("listener=false", func(t *testing.T) {
+		builder := ssa.NewBuilder()
+		c := &Compiler{m: m, ssaBuilder: builder}
+		c.declareSignatures(true)
+
+		declaredSigs := builder.Signatures()
+		require.Equal(t,
+			4*3+
+				2, // memoryGrowSig and checkModuleExitCodeSig.
+			len(declaredSigs),
+		)
+
+		expected := []*ssa.Signature{
+			{ID: 0, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64}},
+			{ID: 1, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI64, ssa.TypeI32}},
+			{ID: 2, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeF64, ssa.TypeI32}},
+			{ID: 3, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64}, Results: []ssa.Type{ssa.TypeI64, ssa.TypeI32}},
+			// Before.
+			{ID: 4, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI32}},
+			{ID: 5, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI32, ssa.TypeI64, ssa.TypeI32}},
+			{ID: 6, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI32, ssa.TypeF64, ssa.TypeI32}},
+			{ID: 7, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI32}},
+			// After.
+			{ID: 8, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI32}},
+			{ID: 9, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI32}},
+			{ID: 10, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI32}},
+			{ID: 11, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI32, ssa.TypeI64, ssa.TypeI32}},
+			// Misc.
+			{ID: 12, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI32}, Results: []ssa.Type{ssa.TypeI32}},
+			{ID: 13, Params: []ssa.Type{ssa.TypeI64}},
+		}
+
+		for i := 0; i < len(declaredSigs); i++ {
+			require.Equal(t, expected[i].String(), declaredSigs[i].String(), i)
+		}
+	})
 }

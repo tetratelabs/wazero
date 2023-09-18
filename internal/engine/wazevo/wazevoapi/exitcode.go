@@ -20,6 +20,10 @@ const (
 	ExitCodeIntegerOverflow
 	ExitCodeInvalidConversionToInteger
 	ExitCodeCheckModuleExitCode
+	ExitCodeCallListenerBefore
+	ExitCodeCallListenerAfter
+	ExitCodeCallGoModuleFunctionWithListener
+	ExitCodeCallGoFunctionWithListener
 	exitCodeMax
 )
 
@@ -54,15 +58,31 @@ func (e ExitCode) String() string {
 		return "invalid_conversion_to_integer"
 	case ExitCodeCheckModuleExitCode:
 		return "check_module_exit_code"
+	case ExitCodeCallListenerBefore:
+		return "call_listener_before"
+	case ExitCodeCallListenerAfter:
+		return "call_listener_after"
+	case ExitCodeCallGoModuleFunctionWithListener:
+		return "call_go_module_function_with_listener"
+	case ExitCodeCallGoFunctionWithListener:
+		return "call_go_function_with_listener"
+	case ExitCodeGrowMemory:
+		return "grow_memory"
 	}
 	panic("TODO")
 }
 
-func ExitCodeCallGoModuleFunctionWithIndex(index int) ExitCode {
+func ExitCodeCallGoModuleFunctionWithIndex(index int, withListener bool) ExitCode {
+	if withListener {
+		return ExitCodeCallGoModuleFunctionWithListener | ExitCode(index<<8)
+	}
 	return ExitCodeCallGoModuleFunction | ExitCode(index<<8)
 }
 
-func ExitCodeCallGoFunctionWithIndex(index int) ExitCode {
+func ExitCodeCallGoFunctionWithIndex(index int, withListener bool) ExitCode {
+	if withListener {
+		return ExitCodeCallGoFunctionWithListener | ExitCode(index<<8)
+	}
 	return ExitCodeCallGoFunction | ExitCode(index<<8)
 }
 

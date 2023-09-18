@@ -145,6 +145,7 @@ func (m *machine) Reset() {
 	m.rootInstr = nil
 	m.ssaBlockIDToLabels = m.ssaBlockIDToLabels[:0]
 	m.perBlockHead, m.perBlockEnd = nil, nil
+	m.maxRequiredStackSizeForCalls = 0
 	m.nextLabel = invalidLabel
 }
 

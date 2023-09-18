@@ -1,6 +1,7 @@
 package wazevo_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"fmt"
@@ -9,6 +10,8 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/experimental/logging"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/testcases"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
@@ -150,7 +153,8 @@ func TestSpectestV2(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Run("normal", func(t *testing.T) {
-				spectest.RunCase(t, v2.Testcases, tc.name, context.Background(), config,
+				ctx := context.Background()
+				spectest.RunCase(t, v2.Testcases, tc.name, ctx, config,
 					-1, 0, math.MaxInt)
 			})
 			t.Run("reg high pressure", func(t *testing.T) {
@@ -430,78 +434,102 @@ func TestE2E(t *testing.T) {
 }
 
 func TestE2E_host_functions(t *testing.T) {
-	config := wazero.NewRuntimeConfigCompiler()
+	var buf bytes.Buffer
+	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
 
-	// Configure the new optimizing backend!
-	wazevo.ConfigureWazevo(config)
+	for _, tc := range []struct {
+		name string
+		ctx  context.Context
+	}{
+		{name: "listener", ctx: ctx},
+		{name: "no listener", ctx: context.Background()},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := tc.ctx
 
-	ctx := context.Background()
-	r := wazero.NewRuntimeWithConfig(ctx, config)
-	defer func() {
-		require.NoError(t, r.Close(ctx))
-	}()
+			config := wazero.NewRuntimeConfigCompiler()
 
-	var expectedMod api.Module
+			// Configure the new optimizing backend!
+			wazevo.ConfigureWazevo(config)
 
-	b := r.NewHostModuleBuilder("env")
-	b.NewFunctionBuilder().WithFunc(func(ctx2 context.Context, d float64) float64 {
-		require.Equal(t, ctx, ctx2)
-		require.Equal(t, 35.0, d)
-		return math.Sqrt(d)
-	}).Export("root")
-	b.NewFunctionBuilder().WithFunc(func(ctx2 context.Context, mod api.Module, a uint32, b uint64, c float32, d float64) (uint32, uint64, float32, float64) {
-		require.Equal(t, expectedMod, mod)
-		require.Equal(t, ctx, ctx2)
-		require.Equal(t, uint32(2), a)
-		require.Equal(t, uint64(100), b)
-		require.Equal(t, float32(15.0), c)
-		require.Equal(t, 35.0, d)
-		return a * a, b * b, c * c, d * d
-	}).Export("square")
+			r := wazero.NewRuntimeWithConfig(ctx, config)
+			defer func() {
+				require.NoError(t, r.Close(ctx))
+			}()
 
-	_, err := b.Instantiate(ctx)
-	require.NoError(t, err)
+			var expectedMod api.Module
 
-	m := &wasm.Module{
-		ImportFunctionCount: 2,
-		ImportSection: []wasm.Import{
-			{Module: "env", Name: "root", Type: wasm.ExternTypeFunc, DescFunc: 0},
-			{Module: "env", Name: "square", Type: wasm.ExternTypeFunc, DescFunc: 1},
-		},
-		TypeSection: []wasm.FunctionType{
-			{Results: []wasm.ValueType{f64}, Params: []wasm.ValueType{f64}},
-			{Results: []wasm.ValueType{i32, i64, f32, f64}, Params: []wasm.ValueType{i32, i64, f32, f64}},
-			{Results: []wasm.ValueType{i32, i64, f32, f64, f64}, Params: []wasm.ValueType{i32, i64, f32, f64}},
-		},
-		FunctionSection: []wasm.Index{2},
-		CodeSection: []wasm.Code{{
-			Body: []byte{
-				wasm.OpcodeLocalGet, 0, wasm.OpcodeLocalGet, 1, wasm.OpcodeLocalGet, 2, wasm.OpcodeLocalGet, 3,
-				wasm.OpcodeCall, 1,
-				wasm.OpcodeLocalGet, 3,
-				wasm.OpcodeCall, 0,
-				wasm.OpcodeEnd,
-			},
-		}},
-		ExportSection: []wasm.Export{{Name: testcases.ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 2}},
+			b := r.NewHostModuleBuilder("env")
+			b.NewFunctionBuilder().WithFunc(func(ctx2 context.Context, d float64) float64 {
+				require.Equal(t, ctx, ctx2)
+				require.Equal(t, 35.0, d)
+				return math.Sqrt(d)
+			}).Export("root")
+			b.NewFunctionBuilder().WithFunc(func(ctx2 context.Context, mod api.Module, a uint32, b uint64, c float32, d float64) (uint32, uint64, float32, float64) {
+				require.Equal(t, expectedMod, mod)
+				require.Equal(t, ctx, ctx2)
+				require.Equal(t, uint32(2), a)
+				require.Equal(t, uint64(100), b)
+				require.Equal(t, float32(15.0), c)
+				require.Equal(t, 35.0, d)
+				return a * a, b * b, c * c, d * d
+			}).Export("square")
+
+			_, err := b.Instantiate(ctx)
+			require.NoError(t, err)
+
+			m := &wasm.Module{
+				ImportFunctionCount: 2,
+				ImportSection: []wasm.Import{
+					{Module: "env", Name: "root", Type: wasm.ExternTypeFunc, DescFunc: 0},
+					{Module: "env", Name: "square", Type: wasm.ExternTypeFunc, DescFunc: 1},
+				},
+				TypeSection: []wasm.FunctionType{
+					{Results: []wasm.ValueType{f64}, Params: []wasm.ValueType{f64}},
+					{Results: []wasm.ValueType{i32, i64, f32, f64}, Params: []wasm.ValueType{i32, i64, f32, f64}},
+					{Results: []wasm.ValueType{i32, i64, f32, f64, f64}, Params: []wasm.ValueType{i32, i64, f32, f64}},
+				},
+				FunctionSection: []wasm.Index{2},
+				CodeSection: []wasm.Code{{
+					Body: []byte{
+						wasm.OpcodeLocalGet, 0, wasm.OpcodeLocalGet, 1, wasm.OpcodeLocalGet, 2, wasm.OpcodeLocalGet, 3,
+						wasm.OpcodeCall, 1,
+						wasm.OpcodeLocalGet, 3,
+						wasm.OpcodeCall, 0,
+						wasm.OpcodeEnd,
+					},
+				}},
+				ExportSection: []wasm.Export{{Name: testcases.ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 2}},
+			}
+
+			compiled, err := r.CompileModule(ctx, binaryencoding.EncodeModule(m))
+			require.NoError(t, err)
+
+			inst, err := r.InstantiateModule(ctx, compiled, wazero.NewModuleConfig())
+			require.NoError(t, err)
+
+			expectedMod = inst
+
+			f := inst.ExportedFunction(testcases.ExportedFunctionName)
+
+			res, err := f.Call(ctx, []uint64{2, 100, uint64(math.Float32bits(15.0)), math.Float64bits(35.0)}...)
+			require.NoError(t, err)
+			require.Equal(t, []uint64{
+				2 * 2, 100 * 100, uint64(math.Float32bits(15.0 * 15.0)), math.Float64bits(35.0 * 35.0),
+				math.Float64bits(math.Sqrt(35.0)),
+			}, res)
+		})
 	}
 
-	compiled, err := r.CompileModule(ctx, binaryencoding.EncodeModule(m))
-	require.NoError(t, err)
-
-	inst, err := r.InstantiateModule(ctx, compiled, wazero.NewModuleConfig())
-	require.NoError(t, err)
-
-	expectedMod = inst
-
-	f := inst.ExportedFunction(testcases.ExportedFunctionName)
-
-	res, err := f.Call(ctx, []uint64{2, 100, uint64(math.Float32bits(15.0)), math.Float64bits(35.0)}...)
-	require.NoError(t, err)
-	require.Equal(t, []uint64{
-		2 * 2, 100 * 100, uint64(math.Float32bits(15.0 * 15.0)), math.Float64bits(35.0 * 35.0),
-		math.Float64bits(math.Sqrt(35.0)),
-	}, res)
+	require.Equal(t, `
+--> .$2(2,100,15,35)
+	==> env.square(2,100,15,35)
+	<== (4,10000,225,1225)
+	==> env.root(35)
+	<== 5.916079783099616
+<-- (4,10000,225,1225,5.916079783099616)
+`, "\n"+buf.String())
 }
 
 func TestE2E_stores(t *testing.T) {
@@ -722,4 +750,115 @@ wasm stack trace:
 	.one()
 	.main()`
 	require.Equal(t, exp, err.Error())
+}
+
+func TestListener_local(t *testing.T) {
+	var buf bytes.Buffer
+	config := wazero.NewRuntimeConfigCompiler()
+	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
+
+	// Configure the new optimizing backend!
+	wazevo.ConfigureWazevo(config)
+
+	r := wazero.NewRuntimeWithConfig(ctx, config)
+	defer func() {
+		require.NoError(t, r.Close(ctx))
+	}()
+
+	compiled, err := r.CompileModule(ctx, binaryencoding.EncodeModule(testcases.CallIndirect.Module))
+	require.NoError(t, err)
+
+	inst, err := r.InstantiateModule(ctx, compiled, wazero.NewModuleConfig())
+	require.NoError(t, err)
+
+	res, err := inst.ExportedFunction(testcases.ExportedFunctionName).Call(ctx, 1)
+	require.NoError(t, err)
+	require.Equal(t, []uint64{10}, res)
+
+	require.Equal(t, `
+--> .$0(1)
+	--> .$2()
+	<-- 10
+<-- 10
+`, "\n"+buf.String())
+}
+
+func TestListener_imported(t *testing.T) {
+	var buf bytes.Buffer
+	config := wazero.NewRuntimeConfigCompiler()
+	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
+
+	// Configure the new optimizing backend!
+	wazevo.ConfigureWazevo(config)
+
+	r := wazero.NewRuntimeWithConfig(ctx, config)
+	defer func() {
+		require.NoError(t, r.Close(ctx))
+	}()
+
+	_, err := r.Instantiate(ctx, binaryencoding.EncodeModule(testcases.ImportedFunctionCall.Imported))
+	require.NoError(t, err)
+
+	compiled, err := r.CompileModule(ctx, binaryencoding.EncodeModule(testcases.ImportedFunctionCall.Module))
+	require.NoError(t, err)
+
+	inst, err := r.InstantiateModule(ctx, compiled, wazero.NewModuleConfig())
+	require.NoError(t, err)
+
+	res, err := inst.ExportedFunction(testcases.ExportedFunctionName).Call(ctx, 100)
+	require.NoError(t, err)
+	require.Equal(t, []uint64{10000}, res)
+
+	require.Equal(t, `
+--> .$1(100)
+	--> env.$0(100,100)
+	<-- 10000
+<-- 10000
+`, "\n"+buf.String())
+}
+
+func TestListener_long(t *testing.T) {
+	t.Skip("TODO")
+	pickOneParam := binaryencoding.EncodeModule(&wasm.Module{
+		TypeSection: []wasm.FunctionType{{Results: []wasm.ValueType{i32}, Params: []wasm.ValueType{
+			i32, i32, i32, i32, i32, i32, i32, i32, i32, i32,
+			i32, i32, i32, i32, i32, i32, i32, i32, i32, i32,
+			i32, i32, i32, i32, i32, i32, i32, i32, i32, i32,
+			i32, i32, i32, i32, i32, i32, i32, i32, i32, i32,
+			i32, i32, i32, i32, i32, i32, i32, i32, i32, i32,
+			i32, i32, i32, i32, i32, i32, i32, i32, i32, i32,
+			i32, i32, i32, i32, i32, i32, i32, i32, i32, i32,
+			i32, i32, i32, i32, i32, i32, i32, i32, i32, i32,
+			i32, i32, i32, i32, i32, i32, i32, i32, i32, i32,
+			i32, i32, i32, i32, i32, i32, i32, i32, i32, i32,
+		}}},
+		ExportSection:   []wasm.Export{{Name: "main", Type: wasm.ExternTypeFunc, Index: 0}},
+		FunctionSection: []wasm.Index{0},
+		CodeSection: []wasm.Code{
+			{Body: []byte{wasm.OpcodeLocalGet, 98, wasm.OpcodeEnd}},
+		},
+	})
+
+	var buf bytes.Buffer
+	config := wazero.NewRuntimeConfigCompiler()
+	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
+
+	// Configure the new optimizing backend!
+	wazevo.ConfigureWazevo(config)
+
+	r := wazero.NewRuntimeWithConfig(ctx, config)
+	defer func() {
+		require.NoError(t, r.Close(ctx))
+	}()
+
+	inst, err := r.Instantiate(ctx, pickOneParam)
+	require.NoError(t, err)
+
+	f := inst.ExportedFunction("main")
+	require.NotNil(t, f)
+	param := make([]uint64, 100)
+	param[98] = 100
+	res, err := f.Call(ctx, param...)
+	require.NoError(t, err)
+	require.Equal(t, []uint64{100}, res)
 }

@@ -677,6 +677,9 @@ func TestInstruction_encode(t *testing.T) {
 		{want: "e17f81a9", setup: func(i *instruction) {
 			i.asStorePair64(x1VReg, xzrVReg, addressModePreOrPostIndex(spVReg, 16, true))
 		}},
+		{want: "ff7f81a9", setup: func(i *instruction) {
+			i.asStorePair64(xzrVReg, xzrVReg, addressModePreOrPostIndex(spVReg, 16, true))
+		}},
 		{want: "20000014", setup: func(i *instruction) {
 			i.asBr(dummyLabel)
 			i.brOffsetResolved(0x80)

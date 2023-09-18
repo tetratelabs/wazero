@@ -63,21 +63,22 @@ func UnwindStack(sp, top uintptr) (returnAddresses []uintptr) {
 // GoCallStackView is a function to get a view of the stack before a Go call, which
 // is the view of the stack allocated in CompileGoFunctionTrampoline.
 func GoCallStackView(stackPointerBeforeGoCall *uint64) []uint64 {
-	//                (high address)
-	//         ^  +-----------------+ <----+
-	//         |  |  arg[N]/ret[M]  |      |
-	//   view  |  |  ............   |      | frame_size
-	//         |  |  arg[1]/ret[1]  |      |
-	//         v  |  arg[0]/ret[0]  | <----+
-	//            |     xxxxxx      |  ;; unused space to make it 16-byte aligned.
-	//            |   frame_size    |
-	//            +-----------------+ <---- stackPointerBeforeGoCall
-	//               (low address)
-	size := *stackPointerBeforeGoCall
+	//                  (high address)
+	//              +-----------------+ <----+
+	//              |   xxxxxxxxxxx   |      | ;; optional unused space to make it 16-byte aligned.
+	//           ^  |  arg[N]/ret[M]  |      |
+	// sliceSize |  |  ............   |      | sliceSize
+	//           |  |  arg[1]/ret[1]  |      |
+	//           v  |  arg[0]/ret[0]  | <----+
+	//              |    sliceSize    |
+	//              |   frame_size    |
+	//              +-----------------+ <---- stackPointerBeforeGoCall
+	//                 (low address)
+	size := *(*uint64)(unsafe.Pointer(uintptr(unsafe.Pointer(stackPointerBeforeGoCall)) + 8))
 	var view []uint64
 	{
 		sh := (*reflect.SliceHeader)(unsafe.Pointer(&view))
-		sh.Data = uintptr(unsafe.Pointer(stackPointerBeforeGoCall)) + 16 // skips the (frame_size, xxxxx).
+		sh.Data = uintptr(unsafe.Pointer(stackPointerBeforeGoCall)) + 16 // skips the (frame_size, sliceSize).
 		sh.Len = int(size)
 		sh.Cap = int(size)
 	}
