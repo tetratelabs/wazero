@@ -3,10 +3,10 @@ package arm64
 import (
 	"encoding/hex"
 	"fmt"
-	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"sort"
 	"testing"
 
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"

@@ -153,8 +153,7 @@ func TestSpectestV2(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Run("normal", func(t *testing.T) {
-				var buf bytes.Buffer
-				ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
+				ctx := context.Background()
 				spectest.RunCase(t, v2.Testcases, tc.name, ctx, config,
 					-1, 0, math.MaxInt)
 			})
@@ -816,4 +815,50 @@ func TestListener_imported(t *testing.T) {
 	<-- 10000
 <-- 10000
 `, "\n"+buf.String())
+}
+
+func TestListener_long(t *testing.T) {
+	t.Skip("TODO")
+	pickOneParam := binaryencoding.EncodeModule(&wasm.Module{
+		TypeSection: []wasm.FunctionType{{Results: []wasm.ValueType{i32}, Params: []wasm.ValueType{
+			i32, i32, i32, i32, i32, i32, i32, i32, i32, i32,
+			i32, i32, i32, i32, i32, i32, i32, i32, i32, i32,
+			i32, i32, i32, i32, i32, i32, i32, i32, i32, i32,
+			i32, i32, i32, i32, i32, i32, i32, i32, i32, i32,
+			i32, i32, i32, i32, i32, i32, i32, i32, i32, i32,
+			i32, i32, i32, i32, i32, i32, i32, i32, i32, i32,
+			i32, i32, i32, i32, i32, i32, i32, i32, i32, i32,
+			i32, i32, i32, i32, i32, i32, i32, i32, i32, i32,
+			i32, i32, i32, i32, i32, i32, i32, i32, i32, i32,
+			i32, i32, i32, i32, i32, i32, i32, i32, i32, i32,
+		}}},
+		ExportSection:   []wasm.Export{{Name: "main", Type: wasm.ExternTypeFunc, Index: 0}},
+		FunctionSection: []wasm.Index{0},
+		CodeSection: []wasm.Code{
+			{Body: []byte{wasm.OpcodeLocalGet, 98, wasm.OpcodeEnd}},
+		},
+	})
+
+	var buf bytes.Buffer
+	config := wazero.NewRuntimeConfigCompiler()
+	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
+
+	// Configure the new optimizing backend!
+	wazevo.ConfigureWazevo(config)
+
+	r := wazero.NewRuntimeWithConfig(ctx, config)
+	defer func() {
+		require.NoError(t, r.Close(ctx))
+	}()
+
+	inst, err := r.Instantiate(ctx, pickOneParam)
+	require.NoError(t, err)
+
+	f := inst.ExportedFunction("main")
+	require.NotNil(t, f)
+	param := make([]uint64, 100)
+	param[98] = 100
+	res, err := f.Call(ctx, param...)
+	require.NoError(t, err)
+	require.Equal(t, []uint64{100}, res)
 }

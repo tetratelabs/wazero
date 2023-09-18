@@ -104,7 +104,7 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listene
 
 	if wazevoapi.DeterministicCompilationVerifierEnabled {
 		for i := 0; i < wazevoapi.DeterministicCompilationVerifyingIter; i++ {
-			_, err = e.compileModule(ctx, module, listeners, ensureTermination)
+			_, err := e.compileModule(ctx, module, listeners, ensureTermination)
 			if err != nil {
 				return err
 			}
@@ -445,6 +445,9 @@ func (e *engine) deleteCompiledModuleFromSortedList(cm *compiledModule) {
 	index := sort.Search(len(e.sortedCompiledModules), func(i int) bool {
 		return uintptr(unsafe.Pointer(&e.sortedCompiledModules[i].executable[0])) >= ptr
 	})
+	if index >= len(e.sortedCompiledModules) {
+		return
+	}
 	copy(e.sortedCompiledModules[index:], e.sortedCompiledModules[index+1:])
 	e.sortedCompiledModules = e.sortedCompiledModules[:len(e.sortedCompiledModules)-1]
 }

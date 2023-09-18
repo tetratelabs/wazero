@@ -2143,9 +2143,8 @@ func (c *Compiler) callListenerBefore() {
 	args := make([]ssa.Value, ps)
 	args[0] = c.execCtxPtrValue
 	args[1] = builder.AllocateInstruction().AsIconst32(c.wasmLocalFunctionIndex).Insert(builder).Return()
-	for i := 0; i < ps-2; i++ {
-		j := i + 2
-		args[j] = entry.Param(j)
+	for i := 2; i < ps; i++ {
+		args[i] = entry.Param(i)
 	}
 
 	beforeSig := c.listenerSignatures[c.wasmFunctionTyp][0]
