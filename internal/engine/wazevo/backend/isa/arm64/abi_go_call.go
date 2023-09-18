@@ -148,7 +148,7 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 	// After the call, we need to restore the callee saved registers.
 	cur = m.restoreRegistersInExecutionContext(cur, calleeSavedRegistersPlusLinkRegSorted)
 
-	// Get the pointer to the arg[0]/ret[0]: We need to skip `frame_size + xxxxxx `.
+	// Get the pointer to the arg[0]/ret[0]: We need to skip `frame_size + sliceSize`.
 	if len(abi.rets) > 0 {
 		cur = m.addsAddOrSubStackPointer(cur, stackPtrReg, 16, true, true)
 	}

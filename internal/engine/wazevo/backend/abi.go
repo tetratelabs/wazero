@@ -26,7 +26,7 @@ type (
 		// This VReg must be based on RealReg.
 		Reg regalloc.VReg
 		// Offset is valid if Kind == ABIArgKindStack.
-		// This is the offset from the stack pointer.
+		// This is the offset from the beginning of either arg or ret stack slot.
 		Offset int64
 		// Type is the type of the argument.
 		Type ssa.Type
