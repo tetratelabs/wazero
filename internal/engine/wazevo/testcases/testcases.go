@@ -1512,6 +1512,26 @@ var (
 			}}},
 		},
 	}
+
+	VecBitSelect = TestCase{
+		Name: "vector_bit_select",
+		Module: &wasm.Module{
+			TypeSection:     []wasm.FunctionType{{Params: []wasm.ValueType{v128, v128, v128}, Results: []wasm.ValueType{v128, v128}}},
+			ExportSection:   []wasm.Export{{Name: ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 0}},
+			FunctionSection: []wasm.Index{0},
+			CodeSection: []wasm.Code{{Body: []byte{
+				// In arm64, the "C" of BSL instruction is overwritten by the result,
+				// so this case can be used to ensure that it is still alive if 'c' is used somewhere else,
+				// which in this case is as a return value.
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeLocalGet, 2,
+				wasm.OpcodeVecPrefix, wasm.OpcodeVecV128Bitselect,
+				wasm.OpcodeLocalGet, 2, // Returns the 'c' as-is.
+				wasm.OpcodeEnd,
+			}}},
+		},
+	}
 )
 
 type TestCase struct {
@@ -1546,10 +1566,11 @@ var (
 )
 
 const (
-	i32 = wasm.ValueTypeI32
-	i64 = wasm.ValueTypeI64
-	f32 = wasm.ValueTypeF32
-	f64 = wasm.ValueTypeF64
+	i32  = wasm.ValueTypeI32
+	i64  = wasm.ValueTypeI64
+	f32  = wasm.ValueTypeF32
+	f64  = wasm.ValueTypeF64
+	v128 = wasm.ValueTypeV128
 
 	blockSignature_vv = 0x40 // 0x40 is the v_v signature in 33-bit signed. See wasm.DecodeBlockType.
 )

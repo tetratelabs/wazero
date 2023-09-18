@@ -320,18 +320,18 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		m.lowerVecRRR(vecOpBic, x, y, instr.Return(), vecArrangement16B)
 	case ssa.OpcodeVbitselect:
 		c, x, y := instr.SelectData()
-		ins := m.allocateInstr()
 		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
 		rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
 		creg := m.getOperand_NR(m.compiler.ValueDefinition(c), extModeNone)
-		ins.asVecRRR(vecOpBsl, creg, rn, rm, vecArrangement16B)
-		m.insert(ins)
-
+		// creg is overwritten by BSL, so we need to move it to the result register before the instruction
+		// in case when it is used somewhere else.
 		rd := m.compiler.VRegOf(instr.Return())
 		mov := m.allocateInstr()
 		mov.asFpuMov128(rd, creg.nr())
-
 		m.insert(mov)
+		ins := m.allocateInstr()
+		ins.asVecRRR(vecOpBsl, operandNR(rd), rn, rm, vecArrangement16B)
+		m.insert(ins)
 	case ssa.OpcodeVIadd:
 		x, y, lane := instr.Arg2WithLane()
 		arr := ssaLaneToArrangement(lane)
