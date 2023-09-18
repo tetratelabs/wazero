@@ -153,7 +153,9 @@ func TestSpectestV2(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Run("normal", func(t *testing.T) {
-				spectest.RunCase(t, v2.Testcases, tc.name, context.Background(), config,
+				var buf bytes.Buffer
+				ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
+				spectest.RunCase(t, v2.Testcases, tc.name, ctx, config,
 					-1, 0, math.MaxInt)
 			})
 			t.Run("reg high pressure", func(t *testing.T) {
