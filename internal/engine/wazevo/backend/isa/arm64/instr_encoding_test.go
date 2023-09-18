@@ -875,20 +875,35 @@ func TestInstruction_encode(t *testing.T) {
 		{want: "4138b06e", setup: func(i *instruction) {
 			i.asVecLanes(vecOpUaddlv, operandNR(v1VReg), operandNR(v2VReg), vecArrangement4S)
 		}},
+		{want: "411c630e", setup: func(i *instruction) {
+			i.asVecRRR(vecOpBic, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
+		}},
 		{want: "411c634e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpBic, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
+			i.asVecRRR(vecOpBic, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
+		}},
+		{want: "411c632e", setup: func(i *instruction) {
+			i.asVecRRR(vecOpBsl, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
 		}},
 		{want: "411c636e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpBsl, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
+			i.asVecRRR(vecOpBsl, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
+		}},
+		{want: "4158202e", setup: func(i *instruction) {
+			i.asVecMisc(vecOpNot, operandNR(v1VReg), operandNR(v2VReg), vecArrangement8B)
 		}},
 		{want: "4158206e", setup: func(i *instruction) {
 			i.asVecMisc(vecOpNot, operandNR(v1VReg), operandNR(v2VReg), vecArrangement16B)
 		}},
+		{want: "411c230e", setup: func(i *instruction) {
+			i.asVecRRR(vecOpAnd, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
+		}},
 		{want: "411c234e", setup: func(i *instruction) {
 			i.asVecRRR(vecOpAnd, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
 		}},
+		{want: "411ca30e", setup: func(i *instruction) {
+			i.asVecRRR(vecOpOrr, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
+		}},
 		{want: "411ca34e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpOrr, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
+			i.asVecRRR(vecOpOrr, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
 		}},
 		{want: "4158200e", setup: func(i *instruction) { i.asVecMisc(vecOpCnt, operandNR(v1VReg), operandNR(v2VReg), vecArrangement8B) }},
 		{want: "4158204e", setup: func(i *instruction) { i.asVecMisc(vecOpCnt, operandNR(v1VReg), operandNR(v2VReg), vecArrangement16B) }},

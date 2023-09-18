@@ -349,12 +349,21 @@ func encodeVecRRR(op vecOp, rd, rn, rm uint32, arr vecArrangement) uint32 {
 		_, q := arrToSizeQEncoded(arr)
 		return encodeAdvancedSIMDThreeSame(rd, rn, rm, 0b00011, 0b10 /* always has size 0b10 */, 0b1, q)
 	case vecOpBic:
+		if arr > vecArrangement16B {
+			panic("unsupported arrangement: " + arr.String())
+		}
 		_, q := arrToSizeQEncoded(arr)
 		return encodeAdvancedSIMDThreeSame(rd, rn, rm, 0b00011, 0b01 /* always has size 0b01 */, 0b0, q)
 	case vecOpBsl:
+		if arr > vecArrangement16B {
+			panic("unsupported arrangement: " + arr.String())
+		}
 		_, q := arrToSizeQEncoded(arr)
 		return encodeAdvancedSIMDThreeSame(rd, rn, rm, 0b00011, 0b01 /* always has size 0b01 */, 0b1, q)
 	case vecOpAnd:
+		if arr > vecArrangement16B {
+			panic("unsupported arrangement: " + arr.String())
+		}
 		_, q := arrToSizeQEncoded(arr)
 		return encodeAdvancedSIMDThreeSame(rd, rn, rm, 0b00011, 0b00 /* always has size 0b00 */, 0b0, q)
 	case vecOpOrr:
