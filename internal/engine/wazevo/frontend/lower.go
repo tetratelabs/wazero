@@ -1404,8 +1404,8 @@ func (c *Compiler) lowerCurrentOpcode() {
 			c := state.pop()
 			v2 := state.pop()
 			v1 := state.pop()
-			builder.AllocateInstruction().AsVbitselect(c, v1, v2).Insert(builder)
-			state.push(c)
+			ret := builder.AllocateInstruction().AsVbitselect(c, v1, v2).Insert(builder).Return()
+			state.push(ret)
 		case wasm.OpcodeVecI8x16Abs, wasm.OpcodeVecI16x8Abs, wasm.OpcodeVecI32x4Abs, wasm.OpcodeVecI64x2Abs:
 			if state.unreachable {
 				break

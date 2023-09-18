@@ -323,9 +323,15 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		ins := m.allocateInstr()
 		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
 		rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
-		rd := m.getOperand_NR(m.compiler.ValueDefinition(c), extModeNone)
-		ins.asVecRRR(vecOpBsl, rd, rn, rm, vecArrangement16B)
+		creg := m.getOperand_NR(m.compiler.ValueDefinition(c), extModeNone)
+		ins.asVecRRR(vecOpBsl, creg, rn, rm, vecArrangement16B)
 		m.insert(ins)
+
+		rd := m.compiler.VRegOf(instr.Return())
+		mov := m.allocateInstr()
+		mov.asFpuMov128(rd, creg.nr())
+
+		m.insert(mov)
 	case ssa.OpcodeVIadd:
 		x, y, lane := instr.Arg2WithLane()
 		arr := ssaLaneToArrangement(lane)
