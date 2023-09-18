@@ -21,10 +21,6 @@ type StackIterator interface {
 	// ProgramCounter returns the program counter associated with the
 	// function call.
 	ProgramCounter() ProgramCounter
-	// Parameters returns api.ValueType-encoded parameters of the current
-	// function. Do not modify the content of the slice, and copy out any
-	// value you need.
-	Parameters() []uint64
 }
 
 // FunctionListenerFactoryKey is a context.Context Value key. Its associated value should be a FunctionListenerFactory.
@@ -219,23 +215,20 @@ func (ps *parameters) index(i int) []uint64 {
 }
 
 type stackIterator struct {
-	base   StackIterator
-	index  int
-	pcs    []uint64
-	fns    []InternalFunction
-	params parameters
+	base  StackIterator
+	index int
+	pcs   []uint64
+	fns   []InternalFunction
 }
 
 func (si *stackIterator) Next() bool {
 	if si.base != nil {
 		si.pcs = si.pcs[:0]
 		si.fns = si.fns[:0]
-		si.params.clear()
 
 		for si.base.Next() {
 			si.pcs = append(si.pcs, uint64(si.base.ProgramCounter()))
 			si.fns = append(si.fns, si.base.Function())
-			si.params.append(si.base.Parameters())
 		}
 
 		si.base = nil
@@ -250,10 +243,6 @@ func (si *stackIterator) ProgramCounter() ProgramCounter {
 
 func (si *stackIterator) Function() InternalFunction {
 	return si.fns[si.index]
-}
-
-func (si *stackIterator) Parameters() []uint64 {
-	return si.params.index(si.index)
 }
 
 // StackFrame represents a frame on the call stack.
@@ -300,10 +289,6 @@ func (si *stackFrameIterator) Function() InternalFunction {
 
 func (si *stackFrameIterator) ProgramCounter() ProgramCounter {
 	return ProgramCounter(si.stack[si.index].PC)
-}
-
-func (si *stackFrameIterator) Parameters() []uint64 {
-	return si.stack[si.index].Params
 }
 
 // NewStackIterator constructs a stack iterator from a list of stack frames.
