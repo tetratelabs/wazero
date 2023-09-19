@@ -262,6 +262,25 @@ func (i *instruction) encode(c backend.Compiler) {
 			vecArrangement(byte(i.u1)),
 			vecIndex(i.u2),
 		))
+	case vecDup:
+		c.Emit4Bytes(encodeVecDup(
+			regNumberInEncoding[i.rd.realReg()],
+			regNumberInEncoding[i.rn.realReg()],
+			vecArrangement(byte(i.u1))))
+	case vecExtract:
+		c.Emit4Bytes(encodeVecExtract(
+			regNumberInEncoding[i.rd.realReg()],
+			regNumberInEncoding[i.rn.realReg()],
+			regNumberInEncoding[i.rm.realReg()],
+			vecArrangement(byte(i.u1)),
+			uint32(i.u2)))
+	case vecPermute:
+		c.Emit4Bytes(encodeVecPermute(
+			vecOp(i.u1),
+			regNumberInEncoding[i.rd.realReg()],
+			regNumberInEncoding[i.rn.realReg()],
+			regNumberInEncoding[i.rm.realReg()],
+			vecArrangement(byte(i.u2))))
 	case vecMisc:
 		c.Emit4Bytes(encodeAdvancedSIMDTwoMisc(
 			vecOp(i.u1),
@@ -275,6 +294,14 @@ func (i *instruction) encode(c backend.Compiler) {
 			vecOp(i.u1),
 			regNumberInEncoding[i.rd.realReg()],
 			regNumberInEncoding[i.rn.realReg()],
+			vecArrangement(i.u2),
+		))
+	case vecShiftImm:
+		c.Emit4Bytes(encodeVecShiftImm(
+			vecOp(i.u1),
+			regNumberInEncoding[i.rd.realReg()],
+			regNumberInEncoding[i.rn.realReg()],
+			uint32(i.rm.shiftImm()),
 			vecArrangement(i.u2),
 		))
 	case brTableSequence:
@@ -715,6 +742,63 @@ func encodeMoveFromVec(rd, rn uint32, arr vecArrangement, index vecIndex) uint32
 		panic("Unsupported arrangement " + arr.String())
 	}
 	return 0b0_001110000<<21 | q<<30 | imm5<<16 | 0b001111<<10 | rn<<5 | rd
+}
+
+// encodeVecDup encodes as "Duplicate general-purpose register to vector."
+// (represented as `dup`)
+// https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/DUP--general---Duplicate-general-purpose-register-to-vector-?lang=en
+func encodeVecDup(rd, rn uint32, arr vecArrangement) uint32 {
+	var q, imm5 uint32
+	switch arr {
+	case vecArrangement8B:
+		q, imm5 = 0b0, 0b1
+	case vecArrangement16B:
+		q, imm5 = 0b1, 0b1
+	case vecArrangement4H:
+		q, imm5 = 0b0, 0b10
+	case vecArrangement8H:
+		q, imm5 = 0b1, 0b10
+	case vecArrangement2S:
+		q, imm5 = 0b0, 0b100
+	case vecArrangement4S:
+		q, imm5 = 0b1, 0b100
+	case vecArrangement2D:
+		q, imm5 = 0b1, 0b1000
+	default:
+		panic("Unsupported arrangement " + arr.String())
+	}
+	return q<<30 | 0b001110000<<21 | imm5<<16 | 0b000011<<10 | rn<<5 | rd
+}
+
+// encodeVecExtract encodes as "Advanced SIMD extract."
+// Currently only `ext` is defined.
+// https://developer.arm.com/documentation/ddi0602/2023-06/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en#simd-dp
+func encodeVecExtract(rd, rn, rm uint32, arr vecArrangement, index uint32) uint32 {
+	var q, imm4 uint32
+	switch arr {
+	case vecArrangement8B:
+		q, imm4 = 0, 0b0111&uint32(index)
+	case vecArrangement16B:
+		q, imm4 = 1, 0b1111&uint32(index)
+	}
+	return q<<30 | 0b101110000<<21 | rm<<16 | imm4<<11 | rn<<5 | rd
+}
+
+// encodeVecPermute encodes as "Advanced SIMD permute."
+// https://developer.arm.com/documentation/ddi0602/2023-06/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en#simd-dp
+func encodeVecPermute(op vecOp, rd, rn, rm uint32, arr vecArrangement) uint32 {
+	var q, size, opcode uint32
+	switch op {
+	case vecOpZip1:
+		opcode = 0b011
+		if arr == vecArrangement1D {
+			panic("unsupported arrangement: " + arr.String())
+		}
+		size, q = arrToSizeQEncoded(arr)
+	default:
+		panic("TODO: " + op.String())
+	}
+	return q<<30 | 0b001110<<24 | size<<22 | rm<<16 | opcode<<12 | 0b10<<10 | rn<<5 | rd
 }
 
 // encodeConditionalSelect encodes as "Conditional select" in
@@ -1434,27 +1518,74 @@ func encodeAluRRImm(op aluOp, rd, rn, amount, _64bit uint32) uint32 {
 // https://developer.arm.com/documentation/ddi0596/2020-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
 func encodeVecLanes(op vecOp, rd uint32, rn uint32, arr vecArrangement) uint32 {
 	var u, q, size, opcode uint32
+	switch arr {
+	case vecArrangement8B:
+		q, size = 0b0, 0b00
+	case vecArrangement16B:
+		q, size = 0b1, 0b00
+	case vecArrangement4H:
+		q, size = 0, 0b01
+	case vecArrangement8H:
+		q, size = 1, 0b01
+	case vecArrangement4S:
+		q, size = 1, 0b10
+	default:
+		panic("unsupported arrangement: " + arr.String())
+	}
 	switch op {
 	case vecOpUaddlv:
 		u, opcode = 1, 0b00011
-		switch arr {
-		case vecArrangement8B:
-			q, size = 0b0, 0b00
-		case vecArrangement16B:
-			q, size = 0b1, 0b00
-		case vecArrangement4H:
-			q, size = 0, 0b01
-		case vecArrangement8H:
-			q, size = 1, 0b01
-		case vecArrangement4S:
-			q, size = 1, 0b10
-		default:
-			panic("unsupported arrangement: " + arr.String())
-		}
+	case vecOpUminv:
+		u, opcode = 1, 0b11010
+	case vecOpAddv:
+		u, opcode = 0, 0b11011
 	default:
 		panic("unsupported or illegal vecOp: " + op.String())
 	}
 	return q<<30 | u<<29 | 0b1110<<24 | size<<22 | 0b11000<<17 | opcode<<12 | 0b10<<10 | rn<<5 | rd
+}
+
+// encodeVecLanes encodes as Data Processing (Advanced SIMD scalar shift by immediate) depending on vecOp in
+// https://developer.arm.com/documentation/ddi0596/2020-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
+func encodeVecShiftImm(op vecOp, rd uint32, rn, amount uint32, arr vecArrangement) uint32 {
+	var u, q, immh, immb, opcode uint32
+	switch op {
+	case vecOpSshr:
+		u, opcode = 0, 0b00000
+		switch arr {
+		case vecArrangement16B:
+			q = 0b1
+			fallthrough
+		case vecArrangement8B:
+			immh = 0b0001
+			immb = 8 - uint32(amount&0b111)
+		case vecArrangement8H:
+			q = 0b1
+			fallthrough
+		case vecArrangement4H:
+			v := 16 - uint32(amount&0b1111)
+			immb = v & 0b111
+			immh = 0b0010 | (v >> 3)
+		case vecArrangement4S:
+			q = 0b1
+			fallthrough
+		case vecArrangement2S:
+			v := 32 - uint32(amount&0b11111)
+			immb = v & 0b111
+			immh = 0b0100 | (v >> 3)
+		case vecArrangement2D:
+			q = 0b1
+			v := 64 - uint32(amount&0b111111)
+			immb = v & 0b111
+			immh = 0b1000 | (v >> 3)
+		default:
+			panic("unsupported arrangement: " + arr.String())
+		}
+
+	default:
+		panic("unsupported or illegal vecOp: " + op.String())
+	}
+	return q<<30 | u<<29 | 0b011110<<23 | immh<<19 | immb<<16 | 0b000001<<10 | opcode<<11 | 0b1<<10 | rn<<5 | rd
 }
 
 // encodeVecMisc encodes as Data Processing (Advanced SIMD two-register miscellaneous) depending on vecOp in
@@ -1472,6 +1603,12 @@ func encodeAdvancedSIMDTwoMisc(op vecOp, rd, rn uint32, arr vecArrangement) uint
 		default:
 			panic("unsupported arrangement: " + arr.String())
 		}
+	case vecOpCmeqZero:
+		if arr == vecArrangement1D {
+			panic("unsupported arrangement: " + arr.String())
+		}
+		opcode = 0b01001
+		size, q = arrToSizeQEncoded(arr)
 	case vecOpNot:
 		u = 1
 		opcode = 0b00101

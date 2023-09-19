@@ -332,6 +332,10 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		ins := m.allocateInstr()
 		ins.asVecRRR(vecOpBsl, operandNR(rd), rn, rm, vecArrangement16B)
 		m.insert(ins)
+	case ssa.OpcodeVanyTrue, ssa.OpcodeVallTrue:
+		m.lowerVcheckTrue(instr)
+	case ssa.OpcodeVhighBits:
+		m.lowerVhighBits(instr)
 	case ssa.OpcodeVIadd:
 		x, y, lane := instr.Arg2WithLane()
 		arr := ssaLaneToArrangement(lane)
@@ -393,6 +397,189 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		panic("TODO: lowering " + op.String())
 	}
 	m.FlushPendingInstructions()
+}
+
+func (m *machine) lowerVcheckTrue(instr *ssa.Instruction) {
+	x, lane := instr.ArgWithLane()
+
+	rm := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+	rd := operandNR(m.compiler.VRegOf(instr.Return()))
+	tmp := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeOf(ssa.TypeV128)))
+
+	if instr.Opcode() == ssa.OpcodeVallTrue && lane == ssa.VecLaneI64x2 {
+		ins := m.allocateInstr()
+		ins.asVecMisc(vecOpCmeqZero, rd, rm, vecArrangement2D)
+		m.insert(ins)
+
+		addp := m.allocateInstr()
+		addp.asVecRRR(vecOpAddp, rd, rd, rd, vecArrangement2D)
+		m.insert(addp)
+
+		fcmp := m.allocateInstr()
+		fcmp.asFpuCmp(rd, rd, true)
+		m.insert(fcmp)
+
+		cset := m.allocateInstr()
+		cset.asCSet(rd.nr(), eq)
+		m.insert(cset)
+
+		return
+	}
+
+	ins := m.allocateInstr()
+
+	// Create a scalar value with umaxp or uminv, then compare it against zero.
+	if instr.Opcode() == ssa.OpcodeVanyTrue {
+		ins.asVecRRR(vecOpUmaxp, tmp, rm, rm, vecArrangement16B)
+	} else {
+		arr := ssaLaneToArrangement(lane)
+		ins.asVecLanes(vecOpUminv, tmp, rm, arr)
+	}
+
+	m.insert(ins)
+
+	movv := m.allocateInstr()
+	movv.asMovFromVec(rd, tmp, vecArrangementD, vecIndex(0))
+	m.insert(movv)
+
+	fc := m.allocateInstr()
+	fc.asCCmpImm(rd, uint64(0), al, 0, true)
+	m.insert(fc)
+
+	cset := m.allocateInstr()
+	cset.asCSet(rd.nr(), ne)
+	m.insert(cset)
+}
+
+func (m *machine) lowerVhighBits(instr *ssa.Instruction) {
+	x, lane := instr.ArgWithLane()
+	rm := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+	rd := operandNR(m.compiler.VRegOf(instr.Return()))
+
+	r0 := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeOf(ssa.TypeI64)))
+	v0 := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeOf(ssa.TypeV128)))
+	v1 := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeOf(ssa.TypeV128)))
+
+	switch lane {
+
+	case ssa.VecLaneI8x16:
+		sshr := m.allocateInstr()
+		sshr.asVecShiftImm(vecOpSshr, v1, rm, operandShiftImm(7), vecArrangement16B)
+		m.insert(sshr)
+
+		// m.lowerConstantI64(r0.nr(), 0x0008000400020001)
+		m.insertMOVZ(r0.nr(), 0x0201, 0, true)
+		m.insertMOVK(r0.nr(), 0x0804, 1, true)
+		m.insertMOVK(r0.nr(), 0x2010, 2, true)
+		m.insertMOVK(r0.nr(), 0x8040, 3, true)
+
+		dup := m.allocateInstr()
+		dup.asVecDup(v0, r0, vecArrangement2D)
+		m.insert(dup)
+
+		and := m.allocateInstr()
+		and.asVecRRR(vecOpAnd, v1, v1, v0, vecArrangement16B)
+		m.insert(and)
+
+		ext := m.allocateInstr()
+		ext.asVecExtract(v0, v1, v1, vecArrangement16B, uint32(8))
+		m.insert(ext)
+
+		zip1 := m.allocateInstr()
+		zip1.asVecPermute(vecOpZip1, v0, v1, v0, vecArrangement16B)
+		m.insert(zip1)
+
+		addv := m.allocateInstr()
+		addv.asVecLanes(vecOpAddv, v0, v0, vecArrangement8H)
+		m.insert(addv)
+
+		movfv := m.allocateInstr()
+		movfv.asMovFromVec(rd, v0, vecArrangementH, vecIndex(0))
+		m.insert(movfv)
+	case ssa.VecLaneI16x8:
+		sshr := m.allocateInstr()
+		sshr.asVecShiftImm(vecOpSshr, v1, rm, operandShiftImm(15), vecArrangement8H)
+		m.insert(sshr)
+
+		m.lowerConstantI64(r0.nr(), 0x0008000400020001)
+
+		dup := m.allocateInstr()
+		dup.asVecDup(v0, r0, vecArrangement2D)
+		m.insert(dup)
+
+		lsl := m.allocateInstr()
+		lsl.asALUShift(aluOpLsl, r0, r0, operandShiftImm(4), true)
+		m.insert(lsl)
+
+		movv := m.allocateInstr()
+		movv.asMovToVec(v0, r0, vecArrangementD, vecIndex(1))
+		m.insert(movv)
+
+		and := m.allocateInstr()
+		and.asVecRRR(vecOpAnd, v0, v1, v0, vecArrangement16B)
+		m.insert(and)
+
+		addv := m.allocateInstr()
+		addv.asVecLanes(vecOpAddv, v0, v0, vecArrangement8H)
+		m.insert(addv)
+
+		movfv := m.allocateInstr()
+		movfv.asMovFromVec(rd, v0, vecArrangementH, vecIndex(0))
+		m.insert(movfv)
+	case ssa.VecLaneI32x4:
+		sshr := m.allocateInstr()
+		sshr.asVecShiftImm(vecOpSshr, v1, rm, operandShiftImm(31), vecArrangement4S)
+		m.insert(sshr)
+
+		m.lowerConstantI64(r0.nr(), 0x0000000200000001)
+
+		dup := m.allocateInstr()
+		dup.asVecDup(v0, r0, vecArrangement2D)
+		m.insert(dup)
+
+		lsl := m.allocateInstr()
+		lsl.asALUShift(aluOpLsl, r0, r0, operandShiftImm(2), true)
+		m.insert(lsl)
+
+		movv := m.allocateInstr()
+		movv.asMovToVec(v0, r0, vecArrangementD, vecIndex(1))
+		m.insert(movv)
+
+		and := m.allocateInstr()
+		and.asVecRRR(vecOpAnd, v0, v1, v0, vecArrangement16B)
+		m.insert(and)
+
+		addv := m.allocateInstr()
+		addv.asVecLanes(vecOpAddv, v0, v0, vecArrangement4S)
+		m.insert(addv)
+
+		movfv := m.allocateInstr()
+		movfv.asMovFromVec(rd, v0, vecArrangementS, vecIndex(0))
+		m.insert(movfv)
+
+	case ssa.VecLaneI64x2:
+		movv0 := m.allocateInstr()
+		movv0.asMovFromVec(rd, rm, vecArrangementD, vecIndex(0))
+		m.insert(movv0)
+
+		movv1 := m.allocateInstr()
+		movv1.asMovFromVec(r0, rm, vecArrangementD, vecIndex(1))
+		m.insert(movv1)
+
+		lsr1 := m.allocateInstr()
+		lsr1.asALUShift(aluOpLsr, r0, r0, operandShiftImm(63), true)
+		m.insert(lsr1)
+
+		lsr2 := m.allocateInstr()
+		lsr2.asALUShift(aluOpLsr, rd, rd, operandShiftImm(63), true)
+		m.insert(lsr2)
+
+		lsl := m.allocateInstr()
+		lsl.asALU(aluOpAdd, rd, rd, operandSR(r0.nr(), 1, shiftOpLSL), false)
+		m.insert(lsl)
+	default:
+		panic("Unsupported " + lane.String())
+	}
 }
 
 func (m *machine) lowerVecMisc(op vecOp, instr *ssa.Instruction) {

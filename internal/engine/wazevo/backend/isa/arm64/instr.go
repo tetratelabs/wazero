@@ -99,8 +99,12 @@ var defKinds = [numInstructionKinds]defKind{
 	fpuCSel:         defKindRD,
 	movToVec:        defKindRD,
 	movFromVec:      defKindRD,
+	vecDup:          defKindRD,
+	vecExtract:      defKindRD,
 	vecMisc:         defKindRD,
 	vecLanes:        defKindRD,
+	vecShiftImm:     defKindRD,
+	vecPermute:      defKindRD,
 	vecRRR:          defKindRD,
 	fpuToInt:        defKindRD,
 	intToFpu:        defKindRD,
@@ -205,10 +209,14 @@ var useKinds = [numInstructionKinds]useKind{
 	fpuCSel:         useKindRNRM,
 	movToVec:        useKindRN,
 	movFromVec:      useKindRN,
+	vecDup:          useKindRN,
+	vecExtract:      useKindRNRM,
 	cCmpImm:         useKindRN,
 	vecMisc:         useKindRN,
 	vecLanes:        useKindRN,
+	vecShiftImm:     useKindRN,
 	vecRRR:          useKindRNRM,
+	vecPermute:      useKindRNRM,
 	fpuToInt:        useKindRN,
 	intToFpu:        useKindRN,
 	movToFPSR:       useKindRN,
@@ -775,6 +783,19 @@ func (i *instruction) asMovFromVec(rd, rn operand, arr vecArrangement, index vec
 	i.u1, i.u2 = uint64(arr), uint64(index)
 }
 
+func (i *instruction) asVecDup(rd, rn operand, arr vecArrangement) {
+	i.kind = vecDup
+	i.u1 = uint64(arr)
+	i.rn, i.rd = rn, rd
+}
+
+func (i *instruction) asVecExtract(rd, rn, rm operand, arr vecArrangement, index uint32) {
+	i.kind = vecExtract
+	i.u1 = uint64(arr)
+	i.rn, i.rm, i.rd = rn, rm, rd
+	i.u2 = uint64(index)
+}
+
 func (i *instruction) asVecMisc(op vecOp, rd, rn operand, arr vecArrangement) {
 	i.kind = vecMisc
 	i.u1 = uint64(op)
@@ -786,6 +807,20 @@ func (i *instruction) asVecLanes(op vecOp, rd, rn operand, arr vecArrangement) {
 	i.kind = vecLanes
 	i.u1 = uint64(op)
 	i.rn, i.rd = rn, rd
+	i.u2 = uint64(arr)
+}
+
+func (i *instruction) asVecShiftImm(op vecOp, rd, rn, rm operand, arr vecArrangement) {
+	i.kind = vecShiftImm
+	i.u1 = uint64(op)
+	i.rn, i.rm, i.rd = rn, rm, rd
+	i.u2 = uint64(arr)
+}
+
+func (i *instruction) asVecPermute(op vecOp, rd, rn, rm operand, arr vecArrangement) {
+	i.kind = vecPermute
+	i.u1 = uint64(op)
+	i.rn, i.rm, i.rd = rn, rm, rd
 	i.u2 = uint64(arr)
 }
 
@@ -1076,9 +1111,19 @@ func (i *instruction) String() (str string) {
 	case movFromVecSigned:
 		panic("TODO")
 	case vecDup:
-		panic("TODO")
+		str = fmt.Sprintf("dup %s, %s",
+			formatVRegVec(i.rd.nr(), vecArrangement(i.u1), vecIndexNone),
+			formatVRegSized(i.rn.nr(), 64),
+		)
 	case vecDupFromFpu:
 		panic("TODO")
+	case vecExtract:
+		str = fmt.Sprintf("ext %s, %s, %s, #%d",
+			formatVRegVec(i.rd.nr(), vecArrangement(i.u1), vecIndexNone),
+			formatVRegVec(i.rn.nr(), vecArrangement(i.u1), vecIndexNone),
+			formatVRegVec(i.rm.nr(), vecArrangement(i.u1), vecIndexNone),
+			uint32(i.u2),
+		)
 	case vecExtend:
 		panic("TODO")
 	case vecMovElement:
@@ -1114,10 +1159,24 @@ func (i *instruction) String() (str string) {
 			vecOp(i.u1),
 			formatVRegWidthVec(i.rd.nr(), destArr),
 			formatVRegVec(i.rn.nr(), arr, vecIndexNone))
+	case vecShiftImm:
+		arr := vecArrangement(i.u2)
+		str = fmt.Sprintf("%s %s, %s, #%d",
+			vecOp(i.u1),
+			formatVRegVec(i.rd.nr(), arr, vecIndexNone),
+			formatVRegVec(i.rn.nr(), arr, vecIndexNone),
+			i.rm.shiftImm())
 	case vecTbl:
 		panic("TODO")
 	case vecTbl2:
 		panic("TODO")
+	case vecPermute:
+		arr := vecArrangement(i.u2)
+		str = fmt.Sprintf("%s %s, %s, %s",
+			vecOp(i.u1),
+			formatVRegVec(i.rd.nr(), arr, vecIndexNone),
+			formatVRegVec(i.rn.nr(), arr, vecIndexNone),
+			formatVRegVec(i.rm.nr(), arr, vecIndexNone))
 	case movToFPSR:
 		str = fmt.Sprintf("msr fpsr, %s", formatVRegSized(i.rn.nr(), 64))
 	case movFromFPSR:
@@ -1322,6 +1381,8 @@ const (
 	vecDup
 	// vecDupFromFpu represents a duplication of scalar to vector.
 	vecDupFromFpu
+	// vecExtract represents a vector extraction operation.
+	vecExtract
 	// vecExtend represents a vector extension operation.
 	vecExtend
 	// vecMovElement represents a move vector element to another vector element operation.
@@ -1334,10 +1395,14 @@ const (
 	vecMisc
 	// vecLanes represents a vector instruction across lanes.
 	vecLanes
+	// vecShiftImm represents a SIMD scalar shift by immediate instruction.
+	vecShiftImm
 	// vecTbl represents a table vector lookup - single register table.
 	vecTbl
 	// vecTbl2 represents a table vector lookup - two register table.
 	vecTbl2
+	// vecPermute represents a vector permute instruction.
+	vecPermute
 	// movToNZCV represents a move to the FPSR.
 	movToFPSR
 	// movFromNZCV represents a move from the FPSR.
@@ -1502,6 +1567,8 @@ func (b vecOp) String() string {
 	switch b {
 	case vecOpCnt:
 		return "cnt"
+	case vecOpCmeqZero:
+		return "cmeqZero"
 	case vecOpUaddlv:
 		return "uaddlv"
 	case vecOpBit:
@@ -1522,16 +1589,22 @@ func (b vecOp) String() string {
 		return "add"
 	case vecOpAddp:
 		return "addp"
+	case vecOpAddv:
+		return "addv"
 	case vecOpSub:
 		return "sub"
 	case vecOpSmin:
 		return "smin"
 	case vecOpUmin:
 		return "umin"
+	case vecOpUminv:
+		return "uminv"
 	case vecOpSmax:
 		return "smax"
 	case vecOpUmax:
 		return "umax"
+	case vecOpUmaxp:
+		return "umaxp"
 	case vecOpUrhadd:
 		return "urhadd"
 	case vecOpMul:
@@ -1546,12 +1619,17 @@ func (b vecOp) String() string {
 		return "xtn"
 	case vecOpShll:
 		return "shll"
+	case vecOpSshr:
+		return "sshr"
+	case vecOpZip1:
+		return "zip1"
 	}
 	panic(int(b))
 }
 
 const (
 	vecOpCnt vecOp = iota
+	vecOpCmeqZero
 	vecOpUaddlv
 	vecOpBit
 	vecOpBic
@@ -1561,6 +1639,7 @@ const (
 	vecOpOrr
 	vecOpEOR
 	vecOpAdd
+	vecOpAddv
 	vecOpSqadd
 	vecOpUqadd
 	vecOpAddp
@@ -1569,6 +1648,7 @@ const (
 	vecOpUqsub
 	vecOpSmin
 	vecOpUmin
+	vecOpUminv
 	vecOpSmax
 	vecOpUmax
 	vecOpUmaxp
@@ -1580,6 +1660,8 @@ const (
 	vecOpRev64
 	vecOpXtn
 	vecOpShll
+	vecOpSshr
+	vecOpZip1
 )
 
 // bitOp determines the type of bitwise operation. Instructions whose kind is one of

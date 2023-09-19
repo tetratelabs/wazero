@@ -913,8 +913,8 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeVbnot:      returnTypesFnV128,
 	OpcodeVbandnot:   returnTypesFnV128,
 	OpcodeVbitselect: returnTypesFnV128,
-	OpcodeVanyTrue:   returnTypesFnV128,
-	OpcodeVallTrue:   returnTypesFnV128,
+	OpcodeVanyTrue:   returnTypesFnSingle,
+	OpcodeVallTrue:   returnTypesFnSingle,
 	OpcodeVhighBits:  returnTypesFnV128,
 	OpcodeVIadd:      returnTypesFnV128,
 	OpcodeVSaddSat:   returnTypesFnV128,
@@ -1553,6 +1553,32 @@ func (i *Instruction) AsVbitselect(c, x, y Value) *Instruction {
 	i.v = c
 	i.v2 = x
 	i.v3 = y
+	return i
+}
+
+// AsVanyTrue initializes this instruction as an anyTrue vector instruction with OpcodeVanyTrue.
+func (i *Instruction) AsVanyTrue(x Value) *Instruction {
+	i.opcode = OpcodeVanyTrue
+	i.typ = TypeI32
+	i.v = x
+	return i
+}
+
+// AsVallTrue initializes this instruction as an allTrue vector instruction with OpcodeVallTrue.
+func (i *Instruction) AsVallTrue(x Value, lane VecLane) *Instruction {
+	i.opcode = OpcodeVallTrue
+	i.typ = TypeI32
+	i.v = x
+	i.u1 = uint64(lane)
+	return i
+}
+
+// AsVhighBits initializes this instruction as a highBits vector instruction with OpcodeVhighBits.
+func (i *Instruction) AsVhighBits(x Value, lane VecLane) *Instruction {
+	i.opcode = OpcodeVhighBits
+	i.typ = TypeI32
+	i.v = x
+	i.u1 = uint64(lane)
 	return i
 }
 

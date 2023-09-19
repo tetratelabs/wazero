@@ -246,6 +246,12 @@ func TestInstruction_encode(t *testing.T) {
 		{want: "4164a36e", setup: func(i *instruction) {
 			i.asVecRRR(vecOpUmax, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
 		}},
+		{want: "41a4236e", setup: func(i *instruction) {
+			i.asVecRRR(vecOpUmaxp, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
+		}},
+		{want: "41a8316e", setup: func(i *instruction) {
+			i.asVecLanes(vecOpUminv, operandNR(v1VReg), operandNR(v2VReg), vecArrangement16B)
+		}},
 		{want: "4114232e", setup: func(i *instruction) {
 			i.asVecRRR(vecOpUrhadd, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
 		}},
@@ -281,6 +287,9 @@ func TestInstruction_encode(t *testing.T) {
 		}},
 		{want: "419ca34e", setup: func(i *instruction) {
 			i.asVecRRR(vecOpMul, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
+		}},
+		{want: "4198200e", setup: func(i *instruction) {
+			i.asVecMisc(vecOpCmeqZero, operandNR(v1VReg), operandNR(v2VReg), vecArrangement8B)
 		}},
 		{want: "41b8200e", setup: func(i *instruction) {
 			i.asVecMisc(vecOpAbs, operandNR(v1VReg), operandNR(v2VReg), vecArrangement8B)
@@ -346,6 +355,16 @@ func TestInstruction_encode(t *testing.T) {
 		{want: "413c020e", setup: func(i *instruction) { i.asMovFromVec(operandNR(x1VReg), operandNR(v2VReg), vecArrangementH, 0) }},
 		{want: "413c040e", setup: func(i *instruction) { i.asMovFromVec(operandNR(x1VReg), operandNR(v2VReg), vecArrangementS, 0) }},
 		{want: "413c084e", setup: func(i *instruction) { i.asMovFromVec(operandNR(x1VReg), operandNR(v2VReg), vecArrangementD, 0) }},
+		{want: "410c084e", setup: func(i *instruction) { i.asVecDup(operandNR(x1VReg), operandNR(v2VReg), vecArrangement2D) }},
+		{want: "4140036e", setup: func(i *instruction) { // 4140036e
+			i.asVecExtract(operandNR(x1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B, 8)
+		}},
+		{want: "4138034e", setup: func(i *instruction) {
+			i.asVecPermute(vecOpZip1, operandNR(x1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
+		}},
+		{want: "4104214f", setup: func(i *instruction) {
+			i.asVecShiftImm(vecOpSshr, operandNR(x1VReg), operandNR(x2VReg), operandShiftImm(31), vecArrangement4S)
+		}},
 		{want: "5b28030b", setup: func(i *instruction) {
 			i.asALU(aluOpAdd, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSL), false)
 		}},
