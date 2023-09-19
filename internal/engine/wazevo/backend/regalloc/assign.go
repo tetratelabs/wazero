@@ -77,7 +77,6 @@ func (a *Allocator) assignRegistersPerInstr(f Function, pc programCounter, instr
 	uses := instr.Uses()
 	for i, u := range uses {
 		if u.IsRealReg() {
-			a.vs = append(a.vs, u)
 			continue
 		}
 		if wazevoapi.RegAllocLoggingEnabled {

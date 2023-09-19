@@ -190,8 +190,10 @@ func (a *abiImpl) CalleeGenFunctionArgsToVRegs(args []ssa.Value) {
 			switch arg.Type {
 			case ssa.TypeI32, ssa.TypeI64:
 				load.asULoad(operandNR(reg), amode, bits)
-			case ssa.TypeF32, ssa.TypeF64:
+			case ssa.TypeF32, ssa.TypeF64, ssa.TypeV128:
 				load.asFpuLoad(operandNR(reg), amode, bits)
+			default:
+				panic("BUG")
 			}
 			m.insert(load)
 			a.m.unresolvedAddressModes = append(a.m.unresolvedAddressModes, load)
@@ -290,7 +292,7 @@ func (a *abiImpl) callerGenFunctionReturnVReg(retIndex int, reg regalloc.VReg) {
 		switch r.Type {
 		case ssa.TypeI32, ssa.TypeI64:
 			ldr.asULoad(operandNR(reg), amode, r.Type.Bits())
-		case ssa.TypeF32, ssa.TypeF64:
+		case ssa.TypeF32, ssa.TypeF64, ssa.TypeV128:
 			ldr.asFpuLoad(operandNR(reg), amode, r.Type.Bits())
 		default:
 			panic("BUG")
@@ -303,6 +305,9 @@ func (m *machine) resolveAddressModeForOffsetAndInsert(cur *instruction, offset 
 	m.pendingInstructions = m.pendingInstructions[:0]
 	mode := m.resolveAddressModeForOffset(offset, dstBits, rn)
 	for _, instr := range m.pendingInstructions {
+		// This is called after/during alloc, so set the flag so that
+		// this insertion won't interfere with the register allocation.
+		instr.addedAfterLowering = true
 		cur = linkInstr(cur, instr)
 	}
 	return cur, mode

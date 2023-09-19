@@ -3,6 +3,7 @@ package regalloc
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 )
@@ -88,16 +89,23 @@ func (a *Allocator) coloringFor(allocatable []RealReg) {
 		sort.SliceStable(degreeSortedNodes, func(i, j int) bool {
 			return currentDegrees[degreeSortedNodes[i]] < currentDegrees[degreeSortedNodes[j]]
 		})
-
 		if wazevoapi.RegAllocLoggingEnabled {
 			fmt.Println("-------------------------------")
 			fmt.Printf("coloringStack: ")
 			for _, c := range coloringStack {
-				fmt.Printf("v%d ", c.v.ID())
+				if c.v.IsRealReg() {
+					fmt.Printf("%s ", a.regInfo.RealRegName(c.v.RealReg()))
+				} else {
+					fmt.Printf("v%d ", c.v.ID())
+				}
 			}
 			fmt.Printf("\ndegreeSortedNodes: ")
 			for _, n := range degreeSortedNodes {
-				fmt.Printf("v%d ", n.v.ID())
+				if n.v.IsRealReg() {
+					fmt.Printf("%s ", a.regInfo.RealRegName(n.v.RealReg()))
+				} else {
+					fmt.Printf("v%d ", n.v.ID())
+				}
 			}
 			fmt.Printf("\ncurrentDegrees: ")
 			for n, degree := range currentDegrees {
@@ -195,13 +203,17 @@ func (a *Allocator) coloringFor(allocatable []RealReg) {
 		}
 
 		if wazevoapi.RegAllocLoggingEnabled {
-			fmt.Printf("\tneighborColors: %v\n", neighborColors)
+			var s []string
+			for _, r := range neighborColors {
+				s = append(s, a.regInfo.RealRegName(r))
+			}
+			fmt.Printf("\tneighborColors: %v\n", strings.Join(s, ","))
 		}
 
 		a.assignColor(n, neighborColorsSet, allocatable)
 
 		if wazevoapi.RegAllocLoggingEnabled {
-			fmt.Printf("\tassigned color: %s\n", n.r)
+			fmt.Printf("\tassigned color: %s\n", a.regInfo.RealRegName(n.r))
 		}
 
 		// Reset the map for the next iteration.

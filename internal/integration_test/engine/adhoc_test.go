@@ -37,7 +37,7 @@ type testCase struct {
 }
 
 var tests = map[string]testCase{
-	"huge stack":                                        {f: testHugeStack, wazevoSkip: true},
+	"huge stack":                                        {f: testHugeStack},
 	"unreachable":                                       {f: testUnreachable},
 	"recursive entry":                                   {f: testRecursiveEntry},
 	"host func memory":                                  {f: testHostFuncMemory},
@@ -61,6 +61,7 @@ var tests = map[string]testCase{
 	"before listener globals":                           {f: testBeforeListenerGlobals},
 	"before listener stack iterator":                    {f: testBeforeListenerStackIterator},
 	"before listener stack iterator offsets":            {f: testListenerStackIteratorOffset, wazevoSkip: true},
+	"many params many results":                          {f: testManyParamsResults, wazevoSkip: true},
 }
 
 func TestEngineCompiler(t *testing.T) {
@@ -77,7 +78,7 @@ func TestEngineInterpreter(t *testing.T) {
 // testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
 var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 
-const i32, i64 = wasm.ValueTypeI32, wasm.ValueTypeI64
+const i32, i64, f32, f64, v128 = wasm.ValueTypeI32, wasm.ValueTypeI64, wasm.ValueTypeF32, wasm.ValueTypeF64, wasm.ValueTypeV128
 
 var memoryCapacityPages = uint32(2)
 
@@ -1615,4 +1616,101 @@ func (f *fnListener) Abort(ctx context.Context, mod api.Module, def api.Function
 	if f.abortFn != nil {
 		f.abortFn(ctx, mod, def, err)
 	}
+}
+
+func testManyParamsResults(t *testing.T, r wazero.Runtime) {
+	mainType := wasm.FunctionType{}
+	swapperType := wasm.FunctionType{}
+	doublerType := wasm.FunctionType{}
+	for i := 0; i < 20; i++ {
+		swapperType.Params = append(swapperType.Params, i32, i64, f32, f64, v128)
+		swapperType.Results = append(swapperType.Results, v128, f64, f32, i64, i32)
+		mainType.Params = append(mainType.Params, i32, i64, f32, f64, v128)
+		mainType.Results = append(mainType.Results, v128, f64, f32, i64, i32)
+		doublerType.Params = append(doublerType.Results, v128, f64, f32, i64, i32)
+		doublerType.Results = append(doublerType.Results, v128, f64, f32, i64, i32)
+	}
+
+	var mainBody []byte
+	for i := 0; i < 100; i++ {
+		mainBody = append(mainBody, wasm.OpcodeLocalGet)
+		mainBody = append(mainBody, leb128.EncodeUint32(uint32(i))...)
+	}
+	mainBody = append(mainBody, wasm.OpcodeCall, 1) // Call swapper.
+	mainBody = append(mainBody, wasm.OpcodeCall, 2) // Call doubler.
+	mainBody = append(mainBody, wasm.OpcodeEnd)
+
+	var swapperBody []byte
+	for i := 0; i < 100; i++ {
+		swapperBody = append(swapperBody, wasm.OpcodeLocalGet)
+		swapperBody = append(swapperBody, leb128.EncodeUint32(uint32(99-i))...)
+	}
+	swapperBody = append(swapperBody, wasm.OpcodeEnd)
+
+	var doublerBody []byte
+	for i := 0; i < 100; i += 5 {
+		// Returns v128 as-is.
+		doublerBody = append(doublerBody, wasm.OpcodeLocalGet)
+		doublerBody = append(doublerBody, leb128.EncodeUint32(uint32(i))...)
+		// Double f64.
+		doublerBody = append(doublerBody, wasm.OpcodeLocalGet)
+		doublerBody = append(doublerBody, leb128.EncodeUint32(uint32(i+1))...)
+		doublerBody = append(doublerBody, wasm.OpcodeLocalGet)
+		doublerBody = append(doublerBody, leb128.EncodeUint32(uint32(i+1))...)
+		doublerBody = append(doublerBody, wasm.OpcodeF64Add)
+		// Double f32.
+		doublerBody = append(doublerBody, wasm.OpcodeLocalGet)
+		doublerBody = append(doublerBody, leb128.EncodeUint32(uint32(i+2))...)
+		doublerBody = append(doublerBody, wasm.OpcodeLocalGet)
+		doublerBody = append(doublerBody, leb128.EncodeUint32(uint32(i+2))...)
+		doublerBody = append(doublerBody, wasm.OpcodeF32Add)
+		// Double i64.
+		doublerBody = append(doublerBody, wasm.OpcodeLocalGet)
+		doublerBody = append(doublerBody, leb128.EncodeUint32(uint32(i+3))...)
+		doublerBody = append(doublerBody, wasm.OpcodeLocalGet)
+		doublerBody = append(doublerBody, leb128.EncodeUint32(uint32(i+3))...)
+		doublerBody = append(doublerBody, wasm.OpcodeI64Add)
+		// Double i32.
+		doublerBody = append(doublerBody, wasm.OpcodeLocalGet)
+		doublerBody = append(doublerBody, leb128.EncodeUint32(uint32(i+4))...)
+		doublerBody = append(doublerBody, wasm.OpcodeLocalGet)
+		doublerBody = append(doublerBody, leb128.EncodeUint32(uint32(i+4))...)
+		doublerBody = append(doublerBody, wasm.OpcodeI32Add)
+	}
+	doublerBody = append(doublerBody, wasm.OpcodeEnd)
+
+	bin := binaryencoding.EncodeModule(&wasm.Module{
+		TypeSection:     []wasm.FunctionType{mainType, swapperType, doublerType},
+		ExportSection:   []wasm.Export{{Name: "main", Type: wasm.ExternTypeFunc, Index: 0}},
+		FunctionSection: []wasm.Index{0, 1, 2},
+		CodeSection:     []wasm.Code{{Body: mainBody}, {Body: swapperBody}, {Body: doublerBody}},
+	})
+
+	mod, err := r.Instantiate(testCtx, bin)
+	require.NoError(t, err)
+
+	main := mod.ExportedFunction("main")
+	require.NotNil(t, main)
+
+	var param []uint64
+	for i := 0; i < 100; i += 5 {
+		param = append(param, uint64(i))
+		param = append(param, uint64(i+1))
+		param = append(param, uint64(i+2))
+		param = append(param, uint64(i+3))
+		// Vector needs two values.
+		param = append(param, uint64(i+3))
+		param = append(param, uint64(i+3))
+	}
+
+	results, err := main.Call(testCtx, param...)
+	require.NoError(t, err)
+	exp := []uint64{
+		98, 98, 196, 194, 192, 190, 93, 93, 186, 184, 182, 180, 88, 88, 176, 174, 172, 170, 83, 83, 166, 164, 162,
+		160, 78, 78, 156, 154, 152, 150, 73, 73, 146, 144, 142, 140, 68, 68, 136, 134, 132, 130, 63, 63, 126, 124,
+		122, 120, 58, 58, 116, 114, 112, 110, 53, 53, 106, 104, 102, 100, 48, 48, 96, 94, 92, 90, 43, 43, 86, 84,
+		82, 80, 38, 38, 76, 74, 72, 70, 33, 33, 66, 64, 62, 60, 28, 28, 56, 54, 52, 50, 23, 23, 46, 44, 42, 40, 18,
+		18, 36, 34, 32, 30, 13, 13, 26, 24, 22, 20, 8, 8, 16, 14, 12, 10, 3, 3, 6, 4, 2, 0,
+	}
+	require.Equal(t, exp, results)
 }
