@@ -88,16 +88,23 @@ func (a *Allocator) coloringFor(allocatable []RealReg) {
 		sort.SliceStable(degreeSortedNodes, func(i, j int) bool {
 			return currentDegrees[degreeSortedNodes[i]] < currentDegrees[degreeSortedNodes[j]]
 		})
-
 		if wazevoapi.RegAllocLoggingEnabled {
 			fmt.Println("-------------------------------")
 			fmt.Printf("coloringStack: ")
 			for _, c := range coloringStack {
-				fmt.Printf("v%d ", c.v.ID())
+				if c.v.IsRealReg() {
+					fmt.Printf("%s ", a.regInfo.RealRegName(c.v.RealReg()))
+				} else {
+					fmt.Printf("v%d ", c.v.ID())
+				}
 			}
 			fmt.Printf("\ndegreeSortedNodes: ")
 			for _, n := range degreeSortedNodes {
-				fmt.Printf("v%d ", n.v.ID())
+				if n.v.IsRealReg() {
+					fmt.Printf("%s ", a.regInfo.RealRegName(n.v.RealReg()))
+				} else {
+					fmt.Printf("v%d ", n.v.ID())
+				}
 			}
 			fmt.Printf("\ncurrentDegrees: ")
 			for n, degree := range currentDegrees {

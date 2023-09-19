@@ -1618,14 +1618,24 @@ func (f *fnListener) Abort(ctx context.Context, mod api.Module, def api.Function
 	}
 }
 
+//func Test_a(t *testing.T) {
+//	config := wazero.NewRuntimeConfigInterpreter()
+//	wazevo.ConfigureWazevo(config)
+//	r := wazero.NewRuntimeWithConfig(testCtx, config)
+//	testManyParamsResults(t, r)
+//}
+
 func testManyParamsResults(t *testing.T, r wazero.Runtime) {
 	mainType := wasm.FunctionType{}
 	swapperType := wasm.FunctionType{}
+	doublerType := wasm.FunctionType{}
 	for i := 0; i < 20; i++ {
 		swapperType.Params = append(swapperType.Params, i32, i64, f32, f64, v128)
 		swapperType.Results = append(swapperType.Results, v128, f64, f32, i64, i32)
 		mainType.Params = append(mainType.Params, i32, i64, f32, f64, v128)
 		mainType.Results = append(mainType.Results, v128, f64, f32, i64, i32)
+		doublerType.Params = append(doublerType.Results, v128, f64, f32, i64, i32)
+		doublerType.Results = append(doublerType.Results, v128, f64, f32, i64, i32)
 	}
 
 	var mainBody []byte
@@ -1644,11 +1654,6 @@ func testManyParamsResults(t *testing.T, r wazero.Runtime) {
 	}
 	swapperBody = append(swapperBody, wasm.OpcodeEnd)
 
-	doublerType := wasm.FunctionType{}
-	for i := 0; i < 20; i++ {
-		doublerType.Params = append(doublerType.Results, v128, f64, f32, i64, i32)
-		doublerType.Results = append(doublerType.Results, v128, f64, f32, i64, i32)
-	}
 	var doublerBody []byte
 	for i := 0; i < 100; i += 5 {
 		// Returns v128 as-is.
