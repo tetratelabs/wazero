@@ -17,8 +17,8 @@ import (
 
 var hammers = map[string]testCase{
 	// Tests here are similar to what's described in /RATIONALE.md, but deviate as they involve blocking functions.
-	"close importing module while in use": {f: closeImportingModuleWhileInUse, wazevoSkip: true},
-	"close imported module while in use":  {f: closeImportedModuleWhileInUse, wazevoSkip: true},
+	"close importing module while in use": {f: closeImportingModuleWhileInUse},
+	"close imported module while in use":  {f: closeImportedModuleWhileInUse},
 }
 
 func TestEngineCompiler_hammer(t *testing.T) {

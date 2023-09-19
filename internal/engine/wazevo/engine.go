@@ -409,9 +409,6 @@ func (e *engine) DeleteCompiledModule(m *wasm.Module) {
 	defer e.mux.Unlock()
 	cm, ok := e.compiledModules[m.ID]
 	if ok {
-		cm.parent = nil
-		cm.module = nil
-		cm.functionOffsets = nil
 		if len(cm.executable) > 0 {
 			e.deleteCompiledModuleFromSortedList(cm)
 		}
