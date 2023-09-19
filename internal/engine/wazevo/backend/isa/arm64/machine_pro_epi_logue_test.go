@@ -210,7 +210,7 @@ func TestMachine_insertStackBoundsCheck(t *testing.T) {
 		tc := tc
 		t.Run(tc.exp, func(t *testing.T) {
 			ctx, _, m := newSetupWithMockContext()
-			m.rootInstr = m.allocateInstrAfterLowering()
+			m.rootInstr = m.allocateInstr()
 			m.rootInstr.asNop0()
 			m.insertStackBoundsCheck(tc.requiredStackSize, m.rootInstr)
 			fmt.Println(m.Format())

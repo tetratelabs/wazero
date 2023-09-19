@@ -94,7 +94,7 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 	}
 
 	// Advances the stack pointer.
-	cur = m.addsAddOrSubStackPointer(cur, spVReg, goCallStackSize, false, true)
+	cur = m.addsAddOrSubStackPointer(cur, spVReg, goCallStackSize, false)
 
 	// Copy the pointer to x15VReg.
 	arg0ret0AddrReg := x15VReg // Caller save, so we can use it for whatever we want.
@@ -158,11 +158,11 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 
 	// Get the pointer to the arg[0]/ret[0]: We need to skip `frame_size + sliceSize`.
 	if len(abi.rets) > 0 {
-		cur = m.addsAddOrSubStackPointer(cur, arg0ret0AddrReg, 16, true, true)
+		cur = m.addsAddOrSubStackPointer(cur, arg0ret0AddrReg, 16, true)
 	}
 
 	// Removes the stack frame! --> Stack pointer now points to the original arg 0 slot.
-	cur = m.addsAddOrSubStackPointer(cur, spVReg, goCallStackSize+callFrameSize, true, true)
+	cur = m.addsAddOrSubStackPointer(cur, spVReg, goCallStackSize+callFrameSize, true)
 
 	for i := range abi.rets {
 		r := &abi.rets[i]
@@ -224,7 +224,7 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 		}
 	}
 
-	ret := m.allocateInstrAfterLowering()
+	ret := m.allocateInstr()
 	ret.asRet(nil)
 	linkInstr(cur, ret)
 
@@ -235,7 +235,7 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 func (m *machine) saveRegistersInExecutionContext(cur *instruction, regs []regalloc.VReg) *instruction {
 	offset := wazevoapi.ExecutionContextOffsetSavedRegistersBegin.I64()
 	for _, v := range regs {
-		store := m.allocateInstrAfterLowering()
+		store := m.allocateInstr()
 		var sizeInBits byte
 		switch v.RegType() {
 		case regalloc.RegTypeInt:
@@ -260,7 +260,7 @@ func (m *machine) saveRegistersInExecutionContext(cur *instruction, regs []regal
 func (m *machine) restoreRegistersInExecutionContext(cur *instruction, regs []regalloc.VReg) *instruction {
 	offset := wazevoapi.ExecutionContextOffsetSavedRegistersBegin.I64()
 	for _, v := range regs {
-		load := m.allocateInstrAfterLowering()
+		load := m.allocateInstr()
 		var as func(dst operand, amode addressMode, sizeInBits byte)
 		var sizeInBits byte
 		switch v.RegType() {
@@ -306,7 +306,7 @@ func (m *machine) setExitCode(cur *instruction, execCtr regalloc.VReg, exitCode 
 	cur = m.lowerConstantI32AndInsert(cur, constReg, int32(exitCode))
 
 	// Set the exit status on the execution context.
-	setExistStatus := m.allocateInstrAfterLowering()
+	setExistStatus := m.allocateInstr()
 	setExistStatus.asStore(operandNR(constReg),
 		addressMode{
 			kind: addressModeKindRegUnsignedImm12,
@@ -318,11 +318,11 @@ func (m *machine) setExitCode(cur *instruction, execCtr regalloc.VReg, exitCode 
 
 func (m *machine) storeReturnAddressAndExit(cur *instruction) *instruction {
 	// Read the return address into tmp, and store it in the execution context.
-	adr := m.allocateInstrAfterLowering()
+	adr := m.allocateInstr()
 	adr.asAdr(tmpRegVReg, exitSequenceSize+8)
 	cur = linkInstr(cur, adr)
 
-	storeReturnAddr := m.allocateInstrAfterLowering()
+	storeReturnAddr := m.allocateInstr()
 	storeReturnAddr.asStore(operandNR(tmpRegVReg),
 		addressMode{
 			kind: addressModeKindRegUnsignedImm12,
@@ -332,7 +332,7 @@ func (m *machine) storeReturnAddressAndExit(cur *instruction) *instruction {
 	cur = linkInstr(cur, storeReturnAddr)
 
 	// Exit the execution.
-	trapSeq := m.allocateInstrAfterLowering()
+	trapSeq := m.allocateInstr()
 	trapSeq.asExitSequence(x0VReg)
 	cur = linkInstr(cur, trapSeq)
 	return cur
@@ -342,11 +342,11 @@ func (m *machine) saveCurrentStackPointer(cur *instruction, execCtr regalloc.VRe
 	// Save the current stack pointer:
 	// 	mov tmp, sp,
 	// 	str tmp, [exec_ctx, #stackPointerBeforeGoCall]
-	movSp := m.allocateInstrAfterLowering()
+	movSp := m.allocateInstr()
 	movSp.asMove64(tmpRegVReg, spVReg)
 	cur = linkInstr(cur, movSp)
 
-	strSp := m.allocateInstrAfterLowering()
+	strSp := m.allocateInstr()
 	strSp.asStore(operandNR(tmpRegVReg),
 		addressMode{
 			kind: addressModeKindRegUnsignedImm12,

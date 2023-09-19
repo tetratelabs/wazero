@@ -21,14 +21,14 @@ type (
 	//
 	// TODO: optimize the layout later once the impl settles.
 	instruction struct {
-		kind               instructionKind
-		prev, next         *instruction
-		u1, u2, u3         uint64
-		rd, rm, rn, ra     operand
-		amode              addressMode
-		abi                *abiImpl
-		targets            []uint32
-		addedAfterLowering bool
+		kind                instructionKind
+		prev, next          *instruction
+		u1, u2, u3          uint64
+		rd, rm, rn, ra      operand
+		amode               addressMode
+		abi                 *abiImpl
+		targets             []uint32
+		addedBeforeRegAlloc bool
 	}
 
 	// instructionKind represents the kind of instruction.

@@ -163,8 +163,8 @@ func (r *regAllocBlockImpl) InstrIteratorNext() regalloc.Instr {
 		instr := r.instrIteratorNext()
 		if instr == nil {
 			return nil
-		} else if !instr.i.addedAfterLowering {
-			// Skips the instruction added after lowering.
+		} else if instr.i.addedBeforeRegAlloc {
+			// Only concerned about the instruction added before regalloc.
 			return instr
 		}
 	}
@@ -243,6 +243,7 @@ func (m *machine) RegisterInfo(debug bool) *regalloc.RegisterInfo {
 
 // Function implements backend.Machine Function.
 func (m *machine) Function() regalloc.Function {
+	m.regAllocStarted = true
 	return &m.regAllocFn
 }
 
@@ -288,7 +289,7 @@ func (m *machine) insertStoreRegisterAt(v regalloc.VReg, instr *instruction, aft
 	offsetFromSP := m.getVRegSpillSlotOffsetFromSP(v.ID(), typ.Size())
 	var amode addressMode
 	cur, amode = m.resolveAddressModeForOffsetAndInsert(cur, offsetFromSP, typ.Bits(), spVReg)
-	store := m.allocateInstrAfterLowering()
+	store := m.allocateInstr()
 	store.asStore(operandNR(v), amode, typ.Bits())
 
 	cur = linkInstr(cur, store)
@@ -312,7 +313,7 @@ func (m *machine) insertReloadRegisterAt(v regalloc.VReg, instr *instruction, af
 	offsetFromSP := m.getVRegSpillSlotOffsetFromSP(v.ID(), typ.Size())
 	var amode addressMode
 	cur, amode = m.resolveAddressModeForOffsetAndInsert(cur, offsetFromSP, typ.Bits(), spVReg)
-	load := m.allocateInstrAfterLowering()
+	load := m.allocateInstr()
 	switch typ {
 	case ssa.TypeI32, ssa.TypeI64:
 		load.asULoad(operandNR(v), amode, typ.Bits())
