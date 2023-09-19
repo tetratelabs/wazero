@@ -305,9 +305,6 @@ func (m *machine) resolveAddressModeForOffsetAndInsert(cur *instruction, offset 
 	m.pendingInstructions = m.pendingInstructions[:0]
 	mode := m.resolveAddressModeForOffset(offset, dstBits, rn)
 	for _, instr := range m.pendingInstructions {
-		// This is called after/during alloc, so set the flag so that
-		// this insertion won't interfere with the register allocation.
-		instr.addedAfterLowering = true
 		cur = linkInstr(cur, instr)
 	}
 	return cur, mode
@@ -351,7 +348,7 @@ func (m *machine) lowerCall(si *ssa.Instruction) {
 
 	stackSlotSize := calleeABI.alignedArgResultStackSlotSize()
 	if stackSlotSize > 0 {
-		m.insertAddOrSubStackPointer(spVReg, stackSlotSize, false /* == sub */, false)
+		m.insertAddOrSubStackPointer(spVReg, stackSlotSize, false /* == sub */)
 	}
 
 	if m.maxRequiredStackSizeForCalls < stackSlotSize {
@@ -388,18 +385,13 @@ func (m *machine) lowerCall(si *ssa.Instruction) {
 	}
 
 	if stackSlotSize > 0 {
-		m.insertAddOrSubStackPointer(spVReg, stackSlotSize, true /* add */, false)
+		m.insertAddOrSubStackPointer(spVReg, stackSlotSize, true /* add */)
 	}
 }
 
-func (m *machine) insertAddOrSubStackPointer(rd regalloc.VReg, diff int64, add bool, afterLowering bool) {
+func (m *machine) insertAddOrSubStackPointer(rd regalloc.VReg, diff int64, add bool) {
 	if imm12Operand, ok := asImm12Operand(uint64(diff)); ok {
-		var alu *instruction
-		if afterLowering {
-			alu = m.allocateInstrAfterLowering()
-		} else {
-			alu = m.allocateInstr()
-		}
+		alu := m.allocateInstr()
 		var ao aluOp
 		if add {
 			ao = aluOpAdd
@@ -410,12 +402,7 @@ func (m *machine) insertAddOrSubStackPointer(rd regalloc.VReg, diff int64, add b
 		m.insert(alu)
 	} else {
 		m.lowerConstantI64(tmpRegVReg, diff)
-		var alu *instruction
-		if afterLowering {
-			alu = m.allocateInstrAfterLowering()
-		} else {
-			alu = m.allocateInstr()
-		}
+		alu := m.allocateInstr()
 		var ao aluOp
 		if add {
 			ao = aluOpAdd

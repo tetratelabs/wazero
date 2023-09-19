@@ -47,7 +47,7 @@ func (m *machine) SetupPrologue() {
 			panic(fmt.Errorf("BUG: spill slot size %d is not 16-byte aligned", size))
 		}
 
-		cur = m.addsAddOrSubStackPointer(cur, spVReg, size, false, true)
+		cur = m.addsAddOrSubStackPointer(cur, spVReg, size, false)
 
 		// At this point, the stack looks like:
 		//
@@ -105,7 +105,7 @@ func (m *machine) SetupPrologue() {
 		)
 		for _, vr := range regs {
 			// TODO: pair stores to reduce the number of instructions.
-			store := m.allocateInstrAfterLowering()
+			store := m.allocateInstr()
 			store.asStore(operandNR(vr), _amode, regTypeToRegisterSizeInBits(vr.RegType()))
 			cur = linkInstr(cur, store)
 		}
@@ -156,7 +156,7 @@ func (m *machine) createReturnAddrAndSizeOfArgRetSlot(cur *instruction) *instruc
 	} else {
 		sizeOfArgRetReg = xzrVReg
 	}
-	pstr := m.allocateInstrAfterLowering()
+	pstr := m.allocateInstr()
 	amode := addressModePreOrPostIndex(spVReg, -16, true /* decrement before store */)
 	pstr.asStorePair64(lrVReg, sizeOfArgRetReg, amode)
 	cur = linkInstr(cur, pstr)
@@ -175,7 +175,7 @@ func (m *machine) createFrameSizeSlot(cur *instruction, s int64) *instruction {
 		-16,  // stack pointer must be 16-byte aligned.
 		true, // Decrement before store.
 	)
-	store := m.allocateInstrAfterLowering()
+	store := m.allocateInstr()
 	store.asStore(operandNR(frameSizeReg), _amode, 64)
 	cur = linkInstr(cur, store)
 	return cur
@@ -206,7 +206,7 @@ func (m *machine) setupEpilogueAfter(cur *instruction) {
 	prevNext := cur.next
 
 	// We've stored the frame size in the prologue, and now that we are about to return from this function, we won't need it anymore.
-	cur = m.addsAddOrSubStackPointer(cur, spVReg, 16, true, true)
+	cur = m.addsAddOrSubStackPointer(cur, spVReg, 16, true)
 
 	// First we need to restore the clobbered registers.
 	if len(m.clobberedRegs) > 0 {
@@ -237,7 +237,7 @@ func (m *machine) setupEpilogueAfter(cur *instruction) {
 		l := len(m.clobberedRegs) - 1
 		for i := range m.clobberedRegs {
 			vr := m.clobberedRegs[l-i] // reverse order to restore.
-			load := m.allocateInstrAfterLowering()
+			load := m.allocateInstr()
 			amode := addressModePreOrPostIndex(spVReg,
 				16,    // stack pointer must be 16-byte aligned.
 				false, // Increment after store.
@@ -276,7 +276,7 @@ func (m *machine) setupEpilogueAfter(cur *instruction) {
 		//   SP---> +-----------------+
 		//             (low address)
 		//
-		cur = m.addsAddOrSubStackPointer(cur, spVReg, s, true, true)
+		cur = m.addsAddOrSubStackPointer(cur, spVReg, s, true)
 	}
 
 	// Reload the return address (lr).
@@ -294,7 +294,7 @@ func (m *machine) setupEpilogueAfter(cur *instruction) {
 	//            |  ReturnAddress  |
 	//    SP----> +-----------------+
 
-	ldr := m.allocateInstrAfterLowering()
+	ldr := m.allocateInstr()
 	amode := addressModePreOrPostIndex(spVReg, 16 /* stack pointer must be 16-byte aligned. */, false /* increment after loads */)
 	ldr.asULoad(operandNR(lrVReg), amode, 64)
 	cur = linkInstr(cur, ldr)
@@ -324,14 +324,14 @@ func (m *machine) insertStackBoundsCheck(requiredStackSize int64, cur *instructi
 
 	if immm12op, ok := asImm12Operand(uint64(requiredStackSize)); ok {
 		// sub tmp, sp, #requiredStackSize
-		sub := m.allocateInstrAfterLowering()
+		sub := m.allocateInstr()
 		sub.asALU(aluOpSub, operandNR(tmpRegVReg), operandNR(spVReg), immm12op, true)
 		cur = linkInstr(cur, sub)
 	} else {
 		// This case, we first load the requiredStackSize into the temporary register,
 		cur = m.lowerConstantI64AndInsert(cur, tmpRegVReg, requiredStackSize)
 		// Then subtract it.
-		sub := m.allocateInstrAfterLowering()
+		sub := m.allocateInstr()
 		sub.asALU(aluOpSub, operandNR(tmpRegVReg), operandNR(spVReg), operandNR(tmpRegVReg), true)
 		cur = linkInstr(cur, sub)
 	}
@@ -339,7 +339,7 @@ func (m *machine) insertStackBoundsCheck(requiredStackSize int64, cur *instructi
 	tmp2 := x11VReg // Callee save, so it is safe to use it here in the prologue.
 
 	// ldr tmp2, [executionContext #StackBottomPtr]
-	ldr := m.allocateInstrAfterLowering()
+	ldr := m.allocateInstr()
 	ldr.asULoad(operandNR(tmp2), addressMode{
 		kind: addressModeKindRegUnsignedImm12,
 		rn:   x0VReg, // execution context is always the first argument.
@@ -348,7 +348,7 @@ func (m *machine) insertStackBoundsCheck(requiredStackSize int64, cur *instructi
 	cur = linkInstr(cur, ldr)
 
 	// subs xzr, tmp, tmp2
-	subs := m.allocateInstrAfterLowering()
+	subs := m.allocateInstr()
 	subs.asALU(aluOpSubS, operandNR(xzrVReg), operandNR(tmpRegVReg), operandNR(tmp2), true)
 	cur = linkInstr(cur, subs)
 
@@ -361,7 +361,7 @@ func (m *machine) insertStackBoundsCheck(requiredStackSize int64, cur *instructi
 	{
 		// First load the requiredStackSize into the temporary register,
 		cur = m.lowerConstantI64AndInsert(cur, tmpRegVReg, requiredStackSize)
-		setRequiredStackSize := m.allocateInstrAfterLowering()
+		setRequiredStackSize := m.allocateInstr()
 		setRequiredStackSize.asStore(operandNR(tmpRegVReg),
 			addressMode{
 				kind: addressModeKindRegUnsignedImm12,
@@ -429,9 +429,9 @@ func (m *machine) CompileStackGrowCallSequence() []byte {
 	return m.compiler.Buf()
 }
 
-func (m *machine) addsAddOrSubStackPointer(cur *instruction, rd regalloc.VReg, diff int64, add bool, afterLowering bool) *instruction {
+func (m *machine) addsAddOrSubStackPointer(cur *instruction, rd regalloc.VReg, diff int64, add bool) *instruction {
 	m.pendingInstructions = m.pendingInstructions[:0]
-	m.insertAddOrSubStackPointer(rd, diff, add, afterLowering)
+	m.insertAddOrSubStackPointer(rd, diff, add)
 	for _, inserted := range m.pendingInstructions {
 		cur = linkInstr(cur, inserted)
 	}

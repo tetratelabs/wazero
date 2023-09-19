@@ -81,6 +81,8 @@ type (
 
 		maxRequiredStackSizeForCalls int64
 		stackBoundsCheckDisabled     bool
+
+		regAllocStarted bool
 	}
 
 	addend32 struct {
@@ -123,6 +125,7 @@ func NewBackend() backend.Machine {
 
 // Reset implements backend.Machine.
 func (m *machine) Reset() {
+	m.regAllocStarted = false
 	m.instrPool.Reset()
 	m.labelPositionPool.Reset()
 	m.currentSSABlk = nil
@@ -275,13 +278,9 @@ func (l label) String() string {
 func (m *machine) allocateInstr() *instruction {
 	instr := m.instrPool.Allocate()
 	*instr = instruction{}
-	return instr
-}
-
-// allocateInstrAfterLowering allocates an instruction that is added after lowering.
-func (m *machine) allocateInstrAfterLowering() *instruction {
-	instr := m.instrPool.Allocate()
-	instr.addedAfterLowering = true
+	if !m.regAllocStarted {
+		instr.addedBeforeRegAlloc = true
+	}
 	return instr
 }
 
