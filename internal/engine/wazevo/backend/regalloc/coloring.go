@@ -3,6 +3,7 @@ package regalloc
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 )
@@ -202,13 +203,17 @@ func (a *Allocator) coloringFor(allocatable []RealReg) {
 		}
 
 		if wazevoapi.RegAllocLoggingEnabled {
-			fmt.Printf("\tneighborColors: %v\n", neighborColors)
+			var s []string
+			for _, r := range neighborColors {
+				s = append(s, a.regInfo.RealRegName(r))
+			}
+			fmt.Printf("\tneighborColors: %v\n", strings.Join(s, ","))
 		}
 
 		a.assignColor(n, neighborColorsSet, allocatable)
 
 		if wazevoapi.RegAllocLoggingEnabled {
-			fmt.Printf("\tassigned color: %s\n", n.r)
+			fmt.Printf("\tassigned color: %s\n", a.regInfo.RealRegName(n.r))
 		}
 
 		// Reset the map for the next iteration.

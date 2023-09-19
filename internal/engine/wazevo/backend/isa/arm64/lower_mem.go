@@ -87,12 +87,12 @@ const (
 
 	// addressModeKindArgStackSpace is used to resolve the address of the argument stack space
 	// exiting right above the stack pointer. Since we don't know the exact stack space needed for a function
-	// at a compilation phase, this is used as a placeholder and further lowered to a real addressing mode like ahove.
+	// at a compilation phase, this is used as a placeholder and further lowered to a real addressing mode like above.
 	addressModeKindArgStackSpace
 
 	// addressModeKindResultStackSpace is used to resolve the address of the result stack space
 	// exiting right above the stack pointer. Since we don't know the exact stack space needed for a function
-	// at a compilation phase, this is used as a placeholder and further lowered to a real addressing mode like ahove.
+	// at a compilation phase, this is used as a placeholder and further lowered to a real addressing mode like above.
 	addressModeKindResultStackSpace
 )
 

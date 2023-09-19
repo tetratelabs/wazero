@@ -37,7 +37,7 @@ type testCase struct {
 }
 
 var tests = map[string]testCase{
-	"huge stack":                                        {f: testHugeStack, wazevoSkip: true},
+	"huge stack":                                        {f: testHugeStack},
 	"unreachable":                                       {f: testUnreachable},
 	"recursive entry":                                   {f: testRecursiveEntry},
 	"host func memory":                                  {f: testHostFuncMemory},
@@ -1617,13 +1617,6 @@ func (f *fnListener) Abort(ctx context.Context, mod api.Module, def api.Function
 		f.abortFn(ctx, mod, def, err)
 	}
 }
-
-//func Test_a(t *testing.T) {
-//	config := wazero.NewRuntimeConfigInterpreter()
-//	wazevo.ConfigureWazevo(config)
-//	r := wazero.NewRuntimeWithConfig(testCtx, config)
-//	testManyParamsResults(t, r)
-//}
 
 func testManyParamsResults(t *testing.T, r wazero.Runtime) {
 	mainType := wasm.FunctionType{}

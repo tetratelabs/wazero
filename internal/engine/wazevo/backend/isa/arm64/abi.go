@@ -305,6 +305,9 @@ func (m *machine) resolveAddressModeForOffsetAndInsert(cur *instruction, offset 
 	m.pendingInstructions = m.pendingInstructions[:0]
 	mode := m.resolveAddressModeForOffset(offset, dstBits, rn)
 	for _, instr := range m.pendingInstructions {
+		// This is called after/during alloc, so set the flag so that
+		// this insertion won't interfere with the register allocation.
+		instr.addedAfterLowering = true
 		cur = linkInstr(cur, instr)
 	}
 	return cur, mode
