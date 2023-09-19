@@ -105,7 +105,7 @@ func TestUnwindStack(t *testing.T) {
 				binary.LittleEndian.PutUint64(buf[i*8:], v)
 			}
 			sp := uintptr(unsafe.Pointer(&buf[0]))
-			returnAddresses := UnwindStack(sp, uintptr(unsafe.Pointer(&buf[len(buf)-1])))
+			returnAddresses := UnwindStack(sp, uintptr(unsafe.Pointer(&buf[len(buf)-1])), nil)
 			require.Equal(t, tc.exp, returnAddresses)
 		})
 	}

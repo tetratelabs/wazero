@@ -6,9 +6,9 @@ import (
 	"unsafe"
 )
 
-// UnwindStack is a function to unwind the stack.
+// UnwindStack is a function to unwind the stack, and appends return addresses to `returnAddresses` slice.
 // The implementation must be aligned with the ABI/Calling convention as in machine_pro_epi_logue.go/abi.go.
-func UnwindStack(sp, top uintptr) (returnAddresses []uintptr) {
+func UnwindStack(sp, top uintptr, returnAddresses []uintptr) []uintptr {
 	l := int(top - sp)
 
 	var stackBuf []byte
@@ -57,7 +57,7 @@ func UnwindStack(sp, top uintptr) (returnAddresses []uintptr) {
 		i += 8 + sizeOfArgRet
 		returnAddresses = append(returnAddresses, uintptr(retAddr))
 	}
-	return
+	return returnAddresses
 }
 
 // GoCallStackView is a function to get a view of the stack before a Go call, which
