@@ -538,8 +538,9 @@ func TestMachine_goEntryPreamblePassArg(t *testing.T) {
 func TestMachine_goEntryPreamblePassResult(t *testing.T) {
 	paramSlicePtr := x16VReg
 	for _, tc := range []struct {
-		arg backend.ABIArg
-		exp string
+		arg      backend.ABIArg
+		retStart int64
+		exp      string
 	}{
 		// Reg kinds.
 		{
@@ -587,9 +588,25 @@ func TestMachine_goEntryPreamblePassResult(t *testing.T) {
 `,
 		},
 		{
+			arg:      backend.ABIArg{Type: ssa.TypeI32, Offset: 0, Kind: backend.ABIArgKindStack},
+			retStart: 1024,
+			exp: `
+	ldr w27, [sp, #0x400]
+	str w27, [x16], #0x8
+`,
+		},
+		{
 			arg: backend.ABIArg{Type: ssa.TypeI32, Offset: 8, Kind: backend.ABIArgKindStack},
 			exp: `
 	ldr w27, [sp, #0x8]
+	str w27, [x16], #0x8
+`,
+		},
+		{
+			arg:      backend.ABIArg{Type: ssa.TypeI32, Offset: 8, Kind: backend.ABIArgKindStack},
+			retStart: 1024,
+			exp: `
+	ldr w27, [sp, #0x408]
 	str w27, [x16], #0x8
 `,
 		},
@@ -650,12 +667,21 @@ func TestMachine_goEntryPreamblePassResult(t *testing.T) {
 	str q15, [x16], #0x10
 `,
 		},
+		{
+			arg:      backend.ABIArg{Type: ssa.TypeV128, Offset: 2056, Kind: backend.ABIArgKindStack},
+			retStart: 1024,
+			exp: `
+	movz x27, #0xc08, lsl 0
+	ldr q15, [sp, x27]
+	str q15, [x16], #0x10
+`,
+		},
 	} {
 		t.Run(tc.exp, func(t *testing.T) {
 			_, _, m := newSetupWithMockContext()
 			cur := m.allocateNop()
 			m.rootInstr = cur
-			m.goEntryPreamblePassResult(cur, paramSlicePtr, &tc.arg)
+			m.goEntryPreamblePassResult(cur, paramSlicePtr, &tc.arg, tc.retStart)
 			fmt.Println(m.Format())
 			require.Equal(t, tc.exp, m.Format())
 		})

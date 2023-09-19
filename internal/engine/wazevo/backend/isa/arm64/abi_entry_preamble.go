@@ -89,7 +89,7 @@ func (m *machine) goEntryPreamblePassArg(cur *instruction, paramSlicePtr regallo
 	return cur
 }
 
-func (m *machine) goEntryPreamblePassResult(cur *instruction, resultSlicePtr regalloc.VReg, result *backend.ABIArg) *instruction {
+func (m *machine) goEntryPreamblePassResult(cur *instruction, resultSlicePtr regalloc.VReg, result *backend.ABIArg, resultStartOffsetFromSP int64) *instruction {
 	isStackArg := result.Kind == backend.ABIArgKindStack
 	typ := result.Type
 	bits := typ.Bits()
@@ -117,13 +117,15 @@ func (m *machine) goEntryPreamblePassResult(cur *instruction, resultSlicePtr reg
 
 	if isStackArg {
 		var loadMode addressMode
-		cur, loadMode = m.resolveAddressModeForOffsetAndInsert(cur, result.Offset, bits, spVReg)
+		cur, loadMode = m.resolveAddressModeForOffsetAndInsert(cur, resultStartOffsetFromSP+result.Offset, bits, spVReg)
 		toReg := m.allocateInstr()
 		switch typ {
 		case ssa.TypeI32, ssa.TypeI64:
 			toReg.asULoad(storeTargetReg, loadMode, bits)
 		case ssa.TypeF32, ssa.TypeF64, ssa.TypeV128:
 			toReg.asFpuLoad(storeTargetReg, loadMode, bits)
+		default:
+			panic("TODO?")
 		}
 		cur = linkInstr(cur, toReg)
 	}
@@ -199,7 +201,7 @@ func (a *abiImpl) constructEntryPreamble() (root *instruction) {
 
 	// Store the register results into paramResultSlicePtr.
 	for i := range a.rets {
-		cur = m.goEntryPreamblePassResult(cur, paramResultSlicePtr, &a.rets[i])
+		cur = m.goEntryPreamblePassResult(cur, paramResultSlicePtr, &a.rets[i], a.argStackSize)
 	}
 
 	// Finally, restore the FP, SP and LR, and return to the Go code.

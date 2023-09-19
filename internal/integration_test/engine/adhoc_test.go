@@ -61,7 +61,9 @@ var tests = map[string]testCase{
 	"before listener globals":                           {f: testBeforeListenerGlobals},
 	"before listener stack iterator":                    {f: testBeforeListenerStackIterator},
 	"before listener stack iterator offsets":            {f: testListenerStackIteratorOffset, wazevoSkip: true},
-	"many params many results":                          {f: testManyParamsResults, wazevoSkip: true},
+	"many params many results / doubler":                {f: testManyParamsResultsDoubler},
+	"many params many results / swapper":                {f: testManyParamsResultsSwapper},
+	"many params many results / main":                   {f: testManyParamsResultsMain, wazevoSkip: true},
 }
 
 func TestEngineCompiler(t *testing.T) {
@@ -1618,7 +1620,7 @@ func (f *fnListener) Abort(ctx context.Context, mod api.Module, def api.Function
 	}
 }
 
-func testManyParamsResults(t *testing.T, r wazero.Runtime) {
+func manyParamsResultsMod() (bin []byte, params []uint64) {
 	mainType := wasm.FunctionType{}
 	swapperType := wasm.FunctionType{}
 	doublerType := wasm.FunctionType{}
@@ -1679,31 +1681,86 @@ func testManyParamsResults(t *testing.T, r wazero.Runtime) {
 	}
 	doublerBody = append(doublerBody, wasm.OpcodeEnd)
 
-	bin := binaryencoding.EncodeModule(&wasm.Module{
-		TypeSection:     []wasm.FunctionType{mainType, swapperType, doublerType},
-		ExportSection:   []wasm.Export{{Name: "main", Type: wasm.ExternTypeFunc, Index: 0}},
+	bin = binaryencoding.EncodeModule(&wasm.Module{
+		TypeSection: []wasm.FunctionType{mainType, swapperType, doublerType},
+		ExportSection: []wasm.Export{
+			{Name: "main", Type: wasm.ExternTypeFunc, Index: 0},
+			{Name: "swapper", Type: wasm.ExternTypeFunc, Index: 1},
+			{Name: "doubler", Type: wasm.ExternTypeFunc, Index: 2},
+		},
 		FunctionSection: []wasm.Index{0, 1, 2},
 		CodeSection:     []wasm.Code{{Body: mainBody}, {Body: swapperBody}, {Body: doublerBody}},
 	})
 
+	for i := 0; i < 100; i += 5 {
+		params = append(params, uint64(i))
+		params = append(params, uint64(i+1))
+		params = append(params, uint64(i+2))
+		params = append(params, uint64(i+3))
+		// Vector needs two values.
+		params = append(params, uint64(i+3))
+		params = append(params, uint64(i+3))
+	}
+	return
+}
+
+func testManyParamsResultsDoubler(t *testing.T, r wazero.Runtime) {
+	bin, params := manyParamsResultsMod()
+	mod, err := r.Instantiate(testCtx, bin)
+	require.NoError(t, err)
+
+	main := mod.ExportedFunction("doubler")
+	require.NotNil(t, main)
+
+	results, err := main.Call(testCtx, params...)
+	require.NoError(t, err)
+	exp := []uint64{
+		0x0, 0x1, 0x4, 0x6, 0x6, 0x6, 0x5, 0x6, 0xe, 0x10, 0x10, 0x10, 0xa,
+		0xb, 0x18, 0x1a, 0x1a, 0x1a, 0xf, 0x10, 0x22, 0x24, 0x24, 0x24, 0x14,
+		0x15, 0x2c, 0x2e, 0x2e, 0x2e, 0x19, 0x1a, 0x36, 0x38, 0x38, 0x38, 0x1e,
+		0x1f, 0x40, 0x42, 0x42, 0x42, 0x23, 0x24, 0x4a, 0x4c, 0x4c, 0x4c, 0x28,
+		0x29, 0x54, 0x56, 0x56, 0x56, 0x2d, 0x2e, 0x5e, 0x60, 0x60, 0x60, 0x32,
+		0x33, 0x68, 0x6a, 0x6a, 0x6a, 0x37, 0x38, 0x72, 0x74, 0x74, 0x74, 0x3c,
+		0x3d, 0x7c, 0x7e, 0x7e, 0x7e, 0x41, 0x42, 0x86, 0x88, 0x88, 0x88, 0x46,
+		0x47, 0x90, 0x92, 0x92, 0x92, 0x4b, 0x4c, 0x9a, 0x9c, 0x9c, 0x9c, 0x50,
+		0x51, 0xa4, 0xa6, 0xa6, 0xa6, 0x55, 0x56, 0xae, 0xb0, 0xb0, 0xb0, 0x5a,
+		0x5b, 0xb8, 0xba, 0xba, 0xba, 0x5f, 0x60, 0xc2, 0xc4, 0xc4, 0xc4,
+	}
+	require.Equal(t, exp, results)
+}
+
+func testManyParamsResultsSwapper(t *testing.T, r wazero.Runtime) {
+	bin, params := manyParamsResultsMod()
+	mod, err := r.Instantiate(testCtx, bin)
+	require.NoError(t, err)
+
+	main := mod.ExportedFunction("swapper")
+	require.NotNil(t, main)
+
+	results, err := main.Call(testCtx, params...)
+	require.NoError(t, err)
+	exp := []uint64{
+		0x62, 0x62, 0x62, 0x61, 0x60, 0x5f, 0x5d, 0x5d, 0x5d, 0x5c, 0x5b, 0x5a, 0x58, 0x58, 0x58, 0x57,
+		0x56, 0x55, 0x53, 0x53, 0x53, 0x52, 0x51, 0x50, 0x4e, 0x4e, 0x4e, 0x4d, 0x4c, 0x4b, 0x49, 0x49,
+		0x49, 0x48, 0x47, 0x46, 0x44, 0x44, 0x44, 0x43, 0x42, 0x41, 0x3f, 0x3f, 0x3f, 0x3e, 0x3d, 0x3c,
+		0x3a, 0x3a, 0x3a, 0x39, 0x38, 0x37, 0x35, 0x35, 0x35, 0x34, 0x33, 0x32, 0x30, 0x30, 0x30, 0x2f,
+		0x2e, 0x2d, 0x2b, 0x2b, 0x2b, 0x2a, 0x29, 0x28, 0x26, 0x26, 0x26, 0x25, 0x24, 0x23, 0x21, 0x21,
+		0x21, 0x20, 0x1f, 0x1e, 0x1c, 0x1c, 0x1c, 0x1b, 0x1a, 0x19, 0x17, 0x17, 0x17, 0x16, 0x15, 0x14,
+		0x12, 0x12, 0x12, 0x11, 0x10, 0xf, 0xd, 0xd, 0xd, 0xc, 0xb, 0xa, 0x8, 0x8, 0x8, 0x7, 0x6, 0x5,
+		0x3, 0x3, 0x3, 0x2, 0x1, 0x0,
+	}
+	require.Equal(t, exp, results)
+}
+
+func testManyParamsResultsMain(t *testing.T, r wazero.Runtime) {
+	bin, params := manyParamsResultsMod()
 	mod, err := r.Instantiate(testCtx, bin)
 	require.NoError(t, err)
 
 	main := mod.ExportedFunction("main")
 	require.NotNil(t, main)
 
-	var param []uint64
-	for i := 0; i < 100; i += 5 {
-		param = append(param, uint64(i))
-		param = append(param, uint64(i+1))
-		param = append(param, uint64(i+2))
-		param = append(param, uint64(i+3))
-		// Vector needs two values.
-		param = append(param, uint64(i+3))
-		param = append(param, uint64(i+3))
-	}
-
-	results, err := main.Call(testCtx, param...)
+	results, err := main.Call(testCtx, params...)
 	require.NoError(t, err)
 	exp := []uint64{
 		98, 98, 196, 194, 192, 190, 93, 93, 186, 184, 182, 180, 88, 88, 176, 174, 172, 170, 83, 83, 166, 164, 162,
