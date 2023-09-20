@@ -373,22 +373,22 @@ func TestAbiImpl_constructEntryPreamble(t *testing.T) {
 	str w5, [x19], #0x8
 	str x6, [x19], #0x8
 	str w7, [x19], #0x8
-	ldr w27, [sp]
+	ldr w27, [sp, #0xa0]
 	str w27, [x19], #0x8
 	str q3, [x19], #0x10
 	str q4, [x19], #0x10
 	str q5, [x19], #0x10
-	ldr x27, [sp, #0x8]
+	ldr x27, [sp, #0xa8]
 	str x27, [x19], #0x8
-	ldr w27, [sp, #0x10]
+	ldr w27, [sp, #0xb0]
 	str w27, [x19], #0x8
-	ldr w27, [sp, #0x18]
+	ldr w27, [sp, #0xb8]
 	str w27, [x19], #0x8
-	ldr x27, [sp, #0x20]
+	ldr x27, [sp, #0xc0]
 	str x27, [x19], #0x8
-	ldr w27, [sp, #0x28]
+	ldr w27, [sp, #0xc8]
 	str w27, [x19], #0x8
-	ldr x27, [sp, #0x30]
+	ldr x27, [sp, #0xd0]
 	str x27, [x19], #0x8
 	ldr x29, [x20, #0x10]
 	ldr x27, [x20, #0x18]
