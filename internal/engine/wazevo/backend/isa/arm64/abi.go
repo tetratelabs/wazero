@@ -274,7 +274,7 @@ func (a *abiImpl) callerGenVRegToFunctionArg(argIndex int, reg regalloc.VReg, de
 		//
 		// Note that at this point, stack pointer is already adjusted.
 		bits := arg.Type.Bits()
-		amode := a.m.resolveAddressModeForOffset(arg.Offset-slotBegin, bits, spVReg)
+		amode := a.m.resolveAddressModeForOffset(arg.Offset-slotBegin, bits, spVReg, false)
 		store := a.m.allocateInstr()
 		store.asStore(operandNR(reg), amode, bits)
 		a.m.insert(store)
@@ -287,7 +287,7 @@ func (a *abiImpl) callerGenFunctionReturnVReg(retIndex int, reg regalloc.VReg, s
 		a.m.InsertMove(reg, r.Reg, r.Type)
 	} else {
 		// TODO: we could use pair load if there's consecutive loads for the same type.
-		amode := a.m.resolveAddressModeForOffset(a.argStackSize+r.Offset-slotBegin, r.Type.Bits(), spVReg)
+		amode := a.m.resolveAddressModeForOffset(a.argStackSize+r.Offset-slotBegin, r.Type.Bits(), spVReg, false)
 		ldr := a.m.allocateInstr()
 		switch r.Type {
 		case ssa.TypeI32, ssa.TypeI64:
@@ -301,16 +301,16 @@ func (a *abiImpl) callerGenFunctionReturnVReg(retIndex int, reg regalloc.VReg, s
 	}
 }
 
-func (m *machine) resolveAddressModeForOffsetAndInsert(cur *instruction, offset int64, dstBits byte, rn regalloc.VReg) (*instruction, addressMode) {
+func (m *machine) resolveAddressModeForOffsetAndInsert(cur *instruction, offset int64, dstBits byte, rn regalloc.VReg, allowTmpRegUse bool) (*instruction, addressMode) {
 	m.pendingInstructions = m.pendingInstructions[:0]
-	mode := m.resolveAddressModeForOffset(offset, dstBits, rn)
+	mode := m.resolveAddressModeForOffset(offset, dstBits, rn, allowTmpRegUse)
 	for _, instr := range m.pendingInstructions {
 		cur = linkInstr(cur, instr)
 	}
 	return cur, mode
 }
 
-func (m *machine) resolveAddressModeForOffset(offset int64, dstBits byte, rn regalloc.VReg) addressMode {
+func (m *machine) resolveAddressModeForOffset(offset int64, dstBits byte, rn regalloc.VReg, allowTmpRegUse bool) addressMode {
 	if rn.RegType() != regalloc.RegTypeInt {
 		panic("BUG: rn should be a pointer: " + formatVRegSized(rn, 64))
 	}
@@ -320,8 +320,15 @@ func (m *machine) resolveAddressModeForOffset(offset int64, dstBits byte, rn reg
 	} else if offsetFitsInAddressModeKindRegSignedImm9(offset) {
 		amode = addressMode{kind: addressModeKindRegSignedImm9, rn: rn, imm: offset}
 	} else {
-		m.lowerConstantI64(tmpRegVReg, offset)
-		amode = addressMode{kind: addressModeKindRegReg, rn: rn, rm: tmpRegVReg, extOp: extendOpUXTX /* indicates index rm is 64-bit */}
+		var indexReg regalloc.VReg
+		if allowTmpRegUse {
+			m.lowerConstantI64(tmpRegVReg, offset)
+			indexReg = tmpRegVReg
+		} else {
+			indexReg = m.compiler.AllocateVRegWithSSAType(regalloc.RegTypeInt, ssa.TypeI64)
+			m.lowerConstantI64(indexReg, offset)
+		}
+		amode = addressMode{kind: addressModeKindRegReg, rn: rn, rm: indexReg, extOp: extendOpUXTX /* indicates index rm is 64-bit */}
 	}
 	return amode
 }

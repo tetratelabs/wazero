@@ -81,7 +81,7 @@ func (m *machine) goEntryPreamblePassArg(cur *instruction, paramSlicePtr regallo
 
 	if isStackArg {
 		var storeMode addressMode
-		cur, storeMode = m.resolveAddressModeForOffsetAndInsert(cur, argStartOffsetFromSP+arg.Offset, bits, spVReg)
+		cur, storeMode = m.resolveAddressModeForOffsetAndInsert(cur, argStartOffsetFromSP+arg.Offset, bits, spVReg, true)
 		toStack := m.allocateInstr()
 		toStack.asStore(loadTargetReg, storeMode, bits)
 		cur = linkInstr(cur, toStack)
@@ -117,7 +117,7 @@ func (m *machine) goEntryPreamblePassResult(cur *instruction, resultSlicePtr reg
 
 	if isStackArg {
 		var loadMode addressMode
-		cur, loadMode = m.resolveAddressModeForOffsetAndInsert(cur, resultStartOffsetFromSP+result.Offset, bits, spVReg)
+		cur, loadMode = m.resolveAddressModeForOffsetAndInsert(cur, resultStartOffsetFromSP+result.Offset, bits, spVReg, true)
 		toReg := m.allocateInstr()
 		switch typ {
 		case ssa.TypeI32, ssa.TypeI64:

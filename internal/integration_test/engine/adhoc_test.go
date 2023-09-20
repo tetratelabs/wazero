@@ -64,7 +64,7 @@ var tests = map[string]testCase{
 	"many params many results / doubler":                               {f: testManyParamsResultsDoubler},
 	"many params many results / call_many_consts":                      {f: testManyParamsResultsCallManyConsts},
 	"many params many results / swapper":                               {f: testManyParamsResultsSwapper},
-	"many params many results / main":                                  {f: testManyParamsResultsMain, wazevoSkip: true},
+	"many params many results / main":                                  {f: testManyParamsResultsMain},
 	"many params many results / call_many_consts_and_pick_last_vector": {f: testManyParamsResultsCallManyConstsAndPickLastVector},
 }
 
