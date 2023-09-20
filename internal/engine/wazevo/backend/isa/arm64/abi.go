@@ -197,7 +197,6 @@ func (a *abiImpl) CalleeGenFunctionArgsToVRegs(args []ssa.Value) {
 			}
 			m.insert(load)
 			a.m.unresolvedAddressModes = append(a.m.unresolvedAddressModes, load)
-			//a.m.insert(a.m.allocateInstr().asUDF())
 		}
 	}
 }
