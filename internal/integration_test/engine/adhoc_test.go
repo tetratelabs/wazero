@@ -62,7 +62,7 @@ var tests = map[string]testCase{
 	"before listener stack iterator":                    {f: testBeforeListenerStackIterator},
 	"before listener stack iterator offsets":            {f: testListenerStackIteratorOffset, wazevoSkip: true},
 	"many params many results / doubler":                {f: testManyParamsResultsDoubler},
-	"many params many results / call_many_consts":       {f: testManyParamsResultsCallManyConsts, wazevoSkip: true},
+	"many params many results / call_many_consts":       {f: testManyParamsResultsCallManyConsts},
 	"many params many results / swapper":                {f: testManyParamsResultsSwapper},
 	"many params many results / main":                   {f: testManyParamsResultsMain, wazevoSkip: true},
 }
