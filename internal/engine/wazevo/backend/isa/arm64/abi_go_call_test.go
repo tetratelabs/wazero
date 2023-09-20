@@ -54,6 +54,9 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 				},
 			},
 			exp: `
+	orr x27, xzr, #0xc0
+	sub sp, sp, x27
+	stp x30, x27, [sp, #-0x10]!
 	sub x27, sp, #0x140
 	ldr x11, [x0, #0x28]
 	subs xzr, x27, x11
@@ -63,8 +66,6 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 	ldr x27, [x0, #0x50]
 	bl x27
 	mov x17, sp
-	orr x27, xzr, #0xc0
-	stp x30, x27, [sp, #-0x10]!
 	str x19, [x0, #0x60]
 	str x20, [x0, #0x70]
 	str x21, [x0, #0x80]
@@ -153,7 +154,7 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 	ldr q30, [x0, #0x1c0]
 	ldr q31, [x0, #0x1d0]
 	add x15, sp, #0x10
-	add sp, sp, #0x140
+	add sp, sp, #0x200
 	ldr q0, [x15], #0x10
 	ldr w0, [x15], #0x8
 	ldr x1, [x15], #0x8
@@ -209,6 +210,7 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 			},
 			needModuleContextPtr: true,
 			exp: `
+	stp x30, xzr, [sp, #-0x10]!
 	sub x27, sp, #0x40
 	ldr x11, [x0, #0x28]
 	subs xzr, x27, x11
@@ -217,7 +219,6 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 	str x27, [x0, #0x40]
 	ldr x27, [x0, #0x50]
 	bl x27
-	stp x30, xzr, [sp, #-0x10]!
 	str x19, [x0, #0x60]
 	str x20, [x0, #0x70]
 	str x21, [x0, #0x80]
@@ -298,6 +299,7 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 			},
 			needModuleContextPtr: true,
 			exp: `
+	stp x30, xzr, [sp, #-0x10]!
 	sub x27, sp, #0x40
 	ldr x11, [x0, #0x28]
 	subs xzr, x27, x11
@@ -306,7 +308,6 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 	str x27, [x0, #0x40]
 	ldr x27, [x0, #0x50]
 	bl x27
-	stp x30, xzr, [sp, #-0x10]!
 	str x19, [x0, #0x60]
 	str x20, [x0, #0x70]
 	str x21, [x0, #0x80]
@@ -384,6 +385,7 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 				Results: []ssa.Type{ssa.TypeI32},
 			},
 			exp: `
+	stp x30, xzr, [sp, #-0x10]!
 	sub x27, sp, #0x30
 	ldr x11, [x0, #0x28]
 	subs xzr, x27, x11
@@ -392,7 +394,6 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 	str x27, [x0, #0x40]
 	ldr x27, [x0, #0x50]
 	bl x27
-	stp x30, xzr, [sp, #-0x10]!
 	str x19, [x0, #0x60]
 	str x20, [x0, #0x70]
 	str x21, [x0, #0x80]

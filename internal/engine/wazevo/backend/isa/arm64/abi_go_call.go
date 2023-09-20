@@ -33,15 +33,15 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 	// In the following, we create the following stack layout:
 	//
 	//                   (high address)
-	//                +-----------------+
-	//                |     .......     |
-	//                |      ret Y      |  <----+
+	//     SP ------> +-----------------+  <----+
+	//                |     .......     |       |
+	//                |      ret Y      |       |
 	//                |     .......     |       |
 	//                |      ret 0      |       |
 	//                |      arg X      |       |  size_of_arg_ret
 	//                |     .......     |       |
 	//                |      arg 1      |       |
-	//     SP ------> |      arg 0      |  <----+ <-------- originalArg0Reg
+	//                |      arg 0      |  <----+ <-------- originalArg0Reg
 	//                | size_of_arg_ret |
 	//                |  ReturnAddress  |
 	//                +-----------------+ <----+
@@ -59,9 +59,12 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 	// therefore will be accessed as the usual []uint64. So that's where we need to pass/receive
 	// the arguments/return values.
 
+	// First of all, to update the SP, and create "ReturnAddress + size_of_arg_ret".
+	cur = m.createReturnAddrAndSizeOfArgRetSlot(cur)
+
 	const callFrameSize = 32 // == frame_size + sliceSize + ReturnAddress + size_of_arg_ret.
 
-	// First of all, we should allocate the stack for the Go function call if necessary.
+	// Next, we should allocate the stack for the Go function call if necessary.
 	goCallStackSize, sliceSizeInBytes := goFunctionCallRequiredStackSize(sig, argBegin)
 	cur = m.insertStackBoundsCheck(goCallStackSize+callFrameSize, cur)
 
@@ -71,9 +74,6 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 		copySp.asMove64(originalArg0Reg, spVReg)
 		cur = linkInstr(cur, copySp)
 	}
-
-	// Next is to create "ReturnAddress + size_of_arg_ret".
-	cur = m.createReturnAddrAndSizeOfArgRetSlot(cur)
 
 	// Save the callee saved registers.
 	cur = m.saveRegistersInExecutionContext(cur, calleeSavedRegistersPlusLinkRegSorted)
@@ -162,7 +162,7 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 	}
 
 	// Removes the stack frame! --> Stack pointer now points to the original arg 0 slot.
-	cur = m.addsAddOrSubStackPointer(cur, spVReg, goCallStackSize+callFrameSize, true)
+	cur = m.addsAddOrSubStackPointer(cur, spVReg, goCallStackSize+callFrameSize+m.currentABI.alignedArgResultStackSlotSize(), true)
 
 	for i := range abi.rets {
 		r := &abi.rets[i]

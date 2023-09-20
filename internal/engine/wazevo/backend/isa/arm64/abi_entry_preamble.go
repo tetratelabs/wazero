@@ -37,7 +37,7 @@ var (
 	functionExecutable = x24VReg
 )
 
-func (m *machine) goEntryPreamblePassArg(cur *instruction, paramSlicePtr regalloc.VReg, arg *backend.ABIArg) *instruction {
+func (m *machine) goEntryPreamblePassArg(cur *instruction, paramSlicePtr regalloc.VReg, arg *backend.ABIArg, argStartOffsetFromSP int64) *instruction {
 	typ := arg.Type
 	bits := typ.Bits()
 	isStackArg := arg.Kind == backend.ABIArgKindStack
@@ -48,7 +48,7 @@ func (m *machine) goEntryPreamblePassArg(cur *instruction, paramSlicePtr regallo
 	} else {
 		switch typ {
 		case ssa.TypeI32, ssa.TypeI64:
-			loadTargetReg = operandNR(tmpRegVReg)
+			loadTargetReg = operandNR(x15VReg)
 		case ssa.TypeF32, ssa.TypeF64, ssa.TypeV128:
 			loadTargetReg = operandNR(v15VReg)
 		default:
@@ -81,7 +81,7 @@ func (m *machine) goEntryPreamblePassArg(cur *instruction, paramSlicePtr regallo
 
 	if isStackArg {
 		var storeMode addressMode
-		cur, storeMode = m.resolveAddressModeForOffsetAndInsert(cur, arg.Offset, bits, spVReg)
+		cur, storeMode = m.resolveAddressModeForOffsetAndInsert(cur, argStartOffsetFromSP+arg.Offset, bits, spVReg)
 		toStack := m.allocateInstr()
 		toStack.asStore(loadTargetReg, storeMode, bits)
 		cur = linkInstr(cur, toStack)
@@ -100,7 +100,7 @@ func (m *machine) goEntryPreamblePassResult(cur *instruction, resultSlicePtr reg
 	} else {
 		switch typ {
 		case ssa.TypeI32, ssa.TypeI64:
-			storeTargetReg = operandNR(tmpRegVReg)
+			storeTargetReg = operandNR(x15VReg)
 		case ssa.TypeF32, ssa.TypeF64, ssa.TypeV128:
 			storeTargetReg = operandNR(v15VReg)
 		default:
@@ -157,21 +157,8 @@ func (a *abiImpl) constructEntryPreamble() (root *instruction) {
 	cur = a.loadOrStoreAtExecutionContext(tmpRegVReg, wazevoapi.ExecutionContextOffsetOriginalStackPointer, true, cur)
 	cur = a.loadOrStoreAtExecutionContext(lrVReg, wazevoapi.ExecutionContextOffsetGoReturnAddress, true, cur)
 
-	// Next, adjust the Go-allocated stack pointer to reserve the arg/result spaces.
-	// 		sub x28, x28, #stackSlotSize
-	if stackSlotSize := a.alignedArgResultStackSlotSize(); stackSlotSize > 0 {
-		if imm12Operand, ok := asImm12Operand(uint64(stackSlotSize)); ok {
-			instr := m.allocateInstr()
-			rd := operandNR(goAllocatedStackPtr)
-			instr.asALU(aluOpSub, rd, rd, imm12Operand, true)
-			cur = linkInstr(cur, instr)
-		} else {
-			panic("TODO: too large stack slot size")
-		}
-	}
-
 	// Then, move the Go-allocated stack pointer to SP:
-	// 		mov sp, x28
+	// 		mov sp, goAllocatedStackPtr
 	cur = a.move64(spVReg, goAllocatedStackPtr, cur)
 
 	prReg := paramResultSlicePtr
@@ -181,18 +168,18 @@ func (a *abiImpl) constructEntryPreamble() (root *instruction) {
 		cur = a.move64(paramResultSliceCopied, paramResultSlicePtr, cur)
 		prReg = paramResultSliceCopied
 	}
+
+	stackSlotSize := a.alignedArgResultStackSlotSize()
 	for i := range a.args {
 		if i < 2 {
 			// module context ptr and execution context ptr are passed in x0 and x1 by the Go assembly function.
 			continue
 		}
 		arg := &a.args[i]
-		cur = m.goEntryPreamblePassArg(cur, prReg, arg)
+		cur = m.goEntryPreamblePassArg(cur, prReg, arg, -stackSlotSize)
 	}
 
-	// Call the real function coming after epilogue:
-	// 		bl #<offset of real function from this instruction>
-	// But at this point, we don't know the size of epilogue, so we emit a placeholder.
+	// Call the real function.
 	bl := m.allocateInstr()
 	bl.asCallIndirect(functionExecutable, a)
 	cur = linkInstr(cur, bl)
@@ -201,7 +188,7 @@ func (a *abiImpl) constructEntryPreamble() (root *instruction) {
 
 	// Store the register results into paramResultSlicePtr.
 	for i := range a.rets {
-		cur = m.goEntryPreamblePassResult(cur, paramResultSlicePtr, &a.rets[i], a.argStackSize)
+		cur = m.goEntryPreamblePassResult(cur, paramResultSlicePtr, &a.rets[i], a.argStackSize-stackSlotSize)
 	}
 
 	// Finally, restore the FP, SP and LR, and return to the Go code.
