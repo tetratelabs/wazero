@@ -259,7 +259,7 @@ func (a *abiImpl) CalleeGenVRegsToFunctionReturns(rets []ssa.Value) {
 
 // callerGenVRegToFunctionArg is the opposite of GenFunctionArgToVReg, which is used to generate the
 // caller side of the function call.
-func (a *abiImpl) callerGenVRegToFunctionArg(argIndex int, reg regalloc.VReg, def *backend.SSAValueDefinition) {
+func (a *abiImpl) callerGenVRegToFunctionArg(argIndex int, reg regalloc.VReg, def *backend.SSAValueDefinition, slotBegin int64) {
 	arg := &a.args[argIndex]
 	if def != nil && def.IsFromInstr() {
 		// Constant instructions are inlined.
@@ -274,20 +274,20 @@ func (a *abiImpl) callerGenVRegToFunctionArg(argIndex int, reg regalloc.VReg, de
 		//
 		// Note that at this point, stack pointer is already adjusted.
 		bits := arg.Type.Bits()
-		amode := a.m.resolveAddressModeForOffset(arg.Offset, bits, spVReg)
+		amode := a.m.resolveAddressModeForOffset(arg.Offset-slotBegin, bits, spVReg, false)
 		store := a.m.allocateInstr()
 		store.asStore(operandNR(reg), amode, bits)
 		a.m.insert(store)
 	}
 }
 
-func (a *abiImpl) callerGenFunctionReturnVReg(retIndex int, reg regalloc.VReg) {
+func (a *abiImpl) callerGenFunctionReturnVReg(retIndex int, reg regalloc.VReg, slotBegin int64) {
 	r := &a.rets[retIndex]
 	if r.Kind == backend.ABIArgKindReg {
 		a.m.InsertMove(reg, r.Reg, r.Type)
 	} else {
 		// TODO: we could use pair load if there's consecutive loads for the same type.
-		amode := a.m.resolveAddressModeForOffset(r.Offset, r.Type.Bits(), spVReg)
+		amode := a.m.resolveAddressModeForOffset(a.argStackSize+r.Offset-slotBegin, r.Type.Bits(), spVReg, false)
 		ldr := a.m.allocateInstr()
 		switch r.Type {
 		case ssa.TypeI32, ssa.TypeI64:
@@ -301,16 +301,16 @@ func (a *abiImpl) callerGenFunctionReturnVReg(retIndex int, reg regalloc.VReg) {
 	}
 }
 
-func (m *machine) resolveAddressModeForOffsetAndInsert(cur *instruction, offset int64, dstBits byte, rn regalloc.VReg) (*instruction, addressMode) {
+func (m *machine) resolveAddressModeForOffsetAndInsert(cur *instruction, offset int64, dstBits byte, rn regalloc.VReg, allowTmpRegUse bool) (*instruction, addressMode) {
 	m.pendingInstructions = m.pendingInstructions[:0]
-	mode := m.resolveAddressModeForOffset(offset, dstBits, rn)
+	mode := m.resolveAddressModeForOffset(offset, dstBits, rn, allowTmpRegUse)
 	for _, instr := range m.pendingInstructions {
 		cur = linkInstr(cur, instr)
 	}
 	return cur, mode
 }
 
-func (m *machine) resolveAddressModeForOffset(offset int64, dstBits byte, rn regalloc.VReg) addressMode {
+func (m *machine) resolveAddressModeForOffset(offset int64, dstBits byte, rn regalloc.VReg, allowTmpRegUse bool) addressMode {
 	if rn.RegType() != regalloc.RegTypeInt {
 		panic("BUG: rn should be a pointer: " + formatVRegSized(rn, 64))
 	}
@@ -320,8 +320,15 @@ func (m *machine) resolveAddressModeForOffset(offset int64, dstBits byte, rn reg
 	} else if offsetFitsInAddressModeKindRegSignedImm9(offset) {
 		amode = addressMode{kind: addressModeKindRegSignedImm9, rn: rn, imm: offset}
 	} else {
-		m.lowerConstantI64(tmpRegVReg, offset)
-		amode = addressMode{kind: addressModeKindRegReg, rn: rn, rm: tmpRegVReg, extOp: extendOpUXTX /* indicates index rm is 64-bit */}
+		var indexReg regalloc.VReg
+		if allowTmpRegUse {
+			m.lowerConstantI64(tmpRegVReg, offset)
+			indexReg = tmpRegVReg
+		} else {
+			indexReg = m.compiler.AllocateVRegWithSSAType(regalloc.RegTypeInt, ssa.TypeI64)
+			m.lowerConstantI64(indexReg, offset)
+		}
+		amode = addressMode{kind: addressModeKindRegReg, rn: rn, rm: indexReg, extOp: extendOpUXTX /* indicates index rm is 64-bit */}
 	}
 	return amode
 }
@@ -347,10 +354,6 @@ func (m *machine) lowerCall(si *ssa.Instruction) {
 	calleeABI := m.getOrCreateABIImpl(m.compiler.ResolveSignature(sigID))
 
 	stackSlotSize := calleeABI.alignedArgResultStackSlotSize()
-	if stackSlotSize > 0 {
-		m.insertAddOrSubStackPointer(spVReg, stackSlotSize, false /* == sub */)
-	}
-
 	if m.maxRequiredStackSizeForCalls < stackSlotSize {
 		m.maxRequiredStackSizeForCalls = stackSlotSize
 	}
@@ -358,7 +361,7 @@ func (m *machine) lowerCall(si *ssa.Instruction) {
 	for i, arg := range args {
 		reg := m.compiler.VRegOf(arg)
 		def := m.compiler.ValueDefinition(arg)
-		calleeABI.callerGenVRegToFunctionArg(i, reg, def)
+		calleeABI.callerGenVRegToFunctionArg(i, reg, def, stackSlotSize)
 	}
 
 	if isDirectCall {
@@ -375,17 +378,13 @@ func (m *machine) lowerCall(si *ssa.Instruction) {
 	var index int
 	r1, rs := si.Returns()
 	if r1.Valid() {
-		calleeABI.callerGenFunctionReturnVReg(0, m.compiler.VRegOf(r1))
+		calleeABI.callerGenFunctionReturnVReg(0, m.compiler.VRegOf(r1), stackSlotSize)
 		index++
 	}
 
 	for _, r := range rs {
-		calleeABI.callerGenFunctionReturnVReg(index, m.compiler.VRegOf(r))
+		calleeABI.callerGenFunctionReturnVReg(index, m.compiler.VRegOf(r), stackSlotSize)
 		index++
-	}
-
-	if stackSlotSize > 0 {
-		m.insertAddOrSubStackPointer(spVReg, stackSlotSize, true /* add */)
 	}
 }
 

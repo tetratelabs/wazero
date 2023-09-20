@@ -37,33 +37,35 @@ type testCase struct {
 }
 
 var tests = map[string]testCase{
-	"huge stack":                                        {f: testHugeStack},
-	"unreachable":                                       {f: testUnreachable},
-	"recursive entry":                                   {f: testRecursiveEntry},
-	"host func memory":                                  {f: testHostFuncMemory},
-	"host function with context parameter":              {f: testHostFunctionContextParameter},
-	"host function with nested context":                 {f: testNestedGoContext},
-	"host function with numeric parameter":              {f: testHostFunctionNumericParameter},
-	"close module with in-flight calls":                 {f: testCloseInFlight},
-	"multiple instantiation from same source":           {f: testMultipleInstantiation},
-	"exported function that grows memory":               {f: testMemOps},
-	"import functions with reference type in signature": {f: testReftypeImports, wazevoSkip: true},
-	"overflow integer addition":                         {f: testOverflow},
-	"un-signed extend global":                           {f: testGlobalExtend},
-	"user-defined primitive in host func":               {f: testUserDefinedPrimitiveHostFunc},
-	"ensures invocations terminate on module close":     {f: testEnsureTerminationOnClose},
-	"call host function indirectly":                     {f: callHostFunctionIndirect},
-	"lookup function":                                   {f: testLookupFunction},
-	"memory grow in recursive call":                     {f: testMemoryGrowInRecursiveCall},
-	"call":                                              {f: testCall},
-	"module memory":                                     {f: testModuleMemory, wazevoSkip: true},
-	"two indirection to host":                           {f: testTwoIndirection},
-	"before listener globals":                           {f: testBeforeListenerGlobals},
-	"before listener stack iterator":                    {f: testBeforeListenerStackIterator},
-	"before listener stack iterator offsets":            {f: testListenerStackIteratorOffset, wazevoSkip: true},
-	"many params many results / doubler":                {f: testManyParamsResultsDoubler},
-	"many params many results / swapper":                {f: testManyParamsResultsSwapper},
-	"many params many results / main":                   {f: testManyParamsResultsMain, wazevoSkip: true},
+	"huge stack":                                                       {f: testHugeStack},
+	"unreachable":                                                      {f: testUnreachable},
+	"recursive entry":                                                  {f: testRecursiveEntry},
+	"host func memory":                                                 {f: testHostFuncMemory},
+	"host function with context parameter":                             {f: testHostFunctionContextParameter},
+	"host function with nested context":                                {f: testNestedGoContext},
+	"host function with numeric parameter":                             {f: testHostFunctionNumericParameter},
+	"close module with in-flight calls":                                {f: testCloseInFlight},
+	"multiple instantiation from same source":                          {f: testMultipleInstantiation},
+	"exported function that grows memory":                              {f: testMemOps},
+	"import functions with reference type in signature":                {f: testReftypeImports, wazevoSkip: true},
+	"overflow integer addition":                                        {f: testOverflow},
+	"un-signed extend global":                                          {f: testGlobalExtend},
+	"user-defined primitive in host func":                              {f: testUserDefinedPrimitiveHostFunc},
+	"ensures invocations terminate on module close":                    {f: testEnsureTerminationOnClose},
+	"call host function indirectly":                                    {f: callHostFunctionIndirect},
+	"lookup function":                                                  {f: testLookupFunction},
+	"memory grow in recursive call":                                    {f: testMemoryGrowInRecursiveCall},
+	"call":                                                             {f: testCall},
+	"module memory":                                                    {f: testModuleMemory, wazevoSkip: true},
+	"two indirection to host":                                          {f: testTwoIndirection},
+	"before listener globals":                                          {f: testBeforeListenerGlobals},
+	"before listener stack iterator":                                   {f: testBeforeListenerStackIterator},
+	"before listener stack iterator offsets":                           {f: testListenerStackIteratorOffset, wazevoSkip: true},
+	"many params many results / doubler":                               {f: testManyParamsResultsDoubler},
+	"many params many results / call_many_consts":                      {f: testManyParamsResultsCallManyConsts},
+	"many params many results / swapper":                               {f: testManyParamsResultsSwapper},
+	"many params many results / main":                                  {f: testManyParamsResultsMain},
+	"many params many results / call_many_consts_and_pick_last_vector": {f: testManyParamsResultsCallManyConstsAndPickLastVector},
 }
 
 func TestEngineCompiler(t *testing.T) {
@@ -1624,6 +1626,10 @@ func manyParamsResultsMod() (bin []byte, params []uint64) {
 	mainType := wasm.FunctionType{}
 	swapperType := wasm.FunctionType{}
 	doublerType := wasm.FunctionType{}
+	manyConstsType := wasm.FunctionType{}
+	callManyConstsType := wasm.FunctionType{}
+	pickLastVectorType := wasm.FunctionType{Results: []wasm.ValueType{v128}}
+	callManyConstsAndPickLastVectorType := wasm.FunctionType{Results: []wasm.ValueType{v128}}
 	for i := 0; i < 20; i++ {
 		swapperType.Params = append(swapperType.Params, i32, i64, f32, f64, v128)
 		swapperType.Results = append(swapperType.Results, v128, f64, f32, i64, i32)
@@ -1631,6 +1637,9 @@ func manyParamsResultsMod() (bin []byte, params []uint64) {
 		mainType.Results = append(mainType.Results, v128, f64, f32, i64, i32)
 		doublerType.Params = append(doublerType.Results, v128, f64, f32, i64, i32)
 		doublerType.Results = append(doublerType.Results, v128, f64, f32, i64, i32)
+		manyConstsType.Results = append(manyConstsType.Results, i32, i64, f32, f64, v128)
+		callManyConstsType.Results = append(callManyConstsType.Results, i32, i64, f32, f64, v128)
+		pickLastVectorType.Params = append(pickLastVectorType.Params, i32, i64, f32, f64, v128)
 	}
 
 	var mainBody []byte
@@ -1681,15 +1690,50 @@ func manyParamsResultsMod() (bin []byte, params []uint64) {
 	}
 	doublerBody = append(doublerBody, wasm.OpcodeEnd)
 
+	var manyConstsBody []byte
+	for i := 0; i < 100; i += 5 {
+		ib := byte(i)
+		manyConstsBody = append(manyConstsBody, wasm.OpcodeI32Const)
+		manyConstsBody = append(manyConstsBody, leb128.EncodeInt32(int32(i))...)
+		manyConstsBody = append(manyConstsBody, wasm.OpcodeI64Const)
+		manyConstsBody = append(manyConstsBody, leb128.EncodeInt64(int64(i))...)
+		manyConstsBody = append(manyConstsBody, wasm.OpcodeF32Const)
+		manyConstsBody = append(manyConstsBody, ib, ib, ib, ib)
+		manyConstsBody = append(manyConstsBody, wasm.OpcodeF64Const)
+		manyConstsBody = append(manyConstsBody, ib, ib, ib, ib, ib, ib, ib, ib)
+		manyConstsBody = append(manyConstsBody, wasm.OpcodeVecPrefix, wasm.OpcodeVecV128Const)
+		manyConstsBody = append(manyConstsBody, ib, ib, ib, ib, ib, ib, ib, ib, ib, ib, ib, ib, ib, ib, ib, ib)
+	}
+	manyConstsBody = append(manyConstsBody, wasm.OpcodeEnd)
+
+	var callManyConstsBody []byte
+	callManyConstsBody = append(callManyConstsBody, wasm.OpcodeCall, 5, wasm.OpcodeEnd)
+
+	var pickLastVector []byte
+	pickLastVector = append(pickLastVector, wasm.OpcodeLocalGet, 99, wasm.OpcodeEnd)
+
+	var callManyConstsAndPickLastVector []byte
+	callManyConstsAndPickLastVector = append(callManyConstsAndPickLastVector, wasm.OpcodeCall, 5, wasm.OpcodeCall, 6, wasm.OpcodeEnd)
+
 	bin = binaryencoding.EncodeModule(&wasm.Module{
-		TypeSection: []wasm.FunctionType{mainType, swapperType, doublerType},
+		TypeSection: []wasm.FunctionType{mainType, swapperType, doublerType, callManyConstsType, callManyConstsAndPickLastVectorType, manyConstsType, pickLastVectorType},
 		ExportSection: []wasm.Export{
 			{Name: "main", Type: wasm.ExternTypeFunc, Index: 0},
 			{Name: "swapper", Type: wasm.ExternTypeFunc, Index: 1},
 			{Name: "doubler", Type: wasm.ExternTypeFunc, Index: 2},
+			{Name: "call_many_consts", Type: wasm.ExternTypeFunc, Index: 3},
+			{Name: "call_many_consts_and_pick_last_vector", Type: wasm.ExternTypeFunc, Index: 4},
 		},
-		FunctionSection: []wasm.Index{0, 1, 2},
-		CodeSection:     []wasm.Code{{Body: mainBody}, {Body: swapperBody}, {Body: doublerBody}},
+		FunctionSection: []wasm.Index{0, 1, 2, 3, 4, 5, 6},
+		CodeSection: []wasm.Code{
+			{Body: mainBody},
+			{Body: swapperBody},
+			{Body: doublerBody},
+			{Body: callManyConstsBody},
+			{Body: callManyConstsAndPickLastVector},
+			{Body: manyConstsBody},
+			{Body: pickLastVector},
+		},
 	})
 
 	for i := 0; i < 100; i += 5 {
@@ -1702,6 +1746,38 @@ func manyParamsResultsMod() (bin []byte, params []uint64) {
 		params = append(params, uint64(i+3))
 	}
 	return
+}
+
+func testManyParamsResultsCallManyConsts(t *testing.T, r wazero.Runtime) {
+	bin, _ := manyParamsResultsMod()
+	mod, err := r.Instantiate(testCtx, bin)
+	require.NoError(t, err)
+
+	main := mod.ExportedFunction("call_many_consts")
+	require.NotNil(t, main)
+
+	results, err := main.Call(testCtx)
+	require.NoError(t, err)
+
+	exp := []uint64{
+		0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x5, 0x5, 0x5050505, 0x505050505050505, 0x505050505050505,
+		0x505050505050505, 0xa, 0xa, 0xa0a0a0a, 0xa0a0a0a0a0a0a0a, 0xa0a0a0a0a0a0a0a, 0xa0a0a0a0a0a0a0a,
+		0xf, 0xf, 0xf0f0f0f, 0xf0f0f0f0f0f0f0f, 0xf0f0f0f0f0f0f0f, 0xf0f0f0f0f0f0f0f, 0x14, 0x14, 0x14141414,
+		0x1414141414141414, 0x1414141414141414, 0x1414141414141414, 0x19, 0x19, 0x19191919, 0x1919191919191919,
+		0x1919191919191919, 0x1919191919191919, 0x1e, 0x1e, 0x1e1e1e1e, 0x1e1e1e1e1e1e1e1e, 0x1e1e1e1e1e1e1e1e,
+		0x1e1e1e1e1e1e1e1e, 0x23, 0x23, 0x23232323, 0x2323232323232323, 0x2323232323232323, 0x2323232323232323,
+		0x28, 0x28, 0x28282828, 0x2828282828282828, 0x2828282828282828, 0x2828282828282828, 0x2d, 0x2d, 0x2d2d2d2d,
+		0x2d2d2d2d2d2d2d2d, 0x2d2d2d2d2d2d2d2d, 0x2d2d2d2d2d2d2d2d, 0x32, 0x32, 0x32323232, 0x3232323232323232,
+		0x3232323232323232, 0x3232323232323232, 0x37, 0x37, 0x37373737, 0x3737373737373737, 0x3737373737373737,
+		0x3737373737373737, 0x3c, 0x3c, 0x3c3c3c3c, 0x3c3c3c3c3c3c3c3c, 0x3c3c3c3c3c3c3c3c, 0x3c3c3c3c3c3c3c3c,
+		0x41, 0x41, 0x41414141, 0x4141414141414141, 0x4141414141414141, 0x4141414141414141, 0x46, 0x46, 0x46464646,
+		0x4646464646464646, 0x4646464646464646, 0x4646464646464646, 0x4b, 0x4b, 0x4b4b4b4b, 0x4b4b4b4b4b4b4b4b,
+		0x4b4b4b4b4b4b4b4b, 0x4b4b4b4b4b4b4b4b, 0x50, 0x50, 0x50505050, 0x5050505050505050, 0x5050505050505050,
+		0x5050505050505050, 0x55, 0x55, 0x55555555, 0x5555555555555555, 0x5555555555555555, 0x5555555555555555,
+		0x5a, 0x5a, 0x5a5a5a5a, 0x5a5a5a5a5a5a5a5a, 0x5a5a5a5a5a5a5a5a, 0x5a5a5a5a5a5a5a5a, 0x5f, 0x5f, 0x5f5f5f5f,
+		0x5f5f5f5f5f5f5f5f, 0x5f5f5f5f5f5f5f5f, 0x5f5f5f5f5f5f5f5f,
+	}
+	require.Equal(t, exp, results)
 }
 
 func testManyParamsResultsDoubler(t *testing.T, r wazero.Runtime) {
@@ -1769,5 +1845,19 @@ func testManyParamsResultsMain(t *testing.T, r wazero.Runtime) {
 		82, 80, 38, 38, 76, 74, 72, 70, 33, 33, 66, 64, 62, 60, 28, 28, 56, 54, 52, 50, 23, 23, 46, 44, 42, 40, 18,
 		18, 36, 34, 32, 30, 13, 13, 26, 24, 22, 20, 8, 8, 16, 14, 12, 10, 3, 3, 6, 4, 2, 0,
 	}
+	require.Equal(t, exp, results)
+}
+
+func testManyParamsResultsCallManyConstsAndPickLastVector(t *testing.T, r wazero.Runtime) {
+	bin, _ := manyParamsResultsMod()
+	mod, err := r.Instantiate(testCtx, bin)
+	require.NoError(t, err)
+
+	main := mod.ExportedFunction("call_many_consts_and_pick_last_vector")
+	require.NotNil(t, main)
+
+	results, err := main.Call(testCtx)
+	require.NoError(t, err)
+	exp := []uint64{0x5f5f5f5f5f5f5f5f, 0x5f5f5f5f5f5f5f5f}
 	require.Equal(t, exp, results)
 }
