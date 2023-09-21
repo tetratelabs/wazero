@@ -325,8 +325,6 @@ func (m *machine) insertReloadRegisterAt(v regalloc.VReg, instr *instruction, af
 		panic("TODO")
 	}
 
-	cur.next = load
-	load.prev = cur
 	cur = linkInstr(cur, load)
 	linkInstr(cur, prevNext)
 }

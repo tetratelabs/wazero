@@ -62,11 +62,16 @@ var tests = map[string]testCase{
 	"before listener globals":                                          {f: testBeforeListenerGlobals},
 	"before listener stack iterator":                                   {f: testBeforeListenerStackIterator},
 	"before listener stack iterator offsets":                           {f: testListenerStackIteratorOffset, wazevoSkip: true},
-	"many params many results / doubler":                               {f: testManyParamsResultsDoubler, wazevoSkip: true},
-	"many params many results / call_many_consts":                      {f: testManyParamsResultsCallManyConsts, wazevoSkip: true},
-	"many params many results / swapper":                               {f: testManyParamsResultsSwapper, wazevoSkip: true},
-	"many params many results / main":                                  {f: testManyParamsResultsMain, wazevoSkip: true},
-	"many params many results / call_many_consts_and_pick_last_vector": {f: testManyParamsResultsCallManyConstsAndPickLastVector, wazevoSkip: true},
+	"many params many results / doubler":                               {f: testManyParamsResultsDoubler},
+	"many params many results / doubler / listener":                    {f: testManyParamsResultsDoubler_listener, wazevoSkip: true},
+	"many params many results / call_many_consts":                      {f: testManyParamsResultsCallManyConsts},
+	"many params many results / call_many_consts / listener":           {f: testManyParamsResultsCallManyConsts_listener, wazevoSkip: true},
+	"many params many results / swapper":                               {f: testManyParamsResultsSwapper},
+	"many params many results / swapper / listener":                    {f: testManyParamsResultsSwapper_listener, wazevoSkip: true},
+	"many params many results / main":                                  {f: testManyParamsResultsMain},
+	"many params many results / main / listener":                       {f: testManyParamsResultsMain_listener, wazevoSkip: true},
+	"many params many results / call_many_consts_and_pick_last_vector": {f: testManyParamsResultsCallManyConstsAndPickLastVector},
+	"many params many results / call_many_consts_and_pick_last_vector / listener": {f: testManyParamsResultsCallManyConstsAndPickLastVector_listener, wazevoSkip: true},
 }
 
 func TestEngineCompiler(t *testing.T) {
@@ -1773,6 +1778,40 @@ func manyParamsResultsMod() (bin []byte, params []uint64) {
 }
 
 func testManyParamsResultsCallManyConsts(t *testing.T, r wazero.Runtime) {
+	ctx := context.Background()
+
+	bin, _ := manyParamsResultsMod()
+	mod, err := r.Instantiate(ctx, bin)
+	require.NoError(t, err)
+
+	main := mod.ExportedFunction("call_many_consts")
+	require.NotNil(t, main)
+
+	results, err := main.Call(ctx)
+	require.NoError(t, err)
+
+	exp := []uint64{
+		0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x5, 0x5, 0x5050505, 0x505050505050505, 0x505050505050505,
+		0x505050505050505, 0xa, 0xa, 0xa0a0a0a, 0xa0a0a0a0a0a0a0a, 0xa0a0a0a0a0a0a0a, 0xa0a0a0a0a0a0a0a,
+		0xf, 0xf, 0xf0f0f0f, 0xf0f0f0f0f0f0f0f, 0xf0f0f0f0f0f0f0f, 0xf0f0f0f0f0f0f0f, 0x14, 0x14, 0x14141414,
+		0x1414141414141414, 0x1414141414141414, 0x1414141414141414, 0x19, 0x19, 0x19191919, 0x1919191919191919,
+		0x1919191919191919, 0x1919191919191919, 0x1e, 0x1e, 0x1e1e1e1e, 0x1e1e1e1e1e1e1e1e, 0x1e1e1e1e1e1e1e1e,
+		0x1e1e1e1e1e1e1e1e, 0x23, 0x23, 0x23232323, 0x2323232323232323, 0x2323232323232323, 0x2323232323232323,
+		0x28, 0x28, 0x28282828, 0x2828282828282828, 0x2828282828282828, 0x2828282828282828, 0x2d, 0x2d, 0x2d2d2d2d,
+		0x2d2d2d2d2d2d2d2d, 0x2d2d2d2d2d2d2d2d, 0x2d2d2d2d2d2d2d2d, 0x32, 0x32, 0x32323232, 0x3232323232323232,
+		0x3232323232323232, 0x3232323232323232, 0x37, 0x37, 0x37373737, 0x3737373737373737, 0x3737373737373737,
+		0x3737373737373737, 0x3c, 0x3c, 0x3c3c3c3c, 0x3c3c3c3c3c3c3c3c, 0x3c3c3c3c3c3c3c3c, 0x3c3c3c3c3c3c3c3c,
+		0x41, 0x41, 0x41414141, 0x4141414141414141, 0x4141414141414141, 0x4141414141414141, 0x46, 0x46, 0x46464646,
+		0x4646464646464646, 0x4646464646464646, 0x4646464646464646, 0x4b, 0x4b, 0x4b4b4b4b, 0x4b4b4b4b4b4b4b4b,
+		0x4b4b4b4b4b4b4b4b, 0x4b4b4b4b4b4b4b4b, 0x50, 0x50, 0x50505050, 0x5050505050505050, 0x5050505050505050,
+		0x5050505050505050, 0x55, 0x55, 0x55555555, 0x5555555555555555, 0x5555555555555555, 0x5555555555555555,
+		0x5a, 0x5a, 0x5a5a5a5a, 0x5a5a5a5a5a5a5a5a, 0x5a5a5a5a5a5a5a5a, 0x5a5a5a5a5a5a5a5a, 0x5f, 0x5f, 0x5f5f5f5f,
+		0x5f5f5f5f5f5f5f5f, 0x5f5f5f5f5f5f5f5f, 0x5f5f5f5f5f5f5f5f,
+	}
+	require.Equal(t, exp, results)
+}
+
+func testManyParamsResultsCallManyConsts_listener(t *testing.T, r wazero.Runtime) {
 	var buf bytes.Buffer
 	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
 
@@ -1813,10 +1852,37 @@ func testManyParamsResultsCallManyConsts(t *testing.T, r wazero.Runtime) {
 		0x5f5f5f5f5f5f5f5f, 0x5f5f5f5f5f5f5f5f, 0x5f5f5f5f5f5f5f5f,
 	}
 	require.Equal(t, exp, results)
-
 }
 
 func testManyParamsResultsDoubler(t *testing.T, r wazero.Runtime) {
+	ctx := context.Background()
+
+	bin, params := manyParamsResultsMod()
+	mod, err := r.Instantiate(ctx, bin)
+	require.NoError(t, err)
+
+	main := mod.ExportedFunction("doubler")
+	require.NotNil(t, main)
+
+	results, err := main.Call(ctx, params...)
+	require.NoError(t, err)
+
+	exp := []uint64{
+		0x0, 0x1, 0x4, 0x6, 0x6, 0x6, 0x5, 0x6, 0xe, 0x10, 0x10, 0x10, 0xa,
+		0xb, 0x18, 0x1a, 0x1a, 0x1a, 0xf, 0x10, 0x22, 0x24, 0x24, 0x24, 0x14,
+		0x15, 0x2c, 0x2e, 0x2e, 0x2e, 0x19, 0x1a, 0x36, 0x38, 0x38, 0x38, 0x1e,
+		0x1f, 0x40, 0x42, 0x42, 0x42, 0x23, 0x24, 0x4a, 0x4c, 0x4c, 0x4c, 0x28,
+		0x29, 0x54, 0x56, 0x56, 0x56, 0x2d, 0x2e, 0x5e, 0x60, 0x60, 0x60, 0x32,
+		0x33, 0x68, 0x6a, 0x6a, 0x6a, 0x37, 0x38, 0x72, 0x74, 0x74, 0x74, 0x3c,
+		0x3d, 0x7c, 0x7e, 0x7e, 0x7e, 0x41, 0x42, 0x86, 0x88, 0x88, 0x88, 0x46,
+		0x47, 0x90, 0x92, 0x92, 0x92, 0x4b, 0x4c, 0x9a, 0x9c, 0x9c, 0x9c, 0x50,
+		0x51, 0xa4, 0xa6, 0xa6, 0xa6, 0x55, 0x56, 0xae, 0xb0, 0xb0, 0xb0, 0x5a,
+		0x5b, 0xb8, 0xba, 0xba, 0xba, 0x5f, 0x60, 0xc2, 0xc4, 0xc4, 0xc4,
+	}
+	require.Equal(t, exp, results)
+}
+
+func testManyParamsResultsDoubler_listener(t *testing.T, r wazero.Runtime) {
 	var buf bytes.Buffer
 	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
 
@@ -1831,10 +1897,10 @@ func testManyParamsResultsDoubler(t *testing.T, r wazero.Runtime) {
 	require.NoError(t, err)
 
 	fmt.Println(buf.String())
-	//	require.Equal(t, `
-	//--> .doubler([0:v128]=00000000000000000000000000000001,[1:f64]=5e-324,[2:f32]=3e-45,[3:i64]=3,[4:i32]=3,[5:v128]=00000000000000030000000000000005,[6:f64]=2.5e-323,[7:f32]=8e-45,[8:i64]=7,[9:i32]=8,[10:v128]=00000000000000080000000000000008,[11:f64]=4e-323,[12:f32]=1.4e-44,[13:i64]=11,[14:i32]=12,[15:v128]=000000000000000d000000000000000d,[16:f64]=6.4e-323,[17:f32]=1.8e-44,[18:i64]=15,[19:i32]=16,[20:v128]=00000000000000110000000000000012,[21:f64]=9e-323,[22:f32]=2.5e-44,[23:i64]=18,[24:i32]=20,[25:v128]=00000000000000150000000000000016,[26:f64]=1.1e-322,[27:f32]=3.2e-44,[28:i64]=23,[29:i32]=23,[30:v128]=0000000000000019000000000000001a,[31:f64]=1.3e-322,[32:f32]=3.8e-44,[33:i64]=28,[34:i32]=28,[35:v128]=000000000000001c000000000000001e,[36:f64]=1.5e-322,[37:f32]=4.3e-44,[38:i64]=32,[39:i32]=33,[40:v128]=00000000000000210000000000000021,[41:f64]=1.63e-322,[42:f32]=4.9e-44,[43:i64]=36,[44:i32]=37,[45:v128]=00000000000000260000000000000026,[46:f64]=1.9e-322,[47:f32]=5.3e-44,[48:i64]=40,[49:i32]=41,[50:v128]=000000000000002a000000000000002b,[51:f64]=2.1e-322,[52:f32]=6e-44,[53:i64]=43,[54:i32]=45,[55:v128]=000000000000002e000000000000002f,[56:f64]=2.3e-322,[57:f32]=6.7e-44,[58:i64]=48,[59:i32]=48,[60:v128]=00000000000000320000000000000033,[61:f64]=2.5e-322,[62:f32]=7.3e-44,[63:i64]=53,[64:i32]=53,[65:v128]=00000000000000350000000000000037,[66:f64]=2.7e-322,[67:f32]=7.8e-44,[68:i64]=57,[69:i32]=58,[70:v128]=000000000000003a000000000000003a,[71:f64]=2.87e-322,[72:f32]=8.4e-44,[73:i64]=61,[74:i32]=62,[75:v128]=000000000000003f000000000000003f,[76:f64]=3.1e-322,[77:f32]=8.8e-44,[78:i64]=65,[79:i32]=66,[80:v128]=00000000000000430000000000000044,[81:f64]=3.36e-322,[82:f32]=9.5e-44,[83:i64]=68,[84:i32]=70,[85:v128]=00000000000000470000000000000048,[86:f64]=3.56e-322,[87:f32]=1.02e-43,[88:i64]=73,[89:i32]=73,[90:v128]=000000000000004b000000000000004c,[91:f64]=3.75e-322,[92:f32]=1.08e-43,[93:i64]=78,[94:i32]=78,[95:v128]=000000000000004e0000000000000050,[96:f64]=3.95e-322,[97:f32]=1.14e-43,[98:i64]=82,[99:i32]=83)
-	//<-- (00000000000000000000000000000001,5e-324,6e-45,6,6,00000000000000060000000000000005,2.5e-323,8e-45,14,16,00000000000000100000000000000010,8e-323,1.4e-44,11,24,000000000000001a000000000000001a,1.3e-322,3.6e-44,15,16,00000000000000220000000000000024,1.8e-322,5e-44,36,20,0000000000000015000000000000002c,2.17e-322,6.4e-44,46,46,0000000000000019000000000000001a,1.3e-322,7.6e-44,56,56,0000000000000038000000000000001e,1.5e-322,4.3e-44,64,66,00000000000000420000000000000042,3.26e-322,4.9e-44,36,74,000000000000004c000000000000004c,3.75e-322,1.06e-43,40,41,00000000000000540000000000000056,4.25e-322,1.2e-43,86,45,000000000000002e000000000000005e,4.64e-322,1.35e-43,96,96,00000000000000320000000000000033,2.5e-322,1.46e-43,106,106,000000000000006a0000000000000037,2.7e-322,7.8e-44,114,116,00000000000000740000000000000074,5.73e-322,8.4e-44,61,124,000000000000007e000000000000007e,6.23e-322,1.77e-43,65,66,00000000000000860000000000000088,6.7e-322,1.9e-43,136,70,00000000000000470000000000000090,7.1e-322,2.05e-43,146,146,000000000000004b000000000000004c,3.75e-322,2.16e-43,156,156,000000000000009c0000000000000050,3.95e-322,1.14e-43,164,166)
-	//`, "\n"+buf.String())
+	require.Equal(t, `
+--> .doubler([0:v128]=00000000000000000000000000000001,[1:f64]=5e-324,[2:f32]=3e-45,[3:i64]=3,[4:i32]=3,[5:v128]=00000000000000030000000000000005,[6:f64]=2.5e-323,[7:f32]=8e-45,[8:i64]=7,[9:i32]=8,[10:v128]=00000000000000080000000000000008,[11:f64]=4e-323,[12:f32]=1.4e-44,[13:i64]=11,[14:i32]=12,[15:v128]=000000000000000d000000000000000d,[16:f64]=6.4e-323,[17:f32]=1.8e-44,[18:i64]=15,[19:i32]=16,[20:v128]=00000000000000110000000000000012,[21:f64]=9e-323,[22:f32]=2.5e-44,[23:i64]=18,[24:i32]=20,[25:v128]=00000000000000150000000000000016,[26:f64]=1.1e-322,[27:f32]=3.2e-44,[28:i64]=23,[29:i32]=23,[30:v128]=0000000000000019000000000000001a,[31:f64]=1.3e-322,[32:f32]=3.8e-44,[33:i64]=28,[34:i32]=28,[35:v128]=000000000000001c000000000000001e,[36:f64]=1.5e-322,[37:f32]=4.3e-44,[38:i64]=32,[39:i32]=33,[40:v128]=00000000000000210000000000000021,[41:f64]=1.63e-322,[42:f32]=4.9e-44,[43:i64]=36,[44:i32]=37,[45:v128]=00000000000000260000000000000026,[46:f64]=1.9e-322,[47:f32]=5.3e-44,[48:i64]=40,[49:i32]=41,[50:v128]=000000000000002a000000000000002b,[51:f64]=2.1e-322,[52:f32]=6e-44,[53:i64]=43,[54:i32]=45,[55:v128]=000000000000002e000000000000002f,[56:f64]=2.3e-322,[57:f32]=6.7e-44,[58:i64]=48,[59:i32]=48,[60:v128]=00000000000000320000000000000033,[61:f64]=2.5e-322,[62:f32]=7.3e-44,[63:i64]=53,[64:i32]=53,[65:v128]=00000000000000350000000000000037,[66:f64]=2.7e-322,[67:f32]=7.8e-44,[68:i64]=57,[69:i32]=58,[70:v128]=000000000000003a000000000000003a,[71:f64]=2.87e-322,[72:f32]=8.4e-44,[73:i64]=61,[74:i32]=62,[75:v128]=000000000000003f000000000000003f,[76:f64]=3.1e-322,[77:f32]=8.8e-44,[78:i64]=65,[79:i32]=66,[80:v128]=00000000000000430000000000000044,[81:f64]=3.36e-322,[82:f32]=9.5e-44,[83:i64]=68,[84:i32]=70,[85:v128]=00000000000000470000000000000048,[86:f64]=3.56e-322,[87:f32]=1.02e-43,[88:i64]=73,[89:i32]=73,[90:v128]=000000000000004b000000000000004c,[91:f64]=3.75e-322,[92:f32]=1.08e-43,[93:i64]=78,[94:i32]=78,[95:v128]=000000000000004e0000000000000050,[96:f64]=3.95e-322,[97:f32]=1.14e-43,[98:i64]=82,[99:i32]=83)
+<-- (00000000000000000000000000000001,5e-324,6e-45,6,6,00000000000000060000000000000005,2.5e-323,8e-45,14,16,00000000000000100000000000000010,8e-323,1.4e-44,11,24,000000000000001a000000000000001a,1.3e-322,3.6e-44,15,16,00000000000000220000000000000024,1.8e-322,5e-44,36,20,0000000000000015000000000000002c,2.17e-322,6.4e-44,46,46,0000000000000019000000000000001a,1.3e-322,7.6e-44,56,56,0000000000000038000000000000001e,1.5e-322,4.3e-44,64,66,00000000000000420000000000000042,3.26e-322,4.9e-44,36,74,000000000000004c000000000000004c,3.75e-322,1.06e-43,40,41,00000000000000540000000000000056,4.25e-322,1.2e-43,86,45,000000000000002e000000000000005e,4.64e-322,1.35e-43,96,96,00000000000000320000000000000033,2.5e-322,1.46e-43,106,106,000000000000006a0000000000000037,2.7e-322,7.8e-44,114,116,00000000000000740000000000000074,5.73e-322,8.4e-44,61,124,000000000000007e000000000000007e,6.23e-322,1.77e-43,65,66,00000000000000860000000000000088,6.7e-322,1.9e-43,136,70,00000000000000470000000000000090,7.1e-322,2.05e-43,146,146,000000000000004b000000000000004c,3.75e-322,2.16e-43,156,156,000000000000009c0000000000000050,3.95e-322,1.14e-43,164,166)
+`, "\n"+buf.String())
 
 	exp := []uint64{
 		0x0, 0x1, 0x4, 0x6, 0x6, 0x6, 0x5, 0x6, 0xe, 0x10, 0x10, 0x10, 0xa,
@@ -1852,6 +1918,32 @@ func testManyParamsResultsDoubler(t *testing.T, r wazero.Runtime) {
 }
 
 func testManyParamsResultsSwapper(t *testing.T, r wazero.Runtime) {
+	ctx := context.Background()
+
+	bin, params := manyParamsResultsMod()
+	mod, err := r.Instantiate(ctx, bin)
+	require.NoError(t, err)
+
+	main := mod.ExportedFunction("swapper")
+	require.NotNil(t, main)
+
+	results, err := main.Call(ctx, params...)
+	require.NoError(t, err)
+
+	exp := []uint64{
+		0x62, 0x62, 0x62, 0x61, 0x60, 0x5f, 0x5d, 0x5d, 0x5d, 0x5c, 0x5b, 0x5a, 0x58, 0x58, 0x58, 0x57,
+		0x56, 0x55, 0x53, 0x53, 0x53, 0x52, 0x51, 0x50, 0x4e, 0x4e, 0x4e, 0x4d, 0x4c, 0x4b, 0x49, 0x49,
+		0x49, 0x48, 0x47, 0x46, 0x44, 0x44, 0x44, 0x43, 0x42, 0x41, 0x3f, 0x3f, 0x3f, 0x3e, 0x3d, 0x3c,
+		0x3a, 0x3a, 0x3a, 0x39, 0x38, 0x37, 0x35, 0x35, 0x35, 0x34, 0x33, 0x32, 0x30, 0x30, 0x30, 0x2f,
+		0x2e, 0x2d, 0x2b, 0x2b, 0x2b, 0x2a, 0x29, 0x28, 0x26, 0x26, 0x26, 0x25, 0x24, 0x23, 0x21, 0x21,
+		0x21, 0x20, 0x1f, 0x1e, 0x1c, 0x1c, 0x1c, 0x1b, 0x1a, 0x19, 0x17, 0x17, 0x17, 0x16, 0x15, 0x14,
+		0x12, 0x12, 0x12, 0x11, 0x10, 0xf, 0xd, 0xd, 0xd, 0xc, 0xb, 0xa, 0x8, 0x8, 0x8, 0x7, 0x6, 0x5,
+		0x3, 0x3, 0x3, 0x2, 0x1, 0x0,
+	}
+	require.Equal(t, exp, results)
+}
+
+func testManyParamsResultsSwapper_listener(t *testing.T, r wazero.Runtime) {
 	var buf bytes.Buffer
 	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
 
@@ -1885,6 +1977,29 @@ func testManyParamsResultsSwapper(t *testing.T, r wazero.Runtime) {
 }
 
 func testManyParamsResultsMain(t *testing.T, r wazero.Runtime) {
+	ctx := context.Background()
+
+	bin, params := manyParamsResultsMod()
+	mod, err := r.Instantiate(ctx, bin)
+	require.NoError(t, err)
+
+	main := mod.ExportedFunction("main")
+	require.NotNil(t, main)
+
+	results, err := main.Call(ctx, params...)
+	require.NoError(t, err)
+
+	exp := []uint64{
+		98, 98, 196, 194, 192, 190, 93, 93, 186, 184, 182, 180, 88, 88, 176, 174, 172, 170, 83, 83, 166, 164, 162,
+		160, 78, 78, 156, 154, 152, 150, 73, 73, 146, 144, 142, 140, 68, 68, 136, 134, 132, 130, 63, 63, 126, 124,
+		122, 120, 58, 58, 116, 114, 112, 110, 53, 53, 106, 104, 102, 100, 48, 48, 96, 94, 92, 90, 43, 43, 86, 84,
+		82, 80, 38, 38, 76, 74, 72, 70, 33, 33, 66, 64, 62, 60, 28, 28, 56, 54, 52, 50, 23, 23, 46, 44, 42, 40, 18,
+		18, 36, 34, 32, 30, 13, 13, 26, 24, 22, 20, 8, 8, 16, 14, 12, 10, 3, 3, 6, 4, 2, 0,
+	}
+	require.Equal(t, exp, results)
+}
+
+func testManyParamsResultsMain_listener(t *testing.T, r wazero.Runtime) {
 	var buf bytes.Buffer
 	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
 
@@ -1919,6 +2034,22 @@ func testManyParamsResultsMain(t *testing.T, r wazero.Runtime) {
 }
 
 func testManyParamsResultsCallManyConstsAndPickLastVector(t *testing.T, r wazero.Runtime) {
+	ctx := context.Background()
+
+	bin, _ := manyParamsResultsMod()
+	mod, err := r.Instantiate(ctx, bin)
+	require.NoError(t, err)
+
+	main := mod.ExportedFunction("call_many_consts_and_pick_last_vector")
+	require.NotNil(t, main)
+
+	results, err := main.Call(ctx)
+	require.NoError(t, err)
+	exp := []uint64{0x5f5f5f5f5f5f5f5f, 0x5f5f5f5f5f5f5f5f}
+	require.Equal(t, exp, results)
+}
+
+func testManyParamsResultsCallManyConstsAndPickLastVector_listener(t *testing.T, r wazero.Runtime) {
 	var buf bytes.Buffer
 	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
 
@@ -1944,10 +2075,3 @@ func testManyParamsResultsCallManyConstsAndPickLastVector(t *testing.T, r wazero
 <-- 5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f
 `, "\n"+buf.String())
 }
-
-//func Test_a(t *testing.T) {
-//	config := wazero.NewRuntimeConfigInterpreter()
-//	wazevo.ConfigureWazevo(config)
-//	r := wazero.NewRuntimeWithConfig(context.Background(), config)
-//	testManyParamsResultsDoubler(t, r)
-//}
