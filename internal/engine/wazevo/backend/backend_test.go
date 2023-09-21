@@ -888,14 +888,15 @@ L1 (SSA Block: blk0):
 	sub sp, sp, x27
 	stp x30, x27, [sp, #-0x10]!
 	str x19, [sp, #-0x10]!
+	str x20, [sp, #-0x10]!
 	str q18, [sp, #-0x10]!
 	str q19, [sp, #-0x10]!
-	orr x27, xzr, #0x30
+	orr x27, xzr, #0x40
 	str x27, [sp, #-0x10]!
 	str x1, [x0, #0x8]
 	bl f1
-	ldr w19, [sp, #-0xc0]
-	ldr x18, [sp, #-0xb8]
+	ldr w20, [sp, #-0xc0]
+	ldr x19, [sp, #-0xb8]
 	ldr s19, [sp, #-0xb0]
 	ldr d18, [sp, #-0xa8]
 	ldr w17, [sp, #-0xa0]
@@ -918,33 +919,34 @@ L1 (SSA Block: blk0):
 	ldr x8, [sp, #-0x18]
 	ldr s9, [sp, #-0x10]
 	ldr d8, [sp, #-0x8]
-	str d8, [sp, #0x108]
-	str s9, [sp, #0x100]
-	str x8, [sp, #0xf8]
-	str w9, [sp, #0xf0]
-	str d10, [sp, #0xe8]
-	str s11, [sp, #0xe0]
-	str x10, [sp, #0xd8]
-	str w11, [sp, #0xd0]
-	str d12, [sp, #0xc8]
-	str s13, [sp, #0xc0]
-	str x12, [sp, #0xb8]
-	str w13, [sp, #0xb0]
-	str d14, [sp, #0xa8]
-	str s15, [sp, #0xa0]
-	str x14, [sp, #0x98]
-	str w15, [sp, #0x90]
-	str d16, [sp, #0x88]
-	str s17, [sp, #0x80]
-	str x16, [sp, #0x78]
-	str w17, [sp, #0x70]
-	str d18, [sp, #0x68]
-	str s19, [sp, #0x60]
-	str x18, [sp, #0x58]
-	str w19, [sp, #0x50]
+	str d8, [sp, #0x118]
+	str s9, [sp, #0x110]
+	str x8, [sp, #0x108]
+	str w9, [sp, #0x100]
+	str d10, [sp, #0xf8]
+	str s11, [sp, #0xf0]
+	str x10, [sp, #0xe8]
+	str w11, [sp, #0xe0]
+	str d12, [sp, #0xd8]
+	str s13, [sp, #0xd0]
+	str x12, [sp, #0xc8]
+	str w13, [sp, #0xc0]
+	str d14, [sp, #0xb8]
+	str s15, [sp, #0xb0]
+	str x14, [sp, #0xa8]
+	str w15, [sp, #0xa0]
+	str d16, [sp, #0x98]
+	str s17, [sp, #0x90]
+	str x16, [sp, #0x88]
+	str w17, [sp, #0x80]
+	str d18, [sp, #0x78]
+	str s19, [sp, #0x70]
+	str x19, [sp, #0x68]
+	str w20, [sp, #0x60]
 	add sp, sp, #0x10
 	ldr q19, [sp], #0x10
 	ldr q18, [sp], #0x10
+	ldr x20, [sp], #0x10
 	ldr x19, [sp], #0x10
 	ldr x30, [sp], #0x10
 	add sp, sp, #0xc0
@@ -1478,26 +1480,27 @@ L1 (SSA Block: blk0):
 	madd w16, w2, w16, wzr
 	movz w17, #0xa, lsl 0
 	madd w17, w2, w17, wzr
-	movz w18, #0xb, lsl 0
-	madd w18, w2, w18, wzr
-	orr w19, wzr, #0xc
+	movz w19, #0xb, lsl 0
 	madd w19, w2, w19, wzr
-	movz w20, #0xd, lsl 0
+	orr w20, wzr, #0xc
 	madd w20, w2, w20, wzr
-	orr w21, wzr, #0xe
+	movz w21, #0xd, lsl 0
 	madd w21, w2, w21, wzr
-	orr w22, wzr, #0xf
+	orr w22, wzr, #0xe
 	madd w22, w2, w22, wzr
-	orr w23, wzr, #0x10
+	orr w23, wzr, #0xf
 	madd w23, w2, w23, wzr
-	movz w24, #0x11, lsl 0
+	orr w24, wzr, #0x10
 	madd w24, w2, w24, wzr
-	movz w25, #0x12, lsl 0
+	movz w25, #0x11, lsl 0
 	madd w25, w2, w25, wzr
-	movz w26, #0x13, lsl 0
+	movz w26, #0x12, lsl 0
 	madd w26, w2, w26, wzr
-	movz w29, #0x14, lsl 0
+	movz w29, #0x13, lsl 0
 	madd w29, w2, w29, wzr
+	movz w30, #0x14, lsl 0
+	madd w30, w2, w30, wzr
+	add w29, w29, w30
 	add w26, w26, w29
 	add w25, w25, w26
 	add w24, w24, w25
@@ -1506,8 +1509,7 @@ L1 (SSA Block: blk0):
 	add w21, w21, w22
 	add w20, w20, w21
 	add w19, w19, w20
-	add w18, w18, w19
-	add w17, w17, w18
+	add w17, w17, w19
 	add w16, w16, w17
 	add w15, w15, w16
 	add w14, w14, w15
