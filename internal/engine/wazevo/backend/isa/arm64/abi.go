@@ -116,7 +116,6 @@ func (a *abiImpl) setABIArgs(s []backend.ABIArg, types []ssa.Type) (stackSize in
 			if nextX > xArgRetRegMax {
 				arg.Kind = backend.ABIArgKindStack
 				const slotSize = 8 // Align 8 bytes.
-				stackOffset = (stackOffset + slotSize - 1) &^ (slotSize - 1)
 				arg.Offset = stackOffset
 				stackOffset += slotSize
 			} else {
@@ -131,7 +130,6 @@ func (a *abiImpl) setABIArgs(s []backend.ABIArg, types []ssa.Type) (stackSize in
 				if typ.Bits() == 128 { // Vector.
 					slotSize = 16
 				}
-				stackOffset = (stackOffset + slotSize - 1) &^ (slotSize - 1)
 				arg.Offset = stackOffset
 				stackOffset += slotSize
 			} else {

@@ -53,7 +53,7 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 				},
 			},
 			exp: `
-	orr x27, xzr, #0xc0
+	movz x27, #0xa0, lsl 0
 	sub sp, sp, x27
 	stp x30, x27, [sp, #-0x10]!
 	sub x27, sp, #0x130
@@ -149,7 +149,8 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 	add x15, sp, #0x10
 	add sp, sp, #0x130
 	ldr x30, [sp], #0x10
-	add sp, sp, #0xc0
+	add x17, sp, #0x38
+	add sp, sp, #0xa0
 	ldr q0, [x15], #0x10
 	ldr w0, [x15], #0x8
 	ldr x1, [x15], #0x8
@@ -165,34 +166,25 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 	ldr x5, [x15], #0x8
 	ldr q7, [x15], #0x10
 	ldr s11, [x15], #0x8
-	add x27, sp, #0x40
-	str s11, [x27]
+	str s11, [x17], #0x8
 	ldr q11, [x15], #0x10
-	add x27, sp, #0x50
-	str q11, [x27]
+	str q11, [x17], #0x10
 	ldr w6, [x15], #0x8
 	ldr x7, [x15], #0x8
 	ldr q11, [x15], #0x10
-	add x27, sp, #0x60
-	str q11, [x27]
+	str q11, [x17], #0x10
 	ldr s11, [x15], #0x8
-	add x27, sp, #0x70
-	str s11, [x27]
+	str s11, [x17], #0x8
 	ldr q11, [x15], #0x10
-	add x27, sp, #0x80
-	str q11, [x27]
+	str q11, [x17], #0x10
 	ldr w11, [x15], #0x8
-	add x27, sp, #0x90
-	str w11, [x27]
+	str w11, [x17], #0x8
 	ldr x11, [x15], #0x8
-	add x27, sp, #0x98
-	str x11, [x27]
+	str x11, [x17], #0x8
 	ldr q11, [x15], #0x10
-	add x27, sp, #0xa0
-	str q11, [x27]
+	str q11, [x17], #0x10
 	ldr s11, [x15], #0x8
-	add x27, sp, #0xb0
-	str s11, [x27]
+	str s11, [x17], #0x8
 	ret
 `,
 		},
@@ -598,18 +590,7 @@ func Test_goFunctionCallStoreStackResult(t *testing.T) {
 			result:    &backend.ABIArg{Offset: 16 * 3, Type: ssa.TypeI32},
 			resultReg: x11VReg,
 			exp: `
-	add x27, sp, #0x38
-	str w11, [x27]
-`,
-		},
-		{
-			name:      "i32 / large offset",
-			result:    &backend.ABIArg{Offset: 16 * 400, Type: ssa.TypeI32},
-			resultReg: x11VReg,
-			exp: `
-	movz x27, #0x1908, lsl 0
-	add x27, sp, x27
-	str w11, [x27]
+	str w11, [sp], #0x8
 `,
 		},
 		{
@@ -617,18 +598,7 @@ func Test_goFunctionCallStoreStackResult(t *testing.T) {
 			result:    &backend.ABIArg{Offset: 16 * 3, Type: ssa.TypeI64},
 			resultReg: x11VReg,
 			exp: `
-	add x27, sp, #0x38
-	str x11, [x27]
-`,
-		},
-		{
-			name:      "i64 / large offset",
-			result:    &backend.ABIArg{Offset: 16 * 400, Type: ssa.TypeI64},
-			resultReg: x11VReg,
-			exp: `
-	movz x27, #0x1908, lsl 0
-	add x27, sp, x27
-	str x11, [x27]
+	str x11, [sp], #0x8
 `,
 		},
 		{
@@ -636,18 +606,7 @@ func Test_goFunctionCallStoreStackResult(t *testing.T) {
 			result:    &backend.ABIArg{Offset: 16 * 3, Type: ssa.TypeF32},
 			resultReg: v11VReg,
 			exp: `
-	add x27, sp, #0x38
-	str s11, [x27]
-`,
-		},
-		{
-			name:      "f32 / large offset",
-			result:    &backend.ABIArg{Offset: 16 * 400, Type: ssa.TypeF32},
-			resultReg: v11VReg,
-			exp: `
-	movz x27, #0x1908, lsl 0
-	add x27, sp, x27
-	str s11, [x27]
+	str s11, [sp], #0x8
 `,
 		},
 		{
@@ -655,18 +614,7 @@ func Test_goFunctionCallStoreStackResult(t *testing.T) {
 			result:    &backend.ABIArg{Offset: 16 * 3, Type: ssa.TypeF64},
 			resultReg: v11VReg,
 			exp: `
-	add x27, sp, #0x38
-	str d11, [x27]
-`,
-		},
-		{
-			name:      "f64 / large offset",
-			result:    &backend.ABIArg{Offset: 16 * 400, Type: ssa.TypeF64},
-			resultReg: v11VReg,
-			exp: `
-	movz x27, #0x1908, lsl 0
-	add x27, sp, x27
-	str d11, [x27]
+	str d11, [sp], #0x8
 `,
 		},
 		{
@@ -674,18 +622,7 @@ func Test_goFunctionCallStoreStackResult(t *testing.T) {
 			result:    &backend.ABIArg{Offset: 16 * 3, Type: ssa.TypeV128},
 			resultReg: v11VReg,
 			exp: `
-	add x27, sp, #0x38
-	str q11, [x27]
-`,
-		},
-		{
-			name:      "v128 / large offset",
-			result:    &backend.ABIArg{Offset: 16 * 400, Type: ssa.TypeV128},
-			resultReg: v11VReg,
-			exp: `
-	movz x27, #0x1908, lsl 0
-	add x27, sp, x27
-	str q11, [x27]
+	str q11, [sp], #0x10
 `,
 		},
 	} {

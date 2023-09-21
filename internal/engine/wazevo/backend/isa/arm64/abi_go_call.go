@@ -168,6 +168,11 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 		addressModePreOrPostIndex(spVReg, 16 /* stack pointer must be 16-byte aligned. */, false /* increment after loads */), 64)
 	cur = linkInstr(cur, ldr)
 
+	originalRet0Reg := x17VReg // Caller save, so we can use it for whatever we want.
+	if m.currentABI.retStackSize > 0 {
+		cur = m.addsAddOrSubStackPointer(cur, originalRet0Reg, m.currentABI.argStackSize, true)
+	}
+
 	// Make the SP point to the original address (above the result slot).
 	if s := m.currentABI.alignedArgResultStackSlotSize(); s > 0 {
 		cur = m.addsAddOrSubStackPointer(cur, spVReg, s, true)
@@ -229,7 +234,7 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 				panic("TODO")
 			}
 			cur = linkInstr(cur, loadIntoTmpReg)
-			cur = m.goFunctionCallStoreStackResult(cur, spVReg, r, resultReg)
+			cur = m.goFunctionCallStoreStackResult(cur, originalRet0Reg, r, resultReg)
 		}
 	}
 
@@ -427,32 +432,23 @@ func (m *machine) goFunctionCallLoadStackArg(cur *instruction, originalArg0Reg r
 	return cur, result
 }
 
-func (m *machine) goFunctionCallStoreStackResult(cur *instruction, originalArg0Reg regalloc.VReg, result *backend.ABIArg, resultVReg regalloc.VReg) *instruction {
-	offset := result.Offset + m.currentABI.argStackSize
-
-	alu := m.allocateInstr()
-	ao := aluOpAdd
-	if imm12Operand, ok := asImm12Operand(uint64(offset)); ok {
-		alu.asALU(ao, operandNR(tmpRegVReg), operandNR(originalArg0Reg), imm12Operand, true)
-		cur = linkInstr(cur, alu)
-	} else {
-		cur = m.lowerConstantI64AndInsert(cur, tmpRegVReg, offset)
-		alu.asALU(ao, operandNR(tmpRegVReg), operandNR(originalArg0Reg), operandNR(tmpRegVReg), true)
-		cur = linkInstr(cur, alu)
-	}
-
+func (m *machine) goFunctionCallStoreStackResult(cur *instruction, originalRet0Reg regalloc.VReg, result *backend.ABIArg, resultVReg regalloc.VReg) *instruction {
 	store := m.allocateInstr()
+	mode := addressMode{kind: addressModeKindPostIndex, rn: originalRet0Reg}
 	var sizeInBits byte
 	switch result.Type {
 	case ssa.TypeI32, ssa.TypeF32:
+		mode.imm = 8
 		sizeInBits = 32
 	case ssa.TypeI64, ssa.TypeF64:
+		mode.imm = 8
 		sizeInBits = 64
 	case ssa.TypeV128:
+		mode.imm = 16
 		sizeInBits = 128
 	default:
 		panic("TODO")
 	}
-	store.asStore(operandNR(resultVReg), addressMode{kind: addressModeKindRegUnsignedImm12, rn: tmpRegVReg}, sizeInBits)
+	store.asStore(operandNR(resultVReg), mode, sizeInBits)
 	return linkInstr(cur, store)
 }
