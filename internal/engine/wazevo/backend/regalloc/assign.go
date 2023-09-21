@@ -125,7 +125,7 @@ func (a *Allocator) handleSpills(
 	case !_usesSpills && !_defSpill: // Nothing to do.
 	case !_usesSpills && _defSpill: // Only definition is spilled.
 		a.collectActiveNodesAt(pc+pcDefOffset, liveNodes)
-		a.spillHandler.init(a.nodes1)
+		a.spillHandler.init(a.nodes1, instr)
 
 		r, evictedNode := a.spillHandler.getUnusedOrEvictReg(defSpill.RegType(), a.regInfo)
 		if evictedNode != nil {
@@ -141,7 +141,7 @@ func (a *Allocator) handleSpills(
 
 	case _usesSpills:
 		a.collectActiveNodesAt(pc, liveNodes)
-		a.spillHandler.init(a.nodes1)
+		a.spillHandler.init(a.nodes1, instr)
 
 		var evicted [3]*node
 		var evictedCount int
@@ -185,7 +185,7 @@ func (a *Allocator) handleSpills(
 			if !defSpill.IsRealReg() {
 				// This case, the destination register type is different from the source registers.
 				a.collectActiveNodesAt(pc+pcDefOffset, liveNodes)
-				a.spillHandler.init(a.nodes1)
+				a.spillHandler.init(a.nodes1, instr)
 				r, evictedNode := a.spillHandler.getUnusedOrEvictReg(defSpill.RegType(), a.regInfo)
 				if evictedNode != nil {
 					evictedNodeV := evictedNode.v.SetRealReg(evictedNode.assignedRealReg())

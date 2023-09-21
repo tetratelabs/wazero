@@ -893,7 +893,7 @@ func TestListener_long_as_is(t *testing.T) {
 	}
 	body = append(body, wasm.OpcodeEnd)
 
-	pickOneParam := binaryencoding.EncodeModule(&wasm.Module{
+	bin := binaryencoding.EncodeModule(&wasm.Module{
 		TypeSection:     []wasm.FunctionType{{Results: params, Params: params}},
 		ExportSection:   []wasm.Export{{Name: "main", Type: wasm.ExternTypeFunc, Index: 0}},
 		FunctionSection: []wasm.Index{0},
@@ -912,7 +912,7 @@ func TestListener_long_as_is(t *testing.T) {
 		require.NoError(t, r.Close(ctx))
 	}()
 
-	inst, err := r.Instantiate(ctx, pickOneParam)
+	inst, err := r.Instantiate(ctx, bin)
 	require.NoError(t, err)
 
 	f := inst.ExportedFunction("main")
@@ -928,5 +928,53 @@ func TestListener_long_as_is(t *testing.T) {
 	require.Equal(t, `
 --> .$0(0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19)
 <-- (0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19)
+`, "\n"+buf.String())
+}
+
+func TestListener_long_many_consts(t *testing.T) {
+	const paramNum = 61
+
+	var exp []uint64
+	var body []byte
+	var resultTypes []wasm.ValueType
+	for i := 0; i < paramNum; i++ {
+		exp = append(exp, uint64(i))
+		resultTypes = append(resultTypes, i32)
+		body = append(body, wasm.OpcodeI32Const)
+		body = append(body, leb128.EncodeInt32(int32(i))...)
+	}
+	body = append(body, wasm.OpcodeEnd)
+
+	bin := binaryencoding.EncodeModule(&wasm.Module{
+		TypeSection:     []wasm.FunctionType{{Results: resultTypes}},
+		ExportSection:   []wasm.Export{{Name: "main", Type: wasm.ExternTypeFunc, Index: 0}},
+		FunctionSection: []wasm.Index{0},
+		CodeSection:     []wasm.Code{{Body: body}},
+	})
+
+	var buf bytes.Buffer
+	config := wazero.NewRuntimeConfigCompiler()
+	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
+
+	// Configure the new optimizing backend!
+	wazevo.ConfigureWazevo(config)
+
+	r := wazero.NewRuntimeWithConfig(ctx, config)
+	defer func() {
+		require.NoError(t, r.Close(ctx))
+	}()
+
+	inst, err := r.Instantiate(ctx, bin)
+	require.NoError(t, err)
+
+	f := inst.ExportedFunction("main")
+	require.NotNil(t, f)
+	res, err := f.Call(ctx)
+	require.NoError(t, err)
+	require.Equal(t, exp, res)
+
+	require.Equal(t, `
+--> .$0()
+<-- (0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60)
 `, "\n"+buf.String())
 }

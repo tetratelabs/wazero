@@ -324,10 +324,14 @@ func (i *instruction) assignUse(index int, reg regalloc.VReg) {
 		} else if index == 1 {
 			if amodeRN := i.amode.rn; amodeRN.Valid() {
 				i.amode.rn = reg
+			} else {
+				panic("BUG")
 			}
 		} else {
 			if amodeRM := i.amode.rm; amodeRM.Valid() {
 				i.amode.rm = reg
+			} else {
+				panic("BUG")
 			}
 		}
 	case useKindCond:

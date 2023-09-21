@@ -63,15 +63,15 @@ var tests = map[string]testCase{
 	"before listener stack iterator":                                   {f: testBeforeListenerStackIterator},
 	"before listener stack iterator offsets":                           {f: testListenerStackIteratorOffset, wazevoSkip: true},
 	"many params many results / doubler":                               {f: testManyParamsResultsDoubler},
-	"many params many results / doubler / listener":                    {f: testManyParamsResultsDoubler_listener},
+	"many params many results / doubler / listener":                    {f: testManyParamsResultsDoublerListener},
 	"many params many results / call_many_consts":                      {f: testManyParamsResultsCallManyConsts},
-	"many params many results / call_many_consts / listener":           {f: testManyParamsResultsCallManyConsts_listener},
+	"many params many results / call_many_consts / listener":           {f: testManyParamsResultsCallManyConstsListener},
 	"many params many results / swapper":                               {f: testManyParamsResultsSwapper},
-	"many params many results / swapper / listener":                    {f: testManyParamsResultsSwapper_listener},
+	"many params many results / swapper / listener":                    {f: testManyParamsResultsSwapperListener},
 	"many params many results / main":                                  {f: testManyParamsResultsMain},
-	"many params many results / main / listener":                       {f: testManyParamsResultsMain_listener},
+	"many params many results / main / listener":                       {f: testManyParamsResultsMainListener},
 	"many params many results / call_many_consts_and_pick_last_vector": {f: testManyParamsResultsCallManyConstsAndPickLastVector},
-	"many params many results / call_many_consts_and_pick_last_vector / listener": {f: testManyParamsResultsCallManyConstsAndPickLastVector_listener, wazevoSkip: true},
+	"many params many results / call_many_consts_and_pick_last_vector / listener": {f: testManyParamsResultsCallManyConstsAndPickLastVectorListener},
 }
 
 func TestEngineCompiler(t *testing.T) {
@@ -1811,7 +1811,7 @@ func testManyParamsResultsCallManyConsts(t *testing.T, r wazero.Runtime) {
 	require.Equal(t, exp, results)
 }
 
-func testManyParamsResultsCallManyConsts_listener(t *testing.T, r wazero.Runtime) {
+func testManyParamsResultsCallManyConstsListener(t *testing.T, r wazero.Runtime) {
 	var buf bytes.Buffer
 	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
 
@@ -1882,7 +1882,7 @@ func testManyParamsResultsDoubler(t *testing.T, r wazero.Runtime) {
 	require.Equal(t, exp, results)
 }
 
-func testManyParamsResultsDoubler_listener(t *testing.T, r wazero.Runtime) {
+func testManyParamsResultsDoublerListener(t *testing.T, r wazero.Runtime) {
 	var buf bytes.Buffer
 	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
 
@@ -1943,7 +1943,7 @@ func testManyParamsResultsSwapper(t *testing.T, r wazero.Runtime) {
 	require.Equal(t, exp, results)
 }
 
-func testManyParamsResultsSwapper_listener(t *testing.T, r wazero.Runtime) {
+func testManyParamsResultsSwapperListener(t *testing.T, r wazero.Runtime) {
 	var buf bytes.Buffer
 	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
 
@@ -1999,7 +1999,7 @@ func testManyParamsResultsMain(t *testing.T, r wazero.Runtime) {
 	require.Equal(t, exp, results)
 }
 
-func testManyParamsResultsMain_listener(t *testing.T, r wazero.Runtime) {
+func testManyParamsResultsMainListener(t *testing.T, r wazero.Runtime) {
 	var buf bytes.Buffer
 	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
 
@@ -2049,7 +2049,7 @@ func testManyParamsResultsCallManyConstsAndPickLastVector(t *testing.T, r wazero
 	require.Equal(t, exp, results)
 }
 
-func testManyParamsResultsCallManyConstsAndPickLastVector_listener(t *testing.T, r wazero.Runtime) {
+func testManyParamsResultsCallManyConstsAndPickLastVectorListener(t *testing.T, r wazero.Runtime) {
 	var buf bytes.Buffer
 	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
 
