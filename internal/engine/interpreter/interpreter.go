@@ -4096,10 +4096,10 @@ func (ce *callEngine) callNativeFuncWithListener(ctx context.Context, m *wasm.Mo
 	def, typ := f.definition(), f.funcType
 
 	ce.stackIterator.reset(ce.stack, ce.frames, f)
-	fnl.Before(ctx, m, def, ce.peekValues(len(typ.Params)), &ce.stackIterator)
+	fnl.Before(ctx, m, def, ce.peekValues(typ.ParamNumInUint64), &ce.stackIterator)
 	ce.stackIterator.clear()
 	ce.callNativeFunc(ctx, m, f)
-	fnl.After(ctx, m, def, ce.peekValues(len(typ.Results)))
+	fnl.After(ctx, m, def, ce.peekValues(typ.ResultNumInUint64))
 	return ctx
 }
 

@@ -354,8 +354,8 @@ func (m *machine) lowerCall(si *ssa.Instruction) {
 	calleeABI := m.getOrCreateABIImpl(m.compiler.ResolveSignature(sigID))
 
 	stackSlotSize := calleeABI.alignedArgResultStackSlotSize()
-	if m.maxRequiredStackSizeForCalls < stackSlotSize {
-		m.maxRequiredStackSizeForCalls = stackSlotSize
+	if m.maxRequiredStackSizeForCalls < stackSlotSize+16 {
+		m.maxRequiredStackSizeForCalls = stackSlotSize + 16 // return address frame.
 	}
 
 	for i, arg := range args {
