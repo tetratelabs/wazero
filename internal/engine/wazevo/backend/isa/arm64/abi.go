@@ -41,7 +41,7 @@ var regInfo = &regalloc.RegisterInfo{
 		v0: {}, v1: {}, v2: {}, v3: {}, v4: {}, v5: {}, v6: {}, v7: {}, v8: {}, v9: {}, v10: {}, v11: {}, v12: {}, v13: {}, v14: {}, v15: {}, v16: {}, v17: {},
 	},
 	RealRegToVReg: []regalloc.VReg{
-		x0: x0VReg, x1: x1VReg, x2: x2VReg, x3: x3VReg, x4: x4VReg, x5: x5VReg, x6: x6VReg, x7: x7VReg, x8: x8VReg, x9: x9VReg, x10: x10VReg, x11: x11VReg, x12: x12VReg, x13: x13VReg, x14: x14VReg, x15: x15VReg, x16: x16VReg, x17: x17VReg, x19: x19VReg, x20: x20VReg, x21: x21VReg, x22: x22VReg, x23: x23VReg, x24: x24VReg, x25: x25VReg, x26: x26VReg, x27: x27VReg, x28: x28VReg, x29: x29VReg, x30: x30VReg,
+		x0: x0VReg, x1: x1VReg, x2: x2VReg, x3: x3VReg, x4: x4VReg, x5: x5VReg, x6: x6VReg, x7: x7VReg, x8: x8VReg, x9: x9VReg, x10: x10VReg, x11: x11VReg, x12: x12VReg, x13: x13VReg, x14: x14VReg, x15: x15VReg, x16: x16VReg, x17: x17VReg, x18: x18VReg, x19: x19VReg, x20: x20VReg, x21: x21VReg, x22: x22VReg, x23: x23VReg, x24: x24VReg, x25: x25VReg, x26: x26VReg, x27: x27VReg, x28: x28VReg, x29: x29VReg, x30: x30VReg,
 		v0: v0VReg, v1: v1VReg, v2: v2VReg, v3: v3VReg, v4: v4VReg, v5: v5VReg, v6: v6VReg, v7: v7VReg, v8: v8VReg, v9: v9VReg, v10: v10VReg, v11: v11VReg, v12: v12VReg, v13: v13VReg, v14: v14VReg, v15: v15VReg, v16: v16VReg, v17: v17VReg, v18: v18VReg, v19: v19VReg, v20: v20VReg, v21: v21VReg, v22: v22VReg, v23: v23VReg, v24: v24VReg, v25: v25VReg, v26: v26VReg, v27: v27VReg, v28: v28VReg, v29: v29VReg, v30: v30VReg, v31: v31VReg,
 	},
 	RealRegName: func(r regalloc.RealReg) string { return regNames[r] },
