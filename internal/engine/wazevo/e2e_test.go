@@ -827,21 +827,21 @@ func TestListener_imported(t *testing.T) {
 func TestListener_long(t *testing.T) {
 	pickOneParam := binaryencoding.EncodeModule(&wasm.Module{
 		TypeSection: []wasm.FunctionType{{Results: []wasm.ValueType{i32}, Params: []wasm.ValueType{
-			i32, i32, i32, i32, i32, i32, i32, i32, i32, i32,
-			i32, i32, i32, i32, i32, i32, i32, i32, i32, i32,
-			i32, i32, i32, i32, i32, i32, i32, i32, i32, i32,
-			i32, i32, i32, i32, i32, i32, i32, i32, i32, i32,
-			i32, i32, i32, i32, i32, i32, i32, i32, i32, i32,
-			i32, i32, i32, i32, i32, i32, i32, i32, i32, i32,
-			i32, i32, i32, i32, i32, i32, i32, i32, i32, i32,
-			i32, i32, i32, i32, i32, i32, i32, i32, i32, i32,
-			i32, i32, i32, i32, i32, i32, i32, i32, i32, i32,
-			i32, i32, i32, i32, i32, i32, i32, i32, i32, i32,
+			i32, i32, f32, f64, i64, i32, i32, f32, f64, i64,
+			i32, i32, f32, f64, i64, i32, i32, f32, f64, i64,
+			i32, i32, f32, f64, i64, i32, i32, f32, f64, i64,
+			i32, i32, f32, f64, i64, i32, i32, f32, f64, i64,
+			i32, i32, f32, f64, i64, i32, i32, f32, f64, i64,
+			i32, i32, f32, f64, i64, i32, i32, f32, f64, i64,
+			i32, i32, f32, f64, i64, i32, i32, f32, f64, i64,
+			i32, i32, f32, f64, i64, i32, i32, f32, f64, i64,
+			i32, i32, f32, f64, i64, i32, i32, f32, f64, i64,
+			i32, i32, f32, f64, i64, i32, i32, f32, f64, i64,
 		}}},
 		ExportSection:   []wasm.Export{{Name: "main", Type: wasm.ExternTypeFunc, Index: 0}},
 		FunctionSection: []wasm.Index{0},
 		CodeSection: []wasm.Code{
-			{Body: []byte{wasm.OpcodeLocalGet, 98, wasm.OpcodeEnd}},
+			{Body: []byte{wasm.OpcodeLocalGet, 90, wasm.OpcodeEnd}},
 		},
 	})
 
@@ -868,10 +868,10 @@ func TestListener_long(t *testing.T) {
 	}
 	res, err := f.Call(ctx, param...)
 	require.NoError(t, err)
-	require.Equal(t, []uint64{98}, res)
+	require.Equal(t, []uint64{90}, res)
 
 	require.Equal(t, `
---> .$0(0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99)
-<-- 98
+--> .$0(0,1,3e-45,1.5e-323,4,5,6,1e-44,4e-323,9,10,11,1.7e-44,6.4e-323,14,15,16,2.4e-44,9e-323,19,20,21,3.1e-44,1.14e-322,24,25,26,3.8e-44,1.4e-322,29,30,31,4.5e-44,1.63e-322,34,35,36,5.2e-44,1.9e-322,39,40,41,5.9e-44,2.1e-322,44,45,46,6.6e-44,2.37e-322,49,50,51,7.3e-44,2.6e-322,54,55,56,8e-44,2.87e-322,59,60,61,8.7e-44,3.1e-322,64,65,66,9.4e-44,3.36e-322,69,70,71,1.01e-43,3.6e-322,74,75,76,1.08e-43,3.85e-322,79,80,81,1.15e-43,4.1e-322,84,85,86,1.22e-43,4.35e-322,89,90,91,1.29e-43,4.6e-322,94,95,96,1.36e-43,4.84e-322,99)
+<-- 90
 `, "\n"+buf.String())
 }
