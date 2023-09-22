@@ -80,7 +80,7 @@ type (
 func (c *callEngine) requiredInitialStackSize() int {
 	const initialStackSizeDefault = 512
 	stackSize := initialStackSizeDefault
-	paramResultInBytes := c.sizeOfParamResultSlice * 8 * 2 // * 8 because uint64 is 8 bytes, and *2 because we need 16 bytes for each param/result.
+	paramResultInBytes := c.sizeOfParamResultSlice * 8 * 2 // * 8 because uint64 is 8 bytes, and *2 because we need both separated param/result slots.
 	required := paramResultInBytes + 32                    // 32 is enough to accommodate the call frame info.
 	if required > stackSize {
 		stackSize = required
