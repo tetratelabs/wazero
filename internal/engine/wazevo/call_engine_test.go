@@ -54,3 +54,12 @@ func TestCallEngine_growStack(t *testing.T) {
 		require.True(t, newSP <= c.stackTop)
 	})
 }
+
+func TestCallEngine_requiredInitialStackSize(t *testing.T) {
+	c := &callEngine{}
+	require.Equal(t, 512, c.requiredInitialStackSize())
+	c.sizeOfParamResultSlice = 10
+	require.Equal(t, 512, c.requiredInitialStackSize())
+	c.sizeOfParamResultSlice = 120
+	require.Equal(t, 120*16+32, c.requiredInitialStackSize())
+}
