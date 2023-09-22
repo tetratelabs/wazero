@@ -154,6 +154,8 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		m.lowerCall(instr)
 	case ssa.OpcodeIcmp:
 		m.lowerIcmp(instr)
+	case ssa.OpcodeVIcmp:
+		m.lowerVIcmp(instr)
 	case ssa.OpcodeBand:
 		m.lowerBitwiseAluOp(instr, aluOpAnd)
 	case ssa.OpcodeBor:
@@ -1009,6 +1011,73 @@ func (m *machine) lowerIcmp(si *ssa.Instruction) {
 
 	cset := m.allocateInstr()
 	cset.asCSet(m.compiler.VRegOf(si.Return()), flag)
+	m.insert(cset)
+}
+
+func (m *machine) lowerVIcmp(si *ssa.Instruction) {
+	x, y, c, lane := si.VIcmpData()
+	flag := condFlagFromSSAIntegerCmpCond(c)
+	arr := ssaLaneToArrangement(lane)
+
+	var ext extMode
+	if c.Signed() {
+		ext = extModeSignExtend64
+	} else {
+		ext = extModeZeroExtend64
+	}
+
+	rn := m.getOperand_NR(m.compiler.ValueDefinition(x), ext)
+	rm := m.getOperand_NR(m.compiler.ValueDefinition(y), ext)
+	rd := operandNR(m.compiler.VRegOf(si.Return()))
+
+	switch flag {
+	case eq:
+		cmp := m.allocateInstr()
+		cmp.asVecRRR(vecOpCmeq, rd, rn, rm, arr)
+		m.insert(cmp)
+	case ne:
+		cmp := m.allocateInstr()
+		cmp.asVecRRR(vecOpCmeq, rd, rn, rm, arr)
+		m.insert(cmp)
+		not := m.allocateInstr()
+		not.asVecMisc(vecOpNot, rd, rn, vecArrangement16B)
+		m.insert(not)
+	case ge:
+		cmp := m.allocateInstr()
+		cmp.asVecRRR(vecOpCmge, rd, rn, rm, arr)
+		m.insert(cmp)
+	case gt:
+		cmp := m.allocateInstr()
+		cmp.asVecRRR(vecOpCmgt, rd, rn, rm, arr)
+		m.insert(cmp)
+	case le:
+		cmp := m.allocateInstr()
+		cmp.asVecRRR(vecOpCmge, rd, rm, rn, arr) // rm, rn are swapped
+		m.insert(cmp)
+	case lt:
+		cmp := m.allocateInstr()
+		cmp.asVecRRR(vecOpCmgt, rd, rm, rn, arr) // rm, rn are swapped
+		m.insert(cmp)
+	case hs:
+		cmp := m.allocateInstr()
+		cmp.asVecRRR(vecOpCmhs, rd, rn, rm, arr)
+		m.insert(cmp)
+	case hi:
+		cmp := m.allocateInstr()
+		cmp.asVecRRR(vecOpCmhi, rd, rn, rm, arr)
+		m.insert(cmp)
+	case ls:
+		cmp := m.allocateInstr()
+		cmp.asVecRRR(vecOpCmhs, rd, rm, rn, arr) // rm, rn are swapped
+		m.insert(cmp)
+	case lo:
+		cmp := m.allocateInstr()
+		cmp.asVecRRR(vecOpCmhi, rd, rm, rn, arr) // rm, rn are swapped
+		m.insert(cmp)
+	}
+
+	cset := m.allocateInstr()
+	cset.asCSet(rd.reg(), flag)
 	m.insert(cset)
 }
 
