@@ -18,16 +18,18 @@ import (
 	"github.com/tetratelabs/wazero/internal/integration_test/spectest"
 	v1 "github.com/tetratelabs/wazero/internal/integration_test/spectest/v1"
 	v2 "github.com/tetratelabs/wazero/internal/integration_test/spectest/v2"
+	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 const (
-	i32 = wasm.ValueTypeI32
-	i64 = wasm.ValueTypeI64
-	f32 = wasm.ValueTypeF32
-	f64 = wasm.ValueTypeF64
+	i32  = wasm.ValueTypeI32
+	i64  = wasm.ValueTypeI64
+	f32  = wasm.ValueTypeF32
+	f64  = wasm.ValueTypeF64
+	v128 = wasm.ValueTypeV128
 )
 
 // TODO: migrate to integration_test/spectest/v1/spec_test.go by the time when closing https://github.com/tetratelabs/wazero/issues/1496
@@ -825,24 +827,23 @@ func TestListener_imported(t *testing.T) {
 }
 
 func TestListener_long(t *testing.T) {
-	t.Skip("TODO")
 	pickOneParam := binaryencoding.EncodeModule(&wasm.Module{
 		TypeSection: []wasm.FunctionType{{Results: []wasm.ValueType{i32}, Params: []wasm.ValueType{
-			i32, i32, i32, i32, i32, i32, i32, i32, i32, i32,
-			i32, i32, i32, i32, i32, i32, i32, i32, i32, i32,
-			i32, i32, i32, i32, i32, i32, i32, i32, i32, i32,
-			i32, i32, i32, i32, i32, i32, i32, i32, i32, i32,
-			i32, i32, i32, i32, i32, i32, i32, i32, i32, i32,
-			i32, i32, i32, i32, i32, i32, i32, i32, i32, i32,
-			i32, i32, i32, i32, i32, i32, i32, i32, i32, i32,
-			i32, i32, i32, i32, i32, i32, i32, i32, i32, i32,
-			i32, i32, i32, i32, i32, i32, i32, i32, i32, i32,
-			i32, i32, i32, i32, i32, i32, i32, i32, i32, i32,
+			i32, i32, f32, f64, i64, i32, i32, v128, f32,
+			i32, i32, f32, f64, i64, i32, i32, v128, f32,
+			i32, i32, f32, f64, i64, i32, i32, v128, f32,
+			i32, i32, f32, f64, i64, i32, i32, v128, f32,
+			i32, i32, f32, f64, i64, i32, i32, v128, f32,
+			i32, i32, f32, f64, i64, i32, i32, v128, f32,
+			i32, i32, f32, f64, i64, i32, i32, v128, f32,
+			i32, i32, f32, f64, i64, i32, i32, v128, f32,
+			i32, i32, f32, f64, i64, i32, i32, v128, f32,
+			i32, i32, f32, f64, i64, i32, i32, v128, f32,
 		}}},
 		ExportSection:   []wasm.Export{{Name: "main", Type: wasm.ExternTypeFunc, Index: 0}},
 		FunctionSection: []wasm.Index{0},
 		CodeSection: []wasm.Code{
-			{Body: []byte{wasm.OpcodeLocalGet, 98, wasm.OpcodeEnd}},
+			{Body: []byte{wasm.OpcodeLocalGet, 10, wasm.OpcodeEnd}},
 		},
 	})
 
@@ -864,8 +865,116 @@ func TestListener_long(t *testing.T) {
 	f := inst.ExportedFunction("main")
 	require.NotNil(t, f)
 	param := make([]uint64, 100)
-	param[98] = 100
+	for i := range param {
+		param[i] = uint64(i)
+	}
 	res, err := f.Call(ctx, param...)
 	require.NoError(t, err)
-	require.Equal(t, []uint64{100}, res)
+	require.Equal(t, []uint64{0xb}, res)
+
+	require.Equal(t, `
+--> .$0(0,1,3e-45,1.5e-323,4,5,6,00000000000000070000000000000008,1.1e-44,9,10,1.5e-44,6e-323,13,14,15,00000000000000100000000000000011,2.4e-44,18,19,2.8e-44,1.04e-322,22,23,24,0000000000000019000000000000001a,3.6e-44,27,28,4e-44,1.5e-322,31,32,33,00000000000000220000000000000023,4.9e-44,36,37,5.3e-44,1.93e-322,40,41,42,000000000000002b000000000000002c,6.2e-44,45,46,6.6e-44,2.37e-322,49,50,51,00000000000000340000000000000035,7.4e-44,54,55,7.8e-44,2.8e-322,58,59,60,000000000000003d000000000000003e,8.7e-44,63,64,9.1e-44,3.26e-322,67,68,69,00000000000000460000000000000047,1e-43,72,73,1.04e-43,3.7e-322,76,77,78,000000000000004f0000000000000050,1.12e-43,81,82,1.16e-43,4.15e-322,85,86,87,00000000000000580000000000000059,1.25e-43)
+<-- 11
+`, "\n"+buf.String())
+}
+
+func TestListener_long_as_is(t *testing.T) {
+	params := []wasm.ValueType{
+		i32, i64, i32, i64, i32, i64, i32, i64, i32, i64,
+		i32, i64, i32, i64, i32, i64, i32, i64, i32, i64,
+	}
+
+	const paramNum = 20
+
+	var body []byte
+	for i := 0; i < paramNum; i++ {
+		body = append(body, wasm.OpcodeLocalGet)
+		body = append(body, leb128.EncodeUint32(uint32(i))...)
+	}
+	body = append(body, wasm.OpcodeEnd)
+
+	bin := binaryencoding.EncodeModule(&wasm.Module{
+		TypeSection:     []wasm.FunctionType{{Results: params, Params: params}},
+		ExportSection:   []wasm.Export{{Name: "main", Type: wasm.ExternTypeFunc, Index: 0}},
+		FunctionSection: []wasm.Index{0},
+		CodeSection:     []wasm.Code{{Body: body}},
+	})
+
+	var buf bytes.Buffer
+	config := wazero.NewRuntimeConfigCompiler()
+	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
+
+	// Configure the new optimizing backend!
+	wazevo.ConfigureWazevo(config)
+
+	r := wazero.NewRuntimeWithConfig(ctx, config)
+	defer func() {
+		require.NoError(t, r.Close(ctx))
+	}()
+
+	inst, err := r.Instantiate(ctx, bin)
+	require.NoError(t, err)
+
+	f := inst.ExportedFunction("main")
+	require.NotNil(t, f)
+	param := make([]uint64, paramNum)
+	for i := range param {
+		param[i] = uint64(i)
+	}
+	res, err := f.Call(ctx, param...)
+	require.NoError(t, err)
+	require.Equal(t, param, res)
+
+	require.Equal(t, `
+--> .$0(0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19)
+<-- (0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19)
+`, "\n"+buf.String())
+}
+
+func TestListener_long_many_consts(t *testing.T) {
+	const paramNum = 61
+
+	var exp []uint64
+	var body []byte
+	var resultTypes []wasm.ValueType
+	for i := 0; i < paramNum; i++ {
+		exp = append(exp, uint64(i))
+		resultTypes = append(resultTypes, i32)
+		body = append(body, wasm.OpcodeI32Const)
+		body = append(body, leb128.EncodeInt32(int32(i))...)
+	}
+	body = append(body, wasm.OpcodeEnd)
+
+	bin := binaryencoding.EncodeModule(&wasm.Module{
+		TypeSection:     []wasm.FunctionType{{Results: resultTypes}},
+		ExportSection:   []wasm.Export{{Name: "main", Type: wasm.ExternTypeFunc, Index: 0}},
+		FunctionSection: []wasm.Index{0},
+		CodeSection:     []wasm.Code{{Body: body}},
+	})
+
+	var buf bytes.Buffer
+	config := wazero.NewRuntimeConfigCompiler()
+	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
+
+	// Configure the new optimizing backend!
+	wazevo.ConfigureWazevo(config)
+
+	r := wazero.NewRuntimeWithConfig(ctx, config)
+	defer func() {
+		require.NoError(t, r.Close(ctx))
+	}()
+
+	inst, err := r.Instantiate(ctx, bin)
+	require.NoError(t, err)
+
+	f := inst.ExportedFunction("main")
+	require.NotNil(t, f)
+	res, err := f.Call(ctx)
+	require.NoError(t, err)
+	require.Equal(t, exp, res)
+
+	require.Equal(t, `
+--> .$0()
+<-- (0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60)
+`, "\n"+buf.String())
 }

@@ -215,9 +215,9 @@ func TestAbiImpl_constructEntryPreamble(t *testing.T) {
 	str s15, [x19], #0x8
 	ldr d15, [sp, #-0x30]
 	str d15, [x19], #0x8
-	ldr q15, [sp, #-0x20]
+	ldr q15, [sp, #-0x28]
 	str q15, [x19], #0x10
-	ldr q15, [sp, #-0x10]
+	ldr q15, [sp, #-0x18]
 	str q15, [x19], #0x10
 	ldr x29, [x20, #0x10]
 	ldr x27, [x20, #0x18]

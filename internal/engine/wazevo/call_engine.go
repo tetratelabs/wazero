@@ -77,17 +77,29 @@ type (
 	}
 )
 
-var initialStackSize uint64 = 512
+func (c *callEngine) requiredInitialStackSize() int {
+	const initialStackSizeDefault = 512
+	stackSize := initialStackSizeDefault
+	paramResultInBytes := c.sizeOfParamResultSlice * 8 * 2 // * 8 because uint64 is 8 bytes, and *2 because we need both separated param/result slots.
+	required := paramResultInBytes + 32                    // 32 is enough to accommodate the call frame info.
+	if required > stackSize {
+		stackSize = required
+	}
+	return stackSize
+}
 
 func (c *callEngine) init() {
-	stackSize := initialStackSize
-	if c.sizeOfParamResultSlice > int(stackSize) {
-		stackSize = uint64(c.sizeOfParamResultSlice)
+	stackSize := c.requiredInitialStackSize()
+	if wazevoapi.StackGuardCheckEnabled {
+		stackSize += wazevoapi.StackGuardCheckGuardPageSize
 	}
-
 	c.stack = make([]byte, stackSize)
 	c.stackTop = alignedStackTop(c.stack)
-	c.execCtx.stackBottomPtr = &c.stack[0]
+	if wazevoapi.StackGuardCheckEnabled {
+		c.execCtx.stackBottomPtr = &c.stack[wazevoapi.StackGuardCheckGuardPageSize]
+	} else {
+		c.execCtx.stackBottomPtr = &c.stack[0]
+	}
 	c.execCtxPtr = uintptr(unsafe.Pointer(&c.execCtx))
 }
 
@@ -141,6 +153,12 @@ func (c *callEngine) CallWithStack(ctx context.Context, paramResultStack []uint6
 
 // CallWithStack implements api.Function.
 func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint64) (err error) {
+	if wazevoapi.StackGuardCheckEnabled {
+		defer func() {
+			wazevoapi.CheckStackGuardPage(c.stack)
+		}()
+	}
+
 	p := c.parent
 	ensureTermination := p.parent.ensureTermination
 	m := p.module
@@ -206,7 +224,12 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 		case wazevoapi.ExitCodeOK:
 			return nil
 		case wazevoapi.ExitCodeGrowStack:
-			newsp, err := c.growStack()
+			var newsp uintptr
+			if wazevoapi.StackGuardCheckEnabled {
+				newsp, err = c.growStackWithGuarded()
+			} else {
+				newsp, err = c.growStack()
+			}
 			if err != nil {
 				return err
 			}
@@ -347,6 +370,21 @@ func opaqueViewFromPtr(ptr uintptr) []byte {
 }
 
 const callStackCeiling = uintptr(5000000) // in uint64 (8 bytes) == 40000000 bytes in total == 40mb.
+
+func (c *callEngine) growStackWithGuarded() (newSP uintptr, err error) {
+	if wazevoapi.StackGuardCheckEnabled {
+		wazevoapi.CheckStackGuardPage(c.stack)
+		c.execCtx.stackGrowRequiredSize += wazevoapi.StackGuardCheckGuardPageSize
+	}
+	newSP, err = c.growStack()
+	if err != nil {
+		return
+	}
+	if wazevoapi.StackGuardCheckEnabled {
+		c.execCtx.stackBottomPtr = &c.stack[wazevoapi.StackGuardCheckGuardPageSize]
+	}
+	return
+}
 
 // growStack grows the stack, and returns the new stack pointer.
 func (c *callEngine) growStack() (newSP uintptr, err error) {

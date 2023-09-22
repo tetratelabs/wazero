@@ -13,17 +13,16 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
-func Test_calleeSavedRegistersPlusLinkRegSorted(t *testing.T) {
+func Test_calleeSavedRegistersSorted(t *testing.T) {
 	var exp []regalloc.VReg
 	for r := range regInfo.CalleeSavedRegisters {
 		exp = append(exp, regInfo.RealRegToVReg[r])
 	}
-	exp = append(exp, regInfo.RealRegToVReg[lr])
 	sort.Slice(exp, func(i, j int) bool {
 		return exp[i].RealReg() < exp[j].RealReg()
 	})
 
-	require.Equal(t, exp, calleeSavedRegistersPlusLinkRegSorted)
+	require.Equal(t, exp, calleeSavedRegistersSorted)
 }
 
 func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
@@ -54,18 +53,18 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 				},
 			},
 			exp: `
-	orr x27, xzr, #0xc0
+	movz x27, #0xa0, lsl 0
 	sub sp, sp, x27
 	stp x30, x27, [sp, #-0x10]!
-	sub x27, sp, #0x140
+	sub x27, sp, #0x130
 	ldr x11, [x0, #0x28]
 	subs xzr, x27, x11
 	b.ge #0x14
-	movz x27, #0x140, lsl 0
+	movz x27, #0x130, lsl 0
 	str x27, [x0, #0x40]
 	ldr x27, [x0, #0x50]
 	bl x27
-	mov x17, sp
+	add x17, sp, #0x10
 	str x19, [x0, #0x60]
 	str x20, [x0, #0x70]
 	str x21, [x0, #0x80]
@@ -75,21 +74,20 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 	str x25, [x0, #0xc0]
 	str x26, [x0, #0xd0]
 	str x28, [x0, #0xe0]
-	str x30, [x0, #0xf0]
-	str q18, [x0, #0x100]
-	str q19, [x0, #0x110]
-	str q20, [x0, #0x120]
-	str q21, [x0, #0x130]
-	str q22, [x0, #0x140]
-	str q23, [x0, #0x150]
-	str q24, [x0, #0x160]
-	str q25, [x0, #0x170]
-	str q26, [x0, #0x180]
-	str q27, [x0, #0x190]
-	str q28, [x0, #0x1a0]
-	str q29, [x0, #0x1b0]
-	str q30, [x0, #0x1c0]
-	str q31, [x0, #0x1d0]
+	str q18, [x0, #0xf0]
+	str q19, [x0, #0x100]
+	str q20, [x0, #0x110]
+	str q21, [x0, #0x120]
+	str q22, [x0, #0x130]
+	str q23, [x0, #0x140]
+	str q24, [x0, #0x150]
+	str q25, [x0, #0x160]
+	str q26, [x0, #0x170]
+	str q27, [x0, #0x180]
+	str q28, [x0, #0x190]
+	str q29, [x0, #0x1a0]
+	str q30, [x0, #0x1b0]
+	str q31, [x0, #0x1c0]
 	str x1, [x0, #0x460]
 	sub sp, sp, #0x120
 	mov x15, sp
@@ -105,19 +103,15 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 	str x5, [x15], #0x8
 	str q6, [x15], #0x10
 	str d7, [x15], #0x8
-	add x11, x17, #0x0
-	ldr q11, [x11, #0x10]
+	ldr q11, [x17], #0x10
 	str q11, [x15], #0x10
 	str x6, [x15], #0x8
 	str x7, [x15], #0x8
-	add x11, x17, #0x10
-	ldr q11, [x11, #0x10]
+	ldr q11, [x17], #0x10
 	str q11, [x15], #0x10
-	add x11, x17, #0x20
-	ldr s11, [x11, #0x8]
+	ldr s11, [x17], #0x8
 	str d11, [x15], #0x8
-	add x11, x17, #0x30
-	ldr q11, [x11, #0x10]
+	ldr q11, [x17], #0x10
 	str q11, [x15], #0x10
 	movz x27, #0x120, lsl 0
 	movz x16, #0x23, lsl 0
@@ -138,23 +132,25 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 	ldr x25, [x0, #0xc0]
 	ldr x26, [x0, #0xd0]
 	ldr x28, [x0, #0xe0]
-	ldr x30, [x0, #0xf0]
-	ldr q18, [x0, #0x100]
-	ldr q19, [x0, #0x110]
-	ldr q20, [x0, #0x120]
-	ldr q21, [x0, #0x130]
-	ldr q22, [x0, #0x140]
-	ldr q23, [x0, #0x150]
-	ldr q24, [x0, #0x160]
-	ldr q25, [x0, #0x170]
-	ldr q26, [x0, #0x180]
-	ldr q27, [x0, #0x190]
-	ldr q28, [x0, #0x1a0]
-	ldr q29, [x0, #0x1b0]
-	ldr q30, [x0, #0x1c0]
-	ldr q31, [x0, #0x1d0]
+	ldr q18, [x0, #0xf0]
+	ldr q19, [x0, #0x100]
+	ldr q20, [x0, #0x110]
+	ldr q21, [x0, #0x120]
+	ldr q22, [x0, #0x130]
+	ldr q23, [x0, #0x140]
+	ldr q24, [x0, #0x150]
+	ldr q25, [x0, #0x160]
+	ldr q26, [x0, #0x170]
+	ldr q27, [x0, #0x180]
+	ldr q28, [x0, #0x190]
+	ldr q29, [x0, #0x1a0]
+	ldr q30, [x0, #0x1b0]
+	ldr q31, [x0, #0x1c0]
 	add x15, sp, #0x10
-	add sp, sp, #0x200
+	add sp, sp, #0x130
+	ldr x30, [sp], #0x10
+	add x17, sp, #0x38
+	add sp, sp, #0xa0
 	ldr q0, [x15], #0x10
 	ldr w0, [x15], #0x8
 	ldr x1, [x15], #0x8
@@ -170,34 +166,25 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 	ldr x5, [x15], #0x8
 	ldr q7, [x15], #0x10
 	ldr s11, [x15], #0x8
-	add x27, sp, #0x40
-	str s11, [x27]
+	str s11, [x17], #0x8
 	ldr q11, [x15], #0x10
-	add x27, sp, #0x50
-	str q11, [x27]
+	str q11, [x17], #0x10
 	ldr w6, [x15], #0x8
 	ldr x7, [x15], #0x8
 	ldr q11, [x15], #0x10
-	add x27, sp, #0x60
-	str q11, [x27]
+	str q11, [x17], #0x10
 	ldr s11, [x15], #0x8
-	add x27, sp, #0x70
-	str s11, [x27]
+	str s11, [x17], #0x8
 	ldr q11, [x15], #0x10
-	add x27, sp, #0x80
-	str q11, [x27]
+	str q11, [x17], #0x10
 	ldr w11, [x15], #0x8
-	add x27, sp, #0x90
-	str w11, [x27]
+	str w11, [x17], #0x8
 	ldr x11, [x15], #0x8
-	add x27, sp, #0x98
-	str x11, [x27]
+	str x11, [x17], #0x8
 	ldr q11, [x15], #0x10
-	add x27, sp, #0xa0
-	str q11, [x27]
+	str q11, [x17], #0x10
 	ldr s11, [x15], #0x8
-	add x27, sp, #0xb0
-	str s11, [x27]
+	str s11, [x17], #0x8
 	ret
 `,
 		},
@@ -211,11 +198,11 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 			needModuleContextPtr: true,
 			exp: `
 	stp x30, xzr, [sp, #-0x10]!
-	sub x27, sp, #0x40
+	sub x27, sp, #0x30
 	ldr x11, [x0, #0x28]
 	subs xzr, x27, x11
 	b.ge #0x14
-	orr x27, xzr, #0x40
+	orr x27, xzr, #0x30
 	str x27, [x0, #0x40]
 	ldr x27, [x0, #0x50]
 	bl x27
@@ -228,21 +215,20 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 	str x25, [x0, #0xc0]
 	str x26, [x0, #0xd0]
 	str x28, [x0, #0xe0]
-	str x30, [x0, #0xf0]
-	str q18, [x0, #0x100]
-	str q19, [x0, #0x110]
-	str q20, [x0, #0x120]
-	str q21, [x0, #0x130]
-	str q22, [x0, #0x140]
-	str q23, [x0, #0x150]
-	str q24, [x0, #0x160]
-	str q25, [x0, #0x170]
-	str q26, [x0, #0x180]
-	str q27, [x0, #0x190]
-	str q28, [x0, #0x1a0]
-	str q29, [x0, #0x1b0]
-	str q30, [x0, #0x1c0]
-	str q31, [x0, #0x1d0]
+	str q18, [x0, #0xf0]
+	str q19, [x0, #0x100]
+	str q20, [x0, #0x110]
+	str q21, [x0, #0x120]
+	str q22, [x0, #0x130]
+	str q23, [x0, #0x140]
+	str q24, [x0, #0x150]
+	str q25, [x0, #0x160]
+	str q26, [x0, #0x170]
+	str q27, [x0, #0x180]
+	str q28, [x0, #0x190]
+	str q29, [x0, #0x1a0]
+	str q30, [x0, #0x1b0]
+	str q31, [x0, #0x1c0]
 	str x1, [x0, #0x460]
 	sub sp, sp, #0x20
 	mov x15, sp
@@ -266,23 +252,23 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 	ldr x25, [x0, #0xc0]
 	ldr x26, [x0, #0xd0]
 	ldr x28, [x0, #0xe0]
-	ldr x30, [x0, #0xf0]
-	ldr q18, [x0, #0x100]
-	ldr q19, [x0, #0x110]
-	ldr q20, [x0, #0x120]
-	ldr q21, [x0, #0x130]
-	ldr q22, [x0, #0x140]
-	ldr q23, [x0, #0x150]
-	ldr q24, [x0, #0x160]
-	ldr q25, [x0, #0x170]
-	ldr q26, [x0, #0x180]
-	ldr q27, [x0, #0x190]
-	ldr q28, [x0, #0x1a0]
-	ldr q29, [x0, #0x1b0]
-	ldr q30, [x0, #0x1c0]
-	ldr q31, [x0, #0x1d0]
+	ldr q18, [x0, #0xf0]
+	ldr q19, [x0, #0x100]
+	ldr q20, [x0, #0x110]
+	ldr q21, [x0, #0x120]
+	ldr q22, [x0, #0x130]
+	ldr q23, [x0, #0x140]
+	ldr q24, [x0, #0x150]
+	ldr q25, [x0, #0x160]
+	ldr q26, [x0, #0x170]
+	ldr q27, [x0, #0x180]
+	ldr q28, [x0, #0x190]
+	ldr q29, [x0, #0x1a0]
+	ldr q30, [x0, #0x1b0]
+	ldr q31, [x0, #0x1c0]
 	add x15, sp, #0x10
-	add sp, sp, #0x40
+	add sp, sp, #0x30
+	ldr x30, [sp], #0x10
 	ldr w0, [x15], #0x8
 	ldr x1, [x15], #0x8
 	ldr s0, [x15], #0x8
@@ -300,11 +286,11 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 			needModuleContextPtr: true,
 			exp: `
 	stp x30, xzr, [sp, #-0x10]!
-	sub x27, sp, #0x40
+	sub x27, sp, #0x30
 	ldr x11, [x0, #0x28]
 	subs xzr, x27, x11
 	b.ge #0x14
-	orr x27, xzr, #0x40
+	orr x27, xzr, #0x30
 	str x27, [x0, #0x40]
 	ldr x27, [x0, #0x50]
 	bl x27
@@ -317,21 +303,20 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 	str x25, [x0, #0xc0]
 	str x26, [x0, #0xd0]
 	str x28, [x0, #0xe0]
-	str x30, [x0, #0xf0]
-	str q18, [x0, #0x100]
-	str q19, [x0, #0x110]
-	str q20, [x0, #0x120]
-	str q21, [x0, #0x130]
-	str q22, [x0, #0x140]
-	str q23, [x0, #0x150]
-	str q24, [x0, #0x160]
-	str q25, [x0, #0x170]
-	str q26, [x0, #0x180]
-	str q27, [x0, #0x190]
-	str q28, [x0, #0x1a0]
-	str q29, [x0, #0x1b0]
-	str q30, [x0, #0x1c0]
-	str q31, [x0, #0x1d0]
+	str q18, [x0, #0xf0]
+	str q19, [x0, #0x100]
+	str q20, [x0, #0x110]
+	str q21, [x0, #0x120]
+	str q22, [x0, #0x130]
+	str q23, [x0, #0x140]
+	str q24, [x0, #0x150]
+	str q25, [x0, #0x160]
+	str q26, [x0, #0x170]
+	str q27, [x0, #0x180]
+	str q28, [x0, #0x190]
+	str q29, [x0, #0x1a0]
+	str q30, [x0, #0x1b0]
+	str q31, [x0, #0x1c0]
 	str x1, [x0, #0x460]
 	sub sp, sp, #0x20
 	mov x15, sp
@@ -358,22 +343,22 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 	ldr x25, [x0, #0xc0]
 	ldr x26, [x0, #0xd0]
 	ldr x28, [x0, #0xe0]
-	ldr x30, [x0, #0xf0]
-	ldr q18, [x0, #0x100]
-	ldr q19, [x0, #0x110]
-	ldr q20, [x0, #0x120]
-	ldr q21, [x0, #0x130]
-	ldr q22, [x0, #0x140]
-	ldr q23, [x0, #0x150]
-	ldr q24, [x0, #0x160]
-	ldr q25, [x0, #0x170]
-	ldr q26, [x0, #0x180]
-	ldr q27, [x0, #0x190]
-	ldr q28, [x0, #0x1a0]
-	ldr q29, [x0, #0x1b0]
-	ldr q30, [x0, #0x1c0]
-	ldr q31, [x0, #0x1d0]
-	add sp, sp, #0x40
+	ldr q18, [x0, #0xf0]
+	ldr q19, [x0, #0x100]
+	ldr q20, [x0, #0x110]
+	ldr q21, [x0, #0x120]
+	ldr q22, [x0, #0x130]
+	ldr q23, [x0, #0x140]
+	ldr q24, [x0, #0x150]
+	ldr q25, [x0, #0x160]
+	ldr q26, [x0, #0x170]
+	ldr q27, [x0, #0x180]
+	ldr q28, [x0, #0x190]
+	ldr q29, [x0, #0x1a0]
+	ldr q30, [x0, #0x1b0]
+	ldr q31, [x0, #0x1c0]
+	add sp, sp, #0x30
+	ldr x30, [sp], #0x10
 	ret
 `,
 		},
@@ -386,11 +371,11 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 			},
 			exp: `
 	stp x30, xzr, [sp, #-0x10]!
-	sub x27, sp, #0x30
+	sub x27, sp, #0x20
 	ldr x11, [x0, #0x28]
 	subs xzr, x27, x11
 	b.ge #0x14
-	orr x27, xzr, #0x30
+	orr x27, xzr, #0x20
 	str x27, [x0, #0x40]
 	ldr x27, [x0, #0x50]
 	bl x27
@@ -403,21 +388,20 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 	str x25, [x0, #0xc0]
 	str x26, [x0, #0xd0]
 	str x28, [x0, #0xe0]
-	str x30, [x0, #0xf0]
-	str q18, [x0, #0x100]
-	str q19, [x0, #0x110]
-	str q20, [x0, #0x120]
-	str q21, [x0, #0x130]
-	str q22, [x0, #0x140]
-	str q23, [x0, #0x150]
-	str q24, [x0, #0x160]
-	str q25, [x0, #0x170]
-	str q26, [x0, #0x180]
-	str q27, [x0, #0x190]
-	str q28, [x0, #0x1a0]
-	str q29, [x0, #0x1b0]
-	str q30, [x0, #0x1c0]
-	str q31, [x0, #0x1d0]
+	str q18, [x0, #0xf0]
+	str q19, [x0, #0x100]
+	str q20, [x0, #0x110]
+	str q21, [x0, #0x120]
+	str q22, [x0, #0x130]
+	str q23, [x0, #0x140]
+	str q24, [x0, #0x150]
+	str q25, [x0, #0x160]
+	str q26, [x0, #0x170]
+	str q27, [x0, #0x180]
+	str q28, [x0, #0x190]
+	str q29, [x0, #0x1a0]
+	str q30, [x0, #0x1b0]
+	str q31, [x0, #0x1c0]
 	sub sp, sp, #0x10
 	mov x15, sp
 	str x1, [x15], #0x8
@@ -440,23 +424,23 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 	ldr x25, [x0, #0xc0]
 	ldr x26, [x0, #0xd0]
 	ldr x28, [x0, #0xe0]
-	ldr x30, [x0, #0xf0]
-	ldr q18, [x0, #0x100]
-	ldr q19, [x0, #0x110]
-	ldr q20, [x0, #0x120]
-	ldr q21, [x0, #0x130]
-	ldr q22, [x0, #0x140]
-	ldr q23, [x0, #0x150]
-	ldr q24, [x0, #0x160]
-	ldr q25, [x0, #0x170]
-	ldr q26, [x0, #0x180]
-	ldr q27, [x0, #0x190]
-	ldr q28, [x0, #0x1a0]
-	ldr q29, [x0, #0x1b0]
-	ldr q30, [x0, #0x1c0]
-	ldr q31, [x0, #0x1d0]
+	ldr q18, [x0, #0xf0]
+	ldr q19, [x0, #0x100]
+	ldr q20, [x0, #0x110]
+	ldr q21, [x0, #0x120]
+	ldr q22, [x0, #0x130]
+	ldr q23, [x0, #0x140]
+	ldr q24, [x0, #0x150]
+	ldr q25, [x0, #0x160]
+	ldr q26, [x0, #0x170]
+	ldr q27, [x0, #0x180]
+	ldr q28, [x0, #0x190]
+	ldr q29, [x0, #0x1a0]
+	ldr q30, [x0, #0x1b0]
+	ldr q31, [x0, #0x1c0]
 	add x15, sp, #0x10
-	add sp, sp, #0x30
+	add sp, sp, #0x20
+	ldr x30, [sp], #0x10
 	ldr w0, [x15], #0x8
 	ret
 `,
@@ -533,98 +517,43 @@ func Test_goFunctionCallLoadStackArg(t *testing.T) {
 		exp          string
 	}{
 		{
-			name:         "i32 / small offset",
-			arg:          &backend.ABIArg{Offset: 16 * 3, Type: ssa.TypeI32},
+			name:         "i32",
+			arg:          &backend.ABIArg{Type: ssa.TypeI32},
 			expResultReg: x11VReg,
 			exp: `
-	add x11, x17, #0x30
-	ldr w11, [x11, #0x8]
+	ldr w11, [x17], #0x8
 `,
 		},
 		{
-			name:         "i64 / small offset",
-			arg:          &backend.ABIArg{Offset: 16 * 3, Type: ssa.TypeI64},
+			name:         "i64",
+			arg:          &backend.ABIArg{Type: ssa.TypeI64},
 			expResultReg: x11VReg,
 			exp: `
-	add x11, x17, #0x30
-	ldr x11, [x11, #0x8]
+	ldr x11, [x17], #0x8
 `,
 		},
 		{
-			name:         "i32 / large offset",
-			arg:          &backend.ABIArg{Offset: 16 * 300, Type: ssa.TypeI32},
-			expResultReg: x11VReg,
-			exp: `
-	movz x27, #0x12c0, lsl 0
-	add x11, x17, x27
-	ldr w11, [x11, #0x8]
-`,
-		},
-		{
-			name:         "i64 / large offset",
-			arg:          &backend.ABIArg{Offset: 16 * 300, Type: ssa.TypeI64},
-			expResultReg: x11VReg,
-			exp: `
-	movz x27, #0x12c0, lsl 0
-	add x11, x17, x27
-	ldr x11, [x11, #0x8]
-`,
-		},
-		{
-			name:         "f32 / small offset",
-			arg:          &backend.ABIArg{Offset: 16 * 3, Type: ssa.TypeF32},
+			name:         "f32",
+			arg:          &backend.ABIArg{Type: ssa.TypeF32},
 			expResultReg: v11VReg,
 			exp: `
-	add x11, x17, #0x30
-	ldr s11, [x11, #0x8]
+	ldr s11, [x17], #0x8
 `,
 		},
 		{
-			name:         "f64 / small offset",
-			arg:          &backend.ABIArg{Offset: 16 * 3, Type: ssa.TypeF64},
+			name:         "f64",
+			arg:          &backend.ABIArg{Type: ssa.TypeF64},
 			expResultReg: v11VReg,
 			exp: `
-	add x11, x17, #0x30
-	ldr d11, [x11, #0x8]
+	ldr d11, [x17], #0x8
 `,
 		},
 		{
-			name:         "f32 / large offset",
-			arg:          &backend.ABIArg{Offset: 16 * 300, Type: ssa.TypeF32},
+			name:         "v128",
+			arg:          &backend.ABIArg{Type: ssa.TypeV128},
 			expResultReg: v11VReg,
 			exp: `
-	movz x27, #0x12c0, lsl 0
-	add x11, x17, x27
-	ldr s11, [x11, #0x8]
-`,
-		},
-		{
-			name:         "f64 / large offset",
-			arg:          &backend.ABIArg{Offset: 16 * 300, Type: ssa.TypeF64},
-			expResultReg: v11VReg,
-			exp: `
-	movz x27, #0x12c0, lsl 0
-	add x11, x17, x27
-	ldr d11, [x11, #0x8]
-`,
-		},
-		{
-			name:         "v128 / small offset",
-			arg:          &backend.ABIArg{Offset: 16 * 3, Type: ssa.TypeV128},
-			expResultReg: v11VReg,
-			exp: `
-	add x11, x17, #0x30
-	ldr q11, [x11, #0x10]
-`,
-		},
-		{
-			name:         "v128 / large offset",
-			arg:          &backend.ABIArg{Offset: 16 * 300, Type: ssa.TypeV128},
-			expResultReg: v11VReg,
-			exp: `
-	movz x27, #0x12c0, lsl 0
-	add x11, x17, x27
-	ldr q11, [x11, #0x10]
+	ldr q11, [x17], #0x10
 `,
 		},
 	} {
@@ -661,18 +590,7 @@ func Test_goFunctionCallStoreStackResult(t *testing.T) {
 			result:    &backend.ABIArg{Offset: 16 * 3, Type: ssa.TypeI32},
 			resultReg: x11VReg,
 			exp: `
-	add x27, sp, #0x38
-	str w11, [x27]
-`,
-		},
-		{
-			name:      "i32 / large offset",
-			result:    &backend.ABIArg{Offset: 16 * 400, Type: ssa.TypeI32},
-			resultReg: x11VReg,
-			exp: `
-	movz x27, #0x1908, lsl 0
-	add x27, sp, x27
-	str w11, [x27]
+	str w11, [sp], #0x8
 `,
 		},
 		{
@@ -680,18 +598,7 @@ func Test_goFunctionCallStoreStackResult(t *testing.T) {
 			result:    &backend.ABIArg{Offset: 16 * 3, Type: ssa.TypeI64},
 			resultReg: x11VReg,
 			exp: `
-	add x27, sp, #0x38
-	str x11, [x27]
-`,
-		},
-		{
-			name:      "i64 / large offset",
-			result:    &backend.ABIArg{Offset: 16 * 400, Type: ssa.TypeI64},
-			resultReg: x11VReg,
-			exp: `
-	movz x27, #0x1908, lsl 0
-	add x27, sp, x27
-	str x11, [x27]
+	str x11, [sp], #0x8
 `,
 		},
 		{
@@ -699,18 +606,7 @@ func Test_goFunctionCallStoreStackResult(t *testing.T) {
 			result:    &backend.ABIArg{Offset: 16 * 3, Type: ssa.TypeF32},
 			resultReg: v11VReg,
 			exp: `
-	add x27, sp, #0x38
-	str s11, [x27]
-`,
-		},
-		{
-			name:      "f32 / large offset",
-			result:    &backend.ABIArg{Offset: 16 * 400, Type: ssa.TypeF32},
-			resultReg: v11VReg,
-			exp: `
-	movz x27, #0x1908, lsl 0
-	add x27, sp, x27
-	str s11, [x27]
+	str s11, [sp], #0x8
 `,
 		},
 		{
@@ -718,18 +614,7 @@ func Test_goFunctionCallStoreStackResult(t *testing.T) {
 			result:    &backend.ABIArg{Offset: 16 * 3, Type: ssa.TypeF64},
 			resultReg: v11VReg,
 			exp: `
-	add x27, sp, #0x38
-	str d11, [x27]
-`,
-		},
-		{
-			name:      "f64 / large offset",
-			result:    &backend.ABIArg{Offset: 16 * 400, Type: ssa.TypeF64},
-			resultReg: v11VReg,
-			exp: `
-	movz x27, #0x1908, lsl 0
-	add x27, sp, x27
-	str d11, [x27]
+	str d11, [sp], #0x8
 `,
 		},
 		{
@@ -737,18 +622,7 @@ func Test_goFunctionCallStoreStackResult(t *testing.T) {
 			result:    &backend.ABIArg{Offset: 16 * 3, Type: ssa.TypeV128},
 			resultReg: v11VReg,
 			exp: `
-	add x27, sp, #0x38
-	str q11, [x27]
-`,
-		},
-		{
-			name:      "v128 / large offset",
-			result:    &backend.ABIArg{Offset: 16 * 400, Type: ssa.TypeV128},
-			resultReg: v11VReg,
-			exp: `
-	movz x27, #0x1908, lsl 0
-	add x27, sp, x27
-	str q11, [x27]
+	str q11, [sp], #0x10
 `,
 		},
 	} {

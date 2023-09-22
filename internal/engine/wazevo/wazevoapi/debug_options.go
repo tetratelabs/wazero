@@ -2,6 +2,7 @@ package wazevoapi
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"math/rand"
 	"os"
@@ -46,6 +47,23 @@ const (
 	RegAllocValidationEnabled = true
 	SSAValidationEnabled      = true
 )
+
+// ----- Stack Guard Check -----
+// These consts must be enabled by default until we reach the point where we can disable them (e.g. multiple days of fuzzing passes).
+const (
+	// StackGuardCheckEnabled enables the stack guard check to ensure that our stack bounds check works correctly.
+	StackGuardCheckEnabled       = true
+	StackGuardCheckGuardPageSize = 8096
+)
+
+// CheckStackGuardPage checks the given stack guard page is not corrupted.
+func CheckStackGuardPage(s []byte) {
+	for i := 0; i < StackGuardCheckGuardPageSize; i++ {
+		if s[i] != 0 {
+			panic(fmt.Sprintf("BUG: stack guard page is corrupted: %s", hex.EncodeToString(s[:StackGuardCheckGuardPageSize])))
+		}
+	}
+}
 
 // ----- Deterministic compilation verifier -----
 

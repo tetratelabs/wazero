@@ -7,8 +7,8 @@ import (
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 )
 
-var calleeSavedRegistersPlusLinkRegSorted = []regalloc.VReg{
-	x19VReg, x20VReg, x21VReg, x22VReg, x23VReg, x24VReg, x25VReg, x26VReg, x28VReg, lrVReg,
+var calleeSavedRegistersSorted = []regalloc.VReg{
+	x19VReg, x20VReg, x21VReg, x22VReg, x23VReg, x24VReg, x25VReg, x26VReg, x28VReg,
 	v18VReg, v19VReg, v20VReg, v21VReg, v22VReg, v23VReg, v24VReg, v25VReg, v26VReg, v27VReg, v28VReg, v29VReg, v30VReg, v31VReg,
 }
 
@@ -62,21 +62,20 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 	// First of all, to update the SP, and create "ReturnAddress + size_of_arg_ret".
 	cur = m.createReturnAddrAndSizeOfArgRetSlot(cur)
 
-	const callFrameSize = 32 // == frame_size + sliceSize + ReturnAddress + size_of_arg_ret.
+	const frameInfoSize = 16 // == frame_size + sliceSize.
 
 	// Next, we should allocate the stack for the Go function call if necessary.
 	goCallStackSize, sliceSizeInBytes := goFunctionCallRequiredStackSize(sig, argBegin)
-	cur = m.insertStackBoundsCheck(goCallStackSize+callFrameSize, cur)
+	cur = m.insertStackBoundsCheck(goCallStackSize+frameInfoSize, cur)
 
 	originalArg0Reg := x17VReg // Caller save, so we can use it for whatever we want.
 	if m.currentABI.alignedArgResultStackSlotSize() > 0 {
-		copySp := m.allocateInstr()
-		copySp.asMove64(originalArg0Reg, spVReg)
-		cur = linkInstr(cur, copySp)
+		// At this point, SP points to `ReturnAddress`, so add 16 to get the original arg 0 slot.
+		cur = m.addsAddOrSubStackPointer(cur, originalArg0Reg, frameInfoSize, true)
 	}
 
 	// Save the callee saved registers.
-	cur = m.saveRegistersInExecutionContext(cur, calleeSavedRegistersPlusLinkRegSorted)
+	cur = m.saveRegistersInExecutionContext(cur, calleeSavedRegistersSorted)
 
 	// Next, we need to store all the arguments to the stack in the typical Wasm stack style.
 	if needModuleContextPtr {
@@ -154,15 +153,30 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 	cur = m.storeReturnAddressAndExit(cur)
 
 	// After the call, we need to restore the callee saved registers.
-	cur = m.restoreRegistersInExecutionContext(cur, calleeSavedRegistersPlusLinkRegSorted)
+	cur = m.restoreRegistersInExecutionContext(cur, calleeSavedRegistersSorted)
 
 	// Get the pointer to the arg[0]/ret[0]: We need to skip `frame_size + sliceSize`.
 	if len(abi.rets) > 0 {
-		cur = m.addsAddOrSubStackPointer(cur, arg0ret0AddrReg, 16, true)
+		cur = m.addsAddOrSubStackPointer(cur, arg0ret0AddrReg, frameInfoSize, true)
 	}
 
-	// Removes the stack frame! --> Stack pointer now points to the original arg 0 slot.
-	cur = m.addsAddOrSubStackPointer(cur, spVReg, goCallStackSize+callFrameSize+m.currentABI.alignedArgResultStackSlotSize(), true)
+	// Advances the SP so that it points to `ReturnAddress`.
+	cur = m.addsAddOrSubStackPointer(cur, spVReg, frameInfoSize+goCallStackSize, true)
+	ldr := m.allocateInstr()
+	// And load the return address.
+	ldr.asULoad(operandNR(lrVReg),
+		addressModePreOrPostIndex(spVReg, 16 /* stack pointer must be 16-byte aligned. */, false /* increment after loads */), 64)
+	cur = linkInstr(cur, ldr)
+
+	originalRet0Reg := x17VReg // Caller save, so we can use it for whatever we want.
+	if m.currentABI.retStackSize > 0 {
+		cur = m.addsAddOrSubStackPointer(cur, originalRet0Reg, m.currentABI.argStackSize, true)
+	}
+
+	// Make the SP point to the original address (above the result slot).
+	if s := m.currentABI.alignedArgResultStackSlotSize(); s > 0 {
+		cur = m.addsAddOrSubStackPointer(cur, spVReg, s, true)
+	}
 
 	for i := range abi.rets {
 		r := &abi.rets[i]
@@ -220,7 +234,7 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 				panic("TODO")
 			}
 			cur = linkInstr(cur, loadIntoTmpReg)
-			cur = m.goFunctionCallStoreStackResult(cur, spVReg, r, resultReg)
+			cur = m.goFunctionCallStoreStackResult(cur, originalRet0Reg, r, resultReg)
 		}
 	}
 
@@ -386,23 +400,9 @@ func goFunctionCallRequiredStackSize(sig *ssa.Signature, argBegin int) (ret, ret
 }
 
 func (m *machine) goFunctionCallLoadStackArg(cur *instruction, originalArg0Reg regalloc.VReg, arg *backend.ABIArg, intVReg, floatVReg regalloc.VReg) (*instruction, regalloc.VReg) {
-	offset := arg.Offset
-
-	alu := m.allocateInstr()
-	ao := aluOpAdd
-	if imm12Operand, ok := asImm12Operand(uint64(offset)); ok {
-		alu.asALU(ao, operandNR(intVReg), operandNR(originalArg0Reg), imm12Operand, true)
-		cur = linkInstr(cur, alu)
-	} else {
-		cur = m.lowerConstantI64AndInsert(cur, tmpRegVReg, offset)
-		alu.asALU(ao, operandNR(intVReg), operandNR(originalArg0Reg), operandNR(tmpRegVReg), true)
-		cur = linkInstr(cur, alu)
-	}
-
 	load := m.allocateInstr()
-
 	var result regalloc.VReg
-	mode := addressMode{kind: addressModeKindRegUnsignedImm12, rn: intVReg}
+	mode := addressMode{kind: addressModeKindPostIndex, rn: originalArg0Reg}
 	switch arg.Type {
 	case ssa.TypeI32:
 		mode.imm = 8 // We use uint64 for all basic types, except SIMD v128.
@@ -432,32 +432,23 @@ func (m *machine) goFunctionCallLoadStackArg(cur *instruction, originalArg0Reg r
 	return cur, result
 }
 
-func (m *machine) goFunctionCallStoreStackResult(cur *instruction, originalArg0Reg regalloc.VReg, result *backend.ABIArg, resultVReg regalloc.VReg) *instruction {
-	offset := result.Offset + m.currentABI.argStackSize
-
-	alu := m.allocateInstr()
-	ao := aluOpAdd
-	if imm12Operand, ok := asImm12Operand(uint64(offset)); ok {
-		alu.asALU(ao, operandNR(tmpRegVReg), operandNR(originalArg0Reg), imm12Operand, true)
-		cur = linkInstr(cur, alu)
-	} else {
-		cur = m.lowerConstantI64AndInsert(cur, tmpRegVReg, offset)
-		alu.asALU(ao, operandNR(tmpRegVReg), operandNR(originalArg0Reg), operandNR(tmpRegVReg), true)
-		cur = linkInstr(cur, alu)
-	}
-
+func (m *machine) goFunctionCallStoreStackResult(cur *instruction, originalRet0Reg regalloc.VReg, result *backend.ABIArg, resultVReg regalloc.VReg) *instruction {
 	store := m.allocateInstr()
+	mode := addressMode{kind: addressModeKindPostIndex, rn: originalRet0Reg}
 	var sizeInBits byte
 	switch result.Type {
 	case ssa.TypeI32, ssa.TypeF32:
+		mode.imm = 8
 		sizeInBits = 32
 	case ssa.TypeI64, ssa.TypeF64:
+		mode.imm = 8
 		sizeInBits = 64
 	case ssa.TypeV128:
+		mode.imm = 16
 		sizeInBits = 128
 	default:
 		panic("TODO")
 	}
-	store.asStore(operandNR(resultVReg), addressMode{kind: addressModeKindRegUnsignedImm12, rn: tmpRegVReg}, sizeInBits)
+	store.asStore(operandNR(resultVReg), mode, sizeInBits)
 	return linkInstr(cur, store)
 }

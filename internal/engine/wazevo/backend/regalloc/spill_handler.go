@@ -2,8 +2,9 @@ package regalloc
 
 // spillHandler is a helper to handle the spill and reload of registers at some point in the program.
 type spillHandler struct {
-	activeRegs map[RealReg]spillHandlerRegState
-	deleteTemp []RealReg
+	activeRegs   map[RealReg]spillHandlerRegState
+	deleteTemp   []RealReg
+	beingUsedNow map[RealReg]struct{}
 }
 
 type spillHandlerRegState struct {
@@ -15,10 +16,28 @@ const (
 	spillHandlerRegStateUsed = iota
 	spillHandlerRegStateEvictable
 	spillHandlerRegStateEvicted
+	spillHandlerRegStateBeingUsedNow
 )
 
 // init initializes the spill handler with the active nodes which are the node alive at a some point in the program.
-func (s *spillHandler) init(activeNodes []*node) {
+func (s *spillHandler) init(activeNodes []*node, inst Instr) {
+	if s.beingUsedNow == nil {
+		s.beingUsedNow = make(map[RealReg]struct{})
+	} else {
+		s.deleteTemp = s.deleteTemp[:0]
+		for r := range s.beingUsedNow {
+			s.deleteTemp = append(s.deleteTemp, r)
+		}
+		for _, r := range s.deleteTemp {
+			delete(s.beingUsedNow, r)
+		}
+		for _, u := range inst.Uses() {
+			if u.IsRealReg() {
+				s.beingUsedNow[u.RealReg()] = struct{}{}
+			}
+		}
+	}
+
 	if s.activeRegs == nil {
 		s.activeRegs = make(map[RealReg]spillHandlerRegState)
 	} else {
@@ -31,7 +50,12 @@ func (s *spillHandler) init(activeNodes []*node) {
 		}
 	}
 	for _, n := range activeNodes {
-		s.activeRegs[n.assignedRealReg()] = spillHandlerRegState{node: n, state: spillHandlerRegStateEvictable}
+		r := n.assignedRealReg()
+		if _, ok := s.beingUsedNow[r]; ok {
+			s.activeRegs[r] = spillHandlerRegState{node: n, state: spillHandlerRegStateBeingUsedNow}
+		} else {
+			s.activeRegs[r] = spillHandlerRegState{node: n, state: spillHandlerRegStateEvictable}
+		}
 	}
 }
 
