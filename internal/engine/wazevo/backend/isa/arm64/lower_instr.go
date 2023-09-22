@@ -1019,15 +1019,8 @@ func (m *machine) lowerVIcmp(si *ssa.Instruction) {
 	flag := condFlagFromSSAIntegerCmpCond(c)
 	arr := ssaLaneToArrangement(lane)
 
-	var ext extMode
-	if c.Signed() {
-		ext = extModeSignExtend64
-	} else {
-		ext = extModeZeroExtend64
-	}
-
-	rn := m.getOperand_NR(m.compiler.ValueDefinition(x), ext)
-	rm := m.getOperand_NR(m.compiler.ValueDefinition(y), ext)
+	rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+	rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
 	rd := operandNR(m.compiler.VRegOf(si.Return()))
 
 	switch flag {
