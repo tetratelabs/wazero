@@ -486,8 +486,8 @@ func (m *machine) lowerVhighBits(instr *ssa.Instruction) {
 		//	addv s5?, v5?.8h
 		//	umov s3?, v5?.h[0]
 
-		// Right arithmetic shift on the original vector and store the result into vecTmp. So we have:
-		// v[i] = 0xff if vi<0, 0 otherwise.
+		// Right arithmetic shift on the original vector and store the result into v1. So we have:
+		// v1[i] = 0xff if vi<0, 0 otherwise.
 		sshr := m.allocateInstr()
 		sshr.asVecShiftImm(vecOpSshr, v1, rm, operandShiftImm(7), vecArrangement16B)
 		m.insert(sshr)
@@ -502,7 +502,7 @@ func (m *machine) lowerVhighBits(instr *ssa.Instruction) {
 		dup.asVecDup(v0, r0, vecArrangement2D)
 		m.insert(dup)
 
-		// Lane-wise logical AND with i8x16BitmaskConst, meaning that we have
+		// Lane-wise logical AND with the bit mask, meaning that we have
 		// v[i] = (1 << i) if vi<0, 0 otherwise.
 		//
 		// Below, we use the following notation:
@@ -511,8 +511,8 @@ func (m *machine) lowerVhighBits(instr *ssa.Instruction) {
 		and.asVecRRR(vecOpAnd, v1, v1, v0, vecArrangement16B)
 		m.insert(and)
 
-		// Swap the lower and higher 8 byte elements, and write it into vecTmp, meaning that we have
-		// vecTmp[i] = w(i+8) if i < 8, w(i-8) otherwise.
+		// Swap the lower and higher 8 byte elements, and write it into v0, meaning that we have
+		// v0[i] = w(i+8) if i < 8, w(i-8) otherwise.
 		ext := m.allocateInstr()
 		ext.asVecExtract(v0, v1, v1, vecArrangement16B, uint32(8))
 		m.insert(ext)
@@ -544,15 +544,16 @@ func (m *machine) lowerVhighBits(instr *ssa.Instruction) {
 		//	addv s5?, v5?.8h
 		//	umov s3?, v5?.h[0]
 
-		// Right arithmetic shift on the original vector and store the result into vecTmp. So we have:
+		// Right arithmetic shift on the original vector and store the result into v1. So we have:
 		// v[i] = 0xffff if vi<0, 0 otherwise.
 		sshr := m.allocateInstr()
 		sshr.asVecShiftImm(vecOpSshr, v1, rm, operandShiftImm(15), vecArrangement8H)
 		m.insert(sshr)
 
-		// Load the bit mask into vecTmp.
+		// Load the bit mask into r0.
 		m.lowerConstantI64(r0.nr(), 0x0008000400020001)
 
+		// dup r0 to vector v0.
 		dup := m.allocateInstr()
 		dup.asVecDup(v0, r0, vecArrangement2D)
 		m.insert(dup)
@@ -565,7 +566,7 @@ func (m *machine) lowerVhighBits(instr *ssa.Instruction) {
 		movv.asMovToVec(v0, r0, vecArrangementD, vecIndex(1))
 		m.insert(movv)
 
-		// Lane-wise logical AND with i16x8BitmaskConst, meaning that we have
+		// Lane-wise logical AND with the bitmask, meaning that we have
 		// v[i] = (1 << i)     if vi<0, 0 otherwise for i=0..3
 		//      = (1 << (i+4)) if vi<0, 0 otherwise for i=3..7
 		and := m.allocateInstr()
@@ -592,15 +593,16 @@ func (m *machine) lowerVhighBits(instr *ssa.Instruction) {
 		//	addv s5?, v5?.8h
 		//	umov s3?, v5?.h[0]
 
-		// Right arithmetic shift on the original vector and store the result into vecTmp. So we have:
+		// Right arithmetic shift on the original vector and store the result into v1. So we have:
 		// v[i] = 0xffffffff if vi<0, 0 otherwise.
 		sshr := m.allocateInstr()
 		sshr.asVecShiftImm(vecOpSshr, v1, rm, operandShiftImm(31), vecArrangement4S)
 		m.insert(sshr)
 
-		// Load the bit mask into vecTmp.
+		// Load the bit mask into r0.
 		m.lowerConstantI64(r0.nr(), 0x0000000200000001)
 
+		// dup r0 to vector v0.
 		dup := m.allocateInstr()
 		dup.asVecDup(v0, r0, vecArrangement2D)
 		m.insert(dup)
@@ -613,7 +615,7 @@ func (m *machine) lowerVhighBits(instr *ssa.Instruction) {
 		movv.asMovToVec(v0, r0, vecArrangementD, vecIndex(1))
 		m.insert(movv)
 
-		// Lane-wise logical AND with i16x8BitmaskConst, meaning that we have
+		// Lane-wise logical AND with the bitmask, meaning that we have
 		// v[i] = (1 << i)     if vi<0, 0 otherwise for i in [0, 1]
 		//      = (1 << (i+4)) if vi<0, 0 otherwise for i in [2, 3]
 		and := m.allocateInstr()
@@ -635,12 +637,12 @@ func (m *machine) lowerVhighBits(instr *ssa.Instruction) {
 		//	lsr d3?, d3?, 0x3f
 		//	add s3?, s3?, w4?, lsl #1
 
-		// Move the lower 64-bit int into result,
+		// Move the lower 64-bit int into result.
 		movv0 := m.allocateInstr()
 		movv0.asMovFromVec(rd, rm, vecArrangementD, vecIndex(0))
 		m.insert(movv0)
 
-		// Move the higher 64-bit int into arm64ReservedRegisterForTemporary.
+		// Move the higher 64-bit int into r0.
 		movv1 := m.allocateInstr()
 		movv1.asMovFromVec(r0, rm, vecArrangementD, vecIndex(1))
 		m.insert(movv1)
@@ -654,7 +656,7 @@ func (m *machine) lowerVhighBits(instr *ssa.Instruction) {
 		lsr2.asALUShift(aluOpLsr, rd, rd, operandShiftImm(63), true)
 		m.insert(lsr2)
 
-		// result = (arm64ReservedRegisterForTemporary<<1) | result
+		// rd = (r0<<1) | rd
 		lsl := m.allocateInstr()
 		lsl.asALU(aluOpAdd, rd, rd, operandSR(r0.nr(), 1, shiftOpLSL), false)
 		m.insert(lsl)
