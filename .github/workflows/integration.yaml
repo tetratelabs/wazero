@@ -19,7 +19,7 @@ defaults:
 
 env:  # Update this prior to requiring a higher minor version in go.mod
   GO_VERSION: "1.21"  # 1.xx == latest patch of 1.xx
-  TINYGO_VERSION: "0.29.0"
+  TINYGO_VERSION: "0.30.0"
   ZIG_VERSION: "0.11.0-dev.3334+cd1417dbd"
 
 concurrency:
