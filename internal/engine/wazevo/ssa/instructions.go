@@ -347,6 +347,9 @@ const (
 	// OpcodeIcmp compares two integer values with the given condition: `v = icmp Cond, x, y`.
 	OpcodeIcmp
 
+	// OpcodeVIcmp compares two integer values with the given condition: `v = vicmp Cond, x, y` on vector.
+	OpcodeVIcmp
+
 	// OpcodeIcmpImm compares an integer value with the immediate value on the given condition: `v = icmp_imm Cond, x, Y`.
 	OpcodeIcmpImm
 
@@ -885,6 +888,7 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeVIsub:              sideEffectNone,
 	OpcodeVSsubSat:           sideEffectNone,
 	OpcodeVUsubSat:           sideEffectNone,
+	OpcodeVIcmp:              sideEffectNone,
 	OpcodeVImin:              sideEffectNone,
 	OpcodeVUmin:              sideEffectNone,
 	OpcodeVImax:              sideEffectNone,
@@ -922,6 +926,7 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeVIsub:      returnTypesFnV128,
 	OpcodeVSsubSat:   returnTypesFnV128,
 	OpcodeVUsubSat:   returnTypesFnV128,
+	OpcodeVIcmp:      returnTypesFnI32,
 	OpcodeVImin:      returnTypesFnV128,
 	OpcodeVUmin:      returnTypesFnV128,
 	OpcodeVImax:      returnTypesFnV128,
@@ -1313,6 +1318,17 @@ func (i *Instruction) AsFcmp(x, y Value, c FloatCmpCond) {
 	i.typ = TypeI32
 }
 
+// AsVIcmp initializes this instruction as an integer vector comparison instruction with OpcodeVIcmp.
+func (i *Instruction) AsVIcmp(x, y Value, c IntegerCmpCond, lane VecLane) *Instruction {
+	i.opcode = OpcodeVIcmp
+	i.v = x
+	i.v2 = y
+	i.u1 = uint64(c)
+	i.u2 = uint64(lane)
+	i.typ = TypeI32
+	return i
+}
+
 // AsSDiv initializes this instruction as an integer bitwise and instruction with OpcodeSdiv.
 func (i *Instruction) AsSDiv(x, y, ctx Value) *Instruction {
 	i.opcode = OpcodeSdiv
@@ -1427,6 +1443,11 @@ func (i *Instruction) IcmpData() (x, y Value, c IntegerCmpCond) {
 // FcmpData returns the operands and comparison condition of this floating-point comparison instruction.
 func (i *Instruction) FcmpData() (x, y Value, c FloatCmpCond) {
 	return i.v, i.v2, FloatCmpCond(i.u1)
+}
+
+// VIcmpData returns the operands and comparison condition of this integer comparison instruction on vector.
+func (i *Instruction) VIcmpData() (x, y Value, c IntegerCmpCond, l VecLane) {
+	return i.v, i.v2, IntegerCmpCond(i.u1), VecLane(i.u2)
 }
 
 // AsFadd initializes this instruction as a floating-point addition instruction with OpcodeFadd.
@@ -2059,7 +2080,7 @@ func (i *Instruction) Format(b Builder) string {
 		instSuffix += "]"
 	case OpcodeBand, OpcodeBor, OpcodeBxor, OpcodeRotr, OpcodeRotl, OpcodeIshl, OpcodeSshr, OpcodeUshr,
 		OpcodeSdiv, OpcodeUdiv, OpcodeFcopysign, OpcodeSrem, OpcodeUrem,
-		OpcodeVbnot, OpcodeVbxor, OpcodeVbor, OpcodeVband, OpcodeVbandnot:
+		OpcodeVbnot, OpcodeVbxor, OpcodeVbor, OpcodeVband, OpcodeVbandnot, OpcodeVIcmp:
 		instSuffix = fmt.Sprintf(" %s, %s", i.v.Format(b), i.v2.Format(b))
 	case OpcodeUndefined:
 	case OpcodeClz, OpcodeCtz, OpcodePopcnt, OpcodeFneg, OpcodeFcvtToSint, OpcodeFcvtToUint, OpcodeFcvtFromSint,
@@ -2239,6 +2260,8 @@ func (o Opcode) String() (ret string) {
 		return "Icmp"
 	case OpcodeIcmpImm:
 		return "IcmpImm"
+	case OpcodeVIcmp:
+		return "VIcmp"
 	case OpcodeIadd:
 		return "Iadd"
 	case OpcodeIsub:

@@ -1574,6 +1574,16 @@ func (b vecOp) String() string {
 	switch b {
 	case vecOpCnt:
 		return "cnt"
+	case vecOpCmeq:
+		return "cmeq"
+	case vecOpCmgt:
+		return "cmgt"
+	case vecOpCmhi:
+		return "cmhi"
+	case vecOpCmge:
+		return "cmge"
+	case vecOpCmhs:
+		return "cmhs"
 	case vecOpCmeq0:
 		return "cmeq0"
 	case vecOpUaddlv:
@@ -1637,6 +1647,11 @@ func (b vecOp) String() string {
 const (
 	vecOpCnt vecOp = iota
 	vecOpCmeq0
+	vecOpCmeq
+	vecOpCmgt
+	vecOpCmhi
+	vecOpCmge
+	vecOpCmhs
 	vecOpUaddlv
 	vecOpBit
 	vecOpBic
