@@ -1414,6 +1414,49 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVbitselect(c, v1, v2).Insert(builder).Return()
 			state.push(ret)
+		case wasm.OpcodeVecV128AnyTrue:
+			if state.unreachable {
+				break
+			}
+			v1 := state.pop()
+			ret := builder.AllocateInstruction().AsVanyTrue(v1).Insert(builder).Return()
+			state.push(ret)
+		case wasm.OpcodeVecI8x16AllTrue, wasm.OpcodeVecI16x8AllTrue, wasm.OpcodeVecI32x4AllTrue, wasm.OpcodeVecI64x2AllTrue:
+			if state.unreachable {
+				break
+			}
+			var lane ssa.VecLane
+			switch vecOp {
+			case wasm.OpcodeVecI8x16AllTrue:
+				lane = ssa.VecLaneI8x16
+			case wasm.OpcodeVecI16x8AllTrue:
+				lane = ssa.VecLaneI16x8
+			case wasm.OpcodeVecI32x4AllTrue:
+				lane = ssa.VecLaneI32x4
+			case wasm.OpcodeVecI64x2AllTrue:
+				lane = ssa.VecLaneI64x2
+			}
+			v1 := state.pop()
+			ret := builder.AllocateInstruction().AsVallTrue(v1, lane).Insert(builder).Return()
+			state.push(ret)
+		case wasm.OpcodeVecI8x16BitMask, wasm.OpcodeVecI16x8BitMask, wasm.OpcodeVecI32x4BitMask, wasm.OpcodeVecI64x2BitMask:
+			if state.unreachable {
+				break
+			}
+			var lane ssa.VecLane
+			switch vecOp {
+			case wasm.OpcodeVecI8x16BitMask:
+				lane = ssa.VecLaneI8x16
+			case wasm.OpcodeVecI16x8BitMask:
+				lane = ssa.VecLaneI16x8
+			case wasm.OpcodeVecI32x4BitMask:
+				lane = ssa.VecLaneI32x4
+			case wasm.OpcodeVecI64x2BitMask:
+				lane = ssa.VecLaneI64x2
+			}
+			v1 := state.pop()
+			ret := builder.AllocateInstruction().AsVhighBits(v1, lane).Insert(builder).Return()
+			state.push(ret)
 		case wasm.OpcodeVecI8x16Abs, wasm.OpcodeVecI16x8Abs, wasm.OpcodeVecI32x4Abs, wasm.OpcodeVecI64x2Abs:
 			if state.unreachable {
 				break

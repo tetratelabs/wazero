@@ -913,8 +913,8 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeVbnot:      returnTypesFnV128,
 	OpcodeVbandnot:   returnTypesFnV128,
 	OpcodeVbitselect: returnTypesFnV128,
-	OpcodeVanyTrue:   returnTypesFnV128,
-	OpcodeVallTrue:   returnTypesFnV128,
+	OpcodeVanyTrue:   returnTypesFnI32,
+	OpcodeVallTrue:   returnTypesFnI32,
 	OpcodeVhighBits:  returnTypesFnV128,
 	OpcodeVIadd:      returnTypesFnV128,
 	OpcodeVSaddSat:   returnTypesFnV128,
@@ -1556,6 +1556,32 @@ func (i *Instruction) AsVbitselect(c, x, y Value) *Instruction {
 	return i
 }
 
+// AsVanyTrue initializes this instruction as an anyTrue vector instruction with OpcodeVanyTrue.
+func (i *Instruction) AsVanyTrue(x Value) *Instruction {
+	i.opcode = OpcodeVanyTrue
+	i.typ = TypeI32
+	i.v = x
+	return i
+}
+
+// AsVallTrue initializes this instruction as an allTrue vector instruction with OpcodeVallTrue.
+func (i *Instruction) AsVallTrue(x Value, lane VecLane) *Instruction {
+	i.opcode = OpcodeVallTrue
+	i.typ = TypeI32
+	i.v = x
+	i.u1 = uint64(lane)
+	return i
+}
+
+// AsVhighBits initializes this instruction as a highBits vector instruction with OpcodeVhighBits.
+func (i *Instruction) AsVhighBits(x Value, lane VecLane) *Instruction {
+	i.opcode = OpcodeVhighBits
+	i.typ = TypeI32
+	i.v = x
+	i.u1 = uint64(lane)
+	return i
+}
+
 // VconstData returns the operands of this vector constant instruction.
 func (i *Instruction) VconstData() (lo, hi uint64) {
 	return i.u1, i.u2
@@ -2041,7 +2067,7 @@ func (i *Instruction) Format(b Builder) string {
 		OpcodeCeil, OpcodeFloor, OpcodeTrunc, OpcodeNearest:
 		instSuffix = " " + i.v.Format(b)
 	case OpcodeVIadd, OpcodeVSaddSat, OpcodeVUaddSat, OpcodeVIsub, OpcodeVSsubSat, OpcodeVUsubSat,
-		OpcodeVImin, OpcodeVUmin, OpcodeVImax, OpcodeVUmax, OpcodeVImul:
+		OpcodeVImin, OpcodeVUmin, OpcodeVImax, OpcodeVUmax, OpcodeVImul, OpcodeVAvgRound:
 		instSuffix = fmt.Sprintf(".%s %s, %s", VecLane(i.u1), i.v.Format(b), i.v2.Format(b))
 	case OpcodeVIabs, OpcodeVIneg, OpcodeVIpopcnt, OpcodeVhighBits, OpcodeVallTrue, OpcodeVanyTrue:
 		instSuffix = fmt.Sprintf(".%s %s", VecLane(i.u1), i.v.Format(b))
@@ -2437,6 +2463,8 @@ func (o Opcode) String() (ret string) {
 		return "VSsubSat"
 	case OpcodeVUsubSat:
 		return "VUsubSat"
+	case OpcodeVAvgRound:
+		return "OpcodeVAvgRound"
 	case OpcodeVIsub:
 		return "VIsub"
 	case OpcodeVImin:

@@ -535,3 +535,193 @@ mul x1.4s, x2.4s, x15.4s
 		})
 	}
 }
+
+func TestMachine_lowerVcheckTrue(t *testing.T) {
+	for _, tc := range []struct {
+		name          string
+		op            ssa.Opcode
+		expectedAsm   string
+		arrangement   vecArrangement
+		expectedBytes string
+	}{
+		{
+			name: "anyTrue",
+			op:   ssa.OpcodeVanyTrue,
+			expectedAsm: `
+umaxp v1?.16b, x1.16b, x1.16b
+mov x15, v1?.d[0]
+ccmp x15, #0x0, #0x0, al
+cset x15, ne
+`,
+			expectedBytes: "20a4216e0f3c084ee0e940faef079f9a",
+		},
+		{
+			name:        "allTrue 2D",
+			op:          ssa.OpcodeVallTrue,
+			arrangement: vecArrangement2D,
+			expectedAsm: `
+cmeq x15.2d, x1.2d, #0
+addp x15.2d, x15.2d, x15.2d
+fcmp x15, x15
+cset x15, eq
+`,
+			expectedBytes: "2f98e04eefbdef4ee0216f1eef179f9a",
+		},
+		{
+			name:        "allTrue 8B",
+			arrangement: vecArrangement8B,
+			op:          ssa.OpcodeVallTrue,
+			expectedAsm: `
+uminv h1?, x1.8b
+mov x15, v1?.d[0]
+ccmp x15, #0x0, #0x0, al
+cset x15, ne
+`,
+			expectedBytes: "20a8312e0f3c084ee0e940faef079f9a",
+		},
+		{
+			name:        "allTrue 16B",
+			arrangement: vecArrangement16B,
+			op:          ssa.OpcodeVallTrue,
+			expectedAsm: `
+uminv h1?, x1.16b
+mov x15, v1?.d[0]
+ccmp x15, #0x0, #0x0, al
+cset x15, ne
+`,
+			expectedBytes: "20a8316e0f3c084ee0e940faef079f9a",
+		},
+		{
+			name:        "allTrue 4H",
+			arrangement: vecArrangement4H,
+			op:          ssa.OpcodeVallTrue,
+			expectedAsm: `
+uminv s1?, x1.4h
+mov x15, v1?.d[0]
+ccmp x15, #0x0, #0x0, al
+cset x15, ne
+`,
+			expectedBytes: "20a8712e0f3c084ee0e940faef079f9a",
+		},
+		{
+			name:        "allTrue 8H",
+			arrangement: vecArrangement8H,
+			op:          ssa.OpcodeVallTrue,
+			expectedAsm: `
+uminv s1?, x1.8h
+mov x15, v1?.d[0]
+ccmp x15, #0x0, #0x0, al
+cset x15, ne
+`,
+			expectedBytes: "20a8716e0f3c084ee0e940faef079f9a",
+		},
+		{
+			name:        "allTrue 4S",
+			arrangement: vecArrangement4S,
+			op:          ssa.OpcodeVallTrue,
+			expectedAsm: `
+uminv d1?, x1.4s
+mov x15, v1?.d[0]
+ccmp x15, #0x0, #0x0, al
+cset x15, ne
+`,
+			expectedBytes: "20a8b16e0f3c084ee0e940faef079f9a",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, _, m := newSetupWithMockContext()
+			m.lowerVcheckTrue(tc.op, operandNR(x1VReg), operandNR(x15VReg), tc.arrangement)
+			require.Equal(t, tc.expectedAsm, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
+
+			m.FlushPendingInstructions()
+			m.encode(m.perBlockHead)
+			buf := m.compiler.Buf()
+			require.Equal(t, tc.expectedBytes, hex.EncodeToString(buf))
+		})
+	}
+}
+
+func TestMachine_lowerVhighBits(t *testing.T) {
+	for _, tc := range []struct {
+		name          string
+		expectedAsm   string
+		arrangement   vecArrangement
+		expectedBytes string
+	}{
+		{
+			name:        "16B",
+			arrangement: vecArrangement16B,
+			expectedAsm: `
+sshr v3?.16b, x1.16b, #7
+movz x1?, #0x201, lsl 0
+movk x1?, #0x804, lsl 16
+movk x1?, #0x2010, lsl 32
+movk x1?, #0x8040, lsl 48
+dup v2?.2d, x1?
+and v3?.16b, v3?.16b, v2?.16b
+ext v2?.16b, v3?.16b, v3?.16b, #8
+zip1 v2?.16b, v3?.16b, v2?.16b
+addv s2?, v2?.8h
+umov w15, v2?.h[0]
+`,
+			expectedBytes: "2004094f204080d28000a1f20002c4f20008f0f2000c084e001c204e0040006e0038004e00b8714e0f3c020e",
+		},
+		{
+			name:        "8H",
+			arrangement: vecArrangement8H,
+			expectedAsm: `
+sshr v3?.8h, x1.8h, #15
+movz x1?, #0x1, lsl 0
+movk x1?, #0x2, lsl 16
+movk x1?, #0x4, lsl 32
+movk x1?, #0x8, lsl 48
+dup v2?.2d, x1?
+lsl x1?, x1?, 0x4
+ins v2?.d[1], x1?
+and v2?.16b, v3?.16b, v2?.16b
+addv s2?, v2?.8h
+umov w15, v2?.h[0]
+`,
+			expectedBytes: "2004114f200080d24000a0f28000c0f20001e0f2000c084e00ec7cd3001c184e001c204e00b8714e0f3c020e",
+		},
+		{
+			name:        "4S",
+			arrangement: vecArrangement4S,
+			expectedAsm: `
+sshr v3?.4s, x1.4s, #31
+movz x1?, #0x1, lsl 0
+movk x1?, #0x2, lsl 32
+dup v2?.2d, x1?
+lsl x1?, x1?, 0x2
+ins v2?.d[1], x1?
+and v2?.16b, v3?.16b, v2?.16b
+addv d2?, v2?.4s
+umov w15, v2?.s[0]
+`,
+			expectedBytes: "2004214f200080d24000c0f2000c084e00f47ed3001c184e001c204e00b8b14e0f3c040e",
+		},
+		{
+			name:        "2D",
+			arrangement: vecArrangement2D,
+			expectedAsm: `
+mov x15, x1.d[0]
+mov x1?, x1.d[1]
+lsr x1?, x1?, 0x3f
+lsr x15, x15, 0x3f
+add w15, w15, w1?, lsl #1
+`,
+			expectedBytes: "2f3c084e203c184e00fc7fd3effd7fd3ef05000b",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, _, m := newSetupWithMockContext()
+			m.lowerVhighBits(operandNR(x1VReg), operandNR(x15VReg), tc.arrangement)
+			require.Equal(t, tc.expectedAsm, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
+
+			m.FlushPendingInstructions()
+			m.encode(m.perBlockHead)
+			buf := m.compiler.Buf()
+			require.Equal(t, tc.expectedBytes, hex.EncodeToString(buf))
+		})
+	}
+}
