@@ -492,12 +492,13 @@ func (m *machine) lowerVhighBits(instr *ssa.Instruction) {
 		sshr.asVecShiftImm(vecOpSshr, v1, rm, operandShiftImm(7), vecArrangement16B)
 		m.insert(sshr)
 
-		// Load the bit mask into vecTmp.
+		// Load the bit mask into r0.
 		m.insertMOVZ(r0.nr(), 0x0201, 0, true)
 		m.insertMOVK(r0.nr(), 0x0804, 1, true)
 		m.insertMOVK(r0.nr(), 0x2010, 2, true)
 		m.insertMOVK(r0.nr(), 0x8040, 3, true)
 
+		// dup r0 to v0.
 		dup := m.allocateInstr()
 		dup.asVecDup(v0, r0, vecArrangement2D)
 		m.insert(dup)
@@ -629,7 +630,6 @@ func (m *machine) lowerVhighBits(instr *ssa.Instruction) {
 		movfv := m.allocateInstr()
 		movfv.asMovFromVec(rd, v0, vecArrangementS, vecIndex(0))
 		m.insert(movfv)
-
 	case ssa.VecLaneI64x2:
 		// 	mov d3?, v2?.d[0]
 		//	mov x4?, v2?.d[1]
