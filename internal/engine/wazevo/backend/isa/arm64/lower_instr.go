@@ -342,7 +342,11 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		rd := operandNR(m.compiler.VRegOf(instr.Return()))
 		m.lowerVcheckTrue(op, rm, rd, arr)
 	case ssa.OpcodeVhighBits:
-		m.lowerVhighBits(instr)
+		x, lane := instr.ArgWithLane()
+		rm := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+		rd := operandNR(m.compiler.VRegOf(instr.Return()))
+		arr := ssaLaneToArrangement(lane)
+		m.lowerVhighBits(rm, rd, arr)
 	case ssa.OpcodeVIadd:
 		x, y, lane := instr.Arg2WithLane()
 		arr := ssaLaneToArrangement(lane)
@@ -464,17 +468,13 @@ func (m *machine) lowerVcheckTrue(op ssa.Opcode, rm, rd operand, arr vecArrangem
 	m.insert(cset)
 }
 
-func (m *machine) lowerVhighBits(instr *ssa.Instruction) {
-	x, lane := instr.ArgWithLane()
-	rm := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
-	rd := operandNR(m.compiler.VRegOf(instr.Return()))
-
+func (m *machine) lowerVhighBits(rm, rd operand, arr vecArrangement) {
 	r0 := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeOf(ssa.TypeI64)))
 	v0 := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeOf(ssa.TypeV128)))
 	v1 := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeOf(ssa.TypeV128)))
 
-	switch lane {
-	case ssa.VecLaneI8x16:
+	switch arr {
+	case vecArrangement16B: // ssa.VecLaneI8x16
 		//	sshr v6?.16b, v2?.16b, #7
 		//	movz x4?, #0x201, lsl 0
 		//	movk x4?, #0x804, lsl 16
@@ -533,7 +533,7 @@ func (m *machine) lowerVhighBits(instr *ssa.Instruction) {
 		movfv := m.allocateInstr()
 		movfv.asMovFromVec(rd, v0, vecArrangementH, vecIndex(0))
 		m.insert(movfv)
-	case ssa.VecLaneI16x8:
+	case vecArrangement8H: // ssa.VecLaneI16x8
 		//	sshr v6?.8h, v2?.8h, #15
 		//	movz x4?, #0x1, lsl 0
 		//	movk x4?, #0x2, lsl 16
@@ -582,7 +582,7 @@ func (m *machine) lowerVhighBits(instr *ssa.Instruction) {
 		movfv := m.allocateInstr()
 		movfv.asMovFromVec(rd, v0, vecArrangementH, vecIndex(0))
 		m.insert(movfv)
-	case ssa.VecLaneI32x4:
+	case vecArrangement4S: // ssa.VecLaneI32x4
 		// 	sshr v6?.8h, v2?.8h, #15
 		//	movz x4?, #0x1, lsl 0
 		//	movk x4?, #0x2, lsl 16
@@ -631,7 +631,7 @@ func (m *machine) lowerVhighBits(instr *ssa.Instruction) {
 		movfv := m.allocateInstr()
 		movfv.asMovFromVec(rd, v0, vecArrangementS, vecIndex(0))
 		m.insert(movfv)
-	case ssa.VecLaneI64x2:
+	case vecArrangement2D: // ssa.VecLaneI64x2
 		// 	mov d3?, v2?.d[0]
 		//	mov x4?, v2?.d[1]
 		//	lsr x4?, x4?, 0x3f
@@ -662,7 +662,7 @@ func (m *machine) lowerVhighBits(instr *ssa.Instruction) {
 		lsl.asALU(aluOpAdd, rd, rd, operandSR(r0.nr(), 1, shiftOpLSL), false)
 		m.insert(lsl)
 	default:
-		panic("Unsupported " + lane.String())
+		panic("Unsupported " + arr.String())
 	}
 }
 
