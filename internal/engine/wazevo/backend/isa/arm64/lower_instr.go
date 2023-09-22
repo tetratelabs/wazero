@@ -333,7 +333,14 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		ins.asVecRRR(vecOpBsl, operandNR(rd), rn, rm, vecArrangement16B)
 		m.insert(ins)
 	case ssa.OpcodeVanyTrue, ssa.OpcodeVallTrue:
-		m.lowerVcheckTrue(instr)
+		x, lane := instr.ArgWithLane()
+		var arr vecArrangement
+		if op == ssa.OpcodeVallTrue {
+			arr = ssaLaneToArrangement(lane)
+		}
+		rm := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+		rd := operandNR(m.compiler.VRegOf(instr.Return()))
+		m.lowerVcheckTrue(op, rm, rd, arr)
 	case ssa.OpcodeVhighBits:
 		m.lowerVhighBits(instr)
 	case ssa.OpcodeVIadd:
@@ -399,15 +406,11 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 	m.FlushPendingInstructions()
 }
 
-func (m *machine) lowerVcheckTrue(instr *ssa.Instruction) {
-	x, lane := instr.ArgWithLane()
-
-	rm := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
-	rd := operandNR(m.compiler.VRegOf(instr.Return()))
+func (m *machine) lowerVcheckTrue(op ssa.Opcode, rm, rd operand, arr vecArrangement) {
 	tmp := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeOf(ssa.TypeV128)))
 
 	// Special case VallTrue for i64x2.
-	if instr.Opcode() == ssa.OpcodeVallTrue && lane == ssa.VecLaneI64x2 {
+	if op == ssa.OpcodeVallTrue && arr == vecArrangement2D {
 		// 	cmeq v3?.2d, v2?.2d, #0
 		//	addp v3?.2d, v3?.2d, v3?.2d
 		//	fcmp x3?, x3?
@@ -434,12 +437,11 @@ func (m *machine) lowerVcheckTrue(instr *ssa.Instruction) {
 
 	// Create a scalar value with umaxp or uminv, then compare it against zero.
 	ins := m.allocateInstr()
-	if instr.Opcode() == ssa.OpcodeVanyTrue {
+	if op == ssa.OpcodeVanyTrue {
 		// 	umaxp v4?.16b, v2?.16b, v2?.16b
 		ins.asVecRRR(vecOpUmaxp, tmp, rm, rm, vecArrangement16B)
 	} else {
 		// 	uminv d4?, v2?.4s
-		arr := ssaLaneToArrangement(lane)
 		ins.asVecLanes(vecOpUminv, tmp, rm, arr)
 	}
 	m.insert(ins)
@@ -472,7 +474,6 @@ func (m *machine) lowerVhighBits(instr *ssa.Instruction) {
 	v1 := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeOf(ssa.TypeV128)))
 
 	switch lane {
-
 	case ssa.VecLaneI8x16:
 		//	sshr v6?.16b, v2?.16b, #7
 		//	movz x4?, #0x201, lsl 0

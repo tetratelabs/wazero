@@ -913,8 +913,8 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeVbnot:      returnTypesFnV128,
 	OpcodeVbandnot:   returnTypesFnV128,
 	OpcodeVbitselect: returnTypesFnV128,
-	OpcodeVanyTrue:   returnTypesFnSingle,
-	OpcodeVallTrue:   returnTypesFnSingle,
+	OpcodeVanyTrue:   returnTypesFnI32,
+	OpcodeVallTrue:   returnTypesFnI32,
 	OpcodeVhighBits:  returnTypesFnV128,
 	OpcodeVIadd:      returnTypesFnV128,
 	OpcodeVSaddSat:   returnTypesFnV128,
@@ -2067,7 +2067,7 @@ func (i *Instruction) Format(b Builder) string {
 		OpcodeCeil, OpcodeFloor, OpcodeTrunc, OpcodeNearest:
 		instSuffix = " " + i.v.Format(b)
 	case OpcodeVIadd, OpcodeVSaddSat, OpcodeVUaddSat, OpcodeVIsub, OpcodeVSsubSat, OpcodeVUsubSat,
-		OpcodeVImin, OpcodeVUmin, OpcodeVImax, OpcodeVUmax, OpcodeVImul:
+		OpcodeVImin, OpcodeVUmin, OpcodeVImax, OpcodeVUmax, OpcodeVImul, OpcodeVAvgRound:
 		instSuffix = fmt.Sprintf(".%s %s, %s", VecLane(i.u1), i.v.Format(b), i.v2.Format(b))
 	case OpcodeVIabs, OpcodeVIneg, OpcodeVIpopcnt, OpcodeVhighBits, OpcodeVallTrue, OpcodeVanyTrue:
 		instSuffix = fmt.Sprintf(".%s %s", VecLane(i.u1), i.v.Format(b))
@@ -2463,6 +2463,8 @@ func (o Opcode) String() (ret string) {
 		return "VSsubSat"
 	case OpcodeVUsubSat:
 		return "VUsubSat"
+	case OpcodeVAvgRound:
+		return "OpcodeVAvgRound"
 	case OpcodeVIsub:
 		return "VIsub"
 	case OpcodeVImin:
