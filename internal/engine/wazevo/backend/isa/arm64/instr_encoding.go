@@ -773,6 +773,7 @@ func encodeVecDup(rd, rn uint32, arr vecArrangement) uint32 {
 // encodeVecExtract encodes as "Advanced SIMD extract."
 // Currently only `ext` is defined.
 // https://developer.arm.com/documentation/ddi0602/2023-06/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en#simd-dp
+// https://developer.arm.com/documentation/ddi0602/2023-06/SIMD-FP-Instructions/EXT--Extract-vector-from-pair-of-vectors-?lang=en
 func encodeVecExtract(rd, rn, rm uint32, arr vecArrangement, index uint32) uint32 {
 	var q, imm4 uint32
 	switch arr {
@@ -780,6 +781,8 @@ func encodeVecExtract(rd, rn, rm uint32, arr vecArrangement, index uint32) uint3
 		q, imm4 = 0, 0b0111&uint32(index)
 	case vecArrangement16B:
 		q, imm4 = 1, 0b1111&uint32(index)
+	default:
+		panic("Unsupported arrangement " + arr.String())
 	}
 	return q<<30 | 0b101110000<<21 | rm<<16 | imm4<<11 | rn<<5 | rd
 }
@@ -1603,7 +1606,7 @@ func encodeAdvancedSIMDTwoMisc(op vecOp, rd, rn uint32, arr vecArrangement) uint
 		default:
 			panic("unsupported arrangement: " + arr.String())
 		}
-	case vecOpCmeqZero:
+	case vecOpCmeq0:
 		if arr == vecArrangement1D {
 			panic("unsupported arrangement: " + arr.String())
 		}

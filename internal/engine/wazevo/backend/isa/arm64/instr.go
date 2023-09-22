@@ -1138,10 +1138,17 @@ func (i *instruction) String() (str string) {
 			formatVRegVec(i.rm.nr(), vecArrangement(i.u2), vecIndexNone),
 		)
 	case vecMisc:
-		str = fmt.Sprintf("%s %s, %s",
-			vecOp(i.u1),
-			formatVRegVec(i.rd.nr(), vecArrangement(i.u2), vecIndexNone),
-			formatVRegVec(i.rn.nr(), vecArrangement(i.u2), vecIndexNone))
+		vop := vecOp(i.u1)
+		if vop == vecOpCmeq0 {
+			str = fmt.Sprintf("cmeq %s, %s, #0",
+				formatVRegVec(i.rd.nr(), vecArrangement(i.u2), vecIndexNone),
+				formatVRegVec(i.rn.nr(), vecArrangement(i.u2), vecIndexNone))
+		} else {
+			str = fmt.Sprintf("%s %s, %s",
+				vop,
+				formatVRegVec(i.rd.nr(), vecArrangement(i.u2), vecIndexNone),
+				formatVRegVec(i.rn.nr(), vecArrangement(i.u2), vecIndexNone))
+		}
 	case vecLanes:
 		arr := vecArrangement(i.u2)
 		var destArr vecArrangement
@@ -1567,8 +1574,8 @@ func (b vecOp) String() string {
 	switch b {
 	case vecOpCnt:
 		return "cnt"
-	case vecOpCmeqZero:
-		return "cmeqZero"
+	case vecOpCmeq0:
+		return "cmeq0"
 	case vecOpUaddlv:
 		return "uaddlv"
 	case vecOpBit:
@@ -1629,7 +1636,7 @@ func (b vecOp) String() string {
 
 const (
 	vecOpCnt vecOp = iota
-	vecOpCmeqZero
+	vecOpCmeq0
 	vecOpUaddlv
 	vecOpBit
 	vecOpBic

@@ -408,7 +408,7 @@ func (m *machine) lowerVcheckTrue(instr *ssa.Instruction) {
 
 	if instr.Opcode() == ssa.OpcodeVallTrue && lane == ssa.VecLaneI64x2 {
 		ins := m.allocateInstr()
-		ins.asVecMisc(vecOpCmeqZero, rd, rm, vecArrangement2D)
+		ins.asVecMisc(vecOpCmeq0, rd, rm, vecArrangement2D)
 		m.insert(ins)
 
 		addp := m.allocateInstr()
