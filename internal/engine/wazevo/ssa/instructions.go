@@ -395,14 +395,41 @@ const (
 	// OpcodeVImul performs an integer multiplication: `v = VImul.lane x, y` on vector.
 	OpcodeVImul
 
-	// OpcodeVIneg negates the given vector value: `v = VIneg x`.
+	// OpcodeVIneg negates the given integer vector value: `v = VIneg x`.
 	OpcodeVIneg
 
 	// OpcodeVIpopcnt counts the number of 1-bits in the given vector: `v = VIpopcnt x`.
 	OpcodeVIpopcnt
 
-	// OpcodeVIabs returns the absolute value for the given vector value: `v = VIabs x`.
+	// OpcodeVIabs returns the absolute value for the given vector value: `v = VIabs.lane x`.
 	OpcodeVIabs
+
+	// OpcodeVFabs takes the absolute value of a floating point value: `v = VFabs.lane x on vector.
+	OpcodeVFabs
+
+	// OpcodeVFmax takes the maximum of two floating point values: `v = VFmax.lane x, y on vector.
+	OpcodeVFmax
+
+	// OpcodeVFmin takes the minimum of two floating point values: `v = VFmin.lane x, y on vector.
+	OpcodeVFmin
+
+	// OpcodeVFneg negates the given floating point vector value: `v = VFneg x`.
+	OpcodeVFneg
+
+	// OpcodeVFadd performs a floating point addition: `v = VFadd.lane x, y` on vector.
+	OpcodeVFadd
+
+	// OpcodeVFsub performs a floating point subtraction: `v = VFsub.lane x, y` on vector.
+	OpcodeVFsub
+
+	// OpcodeVFmul performs a floating point multiplication: `v = VFmul.lane x, y` on vector.
+	OpcodeVFmul
+
+	// OpcodeVFdiv performs a floating point division: `v = VFdiv.lane x, y` on vector.
+	OpcodeVFdiv
+
+	// OpcodeVSqrt takes the minimum of two floating point values: `v = VFmin.lane x, y on vector.
+	OpcodeVSqrt
 
 	// OpcodeImul performs an integer multiplication: `v = Imul x, y`.
 	OpcodeImul
@@ -898,6 +925,15 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeVIabs:              sideEffectNone,
 	OpcodeVIneg:              sideEffectNone,
 	OpcodeVIpopcnt:           sideEffectNone,
+	OpcodeVSqrt:              sideEffectNone,
+	OpcodeVFabs:              sideEffectNone,
+	OpcodeVFmin:              sideEffectNone,
+	OpcodeVFmax:              sideEffectNone,
+	OpcodeVFneg:              sideEffectNone,
+	OpcodeVFadd:              sideEffectNone,
+	OpcodeVFsub:              sideEffectNone,
+	OpcodeVFmul:              sideEffectNone,
+	OpcodeVFdiv:              sideEffectNone,
 }
 
 // sideEffect returns true if this instruction has side effects.
@@ -1038,6 +1074,15 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeFdemote:            returnTypesFnF32,
 	OpcodeFpromote:           returnTypesFnF64,
 	OpcodeVconst:             returnTypesFnV128,
+	OpcodeVFabs:              returnTypesFnV128,
+	OpcodeVSqrt:              returnTypesFnV128,
+	OpcodeVFmax:              returnTypesFnV128,
+	OpcodeVFmin:              returnTypesFnV128,
+	OpcodeVFneg:              returnTypesFnV128,
+	OpcodeVFadd:              returnTypesFnV128,
+	OpcodeVFsub:              returnTypesFnV128,
+	OpcodeVFmul:              returnTypesFnV128,
+	OpcodeVFdiv:              returnTypesFnV128,
 }
 
 // AsLoad initializes this instruction as a store instruction with OpcodeLoad.
@@ -1272,6 +1317,93 @@ func (i *Instruction) AsVIpopcnt(x Value, lane VecLane) *Instruction {
 	}
 	i.opcode = OpcodeVIpopcnt
 	i.v = x
+	i.u1 = uint64(lane)
+	i.typ = TypeV128
+	return i
+}
+
+// AsVSqrt initializes this instruction as a sqrt instruction with OpcodeVSqrt on a vector.
+func (i *Instruction) AsVSqrt(x Value, lane VecLane) *Instruction {
+	i.opcode = OpcodeVSqrt
+	i.v = x
+	i.u1 = uint64(lane)
+	i.typ = TypeV128
+	return i
+}
+
+// AsVFabs initializes this instruction as a float abs instruction with OpcodeVFabs on a vector.
+func (i *Instruction) AsVFabs(x Value, lane VecLane) *Instruction {
+	i.opcode = OpcodeVFabs
+	i.v = x
+	i.u1 = uint64(lane)
+	i.typ = TypeV128
+	return i
+}
+
+// AsVFneg initializes this instruction as a float neg instruction with OpcodeVFneg on a vector.
+func (i *Instruction) AsVFneg(x Value, lane VecLane) *Instruction {
+	i.opcode = OpcodeVFneg
+	i.v = x
+	i.u1 = uint64(lane)
+	i.typ = TypeV128
+	return i
+}
+
+// AsVFmax initializes this instruction as a float max instruction with OpcodeVFmax on a vector.
+func (i *Instruction) AsVFmax(x, y Value, lane VecLane) *Instruction {
+	i.opcode = OpcodeVFmax
+	i.v = x
+	i.v2 = y
+	i.u1 = uint64(lane)
+	i.typ = TypeV128
+	return i
+}
+
+// AsVFmin initializes this instruction as a float min instruction with OpcodeVFmin on a vector.
+func (i *Instruction) AsVFmin(x, y Value, lane VecLane) *Instruction {
+	i.opcode = OpcodeVFmin
+	i.v = x
+	i.v2 = y
+	i.u1 = uint64(lane)
+	i.typ = TypeV128
+	return i
+}
+
+// AsVFadd initializes this instruction as a floating point add instruction with OpcodeVFadd on a vector.
+func (i *Instruction) AsVFadd(x, y Value, lane VecLane) *Instruction {
+	i.opcode = OpcodeVFadd
+	i.v = x
+	i.v2 = y
+	i.u1 = uint64(lane)
+	i.typ = TypeV128
+	return i
+}
+
+// AsVFsub initializes this instruction as a floating point subtraction instruction with OpcodeVFsub on a vector.
+func (i *Instruction) AsVFsub(x, y Value, lane VecLane) *Instruction {
+	i.opcode = OpcodeVFsub
+	i.v = x
+	i.v2 = y
+	i.u1 = uint64(lane)
+	i.typ = TypeV128
+	return i
+}
+
+// AsVFmul initializes this instruction as a floating point multiplication instruction with OpcodeVFmul on a vector.
+func (i *Instruction) AsVFmul(x, y Value, lane VecLane) *Instruction {
+	i.opcode = OpcodeVFmul
+	i.v = x
+	i.v2 = y
+	i.u1 = uint64(lane)
+	i.typ = TypeV128
+	return i
+}
+
+// AsVFdiv initializes this instruction as a floating point division instruction with OpcodeVFdiv on a vector.
+func (i *Instruction) AsVFdiv(x, y Value, lane VecLane) *Instruction {
+	i.opcode = OpcodeVFdiv
+	i.v = x
+	i.v2 = y
 	i.u1 = uint64(lane)
 	i.typ = TypeV128
 	return i
@@ -2088,9 +2220,12 @@ func (i *Instruction) Format(b Builder) string {
 		OpcodeCeil, OpcodeFloor, OpcodeTrunc, OpcodeNearest:
 		instSuffix = " " + i.v.Format(b)
 	case OpcodeVIadd, OpcodeVSaddSat, OpcodeVUaddSat, OpcodeVIsub, OpcodeVSsubSat, OpcodeVUsubSat,
-		OpcodeVImin, OpcodeVUmin, OpcodeVImax, OpcodeVUmax, OpcodeVImul, OpcodeVAvgRound:
+		OpcodeVImin, OpcodeVUmin, OpcodeVImax, OpcodeVUmax, OpcodeVImul, OpcodeVAvgRound,
+		OpcodeVFadd, OpcodeVFsub, OpcodeVFmul, OpcodeVFdiv,
+		OpcodeVFmin, OpcodeVFmax:
 		instSuffix = fmt.Sprintf(".%s %s, %s", VecLane(i.u1), i.v.Format(b), i.v2.Format(b))
-	case OpcodeVIabs, OpcodeVIneg, OpcodeVIpopcnt, OpcodeVhighBits, OpcodeVallTrue, OpcodeVanyTrue:
+	case OpcodeVIabs, OpcodeVIneg, OpcodeVIpopcnt, OpcodeVhighBits, OpcodeVallTrue, OpcodeVanyTrue,
+		OpcodeVFabs, OpcodeVFneg, OpcodeVSqrt:
 		instSuffix = fmt.Sprintf(".%s %s", VecLane(i.u1), i.v.Format(b))
 	default:
 		panic(fmt.Sprintf("TODO: format for %s", i.opcode))
@@ -2506,6 +2641,25 @@ func (o Opcode) String() (ret string) {
 		return "VIneg"
 	case OpcodeVIpopcnt:
 		return "VIpopcnt"
+	case OpcodeVFabs:
+		return "VFabs"
+	case OpcodeVFmax:
+		return "VFmax"
+	case OpcodeVFmin:
+		return "VFmin"
+	case OpcodeVFneg:
+		return "VFneg"
+	case OpcodeVFadd:
+		return "VFadd"
+	case OpcodeVFsub:
+		return "VFsub"
+	case OpcodeVFmul:
+		return "VFmul"
+	case OpcodeVFdiv:
+		return "VFdiv"
+	case OpcodeVSqrt:
+		return "VSqrt"
+
 	}
 	panic(fmt.Sprintf("unknown opcode %d", o))
 }

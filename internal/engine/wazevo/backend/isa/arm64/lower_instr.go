@@ -406,6 +406,36 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		m.lowerVecMisc(vecOpNeg, instr)
 	case ssa.OpcodeVIpopcnt:
 		m.lowerVecMisc(vecOpCnt, instr)
+	case ssa.OpcodeVSqrt:
+		m.lowerVecMisc(vecOpFsqrt, instr)
+	case ssa.OpcodeVFabs:
+		m.lowerVecMisc(vecOpFabs, instr)
+	case ssa.OpcodeVFneg:
+		m.lowerVecMisc(vecOpFneg, instr)
+	case ssa.OpcodeVFmin:
+		x, y, lane := instr.Arg2WithLane()
+		arr := ssaLaneToArrangement(lane)
+		m.lowerVecRRR(vecOpFmin, x, y, instr.Return(), arr)
+	case ssa.OpcodeVFmax:
+		x, y, lane := instr.Arg2WithLane()
+		arr := ssaLaneToArrangement(lane)
+		m.lowerVecRRR(vecOpFmax, x, y, instr.Return(), arr)
+	case ssa.OpcodeVFadd:
+		x, y, lane := instr.Arg2WithLane()
+		arr := ssaLaneToArrangement(lane)
+		m.lowerVecRRR(vecOpFadd, x, y, instr.Return(), arr)
+	case ssa.OpcodeVFsub:
+		x, y, lane := instr.Arg2WithLane()
+		arr := ssaLaneToArrangement(lane)
+		m.lowerVecRRR(vecOpFsub, x, y, instr.Return(), arr)
+	case ssa.OpcodeVFmul:
+		x, y, lane := instr.Arg2WithLane()
+		arr := ssaLaneToArrangement(lane)
+		m.lowerVecRRR(vecOpFmul, x, y, instr.Return(), arr)
+	case ssa.OpcodeVFdiv:
+		x, y, lane := instr.Arg2WithLane()
+		arr := ssaLaneToArrangement(lane)
+		m.lowerVecRRR(vecOpFdiv, x, y, instr.Return(), arr)
 	default:
 		panic("TODO: lowering " + op.String())
 	}

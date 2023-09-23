@@ -1602,6 +1602,8 @@ func (b vecOp) String() string {
 		return "orr"
 	case vecOpEOR:
 		return "eor"
+	case vecOpFadd:
+		return "fadd"
 	case vecOpAdd:
 		return "add"
 	case vecOpAddp:
@@ -1610,6 +1612,8 @@ func (b vecOp) String() string {
 		return "addv"
 	case vecOpSub:
 		return "sub"
+	case vecOpFsub:
+		return "fsub"
 	case vecOpSmin:
 		return "smin"
 	case vecOpUmin:
@@ -1624,12 +1628,20 @@ func (b vecOp) String() string {
 		return "umaxp"
 	case vecOpUrhadd:
 		return "urhadd"
+	case vecOpFmul:
+		return "fmul"
 	case vecOpMul:
 		return "mul"
 	case vecOpUmlal:
 		return "umlal"
+	case vecOpFdiv:
+		return "fmul"
 	case vecOpNeg:
 		return "neg"
+	case vecOpFneg:
+		return "fneg"
+	case vecOpFsqrt:
+		return "fsqrt"
 	case vecOpRev64:
 		return "rev64"
 	case vecOpXtn:
@@ -1640,6 +1652,12 @@ func (b vecOp) String() string {
 		return "sshr"
 	case vecOpZip1:
 		return "zip1"
+	case vecOpFabs:
+		return "fabs"
+	case vecOpFmin:
+		return "fmin"
+	case vecOpFmax:
+		return "fmax"
 	}
 	panic(int(b))
 }
@@ -1661,24 +1679,33 @@ const (
 	vecOpOrr
 	vecOpEOR
 	vecOpAdd
+	vecOpFadd
 	vecOpAddv
 	vecOpSqadd
 	vecOpUqadd
 	vecOpAddp
 	vecOpSub
+	vecOpFsub
 	vecOpSqsub
 	vecOpUqsub
 	vecOpSmin
 	vecOpUmin
 	vecOpUminv
+	vecOpFmin
 	vecOpSmax
 	vecOpUmax
 	vecOpUmaxp
+	vecOpFmax
 	vecOpUrhadd
 	vecOpMul
+	vecOpFmul
 	vecOpUmlal
+	vecOpFdiv
+	vecOpFsqrt
 	vecOpAbs
+	vecOpFabs
 	vecOpNeg
+	vecOpFneg
 	vecOpRev64
 	vecOpXtn
 	vecOpShll
