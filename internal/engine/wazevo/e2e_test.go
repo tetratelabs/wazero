@@ -158,6 +158,10 @@ func TestSpectestV2(t *testing.T) {
 		{"simd_i16x8_cmp"},
 		{"simd_i32x4_cmp"},
 		{"simd_i64x2_cmp"},
+		{"simd_f32x4"},
+		{"simd_f64x2"},
+		{"simd_f32x4_arith"},
+		{"simd_f64x2_arith"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Run("normal", func(t *testing.T) {
