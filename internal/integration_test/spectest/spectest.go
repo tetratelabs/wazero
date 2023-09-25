@@ -422,9 +422,6 @@ func RunCase(t *testing.T, testDataFS embed.FS, f string, ctx context.Context, c
 						}
 						matched, valuesMsg := valuesEq(results, exps, fn.Definition().ResultTypes(), laneTypes)
 						require.True(t, matched, msg+"\n"+valuesMsg)
-						if !matched {
-							panic("stop")
-						}
 					case "get":
 						_, exps := c.getAssertReturnArgsExps()
 						require.Equal(t, 1, len(exps))
