@@ -464,7 +464,13 @@ const (
 	// OpcodeVNearest takes the nearest integer of the given floating point value: `v = nearest.lane x` on vector.
 	OpcodeVNearest
 
-	// OpcodeVSqrt takes the minimum of two floating point values: `v = VFmin.lane x, y on vector.
+	// OpcodeVMaxPseudo computes the lane-wise maximum value `v = VMaxPseudo.lane x, y` on vector defined as `x < y ? x : y`.
+	OpcodeVMaxPseudo
+
+	// OpcodeVMinPseudo computes the lane-wise minimum value `v = VMinPseudo.lane x, y` on vector defined as `y < x ? x : y`.
+	OpcodeVMinPseudo
+
+	// OpcodeVSqrt takes the minimum of two floating point values: `v = VFmin.lane x, y` on vector.
 	OpcodeVSqrt
 
 	// OpcodeImul performs an integer multiplication: `v = Imul x, y`.
@@ -975,6 +981,8 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeVFloor:             sideEffectNone,
 	OpcodeVTrunc:             sideEffectNone,
 	OpcodeVNearest:           sideEffectNone,
+	OpcodeVMaxPseudo:         sideEffectNone,
+	OpcodeVMinPseudo:         sideEffectNone,
 }
 
 // sideEffect returns true if this instruction has side effects.
@@ -1129,6 +1137,8 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeVFloor:             returnTypesFnV128,
 	OpcodeVTrunc:             returnTypesFnV128,
 	OpcodeVNearest:           returnTypesFnV128,
+	OpcodeVMaxPseudo:         returnTypesFnV128,
+	OpcodeVMinPseudo:         returnTypesFnV128,
 }
 
 // AsLoad initializes this instruction as a store instruction with OpcodeLoad.
@@ -1550,6 +1560,26 @@ func (i *Instruction) AsVNearest(x Value, lane VecLane) *Instruction {
 	i.opcode = OpcodeVNearest
 	i.v = x
 	i.typ = x.Type()
+	i.u1 = uint64(lane)
+	return i
+}
+
+// AsVMaxPseudo initializes this instruction as an instruction with OpcodeVMaxPseudo.
+func (i *Instruction) AsVMaxPseudo(x, y Value, lane VecLane) *Instruction {
+	i.opcode = OpcodeVMaxPseudo
+	i.typ = x.Type()
+	i.v = x
+	i.v2 = y
+	i.u1 = uint64(lane)
+	return i
+}
+
+// AsVMinPseudo initializes this instruction as an instruction with OpcodeVMinPseudo.
+func (i *Instruction) AsVMinPseudo(x, y Value, lane VecLane) *Instruction {
+	i.opcode = OpcodeVMinPseudo
+	i.typ = x.Type()
+	i.v = x
+	i.v2 = y
 	i.u1 = uint64(lane)
 	return i
 }
@@ -2320,7 +2350,7 @@ func (i *Instruction) Format(b Builder) string {
 	case OpcodeVIadd, OpcodeVSaddSat, OpcodeVUaddSat, OpcodeVIsub, OpcodeVSsubSat, OpcodeVUsubSat,
 		OpcodeVImin, OpcodeVUmin, OpcodeVImax, OpcodeVUmax, OpcodeVImul, OpcodeVAvgRound,
 		OpcodeVFadd, OpcodeVFsub, OpcodeVFmul, OpcodeVFdiv,
-		OpcodeVFmin, OpcodeVFmax:
+		OpcodeVFmin, OpcodeVFmax, OpcodeVMinPseudo, OpcodeVMaxPseudo:
 		instSuffix = fmt.Sprintf(".%s %s, %s", VecLane(i.u1), i.v.Format(b), i.v2.Format(b))
 	case OpcodeVIabs, OpcodeVIneg, OpcodeVIpopcnt, OpcodeVhighBits, OpcodeVallTrue, OpcodeVanyTrue,
 		OpcodeVFabs, OpcodeVFneg, OpcodeVSqrt, OpcodeVCeil, OpcodeVFloor, OpcodeVTrunc, OpcodeVNearest:
@@ -2757,6 +2787,18 @@ func (o Opcode) String() (ret string) {
 		return "VFdiv"
 	case OpcodeVFcmp:
 		return "VFcmp"
+	case OpcodeVCeil:
+		return "VCeil"
+	case OpcodeVFloor:
+		return "VFloor"
+	case OpcodeVTrunc:
+		return "VTrunc"
+	case OpcodeVNearest:
+		return "VNearest"
+	case OpcodeVMaxPseudo:
+		return "VMaxPseudo"
+	case OpcodeVMinPseudo:
+		return "VMinPseudo"
 	case OpcodeVSqrt:
 		return "VSqrt"
 

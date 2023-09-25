@@ -171,6 +171,10 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		m.lowerVecMisc(vecOpFrintz, instr)
 	case ssa.OpcodeVNearest:
 		m.lowerVecMisc(vecOpFrintn, instr)
+	case ssa.OpcodeVMaxPseudo:
+		m.lowerVMinMaxPseudo(instr, true)
+	case ssa.OpcodeVMinPseudo:
+		m.lowerVMinMaxPseudo(instr, false)
 	case ssa.OpcodeBand:
 		m.lowerBitwiseAluOp(instr, aluOpAnd)
 	case ssa.OpcodeBor:
@@ -771,6 +775,28 @@ func (m *machine) lowerVIMul(rd, rn, rm operand, arr vecArrangement) {
 		umlal.asVecRRR(vecOpUmlal, rd, tmp3, tmp1, vecArrangement2S)
 		m.insert(umlal)
 	}
+}
+
+func (m *machine) lowerVMinMaxPseudo(instr *ssa.Instruction, max bool) {
+	x, y, lane := instr.Arg2WithLane()
+	arr := ssaLaneToArrangement(lane)
+
+	rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+	rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
+	rd := operandNR(m.compiler.VRegOf(instr.Return()))
+
+	fcmgt := m.allocateInstr()
+	if max {
+		fcmgt.asVecRRR(vecOpFcmgt, rd, rm, rn, arr)
+	} else {
+		// if min, swap the args
+		fcmgt.asVecRRR(vecOpFcmgt, rd, rn, rm, arr)
+	}
+	m.insert(fcmgt)
+
+	bsl := m.allocateInstr()
+	bsl.asVecRRR(vecOpBsl, rd, rm, rn, vecArrangement16B)
+	m.insert(bsl)
 }
 
 func (m *machine) lowerIRem(execCtxVReg regalloc.VReg, rd, rn, rm operand, _64bit, signed bool) {

@@ -2154,6 +2154,30 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVNearest(v1, lane).Insert(builder).Return()
 			state.push(ret)
+		case wasm.OpcodeVecF32x4Pmin, wasm.OpcodeVecF64x2Pmin:
+			var lane ssa.VecLane
+			switch vecOp {
+			case wasm.OpcodeVecF32x4Pmin:
+				lane = ssa.VecLaneF32x4
+			case wasm.OpcodeVecF64x2Pmin:
+				lane = ssa.VecLaneF64x2
+			}
+			v2 := state.pop()
+			v1 := state.pop()
+			ret := builder.AllocateInstruction().AsVMinPseudo(v1, v2, lane).Insert(builder).Return()
+			state.push(ret)
+		case wasm.OpcodeVecF32x4Pmax, wasm.OpcodeVecF64x2Pmax:
+			var lane ssa.VecLane
+			switch vecOp {
+			case wasm.OpcodeVecF32x4Pmax:
+				lane = ssa.VecLaneF32x4
+			case wasm.OpcodeVecF64x2Pmax:
+				lane = ssa.VecLaneF64x2
+			}
+			v2 := state.pop()
+			v1 := state.pop()
+			ret := builder.AllocateInstruction().AsVMaxPseudo(v1, v2, lane).Insert(builder).Return()
+			state.push(ret)
 		default:
 			panic("TODO: unsupported vector instruction: " + wasm.VectorInstructionName(vecOp))
 		}
