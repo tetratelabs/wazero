@@ -1602,6 +1602,12 @@ func (b vecOp) String() string {
 		return "cmge"
 	case vecOpCmhs:
 		return "cmhs"
+	case vecOpFcmeq:
+		return "fcmeq"
+	case vecOpFcmgt:
+		return "fcmgt"
+	case vecOpFcmge:
+		return "fcmge"
 	case vecOpCmeq0:
 		return "cmeq0"
 	case vecOpUaddlv:
@@ -1658,6 +1664,14 @@ func (b vecOp) String() string {
 		return "neg"
 	case vecOpFneg:
 		return "fneg"
+	case vecOpFrintp:
+		return "frintp"
+	case vecOpFrintm:
+		return "frintm"
+	case vecOpFrintn:
+		return "frintn"
+	case vecOpFrintz:
+		return "frintz"
 	case vecOpFsqrt:
 		return "fsqrt"
 	case vecOpRev64:
@@ -1688,6 +1702,9 @@ const (
 	vecOpCmhi
 	vecOpCmge
 	vecOpCmhs
+	vecOpFcmeq
+	vecOpFcmgt
+	vecOpFcmge
 	vecOpUaddlv
 	vecOpBit
 	vecOpBic
@@ -1724,6 +1741,10 @@ const (
 	vecOpFabs
 	vecOpNeg
 	vecOpFneg
+	vecOpFrintm
+	vecOpFrintn
+	vecOpFrintp
+	vecOpFrintz
 	vecOpRev64
 	vecOpXtn
 	vecOpShll
