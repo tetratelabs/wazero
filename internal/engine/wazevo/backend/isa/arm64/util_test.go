@@ -62,7 +62,7 @@ type mockCompiler struct {
 	buf         []byte
 }
 
-func (m *mockCompiler) SourceOffsetInfo() []backend.SourceOffset { return nil }
+func (m *mockCompiler) SourceOffsetInfo() []backend.SourceOffsetInfo { return nil }
 
 func (m *mockCompiler) AddSourceOffsetInfo(int64, ssa.SourceOffset) {}
 
