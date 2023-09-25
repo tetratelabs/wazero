@@ -2033,6 +2033,9 @@ func (c *Compiler) lowerCurrentOpcode() {
 			ret := builder.AllocateInstruction().AsVFdiv(v1, v2, lane).Insert(builder).Return()
 			state.push(ret)
 		case wasm.OpcodeVecF32x4Eq, wasm.OpcodeVecF64x2Eq:
+			if state.unreachable {
+				break
+			}
 			var lane ssa.VecLane
 			switch vecOp {
 			case wasm.OpcodeVecF32x4Eq:
@@ -2046,6 +2049,9 @@ func (c *Compiler) lowerCurrentOpcode() {
 				AsVFcmp(v1, v2, ssa.FloatCmpCondEqual, lane).Insert(builder).Return()
 			state.push(ret)
 		case wasm.OpcodeVecF32x4Ne, wasm.OpcodeVecF64x2Ne:
+			if state.unreachable {
+				break
+			}
 			var lane ssa.VecLane
 			switch vecOp {
 			case wasm.OpcodeVecF32x4Ne:
@@ -2059,6 +2065,9 @@ func (c *Compiler) lowerCurrentOpcode() {
 				AsVFcmp(v1, v2, ssa.FloatCmpCondNotEqual, lane).Insert(builder).Return()
 			state.push(ret)
 		case wasm.OpcodeVecF32x4Lt, wasm.OpcodeVecF64x2Lt:
+			if state.unreachable {
+				break
+			}
 			var lane ssa.VecLane
 			switch vecOp {
 			case wasm.OpcodeVecF32x4Lt:
@@ -2072,6 +2081,9 @@ func (c *Compiler) lowerCurrentOpcode() {
 				AsVFcmp(v1, v2, ssa.FloatCmpCondLessThan, lane).Insert(builder).Return()
 			state.push(ret)
 		case wasm.OpcodeVecF32x4Le, wasm.OpcodeVecF64x2Le:
+			if state.unreachable {
+				break
+			}
 			var lane ssa.VecLane
 			switch vecOp {
 			case wasm.OpcodeVecF32x4Le:
@@ -2085,6 +2097,9 @@ func (c *Compiler) lowerCurrentOpcode() {
 				AsVFcmp(v1, v2, ssa.FloatCmpCondLessThanOrEqual, lane).Insert(builder).Return()
 			state.push(ret)
 		case wasm.OpcodeVecF32x4Gt, wasm.OpcodeVecF64x2Gt:
+			if state.unreachable {
+				break
+			}
 			var lane ssa.VecLane
 			switch vecOp {
 			case wasm.OpcodeVecF32x4Gt:
@@ -2098,6 +2113,9 @@ func (c *Compiler) lowerCurrentOpcode() {
 				AsVFcmp(v1, v2, ssa.FloatCmpCondGreaterThan, lane).Insert(builder).Return()
 			state.push(ret)
 		case wasm.OpcodeVecF32x4Ge, wasm.OpcodeVecF64x2Ge:
+			if state.unreachable {
+				break
+			}
 			var lane ssa.VecLane
 			switch vecOp {
 			case wasm.OpcodeVecF32x4Ge:
@@ -2111,6 +2129,9 @@ func (c *Compiler) lowerCurrentOpcode() {
 				AsVFcmp(v1, v2, ssa.FloatCmpCondGreaterThanOrEqual, lane).Insert(builder).Return()
 			state.push(ret)
 		case wasm.OpcodeVecF32x4Ceil, wasm.OpcodeVecF64x2Ceil:
+			if state.unreachable {
+				break
+			}
 			var lane ssa.VecLane
 			switch vecOp {
 			case wasm.OpcodeVecF32x4Ceil:
@@ -2122,6 +2143,9 @@ func (c *Compiler) lowerCurrentOpcode() {
 			ret := builder.AllocateInstruction().AsVCeil(v1, lane).Insert(builder).Return()
 			state.push(ret)
 		case wasm.OpcodeVecF32x4Floor, wasm.OpcodeVecF64x2Floor:
+			if state.unreachable {
+				break
+			}
 			var lane ssa.VecLane
 			switch vecOp {
 			case wasm.OpcodeVecF32x4Floor:
@@ -2133,6 +2157,9 @@ func (c *Compiler) lowerCurrentOpcode() {
 			ret := builder.AllocateInstruction().AsVFloor(v1, lane).Insert(builder).Return()
 			state.push(ret)
 		case wasm.OpcodeVecF32x4Trunc, wasm.OpcodeVecF64x2Trunc:
+			if state.unreachable {
+				break
+			}
 			var lane ssa.VecLane
 			switch vecOp {
 			case wasm.OpcodeVecF32x4Trunc:
@@ -2144,6 +2171,9 @@ func (c *Compiler) lowerCurrentOpcode() {
 			ret := builder.AllocateInstruction().AsVTrunc(v1, lane).Insert(builder).Return()
 			state.push(ret)
 		case wasm.OpcodeVecF32x4Nearest, wasm.OpcodeVecF64x2Nearest:
+			if state.unreachable {
+				break
+			}
 			var lane ssa.VecLane
 			switch vecOp {
 			case wasm.OpcodeVecF32x4Nearest:
@@ -2155,6 +2185,9 @@ func (c *Compiler) lowerCurrentOpcode() {
 			ret := builder.AllocateInstruction().AsVNearest(v1, lane).Insert(builder).Return()
 			state.push(ret)
 		case wasm.OpcodeVecF32x4Pmin, wasm.OpcodeVecF64x2Pmin:
+			if state.unreachable {
+				break
+			}
 			var lane ssa.VecLane
 			switch vecOp {
 			case wasm.OpcodeVecF32x4Pmin:
@@ -2167,6 +2200,9 @@ func (c *Compiler) lowerCurrentOpcode() {
 			ret := builder.AllocateInstruction().AsVMinPseudo(v1, v2, lane).Insert(builder).Return()
 			state.push(ret)
 		case wasm.OpcodeVecF32x4Pmax, wasm.OpcodeVecF64x2Pmax:
+			if state.unreachable {
+				break
+			}
 			var lane ssa.VecLane
 			switch vecOp {
 			case wasm.OpcodeVecF32x4Pmax:
