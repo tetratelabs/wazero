@@ -631,6 +631,42 @@ func TestInstruction_encode(t *testing.T) {
 		{want: "41e4636e", setup: func(i *instruction) {
 			i.asVecRRR(vecOpFcmge, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
 		}},
+		{want: "4198210e", setup: func(i *instruction) {
+			i.asVecMisc(vecOpFrintm, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2S)
+		}},
+		{want: "4198214e", setup: func(i *instruction) {
+			i.asVecMisc(vecOpFrintm, operandNR(v1VReg), operandNR(v2VReg), vecArrangement4S)
+		}},
+		{want: "4198614e", setup: func(i *instruction) {
+			i.asVecMisc(vecOpFrintm, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2D)
+		}},
+		{want: "4188210e", setup: func(i *instruction) {
+			i.asVecMisc(vecOpFrintn, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2S)
+		}},
+		{want: "4188214e", setup: func(i *instruction) {
+			i.asVecMisc(vecOpFrintn, operandNR(v1VReg), operandNR(v2VReg), vecArrangement4S)
+		}},
+		{want: "4188614e", setup: func(i *instruction) {
+			i.asVecMisc(vecOpFrintn, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2D)
+		}},
+		{want: "4188a10e", setup: func(i *instruction) {
+			i.asVecMisc(vecOpFrintp, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2S)
+		}},
+		{want: "4188a14e", setup: func(i *instruction) {
+			i.asVecMisc(vecOpFrintp, operandNR(v1VReg), operandNR(v2VReg), vecArrangement4S)
+		}},
+		{want: "4188e14e", setup: func(i *instruction) {
+			i.asVecMisc(vecOpFrintp, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2D)
+		}},
+		{want: "4198a10e", setup: func(i *instruction) {
+			i.asVecMisc(vecOpFrintz, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2S)
+		}},
+		{want: "4198a14e", setup: func(i *instruction) {
+			i.asVecMisc(vecOpFrintz, operandNR(v1VReg), operandNR(v2VReg), vecArrangement4S)
+		}},
+		{want: "4198e14e", setup: func(i *instruction) {
+			i.asVecMisc(vecOpFrintz, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2D)
+		}},
 		{want: "41b8200e", setup: func(i *instruction) {
 			i.asVecMisc(vecOpAbs, operandNR(v1VReg), operandNR(v2VReg), vecArrangement8B)
 		}},

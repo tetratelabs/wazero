@@ -1762,6 +1762,46 @@ func encodeAdvancedSIMDTwoMisc(op vecOp, rd, rn uint32, arr vecArrangement) uint
 		opcode = 0b01111
 		u = 0b1
 		size, q = arrToSizeQEncoded(arr)
+	case vecOpFrintm:
+		u = 0b0
+		opcode = 0b11001
+		switch arr {
+		case vecArrangement2S:
+			q, size = 0b0, 0b00
+		case vecArrangement4S:
+			q, size = 0b1, 0b00
+		case vecArrangement2D:
+			q, size = 0b1, 0b01
+		default:
+			panic("unsupported arrangement: " + arr.String())
+		}
+	case vecOpFrintn:
+		u = 0b0
+		opcode = 0b11000
+		switch arr {
+		case vecArrangement2S:
+			q, size = 0b0, 0b00
+		case vecArrangement4S:
+			q, size = 0b1, 0b00
+		case vecArrangement2D:
+			q, size = 0b1, 0b01
+		default:
+			panic("unsupported arrangement: " + arr.String())
+		}
+	case vecOpFrintp:
+		u = 0b0
+		opcode = 0b11000
+		if arr < vecArrangement2S || arr == vecArrangement1D {
+			panic("unsupported arrangement: " + arr.String())
+		}
+		size, q = arrToSizeQEncoded(arr)
+	case vecOpFrintz:
+		u = 0b0
+		opcode = 0b11001
+		if arr < vecArrangement2S || arr == vecArrangement1D {
+			panic("unsupported arrangement: " + arr.String())
+		}
+		size, q = arrToSizeQEncoded(arr)
 	case vecOpFsqrt:
 		if arr < vecArrangement2S || arr == vecArrangement1D {
 			panic("unsupported arrangement: " + arr.String())

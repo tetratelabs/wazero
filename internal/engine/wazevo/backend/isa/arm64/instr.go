@@ -1664,6 +1664,14 @@ func (b vecOp) String() string {
 		return "neg"
 	case vecOpFneg:
 		return "fneg"
+	case vecOpFrintp:
+		return "frintp"
+	case vecOpFrintm:
+		return "frintm"
+	case vecOpFrintn:
+		return "frintn"
+	case vecOpFrintz:
+		return "frintz"
 	case vecOpFsqrt:
 		return "fsqrt"
 	case vecOpRev64:
@@ -1733,6 +1741,10 @@ const (
 	vecOpFabs
 	vecOpNeg
 	vecOpFneg
+	vecOpFrintm
+	vecOpFrintn
+	vecOpFrintp
+	vecOpFrintz
 	vecOpRev64
 	vecOpXtn
 	vecOpShll

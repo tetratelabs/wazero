@@ -452,6 +452,18 @@ const (
 	// OpcodeVFcmp compares two float values with the given condition: `v = VFcmp.lane Cond, x, y` on float.
 	OpcodeVFcmp
 
+	// OpcodeVCeil takes the ceiling of the given floating point value: `v = ceil.lane x` on vector.
+	OpcodeVCeil
+
+	// OpcodeVFloor takes the floor of the given floating point value: `v = floor.lane x` on vector.
+	OpcodeVFloor
+
+	// OpcodeVTrunc takes the truncation of the given floating point value: `v = trunc.lane x` on vector.
+	OpcodeVTrunc
+
+	// OpcodeVNearest takes the nearest integer of the given floating point value: `v = nearest.lane x` on vector.
+	OpcodeVNearest
+
 	// OpcodeVSqrt takes the minimum of two floating point values: `v = VFmin.lane x, y on vector.
 	OpcodeVSqrt
 
@@ -959,6 +971,10 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeVFmul:              sideEffectNone,
 	OpcodeVFdiv:              sideEffectNone,
 	OpcodeVFcmp:              sideEffectNone,
+	OpcodeVCeil:              sideEffectNone,
+	OpcodeVFloor:             sideEffectNone,
+	OpcodeVTrunc:             sideEffectNone,
+	OpcodeVNearest:           sideEffectNone,
 }
 
 // sideEffect returns true if this instruction has side effects.
@@ -1109,6 +1125,10 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeVFmul:              returnTypesFnV128,
 	OpcodeVFdiv:              returnTypesFnV128,
 	OpcodeVFcmp:              returnTypesFnI32,
+	OpcodeVCeil:              returnTypesFnV128,
+	OpcodeVFloor:             returnTypesFnV128,
+	OpcodeVTrunc:             returnTypesFnV128,
+	OpcodeVNearest:           returnTypesFnV128,
 }
 
 // AsLoad initializes this instruction as a store instruction with OpcodeLoad.
@@ -1495,6 +1515,42 @@ func (i *Instruction) AsVFcmp(x, y Value, c FloatCmpCond, lane VecLane) *Instruc
 	i.u1 = uint64(c)
 	i.typ = TypeI32
 	i.u2 = uint64(lane)
+	return i
+}
+
+// AsVCeil initializes this instruction as an instruction with OpcodeCeil.
+func (i *Instruction) AsVCeil(x Value, lane VecLane) *Instruction {
+	i.opcode = OpcodeVCeil
+	i.v = x
+	i.typ = x.Type()
+	i.u1 = uint64(lane)
+	return i
+}
+
+// AsVFloor initializes this instruction as an instruction with OpcodeFloor.
+func (i *Instruction) AsVFloor(x Value, lane VecLane) *Instruction {
+	i.opcode = OpcodeVFloor
+	i.v = x
+	i.typ = x.Type()
+	i.u1 = uint64(lane)
+	return i
+}
+
+// AsVTrunc initializes this instruction as an instruction with OpcodeTrunc.
+func (i *Instruction) AsVTrunc(x Value, lane VecLane) *Instruction {
+	i.opcode = OpcodeVTrunc
+	i.v = x
+	i.typ = x.Type()
+	i.u1 = uint64(lane)
+	return i
+}
+
+// AsVNearest initializes this instruction as an instruction with OpcodeNearest.
+func (i *Instruction) AsVNearest(x Value, lane VecLane) *Instruction {
+	i.opcode = OpcodeVNearest
+	i.v = x
+	i.typ = x.Type()
+	i.u1 = uint64(lane)
 	return i
 }
 
@@ -2267,7 +2323,7 @@ func (i *Instruction) Format(b Builder) string {
 		OpcodeVFmin, OpcodeVFmax:
 		instSuffix = fmt.Sprintf(".%s %s, %s", VecLane(i.u1), i.v.Format(b), i.v2.Format(b))
 	case OpcodeVIabs, OpcodeVIneg, OpcodeVIpopcnt, OpcodeVhighBits, OpcodeVallTrue, OpcodeVanyTrue,
-		OpcodeVFabs, OpcodeVFneg, OpcodeVSqrt:
+		OpcodeVFabs, OpcodeVFneg, OpcodeVSqrt, OpcodeVCeil, OpcodeVFloor, OpcodeVTrunc, OpcodeVNearest:
 		instSuffix = fmt.Sprintf(".%s %s", VecLane(i.u1), i.v.Format(b))
 	default:
 		panic(fmt.Sprintf("TODO: format for %s", i.opcode))

@@ -163,6 +163,14 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		m.lowerVIcmp(instr)
 	case ssa.OpcodeVFcmp:
 		m.lowerVFcmp(instr)
+	case ssa.OpcodeVCeil:
+		m.lowerVecMisc(vecOpFrintp, instr)
+	case ssa.OpcodeVFloor:
+		m.lowerVecMisc(vecOpFrintm, instr)
+	case ssa.OpcodeVTrunc:
+		m.lowerVecMisc(vecOpFrintz, instr)
+	case ssa.OpcodeVNearest:
+		m.lowerVecMisc(vecOpFrintn, instr)
 	case ssa.OpcodeBand:
 		m.lowerBitwiseAluOp(instr, aluOpAnd)
 	case ssa.OpcodeBor:

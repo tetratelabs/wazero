@@ -2110,6 +2110,50 @@ func (c *Compiler) lowerCurrentOpcode() {
 			ret := builder.AllocateInstruction().
 				AsVFcmp(v1, v2, ssa.FloatCmpCondGreaterThanOrEqual, lane).Insert(builder).Return()
 			state.push(ret)
+		case wasm.OpcodeVecF32x4Ceil, wasm.OpcodeVecF64x2Ceil:
+			var lane ssa.VecLane
+			switch vecOp {
+			case wasm.OpcodeVecF32x4Ceil:
+				lane = ssa.VecLaneF32x4
+			case wasm.OpcodeVecF64x2Ceil:
+				lane = ssa.VecLaneF64x2
+			}
+			v1 := state.pop()
+			ret := builder.AllocateInstruction().AsVCeil(v1, lane).Insert(builder).Return()
+			state.push(ret)
+		case wasm.OpcodeVecF32x4Floor, wasm.OpcodeVecF64x2Floor:
+			var lane ssa.VecLane
+			switch vecOp {
+			case wasm.OpcodeVecF32x4Floor:
+				lane = ssa.VecLaneF32x4
+			case wasm.OpcodeVecF64x2Floor:
+				lane = ssa.VecLaneF64x2
+			}
+			v1 := state.pop()
+			ret := builder.AllocateInstruction().AsVFloor(v1, lane).Insert(builder).Return()
+			state.push(ret)
+		case wasm.OpcodeVecF32x4Trunc, wasm.OpcodeVecF64x2Trunc:
+			var lane ssa.VecLane
+			switch vecOp {
+			case wasm.OpcodeVecF32x4Trunc:
+				lane = ssa.VecLaneF32x4
+			case wasm.OpcodeVecF64x2Trunc:
+				lane = ssa.VecLaneF64x2
+			}
+			v1 := state.pop()
+			ret := builder.AllocateInstruction().AsVTrunc(v1, lane).Insert(builder).Return()
+			state.push(ret)
+		case wasm.OpcodeVecF32x4Nearest, wasm.OpcodeVecF64x2Nearest:
+			var lane ssa.VecLane
+			switch vecOp {
+			case wasm.OpcodeVecF32x4Nearest:
+				lane = ssa.VecLaneF32x4
+			case wasm.OpcodeVecF64x2Nearest:
+				lane = ssa.VecLaneF64x2
+			}
+			v1 := state.pop()
+			ret := builder.AllocateInstruction().AsVNearest(v1, lane).Insert(builder).Return()
+			state.push(ret)
 		default:
 			panic("TODO: unsupported vector instruction: " + wasm.VectorInstructionName(vecOp))
 		}
