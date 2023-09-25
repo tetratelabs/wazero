@@ -126,6 +126,11 @@ func (m *machine) LowerConditionalBranch(b *ssa.Instruction) {
 
 // LowerInstr implements backend.Machine.
 func (m *machine) LowerInstr(instr *ssa.Instruction) {
+	if l := instr.SourceOffset(); l.Valid() {
+		info := m.allocateInstr().asEmitSourceOffsetInfo(l)
+		m.insert(info)
+	}
+
 	switch op := instr.Opcode(); op {
 	case ssa.OpcodeBrz, ssa.OpcodeBrnz, ssa.OpcodeJump, ssa.OpcodeBrTable:
 		panic("BUG: branching instructions are handled by LowerBranches")

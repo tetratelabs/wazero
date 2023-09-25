@@ -104,11 +104,17 @@ type Compiler interface {
 	// AddRelocationInfo appends the relocation information for the function reference at the current buffer offset.
 	AddRelocationInfo(funcRef ssa.FuncRef)
 
+	// AddSourceOffsetInfo appends the source offset information for the given offset.
+	AddSourceOffsetInfo(executableOffset int64, sourceOffset ssa.SourceOffset)
+
+	// SourceOffsetInfo returns the source offset information for the current buffer offset.
+	SourceOffsetInfo() []SourceOffsetInfo
+
 	// Emit4Bytes appends 4 bytes to the buffer. Used during the code emission.
 	Emit4Bytes(b uint32)
 }
 
-// RelocationInfo is represents the relocation information for a call instruction.
+// RelocationInfo represents the relocation information for a call instruction.
 type RelocationInfo struct {
 	// Offset represents the offset from the beginning of the machine code of either a function or the entire module.
 	Offset int64
@@ -145,6 +151,15 @@ type compiler struct {
 	ssaTypeOfVRegID map[regalloc.VRegID]ssa.Type
 	buf             []byte
 	relocations     []RelocationInfo
+	sourceOffsets   []SourceOffsetInfo
+}
+
+// SourceOffsetInfo is a data to associate the source offset with the executable offset.
+type SourceOffsetInfo struct {
+	// SourceOffset is the source offset in the original source code.
+	SourceOffset ssa.SourceOffset
+	// ExecutableOffset is the offset in the compiled executable.
+	ExecutableOffset int64
 }
 
 // Compile implements Compiler.Compile.
@@ -300,6 +315,7 @@ func (c *compiler) Init() {
 	c.resetVRegSet()
 	c.regAlloc.Reset()
 	c.buf = c.buf[:0]
+	c.sourceOffsets = c.sourceOffsets[:0]
 	c.relocations = c.relocations[:0]
 }
 
@@ -374,6 +390,19 @@ func (c *compiler) MatchInstrOneOf(def *SSAValueDefinition, opcodes []ssa.Opcode
 // ResolveSignature implements Compiler.ResolveSignature.
 func (c *compiler) ResolveSignature(id ssa.SignatureID) *ssa.Signature {
 	return c.ssaBuilder.ResolveSignature(id)
+}
+
+// AddSourceOffsetInfo implements Compiler.AddSourceOffsetInfo.
+func (c *compiler) AddSourceOffsetInfo(executableOffset int64, sourceOffset ssa.SourceOffset) {
+	c.sourceOffsets = append(c.sourceOffsets, SourceOffsetInfo{
+		SourceOffset:     sourceOffset,
+		ExecutableOffset: executableOffset,
+	})
+}
+
+// SourceOffsetInfo implements Compiler.SourceOffsetInfo.
+func (c *compiler) SourceOffsetInfo() []SourceOffsetInfo {
+	return c.sourceOffsets
 }
 
 // AddRelocationInfo implements Compiler.AddRelocationInfo.

@@ -118,6 +118,9 @@ type Builder interface {
 
 	// InsertUndefined inserts an undefined instruction at the current position.
 	InsertUndefined()
+
+	// SetCurrentSourceOffset sets the current source offset. The incoming instruction will be annotated with this offset.
+	SetCurrentSourceOffset(line SourceOffset)
 }
 
 // NewBuilder returns a new Builder implementation.
@@ -181,6 +184,8 @@ type builder struct {
 	donePasses bool
 	// doneBlockLayout is true if LayoutBlocks is called.
 	doneBlockLayout bool
+
+	currentSourceOffset SourceOffset
 }
 
 // ReturnBlock implements Builder.ReturnBlock.
@@ -228,6 +233,8 @@ func (b *builder) Init(s *Signature) {
 	for i := range b.valueRefCounts {
 		b.valueRefCounts[i] = 0
 	}
+
+	b.currentSourceOffset = sourceOffsetUnknown
 }
 
 // Signature implements Builder.Signature.
@@ -262,6 +269,11 @@ func (b *builder) Signatures() (ret []*Signature) {
 		return ret[i].ID < ret[j].ID
 	})
 	return
+}
+
+// SetCurrentSourceOffset implements Builder.SetCurrentSourceOffset.
+func (b *builder) SetCurrentSourceOffset(l SourceOffset) {
+	b.currentSourceOffset = l
 }
 
 func (b *builder) usedSignatures() (ret []*Signature) {
@@ -299,6 +311,15 @@ func (b *builder) allocateBasicBlock() *basicBlock {
 // InsertInstruction implements Builder.InsertInstruction.
 func (b *builder) InsertInstruction(instr *Instruction) {
 	b.currentBB.InsertInstruction(instr)
+
+	if l := b.currentSourceOffset; l.Valid() {
+		// Emit the source offset info only when the instruction has side effect because
+		// these are the only instructions that are accessed by stack unwinding.
+		// This reduces the significant amount of the offset info in the binary.
+		if instr.sideEffect() != sideEffectNone {
+			instr.annotateSourceOffset(l)
+		}
+	}
 
 	resultTypesFn := instructionReturnTypes[instr.opcode]
 	if resultTypesFn == nil {

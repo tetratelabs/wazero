@@ -1792,10 +1792,10 @@ blk4: () <-- (blk2,blk3)
 			b := ssa.NewBuilder()
 
 			offset := wazevoapi.NewModuleContextOffsetData(tc.m, tc.needListener)
-			fc := NewFrontendCompiler(tc.m, b, &offset, tc.ensureTermination, tc.needListener)
+			fc := NewFrontendCompiler(tc.m, b, &offset, tc.ensureTermination, tc.needListener, false)
 			typeIndex := tc.m.FunctionSection[tc.targetIndex]
 			code := &tc.m.CodeSection[tc.targetIndex]
-			fc.Init(tc.targetIndex, typeIndex, &tc.m.TypeSection[typeIndex], code.LocalTypes, code.Body, tc.needListener)
+			fc.Init(tc.targetIndex, typeIndex, &tc.m.TypeSection[typeIndex], code.LocalTypes, code.Body, tc.needListener, 0)
 
 			fc.LowerToSSA()
 

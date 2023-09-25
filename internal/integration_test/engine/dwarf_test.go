@@ -3,21 +3,23 @@ package adhoc
 import (
 	"bufio"
 	_ "embed"
+	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/dwarftestdata"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
 var dwarfTests = map[string]testCase{
-	"tinygo": {f: testTinyGoDWARF, wazevoSkip: true},
-	"zig":    {f: testZigDWARF, wazevoSkip: true},
-	"cc":     {f: testCCDWARF, wazevoSkip: true},
-	"rust":   {f: testRustDWARF, wazevoSkip: true},
+	"tinygo": {f: testTinyGoDWARF, wazevoSkip: true}, // TODO: Skip wazevo because of some v2 instructions.
+	"zig":    {f: testZigDWARF},
+	"cc":     {f: testCCDWARF},
+	"rust":   {f: testRustDWARF},
 }
 
 func TestEngineCompiler_DWARF(t *testing.T) {
@@ -32,7 +34,12 @@ func TestEngineInterpreter_DWARF(t *testing.T) {
 }
 
 func TestEngineWazevo_DWARF(t *testing.T) {
-	t.Skip("TODO")
+	if runtime.GOARCH != "arm64" {
+		t.Skip()
+	}
+	config := wazero.NewRuntimeConfigInterpreter()
+	wazevo.ConfigureWazevo(config)
+	runAllTests(t, dwarfTests, config, true)
 }
 
 func testTinyGoDWARF(t *testing.T, r wazero.Runtime) {

@@ -27,10 +27,30 @@ type Instruction struct {
 	targets    []BasicBlock
 	prev, next *Instruction
 
-	rValue  Value
-	rValues []Value
-	gid     InstructionGroupID
-	live    bool
+	rValue       Value
+	rValues      []Value
+	gid          InstructionGroupID
+	sourceOffset SourceOffset
+	live         bool
+}
+
+// SourceOffset represents the offset of the source of an instruction.
+type SourceOffset int64
+
+const sourceOffsetUnknown = -1
+
+// Valid returns true if this source offset is valid.
+func (l SourceOffset) Valid() bool {
+	return l != sourceOffsetUnknown
+}
+
+func (i *Instruction) annotateSourceOffset(line SourceOffset) {
+	i.sourceOffset = line
+}
+
+// SourceOffset returns the source offset of this instruction.
+func (i *Instruction) SourceOffset() SourceOffset {
+	return i.sourceOffset
 }
 
 // Opcode returns the opcode of this instruction.
@@ -52,6 +72,7 @@ func (i *Instruction) reset() {
 	i.rValue = ValueInvalid
 	i.typ = typeInvalid
 	i.vs = nil
+	i.sourceOffset = sourceOffsetUnknown
 }
 
 // InstructionGroupID is assigned to each instruction and represents a group of instructions

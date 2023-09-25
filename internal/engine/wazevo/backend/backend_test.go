@@ -2053,7 +2053,7 @@ L9 (SSA Block: blk6):
 		t.Run(tc.name, func(t *testing.T) {
 			ssab := ssa.NewBuilder()
 			offset := wazevoapi.NewModuleContextOffsetData(tc.m, false)
-			fc := frontend.NewFrontendCompiler(tc.m, ssab, &offset, false, false)
+			fc := frontend.NewFrontendCompiler(tc.m, ssab, &offset, false, false, false)
 			machine := newMachine()
 			machine.DisableStackCheck()
 			be := backend.NewCompiler(context.Background(), machine, ssab)
@@ -2061,7 +2061,7 @@ L9 (SSA Block: blk6):
 			// Lowers the Wasm to SSA.
 			typeIndex := tc.m.FunctionSection[tc.targetIndex]
 			code := &tc.m.CodeSection[tc.targetIndex]
-			fc.Init(tc.targetIndex, typeIndex, &tc.m.TypeSection[typeIndex], code.LocalTypes, code.Body, false)
+			fc.Init(tc.targetIndex, typeIndex, &tc.m.TypeSection[typeIndex], code.LocalTypes, code.Body, false, 0)
 			fc.LowerToSSA()
 			if verbose {
 				fmt.Println("============ SSA before passes ============")
