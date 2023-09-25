@@ -414,6 +414,38 @@ func encodeVecRRR(op vecOp, rd, rn, rm uint32, arr vecArrangement) uint32 {
 	case vecOpCmhs:
 		size, q := arrToSizeQEncoded(arr)
 		return encodeAdvancedSIMDThreeSame(rd, rn, rm, 0b00111, size, 0b1, q)
+	case vecOpFcmeq:
+		var size, q uint32
+		switch arr {
+		case vecArrangement4S:
+			size, q = 0b00, 0b1
+		case vecArrangement2S:
+			size, q = 0b00, 0b0
+		case vecArrangement2D:
+			size, q = 0b01, 0b1
+		default:
+			panic("unsupported arrangement: " + arr.String())
+		}
+		return encodeAdvancedSIMDThreeSame(rd, rn, rm, 0b11100, size, 0b0, q)
+	case vecOpFcmgt:
+		if arr < vecArrangement2S || arr == vecArrangement1D {
+			panic("unsupported arrangement: " + arr.String())
+		}
+		size, q := arrToSizeQEncoded(arr)
+		return encodeAdvancedSIMDThreeSame(rd, rn, rm, 0b11100, size, 0b1, q)
+	case vecOpFcmge:
+		var size, q uint32
+		switch arr {
+		case vecArrangement4S:
+			size, q = 0b00, 0b1
+		case vecArrangement2S:
+			size, q = 0b00, 0b0
+		case vecArrangement2D:
+			size, q = 0b01, 0b1
+		default:
+			panic("unsupported arrangement: " + arr.String())
+		}
+		return encodeAdvancedSIMDThreeSame(rd, rn, rm, 0b11100, size, 0b1, q)
 	case vecOpAdd:
 		if arr == vecArrangement1D {
 			panic("unsupported arrangement: " + arr.String())

@@ -161,6 +161,8 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		m.lowerIcmp(instr)
 	case ssa.OpcodeVIcmp:
 		m.lowerVIcmp(instr)
+	case ssa.OpcodeVFcmp:
+		m.lowerVFcmp(instr)
 	case ssa.OpcodeBand:
 		m.lowerBitwiseAluOp(instr, aluOpAnd)
 	case ssa.OpcodeBor:
@@ -1101,6 +1103,50 @@ func (m *machine) lowerVIcmp(si *ssa.Instruction) {
 	case lo:
 		cmp := m.allocateInstr()
 		cmp.asVecRRR(vecOpCmhi, rd, rm, rn, arr) // rm, rn are swapped
+		m.insert(cmp)
+	}
+
+	cset := m.allocateInstr()
+	cset.asCSet(rd.reg(), flag)
+	m.insert(cset)
+}
+
+func (m *machine) lowerVFcmp(si *ssa.Instruction) {
+	x, y, c, lane := si.VFcmpData()
+	flag := condFlagFromSSAFloatCmpCond(c)
+	arr := ssaLaneToArrangement(lane)
+
+	rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+	rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
+	rd := operandNR(m.compiler.VRegOf(si.Return()))
+
+	switch flag {
+	case eq:
+		cmp := m.allocateInstr()
+		cmp.asVecRRR(vecOpFcmeq, rd, rn, rm, arr)
+		m.insert(cmp)
+	case ne:
+		cmp := m.allocateInstr()
+		cmp.asVecRRR(vecOpFcmeq, rd, rn, rm, arr)
+		m.insert(cmp)
+		not := m.allocateInstr()
+		not.asVecMisc(vecOpNot, rd, rn, vecArrangement16B)
+		m.insert(not)
+	case ge:
+		cmp := m.allocateInstr()
+		cmp.asVecRRR(vecOpFcmge, rd, rn, rm, arr)
+		m.insert(cmp)
+	case gt:
+		cmp := m.allocateInstr()
+		cmp.asVecRRR(vecOpFcmgt, rd, rn, rm, arr)
+		m.insert(cmp)
+	case mi:
+		cmp := m.allocateInstr()
+		cmp.asVecRRR(vecOpFcmgt, rd, rm, rn, arr) // rm, rn are swapped
+		m.insert(cmp)
+	case ls:
+		cmp := m.allocateInstr()
+		cmp.asVecRRR(vecOpFcmge, rd, rm, rn, arr) // rm, rn are swapped
 		m.insert(cmp)
 	}
 

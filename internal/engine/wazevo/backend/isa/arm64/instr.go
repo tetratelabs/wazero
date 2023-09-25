@@ -1602,6 +1602,12 @@ func (b vecOp) String() string {
 		return "cmge"
 	case vecOpCmhs:
 		return "cmhs"
+	case vecOpFcmeq:
+		return "fcmeq"
+	case vecOpFcmgt:
+		return "fcmgt"
+	case vecOpFcmge:
+		return "fcmge"
 	case vecOpCmeq0:
 		return "cmeq0"
 	case vecOpUaddlv:
@@ -1688,6 +1694,9 @@ const (
 	vecOpCmhi
 	vecOpCmge
 	vecOpCmhs
+	vecOpFcmeq
+	vecOpFcmgt
+	vecOpFcmge
 	vecOpUaddlv
 	vecOpBit
 	vecOpBic
