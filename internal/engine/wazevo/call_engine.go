@@ -134,8 +134,12 @@ func (c *callEngine) addFrame(builder wasmdebug.ErrorBuilder, addr uintptr) (def
 	if cm != nil {
 		index := cm.functionIndexOf(addr)
 		def = cm.module.FunctionDefinition(cm.module.ImportFunctionCount + index)
-		// TODO: DWARF.
-		builder.AddFrame(def.DebugName(), def.ParamTypes(), def.ResultTypes(), nil)
+		var sources []string
+		if dw := cm.module.DWARFLines; dw != nil {
+			sourceOffset := cm.getSourceOffset(addr)
+			sources = dw.Line(sourceOffset)
+		}
+		builder.AddFrame(def.DebugName(), def.ParamTypes(), def.ResultTypes(), sources)
 		if len(cm.listeners) > 0 {
 			listener = cm.listeners[index]
 		}
@@ -485,7 +489,8 @@ func (si *stackIterator) Definition() api.FunctionDefinition {
 }
 
 // SourceOffsetForPC implements the same method as documented on experimental.InternalFunction.
-func (si *stackIterator) SourceOffsetForPC(experimental.ProgramCounter) uint64 {
-	// TODO: DWARF.
-	return 0
+func (si *stackIterator) SourceOffsetForPC(pc experimental.ProgramCounter) uint64 {
+	upc := uintptr(pc)
+	cm := si.eng.compiledModuleOfAddr(upc)
+	return cm.getSourceOffset(upc)
 }

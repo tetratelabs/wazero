@@ -35,12 +35,14 @@ type Compiler struct {
 	wasmFunctionTyp                       *wasm.FunctionType
 	wasmFunctionLocalTypes                []wasm.ValueType
 	wasmFunctionBody                      []byte
+	wasmFunctionBodyOffsetInCodeSection   uint64
 	memoryBaseVariable, memoryLenVariable ssa.Variable
 	needMemory                            bool
 	globalVariables                       []ssa.Variable
 	globalVariablesTypes                  []ssa.Type
 	mutableGlobalVariablesIndexes         []wasm.Index // index to ^.
 	needListener                          bool
+	needSourceOffsetInfo                  bool
 	// br is reused during lowering.
 	br            *bytes.Reader
 	loweringState loweringState
@@ -49,14 +51,15 @@ type Compiler struct {
 }
 
 // NewFrontendCompiler returns a frontend Compiler.
-func NewFrontendCompiler(m *wasm.Module, ssaBuilder ssa.Builder, offset *wazevoapi.ModuleContextOffsetData, ensureTermination bool, listenerOn bool) *Compiler {
+func NewFrontendCompiler(m *wasm.Module, ssaBuilder ssa.Builder, offset *wazevoapi.ModuleContextOffsetData, ensureTermination bool, listenerOn bool, sourceInfo bool) *Compiler {
 	c := &Compiler{
-		m:                   m,
-		ssaBuilder:          ssaBuilder,
-		br:                  bytes.NewReader(nil),
-		wasmLocalToVariable: make(map[wasm.Index]ssa.Variable),
-		offset:              offset,
-		ensureTermination:   ensureTermination,
+		m:                    m,
+		ssaBuilder:           ssaBuilder,
+		br:                   bytes.NewReader(nil),
+		wasmLocalToVariable:  make(map[wasm.Index]ssa.Variable),
+		offset:               offset,
+		ensureTermination:    ensureTermination,
+		needSourceOffsetInfo: sourceInfo,
 	}
 	c.declareSignatures(listenerOn)
 	return c
@@ -125,7 +128,7 @@ func SignatureForWasmFunctionType(typ *wasm.FunctionType) ssa.Signature {
 }
 
 // Init initializes the state of frontendCompiler and make it ready for a next function.
-func (c *Compiler) Init(idx, typIndex wasm.Index, typ *wasm.FunctionType, localTypes []wasm.ValueType, body []byte, needListener bool) {
+func (c *Compiler) Init(idx, typIndex wasm.Index, typ *wasm.FunctionType, localTypes []wasm.ValueType, body []byte, needListener bool, bodyOffsetInCodeSection uint64) {
 	c.ssaBuilder.Init(c.signatures[typ])
 	c.loweringState.reset()
 
@@ -134,6 +137,7 @@ func (c *Compiler) Init(idx, typIndex wasm.Index, typ *wasm.FunctionType, localT
 	c.wasmFunctionTyp = typ
 	c.wasmFunctionLocalTypes = localTypes
 	c.wasmFunctionBody = body
+	c.wasmFunctionBodyOffsetInCodeSection = bodyOffsetInCodeSection
 	c.needListener = needListener
 }
 

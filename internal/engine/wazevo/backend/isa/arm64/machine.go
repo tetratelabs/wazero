@@ -370,8 +370,8 @@ func (m *machine) ResolveRelativeAddresses() {
 			}
 			divided := diff >> 2
 			if divided < minSignedInt26 || divided > maxSignedInt26 {
-				// Though, this means the currently compiled single function is extremely large.
-				panic("TODO: implement branch relocation for large unconditional branch larger than 26-bit range")
+				// This means the currently compiled single function is extremely large.
+				panic("BUG: implement branch relocation for large unconditional branch larger than 26-bit range")
 			}
 			cur.brOffsetResolved(diff)
 		case condBr:
@@ -385,7 +385,8 @@ func (m *machine) ResolveRelativeAddresses() {
 				divided := diff >> 2
 				if divided < minSignedInt19 || divided > maxSignedInt19 {
 					// This case we can insert "trampoline block" in the middle and jump to it.
-					// After that, we need to re-calculate the offset of labels after the trampoline block.
+					// After that, we need to re-calculate the offset of labels after the trampoline block by
+					// recursively calling this function.
 					panic("TODO: implement branch relocation for large conditional branch larger than 19-bit range")
 				}
 				cur.condBrOffsetResolve(diff)
@@ -398,6 +399,8 @@ func (m *machine) ResolveRelativeAddresses() {
 				cur.targets[i] = uint32(diff)
 			}
 			cur.brTableSequenceOffsetsResolved()
+		case emitSourceOffsetInfo:
+			m.compiler.AddSourceOffsetInfo(currentOffset, cur.sourceOffsetInfo())
 		}
 		currentOffset += cur.size()
 	}

@@ -61,7 +61,7 @@ var tests = map[string]testCase{
 	"two indirection to host":                                          {f: testTwoIndirection},
 	"before listener globals":                                          {f: testBeforeListenerGlobals},
 	"before listener stack iterator":                                   {f: testBeforeListenerStackIterator},
-	"before listener stack iterator offsets":                           {f: testListenerStackIteratorOffset, wazevoSkip: true},
+	"before listener stack iterator offsets":                           {f: testListenerStackIteratorOffset},
 	"many params many results / doubler":                               {f: testManyParamsResultsDoubler},
 	"many params many results / doubler / listener":                    {f: testManyParamsResultsDoublerListener},
 	"many params many results / call_many_consts":                      {f: testManyParamsResultsCallManyConsts},

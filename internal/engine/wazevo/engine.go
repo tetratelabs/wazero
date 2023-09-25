@@ -72,8 +72,19 @@ type (
 
 		offsets         wazevoapi.ModuleContextOffsetData
 		sharedFunctions *sharedFunctions
+		sourceMap       sourceMap
 	}
 )
+
+// sourceMap is a mapping from the offset of the executable to the offset of the original wasm binary.
+type sourceMap struct {
+	// executableOffsets is a sorted list of offsets of the executable. This is index-correlated with wasmBinaryOffsets,
+	// in other words executableOffsets[i] is the offset of the executable which corresponds to the offset of a Wasm
+	// binary pointed by wasmBinaryOffsets[i].
+	executableOffsets []uintptr
+	// wasmBinaryOffsets is the counterpart of executableOffsets.
+	wasmBinaryOffsets []uint64
+}
 
 var _ wasm.Engine = (*engine)(nil)
 
@@ -152,9 +163,11 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 		wazevoapi.DeterministicCompilationVerifierRandomizeIndexes(ctx)
 	}
 
+	needSourceInfo := module.DWARFLines != nil
+
 	// Creates new compiler instances which are reused for each function.
 	ssaBuilder := ssa.NewBuilder()
-	fe := frontend.NewFrontendCompiler(module, ssaBuilder, &cm.offsets, ensureTermination, withListener)
+	fe := frontend.NewFrontendCompiler(module, ssaBuilder, &cm.offsets, ensureTermination, withListener, needSourceInfo)
 	machine := newMachine()
 	be := backend.NewCompiler(ctx, machine, ssaBuilder)
 
@@ -187,6 +200,18 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 		totalSize = (totalSize + 15) &^ 15
 		cm.functionOffsets[i] = totalSize
 
+		if needSourceInfo {
+			// At the beginning of the function, we add the offset of the function body so that
+			// we can resolve the source location of the call site of before listener call.
+			cm.sourceMap.executableOffsets = append(cm.sourceMap.executableOffsets, uintptr(totalSize))
+			cm.sourceMap.wasmBinaryOffsets = append(cm.sourceMap.wasmBinaryOffsets, module.CodeSection[i].BodyOffsetInCodeSection)
+
+			for _, info := range be.SourceOffsetInfo() {
+				cm.sourceMap.executableOffsets = append(cm.sourceMap.executableOffsets, uintptr(totalSize)+uintptr(info.Offset))
+				cm.sourceMap.wasmBinaryOffsets = append(cm.sourceMap.wasmBinaryOffsets, uint64(info.Line))
+			}
+		}
+
 		fref := frontend.FunctionIndexToFuncRef(fidx)
 		e.refToBinaryOffset[fref] = totalSize
 
@@ -214,6 +239,12 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 	for i, b := range bodies {
 		offset := cm.functionOffsets[i]
 		copy(executable[offset:], b)
+	}
+
+	if needSourceInfo {
+		for i := range cm.sourceMap.executableOffsets {
+			cm.sourceMap.executableOffsets[i] += uintptr(unsafe.Pointer(&cm.executable[0]))
+		}
 	}
 
 	// Resolve relocations for local function calls.
@@ -245,7 +276,7 @@ func (e *engine) compileLocalWasmFunction(
 	codeSeg := &module.CodeSection[localFunctionIndex]
 
 	// Initializes both frontend and backend compilers.
-	fe.Init(localFunctionIndex, typIndex, typ, codeSeg.LocalTypes, codeSeg.Body, needListener)
+	fe.Init(localFunctionIndex, typIndex, typ, codeSeg.LocalTypes, codeSeg.Body, needListener, codeSeg.BodyOffsetInCodeSection)
 	be.Init()
 
 	// Lower Wasm to SSA.
@@ -593,7 +624,7 @@ func (cm *compiledModule) functionIndexOf(addr uintptr) wasm.Index {
 	index := sort.Search(len(offset), func(i int) bool {
 		return offset[i] > int(addr)
 	})
-	index -= 1
+	index--
 	if index < 0 {
 		panic("BUG")
 	}
@@ -640,4 +671,21 @@ func (e *engine) getListenerTrampolineForType(functionType *wasm.FunctionType) (
 	e.sharedFunctions.listenerBeforeTrampolines[functionType] = beforeBuf
 	e.sharedFunctions.listenerAfterTrampolines[functionType] = afterBuf
 	return &beforeBuf[0], &afterBuf[0]
+}
+
+func (cm *compiledModule) getSourceOffset(pc uintptr) uint64 {
+	offsets := cm.sourceMap.executableOffsets
+	if len(offsets) == 0 {
+		return 0
+	}
+
+	index := sort.Search(len(offsets), func(i int) bool {
+		return offsets[i] >= pc
+	})
+
+	index--
+	if index < 0 {
+		return 0
+	}
+	return cm.sourceMap.wasmBinaryOffsets[index]
 }

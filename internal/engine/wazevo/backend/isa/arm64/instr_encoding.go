@@ -21,7 +21,7 @@ func (m *machine) encode(root *instruction) {
 
 func (i *instruction) encode(c backend.Compiler) {
 	switch kind := i.kind; kind {
-	case nop0:
+	case nop0, emitSourceOffsetInfo:
 	case exitSequence:
 		encodeExitSequence(c, i.rn.reg())
 	case ret:

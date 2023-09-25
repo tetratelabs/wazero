@@ -62,6 +62,10 @@ type mockCompiler struct {
 	buf         []byte
 }
 
+func (m *mockCompiler) SourceOffsetInfo() []backend.SourceOffset { return nil }
+
+func (m *mockCompiler) AddSourceOffsetInfo(int64, ssa.SourceOffset) {}
+
 func (m *mockCompiler) AddRelocationInfo(funcRef ssa.FuncRef) {
 	m.relocs = append(m.relocs, backend.RelocationInfo{FuncRef: funcRef, Offset: int64(len(m.buf))})
 }

@@ -178,6 +178,12 @@ func (c *Compiler) state() *loweringState {
 func (c *Compiler) lowerCurrentOpcode() {
 	op := c.wasmFunctionBody[c.loweringState.pc]
 
+	if c.needSourceOffsetInfo {
+		c.ssaBuilder.SetCurrentSourceOffset(
+			ssa.SourceOffset(c.loweringState.pc) + ssa.SourceOffset(c.wasmFunctionBodyOffsetInCodeSection),
+		)
+	}
+
 	builder := c.ssaBuilder
 	state := c.state()
 	switch op {
