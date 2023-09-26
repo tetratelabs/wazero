@@ -455,6 +455,12 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		x, y, lane := instr.Arg2WithLane()
 		arr := ssaLaneToArrangement(lane)
 		m.lowerVecRRR(vecOpFdiv, x, y, instr.Return(), arr)
+	case ssa.OpcodeVFcvtToSintSat, ssa.OpcodeVFcvtToUintSat:
+		x, lane := instr.ArgWithLane()
+		arr := ssaLaneToArrangement(lane)
+		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+		rd := operandNR(m.compiler.VRegOf(instr.Return()))
+		m.lowerVfpuToInt(rd, rn, arr, op == ssa.OpcodeVFcvtToSintSat)
 	default:
 		panic("TODO: lowering " + op.String())
 	}
@@ -1187,6 +1193,26 @@ func (m *machine) lowerVFcmp(si *ssa.Instruction) {
 	cset := m.allocateInstr()
 	cset.asCSet(rd.reg(), flag)
 	m.insert(cset)
+}
+
+func (m *machine) lowerVfpuToInt(rd, rn operand, arr vecArrangement, signed bool) {
+	cvt := m.allocateInstr()
+	if signed {
+		cvt.asVecMisc(vecOpFcvtzs, rd, rn, arr)
+	} else {
+		cvt.asVecMisc(vecOpFcvtzu, rd, rn, arr)
+	}
+	m.insert(cvt)
+
+	if arr == vecArrangement2D {
+		narrow := m.allocateInstr()
+		if signed {
+			narrow.asVecMisc(vecOpSqxtn, rd, rd, vecArrangement2S)
+		} else {
+			narrow.asVecMisc(vecOpUqxtn, rd, rd, vecArrangement2S)
+		}
+		m.insert(narrow)
+	}
 }
 
 func (m *machine) lowerShifts(si *ssa.Instruction, ext extMode, aluOp aluOp) {

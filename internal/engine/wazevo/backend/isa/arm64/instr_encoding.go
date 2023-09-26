@@ -1809,6 +1809,48 @@ func encodeAdvancedSIMDTwoMisc(op vecOp, rd, rn uint32, arr vecArrangement) uint
 		opcode = 0b11111
 		u = 0b1
 		size, q = arrToSizeQEncoded(arr)
+	case vecOpFcvtzs:
+		opcode = 0b11011
+		u = 0b0
+		switch arr {
+		case vecArrangement2S:
+			q, size = 0b0, 0b10
+		case vecArrangement4S:
+			q, size = 0b1, 0b10
+		case vecArrangement2D:
+			q, size = 0b1, 0b11
+		default:
+			panic("unsupported arrangement: " + arr.String())
+		}
+	case vecOpFcvtzu:
+		opcode = 0b11011
+		u = 0b1
+		switch arr {
+		case vecArrangement2S:
+			q, size = 0b0, 0b10
+		case vecArrangement4S:
+			q, size = 0b1, 0b10
+		case vecArrangement2D:
+			q, size = 0b1, 0b11
+		default:
+			panic("unsupported arrangement: " + arr.String())
+		}
+	case vecOpSqxtn:
+		// when q == 1 it encodes sqxtn2 (operates on upper 64 bits)
+		opcode = 0b10100
+		u = 0b0
+		if arr > vecArrangement4S {
+			panic("unsupported arrangement: " + arr.String())
+		}
+		size, q = arrToSizeQEncoded(arr)
+	case vecOpUqxtn:
+		// when q == 1 it encodes uqxtn2 (operates on upper 64 bits)
+		opcode = 0b10100
+		u = 0b1
+		if arr > vecArrangement4S {
+			panic("unsupported arrangement: " + arr.String())
+		}
+		size, q = arrToSizeQEncoded(arr)
 	case vecOpRev64:
 		opcode = 0b00000
 		size, q = arrToSizeQEncoded(arr)

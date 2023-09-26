@@ -473,6 +473,12 @@ const (
 	// OpcodeVSqrt takes the minimum of two floating point values: `v = VFmin.lane x, y` on vector.
 	OpcodeVSqrt
 
+	// OpcodeVFcvtToUintSat converts a floating point value to an unsigned integer: `v = FcvtToUintSat x` on vector.
+	OpcodeVFcvtToUintSat
+
+	// OpcodeVFcvtToSintSat converts a floating point value to a signed integer: `v = VFcvtToSintSat x` on vector.
+	OpcodeVFcvtToSintSat
+
 	// OpcodeImul performs an integer multiplication: `v = Imul x, y`.
 	OpcodeImul
 
@@ -731,25 +737,25 @@ const (
 	// OpcodeIreduce ...
 	// `v = ireduce x`.
 	OpcodeIreduce
-	// `v = snarrow x, y`.
 
 	// OpcodeSnarrow ...
+	// `v = snarrow x, y`.
 	OpcodeSnarrow
-	// `v = unarrow x, y`.
 
 	// OpcodeUnarrow ...
+	// `v = unarrow x, y`.
 	OpcodeUnarrow
-	// `v = uunarrow x, y`.
 
 	// OpcodeUunarrow ...
+	// `v = uunarrow x, y`.
 	OpcodeUunarrow
-	// `v = swiden_low x`.
 
 	// OpcodeSwidenLow ...
+	// `v = swiden_low x`.
 	OpcodeSwidenLow
-	// `v = swiden_high x`.
 
 	// OpcodeSwidenHigh ...
+	// `v = swiden_high x`.
 	OpcodeSwidenHigh
 	// `v = uwiden_low x`.
 
@@ -983,6 +989,8 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeVNearest:           sideEffectNone,
 	OpcodeVMaxPseudo:         sideEffectNone,
 	OpcodeVMinPseudo:         sideEffectNone,
+	OpcodeVFcvtToUintSat:     sideEffectNone,
+	OpcodeVFcvtToSintSat:     sideEffectNone,
 }
 
 // sideEffect returns true if this instruction has side effects.
@@ -1139,6 +1147,8 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeVNearest:           returnTypesFnV128,
 	OpcodeVMaxPseudo:         returnTypesFnV128,
 	OpcodeVMinPseudo:         returnTypesFnV128,
+	OpcodeVFcvtToUintSat:     returnTypesFnV128,
+	OpcodeVFcvtToSintSat:     returnTypesFnV128,
 }
 
 // AsLoad initializes this instruction as a store instruction with OpcodeLoad.
@@ -2189,6 +2199,18 @@ func (i *Instruction) AsFcvtToInt(x, ctx Value, signed bool, dst64bit bool, sat 
 	return i
 }
 
+// AsVFcvtToIntSat initializes this instruction as an instruction with either OpcodeVFcvtToSintSat or OpcodeVFcvtToUintSat
+func (i *Instruction) AsVFcvtToIntSat(x Value, lane VecLane, signed bool) *Instruction {
+	if signed {
+		i.opcode = OpcodeVFcvtToSintSat
+	} else {
+		i.opcode = OpcodeVFcvtToUintSat
+	}
+	i.v = x
+	i.u1 = uint64(lane)
+	return i
+}
+
 // AsSExtend initializes this instruction as a sign extension instruction with OpcodeSExtend.
 func (i *Instruction) AsSExtend(v Value, from, to byte) {
 	i.opcode = OpcodeSExtend
@@ -2801,7 +2823,10 @@ func (o Opcode) String() (ret string) {
 		return "VMinPseudo"
 	case OpcodeVSqrt:
 		return "VSqrt"
-
+	case OpcodeVFcvtToUintSat:
+		return "VFcvtToUintSat"
+	case OpcodeVFcvtToSintSat:
+		return "VFcvtToSintSat"
 	}
 	panic(fmt.Sprintf("unknown opcode %d", o))
 }

@@ -667,6 +667,60 @@ func TestInstruction_encode(t *testing.T) {
 		{want: "4198e14e", setup: func(i *instruction) {
 			i.asVecMisc(vecOpFrintz, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2D)
 		}},
+		{want: "41b8a10e", setup: func(i *instruction) {
+			i.asVecMisc(vecOpFcvtzs, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2S)
+		}},
+		{want: "41b8a14e", setup: func(i *instruction) {
+			i.asVecMisc(vecOpFcvtzs, operandNR(v1VReg), operandNR(v2VReg), vecArrangement4S)
+		}},
+		{want: "41b8e14e", setup: func(i *instruction) {
+			i.asVecMisc(vecOpFcvtzs, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2D)
+		}},
+		{want: "41b8a12e", setup: func(i *instruction) {
+			i.asVecMisc(vecOpFcvtzu, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2S)
+		}},
+		{want: "41b8a16e", setup: func(i *instruction) {
+			i.asVecMisc(vecOpFcvtzu, operandNR(v1VReg), operandNR(v2VReg), vecArrangement4S)
+		}},
+		{want: "41b8e16e", setup: func(i *instruction) {
+			i.asVecMisc(vecOpFcvtzu, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2D)
+		}},
+		{want: "4148210e", setup: func(i *instruction) {
+			i.asVecMisc(vecOpSqxtn, operandNR(v1VReg), operandNR(v2VReg), vecArrangement8B)
+		}},
+		{want: "4148214e", setup: func(i *instruction) { // sqxtn2
+			i.asVecMisc(vecOpSqxtn, operandNR(v1VReg), operandNR(v2VReg), vecArrangement16B)
+		}},
+		{want: "4148610e", setup: func(i *instruction) {
+			i.asVecMisc(vecOpSqxtn, operandNR(v1VReg), operandNR(v2VReg), vecArrangement4H)
+		}},
+		{want: "4148614e", setup: func(i *instruction) { // sqxtn2
+			i.asVecMisc(vecOpSqxtn, operandNR(v1VReg), operandNR(v2VReg), vecArrangement8H)
+		}},
+		{want: "4148a10e", setup: func(i *instruction) {
+			i.asVecMisc(vecOpSqxtn, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2S)
+		}},
+		{want: "4148a14e", setup: func(i *instruction) { // sqxtn2
+			i.asVecMisc(vecOpSqxtn, operandNR(v1VReg), operandNR(v2VReg), vecArrangement4S)
+		}},
+		{want: "4148212e", setup: func(i *instruction) {
+			i.asVecMisc(vecOpUqxtn, operandNR(v1VReg), operandNR(v2VReg), vecArrangement8B)
+		}},
+		{want: "4148216e", setup: func(i *instruction) { // uqxtn2
+			i.asVecMisc(vecOpUqxtn, operandNR(v1VReg), operandNR(v2VReg), vecArrangement16B)
+		}},
+		{want: "4148612e", setup: func(i *instruction) {
+			i.asVecMisc(vecOpUqxtn, operandNR(v1VReg), operandNR(v2VReg), vecArrangement4H)
+		}},
+		{want: "4148616e", setup: func(i *instruction) { // sqxtn2
+			i.asVecMisc(vecOpUqxtn, operandNR(v1VReg), operandNR(v2VReg), vecArrangement8H)
+		}},
+		{want: "4148a12e", setup: func(i *instruction) {
+			i.asVecMisc(vecOpUqxtn, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2S)
+		}},
+		{want: "4148a16e", setup: func(i *instruction) { // sqxtn2
+			i.asVecMisc(vecOpUqxtn, operandNR(v1VReg), operandNR(v2VReg), vecArrangement4S)
+		}},
 		{want: "41b8200e", setup: func(i *instruction) {
 			i.asVecMisc(vecOpAbs, operandNR(v1VReg), operandNR(v2VReg), vecArrangement8B)
 		}},
