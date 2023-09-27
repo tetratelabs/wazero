@@ -1672,10 +1672,24 @@ func (b vecOp) String() string {
 		return "frintn"
 	case vecOpFrintz:
 		return "frintz"
+	case vecOpFcvtl:
+		return "fcvtl"
+	case vecOpFcvtn:
+		return "fcvtn"
 	case vecOpFcvtzu:
 		return "fcvtzu"
 	case vecOpFcvtzs:
 		return "fcvtzs"
+	case vecOpScvtf:
+		return "scvtf"
+	case vecOpUcvtf:
+		return "ucvtf"
+	case vecOpSqxtn:
+		return "sqxtn"
+	case vecOpUqxtn:
+		return "uqxtn"
+	case vecOpSqxtun:
+		return "sqxtun"
 	case vecOpFsqrt:
 		return "fsqrt"
 	case vecOpRev64:
@@ -1684,6 +1698,11 @@ func (b vecOp) String() string {
 		return "xtn"
 	case vecOpShll:
 		return "shll"
+	case vecOpSshll:
+		return "sshll"
+	case vecOpUshll:
+		return "ushll"
+
 	case vecOpSshr:
 		return "sshr"
 	case vecOpZip1:
@@ -1749,13 +1768,20 @@ const (
 	vecOpFrintn
 	vecOpFrintp
 	vecOpFrintz
+	vecOpFcvtl
+	vecOpFcvtn
 	vecOpFcvtzs
 	vecOpFcvtzu
+	vecOpScvtf
+	vecOpUcvtf
 	vecOpSqxtn
+	vecOpSqxtun
 	vecOpUqxtn
 	vecOpRev64
 	vecOpXtn
 	vecOpShll
+	vecOpSshll
+	vecOpUshll
 	vecOpSshr
 	vecOpZip1
 )

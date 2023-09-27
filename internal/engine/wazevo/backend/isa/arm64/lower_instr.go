@@ -461,6 +461,94 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
 		rd := operandNR(m.compiler.VRegOf(instr.Return()))
 		m.lowerVfpuToInt(rd, rn, arr, op == ssa.OpcodeVFcvtToSintSat)
+	case ssa.OpcodeVFcvtFromSint, ssa.OpcodeVFcvtFromUint:
+		x, lane := instr.ArgWithLane()
+		arr := ssaLaneToArrangement(lane)
+		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+		rd := operandNR(m.compiler.VRegOf(instr.Return()))
+		m.lowerVfpuFromInt(rd, rn, arr, op == ssa.OpcodeVFcvtFromSint)
+	case ssa.OpcodeSwidenLow, ssa.OpcodeUwidenLow:
+		x, lane := instr.ArgWithLane()
+		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+		rd := operandNR(m.compiler.VRegOf(instr.Return()))
+
+		var arr vecArrangement
+		switch lane {
+		case ssa.VecLaneI8x16:
+			arr = vecArrangement8B
+		case ssa.VecLaneI16x8:
+			arr = vecArrangement4H
+		case ssa.VecLaneI32x4:
+			arr = vecArrangement2S
+		}
+
+		shll := m.allocateInstr()
+		if signed := op == ssa.OpcodeSwidenLow; signed {
+			shll.asVecShiftImm(vecOpSshll, rd, rn, operandShiftImm(0), arr)
+		} else {
+			shll.asVecShiftImm(vecOpUshll, rd, rn, operandShiftImm(0), arr)
+		}
+		m.insert(shll)
+	case ssa.OpcodeSwidenHigh, ssa.OpcodeUwidenHigh:
+		x, lane := instr.ArgWithLane()
+		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+		rd := operandNR(m.compiler.VRegOf(instr.Return()))
+
+		arr := ssaLaneToArrangement(lane)
+
+		shll := m.allocateInstr()
+		if signed := op == ssa.OpcodeSwidenHigh; signed {
+			shll.asVecShiftImm(vecOpSshll, rd, rn, operandShiftImm(0), arr)
+		} else {
+			shll.asVecShiftImm(vecOpUshll, rd, rn, operandShiftImm(0), arr)
+		}
+		m.insert(shll)
+
+	case ssa.OpcodeSnarrow, ssa.OpcodeUnarrow:
+		x, y, lane := instr.Arg2WithLane()
+		var arr, arr2 vecArrangement
+		switch lane {
+		case ssa.VecLaneI16x8: // I16x8
+			arr = vecArrangement8B
+			arr2 = vecArrangement16B // implies sqxtn2
+		case ssa.VecLaneI32x4:
+			arr = vecArrangement4H
+			arr2 = vecArrangement8H // implies sqxtn2
+		default:
+			panic("unsupported lane " + lane.String())
+		}
+		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+		rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
+		rd := operandNR(m.compiler.VRegOf(instr.Return()))
+		loQxtn := m.allocateInstr()
+		hiQxtn := m.allocateInstr()
+		if signed := op == ssa.OpcodeSnarrow; signed {
+			// Narrow lanes on rn and write them into lower-half of rd.
+			loQxtn.asVecMisc(vecOpSqxtn, rd, rn, arr) // low
+			// Narrow lanes on rm and write them into higher-half of rd.
+			hiQxtn.asVecMisc(vecOpSqxtn, rd, rm, arr2) // high (sqxtn2)
+		} else {
+			// Narrow lanes on rn and write them into lower-half of rd.
+			loQxtn.asVecMisc(vecOpSqxtun, rd, rn, arr) // low
+			// Narrow lanes on rm and write them into higher-half of rd.
+			hiQxtn.asVecMisc(vecOpSqxtun, rd, rm, arr2) // high (sqxtn2)
+		}
+		m.insert(loQxtn)
+		m.insert(hiQxtn)
+	case ssa.OpcodeFvpromoteLow:
+		x, _ := instr.ArgWithLane()
+		ins := m.allocateInstr()
+		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+		rd := operandNR(m.compiler.VRegOf(instr.Return()))
+		ins.asVecMisc(vecOpFcvtl, rd, rn, vecArrangement2S)
+		m.insert(ins)
+	case ssa.OpcodeFvdemote:
+		x, _ := instr.ArgWithLane()
+		ins := m.allocateInstr()
+		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+		rd := operandNR(m.compiler.VRegOf(instr.Return()))
+		ins.asVecMisc(vecOpFcvtn, rd, rn, vecArrangement2S)
+		m.insert(ins)
 	default:
 		panic("TODO: lowering " + op.String())
 	}
@@ -1213,6 +1301,16 @@ func (m *machine) lowerVfpuToInt(rd, rn operand, arr vecArrangement, signed bool
 		}
 		m.insert(narrow)
 	}
+}
+
+func (m *machine) lowerVfpuFromInt(rd, rn operand, arr vecArrangement, signed bool) {
+	cvt := m.allocateInstr()
+	if signed {
+		cvt.asVecMisc(vecOpScvtf, rd, rn, arr)
+	} else {
+		cvt.asVecMisc(vecOpUcvtf, rd, rn, arr)
+	}
+	m.insert(cvt)
 }
 
 func (m *machine) lowerShifts(si *ssa.Instruction, ext extMode, aluOp aluOp) {
