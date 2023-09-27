@@ -536,14 +536,20 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		m.insert(loQxtn)
 		m.insert(hiQxtn)
 	case ssa.OpcodeFvpromoteLow:
-		x, _ := instr.ArgWithLane()
+		x, lane := instr.ArgWithLane()
+		if lane != ssa.VecLaneF32x4 {
+			panic("unsupported lane type " + lane.String())
+		}
 		ins := m.allocateInstr()
 		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
 		rd := operandNR(m.compiler.VRegOf(instr.Return()))
 		ins.asVecMisc(vecOpFcvtl, rd, rn, vecArrangement2S)
 		m.insert(ins)
 	case ssa.OpcodeFvdemote:
-		x, _ := instr.ArgWithLane()
+		x, lane := instr.ArgWithLane()
+		if lane != ssa.VecLaneF64x2 {
+			panic("unsupported lane type " + lane.String())
+		}
 		ins := m.allocateInstr()
 		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
 		rd := operandNR(m.compiler.VRegOf(instr.Return()))

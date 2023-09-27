@@ -473,16 +473,16 @@ const (
 	// OpcodeVSqrt takes the minimum of two floating point values: `v = VFmin.lane x, y` on vector.
 	OpcodeVSqrt
 
-	// OpcodeVFcvtToUintSat converts a floating point value to an unsigned integer: `v = FcvtToUintSat x` on vector.
+	// OpcodeVFcvtToUintSat converts a floating point value to an unsigned integer: `v = FcvtToUintSat.lane x` on vector.
 	OpcodeVFcvtToUintSat
 
-	// OpcodeVFcvtToSintSat converts a floating point value to a signed integer: `v = VFcvtToSintSat x` on vector.
+	// OpcodeVFcvtToSintSat converts a floating point value to a signed integer: `v = VFcvtToSintSat.lane x` on vector.
 	OpcodeVFcvtToSintSat
 
-	// OpcodeVFcvtFromUint converts a floating point value from an unsigned integer: `v = FcvtFromUint x` on vector.
+	// OpcodeVFcvtFromUint converts a floating point value from an unsigned integer: `v = FcvtFromUint.lane x` on vector.
 	OpcodeVFcvtFromUint
 
-	// OpcodeVFcvtFromSint converts a floating point value from a signed integer: `v = VFcvtFromSint x` on vector.
+	// OpcodeVFcvtFromSint converts a floating point value from a signed integer: `v = VFcvtFromSint.lane x` on vector.
 	OpcodeVFcvtFromSint
 
 	// OpcodeImul performs an integer multiplication: `v = Imul x, y`.
@@ -744,36 +744,30 @@ const (
 	// `v = ireduce x`.
 	OpcodeIreduce
 
-	// OpcodeSnarrow ...
-	// `v = snarrow x, y`.
+	// OpcodeSnarrow converts two input vectors x, y into a smaller lane vector by narrowing each lane, signed `v = Snarrow.lane x, y`.
 	OpcodeSnarrow
 
-	// OpcodeUnarrow ...
-	// `v = unarrow x, y`.
+	// OpcodeUnarrow converts two input vectors x, y into a smaller lane vector by narrowing each lane, unsigned `v = Unarrow.lane x, y`.
 	OpcodeUnarrow
 
 	// OpcodeUunarrow ...
 	// `v = uunarrow x, y`.
 	OpcodeUunarrow
 
-	// OpcodeSwidenLow ...
-	// `v = swiden_low x`.
+	// OpcodeSwidenLow converts low half of the smaller lane vector to a larger lane vector, sign extended: `v = SwidenLow.lane x`.
 	OpcodeSwidenLow
 
-	// OpcodeSwidenHigh ...
-	// `v = swiden_high x`.
+	// OpcodeSwidenHigh converts high half of the smaller lane vector to a larger lane vector, sign extended: `v = SwidenHigh.lane x`.
 	OpcodeSwidenHigh
-	// `v = uwiden_low x`.
 
-	// OpcodeUwidenLow ...
+	// OpcodeUwidenLow converts low half of the smaller lane vector to a larger lane vector, zero (unsigned) extended: `v = UwidenLow.lane x`.
 	OpcodeUwidenLow
-	// `v = uwiden_high x`.
 
-	// OpcodeUwidenHigh ...
+	// OpcodeUwidenHigh converts high half of the smaller lane vector to a larger lane vector, zero (unsigned) extended: `v = UwidenHigh.lane x`.
 	OpcodeUwidenHigh
-	// `v = iadd_pairwise x, y`.
 
 	// OpcodeIaddPairwise ...
+	// `v = iadd_pairwise x, y`.
 	OpcodeIaddPairwise
 
 	// OpcodeWideningPairwiseDotProductS ...
@@ -789,14 +783,15 @@ const (
 	// OpcodeFpromote promotes the given floating point value: `v = Fpromote x`.
 	OpcodeFpromote
 
-	// OpcodeFvpromoteLow promotes the given floating point value: `v = FvpromoteLow.lane x` on vector.
+	// OpcodeFvpromoteLow converts the two lower single-precision floating point lanes
+	// to the two double-precision lanes of the result: `v = FvpromoteLow.lane x` on vector.
 	OpcodeFvpromoteLow
 
 	// OpcodeFdemote demotes the given float point value: `v = Fdemote x`.
 	OpcodeFdemote
 
-	// OpcodeFvdemote ...
-	// `v = fvdemote x`.
+	// OpcodeFvdemote converts the two double-precision floating point lanes
+	// to two lower single-precision lanes of the result `v = Fvdemote.lane x`.
 	OpcodeFvdemote
 
 	// OpcodeFcvtToUint ...
@@ -1922,8 +1917,8 @@ func (i *Instruction) AsIreduce(v Value, dstType Type) *Instruction {
 	return i
 }
 
-// AsWiden initializes this instruction as a signed or unsigned widen low instruction
-// with OpcodeSwidenLow, OpcodeUwidenLow, OpcodeSwidenHigh, OpcodeUwidenHigh.
+// AsWiden initializes this instruction as a signed or unsigned widen instruction
+// on low half or high half of the given vector with OpcodeSwidenLow, OpcodeUwidenLow, OpcodeSwidenHigh, OpcodeUwidenHigh.
 func (i *Instruction) AsWiden(v Value, lane VecLane, signed, low bool) *Instruction {
 	switch {
 	case signed && low:
