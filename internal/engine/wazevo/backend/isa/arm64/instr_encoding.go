@@ -1887,7 +1887,7 @@ func encodeAdvancedSIMDTwoMisc(op vecOp, rd, rn uint32, arr vecArrangement) uint
 			panic("unsupported arrangement: " + arr.String())
 		}
 	case vecOpSqxtn:
-		// when q == 1 it encodes sqxtn2 (operates on upper 64 bits)
+		// When q == 1 it encodes sqxtn2 (operates on upper 64 bits).
 		opcode = 0b10100
 		u = 0b0
 		if arr > vecArrangement4S {
@@ -1895,7 +1895,7 @@ func encodeAdvancedSIMDTwoMisc(op vecOp, rd, rn uint32, arr vecArrangement) uint
 		}
 		size, q = arrToSizeQEncoded(arr)
 	case vecOpUqxtn:
-		// when q == 1 it encodes uqxtn2 (operates on upper 64 bits)
+		// When q == 1 it encodes uqxtn2 (operates on upper 64 bits).
 		opcode = 0b10100
 		u = 0b1
 		if arr > vecArrangement4S {
@@ -1903,7 +1903,7 @@ func encodeAdvancedSIMDTwoMisc(op vecOp, rd, rn uint32, arr vecArrangement) uint
 		}
 		size, q = arrToSizeQEncoded(arr)
 	case vecOpSqxtun:
-		// when q == 1 it encodes sqxtun2 (operates on upper 64 bits)
+		// When q == 1 it encodes sqxtun2 (operates on upper 64 bits).
 		opcode = 0b10010 // 0b10100
 		u = 0b1
 		if arr > vecArrangement4S {

@@ -510,10 +510,10 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		switch lane {
 		case ssa.VecLaneI16x8: // I16x8
 			arr = vecArrangement8B
-			arr2 = vecArrangement16B // implies sqxtn2
+			arr2 = vecArrangement16B // Implies sqxtn2.
 		case ssa.VecLaneI32x4:
 			arr = vecArrangement4H
-			arr2 = vecArrangement8H // implies sqxtn2
+			arr2 = vecArrangement8H // Implies sqxtn2.
 		default:
 			panic("unsupported lane " + lane.String())
 		}
