@@ -1698,11 +1698,14 @@ func (b vecOp) String() string {
 		return "xtn"
 	case vecOpShll:
 		return "shll"
+	case vecOpSshl:
+		return "sshl"
 	case vecOpSshll:
 		return "sshll"
+	case vecOpUshl:
+		return "ushl"
 	case vecOpUshll:
 		return "ushll"
-
 	case vecOpSshr:
 		return "sshr"
 	case vecOpZip1:
@@ -1780,7 +1783,9 @@ const (
 	vecOpRev64
 	vecOpXtn
 	vecOpShll
+	vecOpSshl
 	vecOpSshll
+	vecOpUshl
 	vecOpUshll
 	vecOpSshr
 	vecOpZip1

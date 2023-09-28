@@ -425,6 +425,15 @@ const (
 	// OpcodeVIabs returns the absolute value for the given vector value: `v = VIabs.lane x`.
 	OpcodeVIabs
 
+	// OpcodeVIshl shifts x left by (y mod lane-width): `v = VIshl.lane x, y` on vector.
+	OpcodeVIshl
+
+	// OpcodeVUshr shifts x right by (y mod lane-width), unsigned: `v = VUshr.lane x, y` on vector.
+	OpcodeVUshr
+
+	// OpcodeVSshr shifts x right by (y mod lane-width), signed: `v = VSshr.lane x, y` on vector.
+	OpcodeVSshr
+
 	// OpcodeVFabs takes the absolute value of a floating point value: `v = VFabs.lane x on vector.
 	OpcodeVFabs
 
@@ -987,6 +996,9 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeVIabs:              sideEffectNone,
 	OpcodeVIneg:              sideEffectNone,
 	OpcodeVIpopcnt:           sideEffectNone,
+	OpcodeVIshl:              sideEffectNone,
+	OpcodeVSshr:              sideEffectNone,
+	OpcodeVUshr:              sideEffectNone,
 	OpcodeVSqrt:              sideEffectNone,
 	OpcodeVFabs:              sideEffectNone,
 	OpcodeVFmin:              sideEffectNone,
@@ -1043,6 +1055,9 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeVIabs:      returnTypesFnV128,
 	OpcodeVIneg:      returnTypesFnV128,
 	OpcodeVIpopcnt:   returnTypesFnV128,
+	OpcodeVIshl:      returnTypesFnV128,
+	OpcodeVSshr:      returnTypesFnV128,
+	OpcodeVUshr:      returnTypesFnV128,
 	OpcodeBand:       returnTypesFnSingle,
 	OpcodeFcopysign:  returnTypesFnSingle,
 	OpcodeBitcast:    returnTypesFnSingle,
@@ -1691,11 +1706,31 @@ func (i *Instruction) AsIshl(x, amount Value) *Instruction {
 	return i
 }
 
+// AsVIshl initializes this instruction as an integer shift left instruction with OpcodeVIshl on vector.
+func (i *Instruction) AsVIshl(x, amount Value, lane VecLane) *Instruction {
+	i.opcode = OpcodeVIshl
+	i.v = x
+	i.v2 = amount
+	i.u1 = uint64(lane)
+	i.typ = x.Type()
+	return i
+}
+
 // AsUshr initializes this instruction as an integer unsigned shift right (logical shift right) instruction with OpcodeUshr.
 func (i *Instruction) AsUshr(x, amount Value) *Instruction {
 	i.opcode = OpcodeUshr
 	i.v = x
 	i.v2 = amount
+	i.typ = x.Type()
+	return i
+}
+
+// AsVUshr initializes this instruction as an integer unsigned shift right (logical shift right) instruction with OpcodeVUshr on vector.
+func (i *Instruction) AsVUshr(x, amount Value, lane VecLane) *Instruction {
+	i.opcode = OpcodeVUshr
+	i.v = x
+	i.v2 = amount
+	i.u1 = uint64(lane)
 	i.typ = x.Type()
 	return i
 }
@@ -1706,6 +1741,16 @@ func (i *Instruction) AsSshr(x, amount Value) {
 	i.v = x
 	i.v2 = amount
 	i.typ = x.Type()
+}
+
+// AsVSshr initializes this instruction as an integer signed shift right (arithmetic shift right) instruction with OpcodeVSshr on vector.
+func (i *Instruction) AsVSshr(x, amount Value, lane VecLane) *Instruction {
+	i.opcode = OpcodeVSshr
+	i.v = x
+	i.v2 = amount
+	i.u1 = uint64(lane)
+	i.typ = x.Type()
+	return i
 }
 
 // AsRotl initializes this instruction as a word rotate left instruction with OpcodeRotl.
@@ -2455,6 +2500,7 @@ func (i *Instruction) Format(b Builder) string {
 	case OpcodeVIadd, OpcodeVSaddSat, OpcodeVUaddSat, OpcodeVIsub, OpcodeVSsubSat, OpcodeVUsubSat,
 		OpcodeVImin, OpcodeVUmin, OpcodeVImax, OpcodeVUmax, OpcodeVImul, OpcodeVAvgRound,
 		OpcodeVFadd, OpcodeVFsub, OpcodeVFmul, OpcodeVFdiv,
+		OpcodeVIshl, OpcodeVSshr, OpcodeVUshr,
 		OpcodeVFmin, OpcodeVFmax, OpcodeVMinPseudo, OpcodeVMaxPseudo,
 		OpcodeSnarrow, OpcodeUnarrow:
 		instSuffix = fmt.Sprintf(".%s %s, %s", VecLane(i.u1), i.v.Format(b), i.v2.Format(b))
@@ -2877,6 +2923,12 @@ func (o Opcode) String() (ret string) {
 		return "VIneg"
 	case OpcodeVIpopcnt:
 		return "VIpopcnt"
+	case OpcodeVIshl:
+		return "VIshl"
+	case OpcodeVUshr:
+		return "VUshr"
+	case OpcodeVSshr:
+		return "VSshr"
 	case OpcodeVFabs:
 		return "VFabs"
 	case OpcodeVFmax:

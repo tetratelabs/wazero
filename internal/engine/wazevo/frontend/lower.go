@@ -2342,6 +2342,63 @@ func (c *Compiler) lowerCurrentOpcode() {
 				AsFvdemote(v1, ssa.VecLaneF64x2).
 				Insert(builder).Return()
 			state.push(ret)
+		case wasm.OpcodeVecI8x16Shl, wasm.OpcodeVecI16x8Shl, wasm.OpcodeVecI32x4Shl, wasm.OpcodeVecI64x2Shl:
+			if state.unreachable {
+				break
+			}
+			var lane ssa.VecLane
+			switch vecOp {
+			case wasm.OpcodeVecI8x16Shl:
+				lane = ssa.VecLaneI8x16
+			case wasm.OpcodeVecI16x8Shl:
+				lane = ssa.VecLaneI16x8
+			case wasm.OpcodeVecI32x4Shl:
+				lane = ssa.VecLaneI32x4
+			case wasm.OpcodeVecI64x2Shl:
+				lane = ssa.VecLaneI64x2
+			}
+			v2 := state.pop()
+			v1 := state.pop()
+			ret := builder.AllocateInstruction().AsVIshl(v1, v2, lane).Insert(builder).Return()
+			state.push(ret)
+		case wasm.OpcodeVecI8x16ShrS, wasm.OpcodeVecI16x8ShrS, wasm.OpcodeVecI32x4ShrS, wasm.OpcodeVecI64x2ShrS:
+			if state.unreachable {
+				break
+			}
+			var lane ssa.VecLane
+			switch vecOp {
+			case wasm.OpcodeVecI8x16ShrS:
+				lane = ssa.VecLaneI8x16
+			case wasm.OpcodeVecI16x8ShrS:
+				lane = ssa.VecLaneI16x8
+			case wasm.OpcodeVecI32x4ShrS:
+				lane = ssa.VecLaneI32x4
+			case wasm.OpcodeVecI64x2ShrS:
+				lane = ssa.VecLaneI64x2
+			}
+			v2 := state.pop()
+			v1 := state.pop()
+			ret := builder.AllocateInstruction().AsVSshr(v1, v2, lane).Insert(builder).Return()
+			state.push(ret)
+		case wasm.OpcodeVecI8x16ShrU, wasm.OpcodeVecI16x8ShrU, wasm.OpcodeVecI32x4ShrU, wasm.OpcodeVecI64x2ShrU:
+			if state.unreachable {
+				break
+			}
+			var lane ssa.VecLane
+			switch vecOp {
+			case wasm.OpcodeVecI8x16ShrU:
+				lane = ssa.VecLaneI8x16
+			case wasm.OpcodeVecI16x8ShrU:
+				lane = ssa.VecLaneI16x8
+			case wasm.OpcodeVecI32x4ShrU:
+				lane = ssa.VecLaneI32x4
+			case wasm.OpcodeVecI64x2ShrU:
+				lane = ssa.VecLaneI64x2
+			}
+			v2 := state.pop()
+			v1 := state.pop()
+			ret := builder.AllocateInstruction().AsVUshr(v1, v2, lane).Insert(builder).Return()
+			state.push(ret)
 		default:
 			panic("TODO: unsupported vector instruction: " + wasm.VectorInstructionName(vecOp))
 		}
