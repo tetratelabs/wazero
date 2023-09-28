@@ -144,6 +144,7 @@ func TestSpectestV2(t *testing.T) {
 		{"simd_boolean"},
 		{"simd_bitwise"},
 		{"simd_const"},
+		{"simd_conversions"},
 		{"simd_i8x16_arith"},
 		{"simd_i8x16_arith2"},
 		{"simd_i8x16_sat_arith"},
@@ -168,6 +169,8 @@ func TestSpectestV2(t *testing.T) {
 		{"simd_f64x2_rounding"},
 		{"simd_f32x4_pmin_pmax"},
 		{"simd_f64x2_pmin_pmax"},
+		{"simd_i32x4_trunc_sat_f32x4"},
+		{"simd_i32x4_trunc_sat_f64x2"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Run("normal", func(t *testing.T) {

@@ -1664,40 +1664,43 @@ func encodeVecLanes(op vecOp, rd uint32, rn uint32, arr vecArrangement) uint32 {
 func encodeVecShiftImm(op vecOp, rd uint32, rn, amount uint32, arr vecArrangement) uint32 {
 	var u, q, immh, immb, opcode uint32
 	switch op {
+	case vecOpSshll:
+		u, opcode = 0b0, 0b10100
+	case vecOpUshll:
+		u, opcode = 0b1, 0b10100
 	case vecOpSshr:
 		u, opcode = 0, 0b00000
-		switch arr {
-		case vecArrangement16B:
-			q = 0b1
-			fallthrough
-		case vecArrangement8B:
-			immh = 0b0001
-			immb = 8 - uint32(amount&0b111)
-		case vecArrangement8H:
-			q = 0b1
-			fallthrough
-		case vecArrangement4H:
-			v := 16 - uint32(amount&0b1111)
-			immb = v & 0b111
-			immh = 0b0010 | (v >> 3)
-		case vecArrangement4S:
-			q = 0b1
-			fallthrough
-		case vecArrangement2S:
-			v := 32 - uint32(amount&0b11111)
-			immb = v & 0b111
-			immh = 0b0100 | (v >> 3)
-		case vecArrangement2D:
-			q = 0b1
-			v := 64 - uint32(amount&0b111111)
-			immb = v & 0b111
-			immh = 0b1000 | (v >> 3)
-		default:
-			panic("unsupported arrangement: " + arr.String())
-		}
-
 	default:
 		panic("unsupported or illegal vecOp: " + op.String())
+	}
+	switch arr {
+	case vecArrangement16B:
+		q = 0b1
+		fallthrough
+	case vecArrangement8B:
+		immh = 0b0001
+		immb = 8 - uint32(amount&0b111)
+	case vecArrangement8H:
+		q = 0b1
+		fallthrough
+	case vecArrangement4H:
+		v := 16 - uint32(amount&0b1111)
+		immb = v & 0b111
+		immh = 0b0010 | (v >> 3)
+	case vecArrangement4S:
+		q = 0b1
+		fallthrough
+	case vecArrangement2S:
+		v := 32 - uint32(amount&0b11111)
+		immb = v & 0b111
+		immh = 0b0100 | (v >> 3)
+	case vecArrangement2D:
+		q = 0b1
+		v := 64 - uint32(amount&0b111111)
+		immb = v & 0b111
+		immh = 0b1000 | (v >> 3)
+	default:
+		panic("unsupported arrangement: " + arr.String())
 	}
 	return q<<30 | u<<29 | 0b011110<<23 | immh<<19 | immb<<16 | 0b000001<<10 | opcode<<11 | 0b1<<10 | rn<<5 | rd
 }
@@ -1808,6 +1811,104 @@ func encodeAdvancedSIMDTwoMisc(op vecOp, rd, rn uint32, arr vecArrangement) uint
 		}
 		opcode = 0b11111
 		u = 0b1
+		size, q = arrToSizeQEncoded(arr)
+	case vecOpFcvtl:
+		opcode = 0b10111
+		u = 0b0
+		switch arr {
+		case vecArrangement2S:
+			size, q = 0b01, 0b0
+		case vecArrangement4H:
+			size, q = 0b00, 0b0
+		default:
+			panic("unsupported arrangement: " + arr.String())
+		}
+	case vecOpFcvtn:
+		opcode = 0b10110
+		u = 0b0
+		switch arr {
+		case vecArrangement2S:
+			size, q = 0b01, 0b0
+		case vecArrangement4H:
+			size, q = 0b00, 0b0
+		default:
+			panic("unsupported arrangement: " + arr.String())
+		}
+	case vecOpFcvtzs:
+		opcode = 0b11011
+		u = 0b0
+		switch arr {
+		case vecArrangement2S:
+			q, size = 0b0, 0b10
+		case vecArrangement4S:
+			q, size = 0b1, 0b10
+		case vecArrangement2D:
+			q, size = 0b1, 0b11
+		default:
+			panic("unsupported arrangement: " + arr.String())
+		}
+	case vecOpFcvtzu:
+		opcode = 0b11011
+		u = 0b1
+		switch arr {
+		case vecArrangement2S:
+			q, size = 0b0, 0b10
+		case vecArrangement4S:
+			q, size = 0b1, 0b10
+		case vecArrangement2D:
+			q, size = 0b1, 0b11
+		default:
+			panic("unsupported arrangement: " + arr.String())
+		}
+	case vecOpScvtf:
+		opcode = 0b11101
+		u = 0b0
+		switch arr {
+		case vecArrangement4S:
+			q, size = 0b1, 0b00
+		case vecArrangement2S:
+			q, size = 0b0, 0b00
+		case vecArrangement2D:
+			q, size = 0b1, 0b01
+		default:
+			panic("unsupported arrangement: " + arr.String())
+		}
+	case vecOpUcvtf:
+		opcode = 0b11101
+		u = 0b1
+		switch arr {
+		case vecArrangement4S:
+			q, size = 0b1, 0b00
+		case vecArrangement2S:
+			q, size = 0b0, 0b00
+		case vecArrangement2D:
+			q, size = 0b1, 0b01
+		default:
+			panic("unsupported arrangement: " + arr.String())
+		}
+	case vecOpSqxtn:
+		// When q == 1 it encodes sqxtn2 (operates on upper 64 bits).
+		opcode = 0b10100
+		u = 0b0
+		if arr > vecArrangement4S {
+			panic("unsupported arrangement: " + arr.String())
+		}
+		size, q = arrToSizeQEncoded(arr)
+	case vecOpUqxtn:
+		// When q == 1 it encodes uqxtn2 (operates on upper 64 bits).
+		opcode = 0b10100
+		u = 0b1
+		if arr > vecArrangement4S {
+			panic("unsupported arrangement: " + arr.String())
+		}
+		size, q = arrToSizeQEncoded(arr)
+	case vecOpSqxtun:
+		// When q == 1 it encodes sqxtun2 (operates on upper 64 bits).
+		opcode = 0b10010 // 0b10100
+		u = 0b1
+		if arr > vecArrangement4S {
+			panic("unsupported arrangement: " + arr.String())
+		}
 		size, q = arrToSizeQEncoded(arr)
 	case vecOpRev64:
 		opcode = 0b00000

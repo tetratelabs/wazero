@@ -473,6 +473,18 @@ const (
 	// OpcodeVSqrt takes the minimum of two floating point values: `v = VFmin.lane x, y` on vector.
 	OpcodeVSqrt
 
+	// OpcodeVFcvtToUintSat converts a floating point value to an unsigned integer: `v = FcvtToUintSat.lane x` on vector.
+	OpcodeVFcvtToUintSat
+
+	// OpcodeVFcvtToSintSat converts a floating point value to a signed integer: `v = VFcvtToSintSat.lane x` on vector.
+	OpcodeVFcvtToSintSat
+
+	// OpcodeVFcvtFromUint converts a floating point value from an unsigned integer: `v = FcvtFromUint.lane x` on vector.
+	OpcodeVFcvtFromUint
+
+	// OpcodeVFcvtFromSint converts a floating point value from a signed integer: `v = VFcvtFromSint.lane x` on vector.
+	OpcodeVFcvtFromSint
+
 	// OpcodeImul performs an integer multiplication: `v = Imul x, y`.
 	OpcodeImul
 
@@ -731,37 +743,31 @@ const (
 	// OpcodeIreduce ...
 	// `v = ireduce x`.
 	OpcodeIreduce
-	// `v = snarrow x, y`.
 
-	// OpcodeSnarrow ...
+	// OpcodeSnarrow converts two input vectors x, y into a smaller lane vector by narrowing each lane, signed `v = Snarrow.lane x, y`.
 	OpcodeSnarrow
-	// `v = unarrow x, y`.
 
-	// OpcodeUnarrow ...
+	// OpcodeUnarrow converts two input vectors x, y into a smaller lane vector by narrowing each lane, unsigned `v = Unarrow.lane x, y`.
 	OpcodeUnarrow
-	// `v = uunarrow x, y`.
 
 	// OpcodeUunarrow ...
+	// `v = uunarrow x, y`.
 	OpcodeUunarrow
-	// `v = swiden_low x`.
 
-	// OpcodeSwidenLow ...
+	// OpcodeSwidenLow converts low half of the smaller lane vector to a larger lane vector, sign extended: `v = SwidenLow.lane x`.
 	OpcodeSwidenLow
-	// `v = swiden_high x`.
 
-	// OpcodeSwidenHigh ...
+	// OpcodeSwidenHigh converts high half of the smaller lane vector to a larger lane vector, sign extended: `v = SwidenHigh.lane x`.
 	OpcodeSwidenHigh
-	// `v = uwiden_low x`.
 
-	// OpcodeUwidenLow ...
+	// OpcodeUwidenLow converts low half of the smaller lane vector to a larger lane vector, zero (unsigned) extended: `v = UwidenLow.lane x`.
 	OpcodeUwidenLow
-	// `v = uwiden_high x`.
 
-	// OpcodeUwidenHigh ...
+	// OpcodeUwidenHigh converts high half of the smaller lane vector to a larger lane vector, zero (unsigned) extended: `v = UwidenHigh.lane x`.
 	OpcodeUwidenHigh
-	// `v = iadd_pairwise x, y`.
 
 	// OpcodeIaddPairwise ...
+	// `v = iadd_pairwise x, y`.
 	OpcodeIaddPairwise
 
 	// OpcodeWideningPairwiseDotProductS ...
@@ -777,11 +783,15 @@ const (
 	// OpcodeFpromote promotes the given floating point value: `v = Fpromote x`.
 	OpcodeFpromote
 
+	// OpcodeFvpromoteLow converts the two lower single-precision floating point lanes
+	// to the two double-precision lanes of the result: `v = FvpromoteLow.lane x` on vector.
+	OpcodeFvpromoteLow
+
 	// OpcodeFdemote demotes the given float point value: `v = Fdemote x`.
 	OpcodeFdemote
 
-	// OpcodeFvdemote ...
-	// `v = fvdemote x`.
+	// OpcodeFvdemote converts the two double-precision floating point lanes
+	// to two lower single-precision lanes of the result `v = Fvdemote.lane x`.
 	OpcodeFvdemote
 
 	// OpcodeFcvtToUint ...
@@ -898,6 +908,12 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeSload32:            sideEffectNone,
 	OpcodeSExtend:            sideEffectNone,
 	OpcodeUExtend:            sideEffectNone,
+	OpcodeSwidenLow:          sideEffectNone,
+	OpcodeUwidenLow:          sideEffectNone,
+	OpcodeSwidenHigh:         sideEffectNone,
+	OpcodeUwidenHigh:         sideEffectNone,
+	OpcodeSnarrow:            sideEffectNone,
+	OpcodeUnarrow:            sideEffectNone,
 	OpcodeFsub:               sideEffectNone,
 	OpcodeF32const:           sideEffectNone,
 	OpcodeF64const:           sideEffectNone,
@@ -926,7 +942,11 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeFcvtFromUint:       sideEffectNone,
 	OpcodeFcvtToSintSat:      sideEffectNone,
 	OpcodeFcvtToUintSat:      sideEffectNone,
+	OpcodeVFcvtFromUint:      sideEffectNone,
+	OpcodeVFcvtFromSint:      sideEffectNone,
 	OpcodeFdemote:            sideEffectNone,
+	OpcodeFvpromoteLow:       sideEffectNone,
+	OpcodeFvdemote:           sideEffectNone,
 	OpcodeFpromote:           sideEffectNone,
 	OpcodeBitcast:            sideEffectNone,
 	OpcodeIreduce:            sideEffectNone,
@@ -983,6 +1003,8 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeVNearest:           sideEffectNone,
 	OpcodeVMaxPseudo:         sideEffectNone,
 	OpcodeVMinPseudo:         sideEffectNone,
+	OpcodeVFcvtToUintSat:     sideEffectNone,
+	OpcodeVFcvtToSintSat:     sideEffectNone,
 }
 
 // sideEffect returns true if this instruction has side effects.
@@ -1041,6 +1063,12 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeSelect:     returnTypesFnSingle,
 	OpcodeSExtend:    returnTypesFnSingle,
 	OpcodeUExtend:    returnTypesFnSingle,
+	OpcodeSwidenLow:  returnTypesFnV128,
+	OpcodeUwidenLow:  returnTypesFnV128,
+	OpcodeSwidenHigh: returnTypesFnV128,
+	OpcodeUwidenHigh: returnTypesFnV128,
+	OpcodeSnarrow:    returnTypesFnV128,
+	OpcodeUnarrow:    returnTypesFnV128,
 	OpcodeIreduce:    returnTypesFnSingle,
 	OpcodeFabs:       returnTypesFnSingle,
 	OpcodeSqrt:       returnTypesFnSingle,
@@ -1119,8 +1147,12 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeFcvtFromUint:       returnTypesFnSingle,
 	OpcodeFcvtToSintSat:      returnTypesFnSingle,
 	OpcodeFcvtToUintSat:      returnTypesFnSingle,
+	OpcodeVFcvtFromUint:      returnTypesFnV128,
+	OpcodeVFcvtFromSint:      returnTypesFnV128,
 	OpcodeFneg:               returnTypesFnSingle,
 	OpcodeFdemote:            returnTypesFnF32,
+	OpcodeFvdemote:           returnTypesFnV128,
+	OpcodeFvpromoteLow:       returnTypesFnV128,
 	OpcodeFpromote:           returnTypesFnF64,
 	OpcodeVconst:             returnTypesFnV128,
 	OpcodeVFabs:              returnTypesFnV128,
@@ -1139,6 +1171,8 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeVNearest:           returnTypesFnV128,
 	OpcodeVMaxPseudo:         returnTypesFnV128,
 	OpcodeVMinPseudo:         returnTypesFnV128,
+	OpcodeVFcvtToUintSat:     returnTypesFnV128,
+	OpcodeVFcvtToSintSat:     returnTypesFnV128,
 }
 
 // AsLoad initializes this instruction as a store instruction with OpcodeLoad.
@@ -1883,6 +1917,24 @@ func (i *Instruction) AsIreduce(v Value, dstType Type) *Instruction {
 	return i
 }
 
+// AsWiden initializes this instruction as a signed or unsigned widen instruction
+// on low half or high half of the given vector with OpcodeSwidenLow, OpcodeUwidenLow, OpcodeSwidenHigh, OpcodeUwidenHigh.
+func (i *Instruction) AsWiden(v Value, lane VecLane, signed, low bool) *Instruction {
+	switch {
+	case signed && low:
+		i.opcode = OpcodeSwidenLow
+	case !signed && low:
+		i.opcode = OpcodeUwidenLow
+	case signed && !low:
+		i.opcode = OpcodeSwidenHigh
+	case !signed && !low:
+		i.opcode = OpcodeUwidenHigh
+	}
+	i.v = v
+	i.u1 = uint64(lane)
+	return i
+}
+
 // ReturnVals returns the return values of OpcodeReturn.
 func (i *Instruction) ReturnVals() []Value {
 	return i.vs
@@ -2189,6 +2241,59 @@ func (i *Instruction) AsFcvtToInt(x, ctx Value, signed bool, dst64bit bool, sat 
 	return i
 }
 
+// AsVFcvtToIntSat initializes this instruction as an instruction with either OpcodeVFcvtToSintSat or OpcodeVFcvtToUintSat
+func (i *Instruction) AsVFcvtToIntSat(x Value, lane VecLane, signed bool) *Instruction {
+	if signed {
+		i.opcode = OpcodeVFcvtToSintSat
+	} else {
+		i.opcode = OpcodeVFcvtToUintSat
+	}
+	i.v = x
+	i.u1 = uint64(lane)
+	return i
+}
+
+// AsVFcvtFromInt initializes this instruction as an instruction with either OpcodeVFcvtToSintSat or OpcodeVFcvtToUintSat
+func (i *Instruction) AsVFcvtFromInt(x Value, lane VecLane, signed bool) *Instruction {
+	if signed {
+		i.opcode = OpcodeVFcvtFromSint
+	} else {
+		i.opcode = OpcodeVFcvtFromUint
+	}
+	i.v = x
+	i.u1 = uint64(lane)
+	return i
+}
+
+// AsNarrow initializes this instruction as an instruction with either OpcodeSnarrow or OpcodeUnarrow
+func (i *Instruction) AsNarrow(x, y Value, lane VecLane, signed bool) *Instruction {
+	if signed {
+		i.opcode = OpcodeSnarrow
+	} else {
+		i.opcode = OpcodeUnarrow
+	}
+	i.v = x
+	i.v2 = y
+	i.u1 = uint64(lane)
+	return i
+}
+
+// AsFvpromoteLow initializes this instruction as an instruction with OpcodeFvpromoteLow
+func (i *Instruction) AsFvpromoteLow(x Value, lane VecLane) *Instruction {
+	i.opcode = OpcodeFvpromoteLow
+	i.v = x
+	i.u1 = uint64(lane)
+	return i
+}
+
+// AsFvdemote initializes this instruction as an instruction with OpcodeFvdemote
+func (i *Instruction) AsFvdemote(x Value, lane VecLane) *Instruction {
+	i.opcode = OpcodeFvdemote
+	i.v = x
+	i.u1 = uint64(lane)
+	return i
+}
+
 // AsSExtend initializes this instruction as a sign extension instruction with OpcodeSExtend.
 func (i *Instruction) AsSExtend(v Value, from, to byte) {
 	i.opcode = OpcodeSExtend
@@ -2350,10 +2455,13 @@ func (i *Instruction) Format(b Builder) string {
 	case OpcodeVIadd, OpcodeVSaddSat, OpcodeVUaddSat, OpcodeVIsub, OpcodeVSsubSat, OpcodeVUsubSat,
 		OpcodeVImin, OpcodeVUmin, OpcodeVImax, OpcodeVUmax, OpcodeVImul, OpcodeVAvgRound,
 		OpcodeVFadd, OpcodeVFsub, OpcodeVFmul, OpcodeVFdiv,
-		OpcodeVFmin, OpcodeVFmax, OpcodeVMinPseudo, OpcodeVMaxPseudo:
+		OpcodeVFmin, OpcodeVFmax, OpcodeVMinPseudo, OpcodeVMaxPseudo,
+		OpcodeSnarrow, OpcodeUnarrow:
 		instSuffix = fmt.Sprintf(".%s %s, %s", VecLane(i.u1), i.v.Format(b), i.v2.Format(b))
 	case OpcodeVIabs, OpcodeVIneg, OpcodeVIpopcnt, OpcodeVhighBits, OpcodeVallTrue, OpcodeVanyTrue,
-		OpcodeVFabs, OpcodeVFneg, OpcodeVSqrt, OpcodeVCeil, OpcodeVFloor, OpcodeVTrunc, OpcodeVNearest:
+		OpcodeVFabs, OpcodeVFneg, OpcodeVSqrt, OpcodeVCeil, OpcodeVFloor, OpcodeVTrunc, OpcodeVNearest,
+		OpcodeVFcvtToUintSat, OpcodeVFcvtToSintSat, OpcodeVFcvtFromUint, OpcodeVFcvtFromSint,
+		OpcodeFvpromoteLow, OpcodeFvdemote, OpcodeSwidenLow, OpcodeUwidenLow, OpcodeSwidenHigh, OpcodeUwidenHigh:
 		instSuffix = fmt.Sprintf(".%s %s", VecLane(i.u1), i.v.Format(b))
 	default:
 		panic(fmt.Sprintf("TODO: format for %s", i.opcode))
@@ -2801,7 +2909,16 @@ func (o Opcode) String() (ret string) {
 		return "VMinPseudo"
 	case OpcodeVSqrt:
 		return "VSqrt"
-
+	case OpcodeVFcvtToUintSat:
+		return "VFcvtToUintSat"
+	case OpcodeVFcvtToSintSat:
+		return "VFcvtToSintSat"
+	case OpcodeVFcvtFromUint:
+		return "VFcvtFromUint"
+	case OpcodeVFcvtFromSint:
+		return "VFcvtFromSint"
+	case OpcodeFvpromoteLow:
+		return "FvpromoteLow"
 	}
 	panic(fmt.Sprintf("unknown opcode %d", o))
 }
