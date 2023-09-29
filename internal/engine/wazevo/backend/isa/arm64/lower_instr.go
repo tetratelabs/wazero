@@ -446,19 +446,24 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
 		rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
 		rd := operandNR(m.compiler.VRegOf(instr.Return()))
+		tmp := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
+
+		mov := m.allocateInstr()
+		mov.asFpuMov128(tmp.nr(), rm.nr())
+		m.insert(mov)
 
 		and := m.allocateInstr()
-		and.asALUBitmaskImm(aluOpAnd, rm.nr(), rm.nr(), uint64(modulo), false)
+		and.asALUBitmaskImm(aluOpAnd, rm.nr(), tmp.nr(), uint64(modulo), false)
 		m.insert(and)
 
 		if op != ssa.OpcodeVIshl {
 			// Negate the amount to make this as right shift.
 			neg := m.allocateInstr()
-			neg.asALU(aluOpSub, rm, operandNR(xzrVReg), rm, false)
+			neg.asALU(aluOpSub, tmp, operandNR(xzrVReg), tmp, false)
 			m.insert(neg)
 		}
 
-		// Copy the shift amount into a vector register as sshl/	ushl requires it to be there.
+		// Copy the shift amount into a vector register as sshl/ushl requires it to be there.
 		dup := m.allocateInstr()
 		dup.asVecDup(rd, rm, arr)
 		m.insert(dup)
