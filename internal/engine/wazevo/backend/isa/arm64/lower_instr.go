@@ -563,6 +563,51 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		rd := operandNR(m.compiler.VRegOf(instr.Return()))
 		ins.asVecMisc(vecOpFcvtn, rd, rn, vecArrangement2S)
 		m.insert(ins)
+	case ssa.OpcodeExtractlane:
+		x, index, signed, lane := instr.LaneOpData()
+
+		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+		rd := operandNR(m.compiler.VRegOf(instr.Return()))
+		arr := ssaLaneToArrangement(lane)
+		mov := m.allocateInstr()
+		switch lane {
+		case ssa.VecLaneI8x16:
+			arr = vecArrangementB
+			if signed {
+				mov.asMovFromVecSignedFIXME(rd, rn, arr, vecIndex(index))
+			} else {
+				mov.asMovFromVec(rd, rn, arr, vecIndex(index))
+			}
+		case ssa.VecLaneI16x8:
+			arr = vecArrangementH
+			if signed {
+				mov.asMovFromVecSignedFIXME(rd, rn, arr, vecIndex(index))
+			} else {
+				mov.asMovFromVec(rd, rn, arr, vecIndex(index))
+			}
+		case ssa.VecLaneI32x4:
+			arr = vecArrangementS
+			if signed {
+				mov.asMovFromVecSignedFIXME(rd, rn, arr, vecIndex(index))
+			} else {
+				mov.asMovFromVec(rd, rn, arr, vecIndex(index))
+			}
+		case ssa.VecLaneI64x2:
+			arr = vecArrangementD
+			if signed {
+				mov.asMovFromVecSignedFIXME(rd, rn, arr, vecIndex(index))
+			} else {
+				mov.asMovFromVec(rd, rn, arr, vecIndex(index))
+			}
+
+		case ssa.VecLaneF32x4, ssa.VecLaneF64x2:
+			panic("not done: inselem")
+
+		default:
+			panic("not done")
+		}
+
+		m.insert(mov)
 	default:
 		panic("TODO: lowering " + op.String())
 	}

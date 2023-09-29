@@ -898,6 +898,7 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeImul:               sideEffectNone,
 	OpcodeIsub:               sideEffectNone,
 	OpcodeIcmp:               sideEffectNone,
+	OpcodeExtractlane:        sideEffectNone,
 	OpcodeBand:               sideEffectNone,
 	OpcodeBor:                sideEffectNone,
 	OpcodeBxor:               sideEffectNone,
@@ -1030,67 +1031,68 @@ func (i *Instruction) sideEffect() sideEffect {
 
 // instructionReturnTypes provides the function to determine the return types of an instruction.
 var instructionReturnTypes = [opcodeEnd]returnTypesFn{
-	OpcodeVbor:       returnTypesFnV128,
-	OpcodeVbxor:      returnTypesFnV128,
-	OpcodeVband:      returnTypesFnV128,
-	OpcodeVbnot:      returnTypesFnV128,
-	OpcodeVbandnot:   returnTypesFnV128,
-	OpcodeVbitselect: returnTypesFnV128,
-	OpcodeVanyTrue:   returnTypesFnI32,
-	OpcodeVallTrue:   returnTypesFnI32,
-	OpcodeVhighBits:  returnTypesFnV128,
-	OpcodeVIadd:      returnTypesFnV128,
-	OpcodeVSaddSat:   returnTypesFnV128,
-	OpcodeVUaddSat:   returnTypesFnV128,
-	OpcodeVIsub:      returnTypesFnV128,
-	OpcodeVSsubSat:   returnTypesFnV128,
-	OpcodeVUsubSat:   returnTypesFnV128,
-	OpcodeVIcmp:      returnTypesFnI32,
-	OpcodeVImin:      returnTypesFnV128,
-	OpcodeVUmin:      returnTypesFnV128,
-	OpcodeVImax:      returnTypesFnV128,
-	OpcodeVUmax:      returnTypesFnV128,
-	OpcodeVImul:      returnTypesFnV128,
-	OpcodeVAvgRound:  returnTypesFnV128,
-	OpcodeVIabs:      returnTypesFnV128,
-	OpcodeVIneg:      returnTypesFnV128,
-	OpcodeVIpopcnt:   returnTypesFnV128,
-	OpcodeVIshl:      returnTypesFnV128,
-	OpcodeVSshr:      returnTypesFnV128,
-	OpcodeVUshr:      returnTypesFnV128,
-	OpcodeBand:       returnTypesFnSingle,
-	OpcodeFcopysign:  returnTypesFnSingle,
-	OpcodeBitcast:    returnTypesFnSingle,
-	OpcodeBor:        returnTypesFnSingle,
-	OpcodeBxor:       returnTypesFnSingle,
-	OpcodeRotl:       returnTypesFnSingle,
-	OpcodeRotr:       returnTypesFnSingle,
-	OpcodeIshl:       returnTypesFnSingle,
-	OpcodeSshr:       returnTypesFnSingle,
-	OpcodeSdiv:       returnTypesFnSingle,
-	OpcodeSrem:       returnTypesFnSingle,
-	OpcodeUdiv:       returnTypesFnSingle,
-	OpcodeUrem:       returnTypesFnSingle,
-	OpcodeUshr:       returnTypesFnSingle,
-	OpcodeJump:       returnTypesFnNoReturns,
-	OpcodeUndefined:  returnTypesFnNoReturns,
-	OpcodeIconst:     returnTypesFnSingle,
-	OpcodeSelect:     returnTypesFnSingle,
-	OpcodeSExtend:    returnTypesFnSingle,
-	OpcodeUExtend:    returnTypesFnSingle,
-	OpcodeSwidenLow:  returnTypesFnV128,
-	OpcodeUwidenLow:  returnTypesFnV128,
-	OpcodeSwidenHigh: returnTypesFnV128,
-	OpcodeUwidenHigh: returnTypesFnV128,
-	OpcodeSnarrow:    returnTypesFnV128,
-	OpcodeUnarrow:    returnTypesFnV128,
-	OpcodeIreduce:    returnTypesFnSingle,
-	OpcodeFabs:       returnTypesFnSingle,
-	OpcodeSqrt:       returnTypesFnSingle,
-	OpcodeCeil:       returnTypesFnSingle,
-	OpcodeFloor:      returnTypesFnSingle,
-	OpcodeTrunc:      returnTypesFnSingle,
-	OpcodeNearest:    returnTypesFnSingle,
+	OpcodeVbor:        returnTypesFnV128,
+	OpcodeVbxor:       returnTypesFnV128,
+	OpcodeVband:       returnTypesFnV128,
+	OpcodeVbnot:       returnTypesFnV128,
+	OpcodeVbandnot:    returnTypesFnV128,
+	OpcodeVbitselect:  returnTypesFnV128,
+	OpcodeVanyTrue:    returnTypesFnI32,
+	OpcodeVallTrue:    returnTypesFnI32,
+	OpcodeVhighBits:   returnTypesFnV128,
+	OpcodeVIadd:       returnTypesFnV128,
+	OpcodeVSaddSat:    returnTypesFnV128,
+	OpcodeVUaddSat:    returnTypesFnV128,
+	OpcodeVIsub:       returnTypesFnV128,
+	OpcodeVSsubSat:    returnTypesFnV128,
+	OpcodeVUsubSat:    returnTypesFnV128,
+	OpcodeVIcmp:       returnTypesFnI32,
+	OpcodeVImin:       returnTypesFnV128,
+	OpcodeVUmin:       returnTypesFnV128,
+	OpcodeVImax:       returnTypesFnV128,
+	OpcodeVUmax:       returnTypesFnV128,
+	OpcodeVImul:       returnTypesFnV128,
+	OpcodeVAvgRound:   returnTypesFnV128,
+	OpcodeVIabs:       returnTypesFnV128,
+	OpcodeVIneg:       returnTypesFnV128,
+	OpcodeVIpopcnt:    returnTypesFnV128,
+	OpcodeVIshl:       returnTypesFnV128,
+	OpcodeVSshr:       returnTypesFnV128,
+	OpcodeVUshr:       returnTypesFnV128,
+	OpcodeExtractlane: returnTypesFnSingle,
+	OpcodeBand:        returnTypesFnSingle,
+	OpcodeFcopysign:   returnTypesFnSingle,
+	OpcodeBitcast:     returnTypesFnSingle,
+	OpcodeBor:         returnTypesFnSingle,
+	OpcodeBxor:        returnTypesFnSingle,
+	OpcodeRotl:        returnTypesFnSingle,
+	OpcodeRotr:        returnTypesFnSingle,
+	OpcodeIshl:        returnTypesFnSingle,
+	OpcodeSshr:        returnTypesFnSingle,
+	OpcodeSdiv:        returnTypesFnSingle,
+	OpcodeSrem:        returnTypesFnSingle,
+	OpcodeUdiv:        returnTypesFnSingle,
+	OpcodeUrem:        returnTypesFnSingle,
+	OpcodeUshr:        returnTypesFnSingle,
+	OpcodeJump:        returnTypesFnNoReturns,
+	OpcodeUndefined:   returnTypesFnNoReturns,
+	OpcodeIconst:      returnTypesFnSingle,
+	OpcodeSelect:      returnTypesFnSingle,
+	OpcodeSExtend:     returnTypesFnSingle,
+	OpcodeUExtend:     returnTypesFnSingle,
+	OpcodeSwidenLow:   returnTypesFnV128,
+	OpcodeUwidenLow:   returnTypesFnV128,
+	OpcodeSwidenHigh:  returnTypesFnV128,
+	OpcodeUwidenHigh:  returnTypesFnV128,
+	OpcodeSnarrow:     returnTypesFnV128,
+	OpcodeUnarrow:     returnTypesFnV128,
+	OpcodeIreduce:     returnTypesFnSingle,
+	OpcodeFabs:        returnTypesFnSingle,
+	OpcodeSqrt:        returnTypesFnSingle,
+	OpcodeCeil:        returnTypesFnSingle,
+	OpcodeFloor:       returnTypesFnSingle,
+	OpcodeTrunc:       returnTypesFnSingle,
+	OpcodeNearest:     returnTypesFnSingle,
 	OpcodeCallIndirect: func(b *builder, instr *Instruction) (t1 Type, ts []Type) {
 		sigID := SignatureID(instr.u1)
 		sig, ok := b.signatures[sigID]
@@ -1753,6 +1755,28 @@ func (i *Instruction) AsVSshr(x, amount Value, lane VecLane) *Instruction {
 	return i
 }
 
+// AsExtractlane initializes this instruction as an extract lane instruction with OpcodeExtractlane on vector.
+func (i *Instruction) AsExtractlane(x Value, index byte, lane VecLane, signed bool) *Instruction {
+	i.opcode = OpcodeExtractlane
+	i.v = x
+	i.u1 = uint64(index)
+	if signed {
+		i.u1 = 1 << 32
+	}
+	i.u2 = uint64(lane)
+	switch lane {
+	case VecLaneI8x16, VecLaneI16x8, VecLaneI32x4:
+		i.typ = TypeI32
+	case VecLaneI64x2:
+		i.typ = TypeI64
+	case VecLaneF32x4:
+		i.typ = TypeF32
+	case VecLaneF64x2:
+		i.typ = TypeF64
+	}
+	return i
+}
+
 // AsRotl initializes this instruction as a word rotate left instruction with OpcodeRotl.
 func (i *Instruction) AsRotl(x, amount Value) {
 	i.opcode = OpcodeRotl
@@ -1787,6 +1811,17 @@ func (i *Instruction) VIcmpData() (x, y Value, c IntegerCmpCond, l VecLane) {
 // VFcmpData returns the operands and comparison condition of this float comparison instruction on vector.
 func (i *Instruction) VFcmpData() (x, y Value, c FloatCmpCond, l VecLane) {
 	return i.v, i.v2, FloatCmpCond(i.u1), VecLane(i.u2)
+}
+
+// LaneOpData returns the operands and sign flag of Extractlane and Insertlane on vector.
+func (i *Instruction) LaneOpData() (x Value, imm byte, signed bool, l VecLane) {
+	x = i.v
+	imm = byte(0x00001111 & i.u1)
+	if i.u1>>32 != 0 {
+		signed = true
+	}
+	l = VecLane(i.u2)
+	return
 }
 
 // AsFadd initializes this instruction as a floating-point addition instruction with OpcodeFadd.
@@ -2340,7 +2375,7 @@ func (i *Instruction) AsFvdemote(x Value, lane VecLane) *Instruction {
 }
 
 // AsSExtend initializes this instruction as a sign extension instruction with OpcodeSExtend.
-func (i *Instruction) AsSExtend(v Value, from, to byte) {
+func (i *Instruction) AsSExtend(v Value, from, to byte) *Instruction {
 	i.opcode = OpcodeSExtend
 	i.v = v
 	i.u1 = uint64(from)<<8 | uint64(to)
@@ -2349,10 +2384,11 @@ func (i *Instruction) AsSExtend(v Value, from, to byte) {
 	} else {
 		i.typ = TypeI32
 	}
+	return i
 }
 
 // AsUExtend initializes this instruction as an unsigned extension instruction with OpcodeUExtend.
-func (i *Instruction) AsUExtend(v Value, from, to byte) {
+func (i *Instruction) AsUExtend(v Value, from, to byte) *Instruction {
 	i.opcode = OpcodeUExtend
 	i.v = v
 	i.u1 = uint64(from)<<8 | uint64(to)
@@ -2361,6 +2397,7 @@ func (i *Instruction) AsUExtend(v Value, from, to byte) {
 	} else {
 		i.typ = TypeI32
 	}
+	return i
 }
 
 func (i *Instruction) ExtendData() (from, to byte, signed bool) {
@@ -2507,7 +2544,8 @@ func (i *Instruction) Format(b Builder) string {
 	case OpcodeVIabs, OpcodeVIneg, OpcodeVIpopcnt, OpcodeVhighBits, OpcodeVallTrue, OpcodeVanyTrue,
 		OpcodeVFabs, OpcodeVFneg, OpcodeVSqrt, OpcodeVCeil, OpcodeVFloor, OpcodeVTrunc, OpcodeVNearest,
 		OpcodeVFcvtToUintSat, OpcodeVFcvtToSintSat, OpcodeVFcvtFromUint, OpcodeVFcvtFromSint,
-		OpcodeFvpromoteLow, OpcodeFvdemote, OpcodeSwidenLow, OpcodeUwidenLow, OpcodeSwidenHigh, OpcodeUwidenHigh:
+		OpcodeFvpromoteLow, OpcodeFvdemote, OpcodeSwidenLow, OpcodeUwidenLow, OpcodeSwidenHigh, OpcodeUwidenHigh,
+		OpcodeExtractlane:
 		instSuffix = fmt.Sprintf(".%s %s", VecLane(i.u1), i.v.Format(b))
 	default:
 		panic(fmt.Sprintf("TODO: format for %s", i.opcode))

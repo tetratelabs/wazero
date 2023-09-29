@@ -255,12 +255,13 @@ func (i *instruction) encode(c backend.Compiler) {
 			vecArrangement(byte(i.u1)),
 			vecIndex(i.u2),
 		))
-	case movFromVec:
+	case movFromVec, movFromVecSigned:
 		c.Emit4Bytes(encodeMoveFromVec(
 			regNumberInEncoding[i.rd.realReg()],
 			regNumberInEncoding[i.rn.realReg()],
-			vecArrangement(byte(i.u1)),
+			vecArrangement(byte(0x0000ffff&i.u1)),
 			vecIndex(i.u2),
+			i.u1>>32 != 0,
 		))
 	case vecDup:
 		c.Emit4Bytes(encodeVecDup(
@@ -833,9 +834,8 @@ func encodeUnconditionalBranchReg(rn uint32, link bool) uint32 {
 // (represented as `umov` when dest is 32-bit, `umov` otherwise) in
 // https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/UMOV--Unsigned-Move-vector-element-to-general-purpose-register-?lang=en
 // https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/MOV--to-general---Move-vector-element-to-general-purpose-register--an-alias-of-UMOV-?lang=en
-func encodeMoveFromVec(rd, rn uint32, arr vecArrangement, index vecIndex) uint32 {
-	var q uint32
-	var imm5 uint32
+func encodeMoveFromVec(rd, rn uint32, arr vecArrangement, index vecIndex, signed bool) uint32 {
+	var op, imm4, q, imm5 uint32
 	switch arr {
 	case vecArrangementB:
 		imm5 |= 0b1
@@ -865,7 +865,12 @@ func encodeMoveFromVec(rd, rn uint32, arr vecArrangement, index vecIndex) uint32
 	default:
 		panic("Unsupported arrangement " + arr.String())
 	}
-	return 0b0_001110000<<21 | q<<30 | imm5<<16 | 0b001111<<10 | rn<<5 | rd
+	if signed {
+		op, imm4 = 0, 0b0101
+	} else {
+		op, imm4 = 0, 0b0111
+	}
+	return op<<29 | 0b01110000<<21 | q<<30 | imm5<<16 | imm4<<11 | 1<<10 | rn<<5 | rd
 }
 
 // encodeVecDup encodes as "Duplicate general-purpose register to vector."

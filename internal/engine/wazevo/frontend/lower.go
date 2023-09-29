@@ -2399,6 +2399,63 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVUshr(v1, v2, lane).Insert(builder).Return()
 			state.push(ret)
+		case wasm.OpcodeVecI8x16ExtractLaneS, wasm.OpcodeVecI16x8ExtractLaneS:
+			if state.unreachable {
+				break
+			}
+			var lane ssa.VecLane
+			switch vecOp {
+			case wasm.OpcodeVecI8x16ExtractLaneS:
+				lane = ssa.VecLaneI8x16
+			case wasm.OpcodeVecI16x8ExtractLaneS:
+				lane = ssa.VecLaneI16x8
+			}
+			v1 := state.pop()
+			state.pc++
+			index := c.wasmFunctionBody[state.pc]
+			ext := builder.AllocateInstruction().AsExtractlane(v1, index, lane, true).Insert(builder).Return()
+			state.push(ext)
+		case wasm.OpcodeVecI8x16ExtractLaneU, wasm.OpcodeVecI16x8ExtractLaneU,
+			wasm.OpcodeVecI32x4ExtractLane, wasm.OpcodeVecI64x2ExtractLane,
+			wasm.OpcodeVecF32x4ExtractLane, wasm.OpcodeVecF64x2ExtractLane:
+			if state.unreachable {
+				break
+			}
+			var lane ssa.VecLane
+			switch vecOp {
+			case wasm.OpcodeVecI8x16ExtractLaneU:
+				lane = ssa.VecLaneI8x16
+			case wasm.OpcodeVecI16x8ExtractLaneU:
+				lane = ssa.VecLaneI16x8
+			case wasm.OpcodeVecI32x4ExtractLane:
+				lane = ssa.VecLaneI32x4
+			case wasm.OpcodeVecI64x2ExtractLane:
+				lane = ssa.VecLaneI64x2
+			}
+			v1 := state.pop()
+			state.pc++
+			index := c.wasmFunctionBody[state.pc]
+			ret := builder.AllocateInstruction().AsExtractlane(v1, index, lane, false).Insert(builder).Return()
+			state.push(ret)
+
+		case wasm.OpcodeVecI8x16ReplaceLane, wasm.OpcodeVecI16x8ReplaceLane,
+			wasm.OpcodeVecI32x4ReplaceLane, wasm.OpcodeVecF64x2ReplaceLane:
+
+		case wasm.OpcodeVecV128i8x16Shuffle:
+			v1 := state.pop()
+			v2 := state.pop()
+			lanes := make([]byte, 16)
+			for i := 0; i < 16; i++ {
+				lanes[i] = c.wasmFunctionBody[state.pc+(i)]
+			}
+			_, _ = v1, v2
+			state.pc += 15
+
+		case wasm.OpcodeVecI8x16Swizzle:
+			v1 := state.pop()
+			v2 := state.pop()
+			_, _ = v1, v2
+
 		default:
 			panic("TODO: unsupported vector instruction: " + wasm.VectorInstructionName(vecOp))
 		}

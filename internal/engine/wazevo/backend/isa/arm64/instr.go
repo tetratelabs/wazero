@@ -99,6 +99,7 @@ var defKinds = [numInstructionKinds]defKind{
 	fpuCSel:              defKindRD,
 	movToVec:             defKindRD,
 	movFromVec:           defKindRD,
+	movFromVecSigned:     defKindRD,
 	vecDup:               defKindRD,
 	vecExtract:           defKindRD,
 	vecMisc:              defKindRD,
@@ -210,6 +211,7 @@ var useKinds = [numInstructionKinds]useKind{
 	fpuCSel:              useKindRNRM,
 	movToVec:             useKindRN,
 	movFromVec:           useKindRN,
+	movFromVecSigned:     useKindRN,
 	vecDup:               useKindRN,
 	vecExtract:           useKindRNRM,
 	cCmpImm:              useKindRN,
@@ -785,6 +787,13 @@ func (i *instruction) asMovFromVec(rd, rn operand, arr vecArrangement, index vec
 	i.u1, i.u2 = uint64(arr), uint64(index)
 }
 
+func (i *instruction) asMovFromVecSignedFIXME(rd, rn operand, arr vecArrangement, index vecIndex) {
+	i.kind = movFromVecSigned
+	i.rd = rd
+	i.rn = rn
+	i.u1, i.u2 = uint64(arr), uint64(index)
+}
+
 func (i *instruction) asVecDup(rd, rn operand, arr vecArrangement) {
 	i.kind = vecDup
 	i.u1 = uint64(arr)
@@ -1095,23 +1104,30 @@ func (i *instruction) String() (str string) {
 			panic("unsupported arrangement " + arr.String())
 		}
 		str = fmt.Sprintf("ins %s, %s", formatVRegVec(i.rd.nr(), arr, vecIndex(i.u2)), formatVRegSized(i.rn.nr(), size))
-	case movFromVec:
+	case movFromVec, movFromVecSigned:
 		var size byte
 		var opcode string
 		arr := vecArrangement(i.u1)
+		signed := i.kind == movFromVecSigned
 		switch arr {
 		case vecArrangementB, vecArrangementH, vecArrangementS:
 			size = 32
-			opcode = "umov"
+			if signed {
+				opcode = "smov"
+			} else {
+				opcode = "umov"
+			}
 		case vecArrangementD:
 			size = 64
-			opcode = "mov"
+			if signed {
+				opcode = "smov"
+			} else {
+				opcode = "mov"
+			}
 		default:
 			panic("unsupported arrangement " + arr.String())
 		}
 		str = fmt.Sprintf("%s %s, %s", opcode, formatVRegSized(i.rd.nr(), size), formatVRegVec(i.rn.nr(), arr, vecIndex(i.u2)))
-	case movFromVecSigned:
-		panic("TODO")
 	case vecDup:
 		str = fmt.Sprintf("dup %s, %s",
 			formatVRegVec(i.rd.nr(), vecArrangement(i.u1), vecIndexNone),
