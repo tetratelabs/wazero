@@ -725,3 +725,63 @@ add w15, w15, w1?, lsl #1
 		})
 	}
 }
+
+func TestMachine_lowerVShift(t *testing.T) {
+	for _, tc := range []struct {
+		name          string
+		expectedAsm   string
+		op            ssa.Opcode
+		arrangement   vecArrangement
+		expectedBytes string
+	}{
+		{
+			name:        "VIshl",
+			op:          ssa.OpcodeVIshl,
+			arrangement: vecArrangement16B,
+			expectedAsm: `
+mov v1?.16b, x15.16b
+and s1?, w15, #0x7
+dup x1.16b, x15
+sshl x1.16b, x2.16b, x1.16b
+`,
+			expectedBytes: "e01daf4ee0090012e10d014e4144214e",
+		},
+		{
+			name:        "VSshr",
+			op:          ssa.OpcodeVSshr,
+			arrangement: vecArrangement16B,
+			expectedAsm: `
+mov v1?.16b, x15.16b
+and s1?, w15, #0x7
+sub s1?, wzr, s1?
+dup x1.16b, x15
+sshl x1.16b, x2.16b, x1.16b
+`,
+			expectedBytes: "e01daf4ee0090012e003004be10d014e4144214e",
+		},
+		{
+			name:        "VUshr",
+			op:          ssa.OpcodeVUshr,
+			arrangement: vecArrangement16B,
+			expectedAsm: `
+mov v1?.16b, x15.16b
+and s1?, w15, #0x7
+sub s1?, wzr, s1?
+dup x1.16b, x15
+ushl x1.16b, x2.16b, x1.16b
+`,
+			expectedBytes: "e01daf4ee0090012e003004be10d014e4144216e",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, _, m := newSetupWithMockContext()
+			m.lowerVShift(tc.op, operandNR(x1VReg), operandNR(x2VReg), operandNR(x15VReg), tc.arrangement)
+			require.Equal(t, tc.expectedAsm, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
+
+			m.FlushPendingInstructions()
+			m.encode(m.perBlockHead)
+			buf := m.compiler.Buf()
+			require.Equal(t, tc.expectedBytes, hex.EncodeToString(buf))
+		})
+	}
+}

@@ -429,55 +429,10 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		ssa.OpcodeVSshr, ssa.OpcodeVUshr:
 		x, y, lane := instr.Arg2WithLane()
 		arr := ssaLaneToArrangement(lane)
-		var modulo byte
-		switch arr {
-		case vecArrangement16B:
-			modulo = 0x7 // Modulo 8.
-		case vecArrangement8H:
-			modulo = 0xf // Modulo 16.
-		case vecArrangement4S:
-			modulo = 0x1f // Modulo 32.
-		case vecArrangement2D:
-			modulo = 0x3f // Modulo 64.
-		default:
-			panic("unsupported lane type " + lane.String())
-		}
-
 		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
 		rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
 		rd := operandNR(m.compiler.VRegOf(instr.Return()))
-		tmp := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
-
-		mov := m.allocateInstr()
-		mov.asFpuMov128(tmp.nr(), rm.nr())
-		m.insert(mov)
-
-		and := m.allocateInstr()
-		and.asALUBitmaskImm(aluOpAnd, rm.nr(), tmp.nr(), uint64(modulo), false)
-		m.insert(and)
-
-		if op != ssa.OpcodeVIshl {
-			// Negate the amount to make this as right shift.
-			neg := m.allocateInstr()
-			neg.asALU(aluOpSub, tmp, operandNR(xzrVReg), tmp, false)
-			m.insert(neg)
-		}
-
-		// Copy the shift amount into a vector register as sshl/ushl requires it to be there.
-		dup := m.allocateInstr()
-		dup.asVecDup(rd, rm, arr)
-		m.insert(dup)
-
-		if op == ssa.OpcodeVIshl || op == ssa.OpcodeVSshr {
-			sshl := m.allocateInstr()
-			sshl.asVecRRR(vecOpSshl, rd, rn, rd, arr)
-			m.insert(sshl)
-		} else {
-			ushl := m.allocateInstr()
-			ushl.asVecRRR(vecOpUshl, rd, rn, rd, arr)
-			m.insert(ushl)
-		}
-
+		m.lowerVShift(op, rd, rn, rm, arr)
 	case ssa.OpcodeVSqrt:
 		m.lowerVecMisc(vecOpFsqrt, instr)
 	case ssa.OpcodeVFabs:
@@ -612,6 +567,54 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		panic("TODO: lowering " + op.String())
 	}
 	m.FlushPendingInstructions()
+}
+
+func (m *machine) lowerVShift(op ssa.Opcode, rd, rn, rm operand, arr vecArrangement) {
+	var modulo byte
+	switch arr {
+	case vecArrangement16B:
+		modulo = 0x7 // Modulo 8.
+	case vecArrangement8H:
+		modulo = 0xf // Modulo 16.
+	case vecArrangement4S:
+		modulo = 0x1f // Modulo 32.
+	case vecArrangement2D:
+		modulo = 0x3f // Modulo 64.
+	default:
+		panic("unsupported arrangment " + arr.String())
+	}
+
+	tmp := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
+
+	mov := m.allocateInstr()
+	mov.asFpuMov128(tmp.nr(), rm.nr())
+	m.insert(mov)
+
+	and := m.allocateInstr()
+	and.asALUBitmaskImm(aluOpAnd, rm.nr(), tmp.nr(), uint64(modulo), false)
+	m.insert(and)
+
+	if op != ssa.OpcodeVIshl {
+		// Negate the amount to make this as right shift.
+		neg := m.allocateInstr()
+		neg.asALU(aluOpSub, tmp, operandNR(xzrVReg), tmp, false)
+		m.insert(neg)
+	}
+
+	// Copy the shift amount into a vector register as sshl/ushl requires it to be there.
+	dup := m.allocateInstr()
+	dup.asVecDup(rd, rm, arr)
+	m.insert(dup)
+
+	if op == ssa.OpcodeVIshl || op == ssa.OpcodeVSshr {
+		sshl := m.allocateInstr()
+		sshl.asVecRRR(vecOpSshl, rd, rn, rd, arr)
+		m.insert(sshl)
+	} else {
+		ushl := m.allocateInstr()
+		ushl.asVecRRR(vecOpUshl, rd, rn, rd, arr)
+		m.insert(ushl)
+	}
 }
 
 func (m *machine) lowerVcheckTrue(op ssa.Opcode, rm, rd operand, arr vecArrangement) {
