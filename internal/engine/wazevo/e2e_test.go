@@ -142,6 +142,7 @@ func TestSpectestV2(t *testing.T) {
 		{"if"},
 		{"loop"},
 		{"simd_boolean"},
+		{"simd_bit_shift"},
 		{"simd_bitwise"},
 		{"simd_const"},
 		{"simd_conversions"},
