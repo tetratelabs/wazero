@@ -739,38 +739,35 @@ func TestMachine_lowerVShift(t *testing.T) {
 			op:          ssa.OpcodeVIshl,
 			arrangement: vecArrangement16B,
 			expectedAsm: `
-mov v1?.16b, x15.16b
 and s1?, w15, #0x7
-dup x1.16b, x15
+dup x1.16b, d1?
 sshl x1.16b, x2.16b, x1.16b
 `,
-			expectedBytes: "e01daf4ee0090012e10d014e4144214e",
+			expectedBytes: "e0090012010c014e4144214e",
 		},
 		{
 			name:        "VSshr",
 			op:          ssa.OpcodeVSshr,
 			arrangement: vecArrangement16B,
 			expectedAsm: `
-mov v1?.16b, x15.16b
 and s1?, w15, #0x7
 sub s1?, wzr, s1?
-dup x1.16b, x15
+dup x1.16b, d1?
 sshl x1.16b, x2.16b, x1.16b
 `,
-			expectedBytes: "e01daf4ee0090012e003004be10d014e4144214e",
+			expectedBytes: "e0090012e003004b010c014e4144214e",
 		},
 		{
 			name:        "VUshr",
 			op:          ssa.OpcodeVUshr,
 			arrangement: vecArrangement16B,
 			expectedAsm: `
-mov v1?.16b, x15.16b
 and s1?, w15, #0x7
 sub s1?, wzr, s1?
-dup x1.16b, x15
+dup x1.16b, d1?
 ushl x1.16b, x2.16b, x1.16b
 `,
-			expectedBytes: "e01daf4ee0090012e003004be10d014e4144216e",
+			expectedBytes: "e0090012e003004b010c014e4144216e",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
