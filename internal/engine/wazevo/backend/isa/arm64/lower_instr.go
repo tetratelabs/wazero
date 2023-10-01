@@ -586,10 +586,6 @@ func (m *machine) lowerVShift(op ssa.Opcode, rd, rn, rm operand, arr vecArrangem
 
 	tmp := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
 
-	mov := m.allocateInstr()
-	mov.asFpuMov128(tmp.nr(), rm.nr())
-	m.insert(mov)
-
 	and := m.allocateInstr()
 	and.asALUBitmaskImm(aluOpAnd, rm.nr(), tmp.nr(), uint64(modulo), false)
 	m.insert(and)
@@ -603,7 +599,7 @@ func (m *machine) lowerVShift(op ssa.Opcode, rd, rn, rm operand, arr vecArrangem
 
 	// Copy the shift amount into a vector register as sshl/ushl requires it to be there.
 	dup := m.allocateInstr()
-	dup.asVecDup(rd, rm, arr)
+	dup.asVecDup(rd, tmp, arr)
 	m.insert(dup)
 
 	if op == ssa.OpcodeVIshl || op == ssa.OpcodeVSshr {
