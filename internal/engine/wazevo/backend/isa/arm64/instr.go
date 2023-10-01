@@ -694,7 +694,7 @@ func (i *instruction) asALUShift(aluOp aluOp, rd, rn, rm operand, dst64bit bool)
 	}
 }
 
-func (i *instruction) asALUBitmaskImm(aluOp aluOp, rn, rd regalloc.VReg, imm uint64, dst64bit bool) {
+func (i *instruction) asALUBitmaskImm(aluOp aluOp, rd, rn regalloc.VReg, imm uint64, dst64bit bool) {
 	i.kind = aluRRBitmaskImm
 	i.u1 = uint64(aluOp)
 	i.rn, i.rd = operandNR(rn), operandNR(rd)
