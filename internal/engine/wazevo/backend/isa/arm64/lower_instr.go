@@ -587,7 +587,7 @@ func (m *machine) lowerVShift(op ssa.Opcode, rd, rn, rm operand, arr vecArrangem
 	tmp := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
 
 	and := m.allocateInstr()
-	and.asALUBitmaskImm(aluOpAnd, rm.nr(), tmp.nr(), uint64(modulo), false)
+	and.asALUBitmaskImm(aluOpAnd, tmp.nr(), rm.nr(), uint64(modulo), false)
 	m.insert(and)
 
 	if op != ssa.OpcodeVIshl {

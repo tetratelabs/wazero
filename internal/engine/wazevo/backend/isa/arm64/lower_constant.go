@@ -109,7 +109,7 @@ func (m *machine) lowerConstantI64(dst regalloc.VReg, c int64) {
 
 func (m *machine) lowerConstViaBitMaskImmediate(c uint64, dst regalloc.VReg, b64 bool) {
 	instr := m.allocateInstr()
-	instr.asALUBitmaskImm(aluOpOrr, xzrVReg, dst, c, b64)
+	instr.asALUBitmaskImm(aluOpOrr, dst, xzrVReg, c, b64)
 	m.insert(instr)
 }
 
