@@ -863,7 +863,6 @@ func (c *Compiler) lowerCurrentOpcode() {
 		if state.unreachable {
 			break
 		}
-
 		var opSize uint64
 		var opcode ssa.Opcode
 		switch op {
@@ -1372,6 +1371,22 @@ func (c *Compiler) lowerCurrentOpcode() {
 			load.AsLoad(addr, offset, ssa.TypeV128)
 			builder.InsertInstruction(load)
 			state.push(load.Return())
+		case wasm.OpcodeVecV128Store:
+			_, offset := c.readMemArg()
+			if state.unreachable {
+				break
+			}
+
+			opcode := ssa.OpcodeStore
+			opSize := uint64(16)
+
+			value := state.pop()
+			baseAddr := state.pop()
+			addr := c.memOpSetup(baseAddr, uint64(offset), opSize)
+			builder.AllocateInstruction().
+				AsStore(opcode, value, addr, offset).
+				Insert(builder)
+
 		case wasm.OpcodeVecV128Not:
 			if state.unreachable {
 				break
