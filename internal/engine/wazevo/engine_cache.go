@@ -142,6 +142,13 @@ func deserializeCompiledModule(wazeroVersion string, reader io.ReadCloser) (cm *
 		return nil, false, fmt.Errorf("compilationcache: invalid header length: %d", n)
 	}
 
+	for i := 0; i < len(magic); i++ {
+		if magic[i] != header[i] {
+			return nil, false, fmt.Errorf(
+				"compilationcache: invalid magic number: got %s but want %s", magic, header[:len(magic)])
+		}
+	}
+
 	// Check the version compatibility.
 	versionSize := int(header[len(magic)])
 
@@ -211,10 +218,5 @@ func readUint64(reader io.Reader, b *[8]byte) (uint64, error) {
 
 	// Read the u64 from the underlying buffer.
 	ret := binary.LittleEndian.Uint64(s)
-
-	// Clear the underlying array.
-	for i := 0; i < 8; i++ {
-		b[i] = 0
-	}
 	return ret, nil
 }

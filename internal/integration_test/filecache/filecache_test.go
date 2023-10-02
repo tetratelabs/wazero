@@ -74,6 +74,7 @@ func testSpecTestCompilerCache(t *testing.T, config wazero.RuntimeConfig) {
 		buf := bytes.NewBuffer(nil)
 		for i := 0; i < 2; i++ {
 			cmd := exec.Command(testExecutable)
+			cmd.Args = append(cmd.Args, fmt.Sprintf("-test.run=%s", t.Name()))
 			cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", cachePathKey, cacheDir))
 			cmd.Stdout = buf
 			cmd.Stderr = buf
