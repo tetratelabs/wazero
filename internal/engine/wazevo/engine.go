@@ -18,12 +18,15 @@ import (
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 	"github.com/tetratelabs/wazero/internal/filecache"
 	"github.com/tetratelabs/wazero/internal/platform"
+	"github.com/tetratelabs/wazero/internal/version"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 type (
 	// engine implements wasm.Engine.
 	engine struct {
+		wazeroVersion   string
+		fileCache       filecache.Cache
 		compiledModules map[wasm.ModuleID]*compiledModule
 		// sortedCompiledModules is a list of compiled modules sorted by the initial address of the executable.
 		sortedCompiledModules []*compiledModule
@@ -89,21 +92,29 @@ type sourceMap struct {
 var _ wasm.Engine = (*engine)(nil)
 
 // NewEngine returns the implementation of wasm.Engine.
-func NewEngine(ctx context.Context, _ api.CoreFeatures, _ filecache.Cache) wasm.Engine {
+func NewEngine(ctx context.Context, _ api.CoreFeatures, fc filecache.Cache) wasm.Engine {
 	machine := newMachine()
 	be := backend.NewCompiler(ctx, machine, ssa.NewBuilder())
 	e := &engine{
 		compiledModules: make(map[wasm.ModuleID]*compiledModule), refToBinaryOffset: make(map[ssa.FuncRef]int),
-		setFinalizer: runtime.SetFinalizer,
-		machine:      machine,
-		be:           be,
+		setFinalizer:  runtime.SetFinalizer,
+		machine:       machine,
+		be:            be,
+		fileCache:     fc,
+		wazeroVersion: version.GetWazeroVersion(),
 	}
 	e.compileSharedFunctions()
 	return e
 }
 
 // CompileModule implements wasm.Engine.
-func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listeners []experimental.FunctionListener, ensureTermination bool) error {
+func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listeners []experimental.FunctionListener, ensureTermination bool) (err error) {
+	if _, ok, err := e.getCompiledModule(module, listeners, ensureTermination); ok { // cache hit!
+		return nil
+	} else if err != nil {
+		return err
+	}
+
 	if wazevoapi.DeterministicCompilationVerifierEnabled {
 		ctx = wazevoapi.NewDeterministicCompilationVerifierContext(ctx, len(module.CodeSection))
 	}
@@ -111,7 +122,9 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listene
 	if err != nil {
 		return err
 	}
-	e.addCompiledModule(module, cm)
+	if err = e.addCompiledModule(module, cm); err != nil {
+		return err
+	}
 
 	if wazevoapi.DeterministicCompilationVerifierEnabled {
 		for i := 0; i < wazevoapi.DeterministicCompilationVerifyingIter; i++ {
@@ -444,15 +457,6 @@ func (e *engine) DeleteCompiledModule(m *wasm.Module) {
 			e.deleteCompiledModuleFromSortedList(cm)
 		}
 		delete(e.compiledModules, m.ID)
-	}
-}
-
-func (e *engine) addCompiledModule(m *wasm.Module, cm *compiledModule) {
-	e.mux.Lock()
-	defer e.mux.Unlock()
-	e.compiledModules[m.ID] = cm
-	if len(cm.executable) > 0 {
-		e.addCompiledModuleToSortedList(cm)
 	}
 }
 
