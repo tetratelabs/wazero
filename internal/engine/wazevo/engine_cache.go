@@ -116,7 +116,7 @@ func serializeCompiledModule(wazeroVersion string, cm *compiledModule) io.Reader
 	// Version of wazero.
 	buf.WriteString(wazeroVersion)
 	// Number of *code (== locally defined functions in the module): 4 bytes.
-	buf.Write(u32.LeBytes(uint32(len(cm.module.FunctionSection))))
+	buf.Write(u32.LeBytes(uint32(len(cm.functionOffsets))))
 	for _, offset := range cm.functionOffsets {
 		// The offset of this function in the executable (8 bytes).
 		buf.Write(u64.LeBytes(uint64(offset)))
