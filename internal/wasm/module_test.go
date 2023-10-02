@@ -1,11 +1,13 @@
 package wasm
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/u64"
@@ -1010,30 +1012,88 @@ func TestModule_declaredFunctionIndexes(t *testing.T) {
 }
 
 func TestModule_AssignModuleID(t *testing.T) {
-	getID := func(bin []byte, withListener, withEnsureTermination bool) ModuleID {
+	getID := func(bin []byte, lsns []experimental.FunctionListener, withEnsureTermination bool) ModuleID {
 		m := Module{}
-		m.AssignModuleID(bin, withListener, withEnsureTermination)
+		m.AssignModuleID(bin, lsns, withEnsureTermination)
 		return m.ID
 	}
 
+	ml := &mockListener{}
+
 	// Ensures that different args always produce the different IDs.
 	exists := map[ModuleID]struct{}{}
-	for _, tc := range []struct {
-		bin                                 []byte
-		withListener, withEnsureTermination bool
+	for i, tc := range []struct {
+		bin                   []byte
+		withEnsureTermination bool
+		listeners             []experimental.FunctionListener
 	}{
-		{bin: []byte{1, 2, 3}, withListener: false, withEnsureTermination: false},
-		{bin: []byte{1, 2, 3}, withListener: false, withEnsureTermination: true},
-		{bin: []byte{1, 2, 3}, withListener: true, withEnsureTermination: false},
-		{bin: []byte{1, 2, 3}, withListener: true, withEnsureTermination: true},
-		{bin: []byte{1, 2, 3, 4}, withListener: false, withEnsureTermination: false},
-		{bin: []byte{1, 2, 3, 4}, withListener: false, withEnsureTermination: true},
-		{bin: []byte{1, 2, 3, 4}, withListener: true, withEnsureTermination: false},
-		{bin: []byte{1, 2, 3, 4}, withListener: true, withEnsureTermination: true},
+		{bin: []byte{1, 2, 3}, withEnsureTermination: false},
+		{bin: []byte{1, 2, 3}, withEnsureTermination: true},
+		{
+			bin:                   []byte{1, 2, 3},
+			listeners:             []experimental.FunctionListener{ml},
+			withEnsureTermination: false,
+		},
+		{
+			bin:                   []byte{1, 2, 3},
+			listeners:             []experimental.FunctionListener{ml},
+			withEnsureTermination: true,
+		},
+		{
+			bin:                   []byte{1, 2, 3},
+			listeners:             []experimental.FunctionListener{nil, ml},
+			withEnsureTermination: true,
+		},
+		{
+			bin:                   []byte{1, 2, 3},
+			listeners:             []experimental.FunctionListener{ml, ml},
+			withEnsureTermination: true,
+		},
+		{bin: []byte{1, 2, 3, 4}, withEnsureTermination: false},
+		{bin: []byte{1, 2, 3, 4}, withEnsureTermination: true},
+		{
+			bin:                   []byte{1, 2, 3, 4},
+			listeners:             []experimental.FunctionListener{ml},
+			withEnsureTermination: false,
+		},
+		{
+			bin:                   []byte{1, 2, 3, 4},
+			listeners:             []experimental.FunctionListener{ml},
+			withEnsureTermination: true,
+		},
+		{
+			bin:                   []byte{1, 2, 3, 4},
+			listeners:             []experimental.FunctionListener{nil},
+			withEnsureTermination: true,
+		},
+		{
+			bin:                   []byte{1, 2, 3, 4},
+			listeners:             []experimental.FunctionListener{nil, ml},
+			withEnsureTermination: true,
+		},
+		{
+			bin:                   []byte{1, 2, 3, 4},
+			listeners:             []experimental.FunctionListener{ml, ml},
+			withEnsureTermination: true,
+		},
+		{
+			bin:                   []byte{1, 2, 3, 4},
+			listeners:             []experimental.FunctionListener{ml, ml},
+			withEnsureTermination: false,
+		},
 	} {
-		id := getID(tc.bin, tc.withListener, tc.withEnsureTermination)
+		id := getID(tc.bin, tc.listeners, tc.withEnsureTermination)
 		_, exist := exists[id]
-		require.False(t, exist)
+		require.False(t, exist, i)
 		exists[id] = struct{}{}
 	}
 }
+
+type mockListener struct{}
+
+func (m mockListener) Before(context.Context, api.Module, api.FunctionDefinition, []uint64, experimental.StackIterator) {
+}
+
+func (m mockListener) After(context.Context, api.Module, api.FunctionDefinition, []uint64) {}
+
+func (m mockListener) Abort(context.Context, api.Module, api.FunctionDefinition, error) {}
