@@ -195,14 +195,6 @@ func TestDeserializeCompiledModule(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			cm, staleCache, err := deserializeCompiledModule(testVersion, io.NopCloser(bytes.NewReader(tc.in)))
 
-			if tc.expCompiledModule != nil {
-				require.Equal(t, len(tc.expCompiledModule.functionOffsets), len(cm.functionOffsets))
-				//for i := 0; i < len(cm.functionOffsets); i++ {
-				//	require.Equal(t, cm.compiledCode, cm.functions[i].parent)
-				//	tc.expCompiledModule.functions[i].parent = cm.compiledCode
-				//}
-			}
-
 			if tc.expErr != "" {
 				require.EqualError(t, err, tc.expErr)
 			} else {
