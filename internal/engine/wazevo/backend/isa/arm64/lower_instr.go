@@ -568,7 +568,7 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 
 		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
 		rd := operandNR(m.compiler.VRegOf(instr.Return()))
-		arr := ssaLaneToArrangement(lane)
+		var arr vecArrangement
 		mov := m.allocateInstr()
 		switch lane {
 		case ssa.VecLaneI8x16:
@@ -600,14 +600,107 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 				mov.asMovFromVec(rd, rn, arr, vecIndex(index))
 			}
 
-		case ssa.VecLaneF32x4, ssa.VecLaneF64x2:
-			panic("not done: inselem")
+		case ssa.VecLaneF32x4:
+			arr = vecArrangementS
+			mov.asVecMovElement(rd, rn, arr, vecIndex(0), vecIndex(index))
+
+		case ssa.VecLaneF64x2:
+			arr = vecArrangementD
+			mov.asVecMovElement(rd, rn, arr, vecIndex(0), vecIndex(index))
 
 		default:
 			panic("not done")
 		}
 
 		m.insert(mov)
+
+	case ssa.OpcodeInsertlane:
+		x, y, index, _, lane := instr.InsertLaneOpData()
+		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+		rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
+		rd := operandNR(m.compiler.VRegOf(instr.Return()))
+
+		mov0 := m.allocateInstr()
+		mov0.asFpuMov128(rd.nr(), rn.nr())
+		m.insert(mov0)
+
+		mov := m.allocateInstr()
+		switch lane {
+		case ssa.VecLaneI8x16:
+			mov.asMovToVec(rd, rm, vecArrangementB, vecIndex(index))
+		case ssa.VecLaneI16x8:
+			mov.asMovToVec(rd, rm, vecArrangementH, vecIndex(index))
+		case ssa.VecLaneI32x4:
+			mov.asMovToVec(rd, rm, vecArrangementS, vecIndex(index))
+		case ssa.VecLaneI64x2:
+			mov.asMovToVec(rd, rm, vecArrangementD, vecIndex(index))
+		case ssa.VecLaneF32x4:
+			mov.asVecMovElement(rd, rm, vecArrangementS, vecIndex(index), vecIndex(0))
+		case ssa.VecLaneF64x2:
+			mov.asVecMovElement(rd, rm, vecArrangementD, vecIndex(index), vecIndex(0))
+		}
+		m.insert(mov)
+
+	case ssa.OpcodeSwizzle:
+		x, y, lane := instr.Arg2WithLane()
+		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+		rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
+		rd := operandNR(m.compiler.VRegOf(instr.Return()))
+
+		arr := ssaLaneToArrangement(lane)
+
+		tbl1 := m.allocateInstr()
+		tbl1.asVecTbl(1, rd, rn, rm, arr)
+		m.insert(tbl1)
+
+	case ssa.OpcodeShuffle:
+		x, y, lane1, lane2 := instr.Arg2WithLanes()
+		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+		rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
+		rd := operandNR(m.compiler.VRegOf(instr.Return()))
+
+		vReg, wReg := v29VReg, v30VReg
+
+		movv := m.allocateInstr()
+		movv.asFpuMov128(vReg, rn.nr())
+		m.insert(movv)
+
+		movw := m.allocateInstr()
+		movw.asFpuMov128(wReg, rm.nr())
+		m.insert(movw)
+
+		// lane1, lane2 are already encoded as two u64s.
+		tmp := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
+		lfc := m.allocateInstr()
+		lfc.asLoadFpuConst128(tmp.nr(), lane1, lane2)
+		m.insert(lfc)
+
+		tbl2 := m.allocateInstr()
+		tbl2.asVecTbl(2, rd, operandNR(vReg), tmp, vecArrangement16B)
+		m.insert(tbl2)
+
+	case ssa.OpcodeSplat:
+		x, lane := instr.ArgWithLane()
+		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+		rd := operandNR(m.compiler.VRegOf(instr.Return()))
+
+		dup := m.allocateInstr()
+		switch lane {
+		case ssa.VecLaneI8x16:
+			dup.asVecDup(rd, rn, vecArrangement16B, vecIndexNone)
+		case ssa.VecLaneI16x8:
+			dup.asVecDup(rd, rn, vecArrangement8H, vecIndexNone)
+		case ssa.VecLaneI32x4:
+			dup.asVecDup(rd, rn, vecArrangement4S, vecIndexNone)
+		case ssa.VecLaneI64x2:
+			dup.asVecDup(rd, rn, vecArrangement2D, vecIndexNone)
+		case ssa.VecLaneF32x4:
+			dup.asVecDup(rd, rn, vecArrangementS, vecIndex(0))
+		case ssa.VecLaneF64x2:
+			dup.asVecDup(rd, rn, vecArrangementD, vecIndex(0))
+		}
+		m.insert(dup)
+
 	default:
 		panic("TODO: lowering " + op.String())
 	}
@@ -644,7 +737,7 @@ func (m *machine) lowerVShift(op ssa.Opcode, rd, rn, rm operand, arr vecArrangem
 
 	// Copy the shift amount into a vector register as sshl/ushl requires it to be there.
 	dup := m.allocateInstr()
-	dup.asVecDup(rd, tmp, arr)
+	dup.asVecDup(rd, tmp, arr, vecIndexNone)
 	m.insert(dup)
 
 	if op == ssa.OpcodeVIshl || op == ssa.OpcodeVSshr {
@@ -749,7 +842,7 @@ func (m *machine) lowerVhighBits(rm, rd operand, arr vecArrangement) {
 
 		// dup r0 to v0.
 		dup := m.allocateInstr()
-		dup.asVecDup(v0, r0, vecArrangement2D)
+		dup.asVecDup(v0, r0, vecArrangement2D, vecIndexNone)
 		m.insert(dup)
 
 		// Lane-wise logical AND with the bit mask, meaning that we have
@@ -805,7 +898,7 @@ func (m *machine) lowerVhighBits(rm, rd operand, arr vecArrangement) {
 
 		// dup r0 to vector v0.
 		dup := m.allocateInstr()
-		dup.asVecDup(v0, r0, vecArrangement2D)
+		dup.asVecDup(v0, r0, vecArrangement2D, vecIndexNone)
 		m.insert(dup)
 
 		lsl := m.allocateInstr()
@@ -854,7 +947,7 @@ func (m *machine) lowerVhighBits(rm, rd operand, arr vecArrangement) {
 
 		// dup r0 to vector v0.
 		dup := m.allocateInstr()
-		dup.asVecDup(v0, r0, vecArrangement2D)
+		dup.asVecDup(v0, r0, vecArrangement2D, vecIndexNone)
 		m.insert(dup)
 
 		lsl := m.allocateInstr()

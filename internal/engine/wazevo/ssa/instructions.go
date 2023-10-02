@@ -126,6 +126,11 @@ func (i *Instruction) Arg2WithLane() (Value, Value, VecLane) {
 	return i.v, i.v2, VecLane(i.u1)
 }
 
+// Arg2WithLanes returns the first two arguments to this instruction, and two uint64 encoding 8 1-byte lane types each.
+func (i *Instruction) Arg2WithLanes() (Value, Value, uint64, uint64) {
+	return i.v, i.v2, i.u1, i.u2
+}
+
 // Arg3 returns the first three arguments to this instruction.
 func (i *Instruction) Arg3() (Value, Value, Value) {
 	return i.v, i.v2, i.v3
@@ -899,6 +904,7 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeIsub:               sideEffectNone,
 	OpcodeIcmp:               sideEffectNone,
 	OpcodeExtractlane:        sideEffectNone,
+	OpcodeInsertlane:         sideEffectNone,
 	OpcodeBand:               sideEffectNone,
 	OpcodeBor:                sideEffectNone,
 	OpcodeBxor:               sideEffectNone,
@@ -924,6 +930,9 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeUwidenHigh:         sideEffectNone,
 	OpcodeSnarrow:            sideEffectNone,
 	OpcodeUnarrow:            sideEffectNone,
+	OpcodeSwizzle:            sideEffectNone,
+	OpcodeShuffle:            sideEffectNone,
+	OpcodeSplat:              sideEffectNone,
 	OpcodeFsub:               sideEffectNone,
 	OpcodeF32const:           sideEffectNone,
 	OpcodeF64const:           sideEffectNone,
@@ -1060,6 +1069,7 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeVSshr:       returnTypesFnV128,
 	OpcodeVUshr:       returnTypesFnV128,
 	OpcodeExtractlane: returnTypesFnSingle,
+	OpcodeInsertlane:  returnTypesFnV128,
 	OpcodeBand:        returnTypesFnSingle,
 	OpcodeFcopysign:   returnTypesFnSingle,
 	OpcodeBitcast:     returnTypesFnSingle,
@@ -1086,6 +1096,9 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeUwidenHigh:  returnTypesFnV128,
 	OpcodeSnarrow:     returnTypesFnV128,
 	OpcodeUnarrow:     returnTypesFnV128,
+	OpcodeSwizzle:     returnTypesFnSingle,
+	OpcodeShuffle:     returnTypesFnV128,
+	OpcodeSplat:       returnTypesFnV128,
 	OpcodeIreduce:     returnTypesFnSingle,
 	OpcodeFabs:        returnTypesFnSingle,
 	OpcodeSqrt:        returnTypesFnSingle,
@@ -1759,9 +1772,11 @@ func (i *Instruction) AsVSshr(x, amount Value, lane VecLane) *Instruction {
 func (i *Instruction) AsExtractlane(x Value, index byte, lane VecLane, signed bool) *Instruction {
 	i.opcode = OpcodeExtractlane
 	i.v = x
+	// We do not have a field for signedness, but `index` is a byte,
+	// so we just encode the flag in the high bits of `u1`.
 	i.u1 = uint64(index)
 	if signed {
-		i.u1 = 1 << 32
+		i.u1 = i.u1 | 1<<32
 	}
 	i.u2 = uint64(lane)
 	switch lane {
@@ -1774,6 +1789,51 @@ func (i *Instruction) AsExtractlane(x Value, index byte, lane VecLane, signed bo
 	case VecLaneF64x2:
 		i.typ = TypeF64
 	}
+	return i
+}
+
+// AsInsertlane initializes this instruction as an insert lane instruction with OpcodeInsertlane on vector.
+func (i *Instruction) AsInsertlane(x, y Value, index byte, lane VecLane, signed bool) *Instruction {
+	i.opcode = OpcodeInsertlane
+	i.v = x
+	i.v2 = y
+	i.u1 = uint64(index)
+	if signed {
+		i.u1 = 1 << 32
+	}
+	i.u2 = uint64(lane)
+	i.typ = TypeV128
+	return i
+}
+
+// AsShuffle initializes this instruction as a shuffle instruction with OpcodeShuffle on vector.
+func (i *Instruction) AsShuffle(x, y Value, lane []uint64) *Instruction {
+	i.opcode = OpcodeShuffle
+	i.v = x
+	i.v2 = y
+	// Encode the 16 bytes as 8 bytes in u1, and 8 bytes in u2.
+	i.u1 = lane[7]<<56 | lane[6]<<48 | lane[5]<<40 | lane[4]<<32 | lane[3]<<24 | lane[2]<<16 | lane[1]<<8 | lane[0]
+	i.u2 = lane[15]<<56 | lane[14]<<48 | lane[13]<<40 | lane[12]<<32 | lane[11]<<24 | lane[10]<<16 | lane[9]<<8 | lane[8]
+	i.typ = TypeV128
+	return i
+}
+
+// AsSwizzle initializes this instruction as an insert lane instruction with OpcodeSwizzle on vector.
+func (i *Instruction) AsSwizzle(x, y Value, lane VecLane) *Instruction {
+	i.opcode = OpcodeSwizzle
+	i.v = x
+	i.v2 = y
+	i.u1 = uint64(lane)
+	i.typ = TypeV128
+	return i
+}
+
+// AsSplat initializes this instruction as an insert lane instruction with OpcodeSplat on vector.
+func (i *Instruction) AsSplat(x Value, lane VecLane) *Instruction {
+	i.opcode = OpcodeSplat
+	i.v = x
+	i.u1 = uint64(lane)
+	i.typ = TypeV128
 	return i
 }
 
@@ -1814,9 +1874,21 @@ func (i *Instruction) VFcmpData() (x, y Value, c FloatCmpCond, l VecLane) {
 }
 
 // LaneOpData returns the operands and sign flag of Extractlane and Insertlane on vector.
-func (i *Instruction) LaneOpData() (x Value, imm byte, signed bool, l VecLane) {
+func (i *Instruction) LaneOpData() (x Value, index byte, signed bool, l VecLane) {
 	x = i.v
-	imm = byte(0x00001111 & i.u1)
+	index = byte(0b00001111 & i.u1)
+	if i.u1>>32 != 0 {
+		signed = true
+	}
+	l = VecLane(i.u2)
+	return
+}
+
+// InsertLaneOpData returns the operands and sign flag of Insertlane on vector.
+func (i *Instruction) InsertLaneOpData() (x, y Value, index byte, signed bool, l VecLane) {
+	x = i.v
+	y = i.v2
+	index = byte(0b00001111 & i.u1)
 	if i.u1>>32 != 0 {
 		signed = true
 	}
@@ -2539,14 +2611,22 @@ func (i *Instruction) Format(b Builder) string {
 		OpcodeVFadd, OpcodeVFsub, OpcodeVFmul, OpcodeVFdiv,
 		OpcodeVIshl, OpcodeVSshr, OpcodeVUshr,
 		OpcodeVFmin, OpcodeVFmax, OpcodeVMinPseudo, OpcodeVMaxPseudo,
-		OpcodeSnarrow, OpcodeUnarrow:
+		OpcodeSnarrow, OpcodeUnarrow, OpcodeSwizzle:
 		instSuffix = fmt.Sprintf(".%s %s, %s", VecLane(i.u1), i.v.Format(b), i.v2.Format(b))
 	case OpcodeVIabs, OpcodeVIneg, OpcodeVIpopcnt, OpcodeVhighBits, OpcodeVallTrue, OpcodeVanyTrue,
 		OpcodeVFabs, OpcodeVFneg, OpcodeVSqrt, OpcodeVCeil, OpcodeVFloor, OpcodeVTrunc, OpcodeVNearest,
 		OpcodeVFcvtToUintSat, OpcodeVFcvtToSintSat, OpcodeVFcvtFromUint, OpcodeVFcvtFromSint,
 		OpcodeFvpromoteLow, OpcodeFvdemote, OpcodeSwidenLow, OpcodeUwidenLow, OpcodeSwidenHigh, OpcodeUwidenHigh,
-		OpcodeExtractlane:
+		OpcodeSplat:
 		instSuffix = fmt.Sprintf(".%s %s", VecLane(i.u1), i.v.Format(b))
+	case OpcodeExtractlane:
+		instSuffix = fmt.Sprintf(".%s %d, %s", VecLane(i.u2), 0x0000FFFF&i.u1, i.v.Format(b))
+	case OpcodeInsertlane:
+		instSuffix = fmt.Sprintf(".%s %d, %s, %s", VecLane(i.u2), 0x0000FFFF&i.u1, i.v.Format(b), i.v2.Format(b))
+	case OpcodeShuffle:
+		// fixme print u1, u2
+		instSuffix = fmt.Sprintf(".%s %s, %s", VecLane(i.u1), i.v.Format(b), i.v2.Format(b))
+
 	default:
 		panic(fmt.Sprintf("TODO: format for %s", i.opcode))
 	}

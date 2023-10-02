@@ -103,8 +103,11 @@ var defKinds = [numInstructionKinds]defKind{
 	vecDup:               defKindRD,
 	vecExtract:           defKindRD,
 	vecMisc:              defKindRD,
+	vecMovElement:        defKindRD,
 	vecLanes:             defKindRD,
 	vecShiftImm:          defKindRD,
+	vecTbl:               defKindRD,
+	vecTbl2:              defKindRD,
 	vecPermute:           defKindRD,
 	vecRRR:               defKindRD,
 	fpuToInt:             defKindRD,
@@ -216,8 +219,11 @@ var useKinds = [numInstructionKinds]useKind{
 	vecExtract:           useKindRNRM,
 	cCmpImm:              useKindRN,
 	vecMisc:              useKindRN,
+	vecMovElement:        useKindRN,
 	vecLanes:             useKindRN,
 	vecShiftImm:          useKindRN,
+	vecTbl:               useKindRNRM,
+	vecTbl2:              useKindRNRM,
 	vecRRR:               useKindRNRM,
 	vecPermute:           useKindRNRM,
 	fpuToInt:             useKindRN,
@@ -794,10 +800,11 @@ func (i *instruction) asMovFromVecSignedFIXME(rd, rn operand, arr vecArrangement
 	i.u1, i.u2 = uint64(arr), uint64(index)
 }
 
-func (i *instruction) asVecDup(rd, rn operand, arr vecArrangement) {
+func (i *instruction) asVecDup(rd, rn operand, arr vecArrangement, index vecIndex) {
 	i.kind = vecDup
 	i.u1 = uint64(arr)
 	i.rn, i.rd = rn, rd
+	i.u2 = uint64(index)
 }
 
 func (i *instruction) asVecExtract(rd, rn, rm operand, arr vecArrangement, index uint32) {
@@ -805,6 +812,13 @@ func (i *instruction) asVecExtract(rd, rn, rm operand, arr vecArrangement, index
 	i.u1 = uint64(arr)
 	i.rn, i.rm, i.rd = rn, rm, rd
 	i.u2 = uint64(index)
+}
+
+func (i *instruction) asVecMovElement(rd, rn operand, arr vecArrangement, rdIndex, rnIndex vecIndex) {
+	i.kind = vecMovElement
+	i.u1 = uint64(arr)
+	i.u2, i.u3 = uint64(rdIndex), uint64(rnIndex)
+	i.rn, i.rd = rn, rd
 }
 
 func (i *instruction) asVecMisc(op vecOp, rd, rn operand, arr vecArrangement) {
@@ -824,6 +838,19 @@ func (i *instruction) asVecLanes(op vecOp, rd, rn operand, arr vecArrangement) {
 func (i *instruction) asVecShiftImm(op vecOp, rd, rn, rm operand, arr vecArrangement) {
 	i.kind = vecShiftImm
 	i.u1 = uint64(op)
+	i.rn, i.rm, i.rd = rn, rm, rd
+	i.u2 = uint64(arr)
+}
+
+func (i *instruction) asVecTbl(nregs byte, rd, rn, rm operand, arr vecArrangement) {
+	switch nregs {
+	case 0, 1:
+		i.kind = vecTbl
+	case 2:
+		i.kind = vecTbl2
+	default:
+		panic(fmt.Sprintf("unsupported number of registers %d", nregs))
+	}
 	i.rn, i.rm, i.rd = rn, rm, rd
 	i.u2 = uint64(arr)
 }
@@ -1145,7 +1172,10 @@ func (i *instruction) String() (str string) {
 	case vecExtend:
 		panic("TODO")
 	case vecMovElement:
-		panic("TODO")
+		str = fmt.Sprintf("mov %s, %s",
+			formatVRegVec(i.rd.nr(), vecArrangement(i.u1), vecIndex(i.u2)),
+			formatVRegVec(i.rn.nr(), vecArrangement(i.u1), vecIndex(i.u3)),
+		)
 	case vecMiscNarrow:
 		panic("TODO")
 	case vecRRR:
@@ -1192,9 +1222,18 @@ func (i *instruction) String() (str string) {
 			formatVRegVec(i.rn.nr(), arr, vecIndexNone),
 			i.rm.shiftImm())
 	case vecTbl:
-		panic("TODO")
+		arr := vecArrangement(i.u2)
+		str = fmt.Sprintf("tbl %s, { %s }, %s",
+			formatVRegVec(i.rd.nr(), arr, vecIndexNone),
+			formatVRegVec(i.rn.nr(), vecArrangement16B, vecIndexNone),
+			formatVRegVec(i.rm.nr(), arr, vecIndexNone))
 	case vecTbl2:
-		panic("TODO")
+		arr := vecArrangement(i.u2)
+		str = fmt.Sprintf("tbl %s, { %s, %s }, %s",
+			formatVRegVec(i.rd.nr(), arr, vecIndexNone),
+			formatVRegVec(v29VReg, vecArrangement16B, vecIndexNone),
+			formatVRegVec(v30VReg, vecArrangement16B, vecIndexNone),
+			formatVRegVec(i.rm.nr(), arr, vecIndexNone))
 	case vecPermute:
 		arr := vecArrangement(i.u2)
 		str = fmt.Sprintf("%s %s, %s, %s",
