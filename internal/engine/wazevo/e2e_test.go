@@ -189,6 +189,7 @@ func TestSpectestV2(t *testing.T) {
 }
 
 func TestE2E(t *testing.T) {
+	tmp := t.TempDir()
 	type callCase struct {
 		funcName           string // defaults to testcases.ExportedFunctionName
 		params, expResults []uint64
@@ -409,51 +410,63 @@ func TestE2E(t *testing.T) {
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			config := wazero.NewRuntimeConfigCompiler()
-
-			// Configure the new optimizing backend!
-			wazevo.ConfigureWazevo(config)
-
-			ctx := context.Background()
-			r := wazero.NewRuntimeWithConfig(ctx, config)
-			defer func() {
-				require.NoError(t, r.Close(ctx))
-			}()
-
-			if tc.imported != nil {
-				imported, err := r.CompileModule(ctx, binaryencoding.EncodeModule(tc.imported))
-				require.NoError(t, err)
-
-				_, err = r.InstantiateModule(ctx, imported, wazero.NewModuleConfig())
-				require.NoError(t, err)
-			}
-
-			compiled, err := r.CompileModule(ctx, binaryencoding.EncodeModule(tc.m))
-			require.NoError(t, err)
-
-			inst, err := r.InstantiateModule(ctx, compiled, wazero.NewModuleConfig())
-			require.NoError(t, err)
-
-			for _, cc := range tc.calls {
-				name := cc.funcName
-				if name == "" {
-					name = testcases.ExportedFunctionName
+			for i := 0; i < 2; i++ {
+				var name string
+				if i == 0 {
+					name = "no cache"
+				} else {
+					name = "with cache"
 				}
-				t.Run(fmt.Sprintf("call_%s%v", name, cc.params), func(t *testing.T) {
-					f := inst.ExportedFunction(name)
-					require.NotNil(t, f)
-					result, err := f.Call(ctx, cc.params...)
-					if cc.expErr != "" {
-						require.Contains(t, err.Error(), cc.expErr)
-					} else {
+				t.Run(name, func(t *testing.T) {
+					cache, err := wazero.NewCompilationCacheWithDir(tmp)
+					require.NoError(t, err)
+					config := wazero.NewRuntimeConfigCompiler().WithCompilationCache(cache)
+
+					// Configure the new optimizing backend!
+					wazevo.ConfigureWazevo(config)
+
+					ctx := context.Background()
+					r := wazero.NewRuntimeWithConfig(ctx, config)
+					defer func() {
+						require.NoError(t, r.Close(ctx))
+					}()
+
+					if tc.imported != nil {
+						imported, err := r.CompileModule(ctx, binaryencoding.EncodeModule(tc.imported))
 						require.NoError(t, err)
-						require.Equal(t, len(cc.expResults), len(result))
-						require.Equal(t, cc.expResults, result)
-						for i := range cc.expResults {
-							if cc.expResults[i] != result[i] {
-								t.Errorf("result[%d]: exp %d, got %d", i, cc.expResults[i], result[i])
-							}
+
+						_, err = r.InstantiateModule(ctx, imported, wazero.NewModuleConfig())
+						require.NoError(t, err)
+					}
+
+					compiled, err := r.CompileModule(ctx, binaryencoding.EncodeModule(tc.m))
+					require.NoError(t, err)
+
+					inst, err := r.InstantiateModule(ctx, compiled, wazero.NewModuleConfig())
+					require.NoError(t, err)
+
+					for _, cc := range tc.calls {
+						name := cc.funcName
+						if name == "" {
+							name = testcases.ExportedFunctionName
 						}
+						t.Run(fmt.Sprintf("call_%s%v", name, cc.params), func(t *testing.T) {
+							f := inst.ExportedFunction(name)
+							require.NotNil(t, f)
+							result, err := f.Call(ctx, cc.params...)
+							if cc.expErr != "" {
+								require.Contains(t, err.Error(), cc.expErr)
+							} else {
+								require.NoError(t, err)
+								require.Equal(t, len(cc.expResults), len(result))
+								require.Equal(t, cc.expResults, result)
+								for i := range cc.expResults {
+									if cc.expResults[i] != result[i] {
+										t.Errorf("result[%d]: exp %d, got %d", i, cc.expResults[i], result[i])
+									}
+								}
+							}
+						})
 					}
 				})
 			}

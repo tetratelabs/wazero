@@ -39,7 +39,8 @@ func TestEngine_DeleteCompiledModule(t *testing.T) {
 	e, ok := NewEngine(ctx, api.CoreFeaturesV1, nil).(*engine)
 	require.True(t, ok)
 	id := wasm.ModuleID{0xaa}
-	e.addCompiledModule(&wasm.Module{ID: id}, &compiledModule{executable: make([]byte, 1)})
+	err := e.addCompiledModule(&wasm.Module{ID: id}, &compiledModule{executable: make([]byte, 1)})
+	require.NoError(t, err)
 	require.Equal(t, uint32(1), e.CompiledModuleCount())
 	e.DeleteCompiledModule(&wasm.Module{ID: id})
 	require.Equal(t, uint32(0), e.CompiledModuleCount())
