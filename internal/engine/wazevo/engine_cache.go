@@ -4,14 +4,15 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"io"
+	"runtime"
+
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/u32"
 	"github.com/tetratelabs/wazero/internal/u64"
 	"github.com/tetratelabs/wazero/internal/wasm"
-	"io"
-	"runtime"
 )
 
 func (e *engine) addCompiledModule(module *wasm.Module, cm *compiledModule) (err error) {
