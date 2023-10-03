@@ -144,6 +144,7 @@ func TestSpectestV2(t *testing.T) {
 		{"conversions"},
 		{"if"},
 		{"loop"},
+		{"ref_null"},
 		{"simd_boolean"},
 		{"simd_bit_shift"},
 		{"simd_bitwise"},

@@ -255,7 +255,9 @@ func (c *Compiler) declareWasmGlobal(typ wasm.ValueType, mutable bool) {
 	switch typ {
 	case wasm.ValueTypeI32:
 		st = ssa.TypeI32
-	case wasm.ValueTypeI64:
+	case wasm.ValueTypeI64,
+		// Both externref and funcref are represented as I64 since we only support 64-bit platforms.
+		wasm.ValueTypeExternref, wasm.ValueTypeFuncref:
 		st = ssa.TypeI64
 	case wasm.ValueTypeF32:
 		st = ssa.TypeF32
@@ -280,7 +282,9 @@ func WasmTypeToSSAType(vt wasm.ValueType) ssa.Type {
 	switch vt {
 	case wasm.ValueTypeI32:
 		return ssa.TypeI32
-	case wasm.ValueTypeI64:
+	case wasm.ValueTypeI64,
+		// Both externref and funcref are represented as I64 since we only support 64-bit platforms.
+		wasm.ValueTypeExternref, wasm.ValueTypeFuncref:
 		return ssa.TypeI64
 	case wasm.ValueTypeF32:
 		return ssa.TypeF32
