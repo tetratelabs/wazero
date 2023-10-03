@@ -54,13 +54,13 @@ jobs:
         if: steps.binary-cache.outputs.cache-hit != 'true'
         run: |
           mkdir -p ${{ env.ZIG_INSTALL }}
-          curl -sSL https://ziglang.org/builds/zig-linux-x86_64-${{ env.ZIG_VERSION }}.tar.xz | tar -xJ --strip-components=1 -C ${{ env.ZIG_INSTALL }}
+          curl -sSL https://ziglang.org/download/${{ env.ZIG_VERSION }}/zig-linux-x86_64-${{ env.ZIG_VERSION }}.tar.xz | tar -xJ --strip-components=1 -C ${{ env.ZIG_INSTALL }}
 
       - name: Download Zig source code
         if: steps.binary-cache.outputs.cache-hit != 'true'
         run: |
           mkdir -p ${{ env.ZIG_SOURCE }}
-          curl -sSL https://ziglang.org/builds/zig-${{ env.ZIG_VERSION }}.tar.xz | tar -xJ --strip-components=1 -C ${{ env.ZIG_SOURCE }}
+          curl -sSL https://ziglang.org/download/${{ env.ZIG_VERSION }}/zig-${{ env.ZIG_VERSION }}.tar.xz | tar -xJ --strip-components=1 -C ${{ env.ZIG_SOURCE }}
 
       - name: Build Stdlib test binary
         if: steps.binary-cache.outputs.cache-hit != 'true'
