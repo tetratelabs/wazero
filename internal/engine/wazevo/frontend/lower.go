@@ -2451,17 +2451,17 @@ func (c *Compiler) lowerCurrentOpcode() {
 			case wasm.OpcodeVecF64x2ExtractLane:
 				lane = ssa.VecLaneF64x2
 			}
-
 			v1 := state.pop()
 			state.pc++
 			index := c.wasmFunctionBody[state.pc]
 			ext := builder.AllocateInstruction().AsExtractlane(v1, index, lane, false).Insert(builder).Return()
 			state.push(ext)
-
 		case wasm.OpcodeVecI8x16ReplaceLane, wasm.OpcodeVecI16x8ReplaceLane,
 			wasm.OpcodeVecI32x4ReplaceLane, wasm.OpcodeVecI64x2ReplaceLane,
 			wasm.OpcodeVecF32x4ReplaceLane, wasm.OpcodeVecF64x2ReplaceLane:
-
+			if state.unreachable {
+				break
+			}
 			var lane ssa.VecLane
 			switch vecOp {
 			case wasm.OpcodeVecI8x16ReplaceLane:
@@ -2477,17 +2477,16 @@ func (c *Compiler) lowerCurrentOpcode() {
 			case wasm.OpcodeVecF64x2ReplaceLane:
 				lane = ssa.VecLaneF64x2
 			}
-
 			v2 := state.pop()
 			v1 := state.pop()
-
 			state.pc++
 			index := c.wasmFunctionBody[state.pc]
-
-			ret := builder.AllocateInstruction().AsInsertlane(v1, v2, index, lane, false).Insert(builder).Return()
+			ret := builder.AllocateInstruction().AsInsertlane(v1, v2, index, lane).Insert(builder).Return()
 			state.push(ret)
-
 		case wasm.OpcodeVecV128i8x16Shuffle:
+			if state.unreachable {
+				break
+			}
 			v2 := state.pop()
 			v1 := state.pop()
 			state.pc++
@@ -2500,6 +2499,9 @@ func (c *Compiler) lowerCurrentOpcode() {
 			state.push(ret)
 
 		case wasm.OpcodeVecI8x16Swizzle:
+			if state.unreachable {
+				break
+			}
 			v2 := state.pop()
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsSwizzle(v1, v2, ssa.VecLaneI8x16).Insert(builder).Return()
@@ -2511,7 +2513,9 @@ func (c *Compiler) lowerCurrentOpcode() {
 			wasm.OpcodeVecI64x2Splat,
 			wasm.OpcodeVecF32x4Splat,
 			wasm.OpcodeVecF64x2Splat:
-
+			if state.unreachable {
+				break
+			}
 			var lane ssa.VecLane
 			switch vecOp {
 			case wasm.OpcodeVecI8x16Splat:
@@ -2527,7 +2531,6 @@ func (c *Compiler) lowerCurrentOpcode() {
 			case wasm.OpcodeVecF64x2Splat:
 				lane = ssa.VecLaneF64x2
 			}
-
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsSplat(v1, lane).Insert(builder).Return()
 			state.push(ret)

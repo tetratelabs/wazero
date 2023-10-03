@@ -267,6 +267,11 @@ func (i *instruction) encode(c backend.Compiler) {
 		c.Emit4Bytes(encodeVecDup(
 			regNumberInEncoding[i.rd.realReg()],
 			regNumberInEncoding[i.rn.realReg()],
+			vecArrangement(byte(i.u1))))
+	case vecDupElement:
+		c.Emit4Bytes(encodeVecDupElement(
+			regNumberInEncoding[i.rd.realReg()],
+			regNumberInEncoding[i.rn.realReg()],
 			vecArrangement(byte(i.u1)),
 			vecIndex(i.u2)))
 	case vecExtract:
@@ -938,55 +943,55 @@ func encodeMoveFromVec(rd, rn uint32, arr vecArrangement, index vecIndex, signed
 }
 
 // encodeVecDup encodes as "Duplicate general-purpose register to vector" DUP (general)
-// and "Duplicate vector element to vector or scalar" DUP (element).
 // (represented as `dup`)
 // https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/DUP--general---Duplicate-general-purpose-register-to-vector-?lang=en
-// https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/DUP--element---Duplicate-vector-element-to-vector-or-scalar-
-func encodeVecDup(rd, rn uint32, arr vecArrangement, srcIndex vecIndex) uint32 {
-	var op, q, imm5 uint32
-	if srcIndex != vecIndexNone {
-		op = 0b1
-		q = 0b1
-		switch arr {
-		case vecArrangementB:
-			imm5 |= 0b1
-			imm5 |= uint32(srcIndex) << 1
-		case vecArrangementH:
-			imm5 |= 0b10
-			imm5 |= uint32(srcIndex) << 2
-		case vecArrangementS:
-			imm5 |= 0b100
-			imm5 |= uint32(srcIndex) << 3
-		case vecArrangementD:
-			imm5 |= 0b1000
-			imm5 |= uint32(srcIndex) << 4
-		default:
-			panic("unsupported arrangement" + arr.String())
-		}
-	} else {
-		op = 0b11
+func encodeVecDup(rd, rn uint32, arr vecArrangement) uint32 {
+	var q, imm5 uint32
+	switch arr {
+	case vecArrangement8B:
+		q, imm5 = 0b0, 0b1
+	case vecArrangement16B:
+		q, imm5 = 0b1, 0b1
+	case vecArrangement4H:
+		q, imm5 = 0b0, 0b10
+	case vecArrangement8H:
+		q, imm5 = 0b1, 0b10
+	case vecArrangement2S:
+		q, imm5 = 0b0, 0b100
+	case vecArrangement4S:
+		q, imm5 = 0b1, 0b100
+	case vecArrangement2D:
+		q, imm5 = 0b1, 0b1000
+	default:
+		panic("Unsupported arrangement " + arr.String())
+	}
+	return q<<30 | 0b001110000<<21 | imm5<<16 | 0b000011<<10 | rn<<5 | rd
+}
 
-		switch arr {
-		case vecArrangement8B:
-			q, imm5 = 0b0, 0b1
-		case vecArrangement16B:
-			q, imm5 = 0b1, 0b1
-		case vecArrangement4H:
-			q, imm5 = 0b0, 0b10
-		case vecArrangement8H:
-			q, imm5 = 0b1, 0b10
-		case vecArrangement2S:
-			q, imm5 = 0b0, 0b100
-		case vecArrangement4S:
-			q, imm5 = 0b1, 0b100
-		case vecArrangement2D:
-			q, imm5 = 0b1, 0b1000
-		default:
-			panic("Unsupported arrangement " + arr.String())
-		}
+// encodeVecDup encodes as "Duplicate vector element to vector or scalar" DUP (element).
+// (represented as `dup`)
+// https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/DUP--element---Duplicate-vector-element-to-vector-or-scalar-
+func encodeVecDupElement(rd, rn uint32, arr vecArrangement, srcIndex vecIndex) uint32 {
+	var q, imm5 uint32
+	q = 0b1
+	switch arr {
+	case vecArrangementB:
+		imm5 |= 0b1
+		imm5 |= uint32(srcIndex) << 1
+	case vecArrangementH:
+		imm5 |= 0b10
+		imm5 |= uint32(srcIndex) << 2
+	case vecArrangementS:
+		imm5 |= 0b100
+		imm5 |= uint32(srcIndex) << 3
+	case vecArrangementD:
+		imm5 |= 0b1000
+		imm5 |= uint32(srcIndex) << 4
+	default:
+		panic("unsupported arrangement" + arr.String())
 	}
 
-	return q<<30 | 0b001110000<<21 | imm5<<16 | op<<10 | rn<<5 | rd
+	return q<<30 | 0b001110000<<21 | imm5<<16 | 0b1<<10 | rn<<5 | rd
 }
 
 // encodeVecExtract encodes as "Advanced SIMD extract."

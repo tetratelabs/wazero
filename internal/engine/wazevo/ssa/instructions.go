@@ -126,8 +126,8 @@ func (i *Instruction) Arg2WithLane() (Value, Value, VecLane) {
 	return i.v, i.v2, VecLane(i.u1)
 }
 
-// Arg2WithLanes returns the first two arguments to this instruction, and two uint64 encoding 8 1-byte lane types each.
-func (i *Instruction) Arg2WithLanes() (Value, Value, uint64, uint64) {
+// ShuffleData returns the first two arguments to this instruction, and two uint64 encoding 8 1-byte lane types each.
+func (i *Instruction) ShuffleData() (Value, Value, uint64, uint64) {
 	return i.v, i.v2, i.u1, i.u2
 }
 
@@ -1793,14 +1793,11 @@ func (i *Instruction) AsExtractlane(x Value, index byte, lane VecLane, signed bo
 }
 
 // AsInsertlane initializes this instruction as an insert lane instruction with OpcodeInsertlane on vector.
-func (i *Instruction) AsInsertlane(x, y Value, index byte, lane VecLane, signed bool) *Instruction {
+func (i *Instruction) AsInsertlane(x, y Value, index byte, lane VecLane) *Instruction {
 	i.opcode = OpcodeInsertlane
 	i.v = x
 	i.v2 = y
 	i.u1 = uint64(index)
-	if signed {
-		i.u1 = 1 << 32
-	}
 	i.u2 = uint64(lane)
 	i.typ = TypeV128
 	return i
@@ -1873,25 +1870,20 @@ func (i *Instruction) VFcmpData() (x, y Value, c FloatCmpCond, l VecLane) {
 	return i.v, i.v2, FloatCmpCond(i.u1), VecLane(i.u2)
 }
 
-// LaneOpData returns the operands and sign flag of Extractlane and Insertlane on vector.
-func (i *Instruction) LaneOpData() (x Value, index byte, signed bool, l VecLane) {
+// ExtractlaneData returns the operands and sign flag of Extractlane on vector.
+func (i *Instruction) ExtractlaneData() (x Value, index byte, signed bool, l VecLane) {
 	x = i.v
 	index = byte(0b00001111 & i.u1)
-	if i.u1>>32 != 0 {
-		signed = true
-	}
+	signed = i.u1>>32 != 0
 	l = VecLane(i.u2)
 	return
 }
 
-// InsertLaneOpData returns the operands and sign flag of Insertlane on vector.
-func (i *Instruction) InsertLaneOpData() (x, y Value, index byte, signed bool, l VecLane) {
+// InsertlaneData returns the operands and sign flag of Insertlane on vector.
+func (i *Instruction) InsertlaneData() (x, y Value, index byte, l VecLane) {
 	x = i.v
 	y = i.v2
-	index = byte(0b00001111 & i.u1)
-	if i.u1>>32 != 0 {
-		signed = true
-	}
+	index = byte(i.u1)
 	l = VecLane(i.u2)
 	return
 }
@@ -2620,12 +2612,25 @@ func (i *Instruction) Format(b Builder) string {
 		OpcodeSplat:
 		instSuffix = fmt.Sprintf(".%s %s", VecLane(i.u1), i.v.Format(b))
 	case OpcodeExtractlane:
-		instSuffix = fmt.Sprintf(".%s %d, %s", VecLane(i.u2), 0x0000FFFF&i.u1, i.v.Format(b))
+		var signedness string
+		if i.u1 != 0 {
+			signedness = "signed"
+		} else {
+			signedness = "unsigned"
+		}
+		instSuffix = fmt.Sprintf(".%s %d, %s (%s)", VecLane(i.u2), 0x0000FFFF&i.u1, i.v.Format(b), signedness)
 	case OpcodeInsertlane:
-		instSuffix = fmt.Sprintf(".%s %d, %s, %s", VecLane(i.u2), 0x0000FFFF&i.u1, i.v.Format(b), i.v2.Format(b))
+		instSuffix = fmt.Sprintf(".%s %d, %s, %s", VecLane(i.u2), i.u1, i.v.Format(b), i.v2.Format(b))
 	case OpcodeShuffle:
-		// fixme print u1, u2
-		instSuffix = fmt.Sprintf(".%s %s, %s", VecLane(i.u1), i.v.Format(b), i.v2.Format(b))
+		lanes := make([]byte, 16)
+		for idx := 0; idx < 8; idx++ {
+			lanes[idx] = byte(i.u1 >> (8 * idx))
+		}
+		for idx := 8; idx < 16; idx++ {
+			lanes[idx] = byte(i.u2 >> (8 * idx))
+		}
+		// Prints Shuffle.[0 1 2 3 4 5 6 7 ...] v2, v3
+		instSuffix = fmt.Sprintf(".%v %s, %s", lanes, i.v.Format(b), i.v2.Format(b))
 
 	default:
 		panic(fmt.Sprintf("TODO: format for %s", i.opcode))

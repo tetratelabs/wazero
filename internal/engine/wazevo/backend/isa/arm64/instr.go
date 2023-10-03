@@ -101,6 +101,7 @@ var defKinds = [numInstructionKinds]defKind{
 	movFromVec:           defKindRD,
 	movFromVecSigned:     defKindRD,
 	vecDup:               defKindRD,
+	vecDupElement:        defKindRD,
 	vecExtract:           defKindRD,
 	vecMisc:              defKindRD,
 	vecMovElement:        defKindRD,
@@ -216,6 +217,7 @@ var useKinds = [numInstructionKinds]useKind{
 	movFromVec:           useKindRN,
 	movFromVecSigned:     useKindRN,
 	vecDup:               useKindRN,
+	vecDupElement:        useKindRN,
 	vecExtract:           useKindRNRM,
 	cCmpImm:              useKindRN,
 	vecMisc:              useKindRN,
@@ -786,22 +788,25 @@ func (i *instruction) asMovToVec(rd, rn operand, arr vecArrangement, index vecIn
 	i.u1, i.u2 = uint64(arr), uint64(index)
 }
 
-func (i *instruction) asMovFromVec(rd, rn operand, arr vecArrangement, index vecIndex) {
-	i.kind = movFromVec
+func (i *instruction) asMovFromVec(rd, rn operand, arr vecArrangement, index vecIndex, signed bool) {
+	if signed {
+		i.kind = movFromVecSigned
+	} else {
+		i.kind = movFromVec
+	}
 	i.rd = rd
 	i.rn = rn
 	i.u1, i.u2 = uint64(arr), uint64(index)
 }
 
-func (i *instruction) asMovFromVecSignedFIXME(rd, rn operand, arr vecArrangement, index vecIndex) {
-	i.kind = movFromVecSigned
-	i.rd = rd
-	i.rn = rn
-	i.u1, i.u2 = uint64(arr), uint64(index)
-}
-
-func (i *instruction) asVecDup(rd, rn operand, arr vecArrangement, index vecIndex) {
+func (i *instruction) asVecDup(rd, rn operand, arr vecArrangement) {
 	i.kind = vecDup
+	i.u1 = uint64(arr)
+	i.rn, i.rd = rn, rd
+}
+
+func (i *instruction) asVecDupElement(rd, rn operand, arr vecArrangement, index vecIndex) {
+	i.kind = vecDupElement
 	i.u1 = uint64(arr)
 	i.rn, i.rd = rn, rd
 	i.u2 = uint64(index)
@@ -1160,6 +1165,25 @@ func (i *instruction) String() (str string) {
 			formatVRegVec(i.rd.nr(), vecArrangement(i.u1), vecIndexNone),
 			formatVRegSized(i.rn.nr(), 64),
 		)
+	case vecDupElement:
+		arr := vecArrangement(i.u1)
+		var srcArr vecArrangement
+		switch arr {
+		case vecArrangement8B, vecArrangement16B:
+			srcArr = vecArrangementB
+		case vecArrangement4H, vecArrangement8H:
+			srcArr = vecArrangementH
+		case vecArrangement4S:
+			srcArr = vecArrangementS
+		case vecArrangement2D:
+			srcArr = vecArrangementD
+		default:
+			panic("invalid arrangement " + arr.String())
+		}
+		str = fmt.Sprintf("dup %s, %s",
+			formatVRegVec(i.rd.nr(), srcArr, vecIndexNone),
+			formatVRegVec(i.rn.nr(), arr, vecIndex(i.u2)),
+		)
 	case vecDupFromFpu:
 		panic("TODO")
 	case vecExtract:
@@ -1445,6 +1469,8 @@ const (
 	movFromVecSigned
 	// vecDup represents a duplication of general-purpose register to vector.
 	vecDup
+	// vecDupElement represents a duplication of a vector element to vector or scalar.
+	vecDupElement
 	// vecDupFromFpu represents a duplication of scalar to vector.
 	vecDupFromFpu
 	// vecExtract represents a vector extraction operation.

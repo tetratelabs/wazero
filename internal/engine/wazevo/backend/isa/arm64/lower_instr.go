@@ -564,66 +564,44 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		ins.asVecMisc(vecOpFcvtn, rd, rn, vecArrangement2S)
 		m.insert(ins)
 	case ssa.OpcodeExtractlane:
-		x, index, signed, lane := instr.LaneOpData()
+		x, index, signed, lane := instr.ExtractlaneData()
 
 		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
 		rd := operandNR(m.compiler.VRegOf(instr.Return()))
-		var arr vecArrangement
+
 		mov := m.allocateInstr()
 		switch lane {
 		case ssa.VecLaneI8x16:
-			arr = vecArrangementB
-			if signed {
-				mov.asMovFromVecSignedFIXME(rd, rn, arr, vecIndex(index))
-			} else {
-				mov.asMovFromVec(rd, rn, arr, vecIndex(index))
-			}
+			mov.asMovFromVec(rd, rn, vecArrangementB, vecIndex(index), signed)
 		case ssa.VecLaneI16x8:
-			arr = vecArrangementH
-			if signed {
-				mov.asMovFromVecSignedFIXME(rd, rn, arr, vecIndex(index))
-			} else {
-				mov.asMovFromVec(rd, rn, arr, vecIndex(index))
-			}
+			mov.asMovFromVec(rd, rn, vecArrangementH, vecIndex(index), signed)
 		case ssa.VecLaneI32x4:
-			arr = vecArrangementS
-			if signed {
-				mov.asMovFromVecSignedFIXME(rd, rn, arr, vecIndex(index))
-			} else {
-				mov.asMovFromVec(rd, rn, arr, vecIndex(index))
-			}
+			mov.asMovFromVec(rd, rn, vecArrangementS, vecIndex(index), signed)
 		case ssa.VecLaneI64x2:
-			arr = vecArrangementD
-			if signed {
-				mov.asMovFromVecSignedFIXME(rd, rn, arr, vecIndex(index))
-			} else {
-				mov.asMovFromVec(rd, rn, arr, vecIndex(index))
-			}
-
+			mov.asMovFromVec(rd, rn, vecArrangementD, vecIndex(index), signed)
 		case ssa.VecLaneF32x4:
-			arr = vecArrangementS
-			mov.asVecMovElement(rd, rn, arr, vecIndex(0), vecIndex(index))
-
+			mov.asVecMovElement(rd, rn, vecArrangementS, vecIndex(0), vecIndex(index))
 		case ssa.VecLaneF64x2:
-			arr = vecArrangementD
-			mov.asVecMovElement(rd, rn, arr, vecIndex(0), vecIndex(index))
-
+			mov.asVecMovElement(rd, rn, vecArrangementD, vecIndex(0), vecIndex(index))
 		default:
-			panic("not done")
+			panic("unsupported lane: " + lane.String())
 		}
 
 		m.insert(mov)
 
 	case ssa.OpcodeInsertlane:
-		x, y, index, _, lane := instr.InsertLaneOpData()
+		x, y, index, lane := instr.InsertlaneData()
 		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
 		rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
 		rd := operandNR(m.compiler.VRegOf(instr.Return()))
 
+		// Initially mov rn to rd.
 		mov0 := m.allocateInstr()
 		mov0.asFpuMov128(rd.nr(), rn.nr())
 		m.insert(mov0)
 
+		// movToVec and vecMovElement do not clear the remaining bits to zero,
+		// thus, we can mov rm in-place to rd.
 		mov := m.allocateInstr()
 		switch lane {
 		case ssa.VecLaneI8x16:
@@ -649,18 +627,21 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 
 		arr := ssaLaneToArrangement(lane)
 
+		// tbl <rd>.<arr>, { <rn>.<arr> }, <rm>.<arr>
 		tbl1 := m.allocateInstr()
 		tbl1.asVecTbl(1, rd, rn, rm, arr)
 		m.insert(tbl1)
 
 	case ssa.OpcodeShuffle:
-		x, y, lane1, lane2 := instr.Arg2WithLanes()
+		x, y, lane1, lane2 := instr.ShuffleData()
 		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
 		rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
 		rd := operandNR(m.compiler.VRegOf(instr.Return()))
 
+		// `tbl2` requires 2 consecutive registers, so we arbitrarily pick v29, v30.
 		vReg, wReg := v29VReg, v30VReg
 
+		// Initialize v29, v30 to rn, rm.
 		movv := m.allocateInstr()
 		movv.asFpuMov128(vReg, rn.nr())
 		m.insert(movv)
@@ -669,12 +650,19 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		movw.asFpuMov128(wReg, rm.nr())
 		m.insert(movw)
 
-		// lane1, lane2 are already encoded as two u64s.
+		// `lane1`, `lane2` are already encoded as two u64s with the right layout:
+		//     lane1 := lane[7]<<56 | ... | lane[1]<<8 | lane[0]
+		//     lane2 := lane[15]<<56 | ... | lane[9]<<8 | lane[8]
+		// Thus, we can use loadFpuConst128.
 		tmp := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
 		lfc := m.allocateInstr()
 		lfc.asLoadFpuConst128(tmp.nr(), lane1, lane2)
 		m.insert(lfc)
 
+		// tbl <rd>.16b, { <vReg>.16B, <wReg>.16b }, <tmp>.16b
+		// ;; that is:
+		// tbl <rd>.16b, { v29.16b, v30.16b }, <tmp>.16b
+		// ;; v30 is inferred because vReg := v29.
 		tbl2 := m.allocateInstr()
 		tbl2.asVecTbl(2, rd, operandNR(vReg), tmp, vecArrangement16B)
 		m.insert(tbl2)
@@ -687,17 +675,17 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		dup := m.allocateInstr()
 		switch lane {
 		case ssa.VecLaneI8x16:
-			dup.asVecDup(rd, rn, vecArrangement16B, vecIndexNone)
+			dup.asVecDup(rd, rn, vecArrangement16B)
 		case ssa.VecLaneI16x8:
-			dup.asVecDup(rd, rn, vecArrangement8H, vecIndexNone)
+			dup.asVecDup(rd, rn, vecArrangement8H)
 		case ssa.VecLaneI32x4:
-			dup.asVecDup(rd, rn, vecArrangement4S, vecIndexNone)
+			dup.asVecDup(rd, rn, vecArrangement4S)
 		case ssa.VecLaneI64x2:
-			dup.asVecDup(rd, rn, vecArrangement2D, vecIndexNone)
+			dup.asVecDup(rd, rn, vecArrangement2D)
 		case ssa.VecLaneF32x4:
-			dup.asVecDup(rd, rn, vecArrangementS, vecIndex(0))
+			dup.asVecDupElement(rd, rn, vecArrangementS, vecIndex(0))
 		case ssa.VecLaneF64x2:
-			dup.asVecDup(rd, rn, vecArrangementD, vecIndex(0))
+			dup.asVecDupElement(rd, rn, vecArrangementD, vecIndex(0))
 		}
 		m.insert(dup)
 
@@ -737,7 +725,7 @@ func (m *machine) lowerVShift(op ssa.Opcode, rd, rn, rm operand, arr vecArrangem
 
 	// Copy the shift amount into a vector register as sshl/ushl requires it to be there.
 	dup := m.allocateInstr()
-	dup.asVecDup(rd, tmp, arr, vecIndexNone)
+	dup.asVecDup(rd, tmp, arr)
 	m.insert(dup)
 
 	if op == ssa.OpcodeVIshl || op == ssa.OpcodeVSshr {
@@ -797,7 +785,7 @@ func (m *machine) lowerVcheckTrue(op ssa.Opcode, rm, rd operand, arr vecArrangem
 	//	mov x0, x3?
 
 	movv := m.allocateInstr()
-	movv.asMovFromVec(rd, tmp, vecArrangementD, vecIndex(0))
+	movv.asMovFromVec(rd, tmp, vecArrangementD, vecIndex(0), false)
 	m.insert(movv)
 
 	fc := m.allocateInstr()
@@ -842,7 +830,7 @@ func (m *machine) lowerVhighBits(rm, rd operand, arr vecArrangement) {
 
 		// dup r0 to v0.
 		dup := m.allocateInstr()
-		dup.asVecDup(v0, r0, vecArrangement2D, vecIndexNone)
+		dup.asVecDup(v0, r0, vecArrangement2D)
 		m.insert(dup)
 
 		// Lane-wise logical AND with the bit mask, meaning that we have
@@ -872,7 +860,7 @@ func (m *machine) lowerVhighBits(rm, rd operand, arr vecArrangement) {
 
 		// Extract the v.h[0] as the result.
 		movfv := m.allocateInstr()
-		movfv.asMovFromVec(rd, v0, vecArrangementH, vecIndex(0))
+		movfv.asMovFromVec(rd, v0, vecArrangementH, vecIndex(0), false)
 		m.insert(movfv)
 	case vecArrangement8H: // ssa.VecLaneI16x8
 		//	sshr v6?.8h, v2?.8h, #15
@@ -898,7 +886,7 @@ func (m *machine) lowerVhighBits(rm, rd operand, arr vecArrangement) {
 
 		// dup r0 to vector v0.
 		dup := m.allocateInstr()
-		dup.asVecDup(v0, r0, vecArrangement2D, vecIndexNone)
+		dup.asVecDup(v0, r0, vecArrangement2D)
 		m.insert(dup)
 
 		lsl := m.allocateInstr()
@@ -921,7 +909,7 @@ func (m *machine) lowerVhighBits(rm, rd operand, arr vecArrangement) {
 		m.insert(addv)
 
 		movfv := m.allocateInstr()
-		movfv.asMovFromVec(rd, v0, vecArrangementH, vecIndex(0))
+		movfv.asMovFromVec(rd, v0, vecArrangementH, vecIndex(0), false)
 		m.insert(movfv)
 	case vecArrangement4S: // ssa.VecLaneI32x4
 		// 	sshr v6?.8h, v2?.8h, #15
@@ -947,7 +935,7 @@ func (m *machine) lowerVhighBits(rm, rd operand, arr vecArrangement) {
 
 		// dup r0 to vector v0.
 		dup := m.allocateInstr()
-		dup.asVecDup(v0, r0, vecArrangement2D, vecIndexNone)
+		dup.asVecDup(v0, r0, vecArrangement2D)
 		m.insert(dup)
 
 		lsl := m.allocateInstr()
@@ -970,7 +958,7 @@ func (m *machine) lowerVhighBits(rm, rd operand, arr vecArrangement) {
 		m.insert(addv)
 
 		movfv := m.allocateInstr()
-		movfv.asMovFromVec(rd, v0, vecArrangementS, vecIndex(0))
+		movfv.asMovFromVec(rd, v0, vecArrangementS, vecIndex(0), false)
 		m.insert(movfv)
 	case vecArrangement2D: // ssa.VecLaneI64x2
 		// 	mov d3?, v2?.d[0]
@@ -981,12 +969,12 @@ func (m *machine) lowerVhighBits(rm, rd operand, arr vecArrangement) {
 
 		// Move the lower 64-bit int into result.
 		movv0 := m.allocateInstr()
-		movv0.asMovFromVec(rd, rm, vecArrangementD, vecIndex(0))
+		movv0.asMovFromVec(rd, rm, vecArrangementD, vecIndex(0), false)
 		m.insert(movv0)
 
 		// Move the higher 64-bit int into r0.
 		movv1 := m.allocateInstr()
-		movv1.asMovFromVec(r0, rm, vecArrangementD, vecIndex(1))
+		movv1.asMovFromVec(r0, rm, vecArrangementD, vecIndex(1), false)
 		m.insert(movv1)
 
 		// Move the sign bit into the least significant bit.
@@ -1205,7 +1193,7 @@ func (m *machine) lowerBitcast(instr *ssa.Instruction) {
 		} else {
 			arr = vecArrangementS
 		}
-		mov.asMovFromVec(rd, rn, arr, vecIndex(0))
+		mov.asMovFromVec(rd, rn, arr, vecIndex(0), false)
 		m.insert(mov)
 	default:
 		panic("TODO?BUG?")
@@ -1661,7 +1649,7 @@ func (m *machine) lowerPopcnt(x, result ssa.Value) {
 	m.insert(uaddlv)
 
 	mov := m.allocateInstr()
-	mov.asMovFromVec(rd, rf3, vecArrangementD, vecIndex(0))
+	mov.asMovFromVec(rd, rf3, vecArrangementD, vecIndex(0), false)
 	m.insert(mov)
 }
 
