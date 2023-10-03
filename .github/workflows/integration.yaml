@@ -46,7 +46,7 @@ jobs:
         with:
           # Use share the cache containing archives across OSes.
           enableCrossOsArchive: true
-          key: zig-test-binary-${{ env.ZIG_VERSION }}
+          key: zig-stdlib-test-binary-${{ env.ZIG_VERSION }}
           path:
             ./zigbin/
 
@@ -93,7 +93,7 @@ jobs:
           enableCrossOsArchive: true
           # We need this cache to run tests.
           fail-on-cache-miss: true
-          key: zig-test-binary-${{ env.ZIG_VERSION }}
+          key: zig-stdlib-test-binary-${{ env.ZIG_VERSION }}
           path:
             ./zigbin/
 
