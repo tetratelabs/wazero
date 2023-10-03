@@ -1877,7 +1877,7 @@ func TestCompiler_declareSignatures(t *testing.T) {
 		declaredSigs := builder.Signatures()
 		require.Equal(t,
 			4+
-				2, // memoryGrowSig and checkModuleExitCodeSig.
+				3, // memoryGrowSig and checkModuleExitCodeSig + tableGrowSig.
 			len(declaredSigs),
 		)
 
@@ -1888,9 +1888,10 @@ func TestCompiler_declareSignatures(t *testing.T) {
 			{ID: 3, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64}, Results: []ssa.Type{ssa.TypeI64, ssa.TypeI32}},
 			{ID: 4, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI32}, Results: []ssa.Type{ssa.TypeI32}},
 			{ID: 5, Params: []ssa.Type{ssa.TypeI64}},
+			{ID: 6, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI32, ssa.TypeI32, ssa.TypeI64}, Results: []ssa.Type{ssa.TypeI32}},
 		}
 
-		for i := 0; i < 6; i++ {
+		for i := 0; i < 7; i++ {
 			require.Equal(t, expected[i].String(), declaredSigs[i].String(), i)
 		}
 	})
@@ -1903,7 +1904,7 @@ func TestCompiler_declareSignatures(t *testing.T) {
 		declaredSigs := builder.Signatures()
 		require.Equal(t,
 			4*3+
-				2, // memoryGrowSig and checkModuleExitCodeSig.
+				3, // memoryGrowSig and checkModuleExitCodeSig + tableGrowSig.
 			len(declaredSigs),
 		)
 
@@ -1925,6 +1926,7 @@ func TestCompiler_declareSignatures(t *testing.T) {
 			// Misc.
 			{ID: 12, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI32}, Results: []ssa.Type{ssa.TypeI32}},
 			{ID: 13, Params: []ssa.Type{ssa.TypeI64}},
+			{ID: 14, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI32, ssa.TypeI32, ssa.TypeI64}, Results: []ssa.Type{ssa.TypeI32}},
 		}
 
 		for i := 0; i < len(declaredSigs); i++ {

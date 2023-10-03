@@ -148,6 +148,7 @@ func TestSpectestV2(t *testing.T) {
 		{"ref_is_null"},
 		{"table_get"},
 		{"table_set"},
+		{"table_size"},
 		{"simd_boolean"},
 		{"simd_bit_shift"},
 		{"simd_bitwise"},

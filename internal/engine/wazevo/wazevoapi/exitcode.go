@@ -24,6 +24,7 @@ const (
 	ExitCodeCallListenerAfter
 	ExitCodeCallGoModuleFunctionWithListener
 	ExitCodeCallGoFunctionWithListener
+	ExitCodeTableGrow
 	exitCodeMax
 )
 
@@ -68,6 +69,8 @@ func (e ExitCode) String() string {
 		return "call_go_function_with_listener"
 	case ExitCodeGrowMemory:
 		return "grow_memory"
+	case ExitCodeTableGrow:
+		return "table_grow"
 	}
 	panic("TODO")
 }

@@ -46,13 +46,15 @@ type (
 	}
 
 	sharedFunctions struct {
-		// memoryGrowExecutable is a compiled executable for memory.grow builtin function.
+		// memoryGrowExecutable is a compiled trampoline executable for memory.grow builtin function.
 		memoryGrowExecutable []byte
-		// checkModuleExitCode is a compiled executable for checking module instance exit code. This
+		// checkModuleExitCode is a compiled trampoline executable for checking module instance exit code. This
 		// is used when ensureTermination is true.
 		checkModuleExitCode []byte
 		// stackGrowExecutable is a compiled executable for growing stack builtin function.
-		stackGrowExecutable       []byte
+		stackGrowExecutable []byte
+		// tableGrowExecutable is a compiled trampoline executable for table.grow builtin function.
+		tableGrowExecutable       []byte
 		entryPreambles            map[*wasm.FunctionType][]byte
 		listenerBeforeTrampolines map[*wasm.FunctionType][]byte
 		listenerAfterTrampolines  map[*wasm.FunctionType][]byte
@@ -535,10 +537,19 @@ func (e *engine) compileSharedFunctions() {
 	e.be.Init()
 	{
 		src := e.machine.CompileGoFunctionTrampoline(wazevoapi.ExitCodeGrowMemory, &ssa.Signature{
-			Params:  []ssa.Type{ssa.TypeI32 /* exec context */, ssa.TypeI32},
+			Params:  []ssa.Type{ssa.TypeI64 /* exec context */, ssa.TypeI32},
 			Results: []ssa.Type{ssa.TypeI32},
 		}, false)
 		e.sharedFunctions.memoryGrowExecutable = mmapExecutable(src)
+	}
+
+	e.be.Init()
+	{
+		src := e.machine.CompileGoFunctionTrampoline(wazevoapi.ExitCodeTableGrow, &ssa.Signature{
+			Params:  []ssa.Type{ssa.TypeI64 /* exec context */, ssa.TypeI32 /* table index */, ssa.TypeI32 /* num */, ssa.TypeI64 /* ref */},
+			Results: []ssa.Type{ssa.TypeI32},
+		}, false)
+		e.sharedFunctions.tableGrowExecutable = mmapExecutable(src)
 	}
 
 	e.be.Init()
@@ -571,6 +582,9 @@ func sharedFunctionsFinalizer(sf *sharedFunctions) {
 	if err := platform.MunmapCodeSegment(sf.stackGrowExecutable); err != nil {
 		panic(err)
 	}
+	if err := platform.MunmapCodeSegment(sf.tableGrowExecutable); err != nil {
+		panic(err)
+	}
 	for _, f := range sf.entryPreambles {
 		if err := platform.MunmapCodeSegment(f); err != nil {
 			panic(err)
@@ -590,6 +604,7 @@ func sharedFunctionsFinalizer(sf *sharedFunctions) {
 	sf.memoryGrowExecutable = nil
 	sf.checkModuleExitCode = nil
 	sf.stackGrowExecutable = nil
+	sf.tableGrowExecutable = nil
 	sf.entryPreambles = nil
 	sf.listenerBeforeTrampolines = nil
 	sf.listenerAfterTrampolines = nil
