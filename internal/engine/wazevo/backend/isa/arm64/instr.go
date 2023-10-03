@@ -226,7 +226,7 @@ var useKinds = [numInstructionKinds]useKind{
 	vecLanes:             useKindRN,
 	vecShiftImm:          useKindRN,
 	vecTbl:               useKindRNRM,
-	vecTbl2:              useKindRNRM, // FIXME use useKindRNRN1RM
+	vecTbl2:              useKindRNRN1RM,
 	vecRRR:               useKindRNRM,
 	vecPermute:           useKindRNRM,
 	fpuToInt:             useKindRN,
@@ -264,11 +264,9 @@ func (i *instruction) uses(regs []regalloc.VReg) []regalloc.VReg {
 			regs = append(regs, ra)
 		}
 	case useKindRNRN1RM:
-		if rn := i.rn.reg(); rn.IsRealReg() {
-			regs = append(regs, v29VReg)
-		}
-		if rn1 := i.rn.reg() + 1; rn1.IsRealReg() {
-			regs = append(regs, v30VReg)
+		if rn := i.rn.reg(); rn.Valid() && rn.IsRealReg() {
+			rn1 := regalloc.FromRealReg(rn.RealReg()+1, rn.RegType())
+			regs = append(regs, rn, rn1)
 		}
 		if rm := i.rm.reg(); rm.Valid() {
 			regs = append(regs, rm)
@@ -313,12 +311,23 @@ func (i *instruction) assignUse(index int, reg regalloc.VReg) {
 		if rn := i.rn.reg(); rn.Valid() {
 			i.rn = i.rn.assignReg(reg)
 		}
-	case useKindRNRN1RM:
-		panic("todo")
 	case useKindRNRM:
 		if index == 0 {
 			if rn := i.rn.reg(); rn.Valid() {
 				i.rn = i.rn.assignReg(reg)
+			}
+		} else {
+			if rm := i.rm.reg(); rm.Valid() {
+				i.rm = i.rm.assignReg(reg)
+			}
+		}
+	case useKindRNRN1RM:
+		if index == 0 {
+			if rn := i.rn.reg(); rn.Valid() {
+				i.rn = i.rn.assignReg(reg)
+			}
+			if rn1 := i.rn.reg() + 1; rn1.Valid() {
+				i.rm = i.rm.assignReg(reg + 1)
 			}
 		} else {
 			if rm := i.rm.reg(); rm.Valid() {
@@ -866,9 +875,9 @@ func (i *instruction) asVecTbl(nregs byte, rd, rn, rm operand, arr vecArrangemen
 		i.kind = vecTbl
 	case 2:
 		i.kind = vecTbl2
-		if !rn.reg().IsRealReg() {
-			panic("rn is not a RealReg")
-		}
+		//if !rn.reg().IsRealReg() {
+		//	panic("rn is not a RealReg")
+		//}
 	default:
 		panic(fmt.Sprintf("unsupported number of registers %d", nregs))
 	}
@@ -1183,21 +1192,8 @@ func (i *instruction) String() (str string) {
 		)
 	case vecDupElement:
 		arr := vecArrangement(i.u1)
-		var srcArr vecArrangement
-		switch arr {
-		case vecArrangement8B, vecArrangement16B:
-			srcArr = vecArrangementB
-		case vecArrangement4H, vecArrangement8H:
-			srcArr = vecArrangementH
-		case vecArrangement4S:
-			srcArr = vecArrangementS
-		case vecArrangement2D:
-			srcArr = vecArrangementD
-		default:
-			panic("invalid arrangement " + arr.String())
-		}
 		str = fmt.Sprintf("dup %s, %s",
-			formatVRegVec(i.rd.nr(), srcArr, vecIndexNone),
+			formatVRegVec(i.rd.nr(), arr, vecIndexNone),
 			formatVRegVec(i.rn.nr(), arr, vecIndex(i.u2)),
 		)
 	case vecDupFromFpu:
@@ -1269,11 +1265,13 @@ func (i *instruction) String() (str string) {
 			formatVRegVec(i.rm.nr(), arr, vecIndexNone))
 	case vecTbl2:
 		arr := vecArrangement(i.u2)
+		rd, rn, rm := i.rd.nr(), i.rn.nr(), i.rm.nr()
+		rn1 := regalloc.FromRealReg(rn.RealReg()+1, rn.RegType())
 		str = fmt.Sprintf("tbl %s, { %s, %s }, %s",
-			formatVRegVec(i.rd.nr(), arr, vecIndexNone),
-			formatVRegVec(i.rn.nr(), vecArrangement16B, vecIndexNone),
-			formatVRegVec(i.rn.nr()+1, vecArrangement16B, vecIndexNone),
-			formatVRegVec(i.rm.nr(), arr, vecIndexNone))
+			formatVRegVec(rd, arr, vecIndexNone),
+			formatVRegVec(rn, vecArrangement16B, vecIndexNone),
+			formatVRegVec(rn1, vecArrangement16B, vecIndexNone),
+			formatVRegVec(rm, arr, vecIndexNone))
 	case vecPermute:
 		arr := vecArrangement(i.u2)
 		str = fmt.Sprintf("%s %s, %s, %s",

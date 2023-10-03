@@ -633,39 +633,7 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		m.insert(tbl1)
 
 	case ssa.OpcodeShuffle:
-		x, y, lane1, lane2 := instr.ShuffleData()
-		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
-		rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
-		rd := operandNR(m.compiler.VRegOf(instr.Return()))
-
-		// `tbl2` requires 2 consecutive registers, so we arbitrarily pick v29, v30.
-		vReg, wReg := v29VReg, v30VReg
-
-		// Initialize v29, v30 to rn, rm.
-		movv := m.allocateInstr()
-		movv.asFpuMov128(vReg, rn.nr())
-		m.insert(movv)
-
-		movw := m.allocateInstr()
-		movw.asFpuMov128(wReg, rm.nr())
-		m.insert(movw)
-
-		// `lane1`, `lane2` are already encoded as two u64s with the right layout:
-		//     lane1 := lane[7]<<56 | ... | lane[1]<<8 | lane[0]
-		//     lane2 := lane[15]<<56 | ... | lane[9]<<8 | lane[8]
-		// Thus, we can use loadFpuConst128.
-		tmp := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
-		lfc := m.allocateInstr()
-		lfc.asLoadFpuConst128(tmp.nr(), lane1, lane2)
-		m.insert(lfc)
-
-		// tbl <rd>.16b, { <vReg>.16B, <wReg>.16b }, <tmp>.16b
-		// ;; that is:
-		// tbl <rd>.16b, { v29.16b, v30.16b }, <tmp>.16b
-		// ;; v30 is inferred because vReg := v29.
-		tbl2 := m.allocateInstr()
-		tbl2.asVecTbl(2, rd, operandNR(vReg), tmp, vecArrangement16B)
-		m.insert(tbl2)
+		m.lowerShuffle(instr)
 
 	case ssa.OpcodeSplat:
 		x, lane := instr.ArgWithLane()
@@ -693,6 +661,42 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		panic("TODO: lowering " + op.String())
 	}
 	m.FlushPendingInstructions()
+}
+
+func (m *machine) lowerShuffle(instr *ssa.Instruction) {
+	x, y, lane1, lane2 := instr.ShuffleData()
+	rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+	rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
+	rd := operandNR(m.compiler.VRegOf(instr.Return()))
+
+	// `tbl2` requires 2 consecutive registers, so we arbitrarily pick v29, v30.
+	vReg, wReg := v29VReg, v30VReg
+
+	// Initialize v29, v30 to rn, rm.
+	movv := m.allocateInstr()
+	movv.asFpuMov128(vReg, rn.nr())
+	m.insert(movv)
+
+	movw := m.allocateInstr()
+	movw.asFpuMov128(wReg, rm.nr())
+	m.insert(movw)
+
+	// `lane1`, `lane2` are already encoded as two u64s with the right layout:
+	//     lane1 := lane[7]<<56 | ... | lane[1]<<8 | lane[0]
+	//     lane2 := lane[15]<<56 | ... | lane[9]<<8 | lane[8]
+	// Thus, we can use loadFpuConst128.
+	tmp := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
+	lfc := m.allocateInstr()
+	lfc.asLoadFpuConst128(tmp.nr(), lane1, lane2)
+	m.insert(lfc)
+
+	// tbl <rd>.16b, { <vReg>.16B, <wReg>.16b }, <tmp>.16b
+	// ;; that is:
+	// tbl <rd>.16b, { v29.16b, v30.16b }, <tmp>.16b
+	// ;; operand vReg := v29 implies operand wReg := v30.
+	tbl2 := m.allocateInstr()
+	tbl2.asVecTbl(2, rd, operandNR(vReg), tmp, vecArrangement16B)
+	m.insert(tbl2)
 }
 
 func (m *machine) lowerVShift(op ssa.Opcode, rd, rn, rm operand, arr vecArrangement) {
