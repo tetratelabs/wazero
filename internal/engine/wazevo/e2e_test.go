@@ -136,6 +136,8 @@ func TestSpectestV2(t *testing.T) {
 		name string
 	}{
 		{"block"},
+		{"i32"},
+		{"i64"},
 		{"br"},
 		{"call"},
 		{"call_indirect"},
