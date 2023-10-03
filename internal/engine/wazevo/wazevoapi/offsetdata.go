@@ -46,6 +46,8 @@ const (
 	ExecutionContextOffsetGoFunctionCallCalleeModuleContextOpaque Offset = 1120
 	// ExecutionContextOffsetTableGrowTrampolineAddress is an offset of `tableGrowTrampolineAddress` field in wazevo.executionContext
 	ExecutionContextOffsetTableGrowTrampolineAddress Offset = 1128
+	// ExecutionContextOffsetRefFuncTrampolineAddress is an offset of `refFuncTrampolineAddress` field in wazevo.executionContext
+	ExecutionContextOffsetRefFuncTrampolineAddress Offset = 1136
 )
 
 // ModuleContextOffsetData allows the compilers to get the information about offsets to the fields of wazevo.moduleContextOpaque,

@@ -146,6 +146,7 @@ func TestSpectestV2(t *testing.T) {
 		{"loop"},
 		{"ref_null"},
 		{"ref_is_null"},
+		{"ref_func"},
 		{"table_get"},
 		{"table_set"},
 		{"table_size"},

@@ -76,6 +76,8 @@ type (
 		goFunctionCallCalleeModuleContextOpaque uintptr
 		// tableGrowTrampolineAddress holds the address of table grow trampoline function.
 		tableGrowTrampolineAddress *byte
+		// refFuncTrampolineAddress holds the address of ref-func trampoline function.
+		refFuncTrampolineAddress *byte
 	}
 )
 
@@ -346,6 +348,14 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 			if err := m.FailIfClosed(); err != nil {
 				panic(err)
 			}
+			c.execCtx.exitCode = wazevoapi.ExitCodeOK
+			afterGoFunctionCallEntrypoint(c.execCtx.goCallReturnAddress, c.execCtxPtr, uintptr(unsafe.Pointer(c.execCtx.stackPointerBeforeGoCall)))
+		case wazevoapi.ExitCodeRefFunc:
+			mod := c.callerModuleInstance()
+			s := goCallStackView(c.execCtx.stackPointerBeforeGoCall)
+			funcIndex := s[0]
+			ref := mod.Engine.FunctionInstanceReference(wasm.Index(funcIndex))
+			s[0] = uint64(ref)
 			c.execCtx.exitCode = wazevoapi.ExitCodeOK
 			afterGoFunctionCallEntrypoint(c.execCtx.goCallReturnAddress, c.execCtxPtr, uintptr(unsafe.Pointer(c.execCtx.stackPointerBeforeGoCall)))
 		case wazevoapi.ExitCodeUnreachable:

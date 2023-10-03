@@ -1875,12 +1875,6 @@ func TestCompiler_declareSignatures(t *testing.T) {
 		c.declareSignatures(false)
 
 		declaredSigs := builder.Signatures()
-		require.Equal(t,
-			4+
-				3, // memoryGrowSig and checkModuleExitCodeSig + tableGrowSig.
-			len(declaredSigs),
-		)
-
 		expected := []*ssa.Signature{
 			{ID: 0, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64}},
 			{ID: 1, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI64, ssa.TypeI32}},
@@ -1889,9 +1883,11 @@ func TestCompiler_declareSignatures(t *testing.T) {
 			{ID: 4, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI32}, Results: []ssa.Type{ssa.TypeI32}},
 			{ID: 5, Params: []ssa.Type{ssa.TypeI64}},
 			{ID: 6, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI32, ssa.TypeI32, ssa.TypeI64}, Results: []ssa.Type{ssa.TypeI32}},
+			{ID: 7, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI32}, Results: []ssa.Type{ssa.TypeI64}},
 		}
 
-		for i := 0; i < 7; i++ {
+		require.Equal(t, len(expected), len(declaredSigs))
+		for i := 0; i < len(expected); i++ {
 			require.Equal(t, expected[i].String(), declaredSigs[i].String(), i)
 		}
 	})
@@ -1902,11 +1898,6 @@ func TestCompiler_declareSignatures(t *testing.T) {
 		c.declareSignatures(true)
 
 		declaredSigs := builder.Signatures()
-		require.Equal(t,
-			4*3+
-				3, // memoryGrowSig and checkModuleExitCodeSig + tableGrowSig.
-			len(declaredSigs),
-		)
 
 		expected := []*ssa.Signature{
 			{ID: 0, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64}},
@@ -1927,8 +1918,9 @@ func TestCompiler_declareSignatures(t *testing.T) {
 			{ID: 12, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI32}, Results: []ssa.Type{ssa.TypeI32}},
 			{ID: 13, Params: []ssa.Type{ssa.TypeI64}},
 			{ID: 14, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI32, ssa.TypeI32, ssa.TypeI64}, Results: []ssa.Type{ssa.TypeI32}},
+			{ID: 15, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI32}, Results: []ssa.Type{ssa.TypeI64}},
 		}
-
+		require.Equal(t, len(expected), len(declaredSigs))
 		for i := 0; i < len(declaredSigs); i++ {
 			require.Equal(t, expected[i].String(), declaredSigs[i].String(), i)
 		}
