@@ -44,6 +44,8 @@ const (
 	ExecutionContextOffsetSavedRegistersBegin Offset = 96
 	// ExecutionContextOffsetGoFunctionCallCalleeModuleContextOpaque is an offset of `goFunctionCallCalleeModuleContextOpaque` field in wazevo.executionContext
 	ExecutionContextOffsetGoFunctionCallCalleeModuleContextOpaque Offset = 1120
+	// ExecutionContextOffsetTableGrowTrampolineAddress is an offset of `tableGrowTrampolineAddress` field in wazevo.executionContext
+	ExecutionContextOffsetTableGrowTrampolineAddress Offset = 1128
 )
 
 // ModuleContextOffsetData allows the compilers to get the information about offsets to the fields of wazevo.moduleContextOpaque,

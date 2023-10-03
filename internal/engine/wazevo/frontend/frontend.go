@@ -22,6 +22,7 @@ type Compiler struct {
 	listenerSignatures     map[*wasm.FunctionType][2]*ssa.Signature
 	memoryGrowSig          ssa.Signature
 	checkModuleExitCodeSig ssa.Signature
+	tableGrowSig           ssa.Signature
 	checkModuleExitCodeArg [1]ssa.Value
 	ensureTermination      bool
 
@@ -96,7 +97,7 @@ func (c *Compiler) declareSignatures(listenerOn bool) {
 		ID: begin,
 		// Takes execution context and the page size to grow.
 		Params: []ssa.Type{ssa.TypeI64, ssa.TypeI32},
-		// Returns the new size.
+		// Returns the previous page size.
 		Results: []ssa.Type{ssa.TypeI32},
 	}
 	c.ssaBuilder.DeclareSignature(&c.memoryGrowSig)
@@ -107,6 +108,15 @@ func (c *Compiler) declareSignatures(listenerOn bool) {
 		Params: []ssa.Type{ssa.TypeI64},
 	}
 	c.ssaBuilder.DeclareSignature(&c.checkModuleExitCodeSig)
+
+	c.tableGrowSig = ssa.Signature{
+		ID: c.checkModuleExitCodeSig.ID + 1,
+		// Takes execution context and the page size to grow.
+		Params: []ssa.Type{ssa.TypeI64 /* exec context */, ssa.TypeI32 /* table index */, ssa.TypeI32 /* num */, ssa.TypeI64 /* ref */},
+		// Returns the previous size.
+		Results: []ssa.Type{ssa.TypeI32},
+	}
+	c.ssaBuilder.DeclareSignature(&c.tableGrowSig)
 }
 
 // SignatureForWasmFunctionType returns the ssa.Signature for the given wasm.FunctionType.

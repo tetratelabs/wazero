@@ -74,6 +74,8 @@ type (
 		savedRegisters [64][2]uint64
 		// goFunctionCallCalleeModuleContextOpaque is the pointer to the target Go function's moduleContextOpaque.
 		goFunctionCallCalleeModuleContextOpaque uintptr
+		// tableGrowTrampolineAddress holds the address of table grow trampoline function.
+		tableGrowTrampolineAddress *byte
 	}
 )
 
@@ -258,6 +260,14 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 					putLocalMemory(importedMemOwner, 8 /* local memory begins at 8 */, mem)
 				}
 			}
+			c.execCtx.exitCode = wazevoapi.ExitCodeOK
+			afterGoFunctionCallEntrypoint(c.execCtx.goCallReturnAddress, c.execCtxPtr, uintptr(unsafe.Pointer(c.execCtx.stackPointerBeforeGoCall)))
+		case wazevoapi.ExitCodeTableGrow:
+			mod := c.callerModuleInstance()
+			s := goCallStackView(c.execCtx.stackPointerBeforeGoCall)
+			tableIndex, num, ref := s[0], uint32(s[1]), uintptr(s[2])
+			table := mod.Tables[tableIndex]
+			s[0] = uint64(uint32(int32(table.Grow(num, ref))))
 			c.execCtx.exitCode = wazevoapi.ExitCodeOK
 			afterGoFunctionCallEntrypoint(c.execCtx.goCallReturnAddress, c.execCtxPtr, uintptr(unsafe.Pointer(c.execCtx.stackPointerBeforeGoCall)))
 		case wazevoapi.ExitCodeCallGoFunction:

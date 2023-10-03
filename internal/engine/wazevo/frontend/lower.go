@@ -540,6 +540,52 @@ func (c *Compiler) lowerCurrentOpcode() {
 				true,
 			).Insert(builder).Return()
 			state.push(ret)
+
+		case wasm.OpcodeMiscTableSize:
+			tableIndex := c.readI32u()
+			if state.unreachable {
+				break
+			}
+
+			// Load the table.
+			loadTableInstancePtr := builder.AllocateInstruction()
+			loadTableInstancePtr.AsLoad(c.moduleCtxPtrValue, c.offset.TableOffset(int(tableIndex)).U32(), ssa.TypeI64)
+			builder.InsertInstruction(loadTableInstancePtr)
+			tableInstancePtr := loadTableInstancePtr.Return()
+
+			// Load the table's length.
+			loadTableLen := builder.AllocateInstruction().
+				AsLoad(tableInstancePtr, tableInstanceLenOffset, ssa.TypeI32).
+				Insert(builder)
+			state.push(loadTableLen.Return())
+
+		case wasm.OpcodeMiscTableGrow:
+			tableIndex := c.readI32u()
+			if state.unreachable {
+				break
+			}
+
+			c.storeCallerModuleContext()
+
+			tableIndexVal := builder.AllocateInstruction().AsIconst32(tableIndex).Insert(builder).Return()
+
+			num := state.pop()
+			r := state.pop()
+
+			tableGrowPtr := builder.AllocateInstruction().
+				AsLoad(c.execCtxPtrValue,
+					wazevoapi.ExecutionContextOffsetTableGrowTrampolineAddress.U32(),
+					ssa.TypeI64,
+				).Insert(builder).Return()
+
+			// TODO: reuse the slice.
+			args := []ssa.Value{c.execCtxPtrValue, tableIndexVal, num, r}
+			callGrowRet := builder.
+				AllocateInstruction().
+				AsCallIndirect(tableGrowPtr, &c.tableGrowSig, args).
+				Insert(builder).Return()
+			state.push(callGrowRet)
+
 		default:
 			panic("Unknown MiscOp " + strconv.Itoa(int(miscOpUint)))
 		}
@@ -831,7 +877,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 		c.storeCallerModuleContext()
 
 		pages := state.pop()
-		loadPtr := builder.AllocateInstruction().
+		memoryGrowPtr := builder.AllocateInstruction().
 			AsLoad(c.execCtxPtrValue,
 				wazevoapi.ExecutionContextOffsetMemoryGrowTrampolineAddress.U32(),
 				ssa.TypeI64,
@@ -842,7 +888,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 
 		callGrowRet := builder.
 			AllocateInstruction().
-			AsCallIndirect(loadPtr, &c.memoryGrowSig, args).
+			AsCallIndirect(memoryGrowPtr, &c.memoryGrowSig, args).
 			Insert(builder).Return()
 		state.push(callGrowRet)
 
