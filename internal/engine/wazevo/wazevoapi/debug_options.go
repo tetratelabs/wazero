@@ -76,9 +76,10 @@ const (
 
 type (
 	verifierState struct {
-		randomizedIndexes []int
-		r                 *rand.Rand
-		values            map[string]string
+		initialCompilationDone bool
+		maybeRandomizedIndexes []int
+		r                      *rand.Rand
+		values                 map[string]string
 	}
 	verifierStateContextKey struct{}
 	currentFunctionNameKey  struct{}
@@ -86,31 +87,36 @@ type (
 
 // NewDeterministicCompilationVerifierContext creates a new context with the deterministic compilation verifier used per wasm.Module.
 func NewDeterministicCompilationVerifierContext(ctx context.Context, localFunctions int) context.Context {
-	randomizedIndexes := make([]int, localFunctions)
-	for i := range randomizedIndexes {
-		randomizedIndexes[i] = i
+	maybeRandomizedIndexes := make([]int, localFunctions)
+	for i := range maybeRandomizedIndexes {
+		maybeRandomizedIndexes[i] = i
 	}
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	return context.WithValue(ctx, verifierStateContextKey{}, &verifierState{
-		r: r, randomizedIndexes: randomizedIndexes, values: map[string]string{},
+		r: r, maybeRandomizedIndexes: maybeRandomizedIndexes, values: map[string]string{},
 	})
 }
 
 // DeterministicCompilationVerifierRandomizeIndexes randomizes the indexes for the deterministic compilation verifier.
 // To get the randomized index, use DeterministicCompilationVerifierGetRandomizedLocalFunctionIndex.
 func DeterministicCompilationVerifierRandomizeIndexes(ctx context.Context) {
-	verifierCtx := ctx.Value(verifierStateContextKey{}).(*verifierState)
-	r := verifierCtx.r
-	r.Shuffle(len(verifierCtx.randomizedIndexes), func(i, j int) {
-		verifierCtx.randomizedIndexes[i], verifierCtx.randomizedIndexes[j] = verifierCtx.randomizedIndexes[j], verifierCtx.randomizedIndexes[i]
+	state := ctx.Value(verifierStateContextKey{}).(*verifierState)
+	if !state.initialCompilationDone {
+		// If this is the first attempt, we use the index as-is order.
+		state.initialCompilationDone = true
+		return
+	}
+	r := state.r
+	r.Shuffle(len(state.maybeRandomizedIndexes), func(i, j int) {
+		state.maybeRandomizedIndexes[i], state.maybeRandomizedIndexes[j] = state.maybeRandomizedIndexes[j], state.maybeRandomizedIndexes[i]
 	})
 }
 
 // DeterministicCompilationVerifierGetRandomizedLocalFunctionIndex returns the randomized index for the given `index`
 // which is assigned by DeterministicCompilationVerifierRandomizeIndexes.
 func DeterministicCompilationVerifierGetRandomizedLocalFunctionIndex(ctx context.Context, index int) int {
-	verifierCtx := ctx.Value(verifierStateContextKey{}).(*verifierState)
-	ret := verifierCtx.randomizedIndexes[index]
+	state := ctx.Value(verifierStateContextKey{}).(*verifierState)
+	ret := state.maybeRandomizedIndexes[index]
 	return ret
 }
 

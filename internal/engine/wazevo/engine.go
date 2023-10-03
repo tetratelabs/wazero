@@ -269,7 +269,6 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 			return nil, err
 		}
 	}
-	e.compiledModules[module.ID] = cm
 	cm.sharedFunctions = e.sharedFunctions
 	e.setFinalizer(cm, compiledModuleFinalizer)
 	return cm, nil
