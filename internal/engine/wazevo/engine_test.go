@@ -17,18 +17,17 @@ func Test_sharedFunctionsFinalizer(t *testing.T) {
 
 	b1, err := platform.MmapCodeSegment(100)
 	require.NoError(t, err)
-
 	b2, err := platform.MmapCodeSegment(100)
 	require.NoError(t, err)
-
 	b3, err := platform.MmapCodeSegment(100)
 	require.NoError(t, err)
-
 	b4, err := platform.MmapCodeSegment(100)
 	require.NoError(t, err)
 	b5, err := platform.MmapCodeSegment(100)
 	require.NoError(t, err)
 	b6, err := platform.MmapCodeSegment(100)
+	require.NoError(t, err)
+	b7, err := platform.MmapCodeSegment(100)
 	require.NoError(t, err)
 
 	preabmles := map[*wasm.FunctionType][]byte{
@@ -40,6 +39,7 @@ func Test_sharedFunctionsFinalizer(t *testing.T) {
 	sf.stackGrowExecutable = b2
 	sf.checkModuleExitCode = b3
 	sf.tableGrowExecutable = b6
+	sf.refFuncExecutable = b7
 	sf.entryPreambles = preabmles
 
 	sharedFunctionsFinalizer(sf)
@@ -48,6 +48,7 @@ func Test_sharedFunctionsFinalizer(t *testing.T) {
 	require.Nil(t, sf.checkModuleExitCode)
 	require.Nil(t, sf.tableGrowExecutable)
 	require.Nil(t, sf.entryPreambles)
+	require.Nil(t, sf.refFuncExecutable)
 }
 
 func Test_compiledModuleFinalizer(t *testing.T) {

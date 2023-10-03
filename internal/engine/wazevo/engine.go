@@ -54,7 +54,9 @@ type (
 		// stackGrowExecutable is a compiled executable for growing stack builtin function.
 		stackGrowExecutable []byte
 		// tableGrowExecutable is a compiled trampoline executable for table.grow builtin function.
-		tableGrowExecutable       []byte
+		tableGrowExecutable []byte
+		// refFuncExecutable is a compiled trampoline executable for ref.func builtin function.
+		refFuncExecutable         []byte
 		entryPreambles            map[*wasm.FunctionType][]byte
 		listenerBeforeTrampolines map[*wasm.FunctionType][]byte
 		listenerAfterTrampolines  map[*wasm.FunctionType][]byte
@@ -561,7 +563,14 @@ func (e *engine) compileSharedFunctions() {
 		e.sharedFunctions.checkModuleExitCode = mmapExecutable(src)
 	}
 
-	// TODO: table grow, etc.
+	e.be.Init()
+	{
+		src := e.machine.CompileGoFunctionTrampoline(wazevoapi.ExitCodeRefFunc, &ssa.Signature{
+			Params:  []ssa.Type{ssa.TypeI64 /* exec context */, ssa.TypeI32 /* function index */},
+			Results: []ssa.Type{ssa.TypeI64}, // returns the function reference.
+		}, false)
+		e.sharedFunctions.refFuncExecutable = mmapExecutable(src)
+	}
 
 	e.be.Init()
 	{
@@ -585,6 +594,9 @@ func sharedFunctionsFinalizer(sf *sharedFunctions) {
 	if err := platform.MunmapCodeSegment(sf.tableGrowExecutable); err != nil {
 		panic(err)
 	}
+	if err := platform.MunmapCodeSegment(sf.refFuncExecutable); err != nil {
+		panic(err)
+	}
 	for _, f := range sf.entryPreambles {
 		if err := platform.MunmapCodeSegment(f); err != nil {
 			panic(err)
@@ -605,6 +617,7 @@ func sharedFunctionsFinalizer(sf *sharedFunctions) {
 	sf.checkModuleExitCode = nil
 	sf.stackGrowExecutable = nil
 	sf.tableGrowExecutable = nil
+	sf.refFuncExecutable = nil
 	sf.entryPreambles = nil
 	sf.listenerBeforeTrampolines = nil
 	sf.listenerAfterTrampolines = nil

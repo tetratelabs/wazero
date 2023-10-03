@@ -2448,6 +2448,30 @@ func (c *Compiler) lowerCurrentOpcode() {
 		default:
 			panic("TODO: unsupported vector instruction: " + wasm.VectorInstructionName(vecOp))
 		}
+	case wasm.OpcodeRefFunc:
+		funcIndex := c.readI32u()
+		if state.unreachable {
+			break
+		}
+
+		c.storeCallerModuleContext()
+
+		funcIndexVal := builder.AllocateInstruction().AsIconst32(funcIndex).Insert(builder).Return()
+
+		refFuncPtr := builder.AllocateInstruction().
+			AsLoad(c.execCtxPtrValue,
+				wazevoapi.ExecutionContextOffsetRefFuncTrampolineAddress.U32(),
+				ssa.TypeI64,
+			).Insert(builder).Return()
+
+		// TODO: reuse the slice.
+		args := []ssa.Value{c.execCtxPtrValue, funcIndexVal}
+		refFuncRet := builder.
+			AllocateInstruction().
+			AsCallIndirect(refFuncPtr, &c.refFuncSig, args).
+			Insert(builder).Return()
+		state.push(refFuncRet)
+
 	case wasm.OpcodeRefNull:
 		c.loweringState.pc++ // skips the reference type as we treat both of them as i64(0).
 		if state.unreachable {
