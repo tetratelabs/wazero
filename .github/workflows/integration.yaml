@@ -20,7 +20,7 @@ defaults:
 env:  # Update this prior to requiring a higher minor version in go.mod
   GO_VERSION: "1.21"  # 1.xx == latest patch of 1.xx
   TINYGO_VERSION: "0.30.0"
-  ZIG_VERSION: "0.11.0-dev.3334+cd1417dbd"
+  ZIG_VERSION: "0.11.0"
 
 concurrency:
   # https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#example-using-concurrency-to-cancel-any-in-progress-job-or-run
@@ -46,7 +46,7 @@ jobs:
         with:
           # Use share the cache containing archives across OSes.
           enableCrossOsArchive: true
-          key: zig-test-binary-${{ env.ZIG_VERSION }}
+          key: zig-stdlib-test-binary-${{ env.ZIG_VERSION }}
           path:
             ./zigbin/
 
@@ -54,13 +54,13 @@ jobs:
         if: steps.binary-cache.outputs.cache-hit != 'true'
         run: |
           mkdir -p ${{ env.ZIG_INSTALL }}
-          curl -sSL https://ziglang.org/builds/zig-linux-x86_64-${{ env.ZIG_VERSION }}.tar.xz | tar -xJ --strip-components=1 -C ${{ env.ZIG_INSTALL }}
+          curl -sSL https://ziglang.org/download/${{ env.ZIG_VERSION }}/zig-linux-x86_64-${{ env.ZIG_VERSION }}.tar.xz | tar -xJ --strip-components=1 -C ${{ env.ZIG_INSTALL }}
 
       - name: Download Zig source code
         if: steps.binary-cache.outputs.cache-hit != 'true'
         run: |
           mkdir -p ${{ env.ZIG_SOURCE }}
-          curl -sSL https://ziglang.org/builds/zig-${{ env.ZIG_VERSION }}.tar.xz | tar -xJ --strip-components=1 -C ${{ env.ZIG_SOURCE }}
+          curl -sSL https://ziglang.org/download/${{ env.ZIG_VERSION }}/zig-${{ env.ZIG_VERSION }}.tar.xz | tar -xJ --strip-components=1 -C ${{ env.ZIG_SOURCE }}
 
       - name: Build Stdlib test binary
         if: steps.binary-cache.outputs.cache-hit != 'true'
@@ -93,7 +93,7 @@ jobs:
           enableCrossOsArchive: true
           # We need this cache to run tests.
           fail-on-cache-miss: true
-          key: zig-test-binary-${{ env.ZIG_VERSION }}
+          key: zig-stdlib-test-binary-${{ env.ZIG_VERSION }}
           path:
             ./zigbin/
 

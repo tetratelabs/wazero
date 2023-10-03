@@ -18,7 +18,7 @@ on:
 env:
   EMSDK_VERSION: "3.1.40"
   TINYGO_VERSION: "0.30.0"
-  ZIG_VERSION: "0.11.0-dev.3334+cd1417dbd"
+  ZIG_VERSION: "0.11.0"
 
 concurrency:
   # https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#example-using-concurrency-to-cancel-any-in-progress-job-or-run
@@ -55,7 +55,7 @@ jobs:
       - name: Install Zig
         run: |
           sudo apt install xz-utils
-          sudo sh -c 'wget -c https://ziglang.org/builds/zig-linux-x86_64-${{ env.ZIG_VERSION }}.tar.xz -O - | tar -xJ --strip-components=1 -C /usr/local/bin'
+          sudo sh -c 'wget -c https://ziglang.org/download/${{ env.ZIG_VERSION }}/zig-linux-x86_64-${{ env.ZIG_VERSION }}.tar.xz -O - | tar -xJ --strip-components=1 -C /usr/local/bin'
 
       - name: Cache Emscripten
         id: cache-emsdk
