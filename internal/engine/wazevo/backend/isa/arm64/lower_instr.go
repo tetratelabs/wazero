@@ -633,7 +633,12 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		m.insert(tbl1)
 
 	case ssa.OpcodeShuffle:
-		m.lowerShuffle(instr)
+		x, y, lane1, lane2 := instr.ShuffleData()
+		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+		rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
+		rd := operandNR(m.compiler.VRegOf(instr.Return()))
+
+		m.lowerShuffle(rd, rn, rm, lane1, lane2)
 
 	case ssa.OpcodeSplat:
 		x, lane := instr.ArgWithLane()
@@ -663,12 +668,7 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 	m.FlushPendingInstructions()
 }
 
-func (m *machine) lowerShuffle(instr *ssa.Instruction) {
-	x, y, lane1, lane2 := instr.ShuffleData()
-	rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
-	rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
-	rd := operandNR(m.compiler.VRegOf(instr.Return()))
-
+func (m *machine) lowerShuffle(rd, rn, rm operand, lane1, lane2 uint64) {
 	// `tbl2` requires 2 consecutive registers, so we arbitrarily pick v29, v30.
 	vReg, wReg := v29VReg, v30VReg
 

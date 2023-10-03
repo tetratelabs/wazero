@@ -104,11 +104,11 @@ func TestInstruction_encode(t *testing.T) {
 		{want: "4100034e", setup: func(i *instruction) {
 			i.asVecTbl(1, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
 		}},
-		{want: "4120030e", setup: func(i *instruction) {
-			i.asVecTbl(2, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
+		{want: "4120040e", setup: func(i *instruction) {
+			i.asVecTbl(2, operandNR(v1VReg), operandNR(v2VReg), operandNR(v4VReg), vecArrangement8B)
 		}},
-		{want: "4120034e", setup: func(i *instruction) {
-			i.asVecTbl(2, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
+		{want: "4120044e", setup: func(i *instruction) {
+			i.asVecTbl(2, operandNR(v1VReg), operandNR(v2VReg), operandNR(v4VReg), vecArrangement16B)
 		}},
 		{want: "4138030e", setup: func(i *instruction) {
 			i.asVecPermute(vecOpZip1, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)

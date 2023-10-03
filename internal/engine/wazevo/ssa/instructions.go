@@ -339,8 +339,9 @@ const (
 	// and y when 0: `v = bitselect c, x, y`.
 	OpcodeVbitselect
 
-	// OpcodeShuffle ...
-	// `v = shuffle a, b, mask`.
+	// OpcodeShuffle shuffles two vectors using the given 128-bit immediate: `v = shuffle imm, x, y`.
+	// For each byte in the immediate, a value i in [0, 15] selects the i-th byte in vector x;
+	// i in [16, 31] selects the (i-16)-th byte in vector y.
 	OpcodeShuffle
 
 	// OpcodeSelect chooses between two values based on a condition `c`: `v = Select c, x, y`.
@@ -2630,8 +2631,8 @@ func (i *Instruction) Format(b Builder) string {
 		for idx := 0; idx < 8; idx++ {
 			lanes[idx] = byte(i.u1 >> (8 * idx))
 		}
-		for idx := 8; idx < 16; idx++ {
-			lanes[idx] = byte(i.u2 >> (8 * idx))
+		for idx := 0; idx < 8; idx++ {
+			lanes[idx+8] = byte(i.u2 >> (8 * idx))
 		}
 		// Prints Shuffle.[0 1 2 3 4 5 6 7 ...] v2, v3
 		instSuffix = fmt.Sprintf(".%v %s, %s", lanes, i.v.Format(b), i.v2.Format(b))

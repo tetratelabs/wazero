@@ -1532,6 +1532,21 @@ var (
 			}}},
 		},
 	}
+
+	VecShuffle = TestCase{
+		Name: "shuffle",
+		Module: &wasm.Module{
+			TypeSection:     []wasm.FunctionType{{Params: []wasm.ValueType{v128, v128}, Results: []wasm.ValueType{v128}}},
+			ExportSection:   []wasm.Export{{Name: ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 0}},
+			FunctionSection: []wasm.Index{0},
+			CodeSection: []wasm.Code{{Body: []byte{
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeVecPrefix, wasm.OpcodeVecV128i8x16Shuffle, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+				wasm.OpcodeEnd,
+			}}},
+		},
+	}
 )
 
 type TestCase struct {

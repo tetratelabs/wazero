@@ -726,6 +726,55 @@ add w15, w15, w1?, lsl #1
 	}
 }
 
+func TestMachine_lowerShuffle(t *testing.T) {
+	for _, tc := range []struct {
+		name          string
+		lanes         []uint64
+		expectedAsm   string
+		expectedBytes string
+	}{
+		{
+			name:  "lanes 0..15",
+			lanes: []uint64{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
+			expectedAsm: `
+mov v29.16b, x2.16b
+mov v30.16b, x15.16b
+ldr q1?, #8; b 32; data.v128  0706050403020100 0f0e0d0c0b0a0908
+tbl x1.16b, { v29.16b, v30.16b }, v1?.16b
+`,
+			expectedBytes: "5d1ca24efe1daf4e4000009c05000014000102030405060708090a0b0c0d0e0fa123004e",
+		},
+		{
+			name:  "lanes 0101...",
+			lanes: []uint64{0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1},
+			expectedAsm: `
+mov v29.16b, x2.16b
+mov v30.16b, x15.16b
+ldr q1?, #8; b 32; data.v128  0100010001000100 0100010001000100
+tbl x1.16b, { v29.16b, v30.16b }, v1?.16b
+`,
+			expectedBytes: "5d1ca24efe1daf4e4000009c0500001400010001000100010001000100010001a123004e",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, _, m := newSetupWithMockContext()
+			lanes := tc.lanes
+
+			// Encode the 16 bytes as 8 bytes in u1, and 8 bytes in u2.
+			lane1 := lanes[7]<<56 | lanes[6]<<48 | lanes[5]<<40 | lanes[4]<<32 | lanes[3]<<24 | lanes[2]<<16 | lanes[1]<<8 | lanes[0]
+			lane2 := lanes[15]<<56 | lanes[14]<<48 | lanes[13]<<40 | lanes[12]<<32 | lanes[11]<<24 | lanes[10]<<16 | lanes[9]<<8 | lanes[8]
+
+			m.lowerShuffle(operandNR(x1VReg), operandNR(x2VReg), operandNR(x15VReg), lane1, lane2)
+			require.Equal(t, tc.expectedAsm, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
+
+			m.FlushPendingInstructions()
+			m.encode(m.perBlockHead)
+			buf := m.compiler.Buf()
+			require.Equal(t, tc.expectedBytes, hex.EncodeToString(buf))
+		})
+	}
+}
+
 func TestMachine_lowerVShift(t *testing.T) {
 	for _, tc := range []struct {
 		name          string

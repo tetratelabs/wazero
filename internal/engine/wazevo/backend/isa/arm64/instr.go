@@ -875,9 +875,9 @@ func (i *instruction) asVecTbl(nregs byte, rd, rn, rm operand, arr vecArrangemen
 		i.kind = vecTbl
 	case 2:
 		i.kind = vecTbl2
-		//if !rn.reg().IsRealReg() {
-		//	panic("rn is not a RealReg")
-		//}
+		if !rn.reg().IsRealReg() {
+			panic("rn is not a RealReg")
+		}
 	default:
 		panic(fmt.Sprintf("unsupported number of registers %d", nregs))
 	}

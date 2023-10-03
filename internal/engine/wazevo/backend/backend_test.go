@@ -2049,6 +2049,22 @@ L9 (SSA Block: blk6):
 	ret
 `,
 		},
+		{
+			name: "VecShuffle",
+			m:    testcases.VecShuffle.Module,
+			afterFinalizeARM64: `
+L1 (SSA Block: blk0):
+	stp x30, xzr, [sp, #-0x10]!
+	str xzr, [sp, #-0x10]!
+	mov v29.16b, v0.16b
+	mov v30.16b, v1.16b
+	ldr q8, #8; b 32; data.v128  0706050403020100 0f0e0d0c0b0a0908
+	tbl v0.16b, { v29.16b, v30.16b }, v8.16b
+	add sp, sp, #0x10
+	ldr x30, [sp], #0x10
+	ret
+`,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ssab := ssa.NewBuilder()
