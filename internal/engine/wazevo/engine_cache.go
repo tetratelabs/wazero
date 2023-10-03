@@ -2,18 +2,32 @@ package wazevo
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
 	"io"
 	"runtime"
+	"unsafe"
 
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
+	"github.com/tetratelabs/wazero/internal/filecache"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/u32"
 	"github.com/tetratelabs/wazero/internal/u64"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
+
+// fileCacheKey returns a key for the file cache.
+// In order to avoid collisions with the existing compiler, we do not use m.ID directly,
+// but instead we rehash it with magic.
+func fileCacheKey(m *wasm.Module) (ret filecache.Key) {
+	s := sha256.New()
+	s.Write(m.ID[:])
+	s.Write(magic)
+	s.Sum(ret[:0])
+	return
+}
 
 func (e *engine) addCompiledModule(module *wasm.Module, cm *compiledModule) (err error) {
 	e.addCompiledModuleToMemory(module, cm)
@@ -75,7 +89,7 @@ func (e *engine) addCompiledModuleToCache(module *wasm.Module, cm *compiledModul
 	if e.fileCache == nil || module.IsHostModule {
 		return
 	}
-	err = e.fileCache.Add(module.ID, serializeCompiledModule(e.wazeroVersion, cm))
+	err = e.fileCache.Add(fileCacheKey(module), serializeCompiledModule(e.wazeroVersion, cm))
 	return
 }
 
@@ -86,7 +100,7 @@ func (e *engine) getCompiledModuleFromCache(module *wasm.Module) (cm *compiledMo
 
 	// Check if the entries exist in the external cache.
 	var cached io.ReadCloser
-	cached, hit, err = e.fileCache.Get(module.ID)
+	cached, hit, err = e.fileCache.Get(fileCacheKey(module))
 	if !hit || err != nil {
 		return
 	}
@@ -100,17 +114,17 @@ func (e *engine) getCompiledModuleFromCache(module *wasm.Module) (cm *compiledMo
 		hit = false
 		return
 	} else if staleCache {
-		return nil, false, e.fileCache.Delete(module.ID)
+		return nil, false, e.fileCache.Delete(fileCacheKey(module))
 	}
 	return
 }
 
-const magic = "WAZEVO"
+var magic = []byte{'W', 'A', 'Z', 'E', 'V', 'O'}
 
 func serializeCompiledModule(wazeroVersion string, cm *compiledModule) io.Reader {
 	buf := bytes.NewBuffer(nil)
 	// First 6 byte: WAZEVO header.
-	buf.WriteString(magic)
+	buf.Write(magic)
 	// Next 1 byte: length of version:
 	buf.WriteByte(byte(len(wazeroVersion)))
 	// Version of wazero.
@@ -125,6 +139,19 @@ func serializeCompiledModule(wazeroVersion string, cm *compiledModule) io.Reader
 	buf.Write(u64.LeBytes(uint64(len(cm.executable))))
 	// Append the native code.
 	buf.Write(cm.executable)
+	if sm := cm.sourceMap; len(sm.executableOffsets) > 0 {
+		buf.WriteByte(1) // indicates that source map is present.
+		l := len(sm.wasmBinaryOffsets)
+		buf.Write(u64.LeBytes(uint64(l)))
+		executableAddr := uintptr(unsafe.Pointer(&cm.executable[0]))
+		for i := 0; i < l; i++ {
+			buf.Write(u64.LeBytes(sm.wasmBinaryOffsets[i]))
+			// executableOffsets is absolute address, so we need to subtract executableAddr.
+			buf.Write(u64.LeBytes(uint64(sm.executableOffsets[i] - executableAddr)))
+		}
+	} else {
+		buf.WriteByte(0) // indicates that source map is not present.
+	}
 	return bytes.NewReader(buf.Bytes())
 }
 
@@ -143,11 +170,9 @@ func deserializeCompiledModule(wazeroVersion string, reader io.ReadCloser) (cm *
 		return nil, false, fmt.Errorf("compilationcache: invalid header length: %d", n)
 	}
 
-	for i := 0; i < len(magic); i++ {
-		if magic[i] != header[i] {
-			return nil, false, fmt.Errorf(
-				"compilationcache: invalid magic number: got %s but want %s", magic, header[:len(magic)])
-		}
+	if !bytes.Equal(header[:len(magic)], magic) {
+		return nil, false, fmt.Errorf(
+			"compilationcache: invalid magic number: got %s but want %s", magic, header[:len(magic)])
 	}
 
 	// Check the version compatibility.
@@ -202,6 +227,35 @@ func deserializeCompiledModule(wazeroVersion string, reader io.ReadCloser) (cm *
 			}
 		}
 		cm.executable = executable
+	}
+
+	if _, err := io.ReadFull(reader, eightBytes[:1]); err != nil {
+		return nil, false, fmt.Errorf("compilationcache: error reading source map presence: %v", err)
+	}
+
+	if eightBytes[0] == 1 {
+		sm := &cm.sourceMap
+		sourceMapLen, err := readUint64(reader, &eightBytes)
+		if err != nil {
+			err = fmt.Errorf("compilationcache: error reading source map length: %v", err)
+			return nil, false, err
+		}
+		executableOffset := uintptr(unsafe.Pointer(&cm.executable[0]))
+		for i := uint64(0); i < sourceMapLen; i++ {
+			wasmBinaryOffset, err := readUint64(reader, &eightBytes)
+			if err != nil {
+				err = fmt.Errorf("compilationcache: error reading source map[%d] wasm binary offset: %v", i, err)
+				return nil, false, err
+			}
+			executableRelativeOffset, err := readUint64(reader, &eightBytes)
+			if err != nil {
+				err = fmt.Errorf("compilationcache: error reading source map[%d] executable offset: %v", i, err)
+				return nil, false, err
+			}
+			sm.wasmBinaryOffsets = append(sm.wasmBinaryOffsets, wasmBinaryOffset)
+			// executableOffsets is absolute address, so we need to add executableOffset.
+			sm.executableOffsets = append(sm.executableOffsets, uintptr(executableRelativeOffset)+executableOffset)
+		}
 	}
 	return
 }
