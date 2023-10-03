@@ -2,12 +2,14 @@ package wazevo
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"io"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/u32"
 	"github.com/tetratelabs/wazero/internal/u64"
+	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 var testVersion = "0.0.1"
@@ -23,13 +25,14 @@ func TestSerializeCompiledModule(t *testing.T) {
 				functionOffsets: []int{0},
 			},
 			exp: concat(
-				[]byte(magic),
+				magic,
 				[]byte{byte(len(testVersion))},
 				[]byte(testVersion),
 				u32.LeBytes(1),        // number of functions.
 				u64.LeBytes(0),        // offset.
 				u64.LeBytes(5),        // length of code.
 				[]byte{1, 2, 3, 4, 5}, // code.
+				[]byte{0},             // no source map.
 			),
 		},
 		{
@@ -38,13 +41,14 @@ func TestSerializeCompiledModule(t *testing.T) {
 				functionOffsets: []int{0},
 			},
 			exp: concat(
-				[]byte(magic),
+				magic,
 				[]byte{byte(len(testVersion))},
 				[]byte(testVersion),
 				u32.LeBytes(1),        // number of functions.
 				u64.LeBytes(0),        // offset.
 				u64.LeBytes(5),        // length of code.
 				[]byte{1, 2, 3, 4, 5}, // code.
+				[]byte{0},             // no source map.
 			),
 		},
 		{
@@ -53,7 +57,7 @@ func TestSerializeCompiledModule(t *testing.T) {
 				functionOffsets: []int{0, 5},
 			},
 			exp: concat(
-				[]byte(magic),
+				magic,
 				[]byte{byte(len(testVersion))},
 				[]byte(testVersion),
 				u32.LeBytes(2), // number of functions.
@@ -64,6 +68,7 @@ func TestSerializeCompiledModule(t *testing.T) {
 				// Executable.
 				u64.LeBytes(8),                 // length of code.
 				[]byte{1, 2, 3, 4, 5, 1, 2, 3}, // code.
+				[]byte{0},                      // no source map.
 			),
 		},
 	}
@@ -97,9 +102,19 @@ func TestDeserializeCompiledModule(t *testing.T) {
 			expErr: "compilationcache: invalid header length: 1",
 		},
 		{
+			name: "invalid magic",
+			in: concat(
+				[]byte{'a', 'b', 'c', 'd', 'e', 'f'},
+				[]byte{byte(len(testVersion))},
+				[]byte(testVersion),
+				u32.LeBytes(1), // number of functions.
+			),
+			expErr: "compilationcache: invalid magic number: got WAZEVO but want abcdef",
+		},
+		{
 			name: "version mismatch",
 			in: concat(
-				[]byte(magic),
+				magic,
 				[]byte{byte(len("1233123.1.1"))},
 				[]byte("1233123.1.1"),
 				u32.LeBytes(1), // number of functions.
@@ -109,7 +124,7 @@ func TestDeserializeCompiledModule(t *testing.T) {
 		{
 			name: "version mismatch",
 			in: concat(
-				[]byte(magic),
+				magic,
 				[]byte{byte(len("0.0.0"))},
 				[]byte("0.0.0"),
 				u32.LeBytes(1), // number of functions.
@@ -119,7 +134,7 @@ func TestDeserializeCompiledModule(t *testing.T) {
 		{
 			name: "one function",
 			in: concat(
-				[]byte(magic),
+				magic,
 				[]byte{byte(len(testVersion))},
 				[]byte(testVersion),
 				u32.LeBytes(1), // number of functions.
@@ -127,6 +142,7 @@ func TestDeserializeCompiledModule(t *testing.T) {
 				// Executable.
 				u64.LeBytes(5),        // size.
 				[]byte{1, 2, 3, 4, 5}, // machine code.
+				[]byte{0},             // no source map.
 			),
 			expCompiledModule: &compiledModule{
 				executable:      []byte{1, 2, 3, 4, 5},
@@ -138,7 +154,7 @@ func TestDeserializeCompiledModule(t *testing.T) {
 		{
 			name: "two functions",
 			in: concat(
-				[]byte(magic),
+				magic,
 				[]byte{byte(len(testVersion))},
 				[]byte(testVersion),
 				u32.LeBytes(2), // number of functions.
@@ -149,6 +165,7 @@ func TestDeserializeCompiledModule(t *testing.T) {
 				// Executable.
 				u64.LeBytes(10),                       // size.
 				[]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, // machine code.
+				[]byte{0},                             // no source map.
 			),
 			importedFunctionCount: 1,
 			expCompiledModule: &compiledModule{
@@ -188,6 +205,25 @@ func TestDeserializeCompiledModule(t *testing.T) {
 			),
 			expErr: "compilationcache: error reading executable (len=5): EOF",
 		},
+		{
+			name: "no source map presence",
+			in: concat(
+				magic,
+				[]byte{byte(len(testVersion))},
+				[]byte(testVersion),
+				u32.LeBytes(1), // number of functions.
+				u64.LeBytes(0), // offset.
+				// Executable.
+				u64.LeBytes(5),        // size.
+				[]byte{1, 2, 3, 4, 5}, // machine code.
+			),
+			expCompiledModule: &compiledModule{
+				executable:      []byte{1, 2, 3, 4, 5},
+				functionOffsets: []int{0},
+			},
+			expStaleCache: false,
+			expErr:        "compilationcache: error reading source map presence: EOF",
+		},
 	}
 
 	for _, tc := range tests {
@@ -205,4 +241,15 @@ func TestDeserializeCompiledModule(t *testing.T) {
 			require.Equal(t, tc.expStaleCache, staleCache)
 		})
 	}
+}
+
+func Test_fileCacheKey(t *testing.T) {
+	s := sha256.New()
+	s.Write([]byte("hello world"))
+	m := &wasm.Module{}
+	s.Sum(m.ID[:0])
+	original := m.ID
+	result := fileCacheKey(m)
+	require.Equal(t, original, m.ID)
+	require.NotEqual(t, original, result)
 }

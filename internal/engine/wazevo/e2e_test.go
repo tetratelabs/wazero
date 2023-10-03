@@ -20,6 +20,7 @@ import (
 	v2 "github.com/tetratelabs/wazero/internal/integration_test/spectest/v2"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
+	"github.com/tetratelabs/wazero/internal/testing/dwarftestdata"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
@@ -1009,4 +1010,42 @@ func TestListener_long_many_consts(t *testing.T) {
 --> .$0()
 <-- (0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60)
 `, "\n"+buf.String())
+}
+
+// TestDWARF verifies that the DWARF based stack traces work as expected before/after compilation cache.
+func TestDWARF(t *testing.T) {
+	config := wazero.NewRuntimeConfigCompiler()
+	ctx := context.Background()
+
+	// Configure the new optimizing backend!
+	wazevo.ConfigureWazevo(config)
+
+	bin := dwarftestdata.ZigWasm
+
+	dir := t.TempDir()
+
+	var expErr error
+	{
+		cc, err := wazero.NewCompilationCacheWithDir(dir)
+		require.NoError(t, err)
+		rc := config.WithCompilationCache(cc)
+
+		r := wazero.NewRuntimeWithConfig(ctx, rc)
+		_, expErr = r.Instantiate(ctx, bin)
+		require.Error(t, expErr)
+
+		err = r.Close(ctx)
+		require.NoError(t, err)
+	}
+
+	cc, err := wazero.NewCompilationCacheWithDir(dir)
+	require.NoError(t, err)
+	rc := config.WithCompilationCache(cc)
+	r := wazero.NewRuntimeWithConfig(ctx, rc)
+	_, err = r.Instantiate(ctx, bin)
+	require.Error(t, err)
+	require.Equal(t, expErr.Error(), err.Error())
+
+	err = r.Close(ctx)
+	require.NoError(t, err)
 }
