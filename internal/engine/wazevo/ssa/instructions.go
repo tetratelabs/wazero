@@ -126,8 +126,12 @@ func (i *Instruction) Arg2WithLane() (Value, Value, VecLane) {
 	return i.v, i.v2, VecLane(i.u1)
 }
 
-// ShuffleData returns the first two arguments to this instruction, and two uint64 encoding 8 1-byte lane types each.
-func (i *Instruction) ShuffleData() (Value, Value, uint64, uint64) {
+// ShuffleData returns the first two arguments to this instruction and 2 uint64s `lo`, `hi`.
+//
+// Note: Each uint64 encodes a sequence of 8 bytes where each byte encodes a VecLane,
+// so that the 128bit integer `hi<<64|lo` packs a slice `[16]VecLane`,
+// where `lane[0]` is the least significant byte, and `lane[n]` is shifted to offset `n*8`.
+func (i *Instruction) ShuffleData() (v Value, v2 Value, lo uint64, hi uint64) {
 	return i.v, i.v2, i.u1, i.u2
 }
 

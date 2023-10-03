@@ -153,6 +153,7 @@ const (
 	useKindRN
 	useKindRNRM
 	useKindRNRMRA
+	useKindRNRN1RM
 	useKindRet
 	useKindCall
 	useKindCallInd
@@ -225,7 +226,7 @@ var useKinds = [numInstructionKinds]useKind{
 	vecLanes:             useKindRN,
 	vecShiftImm:          useKindRN,
 	vecTbl:               useKindRNRM,
-	vecTbl2:              useKindRNRM,
+	vecTbl2:              useKindRNRM, // FIXME use useKindRNRN1RM
 	vecRRR:               useKindRNRM,
 	vecPermute:           useKindRNRM,
 	fpuToInt:             useKindRN,
@@ -261,6 +262,16 @@ func (i *instruction) uses(regs []regalloc.VReg) []regalloc.VReg {
 		}
 		if ra := i.ra.reg(); ra.Valid() {
 			regs = append(regs, ra)
+		}
+	case useKindRNRN1RM:
+		if rn := i.rn.reg(); rn.IsRealReg() {
+			regs = append(regs, v29VReg)
+		}
+		if rn1 := i.rn.reg() + 1; rn1.IsRealReg() {
+			regs = append(regs, v30VReg)
+		}
+		if rm := i.rm.reg(); rm.Valid() {
+			regs = append(regs, rm)
 		}
 	case useKindRet:
 		regs = append(regs, i.abi.retRealRegs...)
@@ -302,6 +313,8 @@ func (i *instruction) assignUse(index int, reg regalloc.VReg) {
 		if rn := i.rn.reg(); rn.Valid() {
 			i.rn = i.rn.assignReg(reg)
 		}
+	case useKindRNRN1RM:
+		panic("todo")
 	case useKindRNRM:
 		if index == 0 {
 			if rn := i.rn.reg(); rn.Valid() {
@@ -853,6 +866,9 @@ func (i *instruction) asVecTbl(nregs byte, rd, rn, rm operand, arr vecArrangemen
 		i.kind = vecTbl
 	case 2:
 		i.kind = vecTbl2
+		if !rn.reg().IsRealReg() {
+			panic("rn is not a RealReg")
+		}
 	default:
 		panic(fmt.Sprintf("unsupported number of registers %d", nregs))
 	}
@@ -1255,8 +1271,8 @@ func (i *instruction) String() (str string) {
 		arr := vecArrangement(i.u2)
 		str = fmt.Sprintf("tbl %s, { %s, %s }, %s",
 			formatVRegVec(i.rd.nr(), arr, vecIndexNone),
-			formatVRegVec(v29VReg, vecArrangement16B, vecIndexNone),
-			formatVRegVec(v30VReg, vecArrangement16B, vecIndexNone),
+			formatVRegVec(i.rn.nr(), vecArrangement16B, vecIndexNone),
+			formatVRegVec(i.rn.nr()+1, vecArrangement16B, vecIndexNone),
 			formatVRegVec(i.rm.nr(), arr, vecIndexNone))
 	case vecPermute:
 		arr := vecArrangement(i.u2)

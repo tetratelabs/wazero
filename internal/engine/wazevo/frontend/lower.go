@@ -1376,15 +1376,11 @@ func (c *Compiler) lowerCurrentOpcode() {
 			if state.unreachable {
 				break
 			}
-
-			opcode := ssa.OpcodeStore
-			opSize := uint64(16)
-
 			value := state.pop()
 			baseAddr := state.pop()
-			addr := c.memOpSetup(baseAddr, uint64(offset), opSize)
+			addr := c.memOpSetup(baseAddr, uint64(offset), 16)
 			builder.AllocateInstruction().
-				AsStore(opcode, value, addr, offset).
+				AsStore(ssa.OpcodeStore, value, addr, offset).
 				Insert(builder)
 
 		case wasm.OpcodeVecV128Not:
@@ -2415,6 +2411,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			ret := builder.AllocateInstruction().AsVUshr(v1, v2, lane).Insert(builder).Return()
 			state.push(ret)
 		case wasm.OpcodeVecI8x16ExtractLaneS, wasm.OpcodeVecI16x8ExtractLaneS:
+			state.pc++ // Skip the immediate value.
 			if state.unreachable {
 				break
 			}
@@ -2426,13 +2423,13 @@ func (c *Compiler) lowerCurrentOpcode() {
 				lane = ssa.VecLaneI16x8
 			}
 			v1 := state.pop()
-			state.pc++
 			index := c.wasmFunctionBody[state.pc]
 			ext := builder.AllocateInstruction().AsExtractlane(v1, index, lane, true).Insert(builder).Return()
 			state.push(ext)
 		case wasm.OpcodeVecI8x16ExtractLaneU, wasm.OpcodeVecI16x8ExtractLaneU,
 			wasm.OpcodeVecI32x4ExtractLane, wasm.OpcodeVecI64x2ExtractLane,
 			wasm.OpcodeVecF32x4ExtractLane, wasm.OpcodeVecF64x2ExtractLane:
+			state.pc++ // Skip the immediate value.
 			if state.unreachable {
 				break
 			}
@@ -2452,13 +2449,13 @@ func (c *Compiler) lowerCurrentOpcode() {
 				lane = ssa.VecLaneF64x2
 			}
 			v1 := state.pop()
-			state.pc++
 			index := c.wasmFunctionBody[state.pc]
 			ext := builder.AllocateInstruction().AsExtractlane(v1, index, lane, false).Insert(builder).Return()
 			state.push(ext)
 		case wasm.OpcodeVecI8x16ReplaceLane, wasm.OpcodeVecI16x8ReplaceLane,
 			wasm.OpcodeVecI32x4ReplaceLane, wasm.OpcodeVecI64x2ReplaceLane,
 			wasm.OpcodeVecF32x4ReplaceLane, wasm.OpcodeVecF64x2ReplaceLane:
+			state.pc++ // Skip the immediate value.
 			if state.unreachable {
 				break
 			}
@@ -2479,22 +2476,22 @@ func (c *Compiler) lowerCurrentOpcode() {
 			}
 			v2 := state.pop()
 			v1 := state.pop()
-			state.pc++
 			index := c.wasmFunctionBody[state.pc]
 			ret := builder.AllocateInstruction().AsInsertlane(v1, v2, index, lane).Insert(builder).Return()
 			state.push(ret)
 		case wasm.OpcodeVecV128i8x16Shuffle:
-			if state.unreachable {
-				break
-			}
-			v2 := state.pop()
-			v1 := state.pop()
+			// Skip the immediate values.
 			state.pc++
 			lanes := make([]uint64, 16)
 			for i := 0; i < 16; i++ {
 				lanes[i] = uint64(c.wasmFunctionBody[state.pc+i])
 			}
 			state.pc += 15
+			if state.unreachable {
+				break
+			}
+			v2 := state.pop()
+			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsShuffle(v1, v2, lanes).Insert(builder).Return()
 			state.push(ret)
 
