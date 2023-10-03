@@ -2402,6 +2402,13 @@ func (c *Compiler) lowerCurrentOpcode() {
 		default:
 			panic("TODO: unsupported vector instruction: " + wasm.VectorInstructionName(vecOp))
 		}
+	case wasm.OpcodeRefNull:
+		c.loweringState.pc++ // skips the reference type as we treat both of them as i64(0).
+		if state.unreachable {
+			break
+		}
+		ret := builder.AllocateInstruction().AsIconst64(0).Insert(builder).Return()
+		state.push(ret)
 	default:
 		panic("TODO: unsupported in wazevo yet: " + wasm.InstructionName(op))
 	}
