@@ -2409,6 +2409,37 @@ func (c *Compiler) lowerCurrentOpcode() {
 		}
 		ret := builder.AllocateInstruction().AsIconst64(0).Insert(builder).Return()
 		state.push(ret)
+	case wasm.OpcodeRefIsNull:
+		if state.unreachable {
+			break
+		}
+		r := state.pop()
+		zero := builder.AllocateInstruction().AsIconst64(0).Insert(builder)
+		icmp := builder.AllocateInstruction().
+			AsIcmp(r, zero.Return(), ssa.IntegerCmpCondEqual).
+			Insert(builder).
+			Return()
+		state.push(icmp)
+	case wasm.OpcodeTableSet:
+		tableIndex := c.readI32u()
+		if state.unreachable {
+			break
+		}
+		r := state.pop()
+		targetOffsetInTable := state.pop()
+
+		elementAddr := c.lowerAccessTableWithBoundsCheck(tableIndex, targetOffsetInTable)
+		builder.AllocateInstruction().AsStore(ssa.OpcodeStore, r, elementAddr, 0).Insert(builder)
+
+	case wasm.OpcodeTableGet:
+		tableIndex := c.readI32u()
+		if state.unreachable {
+			break
+		}
+		targetOffsetInTable := state.pop()
+		elementAddr := c.lowerAccessTableWithBoundsCheck(tableIndex, targetOffsetInTable)
+		loaded := builder.AllocateInstruction().AsLoad(elementAddr, 0, ssa.TypeI64).Insert(builder).Return()
+		state.push(loaded)
 	default:
 		panic("TODO: unsupported in wazevo yet: " + wasm.InstructionName(op))
 	}
@@ -2427,16 +2458,12 @@ const (
 	tableInstanceLenOffset         = tableInstanceBaseAddressOffset + 8
 )
 
-func (c *Compiler) lowerCallIndirect(typeIndex, tableIndex uint32) {
+func (c *Compiler) lowerAccessTableWithBoundsCheck(tableIndex uint32, elementOffsetInTable ssa.Value) (elementAddress ssa.Value) {
 	builder := c.ssaBuilder
-	state := c.state()
-
-	targetOffsetInTable := state.pop()
 
 	// Load the table.
-	tableOffset := c.offset.TableOffset(int(tableIndex))
 	loadTableInstancePtr := builder.AllocateInstruction()
-	loadTableInstancePtr.AsLoad(c.moduleCtxPtrValue, tableOffset.U32(), ssa.TypeI64)
+	loadTableInstancePtr.AsLoad(c.moduleCtxPtrValue, c.offset.TableOffset(int(tableIndex)).U32(), ssa.TypeI64)
 	builder.InsertInstruction(loadTableInstancePtr)
 	tableInstancePtr := loadTableInstancePtr.Return()
 
@@ -2448,7 +2475,7 @@ func (c *Compiler) lowerCallIndirect(typeIndex, tableIndex uint32) {
 
 	// Compare the length and the target, and trap if out of bounds.
 	checkOOB := builder.AllocateInstruction()
-	checkOOB.AsIcmp(targetOffsetInTable, tableLen, ssa.IntegerCmpCondUnsignedGreaterThanOrEqual)
+	checkOOB.AsIcmp(elementOffsetInTable, tableLen, ssa.IntegerCmpCondUnsignedGreaterThanOrEqual)
 	builder.InsertInstruction(checkOOB)
 	exitIfOOB := builder.AllocateInstruction()
 	exitIfOOB.AsExitIfTrueWithCode(c.execCtxPtrValue, checkOOB.Return(), wazevoapi.ExitCodeTableOutOfBounds)
@@ -2465,14 +2492,23 @@ func (c *Compiler) lowerCallIndirect(typeIndex, tableIndex uint32) {
 	three := builder.AllocateInstruction()
 	three.AsIconst64(3)
 	builder.InsertInstruction(three)
-	multiplyBy8.AsIshl(targetOffsetInTable, three.Return())
+	multiplyBy8.AsIshl(elementOffsetInTable, three.Return())
 	builder.InsertInstruction(multiplyBy8)
 	targetOffsetInTableMultipliedBy8 := multiplyBy8.Return()
+
 	// Then add the multiplied value to the base which results in the address of the target function (*wazevo.functionInstance)
-	calcFunctionInstancePtrAddressInTable := builder.AllocateInstruction()
-	calcFunctionInstancePtrAddressInTable.AsIadd(tableBase, targetOffsetInTableMultipliedBy8)
-	builder.InsertInstruction(calcFunctionInstancePtrAddressInTable)
-	functionInstancePtrAddress := calcFunctionInstancePtrAddressInTable.Return()
+	calcElementAddressInTable := builder.AllocateInstruction()
+	calcElementAddressInTable.AsIadd(tableBase, targetOffsetInTableMultipliedBy8)
+	builder.InsertInstruction(calcElementAddressInTable)
+	return calcElementAddressInTable.Return()
+}
+
+func (c *Compiler) lowerCallIndirect(typeIndex, tableIndex uint32) {
+	builder := c.ssaBuilder
+	state := c.state()
+
+	elementOffsetInTable := state.pop()
+	functionInstancePtrAddress := c.lowerAccessTableWithBoundsCheck(tableIndex, elementOffsetInTable)
 	loadFunctionInstancePtr := builder.AllocateInstruction()
 	loadFunctionInstancePtr.AsLoad(functionInstancePtrAddress, 0, ssa.TypeI64)
 	builder.InsertInstruction(loadFunctionInstancePtr)
