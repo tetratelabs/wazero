@@ -905,26 +905,29 @@ func encodeUnconditionalBranchReg(rn uint32, link bool) uint32 {
 // https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/MOV--to-general---Move-vector-element-to-general-purpose-register--an-alias-of-UMOV-?lang=en
 func encodeMoveFromVec(rd, rn uint32, arr vecArrangement, index vecIndex, signed bool) uint32 {
 	var op, imm4, q, imm5 uint32
-	switch arr {
-	case vecArrangementB:
+	switch {
+	case arr == vecArrangementB:
 		imm5 |= 0b1
 		imm5 |= uint32(index) << 1
 		if index > 0b1111 {
 			panic(fmt.Sprintf("vector index is larger than the allowed bound: %d > 15", index))
 		}
-	case vecArrangementH:
+	case arr == vecArrangementH:
 		imm5 |= 0b10
 		imm5 |= uint32(index) << 2
 		if index > 0b111 {
 			panic(fmt.Sprintf("vector index is larger than the allowed bound: %d > 7", index))
 		}
-	case vecArrangementS:
+	case arr == vecArrangementS && signed:
+		q = 0b1
+		fallthrough
+	case arr == vecArrangementS:
 		imm5 |= 0b100
 		imm5 |= uint32(index) << 3
 		if index > 0b11 {
 			panic(fmt.Sprintf("vector index is larger than the allowed bound: %d > 3", index))
 		}
-	case vecArrangementD:
+	case arr == vecArrangementD && !signed:
 		imm5 |= 0b1000
 		imm5 |= uint32(index) << 4
 		q = 0b1
