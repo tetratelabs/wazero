@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
-	"strconv"
 	"strings"
 
 	"github.com/tetratelabs/wazero/api"
@@ -586,8 +585,245 @@ func (c *Compiler) lowerCurrentOpcode() {
 				Insert(builder).Return()
 			state.push(callGrowRet)
 
+		case wasm.OpcodeMiscTableCopy:
+			dstTableIndex := c.readI32u()
+			srcTableIndex := c.readI32u()
+			if state.unreachable {
+				break
+			}
+
+			copySize := state.pop()
+			srcOffset := state.pop()
+			dstOffset := state.pop()
+			copySizeExt := builder.
+				AllocateInstruction().AsUExtend(copySize, 32, 64).Insert(builder).Return()
+			srcOffsetExt := builder.
+				AllocateInstruction().AsUExtend(srcOffset, 32, 64).Insert(builder).Return()
+			dstOffsetExt := builder.
+				AllocateInstruction().AsUExtend(dstOffset, 32, 64).Insert(builder).Return()
+
+			// Out of bounds check.
+			var dstTableInstancePtr, srcTableInstancePtr ssa.Value
+			{
+				dstCeil := builder.AllocateInstruction().AsIadd(dstOffsetExt, copySizeExt).Insert(builder).Return()
+
+				// Load the table.
+				dstTableInstancePtr = builder.AllocateInstruction().
+					AsLoad(c.moduleCtxPtrValue, c.offset.TableOffset(int(dstTableIndex)).U32(), ssa.TypeI64).
+					Insert(builder).Return()
+
+				// Load the table's length.
+				tableLen := builder.AllocateInstruction().
+					AsLoad(dstTableInstancePtr, tableInstanceLenOffset, ssa.TypeI32).Insert(builder).Return()
+				tableLenExt := builder.AllocateInstruction().AsUExtend(tableLen, 32, 64).Insert(builder).Return()
+
+				// Compare the length and the target, and trap if out of bounds.
+				checkOOB := builder.AllocateInstruction()
+				checkOOB.AsIcmp(tableLenExt, dstCeil, ssa.IntegerCmpCondUnsignedLessThan)
+				builder.InsertInstruction(checkOOB)
+				exitIfOOB := builder.AllocateInstruction()
+				exitIfOOB.AsExitIfTrueWithCode(c.execCtxPtrValue, checkOOB.Return(), wazevoapi.ExitCodeTableOutOfBounds)
+				builder.InsertInstruction(exitIfOOB)
+			}
+			{
+				srcCeil := builder.AllocateInstruction().AsIadd(srcOffsetExt, copySizeExt).Insert(builder).Return()
+
+				// Load the table.
+				srcTableInstancePtr = builder.AllocateInstruction().
+					AsLoad(c.moduleCtxPtrValue, c.offset.TableOffset(int(srcTableIndex)).U32(), ssa.TypeI64).
+					Insert(builder).Return()
+
+				// Load the table's length.
+				tableLen := builder.AllocateInstruction().
+					AsLoad(srcTableInstancePtr, tableInstanceLenOffset, ssa.TypeI32).Insert(builder).Return()
+				tableLenExt := builder.AllocateInstruction().AsUExtend(tableLen, 32, 64).Insert(builder).Return()
+
+				// Compare the length and the target, and trap if out of bounds.
+				checkOOB := builder.AllocateInstruction()
+				checkOOB.AsIcmp(tableLenExt, srcCeil, ssa.IntegerCmpCondUnsignedLessThan)
+				builder.InsertInstruction(checkOOB)
+				exitIfOOB := builder.AllocateInstruction()
+				exitIfOOB.AsExitIfTrueWithCode(c.execCtxPtrValue, checkOOB.Return(), wazevoapi.ExitCodeTableOutOfBounds)
+				builder.InsertInstruction(exitIfOOB)
+			}
+
+			var dstTableBaseAddr, srcTableBaseAddr ssa.Value
+			{
+				loadTableBaseAddress := builder.AllocateInstruction()
+				loadTableBaseAddress.AsLoad(dstTableInstancePtr, tableInstanceBaseAddressOffset, ssa.TypeI64)
+				builder.InsertInstruction(loadTableBaseAddress)
+				dstTableBaseAddr = loadTableBaseAddress.Return()
+			}
+			{
+				loadTableBaseAddress := builder.AllocateInstruction()
+				loadTableBaseAddress.AsLoad(srcTableInstancePtr, tableInstanceBaseAddressOffset, ssa.TypeI64)
+				builder.InsertInstruction(loadTableBaseAddress)
+				srcTableBaseAddr = loadTableBaseAddress.Return()
+			}
+			three := builder.AllocateInstruction().AsIconst64(3).Insert(builder).Return()
+
+			dstOffsetInBytes := builder.AllocateInstruction().AsIshl(dstOffsetExt, three).Insert(builder).Return()
+			dstAddr := builder.AllocateInstruction().AsIadd(dstTableBaseAddr, dstOffsetInBytes).Insert(builder).Return()
+			srcOffsetInBytes := builder.AllocateInstruction().AsIshl(srcOffsetExt, three).Insert(builder).Return()
+			srcAddr := builder.AllocateInstruction().AsIadd(srcTableBaseAddr, srcOffsetInBytes).Insert(builder).Return()
+
+			memmovePtr := c.loadMemmoveAddr()
+
+			copySizeExtInBytes := builder.AllocateInstruction().AsIshl(copySizeExt, three).Insert(builder).Return()
+
+			// TODO: reuse the slice.
+			args := []ssa.Value{dstAddr, srcAddr, copySizeExtInBytes}
+			builder.
+				AllocateInstruction().
+				AsCallIndirect(memmovePtr, &c.memmoveSig, args).
+				Insert(builder)
+
+		case wasm.OpcodeMiscMemoryCopy:
+			state.pc += 2 // +2 to skip two memory indexes which are fixed to zero.
+			if state.unreachable {
+				break
+			}
+
+			copySize := state.pop()
+			srcOffset := state.pop()
+			dstOffset := state.pop()
+
+			copySizeExt := builder.
+				AllocateInstruction().AsUExtend(copySize, 32, 64).Insert(builder).Return()
+			srcOffsetExt := builder.
+				AllocateInstruction().AsUExtend(srcOffset, 32, 64).Insert(builder).Return()
+			dstOffsetExt := builder.
+				AllocateInstruction().AsUExtend(dstOffset, 32, 64).Insert(builder).Return()
+
+			// Out of bounds check.
+			memLen := c.getMemoryLenValue(false)
+
+			{
+				srcCeil := builder.AllocateInstruction().AsIadd(srcOffsetExt, copySizeExt).Insert(builder).Return()
+				cmp := builder.AllocateInstruction().
+					AsIcmp(memLen, srcCeil, ssa.IntegerCmpCondUnsignedLessThan).
+					Insert(builder).
+					Return()
+				builder.AllocateInstruction().
+					AsExitIfTrueWithCode(c.execCtxPtrValue, cmp, wazevoapi.ExitCodeMemoryOutOfBounds).
+					Insert(builder)
+			}
+			{
+				dstCeil := builder.AllocateInstruction().AsIadd(dstOffsetExt, copySizeExt).Insert(builder).Return()
+				cmp := builder.AllocateInstruction().
+					AsIcmp(memLen, dstCeil, ssa.IntegerCmpCondUnsignedLessThan).
+					Insert(builder).
+					Return()
+				builder.AllocateInstruction().
+					AsExitIfTrueWithCode(c.execCtxPtrValue, cmp, wazevoapi.ExitCodeMemoryOutOfBounds).
+					Insert(builder)
+			}
+
+			memBase := c.getMemoryBaseValue(false)
+			dstAddr := builder.AllocateInstruction().AsIadd(memBase, dstOffsetExt).Insert(builder).Return()
+			srcAddr := builder.AllocateInstruction().AsIadd(memBase, srcOffsetExt).Insert(builder).Return()
+
+			memmovePtr := c.loadMemmoveAddr()
+
+			// TODO: reuse the slice.
+			args := []ssa.Value{dstAddr, srcAddr, copySize}
+			builder.
+				AllocateInstruction().
+				AsCallIndirect(memmovePtr, &c.memmoveSig, args).
+				Insert(builder)
+
+		case wasm.OpcodeMiscMemoryFill:
+			state.pc++ // Skip the memory index which is fixed to zero.
+			if state.unreachable {
+				break
+			}
+			fillSize := state.pop()
+			value := state.pop()
+			offset := state.pop()
+
+			fillSizeExt := builder.
+				AllocateInstruction().AsUExtend(fillSize, 32, 64).Insert(builder).Return()
+			offsetExt := builder.
+				AllocateInstruction().AsUExtend(offset, 32, 64).Insert(builder).Return()
+
+			// Out of bounds check.
+			memLen := c.getMemoryLenValue(false)
+			ceil := builder.AllocateInstruction().AsIadd(fillSizeExt, offsetExt).Insert(builder).Return()
+			boundsCheckFailed := builder.AllocateInstruction().
+				AsIcmp(memLen, ceil, ssa.IntegerCmpCondUnsignedLessThan).
+				Insert(builder).
+				Return()
+			builder.AllocateInstruction().
+				AsExitIfTrueWithCode(c.execCtxPtrValue, boundsCheckFailed, wazevoapi.ExitCodeMemoryOutOfBounds).
+				Insert(builder)
+
+			// Calculate the base address:
+			addr := builder.AllocateInstruction().AsIadd(c.getMemoryBaseValue(false), offsetExt).Insert(builder).Return()
+
+			// Uses the copy trick for faster filling buffer: https://gist.github.com/taylorza/df2f89d5f9ab3ffd06865062a4cf015d
+			// buf := memoryInst.Buffer[offset : offset+fillSize]
+			// buf[0] = value
+			// for i := 1; i < fillSize; i *= 2 {
+			// 	copy(buf[i:], buf[:i])
+			// }
+
+			// Prepare the loop and following block.
+			beforeLoop := builder.AllocateBasicBlock()
+			loopBlk := builder.AllocateBasicBlock()
+			loopVar := loopBlk.AddParam(builder, ssa.TypeI64)
+			followingBlk := builder.AllocateBasicBlock()
+
+			// Insert the jump to the beforeLoop block; If the fillSize is zero, then jump to the following block to skip entire logics.
+			zero := builder.AllocateInstruction().AsIconst64(0).Insert(builder).Return()
+			ifFillSizeZero := builder.AllocateInstruction().AsIcmp(fillSizeExt, zero, ssa.IntegerCmpCondEqual).
+				Insert(builder).Return()
+			builder.AllocateInstruction().AsBrnz(ifFillSizeZero, nil, followingBlk).Insert(builder)
+			c.insertJumpToBlock(nil, beforeLoop)
+
+			// buf[0] = value
+			builder.SetCurrentBlock(beforeLoop)
+			builder.AllocateInstruction().AsStore(ssa.OpcodeIstore8, value, addr, 0).Insert(builder)
+			initValue := builder.AllocateInstruction().AsIconst64(1).Insert(builder).Return()
+			c.insertJumpToBlock([]ssa.Value{initValue}, loopBlk) // TODO: reuse the slice.
+
+			builder.SetCurrentBlock(loopBlk)
+			dstAddr := builder.AllocateInstruction().AsIadd(addr, loopVar).Insert(builder).Return()
+
+			// If loopVar*2 > fillSizeExt, then count must be fillSizeExt-loopVar.
+			var count ssa.Value
+			{
+				loopVarDoubled := builder.AllocateInstruction().AsIadd(loopVar, loopVar).Insert(builder).Return()
+				loopVarDoubledLargerThanFillSize := builder.
+					AllocateInstruction().AsIcmp(loopVarDoubled, fillSizeExt, ssa.IntegerCmpCondUnsignedGreaterThanOrEqual).
+					Insert(builder).Return()
+				diff := builder.AllocateInstruction().AsIsub(fillSizeExt, loopVar).Insert(builder).Return()
+				count = builder.AllocateInstruction().AsSelect(loopVarDoubledLargerThanFillSize, diff, loopVar).Insert(builder).Return()
+			}
+
+			memmovePtr := c.loadMemmoveAddr()
+			builder.
+				AllocateInstruction().
+				AsCallIndirect(memmovePtr, &c.memmoveSig, []ssa.Value{dstAddr, addr, count}). // TODO: reuse the slice.
+				Insert(builder)
+
+			shiftAmount := builder.AllocateInstruction().AsIconst64(1).Insert(builder).Return()
+			newLoopVar := builder.AllocateInstruction().AsIshl(loopVar, shiftAmount).Insert(builder).Return()
+			loopVarLessThanFillSize := builder.AllocateInstruction().
+				AsIcmp(newLoopVar, fillSizeExt, ssa.IntegerCmpCondUnsignedLessThan).Insert(builder).Return()
+
+			builder.AllocateInstruction().
+				AsBrnz(loopVarLessThanFillSize, []ssa.Value{newLoopVar}, loopBlk). // TODO: reuse the slice.
+				Insert(builder)
+
+			c.insertJumpToBlock(nil, followingBlk)
+			builder.SetCurrentBlock(followingBlk)
+
+			builder.Seal(beforeLoop)
+			builder.Seal(loopBlk)
+			builder.Seal(followingBlk)
+
 		default:
-			panic("Unknown MiscOp " + strconv.Itoa(int(miscOpUint)))
+			panic("Unknown MiscOp " + wasm.MiscInstructionName(miscOp))
 		}
 
 	case wasm.OpcodeI32ReinterpretF32:
@@ -2693,6 +2929,16 @@ func (c *Compiler) memOpSetup(baseAddr ssa.Value, constOffset, operationSizeInBy
 	addrCalc.AsIadd(memBase, extBaseAddr.Return())
 	builder.InsertInstruction(addrCalc)
 	return addrCalc.Return()
+}
+
+func (c *Compiler) loadMemmoveAddr() ssa.Value {
+	builder := c.ssaBuilder
+	memmovePtr := builder.AllocateInstruction().
+		AsLoad(c.execCtxPtrValue,
+			wazevoapi.ExecutionContextOffsetMemmoveAddress.U32(),
+			ssa.TypeI64,
+		).Insert(builder).Return()
+	return memmovePtr
 }
 
 func (c *Compiler) reloadAfterCall() {
