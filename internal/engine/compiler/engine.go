@@ -404,7 +404,7 @@ const (
 	dataInstanceStructSize = 24
 
 	// Consts for wasm.ElementInstance.
-	elementInstanceStructSize = 32
+	elementInstanceStructSize = 24
 
 	// pointerSizeLog2 satisfies: 1 << pointerSizeLog2 = sizeOf(uintptr)
 	pointerSizeLog2 = 3

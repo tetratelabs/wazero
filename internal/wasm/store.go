@@ -164,18 +164,17 @@ func (m *ModuleInstance) GetFunctionTypeID(t *FunctionType) FunctionTypeID {
 }
 
 func (m *ModuleInstance) buildElementInstances(elements []ElementSegment) {
-	m.ElementInstances = make([]ElementInstance, len(elements))
+	m.ElementInstances = make([][]Reference, len(elements))
 	for i, elm := range elements {
 		if elm.Type == RefTypeFuncref && elm.Mode == ElementModePassive {
 			// Only passive elements can be access as element instances.
 			// See https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/syntax/modules.html#element-segments
 			inits := elm.Init
-			elemInst := &m.ElementInstances[i]
-			elemInst.References = make([]Reference, len(inits))
-			elemInst.Type = RefTypeFuncref
+			inst := make([]Reference, len(inits))
+			m.ElementInstances[i] = inst
 			for j, idx := range inits {
 				if idx != ElementInitNullReference {
-					elemInst.References[j] = m.Engine.FunctionInstanceReference(idx)
+					inst[j] = m.Engine.FunctionInstanceReference(idx)
 				}
 			}
 		}

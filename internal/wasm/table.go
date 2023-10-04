@@ -134,12 +134,7 @@ type TableInstance struct {
 // ElementInstance represents an element instance in a module.
 //
 // See https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/exec/runtime.html#element-instances
-type ElementInstance struct {
-	// References holds references whose type is either RefTypeFuncref or RefTypeExternref (unsupported).
-	References []Reference
-	// Type is the RefType of the references in this instance's References.
-	Type RefType
-}
+type ElementInstance = []Reference
 
 // Reference is the runtime representation of RefType which is either RefTypeFuncref or RefTypeExternref.
 type Reference = uintptr
