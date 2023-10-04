@@ -732,6 +732,113 @@ func (c *Compiler) lowerCurrentOpcode() {
 				AsCallIndirect(memmovePtr, &c.memmoveSig, args).
 				Insert(builder)
 
+		case wasm.OpcodeMiscTableFill:
+			tableIndex := c.readI32u()
+			if state.unreachable {
+				break
+			}
+			fillSize := state.pop()
+			value := state.pop()
+			offset := state.pop()
+
+			fillSizeExt := builder.
+				AllocateInstruction().AsUExtend(fillSize, 32, 64).Insert(builder).Return()
+			offsetExt := builder.
+				AllocateInstruction().AsUExtend(offset, 32, 64).Insert(builder).Return()
+			var tableInstancePtr ssa.Value
+			{
+				dstCeil := builder.AllocateInstruction().AsIadd(offsetExt, fillSizeExt).Insert(builder).Return()
+
+				// Load the table.
+				tableInstancePtr = builder.AllocateInstruction().
+					AsLoad(c.moduleCtxPtrValue, c.offset.TableOffset(int(tableIndex)).U32(), ssa.TypeI64).
+					Insert(builder).Return()
+
+				// Load the table's length.
+				tableLen := builder.AllocateInstruction().
+					AsLoad(tableInstancePtr, tableInstanceLenOffset, ssa.TypeI32).Insert(builder).Return()
+				tableLenExt := builder.AllocateInstruction().AsUExtend(tableLen, 32, 64).Insert(builder).Return()
+
+				// Compare the length and the target, and trap if out of bounds.
+				checkOOB := builder.AllocateInstruction()
+				checkOOB.AsIcmp(tableLenExt, dstCeil, ssa.IntegerCmpCondUnsignedLessThan)
+				builder.InsertInstruction(checkOOB)
+				exitIfOOB := builder.AllocateInstruction()
+				exitIfOOB.AsExitIfTrueWithCode(c.execCtxPtrValue, checkOOB.Return(), wazevoapi.ExitCodeTableOutOfBounds)
+				builder.InsertInstruction(exitIfOOB)
+			}
+			three := builder.AllocateInstruction().AsIconst64(3).Insert(builder).Return()
+			offsetInBytes := builder.AllocateInstruction().AsIshl(offsetExt, three).Insert(builder).Return()
+			fillSizeInBytes := builder.AllocateInstruction().AsIshl(fillSizeExt, three).Insert(builder).Return()
+
+			// Calculate the base address of the table.
+			tableBaseAddr := builder.AllocateInstruction().
+				AsLoad(tableInstancePtr, tableInstanceBaseAddressOffset, ssa.TypeI64).
+				Insert(builder).Return()
+			addr := builder.AllocateInstruction().AsIadd(tableBaseAddr, offsetInBytes).Insert(builder).Return()
+
+			// Prepare the loop and following block.
+			beforeLoop := builder.AllocateBasicBlock()
+			loopBlk := builder.AllocateBasicBlock()
+			loopVar := loopBlk.AddParam(builder, ssa.TypeI64)
+			followingBlk := builder.AllocateBasicBlock()
+
+			// Uses the copy trick for faster filling buffer like memory.fill, but in this case we copy 8 bytes at a time.
+			// 	buf := memoryInst.Buffer[offset : offset+fillSize]
+			// 	buf[0:8] = value
+			// 	for i := 8; i < fillSize; i *= 2 { Begin with 8 bytes.
+			// 		copy(buf[i:], buf[:i])
+			// 	}
+
+			// Insert the jump to the beforeLoop block; If the fillSize is zero, then jump to the following block to skip entire logics.
+			zero := builder.AllocateInstruction().AsIconst64(0).Insert(builder).Return()
+			ifFillSizeZero := builder.AllocateInstruction().AsIcmp(fillSizeExt, zero, ssa.IntegerCmpCondEqual).
+				Insert(builder).Return()
+			builder.AllocateInstruction().AsBrnz(ifFillSizeZero, nil, followingBlk).Insert(builder)
+			c.insertJumpToBlock(nil, beforeLoop)
+
+			// buf[0:8] = value
+			builder.SetCurrentBlock(beforeLoop)
+			builder.AllocateInstruction().AsStore(ssa.OpcodeStore, value, addr, 0).Insert(builder)
+			initValue := builder.AllocateInstruction().AsIconst64(8).Insert(builder).Return()
+			c.insertJumpToBlock([]ssa.Value{initValue}, loopBlk) // TODO: reuse the slice.
+
+			builder.SetCurrentBlock(loopBlk)
+			dstAddr := builder.AllocateInstruction().AsIadd(addr, loopVar).Insert(builder).Return()
+
+			// If loopVar*2 > fillSizeInBytes, then count must be fillSizeInBytes-loopVar.
+			var count ssa.Value
+			{
+				loopVarDoubled := builder.AllocateInstruction().AsIadd(loopVar, loopVar).Insert(builder).Return()
+				loopVarDoubledLargerThanFillSize := builder.
+					AllocateInstruction().AsIcmp(loopVarDoubled, fillSizeInBytes, ssa.IntegerCmpCondUnsignedGreaterThanOrEqual).
+					Insert(builder).Return()
+				diff := builder.AllocateInstruction().AsIsub(fillSizeInBytes, loopVar).Insert(builder).Return()
+				count = builder.AllocateInstruction().AsSelect(loopVarDoubledLargerThanFillSize, diff, loopVar).Insert(builder).Return()
+			}
+
+			memmovePtr := c.loadMemmoveAddr()
+			builder.
+				AllocateInstruction().
+				AsCallIndirect(memmovePtr, &c.memmoveSig, []ssa.Value{dstAddr, addr, count}). // TODO: reuse the slice.
+				Insert(builder)
+
+			shiftAmount := builder.AllocateInstruction().AsIconst64(1).Insert(builder).Return()
+			newLoopVar := builder.AllocateInstruction().AsIshl(loopVar, shiftAmount).Insert(builder).Return()
+			loopVarLessThanFillSize := builder.AllocateInstruction().
+				AsIcmp(newLoopVar, fillSizeInBytes, ssa.IntegerCmpCondUnsignedLessThan).Insert(builder).Return()
+
+			builder.AllocateInstruction().
+				AsBrnz(loopVarLessThanFillSize, []ssa.Value{newLoopVar}, loopBlk). // TODO: reuse the slice.
+				Insert(builder)
+
+			c.insertJumpToBlock(nil, followingBlk)
+			builder.SetCurrentBlock(followingBlk)
+
+			builder.Seal(beforeLoop)
+			builder.Seal(loopBlk)
+			builder.Seal(followingBlk)
+
 		case wasm.OpcodeMiscMemoryFill:
 			state.pc++ // Skip the memory index which is fixed to zero.
 			if state.unreachable {
@@ -761,11 +868,11 @@ func (c *Compiler) lowerCurrentOpcode() {
 			addr := builder.AllocateInstruction().AsIadd(c.getMemoryBaseValue(false), offsetExt).Insert(builder).Return()
 
 			// Uses the copy trick for faster filling buffer: https://gist.github.com/taylorza/df2f89d5f9ab3ffd06865062a4cf015d
-			// buf := memoryInst.Buffer[offset : offset+fillSize]
-			// buf[0] = value
-			// for i := 1; i < fillSize; i *= 2 {
-			// 	copy(buf[i:], buf[:i])
-			// }
+			// 	buf := memoryInst.Buffer[offset : offset+fillSize]
+			// 	buf[0] = value
+			// 	for i := 1; i < fillSize; i *= 2 {
+			// 		copy(buf[i:], buf[:i])
+			// 	}
 
 			// Prepare the loop and following block.
 			beforeLoop := builder.AllocateBasicBlock()
