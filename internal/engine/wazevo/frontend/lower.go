@@ -2482,7 +2482,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 		case wasm.OpcodeVecV128i8x16Shuffle:
 			// Skip the immediate values.
 			state.pc++
-			lanes := make([]uint64, 16)
+			var lanes [16]uint64
 			for i := 0; i < 16; i++ {
 				lanes[i] = uint64(c.wasmFunctionBody[state.pc+i])
 			}

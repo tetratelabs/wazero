@@ -2058,7 +2058,7 @@ L1 (SSA Block: blk0):
 	str xzr, [sp, #-0x10]!
 	mov v29.16b, v0.16b
 	mov v30.16b, v1.16b
-	ldr q8, #8; b 32; data.v128  0706050403020100 0f0e0d0c0b0a0908
+	ldr q8, #8; b 32; data.v128  0706050403020100 1f1e1d1c1b1a1918
 	tbl v0.16b, { v29.16b, v30.16b }, v8.16b
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10

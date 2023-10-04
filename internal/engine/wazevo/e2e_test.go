@@ -408,6 +408,13 @@ func TestE2E(t *testing.T) {
 				{params: []uint64{1, 2, 3, 4, 5, 6}, expResults: []uint64{0x3, 0x2, 0x5, 0x6}},
 			},
 		},
+		{
+			name: "vector_shuffle",
+			m:    testcases.VecShuffle.Module,
+			calls: []callCase{
+				{params: []uint64{0x01010101, 0x02020202, 0x03030303, 0x04040404}, expResults: []uint64{0x01010101, 0x04040404}},
+			},
+		},
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {

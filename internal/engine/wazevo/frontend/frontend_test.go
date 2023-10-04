@@ -1786,7 +1786,7 @@ blk4: () <-- (blk2,blk3)
 			m:    testcases.VecShuffle.Module,
 			exp: `
 blk0: (exec_ctx:i64, module_ctx:i64, v2:v128, v3:v128)
-	v4:v128 = Shuffle.[0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15] v2, v3
+	v4:v128 = Shuffle.[0 1 2 3 4 5 6 7 24 25 26 27 28 29 30 31] v2, v3
 	Jump blk_ret, v4
 `,
 		},

@@ -1809,7 +1809,7 @@ func (i *Instruction) AsInsertlane(x, y Value, index byte, lane VecLane) *Instru
 }
 
 // AsShuffle initializes this instruction as a shuffle instruction with OpcodeShuffle on vector.
-func (i *Instruction) AsShuffle(x, y Value, lane []uint64) *Instruction {
+func (i *Instruction) AsShuffle(x, y Value, lane [16]uint64) *Instruction {
 	i.opcode = OpcodeShuffle
 	i.v = x
 	i.v2 = y

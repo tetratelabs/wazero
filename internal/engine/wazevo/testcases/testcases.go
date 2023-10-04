@@ -1542,7 +1542,7 @@ var (
 			CodeSection: []wasm.Code{{Body: []byte{
 				wasm.OpcodeLocalGet, 0,
 				wasm.OpcodeLocalGet, 1,
-				wasm.OpcodeVecPrefix, wasm.OpcodeVecV128i8x16Shuffle, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+				wasm.OpcodeVecPrefix, wasm.OpcodeVecV128i8x16Shuffle, 0, 1, 2, 3, 4, 5, 6, 7, 24, 25, 26, 27, 28, 29, 30, 31,
 				wasm.OpcodeEnd,
 			}}},
 		},
