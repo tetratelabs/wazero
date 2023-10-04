@@ -1653,15 +1653,15 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			inElementOffset := ce.popValue()
 			inTableOffset := ce.popValue()
 			table := tables[op.U2]
-			if inElementOffset+copySize > uint64(len(elementInstance.References)) ||
+			if inElementOffset+copySize > uint64(len(elementInstance)) ||
 				inTableOffset+copySize > uint64(len(table.References)) {
 				panic(wasmruntime.ErrRuntimeInvalidTableAccess)
 			} else if copySize != 0 {
-				copy(table.References[inTableOffset:inTableOffset+copySize], elementInstance.References[inElementOffset:])
+				copy(table.References[inTableOffset:inTableOffset+copySize], elementInstance[inElementOffset:])
 			}
 			frame.pc++
 		case wazeroir.OperationKindElemDrop:
-			elementInstances[op.U1].References = nil
+			elementInstances[op.U1] = nil
 			frame.pc++
 		case wazeroir.OperationKindTableCopy:
 			srcTable, dstTable := tables[op.U1].References, tables[op.U2].References

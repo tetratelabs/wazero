@@ -476,13 +476,7 @@ func TestCompiler_compileMemoryInit(t *testing.T) {
 }
 
 func TestCompiler_compileElemDrop(t *testing.T) {
-	origins := []wasm.ElementInstance{
-		{References: []wasm.Reference{1}},
-		{References: []wasm.Reference{2}},
-		{References: []wasm.Reference{3}},
-		{References: []wasm.Reference{4}},
-		{References: []wasm.Reference{5}},
-	}
+	origins := []wasm.ElementInstance{{1}, {2}, {3}, {4}, {5}}
 
 	for i := 0; i < len(origins); i++ {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
@@ -494,7 +488,7 @@ func TestCompiler_compileElemDrop(t *testing.T) {
 
 			// Verify assumption that before Drop instruction, all the element instances are not empty.
 			for _, inst := range insts {
-				require.NotEqual(t, 0, len(inst.References))
+				require.NotEqual(t, 0, len(inst))
 			}
 
 			compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, &wazeroir.CompilationResult{
@@ -523,9 +517,9 @@ func TestCompiler_compileElemDrop(t *testing.T) {
 
 			for j := 0; j < len(insts); j++ {
 				if i == j {
-					require.Zero(t, len(env.module().ElementInstances[j].References))
+					require.Zero(t, len(env.module().ElementInstances[j]))
 				} else {
-					require.NotEqual(t, 0, len(env.module().ElementInstances[j].References))
+					require.NotEqual(t, 0, len(env.module().ElementInstances[j]))
 				}
 			}
 		})
@@ -627,7 +621,7 @@ func TestCompiler_compileTableCopy(t *testing.T) {
 
 func TestCompiler_compileTableInit(t *testing.T) {
 	elementInstances := []wasm.ElementInstance{
-		{}, {References: []wasm.Reference{1, 2, 3, 4, 5}},
+		{}, {1, 2, 3, 4, 5},
 	}
 
 	const tableSize = 100
@@ -707,8 +701,8 @@ func TestCompiler_compileTableInit(t *testing.T) {
 				for i := 0; i < tableSize; i++ {
 					exp[i] = uintptr(i)
 				}
-				if inst := elementInstances[tc.elemIndex]; inst.References != nil {
-					copy(exp[tc.destOffset:], inst.References[tc.sourceOffset:tc.sourceOffset+tc.copySize])
+				if inst := elementInstances[tc.elemIndex]; inst != nil {
+					copy(exp[tc.destOffset:], inst[tc.sourceOffset:tc.sourceOffset+tc.copySize])
 				}
 				require.Equal(t, exp, table)
 			} else {
