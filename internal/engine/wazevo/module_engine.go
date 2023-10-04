@@ -155,6 +155,7 @@ func (m *moduleEngine) NewFunction(index wasm.Index) api.Function {
 	ce.execCtx.checkModuleExitCodeTrampolineAddress = &m.parent.sharedFunctions.checkModuleExitCode[0]
 	ce.execCtx.tableGrowTrampolineAddress = &m.parent.sharedFunctions.tableGrowExecutable[0]
 	ce.execCtx.refFuncTrampolineAddress = &m.parent.sharedFunctions.refFuncExecutable[0]
+	ce.execCtx.memmoveAddress = memmovPtr
 	ce.init()
 	return ce
 }

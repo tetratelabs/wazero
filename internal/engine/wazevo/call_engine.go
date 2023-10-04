@@ -78,6 +78,8 @@ type (
 		tableGrowTrampolineAddress *byte
 		// refFuncTrampolineAddress holds the address of ref-func trampoline function.
 		refFuncTrampolineAddress *byte
+		// memmoveAddress holds the address of memmove function implemented by Go runtime. See memmove.go.
+		memmoveAddress uintptr
 	}
 )
 

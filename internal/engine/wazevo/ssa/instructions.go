@@ -1515,11 +1515,12 @@ func (i *Instruction) AsVFdiv(x, y Value, lane VecLane) *Instruction {
 }
 
 // AsImul initializes this instruction as an integer addition instruction with OpcodeImul.
-func (i *Instruction) AsImul(x, y Value) {
+func (i *Instruction) AsImul(x, y Value) *Instruction {
 	i.opcode = OpcodeImul
 	i.v = x
 	i.v2 = y
 	i.typ = x.Type()
+	return i
 }
 
 func (i *Instruction) Insert(b Builder) *Instruction {
@@ -1993,11 +1994,12 @@ func (i *Instruction) AsExitWithCode(ctx Value, code wazevoapi.ExitCode) {
 }
 
 // AsExitIfTrueWithCode initializes this instruction as a trap instruction with OpcodeExitIfTrueWithCode.
-func (i *Instruction) AsExitIfTrueWithCode(ctx, c Value, code wazevoapi.ExitCode) {
+func (i *Instruction) AsExitIfTrueWithCode(ctx, c Value, code wazevoapi.ExitCode) *Instruction {
 	i.opcode = OpcodeExitIfTrueWithCode
 	i.v = ctx
 	i.v2 = c
 	i.u1 = uint64(code)
+	return i
 }
 
 // ExitWithCodeData returns the context and exit code of OpcodeExitWithCode.
@@ -2079,11 +2081,12 @@ func (i *Instruction) AsBrz(v Value, args []Value, target BasicBlock) {
 }
 
 // AsBrnz initializes this instruction as a branch-if-not-zero instruction with OpcodeBrnz.
-func (i *Instruction) AsBrnz(v Value, args []Value, target BasicBlock) {
+func (i *Instruction) AsBrnz(v Value, args []Value, target BasicBlock) *Instruction {
 	i.opcode = OpcodeBrnz
 	i.v = v
 	i.vs = args
 	i.blk = target
+	return i
 }
 
 // AsBrTable initializes this instruction as a branch-table instruction with OpcodeBrTable.
@@ -2352,7 +2355,7 @@ func (i *Instruction) AsSExtend(v Value, from, to byte) {
 }
 
 // AsUExtend initializes this instruction as an unsigned extension instruction with OpcodeUExtend.
-func (i *Instruction) AsUExtend(v Value, from, to byte) {
+func (i *Instruction) AsUExtend(v Value, from, to byte) *Instruction {
 	i.opcode = OpcodeUExtend
 	i.v = v
 	i.u1 = uint64(from)<<8 | uint64(to)
@@ -2361,6 +2364,7 @@ func (i *Instruction) AsUExtend(v Value, from, to byte) {
 	} else {
 		i.typ = TypeI32
 	}
+	return i
 }
 
 func (i *Instruction) ExtendData() (from, to byte, signed bool) {

@@ -24,6 +24,7 @@ type Compiler struct {
 	checkModuleExitCodeSig ssa.Signature
 	tableGrowSig           ssa.Signature
 	refFuncSig             ssa.Signature
+	memmoveSig             ssa.Signature
 	checkModuleExitCodeArg [1]ssa.Value
 	ensureTermination      bool
 
@@ -125,6 +126,13 @@ func (c *Compiler) declareSignatures(listenerOn bool) {
 		Results: []ssa.Type{ssa.TypeI64},
 	}
 	c.ssaBuilder.DeclareSignature(&c.refFuncSig)
+
+	c.memmoveSig = ssa.Signature{
+		ID: c.refFuncSig.ID + 1,
+		// dst, src, and the byte count.
+		Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI32},
+	}
+	c.ssaBuilder.DeclareSignature(&c.memmoveSig)
 }
 
 // SignatureForWasmFunctionType returns the ssa.Signature for the given wasm.FunctionType.
