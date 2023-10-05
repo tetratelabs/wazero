@@ -21,54 +21,43 @@ func Test_sharedFunctionsFinalizer(t *testing.T) {
 	require.NoError(t, err)
 	b3, err := platform.MmapCodeSegment(100)
 	require.NoError(t, err)
-	b4, err := platform.MmapCodeSegment(100)
-	require.NoError(t, err)
-	b5, err := platform.MmapCodeSegment(100)
-	require.NoError(t, err)
 	b6, err := platform.MmapCodeSegment(100)
 	require.NoError(t, err)
 	b7, err := platform.MmapCodeSegment(100)
 	require.NoError(t, err)
-
-	preabmles := map[*wasm.FunctionType][]byte{
-		{Params: []wasm.ValueType{}}:                  b4,
-		{Params: []wasm.ValueType{wasm.ValueTypeI32}}: b5,
-	}
 
 	sf.memoryGrowExecutable = b1
 	sf.stackGrowExecutable = b2
 	sf.checkModuleExitCode = b3
 	sf.tableGrowExecutable = b6
 	sf.refFuncExecutable = b7
-	sf.entryPreambles = preabmles
 
 	sharedFunctionsFinalizer(sf)
 	require.Nil(t, sf.memoryGrowExecutable)
 	require.Nil(t, sf.stackGrowExecutable)
 	require.Nil(t, sf.checkModuleExitCode)
 	require.Nil(t, sf.tableGrowExecutable)
-	require.Nil(t, sf.entryPreambles)
 	require.Nil(t, sf.refFuncExecutable)
 }
 
-func Test_compiledModuleFinalizer(t *testing.T) {
-	cm := &compiledModule{}
-
+func Test_executablesFinalizer(t *testing.T) {
 	b, err := platform.MmapCodeSegment(100)
 	require.NoError(t, err)
-	cm.executable = b
-	compiledModuleFinalizer(cm)
-	require.Nil(t, cm.executable)
+
+	exec := &executables{}
+	exec.executable = b
+	executablesFinalizer(exec)
+	require.Nil(t, exec.executable)
 }
 
-type fakeFinalizer map[*compiledModule]func(module *compiledModule)
+type fakeFinalizer map[*executables]func(module *executables)
 
 func (f fakeFinalizer) setFinalizer(obj interface{}, finalizer interface{}) {
-	cf := obj.(*compiledModule)
+	cf := obj.(*executables)
 	if _, ok := f[cf]; ok { // easier than adding a field for testing.T
 		panic(fmt.Sprintf("BUG: %v already had its finalizer set", cf))
 	}
-	f[cf] = finalizer.(func(*compiledModule))
+	f[cf] = finalizer.(func(*executables))
 }
 
 func TestEngine_CompileModule(t *testing.T) {
@@ -112,7 +101,7 @@ func TestEngine_sortedCompiledModules(t *testing.T) {
 			hdr.Len = 1
 			hdr.Cap = 1
 		}
-		cm := &compiledModule{executable: buf}
+		cm := &compiledModule{executables: &executables{executable: buf}}
 		return cm
 	}
 
@@ -188,7 +177,7 @@ func TestCompiledModule_functionIndexOf(t *testing.T) {
 	}
 
 	cm := &compiledModule{
-		executable:      executable,
+		executables:     &executables{executable: executable},
 		functionOffsets: []int{0, 500, 1000, 2000},
 	}
 	require.Equal(t, wasm.Index(0), cm.functionIndexOf(executableAddr))

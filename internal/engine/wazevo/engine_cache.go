@@ -2,6 +2,7 @@ package wazevo
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
@@ -10,6 +11,8 @@ import (
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 	"github.com/tetratelabs/wazero/internal/filecache"
 	"github.com/tetratelabs/wazero/internal/platform"
@@ -61,10 +64,13 @@ func (e *engine) getCompiledModule(module *wasm.Module, listeners []experimental
 			}
 		}
 		e.addCompiledModuleToMemory(module, cm)
-		cm.entryPreambles = make([]*byte, len(module.TypeSection))
-		for i := range cm.entryPreambles {
-			cm.entryPreambles[i] = e.getEntryPreambleForType(&module.TypeSection[i])
-		}
+		ssaBuilder := ssa.NewBuilder()
+		machine := newMachine()
+		be := backend.NewCompiler(context.Background(), machine, ssaBuilder)
+		cm.executables.compileEntryPreambles(module, machine, be)
+
+		// Set the finalizer.
+		e.setFinalizer(cm.executables, executablesFinalizer)
 	}
 	return
 }
@@ -188,7 +194,7 @@ func deserializeCompiledModule(wazeroVersion string, reader io.ReadCloser) (cm *
 	}
 
 	functionsNum := binary.LittleEndian.Uint32(header[len(header)-4:])
-	cm = &compiledModule{functionOffsets: make([]int, functionsNum)}
+	cm = &compiledModule{functionOffsets: make([]int, functionsNum), executables: &executables{}}
 
 	var eightBytes [8]byte
 	for i := uint32(0); i < functionsNum; i++ {

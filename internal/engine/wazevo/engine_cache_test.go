@@ -21,7 +21,7 @@ func TestSerializeCompiledModule(t *testing.T) {
 	}{
 		{
 			in: &compiledModule{
-				executable:      []byte{1, 2, 3, 4, 5},
+				executables:     &executables{executable: []byte{1, 2, 3, 4, 5}},
 				functionOffsets: []int{0},
 			},
 			exp: concat(
@@ -37,7 +37,7 @@ func TestSerializeCompiledModule(t *testing.T) {
 		},
 		{
 			in: &compiledModule{
-				executable:      []byte{1, 2, 3, 4, 5},
+				executables:     &executables{executable: []byte{1, 2, 3, 4, 5}},
 				functionOffsets: []int{0},
 			},
 			exp: concat(
@@ -53,7 +53,7 @@ func TestSerializeCompiledModule(t *testing.T) {
 		},
 		{
 			in: &compiledModule{
-				executable:      []byte{1, 2, 3, 4, 5, 1, 2, 3},
+				executables:     &executables{executable: []byte{1, 2, 3, 4, 5, 1, 2, 3}},
 				functionOffsets: []int{0, 5},
 			},
 			exp: concat(
@@ -145,7 +145,7 @@ func TestDeserializeCompiledModule(t *testing.T) {
 				[]byte{0},             // no source map.
 			),
 			expCompiledModule: &compiledModule{
-				executable:      []byte{1, 2, 3, 4, 5},
+				executables:     &executables{executable: []byte{1, 2, 3, 4, 5}},
 				functionOffsets: []int{0},
 			},
 			expStaleCache: false,
@@ -169,7 +169,7 @@ func TestDeserializeCompiledModule(t *testing.T) {
 			),
 			importedFunctionCount: 1,
 			expCompiledModule: &compiledModule{
-				executable:      []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+				executables:     &executables{executable: []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}},
 				functionOffsets: []int{0, 7},
 			},
 			expStaleCache: false,
@@ -218,7 +218,7 @@ func TestDeserializeCompiledModule(t *testing.T) {
 				[]byte{1, 2, 3, 4, 5}, // machine code.
 			),
 			expCompiledModule: &compiledModule{
-				executable:      []byte{1, 2, 3, 4, 5},
+				executables:     &executables{executable: []byte{1, 2, 3, 4, 5}},
 				functionOffsets: []int{0},
 			},
 			expStaleCache: false,

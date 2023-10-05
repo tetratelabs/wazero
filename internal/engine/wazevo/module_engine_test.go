@@ -145,7 +145,7 @@ func TestModuleEngine_ResolveImportedFunction(t *testing.T) {
 	im1 := &moduleEngine{
 		opaquePtr: &op1,
 		parent: &compiledModule{
-			executable:      make([]byte, 1000),
+			executables:     &executables{executable: make([]byte, 1000)},
 			functionOffsets: []int{1, 5, 10},
 		},
 		module: &wasm.ModuleInstance{
@@ -156,7 +156,7 @@ func TestModuleEngine_ResolveImportedFunction(t *testing.T) {
 	im2 := &moduleEngine{
 		opaquePtr: &op2,
 		parent: &compiledModule{
-			executable:      make([]byte, 1000),
+			executables:     &executables{executable: make([]byte, 1000)},
 			functionOffsets: []int{50, 4},
 		},
 		module: &wasm.ModuleInstance{
@@ -208,15 +208,21 @@ func TestModuleEngine_ResolveImportedFunction_recursive(t *testing.T) {
 	var importingOp, importedOp byte = 0xaa, 0xbb
 	imported := &moduleEngine{
 		opaquePtr: &importedOp,
-		parent:    &compiledModule{executable: make([]byte, 50), functionOffsets: []int{10}},
+		parent: &compiledModule{
+			executables:     &executables{executable: make([]byte, 50)},
+			functionOffsets: []int{10},
+		},
 		module: &wasm.ModuleInstance{
 			TypeIDs: []wasm.FunctionTypeID{111},
 			Source:  &wasm.Module{FunctionSection: []wasm.Index{0}},
 		},
 	}
 	importing := &moduleEngine{
-		opaquePtr:         &importingOp,
-		parent:            &compiledModule{executable: make([]byte, 1000), functionOffsets: []int{500}},
+		opaquePtr: &importingOp,
+		parent: &compiledModule{
+			executables:     &executables{executable: make([]byte, 1000)},
+			functionOffsets: []int{500},
+		},
 		importedFunctions: []importedFunction{{me: imported, indexInModule: 0}},
 		module: &wasm.ModuleInstance{
 			TypeIDs: []wasm.FunctionTypeID{0, 222, 0},

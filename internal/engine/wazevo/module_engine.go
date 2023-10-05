@@ -153,7 +153,7 @@ func (m *moduleEngine) NewFunction(index wasm.Index) api.Function {
 		indexInModule:          index,
 		executable:             &p.executable[offset],
 		parent:                 m,
-		preambleExecutable:     m.parent.entryPreambles[typIndex],
+		preambleExecutable:     &m.parent.entryPreambles[typIndex][0],
 		sizeOfParamResultSlice: sizeOfParamResultSlice,
 		requiredParams:         typ.ParamNumInUint64,
 		numberOfResults:        typ.ResultNumInUint64,
