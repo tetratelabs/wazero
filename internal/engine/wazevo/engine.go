@@ -57,19 +57,17 @@ type (
 		tableGrowExecutable []byte
 		// refFuncExecutable is a compiled trampoline executable for ref.func builtin function.
 		refFuncExecutable         []byte
-		entryPreambles            map[*wasm.FunctionType][]byte
 		listenerBeforeTrampolines map[*wasm.FunctionType][]byte
 		listenerAfterTrampolines  map[*wasm.FunctionType][]byte
 	}
 
 	// compiledModule is a compiled variant of a wasm.Module and ready to be used for instantiation.
 	compiledModule struct {
-		executable []byte
+		*executables
 		// functionOffsets maps a local function index to the offset in the executable.
 		functionOffsets           []int
 		parent                    *engine
 		module                    *wasm.Module
-		entryPreambles            []*byte // indexed-correlated with the type index.
 		ensureTermination         bool
 		listeners                 []experimental.FunctionListener
 		listenerBeforeTrampolines []*byte
@@ -80,6 +78,11 @@ type (
 		offsets         wazevoapi.ModuleContextOffsetData
 		sharedFunctions *sharedFunctions
 		sourceMap       sourceMap
+	}
+
+	executables struct {
+		executable     []byte
+		entryPreambles [][]byte
 	}
 )
 
@@ -153,21 +156,29 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listene
 	return nil
 }
 
+func (exec *executables) compileEntryPreambles(m *wasm.Module, machine backend.Machine, be backend.Compiler) {
+	exec.entryPreambles = make([][]byte, len(m.TypeSection))
+	for i := range m.TypeSection {
+		typ := &m.TypeSection[i]
+		sig := frontend.SignatureForWasmFunctionType(typ)
+		be.Init()
+		buf := machine.CompileEntryPreamble(&sig)
+		executable := mmapExecutable(buf)
+		exec.entryPreambles[i] = executable
+	}
+}
+
 func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listeners []experimental.FunctionListener, ensureTermination bool) (*compiledModule, error) {
 	withListener := len(listeners) > 0
 	e.rels = e.rels[:0]
 	cm := &compiledModule{
 		offsets: wazevoapi.NewModuleContextOffsetData(module, withListener), parent: e, module: module,
 		ensureTermination: ensureTermination,
+		executables:       &executables{},
 	}
 
 	if module.IsHostModule {
 		return e.compileHostModule(ctx, module, listeners)
-	}
-
-	cm.entryPreambles = make([]*byte, len(module.TypeSection))
-	for i := range cm.entryPreambles {
-		cm.entryPreambles[i] = e.getEntryPreambleForType(&module.TypeSection[i])
 	}
 
 	importedFns, localFns := int(module.ImportFunctionCount), len(module.FunctionSection)
@@ -187,6 +198,8 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 	fe := frontend.NewFrontendCompiler(module, ssaBuilder, &cm.offsets, ensureTermination, withListener, needSourceInfo)
 	machine := newMachine()
 	be := backend.NewCompiler(ctx, machine, ssaBuilder)
+
+	cm.executables.compileEntryPreambles(module, machine, be)
 
 	totalSize := 0 // Total binary size of the executable.
 	cm.functionOffsets = make([]int, localFns)
@@ -274,7 +287,7 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 		}
 	}
 	cm.sharedFunctions = e.sharedFunctions
-	e.setFinalizer(cm, compiledModuleFinalizer)
+	e.setFinalizer(cm.executables, executablesFinalizer)
 	return cm, nil
 }
 
@@ -345,7 +358,7 @@ func (e *engine) compileHostModule(ctx context.Context, module *wasm.Module, lis
 	be := backend.NewCompiler(ctx, machine, ssa.NewBuilder())
 
 	num := len(module.CodeSection)
-	cm := &compiledModule{module: module, listeners: listeners}
+	cm := &compiledModule{module: module, listeners: listeners, executables: &executables{}}
 	cm.functionOffsets = make([]int, num)
 	totalSize := 0 // Total binary size of the executable.
 	bodies := make([][]byte, num)
@@ -423,6 +436,7 @@ func (e *engine) compileHostModule(ctx context.Context, module *wasm.Module, lis
 			return nil, err
 		}
 	}
+	e.setFinalizer(cm.executables, executablesFinalizer)
 	return cm, nil
 }
 
@@ -432,10 +446,10 @@ func (e *engine) Close() (err error) {
 	defer e.mux.Unlock()
 
 	for _, cm := range e.compiledModules {
-		cm.executable = nil
 		cm.functionOffsets = nil
 		cm.module = nil
 		cm.parent = nil
+		cm.executables = nil
 	}
 	e.sortedCompiledModules = nil
 	e.compiledModules = nil
@@ -531,7 +545,6 @@ func (e *engine) NewModuleEngine(m *wasm.Module, mi *wasm.ModuleInstance) (wasm.
 
 func (e *engine) compileSharedFunctions() {
 	e.sharedFunctions = &sharedFunctions{
-		entryPreambles:            make(map[*wasm.FunctionType][]byte),
 		listenerBeforeTrampolines: make(map[*wasm.FunctionType][]byte),
 		listenerAfterTrampolines:  make(map[*wasm.FunctionType][]byte),
 	}
@@ -597,11 +610,6 @@ func sharedFunctionsFinalizer(sf *sharedFunctions) {
 	if err := platform.MunmapCodeSegment(sf.refFuncExecutable); err != nil {
 		panic(err)
 	}
-	for _, f := range sf.entryPreambles {
-		if err := platform.MunmapCodeSegment(f); err != nil {
-			panic(err)
-		}
-	}
 	for _, f := range sf.listenerBeforeTrampolines {
 		if err := platform.MunmapCodeSegment(f); err != nil {
 			panic(err)
@@ -618,18 +626,24 @@ func sharedFunctionsFinalizer(sf *sharedFunctions) {
 	sf.stackGrowExecutable = nil
 	sf.tableGrowExecutable = nil
 	sf.refFuncExecutable = nil
-	sf.entryPreambles = nil
 	sf.listenerBeforeTrampolines = nil
 	sf.listenerAfterTrampolines = nil
 }
 
-func compiledModuleFinalizer(cm *compiledModule) {
-	if len(cm.executable) > 0 {
-		if err := platform.MunmapCodeSegment(cm.executable); err != nil {
+func executablesFinalizer(exec *executables) {
+	if len(exec.executable) > 0 {
+		if err := platform.MunmapCodeSegment(exec.executable); err != nil {
 			panic(err)
 		}
 	}
-	cm.executable = nil
+	exec.executable = nil
+
+	for _, f := range exec.entryPreambles {
+		if err := platform.MunmapCodeSegment(f); err != nil {
+			panic(err)
+		}
+	}
+	exec.entryPreambles = nil
 }
 
 func mmapExecutable(src []byte) []byte {
@@ -660,23 +674,6 @@ func (cm *compiledModule) functionIndexOf(addr uintptr) wasm.Index {
 		panic("BUG")
 	}
 	return wasm.Index(index)
-}
-
-func (e *engine) getEntryPreambleForType(functionType *wasm.FunctionType) *byte {
-	e.mux.Lock()
-	defer e.mux.Unlock()
-	executable, ok := e.sharedFunctions.entryPreambles[functionType]
-	if ok {
-		return &executable[0]
-	}
-
-	sig := frontend.SignatureForWasmFunctionType(functionType)
-	e.be.Init()
-	buf := e.machine.CompileEntryPreamble(&sig)
-	executable = mmapExecutable(buf)
-
-	e.sharedFunctions.entryPreambles[functionType] = executable
-	return &executable[0]
 }
 
 func (e *engine) getListenerTrampolineForType(functionType *wasm.FunctionType) (before, after *byte) {
