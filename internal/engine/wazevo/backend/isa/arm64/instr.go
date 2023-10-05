@@ -835,7 +835,9 @@ func (i *instruction) asVecRRR(op vecOp, rd, rn, rm operand, arr vecArrangement)
 
 func (i *instruction) isCopy() bool {
 	op := i.kind
-	return op == mov64 || op == mov32 || op == fpuMov64 || op == fpuMov128
+	// We do not include mov32 as it is not a copy instruction in the sense that it does not preserve the upper 32 bits,
+	// and it is only used in the translation of IReduce, not the actual copy indeed.
+	return op == mov64 || op == fpuMov64 || op == fpuMov128
 }
 
 // String implements fmt.Stringer.
