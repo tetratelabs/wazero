@@ -2389,7 +2389,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			vlo := builder.AllocateInstruction().AsWiden(v1, lane, signed, true).Insert(builder).Return()
 			vhi := builder.AllocateInstruction().AsWiden(v1, lane, signed, false).Insert(builder).Return()
 
-			ret := builder.AllocateInstruction().AsIaddPairwise(vlo, vhi, lane).Insert(builder).Return()
+			ret := builder.AllocateInstruction().AsIaddPairwise(vlo, vhi, ssa.VecLaneI16x8).Insert(builder).Return()
 			state.push(ret)
 
 		case wasm.OpcodeVecI32x4ExtaddPairwiseI16x8S, wasm.OpcodeVecI32x4ExtaddPairwiseI16x8U:
@@ -2403,7 +2403,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			vlo := builder.AllocateInstruction().AsWiden(v1, lane, signed, true).Insert(builder).Return()
 			vhi := builder.AllocateInstruction().AsWiden(v1, lane, signed, false).Insert(builder).Return()
 
-			ret := builder.AllocateInstruction().AsIaddPairwise(vlo, vhi, lane).Insert(builder).Return()
+			ret := builder.AllocateInstruction().AsIaddPairwise(vlo, vhi, ssa.VecLaneI32x4).Insert(builder).Return()
 			state.push(ret)
 
 		case wasm.OpcodeVecI16x8ExtMulLowI8x16S, wasm.OpcodeVecI16x8ExtMulLowI8x16U:
