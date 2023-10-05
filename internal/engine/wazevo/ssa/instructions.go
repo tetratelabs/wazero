@@ -785,8 +785,7 @@ const (
 	// OpcodeUwidenHigh converts high half of the smaller lane vector to a larger lane vector, zero (unsigned) extended: `v = UwidenHigh.lane x`.
 	OpcodeUwidenHigh
 
-	// OpcodeIaddPairwise ...
-	// `v = iadd_pairwise x, y`.
+	// OpcodeIaddPairwise is a lane-wise integer extended pairwise addition producing extended results (twice wider results than the inputs): `v = iadd_pairwise x, y` on vector.
 	OpcodeIaddPairwise
 
 	// OpcodeWideningPairwiseDotProductS ...
@@ -985,6 +984,7 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeUrem:               sideEffectTraps,
 	OpcodeFabs:               sideEffectNone,
 	OpcodeFcopysign:          sideEffectNone,
+	OpcodeIaddPairwise:       sideEffectNone,
 	OpcodeVconst:             sideEffectNone,
 	OpcodeVbor:               sideEffectNone,
 	OpcodeVbxor:              sideEffectNone,
@@ -1045,72 +1045,73 @@ func (i *Instruction) sideEffect() sideEffect {
 
 // instructionReturnTypes provides the function to determine the return types of an instruction.
 var instructionReturnTypes = [opcodeEnd]returnTypesFn{
-	OpcodeVbor:        returnTypesFnV128,
-	OpcodeVbxor:       returnTypesFnV128,
-	OpcodeVband:       returnTypesFnV128,
-	OpcodeVbnot:       returnTypesFnV128,
-	OpcodeVbandnot:    returnTypesFnV128,
-	OpcodeVbitselect:  returnTypesFnV128,
-	OpcodeVanyTrue:    returnTypesFnI32,
-	OpcodeVallTrue:    returnTypesFnI32,
-	OpcodeVhighBits:   returnTypesFnV128,
-	OpcodeVIadd:       returnTypesFnV128,
-	OpcodeVSaddSat:    returnTypesFnV128,
-	OpcodeVUaddSat:    returnTypesFnV128,
-	OpcodeVIsub:       returnTypesFnV128,
-	OpcodeVSsubSat:    returnTypesFnV128,
-	OpcodeVUsubSat:    returnTypesFnV128,
-	OpcodeVIcmp:       returnTypesFnI32,
-	OpcodeVImin:       returnTypesFnV128,
-	OpcodeVUmin:       returnTypesFnV128,
-	OpcodeVImax:       returnTypesFnV128,
-	OpcodeVUmax:       returnTypesFnV128,
-	OpcodeVImul:       returnTypesFnV128,
-	OpcodeVAvgRound:   returnTypesFnV128,
-	OpcodeVIabs:       returnTypesFnV128,
-	OpcodeVIneg:       returnTypesFnV128,
-	OpcodeVIpopcnt:    returnTypesFnV128,
-	OpcodeVIshl:       returnTypesFnV128,
-	OpcodeVSshr:       returnTypesFnV128,
-	OpcodeVUshr:       returnTypesFnV128,
-	OpcodeExtractlane: returnTypesFnSingle,
-	OpcodeInsertlane:  returnTypesFnV128,
-	OpcodeBand:        returnTypesFnSingle,
-	OpcodeFcopysign:   returnTypesFnSingle,
-	OpcodeBitcast:     returnTypesFnSingle,
-	OpcodeBor:         returnTypesFnSingle,
-	OpcodeBxor:        returnTypesFnSingle,
-	OpcodeRotl:        returnTypesFnSingle,
-	OpcodeRotr:        returnTypesFnSingle,
-	OpcodeIshl:        returnTypesFnSingle,
-	OpcodeSshr:        returnTypesFnSingle,
-	OpcodeSdiv:        returnTypesFnSingle,
-	OpcodeSrem:        returnTypesFnSingle,
-	OpcodeUdiv:        returnTypesFnSingle,
-	OpcodeUrem:        returnTypesFnSingle,
-	OpcodeUshr:        returnTypesFnSingle,
-	OpcodeJump:        returnTypesFnNoReturns,
-	OpcodeUndefined:   returnTypesFnNoReturns,
-	OpcodeIconst:      returnTypesFnSingle,
-	OpcodeSelect:      returnTypesFnSingle,
-	OpcodeSExtend:     returnTypesFnSingle,
-	OpcodeUExtend:     returnTypesFnSingle,
-	OpcodeSwidenLow:   returnTypesFnV128,
-	OpcodeUwidenLow:   returnTypesFnV128,
-	OpcodeSwidenHigh:  returnTypesFnV128,
-	OpcodeUwidenHigh:  returnTypesFnV128,
-	OpcodeSnarrow:     returnTypesFnV128,
-	OpcodeUnarrow:     returnTypesFnV128,
-	OpcodeSwizzle:     returnTypesFnSingle,
-	OpcodeShuffle:     returnTypesFnV128,
-	OpcodeSplat:       returnTypesFnV128,
-	OpcodeIreduce:     returnTypesFnSingle,
-	OpcodeFabs:        returnTypesFnSingle,
-	OpcodeSqrt:        returnTypesFnSingle,
-	OpcodeCeil:        returnTypesFnSingle,
-	OpcodeFloor:       returnTypesFnSingle,
-	OpcodeTrunc:       returnTypesFnSingle,
-	OpcodeNearest:     returnTypesFnSingle,
+	OpcodeIaddPairwise: returnTypesFnV128,
+	OpcodeVbor:         returnTypesFnV128,
+	OpcodeVbxor:        returnTypesFnV128,
+	OpcodeVband:        returnTypesFnV128,
+	OpcodeVbnot:        returnTypesFnV128,
+	OpcodeVbandnot:     returnTypesFnV128,
+	OpcodeVbitselect:   returnTypesFnV128,
+	OpcodeVanyTrue:     returnTypesFnI32,
+	OpcodeVallTrue:     returnTypesFnI32,
+	OpcodeVhighBits:    returnTypesFnV128,
+	OpcodeVIadd:        returnTypesFnV128,
+	OpcodeVSaddSat:     returnTypesFnV128,
+	OpcodeVUaddSat:     returnTypesFnV128,
+	OpcodeVIsub:        returnTypesFnV128,
+	OpcodeVSsubSat:     returnTypesFnV128,
+	OpcodeVUsubSat:     returnTypesFnV128,
+	OpcodeVIcmp:        returnTypesFnI32,
+	OpcodeVImin:        returnTypesFnV128,
+	OpcodeVUmin:        returnTypesFnV128,
+	OpcodeVImax:        returnTypesFnV128,
+	OpcodeVUmax:        returnTypesFnV128,
+	OpcodeVImul:        returnTypesFnV128,
+	OpcodeVAvgRound:    returnTypesFnV128,
+	OpcodeVIabs:        returnTypesFnV128,
+	OpcodeVIneg:        returnTypesFnV128,
+	OpcodeVIpopcnt:     returnTypesFnV128,
+	OpcodeVIshl:        returnTypesFnV128,
+	OpcodeVSshr:        returnTypesFnV128,
+	OpcodeVUshr:        returnTypesFnV128,
+	OpcodeExtractlane:  returnTypesFnSingle,
+	OpcodeInsertlane:   returnTypesFnV128,
+	OpcodeBand:         returnTypesFnSingle,
+	OpcodeFcopysign:    returnTypesFnSingle,
+	OpcodeBitcast:      returnTypesFnSingle,
+	OpcodeBor:          returnTypesFnSingle,
+	OpcodeBxor:         returnTypesFnSingle,
+	OpcodeRotl:         returnTypesFnSingle,
+	OpcodeRotr:         returnTypesFnSingle,
+	OpcodeIshl:         returnTypesFnSingle,
+	OpcodeSshr:         returnTypesFnSingle,
+	OpcodeSdiv:         returnTypesFnSingle,
+	OpcodeSrem:         returnTypesFnSingle,
+	OpcodeUdiv:         returnTypesFnSingle,
+	OpcodeUrem:         returnTypesFnSingle,
+	OpcodeUshr:         returnTypesFnSingle,
+	OpcodeJump:         returnTypesFnNoReturns,
+	OpcodeUndefined:    returnTypesFnNoReturns,
+	OpcodeIconst:       returnTypesFnSingle,
+	OpcodeSelect:       returnTypesFnSingle,
+	OpcodeSExtend:      returnTypesFnSingle,
+	OpcodeUExtend:      returnTypesFnSingle,
+	OpcodeSwidenLow:    returnTypesFnV128,
+	OpcodeUwidenLow:    returnTypesFnV128,
+	OpcodeSwidenHigh:   returnTypesFnV128,
+	OpcodeUwidenHigh:   returnTypesFnV128,
+	OpcodeSnarrow:      returnTypesFnV128,
+	OpcodeUnarrow:      returnTypesFnV128,
+	OpcodeSwizzle:      returnTypesFnSingle,
+	OpcodeShuffle:      returnTypesFnV128,
+	OpcodeSplat:        returnTypesFnV128,
+	OpcodeIreduce:      returnTypesFnSingle,
+	OpcodeFabs:         returnTypesFnSingle,
+	OpcodeSqrt:         returnTypesFnSingle,
+	OpcodeCeil:         returnTypesFnSingle,
+	OpcodeFloor:        returnTypesFnSingle,
+	OpcodeTrunc:        returnTypesFnSingle,
+	OpcodeNearest:      returnTypesFnSingle,
 	OpcodeCallIndirect: func(b *builder, instr *Instruction) (t1 Type, ts []Type) {
 		sigID := SignatureID(instr.u1)
 		sig, ok := b.signatures[sigID]
@@ -1300,6 +1301,17 @@ func (i *Instruction) AsIadd(x, y Value) *Instruction {
 // AsVIadd initializes this instruction as an integer addition instruction with OpcodeVIadd on a vector.
 func (i *Instruction) AsVIadd(x, y Value, lane VecLane) *Instruction {
 	i.opcode = OpcodeVIadd
+	i.v = x
+	i.v2 = y
+	i.u1 = uint64(lane)
+	i.typ = TypeV128
+	return i
+}
+
+// AsIaddPairwise initializes this instruction as a lane-wise integer extended pairwise addition instruction
+// with OpcodeIaddPairwise on a vector.
+func (i *Instruction) AsIaddPairwise(x, y Value, lane VecLane) *Instruction {
+	i.opcode = OpcodeIaddPairwise
 	i.v = x
 	i.v2 = y
 	i.u1 = uint64(lane)
@@ -2606,7 +2618,7 @@ func (i *Instruction) Format(b Builder) string {
 		OpcodeFcvtFromUint, OpcodeFcvtToSintSat, OpcodeFcvtToUintSat, OpcodeFdemote, OpcodeFpromote, OpcodeIreduce, OpcodeBitcast, OpcodeSqrt, OpcodeFabs,
 		OpcodeCeil, OpcodeFloor, OpcodeTrunc, OpcodeNearest:
 		instSuffix = " " + i.v.Format(b)
-	case OpcodeVIadd, OpcodeVSaddSat, OpcodeVUaddSat, OpcodeVIsub, OpcodeVSsubSat, OpcodeVUsubSat,
+	case OpcodeVIadd, OpcodeIaddPairwise, OpcodeVSaddSat, OpcodeVUaddSat, OpcodeVIsub, OpcodeVSsubSat, OpcodeVUsubSat,
 		OpcodeVImin, OpcodeVUmin, OpcodeVImax, OpcodeVUmax, OpcodeVImul, OpcodeVAvgRound,
 		OpcodeVFadd, OpcodeVFsub, OpcodeVFmul, OpcodeVFdiv,
 		OpcodeVIshl, OpcodeVSshr, OpcodeVUshr,

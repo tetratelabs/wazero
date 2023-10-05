@@ -372,6 +372,10 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		x, y, lane := instr.Arg2WithLane()
 		arr := ssaLaneToArrangement(lane)
 		m.lowerVecRRR(vecOpAdd, x, y, instr.Return(), arr)
+	case ssa.OpcodeIaddPairwise:
+		x, y, lane := instr.Arg2WithLane()
+		arr := ssaLaneToArrangement(lane)
+		m.lowerVecRRR(vecOpAddp, x, y, instr.Return(), arr)
 	case ssa.OpcodeVSaddSat:
 		x, y, lane := instr.Arg2WithLane()
 		arr := ssaLaneToArrangement(lane)

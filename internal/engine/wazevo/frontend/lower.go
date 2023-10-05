@@ -2377,6 +2377,121 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVFdiv(v1, v2, lane).Insert(builder).Return()
 			state.push(ret)
+
+		case wasm.OpcodeVecI16x8ExtaddPairwiseI8x16S, wasm.OpcodeVecI16x8ExtaddPairwiseI8x16U:
+			if state.unreachable {
+				break
+			}
+			v1 := state.pop()
+			// TODO: The sequence `Widen; Widen; IaddPairwise` can be substituted for a single instruction on some ISAs.
+			signed := vecOp == wasm.OpcodeVecI16x8ExtaddPairwiseI8x16S
+			vlo := builder.AllocateInstruction().AsWiden(v1, ssa.VecLaneI8x16, signed, true).Insert(builder).Return()
+			vhi := builder.AllocateInstruction().AsWiden(v1, ssa.VecLaneI8x16, signed, false).Insert(builder).Return()
+			ret := builder.AllocateInstruction().AsIaddPairwise(vlo, vhi, ssa.VecLaneI16x8).Insert(builder).Return()
+			state.push(ret)
+
+		case wasm.OpcodeVecI32x4ExtaddPairwiseI16x8S, wasm.OpcodeVecI32x4ExtaddPairwiseI16x8U:
+			if state.unreachable {
+				break
+			}
+			v1 := state.pop()
+			// TODO: The sequence `Widen; Widen; IaddPairwise` can be substituted for a single instruction on some ISAs.
+			signed := vecOp == wasm.OpcodeVecI32x4ExtaddPairwiseI16x8S
+			vlo := builder.AllocateInstruction().AsWiden(v1, ssa.VecLaneI16x8, signed, true).Insert(builder).Return()
+			vhi := builder.AllocateInstruction().AsWiden(v1, ssa.VecLaneI16x8, signed, false).Insert(builder).Return()
+			ret := builder.AllocateInstruction().AsIaddPairwise(vlo, vhi, ssa.VecLaneI32x4).Insert(builder).Return()
+			state.push(ret)
+
+		case wasm.OpcodeVecI16x8ExtMulLowI8x16S, wasm.OpcodeVecI16x8ExtMulLowI8x16U:
+			if state.unreachable {
+				break
+			}
+			v2 := state.pop()
+			v1 := state.pop()
+			ret := c.lowerExtMul(
+				v1, v2,
+				ssa.VecLaneI8x16, ssa.VecLaneI16x8,
+				vecOp == wasm.OpcodeVecI16x8ExtMulLowI8x16S, true)
+			state.push(ret)
+
+		case wasm.OpcodeVecI16x8ExtMulHighI8x16S, wasm.OpcodeVecI16x8ExtMulHighI8x16U:
+			if state.unreachable {
+				break
+			}
+			v2 := state.pop()
+			v1 := state.pop()
+			ret := c.lowerExtMul(
+				v1, v2,
+				ssa.VecLaneI8x16, ssa.VecLaneI16x8,
+				vecOp == wasm.OpcodeVecI16x8ExtMulHighI8x16S, false)
+			state.push(ret)
+
+		case wasm.OpcodeVecI32x4ExtMulLowI16x8S, wasm.OpcodeVecI32x4ExtMulLowI16x8U:
+			if state.unreachable {
+				break
+			}
+			v2 := state.pop()
+			v1 := state.pop()
+			ret := c.lowerExtMul(
+				v1, v2,
+				ssa.VecLaneI16x8, ssa.VecLaneI32x4,
+				vecOp == wasm.OpcodeVecI32x4ExtMulLowI16x8S, true)
+			state.push(ret)
+
+		case wasm.OpcodeVecI32x4ExtMulHighI16x8S, wasm.OpcodeVecI32x4ExtMulHighI16x8U:
+			if state.unreachable {
+				break
+			}
+			v2 := state.pop()
+			v1 := state.pop()
+			ret := c.lowerExtMul(
+				v1, v2,
+				ssa.VecLaneI16x8, ssa.VecLaneI32x4,
+				vecOp == wasm.OpcodeVecI32x4ExtMulHighI16x8S, false)
+			state.push(ret)
+		case wasm.OpcodeVecI64x2ExtMulLowI32x4S, wasm.OpcodeVecI64x2ExtMulLowI32x4U:
+			if state.unreachable {
+				break
+			}
+			v2 := state.pop()
+			v1 := state.pop()
+			ret := c.lowerExtMul(
+				v1, v2,
+				ssa.VecLaneI32x4, ssa.VecLaneI64x2,
+				vecOp == wasm.OpcodeVecI64x2ExtMulLowI32x4S, true)
+			state.push(ret)
+
+		case wasm.OpcodeVecI64x2ExtMulHighI32x4S, wasm.OpcodeVecI64x2ExtMulHighI32x4U:
+			if state.unreachable {
+				break
+			}
+			v2 := state.pop()
+			v1 := state.pop()
+			ret := c.lowerExtMul(
+				v1, v2,
+				ssa.VecLaneI32x4, ssa.VecLaneI64x2,
+				vecOp == wasm.OpcodeVecI64x2ExtMulHighI32x4S, false)
+			state.push(ret)
+
+		case wasm.OpcodeVecI32x4DotI16x8S:
+			if state.unreachable {
+				break
+			}
+			v2 := state.pop()
+			v1 := state.pop()
+
+			// TODO: The sequence `Widen; Widen; VIMul` can be substituted for a single instruction on some ISAs.
+			v1lo := builder.AllocateInstruction().AsWiden(v1, ssa.VecLaneI16x8, true, true).Insert(builder).Return()
+			v2lo := builder.AllocateInstruction().AsWiden(v2, ssa.VecLaneI16x8, true, true).Insert(builder).Return()
+			low := builder.AllocateInstruction().AsVImul(v1lo, v2lo, ssa.VecLaneI32x4).Insert(builder).Return()
+
+			v1hi := builder.AllocateInstruction().AsWiden(v1, ssa.VecLaneI16x8, true, false).Insert(builder).Return()
+			v2hi := builder.AllocateInstruction().AsWiden(v2, ssa.VecLaneI16x8, true, false).Insert(builder).Return()
+			high := builder.AllocateInstruction().AsVImul(v1hi, v2hi, ssa.VecLaneI32x4).Insert(builder).Return()
+
+			ret := builder.AllocateInstruction().AsIaddPairwise(low, high, ssa.VecLaneI32x4).Insert(builder).Return()
+			state.push(ret)
+
 		case wasm.OpcodeVecF32x4Eq, wasm.OpcodeVecF64x2Eq:
 			if state.unreachable {
 				break
@@ -2656,7 +2771,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			}
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().
-				AsWiden(v1, ssa.VecLaneI32x4, vecOp == wasm.OpcodeVecI16x8NarrowI32x4S, true).
+				AsWiden(v1, ssa.VecLaneI32x4, vecOp == wasm.OpcodeVecI64x2ExtendLowI32x4S, true).
 				Insert(builder).Return()
 			state.push(ret)
 		case wasm.OpcodeVecI64x2ExtendHighI32x4S, wasm.OpcodeVecI64x2ExtendHighI32x4U:
@@ -2665,7 +2780,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			}
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().
-				AsWiden(v1, ssa.VecLaneI32x4, vecOp == wasm.OpcodeVecI16x8NarrowI32x4S, false).
+				AsWiden(v1, ssa.VecLaneI32x4, vecOp == wasm.OpcodeVecI64x2ExtendHighI32x4S, false).
 				Insert(builder).Return()
 			state.push(ret)
 
@@ -2937,6 +3052,16 @@ func (c *Compiler) lowerCurrentOpcode() {
 		fmt.Println("--------------------------")
 	}
 	c.loweringState.pc++
+}
+
+func (c *Compiler) lowerExtMul(v1, v2 ssa.Value, from, to ssa.VecLane, signed, low bool) ssa.Value {
+	// TODO: The sequence `Widen; Widen; VIMul` can be substituted for a single instruction on some ISAs.
+	builder := c.ssaBuilder
+
+	v1lo := builder.AllocateInstruction().AsWiden(v1, from, signed, low).Insert(builder).Return()
+	v2lo := builder.AllocateInstruction().AsWiden(v2, from, signed, low).Insert(builder).Return()
+
+	return builder.AllocateInstruction().AsVImul(v1lo, v2lo, to).Insert(builder).Return()
 }
 
 const (
