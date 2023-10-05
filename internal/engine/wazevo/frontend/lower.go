@@ -2411,7 +2411,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			ret := builder.AllocateInstruction().AsVUshr(v1, v2, lane).Insert(builder).Return()
 			state.push(ret)
 		case wasm.OpcodeVecI8x16ExtractLaneS, wasm.OpcodeVecI16x8ExtractLaneS:
-			state.pc++ // Skip the immediate value.
+			state.pc++
 			if state.unreachable {
 				break
 			}
@@ -2455,7 +2455,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 		case wasm.OpcodeVecI8x16ReplaceLane, wasm.OpcodeVecI16x8ReplaceLane,
 			wasm.OpcodeVecI32x4ReplaceLane, wasm.OpcodeVecI64x2ReplaceLane,
 			wasm.OpcodeVecF32x4ReplaceLane, wasm.OpcodeVecF64x2ReplaceLane:
-			state.pc++ // Skip the immediate value.
+			state.pc++
 			if state.unreachable {
 				break
 			}
@@ -2480,7 +2480,6 @@ func (c *Compiler) lowerCurrentOpcode() {
 			ret := builder.AllocateInstruction().AsInsertlane(v1, v2, index, lane).Insert(builder).Return()
 			state.push(ret)
 		case wasm.OpcodeVecV128i8x16Shuffle:
-			// Skip the immediate values.
 			state.pc++
 			var lanes [16]uint64
 			for i := 0; i < 16; i++ {

@@ -691,9 +691,6 @@ func (m *machine) lowerShuffle(rd, rn, rm operand, lane1, lane2 uint64) {
 	m.insert(lfc)
 
 	// tbl <rd>.16b, { <vReg>.16B, <wReg>.16b }, <tmp>.16b
-	// ;; that is:
-	// tbl <rd>.16b, { v29.16b, v30.16b }, <tmp>.16b
-	// ;; operand vReg := v29 implies operand wReg := v30.
 	tbl2 := m.allocateInstr()
 	tbl2.asVecTbl(2, rd, operandNR(vReg), tmp, vecArrangement16B)
 	m.insert(tbl2)
