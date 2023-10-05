@@ -336,7 +336,7 @@ L2:
 `},
 		{name: "64bit unsigned", _64bit: true, signed: false, exp: `
 udiv x1?, x2?, x3?
-cbnz w3?, L1
+cbnz x3?, L1
 movz x1?, #0xa, lsl 0
 str w1?, [x65535?]
 mov x2?, sp
@@ -348,7 +348,7 @@ L1:
 `},
 		{name: "64bit signed", _64bit: true, signed: true, exp: `
 sdiv x1?, x2?, x3?
-cbnz w3?, L1
+cbnz x3?, L1
 movz x1?, #0xa, lsl 0
 str w1?, [x65535?]
 mov x2?, sp
