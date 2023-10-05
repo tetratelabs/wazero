@@ -43,7 +43,7 @@ fn run(data: &[u8]) -> Result<()> {
     config.min_funcs = 1;
     config.max_funcs = config.max_funcs.max(1);
 
-    wazero_abi::maybe_disable_v2(&mut config);
+    wazero_abi::maybe_disable_simd(&mut config);
 
     // Generate the random module via wasm-smith.
     let mut module = wasm_smith::Module::new(config.clone(), &mut u)?;
