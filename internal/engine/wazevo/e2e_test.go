@@ -201,6 +201,7 @@ func TestSpectestV2(t *testing.T) {
 		{"simd_int_to_int_extend"},
 		{"simd_lane"},
 		{"simd_linking"},
+		{"simd_splat"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Run("normal", func(t *testing.T) {
