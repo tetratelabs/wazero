@@ -16,7 +16,7 @@ import (
 )
 
 var dwarfTests = map[string]testCase{
-	"tinygo": {f: testTinyGoDWARF, wazevoSkip: true}, // TODO: Skip wazevo because of some v2 instructions.
+	"tinygo": {f: testTinyGoDWARF},
 	"zig":    {f: testZigDWARF},
 	"cc":     {f: testCCDWARF},
 	"rust":   {f: testRustDWARF},

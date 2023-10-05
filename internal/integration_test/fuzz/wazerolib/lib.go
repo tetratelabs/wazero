@@ -9,7 +9,6 @@ import (
 	"path"
 
 	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo"
 )
 
@@ -78,7 +77,6 @@ To reproduce the failure, execute: WASM_BINARY_PATH=%s go test -run=%s ./wazerol
 func newCompilerConfig() wazero.RuntimeConfig {
 	c := wazero.NewRuntimeConfigCompiler()
 	if os.Getenv("WAZERO_FUZZ_WAZEVO") != "" {
-		c = c.WithCoreFeatures(api.CoreFeaturesV1) // Currently only V1 is supported.
 		wazevo.ConfigureWazevo(c)
 	}
 	return c

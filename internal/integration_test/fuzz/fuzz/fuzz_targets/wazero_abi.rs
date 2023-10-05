@@ -19,13 +19,9 @@ extern "C" {
 }
 
 #[allow(dead_code)]
-pub fn maybe_disable_v2(config: &mut SwarmConfig) {
+pub fn maybe_disable_simd(config: &mut SwarmConfig) {
     if std::env::var("WAZERO_FUZZ_WAZEVO").is_ok() {
+        // Wazevo doesn't support SIMD yet.
         config.simd_enabled = false;
-        config.multi_value_enabled = false;
-        config.bulk_memory_enabled = false;
-        config.reference_types_enabled = false;
-        config.saturating_float_to_int_enabled = false;
-        config.max_tables = 1;
     }
 }
