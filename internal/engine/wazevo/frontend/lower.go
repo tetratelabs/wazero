@@ -2481,17 +2481,13 @@ func (c *Compiler) lowerCurrentOpcode() {
 			state.push(ret)
 		case wasm.OpcodeVecV128i8x16Shuffle:
 			state.pc++
-			var lanes [16]uint64
-			for i := 0; i < 16; i++ {
-				lanes[i] = uint64(c.wasmFunctionBody[state.pc+i])
-			}
-			state.pc += 15
 			if state.unreachable {
 				break
 			}
 			v2 := state.pop()
 			v1 := state.pop()
-			ret := builder.AllocateInstruction().AsShuffle(v1, v2, lanes).Insert(builder).Return()
+			ret := builder.AllocateInstruction().AsShuffle(v1, v2, c.wasmFunctionBody[state.pc:state.pc+16]).Insert(builder).Return()
+			state.pc += 15
 			state.push(ret)
 
 		case wasm.OpcodeVecI8x16Swizzle:

@@ -1809,13 +1809,13 @@ func (i *Instruction) AsInsertlane(x, y Value, index byte, lane VecLane) *Instru
 }
 
 // AsShuffle initializes this instruction as a shuffle instruction with OpcodeShuffle on vector.
-func (i *Instruction) AsShuffle(x, y Value, lane [16]uint64) *Instruction {
+func (i *Instruction) AsShuffle(x, y Value, lane []byte) *Instruction {
 	i.opcode = OpcodeShuffle
 	i.v = x
 	i.v2 = y
 	// Encode the 16 bytes as 8 bytes in u1, and 8 bytes in u2.
-	i.u1 = lane[7]<<56 | lane[6]<<48 | lane[5]<<40 | lane[4]<<32 | lane[3]<<24 | lane[2]<<16 | lane[1]<<8 | lane[0]
-	i.u2 = lane[15]<<56 | lane[14]<<48 | lane[13]<<40 | lane[12]<<32 | lane[11]<<24 | lane[10]<<16 | lane[9]<<8 | lane[8]
+	i.u1 = uint64(lane[7])<<56 | uint64(lane[6])<<48 | uint64(lane[5])<<40 | uint64(lane[4])<<32 | uint64(lane[3])<<24 | uint64(lane[2])<<16 | uint64(lane[1])<<8 | uint64(lane[0])
+	i.u2 = uint64(lane[15])<<56 | uint64(lane[14])<<48 | uint64(lane[13])<<40 | uint64(lane[12])<<32 | uint64(lane[11])<<24 | uint64(lane[10])<<16 | uint64(lane[9])<<8 | uint64(lane[8])
 	i.typ = TypeV128
 	return i
 }
