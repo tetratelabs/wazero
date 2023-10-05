@@ -2412,13 +2412,10 @@ func (c *Compiler) lowerCurrentOpcode() {
 			}
 			v2 := state.pop()
 			v1 := state.pop()
-			lane := ssa.VecLaneI8x16
-
-			signed := vecOp == wasm.OpcodeVecI16x8ExtMulLowI8x16S
-			v1lo := builder.AllocateInstruction().AsWiden(v1, lane, signed, true).Insert(builder).Return()
-			v2lo := builder.AllocateInstruction().AsWiden(v2, lane, signed, true).Insert(builder).Return()
-
-			ret := builder.AllocateInstruction().AsVImul(v1lo, v2lo, ssa.VecLaneI16x8).Insert(builder).Return()
+			ret := c.lowerExtMul(
+				v1, v2,
+				ssa.VecLaneI8x16, ssa.VecLaneI16x8,
+				vecOp == wasm.OpcodeVecI16x8ExtMulLowI8x16S, true)
 			state.push(ret)
 
 		case wasm.OpcodeVecI16x8ExtMulHighI8x16S, wasm.OpcodeVecI16x8ExtMulHighI8x16U:
@@ -2427,13 +2424,10 @@ func (c *Compiler) lowerCurrentOpcode() {
 			}
 			v2 := state.pop()
 			v1 := state.pop()
-			lane := ssa.VecLaneI8x16
-
-			signed := vecOp == wasm.OpcodeVecI16x8ExtMulHighI8x16S
-			v1lo := builder.AllocateInstruction().AsWiden(v1, lane, signed, false).Insert(builder).Return()
-			v2lo := builder.AllocateInstruction().AsWiden(v2, lane, signed, false).Insert(builder).Return()
-
-			ret := builder.AllocateInstruction().AsVImul(v1lo, v2lo, ssa.VecLaneI16x8).Insert(builder).Return()
+			ret := c.lowerExtMul(
+				v1, v2,
+				ssa.VecLaneI8x16, ssa.VecLaneI16x8,
+				vecOp == wasm.OpcodeVecI16x8ExtMulHighI8x16S, false)
 			state.push(ret)
 		case wasm.OpcodeVecI32x4ExtMulLowI16x8S, wasm.OpcodeVecI32x4ExtMulLowI16x8U:
 			if state.unreachable {
@@ -2441,13 +2435,10 @@ func (c *Compiler) lowerCurrentOpcode() {
 			}
 			v2 := state.pop()
 			v1 := state.pop()
-			lane := ssa.VecLaneI16x8
-
-			signed := vecOp == wasm.OpcodeVecI32x4ExtMulLowI16x8S
-			v1lo := builder.AllocateInstruction().AsWiden(v1, lane, signed, true).Insert(builder).Return()
-			v2lo := builder.AllocateInstruction().AsWiden(v2, lane, signed, true).Insert(builder).Return()
-
-			ret := builder.AllocateInstruction().AsVImul(v1lo, v2lo, ssa.VecLaneI32x4).Insert(builder).Return()
+			ret := c.lowerExtMul(
+				v1, v2,
+				ssa.VecLaneI16x8, ssa.VecLaneI32x4,
+				vecOp == wasm.OpcodeVecI32x4ExtMulLowI16x8S, true)
 			state.push(ret)
 		case wasm.OpcodeVecI32x4ExtMulHighI16x8S, wasm.OpcodeVecI32x4ExtMulHighI16x8U:
 			if state.unreachable {
@@ -2455,45 +2446,33 @@ func (c *Compiler) lowerCurrentOpcode() {
 			}
 			v2 := state.pop()
 			v1 := state.pop()
-			lane := ssa.VecLaneI16x8
-
-			signed := vecOp == wasm.OpcodeVecI32x4ExtMulHighI16x8S
-			v1lo := builder.AllocateInstruction().AsWiden(v1, lane, signed, false).Insert(builder).Return()
-			v2lo := builder.AllocateInstruction().AsWiden(v2, lane, signed, false).Insert(builder).Return()
-
-			ret := builder.AllocateInstruction().AsVImul(v1lo, v2lo, ssa.VecLaneI32x4).Insert(builder).Return()
+			ret := c.lowerExtMul(
+				v1, v2,
+				ssa.VecLaneI16x8, ssa.VecLaneI32x4,
+				vecOp == wasm.OpcodeVecI32x4ExtMulHighI16x8S, false)
 			state.push(ret)
-
 		case wasm.OpcodeVecI64x2ExtMulLowI32x4S, wasm.OpcodeVecI64x2ExtMulLowI32x4U:
 			if state.unreachable {
 				break
 			}
 			v2 := state.pop()
 			v1 := state.pop()
-			lane := ssa.VecLaneI32x4
-
-			signed := vecOp == wasm.OpcodeVecI64x2ExtMulLowI32x4S
-			v1lo := builder.AllocateInstruction().AsWiden(v1, lane, signed, true).Insert(builder).Return()
-			v2lo := builder.AllocateInstruction().AsWiden(v2, lane, signed, true).Insert(builder).Return()
-
-			ret := builder.AllocateInstruction().AsVImul(v1lo, v2lo, ssa.VecLaneI64x2).Insert(builder).Return()
+			ret := c.lowerExtMul(
+				v1, v2,
+				ssa.VecLaneI32x4, ssa.VecLaneI64x2,
+				vecOp == wasm.OpcodeVecI64x2ExtMulLowI32x4S, true)
 			state.push(ret)
-
 		case wasm.OpcodeVecI64x2ExtMulHighI32x4S, wasm.OpcodeVecI64x2ExtMulHighI32x4U:
 			if state.unreachable {
 				break
 			}
 			v2 := state.pop()
 			v1 := state.pop()
-			lane := ssa.VecLaneI32x4
-
-			signed := vecOp == wasm.OpcodeVecI64x2ExtMulHighI32x4S
-			v1lo := builder.AllocateInstruction().AsWiden(v1, lane, signed, false).Insert(builder).Return()
-			v2lo := builder.AllocateInstruction().AsWiden(v2, lane, signed, false).Insert(builder).Return()
-
-			ret := builder.AllocateInstruction().AsVImul(v1lo, v2lo, ssa.VecLaneI64x2).Insert(builder).Return()
+			ret := c.lowerExtMul(
+				v1, v2,
+				ssa.VecLaneI32x4, ssa.VecLaneI64x2,
+				vecOp == wasm.OpcodeVecI64x2ExtMulHighI32x4S, false)
 			state.push(ret)
-
 		case wasm.OpcodeVecI32x4DotI16x8S:
 			if state.unreachable {
 				break
@@ -3075,6 +3054,15 @@ func (c *Compiler) lowerCurrentOpcode() {
 		fmt.Println("--------------------------")
 	}
 	c.loweringState.pc++
+}
+
+func (c *Compiler) lowerExtMul(v1, v2 ssa.Value, from, to ssa.VecLane, signed, low bool) ssa.Value {
+	builder := c.ssaBuilder
+
+	v1lo := builder.AllocateInstruction().AsWiden(v1, from, signed, low).Insert(builder).Return()
+	v2lo := builder.AllocateInstruction().AsWiden(v2, from, signed, low).Insert(builder).Return()
+
+	return builder.AllocateInstruction().AsVImul(v1lo, v2lo, to).Insert(builder).Return()
 }
 
 const (
