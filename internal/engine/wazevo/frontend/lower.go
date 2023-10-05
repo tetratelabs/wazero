@@ -2773,7 +2773,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			}
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().
-				AsWiden(v1, ssa.VecLaneI32x4, vecOp == wasm.OpcodeVecI16x8NarrowI32x4S, true).
+				AsWiden(v1, ssa.VecLaneI32x4, vecOp == wasm.OpcodeVecI64x2ExtendLowI32x4S, true).
 				Insert(builder).Return()
 			state.push(ret)
 		case wasm.OpcodeVecI64x2ExtendHighI32x4S, wasm.OpcodeVecI64x2ExtendHighI32x4U:
@@ -2782,7 +2782,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			}
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().
-				AsWiden(v1, ssa.VecLaneI32x4, vecOp == wasm.OpcodeVecI16x8NarrowI32x4S, false).
+				AsWiden(v1, ssa.VecLaneI32x4, vecOp == wasm.OpcodeVecI64x2ExtendHighI32x4S, false).
 				Insert(builder).Return()
 			state.push(ret)
 
