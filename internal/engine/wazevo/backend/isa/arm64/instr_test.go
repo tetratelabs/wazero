@@ -67,3 +67,10 @@ func TestInstruction_String(t *testing.T) {
 		t.Run(tc.exp, func(t *testing.T) { require.Equal(t, tc.exp, tc.i.String()) })
 	}
 }
+
+func TestInstruction_isCopy(t *testing.T) {
+	require.False(t, (&instruction{kind: mov32}).isCopy())
+	require.True(t, (&instruction{kind: mov64}).isCopy())
+	require.True(t, (&instruction{kind: fpuMov64}).isCopy())
+	require.True(t, (&instruction{kind: fpuMov128}).isCopy())
+}
