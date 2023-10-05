@@ -962,7 +962,7 @@ func (m *machine) lowerIRem(execCtxVReg regalloc.VReg, rd, rn, rm operand, _64bi
 	m.insert(div)
 
 	// Check if rm is zero:
-	m.exitIfNot(execCtxVReg, registerAsRegNotZeroCond(rm.nr()), wazevoapi.ExitCodeIntegerDivisionByZero)
+	m.exitIfNot(execCtxVReg, registerAsRegNotZeroCond(rm.nr()), _64bit, wazevoapi.ExitCodeIntegerDivisionByZero)
 
 	// rd = rn-rd*rm by MSUB instruction.
 	msub := m.allocateInstr()
@@ -981,7 +981,7 @@ func (m *machine) lowerIDiv(execCtxVReg regalloc.VReg, rd, rn, rm operand, _64bi
 	m.insert(div)
 
 	// Check if rm is zero:
-	m.exitIfNot(execCtxVReg, registerAsRegNotZeroCond(rm.nr()), wazevoapi.ExitCodeIntegerDivisionByZero)
+	m.exitIfNot(execCtxVReg, registerAsRegNotZeroCond(rm.nr()), _64bit, wazevoapi.ExitCodeIntegerDivisionByZero)
 
 	if signed {
 		// We need to check the signed overflow which happens iff "math.MinInt{32,64} / -1"
@@ -996,17 +996,20 @@ func (m *machine) lowerIDiv(execCtxVReg regalloc.VReg, rd, rn, rm operand, _64bi
 		m.insert(ccmp)
 
 		// Check the overflow flag.
-		m.exitIfNot(execCtxVReg, vs.invert().asCond(), wazevoapi.ExitCodeIntegerOverflow)
+		m.exitIfNot(execCtxVReg, vs.invert().asCond(), false, wazevoapi.ExitCodeIntegerOverflow)
 	}
 }
 
-func (m *machine) exitIfNot(execCtxVReg regalloc.VReg, c cond, code wazevoapi.ExitCode) {
+// exitIfNot emits a conditional branch to exit if the condition is not met.
+// If `c` (cond type) is a register, `cond64bit` must be chosen to indicate whether the register is 32-bit or 64-bit.
+// Otherwise, `cond64bit` is ignored.
+func (m *machine) exitIfNot(execCtxVReg regalloc.VReg, c cond, cond64bit bool, code wazevoapi.ExitCode) {
 	cbr := m.allocateInstr()
 	m.insert(cbr)
 	m.lowerExitWithCode(execCtxVReg, code)
 	// Conditional branch target is after exit.
 	l := m.insertBrTargetLabel()
-	cbr.asCondBr(c, l, false /* ignored */)
+	cbr.asCondBr(c, l, cond64bit)
 }
 
 func (m *machine) lowerFcopysign(x, y, ret ssa.Value) {
@@ -1121,7 +1124,7 @@ func (m *machine) lowerFpuToInt(rd, rn operand, ctx regalloc.VReg, signed, src64
 		fpuCmp.asFpuCmp(rn, rn, src64bit)
 		m.insert(fpuCmp)
 		// If the VC flag is not set (== VS flag is set), it is a NaN.
-		m.exitIfNot(ctx, vc.asCond(), wazevoapi.ExitCodeInvalidConversionToInteger)
+		m.exitIfNot(ctx, vc.asCond(), false, wazevoapi.ExitCodeInvalidConversionToInteger)
 		// Otherwise, it is an overflow.
 		m.lowerExitWithCode(ctx, wazevoapi.ExitCodeIntegerOverflow)
 
