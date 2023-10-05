@@ -63,7 +63,9 @@ type ModuleContextOffsetData struct {
 	TypeIDs1stElement,
 	TablesBegin,
 	BeforeListenerTrampolines1stElement,
-	AfterListenerTrampolines1stElement Offset
+	AfterListenerTrampolines1stElement,
+	DataInstances1stElement,
+	ElementInstances1stElement Offset
 }
 
 // ImportedFunctionOffset returns an offset of the i-th imported function.
@@ -184,6 +186,12 @@ func NewModuleContextOffsetData(m *wasm.Module, withListener bool) ModuleContext
 		ret.BeforeListenerTrampolines1stElement = -1
 		ret.AfterListenerTrampolines1stElement = -1
 	}
+
+	ret.DataInstances1stElement = offset
+	offset += 8 // First element of DataInstances.
+
+	ret.ElementInstances1stElement = offset
+	offset += 8 // First element of ElementInstances.
 
 	ret.TotalSize = int(offset)
 	return ret

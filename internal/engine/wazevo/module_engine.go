@@ -52,7 +52,10 @@ type (
 	//      globals                                   []*wasm.GlobalInstance (optional)
 	//      typeIDsBegin                              &wasm.ModuleInstance.TypeIDs[0]  (optional)
 	//      tables                                    []*wasm.TableInstance  (optional)
-	// 	    TODO: add more fields, like tables, etc.
+	// 	    beforeListenerTrampolines1stElement       **byte                 (optional)
+	// 	    afterListenerTrampolines1stElement        **byte                 (optional)
+	//      dataInstances1stElement                   []wasm.DataInstance    (optional)
+	//      elementInstances1stElement                []wasm.ElementInstance (optional)
 	// 	}
 	//
 	// See wazevoapi.NewModuleContextOffsetData for the details of the offsets.
@@ -113,6 +116,12 @@ func (m *moduleEngine) setupOpaque() {
 	}
 	if afterListenerOffset := offsets.AfterListenerTrampolines1stElement; afterListenerOffset >= 0 {
 		binary.LittleEndian.PutUint64(opaque[afterListenerOffset:], uint64(uintptr(unsafe.Pointer(&m.parent.listenerAfterTrampolines[0]))))
+	}
+	if len(inst.DataInstances) > 0 {
+		binary.LittleEndian.PutUint64(opaque[offsets.DataInstances1stElement:], uint64(uintptr(unsafe.Pointer(&inst.DataInstances[0]))))
+	}
+	if len(inst.ElementInstances) > 0 {
+		binary.LittleEndian.PutUint64(opaque[offsets.ElementInstances1stElement:], uint64(uintptr(unsafe.Pointer(&inst.ElementInstances[0]))))
 	}
 }
 
