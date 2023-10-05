@@ -1532,7 +1532,29 @@ var (
 			}}},
 		},
 	}
+
+	VecShuffle = TestCase{
+		Name:   "shuffle",
+		Module: VecShuffleWithLane(0, 1, 2, 3, 4, 5, 6, 7, 24, 25, 26, 27, 28, 29, 30, 31),
+	}
 )
+
+// VecShuffleWithLane returns a VecShuffle test with a custom 16-bytes immediate (lane indexes).
+func VecShuffleWithLane(lane ...byte) *wasm.Module {
+	return &wasm.Module{
+		TypeSection:     []wasm.FunctionType{{Params: []wasm.ValueType{v128, v128}, Results: []wasm.ValueType{v128}}},
+		ExportSection:   []wasm.Export{{Name: ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 0}},
+		FunctionSection: []wasm.Index{0},
+		CodeSection: []wasm.Code{{
+			Body: append(append([]byte{
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeVecPrefix, wasm.OpcodeVecV128i8x16Shuffle,
+			}, lane...),
+				wasm.OpcodeEnd),
+		}},
+	}
+}
 
 type TestCase struct {
 	Name             string

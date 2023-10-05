@@ -192,6 +192,7 @@ func TestSpectestV2(t *testing.T) {
 		{"simd_f64x2_pmin_pmax"},
 		{"simd_i32x4_trunc_sat_f32x4"},
 		{"simd_i32x4_trunc_sat_f64x2"},
+		{"simd_lane"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Run("normal", func(t *testing.T) {
@@ -425,6 +426,53 @@ func TestE2E(t *testing.T) {
 			m:    testcases.VecBitSelect.Module,
 			calls: []callCase{
 				{params: []uint64{1, 2, 3, 4, 5, 6}, expResults: []uint64{0x3, 0x2, 0x5, 0x6}},
+			},
+		},
+		{
+			name: "vector_shuffle",
+			m:    testcases.VecShuffle.Module,
+			calls: []callCase{
+				{params: []uint64{0x01010101, 0x02020202, 0x03030303, 0x04040404}, expResults: []uint64{0x01010101, 0x04040404}},
+				{params: []uint64{0x03030303, 0x04040404, 0x01010101, 0x02020202}, expResults: []uint64{0x03030303, 0x02020202}},
+				{params: []uint64{0x00000000, 0xffffffff, 0xffffffff, 0x00000000}, expResults: []uint64{0x00000000, 0x00000000}},
+				{params: []uint64{0xffffffff, 0x00000000, 0x00000000, 0xffffffff}, expResults: []uint64{0xffffffff, 0xffffffff}},
+				{params: []uint64{0x00000000, 0x11111111, 0x11111111, 0xffffffff}, expResults: []uint64{0x00000000, 0xffffffff}},
+			},
+		},
+		{
+			name: "vector_shuffle (1st only)",
+			m:    testcases.VecShuffleWithLane(1, 1, 1, 1, 0, 0, 0, 0, 10, 10, 10, 10, 0, 0, 0, 0),
+			calls: []callCase{
+				{params: []uint64{0x0000000000000b0a, 0x0c0000, 0xffffffffffffffff, 0xffffffffffffffff}, expResults: []uint64{0x0a0a0a0a0b0b0b0b, 0x0a0a0a0a0c0c0c0c}},
+				{params: []uint64{0x01010101, 0x02020202, 0x03030303, 0x04040404}, expResults: []uint64{0x0101010101010101, 0x101010102020202}},
+				{params: []uint64{0x03030303, 0x04040404, 0x01010101, 0x02020202}, expResults: []uint64{0x0303030303030303, 0x303030304040404}},
+				{params: []uint64{0x00000000, 0xffffffff, 0xffffffff, 0x00000000}, expResults: []uint64{0x0000000000000000, 0x0000000ffffffff}},
+				{params: []uint64{0xffffffff, 0x00000000, 0x00000000, 0xffffffff}, expResults: []uint64{0xffffffffffffffff, 0xffffffff00000000}},
+				{params: []uint64{0x00000000, 0x11111111, 0x11111111, 0xffffffff}, expResults: []uint64{0x0000000000000000, 0x0000000011111111}},
+			},
+		},
+		{
+			name: "vector_shuffle (2nd only)",
+			m:    testcases.VecShuffleWithLane(17, 17, 17, 17, 16, 16, 16, 16, 26, 26, 26, 26, 16, 16, 16, 16),
+			calls: []callCase{
+				{params: []uint64{0xffffffffffffffff, 0xffffffffffffffff, 0x0000000000000b0a, 0x0c0000}, expResults: []uint64{0x0a0a0a0a0b0b0b0b, 0x0a0a0a0a0c0c0c0c}},
+				{params: []uint64{0x01010101, 0x02020202, 0x03030303, 0x04040404}, expResults: []uint64{0x303030303030303, 0x303030304040404}},
+				{params: []uint64{0x03030303, 0x04040404, 0x01010101, 0x02020202}, expResults: []uint64{0x101010101010101, 0x101010102020202}},
+				{params: []uint64{0x00000000, 0xffffffff, 0xffffffff, 0x00000000}, expResults: []uint64{0xffffffffffffffff, 0xffffffff00000000}},
+				{params: []uint64{0xffffffff, 0x00000000, 0x00000000, 0xffffffff}, expResults: []uint64{0x0000000000000000, 0xffffffff}},
+				{params: []uint64{0x00000000, 0x11111111, 0x11111111, 0xffffffff}, expResults: []uint64{0x1111111111111111, 0x11111111ffffffff}},
+			},
+		},
+		{
+			name: "vector_shuffle (mixed)",
+			m:    testcases.VecShuffleWithLane(0, 17, 2, 19, 4, 21, 6, 23, 8, 25, 10, 27, 12, 29, 14, 31),
+			calls: []callCase{
+				{params: []uint64{0xff08ff07ff06ff05, 0xff04ff03ff02ff01, 0x18ff17ff16ff15ff, 0x14ff13ff12ff11ff}, expResults: []uint64{0x1808170716061505, 0x1404130312021101}},
+				{params: []uint64{0x01010101, 0x02020202, 0x03030303, 0x04040404}, expResults: []uint64{0x3010301, 0x4020402}},
+				{params: []uint64{0x03030303, 0x04040404, 0x01010101, 0x02020202}, expResults: []uint64{0x1030103, 0x2040204}},
+				{params: []uint64{0x00000000, 0xffffffff, 0xffffffff, 0x00000000}, expResults: []uint64{0xff00ff00, 0xff00ff}},
+				{params: []uint64{0xffffffff, 0x00000000, 0x00000000, 0xffffffff}, expResults: []uint64{0xff00ff, 0xff00ff00}},
+				{params: []uint64{0x00000000, 0x11111111, 0x11111111, 0xffffffff}, expResults: []uint64{0x11001100, 0xff11ff11}},
 			},
 		},
 	} {

@@ -99,11 +99,16 @@ var defKinds = [numInstructionKinds]defKind{
 	fpuCSel:              defKindRD,
 	movToVec:             defKindRD,
 	movFromVec:           defKindRD,
+	movFromVecSigned:     defKindRD,
 	vecDup:               defKindRD,
+	vecDupElement:        defKindRD,
 	vecExtract:           defKindRD,
 	vecMisc:              defKindRD,
+	vecMovElement:        defKindRD,
 	vecLanes:             defKindRD,
 	vecShiftImm:          defKindRD,
+	vecTbl:               defKindRD,
+	vecTbl2:              defKindRD,
 	vecPermute:           defKindRD,
 	vecRRR:               defKindRD,
 	fpuToInt:             defKindRD,
@@ -148,6 +153,7 @@ const (
 	useKindRN
 	useKindRNRM
 	useKindRNRMRA
+	useKindRNRN1RM
 	useKindRet
 	useKindCall
 	useKindCallInd
@@ -210,12 +216,17 @@ var useKinds = [numInstructionKinds]useKind{
 	fpuCSel:              useKindRNRM,
 	movToVec:             useKindRN,
 	movFromVec:           useKindRN,
+	movFromVecSigned:     useKindRN,
 	vecDup:               useKindRN,
+	vecDupElement:        useKindRN,
 	vecExtract:           useKindRNRM,
 	cCmpImm:              useKindRN,
 	vecMisc:              useKindRN,
+	vecMovElement:        useKindRN,
 	vecLanes:             useKindRN,
 	vecShiftImm:          useKindRN,
+	vecTbl:               useKindRNRM,
+	vecTbl2:              useKindRNRN1RM,
 	vecRRR:               useKindRNRM,
 	vecPermute:           useKindRNRM,
 	fpuToInt:             useKindRN,
@@ -251,6 +262,14 @@ func (i *instruction) uses(regs []regalloc.VReg) []regalloc.VReg {
 		}
 		if ra := i.ra.reg(); ra.Valid() {
 			regs = append(regs, ra)
+		}
+	case useKindRNRN1RM:
+		if rn := i.rn.reg(); rn.Valid() && rn.IsRealReg() {
+			rn1 := regalloc.FromRealReg(rn.RealReg()+1, rn.RegType())
+			regs = append(regs, rn, rn1)
+		}
+		if rm := i.rm.reg(); rm.Valid() {
+			regs = append(regs, rm)
 		}
 	case useKindRet:
 		regs = append(regs, i.abi.retRealRegs...)
@@ -296,6 +315,19 @@ func (i *instruction) assignUse(index int, reg regalloc.VReg) {
 		if index == 0 {
 			if rn := i.rn.reg(); rn.Valid() {
 				i.rn = i.rn.assignReg(reg)
+			}
+		} else {
+			if rm := i.rm.reg(); rm.Valid() {
+				i.rm = i.rm.assignReg(reg)
+			}
+		}
+	case useKindRNRN1RM:
+		if index == 0 {
+			if rn := i.rn.reg(); rn.Valid() {
+				i.rn = i.rn.assignReg(reg)
+			}
+			if rn1 := i.rn.reg() + 1; rn1.Valid() {
+				i.rm = i.rm.assignReg(reg + 1)
 			}
 		} else {
 			if rm := i.rm.reg(); rm.Valid() {
@@ -778,8 +810,12 @@ func (i *instruction) asMovToVec(rd, rn operand, arr vecArrangement, index vecIn
 	i.u1, i.u2 = uint64(arr), uint64(index)
 }
 
-func (i *instruction) asMovFromVec(rd, rn operand, arr vecArrangement, index vecIndex) {
-	i.kind = movFromVec
+func (i *instruction) asMovFromVec(rd, rn operand, arr vecArrangement, index vecIndex, signed bool) {
+	if signed {
+		i.kind = movFromVecSigned
+	} else {
+		i.kind = movFromVec
+	}
 	i.rd = rd
 	i.rn = rn
 	i.u1, i.u2 = uint64(arr), uint64(index)
@@ -791,11 +827,25 @@ func (i *instruction) asVecDup(rd, rn operand, arr vecArrangement) {
 	i.rn, i.rd = rn, rd
 }
 
+func (i *instruction) asVecDupElement(rd, rn operand, arr vecArrangement, index vecIndex) {
+	i.kind = vecDupElement
+	i.u1 = uint64(arr)
+	i.rn, i.rd = rn, rd
+	i.u2 = uint64(index)
+}
+
 func (i *instruction) asVecExtract(rd, rn, rm operand, arr vecArrangement, index uint32) {
 	i.kind = vecExtract
 	i.u1 = uint64(arr)
 	i.rn, i.rm, i.rd = rn, rm, rd
 	i.u2 = uint64(index)
+}
+
+func (i *instruction) asVecMovElement(rd, rn operand, arr vecArrangement, rdIndex, rnIndex vecIndex) {
+	i.kind = vecMovElement
+	i.u1 = uint64(arr)
+	i.u2, i.u3 = uint64(rdIndex), uint64(rnIndex)
+	i.rn, i.rd = rn, rd
 }
 
 func (i *instruction) asVecMisc(op vecOp, rd, rn operand, arr vecArrangement) {
@@ -815,6 +865,25 @@ func (i *instruction) asVecLanes(op vecOp, rd, rn operand, arr vecArrangement) {
 func (i *instruction) asVecShiftImm(op vecOp, rd, rn, rm operand, arr vecArrangement) {
 	i.kind = vecShiftImm
 	i.u1 = uint64(op)
+	i.rn, i.rm, i.rd = rn, rm, rd
+	i.u2 = uint64(arr)
+}
+
+func (i *instruction) asVecTbl(nregs byte, rd, rn, rm operand, arr vecArrangement) {
+	switch nregs {
+	case 0, 1:
+		i.kind = vecTbl
+	case 2:
+		i.kind = vecTbl2
+		if !rn.reg().IsRealReg() {
+			panic("rn is not a RealReg")
+		}
+		if rn.realReg() == v31 {
+			panic("rn cannot be v31")
+		}
+	default:
+		panic(fmt.Sprintf("unsupported number of registers %d", nregs))
+	}
 	i.rn, i.rm, i.rd = rn, rm, rd
 	i.u2 = uint64(arr)
 }
@@ -1097,27 +1166,40 @@ func (i *instruction) String() (str string) {
 			panic("unsupported arrangement " + arr.String())
 		}
 		str = fmt.Sprintf("ins %s, %s", formatVRegVec(i.rd.nr(), arr, vecIndex(i.u2)), formatVRegSized(i.rn.nr(), size))
-	case movFromVec:
+	case movFromVec, movFromVecSigned:
 		var size byte
 		var opcode string
 		arr := vecArrangement(i.u1)
+		signed := i.kind == movFromVecSigned
 		switch arr {
 		case vecArrangementB, vecArrangementH, vecArrangementS:
 			size = 32
-			opcode = "umov"
+			if signed {
+				opcode = "smov"
+			} else {
+				opcode = "umov"
+			}
 		case vecArrangementD:
 			size = 64
-			opcode = "mov"
+			if signed {
+				opcode = "smov"
+			} else {
+				opcode = "mov"
+			}
 		default:
 			panic("unsupported arrangement " + arr.String())
 		}
 		str = fmt.Sprintf("%s %s, %s", opcode, formatVRegSized(i.rd.nr(), size), formatVRegVec(i.rn.nr(), arr, vecIndex(i.u2)))
-	case movFromVecSigned:
-		panic("TODO")
 	case vecDup:
 		str = fmt.Sprintf("dup %s, %s",
 			formatVRegVec(i.rd.nr(), vecArrangement(i.u1), vecIndexNone),
 			formatVRegSized(i.rn.nr(), 64),
+		)
+	case vecDupElement:
+		arr := vecArrangement(i.u1)
+		str = fmt.Sprintf("dup %s, %s",
+			formatVRegVec(i.rd.nr(), arr, vecIndexNone),
+			formatVRegVec(i.rn.nr(), arr, vecIndex(i.u2)),
 		)
 	case vecDupFromFpu:
 		panic("TODO")
@@ -1131,7 +1213,10 @@ func (i *instruction) String() (str string) {
 	case vecExtend:
 		panic("TODO")
 	case vecMovElement:
-		panic("TODO")
+		str = fmt.Sprintf("mov %s, %s",
+			formatVRegVec(i.rd.nr(), vecArrangement(i.u1), vecIndex(i.u2)),
+			formatVRegVec(i.rn.nr(), vecArrangement(i.u1), vecIndex(i.u3)),
+		)
 	case vecMiscNarrow:
 		panic("TODO")
 	case vecRRR:
@@ -1178,9 +1263,20 @@ func (i *instruction) String() (str string) {
 			formatVRegVec(i.rn.nr(), arr, vecIndexNone),
 			i.rm.shiftImm())
 	case vecTbl:
-		panic("TODO")
+		arr := vecArrangement(i.u2)
+		str = fmt.Sprintf("tbl %s, { %s }, %s",
+			formatVRegVec(i.rd.nr(), arr, vecIndexNone),
+			formatVRegVec(i.rn.nr(), vecArrangement16B, vecIndexNone),
+			formatVRegVec(i.rm.nr(), arr, vecIndexNone))
 	case vecTbl2:
-		panic("TODO")
+		arr := vecArrangement(i.u2)
+		rd, rn, rm := i.rd.nr(), i.rn.nr(), i.rm.nr()
+		rn1 := regalloc.FromRealReg(rn.RealReg()+1, rn.RegType())
+		str = fmt.Sprintf("tbl %s, { %s, %s }, %s",
+			formatVRegVec(rd, arr, vecIndexNone),
+			formatVRegVec(rn, vecArrangement16B, vecIndexNone),
+			formatVRegVec(rn1, vecArrangement16B, vecIndexNone),
+			formatVRegVec(rm, arr, vecIndexNone))
 	case vecPermute:
 		arr := vecArrangement(i.u2)
 		str = fmt.Sprintf("%s %s, %s, %s",
@@ -1392,6 +1488,8 @@ const (
 	movFromVecSigned
 	// vecDup represents a duplication of general-purpose register to vector.
 	vecDup
+	// vecDupElement represents a duplication of a vector element to vector or scalar.
+	vecDupElement
 	// vecDupFromFpu represents a duplication of scalar to vector.
 	vecDupFromFpu
 	// vecExtract represents a vector extraction operation.

@@ -255,18 +255,25 @@ func (i *instruction) encode(c backend.Compiler) {
 			vecArrangement(byte(i.u1)),
 			vecIndex(i.u2),
 		))
-	case movFromVec:
+	case movFromVec, movFromVecSigned:
 		c.Emit4Bytes(encodeMoveFromVec(
 			regNumberInEncoding[i.rd.realReg()],
 			regNumberInEncoding[i.rn.realReg()],
 			vecArrangement(byte(i.u1)),
 			vecIndex(i.u2),
+			i.kind == movFromVecSigned,
 		))
 	case vecDup:
 		c.Emit4Bytes(encodeVecDup(
 			regNumberInEncoding[i.rd.realReg()],
 			regNumberInEncoding[i.rn.realReg()],
 			vecArrangement(byte(i.u1))))
+	case vecDupElement:
+		c.Emit4Bytes(encodeVecDupElement(
+			regNumberInEncoding[i.rd.realReg()],
+			regNumberInEncoding[i.rn.realReg()],
+			vecArrangement(byte(i.u1)),
+			vecIndex(i.u2)))
 	case vecExtract:
 		c.Emit4Bytes(encodeVecExtract(
 			regNumberInEncoding[i.rd.realReg()],
@@ -281,6 +288,13 @@ func (i *instruction) encode(c backend.Compiler) {
 			regNumberInEncoding[i.rn.realReg()],
 			regNumberInEncoding[i.rm.realReg()],
 			vecArrangement(byte(i.u2))))
+	case vecMovElement:
+		c.Emit4Bytes(encodeVecMovElement(
+			regNumberInEncoding[i.rd.realReg()],
+			regNumberInEncoding[i.rn.realReg()],
+			vecArrangement(i.u1),
+			uint32(i.u2), uint32(i.u3),
+		))
 	case vecMisc:
 		c.Emit4Bytes(encodeAdvancedSIMDTwoMisc(
 			vecOp(i.u1),
@@ -288,7 +302,6 @@ func (i *instruction) encode(c backend.Compiler) {
 			regNumberInEncoding[i.rn.realReg()],
 			vecArrangement(i.u2),
 		))
-
 	case vecLanes:
 		c.Emit4Bytes(encodeVecLanes(
 			vecOp(i.u1),
@@ -304,6 +317,22 @@ func (i *instruction) encode(c backend.Compiler) {
 			uint32(i.rm.shiftImm()),
 			vecArrangement(i.u2),
 		))
+	case vecTbl:
+		c.Emit4Bytes(encodeVecTbl(
+			1,
+			regNumberInEncoding[i.rd.realReg()],
+			regNumberInEncoding[i.rn.realReg()],
+			regNumberInEncoding[i.rm.realReg()],
+			vecArrangement(i.u2)),
+		)
+	case vecTbl2:
+		c.Emit4Bytes(encodeVecTbl(
+			2,
+			regNumberInEncoding[i.rd.realReg()],
+			regNumberInEncoding[i.rn.realReg()],
+			regNumberInEncoding[i.rm.realReg()],
+			vecArrangement(i.u2)),
+		)
 	case brTableSequence:
 		encodeBrTableSequence(c, i.rn.reg(), i.targets)
 	case fpuToInt, intToFpu:
@@ -819,6 +848,47 @@ func encodeMoveToVec(rd, rn uint32, arr vecArrangement, index vecIndex) uint32 {
 	return 0b01001110000<<21 | imm5<<16 | 0b000111<<10 | rn<<5 | rd
 }
 
+// encodeMoveToVec encodes as "Move vector element to another vector element, mov (element)" (represented as `ins`) in
+// https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/MOV--element---Move-vector-element-to-another-vector-element--an-alias-of-INS--element--?lang=en
+// https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/INS--element---Insert-vector-element-from-another-vector-element-?lang=en
+func encodeVecMovElement(rd, rn uint32, arr vecArrangement, srcIndex, dstIndex uint32) uint32 {
+	var imm4, imm5 uint32
+	switch arr {
+	case vecArrangementB:
+		imm5 |= 0b1
+		imm5 |= srcIndex << 1
+		imm4 = dstIndex
+		if srcIndex > 0b1111 {
+			panic(fmt.Sprintf("vector index is larger than the allowed bound: %d > 15", srcIndex))
+		}
+	case vecArrangementH:
+		imm5 |= 0b10
+		imm5 |= srcIndex << 2
+		imm4 = dstIndex << 1
+		if srcIndex > 0b111 {
+			panic(fmt.Sprintf("vector index is larger than the allowed bound: %d > 7", srcIndex))
+		}
+	case vecArrangementS:
+		imm5 |= 0b100
+		imm5 |= srcIndex << 3
+		imm4 = dstIndex << 2
+		if srcIndex > 0b11 {
+			panic(fmt.Sprintf("vector index is larger than the allowed bound: %d > 3", srcIndex))
+		}
+	case vecArrangementD:
+		imm5 |= 0b1000
+		imm5 |= srcIndex << 4
+		imm4 = dstIndex << 3
+		if srcIndex > 0b1 {
+			panic(fmt.Sprintf("vector index is larger than the allowed bound: %d > 1", srcIndex))
+		}
+	default:
+		panic("Unsupported arrangement " + arr.String())
+	}
+
+	return 0b01101110000<<21 | imm5<<16 | imm4<<11 | 0b1<<10 | rn<<5 | rd
+}
+
 // encodeUnconditionalBranchReg encodes as "Unconditional branch (register)" in:
 // https://developer.arm.com/documentation/ddi0596/2020-12/Index-by-Encoding/Branches--Exception-Generating-and-System-instructions?lang=en
 func encodeUnconditionalBranchReg(rn uint32, link bool) uint32 {
@@ -833,29 +903,31 @@ func encodeUnconditionalBranchReg(rn uint32, link bool) uint32 {
 // (represented as `umov` when dest is 32-bit, `umov` otherwise) in
 // https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/UMOV--Unsigned-Move-vector-element-to-general-purpose-register-?lang=en
 // https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/MOV--to-general---Move-vector-element-to-general-purpose-register--an-alias-of-UMOV-?lang=en
-func encodeMoveFromVec(rd, rn uint32, arr vecArrangement, index vecIndex) uint32 {
-	var q uint32
-	var imm5 uint32
-	switch arr {
-	case vecArrangementB:
+func encodeMoveFromVec(rd, rn uint32, arr vecArrangement, index vecIndex, signed bool) uint32 {
+	var op, imm4, q, imm5 uint32
+	switch {
+	case arr == vecArrangementB:
 		imm5 |= 0b1
 		imm5 |= uint32(index) << 1
 		if index > 0b1111 {
 			panic(fmt.Sprintf("vector index is larger than the allowed bound: %d > 15", index))
 		}
-	case vecArrangementH:
+	case arr == vecArrangementH:
 		imm5 |= 0b10
 		imm5 |= uint32(index) << 2
 		if index > 0b111 {
 			panic(fmt.Sprintf("vector index is larger than the allowed bound: %d > 7", index))
 		}
-	case vecArrangementS:
+	case arr == vecArrangementS && signed:
+		q = 0b1
+		fallthrough
+	case arr == vecArrangementS:
 		imm5 |= 0b100
 		imm5 |= uint32(index) << 3
 		if index > 0b11 {
 			panic(fmt.Sprintf("vector index is larger than the allowed bound: %d > 3", index))
 		}
-	case vecArrangementD:
+	case arr == vecArrangementD && !signed:
 		imm5 |= 0b1000
 		imm5 |= uint32(index) << 4
 		q = 0b1
@@ -865,10 +937,15 @@ func encodeMoveFromVec(rd, rn uint32, arr vecArrangement, index vecIndex) uint32
 	default:
 		panic("Unsupported arrangement " + arr.String())
 	}
-	return 0b0_001110000<<21 | q<<30 | imm5<<16 | 0b001111<<10 | rn<<5 | rd
+	if signed {
+		op, imm4 = 0, 0b0101
+	} else {
+		op, imm4 = 0, 0b0111
+	}
+	return op<<29 | 0b01110000<<21 | q<<30 | imm5<<16 | imm4<<11 | 1<<10 | rn<<5 | rd
 }
 
-// encodeVecDup encodes as "Duplicate general-purpose register to vector."
+// encodeVecDup encodes as "Duplicate general-purpose register to vector" DUP (general)
 // (represented as `dup`)
 // https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/DUP--general---Duplicate-general-purpose-register-to-vector-?lang=en
 func encodeVecDup(rd, rn uint32, arr vecArrangement) uint32 {
@@ -892,6 +969,32 @@ func encodeVecDup(rd, rn uint32, arr vecArrangement) uint32 {
 		panic("Unsupported arrangement " + arr.String())
 	}
 	return q<<30 | 0b001110000<<21 | imm5<<16 | 0b000011<<10 | rn<<5 | rd
+}
+
+// encodeVecDup encodes as "Duplicate vector element to vector or scalar" DUP (element).
+// (represented as `dup`)
+// https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/DUP--element---Duplicate-vector-element-to-vector-or-scalar-
+func encodeVecDupElement(rd, rn uint32, arr vecArrangement, srcIndex vecIndex) uint32 {
+	var q, imm5 uint32
+	q = 0b1
+	switch arr {
+	case vecArrangementB:
+		imm5 |= 0b1
+		imm5 |= uint32(srcIndex) << 1
+	case vecArrangementH:
+		imm5 |= 0b10
+		imm5 |= uint32(srcIndex) << 2
+	case vecArrangementS:
+		imm5 |= 0b100
+		imm5 |= uint32(srcIndex) << 3
+	case vecArrangementD:
+		imm5 |= 0b1000
+		imm5 |= uint32(srcIndex) << 4
+	default:
+		panic("unsupported arrangement" + arr.String())
+	}
+
+	return q<<30 | 0b001110000<<21 | imm5<<16 | 0b1<<10 | rn<<5 | rd
 }
 
 // encodeVecExtract encodes as "Advanced SIMD extract."
@@ -1716,6 +1819,35 @@ func encodeVecShiftImm(op vecOp, rd uint32, rn, amount uint32, arr vecArrangemen
 		panic("unsupported arrangement: " + arr.String())
 	}
 	return q<<30 | u<<29 | 0b011110<<23 | immh<<19 | immb<<16 | 0b000001<<10 | opcode<<11 | 0b1<<10 | rn<<5 | rd
+}
+
+// encodeVecTbl encodes as Data Processing (Advanced SIMD table lookup) in
+// https://developer.arm.com/documentation/ddi0596/2020-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en#simd-dp
+//
+// Note: tblOp may encode tbl1, tbl2... in the future. Currently, it is ignored.
+func encodeVecTbl(nregs, rd, rn, rm uint32, arr vecArrangement) uint32 {
+	var q, op2, len, op uint32
+
+	switch nregs {
+	case 1:
+		// tbl: single-register
+		len = 0b00
+	case 2:
+		// tbl2: 2-register table
+		len = 0b01
+	default:
+		panic(fmt.Sprintf("unsupported number or registers %d", nregs))
+	}
+	switch arr {
+	case vecArrangement8B:
+		q = 0b0
+	case vecArrangement16B:
+		q = 0b1
+	default:
+		panic("unsupported arrangement: " + arr.String())
+	}
+
+	return q<<30 | 0b001110<<24 | op2<<22 | rm<<16 | len<<13 | op<<12 | rn<<5 | rd
 }
 
 // encodeVecMisc encodes as Data Processing (Advanced SIMD two-register miscellaneous) depending on vecOp in
