@@ -1308,7 +1308,8 @@ func (i *Instruction) AsVIadd(x, y Value, lane VecLane) *Instruction {
 	return i
 }
 
-// AsIaddPairwise initializes this instruction as an integer addition instruction with OpcodeIaddPairwise on a vector.
+// AsIaddPairwise initializes this instruction as a lane-wise integer extended pairwise addition instruction
+// with OpcodeIaddPairwise on a vector.
 func (i *Instruction) AsIaddPairwise(x, y Value, lane VecLane) *Instruction {
 	i.opcode = OpcodeIaddPairwise
 	i.v = x
