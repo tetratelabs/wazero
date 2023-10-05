@@ -192,7 +192,14 @@ func TestSpectestV2(t *testing.T) {
 		{"simd_f64x2_pmin_pmax"},
 		{"simd_i32x4_trunc_sat_f32x4"},
 		{"simd_i32x4_trunc_sat_f64x2"},
+		{"simd_i32x4_dot_i16x8"},
+		{"simd_i16x8_extmul_i8x16"},
+		{"simd_i64x2_extmul_i32x4"},
+		{"simd_i32x4_extmul_i16x8"},
+		{"simd_i16x8_extadd_pairwise_i8x16"},
+		{"simd_i32x4_extadd_pairwise_i16x8"},
 		{"simd_lane"},
+		{"simd_linking"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Run("normal", func(t *testing.T) {

@@ -1307,6 +1307,16 @@ func (i *Instruction) AsVIadd(x, y Value, lane VecLane) *Instruction {
 	return i
 }
 
+// AsIaddPairwise initializes this instruction as an integer addition instruction with OpcodeIaddPairwise on a vector.
+func (i *Instruction) AsIaddPairwise(x, y Value, lane VecLane) *Instruction {
+	i.opcode = OpcodeIaddPairwise
+	i.v = x
+	i.v2 = y
+	i.u1 = uint64(lane)
+	i.typ = TypeV128
+	return i
+}
+
 // AsVSaddSat initializes this instruction as a vector addition with saturation instruction with OpcodeVSaddSat on a vector.
 func (i *Instruction) AsVSaddSat(x, y Value, lane VecLane) *Instruction {
 	i.opcode = OpcodeVSaddSat
