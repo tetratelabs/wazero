@@ -1715,6 +1715,9 @@ func encodeMoveWideImmediate(opc uint32, rd uint32, imm, shift, _64bit uint64) (
 // encodeAluRRImm encodes as "Bitfield" in
 // https://developer.arm.com/documentation/ddi0596/2020-12/Index-by-Encoding/Data-Processing----Immediate?lang=en#log_imm
 func encodeAluRRImm(op aluOp, rd, rn, amount, _64bit uint32) uint32 {
+	if amount == 0 {
+		panic("Shifting by 0 is not allowed; must be optimized out")
+	}
 	var opc uint32
 	var immr, imms uint32
 	switch op {

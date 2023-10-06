@@ -1769,11 +1769,12 @@ func (i *Instruction) AsVUshr(x, amount Value, lane VecLane) *Instruction {
 }
 
 // AsSshr initializes this instruction as an integer signed shift right (arithmetic shift right) instruction with OpcodeSshr.
-func (i *Instruction) AsSshr(x, amount Value) {
+func (i *Instruction) AsSshr(x, amount Value) *Instruction {
 	i.opcode = OpcodeSshr
 	i.v = x
 	i.v2 = amount
 	i.typ = x.Type()
+	return i
 }
 
 // AsVSshr initializes this instruction as an integer signed shift right (arithmetic shift right) instruction with OpcodeVSshr on vector.

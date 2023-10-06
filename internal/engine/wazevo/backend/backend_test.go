@@ -35,7 +35,7 @@ func newMachine() backend.Machine {
 }
 
 func TestE2E(t *testing.T) {
-	const verbose = true
+	const verbose = false
 
 	type testCase struct {
 		name                                   string

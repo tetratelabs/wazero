@@ -1,7 +1,6 @@
 package frontend
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
@@ -1809,13 +1808,11 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:v128, v3:v128)
 			fc.LowerToSSA()
 
 			actual := fc.formatBuilder()
-			fmt.Println(actual)
 			require.Equal(t, tc.exp, actual)
 
 			b.RunPasses()
 			if expAfterOpt := tc.expAfterOpt; expAfterOpt != "" {
 				actualAfterOpt := fc.formatBuilder()
-				fmt.Println(actualAfterOpt)
 				require.Equal(t, expAfterOpt, actualAfterOpt)
 			}
 
