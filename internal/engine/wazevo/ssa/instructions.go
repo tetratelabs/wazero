@@ -639,59 +639,20 @@ const (
 	// `v = bxor_not x, y`.
 	OpcodeBxorNot
 
-	// OpcodeBandImm ...
-	// `v = band_imm x, Y`. (BinaryImm64)
-	OpcodeBandImm
-
-	// OpcodeBorImm ...
-	// `v = bor_imm x, Y`. (BinaryImm64)
-	OpcodeBorImm
-
-	// OpcodeBxorImm ...
-	// `v = bxor_imm x, Y`. (BinaryImm64)
-	OpcodeBxorImm
-
 	// OpcodeRotl rotates the given integer value to the left: `v = Rotl x, y`.
 	OpcodeRotl
 
 	// OpcodeRotr rotates the given integer value to the right: `v = Rotr x, y`.
 	OpcodeRotr
 
-	// OpcodeRotlImm ...
-	// `v = rotl_imm x, Y`. (BinaryImm64)
-	OpcodeRotlImm
-
-	// OpcodeRotrImm ...
-	// `v = rotr_imm x, Y`. (BinaryImm64)
-	OpcodeRotrImm
-
-	// OpcodeIshl ...
-	// `v = ishl x, y`.
+	// OpcodeIshl does logical shift left: `v = Ishl x, y`.
 	OpcodeIshl
 
-	// OpcodeUshr ...
-	// `v = ushr x, y`.
+	// OpcodeUshr does logical shift right: `v = Ushr x, y`.
 	OpcodeUshr
 
-	// OpcodeSshr ...
-	// `v = sshr x, y`.
+	// OpcodeSshr does arithmetic shift right: `v = Sshr x, y`.
 	OpcodeSshr
-
-	// OpcodeIshlImm ...
-	// `v = ishl_imm x, Y`. (BinaryImm64)
-	OpcodeIshlImm
-
-	// OpcodeUshrImm ...
-	// `v = ushr_imm x, Y`. (BinaryImm64)
-	OpcodeUshrImm
-
-	// OpcodeSshrImm ...
-	// `v = sshr_imm x, Y`. (BinaryImm64)
-	OpcodeSshrImm
-
-	// OpcodeBitrev ...
-	// `v = bitrev x`.
-	OpcodeBitrev
 
 	// OpcodeClz counts the number of leading zeros: `v = clz x`.
 	OpcodeClz
@@ -2897,34 +2858,16 @@ func (o Opcode) String() (ret string) {
 		return "BorNot"
 	case OpcodeBxorNot:
 		return "BxorNot"
-	case OpcodeBandImm:
-		return "BandImm"
-	case OpcodeBorImm:
-		return "BorImm"
-	case OpcodeBxorImm:
-		return "BxorImm"
 	case OpcodeRotl:
 		return "Rotl"
 	case OpcodeRotr:
 		return "Rotr"
-	case OpcodeRotlImm:
-		return "RotlImm"
-	case OpcodeRotrImm:
-		return "RotrImm"
 	case OpcodeIshl:
 		return "Ishl"
 	case OpcodeUshr:
 		return "Ushr"
 	case OpcodeSshr:
 		return "Sshr"
-	case OpcodeIshlImm:
-		return "IshlImm"
-	case OpcodeUshrImm:
-		return "UshrImm"
-	case OpcodeSshrImm:
-		return "SshrImm"
-	case OpcodeBitrev:
-		return "Bitrev"
 	case OpcodeClz:
 		return "Clz"
 	case OpcodeCtz:

@@ -1398,6 +1398,12 @@ func TestInstruction_encode(t *testing.T) {
 		{want: "4008d41a", setup: func(i *instruction) {
 			i.asALU(aluOpUDiv, operandNR(x0VReg), operandNR(x2VReg), operandNR(x20VReg), false)
 		}},
+		{want: "407c0013", setup: func(i *instruction) {
+			i.asALUShift(aluOpAsr, operandNR(x0VReg), operandNR(x2VReg), operandShiftImm(0), false)
+		}},
+		{want: "40fc4093", setup: func(i *instruction) {
+			i.asALUShift(aluOpAsr, operandNR(x0VReg), operandNR(x2VReg), operandShiftImm(0), true)
+		}},
 		{want: "407c0113", setup: func(i *instruction) {
 			i.asALUShift(aluOpAsr, operandNR(x0VReg), operandNR(x2VReg), operandShiftImm(1), false)
 		}},
@@ -1427,6 +1433,12 @@ func TestInstruction_encode(t *testing.T) {
 		}},
 		{want: "40fc7fd3", setup: func(i *instruction) {
 			i.asALUShift(aluOpLsr, operandNR(x0VReg), operandNR(x2VReg), operandShiftImm(63), true)
+		}},
+		{want: "407c0053", setup: func(i *instruction) {
+			i.asALUShift(aluOpLsl, operandNR(x0VReg), operandNR(x2VReg), operandShiftImm(0), false)
+		}},
+		{want: "40fc40d3", setup: func(i *instruction) {
+			i.asALUShift(aluOpLsl, operandNR(x0VReg), operandNR(x2VReg), operandShiftImm(0), true)
 		}},
 		{want: "40781f53", setup: func(i *instruction) {
 			i.asALUShift(aluOpLsl, operandNR(x0VReg), operandNR(x2VReg), operandShiftImm(1), false)

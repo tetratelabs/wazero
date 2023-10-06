@@ -1715,9 +1715,6 @@ func encodeMoveWideImmediate(opc uint32, rd uint32, imm, shift, _64bit uint64) (
 // encodeAluRRImm encodes as "Bitfield" in
 // https://developer.arm.com/documentation/ddi0596/2020-12/Index-by-Encoding/Data-Processing----Immediate?lang=en#log_imm
 func encodeAluRRImm(op aluOp, rd, rn, amount, _64bit uint32) uint32 {
-	if amount == 0 {
-		panic("Shifting by 0 is not allowed; must be optimized out")
-	}
 	var opc uint32
 	var immr, imms uint32
 	switch op {
@@ -1725,12 +1722,22 @@ func encodeAluRRImm(op aluOp, rd, rn, amount, _64bit uint32) uint32 {
 		// LSL (immediate) is an alias for UBFM.
 		// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/UBFM--Unsigned-Bitfield-Move-?lang=en
 		opc = 0b10
-		if _64bit == 1 {
-			immr = 64 - amount
+		if amount == 0 {
+			// This can be encoded as NOP, but we don't do it for consistency: lsr xn, xm, #0
+			immr = 0
+			if _64bit == 1 {
+				imms = 0b111111
+			} else {
+				imms = 0b11111
+			}
 		} else {
-			immr = 32 - amount
+			if _64bit == 1 {
+				immr = 64 - amount
+			} else {
+				immr = (32 - amount) & 0b11111
+			}
+			imms = immr - 1
 		}
-		imms = immr - 1
 	case aluOpLsr:
 		// LSR (immediate) is an alias for UBFM.
 		// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/LSR--immediate---Logical-Shift-Right--immediate---an-alias-of-UBFM-?lang=en
