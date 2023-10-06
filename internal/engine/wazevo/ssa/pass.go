@@ -17,6 +17,7 @@ func (b *builder) RunPasses() {
 	passRedundantPhiEliminationOpt(b)
 	// The result of passCalculateImmediateDominators will be used by various passes below.
 	passCalculateImmediateDominators(b)
+	passNopInstElimination(b)
 
 	// TODO: implement either conversion of irreducible CFG into reducible one, or irreducible CFG detection where we panic.
 	// 	WebAssembly program shouldn't result in irreducible CFG, but we should handle it properly in just in case.
@@ -302,4 +303,50 @@ func (b *builder) clearBlkVisited() {
 		delete(b.blkVisited, blk)
 	}
 	b.blkStack2 = b.blkStack2[:0]
+}
+
+// passNopInstElimination eliminates the instructions which is essentially a no-op.
+func passNopInstElimination(b *builder) {
+	if int(b.nextValueID) >= len(b.valueIDToInstruction) {
+		b.valueIDToInstruction = append(b.valueIDToInstruction, make([]*Instruction, b.nextValueID)...)
+	}
+
+	for blk := b.blockIteratorBegin(); blk != nil; blk = b.blockIteratorNext() {
+		for cur := blk.rootInstr; cur != nil; cur = cur.next {
+			r1, rs := cur.Returns()
+			if r1.Valid() {
+				b.valueIDToInstruction[r1.ID()] = cur
+			}
+			for _, r := range rs {
+				b.valueIDToInstruction[r.ID()] = cur
+			}
+		}
+	}
+
+	for blk := b.blockIteratorBegin(); blk != nil; blk = b.blockIteratorNext() {
+		for cur := blk.rootInstr; cur != nil; cur = cur.next {
+			switch cur.Opcode() {
+			// TODO: add more logics here.
+			case OpcodeIshl, OpcodeSshr, OpcodeUshr:
+				x, amount := cur.Arg2()
+				definingInst := b.valueIDToInstruction[amount.ID()]
+				if definingInst == nil {
+					// If there's no defining instruction, that means the amount is coming from the parameter.
+					continue
+				}
+				if definingInst.Constant() {
+					v := definingInst.ConstantVal()
+
+					if x.Type().Bits() == 64 {
+						v = v % 64
+					} else {
+						v = v % 32
+					}
+					if v == 0 {
+						b.alias(cur.Return(), x)
+					}
+				}
+			}
+		}
+	}
 }

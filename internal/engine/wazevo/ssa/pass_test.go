@@ -1,7 +1,6 @@
 package ssa
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -11,7 +10,9 @@ func TestBuilder_passes(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		// pass is the optimization pass to run.
-		pass func(b *builder)
+		pass,
+		// postPass is run after the pass is executed, and can be used to test a pass that depends on another pass.
+		postPass func(b *builder)
 		// setup creates the SSA function in the given *builder.
 		// TODO: when we have the text SSA IR parser, we can eliminate this `setup`,
 		// 	we could directly decode the *builder from the `before` string. I am still
@@ -283,18 +284,70 @@ blk1: () <-- (blk0)
 	Return v4
 `,
 		},
+		{
+			name:     "nop elimination",
+			pass:     passNopInstElimination,
+			postPass: passDeadCodeEliminationOpt,
+			setup: func(b *builder) (verifier func(t *testing.T)) {
+				entry := b.AllocateBasicBlock()
+				b.SetCurrentBlock(entry)
+
+				i32Param := entry.AddParam(b, TypeI32)
+				i64Param := entry.AddParam(b, TypeI64)
+
+				// 32-bit shift.
+				moduleZeroI32 := b.AllocateInstruction().AsIconst32(32 * 245).Insert(b).Return()
+				nopIshl := b.AllocateInstruction().AsIshl(i32Param, moduleZeroI32).Insert(b).Return()
+
+				// 64-bit shift.
+				moduleZeroI64 := b.AllocateInstruction().AsIconst64(64 * 245).Insert(b).Return()
+				nopUshr := b.AllocateInstruction().AsUshr(i64Param, moduleZeroI64).Insert(b).Return()
+
+				// Non zero shift amount should not be eliminated.
+				nonZeroI32 := b.AllocateInstruction().AsIconst32(32*245 + 1).Insert(b).Return()
+				nonZeroIshl := b.AllocateInstruction().AsIshl(i32Param, nonZeroI32).Insert(b).Return()
+
+				nonZeroI64 := b.AllocateInstruction().AsIconst64(64*245 + 1).Insert(b).Return()
+				nonZeroSshr := b.AllocateInstruction().AsSshr(i64Param, nonZeroI64).Insert(b).Return()
+
+				ret := b.AllocateInstruction()
+				ret.AsReturn([]Value{nopIshl, nopUshr, nonZeroIshl, nonZeroSshr})
+				b.InsertInstruction(ret)
+				return nil
+			},
+			before: `
+blk0: (v0:i32, v1:i64)
+	v2:i32 = Iconst_32 0x1ea0
+	v3:i32 = Ishl v0, v2
+	v4:i64 = Iconst_64 0x3d40
+	v5:i64 = Ushr v1, v4
+	v6:i32 = Iconst_32 0x1ea1
+	v7:i32 = Ishl v0, v6
+	v8:i64 = Iconst_64 0x3d41
+	v9:i64 = Sshr v1, v8
+	Return v3, v5, v7, v9
+`,
+			after: `
+blk0: (v0:i32, v1:i64)
+	v6:i32 = Iconst_32 0x1ea1
+	v7:i32 = Ishl v0, v6
+	v8:i64 = Iconst_64 0x3d41
+	v9:i64 = Sshr v1, v8
+	Return v0, v1, v7, v9
+`,
+		},
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			b := NewBuilder().(*builder)
 			verifier := tc.setup(b)
-			fmt.Println(b.Format())
 			require.Equal(t, tc.before, b.Format())
 			tc.pass(b)
-			fmt.Println("--------")
-			fmt.Println(b.Format())
 			if verifier != nil {
 				verifier(t)
+			}
+			if tc.postPass != nil {
+				tc.postPass(b)
 			}
 			require.Equal(t, tc.after, b.Format())
 		})
