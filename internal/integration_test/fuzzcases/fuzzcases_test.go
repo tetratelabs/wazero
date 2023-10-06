@@ -4,10 +4,13 @@ import (
 	"context"
 	"embed"
 	"fmt"
+	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -44,9 +47,28 @@ func runWithInterpreter(t *testing.T, runner func(t *testing.T, r wazero.Runtime
 	})
 }
 
+func runWithWazevo(t *testing.T, runner func(t *testing.T, r wazero.Runtime)) {
+	t.Run("wazevo", func(t *testing.T) {
+		name := t.Name()
+		for _, skipTarget := range []string{"695", "701", "718"} {
+			if strings.Contains(name, skipTarget) {
+				t.Skip("TODO: skipping for wazevo until SIMD is completed")
+			}
+		}
+		config := wazero.NewRuntimeConfigInterpreter()
+		wazevo.ConfigureWazevo(config)
+		r := wazero.NewRuntimeWithConfig(ctx, config)
+		defer r.Close(ctx)
+		runner(t, r)
+	})
+}
+
 func run(t *testing.T, runner func(t *testing.T, r wazero.Runtime)) {
 	runWithInterpreter(t, runner)
 	runWithCompiler(t, runner)
+	if runtime.GOARCH == "arm64" {
+		runWithWazevo(t, runner)
+	}
 }
 
 // Test695 requires two functions to exit with "out of bounds memory access" consistently across the implementations.
@@ -66,20 +88,22 @@ func Test695(t *testing.T) {
 }
 
 func Test696(t *testing.T) {
-	functionNames := [4]string{
-		"select with 0 / after calling dummy",
-		"select with 0",
-		"typed select with 1 / after calling dummy",
-		"typed select with 1",
-	}
-
 	run(t, func(t *testing.T, r wazero.Runtime) {
 		module, err := r.Instantiate(ctx, getWasmBinary(t, 696))
 		require.NoError(t, err)
-
-		for _, name := range functionNames {
-			_, err := module.ExportedFunction(name).Call(ctx)
+		for _, tc := range []struct {
+			fnName string
+			in     uint64
+			exp    [2]uint64
+		}{
+			{fnName: "select", in: 1, exp: [2]uint64{0xffffffffffffffff, 0xeeeeeeeeeeeeeeee}},
+			{fnName: "select", in: 0, exp: [2]uint64{0x1111111111111111, 0x2222222222222222}},
+			{fnName: "typed select", in: 1, exp: [2]uint64{0xffffffffffffffff, 0xeeeeeeeeeeeeeeee}},
+			{fnName: "typed select", in: 0, exp: [2]uint64{0x1111111111111111, 0x2222222222222222}},
+		} {
+			res, err := module.ExportedFunction(tc.fnName).Call(ctx, tc.in)
 			require.NoError(t, err)
+			require.Equal(t, tc.exp[:], res)
 		}
 	})
 }

@@ -831,3 +831,23 @@ ushl x1.16b, x2.16b, x1.16b
 		})
 	}
 }
+
+func TestMachine_lowerSelectVec(t *testing.T) {
+	_, _, m := newSetupWithMockContext()
+	c := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeInt))
+	rn := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
+	rm := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
+	rd := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
+
+	require.Equal(t, 1, int(c.reg().ID()))
+	require.Equal(t, 2, int(rn.reg().ID()))
+	require.Equal(t, 3, int(rm.reg().ID()))
+	require.Equal(t, 4, int(rd.reg().ID()))
+
+	m.lowerSelectVec(c, rn, rm, rd)
+	require.Equal(t, `
+sub x5?, xzr, x1?
+dup v4?.2d, x5?
+bsl v4?.16b, v2?.16b, v3?.16b
+`, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
+}
