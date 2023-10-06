@@ -215,7 +215,15 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		m.insert(undef)
 	case ssa.OpcodeSelect:
 		c, x, y := instr.SelectData()
-		m.lowerSelect(c, x, y, instr.Return())
+		if x.Type() == ssa.TypeV128 {
+			rc := m.getOperand_NR(m.compiler.ValueDefinition(c), extModeNone)
+			rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+			rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
+			rd := operandNR(m.compiler.VRegOf(instr.Return()))
+			m.lowerSelectVec(rc, rn, rm, rd)
+		} else {
+			m.lowerSelect(c, x, y, instr.Return())
+		}
 	case ssa.OpcodeClz:
 		x := instr.Arg()
 		result := instr.Return()
@@ -1072,7 +1080,7 @@ func (m *machine) lowerVMinMaxPseudo(instr *ssa.Instruction, max bool) {
 	if max {
 		fcmgt.asVecRRR(vecOpFcmgt, rd, rm, rn, arr)
 	} else {
-		// if min, swap the args
+		// If min, swap the args.
 		fcmgt.asVecRRR(vecOpFcmgt, rd, rn, rm, arr)
 	}
 	m.insert(fcmgt)
@@ -1818,5 +1826,27 @@ func (m *machine) lowerSelect(c, x, y, result ssa.Value) {
 		fcsel := m.allocateInstr()
 		fcsel.asFpuCSel(rd, rn, rm, cc, x.Type().Bits() == 64)
 		m.insert(fcsel)
+	default:
+		panic("BUG")
 	}
+}
+
+func (m *machine) lowerSelectVec(rc, rn, rm, rd operand) {
+	tmp := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeInt))
+
+	// Sets all bits to 1 if rc is not zero.
+	alu := m.allocateInstr()
+	alu.asALU(aluOpSub, tmp, operandNR(xzrVReg), rc, true)
+	m.insert(alu)
+
+	// Then move the bits to the result vector register.
+	dup := m.allocateInstr()
+	dup.asVecDup(rd, tmp, vecArrangement2D)
+	m.insert(dup)
+
+	// Now that `rd` has either all bits one or zero depending on `rc`,
+	// we can use bsl to select between `rn` and `rm`.
+	ins := m.allocateInstr()
+	ins.asVecRRR(vecOpBsl, rd, rn, rm, vecArrangement16B)
+	m.insert(ins)
 }

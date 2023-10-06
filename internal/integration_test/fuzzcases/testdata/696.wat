@@ -1,64 +1,18 @@
 (module
   (func $dummy)
-  (func (export "select with 0 / after calling dummy")
-    v128.const i64x2 0xffffffffffffffff 0xffffffffffffffff
-    v128.const i64x2 0xeeeeeeeeeeeeeeee 0xeeeeeeeeeeeeeeee
-    i32.const 0 ;; choose 0xeeeeeeeeeeeeeeee lane.
+  (func (export "select") (param i32) (result v128)
+    v128.const i64x2 0xffffffffffffffff 0xeeeeeeeeeeeeeeee
+    v128.const i64x2 0x1111111111111111 0x2222222222222222
+    local.get 0
     call 0  ;; calling dummy function before select to
     select
-    ;; check the equality.
-    i64x2.extract_lane 0
-    i64.const 0xeeeeeeeeeeeeeeee
-    i64.eq
-    (if
-      (then)
-      (else unreachable)
-    )
   )
 
-  (func (export "select with 0")
-    v128.const i64x2 0xffffffffffffffff 0xffffffffffffffff
-    v128.const i64x2 0xeeeeeeeeeeeeeeee 0xeeeeeeeeeeeeeeee
-    i32.const 0 ;; choose 0xeeeeeeeeeeeeeeee lane.
-    select
-    ;; check the equality.
-    i64x2.extract_lane 0
-    i64.const 0xeeeeeeeeeeeeeeee
-    i64.eq
-    (if
-      (then)
-      (else unreachable)
-    )
-  )
-
-  (func (export "typed select with 1 / after calling dummy")
-    v128.const i64x2 0xffffffffffffffff 0xffffffffffffffff
-    v128.const i64x2 0xeeeeeeeeeeeeeeee 0xeeeeeeeeeeeeeeee
-    i32.const 1 ;; choose 0xffffffffffffffff lane.
+  (func (export "typed select") (param i32) (result v128)
+    v128.const i64x2 0xffffffffffffffff 0xeeeeeeeeeeeeeeee
+    v128.const i64x2 0x1111111111111111 0x2222222222222222
+    local.get 0
     call 0  ;; calling dummy function before select to
     select (result v128)
-    ;; check the equality.
-    i64x2.extract_lane 0
-    i64.const 0xffffffffffffffff
-    i64.eq
-    (if
-      (then)
-      (else unreachable)
-    )
-  )
-
-  (func (export "typed select with 1")
-    v128.const i64x2 0xffffffffffffffff 0xffffffffffffffff
-    v128.const i64x2 0xeeeeeeeeeeeeeeee 0xeeeeeeeeeeeeeeee
-    i32.const 1 ;; choose 0xffffffffffffffff lane.
-    select (result v128)
-    ;; check the equality.
-    i64x2.extract_lane 0
-    i64.const 0xffffffffffffffff
-    i64.eq
-    (if
-      (then)
-      (else unreachable)
-    )
   )
 )
