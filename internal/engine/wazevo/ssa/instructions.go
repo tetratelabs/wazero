@@ -933,6 +933,7 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeFvdemote:           sideEffectNone,
 	OpcodeFpromote:           sideEffectNone,
 	OpcodeBitcast:            sideEffectNone,
+	OpcodeScalarToVector:     sideEffectNone,
 	OpcodeIreduce:            sideEffectNone,
 	OpcodeSqrt:               sideEffectNone,
 	OpcodeCeil:               sideEffectNone,
@@ -1006,73 +1007,74 @@ func (i *Instruction) sideEffect() sideEffect {
 
 // instructionReturnTypes provides the function to determine the return types of an instruction.
 var instructionReturnTypes = [opcodeEnd]returnTypesFn{
-	OpcodeIaddPairwise: returnTypesFnV128,
-	OpcodeVbor:         returnTypesFnV128,
-	OpcodeVbxor:        returnTypesFnV128,
-	OpcodeVband:        returnTypesFnV128,
-	OpcodeVbnot:        returnTypesFnV128,
-	OpcodeVbandnot:     returnTypesFnV128,
-	OpcodeVbitselect:   returnTypesFnV128,
-	OpcodeVanyTrue:     returnTypesFnI32,
-	OpcodeVallTrue:     returnTypesFnI32,
-	OpcodeVhighBits:    returnTypesFnV128,
-	OpcodeVIadd:        returnTypesFnV128,
-	OpcodeVSaddSat:     returnTypesFnV128,
-	OpcodeVUaddSat:     returnTypesFnV128,
-	OpcodeVIsub:        returnTypesFnV128,
-	OpcodeVSsubSat:     returnTypesFnV128,
-	OpcodeVUsubSat:     returnTypesFnV128,
-	OpcodeVIcmp:        returnTypesFnI32,
-	OpcodeVImin:        returnTypesFnV128,
-	OpcodeVUmin:        returnTypesFnV128,
-	OpcodeVImax:        returnTypesFnV128,
-	OpcodeVUmax:        returnTypesFnV128,
-	OpcodeVImul:        returnTypesFnV128,
-	OpcodeVAvgRound:    returnTypesFnV128,
-	OpcodeVIabs:        returnTypesFnV128,
-	OpcodeVIneg:        returnTypesFnV128,
-	OpcodeVIpopcnt:     returnTypesFnV128,
-	OpcodeVIshl:        returnTypesFnV128,
-	OpcodeVSshr:        returnTypesFnV128,
-	OpcodeVUshr:        returnTypesFnV128,
-	OpcodeExtractlane:  returnTypesFnSingle,
-	OpcodeInsertlane:   returnTypesFnV128,
-	OpcodeBand:         returnTypesFnSingle,
-	OpcodeFcopysign:    returnTypesFnSingle,
-	OpcodeBitcast:      returnTypesFnSingle,
-	OpcodeBor:          returnTypesFnSingle,
-	OpcodeBxor:         returnTypesFnSingle,
-	OpcodeRotl:         returnTypesFnSingle,
-	OpcodeRotr:         returnTypesFnSingle,
-	OpcodeIshl:         returnTypesFnSingle,
-	OpcodeSshr:         returnTypesFnSingle,
-	OpcodeSdiv:         returnTypesFnSingle,
-	OpcodeSrem:         returnTypesFnSingle,
-	OpcodeUdiv:         returnTypesFnSingle,
-	OpcodeUrem:         returnTypesFnSingle,
-	OpcodeUshr:         returnTypesFnSingle,
-	OpcodeJump:         returnTypesFnNoReturns,
-	OpcodeUndefined:    returnTypesFnNoReturns,
-	OpcodeIconst:       returnTypesFnSingle,
-	OpcodeSelect:       returnTypesFnSingle,
-	OpcodeSExtend:      returnTypesFnSingle,
-	OpcodeUExtend:      returnTypesFnSingle,
-	OpcodeSwidenLow:    returnTypesFnV128,
-	OpcodeUwidenLow:    returnTypesFnV128,
-	OpcodeSwidenHigh:   returnTypesFnV128,
-	OpcodeUwidenHigh:   returnTypesFnV128,
-	OpcodeSnarrow:      returnTypesFnV128,
-	OpcodeUnarrow:      returnTypesFnV128,
-	OpcodeSwizzle:      returnTypesFnSingle,
-	OpcodeShuffle:      returnTypesFnV128,
-	OpcodeSplat:        returnTypesFnV128,
-	OpcodeIreduce:      returnTypesFnSingle,
-	OpcodeFabs:         returnTypesFnSingle,
-	OpcodeSqrt:         returnTypesFnSingle,
-	OpcodeCeil:         returnTypesFnSingle,
-	OpcodeFloor:        returnTypesFnSingle,
-	OpcodeTrunc:        returnTypesFnSingle,
-	OpcodeNearest:      returnTypesFnSingle,
+	OpcodeIaddPairwise:   returnTypesFnV128,
+	OpcodeVbor:           returnTypesFnV128,
+	OpcodeVbxor:          returnTypesFnV128,
+	OpcodeVband:          returnTypesFnV128,
+	OpcodeVbnot:          returnTypesFnV128,
+	OpcodeVbandnot:       returnTypesFnV128,
+	OpcodeVbitselect:     returnTypesFnV128,
+	OpcodeVanyTrue:       returnTypesFnI32,
+	OpcodeVallTrue:       returnTypesFnI32,
+	OpcodeVhighBits:      returnTypesFnV128,
+	OpcodeVIadd:          returnTypesFnV128,
+	OpcodeVSaddSat:       returnTypesFnV128,
+	OpcodeVUaddSat:       returnTypesFnV128,
+	OpcodeVIsub:          returnTypesFnV128,
+	OpcodeVSsubSat:       returnTypesFnV128,
+	OpcodeVUsubSat:       returnTypesFnV128,
+	OpcodeVIcmp:          returnTypesFnI32,
+	OpcodeVImin:          returnTypesFnV128,
+	OpcodeVUmin:          returnTypesFnV128,
+	OpcodeVImax:          returnTypesFnV128,
+	OpcodeVUmax:          returnTypesFnV128,
+	OpcodeVImul:          returnTypesFnV128,
+	OpcodeVAvgRound:      returnTypesFnV128,
+	OpcodeVIabs:          returnTypesFnV128,
+	OpcodeVIneg:          returnTypesFnV128,
+	OpcodeVIpopcnt:       returnTypesFnV128,
+	OpcodeVIshl:          returnTypesFnV128,
+	OpcodeVSshr:          returnTypesFnV128,
+	OpcodeVUshr:          returnTypesFnV128,
+	OpcodeExtractlane:    returnTypesFnSingle,
+	OpcodeInsertlane:     returnTypesFnV128,
+	OpcodeBand:           returnTypesFnSingle,
+	OpcodeFcopysign:      returnTypesFnSingle,
+	OpcodeBitcast:        returnTypesFnSingle,
+	OpcodeScalarToVector: returnTypesFnV128,
+	OpcodeBor:            returnTypesFnSingle,
+	OpcodeBxor:           returnTypesFnSingle,
+	OpcodeRotl:           returnTypesFnSingle,
+	OpcodeRotr:           returnTypesFnSingle,
+	OpcodeIshl:           returnTypesFnSingle,
+	OpcodeSshr:           returnTypesFnSingle,
+	OpcodeSdiv:           returnTypesFnSingle,
+	OpcodeSrem:           returnTypesFnSingle,
+	OpcodeUdiv:           returnTypesFnSingle,
+	OpcodeUrem:           returnTypesFnSingle,
+	OpcodeUshr:           returnTypesFnSingle,
+	OpcodeJump:           returnTypesFnNoReturns,
+	OpcodeUndefined:      returnTypesFnNoReturns,
+	OpcodeIconst:         returnTypesFnSingle,
+	OpcodeSelect:         returnTypesFnSingle,
+	OpcodeSExtend:        returnTypesFnSingle,
+	OpcodeUExtend:        returnTypesFnSingle,
+	OpcodeSwidenLow:      returnTypesFnV128,
+	OpcodeUwidenLow:      returnTypesFnV128,
+	OpcodeSwidenHigh:     returnTypesFnV128,
+	OpcodeUwidenHigh:     returnTypesFnV128,
+	OpcodeSnarrow:        returnTypesFnV128,
+	OpcodeUnarrow:        returnTypesFnV128,
+	OpcodeSwizzle:        returnTypesFnSingle,
+	OpcodeShuffle:        returnTypesFnV128,
+	OpcodeSplat:          returnTypesFnV128,
+	OpcodeIreduce:        returnTypesFnSingle,
+	OpcodeFabs:           returnTypesFnSingle,
+	OpcodeSqrt:           returnTypesFnSingle,
+	OpcodeCeil:           returnTypesFnSingle,
+	OpcodeFloor:          returnTypesFnSingle,
+	OpcodeTrunc:          returnTypesFnSingle,
+	OpcodeNearest:        returnTypesFnSingle,
 	OpcodeCallIndirect: func(b *builder, instr *Instruction) (t1 Type, ts []Type) {
 		sigID := SignatureID(instr.u1)
 		sig, ok := b.signatures[sigID]
@@ -1182,7 +1184,7 @@ func (i *Instruction) AsLoad(ptr Value, offset uint32, typ Type) *Instruction {
 }
 
 // AsExtLoad initializes this instruction as a store instruction with OpcodeLoad.
-func (i *Instruction) AsExtLoad(op Opcode, ptr Value, offset uint32, dst64bit bool) {
+func (i *Instruction) AsExtLoad(op Opcode, ptr Value, offset uint32, dst64bit bool) *Instruction {
 	i.opcode = op
 	i.v = ptr
 	i.u1 = uint64(offset)
@@ -1191,6 +1193,7 @@ func (i *Instruction) AsExtLoad(op Opcode, ptr Value, offset uint32, dst64bit bo
 	} else {
 		i.typ = TypeI32
 	}
+	return i
 }
 
 // AsSimdLoad initializes this instruction as a load instruction with OpcodeLoad 128 bit.
@@ -1745,6 +1748,23 @@ func (i *Instruction) AsVSshr(x, amount Value, lane VecLane) *Instruction {
 	i.v2 = amount
 	i.u1 = uint64(lane)
 	i.typ = x.Type()
+	return i
+}
+
+func (i *Instruction) AsScalarToVector(x Value, lane VecLane) *Instruction {
+	i.opcode = OpcodeScalarToVector
+	i.v = x
+	i.u1 = uint64(lane)
+	switch lane {
+	case VecLaneI8x16, VecLaneI16x8, VecLaneI32x4:
+		i.typ = TypeI32
+	case VecLaneI64x2:
+		i.typ = TypeI64
+	case VecLaneF32x4:
+		i.typ = TypeF32
+	case VecLaneF64x2:
+		i.typ = TypeF64
+	}
 	return i
 }
 
@@ -2578,7 +2598,7 @@ func (i *Instruction) Format(b Builder) string {
 	case OpcodeUndefined:
 	case OpcodeClz, OpcodeCtz, OpcodePopcnt, OpcodeFneg, OpcodeFcvtToSint, OpcodeFcvtToUint, OpcodeFcvtFromSint,
 		OpcodeFcvtFromUint, OpcodeFcvtToSintSat, OpcodeFcvtToUintSat, OpcodeFdemote, OpcodeFpromote, OpcodeIreduce, OpcodeBitcast, OpcodeSqrt, OpcodeFabs,
-		OpcodeCeil, OpcodeFloor, OpcodeTrunc, OpcodeNearest:
+		OpcodeCeil, OpcodeFloor, OpcodeTrunc, OpcodeNearest, OpcodeScalarToVector:
 		instSuffix = " " + i.v.Format(b)
 	case OpcodeVIadd, OpcodeIaddPairwise, OpcodeVSaddSat, OpcodeVUaddSat, OpcodeVIsub, OpcodeVSsubSat, OpcodeVUsubSat,
 		OpcodeVImin, OpcodeVUmin, OpcodeVImax, OpcodeVUmax, OpcodeVImul, OpcodeVAvgRound,
