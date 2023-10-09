@@ -851,3 +851,47 @@ dup v4?.2d, x5?
 bsl v4?.16b, v2?.16b, v3?.16b
 `, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
 }
+
+func TestMachine_lowerFcopysign(t *testing.T) {
+	for _, tc := range []struct {
+		_64bit bool
+		exp    string
+	}{
+		{
+			_64bit: false,
+			exp: `
+movz w1?, #0x8000, lsl 16
+ins v2?.s[0], w1?
+mov v5?.8b, v3?.8b
+bit v5?.8b, v4?.8b, v2?.8b
+`,
+		},
+		{
+			_64bit: true,
+			exp: `
+movz x1?, #0x8000, lsl 48
+ins v2?.d[0], x1?
+mov v5?.8b, v3?.8b
+bit v5?.8b, v4?.8b, v2?.8b
+`,
+		},
+	} {
+		t.Run(fmt.Sprintf("64bit=%v", tc._64bit), func(t *testing.T) {
+			_, _, m := newSetupWithMockContext()
+			tmpI := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeInt))
+			tmpF := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
+			rn := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
+			rm := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
+			rd := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
+
+			require.Equal(t, 1, int(tmpI.reg().ID()))
+			require.Equal(t, 2, int(tmpF.reg().ID()))
+			require.Equal(t, 3, int(rn.reg().ID()))
+			require.Equal(t, 4, int(rm.reg().ID()))
+			require.Equal(t, 5, int(rd.reg().ID()))
+
+			m.lowerFcopysignImpl(rd, rn, rm, tmpI, tmpF, tc._64bit)
+			require.Equal(t, tc.exp, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
+		})
+	}
+}
