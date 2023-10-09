@@ -187,9 +187,10 @@ func (c *compiler) lowerBlockArguments(args []ssa.Value, succ ssa.BasicBlock) {
 		c.tempRegs = c.tempRegs[:0]
 		for i, edge := range c.varEdges {
 			src := edge[0]
-			temp := c.AllocateVReg(src.RegType())
+			typ := c.varEdgeTypes[i]
+			temp := c.AllocateVReg(typ)
 			c.tempRegs = append(c.tempRegs, temp)
-			c.mach.InsertMove(temp, src, c.varEdgeTypes[i])
+			c.mach.InsertMove(temp, src, typ)
 		}
 		// Then move the temporary registers to the destination.
 		for i, edge := range c.varEdges {

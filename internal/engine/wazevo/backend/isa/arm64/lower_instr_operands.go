@@ -314,13 +314,13 @@ func (m *machine) getOperand_NR(def *backend.SSAValueDefinition, mode extMode) (
 	case mode == extModeNone:
 	case inBits == 32 && (mode == extModeZeroExtend32 || mode == extModeSignExtend32):
 	case inBits == 32 && mode == extModeZeroExtend64:
-		extended := m.compiler.AllocateVReg(regalloc.RegTypeInt)
+		extended := m.compiler.AllocateVReg(ssa.TypeI64)
 		ext := m.allocateInstr()
 		ext.asExtend(extended, v, 32, 64, false)
 		m.insert(ext)
 		r = extended
 	case inBits == 32 && mode == extModeSignExtend64:
-		extended := m.compiler.AllocateVReg(regalloc.RegTypeInt)
+		extended := m.compiler.AllocateVReg(ssa.TypeI64)
 		ext := m.allocateInstr()
 		ext.asExtend(extended, v, 32, 64, true)
 		m.insert(ext)

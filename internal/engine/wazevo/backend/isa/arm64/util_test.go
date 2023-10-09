@@ -74,9 +74,8 @@ func (m *mockCompiler) Emit4Bytes(b uint32) {
 	m.buf = append(m.buf, byte(b), byte(b>>8), byte(b>>16), byte(b>>24))
 }
 
-func (m *mockCompiler) Encode()                                                          {}
-func (m *mockCompiler) Buf() []byte                                                      { return m.buf }
-func (m *mockCompiler) AllocateVRegWithSSAType(regalloc.RegType, ssa.Type) regalloc.VReg { return 0 }
+func (m *mockCompiler) Encode()     {}
+func (m *mockCompiler) Buf() []byte { return m.buf }
 func (m *mockCompiler) TypeOf(v regalloc.VReg) (ret ssa.Type) {
 	return m.typeOf[v]
 }
@@ -100,8 +99,9 @@ func (m *mockCompiler) ResolveSignature(id ssa.SignatureID) *ssa.Signature {
 }
 
 // AllocateVReg implements backend.Compiler.
-func (m *mockCompiler) AllocateVReg(regType regalloc.RegType) regalloc.VReg {
+func (m *mockCompiler) AllocateVReg(typ ssa.Type) regalloc.VReg {
 	m.vRegCounter++
+	regType := regalloc.RegTypeOf(typ)
 	return regalloc.VReg(m.vRegCounter).SetRegType(regType)
 }
 
