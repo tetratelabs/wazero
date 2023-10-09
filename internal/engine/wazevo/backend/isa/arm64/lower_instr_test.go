@@ -895,3 +895,41 @@ bit v5?.8b, v4?.8b, v2?.8b
 		})
 	}
 }
+
+func TestMachine_lowerRotl(t *testing.T) {
+	for _, tc := range []struct {
+		_64bit bool
+		exp    string
+	}{
+		{
+			_64bit: false,
+			exp: `
+sub w1?, wzr, w3?
+ror w4?, w2?, w1?
+`,
+		},
+		{
+			_64bit: true,
+			exp: `
+sub x1?, xzr, x3?
+ror x4?, x2?, x1?
+`,
+		},
+	} {
+		t.Run(fmt.Sprintf("64bit=%v", tc._64bit), func(t *testing.T) {
+			_, _, m := newSetupWithMockContext()
+			tmpI := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeInt))
+			rn := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeInt))
+			rm := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeInt))
+			rd := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeInt))
+
+			require.Equal(t, 1, int(tmpI.reg().ID()))
+			require.Equal(t, 2, int(rn.reg().ID()))
+			require.Equal(t, 3, int(rm.reg().ID()))
+			require.Equal(t, 4, int(rd.reg().ID()))
+
+			m.lowerRotlImpl(rd, rn, rm, tmpI, tc._64bit)
+			require.Equal(t, tc.exp, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
+		})
+	}
+}

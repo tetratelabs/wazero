@@ -1551,14 +1551,20 @@ func (m *machine) lowerRotl(si *ssa.Instruction) {
 
 	rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
 	rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
+	tmp := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeInt))
 	rd := operandNR(m.compiler.VRegOf(r))
 
 	// Encode rotl as neg + rotr: neg is a sub against the zero-reg.
+	m.lowerRotlImpl(rd, rn, rm, tmp, _64)
+}
+
+func (m *machine) lowerRotlImpl(rd, rn, rm, tmp operand, is64bit bool) {
+	// Encode rotl as neg + rotr: neg is a sub against the zero-reg.
 	neg := m.allocateInstr()
-	neg.asALU(aluOpSub, rm, operandNR(xzrVReg), rm, _64)
+	neg.asALU(aluOpSub, tmp, operandNR(xzrVReg), rm, is64bit)
 	m.insert(neg)
 	alu := m.allocateInstr()
-	alu.asALU(aluOpRotR, rd, rn, rm, _64)
+	alu.asALU(aluOpRotR, rd, rn, tmp, is64bit)
 	m.insert(alu)
 }
 
