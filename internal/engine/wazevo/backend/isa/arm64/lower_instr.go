@@ -675,34 +675,30 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		m.insert(dup)
 
 	case ssa.OpcodeScalarToVector:
-
-		// wip
 		x, lane := instr.ArgWithLane()
 		rd := operandNR(m.compiler.VRegOf(instr.Return()))
+
 		var rn operand
-
 		var arr vecArrangement
-
 		switch lane {
 		case ssa.VecLaneI32x4:
 			arr = vecArrangementS
-			rn = m.getOperand_NR(m.compiler.ValueDefinition(x), extModeZeroExtend32)
+			rn = m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
 		case ssa.VecLaneI64x2:
 			arr = vecArrangementD
-			rn = m.getOperand_NR(m.compiler.ValueDefinition(x), extModeZeroExtend64)
+			rn = m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
 		default:
 			panic("unsupported lane " + lane.String())
 		}
 
-		_, _ = arr, rn
-
-		// mov0 := m.allocateInstr()
-		// mov0.asFpuMov128(rd.nr(), xzrVReg)
-		// m.insert(mov0)
+		// movToVec does not zero-out the other lanes,
+		// so we first zero-out explicitly.
+		mov0 := m.allocateInstr()
+		mov0.asLoadFpuConst64(rd.nr(), 0)
+		m.insert(mov0)
 
 		mov := m.allocateInstr()
-		// mov.asMovToVec(rd, rn, arr, 0)
-		mov.asFpuMov64(rd.nr(), rn.nr())
+		mov.asMovToVec(rd, rn, arr, 0)
 		m.insert(mov)
 
 	default:

@@ -712,8 +712,7 @@ const (
 	// OpcodeBitcast is a bitcast operation: `v = bitcast MemFlags, x`.
 	OpcodeBitcast
 
-	// OpcodeScalarToVector ...
-	// `v = scalar_to_vector s`.
+	// OpcodeScalarToVector moves the given scalar value to a vector: `v = scalar_to_vector s`.
 	OpcodeScalarToVector
 
 	// OpcodeBmask ...
@@ -1194,14 +1193,6 @@ func (i *Instruction) AsExtLoad(op Opcode, ptr Value, offset uint32, dst64bit bo
 		i.typ = TypeI32
 	}
 	return i
-}
-
-// AsSimdLoad initializes this instruction as a load instruction with OpcodeLoad 128 bit.
-func (i *Instruction) AsSimdLoad(op Opcode, ptr Value, offset uint32) {
-	i.opcode = op
-	i.v = ptr
-	i.u1 = uint64(offset)
-	i.typ = TypeV128
 }
 
 // LoadData returns the operands for a load instruction.
@@ -1751,20 +1742,12 @@ func (i *Instruction) AsVSshr(x, amount Value, lane VecLane) *Instruction {
 	return i
 }
 
+// AsScalarToVector initializes this instruction as move scalar to vector instruction with OpcodeScalarToVector.
 func (i *Instruction) AsScalarToVector(x Value, lane VecLane) *Instruction {
 	i.opcode = OpcodeScalarToVector
 	i.v = x
 	i.u1 = uint64(lane)
-	switch lane {
-	case VecLaneI8x16, VecLaneI16x8, VecLaneI32x4:
-		i.typ = TypeI32
-	case VecLaneI64x2:
-		i.typ = TypeI64
-	case VecLaneF32x4:
-		i.typ = TypeF32
-	case VecLaneF64x2:
-		i.typ = TypeF64
-	}
+	i.typ = TypeV128
 	return i
 }
 
