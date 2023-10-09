@@ -1157,7 +1157,7 @@ func (m *machine) lowerFcopysign(x, y, ret ssa.Value) {
 	tmpF := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
 	tmpI := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeInt))
 	rd := m.compiler.VRegOf(ret)
-	m.lowerFcopysignImpl(operandNR(rd), rn, rm, tmpI, tmpF, x.Type() == ssa.TypeF32)
+	m.lowerFcopysignImpl(operandNR(rd), rn, rm, tmpI, tmpF, x.Type() == ssa.TypeF64)
 }
 
 func (m *machine) lowerFcopysignImpl(rd, rn, rm, tmpI, tmpF operand, _64bit bool) {
