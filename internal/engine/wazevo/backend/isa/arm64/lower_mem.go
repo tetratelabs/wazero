@@ -292,7 +292,7 @@ func (m *machine) lowerToAddressModeFromAddends(a32s []addend32, a64s []regalloc
 		base32, a32s = dequeue(a32s)
 
 		// First we need 64-bit base.
-		base := m.compiler.AllocateVReg(regalloc.RegTypeInt)
+		base := m.compiler.AllocateVReg(ssa.TypeI64)
 		baseExt := m.allocateInstr()
 		var signed bool
 		if base32.ext == extendOpSXTW {
@@ -309,7 +309,7 @@ func (m *machine) lowerToAddressModeFromAddends(a32s []addend32, a64s []regalloc
 			amode = addressMode{kind: addressModeKindRegUnsignedImm12, rn: base, imm: 0}
 		}
 	default: // Only static offsets.
-		tmpReg := m.compiler.AllocateVReg(regalloc.RegTypeInt)
+		tmpReg := m.compiler.AllocateVReg(ssa.TypeI64)
 		m.lowerConstantI64(tmpReg, offset)
 		amode = addressMode{kind: addressModeKindRegUnsignedImm12, rn: tmpReg, imm: 0}
 		offset = 0
@@ -402,14 +402,14 @@ func (m *machine) collectAddends(ptr ssa.Value) (addends32 []addend32, addends64
 }
 
 func (m *machine) addConstToReg64(r regalloc.VReg, c int64) (rd regalloc.VReg) {
-	rd = m.compiler.AllocateVReg(regalloc.RegTypeInt)
+	rd = m.compiler.AllocateVReg(ssa.TypeI64)
 	alu := m.allocateInstr()
 	if imm12Op, ok := asImm12Operand(uint64(c)); ok {
 		alu.asALU(aluOpAdd, operandNR(rd), operandNR(r), imm12Op, true)
 	} else if imm12Op, ok = asImm12Operand(uint64(-c)); ok {
 		alu.asALU(aluOpSub, operandNR(rd), operandNR(r), imm12Op, true)
 	} else {
-		tmp := m.compiler.AllocateVReg(regalloc.RegTypeInt)
+		tmp := m.compiler.AllocateVReg(ssa.TypeI64)
 		m.load64bitConst(c, tmp)
 		alu.asALU(aluOpAdd, operandNR(rd), operandNR(r), operandNR(tmp), true)
 	}
@@ -418,7 +418,7 @@ func (m *machine) addConstToReg64(r regalloc.VReg, c int64) (rd regalloc.VReg) {
 }
 
 func (m *machine) addReg64ToReg64(rn, rm regalloc.VReg) (rd regalloc.VReg) {
-	rd = m.compiler.AllocateVReg(regalloc.RegTypeInt)
+	rd = m.compiler.AllocateVReg(ssa.TypeI64)
 	alu := m.allocateInstr()
 	alu.asALU(aluOpAdd, operandNR(rd), operandNR(rn), operandNR(rm), true)
 	m.insert(alu)
@@ -426,7 +426,7 @@ func (m *machine) addReg64ToReg64(rn, rm regalloc.VReg) (rd regalloc.VReg) {
 }
 
 func (m *machine) addRegToReg64Ext(rn, rm regalloc.VReg, ext extendOp) (rd regalloc.VReg) {
-	rd = m.compiler.AllocateVReg(regalloc.RegTypeInt)
+	rd = m.compiler.AllocateVReg(ssa.TypeI64)
 	alu := m.allocateInstr()
 	alu.asALU(aluOpAdd, operandNR(rd), operandNR(rn), operandER(rm, ext, 64), true)
 	m.insert(alu)

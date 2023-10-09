@@ -73,10 +73,7 @@ type Compiler interface {
 	ResolveSignature(id ssa.SignatureID) *ssa.Signature
 
 	// AllocateVReg allocates a new virtual register of the given type.
-	AllocateVReg(regType regalloc.RegType) regalloc.VReg
-
-	// AllocateVRegWithSSAType allocates a new virtual register of the given type like AllocateVReg but also sets the ssa.Type.
-	AllocateVRegWithSSAType(regType regalloc.RegType, typ ssa.Type) regalloc.VReg
+	AllocateVReg(typ ssa.Type) regalloc.VReg
 
 	// MarkLowered is used to mark the given instruction as already lowered
 	// which tells the compiler to skip it when traversing.
@@ -234,7 +231,8 @@ func (c *compiler) assignVirtualRegisters() {
 		for i := 0; i < blk.Params(); i++ {
 			p := blk.Param(i)
 			pid := p.ID()
-			vreg := c.AllocateVReg(regalloc.RegTypeOf(p.Type()))
+			typ := p.Type()
+			vreg := c.AllocateVReg(typ)
 			c.ssaValueToVRegs[pid] = vreg
 			c.ssaValueDefinitions[pid] = SSAValueDefinition{BlockParamValue: p, BlkParamVReg: vreg}
 			c.ssaTypeOfVRegID[vreg.ID()] = p.Type()
@@ -247,7 +245,8 @@ func (c *compiler) assignVirtualRegisters() {
 			if r.Valid() {
 				id := r.ID()
 				ssaTyp := r.Type()
-				vReg := c.AllocateVReg(regalloc.RegTypeOf(ssaTyp))
+				typ := r.Type()
+				vReg := c.AllocateVReg(typ)
 				c.ssaValueToVRegs[id] = vReg
 				c.ssaValueDefinitions[id] = SSAValueDefinition{
 					Instr:    cur,
@@ -260,7 +259,7 @@ func (c *compiler) assignVirtualRegisters() {
 			for _, r := range rs {
 				id := r.ID()
 				ssaTyp := r.Type()
-				vReg := c.AllocateVReg(regalloc.RegTypeOf(ssaTyp))
+				vReg := c.AllocateVReg(ssaTyp)
 				c.ssaValueToVRegs[id] = vReg
 				c.ssaValueDefinitions[id] = SSAValueDefinition{
 					Instr:    cur,
@@ -275,21 +274,15 @@ func (c *compiler) assignVirtualRegisters() {
 
 	for i, retBlk := 0, builder.ReturnBlock(); i < retBlk.Params(); i++ {
 		typ := retBlk.Param(i).Type()
-		vReg := c.AllocateVReg(regalloc.RegTypeOf(typ))
+		vReg := c.AllocateVReg(typ)
 		c.returnVRegs = append(c.returnVRegs, vReg)
 		c.ssaTypeOfVRegID[vReg.ID()] = typ
 	}
 }
 
 // AllocateVReg implements Compiler.AllocateVReg.
-func (c *compiler) AllocateVReg(regType regalloc.RegType) regalloc.VReg {
-	r := regalloc.VReg(c.nextVRegID).SetRegType(regType)
-	c.nextVRegID++
-	return r
-}
-
-// AllocateVRegWithSSAType implements Compiler.AllocateVRegWithSSAType.
-func (c *compiler) AllocateVRegWithSSAType(regType regalloc.RegType, typ ssa.Type) regalloc.VReg {
+func (c *compiler) AllocateVReg(typ ssa.Type) regalloc.VReg {
+	regType := regalloc.RegTypeOf(typ)
 	r := regalloc.VReg(c.nextVRegID).SetRegType(regType)
 	c.ssaTypeOfVRegID[r.ID()] = typ
 	c.nextVRegID++

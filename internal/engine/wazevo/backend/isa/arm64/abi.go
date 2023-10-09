@@ -323,7 +323,7 @@ func (m *machine) resolveAddressModeForOffset(offset int64, dstBits byte, rn reg
 			m.lowerConstantI64(tmpRegVReg, offset)
 			indexReg = tmpRegVReg
 		} else {
-			indexReg = m.compiler.AllocateVRegWithSSAType(regalloc.RegTypeInt, ssa.TypeI64)
+			indexReg = m.compiler.AllocateVReg(ssa.TypeI64)
 			m.lowerConstantI64(indexReg, offset)
 		}
 		amode = addressMode{kind: addressModeKindRegReg, rn: rn, rm: indexReg, extOp: extendOpUXTX /* indicates index rm is 64-bit */}

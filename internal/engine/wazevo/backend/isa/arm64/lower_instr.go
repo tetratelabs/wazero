@@ -48,13 +48,13 @@ func (m *machine) lowerBrTable(i *ssa.Instruction) {
 	// mov  maxIndexReg #maximum_index
 	// subs wzr, index, maxIndexReg
 	// csel adjustedIndex, maxIndexReg, index, hs ;; if index is higher or equal than maxIndexReg.
-	maxIndexReg := m.compiler.AllocateVReg(regalloc.RegTypeInt)
+	maxIndexReg := m.compiler.AllocateVReg(ssa.TypeI32)
 	m.lowerConstantI32(maxIndexReg, int32(len(targets)-1))
 	subs := m.allocateInstr()
 	subs.asALU(aluOpSubS, operandNR(xzrVReg), indexOperand, operandNR(maxIndexReg), false)
 	m.insert(subs)
 	csel := m.allocateInstr()
-	adjustedIndex := m.compiler.AllocateVReg(regalloc.RegTypeInt)
+	adjustedIndex := m.compiler.AllocateVReg(ssa.TypeI32)
 	csel.asCSel(operandNR(adjustedIndex), operandNR(maxIndexReg), indexOperand, hs, false)
 	m.insert(csel)
 
@@ -697,7 +697,7 @@ func (m *machine) lowerShuffle(rd, rn, rm operand, lane1, lane2 uint64) {
 	//     lane1 := lane[7]<<56 | ... | lane[1]<<8 | lane[0]
 	//     lane2 := lane[15]<<56 | ... | lane[9]<<8 | lane[8]
 	// Thus, we can use loadFpuConst128.
-	tmp := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
+	tmp := operandNR(m.compiler.AllocateVReg(ssa.TypeV128))
 	lfc := m.allocateInstr()
 	lfc.asLoadFpuConst128(tmp.nr(), lane1, lane2)
 	m.insert(lfc)
@@ -723,7 +723,7 @@ func (m *machine) lowerVShift(op ssa.Opcode, rd, rn, rm operand, arr vecArrangem
 		panic("unsupported arrangment " + arr.String())
 	}
 
-	tmp := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
+	tmp := operandNR(m.compiler.AllocateVReg(ssa.TypeV128))
 
 	and := m.allocateInstr()
 	and.asALUBitmaskImm(aluOpAnd, tmp.nr(), rm.nr(), uint64(modulo), false)
@@ -753,7 +753,7 @@ func (m *machine) lowerVShift(op ssa.Opcode, rd, rn, rm operand, arr vecArrangem
 }
 
 func (m *machine) lowerVcheckTrue(op ssa.Opcode, rm, rd operand, arr vecArrangement) {
-	tmp := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeOf(ssa.TypeV128)))
+	tmp := operandNR(m.compiler.AllocateVReg(ssa.TypeV128))
 
 	// Special case VallTrue for i64x2.
 	if op == ssa.OpcodeVallTrue && arr == vecArrangement2D {
@@ -811,9 +811,9 @@ func (m *machine) lowerVcheckTrue(op ssa.Opcode, rm, rd operand, arr vecArrangem
 }
 
 func (m *machine) lowerVhighBits(rm, rd operand, arr vecArrangement) {
-	r0 := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeOf(ssa.TypeI64)))
-	v0 := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeOf(ssa.TypeV128)))
-	v1 := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeOf(ssa.TypeV128)))
+	r0 := operandNR(m.compiler.AllocateVReg(ssa.TypeI64))
+	v0 := operandNR(m.compiler.AllocateVReg(ssa.TypeV128))
+	v1 := operandNR(m.compiler.AllocateVReg(ssa.TypeV128))
 
 	switch arr {
 	case vecArrangement16B: // ssa.VecLaneI8x16
@@ -1033,9 +1033,9 @@ func (m *machine) lowerVIMul(rd, rn, rm operand, arr vecArrangement) {
 		mul.asVecRRR(vecOpMul, rd, rn, rm, arr)
 		m.insert(mul)
 	} else {
-		tmp1 := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
-		tmp2 := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
-		tmp3 := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
+		tmp1 := operandNR(m.compiler.AllocateVReg(ssa.TypeV128))
+		tmp2 := operandNR(m.compiler.AllocateVReg(ssa.TypeV128))
+		tmp3 := operandNR(m.compiler.AllocateVReg(ssa.TypeV128))
 
 		// Following the algorithm in https://chromium-review.googlesource.com/c/v8/v8/+/1781696
 		rev64 := m.allocateInstr()
@@ -1154,10 +1154,17 @@ func (m *machine) exitIfNot(execCtxVReg regalloc.VReg, c cond, cond64bit bool, c
 func (m *machine) lowerFcopysign(x, y, ret ssa.Value) {
 	rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
 	rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
-	tmpF := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
-	tmpI := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeInt))
+	var tmpI, tmpF operand
+	_64 := x.Type() == ssa.TypeF64
+	if _64 {
+		tmpF = operandNR(m.compiler.AllocateVReg(ssa.TypeF64))
+		tmpI = operandNR(m.compiler.AllocateVReg(ssa.TypeI64))
+	} else {
+		tmpF = operandNR(m.compiler.AllocateVReg(ssa.TypeF32))
+		tmpI = operandNR(m.compiler.AllocateVReg(ssa.TypeI32))
+	}
 	rd := m.compiler.VRegOf(ret)
-	m.lowerFcopysignImpl(operandNR(rd), rn, rm, tmpI, tmpF, x.Type() == ssa.TypeF64)
+	m.lowerFcopysignImpl(operandNR(rd), rn, rm, tmpI, tmpF, _64)
 }
 
 func (m *machine) lowerFcopysignImpl(rd, rn, rm, tmpI, tmpF operand, _64bit bool) {
@@ -1243,7 +1250,7 @@ func (m *machine) lowerFpuToInt(rd, rn operand, ctx regalloc.VReg, signed, src64
 	m.insert(cvt)
 
 	if !nonTrapping {
-		tmpReg := m.compiler.AllocateVReg(regalloc.RegTypeInt)
+		tmpReg := m.compiler.AllocateVReg(ssa.TypeI64)
 
 		// After the conversion, check the FPU flags.
 		getFlag := m.allocateInstr()
@@ -1551,7 +1558,12 @@ func (m *machine) lowerRotl(si *ssa.Instruction) {
 
 	rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
 	rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
-	tmp := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeInt))
+	var tmp operand
+	if _64 {
+		tmp = operandNR(m.compiler.AllocateVReg(ssa.TypeI64))
+	} else {
+		tmp = operandNR(m.compiler.AllocateVReg(ssa.TypeI32))
+	}
 	rd := operandNR(m.compiler.VRegOf(r))
 
 	// Encode rotl as neg + rotr: neg is a sub against the zero-reg.
@@ -1626,12 +1638,18 @@ func (m *machine) lowerCtz(x, result ssa.Value) {
 	rd := m.compiler.VRegOf(result)
 	rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
 	rbit := m.allocateInstr()
-	tmpReg := m.compiler.AllocateVReg(regalloc.RegTypeInt)
-	rbit.asBitRR(bitOpRbit, tmpReg, rn.nr(), x.Type().Bits() == 64)
+	_64 := x.Type().Bits() == 64
+	var tmpReg regalloc.VReg
+	if _64 {
+		tmpReg = m.compiler.AllocateVReg(ssa.TypeI64)
+	} else {
+		tmpReg = m.compiler.AllocateVReg(ssa.TypeI32)
+	}
+	rbit.asBitRR(bitOpRbit, tmpReg, rn.nr(), _64)
 	m.insert(rbit)
 
 	clz := m.allocateInstr()
-	clz.asBitRR(bitOpClz, rd, tmpReg, x.Type().Bits() == 64)
+	clz.asBitRR(bitOpClz, rd, tmpReg, _64)
 	m.insert(clz)
 }
 
@@ -1659,17 +1677,17 @@ func (m *machine) lowerPopcnt(x, result ssa.Value) {
 	rd := operandNR(m.compiler.VRegOf(result))
 	rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
 
-	rf1 := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
+	rf1 := operandNR(m.compiler.AllocateVReg(ssa.TypeF64))
 	ins := m.allocateInstr()
 	ins.asMovToVec(rf1, rn, vecArrangementD, vecIndex(0))
 	m.insert(ins)
 
-	rf2 := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
+	rf2 := operandNR(m.compiler.AllocateVReg(ssa.TypeF64))
 	cnt := m.allocateInstr()
 	cnt.asVecMisc(vecOpCnt, rf2, rf1, vecArrangement16B)
 	m.insert(cnt)
 
-	rf3 := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
+	rf3 := operandNR(m.compiler.AllocateVReg(ssa.TypeF64))
 	uaddlv := m.allocateInstr()
 	uaddlv.asVecLanes(vecOpUaddlv, rf3, rf2, vecArrangement8B)
 	m.insert(uaddlv)
@@ -1681,7 +1699,7 @@ func (m *machine) lowerPopcnt(x, result ssa.Value) {
 
 // lowerExitWithCode lowers the lowerExitWithCode takes a context pointer as argument.
 func (m *machine) lowerExitWithCode(execCtxVReg regalloc.VReg, code wazevoapi.ExitCode) {
-	tmpReg1 := m.compiler.AllocateVReg(regalloc.RegTypeInt)
+	tmpReg1 := m.compiler.AllocateVReg(ssa.TypeI32)
 	loadExitCodeConst := m.allocateInstr()
 	loadExitCodeConst.asMOVZ(tmpReg1, uint64(code), 0, true)
 
@@ -1693,7 +1711,7 @@ func (m *machine) lowerExitWithCode(execCtxVReg regalloc.VReg, code wazevoapi.Ex
 		}, 32)
 
 	// In order to unwind the stack, we also need to push the current stack pointer:
-	tmp2 := m.compiler.AllocateVReg(regalloc.RegTypeInt)
+	tmp2 := m.compiler.AllocateVReg(ssa.TypeI64)
 	movSpToTmp := m.allocateInstr()
 	movSpToTmp.asMove64(tmp2, spVReg)
 	strSpToExecCtx := m.allocateInstr()
@@ -1703,7 +1721,7 @@ func (m *machine) lowerExitWithCode(execCtxVReg regalloc.VReg, code wazevoapi.Ex
 			rn:   execCtxVReg, imm: wazevoapi.ExecutionContextOffsetStackPointerBeforeGoCall.I64(),
 		}, 64)
 	// Also the address of this exit.
-	tmp3 := m.compiler.AllocateVReg(regalloc.RegTypeInt)
+	tmp3 := m.compiler.AllocateVReg(ssa.TypeI64)
 	currentAddrToTmp := m.allocateInstr()
 	currentAddrToTmp.asAdr(tmp3, 0)
 	storeCurrentAddrToExecCtx := m.allocateInstr()
@@ -1842,7 +1860,7 @@ func (m *machine) lowerSelect(c, x, y, result ssa.Value) {
 }
 
 func (m *machine) lowerSelectVec(rc, rn, rm, rd operand) {
-	tmp := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeInt))
+	tmp := operandNR(m.compiler.AllocateVReg(ssa.TypeI64))
 
 	// Sets all bits to 1 if rc is not zero.
 	alu := m.allocateInstr()

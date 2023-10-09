@@ -10,7 +10,7 @@ func (m *machine) lowerConstant(instr *ssa.Instruction) (vr regalloc.VReg) {
 	val := instr.Return()
 	valType := val.Type()
 
-	vr = m.compiler.AllocateVReg(regalloc.RegTypeOf(valType))
+	vr = m.compiler.AllocateVReg(valType)
 	m.InsertLoadConstant(instr, vr)
 	return
 }

@@ -834,10 +834,10 @@ ushl x1.16b, x2.16b, x1.16b
 
 func TestMachine_lowerSelectVec(t *testing.T) {
 	_, _, m := newSetupWithMockContext()
-	c := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeInt))
-	rn := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
-	rm := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
-	rd := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
+	c := operandNR(m.compiler.AllocateVReg(ssa.TypeI32))
+	rn := operandNR(m.compiler.AllocateVReg(ssa.TypeV128))
+	rm := operandNR(m.compiler.AllocateVReg(ssa.TypeV128))
+	rd := operandNR(m.compiler.AllocateVReg(ssa.TypeV128))
 
 	require.Equal(t, 1, int(c.reg().ID()))
 	require.Equal(t, 2, int(rn.reg().ID()))
@@ -878,11 +878,19 @@ bit v5?.8b, v4?.8b, v2?.8b
 	} {
 		t.Run(fmt.Sprintf("64bit=%v", tc._64bit), func(t *testing.T) {
 			_, _, m := newSetupWithMockContext()
-			tmpI := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeInt))
-			tmpF := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
-			rn := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
-			rm := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
-			rd := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
+			var typ, ftyp ssa.Type
+			if tc._64bit {
+				typ = ssa.TypeI64
+				ftyp = ssa.TypeF64
+			} else {
+				typ = ssa.TypeI32
+				ftyp = ssa.TypeF32
+			}
+			tmpI := operandNR(m.compiler.AllocateVReg(typ))
+			tmpF := operandNR(m.compiler.AllocateVReg(ftyp))
+			rn := operandNR(m.compiler.AllocateVReg(ftyp))
+			rm := operandNR(m.compiler.AllocateVReg(ftyp))
+			rd := operandNR(m.compiler.AllocateVReg(ftyp))
 
 			require.Equal(t, 1, int(tmpI.reg().ID()))
 			require.Equal(t, 2, int(tmpF.reg().ID()))
@@ -918,10 +926,16 @@ ror x4?, x2?, x1?
 	} {
 		t.Run(fmt.Sprintf("64bit=%v", tc._64bit), func(t *testing.T) {
 			_, _, m := newSetupWithMockContext()
-			tmpI := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeInt))
-			rn := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeInt))
-			rm := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeInt))
-			rd := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeInt))
+			var typ ssa.Type
+			if tc._64bit {
+				typ = ssa.TypeI64
+			} else {
+				typ = ssa.TypeI32
+			}
+			tmpI := operandNR(m.compiler.AllocateVReg(typ))
+			rn := operandNR(m.compiler.AllocateVReg(typ))
+			rm := operandNR(m.compiler.AllocateVReg(typ))
+			rd := operandNR(m.compiler.AllocateVReg(typ))
 
 			require.Equal(t, 1, int(tmpI.reg().ID()))
 			require.Equal(t, 2, int(rn.reg().ID()))
