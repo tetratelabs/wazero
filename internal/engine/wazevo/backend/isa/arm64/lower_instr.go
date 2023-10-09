@@ -1155,7 +1155,12 @@ func (m *machine) lowerFcopysign(x, y, ret ssa.Value) {
 	rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
 	rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
 	tmpF := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeFloat))
+	tmpI := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeInt))
+	rd := m.compiler.VRegOf(ret)
+	m.lowerFcopysignImpl(operandNR(rd), rn, rm, tmpI, tmpF, x.Type() == ssa.TypeF32)
+}
 
+func (m *machine) lowerFcopysignImpl(rd, rn, rm, tmpI, tmpF operand, _64bit bool) {
 	// This is exactly the same code emitted by GCC for "__builtin_copysign":
 	//
 	//    mov     x0, -9223372036854775808
@@ -1164,23 +1169,22 @@ func (m *machine) lowerFcopysign(x, y, ret ssa.Value) {
 	//
 
 	setMSB := m.allocateInstr()
-	tmpReg := m.compiler.AllocateVReg(regalloc.RegTypeInt)
-	if x.Type() == ssa.TypeF32 {
-		m.lowerConstantI32(tmpReg, math.MinInt32)
-		setMSB.asMovToVec(tmpF, operandNR(tmpReg), vecArrangementS, vecIndex(0))
+	if _64bit {
+		m.lowerConstantI64(tmpI.nr(), math.MinInt64)
+		setMSB.asMovToVec(tmpF, tmpI, vecArrangementD, vecIndex(0))
 	} else {
-		m.lowerConstantI64(tmpReg, math.MinInt64)
-		setMSB.asMovToVec(tmpF, operandNR(tmpReg), vecArrangementD, vecIndex(0))
+		m.lowerConstantI32(tmpI.nr(), math.MinInt32)
+		setMSB.asMovToVec(tmpF, tmpI, vecArrangementS, vecIndex(0))
 	}
 	m.insert(setMSB)
 
-	vbit := m.allocateInstr()
-	vbit.asVecRRR(vecOpBit, rn, rm, tmpF, vecArrangement8B)
-	m.insert(vbit)
-
 	mov := m.allocateInstr()
-	mov.asFpuMov64(m.compiler.VRegOf(ret), rn.nr())
+	mov.asFpuMov64(rd.nr(), rn.nr())
 	m.insert(mov)
+
+	vbit := m.allocateInstr()
+	vbit.asVecRRR(vecOpBit, rd, rm, tmpF, vecArrangement8B)
+	m.insert(vbit)
 }
 
 func (m *machine) lowerBitcast(instr *ssa.Instruction) {
