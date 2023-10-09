@@ -853,7 +853,6 @@ bsl v4?.16b, v2?.16b, v3?.16b
 }
 
 func TestMachine_lowerFcopysign(t *testing.T) {
-
 	for _, tc := range []struct {
 		_64bit bool
 		exp    string
