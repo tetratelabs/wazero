@@ -200,6 +200,49 @@ func TestMachine_getOperand_SR_NR(t *testing.T) {
 			exp:   operandSR(regalloc.VReg(1234), 14, shiftOpLSL),
 		},
 		{
+			name: "ishl with const amount with i32",
+			setup: func(
+				ctx *mockCompiler, builder ssa.Builder, m *machine,
+			) (def *backend.SSAValueDefinition, mode extMode, verify func(t *testing.T)) {
+				blk := builder.CurrentBlock()
+				// (p1+p2) << amount
+				p1 := blk.AddParam(builder, ssa.TypeI32)
+				p2 := blk.AddParam(builder, ssa.TypeI32)
+				add := builder.AllocateInstruction()
+				add.AsIadd(p1, p2)
+				builder.InsertInstruction(add)
+				addResult := add.Return()
+
+				amount := builder.AllocateInstruction()
+				amount.AsIconst32(45) // should be taken modulo by 31.
+				builder.InsertInstruction(amount)
+
+				amountVal := amount.Return()
+
+				ishl := builder.AllocateInstruction()
+				ishl.AsIshl(addResult, amountVal)
+				builder.InsertInstruction(ishl)
+
+				ctx.definitions[p1] = &backend.SSAValueDefinition{BlkParamVReg: regalloc.VReg(1), BlockParamValue: p1}
+				ctx.definitions[p2] = &backend.SSAValueDefinition{BlkParamVReg: regalloc.VReg(2), BlockParamValue: p2}
+				ctx.definitions[addResult] = &backend.SSAValueDefinition{Instr: add, N: 0}
+				ctx.definitions[amountVal] = &backend.SSAValueDefinition{Instr: amount, N: 0}
+
+				ctx.vRegMap[addResult] = regalloc.VReg(1234)
+				ctx.vRegMap[ishl.Return()] = regalloc.VReg(10)
+				def = &backend.SSAValueDefinition{Instr: ishl, N: 0}
+				mode = extModeNone
+				verify = func(t *testing.T) {
+					_, ok := ctx.lowered[ishl]
+					require.True(t, ok)
+					_, ok = ctx.lowered[amount]
+					require.True(t, ok)
+				}
+				return
+			},
+			exp: operandSR(regalloc.VReg(1234), 13, shiftOpLSL),
+		},
+		{
 			name: "ishl with const amount with const shift target",
 			setup: func(
 				ctx *mockCompiler, builder ssa.Builder, m *machine,
