@@ -88,6 +88,7 @@ var defKinds = [numInstructionKinds]defKind{
 	fpuLoad32:            defKindRD,
 	fpuLoad64:            defKindRD,
 	fpuLoad128:           defKindRD,
+	vecLoad1R:            defKindRD,
 	loadFpuConst32:       defKindRD,
 	loadFpuConst64:       defKindRD,
 	loadFpuConst128:      defKindRD,
@@ -212,6 +213,7 @@ var useKinds = [numInstructionKinds]useKind{
 	loadFpuConst32:       useKindNone,
 	loadFpuConst64:       useKindNone,
 	loadFpuConst128:      useKindNone,
+	vecLoad1R:            useKindAMode,
 	cSel:                 useKindRNRM,
 	fpuCSel:              useKindRNRM,
 	movToVec:             useKindRN,
@@ -541,6 +543,13 @@ func (i *instruction) asFpuLoad(dst operand, amode addressMode, sizeInBits byte)
 	}
 	i.rd = dst
 	i.amode = amode
+}
+
+func (i *instruction) asVecLoad1R(dst operand, amode addressMode, arr vecArrangement) {
+	i.kind = vecLoad1R
+	i.rd = dst
+	i.amode = amode
+	i.u1 = uint64(arr)
 }
 
 func (i *instruction) asCSet(rd regalloc.VReg, c condFlag) {
@@ -1474,6 +1483,8 @@ const (
 	loadFpuConst64
 	// loadFpuConst128 represents a load of a 128-bit floating-point constant.
 	loadFpuConst128
+	// vecLoad1R represents a load of a one single-element structure that replicates to all lanes of a vector.
+	vecLoad1R
 	// fpuToInt represents a conversion from FP to integer.
 	fpuToInt
 	// intToFpu represents a conversion from integer to FP.

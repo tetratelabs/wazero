@@ -674,32 +674,31 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		}
 		m.insert(dup)
 
-	case ssa.OpcodeScalarToVector:
-		x, lane := instr.ArgWithLane()
+	case ssa.OpcodeLoadSplat:
+		x, offset, lane := instr.LoadSplatData()
 		rd := operandNR(m.compiler.VRegOf(instr.Return()))
-
-		var rn operand
+		var size byte
 		var arr vecArrangement
 		switch lane {
+		case ssa.VecLaneI8x16:
+			arr = vecArrangement16B
+			size = 8
+		case ssa.VecLaneI16x8:
+			arr = vecArrangement8H
+			size = 16
 		case ssa.VecLaneI32x4:
 			arr = vecArrangementS
-			rn = m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
+			size = 32
 		case ssa.VecLaneI64x2:
+			size = 64
 			arr = vecArrangementD
-			rn = m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
 		default:
 			panic("unsupported lane " + lane.String())
 		}
-
-		// movToVec does not zero-out the other lanes,
-		// so we first zero-out explicitly.
-		mov0 := m.allocateInstr()
-		mov0.asLoadFpuConst64(rd.nr(), 0)
-		m.insert(mov0)
-
-		mov := m.allocateInstr()
-		mov.asMovToVec(rd, rn, arr, 0)
-		m.insert(mov)
+		amode := m.lowerToAddressMode(x, offset, size)
+		ld1r := m.allocateInstr()
+		ld1r.asVecLoad1R(rd, amode, arr)
+		m.insert(ld1r)
 
 	default:
 		panic("TODO: lowering " + op.String())

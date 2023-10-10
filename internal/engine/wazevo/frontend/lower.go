@@ -1816,24 +1816,21 @@ func (c *Compiler) lowerCurrentOpcode() {
 			if state.unreachable {
 				break
 			}
-
-			var loadOp ssa.Opcode
 			var lane ssa.VecLane
 			var opSize uint64
 			switch vecOp {
 			case wasm.OpcodeVecV128Load8Splat:
-				loadOp, lane, opSize = ssa.OpcodeUload8, ssa.VecLaneI8x16, 1
+				lane, opSize = ssa.VecLaneI8x16, 1
 			case wasm.OpcodeVecV128Load16Splat:
-				loadOp, lane, opSize = ssa.OpcodeUload16, ssa.VecLaneI16x8, 2
+				lane, opSize = ssa.VecLaneI16x8, 2
 			case wasm.OpcodeVecV128Load32Splat:
-				loadOp, lane, opSize = ssa.OpcodeUload32, ssa.VecLaneI32x4, 4
+				lane, opSize = ssa.VecLaneI32x4, 4
 			}
 			baseAddr := state.pop()
 			addr := c.memOpSetup(baseAddr, uint64(offset), opSize)
-			load := builder.AllocateInstruction().
-				AsExtLoad(loadOp, addr, offset, false).
+			ret := builder.AllocateInstruction().
+				AsLoadSplat(addr, offset, lane).
 				Insert(builder).Return()
-			ret := builder.AllocateInstruction().AsSplat(load, lane).Insert(builder).Return()
 			state.push(ret)
 
 		case wasm.OpcodeVecV128Load64Splat:
