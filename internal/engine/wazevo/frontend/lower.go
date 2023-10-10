@@ -1758,11 +1758,8 @@ func (c *Compiler) lowerCurrentOpcode() {
 			}
 			baseAddr := state.pop()
 			addr := c.memOpSetup(baseAddr, uint64(offset), 4)
-			load := builder.AllocateInstruction().
-				AsExtLoad(ssa.OpcodeUload32, addr, offset, false).
-				Insert(builder).Return()
 			ret := builder.AllocateInstruction().
-				AsScalarToVector(load, ssa.VecLaneI32x4).
+				AsLoad(addr, offset, ssa.TypeF32).
 				Insert(builder).Return()
 			state.push(ret)
 
@@ -1773,11 +1770,8 @@ func (c *Compiler) lowerCurrentOpcode() {
 			}
 			baseAddr := state.pop()
 			addr := c.memOpSetup(baseAddr, uint64(offset), 8)
-			load := builder.AllocateInstruction().
-				AsLoad(addr, offset, ssa.TypeI64).
-				Insert(builder).Return()
 			ret := builder.AllocateInstruction().
-				AsScalarToVector(load, ssa.VecLaneI64x2).
+				AsLoad(addr, offset, ssa.TypeF64).
 				Insert(builder).Return()
 			state.push(ret)
 
