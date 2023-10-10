@@ -2,7 +2,6 @@ package arm64
 
 import (
 	"fmt"
-	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
@@ -48,7 +47,10 @@ func (i *instruction) encode(c backend.Compiler) {
 	case uLoad8, uLoad16, uLoad32, uLoad64, sLoad8, sLoad16, sLoad32, fpuLoad32, fpuLoad64, fpuLoad128:
 		c.Emit4Bytes(encodeLoadOrStore(i.kind, regNumberInEncoding[i.rd.realReg()], i.amode))
 	case vecLoad1R:
-		c.Emit4Bytes(encodeVecLoad1Rrt(regNumberInEncoding[i.rd.realReg()], i.amode, vecLanes(i.u1)))
+		c.Emit4Bytes(encodeVecLoad1Rrt(
+			regNumberInEncoding[i.rd.realReg()],
+			regNumberInEncoding[i.rn.realReg()],
+			vecArrangement(i.u1)))
 	case condBr:
 		imm19 := i.condBrOffset()
 		if imm19%4 != 0 {
@@ -1296,20 +1298,11 @@ func encodeLoadOrStore(kind instructionKind, rt uint32, amode addressMode) uint3
 	}
 }
 
-func encodeVecLoad1Rrt(rd uint32, amode addressMode, lane ssa.VecLane) uint32 {
-	var _22to31 uint32
-	var bits int64
-
-	// no offset
-
-	// post index
-
-	switch addressMode {
-	case addressModeKindPostIndex:
-	default:
-	}
-
-	return 0b001101010000001100
+// encodeVecLoad1Rrt encodes as Load one single-element structure and Replicate to all lanes (of one register) in
+// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/LD1R--Load-one-single-element-structure-and-Replicate-to-all-lanes--of-one-register--?lang=en#sa_imm
+func encodeVecLoad1Rrt(rt, rn uint32, arr vecArrangement) uint32 {
+	size, q := arrToSizeQEncoded(arr)
+	return q<<30 | 0b001101010000001100<<12 | size<<10 | rn<<5 | rt
 }
 
 // encodeAluBitmaskImmediate encodes as Logical (immediate) in

@@ -213,7 +213,7 @@ var useKinds = [numInstructionKinds]useKind{
 	loadFpuConst32:       useKindNone,
 	loadFpuConst64:       useKindNone,
 	loadFpuConst128:      useKindNone,
-	vecLoad1R:            useKindAMode,
+	vecLoad1R:            useKindRN,
 	cSel:                 useKindRNRM,
 	fpuCSel:              useKindRNRM,
 	movToVec:             useKindRN,
@@ -545,10 +545,10 @@ func (i *instruction) asFpuLoad(dst operand, amode addressMode, sizeInBits byte)
 	i.amode = amode
 }
 
-func (i *instruction) asVecLoad1R(dst operand, amode addressMode, arr vecArrangement) {
+func (i *instruction) asVecLoad1R(rd, rn operand, arr vecArrangement) {
 	i.kind = vecLoad1R
-	i.rd = dst
-	i.amode = amode
+	i.rd = rd
+	i.rn = rn
 	i.u1 = uint64(arr)
 }
 
