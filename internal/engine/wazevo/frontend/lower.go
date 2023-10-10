@@ -1810,8 +1810,8 @@ func (c *Compiler) lowerCurrentOpcode() {
 				AsWiden(load, lane, signed, true).
 				Insert(builder).Return()
 			state.push(ret)
-
-		case wasm.OpcodeVecV128Load8Splat, wasm.OpcodeVecV128Load16Splat, wasm.OpcodeVecV128Load32Splat:
+		case wasm.OpcodeVecV128Load8Splat, wasm.OpcodeVecV128Load16Splat,
+			wasm.OpcodeVecV128Load32Splat, wasm.OpcodeVecV128Load64Splat:
 			_, offset := c.readMemArg()
 			if state.unreachable {
 				break
@@ -1825,6 +1825,8 @@ func (c *Compiler) lowerCurrentOpcode() {
 				lane, opSize = ssa.VecLaneI16x8, 2
 			case wasm.OpcodeVecV128Load32Splat:
 				lane, opSize = ssa.VecLaneI32x4, 4
+			case wasm.OpcodeVecV128Load64Splat:
+				lane, opSize = ssa.VecLaneI64x2, 8
 			}
 			baseAddr := state.pop()
 			addr := c.memOpSetup(baseAddr, uint64(offset), opSize)
@@ -1832,20 +1834,6 @@ func (c *Compiler) lowerCurrentOpcode() {
 				AsLoadSplat(addr, offset, lane).
 				Insert(builder).Return()
 			state.push(ret)
-
-		case wasm.OpcodeVecV128Load64Splat:
-			_, offset := c.readMemArg()
-			if state.unreachable {
-				break
-			}
-			baseAddr := state.pop()
-			addr := c.memOpSetup(baseAddr, uint64(offset), 8)
-			load := builder.AllocateInstruction().
-				AsLoad(addr, offset, ssa.TypeI64).
-				Insert(builder).Return()
-			ret := builder.AllocateInstruction().AsSplat(load, ssa.VecLaneI64x2).Insert(builder).Return()
-			state.push(ret)
-
 		case wasm.OpcodeVecV128Store:
 			_, offset := c.readMemArg()
 			if state.unreachable {
@@ -1857,7 +1845,6 @@ func (c *Compiler) lowerCurrentOpcode() {
 			builder.AllocateInstruction().
 				AsStore(ssa.OpcodeStore, value, addr, offset).
 				Insert(builder)
-
 		case wasm.OpcodeVecV128Store8Lane, wasm.OpcodeVecV128Store16Lane,
 			wasm.OpcodeVecV128Store32Lane, wasm.OpcodeVecV128Store64Lane:
 			_, offset := c.readMemArg()
@@ -1888,7 +1875,6 @@ func (c *Compiler) lowerCurrentOpcode() {
 			builder.AllocateInstruction().
 				AsStore(storeOp, value, addr, offset).
 				Insert(builder)
-
 		case wasm.OpcodeVecV128Not:
 			if state.unreachable {
 				break

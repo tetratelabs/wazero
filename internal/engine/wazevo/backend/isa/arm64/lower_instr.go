@@ -680,16 +680,16 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		arr := ssaLaneToArrangement(lane)
 
 		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
-		tmp := operandNR(m.compiler.AllocateVReg(regalloc.RegTypeInt))
+		tmpReg := m.compiler.AllocateVReg(ssa.TypeI32)
 
 		// Our encoding for vecLoad1R does not support all the addressing modes yet,
 		// we use the no-offset addressing mode and add the offset to a temp register.
 		add := m.allocateInstr()
-		add.asALU(aluOpAdd, tmp, rn, operandImm12(uint16(offset), 0), true)
+		add.asALU(aluOpAdd, operandNR(tmpReg), rn, operandImm12(uint16(offset), 0), true)
 		m.insert(add)
 
 		ld1r := m.allocateInstr()
-		ld1r.asVecLoad1R(rd, tmp, arr)
+		ld1r.asVecLoad1R(rd, operandNR(tmpReg), arr)
 		m.insert(ld1r)
 
 	default:
