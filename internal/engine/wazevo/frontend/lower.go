@@ -1705,6 +1705,135 @@ func (c *Compiler) lowerCurrentOpcode() {
 			load.AsLoad(addr, offset, ssa.TypeV128)
 			builder.InsertInstruction(load)
 			state.push(load.Return())
+		case wasm.OpcodeVecV128Load8Lane, wasm.OpcodeVecV128Load16Lane, wasm.OpcodeVecV128Load32Lane:
+			_, offset := c.readMemArg()
+			state.pc++
+			if state.unreachable {
+				break
+			}
+			var lane ssa.VecLane
+			var loadOp ssa.Opcode
+			var opSize uint64
+			switch vecOp {
+			case wasm.OpcodeVecV128Load8Lane:
+				loadOp, lane, opSize = ssa.OpcodeUload8, ssa.VecLaneI8x16, 1
+			case wasm.OpcodeVecV128Load16Lane:
+				loadOp, lane, opSize = ssa.OpcodeUload16, ssa.VecLaneI16x8, 2
+			case wasm.OpcodeVecV128Load32Lane:
+				loadOp, lane, opSize = ssa.OpcodeUload32, ssa.VecLaneI32x4, 4
+			}
+			laneIndex := c.wasmFunctionBody[state.pc]
+			vector := state.pop()
+			baseAddr := state.pop()
+			addr := c.memOpSetup(baseAddr, uint64(offset), opSize)
+			load := builder.AllocateInstruction().
+				AsExtLoad(loadOp, addr, offset, false).
+				Insert(builder).Return()
+			ret := builder.AllocateInstruction().
+				AsInsertlane(vector, load, laneIndex, lane).
+				Insert(builder).Return()
+			state.push(ret)
+		case wasm.OpcodeVecV128Load64Lane:
+			_, offset := c.readMemArg()
+			state.pc++
+			if state.unreachable {
+				break
+			}
+			laneIndex := c.wasmFunctionBody[state.pc]
+			vector := state.pop()
+			baseAddr := state.pop()
+			addr := c.memOpSetup(baseAddr, uint64(offset), 8)
+			load := builder.AllocateInstruction().
+				AsLoad(addr, offset, ssa.TypeI64).
+				Insert(builder).Return()
+			ret := builder.AllocateInstruction().
+				AsInsertlane(vector, load, laneIndex, ssa.VecLaneI64x2).
+				Insert(builder).Return()
+			state.push(ret)
+
+		case wasm.OpcodeVecV128Load32zero:
+			_, offset := c.readMemArg()
+			if state.unreachable {
+				break
+			}
+			baseAddr := state.pop()
+			addr := c.memOpSetup(baseAddr, uint64(offset), 4)
+			ret := builder.AllocateInstruction().
+				AsLoad(addr, offset, ssa.TypeF32).
+				Insert(builder).Return()
+			state.push(ret)
+
+		case wasm.OpcodeVecV128Load64zero:
+			_, offset := c.readMemArg()
+			if state.unreachable {
+				break
+			}
+			baseAddr := state.pop()
+			addr := c.memOpSetup(baseAddr, uint64(offset), 8)
+			ret := builder.AllocateInstruction().
+				AsLoad(addr, offset, ssa.TypeF64).
+				Insert(builder).Return()
+			state.push(ret)
+
+		case wasm.OpcodeVecV128Load8x8u, wasm.OpcodeVecV128Load8x8s,
+			wasm.OpcodeVecV128Load16x4u, wasm.OpcodeVecV128Load16x4s,
+			wasm.OpcodeVecV128Load32x2u, wasm.OpcodeVecV128Load32x2s:
+			_, offset := c.readMemArg()
+			if state.unreachable {
+				break
+			}
+			var lane ssa.VecLane
+			var signed bool
+			switch vecOp {
+			case wasm.OpcodeVecV128Load8x8s:
+				signed = true
+				fallthrough
+			case wasm.OpcodeVecV128Load8x8u:
+				lane = ssa.VecLaneI8x16
+			case wasm.OpcodeVecV128Load16x4s:
+				signed = true
+				fallthrough
+			case wasm.OpcodeVecV128Load16x4u:
+				lane = ssa.VecLaneI16x8
+			case wasm.OpcodeVecV128Load32x2s:
+				signed = true
+				fallthrough
+			case wasm.OpcodeVecV128Load32x2u:
+				lane = ssa.VecLaneI32x4
+			}
+			baseAddr := state.pop()
+			addr := c.memOpSetup(baseAddr, uint64(offset), 8)
+			load := builder.AllocateInstruction().
+				AsLoad(addr, offset, ssa.TypeV128).
+				Insert(builder).Return()
+			ret := builder.AllocateInstruction().
+				AsWiden(load, lane, signed, true).
+				Insert(builder).Return()
+			state.push(ret)
+		case wasm.OpcodeVecV128Load8Splat, wasm.OpcodeVecV128Load16Splat,
+			wasm.OpcodeVecV128Load32Splat, wasm.OpcodeVecV128Load64Splat:
+			_, offset := c.readMemArg()
+			if state.unreachable {
+				break
+			}
+			var lane ssa.VecLane
+			var opSize uint64
+			switch vecOp {
+			case wasm.OpcodeVecV128Load8Splat:
+				lane, opSize = ssa.VecLaneI8x16, 1
+			case wasm.OpcodeVecV128Load16Splat:
+				lane, opSize = ssa.VecLaneI16x8, 2
+			case wasm.OpcodeVecV128Load32Splat:
+				lane, opSize = ssa.VecLaneI32x4, 4
+			case wasm.OpcodeVecV128Load64Splat:
+				lane, opSize = ssa.VecLaneI64x2, 8
+			}
+			baseAddr := state.pop()
+			addr := c.memOpSetup(baseAddr, uint64(offset), opSize)
+			ret := builder.AllocateInstruction().
+				AsLoadSplat(addr, offset, lane).
+				Insert(builder).Return()
+			state.push(ret)
 		case wasm.OpcodeVecV128Store:
 			_, offset := c.readMemArg()
 			if state.unreachable {
@@ -1716,7 +1845,36 @@ func (c *Compiler) lowerCurrentOpcode() {
 			builder.AllocateInstruction().
 				AsStore(ssa.OpcodeStore, value, addr, offset).
 				Insert(builder)
-
+		case wasm.OpcodeVecV128Store8Lane, wasm.OpcodeVecV128Store16Lane,
+			wasm.OpcodeVecV128Store32Lane, wasm.OpcodeVecV128Store64Lane:
+			_, offset := c.readMemArg()
+			state.pc++
+			if state.unreachable {
+				break
+			}
+			laneIndex := c.wasmFunctionBody[state.pc]
+			var storeOp ssa.Opcode
+			var lane ssa.VecLane
+			var opSize uint64
+			switch vecOp {
+			case wasm.OpcodeVecV128Store8Lane:
+				storeOp, lane, opSize = ssa.OpcodeIstore8, ssa.VecLaneI8x16, 1
+			case wasm.OpcodeVecV128Store16Lane:
+				storeOp, lane, opSize = ssa.OpcodeIstore16, ssa.VecLaneI16x8, 2
+			case wasm.OpcodeVecV128Store32Lane:
+				storeOp, lane, opSize = ssa.OpcodeIstore32, ssa.VecLaneI32x4, 4
+			case wasm.OpcodeVecV128Store64Lane:
+				storeOp, lane, opSize = ssa.OpcodeStore, ssa.VecLaneI64x2, 8
+			}
+			vector := state.pop()
+			baseAddr := state.pop()
+			addr := c.memOpSetup(baseAddr, uint64(offset), opSize)
+			value := builder.AllocateInstruction().
+				AsExtractlane(vector, laneIndex, lane, false).
+				Insert(builder).Return()
+			builder.AllocateInstruction().
+				AsStore(storeOp, value, addr, offset).
+				Insert(builder)
 		case wasm.OpcodeVecV128Not:
 			if state.unreachable {
 				break

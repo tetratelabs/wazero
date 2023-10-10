@@ -5,7 +5,6 @@ import (
 	"embed"
 	"fmt"
 	"runtime"
-	"strings"
 	"testing"
 
 	"github.com/tetratelabs/wazero"
@@ -49,12 +48,6 @@ func runWithInterpreter(t *testing.T, runner func(t *testing.T, r wazero.Runtime
 
 func runWithWazevo(t *testing.T, runner func(t *testing.T, r wazero.Runtime)) {
 	t.Run("wazevo", func(t *testing.T) {
-		name := t.Name()
-		for _, skipTarget := range []string{"695", "701", "718"} {
-			if strings.Contains(name, skipTarget) {
-				t.Skip("TODO: skipping for wazevo until SIMD is completed")
-			}
-		}
 		config := wazero.NewRuntimeConfigInterpreter()
 		wazevo.ConfigureWazevo(config)
 		r := wazero.NewRuntimeWithConfig(ctx, config)

@@ -308,6 +308,9 @@ const (
 	// `v = sload32x2 MemFlags, p, Offset`.
 	OpcodeSload32x2
 
+	// OpcodeLoadSplat represents a load that replicates the loaded value to all lanes `v = LoadSplat.lane MemFlags, p, Offset`.
+	OpcodeLoadSplat
+
 	// OpcodeIconst represents the integer const.
 	OpcodeIconst
 
@@ -712,10 +715,6 @@ const (
 	// OpcodeBitcast is a bitcast operation: `v = bitcast MemFlags, x`.
 	OpcodeBitcast
 
-	// OpcodeScalarToVector ...
-	// `v = scalar_to_vector s`.
-	OpcodeScalarToVector
-
 	// OpcodeBmask ...
 	// `v = bmask x`.
 	OpcodeBmask
@@ -881,6 +880,7 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeCtz:                sideEffectNone,
 	OpcodePopcnt:             sideEffectNone,
 	OpcodeLoad:               sideEffectNone,
+	OpcodeLoadSplat:          sideEffectNone,
 	OpcodeUload8:             sideEffectNone,
 	OpcodeUload16:            sideEffectNone,
 	OpcodeUload32:            sideEffectNone,
@@ -1106,6 +1106,7 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 		return
 	},
 	OpcodeLoad:               returnTypesFnSingle,
+	OpcodeLoadSplat:          returnTypesFnV128,
 	OpcodeIadd:               returnTypesFnSingle,
 	OpcodeIsub:               returnTypesFnSingle,
 	OpcodeImul:               returnTypesFnSingle,
@@ -1182,7 +1183,7 @@ func (i *Instruction) AsLoad(ptr Value, offset uint32, typ Type) *Instruction {
 }
 
 // AsExtLoad initializes this instruction as a store instruction with OpcodeLoad.
-func (i *Instruction) AsExtLoad(op Opcode, ptr Value, offset uint32, dst64bit bool) {
+func (i *Instruction) AsExtLoad(op Opcode, ptr Value, offset uint32, dst64bit bool) *Instruction {
 	i.opcode = op
 	i.v = ptr
 	i.u1 = uint64(offset)
@@ -1191,19 +1192,27 @@ func (i *Instruction) AsExtLoad(op Opcode, ptr Value, offset uint32, dst64bit bo
 	} else {
 		i.typ = TypeI32
 	}
+	return i
 }
 
-// AsSimdLoad initializes this instruction as a load instruction with OpcodeLoad 128 bit.
-func (i *Instruction) AsSimdLoad(op Opcode, ptr Value, offset uint32) {
-	i.opcode = op
+// AsLoadSplat initializes this instruction as a store instruction with OpcodeLoadSplat.
+func (i *Instruction) AsLoadSplat(ptr Value, offset uint32, lane VecLane) *Instruction {
+	i.opcode = OpcodeLoadSplat
 	i.v = ptr
 	i.u1 = uint64(offset)
+	i.u2 = uint64(lane)
 	i.typ = TypeV128
+	return i
 }
 
 // LoadData returns the operands for a load instruction.
 func (i *Instruction) LoadData() (ptr Value, offset uint32, typ Type) {
 	return i.v, uint32(i.u1), i.typ
+}
+
+// LoadSplatData returns the operands for a load splat instruction.
+func (i *Instruction) LoadSplatData() (ptr Value, offset uint32, lane VecLane) {
+	return i.v, uint32(i.u1), VecLane(i.u2)
 }
 
 // AsStore initializes this instruction as a store instruction with OpcodeStore.
@@ -2512,6 +2521,8 @@ func (i *Instruction) Format(b Builder) string {
 		instSuffix = fmt.Sprintf(" %s, %s, %#x", i.v.Format(b), i.v2.Format(b), int32(i.u1))
 	case OpcodeLoad:
 		instSuffix = fmt.Sprintf(" %s, %#x", i.v.Format(b), int32(i.u1))
+	case OpcodeLoadSplat:
+		instSuffix = fmt.Sprintf(".%s %s, %#x", VecLane(i.u2), i.v.Format(b), int32(i.u1))
 	case OpcodeUload8, OpcodeUload16, OpcodeUload32, OpcodeSload8, OpcodeSload16, OpcodeSload32:
 		instSuffix = fmt.Sprintf(" %s, %#x", i.v.Format(b), int32(i.u1))
 	case OpcodeSelect, OpcodeVbitselect:
@@ -2720,6 +2731,8 @@ func (o Opcode) String() (ret string) {
 		return "SsubSat"
 	case OpcodeLoad:
 		return "Load"
+	case OpcodeLoadSplat:
+		return "LoadSplat"
 	case OpcodeStore:
 		return "Store"
 	case OpcodeUload8:
@@ -2906,8 +2919,6 @@ func (o Opcode) String() (ret string) {
 		return "Nearest"
 	case OpcodeBitcast:
 		return "Bitcast"
-	case OpcodeScalarToVector:
-		return "ScalarToVector"
 	case OpcodeBmask:
 		return "Bmask"
 	case OpcodeIreduce:

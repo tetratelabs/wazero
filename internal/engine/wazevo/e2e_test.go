@@ -199,9 +199,22 @@ func TestSpectestV2(t *testing.T) {
 		{"simd_i16x8_extadd_pairwise_i8x16"},
 		{"simd_i32x4_extadd_pairwise_i16x8"},
 		{"simd_int_to_int_extend"},
+		{"simd_load"},
+		{"simd_load_extend"},
+		{"simd_load_splat"},
+		{"simd_load_zero"},
+		{"simd_load8_lane"},
+		{"simd_load16_lane"},
+		{"simd_load32_lane"},
+		{"simd_load64_lane"},
 		{"simd_lane"},
 		{"simd_linking"},
 		{"simd_splat"},
+		{"simd_store"},
+		{"simd_store8_lane"},
+		{"simd_store16_lane"},
+		{"simd_store32_lane"},
+		{"simd_store64_lane"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Run("normal", func(t *testing.T) {
