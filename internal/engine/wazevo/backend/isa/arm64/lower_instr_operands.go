@@ -263,10 +263,10 @@ func (m *machine) getOperand_SR_NR(def *backend.SSAValueDefinition, mode extMode
 		amountDef := m.compiler.ValueDefinition(amountVal)
 		if amountDef.IsFromInstr() && amountDef.Instr.Constant() {
 			// If that is the case, we can use the shifted register operand (SR).
-			c := amountDef.Instr.ConstantVal() & 63 // Clears the unnecessary bits.
+			c := byte(amountDef.Instr.ConstantVal()) & (targetVal.Type().Bits() - 1) // Clears the unnecessary bits.
 			m.compiler.MarkLowered(def.Instr)
 			m.compiler.MarkLowered(amountDef.Instr)
-			return operandSR(targetVReg, byte(c), shiftOpLSL)
+			return operandSR(targetVReg, c, shiftOpLSL)
 		}
 	}
 	return m.getOperand_NR(def, mode)
