@@ -686,10 +686,10 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		arr := ssaLaneToArrangement(lane)
 
 		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
-		tmpReg := m.compiler.AllocateVReg(ssa.TypeI32)
+		tmpReg := m.compiler.AllocateVReg(ssa.TypeI64)
 
-		// vecLoad1R has offset address mode (base+imm) for post index, so we need to
-		// load the offset into a register and add it to the base address to get the register address.
+		// vecLoad1R has offset address mode (base+imm) for post index, so the only addressing mode
+		// we can use here is "no-offset" register addressing mode. Thus, we need to add the const offset to the base address.
 		add := m.allocateInstr()
 		add.asALU(aluOpAdd, operandNR(tmpReg), rn, operandImm12(uint16(offset), 0), true)
 		m.insert(add)
