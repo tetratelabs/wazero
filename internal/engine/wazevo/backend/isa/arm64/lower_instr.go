@@ -840,7 +840,7 @@ func (m *machine) lowerVhighBits(rm, rd operand, arr vecArrangement) {
 	v1 := operandNR(m.compiler.AllocateVReg(ssa.TypeV128))
 
 	switch arr {
-	case vecArrangement16B: // ssa.VecLaneI8x16
+	case vecArrangement16B:
 		//	sshr v6?.16b, v2?.16b, #7
 		//	movz x4?, #0x201, lsl 0
 		//	movk x4?, #0x804, lsl 16
@@ -899,7 +899,7 @@ func (m *machine) lowerVhighBits(rm, rd operand, arr vecArrangement) {
 		movfv := m.allocateInstr()
 		movfv.asMovFromVec(rd, v0, vecArrangementH, vecIndex(0), false)
 		m.insert(movfv)
-	case vecArrangement8H: // ssa.VecLaneI16x8
+	case vecArrangement8H:
 		//	sshr v6?.8h, v2?.8h, #15
 		//	movz x4?, #0x1, lsl 0
 		//	movk x4?, #0x2, lsl 16
@@ -948,7 +948,7 @@ func (m *machine) lowerVhighBits(rm, rd operand, arr vecArrangement) {
 		movfv := m.allocateInstr()
 		movfv.asMovFromVec(rd, v0, vecArrangementH, vecIndex(0), false)
 		m.insert(movfv)
-	case vecArrangement4S: // ssa.VecLaneI32x4
+	case vecArrangement4S:
 		// 	sshr v6?.8h, v2?.8h, #15
 		//	movz x4?, #0x1, lsl 0
 		//	movk x4?, #0x2, lsl 16
@@ -997,7 +997,7 @@ func (m *machine) lowerVhighBits(rm, rd operand, arr vecArrangement) {
 		movfv := m.allocateInstr()
 		movfv.asMovFromVec(rd, v0, vecArrangementS, vecIndex(0), false)
 		m.insert(movfv)
-	case vecArrangement2D: // ssa.VecLaneI64x2
+	case vecArrangement2D:
 		// 	mov d3?, v2?.d[0]
 		//	mov x4?, v2?.d[1]
 		//	lsr x4?, x4?, 0x3f
@@ -1052,7 +1052,7 @@ func (m *machine) lowerVecRRR(op vecOp, x, y, ret ssa.Value, arr vecArrangement)
 }
 
 func (m *machine) lowerVIMul(rd, rn, rm operand, arr vecArrangement) {
-	if arr != vecArrangement2D { // ssa.VecLaneI64x2
+	if arr != vecArrangement2D {
 		mul := m.allocateInstr()
 		mul.asVecRRR(vecOpMul, rd, rn, rm, arr)
 		m.insert(mul)
