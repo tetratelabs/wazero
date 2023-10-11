@@ -213,12 +213,10 @@ func (m *machine) lowerExtLoad(op ssa.Opcode, ptr ssa.Value, offset uint32, ret 
 	m.insert(load)
 }
 
-func (m *machine) lowerLoad(si *ssa.Instruction) {
-	// TODO: merge consecutive loads into a single pair store instruction.
-	ptr, offset, typ := si.LoadData()
+func (m *machine) lowerLoad(ptr ssa.Value, offset uint32, typ ssa.Type, ret ssa.Value) {
 	amode := m.lowerToAddressMode(ptr, offset, typ.Bits())
 
-	dst := m.compiler.VRegOf(si.Return())
+	dst := m.compiler.VRegOf(ret)
 	load := m.allocateInstr()
 	switch typ {
 	case ssa.TypeI32, ssa.TypeI64:

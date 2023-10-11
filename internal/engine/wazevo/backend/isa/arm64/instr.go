@@ -546,6 +546,8 @@ func (i *instruction) asFpuLoad(dst operand, amode addressMode, sizeInBits byte)
 }
 
 func (i *instruction) asVecLoad1R(rd, rn operand, arr vecArrangement) {
+	// NOTE: currently only has support for no-offset loads, though it is suspicious that
+	// we would need to support offset load (that is only available for post-index).
 	i.kind = vecLoad1R
 	i.rd = rd
 	i.rn = rn
@@ -1373,6 +1375,8 @@ func (i *instruction) String() (str string) {
 		str = "udf"
 	case emitSourceOffsetInfo:
 		str = fmt.Sprintf("source_offset_info %d", ssa.SourceOffset(i.u1))
+	case vecLoad1R:
+		str = fmt.Sprintf("ld1r {%s}, [%s]", formatVRegVec(i.rd.nr(), vecArrangement(i.u1), vecIndexNone), formatVRegSized(i.rn.nr(), 64))
 	default:
 		panic(i.kind)
 	}

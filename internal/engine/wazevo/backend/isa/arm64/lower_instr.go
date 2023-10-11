@@ -150,7 +150,13 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 	case ssa.OpcodeStore, ssa.OpcodeIstore8, ssa.OpcodeIstore16, ssa.OpcodeIstore32:
 		m.lowerStore(instr)
 	case ssa.OpcodeLoad:
-		m.lowerLoad(instr)
+		dst := instr.Return()
+		ptr, offset, typ := instr.LoadData()
+		m.lowerLoad(ptr, offset, typ, dst)
+	case ssa.OpcodeVZeroExtLoad:
+		dst := instr.Return()
+		ptr, offset, typ := instr.VZeroExtLoadData()
+		m.lowerLoad(ptr, offset, typ, dst)
 	case ssa.OpcodeUload8, ssa.OpcodeUload16, ssa.OpcodeUload32, ssa.OpcodeSload8, ssa.OpcodeSload16, ssa.OpcodeSload32:
 		ptr, offset, _ := instr.LoadData()
 		ret := m.compiler.VRegOf(instr.Return())
@@ -680,10 +686,10 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		arr := ssaLaneToArrangement(lane)
 
 		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
-		tmpReg := m.compiler.AllocateVReg(ssa.TypeI32)
+		tmpReg := m.compiler.AllocateVReg(ssa.TypeI64)
 
-		// Our encoding for vecLoad1R does not support all the addressing modes yet,
-		// we use the no-offset addressing mode and add the offset to a temp register.
+		// vecLoad1R has offset address mode (base+imm) for post index, so the only addressing mode
+		// we can use here is "no-offset" register addressing mode. Thus, we need to add the const offset to the base address.
 		add := m.allocateInstr()
 		add.asALU(aluOpAdd, operandNR(tmpReg), rn, operandImm12(uint16(offset), 0), true)
 		m.insert(add)
@@ -834,7 +840,7 @@ func (m *machine) lowerVhighBits(rm, rd operand, arr vecArrangement) {
 	v1 := operandNR(m.compiler.AllocateVReg(ssa.TypeV128))
 
 	switch arr {
-	case vecArrangement16B: // ssa.VecLaneI8x16
+	case vecArrangement16B:
 		//	sshr v6?.16b, v2?.16b, #7
 		//	movz x4?, #0x201, lsl 0
 		//	movk x4?, #0x804, lsl 16
@@ -893,7 +899,7 @@ func (m *machine) lowerVhighBits(rm, rd operand, arr vecArrangement) {
 		movfv := m.allocateInstr()
 		movfv.asMovFromVec(rd, v0, vecArrangementH, vecIndex(0), false)
 		m.insert(movfv)
-	case vecArrangement8H: // ssa.VecLaneI16x8
+	case vecArrangement8H:
 		//	sshr v6?.8h, v2?.8h, #15
 		//	movz x4?, #0x1, lsl 0
 		//	movk x4?, #0x2, lsl 16
@@ -942,7 +948,7 @@ func (m *machine) lowerVhighBits(rm, rd operand, arr vecArrangement) {
 		movfv := m.allocateInstr()
 		movfv.asMovFromVec(rd, v0, vecArrangementH, vecIndex(0), false)
 		m.insert(movfv)
-	case vecArrangement4S: // ssa.VecLaneI32x4
+	case vecArrangement4S:
 		// 	sshr v6?.8h, v2?.8h, #15
 		//	movz x4?, #0x1, lsl 0
 		//	movk x4?, #0x2, lsl 16
@@ -991,7 +997,7 @@ func (m *machine) lowerVhighBits(rm, rd operand, arr vecArrangement) {
 		movfv := m.allocateInstr()
 		movfv.asMovFromVec(rd, v0, vecArrangementS, vecIndex(0), false)
 		m.insert(movfv)
-	case vecArrangement2D: // ssa.VecLaneI64x2
+	case vecArrangement2D:
 		// 	mov d3?, v2?.d[0]
 		//	mov x4?, v2?.d[1]
 		//	lsr x4?, x4?, 0x3f
@@ -1046,7 +1052,7 @@ func (m *machine) lowerVecRRR(op vecOp, x, y, ret ssa.Value, arr vecArrangement)
 }
 
 func (m *machine) lowerVIMul(rd, rn, rm operand, arr vecArrangement) {
-	if arr != vecArrangement2D { // ssa.VecLaneI64x2
+	if arr != vecArrangement2D {
 		mul := m.allocateInstr()
 		mul.asVecRRR(vecOpMul, rd, rn, rm, arr)
 		m.insert(mul)

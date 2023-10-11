@@ -1751,27 +1751,25 @@ func (c *Compiler) lowerCurrentOpcode() {
 				Insert(builder).Return()
 			state.push(ret)
 
-		case wasm.OpcodeVecV128Load32zero:
+		case wasm.OpcodeVecV128Load32zero, wasm.OpcodeVecV128Load64zero:
 			_, offset := c.readMemArg()
 			if state.unreachable {
 				break
 			}
-			baseAddr := state.pop()
-			addr := c.memOpSetup(baseAddr, uint64(offset), 4)
-			ret := builder.AllocateInstruction().
-				AsLoad(addr, offset, ssa.TypeF32).
-				Insert(builder).Return()
-			state.push(ret)
 
-		case wasm.OpcodeVecV128Load64zero:
-			_, offset := c.readMemArg()
-			if state.unreachable {
-				break
+			var scalarType ssa.Type
+			switch vecOp {
+			case wasm.OpcodeVecV128Load32zero:
+				scalarType = ssa.TypeF32
+			case wasm.OpcodeVecV128Load64zero:
+				scalarType = ssa.TypeF64
 			}
+
 			baseAddr := state.pop()
-			addr := c.memOpSetup(baseAddr, uint64(offset), 8)
+			addr := c.memOpSetup(baseAddr, uint64(offset), uint64(scalarType.Size()))
+
 			ret := builder.AllocateInstruction().
-				AsLoad(addr, offset, ssa.TypeF64).
+				AsVZeroExtLoad(addr, offset, scalarType).
 				Insert(builder).Return()
 			state.push(ret)
 
