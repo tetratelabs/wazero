@@ -493,6 +493,10 @@ const (
 	// OpcodeFmul performs a floating point multiplication: `v = Fmul x, y`.
 	OpcodeFmul
 
+	// OpcodeSqmulRoundSat performs a lane-wise saturating rounding multiplication
+	// in Q15 format: `v = SqmulRoundSat.lane x,y` on vector.
+	OpcodeSqmulRoundSat
+
 	// OpcodeFdiv performs a floating point division: `v = Fdiv x, y`.
 	OpcodeFdiv
 
@@ -724,6 +728,7 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeFdiv:               sideEffectNone,
 	OpcodeFmul:               sideEffectNone,
 	OpcodeFmax:               sideEffectNone,
+	OpcodeSqmulRoundSat:      sideEffectNone,
 	OpcodeSelect:             sideEffectNone,
 	OpcodeFmin:               sideEffectNone,
 	OpcodeFneg:               sideEffectNone,
@@ -927,6 +932,7 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeFmul:               returnTypesFnSingle,
 	OpcodeFmax:               returnTypesFnSingle,
 	OpcodeFmin:               returnTypesFnSingle,
+	OpcodeSqmulRoundSat:      returnTypesFnV128,
 	OpcodeF32const:           returnTypesFnF32,
 	OpcodeF64const:           returnTypesFnF64,
 	OpcodeClz:                returnTypesFnSingle,
@@ -1213,9 +1219,20 @@ func (i *Instruction) AsVAvgRound(x, y Value, lane VecLane) *Instruction {
 	return i
 }
 
-// AsVImul initializes this instruction as an integer subtraction multiplication with OpcodeVImul on a vector.
+// AsVImul initializes this instruction as an integer multiplication with OpcodeVImul on a vector.
 func (i *Instruction) AsVImul(x, y Value, lane VecLane) *Instruction {
 	i.opcode = OpcodeVImul
+	i.v = x
+	i.v2 = y
+	i.u1 = uint64(lane)
+	i.typ = TypeV128
+	return i
+}
+
+// AsSqmulRoundSat initializes this instruction as a lane-wise saturating rounding multiplication
+// in Q15 format with OpcodeSqmulRoundSat on a vector.
+func (i *Instruction) AsSqmulRoundSat(x, y Value, lane VecLane) *Instruction {
+	i.opcode = OpcodeSqmulRoundSat
 	i.v = x
 	i.v2 = y
 	i.u1 = uint64(lane)
@@ -2420,7 +2437,7 @@ func (i *Instruction) Format(b Builder) string {
 		OpcodeVFadd, OpcodeVFsub, OpcodeVFmul, OpcodeVFdiv,
 		OpcodeVIshl, OpcodeVSshr, OpcodeVUshr,
 		OpcodeVFmin, OpcodeVFmax, OpcodeVMinPseudo, OpcodeVMaxPseudo,
-		OpcodeSnarrow, OpcodeUnarrow, OpcodeSwizzle:
+		OpcodeSnarrow, OpcodeUnarrow, OpcodeSwizzle, OpcodeSqmulRoundSat:
 		instSuffix = fmt.Sprintf(".%s %s, %s", VecLane(i.u1), i.v.Format(b), i.v2.Format(b))
 	case OpcodeVIabs, OpcodeVIneg, OpcodeVIpopcnt, OpcodeVhighBits, OpcodeVallTrue, OpcodeVanyTrue,
 		OpcodeVFabs, OpcodeVFneg, OpcodeVSqrt, OpcodeVCeil, OpcodeVFloor, OpcodeVTrunc, OpcodeVNearest,
@@ -2631,6 +2648,8 @@ func (o Opcode) String() (ret string) {
 		return "Fmul"
 	case OpcodeFdiv:
 		return "Fdiv"
+	case OpcodeSqmulRoundSat:
+		return "SqmulRoundSat"
 	case OpcodeSqrt:
 		return "Sqrt"
 	case OpcodeFneg:

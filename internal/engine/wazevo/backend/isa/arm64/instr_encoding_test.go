@@ -652,6 +652,18 @@ func TestInstruction_encode(t *testing.T) {
 		{want: "41dc636e", setup: func(i *instruction) {
 			i.asVecRRR(vecOpFmul, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
 		}},
+		{want: "41b4636e", setup: func(i *instruction) {
+			i.asVecRRR(vecOpSqrdmulh, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
+		}},
+		{want: "41b4632e", setup: func(i *instruction) {
+			i.asVecRRR(vecOpSqrdmulh, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
+		}},
+		{want: "41b4a32e", setup: func(i *instruction) {
+			i.asVecRRR(vecOpSqrdmulh, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
+		}},
+		{want: "41b4a36e", setup: func(i *instruction) {
+			i.asVecRRR(vecOpSqrdmulh, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
+		}},
 		{want: "41fc232e", setup: func(i *instruction) {
 			i.asVecRRR(vecOpFdiv, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
 		}},
