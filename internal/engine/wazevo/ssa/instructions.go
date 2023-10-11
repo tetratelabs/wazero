@@ -199,12 +199,10 @@ const (
 	// Note that this is different from call_indirect in Wasm, which also does type checking, etc.
 	OpcodeCallIndirect
 
-	// OpcodeSplat ...
-	// `v = splat x`.
+	// OpcodeSplat performs a vector splat operation: `v = Splat.lane x`.
 	OpcodeSplat
 
-	// OpcodeSwizzle ...
-	// `v = swizzle x, y`.
+	// OpcodeSwizzle performs a vector swizzle operation: `v = Swizzle.lane x, y`.
 	OpcodeSwizzle
 
 	// OpcodeInsertlane ...
@@ -214,42 +212,6 @@ const (
 	// OpcodeExtractlane ...
 	// `v = extractlane x, Idx`. (BinaryImm8)
 	OpcodeExtractlane
-
-	// OpcodeSmin ...
-	// `v = smin x, y`.
-	OpcodeSmin
-
-	// OpcodeUmin ...
-	// `v = umin x, y`.
-	OpcodeUmin
-
-	// OpcodeSmax ...
-	// `v = smax x, y`.
-	OpcodeSmax
-
-	// OpcodeUmax ...
-	// `v = umax x, y`.
-	OpcodeUmax
-
-	// OpcodeAvgRound ...
-	// `v = avg_round x, y`.
-	OpcodeAvgRound
-
-	// OpcodeUaddSat ...
-	// `v = uadd_sat x, y`.
-	OpcodeUaddSat
-
-	// OpcodeSaddSat ...
-	// `v = sadd_sat x, y`.
-	OpcodeSaddSat
-
-	// OpcodeUsubSat ...
-	// `v = usub_sat x, y`.
-	OpcodeUsubSat
-
-	// OpcodeSsubSat ...
-	// `v = ssub_sat x, y`.
-	OpcodeSsubSat
 
 	// OpcodeLoad loads a Type value from the [base + offset] address: `v = Load base, offset`.
 	OpcodeLoad
@@ -284,32 +246,12 @@ const (
 	// OpcodeIstore32 stores the 32-bit value to the [base + offset] address, zero-extended to 64 bits: `Istore16 v, base, offset`.
 	OpcodeIstore32
 
-	// OpcodeUload8x8 ...
-	// `v = uload8x8 MemFlags, p, Offset`.
-	OpcodeUload8x8
-
-	// OpcodeSload8x8 ...
-	// `v = sload8x8 MemFlags, p, Offset`.
-	OpcodeSload8x8
-
-	// OpcodeUload16x4 ...
-	// `v = uload16x4 MemFlags, p, Offset`.
-	OpcodeUload16x4
-
-	// OpcodeSload16x4 ...
-	// `v = sload16x4 MemFlags, p, Offset`.
-	OpcodeSload16x4
-
-	// OpcodeUload32x2 ...
-	// `v = uload32x2 MemFlags, p, Offset`.
-	OpcodeUload32x2
-
-	// OpcodeSload32x2 ...
-	// `v = sload32x2 MemFlags, p, Offset`.
-	OpcodeSload32x2
-
-	// OpcodeLoadSplat represents a load that replicates the loaded value to all lanes `v = LoadSplat.lane MemFlags, p, Offset`.
+	// OpcodeLoadSplat represents a load that replicates the loaded value to all lanes `v = LoadSplat.lane p, Offset`.
 	OpcodeLoadSplat
+
+	// OpcodeVZeroExtLoad loads a scalar single/double precision floating point value from the [p + Offset] address,
+	// and zero-extend it to the V128 value: `v = VExtLoad  p, Offset`.
+	OpcodeVZeroExtLoad
 
 	// OpcodeIconst represents the integer const.
 	OpcodeIconst
@@ -350,32 +292,13 @@ const (
 	// OpcodeSelect chooses between two values based on a condition `c`: `v = Select c, x, y`.
 	OpcodeSelect
 
-	// OpcodeBitselect ...
-	// `v = bitselect c, x, y`.
-	OpcodeBitselect
-
-	// OpcodeVsplit ...
-	// `lo, hi = vsplit x`.
-	OpcodeVsplit
-
-	// OpcodeVconcat ...
-	// `v = vconcat x, y`.
-	OpcodeVconcat
-
-	// OpcodeVselect ...
-	// `v = vselect c, x, y`.
-	OpcodeVselect
-
-	// OpcodeVanyTrue ...
-	// `s = vany_true a`.
+	// OpcodeVanyTrue performs a any true operation: `s = VanyTrue a`.
 	OpcodeVanyTrue
 
-	// OpcodeVallTrue ...
-	// `s = vall_true a`.
+	// OpcodeVallTrue performs a lane-wise all true operation: `s = VallTrue.lane a`.
 	OpcodeVallTrue
 
-	// OpcodeVhighBits ...
-	// `x = vhigh_bits a`.
+	// OpcodeVhighBits performs a lane-wise extract of the high bits: `v = VhighBits.lane a`.
 	OpcodeVhighBits
 
 	// OpcodeIcmp compares two integer values with the given condition: `v = icmp Cond, x, y`.
@@ -510,18 +433,6 @@ const (
 	// OpcodeImul performs an integer multiplication: `v = Imul x, y`.
 	OpcodeImul
 
-	// OpcodeUmulhi ...
-	// `v = umulhi x, y`.
-	OpcodeUmulhi
-
-	// OpcodeSmulhi ...
-	// `v = smulhi x, y`.
-	OpcodeSmulhi
-
-	// OpcodeSqmulRoundSat ...
-	// `v = sqmul_round_sat x, y`.
-	OpcodeSqmulRoundSat
-
 	// OpcodeUdiv performs the unsigned integer division `v = Udiv x, y`.
 	OpcodeUdiv
 
@@ -534,113 +445,17 @@ const (
 	// OpcodeSrem computes the remainder of the signed integer division `v = Srem x, y`.
 	OpcodeSrem
 
-	// OpcodeIaddImm ...
-	// `v = iadd_imm x, Y`. (BinaryImm64)
-	OpcodeIaddImm
-
-	// OpcodeImulImm ...
-	// `v = imul_imm x, Y`. (BinaryImm64)
-	OpcodeImulImm
-
-	// OpcodeUdivImm ...
-	// `v = udiv_imm x, Y`. (BinaryImm64)
-	OpcodeUdivImm
-
-	// OpcodeSdivImm ...
-	// `v = sdiv_imm x, Y`. (BinaryImm64)
-	OpcodeSdivImm
-
-	// OpcodeUremImm ...
-	// `v = urem_imm x, Y`. (BinaryImm64)
-	OpcodeUremImm
-
-	// OpcodeSremImm ...
-	// `v = srem_imm x, Y`. (BinaryImm64)
-	OpcodeSremImm
-
-	// OpcodeIrsubImm ...
-	// `v = irsub_imm x, Y`. (BinaryImm64)
-	OpcodeIrsubImm
-
-	// OpcodeIaddCin ...
-	// `v = iadd_cin x, y, c_in`.
-	OpcodeIaddCin
-
-	// OpcodeIaddIfcin ...
-	// `v = iadd_ifcin x, y, c_in`.
-	OpcodeIaddIfcin
-
-	// OpcodeIaddCout ...
-	// `a, c_out = iadd_cout x, y`.
-	OpcodeIaddCout
-
-	// OpcodeIaddIfcout ...
-	// `a, c_out = iadd_ifcout x, y`.
-	OpcodeIaddIfcout
-
-	// OpcodeIaddCarry ...
-	// `a, c_out = iadd_carry x, y, c_in`.
-	OpcodeIaddCarry
-
-	// OpcodeIaddIfcarry ...
-	// `a, c_out = iadd_ifcarry x, y, c_in`.
-	OpcodeIaddIfcarry
-
-	// OpcodeUaddOverflowTrap ...
-	// `v = uadd_overflow_trap x, y, code`.
-	OpcodeUaddOverflowTrap
-
-	// OpcodeIsubBin ...
-	// `v = isub_bin x, y, b_in`.
-	OpcodeIsubBin
-
-	// OpcodeIsubIfbin ...
-	// `v = isub_ifbin x, y, b_in`.
-	OpcodeIsubIfbin
-
-	// OpcodeIsubBout ...
-	// `a, b_out = isub_bout x, y`.
-	OpcodeIsubBout
-
-	// OpcodeIsubIfbout ...
-	// `a, b_out = isub_ifbout x, y`.
-	OpcodeIsubIfbout
-
-	// OpcodeIsubBorrow ...
-	// `a, b_out = isub_borrow x, y, b_in`.
-	OpcodeIsubBorrow
-
-	// OpcodeIsubIfborrow ...
-	// `a, b_out = isub_ifborrow x, y, b_in`.
-	OpcodeIsubIfborrow
-
-	// OpcodeBand ...
-	// `v = band x, y`.
+	// OpcodeBand performs a binary and: `v = Band x, y`.
 	OpcodeBand
 
-	// OpcodeBor ...
-	// `v = bor x, y`.
+	// OpcodeBor performs a binary or: `v = Bor x, y`.
 	OpcodeBor
 
-	// OpcodeBxor ...
-	// `v = bxor x, y`.
+	// OpcodeBxor performs a binary xor: `v = Bxor x, y`.
 	OpcodeBxor
 
-	// OpcodeBnot ...
-	// `v = bnot x`.
+	// OpcodeBnot performs a binary not: `v = Bnot x`.
 	OpcodeBnot
-
-	// OpcodeBandNot ...
-	// `v = band_not x, y`.
-	OpcodeBandNot
-
-	// OpcodeBorNot ...
-	// `v = bor_not x, y`.
-	OpcodeBorNot
-
-	// OpcodeBxorNot ...
-	// `v = bxor_not x, y`.
-	OpcodeBxorNot
 
 	// OpcodeRotl rotates the given integer value to the left: `v = Rotl x, y`.
 	OpcodeRotl
@@ -690,8 +505,8 @@ const (
 	// OpcodeFabs takes the absolute value of the given floating point value: `v = fabs x`.
 	OpcodeFabs
 
-	// OpcodeFcopysign ...
-	// `v = fcopysign x, y`.
+	// OpcodeFcopysign copies the sign of the second floating point value to the first floating point value:
+	// `v = Fcopysign x, y`.
 	OpcodeFcopysign
 
 	// OpcodeFmin takes the minimum of two floating point values: `v = fmin x, y`.
@@ -712,7 +527,7 @@ const (
 	// OpcodeNearest takes the nearest integer of the given floating point value: `v = nearest x`.
 	OpcodeNearest
 
-	// OpcodeBitcast is a bitcast operation: `v = bitcast MemFlags, x`.
+	// OpcodeBitcast is a bitcast operation: `v = bitcast x`.
 	OpcodeBitcast
 
 	// OpcodeBmask ...
@@ -728,10 +543,6 @@ const (
 
 	// OpcodeUnarrow converts two input vectors x, y into a smaller lane vector by narrowing each lane, unsigned `v = Unarrow.lane x, y`.
 	OpcodeUnarrow
-
-	// OpcodeUunarrow ...
-	// `v = uunarrow x, y`.
-	OpcodeUunarrow
 
 	// OpcodeSwidenLow converts low half of the smaller lane vector to a larger lane vector, sign extended: `v = SwidenLow.lane x`.
 	OpcodeSwidenLow
@@ -819,10 +630,6 @@ const (
 	// OpcodeFence ...
 	// `fence`.
 	OpcodeFence
-
-	// OpcodeExtractVector ...
-	// `v = extract_vector x, y`. (BinaryImm8)
-	OpcodeExtractVector
 
 	// opcodeEnd marks the end of the opcode list.
 	opcodeEnd
@@ -993,6 +800,7 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeVMinPseudo:         sideEffectNone,
 	OpcodeVFcvtToUintSat:     sideEffectNone,
 	OpcodeVFcvtToSintSat:     sideEffectNone,
+	OpcodeVZeroExtLoad:       sideEffectNone,
 }
 
 // sideEffect returns true if this instruction has side effects.
@@ -1106,6 +914,7 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 		return
 	},
 	OpcodeLoad:               returnTypesFnSingle,
+	OpcodeVZeroExtLoad:       returnTypesFnV128,
 	OpcodeLoadSplat:          returnTypesFnV128,
 	OpcodeIadd:               returnTypesFnSingle,
 	OpcodeIsub:               returnTypesFnSingle,
@@ -1193,6 +1002,21 @@ func (i *Instruction) AsExtLoad(op Opcode, ptr Value, offset uint32, dst64bit bo
 		i.typ = TypeI32
 	}
 	return i
+}
+
+// AsVZeroExtLoad initializes this instruction as a store instruction with OpcodeVExtLoad.
+func (i *Instruction) AsVZeroExtLoad(ptr Value, offset uint32, scalarType Type) *Instruction {
+	i.opcode = OpcodeVZeroExtLoad
+	i.v = ptr
+	i.u1 = uint64(offset)
+	i.u2 = uint64(scalarType)
+	i.typ = TypeV128
+	return i
+}
+
+// VZeroExtLoadData returns the operands for a load instruction. The returned `typ` is the scalar type of the load target.
+func (i *Instruction) VZeroExtLoadData() (ptr Value, offset uint32, typ Type) {
+	return i.v, uint32(i.u1), Type(i.u2)
 }
 
 // AsLoadSplat initializes this instruction as a store instruction with OpcodeLoadSplat.
@@ -2519,7 +2343,7 @@ func (i *Instruction) Format(b Builder) string {
 		}
 	case OpcodeStore, OpcodeIstore8, OpcodeIstore16, OpcodeIstore32:
 		instSuffix = fmt.Sprintf(" %s, %s, %#x", i.v.Format(b), i.v2.Format(b), int32(i.u1))
-	case OpcodeLoad:
+	case OpcodeLoad, OpcodeVZeroExtLoad:
 		instSuffix = fmt.Sprintf(" %s, %#x", i.v.Format(b), int32(i.u1))
 	case OpcodeLoadSplat:
 		instSuffix = fmt.Sprintf(".%s %s, %#x", VecLane(i.u2), i.v.Format(b), int32(i.u1))
@@ -2711,24 +2535,6 @@ func (o Opcode) String() (ret string) {
 		return "Insertlane"
 	case OpcodeExtractlane:
 		return "Extractlane"
-	case OpcodeSmin:
-		return "Smin"
-	case OpcodeUmin:
-		return "Umin"
-	case OpcodeSmax:
-		return "Smax"
-	case OpcodeUmax:
-		return "Umax"
-	case OpcodeAvgRound:
-		return "AvgRound"
-	case OpcodeUaddSat:
-		return "UaddSat"
-	case OpcodeSaddSat:
-		return "SaddSat"
-	case OpcodeUsubSat:
-		return "UsubSat"
-	case OpcodeSsubSat:
-		return "SsubSat"
 	case OpcodeLoad:
 		return "Load"
 	case OpcodeLoadSplat:
@@ -2753,18 +2559,6 @@ func (o Opcode) String() (ret string) {
 		return "Sload32"
 	case OpcodeIstore32:
 		return "Istore32"
-	case OpcodeUload8x8:
-		return "Uload8x8"
-	case OpcodeSload8x8:
-		return "Sload8x8"
-	case OpcodeUload16x4:
-		return "Uload16x4"
-	case OpcodeSload16x4:
-		return "Sload16x4"
-	case OpcodeUload32x2:
-		return "Uload32x2"
-	case OpcodeSload32x2:
-		return "Sload32x2"
 	case OpcodeIconst:
 		return "Iconst"
 	case OpcodeF32const:
@@ -2777,14 +2571,6 @@ func (o Opcode) String() (ret string) {
 		return "Shuffle"
 	case OpcodeSelect:
 		return "Select"
-	case OpcodeBitselect:
-		return "Bitselect"
-	case OpcodeVsplit:
-		return "Vsplit"
-	case OpcodeVconcat:
-		return "Vconcat"
-	case OpcodeVselect:
-		return "Vselect"
 	case OpcodeVanyTrue:
 		return "VanyTrue"
 	case OpcodeVallTrue:
@@ -2803,12 +2589,6 @@ func (o Opcode) String() (ret string) {
 		return "Isub"
 	case OpcodeImul:
 		return "Imul"
-	case OpcodeUmulhi:
-		return "Umulhi"
-	case OpcodeSmulhi:
-		return "Smulhi"
-	case OpcodeSqmulRoundSat:
-		return "SqmulRoundSat"
 	case OpcodeUdiv:
 		return "Udiv"
 	case OpcodeSdiv:
@@ -2817,46 +2597,6 @@ func (o Opcode) String() (ret string) {
 		return "Urem"
 	case OpcodeSrem:
 		return "Srem"
-	case OpcodeIaddImm:
-		return "IaddImm"
-	case OpcodeImulImm:
-		return "ImulImm"
-	case OpcodeUdivImm:
-		return "UdivImm"
-	case OpcodeSdivImm:
-		return "SdivImm"
-	case OpcodeUremImm:
-		return "UremImm"
-	case OpcodeSremImm:
-		return "SremImm"
-	case OpcodeIrsubImm:
-		return "IrsubImm"
-	case OpcodeIaddCin:
-		return "IaddCin"
-	case OpcodeIaddIfcin:
-		return "IaddIfcin"
-	case OpcodeIaddCout:
-		return "IaddCout"
-	case OpcodeIaddIfcout:
-		return "IaddIfcout"
-	case OpcodeIaddCarry:
-		return "IaddCarry"
-	case OpcodeIaddIfcarry:
-		return "IaddIfcarry"
-	case OpcodeUaddOverflowTrap:
-		return "UaddOverflowTrap"
-	case OpcodeIsubBin:
-		return "IsubBin"
-	case OpcodeIsubIfbin:
-		return "IsubIfbin"
-	case OpcodeIsubBout:
-		return "IsubBout"
-	case OpcodeIsubIfbout:
-		return "IsubIfbout"
-	case OpcodeIsubBorrow:
-		return "IsubBorrow"
-	case OpcodeIsubIfborrow:
-		return "IsubIfborrow"
 	case OpcodeBand:
 		return "Band"
 	case OpcodeBor:
@@ -2865,12 +2605,6 @@ func (o Opcode) String() (ret string) {
 		return "Bxor"
 	case OpcodeBnot:
 		return "Bnot"
-	case OpcodeBandNot:
-		return "BandNot"
-	case OpcodeBorNot:
-		return "BorNot"
-	case OpcodeBxorNot:
-		return "BxorNot"
 	case OpcodeRotl:
 		return "Rotl"
 	case OpcodeRotr:
@@ -2927,8 +2661,6 @@ func (o Opcode) String() (ret string) {
 		return "Snarrow"
 	case OpcodeUnarrow:
 		return "Unarrow"
-	case OpcodeUunarrow:
-		return "Uunarrow"
 	case OpcodeSwidenLow:
 		return "SwidenLow"
 	case OpcodeSwidenHigh:
@@ -2977,8 +2709,6 @@ func (o Opcode) String() (ret string) {
 		return "AtomicStore"
 	case OpcodeFence:
 		return "Fence"
-	case OpcodeExtractVector:
-		return "ExtractVector"
 	case OpcodeVbor:
 		return "Vbor"
 	case OpcodeVbxor:
@@ -3069,6 +2799,8 @@ func (o Opcode) String() (ret string) {
 		return "VFcvtFromSint"
 	case OpcodeFvpromoteLow:
 		return "FvpromoteLow"
+	case OpcodeVZeroExtLoad:
+		return "VZeroExtLoad"
 	}
 	panic(fmt.Sprintf("unknown opcode %d", o))
 }

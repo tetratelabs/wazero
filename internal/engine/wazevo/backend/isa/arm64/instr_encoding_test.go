@@ -1589,7 +1589,10 @@ func TestInstruction_encode(t *testing.T) {
 			i.asFpuRR(fpuUniOpRoundNearest, operandNR(v1VReg), operandNR(v2VReg), true)
 		}},
 		{want: "4140611e", setup: func(i *instruction) { i.asFpuRR(fpuUniOpNeg, operandNR(v1VReg), operandNR(v2VReg), true) }},
-		{want: "41c4404d", setup: func(i *instruction) { i.asVecLoad1R(operandNR(v1VReg), operandNR(v2VReg), vecArrangement8H) }},
+		{want: "41c0404d", setup: func(i *instruction) { i.asVecLoad1R(operandNR(v1VReg), operandNR(x2VReg), vecArrangement16B) }},
+		{want: "41c4404d", setup: func(i *instruction) { i.asVecLoad1R(operandNR(v1VReg), operandNR(x2VReg), vecArrangement8H) }},
+		{want: "41c8404d", setup: func(i *instruction) { i.asVecLoad1R(operandNR(v1VReg), operandNR(x2VReg), vecArrangement4S) }},
+		{want: "41cc404d", setup: func(i *instruction) { i.asVecLoad1R(operandNR(v1VReg), operandNR(x2VReg), vecArrangement2D) }},
 		{want: "4201231e4201631e4201239e4201639e4201221e4201621e4201229e4201629e", setup: func(i *instruction) {
 			i.asNop0()
 			cur := i

@@ -150,7 +150,13 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 	case ssa.OpcodeStore, ssa.OpcodeIstore8, ssa.OpcodeIstore16, ssa.OpcodeIstore32:
 		m.lowerStore(instr)
 	case ssa.OpcodeLoad:
-		m.lowerLoad(instr)
+		dst := instr.Return()
+		ptr, offset, typ := instr.LoadData()
+		m.lowerLoad(ptr, offset, typ, dst)
+	case ssa.OpcodeVZeroExtLoad:
+		dst := instr.Return()
+		ptr, offset, typ := instr.VZeroExtLoadData()
+		m.lowerLoad(ptr, offset, typ, dst)
 	case ssa.OpcodeUload8, ssa.OpcodeUload16, ssa.OpcodeUload32, ssa.OpcodeSload8, ssa.OpcodeSload16, ssa.OpcodeSload32:
 		ptr, offset, _ := instr.LoadData()
 		ret := m.compiler.VRegOf(instr.Return())
@@ -682,8 +688,8 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
 		tmpReg := m.compiler.AllocateVReg(ssa.TypeI32)
 
-		// Our encoding for vecLoad1R does not support all the addressing modes yet,
-		// we use the no-offset addressing mode and add the offset to a temp register.
+		// vecLoad1R has offset address mode (base+imm) for post index, so we need to
+		// load the offset into a register and add it to the base address to get the register address.
 		add := m.allocateInstr()
 		add.asALU(aluOpAdd, operandNR(tmpReg), rn, operandImm12(uint16(offset), 0), true)
 		m.insert(add)
