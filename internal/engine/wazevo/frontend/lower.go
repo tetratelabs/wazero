@@ -2208,6 +2208,14 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVImul(v1, v2, lane).Insert(builder).Return()
 			state.push(ret)
+		case wasm.OpcodeVecI16x8Q15mulrSatS:
+			if state.unreachable {
+				break
+			}
+			v2 := state.pop()
+			v1 := state.pop()
+			ret := builder.AllocateInstruction().AsSqmulRoundSat(v1, v2, ssa.VecLaneI16x8).Insert(builder).Return()
+			state.push(ret)
 		case wasm.OpcodeVecI8x16Eq, wasm.OpcodeVecI16x8Eq, wasm.OpcodeVecI32x4Eq, wasm.OpcodeVecI64x2Eq:
 			if state.unreachable {
 				break

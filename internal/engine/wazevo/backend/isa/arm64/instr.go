@@ -1769,6 +1769,8 @@ func (b vecOp) String() string {
 		return "urhadd"
 	case vecOpFmul:
 		return "fmul"
+	case vecOpSqrdmulh:
+		return "sqrdmulh"
 	case vecOpMul:
 		return "mul"
 	case vecOpUmlal:
@@ -1875,6 +1877,7 @@ const (
 	vecOpUrhadd
 	vecOpMul
 	vecOpFmul
+	vecOpSqrdmulh
 	vecOpUmlal
 	vecOpFdiv
 	vecOpFsqrt

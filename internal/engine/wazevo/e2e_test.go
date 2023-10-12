@@ -198,6 +198,7 @@ func TestSpectestV2(t *testing.T) {
 		{"simd_i32x4_extmul_i16x8"},
 		{"simd_i16x8_extadd_pairwise_i8x16"},
 		{"simd_i32x4_extadd_pairwise_i16x8"},
+		{"simd_i16x8_q15mulr_sat_s"},
 		{"simd_int_to_int_extend"},
 		{"simd_load"},
 		{"simd_load_extend"},
