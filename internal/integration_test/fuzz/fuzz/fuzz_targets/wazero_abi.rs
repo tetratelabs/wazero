@@ -17,11 +17,3 @@ extern "C" {
     #[allow(dead_code)]
     pub fn validate(binary_ptr: *const u8, binary_size: usize);
 }
-
-#[allow(dead_code)]
-pub fn maybe_disable_simd(config: &mut SwarmConfig) {
-    if std::env::var("WAZERO_FUZZ_WAZEVO").is_ok() {
-        // Wazevo doesn't support SIMD yet.
-        config.simd_enabled = false;
-    }
-}

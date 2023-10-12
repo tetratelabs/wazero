@@ -76,3 +76,17 @@ Minimize test case with:
 ```
 
 and you can use that command to "minimize" the input binary while keeping the same error.
+
+
+### Run fuzzing on wazevo
+
+Until we replace the existing compiler with the new optimizing compiler `wazevo`,
+we need to have the mechanism to allow us to run compiler fuzzing on both of these engines.
+
+To run the fuzzing on `wazevo`, you need to set the WAZERO_FUZZ_WAZEVO non-empty like:
+
+```
+export WAZERO_FUZZ_WAZEVO=1
+```
+
+and then run the fuzzing as usual as described above.
