@@ -39,14 +39,16 @@ See `cargo fuzz run --help` for the options. Especially, the following flags are
 
 ```
 # Running the `no_diff` target with 15 concurrent jobs with total runnig time with 2hrs and 8GB memory limit.
-$ cargo fuzz run no_diff -- -rss_limit_mb=8192 -max_len=5000000 -max_total_time=7200 -jobs=15
+$ cargo fuzz run no_diff --sanitizer=none -- -rss_limit_mb=8192 -max_len=5000000 -max_total_time=7200 -jobs=15
 
 # Running the `memory_no_diff` target with 15 concurrent jobs with timeout 2hrs and setting timeout per fuzz case to 30s.
-$ cargo fuzz run memory_no_diff -- -timeout=30 -max_total_time=7200 -jobs=15
+$ cargo fuzz run memory_no_diff --sanitizer=none -- -timeout=30 -max_total_time=7200 -jobs=15
 
 # Running the `validation` target with 4 concurrent jobs with timeout 2hrs and setting timeout per fuzz case to 30s.
-# cargo fuzz run validation -- -timeout=30 -max_total_time=7200 -jobs=4
+# cargo fuzz run validation --sanitizer=none -- -timeout=30 -max_total_time=7200 -jobs=4
 ```
+
+Note that `--sanitizer=none` is always recommended to use because the sanitizer is not useful for our use case plus this will speed up the fuzzing by like multiple times.
 
 ### Reproduce errors
 
