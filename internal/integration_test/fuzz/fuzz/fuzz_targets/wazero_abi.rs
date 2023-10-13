@@ -1,7 +1,5 @@
 //! This module provides the functions implemented by wazero via CGo.
 
-use wasm_smith::SwarmConfig;
-
 extern "C" {
     // require_no_diff is implemented in Go, and accepts the pointer to the binary and its size.
     #[allow(dead_code)]

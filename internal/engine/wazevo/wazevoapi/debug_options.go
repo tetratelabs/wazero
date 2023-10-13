@@ -60,7 +60,11 @@ const (
 func CheckStackGuardPage(s []byte) {
 	for i := 0; i < StackGuardCheckGuardPageSize; i++ {
 		if s[i] != 0 {
-			panic(fmt.Sprintf("BUG: stack guard page is corrupted: %s", hex.EncodeToString(s[:StackGuardCheckGuardPageSize])))
+			panic(
+				fmt.Sprintf("BUG: stack guard page is corrupted:\n\tguard_page=%s\n\tstack=%s",
+					hex.EncodeToString(s[:StackGuardCheckGuardPageSize]),
+					hex.EncodeToString(s[StackGuardCheckGuardPageSize:]),
+				))
 		}
 	}
 }
