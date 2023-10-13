@@ -3723,9 +3723,11 @@ func (c *Compiler) lowerBrTable(labels []uint32, index ssa.Value) {
 	// We need trampoline blocks since depending on the target block structure, we might end up inserting moves before jumps,
 	// which cannot be done with br_table. Instead, we can do such per-block moves in the trampoline blocks.
 	// At the linking phase (very end of the backend), we can remove the unnecessary jumps, and therefore no runtime overhead.
-	args := c.loweringState.nPeekDup(numArgs) // Args are always on the top of the stack.
 	currentBlk := builder.CurrentBlock()
 	for i, l := range labels {
+		// Args are always on the top of the stack. Note that we should not share the args slice
+		// among the jump instructions since the args are modified during passes (e.g. redundant phi elimination).
+		args := c.loweringState.nPeekDup(numArgs)
 		targetBlk, _ := state.brTargetArgNumFor(l)
 		trampoline := builder.AllocateBasicBlock()
 		builder.SetCurrentBlock(trampoline)

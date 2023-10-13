@@ -419,3 +419,21 @@ func Test1054(t *testing.T) {
 		modules[1].Memory().(*wasm.MemoryInstance).Buffer,
 	)
 }
+
+// Test1777 tests that br_table with multiple args works fine even if
+// there might be phi eliminations.
+func Test1777(t *testing.T) {
+	if !platform.CompilerSupported() {
+		return
+	}
+
+	run(t, func(t *testing.T, r wazero.Runtime) {
+		mod, err := r.Instantiate(ctx, getWasmBinary(t, 1777))
+		require.NoError(t, err)
+		f := mod.ExportedFunction("")
+		require.NotNil(t, f)
+		res, err := f.Call(ctx)
+		require.NoError(t, err)
+		require.Equal(t, []uint64{18446626425965379583, 4607736361554183979}, res)
+	})
+}
