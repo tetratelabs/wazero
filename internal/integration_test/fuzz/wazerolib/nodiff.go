@@ -314,6 +314,12 @@ func ensureInvocationError(compilerErr, interpErr error) error {
 		interpErrMsg = interpErrMsg[:strings.Index(interpErrMsg, "\n")]
 	}
 
+	if strings.Contains(compilerErrMsg, "stack overflow") && strings.Contains(interpErrMsg, "unreachable") {
+		// Compiler is more likely to reach stack overflow than interpreter, so we allow this case. This case is most likely
+		// that interpreter reached the unreachable out of "fuel".
+		return nil
+	}
+
 	if compilerErrMsg != interpErrMsg {
 		return fmt.Errorf("error mismatch:\n\tinterpreter: %v\n\tcompiler: %v", interpErr, compilerErr)
 	}
