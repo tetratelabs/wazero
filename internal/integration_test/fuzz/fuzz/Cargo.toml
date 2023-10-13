@@ -9,8 +9,8 @@ edition = "2018"
 cargo-fuzz = true
 
 [dependencies]
-libfuzzer-sys = "0.4.3"
-wasm-smith = "0.12.13"
+libfuzzer-sys = "0.4.7"
+wasm-smith = "0.12.20"
 wasmprinter = "0.2.39"
 
 [[bin]]
