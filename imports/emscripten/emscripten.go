@@ -28,6 +28,8 @@ const i32 = wasm.ValueTypeI32
 //
 // This is a simpler function for those who know the module "env" is not
 // already instantiated, and don't need to unload it.
+//
+// Deprecated: Due to Emscripten dynamic import generation, InstantiateForModule should be used instead.
 func MustInstantiate(ctx context.Context, r wazero.Runtime) {
 	if _, err := Instantiate(ctx, r); err != nil {
 		panic(err)
@@ -42,6 +44,8 @@ func MustInstantiate(ctx context.Context, r wazero.Runtime) {
 //   - Failure cases are documented on wazero.Runtime InstantiateModule.
 //   - Closing the wazero.Runtime has the same effect as closing the result.
 //   - To add more functions to the "env" module, use FunctionExporter.
+//
+// Deprecated: Due to Emscripten dynamic import generation, InstantiateForModule should be used instead.
 func Instantiate(ctx context.Context, r wazero.Runtime) (api.Closer, error) {
 	builder := r.NewHostModuleBuilder("env")
 	NewFunctionExporter().ExportFunctions(builder)
@@ -62,6 +66,7 @@ type FunctionExporter interface {
 }
 
 // NewFunctionExporter returns a FunctionExporter object with trace disabled.
+// Deprecated: Due to Emscripten dynamic import generation, NewFunctionExporterForModule should be used instead.
 func NewFunctionExporter() FunctionExporter {
 	return &functionExporter{}
 }

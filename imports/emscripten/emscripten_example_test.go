@@ -9,8 +9,11 @@ import (
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 )
 
+//go:embed testdata/invoke.wasm
+var invokeWasm []byte
+
 // This shows how to instantiate Emscripten function imports.
-func Example_instantiate() {
+func Example_instantiateForModule() {
 	ctx := context.Background()
 
 	r := wazero.NewRuntime(ctx)
@@ -19,8 +22,17 @@ func Example_instantiate() {
 	// Add WASI which is typically required when using Emscripten.
 	wasi_snapshot_preview1.MustInstantiate(ctx, r)
 
-	// Now, add the "env" module to the runtime, Emscripten default imports.
-	emscripten.MustInstantiate(ctx, r)
+	// Compile the WASM so wazero can handle dynamically generated imports.
+	compiled, err := r.CompileModule(ctx, invokeWasm)
+	if err != nil {
+		panic(err)
+	}
+
+	envCloser, err := emscripten.InstantiateForModule(ctx, r, compiled)
+	if err != nil {
+		panic(err)
+	}
+	defer envCloser.Close(ctx) // This closes the env module.
 
 	// Output:
 }
@@ -36,6 +48,15 @@ func Example_functionExporter() {
 	// Add WASI which is typically required when using Emscripten.
 	wasi_snapshot_preview1.MustInstantiate(ctx, r)
 
+	// Compile the WASM so wazero can handle dynamically generated imports.
+	compiled, err := r.CompileModule(ctx, invokeWasm)
+	if err != nil {
+		panic(err)
+	}
+	exporter, err := emscripten.NewFunctionExporterForModule(compiled)
+	if err != nil {
+		panic(err)
+	}
 	// Next, construct your own module builder for "env" with any functions
 	// you need.
 	envBuilder := r.NewHostModuleBuilder("env").
@@ -44,7 +65,6 @@ func Example_functionExporter() {
 		Export("get_int")
 
 	// Now, add Emscripten special function imports into it.
-	emscripten.NewFunctionExporter().ExportFunctions(envBuilder)
-
+	exporter.ExportFunctions(envBuilder)
 	// Output:
 }
