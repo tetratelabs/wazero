@@ -1,8 +1,6 @@
 package arm64
 
 import (
-	"encoding/hex"
-	"fmt"
 	"sort"
 	"testing"
 
@@ -450,11 +448,9 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 			_, _, m := newSetupWithMockContext()
 			m.CompileGoFunctionTrampoline(tc.exitCode, tc.sig, tc.needModuleContextPtr)
 
-			fmt.Println(m.Format())
 			require.Equal(t, tc.exp, m.Format())
 
 			m.Encode()
-			fmt.Println(hex.EncodeToString(m.compiler.Buf()))
 		})
 	}
 }
@@ -568,11 +564,8 @@ func Test_goFunctionCallLoadStackArg(t *testing.T) {
 
 				m.rootInstr = nop
 
-				fmt.Println(m.Format())
 				require.Equal(t, tc.exp, m.Format())
-
 				m.Encode()
-				fmt.Println(hex.EncodeToString(m.compiler.Buf()))
 			})
 		})
 	}
@@ -637,11 +630,8 @@ func Test_goFunctionCallStoreStackResult(t *testing.T) {
 
 				m.rootInstr = nop
 
-				fmt.Println(m.Format())
 				require.Equal(t, tc.exp, m.Format())
-
 				m.Encode()
-				fmt.Println(hex.EncodeToString(m.compiler.Buf()))
 			})
 		})
 	}

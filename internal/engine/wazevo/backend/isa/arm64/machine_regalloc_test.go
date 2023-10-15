@@ -1,7 +1,6 @@
 package arm64
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
@@ -189,7 +188,6 @@ func TestMachine_insertStoreRegisterAt(t *testing.T) {
 						m.insertStoreRegisterAt(v1VReg, i2, after)
 					}
 					m.rootInstr = i1
-					fmt.Println(m.Format())
 					require.Equal(t, tc.expected, m.Format())
 				})
 			}
@@ -264,7 +262,6 @@ func TestMachine_insertReloadRegisterAt(t *testing.T) {
 					}
 					m.rootInstr = i1
 
-					fmt.Println(m.Format())
 					require.Equal(t, tc.expected, m.Format())
 				})
 			}

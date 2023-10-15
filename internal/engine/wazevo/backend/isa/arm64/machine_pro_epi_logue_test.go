@@ -1,8 +1,6 @@
 package arm64
 
 import (
-	"encoding/hex"
-	"fmt"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
@@ -95,7 +93,7 @@ func TestMachine_SetupPrologue(t *testing.T) {
 	} {
 		tc := tc
 		t.Run(tc.exp, func(t *testing.T) {
-			ctx, _, m := newSetupWithMockContext()
+			_, _, m := newSetupWithMockContext()
 			m.DisableStackCheck()
 			m.spillSlotSize = tc.spillSlotSize
 			m.clobberedRegs = tc.clobberedRegs
@@ -111,8 +109,6 @@ func TestMachine_SetupPrologue(t *testing.T) {
 			m.SetupPrologue()
 			require.Equal(t, root, m.rootInstr)
 			m.Encode()
-			fmt.Println(hex.EncodeToString(ctx.buf))
-			fmt.Println(m.Format())
 			require.Equal(t, tc.exp, m.Format())
 		})
 	}
@@ -211,7 +207,7 @@ func TestMachine_SetupEpilogue(t *testing.T) {
 	} {
 		tc := tc
 		t.Run(tc.exp, func(t *testing.T) {
-			ctx, _, m := newSetupWithMockContext()
+			_, _, m := newSetupWithMockContext()
 			m.spillSlotSize = tc.spillSlotSize
 			m.clobberedRegs = tc.clobberedRegs
 			m.currentABI = &tc.abi
@@ -226,8 +222,6 @@ func TestMachine_SetupEpilogue(t *testing.T) {
 
 			require.Equal(t, root, m.rootInstr)
 			m.Encode()
-			fmt.Println(hex.EncodeToString(ctx.buf))
-			fmt.Println(m.Format())
 			require.Equal(t, tc.exp, m.Format())
 		})
 	}
@@ -268,13 +262,11 @@ func TestMachine_insertStackBoundsCheck(t *testing.T) {
 	} {
 		tc := tc
 		t.Run(tc.exp, func(t *testing.T) {
-			ctx, _, m := newSetupWithMockContext()
+			_, _, m := newSetupWithMockContext()
 			m.rootInstr = m.allocateInstr()
 			m.rootInstr.asNop0()
 			m.insertStackBoundsCheck(tc.requiredStackSize, m.rootInstr)
-			fmt.Println(m.Format())
 			m.Encode()
-			fmt.Println(hex.EncodeToString(ctx.buf))
 			require.Equal(t, tc.exp, m.Format())
 		})
 	}
@@ -282,8 +274,7 @@ func TestMachine_insertStackBoundsCheck(t *testing.T) {
 
 func TestMachine_CompileStackGrowCallSequence(t *testing.T) {
 	_, _, m := newSetupWithMockContext()
-	src := m.CompileStackGrowCallSequence()
-	fmt.Println(hex.EncodeToString(src))
+	_ = m.CompileStackGrowCallSequence()
 
 	require.Equal(t, `
 	str x1, [x0, #0x60]

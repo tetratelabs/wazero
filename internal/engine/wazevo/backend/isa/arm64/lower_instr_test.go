@@ -377,7 +377,6 @@ L2:
 				regalloc.VReg(3).SetRegType(regalloc.RegTypeInt)
 			_, _, m := newSetupWithMockContext()
 			m.lowerIDiv(execCtx, operandNR(rd), operandNR(rn), operandNR(rm), tc._64bit, tc.signed)
-			fmt.Println(formatEmittedInstructionsInCurrentBlock(m))
 			require.Equal(t, tc.exp, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
 		})
 	}

@@ -130,7 +130,7 @@ func requireNoDiff(wasmBin []byte, checkMemory bool, requireNoError func(err err
 
 func ensureMutableGlobalsMatch(compilerMod, interpreterMod api.Module, requireNoError func(err error)) {
 	ci, ii := compilerMod.(*wasm.ModuleInstance), interpreterMod.(*wasm.ModuleInstance)
-	for i := range ci.Globals {
+	for i := range ci.Globals[:len(ci.Globals)-1] { // The last global is the fuel, so we can ignore it.
 		cg := ci.Globals[i]
 		ig := ii.Globals[i]
 		if !cg.Type.Mutable {

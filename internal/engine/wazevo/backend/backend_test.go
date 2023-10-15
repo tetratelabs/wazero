@@ -2,7 +2,6 @@ package backend_test
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"os"
 	"runtime"
@@ -2134,8 +2133,6 @@ L1 (SSA Block: blk0):
 
 			// Sanity check on the final binary encoding.
 			be.Encode()
-
-			fmt.Println(hex.EncodeToString(be.Buf()))
 		})
 	}
 }
