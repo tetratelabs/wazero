@@ -124,6 +124,38 @@ func requireNoDiff(wasmBin []byte, checkMemory bool, requireNoError func(err err
 					compilerMem.Buffer, interpreterMem.Buffer))
 			}
 		}
+		ensureMutableGlobalsMatch(compilerMod, interpreterMod, requireNoError)
+	}
+}
+
+func ensureMutableGlobalsMatch(compilerMod, interpreterMod api.Module, requireNoError func(err error)) {
+	ci, ii := compilerMod.(*wasm.ModuleInstance), interpreterMod.(*wasm.ModuleInstance)
+	for i := range ci.Globals {
+		cg := ci.Globals[i]
+		ig := ii.Globals[i]
+		if !cg.Type.Mutable {
+			continue
+		}
+
+		var ok bool
+		switch ig.Type.ValType {
+		case wasm.ValueTypeI32, wasm.ValueTypeF32:
+			ok = uint32(cg.Val) == uint32(ig.Val)
+		case wasm.ValueTypeI64, wasm.ValueTypeF64:
+			ok = cg.Val == ig.Val
+		case wasm.ValueTypeV128:
+			ok = cg.Val == ig.Val && cg.ValHi == ig.ValHi
+		default:
+			ok = true // Ignore other types.
+		}
+
+		if !ok {
+			if ig.Type.ValType == wasm.ValueTypeV128 {
+				requireNoError(fmt.Errorf("mutable global[%d] value mismatch: (%v,%v) != (%v,%v)", i, cg.Val, cg.ValHi, ig.Val, ig.ValHi))
+			} else {
+				requireNoError(fmt.Errorf("mutable global[%d] value mismatch: %v != %v", i, cg.Val, ig.Val))
+			}
+		}
 	}
 }
 
