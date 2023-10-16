@@ -68,6 +68,7 @@ type (
 		realRegs   []RealReg
 		nodes1     []*node
 		nodes2     []*node
+		nodes3     []*node
 	}
 
 	// blockInfo is a per-block information used during the register allocation.
@@ -105,6 +106,7 @@ type (
 		// copyFromVReg and copyToVReg are the same as above, but for VReg not backed by real registers.
 		copyFromVReg, copyToVReg *node
 		degree                   int
+		visited                  bool
 	}
 
 	// liveRange represents a lifetime of a VReg. Both begin (LiveInterval[0]) and end (LiveInterval[1]) are inclusive.
@@ -516,6 +518,7 @@ func (a *Allocator) allocateNode() (n *node) {
 	n.copyFromReal = RealRegInvalid
 	n.copyToReal = RealRegInvalid
 	n.neighbors = n.neighbors[:0]
+	n.visited = false
 	return
 }
 

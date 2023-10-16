@@ -238,7 +238,8 @@ func (a *Allocator) assignIndirectCall(f Function, instr Instr, vRegIDToNode []*
 // alive but not used by a call instruction.
 func (a *Allocator) collectActiveNonRealVRegsAt(pc programCounter, liveNodes []liveNodeInBlock) {
 	nodes := a.nodes1[:0]
-	for _, live := range liveNodes {
+	for i := range liveNodes {
+		live := &liveNodes[i]
 		n := live.n
 		if n.spill() || n.v.IsRealReg() {
 			continue
@@ -257,7 +258,8 @@ func (a *Allocator) collectActiveNonRealVRegsAt(pc programCounter, liveNodes []l
 
 func (a *Allocator) collectActiveNodesAt(pc programCounter, liveNodes []liveNodeInBlock) {
 	nodes := a.nodes1[:0]
-	for _, live := range liveNodes {
+	for i := range liveNodes {
+		live := &liveNodes[i]
 		n := live.n
 		if n.assignedRealReg() != RealRegInvalid {
 			r := &n.ranges[live.rangeIndex]
