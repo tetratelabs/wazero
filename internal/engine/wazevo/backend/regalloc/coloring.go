@@ -3,7 +3,6 @@ package regalloc
 import (
 	"fmt"
 	"sort"
-	"strings"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 )
@@ -31,8 +30,8 @@ func (a *Allocator) buildNeighborsByLiveNodes(lives []liveNodeInBlock) {
 			dstRange := &dst.n.ranges[dst.rangeIndex]
 			if src.n.v.RegType() == dst.n.v.RegType() && // Interfere only if they are the same type.
 				srcRange.intersects(dstRange) {
-				src.n.neighbors[dst.n] = struct{}{}
-				dst.n.neighbors[src.n] = struct{}{}
+				src.n.neighbors = append(src.n.neighbors, dst.n)
+				dst.n.neighbors = append(dst.n.neighbors, src.n)
 			}
 		}
 	}
@@ -70,13 +69,12 @@ func (a *Allocator) coloringFor(allocatable []RealReg) {
 	degreeSortedNodes := a.nodes1 // We assume nodes1 holds all the nodes of the given register type.
 	// Reuses the nodes2 slice and the degrees map from the previous iteration.
 	coloringStack := a.nodes2[:0]
-	currentDegrees := a.nodeSet
 
 	numAllocatable := len(allocatable)
 
 	// Initialize the degree for each node which is defined as the number of neighbors.
 	for _, n := range degreeSortedNodes {
-		currentDegrees[n] = len(n.neighbors)
+		n.degree = len(n.neighbors)
 	}
 
 	// First step of the algorithm:
@@ -87,7 +85,7 @@ func (a *Allocator) coloringFor(allocatable []RealReg) {
 	for len(coloringStack) != total {
 		// Sort the nodes by the current degree.
 		sort.SliceStable(degreeSortedNodes, func(i, j int) bool {
-			return currentDegrees[degreeSortedNodes[i]] < currentDegrees[degreeSortedNodes[j]]
+			return degreeSortedNodes[i].degree < degreeSortedNodes[j].degree
 		})
 		if wazevoapi.RegAllocLoggingEnabled {
 			fmt.Println("-------------------------------")
@@ -108,8 +106,8 @@ func (a *Allocator) coloringFor(allocatable []RealReg) {
 				}
 			}
 			fmt.Printf("\ncurrentDegrees: ")
-			for n, degree := range currentDegrees {
-				fmt.Printf("v%d:%d ", n.v.ID(), degree)
+			for _, n := range degreeSortedNodes {
+				fmt.Printf("v%d:%d ", n.v.ID(), n.degree)
 			}
 			fmt.Println("")
 		}
@@ -117,7 +115,7 @@ func (a *Allocator) coloringFor(allocatable []RealReg) {
 		var popNum int
 		for i := 0; i < len(degreeSortedNodes); i++ {
 			n := degreeSortedNodes[i]
-			if currentDegrees[n] < numAllocatable {
+			if n.degree < numAllocatable {
 				popNum++
 			} else {
 				break
@@ -144,8 +142,8 @@ func (a *Allocator) coloringFor(allocatable []RealReg) {
 
 		// Update the degrees of the affected nodes.
 		for _, popped := range poppoedNodes {
-			for neighbor := range popped.neighbors {
-				currentDegrees[neighbor]--
+			for _, neighbor := range popped.neighbors {
+				neighbor.degree--
 			}
 		}
 
@@ -161,8 +159,8 @@ func (a *Allocator) coloringFor(allocatable []RealReg) {
 					fmt.Printf("v%d ", n.v.ID())
 				}
 				fmt.Printf("\ncurrentDegrees: ")
-				for n, degree := range currentDegrees {
-					fmt.Printf("v%d:%d ", n.v.ID(), degree)
+				for _, n := range degreeSortedNodes {
+					fmt.Printf("v%d:%d ", n.v.ID(), n.degree)
 				}
 				fmt.Println("")
 			}
@@ -180,8 +178,7 @@ func (a *Allocator) coloringFor(allocatable []RealReg) {
 	}
 
 	// Assign colors.
-	neighborColorsSet := a.realRegSet
-	neighborColors := a.realRegs[:0]
+	neighborColorsSet := &a.realRegSet
 	tail := len(coloringStack) - 1
 	for i := range coloringStack {
 		n := coloringStack[tail-i]
@@ -195,19 +192,10 @@ func (a *Allocator) coloringFor(allocatable []RealReg) {
 		}
 
 		// Gather already used colors.
-		for neighbor := range n.neighbors {
+		for _, neighbor := range n.neighbors {
 			if neighborColor := neighbor.r; neighborColor != RealRegInvalid {
-				neighborColorsSet[neighborColor] = struct{}{}
-				neighborColors = append(neighborColors, neighborColor)
+				neighborColorsSet[neighborColor] = true
 			}
-		}
-
-		if wazevoapi.RegAllocLoggingEnabled {
-			var s []string
-			for _, r := range neighborColors {
-				s = append(s, a.regInfo.RealRegName(r))
-			}
-			fmt.Printf("\tneighborColors: %v\n", strings.Join(s, ","))
 		}
 
 		a.assignColor(n, neighborColorsSet, allocatable)
@@ -217,10 +205,9 @@ func (a *Allocator) coloringFor(allocatable []RealReg) {
 		}
 
 		// Reset the map for the next iteration.
-		for _, c := range neighborColors {
-			delete(neighborColorsSet, c)
+		for j := range neighborColorsSet {
+			neighborColorsSet[j] = false
 		}
-		neighborColors = neighborColors[:0]
 	}
 
 	if wazevoapi.RegAllocValidationEnabled {
@@ -228,7 +215,7 @@ func (a *Allocator) coloringFor(allocatable []RealReg) {
 			if n.r == RealRegInvalid {
 				continue
 			}
-			for neighbor := range n.neighbors {
+			for _, neighbor := range n.neighbors {
 				if n.r == neighbor.r {
 					panic(fmt.Sprintf("BUG color conflict: %s vs %s", n.v, neighbor.v))
 				}
@@ -239,16 +226,13 @@ func (a *Allocator) coloringFor(allocatable []RealReg) {
 	// Reuses the slices for the next coloring.
 	a.nodes1 = degreeSortedNodes[:0]
 	a.nodes2 = coloringStack[:0]
-	a.nodeSet = currentDegrees
-	a.realRegSet = neighborColorsSet
-	a.realRegs = neighborColors[:0]
 }
 
-func (a *Allocator) assignColor(n *node, neighborColorsSet map[RealReg]struct{}, allocatable []RealReg) {
+func (a *Allocator) assignColor(n *node, neighborColorsSet *[256]bool, allocatable []RealReg) {
 	if cfv := n.copyFromVReg; cfv != nil && cfv.r != RealRegInvalid {
 		r := cfv.r
 		if _, ok := a.allocatableSet[r]; ok {
-			if _, ok = neighborColorsSet[r]; !ok {
+			if !neighborColorsSet[r] {
 				n.r = r
 				a.allocatedRegSet[r] = struct{}{}
 				return
@@ -259,7 +243,7 @@ func (a *Allocator) assignColor(n *node, neighborColorsSet map[RealReg]struct{},
 	if ctv := n.copyToVReg; ctv != nil && ctv.r != RealRegInvalid {
 		r := ctv.r
 		if _, ok := a.allocatableSet[r]; ok {
-			if _, ok = neighborColorsSet[r]; !ok {
+			if !neighborColorsSet[r] {
 				n.r = r
 				a.allocatedRegSet[r] = struct{}{}
 				return
@@ -269,7 +253,7 @@ func (a *Allocator) assignColor(n *node, neighborColorsSet map[RealReg]struct{},
 
 	if r := n.copyFromReal; r != RealRegInvalid {
 		if _, ok := a.allocatableSet[r]; ok {
-			if _, ok = neighborColorsSet[r]; !ok {
+			if !neighborColorsSet[r] {
 				n.r = r
 				a.allocatedRegSet[r] = struct{}{}
 				return
@@ -279,7 +263,7 @@ func (a *Allocator) assignColor(n *node, neighborColorsSet map[RealReg]struct{},
 
 	if r := n.copyToReal; r != RealRegInvalid {
 		if _, ok := a.allocatableSet[r]; ok {
-			if _, ok := neighborColorsSet[r]; !ok {
+			if !neighborColorsSet[r] {
 				n.r = r
 				a.allocatedRegSet[r] = struct{}{}
 				return
@@ -289,7 +273,7 @@ func (a *Allocator) assignColor(n *node, neighborColorsSet map[RealReg]struct{},
 
 	if n.r == RealRegInvalid {
 		for _, color := range allocatable {
-			if _, ok := neighborColorsSet[color]; !ok {
+			if !neighborColorsSet[color] {
 				n.r = color
 				a.allocatedRegSet[color] = struct{}{}
 				break

@@ -22,7 +22,6 @@ func NewAllocator(allocatableRegs *RegisterInfo) Allocator {
 	a := Allocator{
 		regInfo:         allocatableRegs,
 		nodePool:        wazevoapi.NewPool[node](),
-		realRegSet:      make(map[RealReg]struct{}),
 		nodeSet:         make(map[*node]int),
 		allocatedRegSet: make(map[RealReg]struct{}),
 		phis:            make(map[VReg]struct{}),
@@ -71,7 +70,7 @@ type (
 		phis map[VReg]struct{}
 
 		// Followings are re-used during various places e.g. coloring.
-		realRegSet map[RealReg]struct{}
+		realRegSet [256]bool
 		realRegs   []RealReg
 		nodeSet    map[*node]int
 		nodes1     []*node
@@ -110,12 +109,13 @@ type (
 		// r is the real register assigned to this node. It is either a pre-colored register or a register assigned during allocation.
 		r RealReg
 		// neighbors are the nodes that this node interferes with. Such neighbors have the same RegType as this node.
-		neighbors map[*node]struct{}
+		neighbors []*node
 		// copyFromReal and copyToReal are the real registers that this node copies from/to. During the allocation phase,
 		// we try to assign the same RealReg to copyFromReal and copyToReal so that we can remove the redundant copy.
 		copyFromReal, copyToReal RealReg
 		// copyFromVReg and copyToVReg are the same as above, but for VReg not backed by real registers.
 		copyFromVReg, copyToVReg *node
+		degree                   int
 	}
 
 	// liveRange represents a lifetime of a VReg. Both begin (LiveInterval[0]) and end (LiveInterval[1]) are inclusive.
@@ -535,8 +535,7 @@ func (a *Allocator) allocateNode() (n *node) {
 	n.copyToVReg = nil
 	n.copyFromReal = RealRegInvalid
 	n.copyToReal = RealRegInvalid
-	// TODO: reuse!!
-	n.neighbors = make(map[*node]struct{})
+	n.neighbors = n.neighbors[:0]
 	return
 }
 
@@ -657,7 +656,7 @@ func (n *node) String() string {
 	buf.WriteString("]")
 	// Add neighbors
 	buf.WriteString(" neighbors[")
-	for n := range n.neighbors {
+	for _, n := range n.neighbors {
 		buf.WriteString(fmt.Sprintf("v%v ", n.v.ID()))
 	}
 	buf.WriteString("]")
