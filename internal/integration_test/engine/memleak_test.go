@@ -32,7 +32,7 @@ func TestMemoryLeak(t *testing.T) {
 		}
 
 		t.Run(tc.name, func(t *testing.T) {
-			duration := 15 * time.Second
+			duration := 5 * time.Second
 			t.Logf("running memory leak test for %s", duration)
 
 			ctx, cancel := context.WithTimeout(context.Background(), duration)

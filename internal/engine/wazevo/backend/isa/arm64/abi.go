@@ -32,13 +32,16 @@ var regInfo = &regalloc.RegisterInfo{
 			v7, v6, v5, v4, v3, v2, v1, v0,
 		},
 	},
-	CalleeSavedRegisters: map[regalloc.RealReg]struct{}{
-		x19: {}, x20: {}, x21: {}, x22: {}, x23: {}, x24: {}, x25: {}, x26: {}, x28: {},
-		v18: {}, v19: {}, v20: {}, v21: {}, v22: {}, v23: {}, v24: {}, v25: {}, v26: {}, v27: {}, v28: {}, v29: {}, v30: {}, v31: {},
+	CalleeSavedRegisters: [regalloc.RealRegsNumMax]bool{
+		x19: true, x20: true, x21: true, x22: true, x23: true, x24: true, x25: true, x26: true, x28: true,
+		v18: true, v19: true, v20: true, v21: true, v22: true, v23: true, v24: true, v25: true, v26: true,
+		v27: true, v28: true, v29: true, v30: true, v31: true,
 	},
-	CallerSavedRegisters: map[regalloc.RealReg]struct{}{
-		x0: {}, x1: {}, x2: {}, x3: {}, x4: {}, x5: {}, x6: {}, x7: {}, x8: {}, x9: {}, x10: {}, x11: {}, x12: {}, x13: {}, x14: {}, x15: {}, x16: {}, x17: {}, x29: {}, x30: {},
-		v0: {}, v1: {}, v2: {}, v3: {}, v4: {}, v5: {}, v6: {}, v7: {}, v8: {}, v9: {}, v10: {}, v11: {}, v12: {}, v13: {}, v14: {}, v15: {}, v16: {}, v17: {},
+	CallerSavedRegisters: [regalloc.RealRegsNumMax]bool{
+		x0: true, x1: true, x2: true, x3: true, x4: true, x5: true, x6: true, x7: true, x8: true, x9: true, x10: true,
+		x11: true, x12: true, x13: true, x14: true, x15: true, x16: true, x17: true, x29: true, x30: true,
+		v0: true, v1: true, v2: true, v3: true, v4: true, v5: true, v6: true, v7: true, v8: true, v9: true, v10: true,
+		v11: true, v12: true, v13: true, v14: true, v15: true, v16: true, v17: true,
 	},
 	RealRegToVReg: []regalloc.VReg{
 		x0: x0VReg, x1: x1VReg, x2: x2VReg, x3: x3VReg, x4: x4VReg, x5: x5VReg, x6: x6VReg, x7: x7VReg, x8: x8VReg, x9: x9VReg, x10: x10VReg, x11: x11VReg, x12: x12VReg, x13: x13VReg, x14: x14VReg, x15: x15VReg, x16: x16VReg, x17: x17VReg, x18: x18VReg, x19: x19VReg, x20: x20VReg, x21: x21VReg, x22: x22VReg, x23: x23VReg, x24: x24VReg, x25: x25VReg, x26: x26VReg, x27: x27VReg, x28: x28VReg, x29: x29VReg, x30: x30VReg,

@@ -8,7 +8,7 @@ import (
 
 func TestAllocator_assignRegistersPerInstr(t *testing.T) {
 	t.Run("call", func(t *testing.T) {
-		a := NewAllocator(&RegisterInfo{CallerSavedRegisters: map[RealReg]struct{}{1: {}, 3: {}}})
+		a := NewAllocator(&RegisterInfo{CallerSavedRegisters: [RealRegsNumMax]bool{1: true, 3: true}})
 		pc := programCounter(5)
 		liveNodes := []liveNodeInBlock{
 			{n: &node{r: 1, v: 0xa, ranges: []liveRange{{begin: 5, end: 20}}}},
@@ -26,12 +26,12 @@ func TestAllocator_assignRegistersPerInstr(t *testing.T) {
 		require.Equal(t, 2, len(f.afters))
 	})
 	t.Run("call_indirect/func_ptr not spilled", func(t *testing.T) {
-		a := NewAllocator(&RegisterInfo{CallerSavedRegisters: map[RealReg]struct{}{1: {}, 3: {}, 0xff: {}}})
+		a := NewAllocator(&RegisterInfo{CallerSavedRegisters: [RealRegsNumMax]bool{1: true, 3: true, 0xf: true}})
 		pc := programCounter(5)
 		functionPtrVRegID := 0x0
 		functionPtrVReg := VReg(functionPtrVRegID).SetRegType(RegTypeInt)
 		functionPtrLiveNode := liveNodeInBlock{
-			n: &node{r: 0xff, v: functionPtrVReg, ranges: []liveRange{{begin: 4, end: pc /* killed at this indirect call. */}}},
+			n: &node{r: 0xf, v: functionPtrVReg, ranges: []liveRange{{begin: 4, end: pc /* killed at this indirect call. */}}},
 		}
 		liveNodes := []liveNodeInBlock{
 			functionPtrLiveNode, // Function pointer, used at this PC. not save target.
@@ -48,12 +48,12 @@ func TestAllocator_assignRegistersPerInstr(t *testing.T) {
 		require.Equal(t, 2, len(f.befores))
 		require.Equal(t, 2, len(f.afters))
 		require.True(t, callInd.uses[0].IsRealReg())
-		require.Equal(t, functionPtrVReg.SetRealReg(0xff), callInd.uses[0])
+		require.Equal(t, functionPtrVReg.SetRealReg(0xf), callInd.uses[0])
 	})
 	t.Run("call_indirect/func_ptr spilled", func(t *testing.T) {
 		a := NewAllocator(&RegisterInfo{
-			CallerSavedRegisters: map[RealReg]struct{}{1: {}, 3: {}, 0xbb: {}},
-			AllocatableRegisters: [3][]RealReg{RegTypeInt: {0xff, 0xbb}},
+			CallerSavedRegisters: [RealRegsNumMax]bool{1: true, 3: true, 0xb: true},
+			AllocatableRegisters: [3][]RealReg{RegTypeInt: {0xf, 0xb}},
 		})
 		pc := programCounter(5)
 		functionPtrVRegID := 0x0
@@ -74,9 +74,9 @@ func TestAllocator_assignRegistersPerInstr(t *testing.T) {
 		require.Equal(t, 3, len(f.befores))
 		require.Equal(t, 2, len(f.afters))
 		require.Equal(t, callInd, f.befores[2].instr)
-		require.Equal(t, functionPtrVReg.SetRealReg(0xbb), f.befores[2].v)
+		require.Equal(t, functionPtrVReg.SetRealReg(0xb), f.befores[2].v)
 		require.True(t, callInd.uses[0].IsRealReg())
-		require.Equal(t, functionPtrVReg.SetRealReg(0xbb), callInd.uses[0])
+		require.Equal(t, functionPtrVReg.SetRealReg(0xb), callInd.uses[0])
 	})
 	t.Run("no spills", func(t *testing.T) {
 		r := FromRealReg(1, RegTypeInt)
@@ -93,9 +93,6 @@ func TestAllocator_assignRegistersPerInstr(t *testing.T) {
 
 		require.Equal(t, []VReg{r, VReg(2).SetRealReg(22), VReg(3).SetRealReg(33)}, instr.uses)
 		require.Equal(t, []VReg{VReg(4).SetRealReg(44)}, instr.defs)
-	})
-	t.Run("spills", func(t *testing.T) {
-		t.Skip("TODO")
 	})
 }
 
@@ -244,7 +241,7 @@ func TestAllocator_handleSpills(t *testing.T) {
 		}
 
 		a := NewAllocator(&RegisterInfo{
-			AllocatableRegisters: [3][]RealReg{RegTypeInt: {0xb, 0xc, 0xff /* free */}},
+			AllocatableRegisters: [3][]RealReg{RegTypeInt: {0xb, 0xc, 0xf /* free */}},
 		})
 
 		f := newMockFunction(newMockBlock(0).entry())
@@ -253,11 +250,11 @@ func TestAllocator_handleSpills(t *testing.T) {
 		instr := newMockInstr().def(vr)
 		a.handleSpills(f, pc, instr, liveNodes, nil, vr)
 		require.Equal(t, 1, len(instr.defs))
-		require.Equal(t, RealReg(0xff), instr.defs[0].RealReg())
+		require.Equal(t, RealReg(0xf), instr.defs[0].RealReg())
 
 		require.Equal(t, 0, len(f.befores))
 		require.Equal(t, 1, len(f.afters))
-		requireInsertedInst(t, f, false, 0, instr, false, vr.SetRealReg(0xff))
+		requireInsertedInst(t, f, false, 0, instr, false, vr.SetRealReg(0xf))
 	})
 
 	t.Run("uses and def / not evicted / def same type", func(t *testing.T) {
@@ -269,8 +266,8 @@ func TestAllocator_handleSpills(t *testing.T) {
 
 		a := NewAllocator(&RegisterInfo{
 			AllocatableRegisters: [3][]RealReg{
-				RegTypeInt:   {0xb, 0xc, 0xaa /* free */},
-				RegTypeFloat: {0xbb /* free */},
+				RegTypeInt:   {0xb, 0xc, 0xa /* free */},
+				RegTypeFloat: {0xf /* free */},
 			},
 		})
 
@@ -281,28 +278,28 @@ func TestAllocator_handleSpills(t *testing.T) {
 		d1 := VReg(104).SetRegType(RegTypeFloat)
 		instr := newMockInstr().use(u1, u2, u3).def(d1)
 		a.handleSpills(f, pc, instr, liveNodes, []VReg{u1, u3}, d1)
-		require.Equal(t, []VReg{u1.SetRealReg(0xaa), u2, u3.SetRealReg(0xbb)}, instr.uses)
-		require.Equal(t, []VReg{d1.SetRealReg(0xbb)}, instr.defs)
+		require.Equal(t, []VReg{u1.SetRealReg(0xa), u2, u3.SetRealReg(0xf)}, instr.uses)
+		require.Equal(t, []VReg{d1.SetRealReg(0xf)}, instr.defs)
 
 		require.Equal(t, 2, len(f.befores))
-		requireInsertedInst(t, f, true, 0, instr, true, u1.SetRealReg(0xaa))
-		requireInsertedInst(t, f, true, 1, instr, true, u3.SetRealReg(0xbb))
+		requireInsertedInst(t, f, true, 0, instr, true, u1.SetRealReg(0xa))
+		requireInsertedInst(t, f, true, 1, instr, true, u3.SetRealReg(0xf))
 
 		require.Equal(t, 1, len(f.afters))
-		requireInsertedInst(t, f, false, 0, instr, false, d1.SetRealReg(0xbb))
+		requireInsertedInst(t, f, false, 0, instr, false, d1.SetRealReg(0xf))
 	})
 
 	t.Run("uses and def / not evicted / def different type", func(t *testing.T) {
 		const pc = 5
 		liveNodes := []liveNodeInBlock{
 			{n: &node{r: RealReg(0xb), v: 0xa, ranges: []liveRange{{begin: pc, end: 20}}}},
-			{n: &node{r: RealReg(0xff), v: 0xb, ranges: []liveRange{{begin: pc, end: 20}}}},
+			{n: &node{r: RealReg(0xf), v: 0xb, ranges: []liveRange{{begin: pc, end: 20}}}},
 		}
 
 		a := NewAllocator(&RegisterInfo{
 			AllocatableRegisters: [3][]RealReg{
-				RegTypeInt:   {0xb, 0xaa /* free */},
-				RegTypeFloat: {0xff},
+				RegTypeInt:   {0xb, 0xa /* free */},
+				RegTypeFloat: {0xf},
 			},
 		})
 
@@ -311,15 +308,15 @@ func TestAllocator_handleSpills(t *testing.T) {
 		d1 := VReg(104).SetRegType(RegTypeFloat)
 		instr := newMockInstr().use(u1).def(d1)
 		a.handleSpills(f, pc, instr, liveNodes, []VReg{u1}, d1)
-		require.Equal(t, []VReg{u1.SetRealReg(0xaa)}, instr.uses)
-		require.Equal(t, []VReg{d1.SetRealReg(0xff)}, instr.defs)
+		require.Equal(t, []VReg{u1.SetRealReg(0xa)}, instr.uses)
+		require.Equal(t, []VReg{d1.SetRealReg(0xf)}, instr.defs)
 
 		require.Equal(t, 2, len(f.befores))
-		requireInsertedInst(t, f, true, 0, instr, true, u1.SetRealReg(0xaa))
-		requireInsertedInst(t, f, true, 1, instr, false, liveNodes[1].n.v.SetRealReg(0xff))
+		requireInsertedInst(t, f, true, 0, instr, true, u1.SetRealReg(0xa))
+		requireInsertedInst(t, f, true, 1, instr, false, liveNodes[1].n.v.SetRealReg(0xf))
 		require.Equal(t, 2, len(f.afters))
-		requireInsertedInst(t, f, false, 0, instr, true, liveNodes[1].n.v.SetRealReg(0xff))
-		requireInsertedInst(t, f, false, 1, instr, false, d1.SetRealReg(0xff))
+		requireInsertedInst(t, f, false, 0, instr, true, liveNodes[1].n.v.SetRealReg(0xf))
+		requireInsertedInst(t, f, false, 1, instr, false, d1.SetRealReg(0xf))
 	})
 
 	t.Run("uses and def / evicted / def different type", func(t *testing.T) {
@@ -327,13 +324,13 @@ func TestAllocator_handleSpills(t *testing.T) {
 		liveNodes := []liveNodeInBlock{
 			{n: &node{r: RealReg(0xb), v: 0xa, ranges: []liveRange{{begin: pc, end: 20}}}},
 			{n: &node{r: RealReg(0xc), v: 0xa, ranges: []liveRange{{begin: pc, end: 20}}}},
-			{n: &node{r: RealReg(0xff), v: 0xb, ranges: []liveRange{{begin: pc, end: 20}}}},
+			{n: &node{r: RealReg(0xf), v: 0xb, ranges: []liveRange{{begin: pc, end: 20}}}},
 		}
 
 		a := NewAllocator(&RegisterInfo{
 			AllocatableRegisters: [3][]RealReg{
 				RegTypeInt:   {0xb, 0xc},
-				RegTypeFloat: {0xff},
+				RegTypeFloat: {0xf},
 			},
 		})
 
@@ -343,16 +340,16 @@ func TestAllocator_handleSpills(t *testing.T) {
 		instr := newMockInstr().use(u1).def(d1)
 		a.handleSpills(f, pc, instr, liveNodes, []VReg{u1}, d1)
 		require.Equal(t, []VReg{u1.SetRealReg(0xb)}, instr.uses)
-		require.Equal(t, []VReg{d1.SetRealReg(0xff)}, instr.defs)
+		require.Equal(t, []VReg{d1.SetRealReg(0xf)}, instr.defs)
 
 		require.Equal(t, 3, len(f.befores))
 		requireInsertedInst(t, f, true, 0, instr, false, liveNodes[0].n.v.SetRealReg(0xb))
 		requireInsertedInst(t, f, true, 1, instr, true, u1.SetRealReg(0xb))
-		requireInsertedInst(t, f, true, 2, instr, false, liveNodes[2].n.v.SetRealReg(0xff))
+		requireInsertedInst(t, f, true, 2, instr, false, liveNodes[2].n.v.SetRealReg(0xf))
 		require.Equal(t, 3, len(f.afters))
 		requireInsertedInst(t, f, false, 0, instr, true, liveNodes[0].n.v.SetRealReg(0xb))
-		requireInsertedInst(t, f, false, 1, instr, true, liveNodes[2].n.v.SetRealReg(0xff))
-		requireInsertedInst(t, f, false, 2, instr, false, d1.SetRealReg(0xff))
+		requireInsertedInst(t, f, false, 1, instr, true, liveNodes[2].n.v.SetRealReg(0xf))
+		requireInsertedInst(t, f, false, 2, instr, false, d1.SetRealReg(0xf))
 	})
 }
 
@@ -367,11 +364,11 @@ func TestAllocator_collectActiveNodesAt(t *testing.T) {
 	t.Run("lives", func(t *testing.T) {
 		const pc = 5
 		liveNodes := []liveNodeInBlock{
-			{n: &node{r: RealReg(0xff), v: 0xa, ranges: []liveRange{{begin: 0, end: pc - 1}}}},
+			{n: &node{r: RealReg(0xf), v: 0xa, ranges: []liveRange{{begin: 0, end: pc - 1}}}},
 			{n: &node{r: RealReg(0x1), v: 0xa, ranges: []liveRange{{begin: pc, end: 20}}}},
 			{n: &node{r: RealReg(0x2), v: 0xa, ranges: []liveRange{{begin: pc, end: 20}}}},
 			{n: &node{r: RealReg(0x4), v: 0xb, ranges: []liveRange{{begin: pc, end: 20}}}},
-			{n: &node{r: RealReg(0xff), v: 0xa, ranges: []liveRange{{begin: 1000, end: 2000000}}}},
+			{n: &node{r: RealReg(0xf), v: 0xa, ranges: []liveRange{{begin: 1000, end: 2000000}}}},
 		}
 
 		a := NewAllocator(&RegisterInfo{})

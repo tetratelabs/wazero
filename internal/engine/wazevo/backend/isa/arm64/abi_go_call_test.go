@@ -13,8 +13,10 @@ import (
 
 func Test_calleeSavedRegistersSorted(t *testing.T) {
 	var exp []regalloc.VReg
-	for r := range regInfo.CalleeSavedRegisters {
-		exp = append(exp, regInfo.RealRegToVReg[r])
+	for i, r := range regInfo.CalleeSavedRegisters {
+		if r {
+			exp = append(exp, regInfo.RealRegToVReg[i])
+		}
 	}
 	sort.Slice(exp, func(i, j int) bool {
 		return exp[i].RealReg() < exp[j].RealReg()

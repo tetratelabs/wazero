@@ -228,13 +228,13 @@ func (a *Allocator) coloringFor(allocatable []RealReg) {
 	a.nodes2 = coloringStack[:0]
 }
 
-func (a *Allocator) assignColor(n *node, neighborColorsSet *[256]bool, allocatable []RealReg) {
+func (a *Allocator) assignColor(n *node, neighborColorsSet *[128]bool, allocatable []RealReg) {
 	if cfv := n.copyFromVReg; cfv != nil && cfv.r != RealRegInvalid {
 		r := cfv.r
-		if _, ok := a.allocatableSet[r]; ok {
+		if a.allocatableSet[r] {
 			if !neighborColorsSet[r] {
 				n.r = r
-				a.allocatedRegSet[r] = struct{}{}
+				a.allocatedRegSet[r] = true
 				return
 			}
 		}
@@ -242,30 +242,30 @@ func (a *Allocator) assignColor(n *node, neighborColorsSet *[256]bool, allocatab
 
 	if ctv := n.copyToVReg; ctv != nil && ctv.r != RealRegInvalid {
 		r := ctv.r
-		if _, ok := a.allocatableSet[r]; ok {
+		if a.allocatableSet[r] {
 			if !neighborColorsSet[r] {
 				n.r = r
-				a.allocatedRegSet[r] = struct{}{}
+				a.allocatedRegSet[r] = true
 				return
 			}
 		}
 	}
 
 	if r := n.copyFromReal; r != RealRegInvalid {
-		if _, ok := a.allocatableSet[r]; ok {
+		if a.allocatableSet[r] {
 			if !neighborColorsSet[r] {
 				n.r = r
-				a.allocatedRegSet[r] = struct{}{}
+				a.allocatedRegSet[r] = true
 				return
 			}
 		}
 	}
 
 	if r := n.copyToReal; r != RealRegInvalid {
-		if _, ok := a.allocatableSet[r]; ok {
+		if a.allocatableSet[r] {
 			if !neighborColorsSet[r] {
 				n.r = r
-				a.allocatedRegSet[r] = struct{}{}
+				a.allocatedRegSet[r] = true
 				return
 			}
 		}
@@ -275,7 +275,7 @@ func (a *Allocator) assignColor(n *node, neighborColorsSet *[256]bool, allocatab
 		for _, color := range allocatable {
 			if !neighborColorsSet[color] {
 				n.r = color
-				a.allocatedRegSet[color] = struct{}{}
+				a.allocatedRegSet[color] = true
 				break
 			}
 		}
