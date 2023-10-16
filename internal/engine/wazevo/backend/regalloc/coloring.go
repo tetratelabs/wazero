@@ -2,8 +2,9 @@ package regalloc
 
 import (
 	"fmt"
-	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 	"sort"
+
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 )
 
 // buildNeighbors builds the neighbors for each node in the interference graph.
