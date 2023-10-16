@@ -196,6 +196,10 @@ func Test_ensureMutableGlobalsMatch(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var actualErr error
+
+			// Append the "fuel" inserted by the fuzzer, which will be ignored by ensureMutableGlobalsMatch.
+			tc.im.Globals = append(tc.im.Globals, &wasm.GlobalInstance{Type: wasm.GlobalType{Mutable: true, ValType: wasm.ValueTypeI32}, Val: 10000})
+			tc.cm.Globals = append(tc.cm.Globals, &wasm.GlobalInstance{Type: wasm.GlobalType{Mutable: true, ValType: wasm.ValueTypeI32}, Val: 1})
 			ensureMutableGlobalsMatch(tc.cm, tc.im, func(err error) {
 				actualErr = err
 			})

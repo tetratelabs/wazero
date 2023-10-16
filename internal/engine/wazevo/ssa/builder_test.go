@@ -1,7 +1,6 @@
 package ssa
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -604,11 +603,7 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 			tc.setup(b)
 
 			b.RunPasses() // LayoutBlocks() must be called after RunPasses().
-			fmt.Println("============ SSA before block layout ============")
-			fmt.Println(b.Format())
 			b.LayoutBlocks()
-			fmt.Println("============ SSA after block layout ============")
-			fmt.Println(b.Format())
 
 			var actual []BasicBlockID
 			for blk := b.BlockIteratorReversePostOrderBegin(); blk != nil; blk = b.BlockIteratorReversePostOrderNext() {

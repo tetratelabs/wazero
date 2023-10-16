@@ -1,8 +1,6 @@
 package arm64
 
 import (
-	"encoding/hex"
-	"fmt"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
@@ -400,10 +398,7 @@ func TestAbiImpl_constructEntryPreamble(t *testing.T) {
 			_, _, m := newSetupWithMockContext()
 			abi := m.getOrCreateABIImpl(tc.sig)
 			m.rootInstr = abi.constructEntryPreamble()
-			fmt.Println(m.Format())
 			require.Equal(t, tc.exp, m.Format())
-			m.Encode()
-			fmt.Println(hex.EncodeToString(m.compiler.Buf()))
 		})
 	}
 }
@@ -539,10 +534,8 @@ func TestMachine_goEntryPreamblePassArg(t *testing.T) {
 			cur := m.allocateNop()
 			m.rootInstr = cur
 			m.goEntryPreamblePassArg(cur, paramSlicePtr, &tc.arg, tc.argSlotBeginOffsetFromSP)
-			fmt.Println(m.Format())
 			require.Equal(t, tc.exp, m.Format())
 			m.Encode()
-			fmt.Println(hex.EncodeToString(m.compiler.Buf()))
 		})
 	}
 }
@@ -694,10 +687,8 @@ func TestMachine_goEntryPreamblePassResult(t *testing.T) {
 			cur := m.allocateNop()
 			m.rootInstr = cur
 			m.goEntryPreamblePassResult(cur, paramSlicePtr, &tc.arg, tc.retStart)
-			fmt.Println(m.Format())
 			require.Equal(t, tc.exp, m.Format())
 			m.Encode()
-			fmt.Println(hex.EncodeToString(m.compiler.Buf()))
 		})
 	}
 }
