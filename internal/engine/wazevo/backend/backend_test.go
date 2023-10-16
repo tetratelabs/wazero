@@ -1460,35 +1460,35 @@ L1 (SSA Block: blk0):
 	movz x27, #0x120, lsl 0
 	str x27, [sp, #-0x10]!
 	orr w8, wzr, #0x1
+	madd w23, w2, w8, wzr
+	orr w8, wzr, #0x2
+	madd w22, w2, w8, wzr
+	orr w8, wzr, #0x3
+	madd w21, w2, w8, wzr
+	orr w8, wzr, #0x4
+	madd w20, w2, w8, wzr
+	movz w8, #0x5, lsl 0
+	madd w19, w2, w8, wzr
+	orr w8, wzr, #0x6
+	madd w17, w2, w8, wzr
+	orr w8, wzr, #0x7
+	madd w16, w2, w8, wzr
+	orr w8, wzr, #0x8
+	madd w15, w2, w8, wzr
+	movz w8, #0x9, lsl 0
+	madd w14, w2, w8, wzr
+	movz w8, #0xa, lsl 0
+	madd w13, w2, w8, wzr
+	movz w8, #0xb, lsl 0
+	madd w12, w2, w8, wzr
+	orr w8, wzr, #0xc
+	madd w11, w2, w8, wzr
+	movz w8, #0xd, lsl 0
+	madd w10, w2, w8, wzr
+	orr w8, wzr, #0xe
+	madd w9, w2, w8, wzr
+	orr w8, wzr, #0xf
 	madd w8, w2, w8, wzr
-	orr w9, wzr, #0x2
-	madd w9, w2, w9, wzr
-	orr w10, wzr, #0x3
-	madd w10, w2, w10, wzr
-	orr w11, wzr, #0x4
-	madd w11, w2, w11, wzr
-	movz w12, #0x5, lsl 0
-	madd w12, w2, w12, wzr
-	orr w13, wzr, #0x6
-	madd w13, w2, w13, wzr
-	orr w14, wzr, #0x7
-	madd w14, w2, w14, wzr
-	orr w15, wzr, #0x8
-	madd w15, w2, w15, wzr
-	movz w16, #0x9, lsl 0
-	madd w16, w2, w16, wzr
-	movz w17, #0xa, lsl 0
-	madd w17, w2, w17, wzr
-	movz w19, #0xb, lsl 0
-	madd w19, w2, w19, wzr
-	orr w20, wzr, #0xc
-	madd w20, w2, w20, wzr
-	movz w21, #0xd, lsl 0
-	madd w21, w2, w21, wzr
-	orr w22, wzr, #0xe
-	madd w22, w2, w22, wzr
-	orr w23, wzr, #0xf
-	madd w23, w2, w23, wzr
 	orr w24, wzr, #0x10
 	madd w24, w2, w24, wzr
 	movz w25, #0x11, lsl 0
@@ -1503,47 +1503,47 @@ L1 (SSA Block: blk0):
 	add w26, w26, w29
 	add w25, w25, w26
 	add w24, w24, w25
-	add w23, w23, w24
-	add w22, w22, w23
-	add w21, w21, w22
-	add w20, w20, w21
-	add w19, w19, w20
-	add w17, w17, w19
-	add w16, w16, w17
-	add w15, w15, w16
-	add w14, w14, w15
-	add w13, w13, w14
-	add w12, w12, w13
-	add w11, w11, w12
-	add w10, w10, w11
-	add w9, w9, w10
-	add w0, w8, w9
+	add w8, w8, w24
+	add w8, w9, w8
+	add w8, w10, w8
+	add w8, w11, w8
+	add w8, w12, w8
+	add w8, w13, w8
+	add w8, w14, w8
+	add w8, w15, w8
+	add w8, w16, w8
+	add w8, w17, w8
+	add w8, w19, w8
+	add w8, w20, w8
+	add w8, w21, w8
+	add w8, w22, w8
+	add w0, w23, w8
 	ldr s8, #8; b 8; data.f32 1.000000
+	fmul s20, s0, s8
+	ldr s8, #8; b 8; data.f32 2.000000
+	fmul s19, s0, s8
+	ldr s8, #8; b 8; data.f32 3.000000
+	fmul s18, s0, s8
+	ldr s8, #8; b 8; data.f32 4.000000
+	fmul s17, s0, s8
+	ldr s8, #8; b 8; data.f32 5.000000
+	fmul s16, s0, s8
+	ldr s8, #8; b 8; data.f32 6.000000
+	fmul s15, s0, s8
+	ldr s8, #8; b 8; data.f32 7.000000
+	fmul s14, s0, s8
+	ldr s8, #8; b 8; data.f32 8.000000
+	fmul s13, s0, s8
+	ldr s8, #8; b 8; data.f32 9.000000
+	fmul s12, s0, s8
+	ldr s8, #8; b 8; data.f32 10.000000
+	fmul s11, s0, s8
+	ldr s8, #8; b 8; data.f32 11.000000
+	fmul s10, s0, s8
+	ldr s8, #8; b 8; data.f32 12.000000
+	fmul s9, s0, s8
+	ldr s8, #8; b 8; data.f32 13.000000
 	fmul s8, s0, s8
-	ldr s9, #8; b 8; data.f32 2.000000
-	fmul s9, s0, s9
-	ldr s10, #8; b 8; data.f32 3.000000
-	fmul s10, s0, s10
-	ldr s11, #8; b 8; data.f32 4.000000
-	fmul s11, s0, s11
-	ldr s12, #8; b 8; data.f32 5.000000
-	fmul s12, s0, s12
-	ldr s13, #8; b 8; data.f32 6.000000
-	fmul s13, s0, s13
-	ldr s14, #8; b 8; data.f32 7.000000
-	fmul s14, s0, s14
-	ldr s15, #8; b 8; data.f32 8.000000
-	fmul s15, s0, s15
-	ldr s16, #8; b 8; data.f32 9.000000
-	fmul s16, s0, s16
-	ldr s17, #8; b 8; data.f32 10.000000
-	fmul s17, s0, s17
-	ldr s18, #8; b 8; data.f32 11.000000
-	fmul s18, s0, s18
-	ldr s19, #8; b 8; data.f32 12.000000
-	fmul s19, s0, s19
-	ldr s20, #8; b 8; data.f32 13.000000
-	fmul s20, s0, s20
 	ldr s21, #8; b 8; data.f32 14.000000
 	fmul s21, s0, s21
 	ldr s22, #8; b 8; data.f32 15.000000
@@ -1564,19 +1564,19 @@ L1 (SSA Block: blk0):
 	fadd s23, s23, s24
 	fadd s22, s22, s23
 	fadd s21, s21, s22
-	fadd s20, s20, s21
-	fadd s19, s19, s20
-	fadd s18, s18, s19
-	fadd s17, s17, s18
-	fadd s16, s16, s17
-	fadd s15, s15, s16
-	fadd s14, s14, s15
-	fadd s13, s13, s14
-	fadd s12, s12, s13
-	fadd s11, s11, s12
-	fadd s10, s10, s11
-	fadd s9, s9, s10
-	fadd s0, s8, s9
+	fadd s8, s8, s21
+	fadd s8, s9, s8
+	fadd s8, s10, s8
+	fadd s8, s11, s8
+	fadd s8, s12, s8
+	fadd s8, s13, s8
+	fadd s8, s14, s8
+	fadd s8, s15, s8
+	fadd s8, s16, s8
+	fadd s8, s17, s8
+	fadd s8, s18, s8
+	fadd s8, s19, s8
+	fadd s0, s20, s8
 	add sp, sp, #0x10
 	ldr q27, [sp], #0x10
 	ldr q26, [sp], #0x10

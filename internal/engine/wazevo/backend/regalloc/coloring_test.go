@@ -164,7 +164,7 @@ func TestAllocator_coloringFor(t *testing.T) {
 			name:        "three nodes with interference and spill",
 			allocatable: []RealReg{RealReg(1), RealReg(2)},
 			links:       [][]int{{1, 2}, {2}, {}},
-			expRegs:     []RealReg{1, 2, RealRegInvalid},
+			expRegs:     []RealReg{2, 1, RealRegInvalid},
 		},
 		{
 			//     0
@@ -173,7 +173,7 @@ func TestAllocator_coloringFor(t *testing.T) {
 			name:         "three nodes with interference and spill / precolor",
 			allocatable:  []RealReg{RealReg(1), RealReg(2)},
 			links:        [][]int{{1, 2}, {2}, {}},
-			expRegs:      []RealReg{1, RealRegInvalid, 2},
+			expRegs:      []RealReg{RealRegInvalid, 1, 2},
 			preColorRegs: map[int]RealReg{2: 2},
 		},
 		{
@@ -189,7 +189,7 @@ func TestAllocator_coloringFor(t *testing.T) {
 				{6},
 				{},
 			},
-			expRegs: []RealReg{40, 20, 30, 10, 10, 30, 20},
+			expRegs: []RealReg{40, 10, 20, 30, 30, 20, 10},
 		},
 		{
 			// https://web.stanford.edu/class/archive/cs/cs143/cs143.1128/lectures/17/Slides17.pdf
@@ -198,7 +198,7 @@ func TestAllocator_coloringFor(t *testing.T) {
 			links: [][]int{
 				{1, 2, 3}, {2, 3, 4, 5}, {3, 4}, {}, {5}, {}, {},
 			},
-			expRegs: []RealReg{10, RealRegInvalid, 20, 30, 10, 20, 10},
+			expRegs: []RealReg{30, RealRegInvalid, 20, 10, 10, 20, 10},
 		},
 	} {
 		tc := tc

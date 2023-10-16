@@ -83,104 +83,57 @@ func (a *Allocator) coloringFor(allocatable []RealReg) {
 		n.degree = len(n.neighbors)
 	}
 
+	// Sort the nodes by the current degree.
+	sort.SliceStable(degreeSortedNodes, func(i, j int) bool {
+		return degreeSortedNodes[i].degree < degreeSortedNodes[j].degree
+	})
+
 	// First step of the algorithm:
 	// until we have removed the all the nodes:
 	//	1. pop the nodes with degree < numAllocatable.
 	//  2. if there's no node with degree < numAllocatable, spill one node.
+	popTargetQueue := a.nodes3[:0] // Only containing the nodes whose degree < numAllocatable.
+	for i := 0; i < len(degreeSortedNodes); i++ {
+		n := degreeSortedNodes[i]
+		if n.degree < numAllocatable {
+			popTargetQueue = append(popTargetQueue, n)
+			n.visited = true
+		} else {
+			break
+		}
+	}
 	total := len(degreeSortedNodes)
 	for len(coloringStack) != total {
-		// Sort the nodes by the current degree.
-		sort.SliceStable(degreeSortedNodes, func(i, j int) bool {
-			return degreeSortedNodes[i].degree < degreeSortedNodes[j].degree
-		})
-		if wazevoapi.RegAllocLoggingEnabled {
-			fmt.Println("-------------------------------")
-			fmt.Printf("coloringStack: ")
-			for _, c := range coloringStack {
-				if c.v.IsRealReg() {
-					fmt.Printf("%s ", a.regInfo.RealRegName(c.v.RealReg()))
-				} else {
-					fmt.Printf("v%d ", c.v.ID())
-				}
-			}
-			fmt.Printf("\ndegreeSortedNodes: ")
-			for _, n := range degreeSortedNodes {
-				if n.v.IsRealReg() {
-					fmt.Printf("%s ", a.regInfo.RealRegName(n.v.RealReg()))
-				} else {
-					fmt.Printf("v%d ", n.v.ID())
-				}
-			}
-			fmt.Printf("\ncurrentDegrees: ")
-			for _, n := range degreeSortedNodes {
-				fmt.Printf("v%d:%d ", n.v.ID(), n.degree)
-			}
-			fmt.Println("")
-		}
-
-		var popNum int
-		for i := 0; i < len(degreeSortedNodes); i++ {
-			n := degreeSortedNodes[i]
-			if n.degree < numAllocatable {
-				popNum++
-			} else {
-				break
-			}
-		}
-
-		if popNum == 0 {
+		if len(popTargetQueue) == 0 {
 			// If no node can be popped, it means that the graph is not colorable. We need to forcibly choose one node to pop.
 			// TODO: currently we just choose the last node. We could do this more wisely. e.g. choose the one without pre-colored neighbors etc.
 			// Swap the top node with the last node.
 			tail := len(degreeSortedNodes) - 1
-			degreeSortedNodes[0], degreeSortedNodes[tail] = degreeSortedNodes[tail], degreeSortedNodes[0]
-
-			popNum++
-			if wazevoapi.RegAllocLoggingEnabled {
-				fmt.Printf("Forcibly pop one node %s as a spill target\n", degreeSortedNodes[0].v)
+			for i := 0; i < len(degreeSortedNodes); i++ {
+				j := tail - i
+				n := degreeSortedNodes[j]
+				if !n.visited {
+					popTargetQueue = append(popTargetQueue, n)
+					n.visited = true
+					break
+				}
 			}
 		}
 
-		// Pop the nodes less than numAllocatable.
-		coloringStack = append(coloringStack, degreeSortedNodes[:popNum]...) // nil is used as a separator.
-		poppoedNodes := degreeSortedNodes[:popNum]
-		degreeSortedNodes = degreeSortedNodes[popNum:]
-
-		// Update the degrees of the affected nodes.
-		for _, popped := range poppoedNodes {
-			for _, neighbor := range popped.neighbors {
+		for len(popTargetQueue) > 0 {
+			top := popTargetQueue[0]
+			popTargetQueue = popTargetQueue[1:]
+			for _, neighbor := range top.neighbors {
 				neighbor.degree--
+				if neighbor.degree < numAllocatable {
+					if !neighbor.visited {
+						popTargetQueue = append(popTargetQueue, neighbor)
+						neighbor.visited = true
+					}
+				}
 			}
+			coloringStack = append(coloringStack, top)
 		}
-
-		if wazevoapi.RegAllocLoggingEnabled {
-			if len(coloringStack) == total {
-				fmt.Println("-------------------------------")
-				fmt.Printf("coloringStack: ")
-				for _, c := range coloringStack {
-					fmt.Printf("v%d ", c.v.ID())
-				}
-				fmt.Printf("\ndegreeSortedNodes: ")
-				for _, n := range degreeSortedNodes {
-					fmt.Printf("v%d ", n.v.ID())
-				}
-				fmt.Printf("\ncurrentDegrees: ")
-				for _, n := range degreeSortedNodes {
-					fmt.Printf("v%d:%d ", n.v.ID(), n.degree)
-				}
-				fmt.Println("")
-			}
-		}
-	}
-
-	if wazevoapi.RegAllocValidationEnabled {
-		if len(degreeSortedNodes) != 0 {
-			panic("BUG")
-		}
-	}
-
-	if wazevoapi.RegAllocLoggingEnabled {
-		fmt.Println("-------------------------------")
 	}
 
 	// Assign colors.
@@ -232,6 +185,7 @@ func (a *Allocator) coloringFor(allocatable []RealReg) {
 	// Reuses the slices for the next coloring.
 	a.nodes1 = degreeSortedNodes[:0]
 	a.nodes2 = coloringStack[:0]
+	a.nodes3 = popTargetQueue[:0]
 }
 
 func (a *Allocator) assignColor(n *node, neighborColorsSet *[128]bool, allocatable []RealReg) {
