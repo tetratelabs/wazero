@@ -24,14 +24,20 @@ func (a *Allocator) buildNeighborsByLiveNodes(lives []liveNodeInBlock) {
 	for i, src := range lives[:len(lives)-1] {
 		srcRange := &src.n.ranges[src.rangeIndex]
 		for _, dst := range lives[i+1:] {
-			if dst == src || dst.n == src.n {
+			srcN, dstN := src.n, dst.n
+			if dst == src || dstN == srcN {
 				panic(fmt.Sprintf("BUG: %s and %s are the same node", src.n.v, dst.n.v))
 			}
 			dstRange := &dst.n.ranges[dst.rangeIndex]
-			if src.n.v.RegType() == dst.n.v.RegType() && // Interfere only if they are the same type.
+			if dstRange.begin > srcRange.end {
+				// liveNodes are sorted by the start program counter, so we can break here.
+				break
+			}
+
+			if srcN.v.RegType() == dstN.v.RegType() && // Interfere only if they are the same type.
 				srcRange.intersects(dstRange) {
-				src.n.neighbors = append(src.n.neighbors, dst.n)
-				dst.n.neighbors = append(dst.n.neighbors, src.n)
+				srcN.neighbors = append(srcN.neighbors, dst.n)
+				dstN.neighbors = append(dstN.neighbors, src.n)
 			}
 		}
 	}

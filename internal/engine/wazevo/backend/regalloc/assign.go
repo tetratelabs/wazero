@@ -30,18 +30,6 @@ func (a *Allocator) assignRegistersPerBlock(f Function, blk Block, vRegIDToNode 
 }
 
 func (a *Allocator) assignRegistersPerInstr(f Function, pc programCounter, instr Instr, vRegIDToNode []*node, liveNodes []liveNodeInBlock) {
-	if wazevoapi.RegAllocValidationEnabled {
-		// Check if the liveNodes are sorted by the start program counter.
-		for i := 1; i < len(liveNodes); i++ {
-			n, m := liveNodes[i-1], liveNodes[i]
-			if n.n.ranges[n.rangeIndex].begin > m.n.ranges[m.rangeIndex].begin {
-				panic(fmt.Sprintf("BUG: liveNodes are not sorted by the start program counter: %d > %d",
-					n.n.ranges[n.rangeIndex].begin, m.n.ranges[m.rangeIndex].begin,
-				))
-			}
-		}
-	}
-
 	if indirect := instr.IsIndirectCall(); instr.IsCall() || indirect {
 		// Only take care of non-real VRegs (e.g. VReg.IsRealReg() == false) since
 		// the real VRegs are already placed in the right registers at this point.
