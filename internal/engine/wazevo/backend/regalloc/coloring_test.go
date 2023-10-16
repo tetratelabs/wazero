@@ -241,29 +241,32 @@ func TestAllocator_coloringFor(t *testing.T) {
 func TestAllocator_assignColor(t *testing.T) {
 	t.Run("copyFromVReg", func(t *testing.T) {
 		a := NewAllocator(&RegisterInfo{})
-		a.allocatableSet = map[RealReg]struct{}{10: {}}
+		a.allocatableSet[10] = true
 		n := a.getOrAllocateNode(100)
 		n.copyFromVReg = &node{r: 10}
 		a.assignColor(n, &a.realRegSet, nil)
 		require.Equal(t, RealReg(10), n.r)
-		_, ok := a.allocatedRegSet[n.r]
+		ok := a.allocatedRegSet[n.r]
 		require.True(t, ok)
 	})
 	t.Run("copyToVReg", func(t *testing.T) {
 		a := NewAllocator(&RegisterInfo{})
-		a.allocatableSet = map[RealReg]struct{}{10: {}, 20: {}}
+		a.allocatableSet[10] = true
+		a.allocatableSet[20] = true
 		n := a.getOrAllocateNode(100)
 		n.copyFromVReg = &node{r: 10}
 		n.copyToVReg = &node{r: 20}
 		a.realRegSet[10] = true
 		a.assignColor(n, &a.realRegSet, nil)
 		require.Equal(t, RealReg(20), n.r)
-		_, ok := a.allocatedRegSet[n.r]
+		ok := a.allocatedRegSet[n.r]
 		require.True(t, ok)
 	})
 	t.Run("copyFromReal", func(t *testing.T) {
 		a := NewAllocator(&RegisterInfo{})
-		a.allocatableSet = map[RealReg]struct{}{10: {}, 20: {}, 30: {}}
+		a.allocatableSet[10] = true
+		a.allocatableSet[20] = true
+		a.allocatableSet[30] = true
 		n := a.getOrAllocateNode(100)
 		n.copyFromVReg = &node{r: 10}
 		n.copyToVReg = &node{r: 20}
@@ -272,12 +275,15 @@ func TestAllocator_assignColor(t *testing.T) {
 		a.realRegSet[20] = true
 		a.assignColor(n, &a.realRegSet, nil)
 		require.Equal(t, RealReg(30), n.r)
-		_, ok := a.allocatedRegSet[n.r]
+		ok := a.allocatedRegSet[n.r]
 		require.True(t, ok)
 	})
 	t.Run("copyToReal", func(t *testing.T) {
 		a := NewAllocator(&RegisterInfo{})
-		a.allocatableSet = map[RealReg]struct{}{10: {}, 20: {}, 30: {}, 40: {}}
+		a.allocatableSet[10] = true
+		a.allocatableSet[20] = true
+		a.allocatableSet[30] = true
+		a.allocatableSet[40] = true
 		n := a.getOrAllocateNode(100)
 		n.copyFromVReg = &node{r: 10}
 		n.copyToVReg = &node{r: 20}
@@ -288,12 +294,16 @@ func TestAllocator_assignColor(t *testing.T) {
 		a.realRegSet[30] = true
 		a.assignColor(n, &a.realRegSet, nil)
 		require.Equal(t, RealReg(40), n.r)
-		_, ok := a.allocatedRegSet[n.r]
+		ok := a.allocatedRegSet[n.r]
 		require.True(t, ok)
 	})
 	t.Run("from allocatable sets", func(t *testing.T) {
 		a := NewAllocator(&RegisterInfo{})
-		a.allocatableSet = map[RealReg]struct{}{10: {}, 20: {}, 30: {}, 40: {}, 50: {}}
+		a.allocatableSet[10] = true
+		a.allocatableSet[20] = true
+		a.allocatableSet[30] = true
+		a.allocatableSet[40] = true
+		a.allocatableSet[50] = true
 		n := a.getOrAllocateNode(100)
 		n.copyFromVReg = &node{r: 10}
 		n.copyToVReg = &node{r: 20}
@@ -305,7 +315,7 @@ func TestAllocator_assignColor(t *testing.T) {
 		a.realRegSet[40] = true
 		a.assignColor(n, &a.realRegSet, []RealReg{50})
 		require.Equal(t, RealReg(50), n.r)
-		_, ok := a.allocatedRegSet[n.r]
+		ok := a.allocatedRegSet[n.r]
 		require.True(t, ok)
 	})
 }

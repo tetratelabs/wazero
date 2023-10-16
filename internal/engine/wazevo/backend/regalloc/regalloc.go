@@ -20,21 +20,15 @@ import (
 // NewAllocator returns a new Allocator.
 func NewAllocator(allocatableRegs *RegisterInfo) Allocator {
 	a := Allocator{
-		regInfo:         allocatableRegs,
-		nodePool:        wazevoapi.NewPool[node](),
-		nodeSet:         make(map[*node]int),
-		allocatedRegSet: make(map[RealReg]struct{}),
-		phis:            make(map[VReg]struct{}),
+		regInfo:  allocatableRegs,
+		nodePool: wazevoapi.NewPool[node](),
+		phis:     make(map[VReg]Block),
 	}
-	allocatableSet := make(map[RealReg]struct{},
-		len(allocatableRegs.AllocatableRegisters[RegTypeInt])+len(allocatableRegs.AllocatableRegisters[RegTypeFloat]),
-	)
 	for _, regs := range allocatableRegs.AllocatableRegisters {
 		for _, r := range regs {
-			allocatableSet[r] = struct{}{}
+			a.allocatableSet[r] = true
 		}
 	}
-	a.allocatableSet = allocatableSet
 	return a
 }
 
@@ -44,8 +38,8 @@ type (
 		// AllocatableRegisters is a 2D array of allocatable RealReg, indexed by regTypeNum and regNum.
 		// The order matters: the first element is the most preferred one when allocating.
 		AllocatableRegisters [RegTypeNum][]RealReg
-		CalleeSavedRegisters map[RealReg]struct{}
-		CallerSavedRegisters map[RealReg]struct{}
+		CalleeSavedRegisters [RealRegsNumMax]bool
+		CallerSavedRegisters [RealRegsNumMax]bool
 		RealRegToVReg        []VReg
 		// RealRegName returns the name of the given RealReg for debugging.
 		RealRegName func(r RealReg) string
@@ -56,9 +50,9 @@ type (
 		// regInfo is static per ABI/ISA, and is initialized by the machine during Machine.PrepareRegisterAllocator.
 		regInfo *RegisterInfo
 		// allocatableSet is a set of allocatable RealReg derived from regInfo. Static per ABI/ISA.
-		allocatableSet map[RealReg]struct{}
+		allocatableSet [RealRegsNumMax]bool
 		// allocatedRegSet is a set of RealReg that are allocated during the allocation phase. This is reset per function.
-		allocatedRegSet          map[RealReg]struct{}
+		allocatedRegSet          [RealRegsNumMax]bool
 		allocatedCalleeSavedRegs []VReg
 		nodePool                 wazevoapi.Pool[node]
 		// vRegIDToNode maps VRegID to the node whose node.v has the VRegID.
@@ -67,12 +61,11 @@ type (
 		vs           []VReg
 		spillHandler spillHandler
 		// phis keeps track of the VRegs that are defined by phi functions.
-		phis map[VReg]struct{}
+		phis map[VReg]Block
 
 		// Followings are re-used during various places e.g. coloring.
-		realRegSet [256]bool
+		realRegSet [RealRegsNumMax]bool
 		realRegs   []RealReg
-		nodeSet    map[*node]int
 		nodes1     []*node
 		nodes2     []*node
 	}
@@ -84,10 +77,6 @@ type (
 		defs     map[VReg]programCounter
 		lastUses map[VReg]programCounter
 		kills    map[VReg]programCounter
-		// phiUses are the set of VRegs that are used in a phi function.
-		phiUses map[VReg]struct{}
-		// phiDefs are the set of VRegs that are defined in a phi function.
-		phiDefs map[VReg]struct{}
 		// Pre-colored real registers can have multiple live ranges in one block.
 		realRegUses map[VReg][]programCounter
 		realRegDefs map[VReg][]programCounter
@@ -141,9 +130,12 @@ func (a *Allocator) DoAllocation(f Function) {
 
 func (a *Allocator) determineCalleeSavedRealRegs(f Function) {
 	a.allocatedCalleeSavedRegs = a.allocatedCalleeSavedRegs[:0]
-	for r := range a.allocatedRegSet {
-		if a.regInfo.isCalleeSaved(r) {
-			a.allocatedCalleeSavedRegs = append(a.allocatedCalleeSavedRegs, a.regInfo.RealRegToVReg[r])
+	for i, allocated := range a.allocatedRegSet {
+		if allocated {
+			r := RealReg(i)
+			if a.regInfo.isCalleeSaved(r) {
+				a.allocatedCalleeSavedRegs = append(a.allocatedCalleeSavedRegs, a.regInfo.RealRegToVReg[r])
+			}
 		}
 	}
 	// In order to make the output deterministic, sort it now.
@@ -174,9 +166,8 @@ func (a *Allocator) livenessAnalysis(f Function) {
 		}
 		// If this is not the entry block, we should define phi nodes, which are not defined by instructions.
 		for _, p := range blk.BlockParams() {
-			info.phiDefs[p] = struct{}{} // Mark this block has the definition of this phi `p`.
-			info.defs[p] = 0             // Earliest definition is at the beginning of the block.
-			a.phis[p] = struct{}{}
+			info.defs[p] = 0 // Earliest definition is at the beginning of the block.
+			a.phis[p] = blk
 		}
 	}
 
@@ -209,14 +200,12 @@ func (a *Allocator) livenessAnalysis(f Function) {
 						// definition to construct live range.
 						info.defs[def] = pos
 					}
-
 					a.vs = append(a.vs, def)
 				}
 			}
 			if instr.IsCopy() {
 				if _, ok := a.phis[dstVR]; ok {
-					// This is the phi move at the end of the block, so srcVR is the phi use (input to the phi function).
-					info.phiUses[srcVR] = struct{}{}
+					info.liveOuts[srcVR] = struct{}{}
 				}
 				a.recordCopyRelation(dstVR, srcVR)
 			}
@@ -229,26 +218,15 @@ func (a *Allocator) livenessAnalysis(f Function) {
 	}
 
 	// Run the Algorithm 9.9. in the book. This will construct blockInfo.liveIns and blockInfo.liveOuts.
+	for phi, blk := range a.phis {
+		a.beginUpAndMarkStack(f, phi, true, blk)
+	}
 	for _, v := range a.vs {
 		if v.IsRealReg() {
 			// Real registers do not need to be tracked in liveOuts and liveIns because they are not allocation targets.
 			panic("BUG")
 		}
-		for blk := f.PostOrderBlockIteratorBegin(); blk != nil; blk = f.PostOrderBlockIteratorNext() {
-			if blk.Preds() == 0 && !blk.Entry() {
-				panic(fmt.Sprintf("block without predecessor must be optimized out by the compiler: %d", blk.ID()))
-			}
-			info := a.blockInfoAt(blk.ID())
-			if _, ok := info.lastUses[v]; !ok {
-				continue
-			}
-			// Phi uses are always live-outs because it is the new value coming out to the successor.
-			if _, ok := info.phiUses[v]; ok {
-				info.liveOuts[v] = struct{}{}
-			}
-			// TODO: we might want to avoid recursion here.
-			a.upAndMarkStack(blk, v, 0)
-		}
+		a.beginUpAndMarkStack(f, v, false, nil)
 	}
 
 	// Now that we finished gathering liveIns, liveOuts, defs, and lastUses, the only thing left is to construct kills.
@@ -268,16 +246,29 @@ func (a *Allocator) livenessAnalysis(f Function) {
 	}
 }
 
+func (a *Allocator) beginUpAndMarkStack(f Function, v VReg, isPhi bool, phiDefinedAt Block) {
+	for blk := f.PostOrderBlockIteratorBegin(); blk != nil; blk = f.PostOrderBlockIteratorNext() {
+		if blk.Preds() == 0 && !blk.Entry() {
+			panic(fmt.Sprintf("block without predecessor must be optimized out by the compiler: %d", blk.ID()))
+		}
+		info := a.blockInfoAt(blk.ID())
+		if _, ok := info.lastUses[v]; !ok {
+			continue
+		}
+		// TODO: we might want to avoid recursion here.
+		a.upAndMarkStack(blk, v, isPhi, phiDefinedAt, 0)
+	}
+}
+
 // upAndMarkStack is the Algorithm 9.10. in the book named Up_and_Mark_Stack(B, v).
 //
 // We recursively call this, so passing `depth` for debugging.
-func (a *Allocator) upAndMarkStack(b Block, v VReg, depth int) {
+func (a *Allocator) upAndMarkStack(b Block, v VReg, isPhi bool, phiDefinedAt Block, depth int) {
 	if wazevoapi.RegAllocLoggingEnabled {
 		fmt.Printf("%supAndMarkStack for %v at %v\n", strings.Repeat("\t", depth), v, b.ID())
 	}
 
 	info := a.blockInfoAt(b.ID())
-	_, isPhi := a.phis[v]
 	if _, ok := info.defs[v]; ok && !isPhi {
 		return // Defined in this block, so no need to go further climbing up.
 	}
@@ -293,7 +284,7 @@ func (a *Allocator) upAndMarkStack(b Block, v VReg, depth int) {
 	info.liveIns[v] = struct{}{}
 
 	// Plus if this is this block has the definition of this phi, we can stop climbing up.
-	if _, ok := info.phiDefs[v]; ok {
+	if b == phiDefinedAt {
 		return
 	}
 
@@ -309,7 +300,7 @@ func (a *Allocator) upAndMarkStack(b Block, v VReg, depth int) {
 			fmt.Printf("%sadding %v live-out at block[%d]\n", strings.Repeat("\t", depth+1), v, pred.ID())
 		}
 		a.blockInfoAt(pred.ID()).liveOuts[v] = struct{}{}
-		a.upAndMarkStack(pred, v, depth+1)
+		a.upAndMarkStack(pred, v, isPhi, phiDefinedAt, depth+1)
 	}
 }
 
@@ -433,7 +424,7 @@ func (a *Allocator) buildLiveRangesForReals(blkID int, info *blockInfo) {
 	a.vs = a.vs[:0]
 	for v := range us {
 		// Non allocation target registers are not needed here.
-		if _, ok := a.allocatableSet[v.RealReg()]; !ok {
+		if !a.allocatableSet[v.RealReg()] {
 			continue
 		}
 		a.vs = append(a.vs, v)
@@ -474,24 +465,13 @@ func (a *Allocator) Reset() {
 	for i := range a.vRegIDToNode {
 		a.vRegIDToNode[i] = nil
 	}
-	rr := a.realRegs[:0]
-	for r := range a.allocatedRegSet {
-		rr = append(rr, r)
-	}
-	for _, r := range rr {
-		delete(a.allocatedRegSet, r)
+	for i := range a.allocatedRegSet {
+		a.allocatedRegSet[i] = false
 	}
 
 	a.nodes1 = a.nodes1[:0]
-	for n := range a.nodeSet {
-		a.nodes1 = append(a.nodes1, n)
-	}
-	for _, n := range a.nodes1 {
-		delete(a.nodeSet, n)
-	}
-	a.nodes1 = a.nodes1[:0]
 	a.nodes2 = a.nodes2[:0]
-	a.realRegs = rr[:0]
+	a.realRegs = a.realRegs[:0]
 	resetMap(a, a.phis)
 	a.vs = a.vs[:0]
 }
@@ -586,16 +566,6 @@ func (a *Allocator) initBlockInfo(i *blockInfo) {
 	} else {
 		resetMap(a, i.realRegDefs)
 	}
-	if i.phiDefs == nil {
-		i.phiDefs = make(map[VReg]struct{})
-	} else {
-		resetMap(a, i.phiDefs)
-	}
-	if i.phiUses == nil {
-		i.phiUses = make(map[VReg]struct{})
-	} else {
-		resetMap(a, i.phiUses)
-	}
 }
 
 func (i *blockInfo) addRealRegUsage(v VReg, pc programCounter) {
@@ -608,7 +578,7 @@ func (i *blockInfo) addRealRegUsage(v VReg, pc programCounter) {
 	i.realRegUses[v] = append(i.realRegUses[v], pc)
 }
 
-// String implements fmt.Stringer for debugging.
+// Format is for debugging.
 func (i *blockInfo) Format(ri *RegisterInfo) string {
 	var buf strings.Builder
 	buf.WriteString("\tliveOuts: ")
@@ -674,13 +644,11 @@ func (l *liveRange) intersects(other *liveRange) bool {
 }
 
 func (r *RegisterInfo) isCalleeSaved(reg RealReg) bool {
-	_, ok := r.CalleeSavedRegisters[reg]
-	return ok
+	return r.CalleeSavedRegisters[reg]
 }
 
 func (r *RegisterInfo) isCallerSaved(reg RealReg) bool {
-	_, ok := r.CallerSavedRegisters[reg]
-	return ok
+	return r.CallerSavedRegisters[reg]
 }
 
 // String implements fmt.Stringer for debugging.

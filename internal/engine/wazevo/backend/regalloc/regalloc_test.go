@@ -611,7 +611,9 @@ func TestAllocator_buildLiveRangesForReals(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			initMapInInfo(tc.info)
 			a := NewAllocator(&RegisterInfo{})
-			a.allocatableSet = tc.allocatableRealRegs
+			for r := range tc.allocatableRealRegs {
+				a.allocatableSet[r] = true
+			}
 			a.buildLiveRangesForReals(blockID, tc.info)
 
 			actual := map[VReg][]liveRange{}
@@ -704,12 +706,6 @@ func initMapInInfo(info *blockInfo) {
 	}
 	if info.realRegDefs == nil {
 		info.realRegDefs = make(map[VReg][]programCounter)
-	}
-	if info.phiDefs == nil {
-		info.phiDefs = make(map[VReg]struct{})
-	}
-	if info.phiUses == nil {
-		info.phiUses = make(map[VReg]struct{})
 	}
 }
 
