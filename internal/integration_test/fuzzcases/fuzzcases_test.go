@@ -437,3 +437,43 @@ func Test1777(t *testing.T) {
 		require.Equal(t, []uint64{18446626425965379583, 4607736361554183979}, res)
 	})
 }
+
+// Test2000 tests that v128.const i32x4 is not skipped when state is unreachable.
+func Test2000(t *testing.T) {
+	if !platform.CompilerSupported() {
+		return
+	}
+	run(t, func(t *testing.T, r wazero.Runtime) {
+		_, err := r.Instantiate(ctx, getWasmBinary(t, 2000))
+		require.NoError(t, err)
+	})
+}
+
+// Test2001 tests that OpcodeVhighBits (v128.Bitmask) is typed as V128.
+func Test2001(t *testing.T) {
+	if !platform.CompilerSupported() {
+		return
+	}
+	run(t, func(t *testing.T, r wazero.Runtime) {
+		_, err := r.Instantiate(ctx, getWasmBinary(t, 2001))
+		require.NoError(t, err)
+	})
+}
+
+// Test2002 tests that OpcodeVFcmp (f32x4.eq) is typed as V128.
+func Test2002(t *testing.T) {
+	if !platform.CompilerSupported() {
+		return
+	}
+	run(t, func(t *testing.T, r wazero.Runtime) {
+		mod, err := r.Instantiate(ctx, getWasmBinary(t, 2002))
+		require.NoError(t, err)
+		f := mod.ExportedFunction("")
+		require.NotNil(t, f)
+		_, err = f.Call(ctx, 0, 0, 0)
+		require.NoError(t, err)
+		m := mod.(*wasm.ModuleInstance)
+		require.Equal(t, uint64(5044022786561933312), m.Globals[0].Val)
+		require.Equal(t, uint64(9205357640488583168), m.Globals[0].ValHi)
+	})
+}
