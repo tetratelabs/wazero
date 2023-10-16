@@ -58,9 +58,6 @@ func TestAllocator_buildNeighborsByLiveNodes(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			a := NewAllocator(&RegisterInfo{})
-			for i := range tc.lives {
-				tc.lives[i].n.neighbors = map[*node]struct{}{}
-			}
 
 			a.buildNeighborsByLiveNodes(tc.lives)
 
@@ -68,12 +65,25 @@ func TestAllocator_buildNeighborsByLiveNodes(t *testing.T) {
 			for _, edge := range tc.expectedEdges {
 				i1, i2 := edge[0], edge[1]
 				n1, n2 := tc.lives[i1].n, tc.lives[i2].n
-				_, n1n2 := n2.neighbors[n1]
-				_, n2n1 := n1.neighbors[n2]
+
+				var found bool
+				for _, neighbor := range n2.neighbors {
+					if neighbor == n1 {
+						found = true
+						break
+					}
+				}
+				require.True(t, found)
+				found = false
+				for _, neighbor := range n1.neighbors {
+					if neighbor == n2 {
+						found = true
+						break
+					}
+				}
+				require.True(t, found)
 				expectedNeighborCounts[n1]++
 				expectedNeighborCounts[n2]++
-				require.True(t, n1n2)
-				require.True(t, n2n1)
 			}
 			for _, n := range tc.lives {
 				require.Equal(t, expectedNeighborCounts[n.n], len(n.n.neighbors))
@@ -101,8 +111,8 @@ func TestAllocator_collectNodesByRegType(t *testing.T) {
 
 func TestAllocator_coloringFor(t *testing.T) {
 	addEdge := func(n1, n2 *node) {
-		n1.neighbors[n2] = struct{}{}
-		n2.neighbors[n1] = struct{}{}
+		n1.neighbors = append(n1.neighbors, n2)
+		n2.neighbors = append(n2.neighbors, n1)
 	}
 
 	for _, tc := range []struct {
@@ -130,7 +140,7 @@ func TestAllocator_coloringFor(t *testing.T) {
 			allocatable: []RealReg{1, 2},
 			links:       [][]int{{1}, {0}},
 			// Interference, so only one can be assigned a register.
-			expRegs: []RealReg{2, 1},
+			expRegs: []RealReg{1, 2},
 		},
 		{
 			// 0 <- 1 -> 2
@@ -234,7 +244,7 @@ func TestAllocator_assignColor(t *testing.T) {
 		a.allocatableSet = map[RealReg]struct{}{10: {}}
 		n := a.getOrAllocateNode(100)
 		n.copyFromVReg = &node{r: 10}
-		a.assignColor(n, map[RealReg]struct{}{}, nil)
+		a.assignColor(n, &a.realRegSet, nil)
 		require.Equal(t, RealReg(10), n.r)
 		_, ok := a.allocatedRegSet[n.r]
 		require.True(t, ok)
@@ -245,7 +255,8 @@ func TestAllocator_assignColor(t *testing.T) {
 		n := a.getOrAllocateNode(100)
 		n.copyFromVReg = &node{r: 10}
 		n.copyToVReg = &node{r: 20}
-		a.assignColor(n, map[RealReg]struct{}{10: {}}, nil)
+		a.realRegSet[10] = true
+		a.assignColor(n, &a.realRegSet, nil)
 		require.Equal(t, RealReg(20), n.r)
 		_, ok := a.allocatedRegSet[n.r]
 		require.True(t, ok)
@@ -257,7 +268,9 @@ func TestAllocator_assignColor(t *testing.T) {
 		n.copyFromVReg = &node{r: 10}
 		n.copyToVReg = &node{r: 20}
 		n.copyFromReal = 30
-		a.assignColor(n, map[RealReg]struct{}{10: {}, 20: {}}, nil)
+		a.realRegSet[10] = true
+		a.realRegSet[20] = true
+		a.assignColor(n, &a.realRegSet, nil)
 		require.Equal(t, RealReg(30), n.r)
 		_, ok := a.allocatedRegSet[n.r]
 		require.True(t, ok)
@@ -270,7 +283,10 @@ func TestAllocator_assignColor(t *testing.T) {
 		n.copyToVReg = &node{r: 20}
 		n.copyFromReal = 30
 		n.copyToReal = 40
-		a.assignColor(n, map[RealReg]struct{}{10: {}, 20: {}, 30: {}}, nil)
+		a.realRegSet[10] = true
+		a.realRegSet[20] = true
+		a.realRegSet[30] = true
+		a.assignColor(n, &a.realRegSet, nil)
 		require.Equal(t, RealReg(40), n.r)
 		_, ok := a.allocatedRegSet[n.r]
 		require.True(t, ok)
@@ -283,7 +299,11 @@ func TestAllocator_assignColor(t *testing.T) {
 		n.copyToVReg = &node{r: 20}
 		n.copyFromReal = 30
 		n.copyToReal = 40
-		a.assignColor(n, map[RealReg]struct{}{10: {}, 20: {}, 30: {}, 40: {}}, []RealReg{50})
+		a.realRegSet[10] = true
+		a.realRegSet[20] = true
+		a.realRegSet[30] = true
+		a.realRegSet[40] = true
+		a.assignColor(n, &a.realRegSet, []RealReg{50})
 		require.Equal(t, RealReg(50), n.r)
 		_, ok := a.allocatedRegSet[n.r]
 		require.True(t, ok)
