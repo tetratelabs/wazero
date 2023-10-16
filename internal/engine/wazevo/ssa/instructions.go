@@ -828,7 +828,7 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeVbitselect:   returnTypesFnV128,
 	OpcodeVanyTrue:     returnTypesFnI32,
 	OpcodeVallTrue:     returnTypesFnI32,
-	OpcodeVhighBits:    returnTypesFnV128,
+	OpcodeVhighBits:    returnTypesFnI32,
 	OpcodeVIadd:        returnTypesFnV128,
 	OpcodeVSaddSat:     returnTypesFnV128,
 	OpcodeVUaddSat:     returnTypesFnV128,
