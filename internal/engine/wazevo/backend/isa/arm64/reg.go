@@ -287,7 +287,7 @@ func formatVRegSized(r regalloc.VReg, size byte) (ret string) {
 				panic("BUG: invalid register size")
 			}
 		default:
-			panic(fmt.Sprintf("BUG: invalid register type: %d fro %s", r.RegType(), r))
+			panic(fmt.Sprintf("BUG: invalid register type: %d for %s", r.RegType(), r))
 		}
 	}
 	return

@@ -68,7 +68,7 @@ func (a *Allocator) assignRegistersPerInstr(f Function, pc programCounter, instr
 			continue
 		}
 		if wazevoapi.RegAllocLoggingEnabled {
-			fmt.Printf("%s uses %d\n", instr, u.ID())
+			fmt.Printf("%s uses %s(%d)\n", instr, u.RegType(), u.ID())
 		}
 		n := vRegIDToNode[u.ID()]
 		if !n.spill() {
@@ -86,7 +86,7 @@ func (a *Allocator) assignRegistersPerInstr(f Function, pc programCounter, instr
 		d := defs[0]
 		if !d.IsRealReg() {
 			if wazevoapi.RegAllocLoggingEnabled {
-				fmt.Printf("%s defines %d\n", instr, d.ID())
+				fmt.Printf("%s defines %s(%d)\n", instr, d.RegType(), d.ID())
 			}
 
 			n := vRegIDToNode[d.ID()]
