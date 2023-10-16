@@ -439,6 +439,7 @@ func Test1777(t *testing.T) {
 }
 
 // Test2000 tests that v128.const i32x4 is not skipped when state is unreachable.
+// This test fails at build-time.
 func Test2000(t *testing.T) {
 	if !platform.CompilerSupported() {
 		return
@@ -450,6 +451,7 @@ func Test2000(t *testing.T) {
 }
 
 // Test2001 tests that OpcodeVhighBits (v128.Bitmask) is typed as V128.
+// This test fails at build-time.
 func Test2001(t *testing.T) {
 	if !platform.CompilerSupported() {
 		return
