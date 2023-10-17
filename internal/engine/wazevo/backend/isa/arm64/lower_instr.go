@@ -766,16 +766,16 @@ func (m *machine) lowerVShift(op ssa.Opcode, rd, rn, rm operand, arr vecArrangem
 
 	// Copy the shift amount into a vector register as sshl/ushl requires it to be there.
 	dup := m.allocateInstr()
-	dup.asVecDup(rd, tmp, arr)
+	dup.asVecDup(tmp, tmp, arr)
 	m.insert(dup)
 
 	if op == ssa.OpcodeVIshl || op == ssa.OpcodeVSshr {
 		sshl := m.allocateInstr()
-		sshl.asVecRRR(vecOpSshl, rd, rn, rd, arr)
+		sshl.asVecRRR(vecOpSshl, rd, rn, tmp, arr)
 		m.insert(sshl)
 	} else {
 		ushl := m.allocateInstr()
-		ushl.asVecRRR(vecOpUshl, rd, rn, rd, arr)
+		ushl.asVecRRR(vecOpUshl, rd, rn, tmp, arr)
 		m.insert(ushl)
 	}
 }
@@ -787,19 +787,19 @@ func (m *machine) lowerVcheckTrue(op ssa.Opcode, rm, rd operand, arr vecArrangem
 	if op == ssa.OpcodeVallTrue && arr == vecArrangement2D {
 		// 	cmeq v3?.2d, v2?.2d, #0
 		//	addp v3?.2d, v3?.2d, v3?.2d
-		//	fcmp x3?, x3?
-		//	cset x3?, eq
+		//	fcmp v3?, v3?
+		//	cset dst, eq
 
 		ins := m.allocateInstr()
-		ins.asVecMisc(vecOpCmeq0, rd, rm, vecArrangement2D)
+		ins.asVecMisc(vecOpCmeq0, tmp, rm, vecArrangement2D)
 		m.insert(ins)
 
 		addp := m.allocateInstr()
-		addp.asVecRRR(vecOpAddp, rd, rd, rd, vecArrangement2D)
+		addp.asVecRRR(vecOpAddp, tmp, tmp, tmp, vecArrangement2D)
 		m.insert(addp)
 
 		fcmp := m.allocateInstr()
-		fcmp.asFpuCmp(rd, rd, true)
+		fcmp.asFpuCmp(tmp, tmp, true)
 		m.insert(fcmp)
 
 		cset := m.allocateInstr()
@@ -1437,7 +1437,7 @@ func (m *machine) lowerVIcmp(si *ssa.Instruction) {
 		cmp.asVecRRR(vecOpCmeq, rd, rn, rm, arr)
 		m.insert(cmp)
 		not := m.allocateInstr()
-		not.asVecMisc(vecOpNot, rd, rn, vecArrangement16B)
+		not.asVecMisc(vecOpNot, rd, rd, vecArrangement16B)
 		m.insert(not)
 	case ge:
 		cmp := m.allocateInstr()
@@ -1472,10 +1472,6 @@ func (m *machine) lowerVIcmp(si *ssa.Instruction) {
 		cmp.asVecRRR(vecOpCmhi, rd, rm, rn, arr) // rm, rn are swapped
 		m.insert(cmp)
 	}
-
-	cset := m.allocateInstr()
-	cset.asCSet(rd.reg(), flag)
-	m.insert(cset)
 }
 
 func (m *machine) lowerVFcmp(si *ssa.Instruction) {

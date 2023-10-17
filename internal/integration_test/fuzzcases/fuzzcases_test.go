@@ -482,3 +482,66 @@ func Test1792c(t *testing.T) {
 		require.Equal(t, uint64(9205357640488583168), m.Globals[0].ValHi)
 	})
 }
+
+// Test1793a tests that OpcodeVAllTrue is lowered to the right registers.
+func Test1793a(t *testing.T) {
+	if !platform.CompilerSupported() {
+		return
+	}
+	run(t, func(t *testing.T, r wazero.Runtime) {
+		mod, err := r.Instantiate(ctx, getWasmBinary(t, "1793a"))
+		require.NoError(t, err)
+		m := mod.(*wasm.ModuleInstance)
+		_, err = m.ExportedFunction("").Call(ctx)
+		require.NoError(t, err)
+		require.Equal(t, uint64(2531906066518671488), m.Globals[2].Val)
+		require.Equal(t, uint64(18446744073709551615), m.Globals[2].ValHi)
+	})
+}
+
+// Test1793b tests that OpcodeVIcmp, OpcodeVFcmp are lowered to the right registers.
+func Test1793b(t *testing.T) {
+	if !platform.CompilerSupported() {
+		return
+	}
+	run(t, func(t *testing.T, r wazero.Runtime) {
+		mod, err := r.Instantiate(ctx, getWasmBinary(t, "1793b"))
+		require.NoError(t, err)
+		m := mod.(*wasm.ModuleInstance)
+		_, err = m.ExportedFunction("").Call(ctx, 0, 0, 0, 0)
+		require.NoError(t, err)
+		require.Equal(t, uint64(18374967954648334335), m.Globals[1].Val)
+		require.Equal(t, uint64(18446744073709551615), m.Globals[1].ValHi)
+	})
+}
+
+// Test1793c tests that OpcodeVIcmp is lowered to the right registers.
+func Test1793c(t *testing.T) {
+	if !platform.CompilerSupported() {
+		return
+	}
+	run(t, func(t *testing.T, r wazero.Runtime) {
+		mod, err := r.Instantiate(ctx, getWasmBinary(t, "1793c"))
+		require.NoError(t, err)
+		m := mod.(*wasm.ModuleInstance)
+		_, err = m.ExportedFunction("").Call(ctx, 0, 0)
+		require.NoError(t, err)
+		require.Equal(t, uint64(18446744073709551615), m.Globals[0].Val)
+		require.Equal(t, uint64(18446744073709551615), m.Globals[0].ValHi)
+	})
+}
+
+// Test1793c tests that OpcodeVShift is lowered to the right registers.
+func Test1793d(t *testing.T) {
+	if !platform.CompilerSupported() {
+		return
+	}
+	run(t, func(t *testing.T, r wazero.Runtime) {
+		mod, err := r.Instantiate(ctx, getWasmBinary(t, "1793d"))
+		require.NoError(t, err)
+		m := mod.(*wasm.ModuleInstance)
+		_, err = m.ExportedFunction("").Call(ctx)
+		require.NoError(t, err)
+		require.Equal(t, uint64(0), m.Globals[1].Val)
+	})
+}

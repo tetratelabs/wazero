@@ -559,12 +559,12 @@ cset x15, ne
 			op:          ssa.OpcodeVallTrue,
 			arrangement: vecArrangement2D,
 			expectedAsm: `
-cmeq x15.2d, x1.2d, #0
-addp x15.2d, x15.2d, x15.2d
-fcmp x15, x15
+cmeq v1?.2d, x1.2d, #0
+addp v1?.2d, v1?.2d, v1?.2d
+fcmp d1?, d1?
 cset x15, eq
 `,
-			expectedBytes: "2f98e04eefbdef4ee0216f1eef179f9a",
+			expectedBytes: "2098e04e00bce04e0020601eef179f9a",
 		},
 		{
 			name:        "allTrue 8B",
@@ -788,10 +788,10 @@ func TestMachine_lowerVShift(t *testing.T) {
 			arrangement: vecArrangement16B,
 			expectedAsm: `
 and s1?, w15, #0x7
-dup x1.16b, d1?
-sshl x1.16b, x2.16b, x1.16b
+dup v1?.16b, d1?
+sshl x1.16b, x2.16b, v1?.16b
 `,
-			expectedBytes: "e0090012010c014e4144214e",
+			expectedBytes: "e0090012000c014e4144204e",
 		},
 		{
 			name:        "VSshr",
@@ -800,10 +800,10 @@ sshl x1.16b, x2.16b, x1.16b
 			expectedAsm: `
 and s1?, w15, #0x7
 sub s1?, wzr, s1?
-dup x1.16b, d1?
-sshl x1.16b, x2.16b, x1.16b
+dup v1?.16b, d1?
+sshl x1.16b, x2.16b, v1?.16b
 `,
-			expectedBytes: "e0090012e003004b010c014e4144214e",
+			expectedBytes: "e0090012e003004b000c014e4144204e",
 		},
 		{
 			name:        "VUshr",
@@ -812,10 +812,10 @@ sshl x1.16b, x2.16b, x1.16b
 			expectedAsm: `
 and s1?, w15, #0x7
 sub s1?, wzr, s1?
-dup x1.16b, d1?
-ushl x1.16b, x2.16b, x1.16b
+dup v1?.16b, d1?
+ushl x1.16b, x2.16b, v1?.16b
 `,
-			expectedBytes: "e0090012e003004b010c014e4144216e",
+			expectedBytes: "e0090012e003004b000c014e4144206e",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
