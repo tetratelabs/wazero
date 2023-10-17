@@ -1437,7 +1437,7 @@ func (m *machine) lowerVIcmp(si *ssa.Instruction) {
 		cmp.asVecRRR(vecOpCmeq, rd, rn, rm, arr)
 		m.insert(cmp)
 		not := m.allocateInstr()
-		not.asVecMisc(vecOpNot, rd, rn, vecArrangement16B)
+		not.asVecMisc(vecOpNot, rd, rd, vecArrangement16B)
 		m.insert(not)
 	case ge:
 		cmp := m.allocateInstr()
