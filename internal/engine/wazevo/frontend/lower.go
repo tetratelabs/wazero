@@ -1692,6 +1692,9 @@ func (c *Compiler) lowerCurrentOpcode() {
 			state.pc += 8
 			hi := binary.LittleEndian.Uint64(c.wasmFunctionBody[state.pc:])
 			state.pc += 7
+			if state.unreachable {
+				break
+			}
 			ret := builder.AllocateInstruction().AsVconst(lo, hi).Insert(builder).Return()
 			state.push(ret)
 		case wasm.OpcodeVecV128Load:
