@@ -1168,45 +1168,6 @@ type snapshot struct {
 	hostBase                int
 	stack                   []uint64
 
-	ce *callEngine
-}
-
-// Snapshot implements the same method as documented on experimental.Snapshotter.
-func (ce *callEngine) Snapshot() experimental.Snapshot {
-	hostBase := int(ce.stackBasePointerInBytes >> 3)
-
-	stackTop := int(ce.stackTopIndex())
-	stack := make([]uint64, stackTop)
-	copy(stack, ce.stack[:stackTop])
-
-	return &snapshot{
-		stackPointer:            ce.stackContext.stackPointer,
-		stackBasePointerInBytes: ce.stackBasePointerInBytes,
-		returnAddress:           uint64(ce.returnAddress),
-		hostBase:                hostBase,
-		stack:                   stack,
-		ce:                      ce,
-	}
-}
-
-// Restore implements the same method as documented on experimental.Snapshot.
-func (s *snapshot) Restore(ret []uint64) {
-	ce := s.ce
-	ce.stackContext.stackPointer = s.stackPointer
-	ce.stackContext.stackBasePointerInBytes = s.stackBasePointerInBytes
-	copy(ce.stack, s.stack)
-	ce.returnAddress = uintptr(s.returnAddress)
-	copy(ce.stack[s.hostBase:], ret)
-}
-
-// snapshot implements experimental.Snapshot
-type snapshot struct {
-	stackPointer            uint64
-	stackBasePointerInBytes uint64
-	returnAddress           uint64
-	hostBase                int
-	stack                   []uint64
-
 	ret []uint64
 
 	ce *callEngine
