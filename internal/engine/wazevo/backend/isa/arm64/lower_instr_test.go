@@ -788,10 +788,10 @@ func TestMachine_lowerVShift(t *testing.T) {
 			arrangement: vecArrangement16B,
 			expectedAsm: `
 and s1?, w15, #0x7
-dup x1.16b, d1?
-sshl x1.16b, x2.16b, x1.16b
+dup v1?.16b, d1?
+sshl x1.16b, x2.16b, v1?.16b
 `,
-			expectedBytes: "e0090012010c014e4144214e",
+			expectedBytes: "e0090012000c014e4144204e",
 		},
 		{
 			name:        "VSshr",
@@ -800,10 +800,10 @@ sshl x1.16b, x2.16b, x1.16b
 			expectedAsm: `
 and s1?, w15, #0x7
 sub s1?, wzr, s1?
-dup x1.16b, d1?
-sshl x1.16b, x2.16b, x1.16b
+dup v1?.16b, d1?
+sshl x1.16b, x2.16b, v1?.16b
 `,
-			expectedBytes: "e0090012e003004b010c014e4144214e",
+			expectedBytes: "e0090012e003004b000c014e4144204e",
 		},
 		{
 			name:        "VUshr",
@@ -812,10 +812,10 @@ sshl x1.16b, x2.16b, x1.16b
 			expectedAsm: `
 and s1?, w15, #0x7
 sub s1?, wzr, s1?
-dup x1.16b, d1?
-ushl x1.16b, x2.16b, x1.16b
+dup v1?.16b, d1?
+ushl x1.16b, x2.16b, v1?.16b
 `,
-			expectedBytes: "e0090012e003004b010c014e4144216e",
+			expectedBytes: "e0090012e003004b000c014e4144206e",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

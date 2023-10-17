@@ -766,16 +766,16 @@ func (m *machine) lowerVShift(op ssa.Opcode, rd, rn, rm operand, arr vecArrangem
 
 	// Copy the shift amount into a vector register as sshl/ushl requires it to be there.
 	dup := m.allocateInstr()
-	dup.asVecDup(rd, tmp, arr)
+	dup.asVecDup(tmp, tmp, arr)
 	m.insert(dup)
 
 	if op == ssa.OpcodeVIshl || op == ssa.OpcodeVSshr {
 		sshl := m.allocateInstr()
-		sshl.asVecRRR(vecOpSshl, rd, rn, rd, arr)
+		sshl.asVecRRR(vecOpSshl, rd, rn, tmp, arr)
 		m.insert(sshl)
 	} else {
 		ushl := m.allocateInstr()
-		ushl.asVecRRR(vecOpUshl, rd, rn, rd, arr)
+		ushl.asVecRRR(vecOpUshl, rd, rn, tmp, arr)
 		m.insert(ushl)
 	}
 }
