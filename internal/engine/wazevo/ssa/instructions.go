@@ -835,7 +835,7 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeVIsub:        returnTypesFnV128,
 	OpcodeVSsubSat:     returnTypesFnV128,
 	OpcodeVUsubSat:     returnTypesFnV128,
-	OpcodeVIcmp:        returnTypesFnI32,
+	OpcodeVIcmp:        returnTypesFnV128,
 	OpcodeVImin:        returnTypesFnV128,
 	OpcodeVUmin:        returnTypesFnV128,
 	OpcodeVImax:        returnTypesFnV128,
@@ -1406,7 +1406,7 @@ func (i *Instruction) AsVIcmp(x, y Value, c IntegerCmpCond, lane VecLane) *Instr
 	i.v2 = y
 	i.u1 = uint64(c)
 	i.u2 = uint64(lane)
-	i.typ = TypeI32
+	i.typ = TypeV128
 	return i
 }
 
@@ -1416,7 +1416,7 @@ func (i *Instruction) AsVFcmp(x, y Value, c FloatCmpCond, lane VecLane) *Instruc
 	i.v = x
 	i.v2 = y
 	i.u1 = uint64(c)
-	i.typ = TypeI32
+	i.typ = TypeV128
 	i.u2 = uint64(lane)
 	return i
 }

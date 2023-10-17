@@ -483,18 +483,34 @@ func Test1792c(t *testing.T) {
 	})
 }
 
-// Test1792 tests that ...
-func Test1793(t *testing.T) {
+// Test1793a tests that ...
+func Test1793a(t *testing.T) {
 	if !platform.CompilerSupported() {
 		return
 	}
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		mod, err := r.Instantiate(ctx, getWasmBinary(t, "66cfe0071ac52dc53818c4ee09d64a55da3ac9972cd22b60f14e743a7f37103d"))
+		mod, err := r.Instantiate(ctx, getWasmBinary(t, "1793a"))
 		require.NoError(t, err)
 		m := mod.(*wasm.ModuleInstance)
 		_, err = m.ExportedFunction("").Call(ctx)
 		require.NoError(t, err)
 		require.Equal(t, uint64(2531906066518671488), m.Globals[2].Val)
 		require.Equal(t, uint64(18446744073709551615), m.Globals[2].ValHi)
+	})
+}
+
+// Test1793b tests that ...
+func Test1793b(t *testing.T) {
+	if !platform.CompilerSupported() {
+		return
+	}
+	run(t, func(t *testing.T, r wazero.Runtime) {
+		mod, err := r.Instantiate(ctx, getWasmBinary(t, "1793b"))
+		require.NoError(t, err)
+		m := mod.(*wasm.ModuleInstance)
+		_, err = m.ExportedFunction("").Call(ctx, 0, 0, 0, 0)
+		require.NoError(t, err)
+		require.Equal(t, uint64(18374967954648334335), m.Globals[1].Val)
+		require.Equal(t, uint64(18446744073709551615), m.Globals[1].ValHi)
 	})
 }

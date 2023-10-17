@@ -787,8 +787,8 @@ func (m *machine) lowerVcheckTrue(op ssa.Opcode, rm, rd operand, arr vecArrangem
 	if op == ssa.OpcodeVallTrue && arr == vecArrangement2D {
 		// 	cmeq v3?.2d, v2?.2d, #0
 		//	addp v3?.2d, v3?.2d, v3?.2d
-		//	fcmp x3?, x3?
-		//	cset x3?, eq
+		//	fcmp v3?, v3?
+		//	cset dst, eq
 
 		ins := m.allocateInstr()
 		ins.asVecMisc(vecOpCmeq0, tmp, rm, vecArrangement2D)
@@ -1472,10 +1472,6 @@ func (m *machine) lowerVIcmp(si *ssa.Instruction) {
 		cmp.asVecRRR(vecOpCmhi, rd, rm, rn, arr) // rm, rn are swapped
 		m.insert(cmp)
 	}
-
-	cset := m.allocateInstr()
-	cset.asCSet(rd.reg(), flag)
-	m.insert(cset)
 }
 
 func (m *machine) lowerVFcmp(si *ssa.Instruction) {

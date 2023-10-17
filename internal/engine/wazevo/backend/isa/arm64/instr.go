@@ -1776,7 +1776,13 @@ func (b vecOp) String() string {
 	case vecOpUmlal:
 		return "umlal"
 	case vecOpFdiv:
-		return "fmul"
+		return "fdiv"
+	case vecOpFsqrt:
+		return "fsqrt"
+	case vecOpAbs:
+		return "abs"
+	case vecOpFabs:
+		return "fabs"
 	case vecOpNeg:
 		return "neg"
 	case vecOpFneg:
@@ -1807,8 +1813,6 @@ func (b vecOp) String() string {
 		return "uqxtn"
 	case vecOpSqxtun:
 		return "sqxtun"
-	case vecOpFsqrt:
-		return "fsqrt"
 	case vecOpRev64:
 		return "rev64"
 	case vecOpXtn:
@@ -1827,8 +1831,6 @@ func (b vecOp) String() string {
 		return "sshr"
 	case vecOpZip1:
 		return "zip1"
-	case vecOpFabs:
-		return "fabs"
 	case vecOpFmin:
 		return "fmin"
 	case vecOpFmax:
