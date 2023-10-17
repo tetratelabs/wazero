@@ -482,3 +482,19 @@ func Test1792c(t *testing.T) {
 		require.Equal(t, uint64(9205357640488583168), m.Globals[0].ValHi)
 	})
 }
+
+// Test1792 tests that ...
+func Test1793(t *testing.T) {
+	if !platform.CompilerSupported() {
+		return
+	}
+	run(t, func(t *testing.T, r wazero.Runtime) {
+		mod, err := r.Instantiate(ctx, getWasmBinary(t, "66cfe0071ac52dc53818c4ee09d64a55da3ac9972cd22b60f14e743a7f37103d"))
+		require.NoError(t, err)
+		m := mod.(*wasm.ModuleInstance)
+		_, err = m.ExportedFunction("").Call(ctx)
+		require.NoError(t, err)
+		require.Equal(t, uint64(2531906066518671488), m.Globals[2].Val)
+		require.Equal(t, uint64(18446744073709551615), m.Globals[2].ValHi)
+	})
+}

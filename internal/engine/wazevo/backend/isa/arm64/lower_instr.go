@@ -791,15 +791,15 @@ func (m *machine) lowerVcheckTrue(op ssa.Opcode, rm, rd operand, arr vecArrangem
 		//	cset x3?, eq
 
 		ins := m.allocateInstr()
-		ins.asVecMisc(vecOpCmeq0, rd, rm, vecArrangement2D)
+		ins.asVecMisc(vecOpCmeq0, tmp, rm, vecArrangement2D)
 		m.insert(ins)
 
 		addp := m.allocateInstr()
-		addp.asVecRRR(vecOpAddp, rd, rd, rd, vecArrangement2D)
+		addp.asVecRRR(vecOpAddp, tmp, tmp, tmp, vecArrangement2D)
 		m.insert(addp)
 
 		fcmp := m.allocateInstr()
-		fcmp.asFpuCmp(rd, rd, true)
+		fcmp.asFpuCmp(tmp, tmp, true)
 		m.insert(fcmp)
 
 		cset := m.allocateInstr()

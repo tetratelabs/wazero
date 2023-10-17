@@ -559,12 +559,12 @@ cset x15, ne
 			op:          ssa.OpcodeVallTrue,
 			arrangement: vecArrangement2D,
 			expectedAsm: `
-cmeq x15.2d, x1.2d, #0
-addp x15.2d, x15.2d, x15.2d
-fcmp x15, x15
+cmeq v1?.2d, x1.2d, #0
+addp v1?.2d, v1?.2d, v1?.2d
+fcmp d1?, d1?
 cset x15, eq
 `,
-			expectedBytes: "2f98e04eefbdef4ee0216f1eef179f9a",
+			expectedBytes: "2098e04e00bce04e0020601eef179f9a",
 		},
 		{
 			name:        "allTrue 8B",
