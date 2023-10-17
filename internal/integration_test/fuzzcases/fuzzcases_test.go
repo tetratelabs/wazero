@@ -483,7 +483,7 @@ func Test1792c(t *testing.T) {
 	})
 }
 
-// Test1793a tests that ...
+// Test1793a tests that OpcodeVAllTrue is lowered to the right registers.
 func Test1793a(t *testing.T) {
 	if !platform.CompilerSupported() {
 		return
@@ -499,7 +499,7 @@ func Test1793a(t *testing.T) {
 	})
 }
 
-// Test1793b tests that ...
+// Test1793b tests that OpcodeVIcmp, OpcodeVFcmp are lowered to the right registers.
 func Test1793b(t *testing.T) {
 	if !platform.CompilerSupported() {
 		return
@@ -515,7 +515,7 @@ func Test1793b(t *testing.T) {
 	})
 }
 
-// Test1793c tests that ...
+// Test1793c tests that OpcodeVIcmp is lowered to the right registers.
 func Test1793c(t *testing.T) {
 	if !platform.CompilerSupported() {
 		return
@@ -531,7 +531,7 @@ func Test1793c(t *testing.T) {
 	})
 }
 
-// Test1793c tests that ...
+// Test1793c tests that OpcodeVShift is lowered to the right registers.
 func Test1793d(t *testing.T) {
 	if !platform.CompilerSupported() {
 		return
