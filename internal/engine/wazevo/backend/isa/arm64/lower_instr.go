@@ -1497,7 +1497,7 @@ func (m *machine) lowerVFcmp(si *ssa.Instruction) {
 		cmp.asVecRRR(vecOpFcmeq, rd, rn, rm, arr)
 		m.insert(cmp)
 		not := m.allocateInstr()
-		not.asVecMisc(vecOpNot, rd, rn, vecArrangement16B)
+		not.asVecMisc(vecOpNot, rd, rd, vecArrangement16B)
 		m.insert(not)
 	case ge:
 		cmp := m.allocateInstr()
@@ -1516,10 +1516,6 @@ func (m *machine) lowerVFcmp(si *ssa.Instruction) {
 		cmp.asVecRRR(vecOpFcmge, rd, rm, rn, arr) // rm, rn are swapped
 		m.insert(cmp)
 	}
-
-	cset := m.allocateInstr()
-	cset.asCSet(rd.reg(), flag)
-	m.insert(cset)
 }
 
 func (m *machine) lowerVfpuToInt(rd, rn operand, arr vecArrangement, signed bool) {
