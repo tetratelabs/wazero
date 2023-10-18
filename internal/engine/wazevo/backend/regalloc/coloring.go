@@ -25,6 +25,9 @@ func (a *Allocator) buildNeighborsFor(n *node) {
 		// Collects all the nodes that are in the same range.
 		for _, neighbor := range r.nodes {
 			neighborID := neighbor.id
+			if neighbor.v.RegType() != n.v.RegType() {
+				continue
+			}
 			if neighbor != n && !a.dedup[neighborID] {
 				n.neighbors = append(n.neighbors, neighbor)
 				a.dedup[neighborID] = true
@@ -35,6 +38,9 @@ func (a *Allocator) buildNeighborsFor(n *node) {
 		// And also collects all the nodes that are in the neighbor ranges.
 		for _, neighborInterval := range r.neighbors {
 			for _, neighbor := range neighborInterval.nodes {
+				if neighbor.v.RegType() != n.v.RegType() {
+					continue
+				}
 				neighborID := neighbor.id
 				if neighbor != n && !a.dedup[neighborID] {
 					n.neighbors = append(n.neighbors, neighbor)
