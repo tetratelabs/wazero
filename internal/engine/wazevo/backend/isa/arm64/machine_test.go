@@ -57,8 +57,7 @@ func TestMachine_resolveAddressingMode(t *testing.T) {
 	})
 
 	t.Run("tmp reg", func(t *testing.T) {
-		// 0x89705f4136b4a598
-		m := &machine{instrPool: wazevoapi.NewPool[instruction]()}
+		m := &machine{instrPool: wazevoapi.NewPool[instruction](resetInstruction)}
 		root := &instruction{kind: udf}
 		i := &instruction{prev: root}
 		i.asULoad(operandNR(x17VReg), addressMode{

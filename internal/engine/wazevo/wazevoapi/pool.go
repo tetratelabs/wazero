@@ -6,12 +6,15 @@ const poolPageSize = 128
 // This is useful to avoid unnecessary allocations.
 type Pool[T any] struct {
 	pages            []*[poolPageSize]T
+	resetFn          func(*T)
 	allocated, index int
 }
 
 // NewPool returns a new Pool.
-func NewPool[T any]() Pool[T] {
+// resetFn is called when a new T is allocated in Pool.Allocate.
+func NewPool[T any](resetFn func(*T)) Pool[T] {
 	var ret Pool[T]
+	ret.resetFn = resetFn
 	ret.Reset()
 	return ret
 }
@@ -36,6 +39,7 @@ func (p *Pool[T]) Allocate() *T {
 		p.index = 0
 	}
 	ret := &p.pages[len(p.pages)-1][p.index]
+	p.resetFn(ret)
 	p.index++
 	p.allocated++
 	return ret
@@ -49,13 +53,6 @@ func (p *Pool[T]) View(i int) *T {
 
 // Reset resets the pool.
 func (p *Pool[T]) Reset() {
-	for _, ns := range p.pages {
-		pages := ns[:]
-		for i := range pages {
-			var v T
-			pages[i] = v
-		}
-	}
 	p.pages = p.pages[:0]
 	p.index = poolPageSize
 	p.allocated = 0

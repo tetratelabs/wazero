@@ -126,8 +126,8 @@ type Builder interface {
 // NewBuilder returns a new Builder implementation.
 func NewBuilder() Builder {
 	return &builder{
-		instructionsPool:               wazevoapi.NewPool[Instruction](),
-		basicBlocksPool:                wazevoapi.NewPool[basicBlock](),
+		instructionsPool:               wazevoapi.NewPool[Instruction](resetInstruction),
+		basicBlocksPool:                wazevoapi.NewPool[basicBlock](resetBasicBlock),
 		valueAnnotations:               make(map[ValueID]string),
 		signatures:                     make(map[SignatureID]*Signature),
 		blkVisited:                     make(map[*basicBlock]int),
@@ -196,7 +196,7 @@ func (b *builder) ReturnBlock() BasicBlock {
 // Init implements Builder.Reset.
 func (b *builder) Init(s *Signature) {
 	b.currentSignature = s
-	b.returnBlk.reset()
+	resetBasicBlock(b.returnBlk)
 	b.instructionsPool.Reset()
 	b.basicBlocksPool.Reset()
 	b.donePasses = false
@@ -211,7 +211,6 @@ func (b *builder) Init(s *Signature) {
 
 	for i := 0; i < b.basicBlocksPool.Allocated(); i++ {
 		blk := b.basicBlocksPool.View(i)
-		blk.reset()
 		delete(b.blkVisited, blk)
 	}
 	b.basicBlocksPool.Reset()
@@ -250,7 +249,6 @@ func (b *builder) AnnotateValue(value Value, a string) {
 // AllocateInstruction implements Builder.AllocateInstruction.
 func (b *builder) AllocateInstruction() *Instruction {
 	instr := b.instructionsPool.Allocate()
-	instr.reset()
 	return instr
 }
 

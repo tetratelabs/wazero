@@ -32,7 +32,7 @@ func (t *intervalTree) reset() {
 
 func newIntervalTree() *intervalTree {
 	return &intervalTree{
-		allocator: wazevoapi.NewPool[intervalTreeNode](),
+		allocator: wazevoapi.NewPool[intervalTreeNode](resetIntervalTreeNode),
 		intervals: make(map[uint64]*intervalTreeNode),
 	}
 }
@@ -48,16 +48,24 @@ type intervalTreeNode struct {
 	// TODO: color for red-black balancing.
 }
 
+func resetIntervalTreeNode(i *intervalTreeNode) {
+	i.begin = 0
+	i.end = 0
+	i.nodes = i.nodes[:0]
+	i.maxEnd = 0
+	i.neighbors = i.neighbors[:0]
+	i.left = nil
+	i.right = nil
+}
+
 func (i *intervalTreeNode) insert(t *intervalTree, n *node, begin, end programCounter) *intervalTreeNode {
 	if i == nil {
 		intervalNode := t.allocator.Allocate()
-		intervalNode.right = nil
-		intervalNode.left = nil
 		intervalNode.nodes = append(intervalNode.nodes, n)
 		intervalNode.maxEnd = end
 		intervalNode.begin = begin
 		intervalNode.end = end
-		key := uint64(begin) | uint64(end)<<32
+		key := intervalTreeNodeKey(begin, end)
 		t.intervals[key] = intervalNode
 		return intervalNode
 	}
