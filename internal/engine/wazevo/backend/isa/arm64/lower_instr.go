@@ -358,15 +358,22 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
 		rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
 		creg := m.getOperand_NR(m.compiler.ValueDefinition(c), extModeNone)
+		tmp := operandNR(m.compiler.AllocateVReg(ssa.TypeV128))
+
 		// creg is overwritten by BSL, so we need to move it to the result register before the instruction
 		// in case when it is used somewhere else.
 		rd := m.compiler.VRegOf(instr.Return())
 		mov := m.allocateInstr()
-		mov.asFpuMov128(rd, creg.nr())
+		mov.asFpuMov128(tmp.nr(), creg.nr())
 		m.insert(mov)
+
 		ins := m.allocateInstr()
-		ins.asVecRRR(vecOpBsl, operandNR(rd), rn, rm, vecArrangement16B)
+		ins.asVecRRR(vecOpBsl, tmp, rn, rm, vecArrangement16B)
 		m.insert(ins)
+
+		mov2 := m.allocateInstr()
+		mov2.asFpuMov128(rd, tmp.nr())
+		m.insert(mov2)
 	case ssa.OpcodeVanyTrue, ssa.OpcodeVallTrue:
 		x, lane := instr.ArgWithLane()
 		var arr vecArrangement

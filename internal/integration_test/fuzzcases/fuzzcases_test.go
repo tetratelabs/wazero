@@ -577,7 +577,7 @@ func Test1797b(t *testing.T) {
 	})
 }
 
-// Test1797a tests that the program counter for V128*Shuffle is advanced correctly
+// Test1797c tests that the program counter for V128*Shuffle is advanced correctly
 // even when an unreachable instruction is present.
 func Test1797c(t *testing.T) {
 	if !platform.CompilerSupported() {
@@ -590,5 +590,22 @@ func Test1797c(t *testing.T) {
 		params := make([]uint64, 20)
 		_, err = m.ExportedFunction("~zz\x00E1E\x00EE\x00$").Call(ctx, params...)
 		require.Error(t, err, "wasm error: unreachable")
+	})
+}
+
+// Test1797d tests that the registers are allocated correctly in Vbitselect.
+func Test1797d(t *testing.T) {
+	if !platform.CompilerSupported() {
+		return
+	}
+	run(t, func(t *testing.T, r wazero.Runtime) {
+		mod, err := r.Instantiate(ctx, getWasmBinary(t, "1797d"))
+		require.NoError(t, err, "wasm binary should build successfully")
+		m := mod.(*wasm.ModuleInstance)
+		params := make([]uint64, 20)
+		_, err = m.ExportedFunction("p").Call(ctx, params...)
+		require.NoError(t, err)
+		require.Equal(t, uint64(15092115255309870764), m.Globals[2].Val)
+		require.Equal(t, uint64(9241386435284803069), m.Globals[2].ValHi)
 	})
 }
