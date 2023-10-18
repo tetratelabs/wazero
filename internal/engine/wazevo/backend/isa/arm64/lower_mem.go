@@ -346,7 +346,7 @@ func (m *machine) collectAddends(ptr ssa.Value) (addends32 []addend32, addends64
 			// If the addend is an add, we recursively collect its operands.
 			x, y := def.Instr.Arg2()
 			m.addendsWorkQueue = append(m.addendsWorkQueue, x, y)
-			m.compiler.MarkLowered(def.Instr)
+			def.Instr.MarkLowered()
 		case ssa.OpcodeIconst:
 			// If the addend is constant, we just statically merge it into the offset.
 			ic := def.Instr
@@ -356,13 +356,13 @@ func (m *machine) collectAddends(ptr ssa.Value) (addends32 []addend32, addends64
 			} else {
 				offset += int64(u64)
 			}
-			m.compiler.MarkLowered(def.Instr)
+			def.Instr.MarkLowered()
 		case ssa.OpcodeUExtend, ssa.OpcodeSExtend:
 			switch input := def.Instr.Arg(); input.Type().Bits() {
 			case 64:
 				// If the input is already 64-bit, this extend is a no-op. TODO: shouldn't this be optimized out at much earlier stage? no?
 				m.addends64 = append(m.addends64, m.getOperand_NR(m.compiler.ValueDefinition(input), extModeNone).nr())
-				m.compiler.MarkLowered(def.Instr)
+				def.Instr.MarkLowered()
 				continue
 			case 32:
 				var ext extendOp
@@ -384,7 +384,7 @@ func (m *machine) collectAddends(ptr ssa.Value) (addends32 []addend32, addends64
 				default:
 					m.addends32 = append(m.addends32, addend32{r: m.getOperand_NR(inputDef, extModeNone).nr(), ext: ext})
 				}
-				m.compiler.MarkLowered(def.Instr)
+				def.Instr.MarkLowered()
 				continue
 			}
 			// If this is the extension smaller than 32 bits, this cannot be merged into addressing mode since

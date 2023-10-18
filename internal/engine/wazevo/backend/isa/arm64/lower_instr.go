@@ -97,7 +97,7 @@ func (m *machine) LowerConditionalBranch(b *ssa.Instruction) {
 		cbr := m.allocateInstr()
 		cbr.asCondBr(cc.asCond(), target, false /* ignored */)
 		m.insert(cbr)
-		m.compiler.MarkLowered(cvalDef.Instr)
+		cvalDef.Instr.MarkLowered()
 	case m.compiler.MatchInstr(cvalDef, ssa.OpcodeFcmp): // This case we can use the Fpu flag directly.
 		cvalInstr := cvalDef.Instr
 		x, y, c := cvalInstr.FcmpData()
@@ -109,7 +109,7 @@ func (m *machine) LowerConditionalBranch(b *ssa.Instruction) {
 		cbr := m.allocateInstr()
 		cbr.asCondBr(cc.asCond(), target, false /* ignored */)
 		m.insert(cbr)
-		m.compiler.MarkLowered(cvalDef.Instr)
+		cvalDef.Instr.MarkLowered()
 	default:
 		rn := m.getOperand_NR(cvalDef, extModeNone)
 		var c cond
@@ -1807,7 +1807,7 @@ func (m *machine) lowerExitIfTrueWithCode(execCtxVReg regalloc.VReg, cond ssa.Va
 	if !m.compiler.MatchInstr(condDef, ssa.OpcodeIcmp) {
 		panic("TODO: OpcodeExitIfTrueWithCode must come after Icmp at the moment: " + condDef.Instr.Opcode().String())
 	}
-	m.compiler.MarkLowered(condDef.Instr)
+	condDef.Instr.MarkLowered()
 
 	cvalInstr := condDef.Instr
 	x, y, c := cvalInstr.IcmpData()
@@ -1833,13 +1833,13 @@ func (m *machine) lowerSelect(c, x, y, result ssa.Value) {
 		x, y, c := cvalInstr.IcmpData()
 		cc = condFlagFromSSAIntegerCmpCond(c)
 		m.lowerIcmpToFlag(x, y, c.Signed())
-		m.compiler.MarkLowered(cvalDef.Instr)
+		cvalDef.Instr.MarkLowered()
 	case m.compiler.MatchInstr(cvalDef, ssa.OpcodeFcmp): // This case we can use the Fpu flag directly.
 		cvalInstr := cvalDef.Instr
 		x, y, c := cvalInstr.FcmpData()
 		cc = condFlagFromSSAFloatCmpCond(c)
 		m.lowerFcmpToFlag(x, y)
-		m.compiler.MarkLowered(cvalDef.Instr)
+		cvalDef.Instr.MarkLowered()
 	default:
 		rn := m.getOperand_NR(cvalDef, extModeNone)
 		if c.Type() != ssa.TypeI32 && c.Type() != ssa.TypeI64 {

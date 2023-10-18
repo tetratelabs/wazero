@@ -170,7 +170,7 @@ func (m *machine) getOperand_Imm12_ER_SR_NR(def *backend.SSAValueDefinition, mod
 	instr := def.Instr
 	if instr.Opcode() == ssa.OpcodeIconst {
 		if imm12Op, ok := asImm12Operand(instr.ConstantVal()); ok {
-			m.compiler.MarkLowered(instr)
+			instr.MarkLowered()
 			return imm12Op
 		}
 	}
@@ -188,7 +188,7 @@ func (m *machine) getOperand_MaybeNegatedImm12_ER_SR_NR(def *backend.SSAValueDef
 	if instr.Opcode() == ssa.OpcodeIconst {
 		c := instr.ConstantVal()
 		if imm12Op, ok := asImm12Operand(c); ok {
-			m.compiler.MarkLowered(instr)
+			instr.MarkLowered()
 			return imm12Op, false
 		}
 
@@ -198,7 +198,7 @@ func (m *machine) getOperand_MaybeNegatedImm12_ER_SR_NR(def *backend.SSAValueDef
 		}
 		negatedWithoutSign := -signExtended
 		if imm12Op, ok := asImm12Operand(uint64(negatedWithoutSign)); ok {
-			m.compiler.MarkLowered(instr)
+			instr.MarkLowered()
 			return imm12Op, true
 		}
 	}
@@ -223,7 +223,7 @@ func (m *machine) getOperand_ER_SR_NR(def *backend.SSAValueDefinition, mode extM
 			eop := extendOpFrom(signed, innerExtFromBits)
 			extArg := m.getOperand_NR(m.compiler.ValueDefinition(extInstr.Arg()), extModeNone)
 			op = operandER(extArg.nr(), eop, innerExtToBits)
-			m.compiler.MarkLowered(extInstr) // We merged the instruction in the operand.
+			extInstr.MarkLowered()
 			return
 		}
 
@@ -236,7 +236,7 @@ func (m *machine) getOperand_ER_SR_NR(def *backend.SSAValueDefinition, mode extM
 			// Two sign/zero extensions are equivalent to one sign/zero extension for the larger size.
 			eop := extendOpFrom(modeSigned, innerExtFromBits)
 			op = operandER(m.compiler.VRegOf(extInstr.Arg()), eop, modeBits)
-			m.compiler.MarkLowered(extInstr) // We merged the instruction in the operand.
+			extInstr.MarkLowered()
 		case (signed && !modeSigned) || (!signed && modeSigned):
 			// We need to {sign, zero}-extend the result of the {zero,sign} extension.
 			eop := extendOpFrom(modeSigned, innerExtToBits)
@@ -264,8 +264,8 @@ func (m *machine) getOperand_SR_NR(def *backend.SSAValueDefinition, mode extMode
 		if amountDef.IsFromInstr() && amountDef.Instr.Constant() {
 			// If that is the case, we can use the shifted register operand (SR).
 			c := byte(amountDef.Instr.ConstantVal()) & (targetVal.Type().Bits() - 1) // Clears the unnecessary bits.
-			m.compiler.MarkLowered(def.Instr)
-			m.compiler.MarkLowered(amountDef.Instr)
+			def.Instr.MarkLowered()
+			amountDef.Instr.MarkLowered()
 			return operandSR(targetVReg, c, shiftOpLSL)
 		}
 	}
@@ -298,7 +298,7 @@ func (m *machine) getOperand_NR(def *backend.SSAValueDefinition, mode extMode) (
 		if instr.Constant() {
 			// We inline all the constant instructions so that we could reduce the register usage.
 			v = m.lowerConstant(instr)
-			m.compiler.MarkLowered(instr)
+			instr.MarkLowered()
 		} else {
 			if n := def.N; n == 0 {
 				v = m.compiler.VRegOf(instr.Return())

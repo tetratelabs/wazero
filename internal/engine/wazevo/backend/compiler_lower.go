@@ -60,7 +60,7 @@ func (c *compiler) lowerBlock(blk ssa.BasicBlock) {
 	// Now start lowering the non-branching instructions.
 	for ; cur != nil; cur = cur.Prev() {
 		c.setCurrentGroupID(cur.GroupID())
-		if c.alreadyLowered[cur] {
+		if cur.Lowered() {
 			continue
 		}
 
@@ -160,17 +160,23 @@ func (c *compiler) lowerBlockArguments(args []ssa.Value, succ ssa.BasicBlock) {
 	}
 
 	// Check if there's an overlap among the dsts and srcs in varEdges.
-	c.resetVRegSet()
 	for _, edge := range c.varEdges {
-		src := edge[0]
+		src := edge[0].ID()
+		if int(src) >= len(c.vRegSet) {
+			c.vRegSet = append(c.vRegSet, make([]bool, src+1)...)
+		}
 		c.vRegSet[src] = true
 	}
 	separated := true
 	for _, edge := range c.varEdges {
-		dst := edge[1]
-		if c.vRegSet[dst] {
-			separated = false
-			break
+		dst := edge[1].ID()
+		if int(dst) >= len(c.vRegSet) {
+			c.vRegSet = append(c.vRegSet, make([]bool, dst+1)...)
+		} else {
+			if c.vRegSet[dst] {
+				separated = false
+				break
+			}
 		}
 	}
 

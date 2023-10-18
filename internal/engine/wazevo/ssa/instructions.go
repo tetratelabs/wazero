@@ -27,11 +27,12 @@ type Instruction struct {
 	targets    []BasicBlock
 	prev, next *Instruction
 
-	rValue       Value
-	rValues      []Value
-	gid          InstructionGroupID
-	sourceOffset SourceOffset
-	live         bool
+	rValue         Value
+	rValues        []Value
+	gid            InstructionGroupID
+	sourceOffset   SourceOffset
+	live           bool
+	alreadyLowered bool
 }
 
 // SourceOffset represents the offset of the source of an instruction.
@@ -61,6 +62,16 @@ func (i *Instruction) Opcode() Opcode {
 // GroupID returns the InstructionGroupID of this instruction.
 func (i *Instruction) GroupID() InstructionGroupID {
 	return i.gid
+}
+
+// MarkLowered marks this instruction as already lowered.
+func (i *Instruction) MarkLowered() {
+	i.alreadyLowered = true
+}
+
+// Lowered returns true if this instruction is already lowered.
+func (i *Instruction) Lowered() bool {
+	return i.alreadyLowered
 }
 
 // reset resets this instruction to the initial state.
