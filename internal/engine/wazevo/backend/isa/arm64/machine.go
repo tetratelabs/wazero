@@ -112,8 +112,8 @@ const (
 // NewBackend returns a new backend for arm64.
 func NewBackend() backend.Machine {
 	m := &machine{
-		instrPool:         wazevoapi.NewPool[instruction](),
-		labelPositionPool: wazevoapi.NewPool[labelPosition](),
+		instrPool:         wazevoapi.NewPool[instruction](resetInstruction),
+		labelPositionPool: wazevoapi.NewPool[labelPosition](resetLabelPosition),
 		labelPositions:    make(map[label]*labelPosition),
 		spillSlots:        make(map[regalloc.VRegID]int64),
 		nextLabel:         invalidLabel,
@@ -243,8 +243,11 @@ func (m *machine) insertBrTargetLabel() label {
 
 func (m *machine) allocateLabelPosition() *labelPosition {
 	l := m.labelPositionPool.Allocate()
-	*l = labelPosition{}
 	return l
+}
+
+func resetLabelPosition(l *labelPosition) {
+	*l = labelPosition{}
 }
 
 func (m *machine) FlushPendingInstructions() {
@@ -277,15 +280,18 @@ func (l label) String() string {
 // allocateInstr allocates an instruction.
 func (m *machine) allocateInstr() *instruction {
 	instr := m.instrPool.Allocate()
-	*instr = instruction{}
 	if !m.regAllocStarted {
 		instr.addedBeforeRegAlloc = true
 	}
 	return instr
 }
 
+func resetInstruction(i *instruction) {
+	*i = instruction{}
+}
+
 func (m *machine) allocateNop() *instruction {
-	instr := m.instrPool.Allocate()
+	instr := m.allocateInstr()
 	instr.asNop0()
 	return instr
 }

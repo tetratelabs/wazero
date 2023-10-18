@@ -445,7 +445,10 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 				actual := &a.blockInfos[blockID]
 				exp := tc.exp[blockID]
 				initMapInInfo(exp)
+				saved := actual.intervalTree
+				actual.intervalTree = nil // Don't compare intervalTree.
 				require.Equal(t, exp, actual, "\n[exp for block[%d]]\n%s\n[actual for block[%d]]\n%s", blockID, exp, blockID, actual)
+				actual.intervalTree = saved
 			}
 
 			// Sanity check: buildLiveRanges should not panic.
@@ -517,9 +520,6 @@ func TestAllocator_recordCopyRelation(t *testing.T) {
 }
 
 func initMapInInfo(info *blockInfo) {
-	if info.intervalTree == nil {
-		info.intervalTree = newIntervalTree()
-	}
 	if info.liveIns == nil {
 		info.liveIns = make(map[VReg]struct{})
 	}

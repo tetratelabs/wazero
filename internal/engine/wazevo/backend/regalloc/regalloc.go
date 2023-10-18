@@ -21,7 +21,7 @@ import (
 func NewAllocator(allocatableRegs *RegisterInfo) Allocator {
 	a := Allocator{
 		regInfo:  allocatableRegs,
-		nodePool: wazevoapi.NewPool[node](),
+		nodePool: wazevoapi.NewPool[node](resetNode),
 		phis:     make(map[VReg]Block),
 	}
 	for _, regs := range allocatableRegs.AllocatableRegisters {
@@ -487,16 +487,22 @@ func (a *Allocator) getOrAllocateNode(v VReg) (n *node) {
 	return
 }
 
-func (a *Allocator) allocateNode() (n *node) {
-	n = a.nodePool.Allocate()
-	n.id = a.nodePool.Allocated() - 1
+func resetNode(n *node) {
+	n.r = RealRegInvalid
+	n.v = VRegInvalid
 	n.ranges = n.ranges[:0]
+	n.neighbors = n.neighbors[:0]
 	n.copyFromVReg = nil
 	n.copyToVReg = nil
 	n.copyFromReal = RealRegInvalid
 	n.copyToReal = RealRegInvalid
-	n.neighbors = n.neighbors[:0]
+	n.degree = 0
 	n.visited = false
+}
+
+func (a *Allocator) allocateNode() (n *node) {
+	n = a.nodePool.Allocate()
+	n.id = a.nodePool.Allocated() - 1
 	return
 }
 

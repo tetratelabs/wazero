@@ -160,12 +160,14 @@ func (c *compiler) lowerBlockArguments(args []ssa.Value, succ ssa.BasicBlock) {
 	}
 
 	// Check if there's an overlap among the dsts and srcs in varEdges.
+	c.vRegIDs = c.vRegIDs[:0]
 	for _, edge := range c.varEdges {
 		src := edge[0].ID()
 		if int(src) >= len(c.vRegSet) {
 			c.vRegSet = append(c.vRegSet, make([]bool, src+1)...)
 		}
 		c.vRegSet[src] = true
+		c.vRegIDs = append(c.vRegIDs, src)
 	}
 	separated := true
 	for _, edge := range c.varEdges {
@@ -178,6 +180,9 @@ func (c *compiler) lowerBlockArguments(args []ssa.Value, succ ssa.BasicBlock) {
 				break
 			}
 		}
+	}
+	for _, id := range c.vRegIDs {
+		c.vRegSet[id] = false // reset for the next use.
 	}
 
 	if separated {

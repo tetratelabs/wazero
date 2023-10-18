@@ -74,8 +74,8 @@ func (i *Instruction) Lowered() bool {
 	return i.alreadyLowered
 }
 
-// reset resets this instruction to the initial state.
-func (i *Instruction) reset() {
+// resetInstruction resets this instruction to the initial state.
+func resetInstruction(i *Instruction) {
 	*i = Instruction{}
 	i.v = ValueInvalid
 	i.v2 = ValueInvalid

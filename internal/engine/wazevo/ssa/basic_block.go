@@ -245,7 +245,7 @@ func (bb *basicBlock) Tail() *Instruction {
 }
 
 // reset resets the basicBlock to its initial state so that it can be reused for another function.
-func (bb *basicBlock) reset() {
+func resetBasicBlock(bb *basicBlock) {
 	bb.params = bb.params[:0]
 	bb.rootInstr, bb.currentInstr = nil, nil
 	bb.preds = bb.preds[:0]

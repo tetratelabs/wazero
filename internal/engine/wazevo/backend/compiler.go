@@ -135,6 +135,7 @@ type compiler struct {
 		dst   regalloc.VReg
 	}
 	vRegSet         []bool
+	vRegIDs         []regalloc.VRegID
 	tempRegs        []regalloc.VReg
 	tmpVals         []ssa.Value
 	ssaTypeOfVRegID [] /* VRegID to */ ssa.Type
