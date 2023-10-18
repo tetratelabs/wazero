@@ -2,9 +2,10 @@ package regalloc
 
 import (
 	"fmt"
-	"github.com/tetratelabs/wazero/internal/testing/require"
 	"sort"
 	"testing"
+
+	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
 func TestIntervalTree_reset(t *testing.T) {
@@ -89,7 +90,6 @@ func newQueryCase(s programCounter, exp ...int) queryCase {
 }
 
 func TestIntervalTree_collectActiveNodesAt(t *testing.T) {
-
 	for _, tc := range []struct {
 		name       string
 		intervals  []interval
@@ -213,7 +213,6 @@ func TestIntervalTree_collectActiveNodesAt(t *testing.T) {
 }
 
 func TestIntervalTree_collectActiveNonRealVRegsAt(t *testing.T) {
-
 	for _, tc := range []struct {
 		name       string
 		intervals  []interval
