@@ -69,6 +69,7 @@ type (
 		nodes1     []*node
 		nodes2     []*node
 		nodes3     []*node
+		dedup      []bool
 	}
 
 	// blockInfo is a per-block information used during the register allocation.
@@ -79,23 +80,16 @@ type (
 		lastUses map[VReg]programCounter
 		kills    map[VReg]programCounter
 		// Pre-colored real registers can have multiple live ranges in one block.
-		realRegUses map[VReg][]programCounter
-		realRegDefs map[VReg][]programCounter
-		liveNodes   []liveNodeInBlock
+		realRegUses  map[VReg][]programCounter
+		realRegDefs  map[VReg][]programCounter
+		intervalTree *intervalTree
 	}
 
-	liveNodeInBlock struct {
-		// rangeIndex is the index to n.ranges which represents the live range of n.v in the block.
-		rangeIndex int
-		n          *node
-	}
-
-	// node represents a node interference graph of LiveRange(s) of VReg(s).
+	// node represents a VReg.
 	node struct {
-		v VReg
-		// ranges holds the live ranges of this node per block. This will be accessed by
-		// liveNodeInBlock.rangeIndex, which in turn is stored in blockInfo.liveNodes.
-		ranges []liveRange
+		id     int
+		v      VReg
+		ranges []*intervalTreeNode
 		// r is the real register assigned to this node. It is either a pre-colored register or a register assigned during allocation.
 		r RealReg
 		// neighbors are the nodes that this node interferes with. Such neighbors have the same RegType as this node.
@@ -109,21 +103,15 @@ type (
 		visited                  bool
 	}
 
-	// liveRange represents a lifetime of a VReg. Both begin (LiveInterval[0]) and end (LiveInterval[1]) are inclusive.
-	liveRange struct {
-		blockID    int
-		begin, end programCounter
-	}
-
 	// programCounter represents an opaque index into the program which is used to represents a LiveInterval of a VReg.
-	programCounter int64
+	programCounter int32
 )
 
 // DoAllocation performs register allocation on the given Function.
 func (a *Allocator) DoAllocation(f Function) {
 	a.livenessAnalysis(f)
 	a.buildLiveRanges(f)
-	a.buildNeighbors(f)
+	a.buildNeighbors()
 	a.coloring()
 	a.determineCalleeSavedRealRegs(f)
 	a.assignRegisters(f)
@@ -310,21 +298,12 @@ func (a *Allocator) buildLiveRanges(f Function) {
 	for blk := f.PostOrderBlockIteratorBegin(); blk != nil; blk = f.PostOrderBlockIteratorNext() { // Order doesn't matter.
 		blkID := blk.ID()
 		info := a.blockInfoAt(blkID)
-		a.buildLiveRangesForNonReals(blkID, info)
-		a.buildLiveRangesForReals(blkID, info)
-		// Sort the live range for a fast lookup to find live registers at a given program counter.
-		sort.Slice(info.liveNodes, func(i, j int) bool {
-			inode, jnode := &info.liveNodes[i], &info.liveNodes[j]
-			irange, jrange := inode.n.ranges[inode.rangeIndex], jnode.n.ranges[jnode.rangeIndex]
-			if irange.begin == jrange.begin {
-				return irange.end < jrange.end
-			}
-			return irange.begin < jrange.begin
-		})
+		a.buildLiveRangesForNonReals(info)
+		a.buildLiveRangesForReals(info)
 	}
 }
 
-func (a *Allocator) buildLiveRangesForNonReals(blkID int, info *blockInfo) {
+func (a *Allocator) buildLiveRangesForNonReals(info *blockInfo) {
 	ins, outs, defs, kills := info.liveIns, info.liveOuts, info.defs, info.kills
 
 	// In order to do the deterministic allocation, we need to sort ins.
@@ -342,7 +321,7 @@ func (a *Allocator) buildLiveRangesForNonReals(blkID int, info *blockInfo) {
 		var begin, end programCounter
 		if _, ok := outs[v]; ok {
 			// v is live-in and live-out, so it is live-through.
-			begin, end = 0, math.MaxInt64
+			begin, end = 0, math.MaxInt32
 			if _, ok := kills[v]; ok {
 				panic("BUG: v is live-out but also killed")
 			}
@@ -355,9 +334,8 @@ func (a *Allocator) buildLiveRangesForNonReals(blkID int, info *blockInfo) {
 			begin, end = 0, killPos
 		}
 		n := a.getOrAllocateNode(v)
-		rangeIndex := len(n.ranges)
-		n.ranges = append(n.ranges, liveRange{blockID: blkID, begin: begin, end: end})
-		info.liveNodes = append(info.liveNodes, liveNodeInBlock{rangeIndex, n})
+		intervalNode := info.intervalTree.insert(n, begin, end)
+		n.ranges = append(n.ranges, intervalNode)
 	}
 
 	// In order to do the deterministic allocation, we need to sort defs.
@@ -382,7 +360,7 @@ func (a *Allocator) buildLiveRangesForNonReals(blkID int, info *blockInfo) {
 		var end programCounter
 		if _, ok := outs[v]; ok {
 			// v is defined here and live-out, so it is live-through.
-			end = math.MaxInt64
+			end = math.MaxInt32
 			if _, ok := kills[v]; ok {
 				panic("BUG: v is killed here but also killed")
 			}
@@ -397,9 +375,8 @@ func (a *Allocator) buildLiveRangesForNonReals(blkID int, info *blockInfo) {
 			}
 		}
 		n := a.getOrAllocateNode(v)
-		rangeIndex := len(n.ranges)
-		n.ranges = append(n.ranges, liveRange{blockID: blkID, begin: defPos, end: end})
-		info.liveNodes = append(info.liveNodes, liveNodeInBlock{rangeIndex, n})
+		intervalNode := info.intervalTree.insert(n, defPos, end)
+		n.ranges = append(n.ranges, intervalNode)
 	}
 
 	// Reuse for the next block.
@@ -419,7 +396,7 @@ func (a *Allocator) buildLiveRangesForNonReals(blkID int, info *blockInfo) {
 }
 
 // buildLiveRangesForReals builds live ranges for pre-colored real registers.
-func (a *Allocator) buildLiveRangesForReals(blkID int, info *blockInfo) {
+func (a *Allocator) buildLiveRangesForReals(info *blockInfo) {
 	ds, us := info.realRegDefs, info.realRegUses
 
 	// In order to do the deterministic compilation, we need to sort the registers.
@@ -454,8 +431,8 @@ func (a *Allocator) buildLiveRangesForReals(blkID int, info *blockInfo) {
 			n.r = v.RealReg()
 			n.v = v
 			defined, used := defs[i], uses[i]
-			n.ranges = append(n.ranges, liveRange{blockID: blkID, begin: defined, end: used})
-			info.liveNodes = append(info.liveNodes, liveNodeInBlock{0, n})
+			intervalNode := info.intervalTree.insert(n, defined, used)
+			n.ranges = append(n.ranges, intervalNode)
 		}
 	}
 }
@@ -512,6 +489,7 @@ func (a *Allocator) getOrAllocateNode(v VReg) (n *node) {
 
 func (a *Allocator) allocateNode() (n *node) {
 	n = a.nodePool.Allocate()
+	n.id = a.nodePool.Allocated() - 1
 	n.ranges = n.ranges[:0]
 	n.copyFromVReg = nil
 	n.copyToVReg = nil
@@ -533,7 +511,11 @@ func resetMap[T any](a *Allocator, m map[VReg]T) {
 }
 
 func (a *Allocator) initBlockInfo(i *blockInfo) {
-	i.liveNodes = i.liveNodes[:0]
+	if i.intervalTree == nil {
+		i.intervalTree = newIntervalTree()
+	} else {
+		i.intervalTree.reset()
+	}
 	if i.liveOuts == nil {
 		i.liveOuts = make(map[VReg]struct{})
 	} else {
@@ -622,11 +604,6 @@ func (n *node) String() string {
 	if n.r != RealRegInvalid {
 		buf.WriteString(fmt.Sprintf(":%v", n.r))
 	}
-	buf.WriteString(" ranges[")
-	for _, r := range n.ranges {
-		buf.WriteString(fmt.Sprintf("[%v-%v]@blk%d ", r.begin, r.end, r.blockID))
-	}
-	buf.WriteString("]")
 	// Add neighbors
 	buf.WriteString(" neighbors[")
 	for _, n := range n.neighbors {
@@ -640,24 +617,12 @@ func (n *node) spill() bool {
 	return n.r == RealRegInvalid
 }
 
-// intersects returns true if the two live ranges intersect.
-// Note that this doesn't compare the block ID because this is called to compare two intervals in the same block.
-func (l *liveRange) intersects(other *liveRange) bool {
-	return other.begin <= l.end && l.begin <= other.end
-}
-
 func (r *RegisterInfo) isCalleeSaved(reg RealReg) bool {
 	return r.CalleeSavedRegisters[reg]
 }
 
 func (r *RegisterInfo) isCallerSaved(reg RealReg) bool {
 	return r.CallerSavedRegisters[reg]
-}
-
-// String implements fmt.Stringer for debugging.
-func (l *liveNodeInBlock) String() string {
-	r := l.n.ranges[l.rangeIndex]
-	return fmt.Sprintf("v%d@[%v-%v]", l.n.v.ID(), r.begin, r.end)
 }
 
 func (a *Allocator) recordCopyRelation(dst, src VReg) {

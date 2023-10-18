@@ -10,33 +10,34 @@ import (
 // This is called after coloring is done.
 func (a *Allocator) assignRegisters(f Function) {
 	for blk := f.ReversePostOrderBlockIteratorBegin(); blk != nil; blk = f.ReversePostOrderBlockIteratorNext() {
-		info := a.blockInfoAt(blk.ID())
-		lns := info.liveNodes
-		a.assignRegistersPerBlock(f, blk, a.vRegIDToNode, lns)
+		a.assignRegistersPerBlock(f, blk, a.vRegIDToNode)
 	}
 }
 
 // assignRegistersPerBlock assigns real registers to virtual registers on each instruction in a block.
-func (a *Allocator) assignRegistersPerBlock(f Function, blk Block, vRegIDToNode []*node, liveNodes []liveNodeInBlock) {
+func (a *Allocator) assignRegistersPerBlock(f Function, blk Block, vRegIDToNode []*node) {
 	if wazevoapi.RegAllocLoggingEnabled {
 		fmt.Println("---------------------- assigning registers for block", blk.ID(), "----------------------")
 	}
 
+	blkID := blk.ID()
 	var pc programCounter
 	for instr := blk.InstrIteratorBegin(); instr != nil; instr = blk.InstrIteratorNext() {
-		a.assignRegistersPerInstr(f, pc, instr, vRegIDToNode, liveNodes)
+		tree := a.blockInfos[blkID].intervalTree
+		a.assignRegistersPerInstr(f, pc, instr, vRegIDToNode, tree)
 		pc += pcStride
 	}
 }
 
-func (a *Allocator) assignRegistersPerInstr(f Function, pc programCounter, instr Instr, vRegIDToNode []*node, liveNodes []liveNodeInBlock) {
+func (a *Allocator) assignRegistersPerInstr(f Function, pc programCounter, instr Instr, vRegIDToNode []*node, tree *intervalTree) {
 	if indirect := instr.IsIndirectCall(); instr.IsCall() || indirect {
 		// Only take care of non-real VRegs (e.g. VReg.IsRealReg() == false) since
 		// the real VRegs are already placed in the right registers at this point.
-		a.collectActiveNonRealVRegsAt(
+		tree.collectActiveNonRealVRegsAt(
 			// To find the all the live registers "after" call, we need to add pcDefOffset for search.
 			pc+pcDefOffset,
-			liveNodes)
+			&a.nodes1,
+		)
 		for _, active := range a.nodes1 {
 			if r := active.r; a.regInfo.isCallerSaved(r) {
 				v := active.v.SetRealReg(r)
@@ -100,19 +101,19 @@ func (a *Allocator) assignRegistersPerInstr(f Function, pc programCounter, instr
 		panic("BUG: multiple def instructions must be special cased")
 	}
 
-	a.handleSpills(f, pc, instr, liveNodes, usesSpills, defSpill)
+	a.handleSpills(f, pc, instr, usesSpills, defSpill, tree)
 	a.vs = usesSpills[:0] // for reuse.
 }
 
 func (a *Allocator) handleSpills(
-	f Function, pc programCounter, instr Instr, liveNodes []liveNodeInBlock,
-	usesSpills []VReg, defSpill VReg,
+	f Function, pc programCounter, instr Instr,
+	usesSpills []VReg, defSpill VReg, tree *intervalTree,
 ) {
 	_usesSpills, _defSpill := len(usesSpills) > 0, defSpill.Valid()
 	switch {
 	case !_usesSpills && !_defSpill: // Nothing to do.
 	case !_usesSpills && _defSpill: // Only definition is spilled.
-		a.collectActiveNodesAt(pc+pcDefOffset, liveNodes)
+		tree.collectActiveRealRegNodesAt(pc+pcDefOffset, &a.nodes1)
 		a.spillHandler.init(a.nodes1, instr)
 
 		r, evictedNode := a.spillHandler.getUnusedOrEvictReg(defSpill.RegType(), a.regInfo)
@@ -128,7 +129,7 @@ func (a *Allocator) handleSpills(
 		f.StoreRegisterAfter(defSpill, instr)
 
 	case _usesSpills:
-		a.collectActiveNodesAt(pc, liveNodes)
+		tree.collectActiveRealRegNodesAt(pc, &a.nodes1)
 		a.spillHandler.init(a.nodes1, instr)
 
 		var evicted [3]*node
@@ -172,7 +173,7 @@ func (a *Allocator) handleSpills(
 
 			if !defSpill.IsRealReg() {
 				// This case, the destination register type is different from the source registers.
-				a.collectActiveNodesAt(pc+pcDefOffset, liveNodes)
+				tree.collectActiveRealRegNodesAt(pc+pcDefOffset, &a.nodes1)
 				a.spillHandler.init(a.nodes1, instr)
 				r, evictedNode := a.spillHandler.getUnusedOrEvictReg(defSpill.RegType(), a.regInfo)
 				if evictedNode != nil {
@@ -231,46 +232,4 @@ func (a *Allocator) assignIndirectCall(f Function, instr Instr, vRegIDToNode []*
 		v = v.SetRealReg(n.r)
 	}
 	instr.AssignUse(0, v)
-}
-
-// collectActiveNonRealVRegsAt collects the set of active registers at the given program counter into `a.nodes1` slice by appending
-// the found registers from its beginning. This excludes the VRegs backed by a real register since this is used to list the registers
-// alive but not used by a call instruction.
-func (a *Allocator) collectActiveNonRealVRegsAt(pc programCounter, liveNodes []liveNodeInBlock) {
-	nodes := a.nodes1[:0]
-	for i := range liveNodes {
-		live := &liveNodes[i]
-		n := live.n
-		if n.spill() || n.v.IsRealReg() {
-			continue
-		}
-		r := &n.ranges[live.rangeIndex]
-		if r.begin > pc {
-			// liveNodes are sorted by the start program counter, so we can break here.
-			break
-		}
-		if pc <= r.end { // pc is in the range.
-			nodes = append(nodes, n)
-		}
-	}
-	a.nodes1 = nodes
-}
-
-func (a *Allocator) collectActiveNodesAt(pc programCounter, liveNodes []liveNodeInBlock) {
-	nodes := a.nodes1[:0]
-	for i := range liveNodes {
-		live := &liveNodes[i]
-		n := live.n
-		if n.assignedRealReg() != RealRegInvalid {
-			r := &n.ranges[live.rangeIndex]
-			if r.begin > pc {
-				// liveNodes are sorted by the start program counter, so we can break here.
-				break
-			}
-			if pc <= r.end { // pc is in the range.
-				nodes = append(nodes, n)
-			}
-		}
-	}
-	a.nodes1 = nodes
 }

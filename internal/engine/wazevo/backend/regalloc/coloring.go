@@ -8,38 +8,45 @@ import (
 )
 
 // buildNeighbors builds the neighbors for each node in the interference graph.
-// TODO: node coalescing by leveraging the info given by Instr.IsCopy().
-func (a *Allocator) buildNeighbors(f Function) {
-	for blk := f.PostOrderBlockIteratorBegin(); blk != nil; blk = f.PostOrderBlockIteratorNext() {
-		lives := a.blockInfos[blk.ID()].liveNodes
-		a.buildNeighborsByLiveNodes(lives)
+func (a *Allocator) buildNeighbors() {
+	allocated := a.nodePool.Allocated()
+	if diff := allocated - len(a.dedup); diff > 0 {
+		a.dedup = append(a.dedup, make([]bool, diff+1)...)
+	}
+	for i := 0; i < allocated; i++ {
+		n := a.nodePool.View(i)
+		a.buildNeighborsFor(n)
 	}
 }
 
-func (a *Allocator) buildNeighborsByLiveNodes(lives []liveNodeInBlock) {
-	if len(lives) == 0 {
-		// TODO: shouldn't this kind of block be removed before reg alloc?
-		return
-	}
-	for i, src := range lives[:len(lives)-1] {
-		srcRange := &src.n.ranges[src.rangeIndex]
-		for _, dst := range lives[i+1:] {
-			srcN, dstN := src.n, dst.n
-			if dst == src || dstN == srcN {
-				panic(fmt.Sprintf("BUG: %s and %s are the same node", src.n.v, dst.n.v))
-			}
-			dstRange := &dst.n.ranges[dst.rangeIndex]
-			if dstRange.begin > srcRange.end {
-				// liveNodes are sorted by the start program counter, so we can break here.
-				break
-			}
-
-			if srcN.v.RegType() == dstN.v.RegType() && // Interfere only if they are the same type.
-				srcRange.intersects(dstRange) {
-				srcN.neighbors = append(srcN.neighbors, dst.n)
-				dstN.neighbors = append(dstN.neighbors, src.n)
+func (a *Allocator) buildNeighborsFor(n *node) {
+	a.nodes1 = a.nodes1[:0]
+	for _, r := range n.ranges {
+		// Collects all the nodes that are in the same range.
+		for _, neighbor := range r.nodes {
+			neighborID := neighbor.id
+			if neighbor != n && !a.dedup[neighborID] {
+				n.neighbors = append(n.neighbors, neighbor)
+				a.dedup[neighborID] = true
+				a.nodes1 = append(a.nodes1, neighbor)
 			}
 		}
+
+		// And also collects all the nodes that are in the neighbor ranges.
+		for _, neighborInterval := range r.neighbors {
+			for _, neighbor := range neighborInterval.nodes {
+				neighborID := neighbor.id
+				if neighbor != n && !a.dedup[neighborID] {
+					n.neighbors = append(n.neighbors, neighbor)
+					a.dedup[neighborID] = true
+					a.nodes1 = append(a.nodes1, neighbor)
+				}
+			}
+		}
+	}
+	// Reset for the next iteration.
+	for _, neighbor := range a.nodes1 {
+		a.dedup[neighbor.id] = false
 	}
 }
 

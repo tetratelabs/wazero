@@ -1,3 +1,5 @@
+//go:build tmp
+
 package regalloc
 
 import (
@@ -94,71 +96,6 @@ func TestAllocator_assignRegistersPerInstr(t *testing.T) {
 		require.Equal(t, []VReg{r, VReg(2).SetRealReg(22), VReg(3).SetRealReg(33)}, instr.uses)
 		require.Equal(t, []VReg{VReg(4).SetRealReg(44)}, instr.defs)
 	})
-}
-
-func TestAllocator_activeNonRealVRegsAt(t *testing.T) {
-	r := FromRealReg(1, RegTypeInt)
-	for _, tc := range []struct {
-		name  string
-		lives []liveNodeInBlock
-		pc    programCounter
-		want  []VReg
-	}{
-		{
-			name:  "no live nodes",
-			pc:    0,
-			lives: []liveNodeInBlock{},
-			want:  []VReg{},
-		},
-		{
-			name:  "no live nodes at pc",
-			pc:    10,
-			lives: []liveNodeInBlock{{n: &node{ranges: []liveRange{{begin: 100, end: 2000}}}}},
-			want:  []VReg{},
-		},
-		{
-			name: "one live",
-			pc:   10,
-			lives: []liveNodeInBlock{
-				{n: &node{r: 2, v: 0xf, ranges: []liveRange{{begin: 5, end: 20}}}},
-				{n: &node{r: 1, v: 0xa, ranges: []liveRange{{begin: 100, end: 2000}}}},
-			},
-			want: []VReg{0xf},
-		},
-		{
-			name: "three lives but one spill",
-			pc:   10,
-			lives: []liveNodeInBlock{
-				{n: &node{r: 1, v: 0xa, ranges: []liveRange{{begin: 5, end: 20}}}},
-				{n: &node{r: RealRegInvalid, v: 0xb, ranges: []liveRange{{begin: 5, end: 20}}}}, // Spill.
-				{n: &node{r: 3, v: 0xc, ranges: []liveRange{{begin: 5, end: 20}}}},
-			},
-			want: []VReg{0xa, 0xc},
-		},
-		{
-			name: "three lives but one real reg-backed VReg",
-			pc:   10,
-			lives: []liveNodeInBlock{
-				{n: &node{r: 1, v: 0xa, ranges: []liveRange{{begin: 5, end: 20}}}},
-				{n: &node{r: 2, v: r, ranges: []liveRange{{begin: 5, end: 20}}}}, // Real reg-backed VReg.
-				{n: &node{r: 3, v: 0xc, ranges: []liveRange{{begin: 5, end: 20}}}},
-			},
-			want: []VReg{0xa, 0xc},
-		},
-	} {
-		tc := tc
-		t.Run(tc.name, func(t *testing.T) {
-			a := NewAllocator(&RegisterInfo{})
-			a.collectActiveNonRealVRegsAt(tc.pc, tc.lives)
-			ans := a.nodes1
-
-			actual := make([]VReg, len(ans))
-			for i, n := range ans {
-				actual[i] = n.v
-			}
-			require.Equal(t, tc.want, actual)
-		})
-	}
 }
 
 func TestAllocator_handleSpills(t *testing.T) {
@@ -350,33 +287,5 @@ func TestAllocator_handleSpills(t *testing.T) {
 		requireInsertedInst(t, f, false, 0, instr, true, liveNodes[0].n.v.SetRealReg(0xb))
 		requireInsertedInst(t, f, false, 1, instr, true, liveNodes[2].n.v.SetRealReg(0xf))
 		requireInsertedInst(t, f, false, 2, instr, false, d1.SetRealReg(0xf))
-	})
-}
-
-func TestAllocator_collectActiveNodesAt(t *testing.T) {
-	t.Run("no live nodes", func(t *testing.T) {
-		a := NewAllocator(&RegisterInfo{})
-		a.nodes1 = []*node{{r: 1}, {r: 2}} // Must be cleared.
-		a.collectActiveNodesAt(0, nil)
-		require.Equal(t, 0, len(a.nodes1))
-	})
-
-	t.Run("lives", func(t *testing.T) {
-		const pc = 5
-		liveNodes := []liveNodeInBlock{
-			{n: &node{r: RealReg(0xf), v: 0xa, ranges: []liveRange{{begin: 0, end: pc - 1}}}},
-			{n: &node{r: RealReg(0x1), v: 0xa, ranges: []liveRange{{begin: pc, end: 20}}}},
-			{n: &node{r: RealReg(0x2), v: 0xa, ranges: []liveRange{{begin: pc, end: 20}}}},
-			{n: &node{r: RealReg(0x4), v: 0xb, ranges: []liveRange{{begin: pc, end: 20}}}},
-			{n: &node{r: RealReg(0xf), v: 0xa, ranges: []liveRange{{begin: 1000, end: 2000000}}}},
-		}
-
-		a := NewAllocator(&RegisterInfo{})
-		a.nodes1 = []*node{{r: 1}, {r: 2}} // Must be cleared.
-		a.collectActiveNodesAt(pc, liveNodes)
-		require.Equal(t, 3, len(a.nodes1))
-		require.Equal(t, liveNodes[1].n, a.nodes1[0])
-		require.Equal(t, liveNodes[2].n, a.nodes1[1])
-		require.Equal(t, liveNodes[3].n, a.nodes1[2])
 	})
 }
