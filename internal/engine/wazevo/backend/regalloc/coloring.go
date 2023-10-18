@@ -20,7 +20,6 @@ func (a *Allocator) buildNeighbors() {
 }
 
 func (a *Allocator) buildNeighborsFor(n *node) {
-	a.nodes1 = a.nodes1[:0]
 	for _, r := range n.ranges {
 		// Collects all the nodes that are in the same range.
 		for _, neighbor := range r.nodes {
@@ -31,7 +30,6 @@ func (a *Allocator) buildNeighborsFor(n *node) {
 			if neighbor != n && !a.dedup[neighborID] {
 				n.neighbors = append(n.neighbors, neighbor)
 				a.dedup[neighborID] = true
-				a.nodes1 = append(a.nodes1, neighbor)
 			}
 		}
 
@@ -45,13 +43,12 @@ func (a *Allocator) buildNeighborsFor(n *node) {
 				if neighbor != n && !a.dedup[neighborID] {
 					n.neighbors = append(n.neighbors, neighbor)
 					a.dedup[neighborID] = true
-					a.nodes1 = append(a.nodes1, neighbor)
 				}
 			}
 		}
 	}
 	// Reset for the next iteration.
-	for _, neighbor := range a.nodes1 {
+	for _, neighbor := range n.neighbors {
 		a.dedup[neighbor.id] = false
 	}
 }
