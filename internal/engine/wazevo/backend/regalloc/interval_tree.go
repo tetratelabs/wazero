@@ -69,6 +69,9 @@ func (i *intervalTreeNode) insert(t *intervalTree, n *node, begin, end programCo
 	if i.maxEnd < end {
 		i.maxEnd = end
 	}
+
+	// TODO: balancing logic so that collection functions are faster.
+
 	return i
 }
 
