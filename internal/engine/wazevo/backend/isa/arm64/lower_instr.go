@@ -751,16 +751,16 @@ func (m *machine) lowerVShift(op ssa.Opcode, rd, rn, rm operand, arr vecArrangem
 		panic("unsupported arrangment " + arr.String())
 	}
 
-	tmp := operandNR(m.compiler.AllocateVReg(ssa.TypeV128))
+	tmp := operandNR(m.compiler.AllocateVReg(ssa.TypeI64))
 
 	and := m.allocateInstr()
-	and.asALUBitmaskImm(aluOpAnd, tmp.nr(), rm.nr(), uint64(modulo), false)
+	and.asALUBitmaskImm(aluOpAnd, tmp.nr(), rm.nr(), uint64(modulo), true)
 	m.insert(and)
 
 	if op != ssa.OpcodeVIshl {
 		// Negate the amount to make this as right shift.
 		neg := m.allocateInstr()
-		neg.asALU(aluOpSub, tmp, operandNR(xzrVReg), tmp, false)
+		neg.asALU(aluOpSub, tmp, operandNR(xzrVReg), tmp, true)
 		m.insert(neg)
 	}
 
