@@ -751,31 +751,32 @@ func (m *machine) lowerVShift(op ssa.Opcode, rd, rn, rm operand, arr vecArrangem
 		panic("unsupported arrangment " + arr.String())
 	}
 
-	tmp := operandNR(m.compiler.AllocateVReg(ssa.TypeI64))
+	rtmp := operandNR(m.compiler.AllocateVReg(ssa.TypeI64))
+	vtmp := operandNR(m.compiler.AllocateVReg(ssa.TypeV128))
 
 	and := m.allocateInstr()
-	and.asALUBitmaskImm(aluOpAnd, tmp.nr(), rm.nr(), uint64(modulo), true)
+	and.asALUBitmaskImm(aluOpAnd, rtmp.nr(), rm.nr(), uint64(modulo), true)
 	m.insert(and)
 
 	if op != ssa.OpcodeVIshl {
 		// Negate the amount to make this as right shift.
 		neg := m.allocateInstr()
-		neg.asALU(aluOpSub, tmp, operandNR(xzrVReg), tmp, true)
+		neg.asALU(aluOpSub, rtmp, operandNR(xzrVReg), rtmp, true)
 		m.insert(neg)
 	}
 
 	// Copy the shift amount into a vector register as sshl/ushl requires it to be there.
 	dup := m.allocateInstr()
-	dup.asVecDup(tmp, tmp, arr)
+	dup.asVecDup(vtmp, rtmp, arr)
 	m.insert(dup)
 
 	if op == ssa.OpcodeVIshl || op == ssa.OpcodeVSshr {
 		sshl := m.allocateInstr()
-		sshl.asVecRRR(vecOpSshl, rd, rn, tmp, arr)
+		sshl.asVecRRR(vecOpSshl, rd, rn, vtmp, arr)
 		m.insert(sshl)
 	} else {
 		ushl := m.allocateInstr()
-		ushl.asVecRRR(vecOpUshl, rd, rn, tmp, arr)
+		ushl.asVecRRR(vecOpUshl, rd, rn, vtmp, arr)
 		m.insert(ushl)
 	}
 }

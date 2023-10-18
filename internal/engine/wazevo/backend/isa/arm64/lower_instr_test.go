@@ -785,8 +785,8 @@ func TestMachine_lowerVShift(t *testing.T) {
 			arrangement: vecArrangement16B,
 			expectedAsm: `
 and x1?, x15, #0x7
-dup v1?.16b, x1?
-sshl x1.16b, x2.16b, v1?.16b
+dup v2?.16b, x1?
+sshl x1.16b, x2.16b, v2?.16b
 `,
 			expectedBytes: "e0094092000c014e4144204e",
 		},
@@ -797,8 +797,8 @@ sshl x1.16b, x2.16b, v1?.16b
 			expectedAsm: `
 and x1?, x15, #0x7
 sub x1?, xzr, x1?
-dup v1?.16b, x1?
-sshl x1.16b, x2.16b, v1?.16b
+dup v2?.16b, x1?
+sshl x1.16b, x2.16b, v2?.16b
 `,
 			expectedBytes: "e0094092e00300cb000c014e4144204e",
 		},
@@ -809,8 +809,8 @@ sshl x1.16b, x2.16b, v1?.16b
 			expectedAsm: `
 and x1?, x15, #0x7
 sub x1?, xzr, x1?
-dup v1?.16b, x1?
-ushl x1.16b, x2.16b, v1?.16b
+dup v2?.16b, x1?
+ushl x1.16b, x2.16b, v2?.16b
 `,
 			expectedBytes: "e0094092e00300cb000c014e4144206e",
 		},
