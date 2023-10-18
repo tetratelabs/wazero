@@ -546,7 +546,7 @@ func Test1793d(t *testing.T) {
 	})
 }
 
-// Test1797a tests that ...
+// Test1797a tests that i8x16.shl uses the right register types when lowered.
 func Test1797a(t *testing.T) {
 	if !platform.CompilerSupported() {
 		return
@@ -561,7 +561,7 @@ func Test1797a(t *testing.T) {
 	})
 }
 
-// Test1797a tests that ...
+// Test1797a tests that i16x8.shr_u uses the right register types when lowered.
 func Test1797b(t *testing.T) {
 	if !platform.CompilerSupported() {
 		return
@@ -572,8 +572,23 @@ func Test1797b(t *testing.T) {
 		m := mod.(*wasm.ModuleInstance)
 		_, err = m.ExportedFunction("\x00\x00\x00\x00\x00").Call(ctx, 0, 0, 0, 0, 0, 0)
 		require.NoError(t, err)
-		// 2666130977255796624,9223142857682330634
 		require.Equal(t, uint64(2666130977255796624), m.Globals[0].Val)
 		require.Equal(t, uint64(9223142857682330634), m.Globals[0].ValHi)
+	})
+}
+
+// Test1797a tests that the program counter for V128*Shuffle is advanced correctly
+// even when an unreachable instruction is present.
+func Test1797c(t *testing.T) {
+	if !platform.CompilerSupported() {
+		return
+	}
+	run(t, func(t *testing.T, r wazero.Runtime) {
+		mod, err := r.Instantiate(ctx, getWasmBinary(t, "1797c"))
+		require.NoError(t, err, "wasm binary should build successfully")
+		m := mod.(*wasm.ModuleInstance)
+		params := make([]uint64, 20)
+		_, err = m.ExportedFunction("~zz\x00E1E\x00EE\x00$").Call(ctx, params...)
+		require.Error(t, err, "wasm error: unreachable")
 	})
 }
