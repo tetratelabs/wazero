@@ -545,3 +545,67 @@ func Test1793d(t *testing.T) {
 		require.Equal(t, uint64(0), m.Globals[1].Val)
 	})
 }
+
+// Test1797a tests that i8x16.shl uses the right register types when lowered.
+func Test1797a(t *testing.T) {
+	if !platform.CompilerSupported() {
+		return
+	}
+	run(t, func(t *testing.T, r wazero.Runtime) {
+		mod, err := r.Instantiate(ctx, getWasmBinary(t, "1797a"))
+		require.NoError(t, err)
+		m := mod.(*wasm.ModuleInstance)
+		res, err := m.ExportedFunction("").Call(ctx)
+		require.NoError(t, err)
+		require.Equal(t, uint64(0), res[0])
+	})
+}
+
+// Test1797a tests that i16x8.shr_u uses the right register types when lowered.
+func Test1797b(t *testing.T) {
+	if !platform.CompilerSupported() {
+		return
+	}
+	run(t, func(t *testing.T, r wazero.Runtime) {
+		mod, err := r.Instantiate(ctx, getWasmBinary(t, "1797b"))
+		require.NoError(t, err)
+		m := mod.(*wasm.ModuleInstance)
+		_, err = m.ExportedFunction("\x00\x00\x00\x00\x00").Call(ctx, 0, 0, 0, 0, 0, 0)
+		require.NoError(t, err)
+		require.Equal(t, uint64(2666130977255796624), m.Globals[0].Val)
+		require.Equal(t, uint64(9223142857682330634), m.Globals[0].ValHi)
+	})
+}
+
+// Test1797c tests that the program counter for V128*Shuffle is advanced correctly
+// even when an unreachable instruction is present.
+func Test1797c(t *testing.T) {
+	if !platform.CompilerSupported() {
+		return
+	}
+	run(t, func(t *testing.T, r wazero.Runtime) {
+		mod, err := r.Instantiate(ctx, getWasmBinary(t, "1797c"))
+		require.NoError(t, err, "wasm binary should build successfully")
+		m := mod.(*wasm.ModuleInstance)
+		params := make([]uint64, 20)
+		_, err = m.ExportedFunction("~zz\x00E1E\x00EE\x00$").Call(ctx, params...)
+		require.Error(t, err, "wasm error: unreachable")
+	})
+}
+
+// Test1797d tests that the registers are allocated correctly in Vbitselect.
+func Test1797d(t *testing.T) {
+	if !platform.CompilerSupported() {
+		return
+	}
+	run(t, func(t *testing.T, r wazero.Runtime) {
+		mod, err := r.Instantiate(ctx, getWasmBinary(t, "1797d"))
+		require.NoError(t, err, "wasm binary should build successfully")
+		m := mod.(*wasm.ModuleInstance)
+		params := make([]uint64, 20)
+		_, err = m.ExportedFunction("p").Call(ctx, params...)
+		require.NoError(t, err)
+		require.Equal(t, uint64(15092115255309870764), m.Globals[2].Val)
+		require.Equal(t, uint64(9241386435284803069), m.Globals[2].ValHi)
+	})
+}

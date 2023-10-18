@@ -358,15 +358,22 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
 		rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
 		creg := m.getOperand_NR(m.compiler.ValueDefinition(c), extModeNone)
+		tmp := operandNR(m.compiler.AllocateVReg(ssa.TypeV128))
+
 		// creg is overwritten by BSL, so we need to move it to the result register before the instruction
 		// in case when it is used somewhere else.
 		rd := m.compiler.VRegOf(instr.Return())
 		mov := m.allocateInstr()
-		mov.asFpuMov128(rd, creg.nr())
+		mov.asFpuMov128(tmp.nr(), creg.nr())
 		m.insert(mov)
+
 		ins := m.allocateInstr()
-		ins.asVecRRR(vecOpBsl, operandNR(rd), rn, rm, vecArrangement16B)
+		ins.asVecRRR(vecOpBsl, tmp, rn, rm, vecArrangement16B)
 		m.insert(ins)
+
+		mov2 := m.allocateInstr()
+		mov2.asFpuMov128(rd, tmp.nr())
+		m.insert(mov2)
 	case ssa.OpcodeVanyTrue, ssa.OpcodeVallTrue:
 		x, lane := instr.ArgWithLane()
 		var arr vecArrangement
@@ -751,31 +758,32 @@ func (m *machine) lowerVShift(op ssa.Opcode, rd, rn, rm operand, arr vecArrangem
 		panic("unsupported arrangment " + arr.String())
 	}
 
-	tmp := operandNR(m.compiler.AllocateVReg(ssa.TypeV128))
+	rtmp := operandNR(m.compiler.AllocateVReg(ssa.TypeI64))
+	vtmp := operandNR(m.compiler.AllocateVReg(ssa.TypeV128))
 
 	and := m.allocateInstr()
-	and.asALUBitmaskImm(aluOpAnd, tmp.nr(), rm.nr(), uint64(modulo), false)
+	and.asALUBitmaskImm(aluOpAnd, rtmp.nr(), rm.nr(), uint64(modulo), true)
 	m.insert(and)
 
 	if op != ssa.OpcodeVIshl {
 		// Negate the amount to make this as right shift.
 		neg := m.allocateInstr()
-		neg.asALU(aluOpSub, tmp, operandNR(xzrVReg), tmp, false)
+		neg.asALU(aluOpSub, rtmp, operandNR(xzrVReg), rtmp, true)
 		m.insert(neg)
 	}
 
 	// Copy the shift amount into a vector register as sshl/ushl requires it to be there.
 	dup := m.allocateInstr()
-	dup.asVecDup(tmp, tmp, arr)
+	dup.asVecDup(vtmp, rtmp, arr)
 	m.insert(dup)
 
 	if op == ssa.OpcodeVIshl || op == ssa.OpcodeVSshr {
 		sshl := m.allocateInstr()
-		sshl.asVecRRR(vecOpSshl, rd, rn, tmp, arr)
+		sshl.asVecRRR(vecOpSshl, rd, rn, vtmp, arr)
 		m.insert(sshl)
 	} else {
 		ushl := m.allocateInstr()
-		ushl.asVecRRR(vecOpUshl, rd, rn, tmp, arr)
+		ushl.asVecRRR(vecOpUshl, rd, rn, vtmp, arr)
 		m.insert(ushl)
 	}
 }
