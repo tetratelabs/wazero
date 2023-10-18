@@ -355,8 +355,7 @@ func TestMachine_collectAddends(t *testing.T) {
 				iadd3 := insertIadd(ctx, b, iadd1.Return(), iadd2.Return())
 				return iadd3.Return(), func(t *testing.T) {
 					for _, instr := range []*ssa.Instruction{iadd1, iadd2, iadd3} {
-						_, lowerd := ctx.lowered[instr]
-						require.True(t, lowerd)
+						require.True(t, instr.Lowered())
 					}
 				}
 			},
@@ -371,8 +370,7 @@ func TestMachine_collectAddends(t *testing.T) {
 				iadd3 := insertIadd(ctx, b, iadd1.Return(), iadd2.Return())
 				return iadd3.Return(), func(t *testing.T) {
 					for _, instr := range []*ssa.Instruction{iadd1, iadd2, iadd3} {
-						_, lowerd := ctx.lowered[instr]
-						require.True(t, lowerd)
+						require.True(t, instr.Lowered())
 					}
 				}
 			},
@@ -390,8 +388,7 @@ func TestMachine_collectAddends(t *testing.T) {
 
 				return iadd4.Return(), func(t *testing.T) {
 					for _, instr := range []*ssa.Instruction{iadd1, iadd2, iadd3, iadd4} {
-						_, lowerd := ctx.lowered[instr]
-						require.True(t, lowerd)
+						require.True(t, instr.Lowered())
 					}
 					// Param must be zero-extended.
 					require.Equal(t, "uxtw x1?, w1000?", formatEmittedInstructionsInCurrentBlock(m))
@@ -411,8 +408,7 @@ func TestMachine_collectAddends(t *testing.T) {
 				iadd4 := insertIadd(ctx, b, param, ext.Return())
 				return iadd4.Return(), func(t *testing.T) {
 					for _, instr := range []*ssa.Instruction{ext, iadd4} {
-						_, lowerd := ctx.lowered[instr]
-						require.True(t, lowerd)
+						require.True(t, instr.Lowered())
 					}
 				}
 			},
@@ -430,8 +426,7 @@ func TestMachine_collectAddends(t *testing.T) {
 				iadd4 := insertIadd(ctx, b, param, ext.Return())
 				return iadd4.Return(), func(t *testing.T) {
 					for _, instr := range []*ssa.Instruction{ext, iadd4} {
-						_, lowerd := ctx.lowered[instr]
-						require.True(t, lowerd)
+						require.True(t, instr.Lowered())
 					}
 				}
 			},
@@ -449,8 +444,7 @@ func TestMachine_collectAddends(t *testing.T) {
 				iadd4 := insertIadd(ctx, b, param, ext.Return())
 				return iadd4.Return(), func(t *testing.T) {
 					for _, instr := range []*ssa.Instruction{ext, iadd4} {
-						_, lowerd := ctx.lowered[instr]
-						require.True(t, lowerd)
+						require.True(t, instr.Lowered())
 					}
 				}
 			},
@@ -466,8 +460,7 @@ func TestMachine_collectAddends(t *testing.T) {
 				iadd4 := insertIadd(ctx, b, param, ext.Return())
 				return iadd4.Return(), func(t *testing.T) {
 					for _, instr := range []*ssa.Instruction{ext, iadd4} {
-						_, lowerd := ctx.lowered[instr]
-						require.True(t, lowerd)
+						require.True(t, instr.Lowered())
 					}
 				}
 			},

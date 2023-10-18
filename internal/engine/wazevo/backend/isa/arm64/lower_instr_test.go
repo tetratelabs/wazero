@@ -58,8 +58,7 @@ func TestMachine_LowerConditionalBranch(t *testing.T) {
 		}
 		builder.InsertInstruction(b)
 		return b, func(t *testing.T) {
-			_, ok := ctx.lowered[cmpInstr]
-			require.True(t, ok)
+			require.True(t, cmpInstr.Lowered())
 		}
 	}
 
@@ -92,8 +91,7 @@ func TestMachine_LowerConditionalBranch(t *testing.T) {
 		}
 		builder.InsertInstruction(b)
 		return b, func(t *testing.T) {
-			_, ok := ctx.lowered[icmp]
-			require.True(t, ok)
+			require.True(t, icmp.Lowered())
 		}
 	}
 
@@ -123,8 +121,7 @@ func TestMachine_LowerConditionalBranch(t *testing.T) {
 				// Indicate that currently compiling in the different group.
 				ctx.currentGID = 1000
 				return brz, func(t *testing.T) {
-					_, ok := ctx.lowered[icmp]
-					require.False(t, ok)
+					require.False(t, icmp.Lowered())
 				}
 			},
 			instructions: []string{"cbz w3?, (L1)"},

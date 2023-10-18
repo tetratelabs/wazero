@@ -23,11 +23,8 @@ func newCompiler(ctx context.Context, mach Machine, builder ssa.Builder) *compil
 
 	c := &compiler{
 		mach: mach, ssaBuilder: builder,
-		alreadyLowered:  make(map[*ssa.Instruction]bool),
-		vRegSet:         make(map[regalloc.VReg]bool),
-		ssaTypeOfVRegID: make(map[regalloc.VRegID]ssa.Type),
-		nextVRegID:      0,
-		regAlloc:        regalloc.NewAllocator(mach.RegisterInfo(registerSetDebug)),
+		nextVRegID: 0,
+		regAlloc:   regalloc.NewAllocator(mach.RegisterInfo(registerSetDebug)),
 	}
 	mach.SetCompiler(c)
 	return c
@@ -74,10 +71,6 @@ type Compiler interface {
 
 	// AllocateVReg allocates a new virtual register of the given type.
 	AllocateVReg(typ ssa.Type) regalloc.VReg
-
-	// MarkLowered is used to mark the given instruction as already lowered
-	// which tells the compiler to skip it when traversing.
-	MarkLowered(inst *ssa.Instruction)
 
 	// ValueDefinition returns the definition of the given value.
 	ValueDefinition(ssa.Value) *SSAValueDefinition
@@ -127,25 +120,24 @@ type compiler struct {
 	// nextVRegID is the next virtual register ID to be allocated.
 	nextVRegID regalloc.VRegID
 	// ssaValueToVRegs maps ssa.ValueID to regalloc.VReg.
-	ssaValueToVRegs []regalloc.VReg
+	ssaValueToVRegs [] /* VRegID to */ regalloc.VReg
 	// ssaValueDefinitions maps ssa.ValueID to its definition.
 	ssaValueDefinitions []SSAValueDefinition
 	// ssaValueRefCounts is a cached list obtained by ssa.Builder.ValueRefCounts().
 	ssaValueRefCounts []int
 	// returnVRegs is the list of virtual registers that store the return values.
-	returnVRegs    []regalloc.VReg
-	alreadyLowered map[*ssa.Instruction]bool
-	regAlloc       regalloc.Allocator
-	varEdges       [][2]regalloc.VReg
-	varEdgeTypes   []ssa.Type
-	constEdges     []struct {
+	returnVRegs  []regalloc.VReg
+	regAlloc     regalloc.Allocator
+	varEdges     [][2]regalloc.VReg
+	varEdgeTypes []ssa.Type
+	constEdges   []struct {
 		cInst *ssa.Instruction
 		dst   regalloc.VReg
 	}
-	vRegSet         map[regalloc.VReg]bool
+	vRegSet         []bool
 	tempRegs        []regalloc.VReg
 	tmpVals         []ssa.Value
-	ssaTypeOfVRegID map[regalloc.VRegID]ssa.Type
+	ssaTypeOfVRegID [] /* VRegID to */ ssa.Type
 	buf             []byte
 	relocations     []RelocationInfo
 	sourceOffsets   []SourceOffsetInfo
@@ -284,43 +276,28 @@ func (c *compiler) assignVirtualRegisters() {
 func (c *compiler) AllocateVReg(typ ssa.Type) regalloc.VReg {
 	regType := regalloc.RegTypeOf(typ)
 	r := regalloc.VReg(c.nextVRegID).SetRegType(regType)
-	c.ssaTypeOfVRegID[r.ID()] = typ
+
+	id := r.ID()
+	if int(id) >= len(c.ssaTypeOfVRegID) {
+		c.ssaTypeOfVRegID = append(c.ssaTypeOfVRegID, make([]ssa.Type, id+1)...)
+	}
+	c.ssaTypeOfVRegID[id] = typ
 	c.nextVRegID++
 	return r
 }
 
 // Init implements Compiler.Init.
 func (c *compiler) Init() {
-	for i, v := range c.ssaValueToVRegs {
-		c.ssaValueToVRegs[i] = regalloc.VRegInvalid
-		delete(c.ssaTypeOfVRegID, v.ID())
-	}
 	c.currentGID = 0
 	c.nextVRegID = 0
 	c.returnVRegs = c.returnVRegs[:0]
 	c.mach.Reset()
 	c.varEdges = c.varEdges[:0]
 	c.constEdges = c.constEdges[:0]
-
-	for key := range c.alreadyLowered {
-		c.alreadyLowered[key] = false
-	}
-	c.resetVRegSet()
 	c.regAlloc.Reset()
 	c.buf = c.buf[:0]
 	c.sourceOffsets = c.sourceOffsets[:0]
 	c.relocations = c.relocations[:0]
-}
-
-func (c *compiler) resetVRegSet() {
-	for key := range c.vRegSet {
-		c.vRegSet[key] = false
-	}
-}
-
-// MarkLowered implements Compiler.MarkLowered.
-func (c *compiler) MarkLowered(inst *ssa.Instruction) {
-	c.alreadyLowered[inst] = true
 }
 
 // ValueDefinition implements Compiler.ValueDefinition.
@@ -340,11 +317,7 @@ func (c *compiler) Format() string {
 
 // TypeOf implements Compiler.Format.
 func (c *compiler) TypeOf(v regalloc.VReg) ssa.Type {
-	typ, ok := c.ssaTypeOfVRegID[v.ID()]
-	if !ok {
-		panic(fmt.Sprintf("BUG: v%d is not a valid vreg", v.ID()))
-	}
-	return typ
+	return c.ssaTypeOfVRegID[v.ID()]
 }
 
 // MatchInstr implements Compiler.MatchInstr.

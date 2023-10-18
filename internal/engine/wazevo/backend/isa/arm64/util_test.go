@@ -55,7 +55,6 @@ type mockCompiler struct {
 	vRegCounter int
 	vRegMap     map[ssa.Value]regalloc.VReg
 	definitions map[ssa.Value]*backend.SSAValueDefinition
-	lowered     map[*ssa.Instruction]bool
 	sigs        map[ssa.SignatureID]*ssa.Signature
 	typeOf      map[regalloc.VReg]ssa.Type
 	relocs      []backend.RelocationInfo
@@ -89,7 +88,6 @@ func newMockCompilationContext() *mockCompiler {
 	return &mockCompiler{
 		vRegMap:     make(map[ssa.Value]regalloc.VReg),
 		definitions: make(map[ssa.Value]*backend.SSAValueDefinition),
-		lowered:     make(map[*ssa.Instruction]bool),
 	}
 }
 
@@ -103,11 +101,6 @@ func (m *mockCompiler) AllocateVReg(typ ssa.Type) regalloc.VReg {
 	m.vRegCounter++
 	regType := regalloc.RegTypeOf(typ)
 	return regalloc.VReg(m.vRegCounter).SetRegType(regType)
-}
-
-// MarkLowered implements backend.Compiler.
-func (m *mockCompiler) MarkLowered(inst *ssa.Instruction) {
-	m.lowered[inst] = true
 }
 
 // ValueDefinition implements backend.Compiler.
