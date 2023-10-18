@@ -1,96 +1,12 @@
 package regalloc
 
 import (
+	"sort"
+	"strconv"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
-
-func TestAllocator_buildNeighborsByLiveNodes(t *testing.T) {
-	for _, tc := range []struct {
-		name          string
-		lives         []liveNodeInBlock
-		expectedEdges [][2]int
-	}{
-		{name: "empty", lives: []liveNodeInBlock{}},
-		{
-			name: "one node",
-			lives: []liveNodeInBlock{
-				{rangeIndex: 0, n: &node{ranges: []liveRange{{begin: 0, end: 1}}}},
-			},
-		},
-		{
-			name: "no overlap",
-			lives: []liveNodeInBlock{
-				{rangeIndex: 4, n: &node{ranges: []liveRange{
-					{}, {}, {}, {}, {begin: 0, end: 1},
-				}}},
-				{rangeIndex: 1, n: &node{v: VReg(0).SetRegType(RegTypeInt), ranges: []liveRange{
-					{}, {begin: 2, end: 3},
-				}}},
-				// This overlaps with the above, but is not the same type.
-				{rangeIndex: 0, n: &node{v: VReg(1).SetRegType(RegTypeFloat), ranges: []liveRange{
-					{begin: 2, end: 3},
-				}}},
-			},
-		},
-		{
-			name: "overlap",
-			lives: []liveNodeInBlock{
-				{rangeIndex: 0, n: &node{v: VReg(0).SetRegType(RegTypeInt), ranges: []liveRange{
-					{begin: 2, end: 50},
-				}}},
-				{rangeIndex: 0, n: &node{v: VReg(1).SetRegType(RegTypeInt), ranges: []liveRange{
-					{begin: 2, end: 3},
-				}}},
-				// This overlaps with the above, but is not the same type.
-				{rangeIndex: 0, n: &node{v: VReg(2).SetRegType(RegTypeFloat), ranges: []liveRange{
-					{begin: 2, end: 100},
-				}}},
-				{rangeIndex: 0, n: &node{v: VReg(3).SetRegType(RegTypeFloat), ranges: []liveRange{
-					{begin: 100, end: 100},
-				}}},
-			},
-			expectedEdges: [][2]int{
-				{0, 1}, {2, 3},
-			},
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			a := NewAllocator(&RegisterInfo{})
-
-			a.buildNeighborsByLiveNodes(tc.lives)
-
-			expectedNeighborCounts := map[*node]int{}
-			for _, edge := range tc.expectedEdges {
-				i1, i2 := edge[0], edge[1]
-				n1, n2 := tc.lives[i1].n, tc.lives[i2].n
-
-				var found bool
-				for _, neighbor := range n2.neighbors {
-					if neighbor == n1 {
-						found = true
-						break
-					}
-				}
-				require.True(t, found)
-				found = false
-				for _, neighbor := range n1.neighbors {
-					if neighbor == n2 {
-						found = true
-						break
-					}
-				}
-				require.True(t, found)
-				expectedNeighborCounts[n1]++
-				expectedNeighborCounts[n2]++
-			}
-			for _, n := range tc.lives {
-				require.Equal(t, expectedNeighborCounts[n.n], len(n.n.neighbors))
-			}
-		})
-	}
-}
 
 func TestAllocator_collectNodesByRegType(t *testing.T) {
 	a := NewAllocator(&RegisterInfo{})
@@ -318,4 +234,75 @@ func TestAllocator_assignColor(t *testing.T) {
 		ok := a.allocatedRegSet[n.r]
 		require.True(t, ok)
 	})
+}
+
+func TestAllocator_buildNeighbors(t *testing.T) {
+	a := NewAllocator(&RegisterInfo{})
+	a.dedup = make([]bool, 1000) // Enough large.
+
+	newNode := func(id int) *node {
+		return &node{id: id}
+	}
+
+	newNodes := func(ids ...int) []*node {
+		var ns []*node
+		for _, id := range ids {
+			ns = append(ns, newNode(id))
+		}
+		return ns
+	}
+
+	for i, tc := range []struct {
+		n   *node
+		exp []int
+	}{
+		{n: newNode(0)},
+		{
+			n: &node{
+				ranges: []*intervalTreeNode{
+					{nodes: newNodes(1, 2, 3)},
+					{nodes: newNodes(4, 5, 1, 2, 3)},
+				},
+			},
+			exp: []int{1, 2, 3, 4, 5},
+		},
+		{
+			n: &node{
+				ranges: []*intervalTreeNode{
+					{nodes: newNodes(1, 2, 3)},
+					{nodes: newNodes(1, 2, 3)},
+					{nodes: newNodes(1, 2, 3)},
+					{nodes: newNodes(1, 2, 3)},
+					{nodes: newNodes(4, 5, 1, 2, 3)},
+				},
+			},
+			exp: []int{1, 2, 3, 4, 5},
+		},
+		{
+			n: &node{
+				ranges: []*intervalTreeNode{
+					{nodes: newNodes(1, 2, 3)},
+					{nodes: newNodes(4), neighbors: []*intervalTreeNode{
+						{nodes: newNodes(5, 6)},
+						{nodes: newNodes(100, 200)},
+					}},
+				},
+			},
+			exp: []int{1, 2, 3, 4, 5, 6, 100, 200},
+		},
+	} {
+		tc := tc
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			a.buildNeighborsFor(tc.n)
+			var collected []int
+			for _, nei := range tc.n.neighbors {
+				collected = append(collected, nei.id)
+			}
+			sort.Ints(collected)
+			require.Equal(t, tc.exp, collected)
+			for i := range a.dedup {
+				require.False(t, a.dedup[i]) // must be cleaned up.
+			}
+		})
+	}
 }

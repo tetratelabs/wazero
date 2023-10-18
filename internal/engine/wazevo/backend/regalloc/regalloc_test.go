@@ -1,8 +1,6 @@
 package regalloc
 
 import (
-	"math"
-	"sort"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -473,173 +471,6 @@ func TestAllocator_livenessAnalysis_copy(t *testing.T) {
 	require.Nil(t, n2.copyToVReg)
 }
 
-func TestAllocator_buildLiveRangesForNonReals(t *testing.T) {
-	const blockID = 100
-	const v1, v2, v3, v4, v5 = 1, 2, 3, 4, 5
-	for _, tc := range []struct {
-		name string
-		info *blockInfo
-		exps map[VReg][]liveRange
-	}{
-		{
-			name: "no defs without outs",
-			info: &blockInfo{
-				liveIns: map[VReg]struct{}{
-					v1: {}, v2: {}, v3: {},
-				},
-				kills: map[VReg]programCounter{v1: 1111, v2: 2222, v3: 3333},
-			},
-			exps: map[VReg][]liveRange{
-				v1: {{blockID: blockID, begin: 0, end: 1111}},
-				v2: {{blockID: blockID, begin: 0, end: 2222}},
-				v3: {{blockID: blockID, begin: 0, end: 3333}},
-			},
-		},
-		{
-			name: "no defs with outs",
-			info: &blockInfo{
-				liveIns: map[VReg]struct{}{
-					v1: {}, v2: {}, v3: {},
-				},
-				liveOuts: map[VReg]struct{}{v1: {}},
-				kills:    map[VReg]programCounter{v2: 2222, v3: 3333},
-			},
-			exps: map[VReg][]liveRange{
-				v1: {{blockID: blockID, begin: 0, end: math.MaxInt64}},
-				v2: {{blockID: blockID, begin: 0, end: 2222}},
-				v3: {{blockID: blockID, begin: 0, end: 3333}},
-			},
-		},
-		{
-			name: "only defs with outs",
-			info: &blockInfo{
-				defs:     map[VReg]programCounter{v1: 1, v2: 2, v3: 3},
-				liveOuts: map[VReg]struct{}{v1: {}},
-				kills:    map[VReg]programCounter{v2: 2222, v3: 3333},
-			},
-			exps: map[VReg][]liveRange{
-				v1: {{blockID: blockID, begin: 1, end: math.MaxInt64}},
-				v2: {{blockID: blockID, begin: 2, end: 2222}},
-				v3: {{blockID: blockID, begin: 3, end: 3333}},
-			},
-		},
-		{
-			name: "only defs without outs",
-			info: &blockInfo{
-				defs: map[VReg]programCounter{v1: 1, v2: 2, v3: 3},
-				// Defined but not killed is allowed: v1 is unused variable.
-				kills: map[VReg]programCounter{v2: 2222, v3: 3333},
-			},
-			exps: map[VReg][]liveRange{
-				v1: {{blockID: blockID, begin: 1, end: 1}}, // Defined and not used: [defined, defined].
-				v2: {{blockID: blockID, begin: 2, end: 2222}},
-				v3: {{blockID: blockID, begin: 3, end: 3333}},
-			},
-		},
-		{
-			name: "mix and match",
-			info: &blockInfo{
-				liveIns:  map[VReg]struct{}{v1: {}, v2: {}},
-				liveOuts: map[VReg]struct{}{v1: {}, v5: {}},
-				defs:     map[VReg]programCounter{v3: 3, v4: 4, v5: 5},
-				kills:    map[VReg]programCounter{v2: 2222, v4: 4444},
-			},
-			exps: map[VReg][]liveRange{
-				v1: {{blockID: blockID, begin: 0, end: math.MaxInt64}},
-				v2: {{blockID: blockID, begin: 0, end: 2222}},
-				v3: {{blockID: blockID, begin: 3, end: 3}},
-				v4: {{blockID: blockID, begin: 4, end: 4444}},
-				v5: {{blockID: blockID, begin: 5, end: math.MaxInt64}},
-			},
-		},
-	} {
-		tc := tc
-		t.Run(tc.name, func(t *testing.T) {
-			a := NewAllocator(&RegisterInfo{})
-			a.buildLiveRangesForNonReals(blockID, tc.info)
-			require.Equal(t, len(tc.exps), a.nodePool.Allocated())
-			for v, exp := range tc.exps {
-				liveNodes := tc.info.liveNodes
-				initMapInInfo(tc.info)
-				tc.info.liveNodes = liveNodes
-				t.Run(v.String(), func(t *testing.T) {
-					n := a.vRegIDToNode[v.ID()]
-					require.Equal(t, exp, n.ranges)
-					var found bool
-					for _, ln := range liveNodes {
-						if ln.n == n {
-							found = true
-							break
-						}
-					}
-					require.True(t, found)
-				})
-			}
-		})
-	}
-}
-
-func TestAllocator_buildLiveRangesForReals(t *testing.T) {
-	realReg, realReg2 := FromRealReg(50, RegTypeInt), FromRealReg(100, RegTypeInt)
-	const blockID = 10
-	for _, tc := range []struct {
-		allocatableRealRegs map[RealReg]struct{}
-		name                string
-		info                *blockInfo
-		exps                map[VReg][]liveRange
-	}{
-		{
-			name:                "ok",
-			allocatableRealRegs: map[RealReg]struct{}{realReg.RealReg(): {}, realReg2.RealReg(): {}},
-			info: &blockInfo{
-				realRegDefs: map[VReg][]programCounter{
-					realReg:  {0, 10, 100},
-					realReg2: {5},
-				},
-				realRegUses: map[VReg][]programCounter{
-					realReg:  {1, 11, 101},
-					realReg2: {10},
-				},
-			},
-			exps: map[VReg][]liveRange{
-				realReg:  {{begin: 0, end: 1}, {begin: 10, end: 11}, {begin: 100, end: 101}},
-				realReg2: {{begin: 5, end: 10}},
-			},
-		},
-	} {
-		tc := tc
-		t.Run(tc.name, func(t *testing.T) {
-			initMapInInfo(tc.info)
-			a := NewAllocator(&RegisterInfo{})
-			for r := range tc.allocatableRealRegs {
-				a.allocatableSet[r] = true
-			}
-			a.buildLiveRangesForReals(blockID, tc.info)
-
-			actual := map[VReg][]liveRange{}
-			for _, n := range tc.info.liveNodes {
-				n := n.n
-				r := n.ranges[0]
-				actual[n.v] = append(actual[n.v], liveRange{begin: r.begin, end: r.end, blockID: r.blockID})
-				sort.Slice(actual[n.v], func(i, j int) bool {
-					return actual[n.v][i].begin < actual[n.v][j].begin
-				})
-			}
-
-			require.Equal(t, len(tc.exps), len(actual))
-			for v, exp := range tc.exps {
-				t.Run(v.String(), func(t *testing.T) {
-					actual := actual[v]
-					for i := range exp {
-						exp[i].blockID = blockID
-					}
-					require.Equal(t, exp, actual)
-				})
-			}
-		})
-	}
-}
-
 func TestAllocator_recordCopyRelation(t *testing.T) {
 	t.Run("real/real", func(t *testing.T) {
 		// Just ensure that it doesn't panic.
@@ -686,6 +517,9 @@ func TestAllocator_recordCopyRelation(t *testing.T) {
 }
 
 func initMapInInfo(info *blockInfo) {
+	if info.intervalTree == nil {
+		info.intervalTree = newIntervalTree()
+	}
 	if info.liveIns == nil {
 		info.liveIns = make(map[VReg]struct{})
 	}
