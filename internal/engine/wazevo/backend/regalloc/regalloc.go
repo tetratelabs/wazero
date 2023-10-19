@@ -22,7 +22,6 @@ func NewAllocator(allocatableRegs *RegisterInfo) Allocator {
 	a := Allocator{
 		regInfo:  allocatableRegs,
 		nodePool: wazevoapi.NewPool[node](resetNode),
-		phis:     make(map[VReg]Block),
 	}
 	for _, regs := range allocatableRegs.AllocatableRegisters {
 		for _, r := range regs {
@@ -61,7 +60,8 @@ type (
 		vs           []VReg
 		spillHandler spillHandler
 		// phis keeps track of the VRegs that are defined by phi functions.
-		phis map[VReg]Block
+		phiBlocks []Block
+		phis      []VReg
 
 		// Followings are re-used during various places e.g. coloring.
 		realRegSet [RealRegsNumMax]bool
@@ -157,7 +157,12 @@ func (a *Allocator) livenessAnalysis(f Function) {
 		// If this is not the entry block, we should define phi nodes, which are not defined by instructions.
 		for _, p := range blk.BlockParams() {
 			info.defs[p] = 0 // Earliest definition is at the beginning of the block.
-			a.phis[p] = blk
+			a.phis = append(a.phis, p)
+			pid := int(p.ID())
+			if diff := pid + 1 - len(a.phiBlocks); diff > 0 {
+				a.phiBlocks = append(a.phiBlocks, make([]Block, diff+1)...)
+			}
+			a.phiBlocks[pid] = blk
 		}
 	}
 
@@ -194,7 +199,8 @@ func (a *Allocator) livenessAnalysis(f Function) {
 				}
 			}
 			if instr.IsCopy() {
-				if _, ok := a.phis[dstVR]; ok {
+				id := int(dstVR.ID())
+				if id < len(a.phiBlocks) && a.phiBlocks[id] != nil {
 					info.liveOuts[srcVR] = struct{}{}
 				}
 				a.recordCopyRelation(dstVR, srcVR)
@@ -208,7 +214,8 @@ func (a *Allocator) livenessAnalysis(f Function) {
 	}
 
 	// Run the Algorithm 9.9. in the book. This will construct blockInfo.liveIns and blockInfo.liveOuts.
-	for phi, blk := range a.phis {
+	for _, phi := range a.phis {
+		blk := a.phiBlocks[phi.ID()]
 		a.beginUpAndMarkStack(f, phi, true, blk)
 	}
 	for _, v := range a.vs {
@@ -452,7 +459,10 @@ func (a *Allocator) Reset() {
 	a.nodes1 = a.nodes1[:0]
 	a.nodes2 = a.nodes2[:0]
 	a.realRegs = a.realRegs[:0]
-	resetMap(a, a.phis)
+	for _, phi := range a.phis {
+		a.phiBlocks[phi.ID()] = nil
+	}
+	a.phis = a.phis[:0]
 	a.vs = a.vs[:0]
 }
 
