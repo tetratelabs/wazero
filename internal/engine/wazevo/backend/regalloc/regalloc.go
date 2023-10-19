@@ -80,16 +80,16 @@ type (
 		lastUses map[VReg]programCounter
 		kills    map[VReg]programCounter
 		// Pre-colored real registers can have multiple live ranges in one block.
-		realRegUses  map[VReg][]programCounter
-		realRegDefs  map[VReg][]programCounter
-		intervalTree *intervalTree
+		realRegUses map[VReg][]programCounter
+		realRegDefs map[VReg][]programCounter
+		intervalMng *intervalManager
 	}
 
 	// node represents a VReg.
 	node struct {
 		id     int
 		v      VReg
-		ranges []*intervalTreeNode
+		ranges []*interval
 		// r is the real register assigned to this node. It is either a pre-colored register or a register assigned during allocation.
 		r RealReg
 		// neighbors are the nodes that this node interferes with. Such neighbors have the same RegType as this node.
@@ -300,6 +300,7 @@ func (a *Allocator) buildLiveRanges(f Function) {
 		info := a.blockInfoAt(blkID)
 		a.buildLiveRangesForNonReals(info)
 		a.buildLiveRangesForReals(info)
+		info.intervalMng.build()
 	}
 }
 
@@ -334,7 +335,7 @@ func (a *Allocator) buildLiveRangesForNonReals(info *blockInfo) {
 			begin, end = 0, killPos
 		}
 		n := a.getOrAllocateNode(v)
-		intervalNode := info.intervalTree.insert(n, begin, end)
+		intervalNode := info.intervalMng.insert(n, begin, end)
 		n.ranges = append(n.ranges, intervalNode)
 	}
 
@@ -375,7 +376,7 @@ func (a *Allocator) buildLiveRangesForNonReals(info *blockInfo) {
 			}
 		}
 		n := a.getOrAllocateNode(v)
-		intervalNode := info.intervalTree.insert(n, defPos, end)
+		intervalNode := info.intervalMng.insert(n, defPos, end)
 		n.ranges = append(n.ranges, intervalNode)
 	}
 
@@ -431,7 +432,7 @@ func (a *Allocator) buildLiveRangesForReals(info *blockInfo) {
 			n.r = v.RealReg()
 			n.v = v
 			defined, used := defs[i], uses[i]
-			intervalNode := info.intervalTree.insert(n, defined, used)
+			intervalNode := info.intervalMng.insert(n, defined, used)
 			n.ranges = append(n.ranges, intervalNode)
 		}
 	}
@@ -517,10 +518,10 @@ func resetMap[T any](a *Allocator, m map[VReg]T) {
 }
 
 func (a *Allocator) initBlockInfo(i *blockInfo) {
-	if i.intervalTree == nil {
-		i.intervalTree = newIntervalTree()
+	if i.intervalMng == nil {
+		i.intervalMng = newIntervalManager()
 	} else {
-		i.intervalTree.reset()
+		i.intervalMng.reset()
 	}
 	if i.liveOuts == nil {
 		i.liveOuts = make(map[VReg]struct{})

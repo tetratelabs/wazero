@@ -23,20 +23,21 @@ func (a *Allocator) assignRegistersPerBlock(f Function, blk Block, vRegIDToNode 
 	blkID := blk.ID()
 	var pc programCounter
 	for instr := blk.InstrIteratorBegin(); instr != nil; instr = blk.InstrIteratorNext() {
-		tree := a.blockInfos[blkID].intervalTree
+		tree := a.blockInfos[blkID].intervalMng
 		a.assignRegistersPerInstr(f, pc, instr, vRegIDToNode, tree)
 		pc += pcStride
 	}
 }
 
-func (a *Allocator) assignRegistersPerInstr(f Function, pc programCounter, instr Instr, vRegIDToNode []*node, tree *intervalTree) {
+func (a *Allocator) assignRegistersPerInstr(f Function, pc programCounter, instr Instr, vRegIDToNode []*node, intervalMng *intervalManager) {
 	if indirect := instr.IsIndirectCall(); instr.IsCall() || indirect {
-		// Only take care of non-real VRegs (e.g. VReg.IsRealReg() == false) since
-		// the real VRegs are already placed in the right registers at this point.
-		tree.collectActiveNonRealVRegsAt(
+		intervalMng.collectActiveNodes(
 			// To find the all the live registers "after" call, we need to add pcDefOffset for search.
 			pc+pcDefOffset,
 			&a.nodes1,
+			// Only take care of non-real VRegs (e.g. VReg.IsRealReg() == false) since
+			// the real VRegs are already placed in the right registers at this point.
+			false,
 		)
 		for _, active := range a.nodes1 {
 			if r := active.r; a.regInfo.isCallerSaved(r) {
@@ -101,19 +102,19 @@ func (a *Allocator) assignRegistersPerInstr(f Function, pc programCounter, instr
 		panic("BUG: multiple def instructions must be special cased")
 	}
 
-	a.handleSpills(f, pc, instr, usesSpills, defSpill, tree)
+	a.handleSpills(f, pc, instr, usesSpills, defSpill, intervalMng)
 	a.vs = usesSpills[:0] // for reuse.
 }
 
 func (a *Allocator) handleSpills(
 	f Function, pc programCounter, instr Instr,
-	usesSpills []VReg, defSpill VReg, tree *intervalTree,
+	usesSpills []VReg, defSpill VReg, intervalMng *intervalManager,
 ) {
 	_usesSpills, _defSpill := len(usesSpills) > 0, defSpill.Valid()
 	switch {
 	case !_usesSpills && !_defSpill: // Nothing to do.
 	case !_usesSpills && _defSpill: // Only definition is spilled.
-		tree.collectActiveRealRegNodesAt(pc+pcDefOffset, &a.nodes1)
+		intervalMng.collectActiveNodes(pc+pcDefOffset, &a.nodes1, true)
 		a.spillHandler.init(a.nodes1, instr)
 
 		r, evictedNode := a.spillHandler.getUnusedOrEvictReg(defSpill.RegType(), a.regInfo)
@@ -129,7 +130,7 @@ func (a *Allocator) handleSpills(
 		f.StoreRegisterAfter(defSpill, instr)
 
 	case _usesSpills:
-		tree.collectActiveRealRegNodesAt(pc, &a.nodes1)
+		intervalMng.collectActiveNodes(pc, &a.nodes1, true)
 		a.spillHandler.init(a.nodes1, instr)
 
 		var evicted [3]*node
@@ -173,7 +174,7 @@ func (a *Allocator) handleSpills(
 
 			if !defSpill.IsRealReg() {
 				// This case, the destination register type is different from the source registers.
-				tree.collectActiveRealRegNodesAt(pc+pcDefOffset, &a.nodes1)
+				intervalMng.collectActiveNodes(pc+pcDefOffset, &a.nodes1, true)
 				a.spillHandler.init(a.nodes1, instr)
 				r, evictedNode := a.spillHandler.getUnusedOrEvictReg(defSpill.RegType(), a.regInfo)
 				if evictedNode != nil {

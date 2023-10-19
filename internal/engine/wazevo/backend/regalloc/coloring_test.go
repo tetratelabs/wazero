@@ -259,7 +259,7 @@ func TestAllocator_buildNeighbors(t *testing.T) {
 		{n: newNode(0)},
 		{
 			n: &node{
-				ranges: []*intervalTreeNode{
+				ranges: []*interval{
 					{nodes: newNodes(1, 2, 3)},
 					{nodes: newNodes(4, 5, 1, 2, 3)},
 				},
@@ -268,7 +268,7 @@ func TestAllocator_buildNeighbors(t *testing.T) {
 		},
 		{
 			n: &node{
-				ranges: []*intervalTreeNode{
+				ranges: []*interval{
 					{nodes: newNodes(1, 2, 3)},
 					{nodes: newNodes(1, 2, 3)},
 					{nodes: newNodes(1, 2, 3)},
@@ -280,9 +280,9 @@ func TestAllocator_buildNeighbors(t *testing.T) {
 		},
 		{
 			n: &node{
-				ranges: []*intervalTreeNode{
+				ranges: []*interval{
 					{nodes: newNodes(1, 2, 3)},
-					{nodes: newNodes(4), neighbors: []*intervalTreeNode{
+					{nodes: newNodes(4), neighbors: []*interval{
 						{nodes: newNodes(5, 6)},
 						{nodes: newNodes(100, 200)},
 					}},
