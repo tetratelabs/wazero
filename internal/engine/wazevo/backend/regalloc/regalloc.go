@@ -78,7 +78,7 @@ type (
 		liveOuts map[VReg]struct{}
 		liveIns  map[VReg]struct{}
 		defs     map[VReg]programCounter
-		lastUses map[VReg]programCounter
+		lastUses VRegTable
 		kills    map[VReg]programCounter
 		// Pre-colored real registers can have multiple live ranges in one block.
 		realRegUses [vRegIDReservedForRealNum][]programCounter
@@ -172,6 +172,23 @@ func (a *Allocator) livenessAnalysis(f Function) {
 	for blk := f.PostOrderBlockIteratorBegin(); blk != nil; blk = f.PostOrderBlockIteratorNext() {
 		info := a.blockInfoAt(blk.ID())
 
+		// We have to do a first pass to find the lowest VRegID in the block;
+		// this is used to reduce memory utilization in the VRegTable, which
+		// can avoid allocating memory for registers zero to minVRegID-1.
+		minVRegID := [numRegTypes]VRegID{MaxVRegID, MaxVRegID, MaxVRegID, MaxVRegID}
+		for instr := blk.InstrIteratorBegin(); instr != nil; instr = blk.InstrIteratorNext() {
+			for _, use := range instr.Uses() {
+				if !use.IsRealReg() {
+					rt := use.RegType()
+					id := use.ID()
+					if id < minVRegID[rt] {
+						minVRegID[rt] = id
+					}
+				}
+			}
+		}
+		info.lastUses.Reset(minVRegID)
+
 		var pc programCounter
 		for instr := blk.InstrIteratorBegin(); instr != nil; instr = blk.InstrIteratorNext() {
 			var srcVR, dstVR VReg
@@ -181,7 +198,7 @@ func (a *Allocator) livenessAnalysis(f Function) {
 				if use.IsRealReg() {
 					info.addRealRegUsage(use, pos)
 				} else {
-					info.lastUses[use] = pos
+					info.lastUses.Insert(use, pos)
 				}
 			}
 			for _, def := range instr.Defs() {
@@ -209,7 +226,6 @@ func (a *Allocator) livenessAnalysis(f Function) {
 			}
 			pc += pcStride
 		}
-
 		if wazevoapi.RegAllocLoggingEnabled {
 			fmt.Printf("prepared block info for block[%d]:\n%s\n\n", blk.ID(), info.Format(a.regInfo))
 		}
@@ -231,13 +247,13 @@ func (a *Allocator) livenessAnalysis(f Function) {
 	// Now that we finished gathering liveIns, liveOuts, defs, and lastUses, the only thing left is to construct kills.
 	for blk := f.PostOrderBlockIteratorBegin(); blk != nil; blk = f.PostOrderBlockIteratorNext() { // Order doesn't matter.
 		info := a.blockInfoAt(blk.ID())
-		lastUses, outs := info.lastUses, info.liveOuts
-		for use, pc := range lastUses {
+		outs := info.liveOuts
+		info.lastUses.Range(func(use VReg, pc programCounter) {
 			// Usage without live-outs is a kill.
 			if _, ok := outs[use]; !ok {
 				info.kills[use] = pc
 			}
-		}
+		})
 
 		if wazevoapi.RegAllocLoggingEnabled {
 			fmt.Printf("\nfinalized info for block[%d]:\n%s\n", blk.ID(), info.Format(a.regInfo))
@@ -251,7 +267,7 @@ func (a *Allocator) beginUpAndMarkStack(f Function, v VReg, isPhi bool, phiDefin
 			panic(fmt.Sprintf("block without predecessor must be optimized out by the compiler: %d", blk.ID()))
 		}
 		info := a.blockInfoAt(blk.ID())
-		if _, ok := info.lastUses[v]; !ok {
+		if !info.lastUses.Contains(v) {
 			continue
 		}
 		// TODO: we might want to avoid recursion here.
@@ -463,7 +479,7 @@ func (a *Allocator) Reset() {
 
 func (a *Allocator) allocateBlockInfo(blockID int) *blockInfo {
 	if blockID >= len(a.blockInfos) {
-		a.blockInfos = append(a.blockInfos, make([]blockInfo, blockID+1)...)
+		a.blockInfos = append(a.blockInfos, make([]blockInfo, (blockID+1)-len(a.blockInfos))...)
 	}
 	info := &a.blockInfos[blockID]
 	a.initBlockInfo(info)
@@ -543,11 +559,6 @@ func (a *Allocator) initBlockInfo(i *blockInfo) {
 	} else {
 		resetMap(a, i.defs)
 	}
-	if i.lastUses == nil {
-		i.lastUses = make(map[VReg]programCounter)
-	} else {
-		resetMap(a, i.lastUses)
-	}
 	if i.kills == nil {
 		i.kills = make(map[VReg]programCounter)
 	} else {
@@ -587,9 +598,9 @@ func (i *blockInfo) Format(ri *RegisterInfo) string {
 		buf.WriteString(fmt.Sprintf("%v@%v ", v, pos))
 	}
 	buf.WriteString("\n\tlastUses: ")
-	for v, pos := range i.lastUses {
+	i.lastUses.Range(func(v VReg, pos programCounter) {
 		buf.WriteString(fmt.Sprintf("%v@%v ", v, pos))
-	}
+	})
 	buf.WriteString("\n\tkills: ")
 	for v, pos := range i.kills {
 		buf.WriteString(fmt.Sprintf("%v@%v ", v, pos))

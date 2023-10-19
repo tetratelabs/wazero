@@ -2,6 +2,7 @@ package regalloc
 
 import (
 	"fmt"
+	"math/bits"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 )
@@ -12,6 +13,10 @@ type VReg uint64
 
 // VRegID is the lower 32bit of VReg, which is the pure identifier of VReg without RealReg info.
 type VRegID uint32
+
+const (
+	MaxVRegID = ^VRegID(0)
+)
 
 // RealReg returns the RealReg of this VReg.
 func (v VReg) RealReg() RealReg {
@@ -58,6 +63,118 @@ func (v VReg) Valid() bool {
 	return v.ID() != vRegIDInvalid && v.RegType() != RegTypeInvalid
 }
 
+// VRegTable is a data structure designed for fast association of program
+// counters to virtual registers.
+type VRegTable [numRegTypes]VRegTypeTable
+
+func (t *VRegTable) Contains(v VReg) bool {
+	return t[v.RegType()].Contains(v.ID())
+}
+
+func (t *VRegTable) Lookup(v VReg) programCounter {
+	return t[v.RegType()].Lookup(v.ID())
+}
+
+func (t *VRegTable) Insert(v VReg, p programCounter) {
+	if v.IsRealReg() {
+		panic("BUG: cannot insert real registers in virtual register table")
+	}
+	t[v.RegType()].Insert(v.ID(), p)
+}
+
+func (t *VRegTable) Range(f func(VReg, programCounter)) {
+	for i := range t {
+		t[i].Range(func(id VRegID, p programCounter) {
+			f(VReg(id).SetRegType(RegType(i)), p)
+		})
+	}
+}
+
+func (t *VRegTable) Reset(minVRegIDs [numRegTypes]VRegID) {
+	for i := range t {
+		t[i].Reset(minVRegIDs[i])
+	}
+}
+
+// VRegTypeTable implements a table for virtual registers of a specific type.
+//
+// The parent VRegTable uses 4 instances of this type to maintain a table for
+// each virtual register type.
+//
+// The virtual register type table uses a bitset to accelerate checking whether
+// a virtual register exists in the table. The bitset also helps identify which
+// slots in the program counter array are used, since the table is sparse and
+// some locations may not be occupied and will have the value zero even though
+// zero is a valid program counter value.
+type VRegTypeTable struct {
+	min VRegID
+	set bitset
+	pcs []programCounter
+}
+
+func (t *VRegTypeTable) Contains(id VRegID) bool {
+	return t.set.has(uint(id - t.min))
+}
+
+func (t *VRegTypeTable) Lookup(id VRegID) programCounter {
+	if id := int(id - t.min); t.set.has(uint(id)) {
+		return t.pcs[id]
+	}
+	return -1
+}
+
+func (t *VRegTypeTable) Insert(id VRegID, p programCounter) {
+	if p < 0 {
+		panic("BUG: cannot insert negative program counter in virtual register table")
+	}
+	i := int(id - t.min)
+	if len(t.pcs) <= i {
+		t.pcs = append(t.pcs, make([]programCounter, (i+1)-len(t.pcs))...)
+	}
+	t.set.set(uint(i))
+	t.pcs[i] = p
+}
+
+func (t *VRegTypeTable) Range(f func(VRegID, programCounter)) {
+	t.set.scan(func(i uint) { f(VRegID(i)+t.min, t.pcs[i]) })
+}
+
+func (t *VRegTypeTable) Reset(minVRegID VRegID) {
+	t.min = minVRegID
+	t.set.reset()
+	t.pcs = t.pcs[:0]
+}
+
+type bitset []uint64
+
+func (b bitset) scan(f func(uint)) {
+	for i, v := range b {
+		for j := uint(i * 64); v != 0; j++ {
+			n := uint(bits.TrailingZeros64(v))
+			j += n
+			v >>= (n + 1)
+			f(j)
+		}
+	}
+}
+
+func (b bitset) has(i uint) bool {
+	index, shift := i/64, i%64
+	return index < uint(len(b)) && ((b[index] & (1 << shift)) != 0)
+}
+
+func (b *bitset) set(i uint) {
+	index, shift := i/64, i%64
+	if index >= uint(len(*b)) {
+		*b = append(*b, make([]uint64, (index+1)-uint(len(*b)))...)
+	}
+	(*b)[index] |= 1 << shift
+}
+
+func (b *bitset) reset() {
+	*b = (*b)[:0]
+}
+
 // RealReg represents a physical register.
 type RealReg byte
 
@@ -96,6 +213,7 @@ const (
 	RegTypeInt
 	RegTypeFloat
 	RegTypeNum
+	numRegTypes // keep last
 )
 
 // String implements fmt.Stringer.
