@@ -79,7 +79,7 @@ type (
 		liveIns  map[VReg]struct{}
 		defs     map[VReg]programCounter
 		lastUses VRegTable
-		kills    map[VReg]struct{}
+		kills    VRegSet
 		// Pre-colored real registers can have multiple live ranges in one block.
 		realRegUses [vRegIDReservedForRealNum][]programCounter
 		realRegDefs [vRegIDReservedForRealNum][]programCounter
@@ -184,6 +184,7 @@ func (a *Allocator) livenessAnalysis(f Function) {
 			}
 		}
 		info.lastUses.Reset(minVRegID)
+		info.kills.Reset(minVRegID)
 
 		var pc programCounter
 		for instr := blk.InstrIteratorBegin(); instr != nil; instr = blk.InstrIteratorNext() {
@@ -247,7 +248,7 @@ func (a *Allocator) livenessAnalysis(f Function) {
 		info.lastUses.Range(func(use VReg, pc programCounter) {
 			// Usage without live-outs is a kill.
 			if _, ok := outs[use]; !ok {
-				info.kills[use] = struct{}{}
+				info.kills.Insert(use)
 			}
 		})
 
@@ -326,7 +327,7 @@ func (a *Allocator) buildLiveRanges(f Function) {
 }
 
 func (a *Allocator) buildLiveRangesForNonReals(info *blockInfo) {
-	ins, outs, defs, kills := info.liveIns, info.liveOuts, info.defs, info.kills
+	ins, outs, defs := info.liveIns, info.liveOuts, info.defs
 
 	// In order to do the deterministic allocation, we need to sort ins.
 	vs := a.vs[:0]
@@ -344,12 +345,11 @@ func (a *Allocator) buildLiveRangesForNonReals(info *blockInfo) {
 		if _, ok := outs[v]; ok {
 			// v is live-in and live-out, so it is live-through.
 			begin, end = 0, math.MaxInt32
-			if _, ok := kills[v]; ok {
+			if info.kills.Contains(v) {
 				panic("BUG: v is live-out but also killed")
 			}
 		} else {
-			_, ok := kills[v]
-			if !ok {
+			if !info.kills.Contains(v) {
 				panic("BUG: v is live-in but not live-out or use")
 			}
 			// v is killed at killPos.
@@ -383,12 +383,11 @@ func (a *Allocator) buildLiveRangesForNonReals(info *blockInfo) {
 		if _, ok := outs[v]; ok {
 			// v is defined here and live-out, so it is live-through.
 			end = math.MaxInt32
-			if _, ok := kills[v]; ok {
+			if info.kills.Contains(v) {
 				panic("BUG: v is killed here but also killed")
 			}
 		} else {
-			_, ok := kills[v]
-			if !ok {
+			if !info.kills.Contains(v) {
 				// This case the defined value is not used at all.
 				end = defPos
 			} else {
@@ -405,7 +404,7 @@ func (a *Allocator) buildLiveRangesForNonReals(info *blockInfo) {
 	a.vs = vs[:0]
 
 	if wazevoapi.RegAllocValidationEnabled {
-		for u := range kills {
+		info.kills.Range(func(u VReg) {
 			if !u.IsRealReg() {
 				_, defined := defs[u]
 				_, liveIn := ins[u]
@@ -413,7 +412,7 @@ func (a *Allocator) buildLiveRangesForNonReals(info *blockInfo) {
 					panic(fmt.Sprintf("BUG: %v is killed but not defined or live-in", u))
 				}
 			}
-		}
+		})
 	}
 }
 
@@ -555,11 +554,6 @@ func (a *Allocator) initBlockInfo(i *blockInfo) {
 	} else {
 		resetMap(a, i.defs)
 	}
-	if i.kills == nil {
-		i.kills = make(map[VReg]struct{})
-	} else {
-		resetMap(a, i.kills)
-	}
 
 	for index := range i.realRegUses {
 		i.realRegUses[index] = i.realRegUses[index][:0]
@@ -598,9 +592,9 @@ func (i *blockInfo) Format(ri *RegisterInfo) string {
 		buf.WriteString(fmt.Sprintf("%v@%v ", v, pos))
 	})
 	buf.WriteString("\n\tkills: ")
-	for v, pos := range i.kills {
-		buf.WriteString(fmt.Sprintf("%v@%v ", v, pos))
-	}
+	i.kills.Range(func(v VReg) {
+		buf.WriteString(fmt.Sprintf("%v@%v ", v, i.lastUses.Lookup(v)))
+	})
 	buf.WriteString("\n\trealRegUses: ")
 	for v, pos := range i.realRegUses {
 		if len(pos) > 0 {

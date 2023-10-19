@@ -114,7 +114,7 @@ func (t *VRegTable) Reset(minVRegIDs VRegIDMinSet) {
 
 // VRegTypeTable implements a table for virtual registers of a specific type.
 //
-// The parent VRegTable uses 4 instances of this type to maintain a table for
+// The parent VRegTable uses 3 instances of this type to maintain a table for
 // each virtual register type.
 //
 // The virtual register type table uses a bitset to accelerate checking whether
@@ -159,6 +159,72 @@ func (t *VRegTypeTable) Reset(minVRegID VRegID) {
 	t.min = minVRegID
 	t.set = nil
 	t.pcs = nil
+}
+
+// VRegSet is a data structure designed for fast lookup in a set of virtual
+// registers.
+//
+// The type maintains one instance of VRegTypeSet for each register type:
+// invalid, int, and float. It dispatches between the sub sets based on the
+// type of virtual registers that are inserted.
+//
+// Note that there is no way to delete entries, the sets are constructed and
+// then used until they are either reset or go unused.
+type VRegSet [NumRegType]VRegTypeSet
+
+func (s *VRegSet) Contains(v VReg) bool {
+	return s[v.RegType()].Contains(v.ID())
+}
+
+func (s *VRegSet) Insert(v VReg) {
+	if v.IsRealReg() {
+		panic("BUG: cannot insert real registers in virtual register table")
+	}
+	s[v.RegType()].Insert(v.ID())
+}
+
+func (s *VRegSet) Range(f func(VReg)) {
+	for i := range s {
+		s[i].Range(func(id VRegID) {
+			f(VReg(id).SetRegType(RegType(i)))
+		})
+	}
+}
+
+func (s *VRegSet) Reset(minVRegIDs VRegIDMinSet) {
+	for i := range s {
+		s[i].Reset(minVRegIDs.Min(RegType(i)))
+	}
+}
+
+// VRegTypeSet implements a set for virtual registers of a specific type.
+//
+// The parent VRegSet uses 3 instances of this type to maintain a table for each
+// virtual register type.
+//
+// The virtual register type set uses a bitset to minimize the memory footprint,
+// registers ids are offseted by the minimum entry, and represented by a bit bit
+// set to 1 in the bitset.
+type VRegTypeSet struct {
+	min VRegID
+	set bitset
+}
+
+func (s *VRegTypeSet) Contains(id VRegID) bool {
+	return s.set.has(uint(id - s.min))
+}
+
+func (s *VRegTypeSet) Insert(id VRegID) {
+	s.set.set(uint(id - s.min))
+}
+
+func (s *VRegTypeSet) Range(f func(VRegID)) {
+	s.set.scan(func(i uint) { f(VRegID(i) + s.min) })
+}
+
+func (s *VRegTypeSet) Reset(minVRegID VRegID) {
+	s.min = minVRegID
+	s.set = nil
 }
 
 type bitset []uint64

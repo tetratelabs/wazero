@@ -55,3 +55,31 @@ func TestVRegTable(t *testing.T) {
 	})
 	require.Equal(t, 0, len(vregs))
 }
+
+func TestVRegSet(t *testing.T) {
+	min := VRegIDMinSet{}
+	min.Observe(VReg(vRegIDReservedForRealNum + 2))
+	min.Observe(VReg(vRegIDReservedForRealNum + 1))
+	min.Observe(VReg(vRegIDReservedForRealNum + 0))
+
+	set := VRegSet{}
+	set.Reset(min)
+	set.Insert(VReg(vRegIDReservedForRealNum + 0))
+	set.Insert(VReg(vRegIDReservedForRealNum + 1))
+	set.Insert(VReg(vRegIDReservedForRealNum + 2))
+
+	vregs := map[VReg]struct{}{}
+	set.Range(func(v VReg) {
+		vregs[v] = struct{}{}
+	})
+	require.Equal(t, 3, len(vregs))
+
+	for v := range vregs {
+		require.True(t, set.Contains(v))
+	}
+
+	set.Range(func(v VReg) {
+		delete(vregs, v)
+	})
+	require.Equal(t, 0, len(vregs))
+}
