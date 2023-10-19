@@ -158,7 +158,7 @@ func (t *VRegTypeTable) Range(f func(VRegID, programCounter)) {
 func (t *VRegTypeTable) Reset(minVRegID VRegID) {
 	t.min = minVRegID
 	t.set.reset()
-	t.pcs = nil
+	t.pcs = t.pcs[:0]
 }
 
 // VRegSet is a data structure designed for fast lookup in a set of virtual
@@ -237,7 +237,7 @@ type bitset struct {
 }
 
 func (b *bitset) reset() {
-	b.bits, b.buf = nil, [5]uint64{}
+	b.bits, b.buf = b.bits[:0], [5]uint64{}
 }
 
 func (b *bitset) scan(f func(uint)) {
