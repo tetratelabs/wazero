@@ -42,6 +42,7 @@ type (
 		RealRegToVReg        []VReg
 		// RealRegName returns the name of the given RealReg for debugging.
 		RealRegName func(r RealReg) string
+		RealRegType func(r RealReg) RegType
 	}
 
 	// Allocator is a register allocator.
@@ -80,8 +81,8 @@ type (
 		lastUses map[VReg]programCounter
 		kills    map[VReg]programCounter
 		// Pre-colored real registers can have multiple live ranges in one block.
-		realRegUses map[VReg][]programCounter
-		realRegDefs map[VReg][]programCounter
+		realRegUses [vRegIDReservedForRealNum][]programCounter
+		realRegDefs [vRegIDReservedForRealNum][]programCounter
 		intervalMng *intervalManager
 	}
 
@@ -185,9 +186,10 @@ func (a *Allocator) livenessAnalysis(f Function) {
 			}
 			for _, def := range instr.Defs() {
 				dstVR = def
+				defID := def.ID()
 				pos := pc + pcDefOffset
 				if def.IsRealReg() {
-					info.realRegDefs[def] = append(info.realRegDefs[def], pos)
+					info.realRegDefs[defID] = append(info.realRegDefs[defID], pos)
 				} else {
 					if _, ok := info.defs[def]; !ok {
 						// This means that this VReg is defined multiple times in a series of instructions
@@ -407,37 +409,30 @@ func (a *Allocator) buildLiveRangesForNonReals(info *blockInfo) {
 func (a *Allocator) buildLiveRangesForReals(info *blockInfo) {
 	ds, us := info.realRegDefs, info.realRegUses
 
-	// In order to do the deterministic compilation, we need to sort the registers.
-	a.vs = a.vs[:0]
-	for v := range us {
+	for i := 0; i < RealRegsNumMax; i++ {
+		r := RealReg(i)
 		// Non allocation target registers are not needed here.
-		if !a.allocatableSet[v.RealReg()] {
+		if !a.allocatableSet[r] {
 			continue
 		}
-		a.vs = append(a.vs, v)
-	}
-	sort.SliceStable(a.vs, func(i, j int) bool {
-		return a.vs[i].RealReg() < a.vs[j].RealReg()
-	})
 
-	for _, v := range a.vs {
-		uses := us[v]
-		defs, ok := ds[v]
-		if !ok || len(defs) != len(uses) {
+		uses := us[r]
+		defs := ds[r]
+		if len(defs) != len(uses) {
 			// This is likely a bug of the Instr interface implementation and/or ABI around call instructions.
 			// E.g. call or ret instructions should specify that they use all the real registers (calling convention).
 			panic(
 				fmt.Sprintf(
 					"BUG: real register (%s) is defined and used, but the number of defs and uses are different: %d (defs) != %d (uses)",
-					a.regInfo.RealRegName(v.RealReg()), len(defs), len(uses),
+					a.regInfo.RealRegName(r), len(defs), len(uses),
 				),
 			)
 		}
 
 		for i := range uses {
 			n := a.allocateNode()
-			n.r = v.RealReg()
-			n.v = v
+			n.r = r
+			n.v = FromRealReg(r, a.regInfo.RealRegType(r))
 			defined, used := defs[i], uses[i]
 			intervalNode := info.intervalMng.insert(n, defined, used)
 			n.ranges = append(n.ranges, intervalNode)
@@ -558,26 +553,22 @@ func (a *Allocator) initBlockInfo(i *blockInfo) {
 	} else {
 		resetMap(a, i.kills)
 	}
-	if i.realRegUses == nil {
-		i.realRegUses = make(map[VReg][]programCounter)
-	} else {
-		resetMap(a, i.realRegUses)
-	}
-	if i.realRegDefs == nil {
-		i.realRegDefs = make(map[VReg][]programCounter)
-	} else {
-		resetMap(a, i.realRegDefs)
+
+	for index := range i.realRegUses {
+		i.realRegUses[index] = i.realRegUses[index][:0]
+		i.realRegDefs[index] = i.realRegDefs[index][:0]
 	}
 }
 
 func (i *blockInfo) addRealRegUsage(v VReg, pc programCounter) {
-	defs := i.realRegDefs[v]
+	id := v.ID()
+	defs := i.realRegDefs[id]
 	if len(defs) == 0 {
 		// If the definition not found yet but used, this must be a function preamble,
 		// so we let's assume it is defined at the beginning.
-		i.realRegDefs[v] = append(i.realRegDefs[v], 0)
+		i.realRegDefs[id] = append(i.realRegDefs[id], 0)
 	}
-	i.realRegUses[v] = append(i.realRegUses[v], pc)
+	i.realRegUses[id] = append(i.realRegUses[id], pc)
 }
 
 // Format is for debugging.
@@ -605,11 +596,15 @@ func (i *blockInfo) Format(ri *RegisterInfo) string {
 	}
 	buf.WriteString("\n\trealRegUses: ")
 	for v, pos := range i.realRegUses {
-		buf.WriteString(fmt.Sprintf("%s@%v ", ri.RealRegName(v.RealReg()), pos))
+		if len(pos) > 0 {
+			buf.WriteString(fmt.Sprintf("%s@%v ", ri.RealRegName(RealReg(v)), pos))
+		}
 	}
 	buf.WriteString("\n\trealRegDefs: ")
 	for v, pos := range i.realRegDefs {
-		buf.WriteString(fmt.Sprintf("%s@%v ", ri.RealRegName(v.RealReg()), pos))
+		if len(pos) > 0 {
+			buf.WriteString(fmt.Sprintf("%s@%v ", ri.RealRegName(RealReg(v)), pos))
+		}
 	}
 	return buf.String()
 }

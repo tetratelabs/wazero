@@ -227,6 +227,7 @@ func (m *machine) RegisterInfo(debug bool) *regalloc.RegisterInfo {
 		regInfoDebug.CallerSavedRegisters = regInfo.CallerSavedRegisters
 		regInfoDebug.RealRegToVReg = regInfo.RealRegToVReg
 		regInfoDebug.RealRegName = regInfo.RealRegName
+		regInfoDebug.RealRegType = regInfo.RealRegType
 		regInfoDebug.AllocatableRegisters[regalloc.RegTypeFloat] = []regalloc.RealReg{
 			v18,                            // One callee saved.
 			v7, v6, v5, v4, v3, v2, v1, v0, // Allocatable sets == Argument registers.
