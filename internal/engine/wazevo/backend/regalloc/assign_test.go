@@ -11,7 +11,7 @@ func TestAllocator_assignRegistersPerInstr(t *testing.T) {
 		a := NewAllocator(&RegisterInfo{CallerSavedRegisters: [RealRegsNumMax]bool{1: true, 3: true}})
 		pc := programCounter(5)
 
-		tree := newIntervalTree()
+		manager := newIntervalManager()
 		liveNodes := []*node{
 			{r: 1, v: 0xa},
 			{r: RealRegInvalid, v: 0xb},           // Spill. not save target.
@@ -20,12 +20,13 @@ func TestAllocator_assignRegistersPerInstr(t *testing.T) {
 			{r: 4, v: 0xd}, // real reg, but not caller saved. not save target
 		}
 		for _, n := range liveNodes {
-			tree.insert(n, 5, 20)
+			manager.insert(n, 5, 20)
 		}
+		manager.build()
 		call := newMockInstr().asCall()
 		blk := newMockBlock(0, call).entry()
 		f := newMockFunction(blk)
-		a.assignRegistersPerInstr(f, pc, call, nil, tree)
+		a.assignRegistersPerInstr(f, pc, call, nil, manager)
 
 		require.Equal(t, 2, len(f.befores))
 		require.Equal(t, 2, len(f.afters))
@@ -36,8 +37,8 @@ func TestAllocator_assignRegistersPerInstr(t *testing.T) {
 		functionPtrVRegID := 0x0
 		functionPtrVReg := VReg(functionPtrVRegID).SetRegType(RegTypeInt)
 		functionPtrLiveNode := &node{r: 0xf, v: functionPtrVReg}
-		tree := newIntervalTree()
-		tree.insert(functionPtrLiveNode, 4, pc)
+		manager := newIntervalManager()
+		manager.insert(functionPtrLiveNode, 4, pc)
 		liveNodes := []*node{
 			{r: 1, v: 0xa},
 			{r: 2, v: FromRealReg(1, RegTypeInt)}, // Real reg-backed VReg. not target
@@ -45,12 +46,13 @@ func TestAllocator_assignRegistersPerInstr(t *testing.T) {
 			{r: 4, v: 0xd}, // real reg, but not caller saved. not save target
 		}
 		for _, n := range liveNodes {
-			tree.insert(n, 5, 20)
+			manager.insert(n, 5, 20)
 		}
+		manager.build()
 		callInd := newMockInstr().asIndirectCall().use(functionPtrVReg)
 		blk := newMockBlock(0, callInd).entry()
 		f := newMockFunction(blk)
-		a.assignRegistersPerInstr(f, pc, callInd, []*node{0: functionPtrLiveNode}, tree)
+		a.assignRegistersPerInstr(f, pc, callInd, []*node{0: functionPtrLiveNode}, manager)
 
 		require.Equal(t, 2, len(f.befores))
 		require.Equal(t, 2, len(f.afters))
@@ -71,17 +73,17 @@ func TestAllocator_assignRegistersPerInstr(t *testing.T) {
 			{r: 3, v: 0xc},
 			{r: 4, v: 0xd}, // real reg, but not caller saved. not save target
 		}
-		tree := newIntervalTree()
+		manager := newIntervalManager()
 		for _, n := range liveNodes {
-			tree.insert(n, 5, 20)
+			manager.insert(n, 5, 20)
 		}
-
+		manager.build()
 		callInd := newMockInstr().asIndirectCall().use(functionPtrVReg)
 		blk := newMockBlock(0, callInd).entry()
 		f := newMockFunction(blk)
 		a.assignRegistersPerInstr(f, pc, callInd, []*node{
 			0: {r: RealRegInvalid},
-		}, tree)
+		}, manager)
 
 		require.Equal(t, 3, len(f.befores))
 		require.Equal(t, 2, len(f.afters))
@@ -132,10 +134,11 @@ func TestAllocator_handleSpills(t *testing.T) {
 			{r: RealReg(0xb), v: 0xa},
 			{r: RealReg(0xc), v: 0xc},
 		}
-		tree := newIntervalTree()
+		manager := newIntervalManager()
 		for _, n := range liveNodes {
-			tree.insert(n, pc, 20)
+			manager.insert(n, pc, 20)
 		}
+		manager.build()
 		a := NewAllocator(&RegisterInfo{
 			AllocatableRegisters: [3][]RealReg{RegTypeInt: {0xa, 0xb, 0xc}}, // Only live nodes are allocatable.
 		})
@@ -144,7 +147,7 @@ func TestAllocator_handleSpills(t *testing.T) {
 
 		vr := VReg(100).SetRegType(RegTypeInt)
 		instr := newMockInstr().def(vr)
-		a.handleSpills(f, pc, instr, nil, vr, tree)
+		a.handleSpills(f, pc, instr, nil, vr, manager)
 		require.Equal(t, 1, len(instr.defs))
 		require.Equal(t, RealReg(0xa), instr.defs[0].RealReg())
 
@@ -162,11 +165,11 @@ func TestAllocator_handleSpills(t *testing.T) {
 			{r: RealReg(0xb), v: 0xa},
 			{r: RealReg(0xc), v: 0xc},
 		}
-		tree := newIntervalTree()
+		manager := newIntervalManager()
 		for _, n := range liveNodes {
-			tree.insert(n, pc, 20)
+			manager.insert(n, pc, 20)
 		}
-
+		manager.build()
 		a := NewAllocator(&RegisterInfo{
 			AllocatableRegisters: [3][]RealReg{RegTypeInt: {0xb, 0xc}}, // Only live nodes are allocatable.
 		})
@@ -175,7 +178,7 @@ func TestAllocator_handleSpills(t *testing.T) {
 
 		vr := VReg(100).SetRegType(RegTypeInt)
 		instr := newMockInstr().def(vr)
-		a.handleSpills(f, pc, instr, nil, vr, tree)
+		a.handleSpills(f, pc, instr, nil, vr, manager)
 		require.Equal(t, 1, len(instr.defs))
 		require.Equal(t, RealReg(0xb), instr.defs[0].RealReg())
 
@@ -194,11 +197,11 @@ func TestAllocator_handleSpills(t *testing.T) {
 			{r: RealReg(0xc), v: 0xc},
 		}
 
-		tree := newIntervalTree()
+		manager := newIntervalManager()
 		for _, n := range liveNodes {
-			tree.insert(n, pc, 20)
+			manager.insert(n, pc, 20)
 		}
-
+		manager.build()
 		a := NewAllocator(&RegisterInfo{
 			AllocatableRegisters: [3][]RealReg{RegTypeInt: {0xb, 0xc, 0xf /* free */}},
 		})
@@ -207,7 +210,7 @@ func TestAllocator_handleSpills(t *testing.T) {
 
 		vr := VReg(100).SetRegType(RegTypeInt)
 		instr := newMockInstr().def(vr)
-		a.handleSpills(f, pc, instr, nil, vr, tree)
+		a.handleSpills(f, pc, instr, nil, vr, manager)
 		require.Equal(t, 1, len(instr.defs))
 		require.Equal(t, RealReg(0xf), instr.defs[0].RealReg())
 
@@ -223,11 +226,11 @@ func TestAllocator_handleSpills(t *testing.T) {
 			{r: RealReg(0xc), v: 0xc},
 		}
 
-		tree := newIntervalTree()
+		manager := newIntervalManager()
 		for _, n := range liveNodes {
-			tree.insert(n, pc, 20)
+			manager.insert(n, pc, 20)
 		}
-
+		manager.build()
 		a := NewAllocator(&RegisterInfo{
 			AllocatableRegisters: [3][]RealReg{
 				RegTypeInt:   {0xb, 0xc, 0xa /* free */},
@@ -241,7 +244,7 @@ func TestAllocator_handleSpills(t *testing.T) {
 			VReg(102).SetRegType(RegTypeFloat)
 		d1 := VReg(104).SetRegType(RegTypeFloat)
 		instr := newMockInstr().use(u1, u2, u3).def(d1)
-		a.handleSpills(f, pc, instr, []VReg{u1, u3}, d1, tree)
+		a.handleSpills(f, pc, instr, []VReg{u1, u3}, d1, manager)
 		require.Equal(t, []VReg{u1.SetRealReg(0xa), u2, u3.SetRealReg(0xf)}, instr.uses)
 		require.Equal(t, []VReg{d1.SetRealReg(0xf)}, instr.defs)
 
@@ -261,11 +264,11 @@ func TestAllocator_handleSpills(t *testing.T) {
 			{r: RealReg(0xf), v: 0xb},
 		}
 
-		tree := newIntervalTree()
+		manager := newIntervalManager()
 		for _, n := range liveNodes {
-			tree.insert(n, pc, 20)
+			manager.insert(n, pc, 20)
 		}
-
+		manager.build()
 		a := NewAllocator(&RegisterInfo{
 			AllocatableRegisters: [3][]RealReg{
 				RegTypeInt:   {0xb, 0xa /* free */},
@@ -277,7 +280,7 @@ func TestAllocator_handleSpills(t *testing.T) {
 		u1 := VReg(100).SetRegType(RegTypeInt)
 		d1 := VReg(104).SetRegType(RegTypeFloat)
 		instr := newMockInstr().use(u1).def(d1)
-		a.handleSpills(f, pc, instr, []VReg{u1}, d1, tree)
+		a.handleSpills(f, pc, instr, []VReg{u1}, d1, manager)
 		require.Equal(t, []VReg{u1.SetRealReg(0xa)}, instr.uses)
 		require.Equal(t, []VReg{d1.SetRealReg(0xf)}, instr.defs)
 
@@ -297,11 +300,11 @@ func TestAllocator_handleSpills(t *testing.T) {
 			{r: RealReg(0xc), v: 0xa},
 			{r: RealReg(0xf), v: 0xb},
 		}
-		tree := newIntervalTree()
+		manager := newIntervalManager()
 		for _, n := range liveNodes {
-			tree.insert(n, pc, 20)
+			manager.insert(n, pc, 20)
 		}
-
+		manager.build()
 		a := NewAllocator(&RegisterInfo{
 			AllocatableRegisters: [3][]RealReg{
 				RegTypeInt:   {0xb, 0xc},
@@ -313,7 +316,7 @@ func TestAllocator_handleSpills(t *testing.T) {
 		u1 := VReg(100).SetRegType(RegTypeInt)
 		d1 := VReg(104).SetRegType(RegTypeFloat)
 		instr := newMockInstr().use(u1).def(d1)
-		a.handleSpills(f, pc, instr, []VReg{u1}, d1, tree)
+		a.handleSpills(f, pc, instr, []VReg{u1}, d1, manager)
 		require.Equal(t, []VReg{u1.SetRealReg(0xb)}, instr.uses)
 		require.Equal(t, []VReg{d1.SetRealReg(0xf)}, instr.defs)
 

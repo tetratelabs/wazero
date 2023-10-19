@@ -446,7 +446,7 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 				exp := tc.exp[blockID]
 				initMapInInfo(exp)
 				saved := actual.intervalTree
-				actual.intervalTree = nil // Don't compare intervalTree.
+				actual.intervalTree = nil // Don't compare intervalManager.
 				require.Equal(t, exp, actual, "\n[exp for block[%d]]\n%s\n[actual for block[%d]]\n%s", blockID, exp, blockID, actual)
 				actual.intervalTree = saved
 			}
