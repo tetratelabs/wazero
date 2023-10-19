@@ -48,6 +48,12 @@ var regInfo = &regalloc.RegisterInfo{
 		v0: v0VReg, v1: v1VReg, v2: v2VReg, v3: v3VReg, v4: v4VReg, v5: v5VReg, v6: v6VReg, v7: v7VReg, v8: v8VReg, v9: v9VReg, v10: v10VReg, v11: v11VReg, v12: v12VReg, v13: v13VReg, v14: v14VReg, v15: v15VReg, v16: v16VReg, v17: v17VReg, v18: v18VReg, v19: v19VReg, v20: v20VReg, v21: v21VReg, v22: v22VReg, v23: v23VReg, v24: v24VReg, v25: v25VReg, v26: v26VReg, v27: v27VReg, v28: v28VReg, v29: v29VReg, v30: v30VReg, v31: v31VReg,
 	},
 	RealRegName: func(r regalloc.RealReg) string { return regNames[r] },
+	RealRegType: func(r regalloc.RealReg) regalloc.RegType {
+		if r < v0 {
+			return regalloc.RegTypeInt
+		}
+		return regalloc.RegTypeFloat
+	},
 }
 
 // abiImpl implements backend.FunctionABI.

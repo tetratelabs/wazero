@@ -7,7 +7,8 @@ import (
 )
 
 func TestAllocator_livenessAnalysis(t *testing.T) {
-	realReg, realReg2 := FromRealReg(50, RegTypeInt), FromRealReg(100, RegTypeInt)
+	const realRegID, realRegID2 = 50, 100
+	realReg, realReg2 := FromRealReg(realRegID, RegTypeInt), FromRealReg(realRegID2, RegTypeInt)
 	const phiVReg = 12345
 	for _, tc := range []struct {
 		name  string
@@ -83,11 +84,11 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 						4: pcStride + pcDefOffset,
 						5: pcStride + pcDefOffset,
 					},
-					realRegUses: map[VReg][]programCounter{
-						realReg: {pcStride*2 + pcUseOffset},
+					realRegUses: [vRegIDReservedForRealNum][]programCounter{
+						realRegID: {pcStride*2 + pcUseOffset},
 					},
-					realRegDefs: map[VReg][]programCounter{
-						realReg: {pcDefOffset},
+					realRegDefs: [vRegIDReservedForRealNum][]programCounter{
+						realRegID: {pcDefOffset},
 					},
 				},
 				2: {
@@ -144,13 +145,13 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 					liveOuts: map[VReg]struct{}{1000: {}},
 					lastUses: map[VReg]programCounter{1: pcUseOffset},
 					kills:    map[VReg]programCounter{1: pcUseOffset},
-					realRegDefs: map[VReg][]programCounter{
-						realReg:  {pcDefOffset, pcStride*4 + pcDefOffset},
-						realReg2: {pcStride*2 + pcDefOffset},
+					realRegDefs: [vRegIDReservedForRealNum][]programCounter{
+						realRegID:  {pcDefOffset, pcStride*4 + pcDefOffset},
+						realRegID2: {pcStride*2 + pcDefOffset},
 					},
-					realRegUses: map[VReg][]programCounter{
-						realReg:  {pcStride + pcUseOffset, pcStride*5 + pcUseOffset},
-						realReg2: {pcStride*3 + pcUseOffset},
+					realRegUses: [vRegIDReservedForRealNum][]programCounter{
+						realRegID:  {pcStride + pcUseOffset, pcStride*5 + pcUseOffset},
+						realRegID2: {pcStride*3 + pcUseOffset},
 					},
 				},
 				2: {
@@ -158,8 +159,8 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 					liveOuts:    map[VReg]struct{}{1000: {}},
 					lastUses:    map[VReg]programCounter{2: pcUseOffset},
 					kills:       map[VReg]programCounter{2: pcUseOffset},
-					realRegUses: map[VReg][]programCounter{realReg2: {pcUseOffset}},
-					realRegDefs: map[VReg][]programCounter{realReg2: {0}},
+					realRegUses: [vRegIDReservedForRealNum][]programCounter{realRegID2: {pcUseOffset}},
+					realRegDefs: [vRegIDReservedForRealNum][]programCounter{realRegID2: {0}},
 				},
 				3: {
 					liveIns:  map[VReg]struct{}{1000: {}},
@@ -534,12 +535,6 @@ func initMapInInfo(info *blockInfo) {
 	}
 	if info.lastUses == nil {
 		info.lastUses = make(map[VReg]programCounter)
-	}
-	if info.realRegUses == nil {
-		info.realRegUses = make(map[VReg][]programCounter)
-	}
-	if info.realRegDefs == nil {
-		info.realRegDefs = make(map[VReg][]programCounter)
 	}
 }
 
