@@ -175,15 +175,11 @@ func (a *Allocator) livenessAnalysis(f Function) {
 		// We have to do a first pass to find the lowest VRegID in the block;
 		// this is used to reduce memory utilization in the VRegTable, which
 		// can avoid allocating memory for registers zero to minVRegID-1.
-		minVRegID := [numRegTypes]VRegID{MaxVRegID, MaxVRegID, MaxVRegID, MaxVRegID}
+		minVRegID := VRegIDMinSet{}
 		for instr := blk.InstrIteratorBegin(); instr != nil; instr = blk.InstrIteratorNext() {
 			for _, use := range instr.Uses() {
 				if !use.IsRealReg() {
-					rt := use.RegType()
-					id := use.ID()
-					if id < minVRegID[rt] {
-						minVRegID[rt] = id
-					}
+					minVRegID.Observe(use)
 				}
 			}
 		}

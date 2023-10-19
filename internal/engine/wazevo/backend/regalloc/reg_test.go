@@ -27,7 +27,13 @@ func Test_FromRealReg(t *testing.T) {
 }
 
 func TestVRegTable(t *testing.T) {
+	min := VRegIDMinSet{}
+	min.Observe(VReg(vRegIDReservedForRealNum + 2))
+	min.Observe(VReg(vRegIDReservedForRealNum + 1))
+	min.Observe(VReg(vRegIDReservedForRealNum + 0))
+
 	table := VRegTable{}
+	table.Reset(min)
 	table.Insert(VReg(vRegIDReservedForRealNum+0), 1)
 	table.Insert(VReg(vRegIDReservedForRealNum+1), 10)
 	table.Insert(VReg(vRegIDReservedForRealNum+2), 100)

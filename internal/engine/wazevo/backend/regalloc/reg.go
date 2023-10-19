@@ -63,6 +63,22 @@ func (v VReg) Valid() bool {
 	return v.ID() != vRegIDInvalid && v.RegType() != RegTypeInvalid
 }
 
+// VRegIDMinSet is used to collect the minimum ID by type in a collection of
+// virtual registers.
+//
+// We store the min values + 1 so the zero-value of the VRegIDMinSet is valid.
+type VRegIDMinSet [numRegTypes]VRegID
+
+func (mins *VRegIDMinSet) Min(t RegType) VRegID {
+	return mins[t] - 1
+}
+
+func (mins *VRegIDMinSet) Observe(v VReg) {
+	if rt, id := v.RegType(), v.ID(); id < (mins[rt] - 1) {
+		mins[rt] = id + 1
+	}
+}
+
 // VRegTable is a data structure designed for fast association of program
 // counters to virtual registers.
 type VRegTable [numRegTypes]VRegTypeTable
@@ -90,9 +106,9 @@ func (t *VRegTable) Range(f func(VReg, programCounter)) {
 	}
 }
 
-func (t *VRegTable) Reset(minVRegIDs [numRegTypes]VRegID) {
+func (t *VRegTable) Reset(minVRegIDs VRegIDMinSet) {
 	for i := range t {
-		t[i].Reset(minVRegIDs[i])
+		t[i].Reset(minVRegIDs.Min(RegType(i)))
 	}
 }
 
@@ -141,8 +157,9 @@ func (t *VRegTypeTable) Range(f func(VRegID, programCounter)) {
 
 func (t *VRegTypeTable) Reset(minVRegID VRegID) {
 	t.min = minVRegID
-	t.set.reset()
-	t.pcs = t.pcs[:0]
+	t.max = minVRegID
+	t.set = nil
+	t.pcs = nil
 }
 
 type bitset []uint64
@@ -169,10 +186,6 @@ func (b *bitset) set(i uint) {
 		*b = append(*b, make([]uint64, (index+1)-uint(len(*b)))...)
 	}
 	(*b)[index] |= 1 << shift
-}
-
-func (b *bitset) reset() {
-	*b = (*b)[:0]
 }
 
 // RealReg represents a physical register.
