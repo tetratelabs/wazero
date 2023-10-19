@@ -2,8 +2,6 @@ package regalloc
 
 import (
 	"fmt"
-	"math"
-
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 )
 
@@ -31,7 +29,7 @@ func FromRealReg(r RealReg, typ RegType) VReg {
 	if rid > vRegIDReservedForRealNum {
 		panic(fmt.Sprintf("invalid real reg %d", r))
 	}
-	return VReg(vRegIDReservedForRealBegin + VRegID(r)).SetRealReg(r).SetRegType(typ)
+	return VReg(r).SetRealReg(r).SetRegType(typ)
 }
 
 // SetRealReg sets the RealReg of this VReg and returns the updated VReg.
@@ -65,11 +63,10 @@ type RealReg byte
 const RealRegInvalid RealReg = 0
 
 const (
-	vRegIDInvalid              VRegID = 1 << 31
-	vRegIDReservedForRealEnd          = vRegIDInvalid - 1
-	vRegIDReservedForRealBegin        = vRegIDReservedForRealEnd - vRegIDReservedForRealNum
-	vRegIDReservedForRealNum          = math.MaxUint8
-	VRegInvalid                       = VReg(vRegIDInvalid)
+	vRegIDInvalid            VRegID = 1 << 31
+	VRegIDNonReservedBegin          = vRegIDReservedForRealNum
+	vRegIDReservedForRealNum VRegID = 128
+	VRegInvalid                     = VReg(vRegIDInvalid)
 )
 
 // String implements fmt.Stringer.
@@ -85,7 +82,7 @@ func (r RealReg) String() string {
 // String implements fmt.Stringer.
 func (v VReg) String() string {
 	if v.IsRealReg() {
-		return fmt.Sprintf("r%d", v.ID()-vRegIDReservedForRealBegin)
+		return fmt.Sprintf("r%d", v.ID())
 	}
 	return fmt.Sprintf("v%d?", v.ID())
 }

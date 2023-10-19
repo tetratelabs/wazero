@@ -23,7 +23,7 @@ func newCompiler(ctx context.Context, mach Machine, builder ssa.Builder) *compil
 
 	c := &compiler{
 		mach: mach, ssaBuilder: builder,
-		nextVRegID: 0,
+		nextVRegID: regalloc.VRegIDNonReservedBegin,
 		regAlloc:   regalloc.NewAllocator(mach.RegisterInfo(registerSetDebug)),
 	}
 	mach.SetCompiler(c)
@@ -290,7 +290,7 @@ func (c *compiler) AllocateVReg(typ ssa.Type) regalloc.VReg {
 // Init implements Compiler.Init.
 func (c *compiler) Init() {
 	c.currentGID = 0
-	c.nextVRegID = 0
+	c.nextVRegID = regalloc.VRegIDNonReservedBegin
 	c.returnVRegs = c.returnVRegs[:0]
 	c.mach.Reset()
 	c.varEdges = c.varEdges[:0]
