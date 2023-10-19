@@ -23,7 +23,7 @@ func (a *Allocator) assignRegistersPerBlock(f Function, blk Block, vRegIDToNode 
 	blkID := blk.ID()
 	var pc programCounter
 	for instr := blk.InstrIteratorBegin(); instr != nil; instr = blk.InstrIteratorNext() {
-		tree := a.blockInfos[blkID].intervalTree
+		tree := a.blockInfos[blkID].intervalMng
 		a.assignRegistersPerInstr(f, pc, instr, vRegIDToNode, tree)
 		pc += pcStride
 	}
