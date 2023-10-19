@@ -67,7 +67,7 @@ func (v VReg) Valid() bool {
 // virtual registers.
 //
 // We store the min values + 1 so the zero-value of the VRegIDMinSet is valid.
-type VRegIDMinSet [numRegTypes]VRegID
+type VRegIDMinSet [NumRegType]VRegID
 
 func (mins *VRegIDMinSet) Min(t RegType) VRegID {
 	return mins[t] - 1
@@ -81,7 +81,7 @@ func (mins *VRegIDMinSet) Observe(v VReg) {
 
 // VRegTable is a data structure designed for fast association of program
 // counters to virtual registers.
-type VRegTable [numRegTypes]VRegTypeTable
+type VRegTable [NumRegType]VRegTypeTable
 
 func (t *VRegTable) Contains(v VReg) bool {
 	return t[v.RegType()].Contains(v.ID())
@@ -224,8 +224,7 @@ const (
 	RegTypeInvalid RegType = iota
 	RegTypeInt
 	RegTypeFloat
-	RegTypeNum
-	numRegTypes // keep last
+	NumRegType
 )
 
 // String implements fmt.Stringer.

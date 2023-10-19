@@ -13,7 +13,7 @@ import (
 const xArgRetRegMax, vArgRetRegMax = x7, v7 // x0-x7 & v0-v7.
 
 var regInfo = &regalloc.RegisterInfo{
-	AllocatableRegisters: [regalloc.RegTypeNum][]regalloc.RealReg{
+	AllocatableRegisters: [regalloc.NumRegType][]regalloc.RealReg{
 		// We don't allocate:
 		// - x18: Reserved by the macOS: https://developer.apple.com/documentation/xcode/writing-arm64-code-for-apple-platforms#Respect-the-purpose-of-specific-CPU-registers
 		// - x28: Reserved by Go runtime.

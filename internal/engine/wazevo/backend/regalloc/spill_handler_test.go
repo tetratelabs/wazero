@@ -29,7 +29,7 @@ func TestSpillHandler_getUnusedOrEvictReg(t *testing.T) {
 	require.Equal(t, 4, len(s.activeRegs))
 
 	regInfo := RegisterInfo{
-		AllocatableRegisters: [RegTypeNum][]RealReg{
+		AllocatableRegisters: [NumRegType][]RealReg{
 			RegTypeInt: {
 				RealReg(0xff), // unused.
 				RealReg(0), RealReg(1), RealReg(2),

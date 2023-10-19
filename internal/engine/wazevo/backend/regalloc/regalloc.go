@@ -36,7 +36,7 @@ type (
 	RegisterInfo struct {
 		// AllocatableRegisters is a 2D array of allocatable RealReg, indexed by regTypeNum and regNum.
 		// The order matters: the first element is the most preferred one when allocating.
-		AllocatableRegisters [RegTypeNum][]RealReg
+		AllocatableRegisters [NumRegType][]RealReg
 		CalleeSavedRegisters [RealRegsNumMax]bool
 		CallerSavedRegisters [RealRegsNumMax]bool
 		RealRegToVReg        []VReg
