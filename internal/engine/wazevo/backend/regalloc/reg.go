@@ -157,7 +157,6 @@ func (t *VRegTypeTable) Range(f func(VRegID, programCounter)) {
 
 func (t *VRegTypeTable) Reset(minVRegID VRegID) {
 	t.min = minVRegID
-	t.max = minVRegID
 	t.set = nil
 	t.pcs = nil
 }
