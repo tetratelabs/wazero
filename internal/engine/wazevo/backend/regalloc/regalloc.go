@@ -20,8 +20,9 @@ import (
 // NewAllocator returns a new Allocator.
 func NewAllocator(allocatableRegs *RegisterInfo) Allocator {
 	a := Allocator{
-		regInfo:  allocatableRegs,
-		nodePool: wazevoapi.NewPool[node](resetNode),
+		regInfo:       allocatableRegs,
+		nodePool:      wazevoapi.NewPool[node](resetNode),
+		blockInfoPool: wazevoapi.NewPool[blockInfo](resetBlockInfo),
 	}
 	for _, regs := range allocatableRegs.AllocatableRegisters {
 		for _, r := range regs {
@@ -55,9 +56,10 @@ type (
 		allocatedRegSet          [RealRegsNumMax]bool
 		allocatedCalleeSavedRegs []VReg
 		nodePool                 wazevoapi.Pool[node]
+		blockInfoPool            wazevoapi.Pool[blockInfo]
 		// vRegIDToNode maps VRegID to the node whose node.v has the VRegID.
 		vRegIDToNode [] /* VRegID to */ *node
-		blockInfos   [] /* blockID to */ blockInfo
+		blockInfos   [] /* blockID to */ *blockInfo
 		vs           []VReg
 		spillHandler spillHandler
 		// phis keeps track of the VRegs that are defined by phi functions.
@@ -455,6 +457,7 @@ func (a *Allocator) buildLiveRangesForReals(info *blockInfo) {
 func (a *Allocator) Reset() {
 	a.nodePool.Reset()
 	a.blockInfos = a.blockInfos[:0]
+	a.blockInfoPool.Reset()
 	for i := range a.vRegIDToNode {
 		a.vRegIDToNode[i] = nil
 	}
@@ -474,15 +477,18 @@ func (a *Allocator) Reset() {
 
 func (a *Allocator) allocateBlockInfo(blockID int) *blockInfo {
 	if blockID >= len(a.blockInfos) {
-		a.blockInfos = append(a.blockInfos, make([]blockInfo, (blockID+1)-len(a.blockInfos))...)
+		a.blockInfos = append(a.blockInfos, make([]*blockInfo, (blockID+1)-len(a.blockInfos))...)
 	}
-	info := &a.blockInfos[blockID]
-	a.initBlockInfo(info)
+	info := a.blockInfos[blockID]
+	if info == nil {
+		info = a.blockInfoPool.Allocate()
+		a.blockInfos[blockID] = info
+	}
 	return info
 }
 
 func (a *Allocator) blockInfoAt(blockID int) (info *blockInfo) {
-	info = &a.blockInfos[blockID]
+	info = a.blockInfos[blockID]
 	return
 }
 
@@ -504,6 +510,22 @@ func (a *Allocator) getOrAllocateNode(v VReg) (n *node) {
 	return
 }
 
+func resetBlockInfo(i *blockInfo) {
+	if i.intervalMng == nil {
+		i.intervalMng = newIntervalManager()
+	} else {
+		i.intervalMng.reset()
+	}
+	i.liveOuts = resetMap(i.liveOuts)
+	i.liveIns = resetMap(i.liveIns)
+	i.defs = resetMap(i.defs)
+
+	for index := range i.realRegUses {
+		i.realRegUses[index] = i.realRegUses[index][:0]
+		i.realRegDefs[index] = i.realRegDefs[index][:0]
+	}
+}
+
 func resetNode(n *node) {
 	n.r = RealRegInvalid
 	n.v = VRegInvalid
@@ -517,48 +539,21 @@ func resetNode(n *node) {
 	n.visited = false
 }
 
+func resetMap[K comparable, V any](m map[K]V) map[K]V {
+	if m == nil {
+		m = make(map[K]V)
+	} else {
+		for v := range m {
+			delete(m, v)
+		}
+	}
+	return m
+}
+
 func (a *Allocator) allocateNode() (n *node) {
 	n = a.nodePool.Allocate()
 	n.id = a.nodePool.Allocated() - 1
 	return
-}
-
-func resetMap[T any](a *Allocator, m map[VReg]T) {
-	a.vs = a.vs[:0]
-	for v := range m {
-		a.vs = append(a.vs, v)
-	}
-	for _, v := range a.vs {
-		delete(m, v)
-	}
-}
-
-func (a *Allocator) initBlockInfo(i *blockInfo) {
-	if i.intervalMng == nil {
-		i.intervalMng = newIntervalManager()
-	} else {
-		i.intervalMng.reset()
-	}
-	if i.liveOuts == nil {
-		i.liveOuts = make(map[VReg]struct{})
-	} else {
-		resetMap(a, i.liveOuts)
-	}
-	if i.liveIns == nil {
-		i.liveIns = make(map[VReg]struct{})
-	} else {
-		resetMap(a, i.liveIns)
-	}
-	if i.defs == nil {
-		i.defs = make(map[VReg]programCounter)
-	} else {
-		resetMap(a, i.defs)
-	}
-
-	for index := range i.realRegUses {
-		i.realRegUses[index] = i.realRegUses[index][:0]
-		i.realRegDefs[index] = i.realRegDefs[index][:0]
-	}
 }
 
 func (i *blockInfo) addRealRegUsage(v VReg, pc programCounter) {
