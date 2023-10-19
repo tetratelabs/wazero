@@ -19,10 +19,10 @@ func TestMachine_lowerConstant(t *testing.T) {
 
 		vr := m.lowerConstant(ssaConstInstr)
 		machInstr := getPendingInstr(m)
-		require.Equal(t, regalloc.VRegID(0), vr.ID())
+		require.Equal(t, regalloc.VRegIDNonReservedBegin, vr.ID())
 		require.Equal(t, regalloc.RegTypeInt, vr.RegType())
 		require.Equal(t, mov64, machInstr.kind)
-		require.Equal(t, "mov x0?, xzr", formatEmittedInstructionsInCurrentBlock(m))
+		require.Equal(t, "mov x128?, xzr", formatEmittedInstructionsInCurrentBlock(m))
 	})
 
 	t.Run("zero i64", func(t *testing.T) {
@@ -33,10 +33,10 @@ func TestMachine_lowerConstant(t *testing.T) {
 
 		vr := m.lowerConstant(ssaConstInstr)
 		machInstr := getPendingInstr(m)
-		require.Equal(t, regalloc.VRegID(0), vr.ID())
+		require.Equal(t, regalloc.VRegIDNonReservedBegin, vr.ID())
 		require.Equal(t, regalloc.RegTypeInt, vr.RegType())
 		require.Equal(t, mov64, machInstr.kind)
-		require.Equal(t, "mov x0?, xzr", formatEmittedInstructionsInCurrentBlock(m))
+		require.Equal(t, "mov x128?, xzr", formatEmittedInstructionsInCurrentBlock(m))
 	})
 
 	t.Run("TypeF32", func(t *testing.T) {
@@ -47,12 +47,12 @@ func TestMachine_lowerConstant(t *testing.T) {
 
 		vr := m.lowerConstant(ssaConstInstr)
 		machInstr := getPendingInstr(m)
-		require.Equal(t, regalloc.VRegID(0), vr.ID())
+		require.Equal(t, regalloc.VRegIDNonReservedBegin, vr.ID())
 		require.Equal(t, regalloc.RegTypeFloat, vr.RegType())
 		require.Equal(t, loadFpuConst32, machInstr.kind)
 		require.Equal(t, uint64(math.Float32bits(1.1234)), machInstr.u1)
 
-		require.Equal(t, "ldr s0?, #8; b 8; data.f32 1.123400", formatEmittedInstructionsInCurrentBlock(m))
+		require.Equal(t, "ldr s128?, #8; b 8; data.f32 1.123400", formatEmittedInstructionsInCurrentBlock(m))
 	})
 
 	t.Run("TypeF64", func(t *testing.T) {
@@ -63,12 +63,12 @@ func TestMachine_lowerConstant(t *testing.T) {
 
 		vr := m.lowerConstant(ssaConstInstr)
 		machInstr := getPendingInstr(m)
-		require.Equal(t, regalloc.VRegID(0), vr.ID())
+		require.Equal(t, regalloc.VRegIDNonReservedBegin, vr.ID())
 		require.Equal(t, regalloc.RegTypeFloat, vr.RegType())
 		require.Equal(t, loadFpuConst64, machInstr.kind)
 		require.Equal(t, math.Float64bits(-9471.2), machInstr.u1)
 
-		require.Equal(t, "ldr d0?, #8; b 16; data.f64 -9471.200000", formatEmittedInstructionsInCurrentBlock(m))
+		require.Equal(t, "ldr d128?, #8; b 16; data.f64 -9471.200000", formatEmittedInstructionsInCurrentBlock(m))
 	})
 }
 
