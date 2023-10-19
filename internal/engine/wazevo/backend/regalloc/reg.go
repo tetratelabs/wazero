@@ -157,7 +157,7 @@ func (t *VRegTypeTable) Range(f func(VRegID, programCounter)) {
 
 func (t *VRegTypeTable) Reset(minVRegID VRegID) {
 	t.min = minVRegID
-	t.set = nil
+	t.set.reset()
 	t.pcs = nil
 }
 
@@ -224,13 +224,24 @@ func (s *VRegTypeSet) Range(f func(VRegID)) {
 
 func (s *VRegTypeSet) Reset(minVRegID VRegID) {
 	s.min = minVRegID
-	s.set = nil
+	s.set.reset()
 }
 
-type bitset []uint64
+type bitset struct {
+	bits []uint64
+	// Most of the bitset values have short backing arrays, to reduce the memory
+	// footprint we use this buffer as backing array for storing up to 320 bits.
+	// When more bits need to be stored, the backing array are offloaded to the
+	// heap.
+	buf [5]uint64
+}
 
-func (b bitset) scan(f func(uint)) {
-	for i, v := range b {
+func (b *bitset) reset() {
+	b.bits, b.buf = nil, [5]uint64{}
+}
+
+func (b *bitset) scan(f func(uint)) {
+	for i, v := range b.bits {
 		for j := uint(i * 64); v != 0; j++ {
 			n := uint(bits.TrailingZeros64(v))
 			j += n
@@ -240,17 +251,22 @@ func (b bitset) scan(f func(uint)) {
 	}
 }
 
-func (b bitset) has(i uint) bool {
+func (b *bitset) has(i uint) bool {
 	index, shift := i/64, i%64
-	return index < uint(len(b)) && ((b[index] & (1 << shift)) != 0)
+	return index < uint(len(b.bits)) && ((b.bits[index] & (1 << shift)) != 0)
 }
 
 func (b *bitset) set(i uint) {
 	index, shift := i/64, i%64
-	if index >= uint(len(*b)) {
-		*b = append(*b, make([]uint64, (index+1)-uint(len(*b)))...)
+	if index >= uint(len(b.bits)) {
+		if index < uint(len(b.buf)) {
+			b.bits = b.buf[:]
+		} else {
+			b.bits = append(b.bits, make([]uint64, (index+1)-uint(len(b.bits)))...)
+			b.buf = [5]uint64{}
+		}
 	}
-	(*b)[index] |= 1 << shift
+	b.bits[index] |= 1 << shift
 }
 
 // RealReg represents a physical register.
