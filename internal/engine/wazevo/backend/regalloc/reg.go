@@ -2,6 +2,7 @@ package regalloc
 
 import (
 	"fmt"
+
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 )
 
