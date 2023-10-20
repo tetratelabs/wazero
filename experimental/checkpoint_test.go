@@ -112,7 +112,11 @@ func TestSnapshotMultipleWasmInvocations(t *testing.T) {
 	// snapshot returned zero
 	require.Equal(t, uint64(0), res[0])
 
-	res, err = mod.ExportedFunction("restore").Call(ctx, snapshotPtr)
-	// Fails, snapshot and restore are called from different wasm invocations.
-	require.Error(t, err)
+	// Fails, snapshot and restore are called from different wasm invocations. Currently, this
+	// results in a panic.
+	err = require.CapturePanic(func() {
+		_, _ = mod.ExportedFunction("restore").Call(ctx, snapshotPtr)
+	})
+	require.EqualError(t, err, "unhandled snapshot restore, this generally indicates restore was called from a different "+
+		"exported function invocation than snapshot")
 }

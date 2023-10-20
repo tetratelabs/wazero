@@ -1202,7 +1202,6 @@ func (s *snapshot) Restore(ret []uint64) {
 	panic(s)
 }
 
-// Restore implements the same method as documented on experimental.Snapshot.
 func (s *snapshot) doRestore() {
 	ce := s.ce
 	ce.stackContext.stackPointer = s.stackPointer
@@ -1212,6 +1211,7 @@ func (s *snapshot) doRestore() {
 	copy(ce.stack[s.hostBase:], s.ret)
 }
 
+// Error implements the same method on error.
 func (s *snapshot) Error() string {
 	return "unhandled snapshot restore, this generally indicates restore was called from a different " +
 		"exported function invocation than snapshot"
