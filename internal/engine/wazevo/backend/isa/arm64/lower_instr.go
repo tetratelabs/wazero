@@ -692,23 +692,8 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		m.insert(dup)
 
 	case ssa.OpcodeLoadSplat:
-		x, offset, lane := instr.LoadSplatData()
-		rd := operandNR(m.compiler.VRegOf(instr.Return()))
-		arr := ssaLaneToArrangement(lane)
-
-		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
-		tmpReg := m.compiler.AllocateVReg(ssa.TypeI64)
-
-		// vecLoad1R has offset address mode (base+imm) for post index, so the only addressing mode
-		// we can use here is "no-offset" register addressing mode. Thus, we need to add the const offset to the base address.
-		add := m.allocateInstr()
-		add.asALU(aluOpAdd, operandNR(tmpReg), rn, operandImm12(uint16(offset), 0), true)
-		m.insert(add)
-
-		ld1r := m.allocateInstr()
-		ld1r.asVecLoad1R(rd, operandNR(tmpReg), arr)
-		m.insert(ld1r)
-
+		ptr, offset, lane := instr.LoadSplatData()
+		m.lowerLoadSplat(ptr, offset, lane, instr.Return())
 	default:
 		panic("TODO: lowering " + op.String())
 	}
