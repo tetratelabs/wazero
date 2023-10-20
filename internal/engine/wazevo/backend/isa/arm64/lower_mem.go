@@ -244,6 +244,12 @@ func (m *machine) lowerLoadSplat(ptr ssa.Value, offset uint32, lane ssa.VecLane,
 		opSize = 64
 	}
 	amode := m.lowerToAddressMode(ptr, offset, opSize)
+	rd := operandNR(m.compiler.VRegOf(ret))
+	m.lowerLoadSplatFromAddressMode(rd, amode, lane)
+}
+
+// lowerLoadSplatFromAddressMode is extracted from lowerLoadSplat for testing.
+func (m *machine) lowerLoadSplatFromAddressMode(rd operand, amode addressMode, lane ssa.VecLane) {
 	tmpReg := operandNR(m.compiler.AllocateVReg(ssa.TypeI64))
 
 	// vecLoad1R has offset address mode (base+imm) only for post index, so the only addressing mode
@@ -261,7 +267,6 @@ func (m *machine) lowerLoadSplat(ptr ssa.Value, offset uint32, lane ssa.VecLane,
 		panic("unsupported address mode for LoadSplat")
 	}
 
-	rd := operandNR(m.compiler.VRegOf(ret))
 	arr := ssaLaneToArrangement(lane)
 
 	ld1r := m.allocateInstr()
