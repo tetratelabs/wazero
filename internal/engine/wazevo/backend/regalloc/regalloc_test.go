@@ -41,7 +41,7 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 				0: {
 					defs:     map[VReg]programCounter{2: pcDefOffset + pcStride, 1: pcDefOffset},
 					lastUses: makeVRegTable(map[VReg]programCounter{1: pcStride + pcUseOffset}),
-					kills:    map[VReg]programCounter{1: pcStride + pcUseOffset},
+					kills:    map[VReg]struct{}{1: {}},
 				},
 			},
 		},
@@ -81,10 +81,10 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 						2:    pcStride*2 + pcUseOffset,
 					}),
 					liveOuts: map[VReg]struct{}{3: {}},
-					kills: map[VReg]programCounter{
-						1000: pcStride + pcUseOffset,
-						1:    pcStride*2 + pcUseOffset,
-						2:    pcStride*2 + pcUseOffset,
+					kills: map[VReg]struct{}{
+						1000: {},
+						1:    {},
+						2:    {},
 					},
 				},
 				1: {
@@ -107,7 +107,7 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 				2: {
 					liveIns:  map[VReg]struct{}{3: {}, 4: {}, 5: {}},
 					lastUses: makeVRegTable(map[VReg]programCounter{3: pcUseOffset, 4: pcUseOffset, 5: pcUseOffset}),
-					kills:    map[VReg]programCounter{3: pcUseOffset, 4: pcUseOffset, 5: pcUseOffset},
+					kills:    map[VReg]struct{}{3: {}, 4: {}, 5: {}},
 				},
 			},
 		},
@@ -158,7 +158,7 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 					liveIns:  map[VReg]struct{}{1000: {}, 1: {}},
 					liveOuts: map[VReg]struct{}{1000: {}},
 					lastUses: makeVRegTable(map[VReg]programCounter{1: pcUseOffset}),
-					kills:    map[VReg]programCounter{1: pcUseOffset},
+					kills:    map[VReg]struct{}{1: {}},
 					realRegDefs: [vRegIDReservedForRealNum][]programCounter{
 						realRegID:  {pcDefOffset, pcStride*4 + pcDefOffset},
 						realRegID2: {pcStride*2 + pcDefOffset},
@@ -172,14 +172,14 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 					liveIns:     map[VReg]struct{}{1000: {}, 2: {}},
 					liveOuts:    map[VReg]struct{}{1000: {}},
 					lastUses:    makeVRegTable(map[VReg]programCounter{2: pcUseOffset}),
-					kills:       map[VReg]programCounter{2: pcUseOffset},
+					kills:       map[VReg]struct{}{2: {}},
 					realRegUses: [vRegIDReservedForRealNum][]programCounter{realRegID2: {pcUseOffset}},
 					realRegDefs: [vRegIDReservedForRealNum][]programCounter{realRegID2: {0}},
 				},
 				3: {
 					liveIns:  map[VReg]struct{}{1000: {}},
 					lastUses: makeVRegTable(map[VReg]programCounter{1000: pcUseOffset}),
-					kills:    map[VReg]programCounter{1000: pcUseOffset},
+					kills:    map[VReg]struct{}{1000: {}},
 				},
 			},
 		},
@@ -225,7 +225,7 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 					liveOuts: map[VReg]struct{}{phiVReg: {}, 3000: {}},
 					defs:     map[VReg]programCounter{phiVReg: pcDefOffset},
 					lastUses: makeVRegTable(map[VReg]programCounter{2000: pcUseOffset}),
-					kills:    map[VReg]programCounter{2000: pcUseOffset},
+					kills:    map[VReg]struct{}{2000: {}},
 				},
 				2: {
 					liveIns:  map[VReg]struct{}{phiVReg: {}, 3000: {}},
@@ -237,12 +237,12 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 					liveOuts: map[VReg]struct{}{phiVReg: {}, 3000: {}},
 					defs:     map[VReg]programCounter{phiVReg: pcDefOffset},
 					lastUses: makeVRegTable(map[VReg]programCounter{1000: pcUseOffset}),
-					kills:    map[VReg]programCounter{1000: pcUseOffset},
+					kills:    map[VReg]struct{}{1000: {}},
 				},
 				4: {
 					liveIns:  map[VReg]struct{}{phiVReg: {}, 3000: {}},
 					lastUses: makeVRegTable(map[VReg]programCounter{phiVReg: pcUseOffset, 3000: pcUseOffset}),
-					kills:    map[VReg]programCounter{phiVReg: pcUseOffset, 3000: pcUseOffset},
+					kills:    map[VReg]struct{}{phiVReg: {}, 3000: {}},
 				},
 			},
 		},
@@ -295,8 +295,8 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 					lastUses: makeVRegTable(map[VReg]programCounter{
 						1: pcStride + pcUseOffset,
 					}),
-					kills: map[VReg]programCounter{
-						1: pcStride + pcUseOffset,
+					kills: map[VReg]struct{}{
+						1: {},
 					},
 				},
 				1: {
@@ -304,28 +304,28 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 					liveOuts: map[VReg]struct{}{phiVReg: {}, 9999: {}},
 					defs:     map[VReg]programCounter{9999: pcDefOffset},
 					lastUses: makeVRegTable(map[VReg]programCounter{}),
-					kills:    map[VReg]programCounter{},
+					kills:    map[VReg]struct{}{},
 				},
 				2: {
 					liveIns:  map[VReg]struct{}{phiVReg: {}, 9999: {}},
 					liveOuts: map[VReg]struct{}{100: {}},
 					defs:     map[VReg]programCounter{100: pcDefOffset},
 					lastUses: makeVRegTable(map[VReg]programCounter{phiVReg: pcUseOffset, 9999: pcUseOffset}),
-					kills:    map[VReg]programCounter{phiVReg: pcUseOffset, 9999: pcUseOffset},
+					kills:    map[VReg]struct{}{phiVReg: {}, 9999: {}},
 				},
 				3: {
 					liveIns:  map[VReg]struct{}{100: {}},
 					liveOuts: map[VReg]struct{}{54321: {}},
 					defs:     map[VReg]programCounter{54321: pcDefOffset},
 					lastUses: makeVRegTable(map[VReg]programCounter{100: pcStride + pcUseOffset}),
-					kills:    map[VReg]programCounter{100: pcStride + pcUseOffset},
+					kills:    map[VReg]struct{}{100: {}},
 				},
 				4: {
 					liveIns:  map[VReg]struct{}{54321: {}},
 					liveOuts: map[VReg]struct{}{phiVReg: {}},
 					defs:     map[VReg]programCounter{phiVReg: pcDefOffset},
 					lastUses: makeVRegTable(map[VReg]programCounter{54321: pcUseOffset}),
-					kills:    map[VReg]programCounter{54321: pcUseOffset},
+					kills:    map[VReg]struct{}{54321: {}},
 				},
 			},
 		},
@@ -569,7 +569,7 @@ func initMapInInfo(info *blockInfo) {
 		info.defs = make(map[VReg]programCounter)
 	}
 	if info.kills == nil {
-		info.kills = make(map[VReg]programCounter)
+		info.kills = make(map[VReg]struct{})
 	}
 }
 

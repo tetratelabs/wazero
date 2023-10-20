@@ -79,7 +79,7 @@ type (
 		liveIns  map[VReg]struct{}
 		defs     map[VReg]programCounter
 		lastUses VRegTable
-		kills    map[VReg]programCounter
+		kills    map[VReg]struct{}
 		// Pre-colored real registers can have multiple live ranges in one block.
 		realRegUses [vRegIDReservedForRealNum][]programCounter
 		realRegDefs [vRegIDReservedForRealNum][]programCounter
@@ -247,7 +247,7 @@ func (a *Allocator) livenessAnalysis(f Function) {
 		info.lastUses.Range(func(use VReg, pc programCounter) {
 			// Usage without live-outs is a kill.
 			if _, ok := outs[use]; !ok {
-				info.kills[use] = pc
+				info.kills[use] = struct{}{}
 			}
 		})
 
@@ -348,12 +348,12 @@ func (a *Allocator) buildLiveRangesForNonReals(info *blockInfo) {
 				panic("BUG: v is live-out but also killed")
 			}
 		} else {
-			killPos, ok := kills[v]
+			_, ok := kills[v]
 			if !ok {
 				panic("BUG: v is live-in but not live-out or use")
 			}
 			// v is killed at killPos.
-			begin, end = 0, killPos
+			begin, end = 0, info.lastUses.Lookup(v)
 		}
 		n := a.getOrAllocateNode(v)
 		intervalNode := info.intervalMng.insert(n, begin, end)
@@ -387,13 +387,13 @@ func (a *Allocator) buildLiveRangesForNonReals(info *blockInfo) {
 				panic("BUG: v is killed here but also killed")
 			}
 		} else {
-			killPos, ok := kills[v]
+			_, ok := kills[v]
 			if !ok {
 				// This case the defined value is not used at all.
 				end = defPos
 			} else {
 				// v is killed at pos.
-				end = killPos
+				end = info.lastUses.Lookup(v)
 			}
 		}
 		n := a.getOrAllocateNode(v)
@@ -556,7 +556,7 @@ func (a *Allocator) initBlockInfo(i *blockInfo) {
 		resetMap(a, i.defs)
 	}
 	if i.kills == nil {
-		i.kills = make(map[VReg]programCounter)
+		i.kills = make(map[VReg]struct{})
 	} else {
 		resetMap(a, i.kills)
 	}
