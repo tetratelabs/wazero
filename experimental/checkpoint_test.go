@@ -2,7 +2,6 @@ package experimental_test
 
 import (
 	"context"
-	_ "embed"
 	"testing"
 
 	"github.com/tetratelabs/wazero"
