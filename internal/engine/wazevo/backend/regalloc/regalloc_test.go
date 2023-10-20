@@ -519,7 +519,7 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 			a := NewAllocator(&RegisterInfo{})
 			a.livenessAnalysis(f)
 			for blockID := range a.blockInfos {
-				actual := &a.blockInfos[blockID]
+				actual := a.blockInfos[blockID]
 				exp := tc.exp[blockID]
 				initMapInInfo(exp)
 				saved := actual.intervalMng
