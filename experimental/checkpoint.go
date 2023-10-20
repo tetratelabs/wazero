@@ -10,8 +10,6 @@ type Snapshot interface {
 }
 
 // Snapshotter allows host functions to snapshot the WebAssembly execution environment.
-// Currently, only the Wasm stack is captured, but in the future, this may be expanded
-// to things like globals.
 type Snapshotter interface {
 	// Snapshot captures the current execution state.
 	Snapshot() Snapshot
