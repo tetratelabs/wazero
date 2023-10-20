@@ -114,7 +114,7 @@ func (t *VRegTable) Reset(minVRegIDs VRegIDMinSet) {
 
 // VRegTypeTable implements a table for virtual registers of a specific type.
 //
-// The parent VRegTable uses 4 instances of this type to maintain a table for
+// The parent VRegTable uses 3 instances of this type to maintain a table for
 // each virtual register type.
 //
 // The virtual register type table uses a bitset to accelerate checking whether
@@ -157,14 +157,91 @@ func (t *VRegTypeTable) Range(f func(VRegID, programCounter)) {
 
 func (t *VRegTypeTable) Reset(minVRegID VRegID) {
 	t.min = minVRegID
-	t.set = nil
+	t.set.reset()
 	t.pcs = nil
 }
 
-type bitset []uint64
+// VRegSet is a data structure designed for fast lookup in a set of virtual
+// registers.
+//
+// The type maintains one instance of VRegTypeSet for each register type:
+// invalid, int, and float. It dispatches between the sub sets based on the
+// type of virtual registers that are inserted.
+//
+// Note that there is no way to delete entries, the sets are constructed and
+// then used until they are either reset or go unused.
+type VRegSet [NumRegType]VRegTypeSet
 
-func (b bitset) scan(f func(uint)) {
-	for i, v := range b {
+func (s *VRegSet) Contains(v VReg) bool {
+	return s[v.RegType()].Contains(v.ID())
+}
+
+func (s *VRegSet) Insert(v VReg) {
+	if v.IsRealReg() {
+		panic("BUG: cannot insert real registers in virtual register table")
+	}
+	s[v.RegType()].Insert(v.ID())
+}
+
+func (s *VRegSet) Range(f func(VReg)) {
+	for i := range s {
+		s[i].Range(func(id VRegID) {
+			f(VReg(id).SetRegType(RegType(i)))
+		})
+	}
+}
+
+func (s *VRegSet) Reset(minVRegIDs VRegIDMinSet) {
+	for i := range s {
+		s[i].Reset(minVRegIDs.Min(RegType(i)))
+	}
+}
+
+// VRegTypeSet implements a set for virtual registers of a specific type.
+//
+// The parent VRegSet uses 3 instances of this type to maintain a table for each
+// virtual register type.
+//
+// The virtual register type set uses a bitset to minimize the memory footprint,
+// registers ids are offseted by the minimum entry, and represented by a bit bit
+// set to 1 in the bitset.
+type VRegTypeSet struct {
+	min VRegID
+	set bitset
+}
+
+func (s *VRegTypeSet) Contains(id VRegID) bool {
+	return s.set.has(uint(id - s.min))
+}
+
+func (s *VRegTypeSet) Insert(id VRegID) {
+	s.set.set(uint(id - s.min))
+}
+
+func (s *VRegTypeSet) Range(f func(VRegID)) {
+	s.set.scan(func(i uint) { f(VRegID(i) + s.min) })
+}
+
+func (s *VRegTypeSet) Reset(minVRegID VRegID) {
+	s.min = minVRegID
+	s.set.reset()
+}
+
+type bitset struct {
+	bits []uint64
+	// Most of the bitset values have short backing arrays, to reduce the memory
+	// footprint we use this buffer as backing array for storing up to 320 bits.
+	// When more bits need to be stored, the backing array are offloaded to the
+	// heap.
+	buf [5]uint64
+}
+
+func (b *bitset) reset() {
+	b.bits, b.buf = nil, [5]uint64{}
+}
+
+func (b *bitset) scan(f func(uint)) {
+	for i, v := range b.bits {
 		for j := uint(i * 64); v != 0; j++ {
 			n := uint(bits.TrailingZeros64(v))
 			j += n
@@ -174,17 +251,22 @@ func (b bitset) scan(f func(uint)) {
 	}
 }
 
-func (b bitset) has(i uint) bool {
+func (b *bitset) has(i uint) bool {
 	index, shift := i/64, i%64
-	return index < uint(len(b)) && ((b[index] & (1 << shift)) != 0)
+	return index < uint(len(b.bits)) && ((b.bits[index] & (1 << shift)) != 0)
 }
 
 func (b *bitset) set(i uint) {
 	index, shift := i/64, i%64
-	if index >= uint(len(*b)) {
-		*b = append(*b, make([]uint64, (index+1)-uint(len(*b)))...)
+	if index >= uint(len(b.bits)) {
+		if index < uint(len(b.buf)) {
+			b.bits = b.buf[:]
+		} else {
+			b.bits = append(b.bits, make([]uint64, (index+1)-uint(len(b.bits)))...)
+			b.buf = [5]uint64{}
+		}
 	}
-	(*b)[index] |= 1 << shift
+	b.bits[index] |= 1 << shift
 }
 
 // RealReg represents a physical register.
