@@ -526,7 +526,30 @@ func TestModuleConfig_toSysContext_WithNanosleep(t *testing.T) {
 			require.Equal(t, int64(2), ns)
 		}).(*moduleConfig).toSysContext()
 	require.NoError(t, err)
-	sysCtx.Nanosleep(2)
+	sysCtx.Nanosleep(context.Background(), 2)
+}
+
+// TestModuleConfig_toSysContext_WithCancellableNanosleep tests that a context
+// can be honored by the given function.
+func TestModuleConfig_toSysContext_WithCancellableNanosleep(t *testing.T) {
+	var isDone bool
+	sysCtx, err := NewModuleConfig().
+		WithCancellableNanosleep(func(ctx context.Context, ns int64) {
+			select {
+			case <-ctx.Done():
+				isDone = true
+			case <-time.After(time.Duration(ns)):
+				// do nothing.
+			}
+			require.Equal(t, int64(2), ns)
+		}).(*moduleConfig).toSysContext()
+	require.NoError(t, err)
+	sysCtx.Nanosleep(context.Background(), 2)
+	require.False(t, isDone)
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	cancelFunc()
+	sysCtx.Nanosleep(ctx, 2)
+	require.True(t, isDone)
 }
 
 // TestModuleConfig_toSysContext_WithOsyield has to test differently because

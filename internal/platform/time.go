@@ -1,6 +1,7 @@
 package platform
 
 import (
+	"context"
 	"sync/atomic"
 	"time"
 
@@ -35,7 +36,7 @@ func NewFakeNanotime() sys.Nanotime {
 }
 
 // FakeNanosleep implements sys.Nanosleep by returning without sleeping.
-var FakeNanosleep = sys.Nanosleep(func(int64) {})
+var FakeNanosleep = sys.CancellableNanosleep(func(context.Context, int64) {})
 
 // FakeOsyield implements sys.Osyield by returning without yielding.
 var FakeOsyield = sys.Osyield(func() {})
@@ -70,7 +71,10 @@ func Nanotime() int64 {
 	return nanotime()
 }
 
-// Nanosleep implements sys.Nanosleep with time.Sleep.
-func Nanosleep(ns int64) {
-	time.Sleep(time.Duration(ns))
+// CancellableNanosleep implements sys.CancellableNanosleep with time.Sleep.
+func CancellableNanosleep(ctx context.Context, ns int64) {
+	select {
+	case <-ctx.Done():
+	case <-time.After(time.Duration(ns)):
+	}
 }

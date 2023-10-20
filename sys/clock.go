@@ -1,5 +1,7 @@
 package sys
 
+import "context"
+
 // ClockResolution is a positive granularity of clock precision in
 // nanoseconds. For example, if the resolution is 1us, this returns 1000.
 //
@@ -21,6 +23,10 @@ type Nanotime func() int64
 
 // Nanosleep puts the current goroutine to sleep for at least ns nanoseconds.
 type Nanosleep func(ns int64)
+
+// CancellableNanosleep puts the current goroutine to sleep for at least ns nanoseconds,
+// honoring the given context.Context.
+type CancellableNanosleep func(ctx context.Context, ns int64)
 
 // Osyield yields the processor, typically to implement spin-wait loops.
 type Osyield func()

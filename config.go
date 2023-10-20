@@ -606,11 +606,32 @@ type ModuleConfig interface {
 	//
 	// # Notes:
 	//   - This does not default to time.Sleep as that violates sandboxing.
+	//   - Some compilers implement sleep by looping on sys.Nanotime (e.g. Go).
+	//   - If you set this, you should probably set WithNanotime also.
+	//   - This function does not honor a context cancellation: when in doubt,
+	//     you should always prefer WithCancellableNanosleep, especially if used
+	//     together with WithCloseOnContextDone.
+	WithNanosleep(sys.Nanosleep) ModuleConfig
+
+	// WithCancellableNanosleep configures the how to pause the current goroutine for at
+	// least the configured nanoseconds. Defaults to return immediately.
+	//
+	// This example uses a custom sleep function:
+	//	moduleConfig = moduleConfig.
+	//		WithCancellableNanosleep(func(ctx context.Context, ns int64) {
+	//			select {
+	//			case <-ctx.Done(): // Return on context done.
+	//			case <-time.After(time.Duration(ns)):
+	//			}
+	//		})
+	//
+	// # Notes:
+	//   - This does not default to time.Sleep as that violates sandboxing.
 	//   - This is used to implement host functions such as WASI `poll_oneoff`.
 	//   - Some compilers implement sleep by looping on sys.Nanotime (e.g. Go).
 	//   - If you set this, you should probably set WithNanotime also.
 	//   - Use WithSysNanosleep for a usable implementation.
-	WithNanosleep(sys.Nanosleep) ModuleConfig
+	WithCancellableNanosleep(sys.CancellableNanosleep) ModuleConfig
 
 	// WithOsyield yields the processor, typically to implement spin-wait
 	// loops. Defaults to return immediately.
@@ -649,7 +670,7 @@ type moduleConfig struct {
 	walltimeResolution sys.ClockResolution
 	nanotime           sys.Nanotime
 	nanotimeResolution sys.ClockResolution
-	nanosleep          sys.Nanosleep
+	nanosleep          sys.CancellableNanosleep
 	osyield            sys.Osyield
 	args               [][]byte
 	// environ is pair-indexed to retain order similar to os.Environ.
@@ -796,6 +817,13 @@ func (c *moduleConfig) WithSysNanotime() ModuleConfig {
 // WithNanosleep implements ModuleConfig.WithNanosleep
 func (c *moduleConfig) WithNanosleep(nanosleep sys.Nanosleep) ModuleConfig {
 	ret := *c // copy
+	ret.nanosleep = func(ctx context.Context, ns int64) { nanosleep(ns) }
+	return &ret
+}
+
+// WithCancellableNanosleep implements ModuleConfig.WithNanosleep
+func (c *moduleConfig) WithCancellableNanosleep(nanosleep sys.CancellableNanosleep) ModuleConfig {
+	ret := *c // copy
 	ret.nanosleep = nanosleep
 	return &ret
 }
@@ -809,7 +837,7 @@ func (c *moduleConfig) WithOsyield(osyield sys.Osyield) ModuleConfig {
 
 // WithSysNanosleep implements ModuleConfig.WithSysNanosleep
 func (c *moduleConfig) WithSysNanosleep() ModuleConfig {
-	return c.WithNanosleep(platform.Nanosleep)
+	return c.WithCancellableNanosleep(platform.CancellableNanosleep)
 }
 
 // WithRandSource implements ModuleConfig.WithRandSource

@@ -1,6 +1,7 @@
 package platform
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -79,8 +80,22 @@ func Test_Nanosleep(t *testing.T) {
 	max := ns * 5
 
 	start := Nanotime()
-	Nanosleep(ns)
+	CancellableNanosleep(context.Background(), ns)
 	duration := Nanotime() - start
 
 	require.True(t, duration > 0 && duration < max, "Nanosleep(%d) slept for %d", ns, duration)
+
+	// We also test that a context will be honored by our default implementation.
+	ctx, cancel := context.WithCancel(context.Background())
+	CancellableNanosleep(ctx, ns)
+	require.True(t, duration > 0 && duration < max, "Nanosleep(%d) slept for %d", ns, duration)
+
+	// Since we cancel immediately, in this case we assume that elapsed time is almost zero
+	// i.e. just function dispatch overhead.
+	cancel()
+	start = Nanotime()
+	CancellableNanosleep(ctx, ns)
+	duration = Nanotime() - start
+
+	require.True(t, duration < int64(1*time.Millisecond), "Nanosleep(%d) slept for %d", ns, duration)
 }

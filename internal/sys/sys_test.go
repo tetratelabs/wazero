@@ -2,6 +2,7 @@ package sys
 
 import (
 	"bytes"
+	"context"
 	"testing"
 	"time"
 
@@ -259,7 +260,7 @@ func Test_clockResolutionInvalid(t *testing.T) {
 }
 
 func TestNewContext_Nanosleep(t *testing.T) {
-	var aNs sys.Nanosleep = func(int64) {}
+	var aNs sys.CancellableNanosleep = func(context.Context, int64) {}
 	sysCtx, err := NewContext(0, nil, nil, nil, nil, nil, nil, nil, 0, nil, 0, aNs, nil, nil, nil, nil)
 	require.Nil(t, err)
 	require.Equal(t, aNs, sysCtx.nanosleep)

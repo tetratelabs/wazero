@@ -1,6 +1,7 @@
 package sys
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -22,7 +23,7 @@ type Context struct {
 	walltimeResolution sys.ClockResolution
 	nanotime           sys.Nanotime
 	nanotimeResolution sys.ClockResolution
-	nanosleep          sys.Nanosleep
+	nanosleep          sys.CancellableNanosleep
 	osyield            sys.Osyield
 	randSource         io.Reader
 	fsc                FSContext
@@ -89,8 +90,8 @@ func (c *Context) NanotimeResolution() sys.ClockResolution {
 }
 
 // Nanosleep implements sys.Nanosleep.
-func (c *Context) Nanosleep(ns int64) {
-	c.nanosleep(ns)
+func (c *Context) Nanosleep(ctx context.Context, ns int64) {
+	c.nanosleep(ctx, ns)
 }
 
 // Osyield implements sys.Osyield.
@@ -133,7 +134,7 @@ func NewContext(
 	walltimeResolution sys.ClockResolution,
 	nanotime sys.Nanotime,
 	nanotimeResolution sys.ClockResolution,
-	nanosleep sys.Nanosleep,
+	nanosleep sys.CancellableNanosleep,
 	osyield sys.Osyield,
 	fs []experimentalsys.FS, guestPaths []string,
 	tcpListeners []*net.TCPListener,

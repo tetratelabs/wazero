@@ -49,7 +49,7 @@ type event struct {
 	errno     wasip1.Errno
 }
 
-func pollOneoffFn(_ context.Context, mod api.Module, params []uint64) sys.Errno {
+func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) sys.Errno {
 	in := uint32(params[0])
 	out := uint32(params[1])
 	nsubscriptions := uint32(params[2])
@@ -166,7 +166,7 @@ func pollOneoffFn(_ context.Context, mod api.Module, params []uint64) sys.Errno 
 		// We only need to observe the timeout (nonzero if there are clock subscriptions)
 		// and return.
 		if timeout > 0 {
-			sysCtx.Nanosleep(int64(timeout))
+			sysCtx.Nanosleep(ctx, int64(timeout))
 		}
 		return 0
 	}
