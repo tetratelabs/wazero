@@ -610,7 +610,8 @@ func Test1797d(t *testing.T) {
 	})
 }
 
-// Test1802 tests that ...
+// Test1802 tests that load32_splat computes the load from the right offset
+// when a nonzero value is on the stack.
 func Test1802(t *testing.T) {
 	if !platform.CompilerSupported() {
 		return
@@ -620,7 +621,6 @@ func Test1802(t *testing.T) {
 		require.NoError(t, err, "wasm binary should build successfully")
 		m := mod.(*wasm.ModuleInstance)
 		_, err = m.ExportedFunction("").Call(ctx)
-		// require.Equal(t, uint64(0), m.Globals[12].Val)
 		require.Contains(t, err.Error(), "wasm error: unreachable")
 	})
 }

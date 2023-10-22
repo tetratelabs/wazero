@@ -909,12 +909,11 @@ ld1r {x10.4s}, [x100?]
 		ctx.vRegCounter = int(nextVReg.ID()) - 1
 
 		t.Run("address mode "+strconv.Itoa(k), func(t *testing.T) {
-			defer func() {
-				errMsg := recover().(string)
-				require.Equal(t, errMsg, "unsupported address mode for LoadSplat")
-			}()
-			m.lowerLoadSplatFromAddressMode(operandNR(x10VReg), addressMode{kind: amk}, ssa.VecLaneI32x4)
-			t.Fatal("lowerLoadSplatFromAddressMode should panic with address mode", amk)
+			err := require.CapturePanic(func() {
+				m.lowerLoadSplatFromAddressMode(operandNR(x10VReg), addressMode{kind: amk}, ssa.VecLaneI32x4)
+				t.Fatal("lowerLoadSplatFromAddressMode should panic with address mode", amk)
+			})
+			require.Contains(t, err.Error(), "unsupported address mode for LoadSplat")
 		})
 
 	}

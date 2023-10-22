@@ -2,7 +2,7 @@
   (func (;0;)
     (local i32)
       loop  ;; label = @4
-        loop ;;(result i32)  ;; label = @5
+        loop  ;; label = @5
           global.get 0
           i32.eqz
           if  ;; label = @6
@@ -12,10 +12,10 @@
           i32.const 1
           i32.sub
           global.set 0
-          block ;;(result i64)  ;; label = @6
+          block ;; label = @6
             i32.const 0
-            v128.load32_splat offset=32768 ;; <-- value in x11 is incorrect
-            i32x4.extract_lane 2  ;; <-- this value is incorrect
+            v128.load32_splat offset=32768
+            i32x4.extract_lane 2
             i64.load offset=32884
             br 2 (;@5;)
           end
