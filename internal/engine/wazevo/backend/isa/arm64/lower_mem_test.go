@@ -911,7 +911,6 @@ ld1r {x10.4s}, [x100?]
 		t.Run("address mode "+strconv.Itoa(k), func(t *testing.T) {
 			err := require.CapturePanic(func() {
 				m.lowerLoadSplatFromAddressMode(operandNR(x10VReg), addressMode{kind: amk}, ssa.VecLaneI32x4)
-				t.Fatal("lowerLoadSplatFromAddressMode should panic with address mode", amk)
 			})
 			require.Contains(t, err.Error(), "unsupported address mode for LoadSplat")
 		})
