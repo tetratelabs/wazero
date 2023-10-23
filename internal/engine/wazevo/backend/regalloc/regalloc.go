@@ -219,7 +219,7 @@ func (a *Allocator) livenessAnalysis(f Function) {
 			if instr.IsCopy() {
 				id := int(dstVR.ID())
 				if id < len(a.phiBlocks) && a.phiBlocks[id] != nil {
-					info.liveOuts[srcVR] = struct{}{}
+					info.liveOuts[dstVR] = struct{}{}
 				}
 				a.recordCopyRelation(dstVR, srcVR)
 			}

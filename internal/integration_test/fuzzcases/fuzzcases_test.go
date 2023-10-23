@@ -585,7 +585,7 @@ func Test1797c(t *testing.T) {
 	}
 	run(t, func(t *testing.T, r wazero.Runtime) {
 		mod, err := r.Instantiate(ctx, getWasmBinary(t, "1797c"))
-		require.NoError(t, err, "wasm binary should build successfully")
+		require.NoError(t, err)
 		m := mod.(*wasm.ModuleInstance)
 		params := make([]uint64, 20)
 		_, err = m.ExportedFunction("~zz\x00E1E\x00EE\x00$").Call(ctx, params...)
@@ -600,12 +600,33 @@ func Test1797d(t *testing.T) {
 	}
 	run(t, func(t *testing.T, r wazero.Runtime) {
 		mod, err := r.Instantiate(ctx, getWasmBinary(t, "1797d"))
-		require.NoError(t, err, "wasm binary should build successfully")
+		require.NoError(t, err)
 		m := mod.(*wasm.ModuleInstance)
 		params := make([]uint64, 20)
 		_, err = m.ExportedFunction("p").Call(ctx, params...)
 		require.NoError(t, err)
 		require.Equal(t, uint64(15092115255309870764), m.Globals[2].Val)
 		require.Equal(t, uint64(9241386435284803069), m.Globals[2].ValHi)
+	})
+}
+
+// Test1812 tests that many constant block params work fine.
+func Test1812(t *testing.T) {
+	if !platform.CompilerSupported() {
+		return
+	}
+	run(t, func(t *testing.T, r wazero.Runtime) {
+		mod, err := r.Instantiate(ctx, getWasmBinary(t, "1812"))
+		require.NoError(t, err)
+		m := mod.(*wasm.ModuleInstance)
+		res, err := m.ExportedFunction("").Call(ctx)
+		require.NoError(t, err)
+		require.Equal(t,
+			[]uint64{
+				0x8301fd00, 0xfd838783, 0x87878383, 0x9b000087, 0x170001fd,
+				0xfd8383fd, 0x87838301, 0x878787, 0x83fd9b00, 0x201fd83, 0x878783,
+				0x83fd9b00, 0x9b00fd83, 0xfd8383fd, 0x87838301, 0x87878787,
+				0xfd9b0000, 0x87878383, 0x1fd8383,
+			}, res)
 	})
 }
