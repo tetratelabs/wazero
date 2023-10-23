@@ -503,13 +503,13 @@ L4 (SSA Block: blk3):
 L1 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
-	cbnz w2, #0xc (L2)
+	cbnz w2, #0x8 (L2)
 L3 (SSA Block: blk2):
-	mov x0, x3
 	b #0x8 (L4)
 L2 (SSA Block: blk1):
-	mov x0, x2
+	mov x3, x2
 L4 (SSA Block: blk3):
+	mov x0, x3
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
 	ret
