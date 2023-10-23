@@ -365,9 +365,7 @@ func (a *Allocator) buildLiveRangesForNonReals(info *blockInfo) {
 			if end = info.lastUses.Lookup(v); end == -1 {
 				// This case the defined value is not used at all.
 				end = defPos
-			} else {
-				// v is killed at pos.
-			}
+			} // Otherwise v is killed at defPos.
 		}
 		n := a.getOrAllocateNode(v)
 		intervalNode := info.intervalMng.insert(n, defPos, end)

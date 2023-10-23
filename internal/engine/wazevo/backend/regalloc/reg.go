@@ -133,6 +133,8 @@ func (t *VRegTypeTable) Contains(id VRegID) bool {
 	return t.set.has(uint(id - t.min))
 }
 
+// Lookup returns the program counter associated with the given virtual register.
+// If the virtual register is not in the table, -1 is returned.
 func (t *VRegTypeTable) Lookup(id VRegID) programCounter {
 	if id := int(id - t.min); t.set.has(uint(id)) {
 		return t.pcs[id]
