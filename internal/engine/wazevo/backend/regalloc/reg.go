@@ -87,6 +87,7 @@ func (t *VRegTable) Contains(v VReg) bool {
 	return t[v.RegType()].Contains(v.ID())
 }
 
+// Lookup returns the program counter associated with the given virtual register.
 func (t *VRegTable) Lookup(v VReg) programCounter {
 	return t[v.RegType()].Lookup(v.ID())
 }

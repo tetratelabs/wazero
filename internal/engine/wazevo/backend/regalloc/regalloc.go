@@ -81,7 +81,6 @@ type (
 		liveIns  map[VReg]struct{}
 		defs     map[VReg]programCounter
 		lastUses VRegTable
-		kills    VRegSet
 		// Pre-colored real registers can have multiple live ranges in one block.
 		realRegUses [vRegIDReservedForRealNum][]programCounter
 		realRegDefs [vRegIDReservedForRealNum][]programCounter
@@ -186,7 +185,6 @@ func (a *Allocator) livenessAnalysis(f Function) {
 			}
 		}
 		info.lastUses.Reset(minVRegID)
-		info.kills.Reset(minVRegID)
 
 		var pc programCounter
 		for instr := blk.InstrIteratorBegin(); instr != nil; instr = blk.InstrIteratorNext() {
@@ -241,22 +239,6 @@ func (a *Allocator) livenessAnalysis(f Function) {
 			panic("BUG")
 		}
 		a.beginUpAndMarkStack(f, v, false, nil)
-	}
-
-	// Now that we finished gathering liveIns, liveOuts, defs, and lastUses, the only thing left is to construct kills.
-	for blk := f.PostOrderBlockIteratorBegin(); blk != nil; blk = f.PostOrderBlockIteratorNext() { // Order doesn't matter.
-		info := a.blockInfoAt(blk.ID())
-		outs := info.liveOuts
-		info.lastUses.Range(func(use VReg, pc programCounter) {
-			// Usage without live-outs is a kill.
-			if _, ok := outs[use]; !ok {
-				info.kills.Insert(use)
-			}
-		})
-
-		if wazevoapi.RegAllocLoggingEnabled {
-			fmt.Printf("\nfinalized info for block[%d]:\n%s\n", blk.ID(), info.Format(a.regInfo))
-		}
 	}
 }
 
@@ -347,13 +329,7 @@ func (a *Allocator) buildLiveRangesForNonReals(info *blockInfo) {
 		if _, ok := outs[v]; ok {
 			// v is live-in and live-out, so it is live-through.
 			begin, end = 0, math.MaxInt32
-			if info.kills.Contains(v) {
-				panic("BUG: v is live-out but also killed")
-			}
 		} else {
-			if !info.kills.Contains(v) {
-				panic("BUG: v is live-in but not live-out or use")
-			}
 			// v is killed at killPos.
 			begin, end = 0, info.lastUses.Lookup(v)
 		}
@@ -385,16 +361,12 @@ func (a *Allocator) buildLiveRangesForNonReals(info *blockInfo) {
 		if _, ok := outs[v]; ok {
 			// v is defined here and live-out, so it is live-through.
 			end = math.MaxInt32
-			if info.kills.Contains(v) {
-				panic("BUG: v is killed here but also killed")
-			}
 		} else {
-			if !info.kills.Contains(v) {
+			if end = info.lastUses.Lookup(v); end == -1 {
 				// This case the defined value is not used at all.
 				end = defPos
 			} else {
 				// v is killed at pos.
-				end = info.lastUses.Lookup(v)
 			}
 		}
 		n := a.getOrAllocateNode(v)
@@ -404,18 +376,6 @@ func (a *Allocator) buildLiveRangesForNonReals(info *blockInfo) {
 
 	// Reuse for the next block.
 	a.vs = vs[:0]
-
-	if wazevoapi.RegAllocValidationEnabled {
-		info.kills.Range(func(u VReg) {
-			if !u.IsRealReg() {
-				_, defined := defs[u]
-				_, liveIn := ins[u]
-				if !defined && !liveIn {
-					panic(fmt.Sprintf("BUG: %v is killed but not defined or live-in", u))
-				}
-			}
-		})
-	}
 }
 
 // buildLiveRangesForReals builds live ranges for pre-colored real registers.
@@ -585,10 +545,6 @@ func (i *blockInfo) Format(ri *RegisterInfo) string {
 	buf.WriteString("\n\tlastUses: ")
 	i.lastUses.Range(func(v VReg, pos programCounter) {
 		buf.WriteString(fmt.Sprintf("%v@%v ", v, pos))
-	})
-	buf.WriteString("\n\tkills: ")
-	i.kills.Range(func(v VReg) {
-		buf.WriteString(fmt.Sprintf("%v@%v ", v, i.lastUses.Lookup(v)))
 	})
 	buf.WriteString("\n\trealRegUses: ")
 	for v, pos := range i.realRegUses {
