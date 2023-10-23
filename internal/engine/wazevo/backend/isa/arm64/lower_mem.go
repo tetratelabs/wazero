@@ -231,6 +231,49 @@ func (m *machine) lowerLoad(ptr ssa.Value, offset uint32, typ ssa.Type, ret ssa.
 	m.insert(load)
 }
 
+func (m *machine) lowerLoadSplat(ptr ssa.Value, offset uint32, lane ssa.VecLane, ret ssa.Value) {
+	var opSize byte
+	switch lane {
+	case ssa.VecLaneI8x16:
+		opSize = 8
+	case ssa.VecLaneI16x8:
+		opSize = 16
+	case ssa.VecLaneI32x4:
+		opSize = 32
+	case ssa.VecLaneI64x2:
+		opSize = 64
+	}
+	amode := m.lowerToAddressMode(ptr, offset, opSize)
+	rd := operandNR(m.compiler.VRegOf(ret))
+	m.lowerLoadSplatFromAddressMode(rd, amode, lane)
+}
+
+// lowerLoadSplatFromAddressMode is extracted from lowerLoadSplat for testing.
+func (m *machine) lowerLoadSplatFromAddressMode(rd operand, amode addressMode, lane ssa.VecLane) {
+	tmpReg := operandNR(m.compiler.AllocateVReg(ssa.TypeI64))
+
+	// vecLoad1R has offset address mode (base+imm) only for post index, so the only addressing mode
+	// we can use here is "no-offset" register addressing mode, i.e. `addressModeKindRegReg`.
+	switch amode.kind {
+	case addressModeKindRegReg:
+		add := m.allocateInstr()
+		add.asALU(aluOpAdd, tmpReg, operandNR(amode.rn), operandNR(amode.rm), true)
+		m.insert(add)
+	case addressModeKindRegSignedImm9, addressModeKindRegUnsignedImm12:
+		add := m.allocateInstr()
+		add.asALU(aluOpAdd, tmpReg, operandNR(amode.rn), operandImm12(uint16(amode.imm), 0), true)
+		m.insert(add)
+	default:
+		panic("unsupported address mode for LoadSplat")
+	}
+
+	arr := ssaLaneToArrangement(lane)
+
+	ld1r := m.allocateInstr()
+	ld1r.asVecLoad1R(rd, tmpReg, arr)
+	m.insert(ld1r)
+}
+
 func (m *machine) lowerStore(si *ssa.Instruction) {
 	// TODO: merge consecutive stores into a single pair store instruction.
 	value, ptr, offset, storeSizeInBits := si.StoreData()

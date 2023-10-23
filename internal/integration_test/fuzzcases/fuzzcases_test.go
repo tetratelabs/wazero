@@ -610,6 +610,21 @@ func Test1797d(t *testing.T) {
 	})
 }
 
+// Test1802 tests that load32_splat computes the load from the right offset
+// when a nonzero value is on the stack.
+func Test1802(t *testing.T) {
+	if !platform.CompilerSupported() {
+		return
+	}
+	run(t, func(t *testing.T, r wazero.Runtime) {
+		mod, err := r.Instantiate(ctx, getWasmBinary(t, "1802"))
+		require.NoError(t, err, "wasm binary should build successfully")
+		m := mod.(*wasm.ModuleInstance)
+		_, err = m.ExportedFunction("").Call(ctx)
+		require.Contains(t, err.Error(), "wasm error: unreachable")
+	})
+}
+
 // Test1812 tests that many constant block params work fine.
 func Test1812(t *testing.T) {
 	if !platform.CompilerSupported() {
