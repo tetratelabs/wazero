@@ -1873,21 +1873,40 @@ func (m *machine) lowerSelect(c, x, y, result ssa.Value) {
 }
 
 func (m *machine) lowerSelectVec(rc, rn, rm, rd operand) {
-	tmp := operandNR(m.compiler.AllocateVReg(ssa.TypeI64))
+	ifNonZero := m.allocateLabel()
+	ifNonZeroPos := m.allocateLabelPosition()
+	end := m.allocateLabel()
+	endPos := m.allocateLabelPosition()
 
-	// Sets all bits to 1 if rc is not zero.
-	alu := m.allocateInstr()
-	alu.asALU(aluOpSub, tmp, operandNR(xzrVReg), rc, true)
-	m.insert(alu)
+	cbr := m.allocateInstr()
+	cbr.asCondBr(registerAsRegNotZeroCond(rc.nr()), ifNonZero, true)
+	m.insert(cbr)
 
-	// Then move the bits to the result vector register.
-	dup := m.allocateInstr()
-	dup.asVecDup(rd, tmp, vecArrangement2D)
-	m.insert(dup)
+	// If rc is zero, mov rd, rm then jump to end.
+	mov0 := m.allocateInstr()
+	mov0.asFpuMov128(rd.nr(), rm.nr())
+	m.insert(mov0)
 
-	// Now that `rd` has either all bits one or zero depending on `rc`,
-	// we can use bsl to select between `rn` and `rm`.
-	ins := m.allocateInstr()
-	ins.asVecRRR(vecOpBsl, rd, rn, rm, vecArrangement16B)
-	m.insert(ins)
+	br := m.allocateInstr()
+	br.asBr(end)
+	m.insert(br)
+
+	// If rc is non-zero, set mov rd, rn.
+	ifnzTgt := m.allocateInstr()
+	ifnzTgt.asNop0WithLabel(ifNonZero)
+	m.insert(ifnzTgt)
+
+	mov := m.allocateInstr()
+	mov.asFpuMov128(rd.nr(), rn.nr())
+	m.insert(mov)
+
+	ifNonZeroPos.begin, ifNonZeroPos.end = ifnzTgt, ifnzTgt
+	m.labelPositions[ifNonZero] = ifNonZeroPos
+
+	endTgt := m.allocateInstr()
+	endTgt.asNop0WithLabel(end)
+	m.insert(endTgt)
+
+	endPos.begin, endPos.end = endTgt, endTgt
+	m.labelPositions[end] = endPos
 }

@@ -94,6 +94,8 @@ func Test696(t *testing.T) {
 		}{
 			{fnName: "select", in: 1, exp: [2]uint64{0xffffffffffffffff, 0xeeeeeeeeeeeeeeee}},
 			{fnName: "select", in: 0, exp: [2]uint64{0x1111111111111111, 0x2222222222222222}},
+			{fnName: "select", in: 0xffffff, exp: [2]uint64{0xffffffffffffffff, 0xeeeeeeeeeeeeeeee}},
+			{fnName: "select", in: 0x000000, exp: [2]uint64{0x1111111111111111, 0x2222222222222222}},
 			{fnName: "typed select", in: 1, exp: [2]uint64{0xffffffffffffffff, 0xeeeeeeeeeeeeeeee}},
 			{fnName: "typed select", in: 0, exp: [2]uint64{0x1111111111111111, 0x2222222222222222}},
 		} {
