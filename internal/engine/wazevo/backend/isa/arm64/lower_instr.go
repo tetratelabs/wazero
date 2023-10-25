@@ -1874,9 +1874,7 @@ func (m *machine) lowerSelect(c, x, y, result ssa.Value) {
 
 func (m *machine) lowerSelectVec(rc, rn, rm, rd operand) {
 	ifNonZero := m.allocateLabel()
-	ifNonZeroPos := m.allocateLabelPosition()
 	end := m.allocateLabel()
-	endPos := m.allocateLabelPosition()
 
 	cbr := m.allocateInstr()
 	cbr.asCondBr(registerAsRegNotZeroCond(rc.nr()), ifNonZero, true)
@@ -1892,21 +1890,11 @@ func (m *machine) lowerSelectVec(rc, rn, rm, rd operand) {
 	m.insert(br)
 
 	// If rc is non-zero, set mov rd, rn.
-	ifnzTgt := m.allocateInstr()
-	ifnzTgt.asNop0WithLabel(ifNonZero)
-	m.insert(ifnzTgt)
+	m.insertBrTarget(ifNonZero)
 
 	mov := m.allocateInstr()
 	mov.asFpuMov128(rd.nr(), rn.nr())
 	m.insert(mov)
 
-	ifNonZeroPos.begin, ifNonZeroPos.end = ifnzTgt, ifnzTgt
-	m.labelPositions[ifNonZero] = ifNonZeroPos
-
-	endTgt := m.allocateInstr()
-	endTgt.asNop0WithLabel(end)
-	m.insert(endTgt)
-
-	endPos.begin, endPos.end = endTgt, endTgt
-	m.labelPositions[end] = endPos
+	m.insertBrTarget(end)
 }

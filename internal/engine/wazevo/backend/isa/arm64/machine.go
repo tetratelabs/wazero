@@ -232,13 +232,17 @@ func (m *machine) insert(i *instruction) {
 
 func (m *machine) insertBrTargetLabel() label {
 	l := m.allocateLabel()
+	m.insertBrTarget(l)
+	return l
+}
+
+func (m *machine) insertBrTarget(l label) {
 	nop := m.allocateInstr()
 	nop.asNop0WithLabel(l)
 	m.insert(nop)
 	pos := m.allocateLabelPosition()
 	pos.begin, pos.end = nop, nop
 	m.labelPositions[l] = pos
-	return l
 }
 
 func (m *machine) allocateLabelPosition() *labelPosition {
