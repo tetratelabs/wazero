@@ -1873,11 +1873,9 @@ func (m *machine) lowerSelect(c, x, y, result ssa.Value) {
 }
 
 func (m *machine) lowerSelectVec(rc, rn, rm, rd operand) {
-	ifNonZero := m.allocateLabel()
-	end := m.allocateLabel()
-
+	// Declare and insert the conditional branch here jump to label `ifNonZero` below:
+	// but we cannot forward reference the label.
 	cbr := m.allocateInstr()
-	cbr.asCondBr(registerAsRegNotZeroCond(rc.nr()), ifNonZero, true)
 	m.insert(cbr)
 
 	// If rc is zero, mov rd, rm then jump to end.
@@ -1885,16 +1883,21 @@ func (m *machine) lowerSelectVec(rc, rn, rm, rd operand) {
 	mov0.asFpuMov128(rd.nr(), rm.nr())
 	m.insert(mov0)
 
+	// Declared and insert the non-conditional jump to label `end` below:
+	// again, we cannot forward reference the label.
 	br := m.allocateInstr()
-	br.asBr(end)
 	m.insert(br)
 
-	// If rc is non-zero, set mov rd, rn.
-	m.insertBrTarget(ifNonZero)
+	// Create and insert the label, and update `cbr` to the real instruction.
+	ifNonZero := m.insertBrTargetLabel()
+	cbr.asCondBr(registerAsRegNotZeroCond(rc.nr()), ifNonZero, true)
 
+	// If rc is non-zero, set mov rd, rn.
 	mov := m.allocateInstr()
 	mov.asFpuMov128(rd.nr(), rn.nr())
 	m.insert(mov)
 
-	m.insertBrTarget(end)
+	// Create and insert the label, and update `br` to the real instruction.
+	end := m.insertBrTargetLabel()
+	br.asBr(end)
 }
