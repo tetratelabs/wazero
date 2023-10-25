@@ -647,3 +647,22 @@ func Test1812(t *testing.T) {
 			}, res)
 	})
 }
+
+// Test1817 tests that v128.store uses the right memory layout.
+func Test1817(t *testing.T) {
+	if !platform.CompilerSupported() {
+		return
+	}
+	run(t, func(t *testing.T, r wazero.Runtime) {
+		mod, err := r.Instantiate(ctx, getWasmBinary(t, "1817"))
+		require.NoError(t, err)
+		m := mod.(*wasm.ModuleInstance)
+		_, err = m.ExportedFunction("").Call(ctx)
+		require.NoError(t, err)
+		buf, ok := m.Memory().Read(15616, 16)
+		require.True(t, ok)
+		require.Equal(t, []uint8{0, 0, 0, 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, buf)
+		require.Equal(t, uint64(0x8000000080000000), m.Globals[0].Val)
+		require.Equal(t, uint64(0x8000000080000000), m.Globals[0].ValHi)
+	})
+}
