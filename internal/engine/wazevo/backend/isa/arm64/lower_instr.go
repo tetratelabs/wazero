@@ -1873,21 +1873,31 @@ func (m *machine) lowerSelect(c, x, y, result ssa.Value) {
 }
 
 func (m *machine) lowerSelectVec(rc, rn, rm, rd operand) {
-	tmp := operandNR(m.compiler.AllocateVReg(ssa.TypeI64))
+	// Declare and insert the conditional branch here jump to label `ifNonZero` below:
+	// but we cannot forward reference the label.
+	cbr := m.allocateInstr()
+	m.insert(cbr)
 
-	// Sets all bits to 1 if rc is not zero.
-	alu := m.allocateInstr()
-	alu.asALU(aluOpSub, tmp, operandNR(xzrVReg), rc, true)
-	m.insert(alu)
+	// If rc is zero, mov rd, rm then jump to end.
+	mov0 := m.allocateInstr()
+	mov0.asFpuMov128(rd.nr(), rm.nr())
+	m.insert(mov0)
 
-	// Then move the bits to the result vector register.
-	dup := m.allocateInstr()
-	dup.asVecDup(rd, tmp, vecArrangement2D)
-	m.insert(dup)
+	// Declared and insert the non-conditional jump to label `end` below:
+	// again, we cannot forward reference the label.
+	br := m.allocateInstr()
+	m.insert(br)
 
-	// Now that `rd` has either all bits one or zero depending on `rc`,
-	// we can use bsl to select between `rn` and `rm`.
-	ins := m.allocateInstr()
-	ins.asVecRRR(vecOpBsl, rd, rn, rm, vecArrangement16B)
-	m.insert(ins)
+	// Create and insert the label, and update `cbr` to the real instruction.
+	ifNonZero := m.insertBrTargetLabel()
+	cbr.asCondBr(registerAsRegNotZeroCond(rc.nr()), ifNonZero, true)
+
+	// If rc is non-zero, set mov rd, rn.
+	mov := m.allocateInstr()
+	mov.asFpuMov128(rd.nr(), rn.nr())
+	m.insert(mov)
+
+	// Create and insert the label, and update `br` to the real instruction.
+	end := m.insertBrTargetLabel()
+	br.asBr(end)
 }
