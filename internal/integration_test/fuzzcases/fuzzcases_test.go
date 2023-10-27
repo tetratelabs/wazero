@@ -666,3 +666,19 @@ func Test1817(t *testing.T) {
 		require.Equal(t, uint64(0x8000000080000000), m.Globals[0].ValHi)
 	})
 }
+
+// Test1817 tests that i16x8.narrow_i32x4_u assigns the dest register correctly.
+func Test1818(t *testing.T) {
+	if !platform.CompilerSupported() {
+		return
+	}
+	run(t, func(t *testing.T, r wazero.Runtime) {
+		mod, err := r.Instantiate(ctx, getWasmBinary(t, "1818"))
+		require.NoError(t, err)
+		m := mod.(*wasm.ModuleInstance)
+		_, err = m.ExportedFunction("").Call(ctx)
+		require.NoError(t, err)
+		require.Equal(t, uint64(0xFFFFFFFFFFFF0000), m.Globals[1].Val)
+		require.Equal(t, uint64(0xFFFF), m.Globals[1].ValHi)
+	})
+}
