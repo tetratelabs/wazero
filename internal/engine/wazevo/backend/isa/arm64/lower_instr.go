@@ -557,21 +557,28 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
 		rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
 		rd := operandNR(m.compiler.VRegOf(instr.Return()))
+
+		tmp := operandNR(m.compiler.AllocateVReg(ssa.TypeV128))
+
 		loQxtn := m.allocateInstr()
 		hiQxtn := m.allocateInstr()
 		if signed := op == ssa.OpcodeSnarrow; signed {
 			// Narrow lanes on rn and write them into lower-half of rd.
-			loQxtn.asVecMisc(vecOpSqxtn, rd, rn, arr) // low
+			loQxtn.asVecMisc(vecOpSqxtn, tmp, rn, arr) // low
 			// Narrow lanes on rm and write them into higher-half of rd.
-			hiQxtn.asVecMisc(vecOpSqxtn, rd, rm, arr2) // high (sqxtn2)
+			hiQxtn.asVecMisc(vecOpSqxtn, tmp, rm, arr2) // high (sqxtn2)
 		} else {
 			// Narrow lanes on rn and write them into lower-half of rd.
-			loQxtn.asVecMisc(vecOpSqxtun, rd, rn, arr) // low
+			loQxtn.asVecMisc(vecOpSqxtun, tmp, rn, arr) // low
 			// Narrow lanes on rm and write them into higher-half of rd.
-			hiQxtn.asVecMisc(vecOpSqxtun, rd, rm, arr2) // high (sqxtn2)
+			hiQxtn.asVecMisc(vecOpSqxtun, tmp, rm, arr2) // high (sqxtn2)
 		}
 		m.insert(loQxtn)
 		m.insert(hiQxtn)
+
+		mov := m.allocateInstr()
+		mov.asFpuMov128(rd.nr(), tmp.nr())
+		m.insert(mov)
 	case ssa.OpcodeFvpromoteLow:
 		x, lane := instr.ArgWithLane()
 		if lane != ssa.VecLaneF32x4 {
