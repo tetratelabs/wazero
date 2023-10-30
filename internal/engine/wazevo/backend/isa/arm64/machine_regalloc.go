@@ -17,7 +17,8 @@ type (
 		// labelToRegAllocBlockIndex maps label to the index of reversePostOrderBlocks.
 		labelToRegAllocBlockIndex map[label]int
 		// vs is used for regalloc.Instr Defs() and Uses() methods, defined here for reuse.
-		vs []regalloc.VReg
+		vs                     []regalloc.VReg
+		loopNestingForestRoots []ssa.BasicBlock
 	}
 
 	// regAllocBlockImpl implements regalloc.Block.
@@ -28,7 +29,8 @@ type (
 		l   label
 		pos *labelPosition
 		// instrImpl is re-used for all instructions in this block.
-		instrImpl regAllocInstrImpl
+		instrImpl                 regAllocInstrImpl
+		loopNestingForestChildren []ssa.BasicBlock
 	}
 
 	// regAllocInstrImpl implements regalloc.Instr.
@@ -151,6 +153,56 @@ func (r *regAllocBlockImpl) Pred(i int) regalloc.Block {
 	return &r.f.reversePostOrderBlocks[index]
 }
 
+// Succs implements regalloc.Block Succs.
+func (r *regAllocBlockImpl) Succs() int {
+	return r.sb.Succs()
+}
+
+// Succ implements regalloc.Block Succ.
+func (r *regAllocBlockImpl) Succ(i int) regalloc.Block {
+	sb := r.sb
+	succ := sb.Succ(i)
+	if succ.ReturnBlock() {
+		return nil
+	}
+	l := r.f.m.ssaBlockIDToLabels[succ.ID()]
+	index := r.f.labelToRegAllocBlockIndex[l]
+	return &r.f.reversePostOrderBlocks[index]
+}
+
+// LoopHeader implements regalloc.Block LoopHeader.
+func (r *regAllocBlockImpl) LoopHeader() bool {
+	return r.sb.LoopHeader()
+}
+
+// LoopNestingForestRoots implements regalloc.Function LoopNestingForestRoots.
+func (f *regAllocFunctionImpl) LoopNestingForestRoots() int {
+	f.loopNestingForestRoots = f.m.compiler.LoopNestingForestRoots()
+	return len(f.loopNestingForestRoots)
+}
+
+// LoopNestingForestRoot implements regalloc.Function LoopNestingForestRoot.
+func (f *regAllocFunctionImpl) LoopNestingForestRoot(i int) regalloc.Block {
+	blk := f.loopNestingForestRoots[i]
+	l := f.m.ssaBlockIDToLabels[blk.ID()]
+	index := f.labelToRegAllocBlockIndex[l]
+	return &f.reversePostOrderBlocks[index]
+}
+
+// LoopNestingForestChildren implements regalloc.Block LoopNestingForestChildren.
+func (r *regAllocBlockImpl) LoopNestingForestChildren() int {
+	r.loopNestingForestChildren = r.sb.LoopNestingForestChildren()
+	return len(r.loopNestingForestChildren)
+}
+
+// LoopNestingForestChild implements regalloc.Block LoopNestingForestChild.
+func (r *regAllocBlockImpl) LoopNestingForestChild(i int) regalloc.Block {
+	blk := r.loopNestingForestChildren[i]
+	l := r.f.m.ssaBlockIDToLabels[blk.ID()]
+	index := r.f.labelToRegAllocBlockIndex[l]
+	return &r.f.reversePostOrderBlocks[index]
+}
+
 // InstrIteratorBegin implements regalloc.Block InstrIteratorBegin.
 func (r *regAllocBlockImpl) InstrIteratorBegin() regalloc.Instr {
 	r.instrImpl.i = r.pos.begin
@@ -161,6 +213,25 @@ func (r *regAllocBlockImpl) InstrIteratorBegin() regalloc.Instr {
 func (r *regAllocBlockImpl) InstrIteratorNext() regalloc.Instr {
 	for {
 		instr := r.instrIteratorNext()
+		if instr == nil {
+			return nil
+		} else if instr.i.addedBeforeRegAlloc {
+			// Only concerned about the instruction added before regalloc.
+			return instr
+		}
+	}
+}
+
+// InstrRevIteratorBegin implements regalloc.Block InstrRevIteratorBegin.
+func (r *regAllocBlockImpl) InstrRevIteratorBegin() regalloc.Instr {
+	r.instrImpl.i = r.pos.end
+	return &r.instrImpl
+}
+
+// InstrRevIteratorNext implements regalloc.Block InstrRevIteratorNext.
+func (r *regAllocBlockImpl) InstrRevIteratorNext() regalloc.Instr {
+	for {
+		instr := r.instrIteratorRevNext()
 		if instr == nil {
 			return nil
 		} else if instr.i.addedBeforeRegAlloc {
@@ -187,6 +258,15 @@ func (r *regAllocBlockImpl) instrIteratorNext() *regAllocInstrImpl {
 		return nil
 	}
 	r.instrImpl.i = cur.next
+	return &r.instrImpl
+}
+
+func (r *regAllocBlockImpl) instrIteratorRevNext() *regAllocInstrImpl {
+	cur := r.instrImpl.i
+	if r.pos.begin == cur {
+		return nil
+	}
+	r.instrImpl.i = cur.prev
 	return &r.instrImpl
 }
 

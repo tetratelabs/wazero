@@ -11,6 +11,7 @@ import (
 // TestReRunFailedRequireNoDiffCase re-runs the failed case specified by WASM_BINARY_NAME in testdata directory.
 func TestReRunFailedRequireNoDiffCase(t *testing.T) {
 	binaryPath := os.Getenv("WASM_BINARY_PATH")
+	binaryPath = "/Users/mathetake/wazero/tmp.wasm"
 
 	wasmBin, err := os.ReadFile(binaryPath)
 	if err != nil {

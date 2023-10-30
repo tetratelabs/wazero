@@ -1,5 +1,12 @@
 package ssa
 
+import (
+	"fmt"
+	"strings"
+
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
+)
+
 // passCalculateImmediateDominators calculates immediate dominators for each basic block.
 // The result is stored in b.dominators. This make it possible for the following passes to
 // use builder.isDominatedBy to check if a block is dominated by another block.
@@ -153,6 +160,40 @@ func subPassLoopDetection(b *builder) {
 			if b.isDominatedBy(pred, blk) {
 				blk.loopHeader = true
 			}
+		}
+	}
+}
+
+func buildLoopNestingForest(b *builder) {
+	ent := b.entryBlk()
+	doms := b.dominators
+	for _, blk := range b.reversePostOrderedBasicBlocks {
+		n := doms[blk.id]
+		for !n.loopHeader && n != ent {
+			n = doms[n.id]
+		}
+
+		if n == ent && blk.loopHeader {
+			b.loopNestingForestRoots = append(b.loopNestingForestRoots, blk)
+		} else if n == ent {
+		} else if n.loopHeader {
+			n.loopNestingForestChildren = append(n.loopNestingForestChildren, blk)
+		}
+	}
+
+	if wazevoapi.SSALoggingEnabled {
+		for _, root := range b.loopNestingForestRoots {
+			printLoopNestingForest(root.(*basicBlock), 0)
+		}
+	}
+}
+
+func printLoopNestingForest(root *basicBlock, depth int) {
+	fmt.Println(strings.Repeat("\t", depth), "loop nesting forest root:", root.ID())
+	for _, child := range root.loopNestingForestChildren {
+		fmt.Println(strings.Repeat("\t", depth+1), "child:", child.ID())
+		if child.LoopHeader() {
+			printLoopNestingForest(child.(*basicBlock), depth+2)
 		}
 	}
 }

@@ -52,14 +52,30 @@ type BasicBlock interface {
 
 	// Valid is true if this block is still valid even after optimizations.
 	Valid() bool
+
 	// BeginPredIterator returns the first predecessor of this block.
 	BeginPredIterator() BasicBlock
+
 	// NextPredIterator returns the next predecessor of this block.
 	NextPredIterator() BasicBlock
+
 	// Preds returns the number of predecessors of this block.
 	Preds() int
+
 	// Pred returns the i-th predecessor of this block.
 	Pred(i int) BasicBlock
+
+	// Succs returns the number of successors of this block.
+	Succs() int
+
+	// Succ returns the i-th successor of this block.
+	Succ(i int) BasicBlock
+
+	// LoopHeader returns true if this block is a loop header.
+	LoopHeader() bool
+
+	// LoopNestingForestChildren returns the children of this block in the loop nesting forest.
+	LoopNestingForestChildren() []BasicBlock
 }
 
 type (
@@ -92,6 +108,10 @@ type (
 		//
 		// This is modified during the subPassLoopDetection pass.
 		loopHeader bool
+
+		// loopNestingForestChildren holds the children of this block in the loop nesting forest.
+		// Non-empty if and only if this block is a loop header (i.e. loopHeader=true)
+		loopNestingForestChildren []BasicBlock
 
 		// reversePostOrder is used to sort all the blocks in the function in reverse post order.
 		// This is used in builder.LayoutBlocks.
@@ -234,6 +254,16 @@ func (bb *basicBlock) Pred(i int) BasicBlock {
 	return bb.preds[i].blk
 }
 
+// Succs implements BasicBlock.Succs.
+func (bb *basicBlock) Succs() int {
+	return len(bb.success)
+}
+
+// Succ implements BasicBlock.Succ.
+func (bb *basicBlock) Succ(i int) BasicBlock {
+	return bb.success[i]
+}
+
 // Root implements BasicBlock.Root.
 func (bb *basicBlock) Root() *Instruction {
 	return bb.rootInstr
@@ -256,6 +286,7 @@ func resetBasicBlock(bb *basicBlock) {
 	bb.unknownValues = make(map[Variable]Value)
 	bb.lastDefinitions = make(map[Variable]Value)
 	bb.reversePostOrder = -1
+	bb.loopNestingForestChildren = bb.loopNestingForestChildren[:0]
 }
 
 // addPred adds a predecessor to this block specified by the branch instruction.
@@ -341,4 +372,14 @@ func (bb *basicBlock) validate(b *builder) {
 // String implements fmt.Stringer for debugging purpose only.
 func (bb *basicBlock) String() string {
 	return strconv.Itoa(int(bb.id))
+}
+
+// LoopNestingForestChildren implements BasicBlock.LoopNestingForestChildren.
+func (bb *basicBlock) LoopNestingForestChildren() []BasicBlock {
+	return bb.loopNestingForestChildren
+}
+
+// LoopHeader implements BasicBlock.LoopHeader.
+func (bb *basicBlock) LoopHeader() bool {
+	return bb.loopHeader
 }

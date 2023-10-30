@@ -12,6 +12,7 @@ type (
 		iter            int
 		blocks          []*mockBlock
 		befores, afters []storeOrReloadInfo
+		lnfRoots        []*mockBlock
 	}
 
 	storeOrReloadInfo struct {
@@ -22,12 +23,15 @@ type (
 
 	// mockBlock implements Block.
 	mockBlock struct {
-		id           int
-		instructions []*mockInstr
-		preds        []*mockBlock
-		_preds       []Block
-		iter         int
-		_entry       bool
+		id             int
+		instructions   []*mockInstr
+		preds, succs   []*mockBlock
+		_preds, _succs []Block
+		iter           int
+		_entry         bool
+		_loop          bool
+		lnfChildren    []*mockBlock
+		blockParams    []VReg
 	}
 
 	// mockInstr implements Instr.
@@ -39,6 +43,10 @@ type (
 
 func newMockFunction(blocks ...*mockBlock) *mockFunction {
 	return &mockFunction{blocks: blocks}
+}
+
+func (m *mockFunction) loopNestingForestRoots(blocks ...*mockBlock) {
+	m.lnfRoots = blocks
 }
 
 func newMockBlock(id int, instructions ...*mockInstr) *mockBlock {
@@ -75,6 +83,8 @@ func (m *mockBlock) String() string {
 func (m *mockBlock) addPred(b *mockBlock) {
 	m.preds = append(m.preds, b)
 	m._preds = append(m._preds, b)
+	b._succs = append(b._succs, m)
+	b.succs = append(b.succs, m)
 }
 
 func (m *mockInstr) use(uses ...VReg) *mockInstr {
@@ -84,6 +94,12 @@ func (m *mockInstr) use(uses ...VReg) *mockInstr {
 
 func (m *mockInstr) def(defs ...VReg) *mockInstr {
 	m.defs = defs
+	return m
+}
+
+func (m *mockBlock) loop(children ...*mockBlock) *mockBlock {
+	m._loop = true
+	m.lnfChildren = children
 	return m
 }
 
@@ -194,13 +210,35 @@ func (m *mockBlock) InstrIteratorNext() Instr {
 	return ret
 }
 
+// InstrRevIteratorBegin implements Block.
+func (m *mockBlock) InstrRevIteratorBegin() Instr {
+	if len(m.instructions) == 0 {
+		return nil
+	}
+	m.iter = len(m.instructions)
+	return m.InstrRevIteratorNext()
+}
+
+// InstrRevIteratorNext implements Block.
+func (m *mockBlock) InstrRevIteratorNext() Instr {
+	m.iter--
+	if m.iter < 0 {
+		return nil
+	}
+	return m.instructions[m.iter]
+}
+
 // Preds implements Block.
 func (m *mockBlock) Preds() int {
 	return len(m._preds)
 }
 
 // BlockParams implements Block.
-func (m *mockBlock) BlockParams() []VReg { return nil }
+func (m *mockBlock) BlockParams() []VReg { return m.blockParams }
+
+func (m *mockBlock) blockParam(v VReg) {
+	m.blockParams = append(m.blockParams, v)
+}
 
 // Pred implements Instr.
 func (m *mockBlock) Pred(i int) Block { return m._preds[i] }
@@ -248,3 +286,31 @@ var (
 	_ Block    = (*mockBlock)(nil)
 	_ Instr    = (*mockInstr)(nil)
 )
+
+func (m *mockFunction) LoopNestingForestRoots() int {
+	return len(m.lnfRoots)
+}
+
+func (m *mockFunction) LoopNestingForestRoot(i int) Block {
+	return m.lnfRoots[i]
+}
+
+func (m *mockBlock) LoopHeader() bool {
+	return m._loop
+}
+
+func (m *mockBlock) Succs() int {
+	return len(m.succs)
+}
+
+func (m *mockBlock) Succ(i int) Block {
+	return m.succs[i]
+}
+
+func (m *mockBlock) LoopNestingForestChildren() int {
+	return len(m.lnfChildren)
+}
+
+func (m *mockBlock) LoopNestingForestChild(i int) Block {
+	return m.lnfChildren[i]
+}
