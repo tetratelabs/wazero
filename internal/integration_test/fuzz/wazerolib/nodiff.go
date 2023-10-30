@@ -379,10 +379,16 @@ func ensureInstantiationError(compilerErr, interpErr error) (okToInvoke bool, er
 		interpErrMsg = interpErrMsg[:strings.Index(interpErrMsg, "\n")]
 	}
 
+	if strings.Contains(compilerErrMsg, "stack overflow") && strings.Contains(interpErrMsg, "unreachable") {
+		// This is the case where the compiler reached stack overflow, but the interpreter reached the unreachable out of "fuel" during
+		// start function invocation. This is fine.
+		return false, nil
+	}
+
 	if !allowedErrorDuringInstantiation(compilerErrMsg) {
-		return false, fmt.Errorf("invalid error occur with compiler: %v", compilerErr)
+		return false, fmt.Errorf("invalid error occur with compiler: %v vs interpreter: %v", compilerErr, interpErr)
 	} else if !allowedErrorDuringInstantiation(interpErrMsg) {
-		return false, fmt.Errorf("invalid error occur with interpreter: %v", interpErrMsg)
+		return false, fmt.Errorf("invalid error occur with interpreter: %v vs compiler: %v", interpErr, compilerErr)
 	}
 
 	if compilerErrMsg != interpErrMsg {
