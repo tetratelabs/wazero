@@ -73,6 +73,7 @@ type (
 		nodes2     []*node
 		nodes3     []*node
 		dedup      []bool
+		blks       []Block
 	}
 
 	// blockInfo is a per-block information used during the register allocation.
@@ -277,30 +278,37 @@ func (a *Allocator) livenessAnalysis(f Function) {
 	}
 }
 
-// loopTreeDFS implements the Algorithm 9.3 in the book.
-// TODO: it should be easy to rewrite this as a non-recursive one.
-func (a *Allocator) loopTreeDFS(root Block) {
-	rootID := root.ID()
-	info := a.blockInfoAt(rootID)
-	tmp := map[VReg]struct{}{}
-	for v := range info.liveIns {
-		if a.phiBlk(v.ID()) != root {
-			tmp[v] = struct{}{}
-			info.liveOuts[v] = struct{}{}
-		}
-	}
+// loopTreeDFS implements the Algorithm 9.3 in the book in an iterative way.
+func (a *Allocator) loopTreeDFS(entry Block) {
+	a.blks = a.blks[:0]
+	a.blks = append(a.blks, entry)
 
-	cn := root.LoopNestingForestChildren()
-	for i := 0; i < cn; i++ {
-		child := root.LoopNestingForestChild(i)
-		childID := child.ID()
-		childInfo := a.blockInfoAt(childID)
-		for v := range tmp {
-			childInfo.liveIns[v] = struct{}{}
-			childInfo.liveOuts[v] = struct{}{}
+	for len(a.blks) > 0 {
+		tail := len(a.blks) - 1
+		loop := a.blks[tail]
+		a.blks = a.blks[:tail]
+		a.vs = a.vs[:0]
+
+		info := a.blockInfoAt(loop.ID())
+		for v := range info.liveIns {
+			if a.phiBlk(v.ID()) != loop {
+				a.vs = append(a.vs, v)
+				info.liveOuts[v] = struct{}{}
+			}
 		}
-		if child.LoopHeader() {
-			a.loopTreeDFS(child)
+
+		cn := loop.LoopNestingForestChildren()
+		for i := 0; i < cn; i++ {
+			child := loop.LoopNestingForestChild(i)
+			childID := child.ID()
+			childInfo := a.blockInfoAt(childID)
+			for _, v := range a.vs {
+				childInfo.liveIns[v] = struct{}{}
+				childInfo.liveOuts[v] = struct{}{}
+			}
+			if child.LoopHeader() {
+				a.blks = append(a.blks, child)
+			}
 		}
 	}
 }

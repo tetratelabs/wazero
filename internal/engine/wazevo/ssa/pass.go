@@ -14,7 +14,7 @@ import (
 // Note that passes suffixed with "Opt" are the optimization passes, meaning that they edit the instructions and blocks
 // while the other passes are not, like passEstimateBranchProbabilities does not edit them, but only calculates the additional information.
 func (b *builder) RunPasses() {
-	passSortSuccessor(b)
+	passSortSuccessors(b)
 	passDeadBlockEliminationOpt(b)
 	passRedundantPhiEliminationOpt(b)
 	// The result of passCalculateImmediateDominators will be used by various passes below.
@@ -353,8 +353,8 @@ func passNopInstElimination(b *builder) {
 	}
 }
 
-// passSortSuccessor sorts the successors of each block in the natural program order.
-func passSortSuccessor(b *builder) {
+// passSortSuccessors sorts the successors of each block in the natural program order.
+func passSortSuccessors(b *builder) {
 	for i := 0; i < b.basicBlocksPool.Allocated(); i++ {
 		blk := b.basicBlocksPool.View(i)
 		sort.SliceStable(blk.success, func(i, j int) bool {

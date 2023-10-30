@@ -164,6 +164,8 @@ func subPassLoopDetection(b *builder) {
 	}
 }
 
+// buildLoopNestingForest builds the loop nesting forest for the function.
+// This must be called after branch splitting since it relies on the CFG.
 func buildLoopNestingForest(b *builder) {
 	ent := b.entryBlk()
 	doms := b.dominators

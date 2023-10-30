@@ -122,7 +122,7 @@ type Builder interface {
 	// SetCurrentSourceOffset sets the current source offset. The incoming instruction will be annotated with this offset.
 	SetCurrentSourceOffset(line SourceOffset)
 
-	// TODO
+	// LoopNestingForestRoots returns the roots of the loop nesting forest.
 	LoopNestingForestRoots() []BasicBlock
 }
 
@@ -846,6 +846,7 @@ func (b *builder) LayoutBlocks() {
 		}
 	}
 
+	// Critical edges are split, so we fix the loop nesting forest.
 	buildLoopNestingForest(b)
 
 	// Reuse the stack for the next iteration.
