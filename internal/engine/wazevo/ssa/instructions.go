@@ -16,6 +16,8 @@ type Opcode uint32
 // for all instructions, and therefore each field has different meaning
 // depending on Opcode.
 type Instruction struct {
+	// id is the unique ID of this instruction which ascends from 0 following the order of program.
+	id         int
 	opcode     Opcode
 	u1, u2     uint64
 	v          Value

@@ -61,6 +61,8 @@ type mockCompiler struct {
 	buf         []byte
 }
 
+func (m *mockCompiler) LoopNestingForestRoots() []ssa.BasicBlock { panic("TODO") }
+
 func (m *mockCompiler) SourceOffsetInfo() []backend.SourceOffsetInfo { return nil }
 
 func (m *mockCompiler) AddSourceOffsetInfo(int64, ssa.SourceOffset) {}

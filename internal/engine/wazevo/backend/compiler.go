@@ -102,6 +102,9 @@ type Compiler interface {
 
 	// Emit4Bytes appends 4 bytes to the buffer. Used during the code emission.
 	Emit4Bytes(b uint32)
+
+	// LoopNestingForestRoots returns the roots of the loop nesting forest.
+	LoopNestingForestRoots() []ssa.BasicBlock
 }
 
 // RelocationInfo represents the relocation information for a call instruction.
@@ -388,4 +391,9 @@ func (c *compiler) Emit4Bytes(b uint32) {
 // Buf implements Compiler.Buf.
 func (c *compiler) Buf() []byte {
 	return c.buf
+}
+
+// LoopNestingForestRoots implements Compiler.LoopNestingForestRoots.
+func (c *compiler) LoopNestingForestRoots() []ssa.BasicBlock {
+	return c.ssaBuilder.LoopNestingForestRoots()
 }

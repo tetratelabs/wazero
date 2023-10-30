@@ -35,12 +35,17 @@ type (
 		ReloadRegisterAfter(v VReg, instr Instr)
 		// Done tells the implementation that register allocation is done, and it can finalize the stack
 		Done()
+		// LoopNestingForestRoots returns the number of roots of the loop nesting forest in a function.
+		LoopNestingForestRoots() int
+		// LoopNestingForestRoot returns the i-th root of the loop nesting forest in a function.
+		LoopNestingForestRoot(i int) Block
 	}
 
 	// Block is a basic block in the CFG of a function, and it consists of multiple instructions, and predecessor Block(s).
 	Block interface {
 		// ID returns the unique identifier of this block.
 		ID() int
+		// BlockParams returns the virtual registers used as the parameters of this block.
 		BlockParams() []VReg
 		// InstrIteratorBegin returns the first instruction in this block. Instructions added after lowering must be skipped.
 		// Note: multiple Instr(s) will not be held at the same time, so it's safe to use the same impl for the return Instr.
@@ -48,12 +53,26 @@ type (
 		// InstrIteratorNext returns the next instruction in this block. Instructions added after lowering must be skipped.
 		// Note: multiple Instr(s) will not be held at the same time, so it's safe to use the same impl for the return Instr.
 		InstrIteratorNext() Instr
+		// InstrRevIteratorBegin is the same as InstrIteratorBegin, but in the reverse order.
+		InstrRevIteratorBegin() Instr
+		// InstrRevIteratorNext is the same as InstrIteratorNext, but in the reverse order.
+		InstrRevIteratorNext() Instr
 		// Preds returns the number of predecessors of this block in the CFG.
 		Preds() int
 		// Pred returns the i-th predecessor of this block in the CFG.
 		Pred(i int) Block
 		// Entry returns true if the block is for the entry block.
 		Entry() bool
+		// Succs returns the number of successors of this block in the CFG.
+		Succs() int
+		// Succ returns the i-th successor of this block in the CFG.
+		Succ(i int) Block
+		// LoopHeader returns true if this block is a loop header.
+		LoopHeader() bool
+		// LoopNestingForestChildren returns the number of children of this block in the loop nesting forest.
+		LoopNestingForestChildren() int
+		// LoopNestingForestChild returns the i-th child of this block in the loop nesting forest.
+		LoopNestingForestChild(i int) Block
 	}
 
 	// Instr is an instruction in a block, abstracting away the underlying ISA.

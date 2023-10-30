@@ -1,8 +1,6 @@
 package ssa
 
-import (
-	"sort"
-)
+import "sort"
 
 // edgesCase is a map from BasicBlockID to its successors.
 type edgesCase map[BasicBlockID][]BasicBlockID
@@ -34,14 +32,10 @@ func constructGraphFromEdges(edges edgesCase) (b *builder) {
 		blocks[blk.id] = blk
 	}
 
-	// To have a consistent behavior in test, we sort the pairs.
+	// To have a consistent behavior in test, we sort the pairs by fromID.
 	sort.Slice(pairs, func(i, j int) bool {
 		xf, yf := pairs[i][0], pairs[j][0]
-		xt, yt := pairs[i][1], pairs[j][1]
-		if xf < yf {
-			return true
-		}
-		return xt < yt
+		return xf < yf
 	})
 
 	// Add edges.

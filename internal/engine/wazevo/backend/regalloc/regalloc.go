@@ -73,6 +73,7 @@ type (
 		nodes2     []*node
 		nodes3     []*node
 		dedup      []bool
+		blks       []Block
 	}
 
 	// blockInfo is a per-block information used during the register allocation.
@@ -145,17 +146,21 @@ const (
 	pcStride    = pcDefOffset + 1
 )
 
+// phiBlk returns the block that defines the given phi value, nil otherwise.
+func (a *Allocator) phiBlk(id VRegID) Block {
+	if int(id) >= len(a.phiBlocks) {
+		return nil
+	}
+	return a.phiBlocks[id]
+}
+
 // liveAnalysis constructs Allocator.blockInfos.
-// The algorithm here is described in https://pfalcon.github.io/ssabook/latest/book-full.pdf Chapter 9.4.
-//
-// TODO: this might not be efficient. We should be able to leverage dominance tree, etc.
+// The algorithm here is described in https://pfalcon.github.io/ssabook/latest/book-full.pdf Chapter 9.2.
 func (a *Allocator) livenessAnalysis(f Function) {
 	// First, we need to allocate blockInfos.
+	var maxBlockID int
 	for blk := f.PostOrderBlockIteratorBegin(); blk != nil; blk = f.PostOrderBlockIteratorNext() { // Order doesn't matter.
 		info := a.allocateBlockInfo(blk.ID())
-		if blk.Entry() {
-			continue
-		}
 		// If this is not the entry block, we should define phi nodes, which are not defined by instructions.
 		for _, p := range blk.BlockParams() {
 			info.defs[p] = 0 // Earliest definition is at the beginning of the block.
@@ -166,137 +171,145 @@ func (a *Allocator) livenessAnalysis(f Function) {
 			}
 			a.phiBlocks[pid] = blk
 		}
+		if blk.ID() > maxBlockID {
+			maxBlockID = blk.ID()
+		}
 	}
 
-	// Gathers all defs, lastUses, and VRegs in use (into a.vs).
-	a.vs = a.vs[:0]
-	for blk := f.PostOrderBlockIteratorBegin(); blk != nil; blk = f.PostOrderBlockIteratorNext() {
-		info := a.blockInfoAt(blk.ID())
+	if maxBlockID >= len(a.dedup) {
+		a.dedup = append(a.dedup, make([]bool, maxBlockID+1)...)
+	}
 
-		// We have to do a first pass to find the lowest VRegID in the block;
-		// this is used to reduce memory utilization in the VRegTable, which
-		// can avoid allocating memory for registers zero to minVRegID-1.
-		minVRegID := VRegIDMinSet{}
+	// Run the Algorithm 9.2 in the bool.
+	for blk := f.PostOrderBlockIteratorBegin(); blk != nil; blk = f.PostOrderBlockIteratorNext() {
+		blkID := blk.ID()
+		info := a.allocateBlockInfo(blkID)
+
+		ns := blk.Succs()
+		for i := 0; i < ns; i++ {
+			succ := blk.Succ(i)
+			if succ == nil {
+				continue
+			}
+
+			succID := succ.ID()
+			if !a.dedup[succID] { // This means the back edge.
+				continue
+			}
+
+			succInfo := a.blockInfoAt(succID)
+			for v := range succInfo.liveIns {
+				if a.phiBlk(v.ID()) != succ {
+					info.liveOuts[v] = struct{}{}
+					info.liveIns[v] = struct{}{}
+				}
+			}
+		}
+
+		var pc programCounter
+		var minVRegID VRegIDMinSet
 		for instr := blk.InstrIteratorBegin(); instr != nil; instr = blk.InstrIteratorNext() {
-			for _, use := range instr.Uses() {
+			uses := instr.Uses()
+			for _, use := range uses {
 				if !use.IsRealReg() {
 					minVRegID.Observe(use)
 				}
 			}
+			pc += pcStride
 		}
 		info.lastUses.Reset(minVRegID)
 
-		var pc programCounter
-		for instr := blk.InstrIteratorBegin(); instr != nil; instr = blk.InstrIteratorNext() {
-			var srcVR, dstVR VReg
-			for _, use := range instr.Uses() {
-				srcVR = use
-				pos := pc + pcUseOffset
-				if use.IsRealReg() {
-					info.addRealRegUsage(use, pos)
-				} else {
-					info.lastUses.Insert(use, pos)
-				}
-			}
-			for _, def := range instr.Defs() {
-				dstVR = def
+		for instr := blk.InstrRevIteratorBegin(); instr != nil; instr = blk.InstrRevIteratorNext() {
+			pc -= pcStride
+			var use, def VReg
+			for _, def = range instr.Defs() {
 				defID := def.ID()
 				pos := pc + pcDefOffset
 				if def.IsRealReg() {
 					info.realRegDefs[defID] = append(info.realRegDefs[defID], pos)
 				} else {
-					if _, ok := info.defs[def]; !ok {
-						// This means that this VReg is defined multiple times in a series of instructions
-						// e.g. loading arbitrary constant in arm64, and we only need the earliest
-						// definition to construct live range.
-						info.defs[def] = pos
+					info.defs[def] = pos
+					delete(info.liveIns, def)
+				}
+			}
+			for _, use = range instr.Uses() {
+				pos := pc + pcUseOffset
+				if use.IsRealReg() {
+					id := use.ID()
+					info.realRegUses[id] = append(info.realRegUses[id], pos)
+				} else {
+					if info.lastUses.Lookup(use) < 0 {
+						info.lastUses.Insert(use, pos)
 					}
-					a.vs = append(a.vs, def)
+					info.liveIns[use] = struct{}{}
 				}
 			}
+
 			if instr.IsCopy() {
-				id := int(dstVR.ID())
-				if id < len(a.phiBlocks) && a.phiBlocks[id] != nil {
-					info.liveOuts[dstVR] = struct{}{}
-				}
-				a.recordCopyRelation(dstVR, srcVR)
+				a.recordCopyRelation(def, use)
 			}
-			pc += pcStride
+
+			// If the destination is a phi value, and ...
+			if def.Valid() && a.phiBlk(def.ID()) != nil {
+				if use.Valid() && use.IsRealReg() {
+					// If the source is a real register, this is the beginning of the function, and
+					// therefore we need to add the definition of the real register.
+					r := use.ID()
+					info.realRegDefs[r] = append(info.realRegDefs[r], 0)
+				} else {
+					// Otherwise, this is the definition of the phi value for the successor block.
+					// So we need to make it outlive the block.
+					info.liveOuts[def] = struct{}{}
+				}
+			}
 		}
-		if wazevoapi.RegAllocLoggingEnabled {
-			fmt.Printf("prepared block info for block[%d]:\n%s\n\n", blk.ID(), info.Format(a.regInfo))
-		}
+		a.dedup[blkID] = true
 	}
 
-	// Run the Algorithm 9.9. in the book. This will construct blockInfo.liveIns and blockInfo.liveOuts.
-	for _, phi := range a.phis {
-		blk := a.phiBlocks[phi.ID()]
-		a.beginUpAndMarkStack(f, phi, true, blk)
+	nrs := f.LoopNestingForestRoots()
+	for i := 0; i < nrs; i++ {
+		root := f.LoopNestingForestRoot(i)
+		a.loopTreeDFS(root)
 	}
-	for _, v := range a.vs {
-		if v.IsRealReg() {
-			// Real registers do not need to be tracked in liveOuts and liveIns because they are not allocation targets.
-			panic("BUG")
-		}
-		a.beginUpAndMarkStack(f, v, false, nil)
+
+	// Clears the dedup array for the next function.
+	for i := 0; i <= maxBlockID; i++ {
+		a.dedup[i] = false
 	}
 }
 
-func (a *Allocator) beginUpAndMarkStack(f Function, v VReg, isPhi bool, phiDefinedAt Block) {
-	for blk := f.PostOrderBlockIteratorBegin(); blk != nil; blk = f.PostOrderBlockIteratorNext() {
-		if blk.Preds() == 0 && !blk.Entry() {
-			panic(fmt.Sprintf("block without predecessor must be optimized out by the compiler: %d", blk.ID()))
+// loopTreeDFS implements the Algorithm 9.3 in the book in an iterative way.
+func (a *Allocator) loopTreeDFS(entry Block) {
+	a.blks = a.blks[:0]
+	a.blks = append(a.blks, entry)
+
+	for len(a.blks) > 0 {
+		tail := len(a.blks) - 1
+		loop := a.blks[tail]
+		a.blks = a.blks[:tail]
+		a.vs = a.vs[:0]
+
+		info := a.blockInfoAt(loop.ID())
+		for v := range info.liveIns {
+			if a.phiBlk(v.ID()) != loop {
+				a.vs = append(a.vs, v)
+				info.liveOuts[v] = struct{}{}
+			}
 		}
-		info := a.blockInfoAt(blk.ID())
-		if !info.lastUses.Contains(v) {
-			continue
+
+		cn := loop.LoopNestingForestChildren()
+		for i := 0; i < cn; i++ {
+			child := loop.LoopNestingForestChild(i)
+			childID := child.ID()
+			childInfo := a.blockInfoAt(childID)
+			for _, v := range a.vs {
+				childInfo.liveIns[v] = struct{}{}
+				childInfo.liveOuts[v] = struct{}{}
+			}
+			if child.LoopHeader() {
+				a.blks = append(a.blks, child)
+			}
 		}
-		// TODO: we might want to avoid recursion here.
-		a.upAndMarkStack(blk, v, isPhi, phiDefinedAt, 0)
-	}
-}
-
-// upAndMarkStack is the Algorithm 9.10. in the book named Up_and_Mark_Stack(B, v).
-//
-// We recursively call this, so passing `depth` for debugging.
-func (a *Allocator) upAndMarkStack(b Block, v VReg, isPhi bool, phiDefinedAt Block, depth int) {
-	if wazevoapi.RegAllocLoggingEnabled {
-		fmt.Printf("%supAndMarkStack for %v at %v\n", strings.Repeat("\t", depth), v, b.ID())
-	}
-
-	info := a.blockInfoAt(b.ID())
-	if _, ok := info.defs[v]; ok && !isPhi {
-		return // Defined in this block, so no need to go further climbing up.
-	}
-	// v must be in liveIns.
-	if _, ok := info.liveIns[v]; ok {
-		return // But this case, it is already visited. (maybe by, for example, sibling blocks).
-	}
-	if wazevoapi.RegAllocLoggingEnabled {
-		fmt.Printf("%sadding %v live-in at block[%d]\n", strings.Repeat("\t", depth), v, b.ID())
-	}
-
-	// Now we can safely mark v as a part of live-in
-	info.liveIns[v] = struct{}{}
-
-	// Plus if this is this block has the definition of this phi, we can stop climbing up.
-	if b == phiDefinedAt {
-		return
-	}
-
-	preds := b.Preds()
-	if preds == 0 {
-		panic(fmt.Sprintf("BUG: block has no predecessors while requiring live-in: blk%d", b.ID()))
-	}
-
-	// and climb up the CFG.
-	for i := 0; i < preds; i++ {
-		pred := b.Pred(i)
-		if wazevoapi.RegAllocLoggingEnabled {
-			fmt.Printf("%sadding %v live-out at block[%d]\n", strings.Repeat("\t", depth+1), v, pred.ID())
-		}
-		a.blockInfoAt(pred.ID()).liveOuts[v] = struct{}{}
-		a.upAndMarkStack(pred, v, isPhi, phiDefinedAt, depth+1)
 	}
 }
 
@@ -362,10 +375,11 @@ func (a *Allocator) buildLiveRangesForNonReals(info *blockInfo) {
 			// v is defined here and live-out, so it is live-through.
 			end = math.MaxInt32
 		} else {
-			if end = info.lastUses.Lookup(v); end == -1 {
+			end = info.lastUses.Lookup(v)
+			if end == -1 {
 				// This case the defined value is not used at all.
 				end = defPos
-			} // Otherwise v is killed at defPos.
+			}
 		}
 		n := a.getOrAllocateNode(v)
 		intervalNode := info.intervalMng.insert(n, defPos, end)
@@ -398,7 +412,16 @@ func (a *Allocator) buildLiveRangesForReals(info *blockInfo) {
 					a.regInfo.RealRegName(r), len(defs), len(uses),
 				),
 			)
+		} else if len(uses) == 0 {
+			continue
 		}
+
+		sort.Slice(uses, func(i, j int) bool {
+			return uses[i] < uses[j]
+		})
+		sort.Slice(defs, func(i, j int) bool {
+			return defs[i] < defs[j]
+		})
 
 		for i := range uses {
 			n := a.allocateNode()
@@ -512,17 +535,6 @@ func (a *Allocator) allocateNode() (n *node) {
 	n = a.nodePool.Allocate()
 	n.id = a.nodePool.Allocated() - 1
 	return
-}
-
-func (i *blockInfo) addRealRegUsage(v VReg, pc programCounter) {
-	id := v.ID()
-	defs := i.realRegDefs[id]
-	if len(defs) == 0 {
-		// If the definition not found yet but used, this must be a function preamble,
-		// so we let's assume it is defined at the beginning.
-		i.realRegDefs[id] = append(i.realRegDefs[id], 0)
-	}
-	i.realRegUses[id] = append(i.realRegUses[id], pc)
 }
 
 // Format is for debugging.

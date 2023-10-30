@@ -327,7 +327,6 @@ var (
 		Module: SingleFunctionModule(i32_v, []byte{
 			wasm.OpcodeLoop, blockSignature_vv,
 			wasm.OpcodeBlock, blockSignature_vv,
-
 			wasm.OpcodeLocalGet, 0,
 			wasm.OpcodeBrIf, 2,
 			wasm.OpcodeEnd,
