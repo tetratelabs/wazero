@@ -699,3 +699,19 @@ func Test1823(t *testing.T) {
 		require.Equal(t, uint64(4671060543367625455), m.Globals[0].ValHi)
 	})
 }
+
+// Test1825 tests that OpcodeInsertlane allocates correctly the temporary registers.
+func Test1825(t *testing.T) {
+	if !platform.CompilerSupported() {
+		return
+	}
+	run(t, func(t *testing.T, r wazero.Runtime) {
+		mod, err := r.Instantiate(ctx, getWasmBinary(t, "1825"))
+		require.NoError(t, err)
+		m := mod.(*wasm.ModuleInstance)
+		_, err = m.ExportedFunction("").Call(ctx)
+		require.NoError(t, err)
+		require.Equal(t, uint64(1099511627775), m.Globals[6].Val)
+		require.Equal(t, uint64(18446744073709551615), m.Globals[6].ValHi)
+	})
+}
