@@ -630,30 +630,36 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
 		rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
 		rd := operandNR(m.compiler.VRegOf(instr.Return()))
+		tmpReg := operandNR(m.compiler.AllocateVReg(ssa.TypeV128))
 
-		// Initially mov rn to rd.
-		mov0 := m.allocateInstr()
-		mov0.asFpuMov128(rd.nr(), rn.nr())
-		m.insert(mov0)
+		// Initially mov rn to tmp.
+		mov1 := m.allocateInstr()
+		mov1.asFpuMov128(tmpReg.nr(), rn.nr())
+		m.insert(mov1)
 
 		// movToVec and vecMovElement do not clear the remaining bits to zero,
-		// thus, we can mov rm in-place to rd.
-		mov := m.allocateInstr()
+		// thus, we can mov rm in-place to tmp.
+		mov2 := m.allocateInstr()
 		switch lane {
 		case ssa.VecLaneI8x16:
-			mov.asMovToVec(rd, rm, vecArrangementB, vecIndex(index))
+			mov2.asMovToVec(tmpReg, rm, vecArrangementB, vecIndex(index))
 		case ssa.VecLaneI16x8:
-			mov.asMovToVec(rd, rm, vecArrangementH, vecIndex(index))
+			mov2.asMovToVec(tmpReg, rm, vecArrangementH, vecIndex(index))
 		case ssa.VecLaneI32x4:
-			mov.asMovToVec(rd, rm, vecArrangementS, vecIndex(index))
+			mov2.asMovToVec(tmpReg, rm, vecArrangementS, vecIndex(index))
 		case ssa.VecLaneI64x2:
-			mov.asMovToVec(rd, rm, vecArrangementD, vecIndex(index))
+			mov2.asMovToVec(tmpReg, rm, vecArrangementD, vecIndex(index))
 		case ssa.VecLaneF32x4:
-			mov.asVecMovElement(rd, rm, vecArrangementS, vecIndex(index), vecIndex(0))
+			mov2.asVecMovElement(tmpReg, rm, vecArrangementS, vecIndex(index), vecIndex(0))
 		case ssa.VecLaneF64x2:
-			mov.asVecMovElement(rd, rm, vecArrangementD, vecIndex(index), vecIndex(0))
+			mov2.asVecMovElement(tmpReg, rm, vecArrangementD, vecIndex(index), vecIndex(0))
 		}
-		m.insert(mov)
+		m.insert(mov2)
+
+		// Finally mov tmp to rd.
+		mov3 := m.allocateInstr()
+		mov3.asFpuMov128(rd.nr(), tmpReg.nr())
+		m.insert(mov3)
 
 	case ssa.OpcodeSwizzle:
 		x, y, lane := instr.Arg2WithLane()
