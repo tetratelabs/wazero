@@ -683,7 +683,7 @@ func Test1820(t *testing.T) {
 	})
 }
 
-// Test1820 tests that f64x2.pmin lowers to BSL with the right register usage
+// Test1823 tests that f64x2.pmin lowers to BSL with the right register usage
 // (condition register gets overwritten).
 func Test1823(t *testing.T) {
 	if !platform.CompilerSupported() {
@@ -699,5 +699,3 @@ func Test1823(t *testing.T) {
 		require.Equal(t, uint64(4671060543367625455), m.Globals[0].ValHi)
 	})
 }
-
-//1823
