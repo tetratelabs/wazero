@@ -1231,13 +1231,19 @@ func (m *machine) lowerFcopysignImpl(rd, rn, rm, tmpI, tmpF operand, _64bit bool
 	}
 	m.insert(setMSB)
 
+	tmpReg := operandNR(m.compiler.AllocateVReg(ssa.TypeF64))
+
 	mov := m.allocateInstr()
-	mov.asFpuMov64(rd.nr(), rn.nr())
+	mov.asFpuMov64(tmpReg.nr(), rn.nr())
 	m.insert(mov)
 
 	vbit := m.allocateInstr()
-	vbit.asVecRRR(vecOpBit, rd, rm, tmpF, vecArrangement8B)
+	vbit.asVecRRR(vecOpBit, tmpReg, rm, tmpF, vecArrangement8B)
 	m.insert(vbit)
+
+	movDst := m.allocateInstr()
+	movDst.asFpuMov64(rd.nr(), tmpReg.nr())
+	m.insert(movDst)
 }
 
 func (m *machine) lowerBitcast(instr *ssa.Instruction) {
