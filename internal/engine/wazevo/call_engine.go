@@ -400,7 +400,6 @@ const callStackCeiling = uintptr(5000000) // in uint64 (8 bytes) == 40000000 byt
 func (c *callEngine) growStackWithGuarded() (newSP uintptr, err error) {
 	if wazevoapi.StackGuardCheckEnabled {
 		wazevoapi.CheckStackGuardPage(c.stack)
-		c.execCtx.stackGrowRequiredSize += wazevoapi.StackGuardCheckGuardPageSize
 	}
 	newSP, err = c.growStack()
 	if err != nil {
@@ -420,7 +419,7 @@ func (c *callEngine) growStack() (newSP uintptr, err error) {
 		return
 	}
 
-	newLen := 2*currentLen + c.execCtx.stackGrowRequiredSize
+	newLen := 2*currentLen + c.execCtx.stackGrowRequiredSize + 16 // Stack might be aligned to 16 bytes, so add 16 bytes just in case.
 	newStack := make([]byte, newLen)
 
 	relSp := c.stackTop - uintptr(unsafe.Pointer(c.execCtx.stackPointerBeforeGoCall))
