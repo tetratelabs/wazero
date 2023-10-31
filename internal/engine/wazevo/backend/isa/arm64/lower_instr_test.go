@@ -861,8 +861,9 @@ func TestMachine_lowerFcopysign(t *testing.T) {
 			exp: `
 movz w1?, #0x8000, lsl 16
 ins v2?.s[0], w1?
-mov v5?.8b, v3?.8b
-bit v5?.8b, v4?.8b, v2?.8b
+mov v6?.8b, v3?.8b
+bit v6?.8b, v4?.8b, v2?.8b
+mov v5?.8b, v6?.8b
 `,
 		},
 		{
@@ -870,8 +871,9 @@ bit v5?.8b, v4?.8b, v2?.8b
 			exp: `
 movz x1?, #0x8000, lsl 48
 ins v2?.d[0], x1?
-mov v5?.8b, v3?.8b
-bit v5?.8b, v4?.8b, v2?.8b
+mov v6?.8b, v3?.8b
+bit v6?.8b, v4?.8b, v2?.8b
+mov v5?.8b, v6?.8b
 `,
 		},
 	} {
