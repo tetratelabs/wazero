@@ -1102,20 +1102,32 @@ func (m *machine) lowerVMinMaxPseudo(instr *ssa.Instruction, max bool) {
 
 	rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
 	rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
-	rd := operandNR(m.compiler.VRegOf(instr.Return()))
+	creg := m.getOperand_NR(m.compiler.ValueDefinition(instr.Return()), extModeNone)
+	tmp := operandNR(m.compiler.AllocateVReg(ssa.TypeV128))
+
+	// creg is overwritten by BSL, so we need to move it to the result register before the instruction
+	// in case when it is used somewhere else.
+	rd := m.compiler.VRegOf(instr.Return())
+	mov := m.allocateInstr()
+	mov.asFpuMov128(tmp.nr(), creg.nr())
+	m.insert(mov)
 
 	fcmgt := m.allocateInstr()
 	if max {
-		fcmgt.asVecRRR(vecOpFcmgt, rd, rm, rn, arr)
+		fcmgt.asVecRRR(vecOpFcmgt, tmp, rm, rn, arr)
 	} else {
 		// If min, swap the args.
-		fcmgt.asVecRRR(vecOpFcmgt, rd, rn, rm, arr)
+		fcmgt.asVecRRR(vecOpFcmgt, tmp, rn, rm, arr)
 	}
 	m.insert(fcmgt)
 
 	bsl := m.allocateInstr()
-	bsl.asVecRRR(vecOpBsl, rd, rm, rn, vecArrangement16B)
+	bsl.asVecRRR(vecOpBsl, tmp, rm, rn, vecArrangement16B)
 	m.insert(bsl)
+
+	mov2 := m.allocateInstr()
+	mov2.asFpuMov128(rd, tmp.nr())
+	m.insert(mov2)
 }
 
 func (m *machine) lowerIRem(execCtxVReg regalloc.VReg, rd, rn, rm operand, _64bit, signed bool) {

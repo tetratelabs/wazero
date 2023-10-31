@@ -667,13 +667,13 @@ func Test1817(t *testing.T) {
 	})
 }
 
-// Test1817 tests that i16x8.narrow_i32x4_u assigns the dest register correctly.
-func Test1818(t *testing.T) {
+// Test1820 tests that i16x8.narrow_i32x4_u assigns the dest register correctly.
+func Test1820(t *testing.T) {
 	if !platform.CompilerSupported() {
 		return
 	}
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		mod, err := r.Instantiate(ctx, getWasmBinary(t, "1818"))
+		mod, err := r.Instantiate(ctx, getWasmBinary(t, "1820"))
 		require.NoError(t, err)
 		m := mod.(*wasm.ModuleInstance)
 		_, err = m.ExportedFunction("").Call(ctx)
@@ -682,3 +682,22 @@ func Test1818(t *testing.T) {
 		require.Equal(t, uint64(0xFFFF), m.Globals[1].ValHi)
 	})
 }
+
+// Test1820 tests that f64x2.pmin lowers to BSL with the right register usage
+// (condition register gets overwritten).
+func Test1823(t *testing.T) {
+	if !platform.CompilerSupported() {
+		return
+	}
+	run(t, func(t *testing.T, r wazero.Runtime) {
+		mod, err := r.Instantiate(ctx, getWasmBinary(t, "1823"))
+		require.NoError(t, err)
+		m := mod.(*wasm.ModuleInstance)
+		_, err = m.ExportedFunction("").Call(ctx)
+		require.NoError(t, err)
+		require.Equal(t, uint64(17282609607625994159), m.Globals[0].Val)
+		require.Equal(t, uint64(4671060543367625455), m.Globals[0].ValHi)
+	})
+}
+
+//1823
