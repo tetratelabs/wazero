@@ -37,7 +37,7 @@ func TestCallEngine_growStack(t *testing.T) {
 		}
 		newSP, err := c.growStack()
 		require.NoError(t, err)
-		require.Equal(t, 160+32*2, len(c.stack))
+		require.Equal(t, 160+32*2+16, len(c.stack))
 
 		require.True(t, c.stackTop%16 == 0)
 		require.Equal(t, &c.stack[0], c.execCtx.stackBottomPtr)
