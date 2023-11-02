@@ -282,11 +282,11 @@ func resetBasicBlock(bb *basicBlock) {
 	bb.success = bb.success[:0]
 	bb.invalid, bb.sealed = false, false
 	bb.singlePred = nil
-	// TODO: reuse the map!
 	bb.unknownValues = make(map[Variable]Value)
 	bb.lastDefinitions = make(map[Variable]Value)
 	bb.reversePostOrder = -1
 	bb.loopNestingForestChildren = bb.loopNestingForestChildren[:0]
+	bb.loopHeader = false
 }
 
 // addPred adds a predecessor to this block specified by the branch instruction.
