@@ -1,8 +1,6 @@
 package regalloc
 
 import (
-	"sort"
-	"strconv"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -26,10 +24,6 @@ func TestAllocator_collectNodesByRegType(t *testing.T) {
 }
 
 func TestAllocator_coloringFor(t *testing.T) {
-	addEdge := func(n1, n2 *node) {
-		n1.neighbors = append(n1.neighbors, n2)
-		n2.neighbors = append(n2.neighbors, n1)
-	}
 
 	for _, tc := range []struct {
 		name         string
@@ -56,7 +50,7 @@ func TestAllocator_coloringFor(t *testing.T) {
 			allocatable: []RealReg{1, 2},
 			links:       [][]int{{1}, {0}},
 			// Interference, so only one can be assigned a register.
-			expRegs: []RealReg{1, 2},
+			expRegs: []RealReg{2, 1},
 		},
 		{
 			// 0 <- 1 -> 2
@@ -137,9 +131,10 @@ func TestAllocator_coloringFor(t *testing.T) {
 				n1 := testNodes[i]
 				for _, link := range links {
 					n2 := testNodes[link]
-					addEdge(n1, n2)
+					a.maybeAddEdge(n1, n2)
 				}
 			}
+			a.finalizeEdges()
 			a.coloringFor(tc.allocatable)
 			var actual []string
 			for _, n := range testNodes {
@@ -234,75 +229,4 @@ func TestAllocator_assignColor(t *testing.T) {
 		ok := a.allocatedRegSet[n.r]
 		require.True(t, ok)
 	})
-}
-
-func TestAllocator_buildNeighbors(t *testing.T) {
-	a := NewAllocator(&RegisterInfo{})
-	a.dedup = make([]bool, 1000) // Enough large.
-
-	newNode := func(id int) *node {
-		return &node{id: id}
-	}
-
-	newNodes := func(ids ...int) []*node {
-		var ns []*node
-		for _, id := range ids {
-			ns = append(ns, newNode(id))
-		}
-		return ns
-	}
-
-	for i, tc := range []struct {
-		n   *node
-		exp []int
-	}{
-		{n: newNode(0)},
-		{
-			n: &node{
-				ranges: []*interval{
-					{nodes: newNodes(1, 2, 3)},
-					{nodes: newNodes(4, 5, 1, 2, 3)},
-				},
-			},
-			exp: []int{1, 2, 3, 4, 5},
-		},
-		{
-			n: &node{
-				ranges: []*interval{
-					{nodes: newNodes(1, 2, 3)},
-					{nodes: newNodes(1, 2, 3)},
-					{nodes: newNodes(1, 2, 3)},
-					{nodes: newNodes(1, 2, 3)},
-					{nodes: newNodes(4, 5, 1, 2, 3)},
-				},
-			},
-			exp: []int{1, 2, 3, 4, 5},
-		},
-		{
-			n: &node{
-				ranges: []*interval{
-					{nodes: newNodes(1, 2, 3)},
-					{nodes: newNodes(4), neighbors: []*interval{
-						{nodes: newNodes(5, 6)},
-						{nodes: newNodes(100, 200)},
-					}},
-				},
-			},
-			exp: []int{1, 2, 3, 4, 5, 6, 100, 200},
-		},
-	} {
-		tc := tc
-		t.Run(strconv.Itoa(i), func(t *testing.T) {
-			a.buildNeighborsFor(tc.n)
-			var collected []int
-			for _, nei := range tc.n.neighbors {
-				collected = append(collected, nei.id)
-			}
-			sort.Ints(collected)
-			require.Equal(t, tc.exp, collected)
-			for i := range a.dedup {
-				require.False(t, a.dedup[i]) // must be cleaned up.
-			}
-		})
-	}
 }

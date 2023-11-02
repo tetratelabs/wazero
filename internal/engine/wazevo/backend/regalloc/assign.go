@@ -2,6 +2,7 @@ package regalloc
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 )
@@ -10,35 +11,97 @@ import (
 // This is called after coloring is done.
 func (a *Allocator) assignRegisters(f Function) {
 	for blk := f.ReversePostOrderBlockIteratorBegin(); blk != nil; blk = f.ReversePostOrderBlockIteratorNext() {
-		a.assignRegistersPerBlock(f, blk, a.vRegIDToNode)
+		a.assignRegistersPerBlock(f, blk)
 	}
 }
 
 // assignRegistersPerBlock assigns real registers to virtual registers on each instruction in a block.
-func (a *Allocator) assignRegistersPerBlock(f Function, blk Block, vRegIDToNode []*node) {
+func (a *Allocator) assignRegistersPerBlock(f Function, blk Block) {
 	if wazevoapi.RegAllocLoggingEnabled {
 		fmt.Println("---------------------- assigning registers for block", blk.ID(), "----------------------")
 	}
 
-	blkID := blk.ID()
+	info := a.blockInfoAt(blk.ID())
+	a.aliveSet = resetMap(a.aliveSet)
+	for v := range info.liveIns {
+		n := a.getOrAllocateNode(v)
+		a.aliveSet[n] = struct{}{}
+	}
+
+	if !blk.Entry() {
+		for _, arg := range blk.BlockParams() {
+			n := a.getOrAllocateNode(arg)
+			a.aliveSet[n] = struct{}{}
+		}
+	}
+
 	var pc programCounter
 	for instr := blk.InstrIteratorBegin(); instr != nil; instr = blk.InstrIteratorNext() {
-		tree := a.blockInfos[blkID].intervalMng
-		a.assignRegistersPerInstr(f, pc, instr, vRegIDToNode, tree)
+		if wazevoapi.RegAllocLoggingEnabled {
+			fmt.Printf("--- handling %v ---\n", instr)
+			for alive := range a.aliveSet {
+				fmt.Println("\t", alive)
+			}
+		}
+
+		a.assignRegistersPerInstr(f, info, pc, instr)
 		pc += pcStride
 	}
 }
 
-func (a *Allocator) assignRegistersPerInstr(f Function, pc programCounter, instr Instr, vRegIDToNode []*node, intervalMng *intervalManager) {
+func (a *Allocator) collectOrderedActiveNodes(real bool) {
+	a.nodes1 = a.nodes1[:0]
+	for n := range a.aliveSet {
+		if real {
+			if n.assignedRealReg() == RealRegInvalid {
+				continue
+			}
+		} else {
+			if n.spill() || n.v.IsRealReg() {
+				continue
+			}
+		}
+		a.nodes1 = append(a.nodes1, n)
+	}
+	sort.Slice(a.nodes1, func(i, j int) bool {
+		return a.nodes1[i].v.ID() < a.nodes1[j].v.ID()
+	})
+}
+
+func (a *Allocator) updateAliveNodesByUse(info *blockInfo, pc programCounter, instr Instr) {
+	for _, use := range instr.Uses() {
+		n := a.vRegIDToNode[use.ID()]
+		v := n.v
+		if v.IsRealReg() {
+			delete(a.aliveSet, n)
+		} else {
+			if info.lastUses.Lookup(v) == pc {
+				if _, ok := info.liveOuts[v]; !ok {
+					delete(a.aliveSet, n)
+				}
+			}
+		}
+	}
+}
+
+func (a *Allocator) updateAliveNodesByDef(info *blockInfo, instr Instr) {
+	for _, def := range instr.Defs() {
+		n := a.vRegIDToNode[def.ID()]
+		v := n.v
+		if !v.IsRealReg() && info.lastUses.Lookup(v) < 0 {
+			if _, ok := info.liveOuts[v]; !ok {
+				continue
+			}
+		}
+		a.aliveSet[n] = struct{}{}
+	}
+}
+
+func (a *Allocator) assignRegistersPerInstr(f Function, info *blockInfo, pc programCounter, instr Instr) {
 	if indirect := instr.IsIndirectCall(); instr.IsCall() || indirect {
-		intervalMng.collectActiveNodes(
-			// To find the all the live registers "after" call, we need to add pcDefOffset for search.
-			pc+pcDefOffset,
-			&a.nodes1,
-			// Only take care of non-real VRegs (e.g. VReg.IsRealReg() == false) since
-			// the real VRegs are already placed in the right registers at this point.
-			false,
-		)
+		a.updateAliveNodesByUse(info, pc, instr)
+		a.updateAliveNodesByDef(info, instr)
+		a.collectOrderedActiveNodes(false)
 		for _, active := range a.nodes1 {
 			if r := active.r; a.regInfo.isCallerSaved(r) {
 				v := active.v.SetRealReg(r)
@@ -48,15 +111,7 @@ func (a *Allocator) assignRegistersPerInstr(f Function, pc programCounter, instr
 		}
 		if indirect {
 			// Direct function calls do not need assignment, while indirect one needs the assignment on the function pointer.
-			a.assignIndirectCall(f, instr, vRegIDToNode)
-		}
-
-		if wazevoapi.RegAllocValidationEnabled {
-			for _, def := range instr.Defs() {
-				if !def.IsRealReg() {
-					panic(fmt.Sprintf("BUG: call/indirect call instruction must define only real registers: %s", def))
-				}
-			}
+			a.assignIndirectCall(f, instr)
 		}
 		return
 	} else if instr.IsReturn() {
@@ -72,7 +127,7 @@ func (a *Allocator) assignRegistersPerInstr(f Function, pc programCounter, instr
 		if wazevoapi.RegAllocLoggingEnabled {
 			fmt.Printf("%s uses %s(%d)\n", instr, u.RegType(), u.ID())
 		}
-		n := vRegIDToNode[u.ID()]
+		n := a.vRegIDToNode[u.ID()]
 		if !n.spill() {
 			instr.AssignUse(i, u.SetRealReg(n.r))
 		} else {
@@ -91,7 +146,7 @@ func (a *Allocator) assignRegistersPerInstr(f Function, pc programCounter, instr
 				fmt.Printf("%s defines %s(%d)\n", instr, d.RegType(), d.ID())
 			}
 
-			n := vRegIDToNode[d.ID()]
+			n := a.vRegIDToNode[d.ID()]
 			if !n.spill() {
 				instr.AssignDef(d.SetRealReg(n.r))
 			} else {
@@ -102,19 +157,23 @@ func (a *Allocator) assignRegistersPerInstr(f Function, pc programCounter, instr
 		panic("BUG: multiple def instructions must be special cased")
 	}
 
-	a.handleSpills(f, pc, instr, usesSpills, defSpill, intervalMng)
+	a.handleSpills(f, info, pc, instr, usesSpills, defSpill)
 	a.vs = usesSpills[:0] // for reuse.
 }
 
 func (a *Allocator) handleSpills(
-	f Function, pc programCounter, instr Instr,
-	usesSpills []VReg, defSpill VReg, intervalMng *intervalManager,
+	f Function, info *blockInfo, pc programCounter, instr Instr,
+	usesSpills []VReg, defSpill VReg,
 ) {
 	_usesSpills, _defSpill := len(usesSpills) > 0, defSpill.Valid()
 	switch {
 	case !_usesSpills && !_defSpill: // Nothing to do.
+		a.updateAliveNodesByUse(info, pc, instr)
+		a.updateAliveNodesByDef(info, instr)
 	case !_usesSpills && _defSpill: // Only definition is spilled.
-		intervalMng.collectActiveNodes(pc+pcDefOffset, &a.nodes1, true)
+		a.updateAliveNodesByUse(info, pc, instr)
+		a.updateAliveNodesByDef(info, instr)
+		a.collectOrderedActiveNodes(true)
 		a.spillHandler.init(a.nodes1, instr)
 
 		r, evictedNode := a.spillHandler.getUnusedOrEvictReg(defSpill.RegType(), a.regInfo)
@@ -130,7 +189,8 @@ func (a *Allocator) handleSpills(
 		f.StoreRegisterAfter(defSpill, instr)
 
 	case _usesSpills:
-		intervalMng.collectActiveNodes(pc, &a.nodes1, true)
+		a.updateAliveNodesByUse(info, pc, instr)
+		a.collectOrderedActiveNodes(true)
 		a.spillHandler.init(a.nodes1, instr)
 
 		var evicted [3]*node
@@ -174,7 +234,8 @@ func (a *Allocator) handleSpills(
 
 			if !defSpill.IsRealReg() {
 				// This case, the destination register type is different from the source registers.
-				intervalMng.collectActiveNodes(pc+pcDefOffset, &a.nodes1, true)
+				a.updateAliveNodesByDef(info, instr)
+				a.collectOrderedActiveNodes(true)
 				a.spillHandler.init(a.nodes1, instr)
 				r, evictedNode := a.spillHandler.getUnusedOrEvictReg(defSpill.RegType(), a.regInfo)
 				if evictedNode != nil {
@@ -191,7 +252,7 @@ func (a *Allocator) handleSpills(
 	}
 }
 
-func (a *Allocator) assignIndirectCall(f Function, instr Instr, vRegIDToNode []*node) {
+func (a *Allocator) assignIndirectCall(f Function, instr Instr) {
 	a.nodes1 = a.nodes1[:0]
 	uses := instr.Uses()
 	if wazevoapi.RegAllocValidationEnabled {
@@ -218,7 +279,7 @@ func (a *Allocator) assignIndirectCall(f Function, instr Instr, vRegIDToNode []*
 		panic(fmt.Sprintf("BUG: function pointer for indirect call must be an integer register: %s", v))
 	}
 
-	n := vRegIDToNode[v.ID()]
+	n := a.vRegIDToNode[v.ID()]
 	if n.spill() {
 		// If the function pointer is spilled, we need to reload it to a register.
 		// But at this point, all the caller-saved registers are saved, we can use a callee-saved register to reload.

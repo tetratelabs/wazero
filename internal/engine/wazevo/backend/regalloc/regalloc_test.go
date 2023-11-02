@@ -2,7 +2,7 @@ package regalloc
 
 import (
 	"fmt"
-	"sort"
+	"strconv"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -70,8 +70,6 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 						1: pcStride + pcUseOffset,
 						2: pcStride*2 + pcUseOffset,
 					}),
-					realRegUses: [vRegIDReservedForRealNum][]programCounter{10: {0}},
-					realRegDefs: [vRegIDReservedForRealNum][]programCounter{10: {pcDefOffset + pcStride*2}},
 				},
 			},
 		},
@@ -120,12 +118,6 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 					defs: map[VReg]programCounter{
 						4: pcStride + pcDefOffset,
 						5: pcStride + pcDefOffset,
-					},
-					realRegUses: [vRegIDReservedForRealNum][]programCounter{
-						realRegID: {pcStride*2 + pcUseOffset},
-					},
-					realRegDefs: [vRegIDReservedForRealNum][]programCounter{
-						realRegID: {pcDefOffset},
 					},
 				},
 				2: {
@@ -181,21 +173,11 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 					liveIns:  map[VReg]struct{}{1000: {}, 1: {}},
 					liveOuts: map[VReg]struct{}{1000: {}},
 					lastUses: makeVRegTable(map[VReg]programCounter{1: pcUseOffset}),
-					realRegDefs: [vRegIDReservedForRealNum][]programCounter{
-						realRegID:  {pcDefOffset, pcStride*4 + pcDefOffset},
-						realRegID2: {pcStride*2 + pcDefOffset},
-					},
-					realRegUses: [vRegIDReservedForRealNum][]programCounter{
-						realRegID:  {pcStride + pcUseOffset, pcStride*5 + pcUseOffset},
-						realRegID2: {pcStride*3 + pcUseOffset},
-					},
 				},
 				2: {
-					liveIns:     map[VReg]struct{}{1000: {}, 2: {}},
-					liveOuts:    map[VReg]struct{}{1000: {}},
-					lastUses:    makeVRegTable(map[VReg]programCounter{2: pcUseOffset}),
-					realRegUses: [vRegIDReservedForRealNum][]programCounter{realRegID2: {pcUseOffset}},
-					realRegDefs: [vRegIDReservedForRealNum][]programCounter{},
+					liveIns:  map[VReg]struct{}{1000: {}, 2: {}},
+					liveOuts: map[VReg]struct{}{1000: {}},
+					lastUses: makeVRegTable(map[VReg]programCounter{2: pcUseOffset}),
 				},
 				3: {
 					liveIns:  map[VReg]struct{}{1000: {}},
@@ -476,31 +458,11 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 					exp := tc.exp[blockID]
 					initMapInInfo(exp)
 					fmt.Printf("\n[exp for block[%d]]\n%v\n[actual for block[%d]]\n%v\n",
-						blockID, exp.Format(a.regInfo), blockID, actual.Format(a.regInfo))
+						blockID, exp.Format(), blockID, actual.Format())
 
 					require.Equal(t, exp.liveOuts, actual.liveOuts, "live outs")
 					require.Equal(t, exp.liveIns, actual.liveIns, "live ins")
 					require.Equal(t, exp.defs, actual.defs, "defs")
-					for i := range exp.realRegUses {
-						_exp, _actual := exp.realRegUses[i], actual.realRegUses[i]
-						sort.Slice(_exp, func(i, j int) bool {
-							return _exp[i] < _exp[j]
-						})
-						sort.Slice(_actual, func(i, j int) bool {
-							return _actual[i] < _actual[j]
-						})
-						require.Equal(t, _exp, _actual, "real reg use[%d]", i)
-					}
-					for i := range exp.realRegDefs {
-						_exp, _actual := exp.realRegDefs[i], actual.realRegDefs[i]
-						sort.Slice(_exp, func(i, j int) bool {
-							return _exp[i] < _exp[j]
-						})
-						sort.Slice(_actual, func(i, j int) bool {
-							return _actual[i] < _actual[j]
-						})
-						require.Equal(t, _exp, _actual, "real defs[%d]", i)
-					}
 					require.Equal(t, exp.lastUses, actual.lastUses, "last uses")
 				})
 			}
@@ -589,4 +551,70 @@ func TestNode_assignedRealReg(t *testing.T) {
 	require.Equal(t, RealRegInvalid, (&node{}).assignedRealReg())
 	require.Equal(t, RealReg(100), (&node{r: 100}).assignedRealReg())
 	require.Equal(t, RealReg(200), (&node{v: VReg(1).SetRealReg(200)}).assignedRealReg())
+}
+
+func TestAllocator_finalizeEdges(t *testing.T) {
+	for i, tc := range []struct {
+		edges        [][2]nodeID
+		expEdgeNum   int
+		expDegrees   map[nodeID]int
+		expEdgeIndex map[nodeID][2]int // [Begin, End]
+	}{
+		{
+			edges:      [][2]nodeID{{0, 1}},
+			expEdgeNum: 2,
+			expDegrees: map[nodeID]int{
+				0: 1, 1: 1,
+				2: 0,
+				3: 0,
+				4: 0,
+			},
+			expEdgeIndex: map[nodeID][2]int{
+				0: {0, 0},
+				1: {1, 1},
+				2: {0, -1},
+				3: {0, -1},
+				4: {0, -1},
+			},
+		},
+		{
+			edges:      [][2]nodeID{{0, 1}, {0, 2}},
+			expEdgeNum: 4,
+			expDegrees: map[nodeID]int{
+				0: 2, 1: 1, 2: 1,
+				3: 0,
+				4: 0,
+			},
+			expEdgeIndex: map[nodeID][2]int{
+				0: {0, 1},
+				1: {2, 2},
+				2: {3, 3},
+				3: {0, -1},
+				4: {0, -1},
+			},
+		},
+	} {
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			a := NewAllocator(&RegisterInfo{})
+			for i := 0; i < 5; i++ {
+				a.allocateNode()
+			}
+			for _, edge := range tc.edges {
+				n := a.nodePool.View(int(edge[0]))
+				m := a.nodePool.View(int(edge[1]))
+				a.maybeAddEdge(n, m)
+			}
+			a.finalizeEdges()
+			require.Equal(t, tc.expEdgeNum, len(a.edges))
+			for nID, expDegree := range tc.expDegrees {
+				t.Run(fmt.Sprintf("node_id=%d", nID), func(t *testing.T) {
+					n := a.nodePool.View(int(nID))
+					require.Equal(t, expDegree, n.degree)
+					expEdgeIndex := tc.expEdgeIndex[nID]
+					require.Equal(t, expEdgeIndex[0], n.edgeIdxBegin)
+					require.Equal(t, expEdgeIndex[1], n.edgeIdxEnd)
+				})
+			}
+		})
+	}
 }

@@ -34,7 +34,7 @@ func newMachine() backend.Machine {
 }
 
 func TestE2E(t *testing.T) {
-	const verbose = false
+	const verbose = true
 
 	type testCase struct {
 		name                                   string
@@ -1518,33 +1518,33 @@ L1 (SSA Block: blk0):
 	add w8, w22, w8
 	add w0, w23, w8
 	ldr s8, #8; b 8; data.f32 1.000000
-	fmul s20, s0, s8
+	fmul s21, s0, s8
 	ldr s8, #8; b 8; data.f32 2.000000
-	fmul s19, s0, s8
+	fmul s20, s0, s8
 	ldr s8, #8; b 8; data.f32 3.000000
-	fmul s18, s0, s8
+	fmul s19, s0, s8
 	ldr s8, #8; b 8; data.f32 4.000000
-	fmul s17, s0, s8
+	fmul s18, s0, s8
 	ldr s8, #8; b 8; data.f32 5.000000
-	fmul s16, s0, s8
+	fmul s17, s0, s8
 	ldr s8, #8; b 8; data.f32 6.000000
-	fmul s15, s0, s8
+	fmul s16, s0, s8
 	ldr s8, #8; b 8; data.f32 7.000000
-	fmul s14, s0, s8
+	fmul s15, s0, s8
 	ldr s8, #8; b 8; data.f32 8.000000
-	fmul s13, s0, s8
+	fmul s14, s0, s8
 	ldr s8, #8; b 8; data.f32 9.000000
-	fmul s12, s0, s8
+	fmul s13, s0, s8
 	ldr s8, #8; b 8; data.f32 10.000000
-	fmul s11, s0, s8
+	fmul s12, s0, s8
 	ldr s8, #8; b 8; data.f32 11.000000
-	fmul s10, s0, s8
+	fmul s11, s0, s8
 	ldr s8, #8; b 8; data.f32 12.000000
-	fmul s9, s0, s8
+	fmul s10, s0, s8
 	ldr s8, #8; b 8; data.f32 13.000000
+	fmul s9, s0, s8
+	ldr s8, #8; b 8; data.f32 14.000000
 	fmul s8, s0, s8
-	ldr s21, #8; b 8; data.f32 14.000000
-	fmul s21, s0, s21
 	ldr s22, #8; b 8; data.f32 15.000000
 	fmul s22, s0, s22
 	ldr s23, #8; b 8; data.f32 16.000000
@@ -1562,8 +1562,7 @@ L1 (SSA Block: blk0):
 	fadd s24, s24, s25
 	fadd s23, s23, s24
 	fadd s22, s22, s23
-	fadd s21, s21, s22
-	fadd s8, s8, s21
+	fadd s8, s8, s22
 	fadd s8, s9, s8
 	fadd s8, s10, s8
 	fadd s8, s11, s8
@@ -1575,7 +1574,8 @@ L1 (SSA Block: blk0):
 	fadd s8, s17, s8
 	fadd s8, s18, s8
 	fadd s8, s19, s8
-	fadd s0, s20, s8
+	fadd s8, s20, s8
+	fadd s0, s21, s8
 	add sp, sp, #0x10
 	ldr q27, [sp], #0x10
 	ldr q26, [sp], #0x10

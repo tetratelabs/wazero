@@ -42,6 +42,7 @@ fn run(data: &[u8]) -> Result<()> {
     // Ensures that at least one function exists.
     config.min_funcs = 1;
     config.max_funcs = config.max_funcs.max(1);
+    config.simd_enabled = false;
 
     // Generate the random module via wasm-smith.
     let mut module = wasm_smith::Module::new(config.clone(), &mut u)?;

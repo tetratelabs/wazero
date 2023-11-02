@@ -10,7 +10,6 @@ package regalloc
 
 import (
 	"fmt"
-	"math"
 	"sort"
 	"strings"
 
@@ -23,6 +22,7 @@ func NewAllocator(allocatableRegs *RegisterInfo) Allocator {
 		regInfo:       allocatableRegs,
 		nodePool:      wazevoapi.NewPool[node](resetNode),
 		blockInfoPool: wazevoapi.NewPool[blockInfo](resetBlockInfo),
+		aliveSet:      make(map[*node]struct{}),
 	}
 	for _, regs := range allocatableRegs.AllocatableRegisters {
 		for _, r := range regs {
@@ -66,9 +66,10 @@ type (
 		phiBlocks []Block
 		phis      []VReg
 
+		aliveSet map[*node]struct{}
+
 		// Followings are re-used during various places e.g. coloring.
 		realRegSet [RealRegsNumMax]bool
-		realRegs   []RealReg
 		nodes1     []*node
 		nodes2     []*node
 		nodes3     []*node
@@ -80,23 +81,14 @@ type (
 	blockInfo struct {
 		liveOuts map[VReg]struct{}
 		liveIns  map[VReg]struct{}
-		defs     map[VReg]programCounter
 		lastUses VRegTable
-		// Pre-colored real registers can have multiple live ranges in one block.
-		realRegUses [vRegIDReservedForRealNum][]programCounter
-		realRegDefs [vRegIDReservedForRealNum][]programCounter
-		intervalMng *intervalManager
 	}
 
 	// node represents a VReg.
 	node struct {
-		id     int
-		v      VReg
-		ranges []*interval
+		v VReg
 		// r is the real register assigned to this node. It is either a pre-colored register or a register assigned during allocation.
 		r RealReg
-		// neighbors are the nodes that this node interferes with. Such neighbors have the same RegType as this node.
-		neighbors []*node
 		// copyFromReal and copyToReal are the real registers that this node copies from/to. During the allocation phase,
 		// we try to assign the same RealReg to copyFromReal and copyToReal so that we can remove the redundant copy.
 		copyFromReal, copyToReal RealReg
@@ -104,6 +96,7 @@ type (
 		copyFromVReg, copyToVReg *node
 		degree                   int
 		visited                  bool
+		neighbors                []*node
 	}
 
 	// programCounter represents an opaque index into the program which is used to represents a LiveInterval of a VReg.
@@ -114,7 +107,6 @@ type (
 func (a *Allocator) DoAllocation(f Function) {
 	a.livenessAnalysis(f)
 	a.buildLiveRanges(f)
-	a.buildNeighbors()
 	a.coloring()
 	a.determineCalleeSavedRealRegs(f)
 	a.assignRegisters(f)
@@ -160,10 +152,8 @@ func (a *Allocator) livenessAnalysis(f Function) {
 	// First, we need to allocate blockInfos.
 	var maxBlockID int
 	for blk := f.PostOrderBlockIteratorBegin(); blk != nil; blk = f.PostOrderBlockIteratorNext() { // Order doesn't matter.
-		info := a.allocateBlockInfo(blk.ID())
 		// If this is not the entry block, we should define phi nodes, which are not defined by instructions.
 		for _, p := range blk.BlockParams() {
-			info.defs[p] = 0 // Earliest definition is at the beginning of the block.
 			a.phis = append(a.phis, p)
 			pid := int(p.ID())
 			if diff := pid + 1 - len(a.phiBlocks); diff > 0 {
@@ -223,21 +213,13 @@ func (a *Allocator) livenessAnalysis(f Function) {
 			pc -= pcStride
 			var use, def VReg
 			for _, def = range instr.Defs() {
-				defID := def.ID()
-				pos := pc + pcDefOffset
-				if def.IsRealReg() {
-					info.realRegDefs[defID] = append(info.realRegDefs[defID], pos)
-				} else {
-					info.defs[def] = pos
+				if !def.IsRealReg() {
 					delete(info.liveIns, def)
 				}
 			}
 			for _, use = range instr.Uses() {
 				pos := pc + pcUseOffset
-				if use.IsRealReg() {
-					id := use.ID()
-					info.realRegUses[id] = append(info.realRegUses[id], pos)
-				} else {
+				if !use.IsRealReg() {
 					if info.lastUses.Lookup(use) < 0 {
 						info.lastUses.Insert(use, pos)
 					}
@@ -252,10 +234,9 @@ func (a *Allocator) livenessAnalysis(f Function) {
 			// If the destination is a phi value, and ...
 			if def.Valid() && a.phiBlk(def.ID()) != nil {
 				if use.Valid() && use.IsRealReg() {
+					info.liveIns[use] = struct{}{}
 					// If the source is a real register, this is the beginning of the function, and
 					// therefore we need to add the definition of the real register.
-					r := use.ID()
-					info.realRegDefs[r] = append(info.realRegDefs[r], 0)
 				} else {
 					// Otherwise, this is the definition of the phi value for the successor block.
 					// So we need to make it outlive the block.
@@ -314,123 +295,96 @@ func (a *Allocator) loopTreeDFS(entry Block) {
 }
 
 func (a *Allocator) buildLiveRanges(f Function) {
-	for blk := f.PostOrderBlockIteratorBegin(); blk != nil; blk = f.PostOrderBlockIteratorNext() { // Order doesn't matter.
-		blkID := blk.ID()
-		info := a.blockInfoAt(blkID)
-		a.buildLiveRangesForNonReals(info)
-		a.buildLiveRangesForReals(info)
-		info.intervalMng.build()
+	for blk := f.ReversePostOrderBlockIteratorBegin(); blk != nil; blk = f.ReversePostOrderBlockIteratorNext() { // Order doesn't matter.
+		a.buildLiveRangeEdges(blk)
+	}
+	a.finalizeEdges()
+}
+
+func (a *Allocator) finalizeEdges() {
+	for i := 0; i < a.nodePool.Allocated(); i++ {
+		n := a.nodePool.View(i)
+		if n.v.IsRealReg() {
+			continue
+		}
+		n.degree = len(n.neighbors)
 	}
 }
 
-func (a *Allocator) buildLiveRangesForNonReals(info *blockInfo) {
-	ins, outs, defs := info.liveIns, info.liveOuts, info.defs
+func (a *Allocator) buildLiveRangeEdges(blk Block) {
+	blkID := blk.ID()
+	info := a.blockInfoAt(blkID)
 
-	// In order to do the deterministic allocation, we need to sort ins.
-	vs := a.vs[:0]
-	for v := range ins {
-		vs = append(vs, v)
+	if wazevoapi.RegAllocLoggingEnabled {
+		fmt.Printf("blk%d:\n%s\n", blkID, info.Format(a.regInfo))
 	}
-	sort.SliceStable(vs, func(i, j int) bool {
-		return vs[i].ID() < vs[j].ID()
-	})
-	for _, v := range vs {
-		if v.IsRealReg() {
-			panic("BUG: real registers should not be in liveIns")
-		}
-		var begin, end programCounter
-		if _, ok := outs[v]; ok {
-			// v is live-in and live-out, so it is live-through.
-			begin, end = 0, math.MaxInt32
-		} else {
-			// v is killed at killPos.
-			begin, end = 0, info.lastUses.Lookup(v)
-		}
+
+	a.aliveSet = resetMap(a.aliveSet)
+	a.vs = a.vs[:0]
+	for v := range info.liveIns {
+		a.vs = append(a.vs, v)
+	}
+	for _, v := range a.vs {
 		n := a.getOrAllocateNode(v)
-		intervalNode := info.intervalMng.insert(n, begin, end)
-		n.ranges = append(n.ranges, intervalNode)
-	}
-
-	// In order to do the deterministic allocation, we need to sort defs.
-	vs = vs[:0]
-	for v := range defs {
-		vs = append(vs, v)
-	}
-	sort.SliceStable(vs, func(i, j int) bool {
-		return vs[i].ID() < vs[j].ID()
-	})
-	for _, v := range vs {
-		defPos := defs[v]
 		if v.IsRealReg() {
-			panic("BUG: real registers should not be in defs")
+			n.r = v.RealReg()
 		}
+		a.aliveSet[n] = struct{}{}
+	}
 
-		if _, ok := ins[v]; ok {
-			// This case, phi value is coming in (used somewhere) but re-defined at the end.
-			continue
+	if !blk.Entry() {
+		for _, arg := range blk.BlockParams() {
+			n := a.getOrAllocateNode(arg)
+			a.aliveSet[n] = struct{}{}
 		}
+	}
 
-		var end programCounter
-		if _, ok := outs[v]; ok {
-			// v is defined here and live-out, so it is live-through.
-			end = math.MaxInt32
-		} else {
-			end = info.lastUses.Lookup(v)
-			if end == -1 {
-				// This case the defined value is not used at all.
-				end = defPos
+	var pc programCounter
+	for instr := blk.InstrIteratorBegin(); instr != nil; instr = blk.InstrIteratorNext() {
+		for _, use := range instr.Uses() {
+			pos := pc + pcUseOffset
+			if use.IsRealReg() {
+				delete(a.aliveSet, a.getOrAllocateNode(use))
+			} else {
+				if info.lastUses.Lookup(use) == pos {
+					if _, ok := info.liveOuts[use]; !ok {
+						delete(a.aliveSet, a.getOrAllocateNode(use))
+					}
+				}
 			}
 		}
-		n := a.getOrAllocateNode(v)
-		intervalNode := info.intervalMng.insert(n, defPos, end)
-		n.ranges = append(n.ranges, intervalNode)
-	}
 
-	// Reuse for the next block.
-	a.vs = vs[:0]
-}
+		for _, def := range instr.Defs() {
+			n := a.getOrAllocateNode(def)
+			if def.IsRealReg() {
+				n.r = def.RealReg()
+			}
 
-// buildLiveRangesForReals builds live ranges for pre-colored real registers.
-func (a *Allocator) buildLiveRangesForReals(info *blockInfo) {
-	ds, us := info.realRegDefs, info.realRegUses
+			if _, ok := a.aliveSet[n]; ok {
+				continue
+			}
 
-	for i := 0; i < RealRegsNumMax; i++ {
-		r := RealReg(i)
-		// Non allocation target registers are not needed here.
-		if !a.allocatableSet[r] {
-			continue
+			for m := range a.aliveSet {
+				nID, mID := n.v.ID(), m.v.ID()
+				if nID == mID || n.v.RegType() != m.v.RegType() {
+					continue
+				}
+				if nID >= mID {
+					nID, mID = mID, nID
+				}
+				n.neighbors = append(n.neighbors, m)
+				m.neighbors = append(m.neighbors, n)
+			}
+
+			if !def.IsRealReg() && info.lastUses.Lookup(def) < 0 {
+				if _, ok := info.liveOuts[def]; !ok {
+					continue
+				}
+			}
+
+			a.aliveSet[n] = struct{}{}
 		}
-
-		uses := us[r]
-		defs := ds[r]
-		if len(defs) != len(uses) {
-			// This is likely a bug of the Instr interface implementation and/or ABI around call instructions.
-			// E.g. call or ret instructions should specify that they use all the real registers (calling convention).
-			panic(
-				fmt.Sprintf(
-					"BUG: real register (%s) is defined and used, but the number of defs and uses are different: %d (defs) != %d (uses)",
-					a.regInfo.RealRegName(r), len(defs), len(uses),
-				),
-			)
-		} else if len(uses) == 0 {
-			continue
-		}
-
-		sort.Slice(uses, func(i, j int) bool {
-			return uses[i] < uses[j]
-		})
-		sort.Slice(defs, func(i, j int) bool {
-			return defs[i] < defs[j]
-		})
-
-		for i := range uses {
-			n := a.allocateNode()
-			n.r = r
-			n.v = FromRealReg(r, a.regInfo.RealRegType(r))
-			defined, used := defs[i], uses[i]
-			intervalNode := info.intervalMng.insert(n, defined, used)
-			n.ranges = append(n.ranges, intervalNode)
-		}
+		pc += pcStride
 	}
 }
 
@@ -448,12 +402,12 @@ func (a *Allocator) Reset() {
 
 	a.nodes1 = a.nodes1[:0]
 	a.nodes2 = a.nodes2[:0]
-	a.realRegs = a.realRegs[:0]
 	for _, phi := range a.phis {
 		a.phiBlocks[phi.ID()] = nil
 	}
 	a.phis = a.phis[:0]
 	a.vs = a.vs[:0]
+	a.aliveSet = resetMap(a.aliveSet)
 }
 
 func (a *Allocator) allocateBlockInfo(blockID int) *blockInfo {
@@ -492,32 +446,20 @@ func (a *Allocator) getOrAllocateNode(v VReg) (n *node) {
 }
 
 func resetBlockInfo(i *blockInfo) {
-	if i.intervalMng == nil {
-		i.intervalMng = newIntervalManager()
-	} else {
-		i.intervalMng.reset()
-	}
 	i.liveOuts = resetMap(i.liveOuts)
 	i.liveIns = resetMap(i.liveIns)
-	i.defs = resetMap(i.defs)
-
-	for index := range i.realRegUses {
-		i.realRegUses[index] = i.realRegUses[index][:0]
-		i.realRegDefs[index] = i.realRegDefs[index][:0]
-	}
 }
 
 func resetNode(n *node) {
 	n.r = RealRegInvalid
 	n.v = VRegInvalid
-	n.ranges = n.ranges[:0]
-	n.neighbors = n.neighbors[:0]
 	n.copyFromVReg = nil
 	n.copyToVReg = nil
 	n.copyFromReal = RealRegInvalid
 	n.copyToReal = RealRegInvalid
 	n.degree = 0
 	n.visited = false
+	n.neighbors = n.neighbors[:0]
 }
 
 func resetMap[K comparable, V any](m map[K]V) map[K]V {
@@ -533,7 +475,6 @@ func resetMap[K comparable, V any](m map[K]V) map[K]V {
 
 func (a *Allocator) allocateNode() (n *node) {
 	n = a.nodePool.Allocate()
-	n.id = a.nodePool.Allocated() - 1
 	return
 }
 
@@ -542,32 +483,24 @@ func (i *blockInfo) Format(ri *RegisterInfo) string {
 	var buf strings.Builder
 	buf.WriteString("\tliveOuts: ")
 	for v := range i.liveOuts {
-		buf.WriteString(fmt.Sprintf("%v ", v))
+		if v.IsRealReg() {
+			buf.WriteString(fmt.Sprintf("%v ", ri.RealRegName(v.RealReg())))
+		} else {
+			buf.WriteString(fmt.Sprintf("%v ", v))
+		}
 	}
 	buf.WriteString("\n\tliveIns: ")
 	for v := range i.liveIns {
-		buf.WriteString(fmt.Sprintf("%v ", v))
-	}
-	buf.WriteString("\n\tdefs: ")
-	for v, pos := range i.defs {
-		buf.WriteString(fmt.Sprintf("%v@%v ", v, pos))
+		if v.IsRealReg() {
+			buf.WriteString(fmt.Sprintf("%v ", ri.RealRegName(v.RealReg())))
+		} else {
+			buf.WriteString(fmt.Sprintf("%v ", v))
+		}
 	}
 	buf.WriteString("\n\tlastUses: ")
 	i.lastUses.Range(func(v VReg, pos programCounter) {
 		buf.WriteString(fmt.Sprintf("%v@%v ", v, pos))
 	})
-	buf.WriteString("\n\trealRegUses: ")
-	for v, pos := range i.realRegUses {
-		if len(pos) > 0 {
-			buf.WriteString(fmt.Sprintf("%s@%v ", ri.RealRegName(RealReg(v)), pos))
-		}
-	}
-	buf.WriteString("\n\trealRegDefs: ")
-	for v, pos := range i.realRegDefs {
-		if len(pos) > 0 {
-			buf.WriteString(fmt.Sprintf("%s@%v ", ri.RealRegName(RealReg(v)), pos))
-		}
-	}
 	return buf.String()
 }
 
@@ -578,12 +511,6 @@ func (n *node) String() string {
 	if n.r != RealRegInvalid {
 		buf.WriteString(fmt.Sprintf(":%v", n.r))
 	}
-	// Add neighbors
-	buf.WriteString(" neighbors[")
-	for _, n := range n.neighbors {
-		buf.WriteString(fmt.Sprintf("v%v ", n.v.ID()))
-	}
-	buf.WriteString("]")
 	return buf.String()
 }
 

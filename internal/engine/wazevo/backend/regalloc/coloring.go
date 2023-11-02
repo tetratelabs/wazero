@@ -7,52 +7,6 @@ import (
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 )
 
-// buildNeighbors builds the neighbors for each node in the interference graph.
-func (a *Allocator) buildNeighbors() {
-	allocated := a.nodePool.Allocated()
-	if diff := allocated - len(a.dedup); diff > 0 {
-		a.dedup = append(a.dedup, make([]bool, diff+1)...)
-	}
-	for i := 0; i < allocated; i++ {
-		n := a.nodePool.View(i)
-		a.buildNeighborsFor(n)
-	}
-}
-
-func (a *Allocator) buildNeighborsFor(n *node) {
-	for _, r := range n.ranges {
-		// Collects all the nodes that are in the same range.
-		for _, neighbor := range r.nodes {
-			neighborID := neighbor.id
-			if neighbor.v.RegType() != n.v.RegType() {
-				continue
-			}
-			if neighbor != n && !a.dedup[neighborID] {
-				n.neighbors = append(n.neighbors, neighbor)
-				a.dedup[neighborID] = true
-			}
-		}
-
-		// And also collects all the nodes that are in the neighbor ranges.
-		for _, neighborInterval := range r.neighbors {
-			for _, neighbor := range neighborInterval.nodes {
-				if neighbor.v.RegType() != n.v.RegType() {
-					continue
-				}
-				neighborID := neighbor.id
-				if neighbor != n && !a.dedup[neighborID] {
-					n.neighbors = append(n.neighbors, neighbor)
-					a.dedup[neighborID] = true
-				}
-			}
-		}
-	}
-	// Reset for the next iteration.
-	for _, neighbor := range n.neighbors {
-		a.dedup[neighbor.id] = false
-	}
-}
-
 // coloring does the graph coloring for both RegType(s).
 // Since the graphs are disjoint per RegType, we do it by RegType separately.
 func (a *Allocator) coloring() {
@@ -87,11 +41,6 @@ func (a *Allocator) coloringFor(allocatable []RealReg) {
 	coloringStack := a.nodes2[:0]
 
 	numAllocatable := len(allocatable)
-
-	// Initialize the degree for each node which is defined as the number of neighbors.
-	for _, n := range degreeSortedNodes {
-		n.degree = len(n.neighbors)
-	}
 
 	// Sort the nodes by the current degree.
 	sort.SliceStable(degreeSortedNodes, func(i, j int) bool {
@@ -133,6 +82,7 @@ func (a *Allocator) coloringFor(allocatable []RealReg) {
 		for len(popTargetQueue) > 0 {
 			top := popTargetQueue[0]
 			popTargetQueue = popTargetQueue[1:]
+
 			for _, neighbor := range top.neighbors {
 				neighbor.degree--
 				if neighbor.degree < numAllocatable {
@@ -162,6 +112,13 @@ func (a *Allocator) coloringFor(allocatable []RealReg) {
 
 		// Gather already used colors.
 		for _, neighbor := range n.neighbors {
+			if wazevoapi.RegAllocLoggingEnabled {
+				if neighbor.r == RealRegInvalid {
+					fmt.Println("\tneighbor: ", neighbor, " (not colored yet)")
+				} else {
+					fmt.Println("\tneighbor: ", neighbor, " (colored)", a.regInfo.RealRegName(neighbor.r))
+				}
+			}
 			if neighborColor := neighbor.r; neighborColor != RealRegInvalid {
 				neighborColorsSet[neighborColor] = true
 			}

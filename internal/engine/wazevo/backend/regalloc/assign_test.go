@@ -1,3 +1,5 @@
+//go:build tmp
+
 package regalloc
 
 import (
