@@ -1095,14 +1095,14 @@ L1 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
 	mov x8, x0
-	mov x10.8b, v0.8b
 	msr fpsr, xzr
-	fcvtzs x0, d10
+	fcvtzs x0, d0
 	mrs x9 fpsr
 	subs xzr, x9, #0x1
 	mov x9, x8
+	mov d8, d0
 	b.ne #0x70, (L17)
-	fcmp x10, x10
+	fcmp d8, d8
 	mov x10, x9
 	b.vc #0x34, (L16)
 	movz x11, #0xc, lsl 0
@@ -1126,9 +1126,9 @@ L17:
 	mrs x9 fpsr
 	subs xzr, x9, #0x1
 	mov x9, x8
-	mov x10, d1
+	mov d8, d1
 	b.ne #0x70, (L15)
-	fcmp w10, w10
+	fcmp s8, s8
 	mov x10, x9
 	b.vc #0x34, (L14)
 	movz x11, #0xc, lsl 0
@@ -1148,12 +1148,13 @@ L14:
 	exit_sequence x9
 L15:
 	msr fpsr, xzr
-	fcvtzs w2, d10
+	fcvtzs w2, d0
 	mrs x9 fpsr
 	subs xzr, x9, #0x1
 	mov x9, x8
+	mov d8, d0
 	b.ne #0x70, (L13)
-	fcmp x10, x10
+	fcmp d8, d8
 	mov x10, x9
 	b.vc #0x34, (L12)
 	movz x11, #0xc, lsl 0
@@ -1177,9 +1178,9 @@ L13:
 	mrs x9 fpsr
 	subs xzr, x9, #0x1
 	mov x9, x8
-	mov x10, d1
+	mov d8, d1
 	b.ne #0x70, (L11)
-	fcmp w10, w10
+	fcmp s8, s8
 	mov x10, x9
 	b.vc #0x34, (L10)
 	movz x11, #0xc, lsl 0
@@ -1199,12 +1200,13 @@ L10:
 	exit_sequence x9
 L11:
 	msr fpsr, xzr
-	fcvtzu x4, d10
+	fcvtzu x4, d0
 	mrs x9 fpsr
 	subs xzr, x9, #0x1
 	mov x9, x8
+	mov d8, d0
 	b.ne #0x70, (L9)
-	fcmp x10, x10
+	fcmp d8, d8
 	mov x10, x9
 	b.vc #0x34, (L8)
 	movz x11, #0xc, lsl 0
@@ -1228,9 +1230,9 @@ L9:
 	mrs x9 fpsr
 	subs xzr, x9, #0x1
 	mov x9, x8
-	mov x10, d1
+	mov d8, d1
 	b.ne #0x70, (L7)
-	fcmp w10, w10
+	fcmp s8, s8
 	mov x10, x9
 	b.vc #0x34, (L6)
 	movz x11, #0xc, lsl 0
@@ -1250,12 +1252,13 @@ L6:
 	exit_sequence x9
 L7:
 	msr fpsr, xzr
-	fcvtzu w6, d10
+	fcvtzu w6, d0
 	mrs x9 fpsr
 	subs xzr, x9, #0x1
 	mov x9, x8
+	mov d8, d0
 	b.ne #0x70, (L5)
-	fcmp x10, x10
+	fcmp d8, d8
 	mov x10, x9
 	b.vc #0x34, (L4)
 	movz x11, #0xc, lsl 0
@@ -1278,9 +1281,9 @@ L5:
 	fcvtzu w7, s1
 	mrs x9 fpsr
 	subs xzr, x9, #0x1
-	mov x9, d1
+	mov d8, d1
 	b.ne #0x70, (L3)
-	fcmp w9, w9
+	fcmp s8, s8
 	mov x9, x8
 	b.vc #0x34, (L2)
 	movz x10, #0xc, lsl 0
@@ -1299,7 +1302,7 @@ L2:
 	str x9, [x8, #0x30]
 	exit_sequence x8
 L3:
-	fcvt s0, x10
+	fcvt s0, d0
 	fcvt d1, s1
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
