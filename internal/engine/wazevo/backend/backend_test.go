@@ -1097,10 +1097,10 @@ L1 (SSA Block: blk0):
 	mov x8, x0
 	msr fpsr, xzr
 	fcvtzs x0, d0
-	mrs x9 fpsr
-	subs xzr, x9, #0x1
+	mrs x10 fpsr
 	mov x9, x8
-	mov d8, d0
+	mov v8.16b, v0.16b
+	subs xzr, x10, #0x1
 	b.ne #0x70, (L17)
 	fcmp d8, d8
 	mov x10, x9
@@ -1123,10 +1123,10 @@ L16:
 L17:
 	msr fpsr, xzr
 	fcvtzs x1, s1
-	mrs x9 fpsr
-	subs xzr, x9, #0x1
+	mrs x10 fpsr
 	mov x9, x8
-	mov d8, d1
+	mov v8.16b, v1.16b
+	subs xzr, x10, #0x1
 	b.ne #0x70, (L15)
 	fcmp s8, s8
 	mov x10, x9
@@ -1149,10 +1149,10 @@ L14:
 L15:
 	msr fpsr, xzr
 	fcvtzs w2, d0
-	mrs x9 fpsr
-	subs xzr, x9, #0x1
+	mrs x10 fpsr
 	mov x9, x8
-	mov d8, d0
+	mov v8.16b, v0.16b
+	subs xzr, x10, #0x1
 	b.ne #0x70, (L13)
 	fcmp d8, d8
 	mov x10, x9
@@ -1175,10 +1175,10 @@ L12:
 L13:
 	msr fpsr, xzr
 	fcvtzs w3, s1
-	mrs x9 fpsr
-	subs xzr, x9, #0x1
+	mrs x10 fpsr
 	mov x9, x8
-	mov d8, d1
+	mov v8.16b, v1.16b
+	subs xzr, x10, #0x1
 	b.ne #0x70, (L11)
 	fcmp s8, s8
 	mov x10, x9
@@ -1201,10 +1201,10 @@ L10:
 L11:
 	msr fpsr, xzr
 	fcvtzu x4, d0
-	mrs x9 fpsr
-	subs xzr, x9, #0x1
+	mrs x10 fpsr
 	mov x9, x8
-	mov d8, d0
+	mov v8.16b, v0.16b
+	subs xzr, x10, #0x1
 	b.ne #0x70, (L9)
 	fcmp d8, d8
 	mov x10, x9
@@ -1227,10 +1227,10 @@ L8:
 L9:
 	msr fpsr, xzr
 	fcvtzu x5, s1
-	mrs x9 fpsr
-	subs xzr, x9, #0x1
+	mrs x10 fpsr
 	mov x9, x8
-	mov d8, d1
+	mov v8.16b, v1.16b
+	subs xzr, x10, #0x1
 	b.ne #0x70, (L7)
 	fcmp s8, s8
 	mov x10, x9
@@ -1253,10 +1253,10 @@ L6:
 L7:
 	msr fpsr, xzr
 	fcvtzu w6, d0
-	mrs x9 fpsr
-	subs xzr, x9, #0x1
+	mrs x10 fpsr
 	mov x9, x8
-	mov d8, d0
+	mov v8.16b, v0.16b
+	subs xzr, x10, #0x1
 	b.ne #0x70, (L5)
 	fcmp d8, d8
 	mov x10, x9
@@ -1280,8 +1280,8 @@ L5:
 	msr fpsr, xzr
 	fcvtzu w7, s1
 	mrs x9 fpsr
+	mov v8.16b, v1.16b
 	subs xzr, x9, #0x1
-	mov d8, d1
 	b.ne #0x70, (L3)
 	fcmp s8, s8
 	mov x9, x8
