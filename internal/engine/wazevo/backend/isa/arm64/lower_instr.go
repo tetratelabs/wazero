@@ -1910,38 +1910,31 @@ func (m *machine) lowerSelect(c, x, y, result ssa.Value) {
 	}
 }
 
-func (m *machine) lowerSelectVec(rc, _rn, _rm, rd operand) {
-	// Copy the operands to tmp registers.
-	rn := operandNR(m.copyToTmp(_rn.nr(), ssa.TypeV128))
-	rm := operandNR(m.copyToTmp(_rm.nr(), ssa.TypeV128))
+func (m *machine) lowerSelectVec(rc, rn, rm, rd operand) {
+	// First we clear the unnecessary bits of rc by ANDing it with 1.
+	one := m.compiler.AllocateVReg(ssa.TypeI32)
+	m.lowerConstantI32(one, 1)
+	and := m.allocateInstr()
+	oneOrZero := operandNR(m.compiler.AllocateVReg(ssa.TypeI32))
+	and.asALU(aluOpAnd, oneOrZero, rc, operandNR(one), false)
+	m.insert(and)
 
-	// Declare and insert the conditional branch here jump to label `ifNonZero` below:
-	// but we cannot forward reference the label.
-	cbr := m.allocateInstr()
-	m.insert(cbr)
+	// Sets all bits to 1 if rc is not zero.
+	allOneOrZero := operandNR(m.compiler.AllocateVReg(ssa.TypeI64))
+	alu := m.allocateInstr()
+	alu.asALU(aluOpSub, allOneOrZero, operandNR(xzrVReg), oneOrZero, true)
+	m.insert(alu)
 
-	// If rc is zero, mov rd, rm then jump to end.
-	mov0 := m.allocateInstr()
-	mov0.asFpuMov128(rd.nr(), rm.nr())
-	m.insert(mov0)
+	// Then move the bits to the result vector register.
+	dup := m.allocateInstr()
+	dup.asVecDup(rd, allOneOrZero, vecArrangement2D)
+	m.insert(dup)
 
-	// Declared and insert the non-conditional jump to label `end` below:
-	// again, we cannot forward reference the label.
-	br := m.allocateInstr()
-	m.insert(br)
-
-	// Create and insert the label, and update `cbr` to the real instruction.
-	ifNonZero := m.insertBrTargetLabel()
-	cbr.asCondBr(registerAsRegNotZeroCond(rc.nr()), ifNonZero, true)
-
-	// If rc is non-zero, set mov rd, rn.
-	mov := m.allocateInstr()
-	mov.asFpuMov128(rd.nr(), rn.nr())
-	m.insert(mov)
-
-	// Create and insert the label, and update `br` to the real instruction.
-	end := m.insertBrTargetLabel()
-	br.asBr(end)
+	// Now that `rd` has either all bits one or zero depending on `rc`,
+	// we can use bsl to select between `rn` and `rm`.
+	ins := m.allocateInstr()
+	ins.asVecRRR(vecOpBsl, rd, rn, rm, vecArrangement16B)
+	m.insert(ins)
 }
 
 // copyToTmp copies the given regalloc.VReg to a temporary register. This is called before cbr to avoid the regalloc issue
