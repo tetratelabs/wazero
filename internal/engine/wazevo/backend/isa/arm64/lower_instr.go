@@ -1189,9 +1189,11 @@ func (m *machine) lowerIDiv(execCtxVReg regalloc.VReg, rd, rn, rm operand, _64bi
 // If `c` (cond type) is a register, `cond64bit` must be chosen to indicate whether the register is 32-bit or 64-bit.
 // Otherwise, `cond64bit` is ignored.
 func (m *machine) exitIfNot(execCtxVReg regalloc.VReg, c cond, cond64bit bool, code wazevoapi.ExitCode) {
+	execCtxTmp := m.copyToTmp(execCtxVReg, ssa.TypeI64)
+
 	cbr := m.allocateInstr()
 	m.insert(cbr)
-	m.lowerExitWithCode(execCtxVReg, code)
+	m.lowerExitWithCode(execCtxTmp, code)
 	// Conditional branch target is after exit.
 	l := m.insertBrTargetLabel()
 	cbr.asCondBr(c, l, cond64bit)
@@ -1315,6 +1317,9 @@ func (m *machine) lowerFpuToInt(rd, rn operand, ctx regalloc.VReg, signed, src64
 		alu.asALU(aluOpSubS, operandNR(xzrVReg), operandNR(tmpReg), operandImm12(1, 0), true)
 		m.insert(alu)
 
+		execCtx := m.copyToTmp(ctx, ssa.TypeI64)
+		_rn := operandNR(m.copyToTmp(rn.nr(), ssa.TypeI64))
+
 		// If it is not undefined, we can return the result.
 		ok := m.allocateInstr()
 		m.insert(ok)
@@ -1323,12 +1328,12 @@ func (m *machine) lowerFpuToInt(rd, rn operand, ctx regalloc.VReg, signed, src64
 
 		// Comparing itself to check if it is a NaN.
 		fpuCmp := m.allocateInstr()
-		fpuCmp.asFpuCmp(rn, rn, src64bit)
+		fpuCmp.asFpuCmp(_rn, _rn, src64bit)
 		m.insert(fpuCmp)
 		// If the VC flag is not set (== VS flag is set), it is a NaN.
-		m.exitIfNot(ctx, vc.asCond(), false, wazevoapi.ExitCodeInvalidConversionToInteger)
+		m.exitIfNot(execCtx, vc.asCond(), false, wazevoapi.ExitCodeInvalidConversionToInteger)
 		// Otherwise, it is an overflow.
-		m.lowerExitWithCode(ctx, wazevoapi.ExitCodeIntegerOverflow)
+		m.lowerExitWithCode(execCtx, wazevoapi.ExitCodeIntegerOverflow)
 
 		// Conditional branch target is after exit.
 		l := m.insertBrTargetLabel()
@@ -1838,10 +1843,12 @@ func (m *machine) lowerExitIfTrueWithCode(execCtxVReg regalloc.VReg, cond ssa.Va
 	signed := c.Signed()
 	m.lowerIcmpToFlag(x, y, signed)
 
+	execCtxTmp := m.copyToTmp(execCtxVReg, ssa.TypeI64)
+
 	// We have to skip the entire exit sequence if the condition is false.
 	cbr := m.allocateInstr()
 	m.insert(cbr)
-	m.lowerExitWithCode(execCtxVReg, code)
+	m.lowerExitWithCode(execCtxTmp, code)
 	// conditional branch target is after exit.
 	l := m.insertBrTargetLabel()
 	cbr.asCondBr(condFlagFromSSAIntegerCmpCond(c).invert().asCond(), l, false /* ignored */)
@@ -1903,7 +1910,11 @@ func (m *machine) lowerSelect(c, x, y, result ssa.Value) {
 	}
 }
 
-func (m *machine) lowerSelectVec(rc, rn, rm, rd operand) {
+func (m *machine) lowerSelectVec(rc, _rn, _rm, rd operand) {
+	// Copy the operands to tmp registers.
+	rn := operandNR(m.copyToTmp(_rn.nr(), ssa.TypeV128))
+	rm := operandNR(m.copyToTmp(_rm.nr(), ssa.TypeV128))
+
 	// Declare and insert the conditional branch here jump to label `ifNonZero` below:
 	// but we cannot forward reference the label.
 	cbr := m.allocateInstr()
@@ -1931,4 +1942,14 @@ func (m *machine) lowerSelectVec(rc, rn, rm, rd operand) {
 	// Create and insert the label, and update `br` to the real instruction.
 	end := m.insertBrTargetLabel()
 	br.asBr(end)
+}
+
+// copyToTmp copies the given regalloc.VReg to a temporary register. This is called before cbr to avoid the regalloc issue
+// e.g. reload happening in the middle of the exit sequence which is not the path the normal path executes
+func (m *machine) copyToTmp(v regalloc.VReg, typ ssa.Type) regalloc.VReg {
+	mov := m.allocateInstr()
+	tmp := m.compiler.AllocateVReg(typ)
+	mov.asMove64(tmp, v)
+	m.insert(mov)
+	return tmp
 }

@@ -297,73 +297,79 @@ func TestMachine_lowerIDiv(t *testing.T) {
 			name: "32bit unsigned", _64bit: false, signed: false,
 			exp: `
 udiv w1?, w2?, w3?
+mov x1?, x65535?
 cbnz w3?, L1
-movz x1?, #0xa, lsl 0
-str w1?, [x65535?]
-mov x2?, sp
-str x2?, [x65535?, #0x38]
-adr x3?, #0x0
-str x3?, [x65535?, #0x30]
-exit_sequence x65535?
+movz x2?, #0xa, lsl 0
+str w2?, [x1?]
+mov x3?, sp
+str x3?, [x1?, #0x38]
+adr x4?, #0x0
+str x4?, [x1?, #0x30]
+exit_sequence x1?
 L1:
 `,
 		},
 		{name: "32bit signed", _64bit: false, signed: true, exp: `
 sdiv w1?, w2?, w3?
+mov x1?, x65535?
 cbnz w3?, L1
-movz x1?, #0xa, lsl 0
-str w1?, [x65535?]
-mov x2?, sp
-str x2?, [x65535?, #0x38]
-adr x3?, #0x0
-str x3?, [x65535?, #0x30]
-exit_sequence x65535?
+movz x2?, #0xa, lsl 0
+str w2?, [x1?]
+mov x3?, sp
+str x3?, [x1?, #0x38]
+adr x4?, #0x0
+str x4?, [x1?, #0x30]
+exit_sequence x1?
 L1:
 adds wzr, w3?, #0x1
 ccmp w2?, #0x1, #0x0, eq
+mov x5?, x65535?
 b.vc L2
-movz x4?, #0xb, lsl 0
-str w4?, [x65535?]
-mov x5?, sp
-str x5?, [x65535?, #0x38]
-adr x6?, #0x0
-str x6?, [x65535?, #0x30]
-exit_sequence x65535?
+movz x6?, #0xb, lsl 0
+str w6?, [x5?]
+mov x7?, sp
+str x7?, [x5?, #0x38]
+adr x8?, #0x0
+str x8?, [x5?, #0x30]
+exit_sequence x5?
 L2:
 `},
 		{name: "64bit unsigned", _64bit: true, signed: false, exp: `
 udiv x1?, x2?, x3?
+mov x1?, x65535?
 cbnz x3?, L1
-movz x1?, #0xa, lsl 0
-str w1?, [x65535?]
-mov x2?, sp
-str x2?, [x65535?, #0x38]
-adr x3?, #0x0
-str x3?, [x65535?, #0x30]
-exit_sequence x65535?
+movz x2?, #0xa, lsl 0
+str w2?, [x1?]
+mov x3?, sp
+str x3?, [x1?, #0x38]
+adr x4?, #0x0
+str x4?, [x1?, #0x30]
+exit_sequence x1?
 L1:
 `},
 		{name: "64bit signed", _64bit: true, signed: true, exp: `
 sdiv x1?, x2?, x3?
+mov x1?, x65535?
 cbnz x3?, L1
-movz x1?, #0xa, lsl 0
-str w1?, [x65535?]
-mov x2?, sp
-str x2?, [x65535?, #0x38]
-adr x3?, #0x0
-str x3?, [x65535?, #0x30]
-exit_sequence x65535?
+movz x2?, #0xa, lsl 0
+str w2?, [x1?]
+mov x3?, sp
+str x3?, [x1?, #0x38]
+adr x4?, #0x0
+str x4?, [x1?, #0x30]
+exit_sequence x1?
 L1:
 adds xzr, x3?, #0x1
 ccmp x2?, #0x1, #0x0, eq
+mov x5?, x65535?
 b.vc L2
-movz x4?, #0xb, lsl 0
-str w4?, [x65535?]
-mov x5?, sp
-str x5?, [x65535?, #0x38]
-adr x6?, #0x0
-str x6?, [x65535?, #0x30]
-exit_sequence x65535?
+movz x6?, #0xb, lsl 0
+str w6?, [x5?]
+mov x7?, sp
+str x7?, [x5?, #0x38]
+adr x8?, #0x0
+str x8?, [x5?, #0x30]
+exit_sequence x5?
 L2:
 `},
 	} {
@@ -409,24 +415,27 @@ msr fpsr, xzr
 fcvtzu w1, s2
 mrs x1? fpsr
 subs xzr, x1?, #0x1
+mov x2?, x15
+mov x3?, x2
 b.ne L2
-fcmp w2, w2
+fcmp w3?, w3?
+mov x4?, x2?
 b.vc L1
-movz x2?, #0xc, lsl 0
-str w2?, [x15]
-mov x3?, sp
-str x3?, [x15, #0x38]
-adr x4?, #0x0
-str x4?, [x15, #0x30]
-exit_sequence x15
-L1:
-movz x5?, #0xb, lsl 0
-str w5?, [x15]
+movz x5?, #0xc, lsl 0
+str w5?, [x4?]
 mov x6?, sp
-str x6?, [x15, #0x38]
+str x6?, [x4?, #0x38]
 adr x7?, #0x0
-str x7?, [x15, #0x30]
-exit_sequence x15
+str x7?, [x4?, #0x30]
+exit_sequence x4?
+L1:
+movz x8?, #0xb, lsl 0
+str w8?, [x2?]
+mov x9?, sp
+str x9?, [x2?, #0x38]
+adr x10?, #0x0
+str x10?, [x2?, #0x30]
+exit_sequence x2?
 L2:
 `,
 		},
@@ -842,11 +851,13 @@ func TestMachine_lowerSelectVec(t *testing.T) {
 
 	m.lowerSelectVec(c, rn, rm, rd)
 	require.Equal(t, `
+mov d5?, d2?
+mov d6?, d3?
 cbnz x1?, L1
-mov v4?.16b, v3?.16b
+mov v4?.16b, v6?.16b
 b L2
 L1:
-mov v4?.16b, v2?.16b
+mov v4?.16b, v5?.16b
 L2:
 `, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
 }
