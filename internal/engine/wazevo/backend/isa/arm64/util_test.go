@@ -90,6 +90,7 @@ func newMockCompilationContext() *mockCompiler {
 	return &mockCompiler{
 		vRegMap:     make(map[ssa.Value]regalloc.VReg),
 		definitions: make(map[ssa.Value]*backend.SSAValueDefinition),
+		typeOf:      map[regalloc.VReg]ssa.Type{},
 	}
 }
 
@@ -102,7 +103,9 @@ func (m *mockCompiler) ResolveSignature(id ssa.SignatureID) *ssa.Signature {
 func (m *mockCompiler) AllocateVReg(typ ssa.Type) regalloc.VReg {
 	m.vRegCounter++
 	regType := regalloc.RegTypeOf(typ)
-	return regalloc.VReg(m.vRegCounter).SetRegType(regType)
+	ret := regalloc.VReg(m.vRegCounter).SetRegType(regType)
+	m.typeOf[ret] = typ
+	return ret
 }
 
 // ValueDefinition implements backend.Compiler.

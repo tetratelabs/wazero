@@ -1189,7 +1189,7 @@ func (m *machine) lowerIDiv(execCtxVReg regalloc.VReg, rd, rn, rm operand, _64bi
 // If `c` (cond type) is a register, `cond64bit` must be chosen to indicate whether the register is 32-bit or 64-bit.
 // Otherwise, `cond64bit` is ignored.
 func (m *machine) exitIfNot(execCtxVReg regalloc.VReg, c cond, cond64bit bool, code wazevoapi.ExitCode) {
-	execCtxTmp := m.copyToTmp(execCtxVReg, ssa.TypeI64)
+	execCtxTmp := m.copyToTmp(execCtxVReg)
 
 	cbr := m.allocateInstr()
 	m.insert(cbr)
@@ -1317,8 +1317,8 @@ func (m *machine) lowerFpuToInt(rd, rn operand, ctx regalloc.VReg, signed, src64
 		alu.asALU(aluOpSubS, operandNR(xzrVReg), operandNR(tmpReg), operandImm12(1, 0), true)
 		m.insert(alu)
 
-		execCtx := m.copyToTmp(ctx, ssa.TypeI64)
-		_rn := operandNR(m.copyToTmp(rn.nr(), ssa.TypeI64))
+		execCtx := m.copyToTmp(ctx)
+		_rn := operandNR(m.copyToTmp(rn.nr()))
 
 		// If it is not undefined, we can return the result.
 		ok := m.allocateInstr()
@@ -1843,7 +1843,7 @@ func (m *machine) lowerExitIfTrueWithCode(execCtxVReg regalloc.VReg, cond ssa.Va
 	signed := c.Signed()
 	m.lowerIcmpToFlag(x, y, signed)
 
-	execCtxTmp := m.copyToTmp(execCtxVReg, ssa.TypeI64)
+	execCtxTmp := m.copyToTmp(execCtxVReg)
 
 	// We have to skip the entire exit sequence if the condition is false.
 	cbr := m.allocateInstr()
@@ -1939,7 +1939,8 @@ func (m *machine) lowerSelectVec(rc, rn, rm, rd operand) {
 
 // copyToTmp copies the given regalloc.VReg to a temporary register. This is called before cbr to avoid the regalloc issue
 // e.g. reload happening in the middle of the exit sequence which is not the path the normal path executes
-func (m *machine) copyToTmp(v regalloc.VReg, typ ssa.Type) regalloc.VReg {
+func (m *machine) copyToTmp(v regalloc.VReg) regalloc.VReg {
+	typ := m.compiler.TypeOf(v)
 	mov := m.allocateInstr()
 	tmp := m.compiler.AllocateVReg(typ)
 	mov.asMove64(tmp, v)

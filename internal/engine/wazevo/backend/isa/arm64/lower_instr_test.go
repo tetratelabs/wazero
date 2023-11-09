@@ -378,7 +378,8 @@ L2:
 			rd, rn, rm := regalloc.VReg(1).SetRegType(regalloc.RegTypeInt),
 				regalloc.VReg(2).SetRegType(regalloc.RegTypeInt),
 				regalloc.VReg(3).SetRegType(regalloc.RegTypeInt)
-			_, _, m := newSetupWithMockContext()
+			mc, _, m := newSetupWithMockContext()
+			mc.typeOf = map[regalloc.VReg]ssa.Type{execCtx: ssa.TypeI64, 2: ssa.TypeI64, 3: ssa.TypeI64}
 			m.lowerIDiv(execCtx, operandNR(rd), operandNR(rn), operandNR(rm), tc._64bit, tc.signed)
 			require.Equal(t, tc.exp, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
 		})
@@ -416,7 +417,7 @@ fcvtzu w1, s2
 mrs x1? fpsr
 subs xzr, x1?, #0x1
 mov x2?, x15
-mov x3?, x2
+mov x3?, d2
 b.ne L2
 fcmp w3?, w3?
 mov x4?, x2?
@@ -448,8 +449,9 @@ fcvtzu w1, s2
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			_, _, m := newSetupWithMockContext()
-			m.lowerFpuToInt(operandNR(x1VReg), operandNR(x2VReg), x15VReg, false, false, false, tc.nontrapping)
+			mc, _, m := newSetupWithMockContext()
+			mc.typeOf = map[regalloc.VReg]ssa.Type{v2VReg: ssa.TypeI64, x15VReg: ssa.TypeI64}
+			m.lowerFpuToInt(operandNR(x1VReg), operandNR(v2VReg), x15VReg, false, false, false, tc.nontrapping)
 			require.Equal(t, tc.expectedAsm, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
 
 			m.FlushPendingInstructions()
