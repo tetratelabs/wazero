@@ -415,9 +415,9 @@ func TestMachine_lowerFpuToInt(t *testing.T) {
 msr fpsr, xzr
 fcvtzu w1, s2
 mrs x1? fpsr
-subs xzr, x1?, #0x1
 mov x2?, x15
 mov x3?, d2
+subs xzr, x1?, #0x1
 b.ne L2
 fcmp w3?, w3?
 mov x4?, x2?
