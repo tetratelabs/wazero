@@ -1311,14 +1311,14 @@ func (m *machine) lowerFpuToInt(rd, rn operand, ctx regalloc.VReg, signed, src64
 		getFlag.asMovFromFPSR(tmpReg)
 		m.insert(getFlag)
 
+		execCtx := m.copyToTmp(ctx)
+		_rn := operandNR(m.copyToTmp(rn.nr()))
+
 		// Check if the conversion was undefined by comparing the status with 1.
 		// See https://developer.arm.com/documentation/ddi0595/2020-12/AArch64-Registers/FPSR--Floating-point-Status-Register
 		alu := m.allocateInstr()
 		alu.asALU(aluOpSubS, operandNR(xzrVReg), operandNR(tmpReg), operandImm12(1, 0), true)
 		m.insert(alu)
-
-		execCtx := m.copyToTmp(ctx)
-		_rn := operandNR(m.copyToTmp(rn.nr()))
 
 		// If it is not undefined, we can return the result.
 		ok := m.allocateInstr()
@@ -1943,7 +1943,11 @@ func (m *machine) copyToTmp(v regalloc.VReg) regalloc.VReg {
 	typ := m.compiler.TypeOf(v)
 	mov := m.allocateInstr()
 	tmp := m.compiler.AllocateVReg(typ)
-	mov.asMove64(tmp, v)
+	if typ.IsInt() {
+		mov.asMove64(tmp, v)
+	} else {
+		mov.asFpuMov128(tmp, v)
+	}
 	m.insert(mov)
 	return tmp
 }
