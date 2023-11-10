@@ -41,6 +41,39 @@ func (m *machine) SetupPrologue() {
 		panic(fmt.Sprintf("BUG: spillSlotSize=%d, spillSlots=%v\n", m.spillSlotSize, m.spillSlots))
 	}
 
+	if regs := m.clobberedRegs; len(regs) > 0 {
+		//
+		//            (high address)                  (high address)
+		//          +-----------------+             +-----------------+
+		//          |     .......     |             |     .......     |
+		//          |      ret Y      |             |      ret Y      |
+		//          |     .......     |             |     .......     |
+		//          |      ret 0      |             |      ret 0      |
+		//          |      arg X      |             |      arg X      |
+		//          |     .......     |             |     .......     |
+		//          |      arg 1      |             |      arg 1      |
+		//          |      arg 0      |             |      arg 0      |
+		//          | size_of_arg_ret |             | size_of_arg_ret |
+		//          |   ReturnAddress |             |  ReturnAddress  |
+		//  SP----> +-----------------+    ====>    +-----------------+
+		//             (low address)                |   clobbered M   |
+		//                                          |   ............  |
+		//                                          |   clobbered 0   |
+		//                                          +-----------------+ <----- SP
+		//                                             (low address)
+		//
+		_amode := addressModePreOrPostIndex(spVReg,
+			-16,  // stack pointer must be 16-byte aligned.
+			true, // Decrement before store.
+		)
+		for _, vr := range regs {
+			// TODO: pair stores to reduce the number of instructions.
+			store := m.allocateInstr()
+			store.asStore(operandNR(vr), _amode, regTypeToRegisterSizeInBits(vr.RegType()))
+			cur = linkInstr(cur, store)
+		}
+	}
+
 	if size := m.spillSlotSize; size > 0 {
 		// Check if size is 16-byte aligned.
 		if size&0xf != 0 {
@@ -64,51 +97,15 @@ func (m *machine) SetupPrologue() {
 		//          |  size_of_arg_ret |
 		//          |   ReturnAddress  |
 		//          +------------------+
-		//          |   spill slot M   |
+		//          |    clobbered M   |
+		//          |   ............   |
+		//          |    clobbered 0   |
+		//          |   spill slot N   |
 		//          |   ............   |
 		//          |   spill slot 2   |
-		//          |   spill slot 1   |
+		//          |   spill slot 0   |
 		//  SP----> +------------------+
 		//             (low address)
-	}
-
-	if regs := m.clobberedRegs; len(regs) > 0 {
-		//
-		//            (high address)                  (high address)
-		//          +-----------------+             +-----------------+
-		//          |     .......     |             |     .......     |
-		//          |      ret Y      |             |      ret Y      |
-		//          |     .......     |             |     .......     |
-		//          |      ret 0      |             |      ret 0      |
-		//          |      arg X      |             |      arg X      |
-		//          |     .......     |             |     .......     |
-		//          |      arg 1      |             |      arg 1      |
-		//          |      arg 0      |             |      arg 0      |
-		//          | size_of_arg_ret |             | size_of_arg_ret |
-		//          |   ReturnAddress |             |  ReturnAddress  |
-		//          +-----------------+    ====>    +-----------------+
-		//          |   ...........   |             |   ...........   |
-		//          |   spill slot M  |             |   spill slot M  |
-		//          |   ............  |             |   ............  |
-		//          |   spill slot 2  |             |   spill slot 2  |
-		//          |   spill slot 1  |             |   spill slot 1  |
-		//  SP----> +-----------------+             |   spill slot 1  |
-		//             (low address)                |   clobbered N   |
-		//                                          |   ............  |
-		//                                          |   clobbered 0   |
-		//                                          +-----------------+ <----- SP
-		//                                             (low address)
-		//
-		_amode := addressModePreOrPostIndex(spVReg,
-			-16,  // stack pointer must be 16-byte aligned.
-			true, // Decrement before store.
-		)
-		for _, vr := range regs {
-			// TODO: pair stores to reduce the number of instructions.
-			store := m.allocateInstr()
-			store.asStore(operandNR(vr), _amode, regTypeToRegisterSizeInBits(vr.RegType()))
-			cur = linkInstr(cur, store)
-		}
 	}
 
 	// We push the frame size into the stack to make it possible to unwind stack:
@@ -127,15 +124,14 @@ func (m *machine) SetupPrologue() {
 	//         | size_of_arg_ret |                | size_of_arg_ret |
 	//         |  ReturnAddress  |                |  ReturnAddress  |
 	//         +-----------------+      ==>       +-----------------+ <----+
-	//         |   ...........   |                |   ...........   |      |
-	//         |   spill slot M  |                |   spill slot M  |      |
+	//         |   clobbered  M  |                |   clobbered  M  |      |
 	//         |   ............  |                |   ............  |      |
-	//         |   spill slot 2  |                |   spill slot 2  |      |
-	//         |   spill slot 1  |                |   spill slot 1  |      | frame size
-	//         |   spill slot 1  |                |   spill slot 1  |      |
-	//         |   clobbered N   |                |   clobbered N   |      |
+	//         |   clobbered  2  |                |   clobbered  2  |      |
+	//         |   clobbered  1  |                |   clobbered  1  |      | frame size
+	//         |   clobbered  0  |                |   clobbered  0  |      |
+	//         |   spill slot N  |                |   spill slot N  |      |
 	//         |   ............  |                |   ............  |      |
-	//         |   clobbered 0   |                |   clobbered 0   | <----+
+	//         |   spill slot 0  |                |   spill slot 0  | <----+
 	// SP--->  +-----------------+                |     xxxxxx      |  ;; unused space to make it 16-byte aligned.
 	//                                            |   frame_size    |
 	//                                            +-----------------+ <---- SP
@@ -215,6 +211,35 @@ func (m *machine) setupEpilogueAfter(cur *instruction) {
 	// We've stored the frame size in the prologue, and now that we are about to return from this function, we won't need it anymore.
 	cur = m.addsAddOrSubStackPointer(cur, spVReg, 16, true)
 
+	if s := m.spillSlotSize; s > 0 {
+		// Adjust SP to the original value:
+		//
+		//            (high address)                        (high address)
+		//          +-----------------+                  +-----------------+
+		//          |     .......     |                  |     .......     |
+		//          |      ret Y      |                  |      ret Y      |
+		//          |     .......     |                  |     .......     |
+		//          |      ret 0      |                  |      ret 0      |
+		//          |      arg X      |                  |      arg X      |
+		//          |     .......     |                  |     .......     |
+		//          |      arg 1      |                  |      arg 1      |
+		//          |      arg 0      |                  |      arg 0      |
+		//          |      xxxxx      |                  |      xxxxx      |
+		//          |   ReturnAddress |                  |   ReturnAddress |
+		//          +-----------------+      ====>       +-----------------+
+		//          |    clobbered M  |                  |    clobbered M  |
+		//          |   ............  |                  |   ............  |
+		//          |    clobbered 1  |                  |    clobbered 1  |
+		//          |    clobbered 0  |                  |    clobbered 0  |
+		//          |   spill slot N  |                  +-----------------+ <---- SP
+		//          |   ............  |
+		//          |   spill slot 0  |
+		//   SP---> +-----------------+
+		//             (low address)
+		//
+		cur = m.addsAddOrSubStackPointer(cur, spVReg, s, true)
+	}
+
 	// First we need to restore the clobbered registers.
 	if len(m.clobberedRegs) > 0 {
 		//            (high address)
@@ -227,17 +252,13 @@ func (m *machine) setupEpilogueAfter(cur *instruction) {
 		//          |     .......     |                      |     .......     |
 		//          |      arg 1      |                      |      arg 1      |
 		//          |      arg 0      |                      |      arg 0      |
+		//          |      xxxxx      |                      |      xxxxx      |
 		//          |   ReturnAddress |                      |   ReturnAddress |
-		//          +-----------------+      ========>       +-----------------+
-		//          |   ...........   |                      |   ...........   |
-		//          |   spill slot M  |                      |   spill slot M  |
-		//          |   ............  |                      |   ............  |
-		//          |   spill slot 2  |                      |   spill slot 2  |
-		//          |   spill slot 1  |                      |   spill slot 1  |
-		//          |   clobbered 0   |               SP---> +-----------------+
+		//          +-----------------+      ========>       +-----------------+ <---- SP
+		//          |   clobbered M   |
 		//          |   clobbered 1   |
 		//          |   ...........   |
-		//          |   clobbered N   |
+		//          |   clobbered 0   |
 		//   SP---> +-----------------+
 		//             (low address)
 
@@ -258,33 +279,6 @@ func (m *machine) setupEpilogueAfter(cur *instruction) {
 			}
 			cur = linkInstr(cur, load)
 		}
-	}
-
-	if s := m.spillSlotSize; s > 0 {
-		// Adjust SP to the original value:
-		//
-		//            (high address)                        (high address)
-		//          +-----------------+                  +-----------------+
-		//          |     .......     |                  |     .......     |
-		//          |      ret Y      |                  |      ret Y      |
-		//          |     .......     |                  |     .......     |
-		//          |      ret 0      |                  |      ret 0      |
-		//          |      arg X      |                  |      arg X      |
-		//          |     .......     |                  |     .......     |
-		//          |      arg 1      |                  |      arg 1      |
-		//          |      arg 0      |                  |      arg 0      |
-		//          |      xxxxx      |                  |      xxxxx      |
-		//          |   ReturnAddress |                  |   ReturnAddress |
-		//          +-----------------+      ====>       +-----------------+ <---- SP
-		//          |   ...........   |                     (low address)
-		//          |   spill slot M  |
-		//          |   ............  |
-		//          |   spill slot 2  |
-		//          |   spill slot 1  |
-		//   SP---> +-----------------+
-		//             (low address)
-		//
-		cur = m.addsAddOrSubStackPointer(cur, spVReg, s, true)
 	}
 
 	// Reload the return address (lr).

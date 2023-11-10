@@ -485,7 +485,7 @@ func (m *machine) getVRegSpillSlotOffsetFromSP(id regalloc.VRegID, size byte) in
 		m.spillSlots[id] = offset
 		m.spillSlotSize += int64(size)
 	}
-	return offset + m.clobberedRegSlotSize() + 16 // spill slot starts above the clobbered registers and the frame size.
+	return offset + 16 // spill slot starts above the clobbered registers and the frame size.
 }
 
 func (m *machine) clobberedRegSlotSize() int64 {
