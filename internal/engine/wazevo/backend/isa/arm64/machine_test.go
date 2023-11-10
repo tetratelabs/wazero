@@ -108,17 +108,17 @@ func TestMachine_ret0OffsetFromSP(t *testing.T) {
 }
 
 func TestMachine_getVRegSpillSlotOffsetFromSP(t *testing.T) {
-	m := &machine{clobberedRegs: make([]regalloc.VReg, 10), spillSlots: make(map[regalloc.VRegID]int64)}
+	m := &machine{spillSlots: make(map[regalloc.VRegID]int64)}
 	id := regalloc.VRegID(1)
 	offset := m.getVRegSpillSlotOffsetFromSP(id, 8)
-	require.Equal(t, int64(160)+16, offset)
+	require.Equal(t, int64(16), offset)
 	require.Equal(t, int64(8), m.spillSlotSize)
 	_, ok := m.spillSlots[id]
 	require.True(t, ok)
 
 	id = 100
 	offset = m.getVRegSpillSlotOffsetFromSP(id, 16)
-	require.Equal(t, int64(160)+16+8, offset)
+	require.Equal(t, int64(16+8), offset)
 	require.Equal(t, int64(24), m.spillSlotSize)
 	_, ok = m.spillSlots[id]
 	require.True(t, ok)

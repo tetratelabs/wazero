@@ -62,7 +62,6 @@ func TestRegAllocFunctionImpl_ReversePostOrderBlockIterator(t *testing.T) {
 
 func TestRegAllocFunctionImpl_ReloadRegisterAfter(t *testing.T) {
 	ctx, _, m := newSetupWithMockContext()
-	m.clobberedRegs = make([]regalloc.VReg, 3) // This will make the beginning of the spill slot at (3 + 1(frame size))* 16 bytes = 64.
 
 	ctx.typeOf = map[regalloc.VReg]ssa.Type{x1VReg: ssa.TypeI64, v1VReg: ssa.TypeF64}
 	i1, i2 := m.allocateNop(), m.allocateNop()
@@ -86,14 +85,13 @@ func TestRegAllocFunctionImpl_ReloadRegisterAfter(t *testing.T) {
 
 	m.rootInstr = i1
 	require.Equal(t, `
-	ldr d1, [sp, #0x48]
-	ldr x1, [sp, #0x40]
+	ldr d1, [sp, #0x18]
+	ldr x1, [sp, #0x10]
 `, m.Format())
 }
 
 func TestRegAllocFunctionImpl_StoreRegisterBefore(t *testing.T) {
 	ctx, _, m := newSetupWithMockContext()
-	m.clobberedRegs = make([]regalloc.VReg, 3) // This will make the beginning of the spill slot at (3 + 1(frame size))* 16 bytes = 64.
 
 	ctx.typeOf = map[regalloc.VReg]ssa.Type{x1VReg: ssa.TypeI64, v1VReg: ssa.TypeF64}
 	i1, i2 := m.allocateNop(), m.allocateNop()
@@ -117,8 +115,8 @@ func TestRegAllocFunctionImpl_StoreRegisterBefore(t *testing.T) {
 
 	m.rootInstr = i1
 	require.Equal(t, `
-	str x1, [sp, #0x40]
-	str d1, [sp, #0x48]
+	str x1, [sp, #0x10]
+	str d1, [sp, #0x18]
 `, m.Format())
 }
 
