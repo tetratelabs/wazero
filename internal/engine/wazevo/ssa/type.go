@@ -3,7 +3,7 @@ package ssa
 type Type byte
 
 const (
-	typeInvalid Type = 1 + iota
+	typeInvalid Type = iota
 
 	// TODO: add 8, 16 bit types when it's needed for optimizations.
 

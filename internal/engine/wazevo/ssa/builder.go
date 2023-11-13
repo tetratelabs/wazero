@@ -201,6 +201,7 @@ func (b *builder) ReturnBlock() BasicBlock {
 
 // Init implements Builder.Reset.
 func (b *builder) Init(s *Signature) {
+	b.nextVariable = 0
 	b.currentSignature = s
 	resetBasicBlock(b.returnBlk)
 	b.instructionsPool.Reset()
@@ -221,10 +222,6 @@ func (b *builder) Init(s *Signature) {
 		delete(b.blkVisited, blk)
 	}
 	b.basicBlocksPool.Reset()
-
-	for i := Variable(0); i < b.nextVariable; i++ {
-		b.variables[i] = typeInvalid
-	}
 
 	for v := ValueID(0); v < b.nextValueID; v++ {
 		delete(b.valueAnnotations, v)
