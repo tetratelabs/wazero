@@ -472,7 +472,15 @@ func TestMachine_collectAddends(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx, b, m := newSetupWithMockContext()
 			ptr, verify := tc.setup(ctx, b, m)
-			actual32s, actual64s, actualOffset := m.collectAddends(ptr)
+			actual32sQ, actual64sQ, actualOffset := m.collectAddends(ptr)
+			var actual32s []addend32
+			for !actual32sQ.isEmpty() {
+				actual32s = append(actual32s, actual32sQ.dequeue())
+			}
+			var actual64s []regalloc.VReg
+			for !actual64sQ.isEmpty() {
+				actual64s = append(actual64s, actual64sQ.dequeue())
+			}
 			require.Equal(t, tc.exp32s, actual32s)
 			require.Equal(t, tc.exp64s, actual64s)
 			require.Equal(t, tc.offset, actualOffset)
@@ -565,18 +573,6 @@ func TestMachine_addRegToReg64Ext(t *testing.T) {
 			require.Equal(t, rd, regalloc.VReg(nextVRegID).SetRegType(regalloc.RegTypeInt))
 		})
 	}
-}
-
-func Test_dequeue(t *testing.T) {
-	ints := []int{1, 2, 3}
-	one, intPopped := dequeue(ints)
-	require.Equal(t, 1, one)
-	require.Equal(t, []int{2, 3}, intPopped)
-
-	strs := []string{"a", "b", "c"}
-	a, strPopped := dequeue(strs)
-	require.Equal(t, "a", a)
-	require.Equal(t, []string{"b", "c"}, strPopped)
 }
 
 func TestMachine_lowerToAddressModeFromAddends(t *testing.T) {
@@ -823,7 +819,16 @@ func TestMachine_lowerToAddressModeFromAddends(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx, _, m := newSetupWithMockContext()
 			ctx.vRegCounter = int(nextVReg.ID()) - 1
-			actual := m.lowerToAddressModeFromAddends(tc.a32s, tc.a64s, tc.dstSizeInBits, tc.offset)
+
+			var a32s queue[addend32]
+			var a64s queue[regalloc.VReg]
+			for _, a32 := range tc.a32s {
+				a32s.enqueue(a32)
+			}
+			for _, a64 := range tc.a64s {
+				a64s.enqueue(a64)
+			}
+			actual := m.lowerToAddressModeFromAddends(&a32s, &a64s, tc.dstSizeInBits, tc.offset)
 			require.Equal(t, strings.Join(tc.insts, "\n"), formatEmittedInstructionsInCurrentBlock(m))
 			require.Equal(t, tc.exp, actual, actual.format(tc.dstSizeInBits))
 		})
