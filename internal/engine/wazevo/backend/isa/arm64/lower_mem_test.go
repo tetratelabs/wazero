@@ -473,16 +473,8 @@ func TestMachine_collectAddends(t *testing.T) {
 			ctx, b, m := newSetupWithMockContext()
 			ptr, verify := tc.setup(ctx, b, m)
 			actual32sQ, actual64sQ, actualOffset := m.collectAddends(ptr)
-			var actual32s []addend32
-			for !actual32sQ.isEmpty() {
-				actual32s = append(actual32s, actual32sQ.dequeue())
-			}
-			var actual64s []regalloc.VReg
-			for !actual64sQ.isEmpty() {
-				actual64s = append(actual64s, actual64sQ.dequeue())
-			}
-			require.Equal(t, tc.exp32s, actual32s)
-			require.Equal(t, tc.exp64s, actual64s)
+			require.Equal(t, tc.exp32s, actual32sQ.data)
+			require.Equal(t, tc.exp64s, actual64sQ.data)
 			require.Equal(t, tc.offset, actualOffset)
 			verify(t)
 		})
