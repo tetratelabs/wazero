@@ -13,9 +13,10 @@ import (
 	"reflect"
 	"runtime"
 	"strings"
-	"syscall"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/tetratelabs/wazero/experimental/sys"
 )
 
 // TestingT is an interface wrapper of functions used in TestingT
@@ -131,14 +132,14 @@ func Error(t TestingT, err error, formatWithArgs ...interface{}) {
 	}
 }
 
-// EqualErrno should be used for functions that return syscall.Errno or nil.
-func EqualErrno(t TestingT, expected syscall.Errno, err error, formatWithArgs ...interface{}) {
+// EqualErrno should be used for functions that return sys.Errno or nil.
+func EqualErrno(t TestingT, expected sys.Errno, err error, formatWithArgs ...interface{}) {
 	if err == nil {
-		fail(t, "expected a syscall.Errno, but was nil", "", formatWithArgs...)
+		fail(t, "expected a sys.Errno, but was nil", "", formatWithArgs...)
 		return
 	}
-	if se, ok := err.(syscall.Errno); !ok {
-		fail(t, fmt.Sprintf("expected %v to be a syscall.Errno", err), "", formatWithArgs...)
+	if se, ok := err.(sys.Errno); !ok {
+		fail(t, fmt.Sprintf("expected %v to be a sys.Errno", err), "", formatWithArgs...)
 	} else if se != expected {
 		fail(t, fmt.Sprintf("expected Errno %#[1]v(%[1]s), but was %#[2]v(%[2]s)", expected, err), "", formatWithArgs...)
 	}

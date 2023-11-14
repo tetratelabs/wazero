@@ -1,0 +1,2 @@
+no required module provides package github.com/ChainSafe/gossamer/lib/runtime/wazero; to add it:
+	go get github.com/ChainSafe/gossamer/lib/runtime/wazero

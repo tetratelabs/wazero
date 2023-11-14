@@ -80,7 +80,7 @@ func requireNoDiff(wasmBin []byte, checkMemory bool, requireNoError func(err err
 	// Choose the context to use for function calls.
 	ctx := context.Background()
 
-	compiler := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigCompiler())
+	compiler := wazero.NewRuntimeWithConfig(ctx, newCompilerConfig())
 	interpreter := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigInterpreter())
 	defer compiler.Close(ctx)
 	defer interpreter.Close(ctx)
@@ -122,6 +122,41 @@ func requireNoDiff(wasmBin []byte, checkMemory bool, requireNoError func(err err
 			if !bytes.Equal(compilerMem.Buffer, interpreterMem.Buffer) {
 				requireNoError(fmt.Errorf("memory state mimsmatch\ncompiler: %v\ninterpreter: %v",
 					compilerMem.Buffer, interpreterMem.Buffer))
+			}
+		}
+		ensureMutableGlobalsMatch(compilerMod, interpreterMod, requireNoError)
+	}
+}
+
+func ensureMutableGlobalsMatch(compilerMod, interpreterMod api.Module, requireNoError func(err error)) {
+	ci, ii := compilerMod.(*wasm.ModuleInstance), interpreterMod.(*wasm.ModuleInstance)
+	if len(ci.Globals) == 0 {
+		return
+	}
+	for i := range ci.Globals[:len(ci.Globals)-1] { // The last global is the fuel, so we can ignore it.
+		cg := ci.Globals[i]
+		ig := ii.Globals[i]
+		if !cg.Type.Mutable {
+			continue
+		}
+
+		var ok bool
+		switch ig.Type.ValType {
+		case wasm.ValueTypeI32, wasm.ValueTypeF32:
+			ok = uint32(cg.Val) == uint32(ig.Val)
+		case wasm.ValueTypeI64, wasm.ValueTypeF64:
+			ok = cg.Val == ig.Val
+		case wasm.ValueTypeV128:
+			ok = cg.Val == ig.Val && cg.ValHi == ig.ValHi
+		default:
+			ok = true // Ignore other types.
+		}
+
+		if !ok {
+			if ig.Type.ValType == wasm.ValueTypeV128 {
+				requireNoError(fmt.Errorf("mutable global[%d] value mismatch: (%v,%v) != (%v,%v)", i, cg.Val, cg.ValHi, ig.Val, ig.ValHi))
+			} else {
+				requireNoError(fmt.Errorf("mutable global[%d] value mismatch: %v != %v", i, cg.Val, ig.Val))
 			}
 		}
 	}
@@ -314,6 +349,12 @@ func ensureInvocationError(compilerErr, interpErr error) error {
 		interpErrMsg = interpErrMsg[:strings.Index(interpErrMsg, "\n")]
 	}
 
+	if strings.Contains(compilerErrMsg, "stack overflow") && strings.Contains(interpErrMsg, "unreachable") {
+		// Compiler is more likely to reach stack overflow than interpreter, so we allow this case. This case is most likely
+		// that interpreter reached the unreachable out of "fuel".
+		return nil
+	}
+
 	if compilerErrMsg != interpErrMsg {
 		return fmt.Errorf("error mismatch:\n\tinterpreter: %v\n\tcompiler: %v", interpErr, compilerErr)
 	}
@@ -338,10 +379,16 @@ func ensureInstantiationError(compilerErr, interpErr error) (okToInvoke bool, er
 		interpErrMsg = interpErrMsg[:strings.Index(interpErrMsg, "\n")]
 	}
 
+	if strings.Contains(compilerErrMsg, "stack overflow") && strings.Contains(interpErrMsg, "unreachable") {
+		// This is the case where the compiler reached stack overflow, but the interpreter reached the unreachable out of "fuel" during
+		// start function invocation. This is fine.
+		return false, nil
+	}
+
 	if !allowedErrorDuringInstantiation(compilerErrMsg) {
-		return false, fmt.Errorf("invalid error occur with compiler: %v", compilerErr)
+		return false, fmt.Errorf("invalid error occur with compiler: %v vs interpreter: %v", compilerErr, interpErr)
 	} else if !allowedErrorDuringInstantiation(interpErrMsg) {
-		return false, fmt.Errorf("invalid error occur with interpreter: %v", interpErrMsg)
+		return false, fmt.Errorf("invalid error occur with interpreter: %v vs compiler: %v", interpErr, compilerErr)
 	}
 
 	if compilerErrMsg != interpErrMsg {

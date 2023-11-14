@@ -4,35 +4,70 @@ import (
 	"os"
 	"path"
 	"runtime"
-	"syscall"
 	"testing"
 	"time"
 
-	"github.com/tetratelabs/wazero/internal/fsapi"
-	"github.com/tetratelabs/wazero/internal/platform"
+	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/tetratelabs/wazero/sys"
 )
 
 func TestStat(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	_, errno := stat(path.Join(tmpDir, "cat"))
-	require.EqualErrno(t, syscall.ENOENT, errno)
+	require.EqualErrno(t, experimentalsys.ENOENT, errno)
 	_, errno = stat(path.Join(tmpDir, "sub/cat"))
-	require.EqualErrno(t, syscall.ENOENT, errno)
+	require.EqualErrno(t, experimentalsys.ENOENT, errno)
 
-	var st fsapi.Stat_t
+	var st sys.Stat_t
 
-	t.Run("dir", func(t *testing.T) {
+	t.Run("empty dir", func(t *testing.T) {
 		st, errno = stat(tmpDir)
 		require.EqualErrno(t, 0, errno)
 
 		require.True(t, st.Mode.IsDir())
 		require.NotEqual(t, uint64(0), st.Ino)
+
+		// We expect one link: the directory itself
+		expectedNlink := uint64(1)
+		if dirNlinkIncludesDot {
+			expectedNlink++
+		}
+		require.Equal(t, expectedNlink, st.Nlink, runtime.GOOS)
 	})
 
+	subdir := path.Join(tmpDir, "sub")
+	var stSubdir sys.Stat_t
+	t.Run("subdir", func(t *testing.T) {
+		require.NoError(t, os.Mkdir(subdir, 0o500))
+
+		stSubdir, errno = stat(subdir)
+		require.EqualErrno(t, 0, errno)
+
+		require.True(t, stSubdir.Mode.IsDir())
+		require.NotEqual(t, uint64(0), st.Ino)
+	})
+
+	t.Run("not empty dir", func(t *testing.T) {
+		st, errno = stat(tmpDir)
+		require.EqualErrno(t, 0, errno)
+
+		// We expect two links: the directory itself and the subdir
+		expectedNlink := uint64(2)
+		if dirNlinkIncludesDot {
+			expectedNlink++
+		} else if runtime.GOOS == "windows" {
+			expectedNlink = 1 // directory count is not returned.
+		}
+		require.Equal(t, expectedNlink, st.Nlink, runtime.GOOS)
+	})
+
+	// TODO: Investigate why Nlink increases on BSD when a file is added, but
+	// not Linux.
+
 	file := path.Join(tmpDir, "file")
-	var stFile fsapi.Stat_t
+	var stFile sys.Stat_t
 
 	t.Run("file", func(t *testing.T) {
 		require.NoError(t, os.WriteFile(file, nil, 0o400))
@@ -54,18 +89,6 @@ func TestStat(t *testing.T) {
 		require.Equal(t, stFile, stLink) // resolves to the file
 	})
 
-	subdir := path.Join(tmpDir, "sub")
-	var stSubdir fsapi.Stat_t
-	t.Run("subdir", func(t *testing.T) {
-		require.NoError(t, os.Mkdir(subdir, 0o500))
-
-		stSubdir, errno = stat(subdir)
-		require.EqualErrno(t, 0, errno)
-
-		require.True(t, stSubdir.Mode.IsDir())
-		require.NotEqual(t, uint64(0), st.Ino)
-	})
-
 	t.Run("link to dir", func(t *testing.T) {
 		link := path.Join(tmpDir, "dir-link")
 		require.NoError(t, os.Symlink(subdir, link))
@@ -80,15 +103,14 @@ func TestStat(t *testing.T) {
 func TestStatFile(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	tmpDirF := requireOpenFile(t, tmpDir, syscall.O_RDONLY, 0)
+	tmpDirF := requireOpenFile(t, tmpDir, experimentalsys.O_RDONLY, 0)
 	defer tmpDirF.Close()
 
 	t.Run("dir", func(t *testing.T) {
 		st, errno := tmpDirF.Stat()
 		require.EqualErrno(t, 0, errno)
-
-		require.True(t, st.Mode.IsDir())
-		requireDirectoryDevIno(t, st)
+		requireDir(t, tmpDirF, st)
+		requireDevIno(t, tmpDirF, st)
 	})
 
 	// Windows allows you to stat a closed dir because it is accessed by path,
@@ -97,13 +119,13 @@ func TestStatFile(t *testing.T) {
 		t.Run("closed dir", func(t *testing.T) {
 			require.EqualErrno(t, 0, tmpDirF.Close())
 			_, errno := tmpDirF.Stat()
-			require.EqualErrno(t, syscall.EBADF, errno)
+			require.EqualErrno(t, experimentalsys.EBADF, errno)
 		})
 	}
 
 	file := path.Join(tmpDir, "file")
 	require.NoError(t, os.WriteFile(file, nil, 0o400))
-	fileF := requireOpenFile(t, file, syscall.O_RDONLY, 0)
+	fileF := requireOpenFile(t, file, experimentalsys.O_RDONLY, 0)
 	defer fileF.Close()
 
 	t.Run("file", func(t *testing.T) {
@@ -117,27 +139,26 @@ func TestStatFile(t *testing.T) {
 	t.Run("closed fsFile", func(t *testing.T) {
 		require.EqualErrno(t, 0, fileF.Close())
 		_, errno := fileF.Stat()
-		require.EqualErrno(t, syscall.EBADF, errno)
+		require.EqualErrno(t, experimentalsys.EBADF, errno)
 	})
 
 	subdir := path.Join(tmpDir, "sub")
 	require.NoError(t, os.Mkdir(subdir, 0o500))
-	subdirF := requireOpenFile(t, subdir, syscall.O_RDONLY, 0)
+	subdirF := requireOpenFile(t, subdir, experimentalsys.O_RDONLY, 0)
 	defer subdirF.Close()
 
 	t.Run("subdir", func(t *testing.T) {
 		st, errno := subdirF.Stat()
 		require.EqualErrno(t, 0, errno)
-
-		require.True(t, st.Mode.IsDir())
-		requireDirectoryDevIno(t, st)
+		requireDir(t, subdirF, st)
+		requireDevIno(t, subdirF, st)
 	})
 
 	if runtime.GOOS != "windows" { // windows allows you to stat a closed dir
 		t.Run("closed subdir", func(t *testing.T) {
 			require.EqualErrno(t, 0, subdirF.Close())
 			_, errno := subdirF.Stat()
-			require.EqualErrno(t, syscall.EBADF, errno)
+			require.EqualErrno(t, experimentalsys.EBADF, errno)
 		})
 	}
 }
@@ -181,7 +202,7 @@ func Test_StatFile_times(t *testing.T) {
 			err := os.Chtimes(file, time.UnixMicro(tc.atimeNsec/1e3), time.UnixMicro(tc.mtimeNsec/1e3))
 			require.NoError(t, err)
 
-			f := requireOpenFile(t, file, syscall.O_RDONLY, 0)
+			f := requireOpenFile(t, file, experimentalsys.O_RDONLY, 0)
 			defer f.Close()
 
 			st, errno := f.Stat()
@@ -195,38 +216,44 @@ func Test_StatFile_times(t *testing.T) {
 
 func TestStatFile_dev_inode(t *testing.T) {
 	tmpDir := t.TempDir()
-	d := requireOpenFile(t, tmpDir, os.O_RDONLY, 0)
+	d := requireOpenFile(t, tmpDir, experimentalsys.O_RDONLY, 0)
 	defer d.Close()
 
 	path1 := path.Join(tmpDir, "1")
-	f1 := requireOpenFile(t, path1, os.O_CREATE, 0o666)
+	f1 := requireOpenFile(t, path1, experimentalsys.O_CREAT, 0o666)
 	defer f1.Close()
 
 	path2 := path.Join(tmpDir, "2")
-	f2 := requireOpenFile(t, path2, os.O_CREATE, 0o666)
+	f2 := requireOpenFile(t, path2, experimentalsys.O_CREAT, 0o666)
 	defer f2.Close()
 
 	pathLink2 := path.Join(tmpDir, "link2")
 	err := os.Symlink(path2, pathLink2)
 	require.NoError(t, err)
-	l2 := requireOpenFile(t, pathLink2, os.O_RDONLY, 0)
+	l2 := requireOpenFile(t, pathLink2, experimentalsys.O_RDONLY, 0)
 	defer l2.Close()
 
 	// First, stat the directory
 	st1, errno := d.Stat()
 	require.EqualErrno(t, 0, errno)
-
-	requireDirectoryDevIno(t, st1)
+	requireDir(t, d, st1)
+	requireDevIno(t, d, st1)
 
 	// Now, stat the files in it
 	st1, errno = f1.Stat()
 	require.EqualErrno(t, 0, errno)
+	requireNotDir(t, f1, st1)
+	requireDevIno(t, f1, st1)
 
 	st2, errno := f2.Stat()
 	require.EqualErrno(t, 0, errno)
+	requireNotDir(t, f2, st2)
+	requireDevIno(t, f2, st2)
 
 	st3, errno := l2.Stat()
 	require.EqualErrno(t, 0, errno)
+	requireNotDir(t, l2, st3)
+	requireDevIno(t, l2, st3)
 
 	// The files should be on the same device, but different inodes
 	require.Equal(t, st1.Dev, st2.Dev)
@@ -245,8 +272,8 @@ func TestStatFile_dev_inode(t *testing.T) {
 	require.EqualErrno(t, 0, l2.Close())
 
 	// Renaming a file shouldn't change its inodes.
-	require.EqualErrno(t, 0, Rename(path1, path2))
-	f1 = requireOpenFile(t, path2, os.O_RDONLY, 0)
+	require.EqualErrno(t, 0, rename(path1, path2))
+	f1 = requireOpenFile(t, path2, experimentalsys.O_RDONLY, 0)
 	defer f1.Close()
 
 	st1Again, errno = f1.Stat()
@@ -255,71 +282,35 @@ func TestStatFile_dev_inode(t *testing.T) {
 	require.Equal(t, st1.Ino, st1Again.Ino)
 }
 
-func requireDirectoryDevIno(t *testing.T, st fsapi.Stat_t) {
-	// windows before go 1.20 has trouble reading the inode information on
-	// directories.
-	if runtime.GOOS != "windows" || platform.IsGo120 {
+func requireNotDir(t *testing.T, d experimentalsys.File, st sys.Stat_t) {
+	// Verify cached state is correct
+	isDir, errno := d.IsDir()
+	require.EqualErrno(t, 0, errno)
+	require.False(t, isDir)
+	require.False(t, st.Mode.IsDir())
+}
+
+func requireDir(t *testing.T, d experimentalsys.File, st sys.Stat_t) {
+	// Verify cached state is correct
+	isDir, errno := d.IsDir()
+	require.EqualErrno(t, 0, errno)
+	require.True(t, isDir)
+	require.True(t, st.Mode.IsDir())
+}
+
+func requireDevIno(t *testing.T, f experimentalsys.File, st sys.Stat_t) {
+	// Results are inconsistent, so don't validate the opposite.
+	if statSetsIno() {
 		require.NotEqual(t, uint64(0), st.Dev)
 		require.NotEqual(t, uint64(0), st.Ino)
-	} else {
-		require.Zero(t, st.Dev)
-		require.Zero(t, st.Ino)
-	}
-}
-
-// TestStat_uid_gid is similar to os.TestChown
-func TestStat_uid_gid(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("windows")
 	}
 
-	// We don't attempt changing the uid of a file, as only root can do that.
-	// Also, this isn't a test of chown. The main goal here is to read-back
-	// the uid, gid, both of which are zero if run as root.
-	uid := uint32(os.Getuid())
-	gid := uint32(os.Getgid())
-
-	t.Run("Stat", func(t *testing.T) {
-		tmpDir := t.TempDir()
-		dir := path.Join(tmpDir, "dir")
-		require.NoError(t, os.Mkdir(dir, 0o0777))
-		require.EqualErrno(t, 0, chgid(dir, gid))
-
-		st, errno := stat(dir)
-		require.EqualErrno(t, 0, errno)
-
-		require.Equal(t, uid, st.Uid)
-		require.Equal(t, gid, st.Gid)
-	})
-
-	t.Run("LStat", func(t *testing.T) {
-		tmpDir := t.TempDir()
-		link := path.Join(tmpDir, "link")
-		require.NoError(t, os.Symlink(tmpDir, link))
-		require.EqualErrno(t, 0, chgid(link, gid))
-
-		st, errno := lstat(link)
-		require.EqualErrno(t, 0, errno)
-
-		require.Equal(t, uid, st.Uid)
-		require.Equal(t, gid, st.Gid)
-	})
-
-	t.Run("statFile", func(t *testing.T) {
-		tmpDir := t.TempDir()
-		file := path.Join(tmpDir, "file")
-		require.NoError(t, os.WriteFile(file, nil, 0o0666))
-		require.EqualErrno(t, 0, chgid(file, gid))
-
-		st, errno := lstat(file)
-		require.EqualErrno(t, 0, errno)
-
-		require.Equal(t, uid, st.Uid)
-		require.Equal(t, gid, st.Gid)
-	})
-}
-
-func chgid(path string, gid uint32) error {
-	// Note: In Chown, -1 is means leave the uid alone
-	return Chown(path, -1, int(gid))
+	// Verify the special-cased properties supporting wasip2 "is_same_object"
+	// See https://github.com/WebAssembly/wasi-filesystem/pull/81
+	dev, errno := f.Dev()
+	require.EqualErrno(t, 0, errno)
+	require.Equal(t, st.Dev, dev)
+	ino, errno := f.Ino()
+	require.EqualErrno(t, 0, errno)
+	require.Equal(t, st.Ino, ino)
 }

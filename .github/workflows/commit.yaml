@@ -14,7 +14,7 @@ on:
       - 'netlify.toml'
 
 env:  # Update this prior to requiring a higher minor version in go.mod
-  GO_VERSION: "1.20"  # 1.xx == latest patch of 1.xx
+  GO_VERSION: "1.21"  # 1.xx == latest patch of 1.xx
 
 defaults:
   run:  # use bash for all operating systems unless overridden
@@ -39,8 +39,9 @@ jobs:
 
       - uses: actions/checkout@v3
 
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@v4
         with:  # not cache: true as we also need to cache golint
+          cache: false
           go-version: ${{ env.GO_VERSION }}
 
       - uses: actions/cache@v3
@@ -52,9 +53,9 @@ jobs:
             ~/go/bin
           key: check-${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum', 'Makefile') }}
 
-      - run: make check
-
       - run: make build.spectest
+
+      - run: make check
 
   test_amd64:
     name: amd64, ${{ matrix.os }}, Go-${{ matrix.go-version }}
@@ -64,17 +65,16 @@ jobs:
       matrix:  # Use versions consistent with wazero's Go support policy.
         os: [ubuntu-22.04, macos-12, windows-2022]
         go-version:
-          - "1.20"  # Current Go version
-          - "1.18"  # Floor Go version of wazero (current - 2)
+          - "1.21"  # Current Go version
+          - "1.19"  # Floor Go version of wazero (current - 2)
 
     steps:
 
       - uses: actions/checkout@v3
 
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@v4
         with:
           go-version: ${{ matrix.go-version }}
-          cache: true
 
       # Ensure the pagefile is large enough to execute tests like TestStore_hammer_close on Windows.
       - name: configure Pagefile
@@ -106,8 +106,8 @@ jobs:
       fail-fast: false  # don't fail fast as sometimes failures are arch/OS specific
       matrix:  # Use versions consistent with wazero's Go support policy.
         go-version:
-          - "1.20"  # Current Go version
-          - "1.18"  # Floor Go version of wazero (current - 2)
+          - "1.21"  # Current Go version
+          - "1.19"  # Floor Go version of wazero (current - 2)
         arch:
           - "amd64"
           - "arm64"
@@ -117,10 +117,9 @@ jobs:
 
       - uses: actions/checkout@v3
 
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@v4
         with:
           go-version: ${{ matrix.go-version }}
-          cache: true
 
       - name: Build test binaries
         # Exclude benchmarks as we don't run those in Docker
@@ -164,10 +163,9 @@ jobs:
 
       - uses: actions/checkout@v3
 
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
-          cache: true
 
       - run: make bench
 
@@ -179,10 +177,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
-          cache: true
 
       - uses: actions/cache@v3
         id: cache

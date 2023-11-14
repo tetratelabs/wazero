@@ -36,6 +36,16 @@ func validate(binaryPtr uintptr, binarySize int) {
 // Ensure that validation and compilation do not panic!
 func tryCompile(wasmBin []byte) {
 	ctx := context.Background()
-	compiler := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigCompiler())
-	_, _ = compiler.CompileModule(ctx, wasmBin)
+	r := wazero.NewRuntimeWithConfig(ctx, newCompilerConfig())
+	defer func() {
+		if err := r.Close(context.Background()); err != nil {
+			panic(err)
+		}
+	}()
+	compiled, err := r.CompileModule(ctx, wasmBin)
+	if err == nil {
+		if err := compiled.Close(context.Background()); err != nil {
+			panic(err)
+		}
+	}
 }

@@ -9,15 +9,15 @@ a `%.wasm` file compiled by Go.  This is similar to what is implemented in
 
 ## Example
 
-wazero includes an [example](example) that makes HTTP client requests.
+wazero includes an [example](example) that implements the `cat` utility.
 
 ## Experimental
 
 Go defines js "EXPERIMENTAL... exempt from the Go compatibility promise."
 Accordingly, wazero cannot guarantee this will work from release to release,
-or that usage will be relatively free of bugs. Moreover, [`GOOS=wasip1`][2] will be shipped
-in Go 1.21, and once that's available in two releases wazero will remove this
-package.
+or that usage will be relatively free of bugs. Moreover, [`GOOS=wasip1`][2]
+will be shipped in Go 1.21. wazero will remove this package after Go 1.22 is
+released.
 
 Due to these concerns and the relatively high implementation overhead, most
 will choose TinyGo instead of gojs.

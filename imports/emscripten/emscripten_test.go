@@ -370,6 +370,8 @@ func TestInstantiateForModule(t *testing.T) {
 			expectedResults: []uint64{42},
 			expectedLog: `--> .call_v_i32(0)
 	==> env.invoke_i(index=0)
+		--> .stackSave()
+		<-- 65536
 		--> .v_i32()
 		<-- 42
 	<== 42
@@ -384,6 +386,8 @@ func TestInstantiateForModule(t *testing.T) {
 			expectedResults: []uint64{42},
 			expectedLog: `--> .call_i32_i32(2,42)
 	==> env.invoke_ii(index=2,a1=42)
+		--> .stackSave()
+		<-- 65536
 		--> .i32_i32(42)
 		<-- 42
 	<== 42
@@ -398,6 +402,8 @@ func TestInstantiateForModule(t *testing.T) {
 			expectedResults: []uint64{3},
 			expectedLog: `--> .call_i32i32_i32(4,1,2)
 	==> env.invoke_iii(index=4,a1=1,a2=2)
+		--> .stackSave()
+		<-- 65536
 		--> .i32i32_i32(1,2)
 		<-- 3
 	<== 3
@@ -412,6 +418,8 @@ func TestInstantiateForModule(t *testing.T) {
 			expectedResults: []uint64{7},
 			expectedLog: `--> .call_i32i32i32_i32(6,1,2,4)
 	==> env.invoke_iiii(index=6,a1=1,a2=2,a3=4)
+		--> .stackSave()
+		<-- 65536
 		--> .i32i32i32_i32(1,2,4)
 		<-- 7
 	<== 7
@@ -426,6 +434,8 @@ func TestInstantiateForModule(t *testing.T) {
 			expectedResults: []uint64{15},
 			expectedLog: `--> .calli32_i32i32i32i32_i32(8,1,2,4,8)
 	==> env.invoke_iiiii(index=8,a1=1,a2=2,a3=4,a4=8)
+		--> .stackSave()
+		<-- 65536
 		--> .i32i32i32i32_i32(1,2,4,8)
 		<-- 15
 	<== 15
@@ -438,6 +448,8 @@ func TestInstantiateForModule(t *testing.T) {
 			tableOffset: 10,
 			expectedLog: `--> .call_v_v(10)
 	==> env.invoke_v(index=10)
+		--> .stackSave()
+		<-- 65536
 		--> .v_v()
 		<--
 	<==
@@ -451,6 +463,8 @@ func TestInstantiateForModule(t *testing.T) {
 			params:      []uint64{42},
 			expectedLog: `--> .call_i32_v(12,42)
 	==> env.invoke_vi(index=12,a1=42)
+		--> .stackSave()
+		<-- 65536
 		--> .i32_v(42)
 		<--
 	<==
@@ -464,6 +478,8 @@ func TestInstantiateForModule(t *testing.T) {
 			params:      []uint64{1, 2},
 			expectedLog: `--> .call_i32i32_v(14,1,2)
 	==> env.invoke_vii(index=14,a1=1,a2=2)
+		--> .stackSave()
+		<-- 65536
 		--> .i32i32_v(1,2)
 		<--
 	<==
@@ -477,6 +493,8 @@ func TestInstantiateForModule(t *testing.T) {
 			params:      []uint64{1, 2, 4},
 			expectedLog: `--> .call_i32i32i32_v(16,1,2,4)
 	==> env.invoke_viii(index=16,a1=1,a2=2,a3=4)
+		--> .stackSave()
+		<-- 65536
 		--> .i32i32i32_v(1,2,4)
 		<--
 	<==
@@ -490,7 +508,28 @@ func TestInstantiateForModule(t *testing.T) {
 			params:      []uint64{1, 2, 4, 8},
 			expectedLog: `--> .calli32_i32i32i32i32_v(18,1,2,4,8)
 	==> env.invoke_viiii(index=18,a1=1,a2=2,a3=4,a4=8)
+		--> .stackSave()
+		<-- 65536
 		--> .i32i32i32i32_v(1,2,4,8)
+		<--
+	<==
+<--
+`,
+		},
+		{
+			name:        "invoke_v_with_longjmp",
+			funcName:    "call_invoke_v_with_longjmp_throw",
+			tableOffset: 20,
+			params:      []uint64{},
+			expectedLog: `--> .call_invoke_v_with_longjmp_throw(20)
+	==> env.invoke_v(index=20)
+		--> .stackSave()
+		<-- 42
+		--> .call_longjmp_throw()
+			==> env._emscripten_throw_longjmp()
+		--> .stackRestore(42)
+		<--
+		--> .setThrew(1,0)
 		<--
 	<==
 <--

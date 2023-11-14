@@ -416,6 +416,13 @@ type mockModuleEngine struct {
 	callFailIndex        int
 	functionRefs         map[Index]Reference
 	resolveImportsCalled map[Index]Index
+	importedMemModEngine ModuleEngine
+	lookupEntries        map[Index]mockModuleEngineLookupEntry
+}
+
+type mockModuleEngineLookupEntry struct {
+	m     *ModuleInstance
+	index Index
 }
 
 type mockCallEngine struct {
@@ -439,8 +446,11 @@ func (e *mockEngine) CompileModule(context.Context, *Module, []experimental.Func
 }
 
 // LookupFunction implements the same method as documented on wasm.Engine.
-func (e *mockModuleEngine) LookupFunction(*TableInstance, FunctionTypeID, Index) (api.Function, error) {
-	return nil, nil
+func (e *mockModuleEngine) LookupFunction(_ *TableInstance, _ FunctionTypeID, offset Index) (*ModuleInstance, Index) {
+	if entry, ok := e.lookupEntries[offset]; ok {
+		return entry.m, entry.index
+	}
+	return nil, 0
 }
 
 // CompiledModuleCount implements the same method as documented on wasm.Engine.
@@ -457,6 +467,9 @@ func (e *mockEngine) NewModuleEngine(_ *Module, _ *ModuleInstance) (ModuleEngine
 	return &mockModuleEngine{callFailIndex: e.callFailIndex, resolveImportsCalled: map[Index]Index{}}, nil
 }
 
+// mockModuleEngine implements the same method as documented on wasm.ModuleEngine.
+func (e *mockModuleEngine) DoneInstantiation() {}
+
 // FunctionInstanceReference implements the same method as documented on wasm.ModuleEngine.
 func (e *mockModuleEngine) FunctionInstanceReference(i Index) Reference {
 	return e.functionRefs[i]
@@ -465,6 +478,11 @@ func (e *mockModuleEngine) FunctionInstanceReference(i Index) Reference {
 // ResolveImportedFunction implements the same method as documented on wasm.ModuleEngine.
 func (e *mockModuleEngine) ResolveImportedFunction(index, importedIndex Index, _ ModuleEngine) {
 	e.resolveImportsCalled[index] = importedIndex
+}
+
+// ResolveImportedMemory implements the same method as documented on wasm.ModuleEngine.
+func (e *mockModuleEngine) ResolveImportedMemory(imp ModuleEngine) {
+	e.importedMemModEngine = imp
 }
 
 // NewFunction implements the same method as documented on wasm.ModuleEngine.
@@ -809,14 +827,16 @@ func Test_resolveImports(t *testing.T) {
 			max := uint32(10)
 			memoryInst := &MemoryInstance{Max: max}
 			s := newStore()
+			importedME := &mockModuleEngine{}
 			s.nameToModule[moduleName] = &ModuleInstance{
 				MemoryInstance: memoryInst,
 				Exports: map[string]*Export{name: {
 					Type: ExternTypeMemory,
 				}},
 				ModuleName: moduleName,
+				Engine:     importedME,
 			}
-			m := &ModuleInstance{s: s}
+			m := &ModuleInstance{s: s, Engine: &mockModuleEngine{resolveImportsCalled: map[Index]Index{}}}
 			err := m.resolveImports(&Module{
 				ImportPerModule: map[string][]*Import{
 					moduleName: {{Module: moduleName, Name: name, Type: ExternTypeMemory, DescMem: &Memory{Max: max}}},
@@ -824,6 +844,7 @@ func Test_resolveImports(t *testing.T) {
 			})
 			require.NoError(t, err)
 			require.Equal(t, m.MemoryInstance, memoryInst)
+			require.Equal(t, importedME, m.Engine.(*mockModuleEngine).importedMemModEngine)
 		})
 		t.Run("minimum size mismatch", func(t *testing.T) {
 			importMemoryType := &Memory{Min: 2, Cap: 2}

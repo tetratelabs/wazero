@@ -1,7 +1,6 @@
 package interpreter
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"math"
@@ -9,9 +8,6 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/experimental"
-	"github.com/tetratelabs/wazero/experimental/logging"
-	"github.com/tetratelabs/wazero/internal/testing/enginetest"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
@@ -61,120 +57,6 @@ func TestInterpreter_CallEngine_PushFrame_StackOverflow(t *testing.T) {
 
 	captured := require.CapturePanic(func() { vm.pushFrame(f4) })
 	require.EqualError(t, captured, "stack overflow")
-}
-
-// et is used for tests defined in the enginetest package.
-var (
-	et              = &engineTester{}
-	functionLog     bytes.Buffer
-	listenerFactory = logging.NewLoggingListenerFactory(&functionLog)
-)
-
-// engineTester implements enginetest.EngineTester.
-type engineTester struct{}
-
-// ListenerFactory implements enginetest.EngineTester NewEngine.
-func (e engineTester) ListenerFactory() experimental.FunctionListenerFactory {
-	return listenerFactory
-}
-
-// NewEngine implements enginetest.EngineTester NewEngine.
-func (e engineTester) NewEngine(enabledFeatures api.CoreFeatures) wasm.Engine {
-	return NewEngine(context.Background(), enabledFeatures, nil)
-}
-
-func TestInterpreter_MemoryGrowInRecursiveCall(t *testing.T) {
-	defer functionLog.Reset()
-	enginetest.RunTestEngineMemoryGrowInRecursiveCall(t, et)
-}
-
-func TestInterpreter_Engine_NewModuleEngine(t *testing.T) {
-	enginetest.RunTestEngineNewModuleEngine(t, et)
-}
-
-func TestInterpreter_ModuleEngine_LookupFunction(t *testing.T) {
-	enginetest.RunTestModuleEngineLookupFunction(t, et)
-}
-
-func TestInterpreter_ModuleEngine_Call(t *testing.T) {
-	defer functionLog.Reset()
-	enginetest.RunTestModuleEngineCall(t, et)
-	require.Equal(t, `
---> .$0(1,2)
-<-- (1,2)
-`, "\n"+functionLog.String())
-}
-
-func TestCompiler_ModuleEngine_CallWithStack(t *testing.T) {
-	defer functionLog.Reset()
-	enginetest.RunTestModuleEngineCallWithStack(t, et)
-	require.Equal(t, `
---> .$0(1,2)
-<-- (1,2)
-`, "\n"+functionLog.String())
-}
-
-func TestInterpreter_ModuleEngine_Call_HostFn(t *testing.T) {
-	defer functionLog.Reset()
-	enginetest.RunTestModuleEngineCallHostFn(t, et)
-}
-
-func TestInterpreter_ModuleEngine_Call_Errors(t *testing.T) {
-	defer functionLog.Reset()
-	enginetest.RunTestModuleEngine_Call_Errors(t, et)
-
-	// TODO: Currently, the listener doesn't get notified on errors as they are
-	// implemented with panic. This means the end hooks aren't make resulting
-	// in dangling logs like this:
-	//	==> host.host_div_by(-1)
-	// instead of seeing a return like
-	//	<== DivByZero
-	require.Equal(t, `
---> imported.div_by.wasm(1)
-<-- 1
---> imported.div_by.wasm(1)
-<-- 1
---> imported.div_by.wasm(0)
---> imported.div_by.wasm(1)
-<-- 1
---> imported.call->div_by.go(-1)
-	==> host.div_by.go(-1)
---> imported.call->div_by.go(1)
-	==> host.div_by.go(1)
-	<== 1
-<-- 1
---> importing.call_import->call->div_by.go(0)
-	--> imported.call->div_by.go(0)
-		==> host.div_by.go(0)
---> importing.call_import->call->div_by.go(1)
-	--> imported.call->div_by.go(1)
-		==> host.div_by.go(1)
-		<== 1
-	<-- 1
-<-- 1
---> importing.call_import->call->div_by.go(-1)
-	--> imported.call->div_by.go(-1)
-		==> host.div_by.go(-1)
---> importing.call_import->call->div_by.go(1)
-	--> imported.call->div_by.go(1)
-		==> host.div_by.go(1)
-		<== 1
-	<-- 1
-<-- 1
---> importing.call_import->call->div_by.go(0)
-	--> imported.call->div_by.go(0)
-		==> host.div_by.go(0)
---> importing.call_import->call->div_by.go(1)
-	--> imported.call->div_by.go(1)
-		==> host.div_by.go(1)
-		<== 1
-	<-- 1
-<-- 1
-`, "\n"+functionLog.String())
-}
-
-func TestInterpreter_ModuleEngine_Memory(t *testing.T) {
-	enginetest.RunTestModuleEngineMemory(t, et)
 }
 
 func TestInterpreter_NonTrappingFloatToIntConversion(t *testing.T) {
@@ -494,7 +376,7 @@ func TestInterpreter_CallEngine_callNativeFunc_signExtend(t *testing.T) {
 
 func TestInterpreter_Compile(t *testing.T) {
 	t.Run("uncompiled", func(t *testing.T) {
-		e := et.NewEngine(api.CoreFeaturesV1).(*engine)
+		e := NewEngine(testCtx, api.CoreFeaturesV1, nil).(*engine)
 		_, err := e.NewModuleEngine(
 			&wasm.Module{},
 			nil, // functions
@@ -502,7 +384,7 @@ func TestInterpreter_Compile(t *testing.T) {
 		require.EqualError(t, err, "source module must be compiled before instantiation")
 	})
 	t.Run("fail", func(t *testing.T) {
-		e := et.NewEngine(api.CoreFeaturesV1).(*engine)
+		e := NewEngine(testCtx, api.CoreFeaturesV1, nil).(*engine)
 
 		errModule := &wasm.Module{
 			TypeSection:     []wasm.FunctionType{{}},
@@ -523,7 +405,7 @@ func TestInterpreter_Compile(t *testing.T) {
 		require.False(t, ok)
 	})
 	t.Run("ok", func(t *testing.T) {
-		e := et.NewEngine(api.CoreFeaturesV1).(*engine)
+		e := NewEngine(testCtx, api.CoreFeaturesV1, nil).(*engine)
 
 		okModule := &wasm.Module{
 			TypeSection:     []wasm.FunctionType{{}},
@@ -549,7 +431,7 @@ func TestInterpreter_Compile(t *testing.T) {
 }
 
 func TestEngine_CachedCompiledFunctionPerModule(t *testing.T) {
-	e := et.NewEngine(api.CoreFeaturesV1).(*engine)
+	e := NewEngine(testCtx, api.CoreFeaturesV1, nil).(*engine)
 	exp := []compiledFunction{
 		{body: []wazeroir.UnionOperation{}},
 		{body: []wazeroir.UnionOperation{}},
@@ -568,16 +450,4 @@ func TestEngine_CachedCompiledFunctionPerModule(t *testing.T) {
 	e.deleteCompiledFunctions(m)
 	_, ok = e.getCompiledFunctions(m)
 	require.False(t, ok)
-}
-
-func TestCompiler_BeforeListenerStackIterator(t *testing.T) {
-	enginetest.RunTestModuleEngineBeforeListenerStackIterator(t, et)
-}
-
-func TestCompiler_BeforeListenerStackIteratorSourceOffset(t *testing.T) {
-	enginetest.RunTestModuleEngineStackIteratorOffset(t, et)
-}
-
-func TestCompiler_BeforeListenerGlobals(t *testing.T) {
-	enginetest.RunTestModuleEngineBeforeListenerGlobals(t, et)
 }

@@ -822,7 +822,7 @@ func TestCompiler_callIndirect_largeTypeIndex(t *testing.T) {
 
 		makeExecutable(code1.Bytes())
 		f := function{
-			parent:             &compiledFunction{parent: &compiledModule{executable: code1}},
+			parent:             &compiledFunction{parent: &compiledCode{executable: code1}},
 			codeInitialAddress: uintptr(unsafe.Pointer(&code1.Bytes()[0])),
 			moduleInstance:     env.moduleInstance,
 		}
@@ -896,7 +896,7 @@ func TestCompiler_compileCall(t *testing.T) {
 
 		makeExecutable(code.Bytes())
 		me.functions = append(me.functions, function{
-			parent:             &compiledFunction{parent: &compiledModule{executable: code}},
+			parent:             &compiledFunction{parent: &compiledCode{executable: code}},
 			codeInitialAddress: uintptr(unsafe.Pointer(&code.Bytes()[0])),
 			moduleInstance:     env.moduleInstance,
 		})

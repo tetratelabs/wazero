@@ -2,6 +2,7 @@
 
 extern "C" {
     // require_no_diff is implemented in Go, and accepts the pointer to the binary and its size.
+    #[allow(dead_code)]
     pub fn require_no_diff(
         binary_ptr: *const u8,
         binary_size: usize,
@@ -11,5 +12,6 @@ extern "C" {
     );
 
     // validate is implemented in Go, and accepts the pointer to the binary and its size.
+    #[allow(dead_code)]
     pub fn validate(binary_ptr: *const u8, binary_size: usize);
 }

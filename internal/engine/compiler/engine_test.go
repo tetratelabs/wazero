@@ -1,7 +1,6 @@
 package compiler
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -11,151 +10,14 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
-	"github.com/tetratelabs/wazero/experimental/logging"
 	"github.com/tetratelabs/wazero/internal/bitpack"
 	"github.com/tetratelabs/wazero/internal/platform"
-	"github.com/tetratelabs/wazero/internal/testing/enginetest"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 // testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
 var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
-
-var (
-	// et is used for tests defined in the enginetest package.
-	et              = &engineTester{}
-	functionLog     bytes.Buffer
-	listenerFactory = logging.NewLoggingListenerFactory(&functionLog)
-)
-
-// engineTester implements enginetest.EngineTester.
-type engineTester struct{}
-
-// ListenerFactory implements the same method as documented on enginetest.EngineTester.
-func (e engineTester) ListenerFactory() experimental.FunctionListenerFactory {
-	return listenerFactory
-}
-
-// NewEngine implements the same method as documented on enginetest.EngineTester.
-func (e engineTester) NewEngine(enabledFeatures api.CoreFeatures) wasm.Engine {
-	return newEngine(enabledFeatures, nil)
-}
-
-func TestCompiler_Engine_NewModuleEngine(t *testing.T) {
-	defer functionLog.Reset()
-	requireSupportedOSArch(t)
-	enginetest.RunTestEngineNewModuleEngine(t, et)
-}
-
-func TestCompiler_MemoryGrowInRecursiveCall(t *testing.T) {
-	defer functionLog.Reset()
-	enginetest.RunTestEngineMemoryGrowInRecursiveCall(t, et)
-}
-
-func TestCompiler_ModuleEngine_LookupFunction(t *testing.T) {
-	defer functionLog.Reset()
-	enginetest.RunTestModuleEngineLookupFunction(t, et)
-}
-
-func TestCompiler_ModuleEngine_Call(t *testing.T) {
-	defer functionLog.Reset()
-	requireSupportedOSArch(t)
-	enginetest.RunTestModuleEngineCall(t, et)
-	require.Equal(t, `
---> .$0(1,2)
-<-- (1,2)
-`, "\n"+functionLog.String())
-}
-
-func TestCompiler_ModuleEngine_CallWithStack(t *testing.T) {
-	defer functionLog.Reset()
-	requireSupportedOSArch(t)
-	enginetest.RunTestModuleEngineCallWithStack(t, et)
-	require.Equal(t, `
---> .$0(1,2)
-<-- (1,2)
-`, "\n"+functionLog.String())
-}
-
-func TestCompiler_ModuleEngine_Call_HostFn(t *testing.T) {
-	defer functionLog.Reset()
-	requireSupportedOSArch(t)
-	enginetest.RunTestModuleEngineCallHostFn(t, et)
-}
-
-func TestCompiler_ModuleEngine_Call_Errors(t *testing.T) {
-	defer functionLog.Reset()
-	requireSupportedOSArch(t)
-	enginetest.RunTestModuleEngine_Call_Errors(t, et)
-
-	// TODO: Currently, the listener doesn't get notified on errors as they are
-	// implemented with panic. This means the end hooks aren't make resulting
-	// in dangling logs like this:
-	//	==> host.host_div_by(-1)
-	// instead of seeing a return like
-	//	<== DivByZero
-	require.Equal(t, `
---> imported.div_by.wasm(1)
-<-- 1
---> imported.div_by.wasm(1)
-<-- 1
---> imported.div_by.wasm(0)
---> imported.div_by.wasm(1)
-<-- 1
---> imported.call->div_by.go(-1)
-	==> host.div_by.go(-1)
---> imported.call->div_by.go(1)
-	==> host.div_by.go(1)
-	<== 1
-<-- 1
---> importing.call_import->call->div_by.go(0)
-	--> imported.call->div_by.go(0)
-		==> host.div_by.go(0)
---> importing.call_import->call->div_by.go(1)
-	--> imported.call->div_by.go(1)
-		==> host.div_by.go(1)
-		<== 1
-	<-- 1
-<-- 1
---> importing.call_import->call->div_by.go(-1)
-	--> imported.call->div_by.go(-1)
-		==> host.div_by.go(-1)
---> importing.call_import->call->div_by.go(1)
-	--> imported.call->div_by.go(1)
-		==> host.div_by.go(1)
-		<== 1
-	<-- 1
-<-- 1
---> importing.call_import->call->div_by.go(0)
-	--> imported.call->div_by.go(0)
-		==> host.div_by.go(0)
---> importing.call_import->call->div_by.go(1)
-	--> imported.call->div_by.go(1)
-		==> host.div_by.go(1)
-		<== 1
-	<-- 1
-<-- 1
-`, "\n"+functionLog.String())
-}
-
-func TestCompiler_ModuleEngine_Memory(t *testing.T) {
-	defer functionLog.Reset()
-	requireSupportedOSArch(t)
-	enginetest.RunTestModuleEngineMemory(t, et)
-}
-
-func TestCompiler_BeforeListenerStackIterator(t *testing.T) {
-	enginetest.RunTestModuleEngineBeforeListenerStackIterator(t, et)
-}
-
-func TestCompiler_BeforeListenerStackIteratorSourceOffset(t *testing.T) {
-	enginetest.RunTestModuleEngineStackIteratorOffset(t, et)
-}
-
-func TestCompiler_BeforeListenerGlobals(t *testing.T) {
-	enginetest.RunTestModuleEngineBeforeListenerGlobals(t, et)
-}
 
 // requireSupportedOSArch is duplicated also in the platform package to ensure no cyclic dependency.
 func requireSupportedOSArch(t *testing.T) {
@@ -176,7 +38,7 @@ func (f fakeFinalizer) setFinalizer(obj interface{}, finalizer interface{}) {
 
 func TestCompiler_CompileModule(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
-		e := et.NewEngine(api.CoreFeaturesV1).(*engine)
+		e := NewEngine(testCtx, api.CoreFeaturesV1, nil).(*engine)
 		ff := fakeFinalizer{}
 		e.setFinalizer = ff.setFinalizer
 
@@ -221,7 +83,7 @@ func TestCompiler_CompileModule(t *testing.T) {
 			ID: wasm.ModuleID{},
 		}
 
-		e := et.NewEngine(api.CoreFeaturesV1).(*engine)
+		e := NewEngine(testCtx, api.CoreFeaturesV1, nil).(*engine)
 		err := e.CompileModule(testCtx, errModule, nil, false)
 		require.EqualError(t, err, "failed to lower func[2]: handling instruction: apply stack failed for call: reading immediates: EOF")
 
@@ -234,7 +96,9 @@ func TestCompiler_CompileModule(t *testing.T) {
 func TestCompiler_Releasecode_Panic(t *testing.T) {
 	captured := require.CapturePanic(func() {
 		releaseCompiledModule(&compiledModule{
-			executable: makeCodeSegment(1, 2),
+			compiledCode: &compiledCode{
+				executable: makeCodeSegment(1, 2),
+			},
 		})
 	})
 	require.Contains(t, captured.Error(), "compiler: failed to munmap code segment")
@@ -393,15 +257,15 @@ func TestCallEngine_deferredOnCall(t *testing.T) {
 	}
 	f1 := &function{
 		funcType: &wasm.FunctionType{ParamNumInUint64: 2},
-		parent:   &compiledFunction{parent: &compiledModule{source: s}, index: 0},
+		parent:   &compiledFunction{parent: &compiledCode{source: s}, index: 0},
 	}
 	f2 := &function{
 		funcType: &wasm.FunctionType{ParamNumInUint64: 2, ResultNumInUint64: 3},
-		parent:   &compiledFunction{parent: &compiledModule{source: s}, index: 1},
+		parent:   &compiledFunction{parent: &compiledCode{source: s}, index: 1},
 	}
 	f3 := &function{
 		funcType: &wasm.FunctionType{ResultNumInUint64: 1},
-		parent:   &compiledFunction{parent: &compiledModule{source: s}, index: 2},
+		parent:   &compiledFunction{parent: &compiledCode{source: s}, index: 2},
 	}
 
 	ce := &callEngine{
@@ -573,14 +437,13 @@ func Test_callFrameOffset(t *testing.T) {
 }
 
 type stackEntry struct {
-	def  api.FunctionDefinition
-	args []uint64
+	def api.FunctionDefinition
 }
 
 func assertStackIterator(t *testing.T, it experimental.StackIterator, expected []stackEntry) {
 	var actual []stackEntry
 	for it.Next() {
-		actual = append(actual, stackEntry{def: it.Function().Definition(), args: it.Parameters()})
+		actual = append(actual, stackEntry{def: it.Function().Definition()})
 	}
 	require.Equal(t, expected, actual)
 }
@@ -595,11 +458,11 @@ func TestCallEngine_builtinFunctionFunctionListenerBefore(t *testing.T) {
 				before: func(ctx context.Context, _ api.Module, def api.FunctionDefinition, params []uint64, stackIterator experimental.StackIterator) {
 					require.Equal(t, currentContext, ctx)
 					require.Equal(t, []uint64{2, 3, 4}, params)
-					assertStackIterator(t, stackIterator, []stackEntry{{def: def, args: []uint64{2, 3, 4}}})
+					assertStackIterator(t, stackIterator, []stackEntry{{def: def}})
 				},
 			},
 			index: 0,
-			parent: &compiledModule{source: &wasm.Module{
+			parent: &compiledCode{source: &wasm.Module{
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []wasm.Code{{}},
 				TypeSection:     []wasm.FunctionType{{}},
@@ -625,7 +488,7 @@ func TestCallEngine_builtinFunctionFunctionListenerAfter(t *testing.T) {
 				},
 			},
 			index: 0,
-			parent: &compiledModule{source: &wasm.Module{
+			parent: &compiledCode{source: &wasm.Module{
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []wasm.Code{{}},
 				TypeSection:     []wasm.FunctionType{{}},

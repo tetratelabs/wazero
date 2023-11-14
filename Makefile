@@ -1,10 +1,10 @@
 
 gofumpt       := mvdan.cc/gofumpt@v0.5.0
 gosimports    := github.com/rinchsan/gosimports/cmd/gosimports@v0.3.8
-golangci_lint := github.com/golangci/golangci-lint/cmd/golangci-lint@v1.52.2
+golangci_lint := github.com/golangci/golangci-lint/cmd/golangci-lint@v1.53.3
 asmfmt        := github.com/klauspost/asmfmt/cmd/asmfmt@v1.3.2
 # sync this with netlify.toml!
-hugo          := github.com/gohugoio/hugo@v0.112.5
+hugo          := github.com/gohugoio/hugo@v0.115.2
 
 # Make 3.81 doesn't support '**' globbing: Set explicitly instead of recursion.
 all_sources   := $(wildcard *.go */*.go */*/*.go */*/*/*.go */*/*/*.go */*/*/*/*.go)
@@ -53,7 +53,7 @@ build.examples.as:
 build.examples.zig: examples/allocation/zig/testdata/greet.wasm imports/wasi_snapshot_preview1/example/testdata/zig/cat.wasm imports/wasi_snapshot_preview1/testdata/zig/wasi.wasm
 	@cd internal/testing/dwarftestdata/testdata/zig; zig build; mv zig-out/*/main.wasm ./ # Need DWARF custom sections.
 
-tinygo_sources := examples/basic/testdata/add.go examples/allocation/tinygo/testdata/greet.go examples/cli/testdata/cli.go imports/wasi_snapshot_preview1/example/testdata/tinygo/cat.go
+tinygo_sources := examples/basic/testdata/add.go examples/allocation/tinygo/testdata/greet.go examples/cli/testdata/cli.go imports/wasi_snapshot_preview1/example/testdata/tinygo/cat.go imports/wasi_snapshot_preview1/testdata/tinygo/wasi.go
 .PHONY: build.examples.tinygo
 build.examples.tinygo: $(tinygo_sources)
 	@for f in $^; do \
@@ -212,6 +212,14 @@ check:
 # This makes sure the intepreter can be used. Most often the package that can
 # drift here is "platform" or "sysfs":
 #
+# Ensure we build on plan9. See #1578
+	@GOARCH=amd64 GOOS=plan9 go build ./...
+# Ensure we build on gojs. See #1526.
+	@GOARCH=wasm GOOS=js go build ./...
+# Ensure we build on gojs. See #1526.
+	@GOARCH=wasm GOOS=wasip1 go build ./...
+# Ensure we build on aix. See #1723
+	@GOARCH=ppc64 GOOS=aix go build ./...
 # Ensure we build on windows:
 	@GOARCH=amd64 GOOS=windows go build ./...
 # Ensure we build on an arbitrary operating system:
@@ -250,9 +258,9 @@ clean: ## Ensure a clean build
 fuzz_timeout_seconds ?= 10
 .PHONY: fuzz
 fuzz:
-	@cd internal/integration_test/fuzz && cargo fuzz run basic -- -rss_limit_mb=8192 -max_total_time=$(fuzz_timeout_seconds)
-	@cd internal/integration_test/fuzz && cargo fuzz run memory_no_diff -- -rss_limit_mb=8192 -max_total_time=$(fuzz_timeout_seconds)
-	@cd internal/integration_test/fuzz && cargo fuzz run validation -- -rss_limit_mb=8192 -max_total_time=$(fuzz_timeout_seconds)
+	@cd internal/integration_test/fuzz && cargo fuzz run no_diff --sanitizer=none -- -rss_limit_mb=8192 -max_total_time=$(fuzz_timeout_seconds)
+	@cd internal/integration_test/fuzz && cargo fuzz run memory_no_diff --sanitizer=none -- -rss_limit_mb=8192 -max_total_time=$(fuzz_timeout_seconds)
+	@cd internal/integration_test/fuzz && cargo fuzz run validation --sanitizer=none -- -rss_limit_mb=8192 -max_total_time=$(fuzz_timeout_seconds)
 
 #### CLI release related ####
 

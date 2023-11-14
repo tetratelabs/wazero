@@ -3,7 +3,7 @@ package wazero
 import (
 	"testing"
 
-	"github.com/tetratelabs/wazero/internal/fsapi"
+	"github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/sysfs"
 	testfs "github.com/tetratelabs/wazero/internal/testing/fs"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -19,7 +19,7 @@ func TestFSConfig(t *testing.T) {
 	tests := []struct {
 		name               string
 		input              FSConfig
-		expectedFS         []fsapi.FS
+		expectedFS         []sys.FS
 		expectedGuestPaths []string
 	}{
 		{
@@ -29,13 +29,13 @@ func TestFSConfig(t *testing.T) {
 		{
 			name:               "WithFSMount",
 			input:              base.WithFSMount(testFS, "/"),
-			expectedFS:         []fsapi.FS{sysfs.Adapt(testFS)},
+			expectedFS:         []sys.FS{&sysfs.AdaptFS{FS: testFS}},
 			expectedGuestPaths: []string{"/"},
 		},
 		{
 			name:               "WithFSMount overwrites",
 			input:              base.WithFSMount(testFS, "/").WithFSMount(testFS2, "/"),
-			expectedFS:         []fsapi.FS{sysfs.Adapt(testFS2)},
+			expectedFS:         []sys.FS{&sysfs.AdaptFS{FS: testFS2}},
 			expectedGuestPaths: []string{"/"},
 		},
 		{
@@ -45,13 +45,13 @@ func TestFSConfig(t *testing.T) {
 		{
 			name:               "WithDirMount overwrites",
 			input:              base.WithFSMount(testFS, "/").WithDirMount(".", "/"),
-			expectedFS:         []fsapi.FS{sysfs.NewDirFS(".")},
+			expectedFS:         []sys.FS{sysfs.DirFS(".")},
 			expectedGuestPaths: []string{"/"},
 		},
 		{
 			name:               "multiple",
 			input:              base.WithReadOnlyDirMount(".", "/").WithDirMount("/tmp", "/tmp"),
-			expectedFS:         []fsapi.FS{sysfs.NewReadFS(sysfs.NewDirFS(".")), sysfs.NewDirFS("/tmp")},
+			expectedFS:         []sys.FS{&sysfs.ReadFS{FS: sysfs.DirFS(".")}, sysfs.DirFS("/tmp")},
 			expectedGuestPaths: []string{"/", "/tmp"},
 		},
 	}

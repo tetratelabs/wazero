@@ -17,8 +17,8 @@ on:
 
 env:
   EMSDK_VERSION: "3.1.40"
-  TINYGO_VERSION: "0.28.1"
-  ZIG_VERSION: "0.11.0-dev.3334+cd1417dbd"
+  TINYGO_VERSION: "0.30.0"
+  ZIG_VERSION: "0.11.0"
 
 concurrency:
   # https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#example-using-concurrency-to-cancel-any-in-progress-job-or-run
@@ -34,17 +34,16 @@ jobs:
     strategy:
       matrix:  # Use versions consistent with TinyGo.
         go-version:
-          - "1.20"  # Current Go version
-          - "1.18"  # Floor Go version of latest TinyGo
+          - "1.20"  # Latest Go version supported by TinyGo until its next version.
+          - "1.19"  # Floor Go version of latest TinyGo
 
     steps:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@v4
         with:
           go-version: ${{ matrix.go-version }}
-          cache: true
 
       - name: Install TinyGo
         run: |  # installing via curl so commands are similar on OS/x
@@ -56,7 +55,7 @@ jobs:
       - name: Install Zig
         run: |
           sudo apt install xz-utils
-          sudo sh -c 'wget -c https://ziglang.org/builds/zig-linux-x86_64-${{ env.ZIG_VERSION }}.tar.xz -O - | tar -xJ --strip-components=1 -C /usr/local/bin'
+          sudo sh -c 'wget -c https://ziglang.org/download/${{ env.ZIG_VERSION }}/zig-linux-x86_64-${{ env.ZIG_VERSION }}.tar.xz -O - | tar -xJ --strip-components=1 -C /usr/local/bin'
 
       - name: Cache Emscripten
         id: cache-emsdk

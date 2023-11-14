@@ -202,7 +202,7 @@ func (j *compilerEnv) callEngine() *callEngine {
 }
 
 func (j *compilerEnv) exec(machineCode []byte) {
-	cm := new(compiledModule)
+	cm := &compiledModule{compiledCode: &compiledCode{}}
 	if err := cm.executable.Map(len(machineCode)); err != nil {
 		panic(err)
 	}
@@ -211,7 +211,7 @@ func (j *compilerEnv) exec(machineCode []byte) {
 	makeExecutable(executable)
 
 	f := &function{
-		parent:             &compiledFunction{parent: cm},
+		parent:             &compiledFunction{parent: cm.compiledCode},
 		codeInitialAddress: uintptr(unsafe.Pointer(&executable[0])),
 		moduleInstance:     j.moduleInstance,
 	}
@@ -268,7 +268,7 @@ func newCompilerEnvironment() *compilerEnv {
 			Globals:        []*wasm.GlobalInstance{},
 			Engine:         me,
 		},
-		ce: me.newCallEngine(initialStackSize, &function{parent: &compiledFunction{parent: &compiledModule{}}}),
+		ce: me.newCallEngine(initialStackSize, &function{parent: &compiledFunction{parent: &compiledCode{}}}),
 	}
 }
 

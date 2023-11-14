@@ -8,32 +8,22 @@ import (
 // newJsGlobal = js.Global() // js.go init
 func newJsGlobal(config *config.Config) *jsVal {
 	var fetchProperty interface{} = goos.Undefined
-	uid, gid, euid := config.Uid, config.Gid, config.Euid
-	groups := config.Groups
 	proc := &processState{
 		cwd:   config.Workdir,
 		umask: config.Umask,
 	}
-	rt := config.Rt
-
-	if config.Rt != nil {
-		fetchProperty = goos.RefHttpFetch
-	}
 
 	return newJsVal(goos.RefValueGlobal, "global").
 		addProperties(map[string]interface{}{
-			"Object":          objectConstructor,
-			"Array":           arrayConstructor,
-			"crypto":          jsCrypto,
-			"Uint8Array":      uint8ArrayConstructor,
-			"fetch":           fetchProperty,
-			"AbortController": goos.Undefined,
-			"Headers":         headersConstructor,
-			"process":         newJsProcess(uid, gid, euid, groups, proc),
-			"fs":              newJsFs(proc),
-			"Date":            jsDateConstructor,
-		}).
-		addFunction("fetch", &httpFetch{rt})
+			"Object":     objectConstructor,
+			"Array":      arrayConstructor,
+			"crypto":     jsCrypto,
+			"Uint8Array": uint8ArrayConstructor,
+			"fetch":      fetchProperty,
+			"process":    newJsProcess(proc),
+			"fs":         newJsFs(proc),
+			"Date":       jsDateConstructor,
+		})
 }
 
 var (
@@ -51,7 +41,7 @@ var (
 	arrayConstructor = newJsVal(goos.RefArrayConstructor, "Array")
 
 	// uint8ArrayConstructor = js.Global().Get("Uint8Array")
-	//	// fs_js.go, rand_js.go, roundtrip_js.go init
+	//	// fs_js.go, rand_js.go init
 	//
 	// It has only one invocation pattern: `buf := uint8Array.New(len(b))`
 	uint8ArrayConstructor = newJsVal(goos.RefUint8ArrayConstructor, "Uint8Array")

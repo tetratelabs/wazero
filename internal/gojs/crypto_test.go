@@ -20,7 +20,7 @@ func Test_crypto(t *testing.T) {
 	stdout, stderr, err := compileAndRun(loggingCtx, "crypto", defaultConfig)
 
 	require.Zero(t, stderr)
-	require.EqualError(t, err, `module closed with exit_code(0)`)
+	require.NoError(t, err)
 	require.Equal(t, `7a0c9f9f0d
 `, stdout)
 	require.Equal(t, `==> go.runtime.getRandomData(r_len=32)
@@ -29,5 +29,5 @@ func Test_crypto(t *testing.T) {
 <==
 ==> go.syscall/js.valueCall(crypto.getRandomValues(r_len=5))
 <== (n=5)
-`, log.String())
+`, logString(log))
 }

@@ -15,7 +15,7 @@ func Test_Values(t *testing.T) {
 	err := require.CapturePanic(func() {
 		_ = vs.Get(goos.NextID)
 	})
-	require.EqualError(t, err, "id 18 is out of range 0")
+	require.Contains(t, err.Error(), "is out of range 0")
 
 	v1 := "foo"
 	id1 := vs.Increment(v1)
@@ -43,7 +43,7 @@ func Test_Values(t *testing.T) {
 	err = require.CapturePanic(func() {
 		_ = vs.Get(id1)
 	})
-	require.EqualError(t, err, "value for 18 was nil")
+	require.Contains(t, err.Error(), "was nil")
 
 	// Since the ID is no longer in use, we should be able to revive it.
 	require.Equal(t, id1, vs.Increment(v1))

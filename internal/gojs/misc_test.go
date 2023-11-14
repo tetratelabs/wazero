@@ -23,12 +23,12 @@ func Test_exit(t *testing.T) {
 
 	stdout, stderr, err := compileAndRun(loggingCtx, "exit", defaultConfig)
 
-	require.EqualError(t, err, `module closed with exit_code(255)`)
 	require.Zero(t, stderr)
+	require.EqualError(t, err, `module closed with exit_code(255)`)
 	require.Zero(t, stdout)
 	require.Equal(t, `==> go.runtime.wasmExit(code=255)
 <==
-`, log.String()) // Note: gojs doesn't panic on exit, so you see "<=="
+`, logString(log)) // Note: gojs doesn't panic on exit, so you see "<=="
 }
 
 func Test_goroutine(t *testing.T) {
@@ -36,8 +36,8 @@ func Test_goroutine(t *testing.T) {
 
 	stdout, stderr, err := compileAndRun(testCtx, "goroutine", defaultConfig)
 
-	require.EqualError(t, err, `module closed with exit_code(0)`)
 	require.Zero(t, stderr)
+	require.NoError(t, err)
 	require.Equal(t, `producer
 consumer
 `, stdout)
@@ -52,12 +52,12 @@ func Test_mem(t *testing.T) {
 
 	stdout, stderr, err := compileAndRun(loggingCtx, "mem", defaultConfig)
 
-	require.EqualError(t, err, `module closed with exit_code(0)`)
 	require.Zero(t, stderr)
+	require.NoError(t, err)
 	require.Zero(t, stdout)
 
 	// The memory view is reset at least once.
-	require.Contains(t, log.String(), `==> go.runtime.resetMemoryDataView()
+	require.Contains(t, logString(log), `==> go.runtime.resetMemoryDataView()
 <==
 `)
 }
@@ -71,7 +71,7 @@ func Test_stdio(t *testing.T) {
 	})
 
 	require.Equal(t, "stderr 6\n", stderr)
-	require.EqualError(t, err, `module closed with exit_code(0)`)
+	require.NoError(t, err)
 	require.Equal(t, "stdout 6\n", stdout)
 }
 
@@ -89,17 +89,13 @@ func Test_stdio_large(t *testing.T) {
 		return defaultConfig(moduleConfig.WithStdin(bytes.NewReader(input)))
 	})
 
-	require.EqualError(t, err, `module closed with exit_code(0)`)
+	require.NoError(t, err)
 	require.Equal(t, fmt.Sprintf("stderr %d\n", size), stderr)
 	require.Equal(t, fmt.Sprintf("stdout %d\n", size), stdout)
 
-	// We can't predict the precise ms the timeout event will be, so we partial match.
-	require.Contains(t, log.String(), `==> go.runtime.scheduleTimeoutEvent(ms=`)
-	require.Contains(t, log.String(), `<== (id=1)`)
-	// There may be another timeout event between the first and its clear.
-	require.Contains(t, log.String(), `==> go.runtime.clearTimeoutEvent(id=1)
-<==
-`)
+	// There's no guarantee of a timeout event (in Go 1.21 there isn't), so we
+	// don't verify this. gojs is in maintenance mode until it is removed after
+	// Go 1.22 is out.
 }
 
 func Test_gc(t *testing.T) {
@@ -107,7 +103,7 @@ func Test_gc(t *testing.T) {
 
 	stdout, stderr, err := compileAndRun(testCtx, "gc", defaultConfig)
 
-	require.EqualError(t, err, `module closed with exit_code(0)`)
+	require.NoError(t, err)
 	require.Equal(t, "", stderr)
 	require.Equal(t, "before gc\nafter gc\n", stdout)
 }

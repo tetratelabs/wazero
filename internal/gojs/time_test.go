@@ -19,20 +19,21 @@ func Test_time(t *testing.T) {
 
 	stdout, stderr, err := compileAndRun(loggingCtx, "time", defaultConfig)
 
-	require.EqualError(t, err, `module closed with exit_code(0)`)
 	require.Zero(t, stderr)
+	require.NoError(t, err)
 	require.Equal(t, `Local
 1ms
 `, stdout)
 
 	// To avoid multiple similar assertions, just check three functions we
 	// expect were called.
-	require.Contains(t, log.String(), `==> go.runtime.nanotime1()
+	logString := logString(log)
+	require.Contains(t, logString, `==> go.runtime.nanotime1()
 <== (nsec=0)`)
-	require.Contains(t, log.String(), `==> go.runtime.walltime()
+	require.Contains(t, logString, `==> go.runtime.walltime()
 <== (sec=1640995200,nsec=0)
 `)
-	require.Contains(t, log.String(), `==> go.syscall/js.valueCall(Date.getTimezoneOffset())
+	require.Contains(t, logString, `==> go.syscall/js.valueCall(Date.getTimezoneOffset())
 <== (tz=0)
 `)
 }

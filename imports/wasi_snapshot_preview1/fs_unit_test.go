@@ -2,10 +2,9 @@ package wasi_snapshot_preview1
 
 import (
 	"os"
-	"syscall"
 	"testing"
 
-	"github.com/tetratelabs/wazero/internal/fsapi"
+	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/fstest"
 	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/sysfs"
@@ -15,83 +14,83 @@ import (
 
 func Test_maxDirents(t *testing.T) {
 	tests := []struct {
-		name                        string
-		dirents                     []fsapi.Dirent
-		maxLen                      uint32
-		expectedCount               uint32
-		expectedwriteTruncatedEntry bool
-		expectedBufused             uint32
+		name                 string
+		dirents              []experimentalsys.Dirent
+		bufLen               uint32
+		expectedBufToWrite   uint32
+		expectedDirentCount  int
+		expectedTruncatedLen uint32
 	}{
 		{
 			name: "no entries",
 		},
 		{
-			name:                        "can't fit one",
-			dirents:                     testDirents,
-			maxLen:                      23,
-			expectedBufused:             23,
-			expectedwriteTruncatedEntry: false,
+			name:                 "can't fit one",
+			dirents:              testDirents,
+			bufLen:               23,
+			expectedBufToWrite:   23,
+			expectedDirentCount:  1,
+			expectedTruncatedLen: 23,
 		},
 		{
-			name:                        "only fits header",
-			dirents:                     testDirents,
-			maxLen:                      24,
-			expectedBufused:             24,
-			expectedwriteTruncatedEntry: true,
+			name:                 "only fits header",
+			dirents:              testDirents,
+			bufLen:               wasip1.DirentSize,
+			expectedBufToWrite:   wasip1.DirentSize,
+			expectedDirentCount:  1,
+			expectedTruncatedLen: wasip1.DirentSize,
 		},
 		{
-			name:            "one",
-			dirents:         testDirents,
-			maxLen:          25,
-			expectedCount:   1,
-			expectedBufused: 25,
+			name:                "one",
+			dirents:             testDirents,
+			bufLen:              25,
+			expectedBufToWrite:  25,
+			expectedDirentCount: 1,
 		},
 		{
-			name:                        "one but not room for two's name",
-			dirents:                     testDirents,
-			maxLen:                      25 + 25,
-			expectedCount:               1,
-			expectedwriteTruncatedEntry: true, // can write DirentSize
-			expectedBufused:             25 + 25,
+			name:                 "one but not room for two's name",
+			dirents:              testDirents,
+			bufLen:               25 + 25,
+			expectedBufToWrite:   25 + wasip1.DirentSize,
+			expectedDirentCount:  2,
+			expectedTruncatedLen: wasip1.DirentSize, // can write DirentSize
 		},
 		{
-			name:            "two",
-			dirents:         testDirents,
-			maxLen:          25 + 26,
-			expectedCount:   2,
-			expectedBufused: 25 + 26,
+			name:                "two",
+			dirents:             testDirents,
+			bufLen:              25 + 26,
+			expectedBufToWrite:  25 + 26,
+			expectedDirentCount: 2,
 		},
 		{
-			name:                        "two but not three's dirent",
-			dirents:                     testDirents,
-			maxLen:                      25 + 26 + 20,
-			expectedCount:               2,
-			expectedwriteTruncatedEntry: false, // 20 + 4 == DirentSize
-			expectedBufused:             25 + 26 + 20,
+			name:                 "two but not three's dirent",
+			dirents:              testDirents,
+			bufLen:               25 + 26 + 20,
+			expectedBufToWrite:   25 + 26 + 20,
+			expectedDirentCount:  3,
+			expectedTruncatedLen: 20, // 20 + 4 == DirentSize
 		},
 		{
-			name:                        "two but not three's name",
-			dirents:                     testDirents,
-			maxLen:                      25 + 26 + 26,
-			expectedCount:               2,
-			expectedwriteTruncatedEntry: true, // can write DirentSize
-			expectedBufused:             25 + 26 + 26,
+			name:                 "two but not three's name",
+			dirents:              testDirents,
+			bufLen:               25 + 26 + 25,
+			expectedBufToWrite:   25 + 26 + wasip1.DirentSize,
+			expectedDirentCount:  3,
+			expectedTruncatedLen: wasip1.DirentSize, // can write DirentSize
 		},
 		{
-			name:                        "three",
-			dirents:                     testDirents,
-			maxLen:                      25 + 26 + 27,
-			expectedCount:               3,
-			expectedwriteTruncatedEntry: false, // end of dir
-			expectedBufused:             25 + 26 + 27,
+			name:                "three",
+			dirents:             testDirents,
+			bufLen:              25 + 26 + 27,
+			expectedBufToWrite:  25 + 26 + 27,
+			expectedDirentCount: 3,
 		},
 		{
-			name:                        "max",
-			dirents:                     testDirents,
-			maxLen:                      100,
-			expectedCount:               3,
-			expectedwriteTruncatedEntry: false, // end of dir
-			expectedBufused:             25 + 26 + 27,
+			name:                "max",
+			dirents:             testDirents,
+			bufLen:              100,
+			expectedBufToWrite:  25 + 26 + 27,
+			expectedDirentCount: 3,
 		},
 	}
 
@@ -99,26 +98,18 @@ func Test_maxDirents(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			readdir, _ := sys.NewReaddir(
-				func() ([]fsapi.Dirent, syscall.Errno) {
-					return tc.dirents, 0
-				},
-				func(n uint64) ([]fsapi.Dirent, syscall.Errno) {
-					return nil, 0
-				},
-			)
-			_, bufused, direntCount, writeTruncatedEntry := maxDirents(readdir, tc.maxLen)
-			require.Equal(t, tc.expectedCount, direntCount)
-			require.Equal(t, tc.expectedwriteTruncatedEntry, writeTruncatedEntry)
-			require.Equal(t, tc.expectedBufused, bufused)
+			bufToWrite, direntCount, truncatedLen := maxDirents(tc.dirents, tc.bufLen)
+			require.Equal(t, tc.expectedBufToWrite, bufToWrite)
+			require.Equal(t, tc.expectedDirentCount, direntCount)
+			require.Equal(t, tc.expectedTruncatedLen, truncatedLen)
 		})
 	}
 }
 
 var (
-	testDirents = func() []fsapi.Dirent {
+	testDirents = func() []experimentalsys.Dirent {
 		dPath := "dir"
-		d, errno := sysfs.OpenFSFile(fstest.FS, dPath, syscall.O_RDONLY, 0)
+		d, errno := sysfs.OpenFSFile(fstest.FS, dPath, experimentalsys.O_RDONLY, 0)
 		if errno != 0 {
 			panic(errno)
 		}
@@ -155,40 +146,47 @@ var (
 
 func Test_writeDirents(t *testing.T) {
 	tests := []struct {
-		name                string
-		entries             []fsapi.Dirent
-		entryCount          uint32
-		writeTruncatedEntry bool
-		expectedEntriesBuf  []byte
+		name         string
+		dirents      []experimentalsys.Dirent
+		entryCount   int
+		truncatedLen uint32
+		expected     []byte
 	}{
 		{
 			name:    "none",
-			entries: testDirents,
+			dirents: testDirents,
 		},
 		{
-			name:               "one",
-			entries:            testDirents,
-			entryCount:         1,
-			expectedEntriesBuf: dirent1,
+			name:       "one",
+			dirents:    testDirents,
+			entryCount: 1,
+			expected:   dirent1,
 		},
 		{
-			name:               "two",
-			entries:            testDirents,
-			entryCount:         2,
-			expectedEntriesBuf: append(dirent1, dirent2...),
+			name:       "two",
+			dirents:    testDirents,
+			entryCount: 2,
+			expected:   append(dirent1, dirent2...),
 		},
 		{
-			name:                "two with truncated",
-			entries:             testDirents,
-			entryCount:          2,
-			writeTruncatedEntry: true,
-			expectedEntriesBuf:  append(append(dirent1, dirent2...), dirent3[0:10]...),
+			name:         "two with truncated dirent",
+			dirents:      testDirents,
+			entryCount:   3,
+			truncatedLen: wasip1.DirentSize,
+			expected:     append(append(dirent1, dirent2...), dirent3[:wasip1.DirentSize]...),
 		},
 		{
-			name:               "three",
-			entries:            testDirents,
-			entryCount:         3,
-			expectedEntriesBuf: append(append(dirent1, dirent2...), dirent3...),
+			name:         "two with truncated smaller than dirent",
+			dirents:      testDirents,
+			entryCount:   3,
+			truncatedLen: 5,
+			expected:     append(append(dirent1, dirent2...), 0, 0, 0, 0, 0),
+		},
+		{
+			name:       "three",
+			dirents:    testDirents,
+			entryCount: 3,
+			expected:   append(append(dirent1, dirent2...), dirent3...),
 		},
 	}
 
@@ -196,10 +194,10 @@ func Test_writeDirents(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			cookie := uint64(1)
-			entriesBuf := make([]byte, len(tc.expectedEntriesBuf))
-			writeDirents(tc.entries, tc.entryCount, tc.writeTruncatedEntry, entriesBuf, cookie)
-			require.Equal(t, tc.expectedEntriesBuf, entriesBuf)
+			d_next := uint64(1)
+			buf := make([]byte, len(tc.expected))
+			writeDirents(buf, tc.dirents, d_next, tc.entryCount, tc.truncatedLen)
+			require.Equal(t, tc.expected, buf)
 		})
 	}
 }
@@ -209,61 +207,61 @@ func Test_openFlags(t *testing.T) {
 		name                      string
 		dirflags, oflags, fdflags uint16
 		rights                    uint32
-		expectedOpenFlags         int
+		expectedOpenFlags         experimentalsys.Oflag
 	}{
 		{
 			name:              "oflags=0",
-			expectedOpenFlags: fsapi.O_NOFOLLOW | syscall.O_RDONLY,
+			expectedOpenFlags: experimentalsys.O_NOFOLLOW | experimentalsys.O_RDONLY,
 		},
 		{
 			name:              "oflags=O_CREAT",
 			oflags:            wasip1.O_CREAT,
-			expectedOpenFlags: fsapi.O_NOFOLLOW | syscall.O_RDWR | syscall.O_CREAT,
+			expectedOpenFlags: experimentalsys.O_NOFOLLOW | experimentalsys.O_RDWR | experimentalsys.O_CREAT,
 		},
 		{
 			name:              "oflags=O_DIRECTORY",
 			oflags:            wasip1.O_DIRECTORY,
-			expectedOpenFlags: fsapi.O_NOFOLLOW | fsapi.O_DIRECTORY,
+			expectedOpenFlags: experimentalsys.O_NOFOLLOW | experimentalsys.O_DIRECTORY,
 		},
 		{
 			name:              "oflags=O_EXCL",
 			oflags:            wasip1.O_EXCL,
-			expectedOpenFlags: fsapi.O_NOFOLLOW | syscall.O_RDONLY | syscall.O_EXCL,
+			expectedOpenFlags: experimentalsys.O_NOFOLLOW | experimentalsys.O_RDONLY | experimentalsys.O_EXCL,
 		},
 		{
 			name:              "oflags=O_TRUNC",
 			oflags:            wasip1.O_TRUNC,
-			expectedOpenFlags: fsapi.O_NOFOLLOW | syscall.O_RDWR | syscall.O_TRUNC,
+			expectedOpenFlags: experimentalsys.O_NOFOLLOW | experimentalsys.O_RDWR | experimentalsys.O_TRUNC,
 		},
 		{
 			name:              "fdflags=FD_APPEND",
 			fdflags:           wasip1.FD_APPEND,
-			expectedOpenFlags: fsapi.O_NOFOLLOW | syscall.O_RDWR | syscall.O_APPEND,
+			expectedOpenFlags: experimentalsys.O_NOFOLLOW | experimentalsys.O_RDWR | experimentalsys.O_APPEND,
 		},
 		{
 			name:              "oflags=O_TRUNC|O_CREAT",
 			oflags:            wasip1.O_TRUNC | wasip1.O_CREAT,
-			expectedOpenFlags: fsapi.O_NOFOLLOW | syscall.O_RDWR | syscall.O_TRUNC | syscall.O_CREAT,
+			expectedOpenFlags: experimentalsys.O_NOFOLLOW | experimentalsys.O_RDWR | experimentalsys.O_TRUNC | experimentalsys.O_CREAT,
 		},
 		{
 			name:              "dirflags=LOOKUP_SYMLINK_FOLLOW",
 			dirflags:          wasip1.LOOKUP_SYMLINK_FOLLOW,
-			expectedOpenFlags: syscall.O_RDONLY,
+			expectedOpenFlags: experimentalsys.O_RDONLY,
 		},
 		{
 			name:              "rights=FD_READ",
 			rights:            wasip1.RIGHT_FD_READ,
-			expectedOpenFlags: fsapi.O_NOFOLLOW | syscall.O_RDONLY,
+			expectedOpenFlags: experimentalsys.O_NOFOLLOW | experimentalsys.O_RDONLY,
 		},
 		{
 			name:              "rights=FD_WRITE",
 			rights:            wasip1.RIGHT_FD_WRITE,
-			expectedOpenFlags: fsapi.O_NOFOLLOW | syscall.O_WRONLY,
+			expectedOpenFlags: experimentalsys.O_NOFOLLOW | experimentalsys.O_WRONLY,
 		},
 		{
 			name:              "rights=FD_READ|FD_WRITE",
 			rights:            wasip1.RIGHT_FD_READ | wasip1.RIGHT_FD_WRITE,
-			expectedOpenFlags: fsapi.O_NOFOLLOW | syscall.O_RDWR,
+			expectedOpenFlags: experimentalsys.O_NOFOLLOW | experimentalsys.O_RDWR,
 		},
 	}
 

@@ -5,25 +5,25 @@ import (
 	"io/fs"
 	"os"
 	"path"
-	"syscall"
 	"testing"
+	"time"
+
+	"github.com/tetratelabs/wazero/experimental/sys"
 )
 
 func BenchmarkFsFileUtimesNs(b *testing.B) {
-	f, errno := OpenOSFile(path.Join(b.TempDir(), "file"), syscall.O_CREAT, 0)
+	f, errno := OpenOSFile(path.Join(b.TempDir(), "file"), sys.O_CREAT, 0)
 	if errno != 0 {
 		b.Fatal(errno)
 	}
 	defer f.Close()
 
-	times := &[2]syscall.Timespec{
-		{Sec: 123, Nsec: 4 * 1e3},
-		{Sec: 123, Nsec: 4 * 1e3},
-	}
+	atim := int64(123*time.Second + 4*time.Microsecond)
+	mtim := atim
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if errno := f.Utimens(times); errno != 0 {
+		if errno := f.Utimens(atim, mtim); errno != 0 {
 			b.Fatal(errno)
 		}
 	}
@@ -54,7 +54,7 @@ func BenchmarkFsFileRead(b *testing.B) {
 
 		b.Run(bc.name, func(b *testing.B) {
 			name := "wazero.txt"
-			f, errno := OpenFSFile(bc.fs, name, syscall.O_RDONLY, 0)
+			f, errno := OpenFSFile(bc.fs, name, sys.O_RDONLY, 0)
 			if errno != 0 {
 				b.Fatal(errno)
 			}
@@ -65,7 +65,7 @@ func BenchmarkFsFileRead(b *testing.B) {
 				b.StopTimer()
 
 				var n int
-				var errno syscall.Errno
+				var errno sys.Errno
 
 				// Reset the read position back to the beginning of the file.
 				if _, errno = f.Seek(0, io.SeekStart); errno != 0 {

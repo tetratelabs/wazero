@@ -7,13 +7,13 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/tetratelabs/wazero/internal/fsapi"
+	"github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/platform"
 )
 
-func openFile(path string, flag int, perm fs.FileMode) (*os.File, syscall.Errno) {
-	isDir := flag&fsapi.O_DIRECTORY > 0
-	flag &= ^(fsapi.O_DIRECTORY | fsapi.O_NOFOLLOW) // erase placeholders
+func openFile(path string, oflag sys.Oflag, perm fs.FileMode) (*os.File, sys.Errno) {
+	isDir := oflag&sys.O_DIRECTORY > 0
+	flag := toOsOpenFlag(oflag)
 
 	// TODO: document why we are opening twice
 	fd, err := open(path, flag|syscall.O_CLOEXEC, uint32(perm))
@@ -23,35 +23,49 @@ func openFile(path string, flag int, perm fs.FileMode) (*os.File, syscall.Errno)
 
 	// TODO: Set FILE_SHARE_DELETE for directory as well.
 	f, err := os.OpenFile(path, flag, perm)
-	errno := platform.UnwrapOSError(err)
+	errno := sys.UnwrapOSError(err)
 	if errno == 0 {
 		return f, 0
 	}
 
 	switch errno {
-	case syscall.EINVAL:
+	case sys.EINVAL:
 		// WASI expects ENOTDIR for a file path with a trailing slash.
 		if strings.HasSuffix(path, "/") {
-			errno = syscall.ENOTDIR
+			errno = sys.ENOTDIR
 		}
 	// To match expectations of WASI, e.g. TinyGo TestStatBadDir, return
 	// ENOENT, not ENOTDIR.
-	case syscall.ENOTDIR:
-		errno = syscall.ENOENT
-	case syscall.ENOENT:
+	case sys.ENOTDIR:
+		errno = sys.ENOENT
+	case sys.ENOENT:
 		if isSymlink(path) {
 			// Either symlink or hard link not found. We change the returned
 			// errno depending on if it is symlink or not to have consistent
 			// behavior across OSes.
 			if isDir {
 				// Dangling symlink dir must raise ENOTDIR.
-				errno = syscall.ENOTDIR
+				errno = sys.ENOTDIR
 			} else {
-				errno = syscall.ELOOP
+				errno = sys.ELOOP
 			}
 		}
 	}
 	return f, errno
+}
+
+const supportedSyscallOflag = sys.O_NONBLOCK
+
+// Map to synthetic values here https://github.com/golang/go/blob/go1.20/src/syscall/types_windows.go#L34-L48
+func withSyscallOflag(oflag sys.Oflag, flag int) int {
+	// O_DIRECTORY not defined in windows
+	// O_DSYNC not defined in windows
+	// O_NOFOLLOW not defined in windows
+	if oflag&sys.O_NONBLOCK != 0 {
+		flag |= syscall.O_NONBLOCK
+	}
+	// O_RSYNC not defined in windows
+	return flag
 }
 
 func isSymlink(path string) bool {
@@ -136,7 +150,7 @@ func open(path string, mode int, perm uint32) (fd syscall.Handle, err error) {
 		}
 	}
 
-	if platform.IsGo120 {
+	if platform.IsAtLeastGo120 {
 		// This shouldn't be included before 1.20 to have consistent behavior.
 		// https://github.com/golang/go/commit/0f0aa5d8a6a0253627d58b3aa083b24a1091933f
 		if createmode == syscall.OPEN_EXISTING && access == syscall.GENERIC_READ {

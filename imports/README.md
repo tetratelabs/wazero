@@ -35,5 +35,5 @@ module in the compiled `%.wasm` file. To support any of these, wazero users can
 invoke `wasi_snapshot_preview1.Instantiate` on their `wazero.Runtime`.
 
 Other times, host imports are either completely compiler-specific, such as the
-case with `GOARCH=wasm GOOS=js`, or coexist alongside WASI, such as the case
+case with `GOOS=js GOARCH=wasm`, or coexist alongside WASI, such as the case
 with Emscripten.

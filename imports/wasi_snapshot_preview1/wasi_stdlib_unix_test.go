@@ -1,4 +1,4 @@
-//go:build unix || linux || darwin
+//go:build unix
 
 package wasi_snapshot_preview1_test
 

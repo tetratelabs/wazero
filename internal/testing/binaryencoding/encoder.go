@@ -1,6 +1,7 @@
 package binaryencoding
 
 import (
+	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -44,6 +45,9 @@ func EncodeModule(m *wasm.Module) (bytes []byte) {
 	if m.SectionElementCount(wasm.SectionIDData) > 0 {
 		bytes = append(bytes, encodeDataSection(m.DataSection)...)
 	}
+	if dc := m.DataCountSection; dc != nil {
+		bytes = append(bytes, encodeSection(wasm.SectionIDDataCount, leb128.EncodeUint32(*dc))...)
+	}
 	if m.SectionElementCount(wasm.SectionIDCustom) > 0 {
 		// >> The name section should appear only once in a module, and only after the data section.
 		// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-namesec
@@ -51,6 +55,15 @@ func EncodeModule(m *wasm.Module) (bytes []byte) {
 			nameSection := append(sizePrefixedName, EncodeNameSectionData(m.NameSection)...)
 			bytes = append(bytes, encodeSection(wasm.SectionIDCustom, nameSection)...)
 		}
+		for _, custom := range m.CustomSections {
+			bytes = append(bytes, encodeCustomSection(custom)...)
+		}
 	}
 	return
+}
+
+func encodeCustomSection(c *wasm.CustomSection) []byte {
+	content := append(leb128.EncodeUint32(uint32(len(c.Name))), c.Name...)
+	content = append(content, c.Data...)
+	return encodeSection(wasm.SectionIDCustom, content)
 }

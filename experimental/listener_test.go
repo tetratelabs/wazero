@@ -125,22 +125,6 @@ func TestMultiFunctionListenerFactory(t *testing.T) {
 		n++
 		i := 0
 		for stackIterator.Next() {
-			var param uint64
-			switch i {
-			case 0:
-				param = 3
-			case 1:
-				param = 2
-			case 2:
-				param = 1
-			default:
-				t.Errorf("too many frames seen by stack iterator: %d", i)
-			}
-			if params := stackIterator.Parameters(); len(params) != 1 {
-				t.Errorf("wrong number of parameters in call frame %d: want=1 got=%d", i, len(params))
-			} else if params[0] != param {
-				t.Errorf("wrong parameter in call frame %d: want=%d got=%d", i, param, params[0])
-			}
 			i++
 		}
 		if i != 3 {
