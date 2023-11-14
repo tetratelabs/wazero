@@ -1108,15 +1108,9 @@ func (m *machine) lowerVMinMaxPseudo(instr *ssa.Instruction, max bool) {
 
 	rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
 	rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
-	creg := m.getOperand_NR(m.compiler.ValueDefinition(instr.Return()), extModeNone)
-	tmp := operandNR(m.compiler.AllocateVReg(ssa.TypeV128))
 
-	// creg is overwritten by BSL, so we need to move it to the result register before the instruction
-	// in case when it is used somewhere else.
-	rd := m.compiler.VRegOf(instr.Return())
-	mov := m.allocateInstr()
-	mov.asFpuMov128(tmp.nr(), creg.nr())
-	m.insert(mov)
+	// TODO: this usage of tmp is weird - it should be fine directly using rd. (seems a bug in regalloc).
+	tmp := operandNR(m.compiler.AllocateVReg(ssa.TypeV128))
 
 	fcmgt := m.allocateInstr()
 	if max {
@@ -1131,8 +1125,9 @@ func (m *machine) lowerVMinMaxPseudo(instr *ssa.Instruction, max bool) {
 	bsl.asVecRRR(vecOpBsl, tmp, rm, rn, vecArrangement16B)
 	m.insert(bsl)
 
+	res := operandNR(m.compiler.VRegOf(instr.Return()))
 	mov2 := m.allocateInstr()
-	mov2.asFpuMov128(rd, tmp.nr())
+	mov2.asFpuMov128(res.nr(), tmp.nr())
 	m.insert(mov2)
 }
 
