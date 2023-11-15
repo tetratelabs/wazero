@@ -42,6 +42,7 @@ const (
 	defKindNone defKind = iota + 1
 	defKindRD
 	defKindCall
+	defKindVecRRR
 )
 
 var defKinds = [numInstructionKinds]defKind{
@@ -111,7 +112,7 @@ var defKinds = [numInstructionKinds]defKind{
 	vecTbl:               defKindRD,
 	vecTbl2:              defKindRD,
 	vecPermute:           defKindRD,
-	vecRRR:               defKindRD,
+	vecRRR:               defKindVecRRR,
 	fpuToInt:             defKindRD,
 	intToFpu:             defKindRD,
 	cCmpImm:              defKindNone,
@@ -129,6 +130,10 @@ func (i *instruction) defs(regs []regalloc.VReg) []regalloc.VReg {
 		regs = append(regs, i.rd.nr())
 	case defKindCall:
 		regs = append(regs, i.abi.retRealRegs...)
+	case defKindVecRRR:
+		if vecOp(i.u1) != vecOpBsl {
+			regs = append(regs, i.rd.nr())
+		}
 	default:
 		panic(fmt.Sprintf("defKind for %v not defined", i))
 	}
@@ -142,6 +147,8 @@ func (i *instruction) assignDef(reg regalloc.VReg) {
 		i.rd = i.rd.assignReg(reg)
 	case defKindCall:
 		panic("BUG: call instructions shouldn't be assigned")
+	case defKindVecRRR:
+		i.rd = i.rd.assignReg(reg)
 	default:
 		panic(fmt.Sprintf("defKind for %v not defined", i))
 	}
@@ -161,6 +168,7 @@ const (
 	useKindAMode
 	useKindRNAMode
 	useKindCond
+	useKindVecRRR
 )
 
 var useKinds = [numInstructionKinds]useKind{
@@ -229,7 +237,7 @@ var useKinds = [numInstructionKinds]useKind{
 	vecShiftImm:          useKindRN,
 	vecTbl:               useKindRNRM,
 	vecTbl2:              useKindRNRN1RM,
-	vecRRR:               useKindRNRM,
+	vecRRR:               useKindVecRRR,
 	vecPermute:           useKindRNRM,
 	fpuToInt:             useKindRN,
 	intToFpu:             useKindRN,
@@ -300,6 +308,16 @@ func (i *instruction) uses(regs []regalloc.VReg) []regalloc.VReg {
 	case useKindCallInd:
 		regs = append(regs, i.rn.nr())
 		regs = append(regs, i.abi.argRealRegs...)
+	case useKindVecRRR:
+		if rn := i.rn.reg(); rn.Valid() {
+			regs = append(regs, rn)
+		}
+		if rm := i.rm.reg(); rm.Valid() {
+			regs = append(regs, rm)
+		}
+		if vecOp(i.u1) == vecOpBsl {
+			regs = append(regs, i.rd.reg())
+		}
 	default:
 		panic(fmt.Sprintf("useKind for %v not defined", i))
 	}
@@ -321,6 +339,20 @@ func (i *instruction) assignUse(index int, reg regalloc.VReg) {
 		} else {
 			if rm := i.rm.reg(); rm.Valid() {
 				i.rm = i.rm.assignReg(reg)
+			}
+		}
+	case useKindVecRRR:
+		if index == 0 {
+			if rn := i.rn.reg(); rn.Valid() {
+				i.rn = i.rn.assignReg(reg)
+			}
+		} else if index == 1 {
+			if rm := i.rm.reg(); rm.Valid() {
+				i.rm = i.rm.assignReg(reg)
+			}
+		} else {
+			if rd := i.rd.reg(); rd.Valid() {
+				i.rd = i.rd.assignReg(reg)
 			}
 		}
 	case useKindRNRN1RM:
