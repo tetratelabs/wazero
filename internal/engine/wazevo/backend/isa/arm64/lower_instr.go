@@ -1906,18 +1906,22 @@ func (m *machine) lowerSelect(c, x, y, result ssa.Value) {
 }
 
 func (m *machine) lowerSelectVec(rc, rn, rm, rd operand) {
-	// First we clear the unnecessary bits of rc by ANDing it with 1.
-	one := m.compiler.AllocateVReg(ssa.TypeI32)
-	m.lowerConstantI32(one, 1)
+	// First, we copy the condition to a temporary register in case rc is used somewhere else.
+	tmp := m.compiler.AllocateVReg(ssa.TypeI32)
+	mov := m.allocateInstr()
+	mov.asFpuMov128(tmp, rc.nr())
+	m.insert(mov)
+
+	// Next is to clear the unnecessary bits of rc by ANDing it with 1, and store it to a temporary register.
+	oneOrZero := m.compiler.AllocateVReg(ssa.TypeI32)
 	and := m.allocateInstr()
-	oneOrZero := operandNR(m.compiler.AllocateVReg(ssa.TypeI32))
-	and.asALU(aluOpAnd, oneOrZero, rc, operandNR(one), false)
+	and.asALUBitmaskImm(aluOpAnd, oneOrZero, tmp, 1, false)
 	m.insert(and)
 
 	// Sets all bits to 1 if rc is not zero.
 	allOneOrZero := operandNR(m.compiler.AllocateVReg(ssa.TypeI64))
 	alu := m.allocateInstr()
-	alu.asALU(aluOpSub, allOneOrZero, operandNR(xzrVReg), oneOrZero, true)
+	alu.asALU(aluOpSub, allOneOrZero, operandNR(xzrVReg), operandNR(oneOrZero), true)
 	m.insert(alu)
 
 	// Then move the bits to the result vector register.
