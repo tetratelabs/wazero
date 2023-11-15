@@ -1909,7 +1909,7 @@ func (m *machine) lowerSelectVec(rc, rn, rm, rd operand) {
 	// First, we copy the condition to a temporary register in case rc is used somewhere else.
 	tmp := m.compiler.AllocateVReg(ssa.TypeI32)
 	mov := m.allocateInstr()
-	mov.asFpuMov128(tmp, rc.nr())
+	mov.asMove32(tmp, rc.nr())
 	m.insert(mov)
 
 	// Next is to clear the unnecessary bits of rc by ANDing it with 1, and store it to a temporary register.
