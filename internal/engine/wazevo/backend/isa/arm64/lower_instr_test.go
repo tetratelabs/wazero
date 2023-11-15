@@ -853,8 +853,8 @@ func TestMachine_lowerSelectVec(t *testing.T) {
 
 	m.lowerSelectVec(c, rn, rm, rd)
 	require.Equal(t, `
-orr w5?, wzr, #0x1
-and w6?, w1?, w5?
+mov v5?.16b, v1?.16b
+and w6?, w5?, #0x1
 sub x7?, xzr, x6?
 dup v4?.2d, x7?
 bsl v4?.16b, v2?.16b, v3?.16b
