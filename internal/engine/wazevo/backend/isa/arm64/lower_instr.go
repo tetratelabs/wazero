@@ -809,7 +809,7 @@ func (m *machine) lowerVcheckTrue(op ssa.Opcode, rm, rd operand, arr vecArrangem
 		m.insert(fcmp)
 
 		cset := m.allocateInstr()
-		cset.asCSet(rd.nr(), eq)
+		cset.asCSet(rd.nr(), false, eq)
 		m.insert(cset)
 
 		return
@@ -840,7 +840,7 @@ func (m *machine) lowerVcheckTrue(op ssa.Opcode, rm, rd operand, arr vecArrangem
 	m.insert(fc)
 
 	cset := m.allocateInstr()
-	cset.asCSet(rd.nr(), ne)
+	cset.asCSet(rd.nr(), false, ne)
 	m.insert(cset)
 }
 
@@ -1438,7 +1438,7 @@ func (m *machine) lowerIcmp(si *ssa.Instruction) {
 	m.insert(alu)
 
 	cset := m.allocateInstr()
-	cset.asCSet(m.compiler.VRegOf(si.Return()), flag)
+	cset.asCSet(m.compiler.VRegOf(si.Return()), false, flag)
 	m.insert(cset)
 }
 
@@ -1654,7 +1654,7 @@ func (m *machine) lowerFcmp(x, y, result ssa.Value, c ssa.FloatCmpCond) {
 	m.insert(fc)
 
 	cset := m.allocateInstr()
-	cset.asCSet(m.compiler.VRegOf(result), condFlagFromSSAFloatCmpCond(c))
+	cset.asCSet(m.compiler.VRegOf(result), false, condFlagFromSSAFloatCmpCond(c))
 	m.insert(cset)
 }
 
@@ -1906,27 +1906,20 @@ func (m *machine) lowerSelect(c, x, y, result ssa.Value) {
 }
 
 func (m *machine) lowerSelectVec(rc, rn, rm, rd operand) {
-	// First, we copy the condition to a temporary register in case rc is used somewhere else.
-	tmp := m.compiler.AllocateVReg(ssa.TypeI32)
-	mov := m.allocateInstr()
-	mov.asMove32(tmp, rc.nr())
-	m.insert(mov)
+	// First check if `rc` is zero or not.
+	checkZero := m.allocateInstr()
+	checkZero.asALU(aluOpSubS, operandNR(xzrVReg), rc, operandNR(xzrVReg), false)
+	m.insert(checkZero)
 
-	// Next is to clear the unnecessary bits of rc by ANDing it with 1, and store it to a temporary register.
-	oneOrZero := m.compiler.AllocateVReg(ssa.TypeI32)
-	and := m.allocateInstr()
-	and.asALUBitmaskImm(aluOpAnd, oneOrZero, tmp, 1, false)
-	m.insert(and)
-
-	// Sets all bits to 1 if rc is not zero.
-	allOneOrZero := operandNR(m.compiler.AllocateVReg(ssa.TypeI64))
-	alu := m.allocateInstr()
-	alu.asALU(aluOpSub, allOneOrZero, operandNR(xzrVReg), operandNR(oneOrZero), true)
-	m.insert(alu)
+	// Then use CSETM to set all bits to one if `rc` is zero.
+	allOnesOrZero := m.compiler.AllocateVReg(ssa.TypeI64)
+	cset := m.allocateInstr()
+	cset.asCSet(allOnesOrZero, true, ne)
+	m.insert(cset)
 
 	// Then move the bits to the result vector register.
 	dup := m.allocateInstr()
-	dup.asVecDup(rd, allOneOrZero, vecArrangement2D)
+	dup.asVecDup(rd, operandNR(allOnesOrZero), vecArrangement2D)
 	m.insert(dup)
 
 	// Now that `rd` has either all bits one or zero depending on `rc`,

@@ -586,10 +586,13 @@ func (i *instruction) asVecLoad1R(rd, rn operand, arr vecArrangement) {
 	i.u1 = uint64(arr)
 }
 
-func (i *instruction) asCSet(rd regalloc.VReg, c condFlag) {
+func (i *instruction) asCSet(rd regalloc.VReg, mask bool, c condFlag) {
 	i.kind = cSet
 	i.rd = operandNR(rd)
 	i.u1 = uint64(c)
+	if mask {
+		i.u2 = 1
+	}
 }
 
 func (i *instruction) asCSel(rd, rn, rm operand, c condFlag, _64bit bool) {
@@ -1092,7 +1095,11 @@ func (i *instruction) String() (str string) {
 			condFlag(i.u1),
 		)
 	case cSet:
-		str = fmt.Sprintf("cset %s, %s", formatVRegSized(i.rd.nr(), 64), condFlag(i.u1))
+		if i.u2 != 0 {
+			str = fmt.Sprintf("csetm %s, %s", formatVRegSized(i.rd.nr(), 64), condFlag(i.u1))
+		} else {
+			str = fmt.Sprintf("cset %s, %s", formatVRegSized(i.rd.nr(), 64), condFlag(i.u1))
+		}
 	case cCmpImm:
 		size := is64SizeBitToSize(i.u3)
 		str = fmt.Sprintf("ccmp %s, #%#x, #%#x, %s",

@@ -214,9 +214,15 @@ func (i *instruction) encode(c backend.Compiler) {
 	case cSet:
 		rd := regNumberInEncoding[i.rd.realReg()]
 		cf := condFlag(i.u1)
-		// https://developer.arm.com/documentation/ddi0602/2022-06/Base-Instructions/CSET--Conditional-Set--an-alias-of-CSINC-
-		// Note that we set 64bit version here.
-		c.Emit4Bytes(0b1001101010011111<<16 | uint32(cf.invert())<<12 | 0b111111<<5 | rd)
+		if i.u2 == 1 {
+			// https://developer.arm.com/documentation/ddi0602/2022-03/Base-Instructions/CSETM--Conditional-Set-Mask--an-alias-of-CSINV-
+			// Note that we set 64bit version here.
+			c.Emit4Bytes(0b1101101010011111<<16 | uint32(cf.invert())<<12 | 0b011111<<5 | rd)
+		} else {
+			// https://developer.arm.com/documentation/ddi0602/2022-06/Base-Instructions/CSET--Conditional-Set--an-alias-of-CSINC-
+			// Note that we set 64bit version here.
+			c.Emit4Bytes(0b1001101010011111<<16 | uint32(cf.invert())<<12 | 0b111111<<5 | rd)
+		}
 	case extend:
 		c.Emit4Bytes(encodeExtend(i.u3 == 1, byte(i.u1), byte(i.u2), regNumberInEncoding[i.rd.realReg()], regNumberInEncoding[i.rn.realReg()]))
 	case fpuCmp:
