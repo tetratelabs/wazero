@@ -358,7 +358,7 @@ func (m *machine) lowerCall(si *ssa.Instruction) {
 	} else {
 		indirectCalleePtr, sigID, args = si.CallIndirectData()
 	}
-	calleeABI := m.getOrCreateABIImpl(m.compiler.ResolveSignature(sigID))
+	calleeABI := m.getOrCreateABIImpl(m.compiler.SSABuilder().ResolveSignature(sigID))
 
 	stackSlotSize := calleeABI.alignedArgResultStackSlotSize()
 	if m.maxRequiredStackSizeForCalls < stackSlotSize+16 {

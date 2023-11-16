@@ -41,6 +41,14 @@ type (
 	}
 )
 
+func (m *mockFunction) LowestCommonAncestor(blk1, blk2 Block) Block { panic("TODO") }
+
+func (m *mockFunction) Idom(blk Block) Block { panic("TODO") }
+
+func (m *mockFunction) SwapAtEndOfBlock(x1, x2, tmp VReg, block Block) { panic("TODO") }
+
+func (m *mockFunction) InsertMoveBefore(dst, src VReg, instr Instr) { panic("TODO") }
+
 func newMockFunction(blocks ...*mockBlock) *mockFunction {
 	return &mockFunction{blocks: blocks}
 }
@@ -113,12 +121,12 @@ func (m *mockInstr) asCopy() *mockInstr {
 	return m
 }
 
-func (m *mockInstr) asCall() *mockInstr {
+func (m *mockInstr) asCall() *mockInstr { //nolint:unused
 	m.isCall = true
 	return m
 }
 
-func (m *mockInstr) asIndirectCall() *mockInstr {
+func (m *mockInstr) asIndirectCall() *mockInstr { //nolint:unused
 	m.isIndirect = true
 	return m
 }
@@ -234,7 +242,10 @@ func (m *mockBlock) Preds() int {
 }
 
 // BlockParams implements Block.
-func (m *mockBlock) BlockParams() []VReg { return m.blockParams }
+func (m *mockBlock) BlockParams(ret *[]VReg) []VReg {
+	*ret = append((*ret)[:0], m.blockParams...)
+	return *ret
+}
 
 func (m *mockBlock) blockParam(v VReg) {
 	m.blockParams = append(m.blockParams, v)
@@ -244,13 +255,15 @@ func (m *mockBlock) blockParam(v VReg) {
 func (m *mockBlock) Pred(i int) Block { return m._preds[i] }
 
 // Defs implements Instr.
-func (m *mockInstr) Defs() []VReg {
-	return m.defs
+func (m *mockInstr) Defs(ret *[]VReg) []VReg {
+	*ret = append((*ret)[:0], m.defs...)
+	return *ret
 }
 
 // Uses implements Instr.
-func (m *mockInstr) Uses() []VReg {
-	return m.uses
+func (m *mockInstr) Uses(ret *[]VReg) []VReg {
+	*ret = append((*ret)[:0], m.uses...)
+	return *ret
 }
 
 // IsCopy implements Instr.
@@ -313,4 +326,12 @@ func (m *mockBlock) LoopNestingForestChildren() int {
 
 func (m *mockBlock) LoopNestingForestChild(i int) Block {
 	return m.lnfChildren[i]
+}
+
+func (m *mockBlock) LastInstr() Instr {
+	return m.instructions[len(m.instructions)-1]
+}
+
+func (m *mockBlock) FirstInstr() Instr {
+	return m.instructions[0]
 }

@@ -124,6 +124,12 @@ type Builder interface {
 
 	// LoopNestingForestRoots returns the roots of the loop nesting forest.
 	LoopNestingForestRoots() []BasicBlock
+
+	// LowestCommonAncestor returns the lowest common ancestor in the dominator tree of the given BasicBlock(s).
+	LowestCommonAncestor(blk1, blk2 BasicBlock) BasicBlock
+
+	// Idom returns the immediate dominator of the given BasicBlock.
+	Idom(blk BasicBlock) BasicBlock
 }
 
 // NewBuilder returns a new Builder implementation.
@@ -169,6 +175,7 @@ type builder struct {
 	// dominators stores the immediate dominator of each BasicBlock.
 	// The index is blockID of the BasicBlock.
 	dominators []*basicBlock
+	sparseTree dominatorSparseTree
 
 	// loopNestingForestRoots are the roots of the loop nesting forest.
 	loopNestingForestRoots []BasicBlock
@@ -309,6 +316,11 @@ func (b *builder) allocateBasicBlock() *basicBlock {
 	blk.lastDefinitions = make(map[Variable]Value)
 	blk.unknownValues = make(map[Variable]Value)
 	return blk
+}
+
+// Idom implements Builder.Idom.
+func (b *builder) Idom(blk BasicBlock) BasicBlock {
+	return b.dominators[blk.ID()]
 }
 
 // InsertInstruction implements Builder.InsertInstruction.
@@ -845,6 +857,7 @@ func (b *builder) LayoutBlocks() {
 
 	// Critical edges are split, so we fix the loop nesting forest.
 	buildLoopNestingForest(b)
+	buildDominatorTree(b)
 
 	// Reuse the stack for the next iteration.
 	b.blkStack2 = uninsertedTrampolines[:0]
@@ -1045,4 +1058,9 @@ func (b *builder) InsertUndefined() {
 // LoopNestingForestRoots implements Builder.LoopNestingForestRoots.
 func (b *builder) LoopNestingForestRoots() []BasicBlock {
 	return b.loopNestingForestRoots
+}
+
+// LowestCommonAncestor implements Builder.LowestCommonAncestor.
+func (b *builder) LowestCommonAncestor(blk1, blk2 BasicBlock) BasicBlock {
+	return b.sparseTree.findLCA(blk1.ID(), blk2.ID())
 }

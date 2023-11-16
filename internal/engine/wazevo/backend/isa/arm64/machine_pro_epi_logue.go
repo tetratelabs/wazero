@@ -194,7 +194,7 @@ func (m *machine) SetupEpilogue() {
 
 		// Removes the redundant copy instruction.
 		// TODO: doing this in `SetupEpilogue` seems weird. Find a better home.
-		if cur.isCopy() && cur.rn.realReg() == cur.rd.realReg() {
+		if cur.IsCopy() && cur.rn.realReg() == cur.rd.realReg() {
 			prev, next := cur.prev, cur.next
 			// Remove the copy instruction.
 			prev.next = next

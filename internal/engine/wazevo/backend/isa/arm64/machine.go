@@ -250,6 +250,7 @@ func resetLabelPosition(l *labelPosition) {
 	*l = labelPosition{}
 }
 
+// FlushPendingInstructions implements backend.Machine.
 func (m *machine) FlushPendingInstructions() {
 	l := len(m.pendingInstructions)
 	if l == 0 {

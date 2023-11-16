@@ -36,13 +36,27 @@ type (
 	instructionKind int
 )
 
+// IsCall implements regalloc.Instr IsCall.
+func (i *instruction) IsCall() bool {
+	return i.kind == call
+}
+
+// IsIndirectCall implements regalloc.Instr IsIndirectCall.
+func (i *instruction) IsIndirectCall() bool {
+	return i.kind == callInd
+}
+
+// IsReturn implements regalloc.Instr IsReturn.
+func (i *instruction) IsReturn() bool {
+	return i.kind == ret
+}
+
 type defKind byte
 
 const (
 	defKindNone defKind = iota + 1
 	defKindRD
 	defKindCall
-	defKindVecRRR
 )
 
 var defKinds = [numInstructionKinds]defKind{
@@ -112,7 +126,8 @@ var defKinds = [numInstructionKinds]defKind{
 	vecTbl:               defKindRD,
 	vecTbl2:              defKindRD,
 	vecPermute:           defKindRD,
-	vecRRR:               defKindVecRRR,
+	vecRRR:               defKindRD,
+	vecRRRRewrite:        defKindNone,
 	fpuToInt:             defKindRD,
 	intToFpu:             defKindRD,
 	cCmpImm:              defKindNone,
@@ -121,34 +136,30 @@ var defKinds = [numInstructionKinds]defKind{
 	emitSourceOffsetInfo: defKindNone,
 }
 
-// defs returns the list of regalloc.VReg that are defined by the instruction.
+// Defs returns the list of regalloc.VReg that are defined by the instruction.
 // In order to reduce the number of allocations, the caller can pass the slice to be used.
-func (i *instruction) defs(regs []regalloc.VReg) []regalloc.VReg {
+func (i *instruction) Defs(regs *[]regalloc.VReg) []regalloc.VReg {
+	*regs = (*regs)[:0]
 	switch defKinds[i.kind] {
 	case defKindNone:
 	case defKindRD:
-		regs = append(regs, i.rd.nr())
+		*regs = append(*regs, i.rd.nr())
 	case defKindCall:
-		regs = append(regs, i.abi.retRealRegs...)
-	case defKindVecRRR:
-		if vecOp(i.u1) != vecOpBsl {
-			regs = append(regs, i.rd.nr())
-		}
+		*regs = append(*regs, i.abi.retRealRegs...)
 	default:
 		panic(fmt.Sprintf("defKind for %v not defined", i))
 	}
-	return regs
+	return *regs
 }
 
-func (i *instruction) assignDef(reg regalloc.VReg) {
+// AssignDef implements regalloc.Instr AssignDef.
+func (i *instruction) AssignDef(reg regalloc.VReg) {
 	switch defKinds[i.kind] {
 	case defKindNone:
 	case defKindRD:
 		i.rd = i.rd.assignReg(reg)
 	case defKindCall:
 		panic("BUG: call instructions shouldn't be assigned")
-	case defKindVecRRR:
-		i.rd = i.rd.assignReg(reg)
 	default:
 		panic(fmt.Sprintf("defKind for %v not defined", i))
 	}
@@ -168,7 +179,7 @@ const (
 	useKindAMode
 	useKindRNAMode
 	useKindCond
-	useKindVecRRR
+	useKindVecRRRRewrite
 )
 
 var useKinds = [numInstructionKinds]useKind{
@@ -237,7 +248,8 @@ var useKinds = [numInstructionKinds]useKind{
 	vecShiftImm:          useKindRN,
 	vecTbl:               useKindRNRM,
 	vecTbl2:              useKindRNRN1RM,
-	vecRRR:               useKindVecRRR,
+	vecRRR:               useKindRNRM,
+	vecRRRRewrite:        useKindVecRRRRewrite,
 	vecPermute:           useKindRNRM,
 	fpuToInt:             useKindRN,
 	intToFpu:             useKindRN,
@@ -247,84 +259,79 @@ var useKinds = [numInstructionKinds]useKind{
 	emitSourceOffsetInfo: useKindNone,
 }
 
-// uses returns the list of regalloc.VReg that are used by the instruction.
+// Uses returns the list of regalloc.VReg that are used by the instruction.
 // In order to reduce the number of allocations, the caller can pass the slice to be used.
-func (i *instruction) uses(regs []regalloc.VReg) []regalloc.VReg {
+func (i *instruction) Uses(regs *[]regalloc.VReg) []regalloc.VReg {
+	*regs = (*regs)[:0]
 	switch useKinds[i.kind] {
 	case useKindNone:
 	case useKindRN:
 		if rn := i.rn.reg(); rn.Valid() {
-			regs = append(regs, rn)
+			*regs = append(*regs, rn)
 		}
 	case useKindRNRM:
 		if rn := i.rn.reg(); rn.Valid() {
-			regs = append(regs, rn)
+			*regs = append(*regs, rn)
 		}
 		if rm := i.rm.reg(); rm.Valid() {
-			regs = append(regs, rm)
+			*regs = append(*regs, rm)
 		}
 	case useKindRNRMRA:
 		if rn := i.rn.reg(); rn.Valid() {
-			regs = append(regs, rn)
+			*regs = append(*regs, rn)
 		}
 		if rm := i.rm.reg(); rm.Valid() {
-			regs = append(regs, rm)
+			*regs = append(*regs, rm)
 		}
 		if ra := i.ra.reg(); ra.Valid() {
-			regs = append(regs, ra)
+			*regs = append(*regs, ra)
 		}
 	case useKindRNRN1RM:
 		if rn := i.rn.reg(); rn.Valid() && rn.IsRealReg() {
 			rn1 := regalloc.FromRealReg(rn.RealReg()+1, rn.RegType())
-			regs = append(regs, rn, rn1)
+			*regs = append(*regs, rn, rn1)
 		}
 		if rm := i.rm.reg(); rm.Valid() {
-			regs = append(regs, rm)
+			*regs = append(*regs, rm)
 		}
 	case useKindRet:
-		regs = append(regs, i.abi.retRealRegs...)
+		*regs = append(*regs, i.abi.retRealRegs...)
 	case useKindAMode:
 		if amodeRN := i.amode.rn; amodeRN.Valid() {
-			regs = append(regs, amodeRN)
+			*regs = append(*regs, amodeRN)
 		}
 		if amodeRM := i.amode.rm; amodeRM.Valid() {
-			regs = append(regs, amodeRM)
+			*regs = append(*regs, amodeRM)
 		}
 	case useKindRNAMode:
-		regs = append(regs, i.rn.reg())
+		*regs = append(*regs, i.rn.reg())
 		if amodeRN := i.amode.rn; amodeRN.Valid() {
-			regs = append(regs, amodeRN)
+			*regs = append(*regs, amodeRN)
 		}
 		if amodeRM := i.amode.rm; amodeRM.Valid() {
-			regs = append(regs, amodeRM)
+			*regs = append(*regs, amodeRM)
 		}
 	case useKindCond:
 		cnd := cond(i.u1)
 		if cnd.kind() != condKindCondFlagSet {
-			regs = append(regs, cnd.register())
+			*regs = append(*regs, cnd.register())
 		}
 	case useKindCall:
-		regs = append(regs, i.abi.argRealRegs...)
+		*regs = append(*regs, i.abi.argRealRegs...)
 	case useKindCallInd:
-		regs = append(regs, i.rn.nr())
-		regs = append(regs, i.abi.argRealRegs...)
-	case useKindVecRRR:
-		if rn := i.rn.reg(); rn.Valid() {
-			regs = append(regs, rn)
-		}
-		if rm := i.rm.reg(); rm.Valid() {
-			regs = append(regs, rm)
-		}
-		if vecOp(i.u1) == vecOpBsl {
-			regs = append(regs, i.rd.reg())
-		}
+		*regs = append(*regs, i.rn.nr())
+		*regs = append(*regs, i.abi.argRealRegs...)
+	case useKindVecRRRRewrite:
+		*regs = append(*regs, i.rn.reg())
+		*regs = append(*regs, i.rm.reg())
+		*regs = append(*regs, i.rd.reg())
 	default:
 		panic(fmt.Sprintf("useKind for %v not defined", i))
 	}
-	return regs
+	return *regs
 }
 
-func (i *instruction) assignUse(index int, reg regalloc.VReg) {
+func (i *instruction) AssignUse(index int, reg regalloc.VReg) {
 	switch useKinds[i.kind] {
 	case useKindNone:
 	case useKindRN:
@@ -341,7 +348,7 @@ func (i *instruction) assignUse(index int, reg regalloc.VReg) {
 				i.rm = i.rm.assignReg(reg)
 			}
 		}
-	case useKindVecRRR:
+	case useKindVecRRRRewrite:
 		if index == 0 {
 			if rn := i.rn.reg(); rn.Valid() {
 				i.rn = i.rn.assignReg(reg)
@@ -834,9 +841,10 @@ func (i *instruction) asMove32(rd, rn regalloc.VReg) {
 	i.rn, i.rd = operandNR(rn), operandNR(rd)
 }
 
-func (i *instruction) asMove64(rd, rn regalloc.VReg) {
+func (i *instruction) asMove64(rd, rn regalloc.VReg) *instruction {
 	i.kind = mov64
 	i.rn, i.rd = operandNR(rn), operandNR(rd)
+	return i
 }
 
 func (i *instruction) asFpuMov64(rd, rn regalloc.VReg) {
@@ -844,9 +852,10 @@ func (i *instruction) asFpuMov64(rd, rn regalloc.VReg) {
 	i.rn, i.rd = operandNR(rn), operandNR(rd)
 }
 
-func (i *instruction) asFpuMov128(rd, rn regalloc.VReg) {
+func (i *instruction) asFpuMov128(rd, rn regalloc.VReg) *instruction {
 	i.kind = fpuMov128
 	i.rn, i.rd = operandNR(rn), operandNR(rd)
+	return i
 }
 
 func (i *instruction) asMovToVec(rd, rn operand, arr vecArrangement, index vecIndex) {
@@ -948,7 +957,16 @@ func (i *instruction) asVecRRR(op vecOp, rd, rn, rm operand, arr vecArrangement)
 	i.u2 = uint64(arr)
 }
 
-func (i *instruction) isCopy() bool {
+// asVecRRRRewrite encodes a vector instruction that rewrites the destination register.
+// IMPORTANT: the destination register must be already defined before this instruction.
+func (i *instruction) asVecRRRRewrite(op vecOp, rd, rn, rm operand, arr vecArrangement) {
+	i.kind = vecRRRRewrite
+	i.u1 = uint64(op)
+	i.rn, i.rd, i.rm = rn, rd, rm
+	i.u2 = uint64(arr)
+}
+
+func (i *instruction) IsCopy() bool {
 	op := i.kind
 	// We do not include mov32 as it is not a copy instruction in the sense that it does not preserve the upper 32 bits,
 	// and it is only used in the translation of IReduce, not the actual copy indeed.
@@ -1269,7 +1287,7 @@ func (i *instruction) String() (str string) {
 		)
 	case vecMiscNarrow:
 		panic("TODO")
-	case vecRRR:
+	case vecRRR, vecRRRRewrite:
 		str = fmt.Sprintf("%s %s, %s, %s",
 			vecOp(i.u1),
 			formatVRegVec(i.rd.nr(), vecArrangement(i.u2), vecIndexNone),
@@ -1556,6 +1574,11 @@ const (
 	vecMiscNarrow
 	// vecRRR represents a vector ALU operation.
 	vecRRR
+	// vecRRRRewrite is exactly the same as vecRRR except that this rewrites the destination register.
+	// For example, BSL instruction rewrites the destination register, and the existing value influences the result.
+	// Therefore, the "destination" register in vecRRRRewrite will be treated as "use" which makes the register outlive
+	// the instruction while this instruction doesn't have "def" in the context of register allocation.
+	vecRRRRewrite
 	// vecMisc represents a vector two register miscellaneous instruction.
 	vecMisc
 	// vecLanes represents a vector instruction across lanes.

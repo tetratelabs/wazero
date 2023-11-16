@@ -116,6 +116,9 @@ type (
 		// reversePostOrder is used to sort all the blocks in the function in reverse post order.
 		// This is used in builder.LayoutBlocks.
 		reversePostOrder int
+
+		// child and sibling are the ones in the dominator tree.
+		child, sibling *basicBlock
 	}
 	// BasicBlockID is the unique ID of a basicBlock.
 	BasicBlockID uint32
@@ -287,6 +290,8 @@ func resetBasicBlock(bb *basicBlock) {
 	bb.reversePostOrder = -1
 	bb.loopNestingForestChildren = bb.loopNestingForestChildren[:0]
 	bb.loopHeader = false
+	bb.sibling = nil
+	bb.child = nil
 }
 
 // addPred adds a predecessor to this block specified by the branch instruction.

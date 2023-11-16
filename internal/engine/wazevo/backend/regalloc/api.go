@@ -25,6 +25,21 @@ type (
 		ReversePostOrderBlockIteratorNext() Block
 		// ClobberedRegisters tell the clobbered registers by this function.
 		ClobberedRegisters([]VReg)
+		// Done tells the implementation that register allocation is done, and it can finalize the stack
+		Done()
+		// LoopNestingForestRoots returns the number of roots of the loop nesting forest in a function.
+		LoopNestingForestRoots() int
+		// LoopNestingForestRoot returns the i-th root of the loop nesting forest in a function.
+		LoopNestingForestRoot(i int) Block
+		// LowestCommonAncestor returns the lowest common ancestor of two blocks in the dominator tree.
+		LowestCommonAncestor(blk1, blk2 Block) Block
+		// Idom returns the immediate dominator of the given block.
+		Idom(blk Block) Block
+
+		// Followings are for rewriting the function.
+
+		// SwapAtEndOfBlock swaps the two virtual registers at the end of the given block.
+		SwapAtEndOfBlock(x1, x2, tmp VReg, block Block)
 		// StoreRegisterBefore inserts store instruction(s) before the given instruction for the given virtual register.
 		StoreRegisterBefore(v VReg, instr Instr)
 		// StoreRegisterAfter inserts store instruction(s) after the given instruction for the given virtual register.
@@ -33,20 +48,16 @@ type (
 		ReloadRegisterBefore(v VReg, instr Instr)
 		// ReloadRegisterAfter inserts reload instruction(s) after the given instruction for the given virtual register.
 		ReloadRegisterAfter(v VReg, instr Instr)
-		// Done tells the implementation that register allocation is done, and it can finalize the stack
-		Done()
-		// LoopNestingForestRoots returns the number of roots of the loop nesting forest in a function.
-		LoopNestingForestRoots() int
-		// LoopNestingForestRoot returns the i-th root of the loop nesting forest in a function.
-		LoopNestingForestRoot(i int) Block
+		// InsertMoveBefore inserts move instruction(s) before the given instruction for the given virtual registers.
+		InsertMoveBefore(dst, src VReg, instr Instr)
 	}
 
 	// Block is a basic block in the CFG of a function, and it consists of multiple instructions, and predecessor Block(s).
 	Block interface {
-		// ID returns the unique identifier of this block.
+		// ID returns the unique identifier of this block which is ordered in the reverse post-order traversal of the CFG.
 		ID() int
 		// BlockParams returns the virtual registers used as the parameters of this block.
-		BlockParams() []VReg
+		BlockParams(*[]VReg) []VReg
 		// InstrIteratorBegin returns the first instruction in this block. Instructions added after lowering must be skipped.
 		// Note: multiple Instr(s) will not be held at the same time, so it's safe to use the same impl for the return Instr.
 		InstrIteratorBegin() Instr
@@ -57,6 +68,14 @@ type (
 		InstrRevIteratorBegin() Instr
 		// InstrRevIteratorNext is the same as InstrIteratorNext, but in the reverse order.
 		InstrRevIteratorNext() Instr
+		// FirstInstr returns the fist instruction in this block where instructions will be inserted after it.
+		FirstInstr() Instr
+		// LastInstr returns the last instruction in this block where instructions will be inserted before it.
+		// Such insertions only happen when we need to insert spill/reload instructions to adjust the merge edges.
+		// If the very last instruction is the unconditional branching, then the returned instruction is the one before it.
+		// Note that at the time of register allocation, all the critical edges are already split, so there is no need
+		// to worry about the case where branching instruction has multiple successors.
+		LastInstr() Instr
 		// Preds returns the number of predecessors of this block in the CFG.
 		Preds() int
 		// Pred returns the i-th predecessor of this block in the CFG.
@@ -80,11 +99,10 @@ type (
 		fmt.Stringer
 
 		// Defs returns the virtual registers defined by this instruction.
-		// Note: multiple returned []VReg will not be held at the same time, so it's safe to use the same slice for this.
-		Defs() []VReg
+		Defs(*[]VReg) []VReg
 		// Uses returns the virtual registers used by this instruction.
 		// Note: multiple returned []VReg will not be held at the same time, so it's safe to use the same slice for this.
-		Uses() []VReg
+		Uses(*[]VReg) []VReg
 		// AssignUse assigns the RealReg-allocated virtual register used by this instruction at the given index.
 		AssignUse(index int, v VReg)
 		// AssignDef assigns a RealReg-allocated virtual register defined by this instruction.
