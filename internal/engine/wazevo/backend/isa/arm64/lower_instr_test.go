@@ -379,7 +379,7 @@ L2:
 				regalloc.VReg(2).SetRegType(regalloc.RegTypeInt),
 				regalloc.VReg(3).SetRegType(regalloc.RegTypeInt)
 			mc, _, m := newSetupWithMockContext()
-			mc.typeOf = map[regalloc.VReg]ssa.Type{execCtx: ssa.TypeI64, 2: ssa.TypeI64, 3: ssa.TypeI64}
+			mc.typeOf = map[regalloc.VRegID]ssa.Type{execCtx.ID(): ssa.TypeI64, 2: ssa.TypeI64, 3: ssa.TypeI64}
 			m.lowerIDiv(execCtx, operandNR(rd), operandNR(rn), operandNR(rm), tc._64bit, tc.signed)
 			require.Equal(t, tc.exp, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
 		})
@@ -450,7 +450,7 @@ fcvtzu w1, s2
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			mc, _, m := newSetupWithMockContext()
-			mc.typeOf = map[regalloc.VReg]ssa.Type{v2VReg: ssa.TypeI64, x15VReg: ssa.TypeI64}
+			mc.typeOf = map[regalloc.VRegID]ssa.Type{v2VReg.ID(): ssa.TypeI64, x15VReg.ID(): ssa.TypeI64}
 			m.lowerFpuToInt(operandNR(x1VReg), operandNR(v2VReg), x15VReg, false, false, false, tc.nontrapping)
 			require.Equal(t, tc.expectedAsm, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
 
@@ -476,10 +476,11 @@ mul v2?.4s, v2?.4s, x2.4s
 xtn v1?.2s, x2.2s
 addp v2?.4s, v2?.4s, v2?.4s
 xtn v3?.2s, x15.2s
-shll x1.2s, v2?.2s
-umlal x1.2s, v3?.2s, v1?.2s
+shll v4?.2s, v2?.2s
+umlal v4?.2s, v3?.2s, v1?.2s
+mov x1.16b, v4?.16b
 `,
-			expectedBytes: "e009a04e009ca24e4028a10e00bca04ee029a10e0138a12e0180a02e",
+			expectedBytes: "e009a04e009ca24e4028a10e00bca04ee029a10e0038a12e0080a02e011ca04e",
 		},
 		{
 			name:        "8B",
@@ -855,8 +856,9 @@ func TestMachine_lowerSelectVec(t *testing.T) {
 	require.Equal(t, `
 subs wzr, w1?, wzr
 csetm x5?, ne
-dup v4?.2d, x5?
-bsl v4?.16b, v2?.16b, v3?.16b
+dup v6?.2d, x5?
+bsl v6?.16b, v2?.16b, v3?.16b
+mov v4?.16b, v6?.16b
 `, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
 }
 

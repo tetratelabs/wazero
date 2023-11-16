@@ -356,6 +356,11 @@ func (i *instruction) encode(c backend.Compiler) {
 			i.u3 == 1,
 		))
 	case vecRRR:
+		if op := vecOp(i.u1); op == vecOpBsl || op == vecOpBit || op == vecOpUmlal {
+			panic(fmt.Sprintf("vecOp %s must use vecRRRRewrite instead of vecRRR", op.String()))
+		}
+		fallthrough
+	case vecRRRRewrite:
 		c.Emit4Bytes(encodeVecRRR(
 			vecOp(i.u1),
 			regNumberInEncoding[i.rd.realReg()],

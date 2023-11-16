@@ -362,16 +362,16 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 
 		// creg is overwritten by BSL, so we need to move it to the result register before the instruction
 		// in case when it is used somewhere else.
-		rd := m.compiler.VRegOf(instr.Return())
 		mov := m.allocateInstr()
 		mov.asFpuMov128(tmp.nr(), creg.nr())
 		m.insert(mov)
 
 		ins := m.allocateInstr()
-		ins.asVecRRR(vecOpBsl, tmp, rn, rm, vecArrangement16B)
+		ins.asVecRRRRewrite(vecOpBsl, tmp, rn, rm, vecArrangement16B)
 		m.insert(ins)
 
 		mov2 := m.allocateInstr()
+		rd := m.compiler.VRegOf(instr.Return())
 		mov2.asFpuMov128(rd, tmp.nr())
 		m.insert(mov2)
 	case ssa.OpcodeVanyTrue, ssa.OpcodeVallTrue:
@@ -1071,6 +1071,8 @@ func (m *machine) lowerVIMul(rd, rn, rm operand, arr vecArrangement) {
 		tmp2 := operandNR(m.compiler.AllocateVReg(ssa.TypeV128))
 		tmp3 := operandNR(m.compiler.AllocateVReg(ssa.TypeV128))
 
+		tmpRes := operandNR(m.compiler.AllocateVReg(ssa.TypeV128))
+
 		// Following the algorithm in https://chromium-review.googlesource.com/c/v8/v8/+/1781696
 		rev64 := m.allocateInstr()
 		rev64.asVecMisc(vecOpRev64, tmp2, rm, vecArrangement4S)
@@ -1092,13 +1094,20 @@ func (m *machine) lowerVIMul(rd, rn, rm operand, arr vecArrangement) {
 		xtn2.asVecMisc(vecOpXtn, tmp3, rm, vecArrangement2S)
 		m.insert(xtn2)
 
+		// Note: do not write the result directly into result yet. This is the same reason as in bsl.
+		// In short, in UMLAL instruction, the result register is also one of the source register, and
+		// the value on the result register is significant.
 		shll := m.allocateInstr()
-		shll.asVecMisc(vecOpShll, rd, tmp2, vecArrangement2S)
+		shll.asVecMisc(vecOpShll, tmpRes, tmp2, vecArrangement2S)
 		m.insert(shll)
 
 		umlal := m.allocateInstr()
-		umlal.asVecRRR(vecOpUmlal, rd, tmp3, tmp1, vecArrangement2S)
+		umlal.asVecRRRRewrite(vecOpUmlal, tmpRes, tmp3, tmp1, vecArrangement2S)
 		m.insert(umlal)
+
+		mov := m.allocateInstr()
+		mov.asFpuMov128(rd.nr(), tmpRes.nr())
+		m.insert(mov)
 	}
 }
 
@@ -1109,7 +1118,10 @@ func (m *machine) lowerVMinMaxPseudo(instr *ssa.Instruction, max bool) {
 	rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
 	rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
 
-	// TODO: this usage of tmp is weird - it should be fine directly using rd. (seems a bug in regalloc).
+	// Note: this usage of tmp is important.
+	// BSL modifies the destination register, so we need to use a temporary register so that
+	// the actual definition of the destination register happens *after* the BSL instruction.
+	// That way, we can force the spill instruction to be inserted after the BSL instruction.
 	tmp := operandNR(m.compiler.AllocateVReg(ssa.TypeV128))
 
 	fcmgt := m.allocateInstr()
@@ -1122,7 +1134,7 @@ func (m *machine) lowerVMinMaxPseudo(instr *ssa.Instruction, max bool) {
 	m.insert(fcmgt)
 
 	bsl := m.allocateInstr()
-	bsl.asVecRRR(vecOpBsl, tmp, rm, rn, vecArrangement16B)
+	bsl.asVecRRRRewrite(vecOpBsl, tmp, rm, rn, vecArrangement16B)
 	m.insert(bsl)
 
 	res := operandNR(m.compiler.VRegOf(instr.Return()))
@@ -1235,7 +1247,7 @@ func (m *machine) lowerFcopysignImpl(rd, rn, rm, tmpI, tmpF operand, _64bit bool
 	m.insert(mov)
 
 	vbit := m.allocateInstr()
-	vbit.asVecRRR(vecOpBit, tmpReg, rm, tmpF, vecArrangement8B)
+	vbit.asVecRRRRewrite(vecOpBit, tmpReg, rm, tmpF, vecArrangement8B)
 	m.insert(vbit)
 
 	movDst := m.allocateInstr()
@@ -1918,15 +1930,21 @@ func (m *machine) lowerSelectVec(rc, rn, rm, rd operand) {
 	m.insert(cset)
 
 	// Then move the bits to the result vector register.
+	tmp2 := operandNR(m.compiler.AllocateVReg(ssa.TypeV128))
 	dup := m.allocateInstr()
-	dup.asVecDup(rd, operandNR(allOnesOrZero), vecArrangement2D)
+	dup.asVecDup(tmp2, operandNR(allOnesOrZero), vecArrangement2D)
 	m.insert(dup)
 
-	// Now that `rd` has either all bits one or zero depending on `rc`,
+	// Now that `tmp2` has either all bits one or zero depending on `rc`,
 	// we can use bsl to select between `rn` and `rm`.
 	ins := m.allocateInstr()
-	ins.asVecRRR(vecOpBsl, rd, rn, rm, vecArrangement16B)
+	ins.asVecRRRRewrite(vecOpBsl, tmp2, rn, rm, vecArrangement16B)
 	m.insert(ins)
+
+	// Finally, move the result to the destination register.
+	mov2 := m.allocateInstr()
+	mov2.asFpuMov128(rd.nr(), tmp2.nr())
+	m.insert(mov2)
 }
 
 // copyToTmp copies the given regalloc.VReg to a temporary register. This is called before cbr to avoid the regalloc issue

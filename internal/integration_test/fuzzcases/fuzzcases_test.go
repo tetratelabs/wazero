@@ -413,7 +413,7 @@ func Test1054(t *testing.T) {
 		return
 	}
 
-	modules := make([]api.Module, 0, 2)
+	modules := make([]api.Module, 0, 3)
 	run(t, func(t *testing.T, r wazero.Runtime) {
 		mod, err := r.Instantiate(ctx, getWasmBinary(t, "1054"))
 		require.NoError(t, err)
@@ -421,10 +421,11 @@ func Test1054(t *testing.T) {
 	})
 
 	// Checks if the memory state is the same between engines.
-	require.Equal(t,
-		modules[0].Memory().(*wasm.MemoryInstance).Buffer,
-		modules[1].Memory().(*wasm.MemoryInstance).Buffer,
-	)
+	exp := modules[0].Memory().(*wasm.MemoryInstance).Buffer
+	for i := 1; i < len(modules); i++ {
+		actual := modules[i].Memory().(*wasm.MemoryInstance).Buffer
+		require.Equal(t, exp, actual)
+	}
 }
 
 // Test1777 tests that br_table with multiple args works fine even if

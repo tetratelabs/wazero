@@ -33,6 +33,9 @@ func newCompiler(ctx context.Context, mach Machine, builder ssa.Builder) *compil
 // Compiler is the backend of wazevo which takes ssa.Builder and Machine,
 // use the information there to emit the final machine code.
 type Compiler interface {
+	// SSABuilder returns the ssa.Builder used by this compiler.
+	SSABuilder() ssa.Builder
+
 	// Compile executes the following steps:
 	// 	1. Lower()
 	// 	2. RegAlloc()
@@ -65,9 +68,6 @@ type Compiler interface {
 
 	// Init initializes the internal state of the compiler for the next compilation.
 	Init()
-
-	// ResolveSignature returns the ssa.Signature of the given ssa.SignatureID.
-	ResolveSignature(id ssa.SignatureID) *ssa.Signature
 
 	// AllocateVReg allocates a new virtual register of the given type.
 	AllocateVReg(typ ssa.Type) regalloc.VReg
@@ -102,9 +102,6 @@ type Compiler interface {
 
 	// Emit4Bytes appends 4 bytes to the buffer. Used during the code emission.
 	Emit4Bytes(b uint32)
-
-	// LoopNestingForestRoots returns the roots of the loop nesting forest.
-	LoopNestingForestRoots() []ssa.BasicBlock
 }
 
 // RelocationInfo represents the relocation information for a call instruction.
@@ -357,9 +354,9 @@ func (c *compiler) MatchInstrOneOf(def *SSAValueDefinition, opcodes []ssa.Opcode
 	return ssa.OpcodeInvalid
 }
 
-// ResolveSignature implements Compiler.ResolveSignature.
-func (c *compiler) ResolveSignature(id ssa.SignatureID) *ssa.Signature {
-	return c.ssaBuilder.ResolveSignature(id)
+// SSABuilder implements Compiler .SSABuilder.
+func (c *compiler) SSABuilder() ssa.Builder {
+	return c.ssaBuilder
 }
 
 // AddSourceOffsetInfo implements Compiler.AddSourceOffsetInfo.
@@ -391,9 +388,4 @@ func (c *compiler) Emit4Bytes(b uint32) {
 // Buf implements Compiler.Buf.
 func (c *compiler) Buf() []byte {
 	return c.buf
-}
-
-// LoopNestingForestRoots implements Compiler.LoopNestingForestRoots.
-func (c *compiler) LoopNestingForestRoots() []ssa.BasicBlock {
-	return c.ssaBuilder.LoopNestingForestRoots()
 }

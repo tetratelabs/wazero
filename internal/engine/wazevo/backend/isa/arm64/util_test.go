@@ -56,10 +56,12 @@ type mockCompiler struct {
 	vRegMap     map[ssa.Value]regalloc.VReg
 	definitions map[ssa.Value]*backend.SSAValueDefinition
 	sigs        map[ssa.SignatureID]*ssa.Signature
-	typeOf      map[regalloc.VReg]ssa.Type
+	typeOf      map[regalloc.VRegID]ssa.Type
 	relocs      []backend.RelocationInfo
 	buf         []byte
 }
+
+func (m *mockCompiler) SSABuilder() ssa.Builder { panic("TODO") }
 
 func (m *mockCompiler) LoopNestingForestRoots() []ssa.BasicBlock { panic("TODO") }
 
@@ -78,7 +80,7 @@ func (m *mockCompiler) Emit4Bytes(b uint32) {
 func (m *mockCompiler) Encode()     {}
 func (m *mockCompiler) Buf() []byte { return m.buf }
 func (m *mockCompiler) TypeOf(v regalloc.VReg) (ret ssa.Type) {
-	return m.typeOf[v]
+	return m.typeOf[v.ID()]
 }
 func (m *mockCompiler) Finalize()      {}
 func (m *mockCompiler) RegAlloc()      {}
@@ -90,7 +92,7 @@ func newMockCompilationContext() *mockCompiler {
 	return &mockCompiler{
 		vRegMap:     make(map[ssa.Value]regalloc.VReg),
 		definitions: make(map[ssa.Value]*backend.SSAValueDefinition),
-		typeOf:      map[regalloc.VReg]ssa.Type{},
+		typeOf:      map[regalloc.VRegID]ssa.Type{},
 	}
 }
 
@@ -104,7 +106,7 @@ func (m *mockCompiler) AllocateVReg(typ ssa.Type) regalloc.VReg {
 	m.vRegCounter++
 	regType := regalloc.RegTypeOf(typ)
 	ret := regalloc.VReg(m.vRegCounter).SetRegType(regType)
-	m.typeOf[ret] = typ
+	m.typeOf[ret.ID()] = typ
 	return ret
 }
 

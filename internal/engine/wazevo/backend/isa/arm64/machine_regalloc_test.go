@@ -23,8 +23,6 @@ func TestRegAllocFunctionImpl_addBlock(t *testing.T) {
 	rb1, rb2 := &f.reversePostOrderBlocks[0], &f.reversePostOrderBlocks[1]
 	require.Equal(t, f, rb1.f)
 	require.Equal(t, f, rb2.f)
-	require.Equal(t, f, rb1.instrImpl.f)
-	require.Equal(t, f, rb2.instrImpl.f)
 
 	require.Equal(t, p1, rb1.pos)
 	require.Equal(t, p2, rb2.pos)
@@ -63,14 +61,14 @@ func TestRegAllocFunctionImpl_ReversePostOrderBlockIterator(t *testing.T) {
 func TestRegAllocFunctionImpl_ReloadRegisterAfter(t *testing.T) {
 	ctx, _, m := newSetupWithMockContext()
 
-	ctx.typeOf = map[regalloc.VReg]ssa.Type{x1VReg: ssa.TypeI64, v1VReg: ssa.TypeF64}
+	ctx.typeOf = map[regalloc.VRegID]ssa.Type{x1VReg.ID(): ssa.TypeI64, v1VReg.ID(): ssa.TypeF64}
 	i1, i2 := m.allocateNop(), m.allocateNop()
 	i1.next = i2
 	i2.prev = i1
 
 	f := &regAllocFunctionImpl{m: m}
-	f.ReloadRegisterAfter(x1VReg, &regAllocInstrImpl{i: i1})
-	f.ReloadRegisterAfter(v1VReg, &regAllocInstrImpl{i: i1})
+	f.ReloadRegisterAfter(x1VReg, i1)
+	f.ReloadRegisterAfter(v1VReg, i1)
 
 	require.NotEqual(t, i1, i2.prev)
 	require.NotEqual(t, i1.next, i2)
@@ -93,14 +91,14 @@ func TestRegAllocFunctionImpl_ReloadRegisterAfter(t *testing.T) {
 func TestRegAllocFunctionImpl_StoreRegisterBefore(t *testing.T) {
 	ctx, _, m := newSetupWithMockContext()
 
-	ctx.typeOf = map[regalloc.VReg]ssa.Type{x1VReg: ssa.TypeI64, v1VReg: ssa.TypeF64}
+	ctx.typeOf = map[regalloc.VRegID]ssa.Type{x1VReg.ID(): ssa.TypeI64, v1VReg.ID(): ssa.TypeF64}
 	i1, i2 := m.allocateNop(), m.allocateNop()
 	i1.next = i2
 	i2.prev = i1
 
 	f := &regAllocFunctionImpl{m: m}
-	f.StoreRegisterBefore(x1VReg, &regAllocInstrImpl{i: i2})
-	f.StoreRegisterBefore(v1VReg, &regAllocInstrImpl{i: i2})
+	f.StoreRegisterBefore(x1VReg, i2)
+	f.StoreRegisterBefore(v1VReg, i2)
 
 	require.NotEqual(t, i1, i2.prev)
 	require.NotEqual(t, i1.next, i2)
@@ -173,7 +171,7 @@ func TestMachine_insertStoreRegisterAt(t *testing.T) {
 					name = "before"
 				}
 				t.Run(name, func(t *testing.T) {
-					ctx.typeOf = map[regalloc.VReg]ssa.Type{x1VReg: ssa.TypeI64, v1VReg: ssa.TypeF64}
+					ctx.typeOf = map[regalloc.VRegID]ssa.Type{x1VReg.ID(): ssa.TypeI64, v1VReg.ID(): ssa.TypeF64}
 					i1, i2 := m.allocateInstr().asUDF(), m.allocateInstr().asExitSequence(x30VReg)
 					i1.next = i2
 					i2.prev = i1
@@ -246,7 +244,7 @@ func TestMachine_insertReloadRegisterAt(t *testing.T) {
 					name = "before"
 				}
 				t.Run(name, func(t *testing.T) {
-					ctx.typeOf = map[regalloc.VReg]ssa.Type{x1VReg: ssa.TypeI64, v1VReg: ssa.TypeF64}
+					ctx.typeOf = map[regalloc.VRegID]ssa.Type{x1VReg.ID(): ssa.TypeI64, v1VReg.ID(): ssa.TypeF64}
 					i1, i2 := m.allocateInstr().asUDF(), m.allocateInstr().asExitSequence(x30VReg)
 					i1.next = i2
 					i2.prev = i1
@@ -272,4 +270,77 @@ func TestRegAllocFunctionImpl_ClobberedRegisters(t *testing.T) {
 	f := &regAllocFunctionImpl{m: m}
 	f.ClobberedRegisters([]regalloc.VReg{v19VReg, v19VReg, v19VReg, v19VReg})
 	require.Equal(t, []regalloc.VReg{v19VReg, v19VReg, v19VReg, v19VReg}, m.clobberedRegs)
+}
+
+func TestMachine_swap(t *testing.T) {
+	for _, tc := range []struct {
+		x1, x2, tmp regalloc.VReg
+		expected    string
+	}{
+		{
+			x1:  x18VReg,
+			x2:  x19VReg,
+			tmp: x20VReg,
+			expected: `
+	udf
+	mov x20, x18
+	mov x18, x19
+	mov x19, x20
+	exit_sequence x30
+`,
+		},
+		{
+			x1: x18VReg,
+			x2: x19VReg,
+			// Tmp not given.
+			expected: `
+	udf
+	mov x27, x18
+	mov x18, x19
+	mov x19, x27
+	exit_sequence x30
+`,
+		},
+		{
+			x1:  v18VReg,
+			x2:  v19VReg,
+			tmp: v11VReg,
+			expected: `
+	udf
+	mov v11.16b, v18.16b
+	mov v18.16b, v19.16b
+	mov v19.16b, v11.16b
+	exit_sequence x30
+`,
+		},
+		{
+			x1: v18VReg,
+			x2: v19VReg,
+			// Tmp not given.
+			expected: `
+	udf
+	str d18, [sp, #0x10]
+	mov v18.16b, v19.16b
+	ldr d19, [sp, #0x10]
+	exit_sequence x30
+`,
+		},
+	} {
+		t.Run(tc.expected, func(t *testing.T) {
+			ctx, _, m := newSetupWithMockContext()
+
+			ctx.typeOf = map[regalloc.VRegID]ssa.Type{
+				x18VReg.ID(): ssa.TypeI64, x19VReg.ID(): ssa.TypeI64,
+				v18VReg.ID(): ssa.TypeF64, v19VReg.ID(): ssa.TypeF64,
+			}
+			cur, i2 := m.allocateInstr().asUDF(), m.allocateInstr().asExitSequence(x30VReg)
+			cur.next = i2
+			i2.prev = cur
+
+			m.swap(cur, tc.x1, tc.x2, tc.tmp)
+			m.rootInstr = cur
+
+			require.Equal(t, tc.expected, m.Format())
+		})
+	}
 }

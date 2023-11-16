@@ -680,3 +680,165 @@ func TestBuildLoopNestingForest(t *testing.T) {
 		})
 	}
 }
+
+func TestDominatorTree(t *testing.T) {
+	type lowestCommonAncestorCase struct {
+		a, b BasicBlockID
+		exp  BasicBlockID
+	}
+
+	for _, tc := range []struct {
+		name  string
+		edges edgesCase
+		cases []lowestCommonAncestorCase
+	}{
+		{
+			name: "linear",
+			// 0 -> 1 -> 2 -> 3 -> 4
+			edges: edgesCase{
+				0: {1},
+				1: {2},
+				2: {3},
+				3: {4},
+			},
+			cases: []lowestCommonAncestorCase{
+				{a: 0, b: 0, exp: 0},
+				{a: 0, b: 1, exp: 0},
+				{a: 0, b: 2, exp: 0},
+				{a: 0, b: 3, exp: 0},
+				{a: 0, b: 4, exp: 0},
+				{a: 1, b: 1, exp: 1},
+				{a: 1, b: 2, exp: 1},
+				{a: 1, b: 3, exp: 1},
+				{a: 1, b: 4, exp: 1},
+				{a: 2, b: 2, exp: 2},
+				{a: 2, b: 3, exp: 2},
+				{a: 2, b: 4, exp: 2},
+				{a: 3, b: 3, exp: 3},
+				{a: 3, b: 4, exp: 3},
+				{a: 4, b: 4, exp: 4},
+			},
+		},
+		{
+			//
+			//                  +-----+
+			//                  |     |
+			//                  v     |
+			//    0 ---> 1 ---> 2 --> 3 ---> 4
+			//           ^      |
+			//           |      |
+			//           +------+
+			//
+			name: "two loops",
+			edges: map[BasicBlockID][]BasicBlockID{
+				0: {1},
+				1: {2},
+				2: {1, 3},
+				3: {2, 4},
+			},
+			cases: []lowestCommonAncestorCase{
+				{a: 0, b: 0, exp: 0},
+				{a: 0, b: 1, exp: 0},
+				{a: 0, b: 2, exp: 0},
+				{a: 0, b: 3, exp: 0},
+				{a: 0, b: 4, exp: 0},
+				{a: 1, b: 1, exp: 1},
+				{a: 1, b: 2, exp: 1},
+				{a: 1, b: 3, exp: 1},
+				{a: 1, b: 4, exp: 1},
+				{a: 2, b: 2, exp: 2},
+				{a: 2, b: 3, exp: 2},
+				{a: 2, b: 4, exp: 2},
+				{a: 3, b: 3, exp: 3},
+				{a: 3, b: 4, exp: 3},
+				{a: 4, b: 4, exp: 4},
+			},
+		},
+		{
+			name: "binary",
+			edges: edgesCase{
+				0: {1, 2},
+				1: {3, 4},
+				2: {5, 6},
+				3: {},
+				4: {},
+				5: {},
+				6: {},
+			},
+			cases: []lowestCommonAncestorCase{
+				{a: 3, b: 4, exp: 1},
+				{a: 3, b: 5, exp: 0},
+				{a: 3, b: 6, exp: 0},
+				{a: 4, b: 5, exp: 0},
+				{a: 4, b: 6, exp: 0},
+				{a: 5, b: 6, exp: 2},
+				{a: 3, b: 1, exp: 1},
+				{a: 6, b: 2, exp: 2},
+			},
+		},
+		{
+			name: "complex tree",
+			edges: edgesCase{
+				0:  {1, 2},
+				1:  {3, 4, 5},
+				2:  {6, 7},
+				3:  {8, 9},
+				4:  {10},
+				6:  {11, 12, 13},
+				7:  {14},
+				12: {15},
+			},
+			cases: []lowestCommonAncestorCase{
+				{a: 8, b: 9, exp: 3},
+				{a: 10, b: 5, exp: 1},
+				{a: 11, b: 14, exp: 2},
+				{a: 15, b: 13, exp: 6},
+				{a: 8, b: 10, exp: 1},
+				{a: 9, b: 4, exp: 1},
+				{a: 15, b: 7, exp: 2},
+			},
+		},
+		{
+			name: "complex tree with single and multiple branching",
+			edges: edgesCase{
+				0:  {1, 2},
+				1:  {3},
+				2:  {4, 5},
+				3:  {6, 7, 8},
+				4:  {9, 10},
+				5:  {11},
+				8:  {12, 13},
+				9:  {14, 15},
+				10: {16},
+				13: {17, 18},
+			},
+			cases: []lowestCommonAncestorCase{
+				{a: 6, b: 7, exp: 3},
+				{a: 14, b: 16, exp: 4},
+				{a: 17, b: 18, exp: 13},
+				{a: 12, b: 18, exp: 8},
+				{a: 6, b: 12, exp: 3},
+				{a: 11, b: 9, exp: 2},
+				{a: 15, b: 11, exp: 2},
+				{a: 3, b: 10, exp: 0},
+				{a: 7, b: 13, exp: 3},
+				{a: 15, b: 16, exp: 4},
+				{a: 0, b: 17, exp: 0},
+				{a: 1, b: 18, exp: 1},
+			},
+		},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			b := constructGraphFromEdges(tc.edges)
+			// buildDominatorTree requires passCalculateImmediateDominators to be done.
+			passCalculateImmediateDominators(b)
+			buildDominatorTree(b)
+
+			for _, c := range tc.cases {
+				exp := b.sparseTree.findLCA(c.a, c.b)
+				require.Equal(t, exp.id, c.exp, "LCA(%d, %d)", c.a, c.b)
+			}
+		})
+	}
+}

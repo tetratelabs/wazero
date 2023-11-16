@@ -140,10 +140,10 @@ func TestInstruction_encode(t *testing.T) {
 			i.asVecPermute(vecOpZip1, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
 		}},
 		{want: "411ca32e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpBit, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
+			i.asVecRRRRewrite(vecOpBit, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
 		}},
 		{want: "411ca36e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpBit, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
+			i.asVecRRRRewrite(vecOpBit, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
 		}},
 		{want: "411c236e", setup: func(i *instruction) {
 			i.asVecRRR(vecOpEOR, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
@@ -1495,10 +1495,10 @@ func TestInstruction_encode(t *testing.T) {
 			i.asVecRRR(vecOpBic, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
 		}},
 		{want: "411c632e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpBsl, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
+			i.asVecRRRRewrite(vecOpBsl, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
 		}},
 		{want: "411c636e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpBsl, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
+			i.asVecRRRRewrite(vecOpBsl, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
 		}},
 		{want: "4158202e", setup: func(i *instruction) {
 			i.asVecMisc(vecOpNot, operandNR(v1VReg), operandNR(v2VReg), vecArrangement8B)
