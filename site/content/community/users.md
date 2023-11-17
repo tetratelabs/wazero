@@ -25,6 +25,7 @@ considering their efforts before starting your own!
 
 | Name                           | Description                                                                   |
 |:-------------------------------|-------------------------------------------------------------------------------|
+| [Extism][38]                   | Simplified cross-language extensibility in Go & a dozen+ languages|
 | [go-plugin][2]                 | implements [Protocol Buffers][8] services with WebAssembly vi code generation |
 | [waPC][5]                      | implements [Apex][6] interfaces with WebAssembly via code generation          |
 | [wazero-emscripten-embind][36] | Emscripten [Embind][37] and code generation support for Wazero                |
@@ -142,3 +143,5 @@ experience.
 [36]: https://github.com/jerbob92/wazero-emscripten-embind
 
 [37]: https://emscripten.org/docs/porting/connecting_cpp_and_javascript/embind.html
+
+[38]: https://github.com/extism/extism
