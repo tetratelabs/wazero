@@ -833,8 +833,8 @@ func (a *Allocator) reconcileEdge(f Function,
 			)
 		}
 		f.SwapAtEndOfBlock(
-			FromRealReg(r, typ),
-			FromRealReg(er, typ),
+			currentVReg.SetRealReg(r),
+			desiredVReg.SetRealReg(er),
 			freeReg,
 			pred,
 		)
