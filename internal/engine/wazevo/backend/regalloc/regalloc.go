@@ -838,6 +838,7 @@ func (a *Allocator) reconcileEdge(f Function,
 			freeReg,
 			pred,
 		)
+		s.allocatedRegSet = s.allocatedRegSet.add(freeReg.RealReg())
 		currentOccupantsRev[desiredVReg] = r
 		currentOccupantsRev[currentVReg] = er
 		currentOccupants.add(r, desiredVReg)
