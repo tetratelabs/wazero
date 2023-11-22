@@ -80,6 +80,16 @@ Minimize test case with:
 and you can use that command to "minimize" the input binary while keeping the same error.
 
 
+Alternatively, you can use the following command to minimize the arbitrary input binary:
+
+```
+go test -c ./wazerolib -o nodiff.test && wasm-tools shrink ./predicate.sh original.{wasm,wat} -o shrinken.wasm --attempts 4294967295
+```
+
+which uses `wasm-tools shrinken` command to minimize the input binary. Internally, the `predicate.sh` is invoked for each input binary
+where it executes the `nodiff.test` binary which runs `TestReRunFailedRequireNoDiffCase`.
+
+
 ### Run fuzzing on wazevo
 
 Until we replace the existing compiler with the new optimizing compiler `wazevo`,
