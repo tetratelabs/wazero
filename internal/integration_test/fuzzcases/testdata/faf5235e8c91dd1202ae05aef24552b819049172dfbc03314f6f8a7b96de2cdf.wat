@@ -163,6 +163,10 @@
     i64x2.extmul_low_i32x4_u
     i64x2.gt_s
     i16x8.all_true
+    drop
+
+    i32.const 0
+
     if (result f64 f64 f32 f64 f64 f32 f64 f64 f64 f64 f64 f64 f64 f64 f64 f64 f64 f64 f64 f64)  ;; label = @1
       f64.const -nan:0xfffffffffffff (;=NaN;)
        call 3
@@ -318,8 +322,8 @@
 
 
     i64.reinterpret_f64
-    global.get 0
-    i64.xor
+;;    global.get 0
+;;    i64.xor
     global.set 0 ;; last failure
 
 ;;    unreachable

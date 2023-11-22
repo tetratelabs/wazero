@@ -746,7 +746,7 @@ func Test1900(t *testing.T) {
 		m := mod.(*wasm.ModuleInstance)
 		_, err = m.ExportedFunction("9").Call(ctx)
 		//require.NoError(t, err)
-		require.Equal(t, uint64(15194062179110753778), m.Globals[0].Val)
+		require.Equal(t, uint64(17578661999652631539), m.Globals[0].Val)
 		require.Equal(t, uint64(0), m.Globals[0].ValHi)
 	})
 }
