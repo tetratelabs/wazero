@@ -4,6 +4,7 @@ import (
 	"context"
 	"embed"
 	"fmt"
+	"math"
 	"runtime"
 	"testing"
 
@@ -745,8 +746,8 @@ func Test1900(t *testing.T) {
 		require.NoError(t, err)
 		m := mod.(*wasm.ModuleInstance)
 		_, err = m.ExportedFunction("9").Call(ctx)
-		//require.NoError(t, err)
-		require.Equal(t, uint64(17578661999652631539), m.Globals[0].Val)
+		require.NoError(t, err)
+		require.Equal(t, uint64(math.Float64bits(2)), m.Globals[0].Val)
 		require.Equal(t, uint64(0), m.Globals[0].ValHi)
 	})
 }
