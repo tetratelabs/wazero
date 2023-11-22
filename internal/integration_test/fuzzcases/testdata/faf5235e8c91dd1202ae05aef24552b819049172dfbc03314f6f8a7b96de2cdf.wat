@@ -140,23 +140,23 @@
 ;;    i32.const 1
 ;;    i32.sub
 ;;    global.set 3
-    local.get 0
+;;    local.get 0
     ;;call 3
 
-        v128.const i32x4 0xa3a3a3a3 0xa3a3a3a3 0xffff25ff 0xffffffff
-        v128.const i32x4 0xffffff7f 0xffffffff 0xffffffff 0xffffffff
+;;        v128.const i32x4 0xa3a3a3a3 0xa3a3a3a3 0xffff25ff 0xffffffff
+;;        v128.const i32x4 0xffffff7f 0xffffffff 0xffffffff 0xffffffff
         v128.const i32x4 0xffff01ff 0xffffffff 0xffffffff 0xffffffff
         v128.const i32x4 0xffffffff 0xffffffff 0xffffffff 0xffffffff
         v128.const i32x4 0xffffffff 0x00000035 0xffffffff 0xffffffff
         v128.const i32x4 0xffffffff 0xffffffff 0xffffffff 0xffffffff
         v128.const i32x4 0xffffffff 0xffffffff 0x0000d30e 0xf7010000
         v128.const i32x4 0x0000ffff 0x0000db00 0xffffffd0 0x0000d0d0
-        v128.const i32x4 0x00000001 0x000002ff 0x00000000 0xffffff00
-        v128.const i32x4 0xffffffff 0xffffffff 0xf3f3ff2e 0x000000f3
-    v128.const i32x4 0x11111111 0x11111111 0x00000000 0x00000000
-    i64x2.extmul_low_i32x4_u
-    i64x2.extmul_low_i32x4_u
-    i64x2.extmul_low_i32x4_u
+;;        v128.const i32x4 0x00000001 0x000002ff 0x00000000 0xffffff00
+;;        v128.const i32x4 0xffffffff 0xffffffff 0xf3f3ff2e 0x000000f3
+;;    v128.const i32x4 0x11111111 0x11111111 0x00000000 0x00000000
+;;    i64x2.extmul_low_i32x4_u
+;;    i64x2.extmul_low_i32x4_u
+;;    i64x2.extmul_low_i32x4_u
     i64x2.extmul_low_i32x4_u
     i32x4.lt_s
     i64x2.extmul_low_i32x4_u
@@ -324,7 +324,7 @@
 
 ;;    unreachable
 
-drop drop drop
+;;drop drop drop
 
 ;;
 ;;    global.get 2
