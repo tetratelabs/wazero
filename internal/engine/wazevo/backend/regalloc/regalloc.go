@@ -726,6 +726,9 @@ func (a *Allocator) fixMergeState(f Function, blk Block) {
 	// Record that register-allocated phis and not.
 	for _, phi := range blk.BlockParams(&a.vs) {
 		vs := s.getVRegState(phi)
+		if wazevoapi.RegAllocLoggingEnabled && vs.spilled {
+			fmt.Printf("\tphi %s is spilled in blk%d\n", phi, vs.defBlk.ID())
+		}
 		if r, ok := aliveOnRegVRegs[phi]; ok {
 			vs.regPhi = r
 		}
@@ -744,7 +747,15 @@ func (a *Allocator) fixMergeState(f Function, blk Block) {
 		for ii := 0; ii < 64; ii++ {
 			r := RealReg(ii)
 			if v := predSt.endRegs.get(r); v.Valid() {
+				// If this register is expected to be spilled, inject a spill before the end of the block.
 				if _, ok := aliveOnRegVRegs[v]; !ok {
+					if vs := s.getVRegState(v); vs.spilled {
+						if wazevoapi.RegAllocLoggingEnabled {
+							fmt.Printf("\t%s is expected to be on stack in %d: spilling at the end.\n", v, pred.ID())
+						}
+						f.StoreRegisterBefore(v.SetRealReg(r), pred.LastInstr())
+						continue
+					}
 					continue
 				}
 				currentOccupants.add(r, v)

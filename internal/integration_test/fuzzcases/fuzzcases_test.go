@@ -745,7 +745,7 @@ func Test1900(t *testing.T) {
 		mod, err := r.Instantiate(ctx, getWasmBinary(t, "faf5235e8c91dd1202ae05aef24552b819049172dfbc03314f6f8a7b96de2cdf"))
 		require.NoError(t, err)
 		m := mod.(*wasm.ModuleInstance)
-		_, err = m.ExportedFunction("9").Call(ctx)
+		_, err = m.ExportedFunction("").Call(ctx)
 		require.NoError(t, err)
 		require.Equal(t, uint64(math.Float64bits(2)), m.Globals[0].Val)
 		require.Equal(t, uint64(0), m.Globals[0].ValHi)
