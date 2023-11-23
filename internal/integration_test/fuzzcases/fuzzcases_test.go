@@ -736,13 +736,14 @@ func Test1826(t *testing.T) {
 	})
 }
 
-// Test1900 tests ...
-func Test1900(t *testing.T) {
+// Test1845 tests regalloc ensures that when one predecessor Y1 for a block X
+// spills Vreg Vn, then all predecessors Y2, Y3, ... to X will also spill Vn.
+func Test1845(t *testing.T) {
 	if !platform.CompilerSupported() {
 		return
 	}
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		mod, err := r.Instantiate(ctx, getWasmBinary(t, "faf5235e8c91dd1202ae05aef24552b819049172dfbc03314f6f8a7b96de2cdf"))
+		mod, err := r.Instantiate(ctx, getWasmBinary(t, "1845"))
 		require.NoError(t, err)
 		m := mod.(*wasm.ModuleInstance)
 		_, err = m.ExportedFunction("").Call(ctx)
