@@ -750,3 +750,14 @@ func Test1846(t *testing.T) {
 		require.Equal(t, uint64(0), m.Globals[0].ValHi)
 	})
 }
+
+func Test1847(t *testing.T) {
+	run(t, func(t *testing.T, r wazero.Runtime) {
+		mod, err := r.Instantiate(ctx, getWasmBinary(t, "1847"))
+		require.NoError(t, err)
+		m := mod.(*wasm.ModuleInstance)
+		res, err := m.ExportedFunction("").Call(ctx)
+		require.NoError(t, err)
+		require.Equal(t, res, []uint64{0x0, 0x7fc0000000000000})
+	})
+}
