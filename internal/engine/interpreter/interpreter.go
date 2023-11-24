@@ -2973,6 +2973,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 				retHi = x1hi * x2hi
 				retLo = x1lo * x2lo
 			case wazeroir.ShapeF32x4:
+				fmt.Println(mulFloat32bits(uint32(x1hi>>32), uint32(x2hi>>32)) << 32)
 				retHi = mulFloat32bits(uint32(x1hi), uint32(x2hi)) | mulFloat32bits(uint32(x1hi>>32), uint32(x2hi>>32))<<32
 				retLo = mulFloat32bits(uint32(x1lo), uint32(x2lo)) | mulFloat32bits(uint32(x1lo>>32), uint32(x2lo>>32))<<32
 			case wazeroir.ShapeF64x2:
