@@ -21,6 +21,7 @@ func NewAllocator(allocatableRegs *RegisterInfo) Allocator {
 	a := Allocator{
 		regInfo:               allocatableRegs,
 		blockLivenessDataPool: wazevoapi.NewPool[blockLivenessData](resetBlockLivenessData),
+		phiDefInstListPool:    wazevoapi.NewPool[phiDefInstList](resetPhiDefInstList),
 	}
 	a.state.reset()
 	for _, regs := range allocatableRegs.AllocatableRegisters {
@@ -56,10 +57,10 @@ type (
 		blockLivenessData        [] /* blockID to */ *blockLivenessData
 		vs                       []VReg
 		maxBlockID               int
+		phiDefInstListPool       wazevoapi.Pool[phiDefInstList]
 
 		// Followings are re-used during various places e.g. coloring.
 		blks             []Block
-		insts            []Instr
 		reals            []RealReg
 		currentOccupants regInUseSet
 
@@ -115,10 +116,22 @@ type (
 		lastUse programCounter
 		// isPhi is true if this is a phi value.
 		isPhi bool
-		// isArg is true if this is phi (isPhi=true) and the value is passed via a real register at the beginning of the blk.
-		regPhi RealReg
+		// phiDefInstList is a list of instructions that defines this phi value.
+		// This is used to determine the spill location, and only valid if isPhi=true.
+		*phiDefInstList
+	}
+
+	// phiDefInstList is a linked list of instructions that defines a phi value.
+	phiDefInstList struct {
+		instr Instr
+		next  *phiDefInstList
 	}
 )
+
+func resetPhiDefInstList(l *phiDefInstList) {
+	l.instr = nil
+	l.next = nil
+}
 
 func (s *state) dump(info *RegisterInfo) { //nolint:unused
 	fmt.Println("\t\tstate:")
@@ -178,7 +191,7 @@ func (vs *vrState) reset() {
 	vs.spilled = false
 	vs.lca = nil
 	vs.isPhi = false
-	vs.regPhi = RealRegInvalid
+	vs.phiDefInstList = nil
 }
 
 func (s *state) getVRegState(v VReg) *vrState {
@@ -531,7 +544,6 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 	}
 
 	pc = 0
-	a.insts = a.insts[:0]
 	for instr := blk.InstrIteratorBegin(); instr != nil; instr = blk.InstrIteratorNext() {
 		if wazevoapi.RegAllocLoggingEnabled {
 			fmt.Println(instr)
@@ -641,11 +653,10 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 					fmt.Printf("\tdefining v%d with %s\n", def.ID(), a.regInfo.RealRegName(r))
 				}
 				if vState.isPhi {
-					if blk.Entry() {
-						// If this is the entry block, the phi value has a unique definition.
-						vState.defInstr = instr
-					}
-					a.insts = append(a.insts, instr)
+					n := a.phiDefInstListPool.Allocate()
+					n.instr = instr
+					n.next = vState.phiDefInstList
+					vState.phiDefInstList = n
 				} else {
 					vState.defInstr = instr
 					vState.defBlk = blk
@@ -656,16 +667,6 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 			fmt.Println(instr)
 		}
 		pc++
-	}
-
-	if !blk.Entry() {
-		for _, phiDefInstr := range a.insts {
-			phiDefInstr.Defs(&a.vs)
-			phi := a.vs[0]
-			if s.getVRegState(phi).r == RealRegInvalid {
-				f.StoreRegisterAfter(phi, phiDefInstr)
-			}
-		}
 	}
 
 	s.regsInUse.range_(func(allocated RealReg, v VReg) {
@@ -721,14 +722,6 @@ func (a *Allocator) fixMergeState(f Function, blk Block) {
 
 	if wazevoapi.RegAllocLoggingEnabled {
 		fmt.Println("fixMergeState", blk.ID(), ":", desiredOccupants.format(a.regInfo))
-	}
-
-	// Record that register-allocated phis and not.
-	for _, phi := range blk.BlockParams(&a.vs) {
-		vs := s.getVRegState(phi)
-		if r, ok := aliveOnRegVRegs[phi]; ok {
-			vs.regPhi = r
-		}
 	}
 
 	currentOccupants := &a.currentOccupants
@@ -885,21 +878,11 @@ func (a *Allocator) scheduleSpills(f Function) {
 
 func (a *Allocator) scheduleSpill(f Function, vs *vrState) {
 	v := vs.v
-	// If the value is the phi value, we need to insert a spill before the first instruction of the defining block whose
-	// arguments contain the value.
-	if phiDefiningBlk := vs.defBlk; vs.isPhi &&
-		// Except for the entry block since the phi value is actually defined via the instruction.
-		!phiDefiningBlk.Entry() {
-		if r := vs.regPhi; r == RealRegInvalid {
-			// This case, the phi is already passed via stack performed in the code inserted in fixMergeState function.
-			if wazevoapi.RegAllocLoggingEnabled {
-				fmt.Printf("v%d is already passed via stack at blk%v\n", v.ID(), phiDefiningBlk.ID())
-				fmt.Println(vs.defInstr)
-				a.blockStates[phiDefiningBlk.ID()].dump(a.regInfo)
-			}
-		} else {
-			// Otherwise, we need to insert a spill before the first instruction of the block.
-			f.StoreRegisterAfter(v.SetRealReg(r), phiDefiningBlk.FirstInstr())
+	// If the value is the phi value, we need to insert a spill after each phi definition.
+	if vs.isPhi {
+		for defInstr := vs.phiDefInstList; defInstr != nil; defInstr = defInstr.next {
+			def := defInstr.instr.Defs(&a.vs)[0]
+			f.StoreRegisterAfter(def, defInstr.instr)
 		}
 		return
 	}
@@ -955,6 +938,7 @@ func (a *Allocator) Reset() {
 		s.reset()
 	}
 	a.blockLivenessDataPool.Reset()
+	a.phiDefInstListPool.Reset()
 
 	a.vs = a.vs[:0]
 	a.maxBlockID = -1
