@@ -4,6 +4,7 @@ import (
 	"context"
 	"embed"
 	"fmt"
+	"math"
 	"runtime"
 	"testing"
 
@@ -719,7 +720,7 @@ func Test1825(t *testing.T) {
 	})
 }
 
-// Test1825 tests that lowerFcopysignImpl allocates correctly the temporary registers.
+// Test1826 tests that lowerFcopysignImpl allocates correctly the temporary registers.
 func Test1826(t *testing.T) {
 	if !platform.CompilerSupported() {
 		return
@@ -731,6 +732,21 @@ func Test1826(t *testing.T) {
 		_, err = m.ExportedFunction("3").Call(ctx, 0, 0)
 		require.NoError(t, err)
 		require.Equal(t, uint64(1608723901141126568), m.Globals[0].Val)
+		require.Equal(t, uint64(0), m.Globals[0].ValHi)
+	})
+}
+
+func Test1846(t *testing.T) {
+	if !platform.CompilerSupported() {
+		return
+	}
+	run(t, func(t *testing.T, r wazero.Runtime) {
+		mod, err := r.Instantiate(ctx, getWasmBinary(t, "1846"))
+		require.NoError(t, err)
+		m := mod.(*wasm.ModuleInstance)
+		_, err = m.ExportedFunction("").Call(ctx)
+		require.NoError(t, err)
+		require.Equal(t, math.Float64bits(2), m.Globals[0].Val)
 		require.Equal(t, uint64(0), m.Globals[0].ValHi)
 	})
 }
