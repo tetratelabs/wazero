@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 	"unsafe"
 
@@ -275,8 +276,16 @@ const valueTypeVector = 0x7b
 func ensureInvocationResultMatch(compiledMod, interpreterMod api.Module, exportedFunctions map[string]api.FunctionDefinition) (err error) {
 	ctx := context.Background()
 
+	// In order to do the deterministic execution, we need to sort the exported functions.
+	var names []string
+	for f := range exportedFunctions {
+		names = append(names, f)
+	}
+	sort.Strings(names)
+
 outer:
-	for name, def := range exportedFunctions {
+	for _, name := range names {
+		def := exportedFunctions[name]
 		resultTypes := def.ResultTypes()
 		for _, rt := range resultTypes {
 			switch rt {
