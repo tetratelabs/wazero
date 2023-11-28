@@ -382,7 +382,7 @@ func ensureValueIdToInstructionInit(b *builder) {
 	}
 }
 
-// passNopInstElimination eliminates the instructions which is essentially a no-op.
+// passConstFoldingOpt folds constant arithmetic ops into constant ops.
 func passConstFoldingOpt(b *builder) {
 	ensureValueIdToInstructionInit(b)
 
@@ -397,7 +397,6 @@ func passConstFoldingOpt(b *builder) {
 				// Y := Const yc
 				// - (Iadd X, Y) => Const (xc + yc)
 				case OpcodeIadd, OpcodeIsub:
-					isFixedPoint = false
 					x, y := cur.Arg2()
 					xDef := b.valueIDToInstruction[x.ID()]
 					yDef := b.valueIDToInstruction[y.ID()]
@@ -405,7 +404,9 @@ func passConstFoldingOpt(b *builder) {
 						// If we are adding some parameter, ignore.
 						continue
 					}
-					if xDef.Constant() || yDef.Constant() {
+					if xDef.Constant() && yDef.Constant() {
+						isFixedPoint = false
+
 						yc := yDef.ConstantVal()
 						xc := xDef.ConstantVal()
 						// Mutate the instruction to an Iconst.
