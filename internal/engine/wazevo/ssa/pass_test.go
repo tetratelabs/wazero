@@ -326,13 +326,8 @@ blk1: () <-- (blk0)
 				zeroI64_2 := b.AllocateInstruction().AsIconst64(0).Insert(b).Return()
 				nopIadd64_2 := b.AllocateInstruction().AsIadd(zeroI64_2, i64Param).Insert(b).Return()
 
-				// Iadd32 const1 + const2 should resolve to Const (const1 + const2).
-				nonZeroI32_3 := b.AllocateInstruction().AsIconst32(1234).Insert(b).Return()
-				nonZeroI32_4 := b.AllocateInstruction().AsIconst32(5678).Insert(b).Return()
-				foldIaddI32_3 := b.AllocateInstruction().AsIadd(nonZeroI32_3, nonZeroI32_4).Insert(b).Return()
-
 				ret := b.AllocateInstruction()
-				ret.AsReturn([]Value{nopIshl, nopUshr, nonZeroIshl, nonZeroSshr, nopIadd32, nopIadd32_2, nopIadd64, nopIadd64_2, foldIaddI32_3})
+				ret.AsReturn([]Value{nopIshl, nopUshr, nonZeroIshl, nonZeroSshr, nopIadd32, nopIadd32_2, nopIadd64, nopIadd64_2})
 				b.InsertInstruction(ret)
 				return nil
 			},
@@ -354,10 +349,7 @@ blk0: (v0:i32, v1:i64)
 	v15:i64 = Iadd v1, v14
 	v16:i64 = Iconst_64 0x0
 	v17:i64 = Iadd v16, v1
-	v18:i32 = Iconst_32 0x4d2
-	v19:i32 = Iconst_32 0x162e
-	v20:i32 = Iadd v18, v19
-	Return v3, v5, v7, v9, v11, v13, v15, v17, v20
+	Return v3, v5, v7, v9, v11, v13, v15, v17
 `,
 			after: `
 blk0: (v0:i32, v1:i64)
@@ -366,6 +358,51 @@ blk0: (v0:i32, v1:i64)
 	v8:i64 = Iconst_64 0x3d41
 	v9:i64 = Sshr v1, v8
 	Return v0, v1, v7, v9, v0, v0, v1, v1
+`,
+		},
+		{
+			name:     "const folding",
+			pass:     passConstFoldingOpt,
+			postPass: passDeadCodeEliminationOpt,
+			setup: func(b *builder) (verifier func(t *testing.T)) {
+				entry := b.AllocateBasicBlock()
+				b.SetCurrentBlock(entry)
+
+				// Iadd32 const1 + const2 should resolve to Const (const1 + const2).
+				nonZeroI32_1 := b.AllocateInstruction().AsIconst32(0x1).Insert(b).Return()
+				nonZeroI32_2 := b.AllocateInstruction().AsIconst32(0x2).Insert(b).Return()
+				foldIaddI32_1 := b.AllocateInstruction().AsIadd(nonZeroI32_1, nonZeroI32_2).Insert(b).Return()
+
+				// Iadd32 foldedConst1, const3 should resolve to Const (foldedConst1, const3).
+				nonZeroI32_3 := b.AllocateInstruction().AsIconst32(0x3).Insert(b).Return()
+				foldIaddI32_2 := b.AllocateInstruction().AsIadd(foldIaddI32_1, nonZeroI32_3).Insert(b).Return()
+
+				// Isub32 foldedConst1, const3 should resolve to Const (const4, foldedConst2).
+				nonZeroI32_4 := b.AllocateInstruction().AsIconst32(0x4).Insert(b).Return()
+				foldIsubI32_1 := b.AllocateInstruction().AsIsub(nonZeroI32_4, foldIaddI32_2).Insert(b).Return()
+
+				ret := b.AllocateInstruction()
+				ret.AsReturn([]Value{foldIsubI32_1})
+				b.InsertInstruction(ret)
+				return nil
+			},
+			before: `
+blk0: ()
+	v0:i32 = Iconst_32 0x1
+	v1:i32 = Iconst_32 0x2
+	v2:i32 = Iadd v0, v1
+	v3:i32 = Iconst_32 0x3
+	v4:i32 = Iadd v2, v3
+	v5:i32 = Iconst_32 0x4
+	v6:i32 = Isub v5, v4
+	Return v6
+`,
+			// FIXME: the first `Iconst_32 0x1` should be dead code, and should not be present in the output.
+			after: `
+blk0: ()
+	v0:i32 = Iconst_32 0x1
+	v6:i32 = Iconst_32 0xfffffffe
+	Return v6
 `,
 		},
 	} {

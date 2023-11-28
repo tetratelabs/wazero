@@ -33,6 +33,8 @@ func (b *builder) RunPasses() {
 	// 	Arithmetic simplifications.
 	// 	and more!
 
+	passConstFoldingOpt(b)
+
 	// passDeadCodeEliminationOpt could be more accurate if we do this after other optimizations.
 	passDeadCodeEliminationOpt(b)
 	b.donePasses = true
@@ -309,21 +311,7 @@ func (b *builder) clearBlkVisited() {
 
 // passNopInstElimination eliminates the instructions which is essentially a no-op.
 func passNopInstElimination(b *builder) {
-	if int(b.nextValueID) >= len(b.valueIDToInstruction) {
-		b.valueIDToInstruction = append(b.valueIDToInstruction, make([]*Instruction, b.nextValueID)...)
-	}
-
-	for blk := b.blockIteratorBegin(); blk != nil; blk = b.blockIteratorNext() {
-		for cur := blk.rootInstr; cur != nil; cur = cur.next {
-			r1, rs := cur.Returns()
-			if r1.Valid() {
-				b.valueIDToInstruction[r1.ID()] = cur
-			}
-			for _, r := range rs {
-				b.valueIDToInstruction[r.ID()] = cur
-			}
-		}
-	}
+	ensureValueIdToInstructionInit(b)
 
 	for blk := b.blockIteratorBegin(); blk != nil; blk = b.blockIteratorNext() {
 		for cur := blk.rootInstr; cur != nil; cur = cur.next {
@@ -352,32 +340,84 @@ func passNopInstElimination(b *builder) {
 					}
 				}
 			// Z := Const 0
-			// - (Iadd|Isub X, Z) => X
-			// - (Iadd Z, Y) => Y
-			case OpcodeIadd: //, OpcodeIsub:
+			// (Iadd X, Z) => X
+			// (Iadd Z, Y) => Y
+			case OpcodeIadd:
 				x, y := cur.Arg2()
-				xDef := b.valueIDToInstruction[x.ID()]
-				yDef := b.valueIDToInstruction[y.ID()]
-				if yDef == nil {
-					// If there's no defining instruction, that means the amount is coming from the parameter.
-					if xDef == nil {
-						// If we are adding the two parameters, ignore.
+				definingInst := b.valueIDToInstruction[y.ID()]
+				if definingInst == nil {
+					if definingInst = b.valueIDToInstruction[x.ID()]; definingInst == nil {
 						continue
 					} else {
-						// Add is commutative, normalize (param, y) => (y, param).
-						x, y = y, x
-						xDef, yDef = yDef, xDef
+						x = y
 					}
 				}
-				if yDef.Constant() {
-					yc := yDef.ConstantVal()
-					if yc == 0 {
-						b.alias(cur.Return(), x)
-					} else if xDef.Constant() {
+				if definingInst.Constant() && definingInst.ConstantVal() == 0 {
+					b.alias(cur.Return(), x)
+				}
+			}
+		}
+	}
+}
+
+func ensureValueIdToInstructionInit(b *builder) {
+	if len(b.valueIDToInstruction) != 0 {
+		return
+	}
+
+	if int(b.nextValueID) >= len(b.valueIDToInstruction) {
+		b.valueIDToInstruction = append(b.valueIDToInstruction, make([]*Instruction, b.nextValueID)...)
+	}
+
+	for blk := b.blockIteratorBegin(); blk != nil; blk = b.blockIteratorNext() {
+		for cur := blk.rootInstr; cur != nil; cur = cur.next {
+			r1, rs := cur.Returns()
+			if r1.Valid() {
+				b.valueIDToInstruction[r1.ID()] = cur
+			}
+			for _, r := range rs {
+				b.valueIDToInstruction[r.ID()] = cur
+			}
+		}
+	}
+}
+
+// passNopInstElimination eliminates the instructions which is essentially a no-op.
+func passConstFoldingOpt(b *builder) {
+	ensureValueIdToInstructionInit(b)
+
+	isFixedPoint := false
+	for !isFixedPoint {
+		isFixedPoint = true
+		for blk := b.blockIteratorBegin(); blk != nil; blk = b.blockIteratorNext() {
+			for cur := blk.rootInstr; cur != nil; cur = cur.next {
+				op := cur.Opcode()
+				switch op {
+				// X := Const xc
+				// Y := Const yc
+				// - (Iadd X, Y) => Const (xc + yc)
+				case OpcodeIadd, OpcodeIsub:
+					isFixedPoint = false
+					x, y := cur.Arg2()
+					xDef := b.valueIDToInstruction[x.ID()]
+					yDef := b.valueIDToInstruction[y.ID()]
+					if xDef == nil || yDef == nil {
+						// If we are adding some parameter, ignore.
+						continue
+					}
+					if xDef.Constant() || yDef.Constant() {
+						yc := yDef.ConstantVal()
 						xc := xDef.ConstantVal()
+						// Mutate the instruction to an Iconst.
 						cur.opcode = OpcodeIconst
-						cur.u1 = xc + yc
+						switch op {
+						case OpcodeIadd:
+							cur.u1 = xc + yc
+						case OpcodeIsub:
+							cur.u1 = xc - yc
+						}
 						cur.u2 = 0
+						// Clear the references to operands.
 						cur.v = 0
 						cur.v2 = 0
 					}
