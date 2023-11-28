@@ -310,20 +310,29 @@ blk1: () <-- (blk0)
 				nonZeroI64 := b.AllocateInstruction().AsIconst64(64*245 + 1).Insert(b).Return()
 				nonZeroSshr := b.AllocateInstruction().AsSshr(i64Param, nonZeroI64).Insert(b).Return()
 
-				// Iadd32.
-				zero32 := b.AllocateInstruction().AsIconst32(0).Insert(b).Return()
-				nopIadd32 := b.AllocateInstruction().AsIadd(i32Param, zero32).Insert(b).Return()
+				// Iadd32 x + 0 should resolve to const.
+				zeroI32 := b.AllocateInstruction().AsIconst32(0).Insert(b).Return()
+				nopIadd32 := b.AllocateInstruction().AsIadd(i32Param, zeroI32).Insert(b).Return()
 
-				// Iadd32.
-				zero32_2 := b.AllocateInstruction().AsIconst32(0).Insert(b).Return()
-				nopIadd32_2 := b.AllocateInstruction().AsIadd(zero32_2, i32Param).Insert(b).Return()
+				// Iadd32 0 + x should resolve to const.
+				zeroI32_2 := b.AllocateInstruction().AsIconst32(0).Insert(b).Return()
+				nopIadd32_2 := b.AllocateInstruction().AsIadd(zeroI32_2, i32Param).Insert(b).Return()
 
-				// Iadd64.
-				zero64 := b.AllocateInstruction().AsIconst64(0).Insert(b).Return()
-				nopIadd64 := b.AllocateInstruction().AsIadd(i64Param, zero64).Insert(b).Return()
+				// Iadd64 x + 0 should resolve to const.
+				zeroI64 := b.AllocateInstruction().AsIconst64(0).Insert(b).Return()
+				nopIadd64 := b.AllocateInstruction().AsIadd(i64Param, zeroI64).Insert(b).Return()
+
+				// Iadd64 0 + x should resolve to const.
+				zeroI64_2 := b.AllocateInstruction().AsIconst64(0).Insert(b).Return()
+				nopIadd64_2 := b.AllocateInstruction().AsIadd(zeroI64_2, i64Param).Insert(b).Return()
+
+				// Iadd32 const1 + const2 should resolve to Const (const1 + const2).
+				nonZeroI32_3 := b.AllocateInstruction().AsIconst32(1234).Insert(b).Return()
+				nonZeroI32_4 := b.AllocateInstruction().AsIconst32(5678).Insert(b).Return()
+				foldIaddI32_3 := b.AllocateInstruction().AsIadd(nonZeroI32_3, nonZeroI32_4).Insert(b).Return()
 
 				ret := b.AllocateInstruction()
-				ret.AsReturn([]Value{nopIshl, nopUshr, nonZeroIshl, nonZeroSshr, nopIadd32, nopIadd32_2, nopIadd64})
+				ret.AsReturn([]Value{nopIshl, nopUshr, nonZeroIshl, nonZeroSshr, nopIadd32, nopIadd32_2, nopIadd64, nopIadd64_2, foldIaddI32_3})
 				b.InsertInstruction(ret)
 				return nil
 			},
@@ -343,7 +352,12 @@ blk0: (v0:i32, v1:i64)
 	v13:i32 = Iadd v12, v0
 	v14:i64 = Iconst_64 0x0
 	v15:i64 = Iadd v1, v14
-	Return v3, v5, v7, v9, v11, v13, v15
+	v16:i64 = Iconst_64 0x0
+	v17:i64 = Iadd v16, v1
+	v18:i32 = Iconst_32 0x4d2
+	v19:i32 = Iconst_32 0x162e
+	v20:i32 = Iadd v18, v19
+	Return v3, v5, v7, v9, v11, v13, v15, v17, v20
 `,
 			after: `
 blk0: (v0:i32, v1:i64)
@@ -351,7 +365,7 @@ blk0: (v0:i32, v1:i64)
 	v7:i32 = Ishl v0, v6
 	v8:i64 = Iconst_64 0x3d41
 	v9:i64 = Sshr v1, v8
-	Return v0, v1, v7, v9, v0, v0, v1
+	Return v0, v1, v7, v9, v0, v0, v1, v1
 `,
 		},
 	} {

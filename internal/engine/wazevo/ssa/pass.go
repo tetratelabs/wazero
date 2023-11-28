@@ -327,7 +327,8 @@ func passNopInstElimination(b *builder) {
 
 	for blk := b.blockIteratorBegin(); blk != nil; blk = b.blockIteratorNext() {
 		for cur := blk.rootInstr; cur != nil; cur = cur.next {
-			switch cur.Opcode() {
+			op := cur.Opcode()
+			switch op {
 			// TODO: add more logics here.
 			// Amount := (Const $someValue)
 			// (Shift X, Amount) where Amount == x.Type.Bits() => X
@@ -351,20 +352,35 @@ func passNopInstElimination(b *builder) {
 					}
 				}
 			// Z := Const 0
-			// (Iadd X, Z) => X
-			// (Iadd Z, Y) => Y
-			case OpcodeIadd:
+			// - (Iadd|Isub X, Z) => X
+			// - (Iadd Z, Y) => Y
+			case OpcodeIadd: //, OpcodeIsub:
 				x, y := cur.Arg2()
-				definingInst := b.valueIDToInstruction[y.ID()]
-				if definingInst == nil {
-					if definingInst = b.valueIDToInstruction[x.ID()]; definingInst == nil {
+				xDef := b.valueIDToInstruction[x.ID()]
+				yDef := b.valueIDToInstruction[y.ID()]
+				if yDef == nil {
+					// If there's no defining instruction, that means the amount is coming from the parameter.
+					if xDef == nil {
+						// If we are adding the two parameters, ignore.
 						continue
 					} else {
-						x = y
+						// Add is commutative, normalize (param, y) => (y, param).
+						x, y = y, x
+						xDef, yDef = yDef, xDef
 					}
 				}
-				if definingInst.Constant() && definingInst.ConstantVal() == 0 {
-					b.alias(cur.Return(), x)
+				if yDef.Constant() {
+					yc := yDef.ConstantVal()
+					if yc == 0 {
+						b.alias(cur.Return(), x)
+					} else if xDef.Constant() {
+						xc := xDef.ConstantVal()
+						cur.opcode = OpcodeIconst
+						cur.u1 = xc + yc
+						cur.u2 = 0
+						cur.v = 0
+						cur.v2 = 0
+					}
 				}
 			}
 		}
