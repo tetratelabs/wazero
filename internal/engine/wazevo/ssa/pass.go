@@ -329,6 +329,8 @@ func passNopInstElimination(b *builder) {
 		for cur := blk.rootInstr; cur != nil; cur = cur.next {
 			switch cur.Opcode() {
 			// TODO: add more logics here.
+			// Amount := (Const $someValue)
+			// (Shift X, Amount) where Amount == x.Type.Bits() => X
 			case OpcodeIshl, OpcodeSshr, OpcodeUshr:
 				x, amount := cur.Arg2()
 				definingInst := b.valueIDToInstruction[amount.ID()]
@@ -347,6 +349,22 @@ func passNopInstElimination(b *builder) {
 					if v == 0 {
 						b.alias(cur.Return(), x)
 					}
+				}
+			// Z := Const 0
+			// (Iadd X, Z) => X
+			// (Iadd Z, Y) => Y
+			case OpcodeIadd:
+				x, y := cur.Arg2()
+				definingInst := b.valueIDToInstruction[y.ID()]
+				if definingInst == nil {
+					if definingInst = b.valueIDToInstruction[x.ID()]; definingInst == nil {
+						continue
+					} else {
+						x = y
+					}
+				}
+				if definingInst.Constant() && definingInst.ConstantVal() == 0 {
+					b.alias(cur.Return(), x)
 				}
 			}
 		}

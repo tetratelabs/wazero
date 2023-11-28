@@ -310,8 +310,20 @@ blk1: () <-- (blk0)
 				nonZeroI64 := b.AllocateInstruction().AsIconst64(64*245 + 1).Insert(b).Return()
 				nonZeroSshr := b.AllocateInstruction().AsSshr(i64Param, nonZeroI64).Insert(b).Return()
 
+				// Iadd32.
+				zero32 := b.AllocateInstruction().AsIconst32(0).Insert(b).Return()
+				nopIadd32 := b.AllocateInstruction().AsIadd(i32Param, zero32).Insert(b).Return()
+
+				// Iadd32.
+				zero32_2 := b.AllocateInstruction().AsIconst32(0).Insert(b).Return()
+				nopIadd32_2 := b.AllocateInstruction().AsIadd(zero32_2, i32Param).Insert(b).Return()
+
+				// Iadd64.
+				zero64 := b.AllocateInstruction().AsIconst64(0).Insert(b).Return()
+				nopIadd64 := b.AllocateInstruction().AsIadd(i64Param, zero64).Insert(b).Return()
+
 				ret := b.AllocateInstruction()
-				ret.AsReturn([]Value{nopIshl, nopUshr, nonZeroIshl, nonZeroSshr})
+				ret.AsReturn([]Value{nopIshl, nopUshr, nonZeroIshl, nonZeroSshr, nopIadd32, nopIadd32_2, nopIadd64})
 				b.InsertInstruction(ret)
 				return nil
 			},
@@ -325,7 +337,13 @@ blk0: (v0:i32, v1:i64)
 	v7:i32 = Ishl v0, v6
 	v8:i64 = Iconst_64 0x3d41
 	v9:i64 = Sshr v1, v8
-	Return v3, v5, v7, v9
+	v10:i32 = Iconst_32 0x0
+	v11:i32 = Iadd v0, v10
+	v12:i32 = Iconst_32 0x0
+	v13:i32 = Iadd v12, v0
+	v14:i64 = Iconst_64 0x0
+	v15:i64 = Iadd v1, v14
+	Return v3, v5, v7, v9, v11, v13, v15
 `,
 			after: `
 blk0: (v0:i32, v1:i64)
@@ -333,7 +351,7 @@ blk0: (v0:i32, v1:i64)
 	v7:i32 = Ishl v0, v6
 	v8:i64 = Iconst_64 0x3d41
 	v9:i64 = Sshr v1, v8
-	Return v0, v1, v7, v9
+	Return v0, v1, v7, v9, v0, v0, v1
 `,
 		},
 	} {
