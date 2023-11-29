@@ -381,8 +381,69 @@ blk0: (v0:i32, v1:i64)
 				nonZeroI32_4 := b.AllocateInstruction().AsIconst32(0x4).Insert(b).Return()
 				foldIsubI32_1 := b.AllocateInstruction().AsIsub(nonZeroI32_4, foldIaddI32_2).Insert(b).Return()
 
+				// Imul32 foldedConst, foldedConst should resolve to IConst32 (foldedConst * foldedConst).
+				foldImulI32_1 := b.AllocateInstruction().AsImul(foldIsubI32_1, foldIsubI32_1).Insert(b).Return()
+
+				// Iadd64 const1 + const2 should resolve to Const (const1 + const2).
+				nonZeroI64_1 := b.AllocateInstruction().AsIconst64(0x1).Insert(b).Return()
+				nonZeroI64_2 := b.AllocateInstruction().AsIconst64(0x2).Insert(b).Return()
+				foldIaddI64_1 := b.AllocateInstruction().AsIadd(nonZeroI64_1, nonZeroI64_2).Insert(b).Return()
+
+				// Iadd64 foldedConst1, const3 should resolve to Const (foldedConst1, const3).
+				nonZeroI64_3 := b.AllocateInstruction().AsIconst64(0x3).Insert(b).Return()
+				foldIaddI64_2 := b.AllocateInstruction().AsIadd(foldIaddI64_1, nonZeroI64_3).Insert(b).Return()
+
+				// Isub64 const4, foldedConst1 should resolve to Const (const4, foldedConst2).
+				nonZeroI64_4 := b.AllocateInstruction().AsIconst64(0x4).Insert(b).Return()
+				foldIsubI64_1 := b.AllocateInstruction().AsIsub(nonZeroI64_4, foldIaddI64_2).Insert(b).Return()
+
+				// Imul64 foldedConst, foldedConst should resolve to IConst64 (foldedConst * foldedConst).
+				foldImulI64_1 := b.AllocateInstruction().AsImul(foldIsubI64_1, foldIsubI64_1).Insert(b).Return()
+
+				// Fadd32 const1 + const2 should resolve to Const (const1 + const2).
+				nonZeroF32_1 := b.AllocateInstruction().AsF32const(1.0).Insert(b).Return()
+				nonZeroF32_2 := b.AllocateInstruction().AsF32const(2.0).Insert(b).Return()
+				foldFaddF32_1 := b.AllocateInstruction().AsFadd(nonZeroF32_1, nonZeroF32_2).Insert(b).Return()
+
+				// Fadd32 foldedConst1, const3 should resolve to Const (foldedConst1 + const3).
+				nonZeroF32_3 := b.AllocateInstruction().AsF32const(3.0).Insert(b).Return()
+				foldIaddF32_2 := b.AllocateInstruction().AsFadd(foldFaddF32_1, nonZeroF32_3).Insert(b).Return()
+
+				// Fsub32 const4, foldedConst1 should resolve to Const (const4 - foldedConst2).
+				nonZeroF32_4 := b.AllocateInstruction().AsF32const(4.0).Insert(b).Return()
+				foldIsubF32_1 := b.AllocateInstruction().AsFsub(nonZeroF32_4, foldIaddF32_2).Insert(b).Return()
+
+				// Fmul32 foldedConst, foldedConst should resolve to FConst32 (foldedConst * foldedConst).
+				foldFmulF32_1 := b.AllocateInstruction().AsFmul(foldIsubF32_1, foldIsubF32_1).Insert(b).Return()
+
+				// Fadd64 const1 + const2 should resolve to FConst64 (const1 + const2).
+				nonZeroF64_1 := b.AllocateInstruction().AsF64const(1.0).Insert(b).Return()
+				nonZeroF64_2 := b.AllocateInstruction().AsF64const(2.0).Insert(b).Return()
+				// This intermediate value won't be dropped because it is referenced in the result.
+				foldFaddF64_1 := b.AllocateInstruction().AsFadd(nonZeroF64_1, nonZeroF64_2).Insert(b).Return()
+
+				// Fadd64 foldedConst1, const3 should resolve to FConst64 (foldedConst1 + const3).
+				nonZeroF64_3 := b.AllocateInstruction().AsF64const(3.0).Insert(b).Return()
+				foldFaddF64_2 := b.AllocateInstruction().AsFadd(foldFaddF64_1, nonZeroF64_3).Insert(b).Return()
+
+				// Fsub64 const4, foldedConst1 should resolve to FConst64 (const4 - foldedConst2).
+				nonZeroF64_4 := b.AllocateInstruction().AsF64const(4.0).Insert(b).Return()
+				foldFsubF64_1 := b.AllocateInstruction().AsFsub(nonZeroF64_4, foldFaddF64_2).Insert(b).Return()
+
+				// Fmul64 foldedConst, foldedConst should resolve to FConst64 (foldedConst * foldedConst).
+				foldFmulF64_1 := b.AllocateInstruction().AsFmul(foldFsubF64_1, foldFsubF64_1).Insert(b).Return()
+
 				ret := b.AllocateInstruction()
-				ret.AsReturn([]Value{foldIsubI32_1})
+				ret.AsReturn([]Value{
+					foldImulI32_1,
+					foldIsubI64_1,
+					foldImulI64_1,
+					foldIsubF32_1,
+					foldFmulF32_1,
+					foldFaddF64_1,
+					foldFsubF64_1,
+					foldFmulF64_1,
+				})
 				b.InsertInstruction(ret)
 				return nil
 			},
@@ -395,13 +456,44 @@ blk0: ()
 	v4:i32 = Iadd v2, v3
 	v5:i32 = Iconst_32 0x4
 	v6:i32 = Isub v5, v4
-	Return v6
+	v7:i32 = Imul v6, v6
+	v8:i64 = Iconst_64 0x1
+	v9:i64 = Iconst_64 0x2
+	v10:i64 = Iadd v8, v9
+	v11:i64 = Iconst_64 0x3
+	v12:i64 = Iadd v10, v11
+	v13:i64 = Iconst_64 0x4
+	v14:i64 = Isub v13, v12
+	v15:i64 = Imul v14, v14
+	v16:f32 = F32const 1.000000
+	v17:f32 = F32const 2.000000
+	v18:f32 = Fadd v16, v17
+	v19:f32 = F32const 3.000000
+	v20:f32 = Fadd v18, v19
+	v21:f32 = F32const 4.000000
+	v22:f32 = Fsub v21, v20
+	v23:f32 = Fmul v22, v22
+	v24:f64 = F64const 1.000000
+	v25:f64 = F64const 2.000000
+	v26:f64 = Fadd v24, v25
+	v27:f64 = F64const 3.000000
+	v28:f64 = Fadd v26, v27
+	v29:f64 = F64const 4.000000
+	v30:f64 = Fsub v29, v28
+	v31:f64 = Fmul v30, v30
+	Return v7, v14, v15, v22, v23, v26, v30, v31
 `,
-			// FIXME: the first `Iconst_32 0x1` should be dead code, and should not be present in the output.
 			after: `
 blk0: ()
-	v6:i32 = Iconst_32 0xfffffffe
-	Return v6
+	v7:i32 = Iconst_32 0x4
+	v14:i64 = Iconst_64 0xfffffffffffffffe
+	v15:i64 = Iconst_64 0x4
+	v22:f32 = F32const -2.000000
+	v23:f32 = F32const 4.000000
+	v26:f64 = F64const 3.000000
+	v30:f64 = F64const -2.000000
+	v31:f64 = F64const 4.000000
+	Return v7, v14, v15, v22, v23, v26, v30, v31
 `,
 		},
 	} {

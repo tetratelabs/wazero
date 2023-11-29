@@ -1732,27 +1732,30 @@ func (i *Instruction) InsertlaneData() (x, y Value, index byte, l VecLane) {
 }
 
 // AsFadd initializes this instruction as a floating-point addition instruction with OpcodeFadd.
-func (i *Instruction) AsFadd(x, y Value) {
+func (i *Instruction) AsFadd(x, y Value) *Instruction {
 	i.opcode = OpcodeFadd
 	i.v = x
 	i.v2 = y
 	i.typ = x.Type()
+	return i
 }
 
 // AsFsub initializes this instruction as a floating-point subtraction instruction with OpcodeFsub.
-func (i *Instruction) AsFsub(x, y Value) {
+func (i *Instruction) AsFsub(x, y Value) *Instruction {
 	i.opcode = OpcodeFsub
 	i.v = x
 	i.v2 = y
 	i.typ = x.Type()
+	return i
 }
 
 // AsFmul initializes this instruction as a floating-point multiplication instruction with OpcodeFmul.
-func (i *Instruction) AsFmul(x, y Value) {
+func (i *Instruction) AsFmul(x, y Value) *Instruction {
 	i.opcode = OpcodeFmul
 	i.v = x
 	i.v2 = y
 	i.typ = x.Type()
+	return i
 }
 
 // AsFdiv initializes this instruction as a floating-point division instruction with OpcodeFdiv.

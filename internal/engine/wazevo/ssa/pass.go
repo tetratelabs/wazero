@@ -379,7 +379,8 @@ func ensureValueIdToInstructionInit(b *builder) {
 	}
 }
 
-// passConstFoldingOpt folds constant arithmetic ops into constant ops.
+// passConstFoldingOpt scans all instructions for arithmetic operations over constants,
+// and replaces them with a const of their result.
 func passConstFoldingOpt(b *builder) {
 	ensureValueIdToInstructionInit(b)
 
@@ -404,11 +405,10 @@ func passConstFoldingOpt(b *builder) {
 					if xDef.Constant() && yDef.Constant() {
 						isFixedPoint = false
 						// Mutate the instruction to an Iconst.
-						// We assume all the types are consistent.
 						cur.opcode = OpcodeIconst
 						// Clear the references to operands.
 						cur.v, cur.v2 = ValueInvalid, ValueInvalid
-
+						// We assume all the types are consistent.
 						xc, yc := xDef.ConstantVal(), yDef.ConstantVal()
 						switch op {
 						case OpcodeIadd:
@@ -430,12 +430,11 @@ func passConstFoldingOpt(b *builder) {
 					if xDef.Constant() && yDef.Constant() {
 						isFixedPoint = false
 						// Mutate the instruction to an Iconst.
-						// We assume all the types are consistent.
-						cur.opcode = OpcodeIconst
 						// Clear the references to operands.
 						cur.v, cur.v2 = ValueInvalid, ValueInvalid
-
+						// We assume all the types are consistent.
 						if x.Type().Bits() == 64 {
+							cur.opcode = OpcodeF64const
 							yc := math.Float64frombits(yDef.ConstantVal())
 							xc := math.Float64frombits(xDef.ConstantVal())
 							switch op {
@@ -447,6 +446,7 @@ func passConstFoldingOpt(b *builder) {
 								cur.u1 = math.Float64bits(xc * yc)
 							}
 						} else {
+							cur.opcode = OpcodeF32const
 							yc := math.Float32frombits(uint32(yDef.ConstantVal()))
 							xc := math.Float32frombits(uint32(xDef.ConstantVal()))
 							switch op {
