@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"fmt"
+	"math"
 	"sort"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
@@ -392,7 +393,7 @@ func passConstFoldingOpt(b *builder) {
 				// X := Const xc
 				// Y := Const yc
 				// - (Iadd X, Y) => Const (xc + yc)
-				case OpcodeIadd, OpcodeIsub:
+				case OpcodeIadd, OpcodeIsub, OpcodeImul:
 					x, y := cur.Arg2()
 					xDef := b.valueIDToInstruction[x.ID()]
 					yDef := b.valueIDToInstruction[y.ID()]
@@ -402,21 +403,60 @@ func passConstFoldingOpt(b *builder) {
 					}
 					if xDef.Constant() && yDef.Constant() {
 						isFixedPoint = false
-
-						yc := yDef.ConstantVal()
-						xc := xDef.ConstantVal()
-
-						// Clear the references to operands.
-						cur.v = ValueInvalid
-						cur.v2 = ValueInvalid
-
 						// Mutate the instruction to an Iconst.
+						// We assume all the types are consistent.
 						cur.opcode = OpcodeIconst
+						// Clear the references to operands.
+						cur.v, cur.v2 = ValueInvalid, ValueInvalid
+
+						xc, yc := xDef.ConstantVal(), yDef.ConstantVal()
 						switch op {
 						case OpcodeIadd:
 							cur.u1 = xc + yc
 						case OpcodeIsub:
 							cur.u1 = xc - yc
+						case OpcodeImul:
+							cur.u1 = xc * yc
+						}
+					}
+				case OpcodeFadd, OpcodeFsub, OpcodeFmul:
+					x, y := cur.Arg2()
+					xDef := b.valueIDToInstruction[x.ID()]
+					yDef := b.valueIDToInstruction[y.ID()]
+					if xDef == nil || yDef == nil {
+						// If we are adding together some parameter, ignore.
+						continue
+					}
+					if xDef.Constant() && yDef.Constant() {
+						isFixedPoint = false
+						// Mutate the instruction to an Iconst.
+						// We assume all the types are consistent.
+						cur.opcode = OpcodeIconst
+						// Clear the references to operands.
+						cur.v, cur.v2 = ValueInvalid, ValueInvalid
+
+						if x.Type().Bits() == 64 {
+							yc := math.Float64frombits(yDef.ConstantVal())
+							xc := math.Float64frombits(xDef.ConstantVal())
+							switch op {
+							case OpcodeFadd:
+								cur.u1 = math.Float64bits(xc + yc)
+							case OpcodeFsub:
+								cur.u1 = math.Float64bits(xc - yc)
+							case OpcodeFmul:
+								cur.u1 = math.Float64bits(xc * yc)
+							}
+						} else {
+							yc := math.Float32frombits(uint32(yDef.ConstantVal()))
+							xc := math.Float32frombits(uint32(xDef.ConstantVal()))
+							switch op {
+							case OpcodeFadd:
+								cur.u1 = uint64(math.Float32bits(xc + yc))
+							case OpcodeFsub:
+								cur.u1 = uint64(math.Float32bits(xc - yc))
+							case OpcodeFmul:
+								cur.u1 = uint64(math.Float32bits(xc * yc))
+							}
 						}
 					}
 				}
