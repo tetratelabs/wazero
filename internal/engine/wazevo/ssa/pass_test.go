@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"math"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -500,6 +501,73 @@ blk0: ()
 	v30:f64 = F64const -2.000000
 	v31:f64 = F64const 4.000000
 	Return v7, v14, v15, v22, v23, v26, v30, v31
+`,
+		},
+		{
+			name:     "const folding (overflow)",
+			prePass:  passCollectValueIdToInstructionMapping,
+			pass:     passConstFoldingOpt,
+			postPass: passDeadCodeEliminationOpt,
+			setup: func(b *builder) (verifier func(t *testing.T)) {
+				entry := b.AllocateBasicBlock()
+				b.SetCurrentBlock(entry)
+
+				maxI32 := b.AllocateInstruction().AsIconst32(math.MaxInt32).Insert(b).Return()
+				oneI32 := b.AllocateInstruction().AsIconst32(1).Insert(b).Return()
+				wrapI32 := b.AllocateInstruction().AsIadd(maxI32, oneI32).Insert(b).Return()
+				mulI32 := b.AllocateInstruction().AsImul(maxI32, maxI32).Insert(b).Return()
+
+				maxI64 := b.AllocateInstruction().AsIconst64(math.MaxInt64).Insert(b).Return()
+				oneI64 := b.AllocateInstruction().AsIconst64(1).Insert(b).Return()
+				wrapI64 := b.AllocateInstruction().AsIadd(maxI64, oneI64).Insert(b).Return()
+				mulI64 := b.AllocateInstruction().AsImul(maxI64, maxI64).Insert(b).Return()
+
+				maxF32 := b.AllocateInstruction().AsF32const(math.MaxFloat32).Insert(b).Return()
+				oneF32 := b.AllocateInstruction().AsF32const(1.0).Insert(b).Return()
+				addF32 := b.AllocateInstruction().AsFadd(maxF32, oneF32).Insert(b).Return()
+				mulF32 := b.AllocateInstruction().AsFmul(maxF32, maxF32).Insert(b).Return()
+
+				maxF64 := b.AllocateInstruction().AsF64const(math.MaxFloat64).Insert(b).Return()
+				oneF64 := b.AllocateInstruction().AsF64const(1.0).Insert(b).Return()
+				addF64 := b.AllocateInstruction().AsFadd(maxF64, oneF64).Insert(b).Return()
+				mulF64 := b.AllocateInstruction().AsFmul(maxF64, maxF64).Insert(b).Return()
+
+				ret := b.AllocateInstruction()
+				ret.AsReturn([]Value{wrapI32, mulI32, wrapI64, mulI64, addF32, mulF32, addF64, mulF64})
+				b.InsertInstruction(ret)
+				return nil
+			},
+			before: `
+blk0: ()
+	v0:i32 = Iconst_32 0x7fffffff
+	v1:i32 = Iconst_32 0x1
+	v2:i32 = Iadd v0, v1
+	v3:i32 = Imul v0, v0
+	v4:i64 = Iconst_64 0x7fffffffffffffff
+	v5:i64 = Iconst_64 0x1
+	v6:i64 = Iadd v4, v5
+	v7:i64 = Imul v4, v4
+	v8:f32 = F32const 340282346638528859811704183484516925440.000000
+	v9:f32 = F32const 1.000000
+	v10:f32 = Fadd v8, v9
+	v11:f32 = Fmul v8, v8
+	v12:f64 = F64const 179769313486231570814527423731704356798070567525844996598917476803157260780028538760589558632766878171540458953514382464234321326889464182768467546703537516986049910576551282076245490090389328944075868508455133942304583236903222948165808559332123348274797826204144723168738177180919299881250404026184124858368.000000
+	v13:f64 = F64const 1.000000
+	v14:f64 = Fadd v12, v13
+	v15:f64 = Fmul v12, v12
+	Return v2, v3, v6, v7, v10, v11, v14, v15
+`,
+			after: `
+blk0: ()
+	v2:i32 = Iconst_32 0x80000000
+	v3:i32 = Iconst_32 0x1
+	v6:i64 = Iconst_64 0x8000000000000000
+	v7:i64 = Iconst_64 0x1
+	v10:f32 = F32const 340282346638528859811704183484516925440.000000
+	v11:f32 = F32const +Inf
+	v14:f64 = F64const 179769313486231570814527423731704356798070567525844996598917476803157260780028538760589558632766878171540458953514382464234321326889464182768467546703537516986049910576551282076245490090389328944075868508455133942304583236903222948165808559332123348274797826204144723168738177180919299881250404026184124858368.000000
+	v15:f64 = F64const +Inf
+	Return v2, v3, v6, v7, v10, v11, v14, v15
 `,
 		},
 	} {

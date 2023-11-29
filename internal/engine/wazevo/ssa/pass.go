@@ -399,14 +399,26 @@ func passConstFoldingOpt(b *builder) {
 						// Clear the references to operands.
 						cur.v, cur.v2 = ValueInvalid, ValueInvalid
 						// We assume all the types are consistent.
-						xc, yc := xDef.ConstantVal(), yDef.ConstantVal()
-						switch op {
-						case OpcodeIadd:
-							cur.u1 = xc + yc
-						case OpcodeIsub:
-							cur.u1 = xc - yc
-						case OpcodeImul:
-							cur.u1 = xc * yc
+						if x.Type().Bits() == 64 {
+							xc, yc := int64(xDef.ConstantVal()), int64(yDef.ConstantVal())
+							switch op {
+							case OpcodeIadd:
+								cur.u1 = uint64(xc + yc)
+							case OpcodeIsub:
+								cur.u1 = uint64(xc - yc)
+							case OpcodeImul:
+								cur.u1 = uint64(xc * yc)
+							}
+						} else {
+							xc, yc := int32(xDef.ConstantVal()), int32(yDef.ConstantVal())
+							switch op {
+							case OpcodeIadd:
+								cur.u1 = uint64(xc + yc)
+							case OpcodeIsub:
+								cur.u1 = uint64(xc - yc)
+							case OpcodeImul:
+								cur.u1 = uint64(xc * yc)
+							}
 						}
 					}
 				case OpcodeFadd, OpcodeFsub, OpcodeFmul:
