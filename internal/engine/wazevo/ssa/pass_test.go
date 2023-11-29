@@ -9,6 +9,9 @@ import (
 func TestBuilder_passes(t *testing.T) {
 	for _, tc := range []struct {
 		name string
+		// prePass is run before the pass is executed, and can be used to configure the environment
+		// (e.g. init `*builder` fields).
+		prePass,
 		// pass is the optimization pass to run.
 		pass,
 		// postPass is run after the pass is executed, and can be used to test a pass that depends on another pass.
@@ -193,11 +196,9 @@ blk2: () <-- (blk1)
 `,
 		},
 		{
-			name: "dead code",
-			pass: func(b *builder) {
-				passCollectValueIdToInstructionMapping(b)
-				passDeadCodeEliminationOpt(b)
-			},
+			name:    "dead code",
+			prePass: passCollectValueIdToInstructionMapping,
+			pass:    passDeadCodeEliminationOpt,
 			setup: func(b *builder) func(*testing.T) {
 				entry, end := b.AllocateBasicBlock(), b.AllocateBasicBlock()
 
@@ -288,11 +289,9 @@ blk1: () <-- (blk0)
 `,
 		},
 		{
-			name: "nop elimination",
-			pass: func(b *builder) {
-				passCollectValueIdToInstructionMapping(b)
-				passNopInstElimination(b)
-			},
+			name:     "nop elimination",
+			prePass:  passCollectValueIdToInstructionMapping,
+			pass:     passNopInstElimination,
 			postPass: passDeadCodeEliminationOpt,
 			setup: func(b *builder) (verifier func(t *testing.T)) {
 				entry := b.AllocateBasicBlock()
@@ -367,11 +366,9 @@ blk0: (v0:i32, v1:i64)
 `,
 		},
 		{
-			name: "const folding",
-			pass: func(b *builder) {
-				passCollectValueIdToInstructionMapping(b)
-				passConstFoldingOpt(b)
-			},
+			name:     "const folding",
+			prePass:  passCollectValueIdToInstructionMapping,
+			pass:     passConstFoldingOpt,
 			postPass: passDeadCodeEliminationOpt,
 			setup: func(b *builder) (verifier func(t *testing.T)) {
 				entry := b.AllocateBasicBlock()
@@ -511,6 +508,9 @@ blk0: ()
 			b := NewBuilder().(*builder)
 			verifier := tc.setup(b)
 			require.Equal(t, tc.before, b.Format())
+			if tc.prePass != nil {
+				tc.prePass(b)
+			}
 			tc.pass(b)
 			if verifier != nil {
 				verifier(t)

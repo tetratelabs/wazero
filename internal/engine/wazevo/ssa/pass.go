@@ -18,10 +18,11 @@ func (b *builder) RunPasses() {
 	passSortSuccessors(b)
 	passDeadBlockEliminationOpt(b)
 	passRedundantPhiEliminationOpt(b)
-	// The result of passCalculateImmediateDominators will be used by various passes below.
+	// The result of passCalculateImmediateDominators and passCollectValueIdToInstructionMapping
+	// will be used by various passes below.
 	passCalculateImmediateDominators(b)
-
 	passCollectValueIdToInstructionMapping(b)
+
 	passNopInstElimination(b)
 
 	// TODO: implement either conversion of irreducible CFG into reducible one, or irreducible CFG detection where we panic.
@@ -371,11 +372,13 @@ func passCollectValueIdToInstructionMapping(b *builder) {
 // passConstFoldingOpt scans all instructions for arithmetic operations over constants,
 // and replaces them with a const of their result.
 func passConstFoldingOpt(b *builder) {
-	isFixedPoint := false
-	for !isFixedPoint {
-		isFixedPoint = true
-		for blk := b.blockIteratorBegin(); blk != nil; blk = b.blockIteratorNext() {
-			for cur := blk.rootInstr; cur != nil; cur = cur.next {
+	for blk := b.blockIteratorBegin(); blk != nil; blk = b.blockIteratorNext() {
+		for cur := blk.rootInstr; cur != nil; cur = cur.next {
+			// The fixed point is reached through a simple iteration over the list of instructions.
+			// Note: Instead of just an unbounded loop with a flag, we may also add an upper bound to the number of iterations.
+			isFixedPoint := false
+			for !isFixedPoint {
+				isFixedPoint = true
 				op := cur.Opcode()
 				switch op {
 				// X := Const xc
