@@ -361,8 +361,6 @@ func passNopInstElimination(b *builder) {
 }
 
 func ensureValueIdToInstructionInit(b *builder) {
-	b.valueIDToInstruction = b.valueIDToInstruction[:0]
-
 	if int(b.nextValueID) >= len(b.valueIDToInstruction) {
 		b.valueIDToInstruction = append(b.valueIDToInstruction, make([]*Instruction, b.nextValueID)...)
 	}
