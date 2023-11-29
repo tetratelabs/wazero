@@ -285,8 +285,11 @@ blk1: () <-- (blk0)
 `,
 		},
 		{
-			name:     "nop elimination",
-			pass:     passNopInstElimination,
+			name: "nop elimination",
+			pass: func(b *builder) {
+				passCollectValueIdToInstructionMapping(b)
+				passNopInstElimination(b)
+			},
 			postPass: passDeadCodeEliminationOpt,
 			setup: func(b *builder) (verifier func(t *testing.T)) {
 				entry := b.AllocateBasicBlock()
@@ -361,8 +364,11 @@ blk0: (v0:i32, v1:i64)
 `,
 		},
 		{
-			name:     "const folding",
-			pass:     passConstFoldingOpt,
+			name: "const folding",
+			pass: func(b *builder) {
+				passCollectValueIdToInstructionMapping(b)
+				passConstFoldingOpt(b)
+			},
 			postPass: passDeadCodeEliminationOpt,
 			setup: func(b *builder) (verifier func(t *testing.T)) {
 				entry := b.AllocateBasicBlock()

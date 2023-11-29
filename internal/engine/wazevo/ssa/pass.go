@@ -20,6 +20,8 @@ func (b *builder) RunPasses() {
 	passRedundantPhiEliminationOpt(b)
 	// The result of passCalculateImmediateDominators will be used by various passes below.
 	passCalculateImmediateDominators(b)
+
+	passCollectValueIdToInstructionMapping(b)
 	passNopInstElimination(b)
 
 	// TODO: implement either conversion of irreducible CFG into reducible one, or irreducible CFG detection where we panic.
@@ -312,8 +314,6 @@ func (b *builder) clearBlkVisited() {
 
 // passNopInstElimination eliminates the instructions which is essentially a no-op.
 func passNopInstElimination(b *builder) {
-	ensureValueIdToInstructionInit(b)
-
 	for blk := b.blockIteratorBegin(); blk != nil; blk = b.blockIteratorNext() {
 		for cur := blk.rootInstr; cur != nil; cur = cur.next {
 			op := cur.Opcode()
@@ -361,7 +361,7 @@ func passNopInstElimination(b *builder) {
 	}
 }
 
-func ensureValueIdToInstructionInit(b *builder) {
+func passCollectValueIdToInstructionMapping(b *builder) {
 	if int(b.nextValueID) >= len(b.valueIDToInstruction) {
 		b.valueIDToInstruction = append(b.valueIDToInstruction, make([]*Instruction, b.nextValueID)...)
 	}
@@ -382,8 +382,6 @@ func ensureValueIdToInstructionInit(b *builder) {
 // passConstFoldingOpt scans all instructions for arithmetic operations over constants,
 // and replaces them with a const of their result.
 func passConstFoldingOpt(b *builder) {
-	ensureValueIdToInstructionInit(b)
-
 	isFixedPoint := false
 	for !isFixedPoint {
 		isFixedPoint = true
