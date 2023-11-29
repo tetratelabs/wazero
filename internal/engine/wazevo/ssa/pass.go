@@ -405,6 +405,11 @@ func passConstFoldingOpt(b *builder) {
 
 						yc := yDef.ConstantVal()
 						xc := xDef.ConstantVal()
+
+						// Clear the references to operands.
+						cur.v = ValueInvalid
+						cur.v2 = ValueInvalid
+
 						// Mutate the instruction to an Iconst.
 						cur.opcode = OpcodeIconst
 						switch op {
@@ -413,10 +418,6 @@ func passConstFoldingOpt(b *builder) {
 						case OpcodeIsub:
 							cur.u1 = xc - yc
 						}
-						cur.u2 = 0
-						// Clear the references to operands.
-						cur.v = 0
-						cur.v2 = 0
 					}
 				}
 			}

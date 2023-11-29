@@ -400,7 +400,6 @@ blk0: ()
 			// FIXME: the first `Iconst_32 0x1` should be dead code, and should not be present in the output.
 			after: `
 blk0: ()
-	v0:i32 = Iconst_32 0x1
 	v6:i32 = Iconst_32 0xfffffffe
 	Return v6
 `,
