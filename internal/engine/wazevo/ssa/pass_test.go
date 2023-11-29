@@ -194,7 +194,10 @@ blk2: () <-- (blk1)
 		},
 		{
 			name: "dead code",
-			pass: passDeadCodeEliminationOpt,
+			pass: func(b *builder) {
+				passCollectValueIdToInstructionMapping(b)
+				passDeadCodeEliminationOpt(b)
+			},
 			setup: func(b *builder) func(*testing.T) {
 				entry, end := b.AllocateBasicBlock(), b.AllocateBasicBlock()
 

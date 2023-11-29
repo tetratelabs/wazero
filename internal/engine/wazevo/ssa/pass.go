@@ -179,9 +179,6 @@ func passDeadCodeEliminationOpt(b *builder) {
 	if nvid >= len(b.valueRefCounts) {
 		b.valueRefCounts = append(b.valueRefCounts, make([]int, b.nextValueID)...)
 	}
-	if nvid >= len(b.valueIDToInstruction) {
-		b.valueIDToInstruction = append(b.valueIDToInstruction, make([]*Instruction, b.nextValueID)...)
-	}
 
 	// First, we gather all the instructions with side effects.
 	liveInstructions := b.instStack[:0]
@@ -199,14 +196,6 @@ func passDeadCodeEliminationOpt(b *builder) {
 				liveInstructions = append(liveInstructions, cur)
 				// The strict side effect should create different instruction groups.
 				gid++
-			}
-
-			r1, rs := cur.Returns()
-			if r1.Valid() {
-				b.valueIDToInstruction[r1.ID()] = cur
-			}
-			for _, r := range rs {
-				b.valueIDToInstruction[r.ID()] = cur
 			}
 		}
 	}
