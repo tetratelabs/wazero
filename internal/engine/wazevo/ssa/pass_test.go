@@ -514,26 +514,70 @@ blk0: ()
 
 				maxI32 := b.AllocateInstruction().AsIconst32(math.MaxInt32).Insert(b).Return()
 				oneI32 := b.AllocateInstruction().AsIconst32(1).Insert(b).Return()
+				// Iadd MaxInt32, 1 overflows and wraps around to 0x80000000 (min representable Int32)
 				wrapI32 := b.AllocateInstruction().AsIadd(maxI32, oneI32).Insert(b).Return()
+				// Imul MaxInt32, MaxInt32 overflows and wraps around to 0x1.
 				mulI32 := b.AllocateInstruction().AsImul(maxI32, maxI32).Insert(b).Return()
+
+				// Explicitly using the constant because math.MinInt32 is not representable.
+				minI32 := b.AllocateInstruction().AsIconst32(0x80000000).Insert(b).Return()
+				// Isub 0x80000000, 1 overflows and wraps around to 0x7fffffff (max representable Int32)
+				negWrapI32 := b.AllocateInstruction().AsIsub(minI32, oneI32).Insert(b).Return()
 
 				maxI64 := b.AllocateInstruction().AsIconst64(math.MaxInt64).Insert(b).Return()
 				oneI64 := b.AllocateInstruction().AsIconst64(1).Insert(b).Return()
+				// Iadd MaxInt64, 1 overflows and wraps around to 0x8000000000000000 (min representable Int64)
 				wrapI64 := b.AllocateInstruction().AsIadd(maxI64, oneI64).Insert(b).Return()
 				mulI64 := b.AllocateInstruction().AsImul(maxI64, maxI64).Insert(b).Return()
 
+				// Explicitly using the constant because math.MinInt64 is not representable.
+				minI64 := b.AllocateInstruction().AsIconst64(0x8000000000000000).Insert(b).Return()
+				// Isub 0x8000000000000000, 1 overflows and wraps around to 0x7fffffffffffffff (max representable Int64)
+				negWrapI64 := b.AllocateInstruction().AsIsub(minI64, oneI64).Insert(b).Return()
+
 				maxF32 := b.AllocateInstruction().AsF32const(math.MaxFloat32).Insert(b).Return()
 				oneF32 := b.AllocateInstruction().AsF32const(1.0).Insert(b).Return()
+				// Fadd MaxFloat32, 1 absorbs the value and returns MaxFloat32.
 				addF32 := b.AllocateInstruction().AsFadd(maxF32, oneF32).Insert(b).Return()
+				// Fadd MaxFloat32, MaxFloat32 returns +Inf.
+				addF32_2 := b.AllocateInstruction().AsFadd(maxF32, maxF32).Insert(b).Return()
+				// Fmul MaxFloat32, MaxFloat32 returns +Inf.
 				mulF32 := b.AllocateInstruction().AsFmul(maxF32, maxF32).Insert(b).Return()
+
+				minF32 := b.AllocateInstruction().AsF32const(-math.MaxFloat32).Insert(b).Return()
+				// Fsub -MaxFloat32, 1 absorbs the value and returns -MaxFloat32.
+				subF32 := b.AllocateInstruction().AsFsub(minF32, oneF32).Insert(b).Return()
+				// Fsub -MaxFloat32, -MaxFloat32 returns ??
+				subF32_2 := b.AllocateInstruction().AsFadd(minF32, minF32).Insert(b).Return()
+				// Fmul returns +Inf.
+				mulMinF32 := b.AllocateInstruction().AsFmul(minF32, minF32).Insert(b).Return()
 
 				maxF64 := b.AllocateInstruction().AsF64const(math.MaxFloat64).Insert(b).Return()
 				oneF64 := b.AllocateInstruction().AsF64const(1.0).Insert(b).Return()
+				// Fadd MaxFloat64, 1 absorbs the value and returns MaxFloat64.
 				addF64 := b.AllocateInstruction().AsFadd(maxF64, oneF64).Insert(b).Return()
+				// Fadd MaxFloat64, MaxFloat64 returns +Inf.
+				addF64_2 := b.AllocateInstruction().AsFadd(maxF64, maxF64).Insert(b).Return()
+				// Fmul MaxFloat64, MaxFloat64 returns +Inf.
 				mulF64 := b.AllocateInstruction().AsFmul(maxF64, maxF64).Insert(b).Return()
 
+				minF64 := b.AllocateInstruction().AsF64const(-math.MaxFloat64).Insert(b).Return()
+				// Fsub -MaxFloat64, 1 absorbs the value and returns -MaxFloat64.
+				subF64 := b.AllocateInstruction().AsFsub(minF64, oneF64).Insert(b).Return()
+				// Fsub -MaxFloat64, -MaxFloat64 returns -Inf.
+				subF64_2 := b.AllocateInstruction().AsFadd(minF64, minF64).Insert(b).Return()
+				// Fmul -MaxFloat64, -MaxFloat64 returns +Inf.
+				mulMinF64 := b.AllocateInstruction().AsFmul(minF64, minF64).Insert(b).Return()
+
 				ret := b.AllocateInstruction()
-				ret.AsReturn([]Value{wrapI32, mulI32, wrapI64, mulI64, addF32, mulF32, addF64, mulF64})
+				ret.AsReturn([]Value{
+					wrapI32, mulI32, negWrapI32,
+					wrapI64, mulI64, negWrapI64,
+					addF32, addF32_2, mulF32,
+					subF32, subF32_2, mulMinF32,
+					addF64, addF64_2, mulF64,
+					subF64, subF64_2, mulMinF64,
+				})
 				b.InsertInstruction(ret)
 				return nil
 			},
@@ -543,31 +587,55 @@ blk0: ()
 	v1:i32 = Iconst_32 0x1
 	v2:i32 = Iadd v0, v1
 	v3:i32 = Imul v0, v0
-	v4:i64 = Iconst_64 0x7fffffffffffffff
-	v5:i64 = Iconst_64 0x1
-	v6:i64 = Iadd v4, v5
-	v7:i64 = Imul v4, v4
-	v8:f32 = F32const 340282346638528859811704183484516925440.000000
-	v9:f32 = F32const 1.000000
-	v10:f32 = Fadd v8, v9
-	v11:f32 = Fmul v8, v8
-	v12:f64 = F64const 179769313486231570814527423731704356798070567525844996598917476803157260780028538760589558632766878171540458953514382464234321326889464182768467546703537516986049910576551282076245490090389328944075868508455133942304583236903222948165808559332123348274797826204144723168738177180919299881250404026184124858368.000000
-	v13:f64 = F64const 1.000000
-	v14:f64 = Fadd v12, v13
-	v15:f64 = Fmul v12, v12
-	Return v2, v3, v6, v7, v10, v11, v14, v15
+	v4:i32 = Iconst_32 0x80000000
+	v5:i32 = Isub v4, v1
+	v6:i64 = Iconst_64 0x7fffffffffffffff
+	v7:i64 = Iconst_64 0x1
+	v8:i64 = Iadd v6, v7
+	v9:i64 = Imul v6, v6
+	v10:i64 = Iconst_64 0x8000000000000000
+	v11:i64 = Isub v10, v7
+	v12:f32 = F32const 3.4028235e+38
+	v13:f32 = F32const 1
+	v14:f32 = Fadd v12, v13
+	v15:f32 = Fadd v12, v12
+	v16:f32 = Fmul v12, v12
+	v17:f32 = F32const -3.4028235e+38
+	v18:f32 = Fsub v17, v13
+	v19:f32 = Fadd v17, v17
+	v20:f32 = Fmul v17, v17
+	v21:f64 = F64const 1.7976931348623157e+308
+	v22:f64 = F64const 1
+	v23:f64 = Fadd v21, v22
+	v24:f64 = Fadd v21, v21
+	v25:f64 = Fmul v21, v21
+	v26:f64 = F64const -1.7976931348623157e+308
+	v27:f64 = Fsub v26, v22
+	v28:f64 = Fadd v26, v26
+	v29:f64 = Fmul v26, v26
+	Return v2, v3, v5, v8, v9, v11, v14, v15, v16, v18, v19, v20, v23, v24, v25, v27, v28, v29
 `,
 			after: `
 blk0: ()
 	v2:i32 = Iconst_32 0x80000000
 	v3:i32 = Iconst_32 0x1
-	v6:i64 = Iconst_64 0x8000000000000000
-	v7:i64 = Iconst_64 0x1
-	v10:f32 = F32const 340282346638528859811704183484516925440.000000
-	v11:f32 = F32const +Inf
-	v14:f64 = F64const 179769313486231570814527423731704356798070567525844996598917476803157260780028538760589558632766878171540458953514382464234321326889464182768467546703537516986049910576551282076245490090389328944075868508455133942304583236903222948165808559332123348274797826204144723168738177180919299881250404026184124858368.000000
-	v15:f64 = F64const +Inf
-	Return v2, v3, v6, v7, v10, v11, v14, v15
+	v5:i32 = Iconst_32 0x7fffffff
+	v8:i64 = Iconst_64 0x8000000000000000
+	v9:i64 = Iconst_64 0x1
+	v11:i64 = Iconst_64 0x7fffffffffffffff
+	v14:f32 = F32const 3.4028235e+38
+	v15:f32 = F32const +Inf
+	v16:f32 = F32const +Inf
+	v18:f32 = F32const -3.4028235e+38
+	v19:f32 = F32const -Inf
+	v20:f32 = F32const +Inf
+	v23:f64 = F64const 1.7976931348623157e+308
+	v24:f64 = F64const +Inf
+	v25:f64 = F64const +Inf
+	v27:f64 = F64const -1.7976931348623157e+308
+	v28:f64 = F64const -Inf
+	v29:f64 = F64const +Inf
+	Return v2, v3, v5, v8, v9, v11, v14, v15, v16, v18, v19, v20, v23, v24, v25, v27, v28, v29
 `,
 		},
 	} {
