@@ -472,20 +472,20 @@ blk0: ()
 	v13:i64 = Iconst_64 0x4
 	v14:i64 = Isub v13, v12
 	v15:i64 = Imul v14, v14
-	v16:f32 = F32const 1.000000
-	v17:f32 = F32const 2.000000
+	v16:f32 = F32const 1
+	v17:f32 = F32const 2
 	v18:f32 = Fadd v16, v17
-	v19:f32 = F32const 3.000000
+	v19:f32 = F32const 3
 	v20:f32 = Fadd v18, v19
-	v21:f32 = F32const 4.000000
+	v21:f32 = F32const 4
 	v22:f32 = Fsub v21, v20
 	v23:f32 = Fmul v22, v22
-	v24:f64 = F64const 1.000000
-	v25:f64 = F64const 2.000000
+	v24:f64 = F64const 1
+	v25:f64 = F64const 2
 	v26:f64 = Fadd v24, v25
-	v27:f64 = F64const 3.000000
+	v27:f64 = F64const 3
 	v28:f64 = Fadd v26, v27
-	v29:f64 = F64const 4.000000
+	v29:f64 = F64const 4
 	v30:f64 = Fsub v29, v28
 	v31:f64 = Fmul v30, v30
 	Return v7, v14, v15, v22, v23, v26, v30, v31
@@ -495,11 +495,11 @@ blk0: ()
 	v7:i32 = Iconst_32 0x4
 	v14:i64 = Iconst_64 0xfffffffffffffffe
 	v15:i64 = Iconst_64 0x4
-	v22:f32 = F32const -2.000000
-	v23:f32 = F32const 4.000000
-	v26:f64 = F64const 3.000000
-	v30:f64 = F64const -2.000000
-	v31:f64 = F64const 4.000000
+	v22:f32 = F32const -2
+	v23:f32 = F32const 4
+	v26:f64 = F64const 3
+	v30:f64 = F64const -2
+	v31:f64 = F64const 4
 	Return v7, v14, v15, v22, v23, v26, v30, v31
 `,
 		},

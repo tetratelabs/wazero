@@ -95,8 +95,8 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i32)
 blk0: (exec_ctx:i64, module_ctx:i64)
 	v2:i32 = Iconst_32 0x0
 	v3:i64 = Iconst_64 0x0
-	v4:f32 = F32const 0.000000
-	v5:f64 = F64const 0.000000
+	v4:f32 = F32const 0
+	v5:f64 = F64const 0
 	Jump blk_ret
 `,
 			expAfterOpt: `
@@ -136,8 +136,8 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
 blk0: (exec_ctx:i64, module_ctx:i64, v2:i64, v3:f32, v4:f64)
 	v5:i32 = Iconst_32 0x0
 	v6:i64 = Iconst_64 0x0
-	v7:f32 = F32const 0.000000
-	v8:f64 = F64const 0.000000
+	v7:f32 = F32const 0
+	v8:f64 = F64const 0
 	v9:i64 = Iadd v2, v2
 	v10:i64 = Isub v9, v2
 	v11:f32 = Fadd v3, v3
@@ -204,8 +204,8 @@ blk1: () <-- (blk0)
 blk0: (exec_ctx:i64, module_ctx:i64)
 	v2:i32 = Iconst_32 0x0
 	v3:i64 = Iconst_64 0x0
-	v4:f32 = F32const 0.000000
-	v5:f64 = F64const 0.000000
+	v4:f32 = F32const 0
+	v5:f64 = F64const 0
 	Jump blk1
 
 blk1: () <-- (blk0)
@@ -311,8 +311,8 @@ blk3: () <-- (blk1)
 blk0: (exec_ctx:i64, module_ctx:i64)
 	v2:i32 = Iconst_32 0x0
 	v3:i64 = Iconst_64 0x0
-	v4:f32 = F32const 0.000000
-	v5:f64 = F64const 0.000000
+	v4:f32 = F32const 0
+	v5:f64 = F64const 0
 	Jump blk1
 
 blk1: () <-- (blk0)
@@ -885,45 +885,45 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:f32)
 	v60:i32 = Iadd v9, v59
 	v61:i32 = Iadd v7, v60
 	v62:i32 = Iadd v5, v61
-	v63:f32 = F32const 1.000000
+	v63:f32 = F32const 1
 	v64:f32 = Fmul v3, v63
-	v65:f32 = F32const 2.000000
+	v65:f32 = F32const 2
 	v66:f32 = Fmul v3, v65
-	v67:f32 = F32const 3.000000
+	v67:f32 = F32const 3
 	v68:f32 = Fmul v3, v67
-	v69:f32 = F32const 4.000000
+	v69:f32 = F32const 4
 	v70:f32 = Fmul v3, v69
-	v71:f32 = F32const 5.000000
+	v71:f32 = F32const 5
 	v72:f32 = Fmul v3, v71
-	v73:f32 = F32const 6.000000
+	v73:f32 = F32const 6
 	v74:f32 = Fmul v3, v73
-	v75:f32 = F32const 7.000000
+	v75:f32 = F32const 7
 	v76:f32 = Fmul v3, v75
-	v77:f32 = F32const 8.000000
+	v77:f32 = F32const 8
 	v78:f32 = Fmul v3, v77
-	v79:f32 = F32const 9.000000
+	v79:f32 = F32const 9
 	v80:f32 = Fmul v3, v79
-	v81:f32 = F32const 10.000000
+	v81:f32 = F32const 10
 	v82:f32 = Fmul v3, v81
-	v83:f32 = F32const 11.000000
+	v83:f32 = F32const 11
 	v84:f32 = Fmul v3, v83
-	v85:f32 = F32const 12.000000
+	v85:f32 = F32const 12
 	v86:f32 = Fmul v3, v85
-	v87:f32 = F32const 13.000000
+	v87:f32 = F32const 13
 	v88:f32 = Fmul v3, v87
-	v89:f32 = F32const 14.000000
+	v89:f32 = F32const 14
 	v90:f32 = Fmul v3, v89
-	v91:f32 = F32const 15.000000
+	v91:f32 = F32const 15
 	v92:f32 = Fmul v3, v91
-	v93:f32 = F32const 16.000000
+	v93:f32 = F32const 16
 	v94:f32 = Fmul v3, v93
-	v95:f32 = F32const 17.000000
+	v95:f32 = F32const 17
 	v96:f32 = Fmul v3, v95
-	v97:f32 = F32const 18.000000
+	v97:f32 = F32const 18
 	v98:f32 = Fmul v3, v97
-	v99:f32 = F32const 19.000000
+	v99:f32 = F32const 19
 	v100:f32 = Fmul v3, v99
-	v101:f32 = F32const 20.000000
+	v101:f32 = F32const 20
 	v102:f32 = Fmul v3, v101
 	v103:f32 = Fadd v100, v102
 	v104:f32 = Fadd v98, v103
@@ -1356,10 +1356,10 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 	v4:i64 = Iconst_64 0x2
 	v5:i64 = Load module_ctx, 0x10
 	Store v4, v5, 0x8
-	v6:f32 = F32const 3.000000
+	v6:f32 = F32const 3
 	v7:i64 = Load module_ctx, 0x18
 	Store v6, v7, 0x8
-	v8:f64 = F64const 4.000000
+	v8:f64 = F64const 4
 	v9:i64 = Load module_ctx, 0x20
 	Store v8, v9, 0x8
 	Jump blk_ret, v2, v4, v6, v8

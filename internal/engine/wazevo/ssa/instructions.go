@@ -2394,9 +2394,9 @@ func (i *Instruction) Format(b Builder) string {
 	case OpcodeVconst:
 		instSuffix = fmt.Sprintf(" %016x %016x", i.u1, i.u2)
 	case OpcodeF32const:
-		instSuffix = fmt.Sprintf(" %f", math.Float32frombits(uint32(i.u1)))
+		instSuffix = fmt.Sprintf(" %g", math.Float32frombits(uint32(i.u1)))
 	case OpcodeF64const:
-		instSuffix = fmt.Sprintf(" %f", math.Float64frombits(i.u1))
+		instSuffix = fmt.Sprintf(" %g", math.Float64frombits(i.u1))
 	case OpcodeReturn:
 		if len(i.vs) == 0 {
 			break
