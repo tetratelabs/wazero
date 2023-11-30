@@ -58,8 +58,15 @@ func (m *MemoryInstance) Definition() api.MemoryDefinition {
 }
 
 // Size implements the same method as documented on api.Memory.
+// WARNING: returned size can be innacurate if the number of
+// pages is >= 65536 pages, as the buffer length becomes 2^32
+// which is larger than the maximum of uint32, use Size64() instead
 func (m *MemoryInstance) Size() uint32 {
 	return m.size()
+}
+
+func (m *MemoryInstance) Size64() uint64 {
+	return m.size64()
 }
 
 // ReadByte implements the same method as documented on api.Memory.
@@ -177,7 +184,7 @@ func MemoryPagesToBytesNum(pages uint32) (bytesNum uint64) {
 
 // Grow implements the same method as documented on api.Memory.
 func (m *MemoryInstance) Grow(delta uint32) (result uint32, ok bool) {
-	currentPages := memoryBytesNumToPages(uint64(len(m.Buffer)))
+	currentPages := memoryBytesNumToPages(m.size64())
 	if delta == 0 {
 		return currentPages, true
 	}
@@ -199,7 +206,7 @@ func (m *MemoryInstance) Grow(delta uint32) (result uint32, ok bool) {
 
 // PageSize returns the current memory buffer size in pages.
 func (m *MemoryInstance) PageSize() (result uint32) {
-	return memoryBytesNumToPages(uint64(len(m.Buffer)))
+	return memoryBytesNumToPages(m.size64())
 }
 
 // PagesToUnitOfBytes converts the pages to a human-readable form similar to what's specified. e.g. 1 -> "64Ki"
@@ -233,11 +240,15 @@ func (m *MemoryInstance) size() uint32 {
 	return uint32(len(m.Buffer)) // We don't lock here because size can't become smaller.
 }
 
+func (m *MemoryInstance) size64() uint64 {
+	return uint64(len(m.Buffer))
+}
+
 // hasSize returns true if Len is sufficient for byteCount at the given offset.
 //
 // Note: This is always fine, because memory can grow, but never shrink.
 func (m *MemoryInstance) hasSize(offset uint32, byteCount uint64) bool {
-	return uint64(offset)+byteCount <= uint64(len(m.Buffer)) // uint64 prevents overflow on add
+	return uint64(offset)+byteCount <= m.size64() // uint64 prevents overflow on add
 }
 
 // readUint32Le implements ReadUint32Le without using a context. This is extracted as both ints and floats are stored in
