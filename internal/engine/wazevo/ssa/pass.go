@@ -369,15 +369,18 @@ func passCollectValueIdToInstructionMapping(b *builder) {
 	}
 }
 
+// passConstFoldingOptMaxIter controls the max number of iterations per-BB, before giving up.
+const passConstFoldingOptMaxIter = 10
+
 // passConstFoldingOpt scans all instructions for arithmetic operations over constants,
-// and replaces them with a const of their result.
+// and replaces them with a const of their result. Repeats for each basic blocks until
+// a fixed point is reached or num iter == passConstFoldingOptMaxIter.
 func passConstFoldingOpt(b *builder) {
 	for blk := b.blockIteratorBegin(); blk != nil; blk = b.blockIteratorNext() {
 		for cur := blk.rootInstr; cur != nil; cur = cur.next {
 			// The fixed point is reached through a simple iteration over the list of instructions.
 			// Note: Instead of just an unbounded loop with a flag, we may also add an upper bound to the number of iterations.
-			isFixedPoint := false
-			for !isFixedPoint {
+			for iter, isFixedPoint := 0, false; iter < passConstFoldingOptMaxIter && !isFixedPoint; iter++ {
 				isFixedPoint = true
 				op := cur.Opcode()
 				switch op {
@@ -399,26 +402,16 @@ func passConstFoldingOpt(b *builder) {
 						// Clear the references to operands.
 						cur.v, cur.v2 = ValueInvalid, ValueInvalid
 						// We assume all the types are consistent.
-						if x.Type().Bits() == 64 {
-							xc, yc := int64(xDef.ConstantVal()), int64(yDef.ConstantVal())
-							switch op {
-							case OpcodeIadd:
-								cur.u1 = uint64(xc + yc)
-							case OpcodeIsub:
-								cur.u1 = uint64(xc - yc)
-							case OpcodeImul:
-								cur.u1 = uint64(xc * yc)
-							}
-						} else {
-							xc, yc := int32(xDef.ConstantVal()), int32(yDef.ConstantVal())
-							switch op {
-							case OpcodeIadd:
-								cur.u1 = uint64(xc + yc)
-							case OpcodeIsub:
-								cur.u1 = uint64(xc - yc)
-							case OpcodeImul:
-								cur.u1 = uint64(xc * yc)
-							}
+						// Signed integers are 2 complement, so we can just apply the operations.
+						// Operations are evaluated over uint64s and will be bitcasted at the use-sites.
+						xc, yc := xDef.ConstantVal(), yDef.ConstantVal()
+						switch op {
+						case OpcodeIadd:
+							cur.u1 = xc + yc
+						case OpcodeIsub:
+							cur.u1 = xc - yc
+						case OpcodeImul:
+							cur.u1 = xc * yc
 						}
 					}
 				case OpcodeFadd, OpcodeFsub, OpcodeFmul:
@@ -426,7 +419,7 @@ func passConstFoldingOpt(b *builder) {
 					xDef := b.valueIDToInstruction[x.ID()]
 					yDef := b.valueIDToInstruction[y.ID()]
 					if xDef == nil || yDef == nil {
-						// If we are adding together some parameter, ignore.
+						// If we are composing some parameter, ignore.
 						continue
 					}
 					if xDef.Constant() && yDef.Constant() {

@@ -528,6 +528,7 @@ blk0: ()
 				oneI64 := b.AllocateInstruction().AsIconst64(1).Insert(b).Return()
 				// Iadd MaxInt64, 1 overflows and wraps around to 0x8000000000000000 (min representable Int64)
 				wrapI64 := b.AllocateInstruction().AsIadd(maxI64, oneI64).Insert(b).Return()
+				// Imul MaxInt64, MaxInt64 overflows and wraps around to 0x1.
 				mulI64 := b.AllocateInstruction().AsImul(maxI64, maxI64).Insert(b).Return()
 
 				// Explicitly using the constant because math.MinInt64 is not representable.
