@@ -528,7 +528,7 @@ blk0: ()
 				oneI64 := b.AllocateInstruction().AsIconst64(1).Insert(b).Return()
 				// Iadd MaxInt64, 1 overflows and wraps around to 0x8000000000000000 (min representable Int64)
 				wrapI64 := b.AllocateInstruction().AsIadd(maxI64, oneI64).Insert(b).Return()
-				// Imul MaxInt64, MaxInt64 overflows and wraps around to 0x1.
+				// Imul MaxInt64, MaxInt32 overflows and wraps around to 0x1.
 				mulI64 := b.AllocateInstruction().AsImul(maxI64, maxI64).Insert(b).Return()
 
 				// Explicitly using the constant because math.MinInt64 is not representable.
@@ -637,6 +637,54 @@ blk0: ()
 	v28:f64 = F64const -Inf
 	v29:f64 = F64const +Inf
 	Return v2, v3, v5, v8, v9, v11, v14, v15, v16, v18, v19, v20, v23, v24, v25, v27, v28, v29
+`,
+		},
+		{
+			name:     "algebraic simplification",
+			prePass:  passCollectValueIdToInstructionMapping,
+			pass:     passAlgebraicSimplification,
+			postPass: passDeadCodeEliminationOpt,
+			setup: func(b *builder) (verifier func(t *testing.T)) {
+				entry := b.AllocateBasicBlock()
+				b.SetCurrentBlock(entry)
+
+				i32Param := entry.AddParam(b, TypeI32)
+				i64Param := entry.AddParam(b, TypeI64)
+
+				oneI32 := b.AllocateInstruction().AsIconst32(1).Insert(b).Return()
+				twoI32 := b.AllocateInstruction().AsIconst32(2).Insert(b).Return()
+				res1I32 := b.AllocateInstruction().AsIadd(i32Param, oneI32).Insert(b).Return()
+				res2I32 := b.AllocateInstruction().AsIadd(res1I32, twoI32).Insert(b).Return()
+
+				oneI64 := b.AllocateInstruction().AsIconst64(1).Insert(b).Return()
+				twoI64 := b.AllocateInstruction().AsIconst64(2).Insert(b).Return()
+				res1I64 := b.AllocateInstruction().AsIadd(i64Param, oneI64).Insert(b).Return()
+				res2I64 := b.AllocateInstruction().AsIadd(res1I64, twoI64).Insert(b).Return()
+
+				ret := b.AllocateInstruction()
+				ret.AsReturn([]Value{res2I32, res2I64})
+				b.InsertInstruction(ret)
+				return nil
+			},
+			before: `
+blk0: (v0:i32, v1:i64)
+	v2:i32 = Iconst_32 0x1
+	v3:i32 = Iconst_32 0x2
+	v4:i32 = Iadd v0, v2
+	v5:i32 = Iadd v4, v3
+	v6:i64 = Iconst_64 0x1
+	v7:i64 = Iconst_64 0x2
+	v8:i64 = Iadd v1, v6
+	v9:i64 = Iadd v8, v7
+	Return v5, v9
+`,
+			after: `
+blk0: (v0:i32, v1:i64)
+	v10:i32 = Iconst_32 0x3
+	v5:i32 = Iadd v0, v10
+	v11:i64 = Iconst_64 0x3
+	v9:i64 = Iadd v1, v11
+	Return v5, v9
 `,
 		},
 	} {

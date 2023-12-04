@@ -38,6 +38,9 @@ func (b *builder) RunPasses() {
 	// 	and more!
 
 	passConstFoldingOpt(b)
+	passAlgebraicSimplification(b)
+
+	passCollectValueIdToInstructionMapping(b)
 
 	// passDeadCodeEliminationOpt could be more accurate if we do this after other optimizations.
 	passDeadCodeEliminationOpt(b)
@@ -369,7 +372,7 @@ func passCollectValueIdToInstructionMapping(b *builder) {
 	}
 }
 
-// passConstFoldingOptMaxIter controls the max number of iterations per-BB, before giving up.
+// passConstFoldingOptMaxIter controls the max number of iterations per-BB in passConstFoldingOpt, before giving up.
 const passConstFoldingOptMaxIter = 10
 
 // passConstFoldingOpt scans all instructions for arithmetic operations over constants,
@@ -453,6 +456,93 @@ func passConstFoldingOpt(b *builder) {
 								cur.u1 = uint64(math.Float32bits(xc * yc))
 							}
 						}
+					}
+				}
+			}
+		}
+	}
+}
+
+// passAlgebraicSimplificationMaxIter controls the max number of iterations per-BB in passAlgebraicSimplification, before giving up.
+const passAlgebraicSimplificationMaxIter = 10
+
+// passAlgebraicSimplification performs algebraic simplification.
+func passAlgebraicSimplification(b *builder) {
+	// isConstant is a utility for nil-safe check for Constant(). It can be moved into inst.Constant() if useful.
+	isConstant := func(inst *Instruction) bool { return inst != nil && inst.Constant() }
+	// isCanonical returns true when the given pair of instruction resolves to non-constant, constant.
+	isCanonical := func(a, b *Instruction) bool { return !isConstant(a) && isConstant(b) }
+	makeAddConstant := func(yDef, wDef *Instruction) *Instruction {
+		// Create a const as wide as yDef (either 32 or 64-bits), sum the two consts in cur and xDef.
+		// We are assuming the types match.
+		instr := b.AllocateInstruction()
+		instr.opcode = OpcodeIconst
+		instr.typ = yDef.typ
+		instr.u1 = yDef.ConstantVal() + wDef.ConstantVal()
+		instr.rValue = b.allocateValue(yDef.typ)
+		return instr
+	}
+	// TODO: We should first canonicalize operations. E.g, Iadd const, v => Iadd v, const.
+	for blk := b.blockIteratorBegin(); blk != nil; blk = b.blockIteratorNext() {
+		for iter, isFixedPoint := 0, false; iter < passAlgebraicSimplificationMaxIter && !isFixedPoint; iter++ {
+			isFixedPoint = true
+			for cur := blk.rootInstr; cur != nil; cur = cur.next {
+				// The fixed point is reached through a simple iteration over the list of instructions.
+				// Note: Instead of just an unbounded loop with a flag, we may also add an upper bound to the number of iterations.
+				op := cur.Opcode()
+				switch op {
+				// For a given sequence of instructions:
+				//     C0 = Iconst_(32|64) ...
+				//     C1 = Iconst_(32|64) ...
+				//	   V0 = ...
+				//     V1 = Iadd V0, C0
+				//     Vn = Iadd V1, C1
+				// Rewrites Vn to:
+				//     Ck = Iconst_(32|64) C0+C1
+				//     Vn = Iadd V0, Ck
+				// C0, C1, V0, V1 might be deleted by passDeadCodeEliminationOpt
+				// if they are not referenced by other instructions.
+				case OpcodeIadd:
+					x, y := cur.Arg2()
+					xDef, yDef := b.valueIDToInstruction[x.ID()], b.valueIDToInstruction[y.ID()]
+					// Only apply if the referenced value was defined by an Iadd.
+					if xDef == nil || xDef.Opcode() != OpcodeIadd {
+						continue
+					}
+					// Canonical representation is `Iadd Value, Const`
+					if !isCanonical(xDef, yDef) {
+						continue
+					}
+					// Verify the instruction xDef is in the form `Iadd Value, Const`
+					v, w := xDef.Arg2()
+					vDef, wDef := b.valueIDToInstruction[v.ID()], b.valueIDToInstruction[w.ID()]
+					if !isCanonical(vDef, wDef) {
+						continue
+					}
+
+					isFixedPoint = false
+
+					// Create a const as wide as yDef (either 32 or 64-bits), sum the two consts in cur and xDef.
+					// We are assuming the types match.
+					instr := makeAddConstant(yDef, wDef)
+					// Update the current instruction to point to the value referenced by xDef and the new const.
+					cur.v, cur.v2 = v, instr.Return()
+
+					// Update or append the new valueId to the mapping slice.
+					if int(b.nextValueID) >= len(b.valueIDToInstruction) {
+						b.valueIDToInstruction = append(b.valueIDToInstruction, instr)
+					} else {
+						b.valueIDToInstruction[instr.Return().ID()] = instr
+					}
+
+					// Insert the new instruction in the linked list between cur.prev and cur.
+					cur.prev.next = instr
+					instr.prev = cur.prev
+					cur.prev = instr
+					instr.next = cur
+
+					if cur == blk.rootInstr {
+						blk.rootInstr = instr
 					}
 				}
 			}
