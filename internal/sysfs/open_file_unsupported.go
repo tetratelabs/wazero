@@ -1,4 +1,4 @@
-//go:build !darwin && !linux && !windows && !illumos && !solaris && !freebsd
+//go:build (!darwin && !linux && !windows && !illumos && !solaris && !freebsd) || tinygo
 
 package sysfs
 

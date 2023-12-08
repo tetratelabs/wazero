@@ -17,3 +17,7 @@ func mmapCodeSegmentAMD64(size int) ([]byte, error) {
 func mmapCodeSegmentARM64(size int) ([]byte, error) {
 	return nil, errNotYetSupported
 }
+
+func MprotectRX(b []byte) (err error) {
+	return errNotYetSupported
+}
