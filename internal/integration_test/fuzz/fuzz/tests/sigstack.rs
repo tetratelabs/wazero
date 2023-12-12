@@ -29,6 +29,11 @@ fn main() {
             // cause any memory corruption. I would say such C program is using Go library in a dangerous way.
             //
             // To reproduce the failure in wazevo, Use SaFlags::empty() and wazevoapi.StackGuardCheckEnabled=true.
+            //
+            // Note that this only happens the Go program is used c-archive or c-shared. If the Go program is
+            // used normally, the signal handlers are installed on each signal by the Go runtime, which
+            // sets SA_ONSTACK and proper alternate stack, hence there's no way the current stack is used
+            // during singal handling.
             SaFlags::SA_ONSTACK,
             SigSet::empty(),
         );
