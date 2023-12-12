@@ -7,16 +7,17 @@ import (
 	_ "embed"
 	"encoding/hex"
 	"fmt"
-	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/internal/engine/wazevo"
-	"github.com/tetratelabs/wazero/internal/leb128"
-	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
-	"github.com/tetratelabs/wazero/internal/wasm"
 	"math"
 	"os"
 	"path"
 	"runtime"
 	"strings"
+
+	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo"
+	"github.com/tetratelabs/wazero/internal/leb128"
+	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
+	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 func main() {}

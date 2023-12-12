@@ -17,11 +17,18 @@ fn main() {
         let sa = SigAction::new(
             SigHandler::SigAction(handler),
             // Set SA_ONSTACK to ensure the signal handler runs on the alternate stack.
-            // If this is not set, which happens when the host C program not having intention to deal with
-            // signals gracefully, the signal handler will run on the "current stack". That is problematic
-            // when the sig handling happens during execution of wazevo function because it uses "Go allocated" stack.
-            // On the other hand, this is a general problem for any C program that uses Go as a library when they do not
-            // install sig handlers with SA_ONSTACK.
+            // The alternate stack is prepared by the Go runtime if there's not the one by the host C program
+            // via the sigaltstack syscall. However if this flag is not set, which happens when
+            // the host C program not having intention to deal with signals gracefully (e.g. stack overflow),
+            // the signal handler (installed by either C program or Go runtime) will run on
+            // the "current stack". That is problematic when a signal handling happens during execution
+            // of wazevo function because it uses "Go allocated" stack.
+            //
+            // On the other hand, this is more of a general problem for any C program that uses Go as a library,
+            // not limited to wazevo, when it do not not install sig handlers with SA_ONSTACK. That means
+            // the Gorountime stack results in being used during signal handling, which can potentially
+            // cause any memory corruption.I would say such C program is using Go library in a dangerous way.
+            //
             // To reproduce the failure in wazevo, Use SaFlags::empty() and wazevoapi.StackGuardCheckEnabled=true.
             SaFlags::SA_ONSTACK,
             SigSet::empty(),
