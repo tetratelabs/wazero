@@ -373,7 +373,7 @@ func passCollectValueIdToInstructionMapping(b *builder) {
 }
 
 // passConstFoldingOptMaxIter controls the max number of iterations per-BB in passConstFoldingOpt, before giving up.
-const passConstFoldingOptMaxIter = 10
+const passConstFoldingOptMaxIter = math.MaxInt
 
 // passConstFoldingOpt scans all instructions for arithmetic operations over constants,
 // and replaces them with a const of their result. Repeats for each basic blocks until
@@ -408,14 +408,7 @@ func passConstFoldingOpt(b *builder) {
 						// Signed integers are 2 complement, so we can just apply the operations.
 						// Operations are evaluated over uint64s and will be bitcasted at the use-sites.
 						xc, yc := xDef.ConstantVal(), yDef.ConstantVal()
-						switch op {
-						case OpcodeIadd:
-							cur.u1 = xc + yc
-						case OpcodeIsub:
-							cur.u1 = xc - yc
-						case OpcodeImul:
-							cur.u1 = xc * yc
-						}
+						cur.u1 = eval(op, xc, yc)
 					}
 				case OpcodeFadd, OpcodeFsub, OpcodeFmul:
 					x, y := cur.Arg2()
@@ -463,6 +456,25 @@ func passConstFoldingOpt(b *builder) {
 	}
 }
 
+func eval(op Opcode, xc uint64, yc uint64) uint64 {
+	switch op {
+	case OpcodeIadd:
+		return xc + yc
+	case OpcodeIsub:
+		return xc - yc
+	case OpcodeImul:
+		return xc * yc
+	case OpcodeBor:
+		return xc | yc
+	case OpcodeBand:
+		return xc & yc
+	case OpcodeBxor:
+		return xc ^ yc
+	default:
+		panic("unhandled default case")
+	}
+}
+
 // passAlgebraicSimplificationMaxIter controls the max number of iterations per-BB in passAlgebraicSimplification, before giving up.
 const passAlgebraicSimplificationMaxIter = 10
 
@@ -472,14 +484,15 @@ func passAlgebraicSimplification(b *builder) {
 	isConstant := func(inst *Instruction) bool { return inst != nil && inst.Constant() }
 	// isCanonical returns true when the given pair of instruction resolves to non-constant, constant.
 	isCanonical := func(a, b *Instruction) bool { return !isConstant(a) && isConstant(b) }
-	makeAddConstant := func(yDef, wDef *Instruction) *Instruction {
+	makeConstant := func(yDef, wDef *Instruction, op Opcode) *Instruction {
 		// Create a const as wide as yDef (either 32 or 64-bits), sum the two consts in cur and xDef.
 		// We are assuming the types match.
 		instr := b.AllocateInstruction()
 		instr.opcode = OpcodeIconst
 		instr.typ = yDef.typ
-		instr.u1 = yDef.ConstantVal() + wDef.ConstantVal()
 		instr.rValue = b.allocateValue(yDef.typ)
+		yc, wc := yDef.ConstantVal(), wDef.ConstantVal()
+		instr.u1 = eval(op, yc, wc)
 		return instr
 	}
 	// TODO: We should first canonicalize operations. E.g, Iadd const, v => Iadd v, const.
@@ -502,11 +515,11 @@ func passAlgebraicSimplification(b *builder) {
 				//     Vn = Iadd V0, Ck
 				// C0, C1, V0, V1 might be deleted by passDeadCodeEliminationOpt
 				// if they are not referenced by other instructions.
-				case OpcodeIadd:
+				case OpcodeIadd, OpcodeImul, OpcodeBor, OpcodeBand, OpcodeBxor:
 					x, y := cur.Arg2()
 					xDef, yDef := b.valueIDToInstruction[x.ID()], b.valueIDToInstruction[y.ID()]
-					// Only apply if the referenced value was defined by an Iadd.
-					if xDef == nil || xDef.Opcode() != OpcodeIadd {
+					// Only apply if the referenced value was defined by the same instruction.
+					if xDef == nil || xDef.Opcode() != op {
 						continue
 					}
 					// Canonical representation is `Iadd Value, Const`
@@ -524,7 +537,7 @@ func passAlgebraicSimplification(b *builder) {
 
 					// Create a const as wide as yDef (either 32 or 64-bits), sum the two consts in cur and xDef.
 					// We are assuming the types match.
-					instr := makeAddConstant(yDef, wDef)
+					instr := makeConstant(yDef, wDef, op)
 					// Update the current instruction to point to the value referenced by xDef and the new const.
 					cur.v, cur.v2 = v, instr.Return()
 
@@ -544,6 +557,8 @@ func passAlgebraicSimplification(b *builder) {
 					if cur == blk.rootInstr {
 						blk.rootInstr = instr
 					}
+				default:
+					continue
 				}
 			}
 		}
