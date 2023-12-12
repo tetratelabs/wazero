@@ -111,7 +111,7 @@ func test_signal_stack() {
 	//    )
 	//  )
 	//  (global (;0;) (mut i32) i32.const 2147483648)
-	//)
+	// )
 	bin := binaryencoding.EncodeModule(&wasm.Module{
 		TypeSection:     []wasm.FunctionType{{}},
 		FunctionSection: []wasm.Index{0},
