@@ -25,9 +25,9 @@ fn main() {
             // of wazevo function because it uses "Go allocated" stack.
             //
             // On the other hand, this is more of a general problem for any C program that uses Go as a library,
-            // not limited to wazevo, when it do not not install sig handlers with SA_ONSTACK. That means
-            // the Gorountime stack results in being used during signal handling, which can potentially
-            // cause any memory corruption.I would say such C program is using Go library in a dangerous way.
+            // not limited to wazevo, when it does not not install sig handlers with SA_ONSTACK. That means
+            // any Gorountime stack could result in being used during signal handling, which can potentially
+            // cause any memory corruption. I would say such C program is using Go library in a dangerous way.
             //
             // To reproduce the failure in wazevo, Use SaFlags::empty() and wazevoapi.StackGuardCheckEnabled=true.
             SaFlags::SA_ONSTACK,
