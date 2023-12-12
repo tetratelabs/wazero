@@ -480,6 +480,42 @@ func Test_fdFdstatGet_StdioNonblock(t *testing.T) {
 	}
 }
 
+func Test_fdFdstatSetFlagsWithTrunc(t *testing.T) {
+	tmpDir := t.TempDir()
+	fileName := "test"
+
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().
+		WithFSConfig(wazero.NewFSConfig().WithDirMount(tmpDir, "/")))
+	defer r.Close(testCtx)
+
+	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
+	preopen := fsc.RootFS()
+
+	fd, errno := fsc.OpenFile(preopen, fileName, experimentalsys.O_RDWR|experimentalsys.O_CREAT|experimentalsys.O_EXCL|experimentalsys.O_TRUNC, 0o600)
+	require.EqualErrno(t, 0, errno)
+
+	// Write the initial text to the file.
+	f, ok := fsc.LookupFile(fd)
+	require.True(t, ok)
+	n, _ := f.File.Write([]byte("abc"))
+	require.Equal(t, n, 3)
+
+	buf, err := os.ReadFile(joinPath(tmpDir, fileName))
+	require.NoError(t, err)
+	require.Equal(t, "abc", string(buf))
+
+	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdFdstatSetFlagsName, uint64(fd), uint64(0))
+	require.Equal(t, `
+==> wasi_snapshot_preview1.fd_fdstat_set_flags(fd=4,flags=)
+<== errno=ESUCCESS
+`, "\n"+log.String())
+	log.Reset()
+
+	buf, err = os.ReadFile(joinPath(tmpDir, fileName))
+	require.NoError(t, err)
+	require.Equal(t, "abc", string(buf))
+}
+
 func Test_fdFdstatSetFlags(t *testing.T) {
 	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
 

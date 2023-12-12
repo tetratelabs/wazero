@@ -83,8 +83,8 @@ func (f *osFile) SetAppend(enable bool) (errno experimentalsys.Errno) {
 		f.flag &= ^experimentalsys.O_APPEND
 	}
 
-	// Clear any create flag, as we are re-opening, not re-creating.
-	f.flag &= ^experimentalsys.O_CREAT
+	// Clear any create or trunc flag, as we are re-opening, not re-creating.
+	f.flag &= ^(experimentalsys.O_CREAT | experimentalsys.O_TRUNC)
 
 	// appendMode (bool) cannot be changed later, so we have to re-open the
 	// file. https://github.com/golang/go/blob/go1.20/src/os/file_unix.go#L60
