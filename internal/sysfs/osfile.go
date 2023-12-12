@@ -98,9 +98,38 @@ func (f *osFile) reopen() (errno experimentalsys.Errno) {
 	// Clear any create flag, as we are re-opening, not re-creating.
 	f.flag &= ^experimentalsys.O_CREAT
 
+	var (
+		isDir  bool
+		offset int64
+		err    error
+	)
+
+	isDir, errno = f.IsDir()
+	if errno != 0 {
+		return errno
+	}
+
+	if !isDir {
+		offset, err = f.file.Seek(0, 1)
+		if err != nil {
+			return experimentalsys.UnwrapOSError(err)
+		}
+	}
+
 	_ = f.close()
 	f.file, errno = OpenFile(f.path, f.flag, f.perm)
-	return
+	if errno != 0 {
+		return errno
+	}
+
+	if !isDir {
+		_, err = f.file.Seek(offset, 0)
+		if err != nil {
+			return experimentalsys.UnwrapOSError(err)
+		}
+	}
+
+	return 0
 }
 
 // IsNonblock implements the same method as documented on fsapi.File

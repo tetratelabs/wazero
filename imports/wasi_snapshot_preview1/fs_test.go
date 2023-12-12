@@ -597,6 +597,13 @@ func Test_fdFdstatSetFlags(t *testing.T) {
 `, "\n"+log.String()) // FIXME? flags==0 prints 'flags='
 	log.Reset()
 
+	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdSeekName, uint64(fd), uint64(0), uint64(0), uint64(1024))
+	require.Equal(t, `
+==> wasi_snapshot_preview1.fd_seek(fd=4,offset=0,whence=0)
+<== (newoffset=0,errno=ESUCCESS)
+`, "\n"+log.String())
+	log.Reset()
+
 	// Without O_APPEND flag, the data is written at the beginning.
 	writeWazero()
 	requireFileContent("wazero6789" + "wazero")
@@ -608,6 +615,16 @@ func Test_fdFdstatSetFlags(t *testing.T) {
 <== errno=ESUCCESS
 `, "\n"+log.String()) // FIXME? flags==1 prints 'flags=APPEND'
 	log.Reset()
+
+	// Restoring the O_APPEND flag should not reset fd offset.
+	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdTellName, uint64(fd), uint64(1024))
+	require.Equal(t, `
+==> wasi_snapshot_preview1.fd_tell(fd=4,result.offset=1024)
+<== errno=ESUCCESS
+`, "\n"+log.String())
+	log.Reset()
+	offset, _ := mod.Memory().Read(1024, 4)
+	require.Equal(t, offset, []byte{6, 0, 0, 0})
 
 	// with O_APPEND flag, the data is appended to buffer.
 	writeWazero()
