@@ -12,6 +12,9 @@ cargo-fuzz = true
 libfuzzer-sys = "0.4.7"
 wasm-smith = "0.12.20"
 wasmprinter = "0.2.39"
+libc = "0.2"
+nix = "0.23.0"
+ctor = "0.2.6"
 
 [[bin]]
 name = "memory_no_diff"
