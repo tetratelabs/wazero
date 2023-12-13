@@ -110,7 +110,7 @@ func (f *osFile) reopen() (errno experimentalsys.Errno) {
 	}
 
 	if !isDir {
-		offset, err = f.file.Seek(0, 1)
+		offset, err = f.file.Seek(0, io.SeekCurrent)
 		if err != nil {
 			return experimentalsys.UnwrapOSError(err)
 		}
@@ -123,7 +123,7 @@ func (f *osFile) reopen() (errno experimentalsys.Errno) {
 	}
 
 	if !isDir {
-		_, err = f.file.Seek(offset, 0)
+		_, err = f.file.Seek(offset, io.SeekStart)
 		if err != nil {
 			return experimentalsys.UnwrapOSError(err)
 		}
