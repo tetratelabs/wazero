@@ -56,7 +56,7 @@ func (m mockMachine) ResolveRelativeAddresses() {}
 func (m mockMachine) Function() (f regalloc.Function) { return }
 
 // RegisterInfo implements Machine.RegisterInfo.
-func (m mockMachine) RegisterInfo(bool) *regalloc.RegisterInfo {
+func (m mockMachine) RegisterInfo() *regalloc.RegisterInfo {
 	if m.rinfo != nil {
 		return m.rinfo
 	}
