@@ -7,7 +7,6 @@ import (
 	_ "embed"
 	"encoding/hex"
 	"fmt"
-	"github.com/tetratelabs/wazero/experimental/opt"
 	"math"
 	"os"
 	"path"
@@ -15,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/experimental/opt"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
 	"github.com/tetratelabs/wazero/internal/wasm"
