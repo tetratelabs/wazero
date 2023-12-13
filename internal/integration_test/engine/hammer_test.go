@@ -8,7 +8,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/internal/engine/wazevo"
+	"github.com/tetratelabs/wazero/experimental/opt"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/hammer"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -36,8 +36,7 @@ func TestEngineWazevo_hammer(t *testing.T) {
 	if runtime.GOARCH != "arm64" {
 		t.Skip()
 	}
-	c := wazero.NewRuntimeConfigInterpreter()
-	wazevo.ConfigureWazevo(c)
+	c := opt.NewRuntimeConfigOptimizingCompiler()
 	runAllTests(t, hammers, c, true)
 }
 
