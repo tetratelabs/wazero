@@ -15,16 +15,11 @@ func NewCompiler(ctx context.Context, mach Machine, builder ssa.Builder) Compile
 	return newCompiler(ctx, mach, builder)
 }
 
-func newCompiler(ctx context.Context, mach Machine, builder ssa.Builder) *compiler {
-	registerSetDebug := false
-	if wazevoapi.RegAllocValidationEnabled {
-		registerSetDebug = wazevoapi.IsHighRegisterPressure(ctx)
-	}
-
+func newCompiler(_ context.Context, mach Machine, builder ssa.Builder) *compiler {
 	c := &compiler{
 		mach: mach, ssaBuilder: builder,
 		nextVRegID: regalloc.VRegIDNonReservedBegin,
-		regAlloc:   regalloc.NewAllocator(mach.RegisterInfo(registerSetDebug)),
+		regAlloc:   regalloc.NewAllocator(mach.RegisterInfo()),
 	}
 	mach.SetCompiler(c)
 	return c

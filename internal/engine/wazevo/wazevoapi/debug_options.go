@@ -41,18 +41,15 @@ const (
 )
 
 // ----- Validations -----
-// These consts must be enabled by default until we reach the point where we can disable them (e.g. multiple days of fuzzing passes).
-
 const (
-	RegAllocValidationEnabled = true
-	SSAValidationEnabled      = true
+	// SSAValidationEnabled enables the SSA validation. This is disabled by default since the operation is expensive.
+	SSAValidationEnabled = false
 )
 
 // ----- Stack Guard Check -----
-// These consts must be enabled by default until we reach the point where we can disable them (e.g. multiple days of fuzzing passes).
 const (
 	// StackGuardCheckEnabled enables the stack guard check to ensure that our stack bounds check works correctly.
-	StackGuardCheckEnabled       = true
+	StackGuardCheckEnabled       = false
 	StackGuardCheckGuardPageSize = 8096
 )
 

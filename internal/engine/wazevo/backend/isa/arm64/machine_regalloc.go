@@ -320,25 +320,7 @@ func (r *regAllocBlockImpl) BlockParams(regs *[]regalloc.VReg) []regalloc.VReg {
 func (r *regAllocBlockImpl) Entry() bool { return r.sb.EntryBlock() }
 
 // RegisterInfo implements backend.Machine.
-func (m *machine) RegisterInfo(debug bool) *regalloc.RegisterInfo {
-	if debug {
-		regInfoDebug := &regalloc.RegisterInfo{}
-		regInfoDebug.CalleeSavedRegisters = regInfo.CalleeSavedRegisters
-		regInfoDebug.CallerSavedRegisters = regInfo.CallerSavedRegisters
-		regInfoDebug.RealRegToVReg = regInfo.RealRegToVReg
-		regInfoDebug.RealRegName = regInfo.RealRegName
-		regInfoDebug.RealRegType = regInfo.RealRegType
-		regInfoDebug.AllocatableRegisters[regalloc.RegTypeFloat] = []regalloc.RealReg{
-			v18,                            // One callee saved.
-			v7, v6, v5, v4, v3, v2, v1, v0, // Allocatable sets == Argument registers.
-		}
-		regInfoDebug.AllocatableRegisters[regalloc.RegTypeInt] = []regalloc.RealReg{
-			x29, x30, // Caller saved, and special ones. But they should be able to get allocated.
-			x19,                            // One callee saved.
-			x7, x6, x5, x4, x3, x2, x1, x0, // Argument registers (all caller saved).
-		}
-		return regInfoDebug
-	}
+func (m *machine) RegisterInfo() *regalloc.RegisterInfo {
 	return regInfo
 }
 
