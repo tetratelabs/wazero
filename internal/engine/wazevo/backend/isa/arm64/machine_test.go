@@ -1,7 +1,6 @@
 package arm64
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
@@ -209,15 +208,15 @@ L200:
 			m.labelPositions[originLabelNext] = originNextLabelPos
 
 			m.rootInstr = cbr
-			fmt.Println(originLabelPos.begin.String())
 			require.Equal(t, tc.expBefore, m.Format())
 
 			m.nextLabel = 9999999
 			m.insertConditionalJumpTrampoline(cbr, originLabelPos, originLabelNext)
 
-			fmt.Println(originLabelPos.begin.String())
-
 			require.Equal(t, tc.expAfter, m.Format())
+
+			// The original label position should be updated to the unconditional jump to the original target destination.
+			require.Equal(t, "b L12345", originLabelPos.end.String())
 		})
 	}
 }
