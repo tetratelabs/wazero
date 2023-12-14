@@ -75,12 +75,18 @@ jobs:
 
   zig:
     needs: build_zig_test_binary
-    name: Zig (${{ matrix.os }})
+    name: Zig (${{ matrix.os }}, ${{ matrix.arch }}, ${{ matrix.compiler }}-compiler)
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false # don't fail fast as sometimes failures are arch/OS specific
       matrix:
-        os: [ubuntu-22.04, macos-12, windows-2022]
+        os:       [ubuntu-22.04, macos-12, windows-2022]
+        compiler: [baseline]
+        arch:     [amd64]
+        include:
+          - os:       ubuntu-22.04
+            compiler: optimizing
+            arch:     "arm64"
 
     steps:
       - name: Checkout wazero
@@ -101,15 +107,41 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - name: Install wazero
-        run: go install ./cmd/wazero
+      - name: Build wazero
+        run: go build -o ./wazerocli ./cmd/wazero
+        env:
+          GOARCH: ${{ matrix.arch }}
 
-      # This runs the previously compiled Zig tests with wazero. If you need
-      # to troubleshoot one, you can add "-hostlogging=filesystem" after
-      # adding filter argument to the "Build Stdlib test binary" step.
+      - name: Set up QEMU
+        if: ${{ matrix.compiler == 'optimizing' && matrix.arch == 'arm64' }}
+        uses: docker/setup-qemu-action@v2
+        with: # Avoid docker.io rate-limits; built with internal-images.yml
+          image: ghcr.io/tetratelabs/wazero/internal-binfmt
+          platforms: ${{ matrix.arch }}
+
+      - name: Build scratch container
+        if: ${{ matrix.compiler == 'optimizing' }}
+        run: |
+          echo 'FROM scratch' >> Dockerfile
+          echo 'CMD ["/test"]' >> Dockerfile
+          docker buildx build -t wazero:test --platform linux/${{ matrix.arch }} .
+
+
+      # The following two steps run the previously compiled Zig tests with wazero.
+      # If you need to troubleshoot any of the test, you can add "-hostlogging=filesystem" after
+      # adding filter argument either to step "Run built test binaries" or
+      # "Run built test binaries (container)".
       # e.g. --test-filter "Dir.Iterator but dir is deleted during iteration"
-      - name: Run the test binary with wazero CLI
-        run: wazero run -mount=:/ ./zigbin/test.wasm
+
+      - name: Run built test binaries (container)
+        if: ${{ matrix.compiler == 'optimizing' }}
+        run: |
+          docker run --platform linux/${{ matrix.arch }} -v $(pwd)/zigbin:/test -v $(pwd)/wazerocli:/wazero -e WAZEROCLI=/wazero --tmpfs /tmp --rm -t wazero:test \
+            /wazero run -optimizing-compiler -mount=:/ ./test/test.wasm
+
+      - name: Run built test binaries
+        if: ${{ matrix.compiler != 'optimizing' }}
+        run: ./wazerocli run -mount=:/ ./zigbin/test.wasm
 
   build_tinygo_test_binary:
     name: Build TinyGo test binary
@@ -194,12 +226,18 @@ jobs:
 
   tinygo:
     needs: build_tinygo_test_binary
-    name: TinyGo (${{ matrix.os }})
+    name: TinyGo (${{ matrix.os }}, ${{ matrix.arch }}, ${{ matrix.compiler }}-compiler)
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false # don't fail fast as sometimes failures are arch/OS specific
       matrix:
-        os: [ubuntu-22.04, macos-12, windows-2022]
+        os:       [ubuntu-22.04, macos-12, windows-2022]
+        compiler: [baseline]
+        arch:     [amd64]
+        include:
+          - os:       ubuntu-22.04
+            compiler: optimizing
+            arch:     "arm64"
 
     steps:
       - name: Checkout wazero
@@ -220,19 +258,48 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - name: Install wazero
-        run: go install ./cmd/wazero
+      - name: Build wazero
+        run: go build -o ~/wazerocli ./cmd/wazero
+        env:
+          GOARCH: ${{ matrix.arch }}
 
-      # This runs the previously compiled TinyGo tests with wazero. If you need
+      - name: Set up QEMU
+        if: ${{ matrix.compiler == 'optimizing' && matrix.arch == 'arm64' }}
+        uses: docker/setup-qemu-action@v2
+        with: # Avoid docker.io rate-limits; built with internal-images.yml
+          image: ghcr.io/tetratelabs/wazero/internal-binfmt
+          platforms: ${{ matrix.arch }}
+
+      - name: Build scratch container
+        if: ${{ matrix.compiler == 'optimizing' }}
+        run: |
+          echo 'FROM scratch' >> Dockerfile
+          echo 'CMD ["/test"]' >> Dockerfile
+          docker buildx build -t wazero:test --platform linux/${{ matrix.arch }} .
+
+      # The following steps run the previously compiled TinyGo tests with wazero. If you need
       # to troubleshoot one, you can add "-hostlogging=filesystem" and also a
       # trailing argument narrowing which test to execute.
       # e.g. "-test.run '^TestStatBadDir$'"
-      - name: Run standard library tests
+
+      - name: Run test binaries (container)
+        if: ${{ matrix.compiler == 'optimizing' }}
+        # This runs all tests compiled above in sequence. Note: This mounts /tmp to allow t.TempDir() in tests.
         run: |
           cd ./tinygobin
           for bin in *.test; do
             echo $bin
-            wazero run -mount=:/ -mount=:/tmp $bin -- -test.v
+            docker run --platform linux/${{ matrix.arch }} -v $(pwd):/test -v ~/wazerocli:/wazero -e WAZEROCLI=/wazero --tmpfs /tmp --rm -t wazero:test \
+              /wazero run -optimizing-compiler -mount=:/  /test/$bin -- -test.v
+          done
+
+      - name: Run test binaries
+        if: ${{ matrix.compiler != 'optimizing' }}
+        run: |
+          cd ./tinygobin
+          for bin in *.test; do
+            echo $bin
+            ~/wazerocli run -mount=:/ -mount=:/tmp $bin -- -test.v
           done
 
   wasi-testsuite:
@@ -325,15 +392,21 @@ jobs:
   go_tests:
     # Due to the embedding of the GOROOT of the building env(https://github.com/golang/go/blob/3c59639b902fada0a2e5a6a35bafd10fc9183b89/src/os/os_test.go#L112),
     # we have to build and cache on each OS unlike others in this file.
-    name: Go (${{ matrix.os }}, Go-${{ matrix.go-version }})
+    name: Go (${{ matrix.os }}, Go-${{ matrix.go-version }}, ${{ matrix.arch }}, ${{ matrix.compiler }}-compiler)
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false # don't fail fast as sometimes failures are arch/OS specific
       matrix:
-        os: [ubuntu-22.04, macos-12, windows-2022]
+        os:       [ubuntu-22.04, macos-12, windows-2022]
+        compiler: [baseline]
+        arch:     [amd64]
         go-version:
           - "1.21"  # Current Go version && The only version that supports wasip1.
-
+        include:
+          - os:         ubuntu-22.04
+            compiler:   optimizing
+            arch:       "arm64"
+            go-version: "1.21"
     steps:
       - id: setup-go
         uses: actions/setup-go@v4
@@ -425,11 +498,27 @@ jobs:
       - name: Checkout wazero
         uses: actions/checkout@v3
 
-      - name: Install wazero
-        run: go install ./cmd/wazero
+      - name: Build wazero
+        run: go build -o ~/wazerocli ./cmd/wazero
+        env:
+          GOARCH: ${{ matrix.arch }}
 
-      - if: ${{ runner.os != 'Windows' }}
-        name: Run standard library tests
+      - name: Set up QEMU
+        if: ${{ matrix.compiler == 'optimizing' && matrix.arch == 'arm64' }}
+        uses: docker/setup-qemu-action@v2
+        with: # Avoid docker.io rate-limits; built with internal-images.yml
+          image: ghcr.io/tetratelabs/wazero/internal-binfmt
+          platforms: ${{ matrix.arch }}
+
+      - name: Build scratch container
+        if: ${{ matrix.compiler == 'optimizing' }}
+        run: |
+          echo 'FROM scratch' >> Dockerfile
+          echo 'CMD ["/test"]' >> Dockerfile
+          docker buildx build -t wazero:test --platform linux/${{ matrix.arch }} .
+
+      - if: ${{ matrix.compiler == 'optimizing' }}
+        name: Run test binaries (container)
         run: |
           echo "Running $(find ~/tests -name *.test | wc -l) test binaries"
 
@@ -437,12 +526,27 @@ jobs:
           for bin in ~/tests/*.test; do
             dir=$(basename $bin); dir=${dir%.test}; dir=${dir//_/\/}
             pushd $(go env GOROOT)/$dir
-            wazero run -mount=/:/ -env PWD=$PWD $bin -- -test.short -test.v
+            # Mount / as /ROOT in docker and then remount /ROOT as / in wazero; $bin is now in /ROOT/$bin.
+            docker run --platform linux/arm64 -v /:/ROOT -v ~/wazerocli:/wazero -e WAZEROCLI=/wazero --tmpfs /tmp --rm -t wazero:test \
+              /wazero run -optimizing-compiler -mount=/ROOT:/ -env PWD=$PWD /ROOT/$bin -- -test.short -test.v
+            popd
+          done
+
+      - if: ${{ matrix.compiler != 'optimizing' && runner.os != 'Windows' }}
+        name: Run test binaries
+        run: |
+          echo "Running $(find ~/tests -name *.test | wc -l) test binaries"
+
+          # Go tests often look for files relative to the source. Change to the corresponding directory.
+          for bin in ~/tests/*.test; do
+            dir=$(basename $bin); dir=${dir%.test}; dir=${dir//_/\/}
+            pushd $(go env GOROOT)/$dir
+            ~/wazerocli run -mount=/:/ -env PWD=$PWD $bin -- -test.short -test.v
             popd
           done
 
       - if: ${{ runner.os == 'Windows' }}
-        name: Run standard library tests
+        name: Run test binaries (Windows)
         # Ack failures on Windows. https://github.com/tetratelabs/wazero/issues/1410
         continue-on-error: true
         run: |
@@ -471,7 +575,7 @@ jobs:
 
             # Create a script with all the tests (do not run yet).
             echo ${MOUNT} ${IN_WASM_PWD} $GOROOT/$dir
-            COMMAND="wazero run -mount=${MOUNT} ${EXTRAPARAMS} -hostlogging=filesystem -env PWD=${IN_WASM_PWD} -env GOROOT=${GOROOT} -env GOOS=wasip1 $bin -- -test.short -test.v"
+            COMMAND="~/wazerocli run -mount=${MOUNT} ${EXTRAPARAMS} -hostlogging=filesystem -env PWD=${IN_WASM_PWD} -env GOROOT=${GOROOT} -env GOOS=wasip1 $bin -- -test.short -test.v"
             echo $COMMAND >> $SCRIPT
             # Uncomment the following line for early exit on error on Windows.
             # Otherwise the tests will report are successful evne on failure.
