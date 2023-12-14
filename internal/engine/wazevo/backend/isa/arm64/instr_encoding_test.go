@@ -1280,7 +1280,7 @@ func TestInstruction_encode(t *testing.T) {
 		}},
 		{want: "20000014", setup: func(i *instruction) {
 			i.asBr(dummyLabel)
-			i.brOffsetResolved(0x80)
+			i.brOffsetResolve(0x80)
 		}},
 		{want: "01040034", setup: func(i *instruction) {
 			i.asCondBr(registerAsRegZeroCond(x1VReg), dummyLabel, false)

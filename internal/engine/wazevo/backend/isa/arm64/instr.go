@@ -647,9 +647,13 @@ func (i *instruction) brLabel() label {
 }
 
 // brOffsetResolved is called when the target label is resolved.
-func (i *instruction) brOffsetResolved(offset int64) {
+func (i *instruction) brOffsetResolve(offset int64) {
 	i.u2 = uint64(offset)
 	i.u3 = 1 // indicate that the offset is resolved, for debugging.
+}
+
+func (i *instruction) brOffsetResolved() bool {
+	return i.u3 == 1
 }
 
 func (i *instruction) brOffset() int64 {
@@ -664,6 +668,10 @@ func (i *instruction) asCondBr(c cond, target label, is64bit bool) {
 	if is64bit {
 		i.u3 = 1
 	}
+}
+
+func (i *instruction) setCondBrTargets(target label) {
+	i.u2 = uint64(target)
 }
 
 func (i *instruction) condBrLabel() label {
