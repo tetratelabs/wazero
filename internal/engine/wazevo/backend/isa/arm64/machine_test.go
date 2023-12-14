@@ -123,3 +123,100 @@ func TestMachine_getVRegSpillSlotOffsetFromSP(t *testing.T) {
 	_, ok = m.spillSlots[id]
 	require.True(t, ok)
 }
+
+func TestMachine_insertConditionalJumpTrampoline(t *testing.T) {
+	for _, tc := range []struct {
+		brAtEnd             bool
+		expBefore, expAfter string
+	}{
+		{
+			brAtEnd: true,
+			expBefore: `
+L100:
+	b.eq L12345
+	b L888888888
+L200:
+	exit_sequence x0
+`,
+			expAfter: `
+L100:
+	b.eq L10000000
+	b L888888888
+L10000000:
+	b L12345
+L200:
+	exit_sequence x0
+`,
+		},
+		{
+			brAtEnd: false,
+			expBefore: `
+L100:
+	b.eq L12345
+	udf
+L200:
+	exit_sequence x0
+`,
+			expAfter: `
+L100:
+	b.eq L10000000
+	udf
+	b L200
+L10000000:
+	b L12345
+L200:
+	exit_sequence x0
+`,
+		},
+	} {
+		var name string
+		if tc.brAtEnd {
+			name = "brAtEnd"
+		} else {
+			name = "brNotAtEnd"
+		}
+
+		t.Run(name, func(t *testing.T) {
+			m := NewBackend().(*machine)
+			const (
+				originLabel     = 100
+				originLabelNext = 200
+				targetLabel     = 12345
+			)
+
+			cbr := m.allocateInstr()
+			cbr.asCondBr(eq.asCond(), targetLabel, false)
+
+			end := m.allocateInstr()
+			if tc.brAtEnd {
+				end.asBr(888888888)
+			} else {
+				end.asUDF()
+			}
+
+			originalEndNext := m.allocateInstr()
+			originalEndNext.asExitSequence(x0VReg)
+
+			originLabelPos := m.allocateLabelPosition(originLabel)
+			originLabelPos.begin = cbr
+			originLabelPos.end = linkInstr(cbr, end)
+			originNextLabelPos := m.allocateLabelPosition(originLabelNext)
+			originNextLabelPos.begin = originalEndNext
+			linkInstr(originLabelPos.end, originalEndNext)
+
+			m.labelPositions[originLabel] = originLabelPos
+			m.labelPositions[originLabelNext] = originNextLabelPos
+
+			m.rootInstr = cbr
+			require.Equal(t, tc.expBefore, m.Format())
+
+			m.nextLabel = 9999999
+			m.insertConditionalJumpTrampoline(cbr, originLabelPos, originLabelNext)
+
+			require.Equal(t, tc.expAfter, m.Format())
+
+			// The original label position should be updated to the unconditional jump to the original target destination.
+			require.Equal(t, "b L12345", originLabelPos.end.String())
+		})
+	}
+}

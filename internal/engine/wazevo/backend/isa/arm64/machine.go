@@ -43,6 +43,9 @@ type (
 		addends64              queue[regalloc.VReg]
 		unresolvedAddressModes []*instruction
 
+		// condBrRelocs holds the conditional branches which need offset relocation.
+		condBrRelocs []condBrReloc
+
 		// spillSlotSize is the size of the stack slot in bytes used for spilling registers.
 		// During the execution of the function, the stack looks like:
 		//
@@ -98,9 +101,19 @@ type (
 
 	// labelPosition represents the regions of the generated code which the label represents.
 	labelPosition struct {
+		l            label
 		begin, end   *instruction
 		binarySize   int64
 		binaryOffset int64
+	}
+
+	condBrReloc struct {
+		cbr *instruction
+		// currentLabelPos is the labelPosition within which condBr is defined.
+		currentLabelPos *labelPosition
+		// Next block's labelPosition.
+		nextLabel label
+		offset    int64
 	}
 )
 
@@ -205,7 +218,7 @@ func (m *machine) StartBlock(blk ssa.BasicBlock) {
 
 	labelPos, ok := m.labelPositions[l]
 	if !ok {
-		labelPos = m.allocateLabelPosition()
+		labelPos = m.allocateLabelPosition(l)
 		m.labelPositions[l] = labelPos
 	}
 	m.orderedBlockLabels = append(m.orderedBlockLabels, labelPos)
@@ -231,18 +244,24 @@ func (m *machine) insert(i *instruction) {
 }
 
 func (m *machine) insertBrTargetLabel() label {
-	l := m.allocateLabel()
-	nop := m.allocateInstr()
-	nop.asNop0WithLabel(l)
+	nop, l := m.allocateBrTarget()
 	m.insert(nop)
-	pos := m.allocateLabelPosition()
-	pos.begin, pos.end = nop, nop
-	m.labelPositions[l] = pos
 	return l
 }
 
-func (m *machine) allocateLabelPosition() *labelPosition {
+func (m *machine) allocateBrTarget() (nop *instruction, l label) {
+	l = m.allocateLabel()
+	nop = m.allocateInstr()
+	nop.asNop0WithLabel(l)
+	pos := m.allocateLabelPosition(l)
+	pos.begin, pos.end = nop, nop
+	m.labelPositions[l] = pos
+	return
+}
+
+func (m *machine) allocateLabelPosition(la label) *labelPosition {
 	l := m.labelPositionPool.Allocate()
+	l.l = la
 	return l
 }
 
@@ -344,16 +363,33 @@ func (m *machine) ResolveRelativeAddresses() {
 		}
 	}
 
+	// Reuse the slice to gather the unresolved conditional branches.
+	cbrs := m.condBrRelocs[:0]
+
 	// Next, in order to determine the offsets of relative jumps, we have to calculate the size of each label.
 	var offset int64
-	for _, pos := range m.orderedBlockLabels {
+	for i, pos := range m.orderedBlockLabels {
 		pos.binaryOffset = offset
 		var size int64
 		for cur := pos.begin; ; cur = cur.next {
-			if cur.kind == nop0 {
+			switch cur.kind {
+			case nop0:
 				l := cur.nop0Label()
 				if pos, ok := m.labelPositions[l]; ok {
 					pos.binaryOffset = offset + size
+				}
+			case condBr:
+				if !cur.condBrOffsetResolved() {
+					var nextLabel label
+					if i < len(m.orderedBlockLabels)-1 {
+						// Note: this is only used when the block ends with fallthrough,
+						// therefore can be safely assumed that the next block exists when it's needed.
+						nextLabel = m.orderedBlockLabels[i+1].l
+					}
+					cbrs = append(cbrs, condBrReloc{
+						cbr: cur, currentLabelPos: pos, offset: offset + size,
+						nextLabel: nextLabel,
+					})
 				}
 			}
 			size += cur.size()
@@ -365,6 +401,30 @@ func (m *machine) ResolveRelativeAddresses() {
 		offset += size
 	}
 
+	// Before resolving any offsets, we need to check if all the conditional branches can be resolved.
+	var needRerun bool
+	for i := range cbrs {
+		reloc := &cbrs[i]
+		cbr := reloc.cbr
+		offset := reloc.offset
+
+		target := cbr.condBrLabel()
+		offsetOfTarget := m.labelPositions[target].binaryOffset
+		diff := offsetOfTarget - offset
+		if divided := diff >> 2; divided < minSignedInt19 || divided > maxSignedInt19 {
+			// This case the conditional branch is too huge. We place the trampoline instructions at the end of the current block,
+			// and jump to it.
+			m.insertConditionalJumpTrampoline(cbr, reloc.currentLabelPos, reloc.nextLabel)
+			// Then, we need to recall this function to fix up the label offsets
+			// as they have changed after the trampoline is inserted.
+			needRerun = true
+		}
+	}
+	if needRerun {
+		m.ResolveRelativeAddresses()
+		return
+	}
+
 	var currentOffset int64
 	for cur := m.rootInstr; cur != nil; cur = cur.next {
 		switch cur.kind {
@@ -372,29 +432,19 @@ func (m *machine) ResolveRelativeAddresses() {
 			target := cur.brLabel()
 			offsetOfTarget := m.labelPositions[target].binaryOffset
 			diff := offsetOfTarget - currentOffset
-			if diff%4 != 0 {
-				panic("BUG: offsets between b and the target must be a multiple of 4")
-			}
 			divided := diff >> 2
 			if divided < minSignedInt26 || divided > maxSignedInt26 {
 				// This means the currently compiled single function is extremely large.
-				panic("BUG: implement branch relocation for large unconditional branch larger than 26-bit range")
+				panic("too large function that requires branch relocation of large unconditional branch larger than 26-bit range")
 			}
-			cur.brOffsetResolved(diff)
+			cur.brOffsetResolve(diff)
 		case condBr:
 			if !cur.condBrOffsetResolved() {
 				target := cur.condBrLabel()
 				offsetOfTarget := m.labelPositions[target].binaryOffset
 				diff := offsetOfTarget - currentOffset
-				if diff%4 != 0 {
-					panic("BUG: offsets between b and the target must be a multiple of 4")
-				}
-				divided := diff >> 2
-				if divided < minSignedInt19 || divided > maxSignedInt19 {
-					// This case we can insert "trampoline block" in the middle and jump to it.
-					// After that, we need to re-calculate the offset of labels after the trampoline block by
-					// recursively calling this function.
-					panic("TODO: implement branch relocation for large conditional branch larger than 19-bit range")
+				if divided := diff >> 2; divided < minSignedInt19 || divided > maxSignedInt19 {
+					panic("BUG: branch relocation for large conditional branch larger than 19-bit range must be handled properly")
 				}
 				cur.condBrOffsetResolve(diff)
 			}
@@ -420,6 +470,35 @@ const (
 	maxSignedInt19 int64 = 1<<19 - 1
 	minSignedInt19 int64 = -(1 << 19)
 )
+
+func (m *machine) insertConditionalJumpTrampoline(cbr *instruction, currentBlk *labelPosition, nextLabel label) {
+	cur := currentBlk.end
+	originalTarget := cbr.condBrLabel()
+	endNext := cur.next
+
+	if cur.kind != br {
+		// If the current block ends with a conditional branch, we can just insert the trampoline after it.
+		// Otherwise, we need to insert "skip" instruction to skip the trampoline instructions.
+		skip := m.allocateInstr()
+		skip.asBr(nextLabel)
+		cur = linkInstr(cur, skip)
+	}
+
+	cbrNewTargetInstr, cbrNewTargetLabel := m.allocateBrTarget()
+	cbr.setCondBrTargets(cbrNewTargetLabel)
+	cur = linkInstr(cur, cbrNewTargetInstr)
+
+	// Then insert the unconditional branch to the original, which should be possible to get encoded
+	// as 26-bit offset should be enough for any practical application.
+	br := m.allocateInstr()
+	br.asBr(originalTarget)
+	cur = linkInstr(cur, br)
+
+	// Update the end of the current block.
+	currentBlk.end = cur
+
+	linkInstr(cur, endNext)
+}
 
 func (m *machine) getOrAllocateSSABlockLabel(blk ssa.BasicBlock) label {
 	if blk.ReturnBlock() {
