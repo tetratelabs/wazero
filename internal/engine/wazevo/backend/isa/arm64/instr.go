@@ -652,10 +652,6 @@ func (i *instruction) brOffsetResolve(offset int64) {
 	i.u3 = 1 // indicate that the offset is resolved, for debugging.
 }
 
-func (i *instruction) brOffsetResolved() bool {
-	return i.u3 == 1
-}
-
 func (i *instruction) brOffset() int64 {
 	return int64(i.u2)
 }

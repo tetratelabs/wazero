@@ -43,7 +43,8 @@ type (
 		addends64              queue[regalloc.VReg]
 		unresolvedAddressModes []*instruction
 
-		condBrsRelocs []condBrReloc
+		// condBrRelocs holds the conditional branches which need offset relocation.
+		condBrRelocs []condBrReloc
 
 		// spillSlotSize is the size of the stack slot in bytes used for spilling registers.
 		// During the execution of the function, the stack looks like:
@@ -100,6 +101,7 @@ type (
 
 	// labelPosition represents the regions of the generated code which the label represents.
 	labelPosition struct {
+		l            label
 		begin, end   *instruction
 		binarySize   int64
 		binaryOffset int64
@@ -107,9 +109,11 @@ type (
 
 	condBrReloc struct {
 		cbr *instruction
-		// l is the label within which condBr is defined.
-		l      *labelPosition
-		offset int64
+		// currentLabelPos is the labelPosition within which condBr is defined.
+		currentLabelPos *labelPosition
+		// Next block's labelPosition.
+		nextLabel label
+		offset    int64
 	}
 )
 
@@ -214,7 +218,7 @@ func (m *machine) StartBlock(blk ssa.BasicBlock) {
 
 	labelPos, ok := m.labelPositions[l]
 	if !ok {
-		labelPos = m.allocateLabelPosition()
+		labelPos = m.allocateLabelPosition(l)
 		m.labelPositions[l] = labelPos
 	}
 	m.orderedBlockLabels = append(m.orderedBlockLabels, labelPos)
@@ -249,14 +253,15 @@ func (m *machine) allocateBrTarget() (nop *instruction, l label) {
 	l = m.allocateLabel()
 	nop = m.allocateInstr()
 	nop.asNop0WithLabel(l)
-	pos := m.allocateLabelPosition()
+	pos := m.allocateLabelPosition(l)
 	pos.begin, pos.end = nop, nop
 	m.labelPositions[l] = pos
 	return
 }
 
-func (m *machine) allocateLabelPosition() *labelPosition {
+func (m *machine) allocateLabelPosition(la label) *labelPosition {
 	l := m.labelPositionPool.Allocate()
+	l.l = la
 	return l
 }
 
@@ -359,11 +364,11 @@ func (m *machine) ResolveRelativeAddresses() {
 	}
 
 	// Reuse the slice to gather the unresolved conditional branches.
-	cbrs := m.condBrsRelocs[:0]
+	cbrs := m.condBrRelocs[:0]
 
 	// Next, in order to determine the offsets of relative jumps, we have to calculate the size of each label.
 	var offset int64
-	for _, pos := range m.orderedBlockLabels {
+	for i, pos := range m.orderedBlockLabels {
 		pos.binaryOffset = offset
 		var size int64
 		for cur := pos.begin; ; cur = cur.next {
@@ -375,7 +380,16 @@ func (m *machine) ResolveRelativeAddresses() {
 				}
 			case condBr:
 				if !cur.condBrOffsetResolved() {
-					cbrs = append(cbrs, condBrReloc{cbr: cur, l: pos, offset: offset + size})
+					var nextLabel label
+					if i < len(m.orderedBlockLabels)-1 {
+						// Note: this is only used when the block ends with fallthrough,
+						// therefore can be safely assumed that the next block exists when it's needed.
+						nextLabel = m.orderedBlockLabels[i+1].l
+					}
+					cbrs = append(cbrs, condBrReloc{
+						cbr: cur, currentLabelPos: pos, offset: offset + size,
+						nextLabel: nextLabel,
+					})
 				}
 			}
 			size += cur.size()
@@ -398,11 +412,11 @@ func (m *machine) ResolveRelativeAddresses() {
 		offsetOfTarget := m.labelPositions[target].binaryOffset
 		diff := offsetOfTarget - offset
 		if divided := diff >> 2; divided < minSignedInt19 || divided > maxSignedInt19 {
-			// This case the conditional branch is too huge.
-			// We place the trampoline after the current block, and jump to it.
-			// Then we need to recall this function to fix up the label offsets
+			// This case the conditional branch is too huge. We place the trampoline instructions at the end of the current block,
+			// and jump to it.
+			m.insertConditionalJumpTrampoline(cbr, reloc.currentLabelPos, reloc.nextLabel)
+			// Then, we need to recall this function to fix up the label offsets
 			// as they have changed after the trampoline is inserted.
-			m.insertConditionalJumpTrampoline(cbr, reloc.l)
 			needRerun = true
 		}
 	}
@@ -415,17 +429,15 @@ func (m *machine) ResolveRelativeAddresses() {
 	for cur := m.rootInstr; cur != nil; cur = cur.next {
 		switch cur.kind {
 		case br:
-			if !cur.brOffsetResolved() {
-				target := cur.brLabel()
-				offsetOfTarget := m.labelPositions[target].binaryOffset
-				diff := offsetOfTarget - currentOffset
-				divided := diff >> 2
-				if divided < minSignedInt26 || divided > maxSignedInt26 {
-					// This means the currently compiled single function is extremely large.
-					panic("too large function that requires branch relocation of large unconditional branch larger than 26-bit range")
-				}
-				cur.brOffsetResolve(diff)
+			target := cur.brLabel()
+			offsetOfTarget := m.labelPositions[target].binaryOffset
+			diff := offsetOfTarget - currentOffset
+			divided := diff >> 2
+			if divided < minSignedInt26 || divided > maxSignedInt26 {
+				// This means the currently compiled single function is extremely large.
+				panic("too large function that requires branch relocation of large unconditional branch larger than 26-bit range")
 			}
+			cur.brOffsetResolve(diff)
 		case condBr:
 			if !cur.condBrOffsetResolved() {
 				target := cur.condBrLabel()
@@ -459,17 +471,16 @@ const (
 	minSignedInt19 int64 = -(1 << 19)
 )
 
-func (m *machine) insertConditionalJumpTrampoline(cbr *instruction, currentBlk *labelPosition) {
+func (m *machine) insertConditionalJumpTrampoline(cbr *instruction, currentBlk *labelPosition, nextLabel label) {
 	cur := currentBlk.end
 	originalTarget := cbr.condBrLabel()
 	endNext := cur.next
 
 	if cur.kind != br {
 		// If the current block ends with a conditional branch, we can just insert the trampoline after it.
-		// Otherwise, we need to insert "skip" instruction to skip the trampoline.
+		// Otherwise, we need to insert "skip" instruction to skip the trampoline instructions.
 		skip := m.allocateInstr()
-		skip.asBr(invalidLabel)
-		skip.brOffsetResolve(12) // Skip two instructions + itself.
+		skip.asBr(nextLabel)
 		cur = linkInstr(cur, skip)
 	}
 
@@ -483,6 +494,7 @@ func (m *machine) insertConditionalJumpTrampoline(cbr *instruction, currentBlk *
 	br.asBr(originalTarget)
 	cur = linkInstr(cur, br)
 
+	// Update the end of the current block.
 	currentBlk.end = cur
 
 	linkInstr(cur, endNext)
