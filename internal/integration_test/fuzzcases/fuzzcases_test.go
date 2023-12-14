@@ -10,7 +10,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/internal/engine/wazevo"
+	"github.com/tetratelabs/wazero/experimental/opt"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -52,8 +52,7 @@ func runWithInterpreter(t *testing.T, runner func(t *testing.T, r wazero.Runtime
 
 func runWithWazevo(t *testing.T, runner func(t *testing.T, r wazero.Runtime)) {
 	t.Run("wazevo", func(t *testing.T) {
-		config := wazero.NewRuntimeConfigInterpreter()
-		wazevo.ConfigureWazevo(config)
+		config := opt.NewRuntimeConfigOptimizingCompiler()
 		r := wazero.NewRuntimeWithConfig(ctx, config)
 		defer r.Close(ctx)
 		runner(t, r)

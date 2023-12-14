@@ -14,6 +14,7 @@ import (
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/engine/compiler"
 	"github.com/tetratelabs/wazero/internal/engine/interpreter"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo"
 	"github.com/tetratelabs/wazero/internal/filecache"
 	"github.com/tetratelabs/wazero/internal/internalapi"
 	"github.com/tetratelabs/wazero/internal/platform"
@@ -188,6 +189,11 @@ type runtimeConfig struct {
 	cache                 CompilationCache
 	storeCustomSections   bool
 	ensureTermination     bool
+}
+
+// EnableOptimizingCompiler implements experimental/opt/enabler.EnableOptimizingCompiler.
+func (c *runtimeConfig) EnableOptimizingCompiler() {
+	c.newEngine = wazevo.NewEngine
 }
 
 // engineLessConfig helps avoid copy/pasting the wrong defaults.

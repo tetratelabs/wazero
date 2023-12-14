@@ -15,7 +15,7 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/experimental/logging"
-	"github.com/tetratelabs/wazero/internal/engine/wazevo"
+	"github.com/tetratelabs/wazero/experimental/opt"
 	"github.com/tetratelabs/wazero/internal/integration_test/spectest"
 	v1 "github.com/tetratelabs/wazero/internal/integration_test/spectest/v1"
 	"github.com/tetratelabs/wazero/internal/platform"
@@ -35,8 +35,7 @@ func TestFileCacheSpecTest_wazevo(t *testing.T) {
 	if runtime.GOARCH != "arm64" {
 		return
 	}
-	config := wazero.NewRuntimeConfigCompiler()
-	wazevo.ConfigureWazevo(config)
+	config := opt.NewRuntimeConfigOptimizingCompiler()
 	runAllFileCacheTests(t, config)
 }
 

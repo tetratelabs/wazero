@@ -14,7 +14,7 @@ import (
 	"strings"
 
 	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/internal/engine/wazevo"
+	"github.com/tetratelabs/wazero/experimental/opt"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -85,7 +85,7 @@ To reproduce the failure, execute: WASM_BINARY_PATH=%s go test -run=%s ./wazerol
 func newCompilerConfig() wazero.RuntimeConfig {
 	c := wazero.NewRuntimeConfigCompiler()
 	if os.Getenv("WAZERO_FUZZ_WAZEVO") != "" {
-		wazevo.ConfigureWazevo(c)
+		c = opt.NewRuntimeConfigOptimizingCompiler()
 	}
 	return c
 }
@@ -144,8 +144,7 @@ func test_signal_stack() {
 		},
 	})
 	ctx := context.Background()
-	config := wazero.NewRuntimeConfigInterpreter()
-	wazevo.ConfigureWazevo(config)
+	config := opt.NewRuntimeConfigOptimizingCompiler()
 	r := wazero.NewRuntimeWithConfig(ctx, config)
 	module, err := r.Instantiate(ctx, bin)
 	if err != nil {

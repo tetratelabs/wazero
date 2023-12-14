@@ -12,7 +12,7 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/experimental/logging"
-	"github.com/tetratelabs/wazero/internal/engine/wazevo"
+	"github.com/tetratelabs/wazero/experimental/opt"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/testcases"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
@@ -308,10 +308,7 @@ func TestE2E(t *testing.T) {
 				t.Run(name, func(t *testing.T) {
 					cache, err := wazero.NewCompilationCacheWithDir(tmp)
 					require.NoError(t, err)
-					config := wazero.NewRuntimeConfigCompiler().WithCompilationCache(cache)
-
-					// Configure the new optimizing backend!
-					wazevo.ConfigureWazevo(config)
+					config := opt.NewRuntimeConfigOptimizingCompiler().WithCompilationCache(cache)
 
 					ctx := context.Background()
 					r := wazero.NewRuntimeWithConfig(ctx, config)
@@ -377,10 +374,7 @@ func TestE2E_host_functions(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := tc.ctx
 
-			config := wazero.NewRuntimeConfigCompiler()
-
-			// Configure the new optimizing backend!
-			wazevo.ConfigureWazevo(config)
+			config := opt.NewRuntimeConfigOptimizingCompiler()
 
 			r := wazero.NewRuntimeWithConfig(ctx, config)
 			defer func() {
@@ -462,10 +456,7 @@ func TestE2E_host_functions(t *testing.T) {
 }
 
 func TestE2E_stores(t *testing.T) {
-	config := wazero.NewRuntimeConfigCompiler()
-
-	// Configure the new optimizing backend!
-	wazevo.ConfigureWazevo(config)
+	config := opt.NewRuntimeConfigOptimizingCompiler()
 
 	ctx := context.Background()
 	r := wazero.NewRuntimeWithConfig(ctx, config)
@@ -552,10 +543,7 @@ func TestE2E_reexported_memory(t *testing.T) {
 		CodeSection:       []wasm.Code{{Body: []byte{wasm.OpcodeI32Const, 10, wasm.OpcodeMemoryGrow, 0, wasm.OpcodeEnd}}},
 	}
 
-	config := wazero.NewRuntimeConfigCompiler()
-
-	// Configure the new optimizing backend!
-	wazevo.ConfigureWazevo(config)
+	config := opt.NewRuntimeConfigOptimizingCompiler()
 
 	ctx := context.Background()
 	r := wazero.NewRuntimeWithConfig(ctx, config)
@@ -604,10 +592,7 @@ func TestStackUnwind_panic_in_host(t *testing.T) {
 		},
 	}
 
-	config := wazero.NewRuntimeConfigCompiler()
-
-	// Configure the new optimizing backend!
-	wazevo.ConfigureWazevo(config)
+	config := opt.NewRuntimeConfigOptimizingCompiler()
 
 	ctx := context.Background()
 	r := wazero.NewRuntimeWithConfig(ctx, config)
@@ -657,11 +642,7 @@ func TestStackUnwind_unreachable(t *testing.T) {
 		},
 	}
 
-	config := wazero.NewRuntimeConfigCompiler()
-
-	// Configure the new optimizing backend!
-	wazevo.ConfigureWazevo(config)
-
+	config := opt.NewRuntimeConfigOptimizingCompiler()
 	ctx := context.Background()
 	r := wazero.NewRuntimeWithConfig(ctx, config)
 	defer func() {
@@ -683,11 +664,8 @@ wasm stack trace:
 
 func TestListener_local(t *testing.T) {
 	var buf bytes.Buffer
-	config := wazero.NewRuntimeConfigCompiler()
+	config := opt.NewRuntimeConfigOptimizingCompiler()
 	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
-
-	// Configure the new optimizing backend!
-	wazevo.ConfigureWazevo(config)
 
 	r := wazero.NewRuntimeWithConfig(ctx, config)
 	defer func() {
@@ -714,11 +692,8 @@ func TestListener_local(t *testing.T) {
 
 func TestListener_imported(t *testing.T) {
 	var buf bytes.Buffer
-	config := wazero.NewRuntimeConfigCompiler()
+	config := opt.NewRuntimeConfigOptimizingCompiler()
 	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
-
-	// Configure the new optimizing backend!
-	wazevo.ConfigureWazevo(config)
 
 	r := wazero.NewRuntimeWithConfig(ctx, config)
 	defer func() {
@@ -768,11 +743,8 @@ func TestListener_long(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
-	config := wazero.NewRuntimeConfigCompiler()
+	config := opt.NewRuntimeConfigOptimizingCompiler()
 	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
-
-	// Configure the new optimizing backend!
-	wazevo.ConfigureWazevo(config)
 
 	r := wazero.NewRuntimeWithConfig(ctx, config)
 	defer func() {
@@ -821,11 +793,8 @@ func TestListener_long_as_is(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
-	config := wazero.NewRuntimeConfigCompiler()
+	config := opt.NewRuntimeConfigOptimizingCompiler()
 	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
-
-	// Configure the new optimizing backend!
-	wazevo.ConfigureWazevo(config)
 
 	r := wazero.NewRuntimeWithConfig(ctx, config)
 	defer func() {
@@ -873,11 +842,8 @@ func TestListener_long_many_consts(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
-	config := wazero.NewRuntimeConfigCompiler()
+	config := opt.NewRuntimeConfigOptimizingCompiler()
 	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
-
-	// Configure the new optimizing backend!
-	wazevo.ConfigureWazevo(config)
 
 	r := wazero.NewRuntimeWithConfig(ctx, config)
 	defer func() {
@@ -901,11 +867,8 @@ func TestListener_long_many_consts(t *testing.T) {
 
 // TestDWARF verifies that the DWARF based stack traces work as expected before/after compilation cache.
 func TestDWARF(t *testing.T) {
-	config := wazero.NewRuntimeConfigCompiler()
+	config := opt.NewRuntimeConfigOptimizingCompiler()
 	ctx := context.Background()
-
-	// Configure the new optimizing backend!
-	wazevo.ConfigureWazevo(config)
 
 	bin := dwarftestdata.ZigWasm
 

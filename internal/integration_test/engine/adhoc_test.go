@@ -18,8 +18,8 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/experimental/logging"
+	"github.com/tetratelabs/wazero/experimental/opt"
 	"github.com/tetratelabs/wazero/experimental/table"
-	"github.com/tetratelabs/wazero/internal/engine/wazevo"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
@@ -96,8 +96,7 @@ func TestEngineWazevo(t *testing.T) {
 	if runtime.GOARCH != "arm64" {
 		t.Skip()
 	}
-	config := wazero.NewRuntimeConfigInterpreter()
-	wazevo.ConfigureWazevo(config)
+	config := opt.NewRuntimeConfigOptimizingCompiler()
 	runAllTests(t, tests, config.WithCloseOnContextDone(true), true)
 }
 
