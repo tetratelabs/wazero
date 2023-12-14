@@ -835,7 +835,7 @@ func Test_fdFilestatSetSize(t *testing.T) {
 
 	tests := []struct {
 		name                     string
-		size                     uint32
+		size                     uint64
 		content, expectedContent []byte
 		expectedLog              string
 		expectedErrno            wasip1.Errno
@@ -881,6 +881,17 @@ func Test_fdFilestatSetSize(t *testing.T) {
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_filestat_set_size(fd=4,size=106)
 <== errno=ESUCCESS
+`,
+		},
+		{
+			name:            "large size",
+			content:         []byte(""),
+			expectedContent: []byte(""),
+			size:            math.MaxUint64,
+			expectedErrno:   wasip1.ErrnoInval,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_filestat_set_size(fd=4,size=-1)
+<== errno=EINVAL
 `,
 		},
 	}
