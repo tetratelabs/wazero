@@ -522,8 +522,10 @@ jobs:
         run: |
           echo "Running $(find ~/tests -name *.test | wc -l) test binaries"
 
+          # Skip tests that are hideously slow (mostly compilation time) for running inside QEMU.
+          skip_targets="src_encoding_json|src_runtime|src_os_exec|src_math_big|src_encoding_gob|src_time|src_archive_tar|src_math_rand|src_expvar|src_testing|src_os"
           # Go tests often look for files relative to the source. Change to the corresponding directory.
-          for bin in ~/tests/*.test; do
+          for bin in $(find ~/tests -name "*.test" | grep -vE "$skip_targets"); do
             dir=$(basename $bin); dir=${dir%.test}; dir=${dir//_/\/}
             pushd $(go env GOROOT)/$dir
             # Mount / as /ROOT in docker and then remount /ROOT as / in wazero; $bin is now in /ROOT/$bin.
