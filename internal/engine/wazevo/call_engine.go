@@ -395,7 +395,7 @@ func opaqueViewFromPtr(ptr uintptr) []byte {
 	return opaque
 }
 
-const callStackCeiling = uintptr(5000000) // in uint64 (8 bytes) == 40000000 bytes in total == 40mb.
+const callStackCeiling = uintptr(50000000) // in uint64 (8 bytes) == 400000000 bytes in total == 400mb.
 
 func (c *callEngine) growStackWithGuarded() (newSP uintptr, err error) {
 	if wazevoapi.StackGuardCheckEnabled {
