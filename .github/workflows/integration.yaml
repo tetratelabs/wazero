@@ -528,7 +528,7 @@ jobs:
             pushd $(go env GOROOT)/$dir
             # Mount / as /ROOT in docker and then remount /ROOT as / in wazero; $bin is now in /ROOT/$bin.
             docker run --platform linux/arm64 -v /:/ROOT -v ~/wazerocli:/wazero -e WAZEROCLI=/wazero --tmpfs /tmp --rm -t wazero:test \
-              /wazero run -optimizing-compiler -mount=/ROOT:/ -env PWD=$PWD /ROOT/$bin -- -test.short -test.v
+              /wazero run -optimizing-compiler -mount=/ROOT:/ -mount=/tmp:/tmp -env PWD=$PWD /ROOT/$bin -- -test.short -test.v
             popd
           done
 
