@@ -23,8 +23,6 @@ func (b *builder) RunPasses() {
 	passCalculateImmediateDominators(b)
 	passCollectValueIdToInstructionMapping(b)
 
-	passNopInstElimination(b)
-
 	// TODO: implement either conversion of irreducible CFG into reducible one, or irreducible CFG detection where we panic.
 	// 	WebAssembly program shouldn't result in irreducible CFG, but we should handle it properly in just in case.
 	// 	See FixIrreducible pass in LLVM: https://llvm.org/doxygen/FixIrreducible_8cpp_source.html
@@ -38,7 +36,7 @@ func (b *builder) RunPasses() {
 	// 	and more!
 
 	passConstFoldingOpt(b)
-	passAlgebraicSimplification(b)
+	passNopInstElimination(b)
 
 	passCollectValueIdToInstructionMapping(b)
 
@@ -333,10 +331,10 @@ func passNopInstElimination(b *builder) {
 						b.alias(cur.Return(), x)
 					}
 				}
-			// Z := Const 0
-			// (Iadd X, Z) => X
-			// (Iadd Z, Y) => Y
-			case OpcodeIadd:
+			// When Op is Iadd, Bor, Bxor, Rotl or Rotr, and Z is Iconst 0:
+			//   (Op X, Z) => X
+			//   (Op Z, Y) => Y
+			case OpcodeIadd, OpcodeBor, OpcodeBxor, OpcodeRotl, OpcodeRotr:
 				x, y := cur.Arg2()
 				definingInst := b.valueIDToInstruction[y.ID()]
 				if definingInst == nil {
@@ -349,6 +347,26 @@ func passNopInstElimination(b *builder) {
 				if definingInst.Constant() && definingInst.ConstantVal() == 0 {
 					b.alias(cur.Return(), x)
 				}
+			// When Op is Imul and Z is Iconst 1:
+			//   (Op X, Z) => X
+			//   (Op Z, Y) => Y
+			// TODO: This is also valid for UDiv, SDiv, but they are trapping, so we would
+			//       need to update passDeadCodeEliminationOpt to account for this case and mark them dead.
+			case OpcodeImul:
+				x, y := cur.Arg2()
+				definingInst := b.valueIDToInstruction[y.ID()]
+				if definingInst == nil {
+					if definingInst = b.valueIDToInstruction[x.ID()]; definingInst == nil {
+						continue
+					} else {
+						x = y
+					}
+				}
+				if definingInst.Constant() && definingInst.ConstantVal() == 1 {
+					b.alias(cur.Return(), x)
+				}
+			default:
+				continue
 			}
 		}
 	}
@@ -389,7 +407,7 @@ func passConstFoldingOpt(b *builder) {
 				switch op {
 				// X := Const xc
 				// Y := Const yc
-				// - (Iadd X, Y) => Const (xc + yc)
+				// - (op X, Y) => Const (xc <op> yc); e.g. if op is Iadd => xc + yc.
 				case OpcodeIadd, OpcodeIsub, OpcodeImul:
 					x, y := cur.Arg2()
 					xDef := b.valueIDToInstruction[x.ID()]
@@ -408,8 +426,11 @@ func passConstFoldingOpt(b *builder) {
 						// Signed integers are 2 complement, so we can just apply the operations.
 						// Operations are evaluated over uint64s and will be bitcasted at the use-sites.
 						xc, yc := xDef.ConstantVal(), yDef.ConstantVal()
-						cur.u1 = eval(op, xc, yc)
+						cur.u1 = evalArithmeticOp(op, xc, yc)
 					}
+				// X := Const xc
+				// Y := Const yc
+				// - (op X, Y) => Const (xc <op> yc); e.g. if op is Fadd => xc + yc.
 				case OpcodeFadd, OpcodeFsub, OpcodeFmul:
 					x, y := cur.Arg2()
 					xDef := b.valueIDToInstruction[x.ID()]
@@ -456,7 +477,7 @@ func passConstFoldingOpt(b *builder) {
 	}
 }
 
-func eval(op Opcode, xc uint64, yc uint64) uint64 {
+func evalArithmeticOp(op Opcode, xc uint64, yc uint64) uint64 {
 	switch op {
 	case OpcodeIadd:
 		return xc + yc
@@ -471,97 +492,7 @@ func eval(op Opcode, xc uint64, yc uint64) uint64 {
 	case OpcodeBxor:
 		return xc ^ yc
 	default:
-		panic("unhandled default case")
-	}
-}
-
-// passAlgebraicSimplificationMaxIter controls the max number of iterations per-BB in passAlgebraicSimplification, before giving up.
-const passAlgebraicSimplificationMaxIter = 10
-
-// passAlgebraicSimplification performs algebraic simplification.
-func passAlgebraicSimplification(b *builder) {
-	// isConstant is a utility for nil-safe check for Constant(). It can be moved into inst.Constant() if useful.
-	isConstant := func(inst *Instruction) bool { return inst != nil && inst.Constant() }
-	// isCanonical returns true when the given pair of instruction resolves to non-constant, constant.
-	isCanonical := func(a, b *Instruction) bool { return !isConstant(a) && isConstant(b) }
-	makeConstant := func(yDef, wDef *Instruction, op Opcode) *Instruction {
-		// Create a const as wide as yDef (either 32 or 64-bits), sum the two consts in cur and xDef.
-		// We are assuming the types match.
-		instr := b.AllocateInstruction()
-		instr.opcode = OpcodeIconst
-		instr.typ = yDef.typ
-		instr.rValue = b.allocateValue(yDef.typ)
-		yc, wc := yDef.ConstantVal(), wDef.ConstantVal()
-		instr.u1 = eval(op, yc, wc)
-		return instr
-	}
-	// TODO: We should first canonicalize operations. E.g, Iadd const, v => Iadd v, const.
-	for blk := b.blockIteratorBegin(); blk != nil; blk = b.blockIteratorNext() {
-		for iter, isFixedPoint := 0, false; iter < passAlgebraicSimplificationMaxIter && !isFixedPoint; iter++ {
-			isFixedPoint = true
-			for cur := blk.rootInstr; cur != nil; cur = cur.next {
-				// The fixed point is reached through a simple iteration over the list of instructions.
-				// Note: Instead of just an unbounded loop with a flag, we may also add an upper bound to the number of iterations.
-				op := cur.Opcode()
-				switch op {
-				// For a given sequence of instructions:
-				//     C0 = Iconst_(32|64) ...
-				//     C1 = Iconst_(32|64) ...
-				//	   V0 = ...
-				//     V1 = Iadd V0, C0
-				//     Vn = Iadd V1, C1
-				// Rewrites Vn to:
-				//     Ck = Iconst_(32|64) C0+C1
-				//     Vn = Iadd V0, Ck
-				// C0, C1, V0, V1 might be deleted by passDeadCodeEliminationOpt
-				// if they are not referenced by other instructions.
-				case OpcodeIadd, OpcodeImul, OpcodeBor, OpcodeBand, OpcodeBxor:
-					x, y := cur.Arg2()
-					xDef, yDef := b.valueIDToInstruction[x.ID()], b.valueIDToInstruction[y.ID()]
-					// Only apply if the referenced value was defined by the same instruction.
-					if xDef == nil || xDef.Opcode() != op {
-						continue
-					}
-					// Canonical representation is `Iadd Value, Const`
-					if !isCanonical(xDef, yDef) {
-						continue
-					}
-					// Verify the instruction xDef is in the form `Iadd Value, Const`
-					v, w := xDef.Arg2()
-					vDef, wDef := b.valueIDToInstruction[v.ID()], b.valueIDToInstruction[w.ID()]
-					if !isCanonical(vDef, wDef) {
-						continue
-					}
-
-					isFixedPoint = false
-
-					// Create a const as wide as yDef (either 32 or 64-bits), sum the two consts in cur and xDef.
-					// We are assuming the types match.
-					instr := makeConstant(yDef, wDef, op)
-					// Update the current instruction to point to the value referenced by xDef and the new const.
-					cur.v, cur.v2 = v, instr.Return()
-
-					// Update or append the new valueId to the mapping slice.
-					if int(b.nextValueID) >= len(b.valueIDToInstruction) {
-						b.valueIDToInstruction = append(b.valueIDToInstruction, instr)
-					} else {
-						b.valueIDToInstruction[instr.Return().ID()] = instr
-					}
-
-					// Insert the new instruction in the linked list between cur.prev and cur.
-					cur.prev.next = instr
-					instr.prev = cur.prev
-					cur.prev = instr
-					instr.next = cur
-
-					if cur == blk.rootInstr {
-						blk.rootInstr = instr
-					}
-				default:
-					continue
-				}
-			}
-		}
+		panic("unhandled default case " + op.String())
 	}
 }
 
