@@ -38,8 +38,6 @@ func (b *builder) RunPasses() {
 	passConstFoldingOpt(b)
 	passNopInstElimination(b)
 
-	passCollectValueIdToInstructionMapping(b)
-
 	// passDeadCodeEliminationOpt could be more accurate if we do this after other optimizations.
 	passDeadCodeEliminationOpt(b)
 	b.donePasses = true
