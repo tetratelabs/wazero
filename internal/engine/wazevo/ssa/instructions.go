@@ -2514,7 +2514,7 @@ func (i *Instruction) addArgumentBranchInst(v Value) {
 // Constant returns true if this instruction is a constant instruction.
 func (i *Instruction) Constant() bool {
 	switch i.opcode {
-	case OpcodeIconst, OpcodeF32const, OpcodeF64const:
+	case OpcodeIconst, OpcodeF32const, OpcodeF64const, OpcodeVconst:
 		return true
 	}
 	return false
@@ -2527,7 +2527,8 @@ func (i *Instruction) ConstantVal() (ret uint64) {
 	case OpcodeIconst, OpcodeF32const, OpcodeF64const:
 		ret = i.u1
 	default:
-		panic("TODO")
+		// OpcodeVconst must be handled via VconstData.
+		panic("BUG: ConstantVal only available for OpcodeIconst, OpcodeF32const, OpcodeF64const")
 	}
 	return
 }

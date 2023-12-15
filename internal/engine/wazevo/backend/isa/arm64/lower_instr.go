@@ -140,7 +140,7 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		m.lowerSubOrAdd(instr, op == ssa.OpcodeIadd)
 	case ssa.OpcodeFadd, ssa.OpcodeFsub, ssa.OpcodeFmul, ssa.OpcodeFdiv, ssa.OpcodeFmax, ssa.OpcodeFmin:
 		m.lowerFpuBinOp(instr)
-	case ssa.OpcodeIconst, ssa.OpcodeF32const, ssa.OpcodeF64const: // Constant instructions are inlined.
+	case ssa.OpcodeIconst, ssa.OpcodeF32const, ssa.OpcodeF64const, ssa.OpcodeVconst: // Constant instructions are inlined.
 	case ssa.OpcodeExitWithCode:
 		execCtx, code := instr.ExitWithCodeData()
 		m.lowerExitWithCode(m.compiler.VRegOf(execCtx), code)
@@ -328,12 +328,6 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
 		rd := operandNR(m.compiler.VRegOf(instr.Return()))
 		m.lowerIRem(ctxVReg, rd, rn, rm, x.Type() == ssa.TypeI64, op == ssa.OpcodeSrem)
-	case ssa.OpcodeVconst:
-		result := m.compiler.VRegOf(instr.Return())
-		lo, hi := instr.VconstData()
-		v := m.allocateInstr()
-		v.asLoadFpuConst128(result, lo, hi)
-		m.insert(v)
 	case ssa.OpcodeVbnot:
 		x := instr.Arg()
 		ins := m.allocateInstr()

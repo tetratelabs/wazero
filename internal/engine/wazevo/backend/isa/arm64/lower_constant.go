@@ -10,7 +10,7 @@ func (m *machine) lowerConstant(instr *ssa.Instruction) (vr regalloc.VReg) {
 	val := instr.Return()
 	valType := val.Type()
 
-	vr = m.compiler.AllocateVReg(valType)
+	vr = m.compiler.AllocateVReg(valType).MarkRematerializable()
 	m.InsertLoadConstant(instr, vr)
 	return
 }
@@ -19,6 +19,14 @@ func (m *machine) lowerConstant(instr *ssa.Instruction) (vr regalloc.VReg) {
 func (m *machine) InsertLoadConstant(instr *ssa.Instruction, vr regalloc.VReg) {
 	val := instr.Return()
 	valType := val.Type()
+	if valType == ssa.TypeV128 {
+		lo, hi := instr.VconstData()
+		loadV128 := m.allocateInstr()
+		loadV128.asLoadFpuConst128(vr, lo, hi)
+		m.insert(loadV128)
+		return
+	}
+
 	v := instr.ConstantVal()
 
 	if valType.Bits() < 64 { // Clear the redundant bits just in case it's unexpectedly sign-extended, etc.
@@ -47,7 +55,7 @@ func (m *machine) InsertLoadConstant(instr *ssa.Instruction, vr regalloc.VReg) {
 			m.lowerConstantI64(vr, int64(v))
 		}
 	default:
-		panic("TODO")
+		panic("BUG")
 	}
 }
 

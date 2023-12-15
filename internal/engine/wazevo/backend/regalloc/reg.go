@@ -35,7 +35,7 @@ func FromRealReg(r RealReg, typ RegType) VReg {
 
 // SetRealReg sets the RealReg of this VReg and returns the updated VReg.
 func (v VReg) SetRealReg(r RealReg) VReg {
-	return VReg(r)<<32 | (v & 0xff_00_ffffffff)
+	return VReg(r)<<32 | (v & 0xffffff00_ffffffff)
 }
 
 // RegType returns the RegType of this VReg.
@@ -45,7 +45,18 @@ func (v VReg) RegType() RegType {
 
 // SetRegType sets the RegType of this VReg and returns the updated VReg.
 func (v VReg) SetRegType(t RegType) VReg {
-	return VReg(t)<<40 | (v & 0x00_ff_ffffffff)
+	return VReg(t)<<40 | (v & 0xffff00ff_ffffffff)
+}
+
+// MarkRematerializable marks this VReg as rematerializable.
+func (v VReg) MarkRematerializable() VReg {
+	v |= 1 << 48
+	return v
+}
+
+// Rematerializable returns true if this VReg is rematerializable.
+func (v VReg) Rematerializable() bool {
+	return v&(1<<48) != 0
 }
 
 // ID returns the VRegID of this VReg.

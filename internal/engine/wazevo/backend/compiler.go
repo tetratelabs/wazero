@@ -70,6 +70,9 @@ type Compiler interface {
 	// ValueDefinition returns the definition of the given value.
 	ValueDefinition(ssa.Value) *SSAValueDefinition
 
+	// VRegDefinition returns the definition of the given virtual register.
+	VRegDefinition(regalloc.VReg) *SSAValueDefinition
+
 	// VRegOf returns the virtual register of the given ssa.Value.
 	VRegOf(value ssa.Value) regalloc.VReg
 
@@ -118,6 +121,8 @@ type compiler struct {
 	ssaValueToVRegs [] /* VRegID to */ regalloc.VReg
 	// ssaValueDefinitions maps ssa.ValueID to its definition.
 	ssaValueDefinitions []SSAValueDefinition
+	// vRegDefs maps regalloc.VRegID to its definition, just like ssaValueDefinitions.
+	vRegDefs [] /* VRegID to */ *SSAValueDefinition
 	// ssaValueRefCounts is a cached list obtained by ssa.Builder.ValueRefCounts().
 	ssaValueRefCounts []int
 	// returnVRegs is the list of virtual registers that store the return values.
@@ -223,6 +228,7 @@ func (c *compiler) assignVirtualRegisters() {
 			vreg := c.AllocateVReg(typ)
 			c.ssaValueToVRegs[pid] = vreg
 			c.ssaValueDefinitions[pid] = SSAValueDefinition{BlockParamValue: p, BlkParamVReg: vreg}
+			c.vRegDefs[vreg.ID()] = &c.ssaValueDefinitions[pid]
 			c.ssaTypeOfVRegID[vreg.ID()] = p.Type()
 		}
 
@@ -235,13 +241,18 @@ func (c *compiler) assignVirtualRegisters() {
 				ssaTyp := r.Type()
 				typ := r.Type()
 				vReg := c.AllocateVReg(typ)
+				if cur.Constant() {
+					vReg = vReg.MarkRematerializable()
+				}
 				c.ssaValueToVRegs[id] = vReg
 				c.ssaValueDefinitions[id] = SSAValueDefinition{
 					Instr:    cur,
 					N:        0,
 					RefCount: refCounts[id],
 				}
-				c.ssaTypeOfVRegID[vReg.ID()] = ssaTyp
+				vid := vReg.ID()
+				c.vRegDefs[vid] = &c.ssaValueDefinitions[id]
+				c.ssaTypeOfVRegID[vid] = ssaTyp
 				N++
 			}
 			for _, r := range rs {
@@ -254,7 +265,9 @@ func (c *compiler) assignVirtualRegisters() {
 					N:        N,
 					RefCount: refCounts[id],
 				}
-				c.ssaTypeOfVRegID[vReg.ID()] = ssaTyp
+				vid := vReg.ID()
+				c.vRegDefs[vid] = &c.ssaValueDefinitions[id]
+				c.ssaTypeOfVRegID[vid] = ssaTyp
 				N++
 			}
 		}
@@ -276,6 +289,9 @@ func (c *compiler) AllocateVReg(typ ssa.Type) regalloc.VReg {
 	id := r.ID()
 	if int(id) >= len(c.ssaTypeOfVRegID) {
 		c.ssaTypeOfVRegID = append(c.ssaTypeOfVRegID, make([]ssa.Type, id+1)...)
+	}
+	if int(id) >= len(c.vRegDefs) {
+		c.vRegDefs = append(c.vRegDefs, make([]*SSAValueDefinition, id+1)...)
 	}
 	c.ssaTypeOfVRegID[id] = typ
 	c.nextVRegID++
@@ -299,6 +315,11 @@ func (c *compiler) Init() {
 // ValueDefinition implements Compiler.ValueDefinition.
 func (c *compiler) ValueDefinition(value ssa.Value) *SSAValueDefinition {
 	return &c.ssaValueDefinitions[value.ID()]
+}
+
+// VRegDefinition implements Compiler.VRegDefinition.
+func (c *compiler) VRegDefinition(v regalloc.VReg) *SSAValueDefinition {
+	return c.vRegDefs[v.ID()]
 }
 
 // VRegOf implements Compiler.VRegOf.

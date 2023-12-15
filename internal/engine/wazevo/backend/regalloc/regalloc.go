@@ -246,6 +246,7 @@ func (s *state) findOrSpillAllocatable(a *Allocator, allocatable []RealReg, forb
 	r = RealRegInvalid
 	var lastUseAt programCounter = math.MinInt32
 	var spillVReg VReg
+	var spillRematerializable bool
 	for _, candidateReal := range allocatable {
 		if forbiddenMask.has(candidateReal) {
 			continue
@@ -257,7 +258,22 @@ func (s *state) findOrSpillAllocatable(a *Allocator, allocatable []RealReg, forb
 			return candidateReal
 		}
 
-		if last := s.getVRegState(using).lastUse; last > lastUseAt {
+		if spillRematerializable {
+			// Already found the best candidate.
+			continue
+		}
+
+		// If we can rematerialize this value, we spill it immediately as it is cheaper than
+		// reloading from the stack.
+		vstate := s.getVRegState(using)
+		if using.Rematerializable() {
+			r = candidateReal
+			spillVReg = using
+			spillRematerializable = true
+			continue
+		}
+
+		if last := vstate.lastUse; last > lastUseAt {
 			lastUseAt = last
 			r = candidateReal
 			spillVReg = using
@@ -269,7 +285,14 @@ func (s *state) findOrSpillAllocatable(a *Allocator, allocatable []RealReg, forb
 	}
 
 	if wazevoapi.RegAllocLoggingEnabled {
-		fmt.Printf("\tspilling v%d when: %s\n", spillVReg.ID(), forbiddenMask.format(a.regInfo))
+		if spillRematerializable {
+			fmt.Printf("\tspilling rematerializable v%d when: %s\n", spillVReg.ID(), forbiddenMask.format(a.regInfo))
+		} else {
+			fmt.Printf("\tspilling v%d when: %s\n", spillVReg.ID(), forbiddenMask.format(a.regInfo))
+		}
+	}
+	if spillRematerializable {
+		fmt.Printf("\tspilling rematerializable v%d when: %s\n", spillVReg.ID(), forbiddenMask.format(a.regInfo))
 	}
 	s.releaseRealReg(r)
 	return r
@@ -870,6 +893,10 @@ func (a *Allocator) scheduleSpills(f Function) {
 	vrStates := a.state.vrStates
 	for i := 0; i <= a.state.maxVRegIDEncountered; i++ {
 		vs := &vrStates[i]
+		if vs.v.Rematerializable() {
+			// Rematerializable values are not spilled as they can be recalculated.
+			continue
+		}
 		if vs.spilled {
 			a.scheduleSpill(f, vs)
 		}

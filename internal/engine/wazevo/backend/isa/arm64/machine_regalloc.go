@@ -174,6 +174,23 @@ func (f *regAllocFunctionImpl) StoreRegisterAfter(v regalloc.VReg, instr regallo
 // ReloadRegisterBefore implements regalloc.Function ReloadRegisterBefore.
 func (f *regAllocFunctionImpl) ReloadRegisterBefore(v regalloc.VReg, instr regalloc.Instr) {
 	m := f.m
+	def := m.compiler.VRegDefinition(v)
+	if def != nil {
+		if defInst := def.Instr; defInst != nil {
+			switch defInst.Opcode() {
+			case ssa.OpcodeIconst, ssa.OpcodeF32const, ssa.OpcodeF64const, ssa.OpcodeVconst:
+				m.pendingInstructions = m.pendingInstructions[:0]
+				m.InsertLoadConstant(defInst, v)
+				_instr := instr.(*instruction)
+				cur, prevNext := _instr.prev, _instr
+				for _, inserted := range m.pendingInstructions {
+					cur = linkInstr(cur, inserted)
+				}
+				linkInstr(cur, prevNext)
+				return
+			}
+		}
+	}
 	m.insertReloadRegisterAt(v, instr.(*instruction), false)
 }
 
