@@ -871,6 +871,13 @@ ld1r {x10.4s}, [x100?]
 `,
 		},
 		{
+			amode: addressMode{kind: addressModeKindRegUnsignedImm12, rn: v0VReg, imm: 0},
+			expected: `
+add x100?, d0, xzr
+ld1r {x10.4s}, [x100?]
+`,
+		},
+		{
 			amode: addressMode{kind: addressModeKindRegSignedImm9, rn: v0VReg, imm: 42},
 			expected: `
 add x100?, d0, #0x2a
@@ -884,7 +891,7 @@ ld1r {x10.4s}, [x100?]
 			ctx.vRegCounter = int(nextVReg.ID()) - 1
 			positiveTests[tc.amode.kind] = true
 
-			m.lowerLoadSplatFromAddressMode(operandNR(x10VReg), tc.amode, 32, ssa.VecLaneI32x4)
+			m.lowerLoadSplatFromAddressMode(operandNR(x10VReg), tc.amode, ssa.VecLaneI32x4)
 			require.Equal(t, tc.expected, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
 		})
 	}
@@ -901,7 +908,7 @@ ld1r {x10.4s}, [x100?]
 
 		t.Run("address mode "+strconv.Itoa(k), func(t *testing.T) {
 			err := require.CapturePanic(func() {
-				m.lowerLoadSplatFromAddressMode(operandNR(x10VReg), addressMode{kind: amk}, 32, ssa.VecLaneI32x4)
+				m.lowerLoadSplatFromAddressMode(operandNR(x10VReg), addressMode{kind: amk}, ssa.VecLaneI32x4)
 			})
 			require.Contains(t, err.Error(), "unsupported address mode for LoadSplat")
 		})
