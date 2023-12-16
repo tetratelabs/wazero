@@ -856,31 +856,30 @@ func Test_lowerLoadSplatFromAddressMode(t *testing.T) {
 		expectPanic bool
 	}{
 		{
-			amode: addressMode{kind: addressModeKindRegReg, rn: v0VReg, rm: v1VReg},
+			amode: addressMode{kind: addressModeKindRegReg, rn: x0VReg, rm: x1VReg},
 			expected: `
-add x100?, d0, d1
+add x100?, x0, x1
 ld1r {x10.4s}, [x100?]
 `,
 		},
 		{
-			amode: addressMode{kind: addressModeKindRegUnsignedImm12, rn: v0VReg, imm: 15616},
+			amode: addressMode{kind: addressModeKindRegUnsignedImm12, rn: x0VReg, imm: 15616},
 			expected: `
 movz x101?, #0x3d00, lsl 0
-add x100?, d0, x101?
+add x100?, x0, x101?
 ld1r {x10.4s}, [x100?]
 `,
 		},
 		{
-			amode: addressMode{kind: addressModeKindRegUnsignedImm12, rn: v0VReg, imm: 0},
+			amode: addressMode{kind: addressModeKindRegUnsignedImm12, rn: x0VReg, imm: 0},
 			expected: `
-add x100?, d0, xzr
 ld1r {x10.4s}, [x100?]
 `,
 		},
 		{
-			amode: addressMode{kind: addressModeKindRegSignedImm9, rn: v0VReg, imm: 42},
+			amode: addressMode{kind: addressModeKindRegSignedImm9, rn: x0VReg, imm: 42},
 			expected: `
-add x100?, d0, #0x2a
+add x100?, x0, #0x2a
 ld1r {x10.4s}, [x100?]
 `,
 		},

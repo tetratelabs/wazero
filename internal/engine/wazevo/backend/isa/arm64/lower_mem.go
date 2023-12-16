@@ -264,17 +264,15 @@ func (m *machine) lowerLoadSplatFromAddressMode(rd operand, amode addressMode, l
 		add.asALU(aluOpAdd, tmpReg, operandNR(amode.rn), operandImm12(uint16(amode.imm), 0), true)
 		m.insert(add)
 	case addressModeKindRegUnsignedImm12:
-		var offsetReg regalloc.VReg
 		if amode.imm != 0 {
-			offsetReg = m.compiler.AllocateVReg(ssa.TypeI64)
+			offsetReg := m.compiler.AllocateVReg(ssa.TypeI64)
 			m.load64bitConst(amode.imm, offsetReg)
+			add := m.allocateInstr()
+			m.insert(add)
+			add.asALU(aluOpAdd, tmpReg, operandNR(amode.rn), operandNR(offsetReg), true)
 		} else {
-			offsetReg = xzrVReg
+			tmpRegVReg = amode.rn
 		}
-
-		add := m.allocateInstr()
-		m.insert(add)
-		add.asALU(aluOpAdd, tmpReg, operandNR(amode.rn), operandNR(offsetReg), true)
 	default:
 		panic("unsupported address mode for LoadSplat")
 	}
