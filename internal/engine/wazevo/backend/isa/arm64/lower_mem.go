@@ -271,7 +271,7 @@ func (m *machine) lowerLoadSplatFromAddressMode(rd operand, amode addressMode, l
 			m.insert(add)
 			add.asALU(aluOpAdd, tmpReg, operandNR(amode.rn), operandNR(offsetReg), true)
 		} else {
-			tmpRegVReg = amode.rn
+			tmpReg = operandNR(amode.rn)
 		}
 	default:
 		panic("unsupported address mode for LoadSplat")

@@ -871,9 +871,9 @@ ld1r {x10.4s}, [x100?]
 `,
 		},
 		{
-			amode: addressMode{kind: addressModeKindRegUnsignedImm12, rn: x0VReg, imm: 0},
+			amode: addressMode{kind: addressModeKindRegUnsignedImm12, rn: x15VReg, imm: 0},
 			expected: `
-ld1r {x10.4s}, [x100?]
+ld1r {x10.4s}, [x15]
 `,
 		},
 		{
