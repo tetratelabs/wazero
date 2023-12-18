@@ -7,6 +7,7 @@ import (
 	"github.com/tetratelabs/wazero/experimental/opt"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/tetratelabs/wazero/sys"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -28,7 +29,13 @@ var configs = []struct {
 	},
 }
 
-func BenchmarkZig(b *testing.B) {
+func BenchmarkStdlibs(b *testing.B) {
+	b.Run("zig", benchmarkZig)
+	b.Run("tinygo", benchmarkTinyGo)
+	b.Run("gowasip1", benchmarkGoWasip1)
+}
+
+func benchmarkZig(b *testing.B) {
 	dir := "testdata/zig/"
 	ctx := context.Background()
 
@@ -55,9 +62,11 @@ func BenchmarkZig(b *testing.B) {
 						_, err := r.CompileModule(ctx, bin)
 						require.NoError(b, err)
 					})
+					im, err := r.InstantiateModule(ctx, m, modCfg)
+					require.NoError(b, err)
 					b.Run("Run", func(b *testing.B) {
-						_, err = r.InstantiateModule(ctx, m, modCfg)
-						require.NoError(b, err)
+						_, err := im.ExportedFunction("_start").Call(ctx)
+						requireZeroExitCode(b, err)
 					})
 				})
 			}
@@ -65,7 +74,7 @@ func BenchmarkZig(b *testing.B) {
 	}
 }
 
-func BenchmarkTinyGo(b *testing.B) {
+func benchmarkTinyGo(b *testing.B) {
 	dir := "testdata/tinygo/"
 	ctx := context.Background()
 
@@ -98,9 +107,11 @@ func BenchmarkTinyGo(b *testing.B) {
 						_, err := r.CompileModule(ctx, bin)
 						require.NoError(b, err)
 					})
+					im, err := r.InstantiateModule(ctx, m, modCfg)
+					require.NoError(b, err)
 					b.Run("Run", func(b *testing.B) {
-						_, err = r.InstantiateModule(ctx, m, modCfg)
-						require.NoError(b, err)
+						_, err := im.ExportedFunction("_start").Call(ctx)
+						requireZeroExitCode(b, err)
 					})
 				})
 			}
@@ -108,7 +119,7 @@ func BenchmarkTinyGo(b *testing.B) {
 	}
 }
 
-func BenchmarkGoWasip1(b *testing.B) {
+func benchmarkGoWasip1(b *testing.B) {
 	cwd, _ := os.Getwd()
 	defer os.Chdir(cwd)
 	dir := "testdata/go/"
@@ -144,22 +155,30 @@ func BenchmarkGoWasip1(b *testing.B) {
 
 				m, err := r.CompileModule(ctx, bin)
 				require.NoError(b, err)
-				if m == nil {
-					b.Fatal(err, f.Name())
-				}
 
 				b.Run(cfg.name, func(b *testing.B) {
 					b.Run("Compile", func(b *testing.B) {
 						_, err := r.CompileModule(ctx, bin)
 						require.NoError(b, err)
 					})
+					im, err := r.InstantiateModule(ctx, m, modCfg)
+					require.NoError(b, err)
 					b.Run("Run", func(b *testing.B) {
-						_, err = r.InstantiateModule(ctx, m, modCfg)
-						require.NoError(b, err)
+						_, err := im.ExportedFunction("_start").Call(ctx)
+						requireZeroExitCode(b, err)
 					})
 				})
 			}
 		})
+	}
+}
+
+func requireZeroExitCode(b *testing.B, err error) {
+	b.Helper()
+	if se, ok := err.(*sys.ExitError); ok {
+		if se.ExitCode() != 0 { // Don't err on success.
+			require.NoError(b, err)
+		}
 	}
 }
 
@@ -171,5 +190,6 @@ func defaultModuleConfig() wazero.ModuleConfig {
 		WithRandSource(rand.Reader).
 		// Some tests require Stdout and Stderr to be present.
 		WithStdout(os.Stdout).
-		WithStderr(os.Stderr)
+		WithStderr(os.Stderr).
+		WithStartFunctions()
 }
