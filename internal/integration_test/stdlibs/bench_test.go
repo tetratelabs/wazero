@@ -3,23 +3,24 @@ package wazevo_test
 import (
 	"context"
 	"crypto/rand"
-	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/experimental/opt"
-	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
-	"github.com/tetratelabs/wazero/internal/testing/require"
-	"github.com/tetratelabs/wazero/sys"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/experimental/opt"
+	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
+	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/tetratelabs/wazero/sys"
 )
 
 func BenchmarkStdlibs(b *testing.B) {
 	if runtime.GOARCH != "arm64" {
 		b.Skip("The optimizing compiler is currently only supported on arm64.")
 	}
-	var configs = []struct {
+	configs := []struct {
 		name   string
 		config wazero.RuntimeConfig
 	}{
@@ -28,7 +29,7 @@ func BenchmarkStdlibs(b *testing.B) {
 	}
 
 	cwd, _ := os.Getwd()
-	defer os.Chdir(cwd)
+	defer os.Chdir(cwd) //nolint
 	ctx := context.Background()
 
 	testCases := []struct {
@@ -72,13 +73,15 @@ func BenchmarkStdlibs(b *testing.B) {
 				if !strings.HasSuffix(fname, ".test") {
 					return nil, nil, nil
 				}
-
 				bin, err := os.ReadFile(fpath)
+				if err != nil {
+					return nil, nil, err
+				}
 				fsuffixstripped := strings.ReplaceAll(fname, ".test", "")
 				inferredpath := strings.ReplaceAll(fsuffixstripped, "_", "/")
 				testdir := filepath.Join(runtime.GOROOT(), inferredpath)
 
-				os.Chdir(testdir)
+				err = os.Chdir(testdir)
 				modCfg := defaultModuleConfig().
 					WithFSConfig(
 						wazero.NewFSConfig().
@@ -97,7 +100,8 @@ func BenchmarkStdlibs(b *testing.B) {
 			for _, f := range files {
 				fname := f.Name()
 				// Ensure we are on root dir.
-				os.Chdir(cwd)
+				err = os.Chdir(cwd)
+				require.NoError(b, err)
 
 				fpath := filepath.Join(cwd, tc.dir, fname)
 				bin, modCfg, err := tc.readTestCase(fpath, fname)
