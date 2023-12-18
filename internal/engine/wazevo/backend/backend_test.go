@@ -2231,7 +2231,7 @@ L1 (SSA Block: blk0):
 				fmt.Println(be.Format())
 			}
 
-			be.Finalize()
+			be.Finalize(context.Background())
 			if verbose {
 				fmt.Println("============ finalization result ============")
 				fmt.Println(be.Format())

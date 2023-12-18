@@ -50,7 +50,7 @@ type Compiler interface {
 	RegAlloc()
 
 	// Finalize performs the finalization of the compilation. This must be called after RegAlloc.
-	Finalize()
+	Finalize(ctx context.Context)
 
 	// Encode encodes the machine code to the buffer.
 	Encode()
@@ -163,7 +163,7 @@ func (c *compiler) Compile(ctx context.Context) ([]byte, []RelocationInfo, error
 	if wazevoapi.DeterministicCompilationVerifierEnabled {
 		wazevoapi.VerifyOrSetDeterministicCompilationContextValue(ctx, "After Register Allocation", c.Format())
 	}
-	c.Finalize()
+	c.Finalize(ctx)
 	if wazevoapi.PrintFinalizedMachineCode {
 		fmt.Printf("[[[after finalize for %s]]]%s\n", wazevoapi.GetCurrentFunctionName(ctx), c.Format())
 	}
@@ -184,10 +184,10 @@ func (c *compiler) RegAlloc() {
 }
 
 // Finalize implements Compiler.Finalize.
-func (c *compiler) Finalize() {
+func (c *compiler) Finalize(ctx context.Context) {
 	c.mach.SetupPrologue()
 	c.mach.SetupEpilogue()
-	c.mach.ResolveRelativeAddresses()
+	c.mach.ResolveRelativeAddresses(ctx)
 }
 
 // Encode implements Compiler.Encode.

@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"context"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
@@ -50,7 +51,7 @@ func (m mockMachine) SetupPrologue() {}
 func (m mockMachine) SetupEpilogue() {}
 
 // ResolveRelativeAddresses implements Machine.ResolveRelativeAddresses.
-func (m mockMachine) ResolveRelativeAddresses() {}
+func (m mockMachine) ResolveRelativeAddresses(ctx context.Context) {}
 
 // Function implements Machine.Function.
 func (m mockMachine) Function() (f regalloc.Function) { return }

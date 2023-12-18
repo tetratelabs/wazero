@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"context"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
@@ -89,7 +90,7 @@ type (
 
 		// ResolveRelativeAddresses resolves the relative addresses after register allocations and prologue/epilogue setup.
 		// After this, the compiler is finally ready to emit machine code.
-		ResolveRelativeAddresses()
+		ResolveRelativeAddresses(ctx context.Context)
 
 		// ResolveRelocations resolves the relocations after emitting machine code.
 		ResolveRelocations(refToBinaryOffset map[ssa.FuncRef]int, binary []byte, relocations []RelocationInfo)

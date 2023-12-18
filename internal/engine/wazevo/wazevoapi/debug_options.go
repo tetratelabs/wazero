@@ -162,7 +162,8 @@ const NeedFunctionNameInContext = PrintSSA ||
 	PrintRegisterAllocated ||
 	PrintFinalizedMachineCode ||
 	PrintMachineCodeHexPerFunction ||
-	DeterministicCompilationVerifierEnabled
+	DeterministicCompilationVerifierEnabled ||
+	PerfMapEnabled
 
 // SetCurrentFunctionName sets the current function name to the given `functionName`.
 func SetCurrentFunctionName(ctx context.Context, functionName string) context.Context {
