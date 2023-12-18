@@ -15,21 +15,18 @@ import (
 	"testing"
 )
 
-var configs = []struct {
-	name   string
-	config wazero.RuntimeConfig
-}{
-	{
-		name:   "baseline",
-		config: wazero.NewRuntimeConfigCompiler(),
-	},
-	{
-		name:   "optimizing",
-		config: opt.NewRuntimeConfigOptimizingCompiler(),
-	},
-}
-
 func BenchmarkStdlibs(b *testing.B) {
+	if runtime.GOARCH != "arm64" {
+		b.Skip("The optimizing compiler is currently only supported on arm64.")
+	}
+	var configs = []struct {
+		name   string
+		config wazero.RuntimeConfig
+	}{
+		{name: "baseline", config: wazero.NewRuntimeConfigCompiler()},
+		{name: "optimizing", config: opt.NewRuntimeConfigOptimizingCompiler()},
+	}
+
 	cwd, _ := os.Getwd()
 	defer os.Chdir(cwd)
 	ctx := context.Background()
