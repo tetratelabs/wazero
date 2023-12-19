@@ -1593,17 +1593,25 @@ func (m *machine) lowerShifts(si *ssa.Instruction, ext extMode, aluOp aluOp) {
 
 func (m *machine) lowerBitwiseAluOp(si *ssa.Instruction, op aluOp) {
 	x, y := si.Arg2()
-	if !x.Type().IsInt() {
-		panic("BUG?")
-	}
 
 	xDef, yDef := m.compiler.ValueDefinition(x), m.compiler.ValueDefinition(y)
 	rn := m.getOperand_NR(xDef, extModeNone)
-	rm := m.getOperand_SR_NR(yDef, extModeNone)
 	rd := operandNR(m.compiler.VRegOf(si.Return()))
 
+	_64 := x.Type().Bits() == 64
 	alu := m.allocateInstr()
-	alu.asALU(op, rd, rn, rm, si.Return().Type().Bits() == 64)
+	if instr := yDef.Instr; instr != nil && instr.Constant() {
+		c := instr.ConstantVal()
+		if isBitMaskImmediate(c, _64) {
+			// Constant bit wise operations can be lowered to a single instruction.
+			alu.asALUBitmaskImm(op, rd.nr(), rn.nr(), c, _64)
+			m.insert(alu)
+			return
+		}
+	}
+
+	rm := m.getOperand_SR_NR(yDef, extModeNone)
+	alu.asALU(op, rd, rn, rm, _64)
 	m.insert(alu)
 }
 

@@ -59,7 +59,7 @@ func (m *machine) lowerConstantI32(dst regalloc.VReg, c int32) {
 	// https://github.com/golang/go/blob/release-branch.go1.15/src/cmd/internal/obj/arm64/asm7.go#L1637
 	ic := int64(uint32(c))
 	if ic >= 0 && (ic <= 0xfff || (ic&0xfff) == 0 && (uint64(ic>>12) <= 0xfff)) {
-		if isBitMaskImmediate(uint64(c)) {
+		if isBitMaskImmediate(uint64(c), false) {
 			m.lowerConstViaBitMaskImmediate(uint64(uint32(c)), dst, false)
 			return
 		}
@@ -72,7 +72,7 @@ func (m *machine) lowerConstantI32(dst regalloc.VReg, c int32) {
 	} else if t := const16bitAligned(int64(^c)); t >= 0 {
 		// Also, if the inverse of the const can fit within 16-bit range, do the same ^^.
 		m.insertMOVN(dst, uint64(^c>>(16*t)), t, false)
-	} else if isBitMaskImmediate(uint64(uint32(c))) {
+	} else if isBitMaskImmediate(uint64(uint32(c)), false) {
 		m.lowerConstViaBitMaskImmediate(uint64(c), dst, false)
 	} else {
 		// Otherwise, we use MOVZ and MOVK to load it.
@@ -87,7 +87,7 @@ func (m *machine) lowerConstantI64(dst regalloc.VReg, c int64) {
 	// Following the logic here:
 	// https://github.com/golang/go/blob/release-branch.go1.15/src/cmd/internal/obj/arm64/asm7.go#L1798-L1852
 	if c >= 0 && (c <= 0xfff || (c&0xfff) == 0 && (uint64(c>>12) <= 0xfff)) {
-		if isBitMaskImmediate(uint64(c)) {
+		if isBitMaskImmediate(uint64(c), true) {
 			m.lowerConstViaBitMaskImmediate(uint64(c), dst, true)
 			return
 		}
@@ -100,7 +100,7 @@ func (m *machine) lowerConstantI64(dst regalloc.VReg, c int64) {
 	} else if t := const16bitAligned(^c); t >= 0 {
 		// Also, if the reverse of the const can fit within 16-bit range, do the same ^^.
 		m.insertMOVN(dst, uint64(^c)>>(16*t), t, true)
-	} else if isBitMaskImmediate(uint64(c)) {
+	} else if isBitMaskImmediate(uint64(c), true) {
 		m.lowerConstViaBitMaskImmediate(uint64(c), dst, true)
 	} else {
 		m.load64bitConst(c, dst)
@@ -119,9 +119,9 @@ func (m *machine) lowerConstViaBitMaskImmediate(c uint64, dst regalloc.VReg, b64
 //	Each element contains the same sub-pattern: a single run of 1 to e-1 non-zero bits, rotated by 0 to e-1 bits.
 //
 // See https://developer.arm.com/documentation/dui0802/b/A64-General-Instructions/MOV--bitmask-immediate-
-func isBitMaskImmediate(x uint64) bool {
+func isBitMaskImmediate(x uint64, _64 bool) bool {
 	// All zeros and ones are not "bitmask immediate" by definition.
-	if x == 0 || x == 0xffff_ffff_ffff_ffff {
+	if x == 0 || (_64 && x == 0xffff_ffff_ffff_ffff) || (!_64 && x == 0xffff_ffff) {
 		return false
 	}
 
