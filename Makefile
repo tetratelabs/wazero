@@ -1,7 +1,7 @@
 
 gofumpt       := mvdan.cc/gofumpt@v0.5.0
 gosimports    := github.com/rinchsan/gosimports/cmd/gosimports@v0.3.8
-golangci_lint := github.com/golangci/golangci-lint/cmd/golangci-lint@v1.53.3
+golangci_lint := github.com/golangci/golangci-lint/cmd/golangci-lint@v1.55.2
 asmfmt        := github.com/klauspost/asmfmt/cmd/asmfmt@v1.3.2
 # sync this with netlify.toml!
 hugo          := github.com/gohugoio/hugo@v0.115.2
