@@ -145,9 +145,16 @@ jobs:
           docker run --platform linux/${{ matrix.arch }} -v $(pwd)/internal/integration_test/stdlibs/testdata/zig:/test -v $(pwd)/wazerocli:/wazero -e WAZEROCLI=/wazero --tmpfs /tmp --rm -t wazero:test \
             /wazero run -optimizing-compiler -mount=:/ ./test/test.wasm
 
-      - name: Run built test binaries
-        if: ${{ matrix.compiler != 'optimizing' }}
+      - name: Run built test binaries (Windows)
+        if: ${{ matrix.compiler != 'optimizing' && runner.os == 'Windows' }}
         run: ./wazerocli run -mount=:/ ./internal/integration_test/stdlibs/testdata/zig/test.wasm
+
+      - name: Run built test binaries
+        if: ${{ matrix.compiler != 'optimizing' && runner.os != 'Windows' }}
+        run: |
+          cd ./internal/integration_test/stdlibs
+          go test -bench='./zig' -benchtime=1x
+
 
   build_tinygo_test_binary:
     name: Build TinyGo test binary
@@ -259,14 +266,20 @@ jobs:
               /wazero run -optimizing-compiler -mount=:/  /test/$bin -- -test.v
           done
 
-      - name: Run test binaries
-        if: ${{ matrix.compiler != 'optimizing' }}
+      - name: Run test binaries (Windows)
+        if: ${{ matrix.compiler != 'optimizing' && runner.os == 'Windows'  }}
         run: |
           cd ./internal/integration_test/stdlibs/testdata/tinygo
           for bin in *.test; do
             echo $bin
             ~/wazerocli run -mount=:/ -mount=:/tmp $bin -- -test.v
           done
+
+      - name: Run test binaries
+        if: ${{ matrix.compiler != 'optimizing' && runner.os != 'Windows' }}
+        run: |
+          cd ./internal/integration_test/stdlibs
+          go test -bench='./tinygo' -benchtime=1x
 
   wasi-testsuite:
     name: wasi-testsuite
@@ -433,19 +446,7 @@ jobs:
             popd
           done
 
-      - if: ${{ matrix.compiler != 'optimizing' && runner.os != 'Windows' }}
-        name: Run test binaries
-        run: |
-          echo "Running $(find ./internal/integration_test/stdlibs/testdata/go -name *.test | wc -l) test binaries"
-          # Go tests often look for files relative to the source. Change to the corresponding directory.
-          for bin in $PWD/internal/integration_test/stdlibs/testdata/go/*.test; do
-            dir=$(basename $bin); dir=${dir%.test}; dir=${dir//_/\/}
-            pushd $(go env GOROOT)/$dir
-            ~/wazerocli run -mount=/:/ -env PWD=$PWD $bin -- -test.short -test.v
-            popd
-          done
-
-      - if: ${{ runner.os == 'Windows' }}
+      - if: ${{ matrix.compiler != 'optimizing' && runner.os == 'Windows' }}
         name: Run test binaries (Windows)
         # Ack failures on Windows. https://github.com/tetratelabs/wazero/issues/1410
         continue-on-error: true
@@ -485,3 +486,9 @@ jobs:
 
           # Run all the tests in their own shell.
           $RUNNER
+
+      - name: Run built test binaries
+        if: ${{ matrix.compiler != 'optimizing' && runner.os != 'Windows' }}
+        run: |
+          cd ./internal/integration_test/stdlibs
+          go test -bench='./wasip1' -benchtime=1x
