@@ -27,11 +27,11 @@ const (
 
 const (
 	PrintSSA                                 = false
-	PrintOptimizedSSA                        = true
+	PrintOptimizedSSA                        = false
 	PrintBlockLaidOutSSA                     = false
-	PrintSSAToBackendIRLowering              = true
-	PrintRegisterAllocated                   = true
-	PrintFinalizedMachineCode                = true
+	PrintSSAToBackendIRLowering              = false
+	PrintRegisterAllocated                   = false
+	PrintFinalizedMachineCode                = false
 	PrintMachineCodeHexPerFunction           = printMachineCodeHexPerFunctionUnmodified || PrintMachineCodeHexPerFunctionDisassemblable //nolint
 	printMachineCodeHexPerFunctionUnmodified = false
 	// PrintMachineCodeHexPerFunctionDisassemblable prints the machine code while modifying the actual result
@@ -42,7 +42,7 @@ const (
 
 // printTarget is the function index to print the machine code. This is used for debugging to print the machine code
 // of a specific function.
-const printTarget = 23231
+const printTarget = -1
 
 // PrintEnabledIndex returns true if the current function index is the print target.
 func PrintEnabledIndex(ctx context.Context) bool {
