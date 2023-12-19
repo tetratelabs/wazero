@@ -1,6 +1,7 @@
 package arm64
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"strings"
@@ -355,7 +356,7 @@ func (m *machine) resolveAddressingMode(arg0offset, ret0offset int64, i *instruc
 }
 
 // ResolveRelativeAddresses implements backend.Machine.
-func (m *machine) ResolveRelativeAddresses() {
+func (m *machine) ResolveRelativeAddresses(ctx context.Context) {
 	if len(m.unresolvedAddressModes) > 0 {
 		arg0offset, ret0offset := m.arg0OffsetFromSP(), m.ret0OffsetFromSP()
 		for _, i := range m.unresolvedAddressModes {
@@ -365,6 +366,18 @@ func (m *machine) ResolveRelativeAddresses() {
 
 	// Reuse the slice to gather the unresolved conditional branches.
 	cbrs := m.condBrRelocs[:0]
+
+	var fn string
+	var fnIndex int
+	var labelToSSABlockID map[label]ssa.BasicBlockID
+	if wazevoapi.PerfMapEnabled {
+		fn = wazevoapi.GetCurrentFunctionName(ctx)
+		labelToSSABlockID = make(map[label]ssa.BasicBlockID)
+		for i, l := range m.ssaBlockIDToLabels {
+			labelToSSABlockID[l] = ssa.BasicBlockID(i)
+		}
+		fnIndex = wazevoapi.GetCurrentFunctionIndex(ctx)
+	}
 
 	// Next, in order to determine the offsets of relative jumps, we have to calculate the size of each label.
 	var offset int64
@@ -397,6 +410,20 @@ func (m *machine) ResolveRelativeAddresses() {
 				break
 			}
 		}
+
+		if wazevoapi.PerfMapEnabled {
+			if size > 0 {
+				l := pos.l
+				var labelStr string
+				if blkID, ok := labelToSSABlockID[l]; ok {
+					labelStr = fmt.Sprintf("%s::SSA_Block[%s]", l, blkID)
+				} else {
+					labelStr = l.String()
+				}
+				wazevoapi.PerfMap.AddModuleEntry(fnIndex, offset, uint64(size), fmt.Sprintf("%s:::::%s", fn, labelStr))
+			}
+		}
+
 		pos.binarySize = size
 		offset += size
 	}
@@ -421,7 +448,8 @@ func (m *machine) ResolveRelativeAddresses() {
 		}
 	}
 	if needRerun {
-		m.ResolveRelativeAddresses()
+		m.ResolveRelativeAddresses(ctx)
+		wazevoapi.PerfMap.Clear()
 		return
 	}
 

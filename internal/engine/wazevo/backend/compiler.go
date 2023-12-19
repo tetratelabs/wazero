@@ -50,7 +50,7 @@ type Compiler interface {
 	RegAlloc()
 
 	// Finalize performs the finalization of the compilation. This must be called after RegAlloc.
-	Finalize()
+	Finalize(ctx context.Context)
 
 	// Encode encodes the machine code to the buffer.
 	Encode()
@@ -150,21 +150,21 @@ type SourceOffsetInfo struct {
 // Compile implements Compiler.Compile.
 func (c *compiler) Compile(ctx context.Context) ([]byte, []RelocationInfo, error) {
 	c.Lower()
-	if wazevoapi.PrintSSAToBackendIRLowering {
+	if wazevoapi.PrintSSAToBackendIRLowering && wazevoapi.PrintEnabledIndex(ctx) {
 		fmt.Printf("[[[after lowering for %s ]]]%s\n", wazevoapi.GetCurrentFunctionName(ctx), c.Format())
 	}
 	if wazevoapi.DeterministicCompilationVerifierEnabled {
 		wazevoapi.VerifyOrSetDeterministicCompilationContextValue(ctx, "After lowering to ISA specific IR", c.Format())
 	}
 	c.RegAlloc()
-	if wazevoapi.PrintRegisterAllocated {
+	if wazevoapi.PrintRegisterAllocated && wazevoapi.PrintEnabledIndex(ctx) {
 		fmt.Printf("[[[after regalloc for %s]]]%s\n", wazevoapi.GetCurrentFunctionName(ctx), c.Format())
 	}
 	if wazevoapi.DeterministicCompilationVerifierEnabled {
 		wazevoapi.VerifyOrSetDeterministicCompilationContextValue(ctx, "After Register Allocation", c.Format())
 	}
-	c.Finalize()
-	if wazevoapi.PrintFinalizedMachineCode {
+	c.Finalize(ctx)
+	if wazevoapi.PrintFinalizedMachineCode && wazevoapi.PrintEnabledIndex(ctx) {
 		fmt.Printf("[[[after finalize for %s]]]%s\n", wazevoapi.GetCurrentFunctionName(ctx), c.Format())
 	}
 	if wazevoapi.DeterministicCompilationVerifierEnabled {
@@ -184,10 +184,10 @@ func (c *compiler) RegAlloc() {
 }
 
 // Finalize implements Compiler.Finalize.
-func (c *compiler) Finalize() {
+func (c *compiler) Finalize(ctx context.Context) {
 	c.mach.SetupPrologue()
 	c.mach.SetupEpilogue()
-	c.mach.ResolveRelativeAddresses()
+	c.mach.ResolveRelativeAddresses(ctx)
 }
 
 // Encode implements Compiler.Encode.
