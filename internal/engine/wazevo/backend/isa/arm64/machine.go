@@ -368,6 +368,7 @@ func (m *machine) ResolveRelativeAddresses(ctx context.Context) {
 	cbrs := m.condBrRelocs[:0]
 
 	var fn string
+	var fnIndex int
 	var labelToSSABlockID map[label]ssa.BasicBlockID
 	if wazevoapi.PerfMapEnabled {
 		fn = wazevoapi.GetCurrentFunctionName(ctx)
@@ -375,6 +376,7 @@ func (m *machine) ResolveRelativeAddresses(ctx context.Context) {
 		for i, l := range m.ssaBlockIDToLabels {
 			labelToSSABlockID[l] = ssa.BasicBlockID(i)
 		}
+		fnIndex = wazevoapi.GetCurrentFunctionIndex(ctx)
 	}
 
 	// Next, in order to determine the offsets of relative jumps, we have to calculate the size of each label.
@@ -418,7 +420,7 @@ func (m *machine) ResolveRelativeAddresses(ctx context.Context) {
 				} else {
 					labelStr = l.String()
 				}
-				wazevoapi.PerfMap.AddEntry(offset, uint64(size), fmt.Sprintf("%s:::::%s", fn, labelStr))
+				wazevoapi.PerfMap.AddModuleEntry(fnIndex, offset, uint64(size), fmt.Sprintf("%s:::::%s", fn, labelStr))
 			}
 		}
 
@@ -451,16 +453,8 @@ func (m *machine) ResolveRelativeAddresses(ctx context.Context) {
 		return
 	}
 
-	first := m.orderedBlockLabels[0].begin
-
 	var currentOffset int64
 	for cur := m.rootInstr; cur != nil; cur = cur.next {
-		if wazevoapi.PerfMapEnabled {
-			if first == cur {
-				wazevoapi.PerfMap.AddEntry(0, uint64(currentOffset), fmt.Sprintf("%s:::::prologue", fn))
-			}
-		}
-
 		switch cur.kind {
 		case br:
 			target := cur.brLabel()

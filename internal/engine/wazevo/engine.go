@@ -116,6 +116,11 @@ func NewEngine(ctx context.Context, _ api.CoreFeatures, fc filecache.Cache) wasm
 
 // CompileModule implements wasm.Engine.
 func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listeners []experimental.FunctionListener, ensureTermination bool) (err error) {
+	if wazevoapi.PerfMapEnabled {
+		wazevoapi.PerfMap.Lock()
+		defer wazevoapi.PerfMap.Unlock()
+	}
+
 	if _, ok, err := e.getCompiledModule(module, listeners, ensureTermination); ok { // cache hit!
 		return nil
 	} else if err != nil {
@@ -167,9 +172,8 @@ func (exec *executables) compileEntryPreambles(m *wasm.Module, machine backend.M
 		exec.entryPreambles[i] = executable
 
 		if wazevoapi.PerfMapEnabled {
-			wazevoapi.PerfMap.AddEntry(int64(uintptr(unsafe.Pointer(&executable[0]))),
+			wazevoapi.PerfMap.AddEntry(uintptr(unsafe.Pointer(&executable[0])),
 				uint64(len(executable)), fmt.Sprintf("entry_preamble::type=%s", typ.String()))
-			wazevoapi.PerfMap.Flush(0)
 		}
 	}
 }
@@ -223,7 +227,7 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 			if len(def.ExportNames()) > 0 {
 				name = def.ExportNames()[0]
 			}
-			ctx = wazevoapi.SetCurrentFunctionName(ctx, fmt.Sprintf("[%d/%d]%s", i, len(module.CodeSection)-1, name))
+			ctx = wazevoapi.SetCurrentFunctionName(ctx, i, fmt.Sprintf("[%d/%d]%s", i, len(module.CodeSection)-1, name))
 		}
 
 		needListener := len(listeners) > 0 && listeners[i] != nil
@@ -278,8 +282,7 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 	}
 
 	if wazevoapi.PerfMapEnabled {
-		fmt.Println("PerfMapEnabled")
-		wazevoapi.PerfMap.Flush(uintptr(unsafe.Pointer(&executable[0])))
+		wazevoapi.PerfMap.Flush(uintptr(unsafe.Pointer(&executable[0])), cm.functionOffsets)
 	}
 
 	if needSourceInfo {
@@ -321,7 +324,7 @@ func (e *engine) compileLocalWasmFunction(
 
 	// Lower Wasm to SSA.
 	fe.LowerToSSA()
-	if wazevoapi.PrintSSA {
+	if wazevoapi.PrintSSA && wazevoapi.PrintEnabledIndex(ctx) {
 		fmt.Printf("[[[SSA for %s]]]%s\n", wazevoapi.GetCurrentFunctionName(ctx), ssaBuilder.Format())
 	}
 
@@ -332,7 +335,7 @@ func (e *engine) compileLocalWasmFunction(
 	// Run SSA-level optimization passes.
 	ssaBuilder.RunPasses()
 
-	if wazevoapi.PrintOptimizedSSA {
+	if wazevoapi.PrintOptimizedSSA && wazevoapi.PrintEnabledIndex(ctx) {
 		fmt.Printf("[[[Optimized SSA for %s]]]%s\n", wazevoapi.GetCurrentFunctionName(ctx), ssaBuilder.Format())
 	}
 
@@ -343,7 +346,7 @@ func (e *engine) compileLocalWasmFunction(
 	// Finalize the layout of SSA blocks which might use the optimization results.
 	ssaBuilder.LayoutBlocks()
 
-	if wazevoapi.PrintBlockLaidOutSSA {
+	if wazevoapi.PrintBlockLaidOutSSA && wazevoapi.PrintEnabledIndex(ctx) {
 		fmt.Printf("[[[Laidout SSA for %s]]]%s\n", wazevoapi.GetCurrentFunctionName(ctx), ssaBuilder.Format())
 	}
 
@@ -422,6 +425,14 @@ func (e *engine) compileHostModule(ctx context.Context, module *wasm.Module, lis
 		be.Encode()
 		body := be.Buf()
 
+		if wazevoapi.PerfMapEnabled {
+			name := module.FunctionDefinition(wasm.Index(i)).DebugName()
+			wazevoapi.PerfMap.AddModuleEntry(i,
+				int64(totalSize),
+				uint64(len(body)),
+				fmt.Sprintf("trampoline:%s", name))
+		}
+
 		// TODO: optimize as zero copy.
 		copied := make([]byte, len(body))
 		copy(copied, body)
@@ -439,6 +450,10 @@ func (e *engine) compileHostModule(ctx context.Context, module *wasm.Module, lis
 	for i, b := range bodies {
 		offset := cm.functionOffsets[i]
 		copy(executable[offset:], b)
+	}
+
+	if wazevoapi.PerfMapEnabled {
+		wazevoapi.PerfMap.Flush(uintptr(unsafe.Pointer(&executable[0])), cm.functionOffsets)
 	}
 
 	if runtime.GOARCH == "arm64" {
@@ -567,11 +582,9 @@ func (e *engine) compileSharedFunctions() {
 			Results: []ssa.Type{ssa.TypeI32},
 		}, false)
 		e.sharedFunctions.memoryGrowExecutable = mmapExecutable(src)
-
 		if wazevoapi.PerfMapEnabled {
 			exe := e.sharedFunctions.memoryGrowExecutable
-			wazevoapi.PerfMap.AddEntry(int64(uintptr(unsafe.Pointer(&exe[0]))), uint64(len(exe)), fmt.Sprintf("memory_grow_trampoline"))
-			wazevoapi.PerfMap.Flush(0)
+			wazevoapi.PerfMap.AddEntry(uintptr(unsafe.Pointer(&exe[0])), uint64(len(exe)), fmt.Sprintf("memory_grow_trampoline"))
 		}
 	}
 
@@ -584,8 +597,7 @@ func (e *engine) compileSharedFunctions() {
 		e.sharedFunctions.tableGrowExecutable = mmapExecutable(src)
 		if wazevoapi.PerfMapEnabled {
 			exe := e.sharedFunctions.tableGrowExecutable
-			wazevoapi.PerfMap.AddEntry(int64(uintptr(unsafe.Pointer(&exe[0]))), uint64(len(exe)), fmt.Sprintf("table_grow_trampoline"))
-			wazevoapi.PerfMap.Flush(0)
+			wazevoapi.PerfMap.AddEntry(uintptr(unsafe.Pointer(&exe[0])), uint64(len(exe)), fmt.Sprintf("table_grow_trampoline"))
 		}
 	}
 
@@ -597,10 +609,8 @@ func (e *engine) compileSharedFunctions() {
 		}, false)
 		e.sharedFunctions.checkModuleExitCode = mmapExecutable(src)
 		if wazevoapi.PerfMapEnabled {
-
 			exe := e.sharedFunctions.checkModuleExitCode
-			wazevoapi.PerfMap.AddEntry(int64(uintptr(unsafe.Pointer(&exe[0]))), uint64(len(exe)), fmt.Sprintf("check_module_exit_code_trampoline"))
-			wazevoapi.PerfMap.Flush(0)
+			wazevoapi.PerfMap.AddEntry(uintptr(unsafe.Pointer(&exe[0])), uint64(len(exe)), fmt.Sprintf("check_module_exit_code_trampoline"))
 		}
 	}
 
@@ -612,10 +622,8 @@ func (e *engine) compileSharedFunctions() {
 		}, false)
 		e.sharedFunctions.refFuncExecutable = mmapExecutable(src)
 		if wazevoapi.PerfMapEnabled {
-
 			exe := e.sharedFunctions.refFuncExecutable
-			wazevoapi.PerfMap.AddEntry(int64(uintptr(unsafe.Pointer(&exe[0]))), uint64(len(exe)), fmt.Sprintf("ref_func_trampoline"))
-			wazevoapi.PerfMap.Flush(0)
+			wazevoapi.PerfMap.AddEntry(uintptr(unsafe.Pointer(&exe[0])), uint64(len(exe)), fmt.Sprintf("ref_func_trampoline"))
 		}
 	}
 
@@ -624,10 +632,8 @@ func (e *engine) compileSharedFunctions() {
 		src := e.machine.CompileStackGrowCallSequence()
 		e.sharedFunctions.stackGrowExecutable = mmapExecutable(src)
 		if wazevoapi.PerfMapEnabled {
-
 			exe := e.sharedFunctions.stackGrowExecutable
-			wazevoapi.PerfMap.AddEntry(int64(uintptr(unsafe.Pointer(&exe[0]))), uint64(len(exe)), fmt.Sprintf("stack_grow_trampoline"))
-			wazevoapi.PerfMap.Flush(0)
+			wazevoapi.PerfMap.AddEntry(uintptr(unsafe.Pointer(&exe[0])), uint64(len(exe)), fmt.Sprintf("stack_grow_trampoline"))
 		}
 	}
 
