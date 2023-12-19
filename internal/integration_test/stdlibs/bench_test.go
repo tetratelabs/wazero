@@ -17,15 +17,15 @@ import (
 )
 
 func BenchmarkStdlibs(b *testing.B) {
-	if runtime.GOARCH != "arm64" {
-		b.Skip("The optimizing compiler is currently only supported on arm64.")
-	}
-	configs := []struct {
+	type testConfig struct {
 		name   string
 		config wazero.RuntimeConfig
-	}{
+	}
+	configs := []testConfig{
 		{name: "baseline", config: wazero.NewRuntimeConfigCompiler()},
-		{name: "optimizing", config: opt.NewRuntimeConfigOptimizingCompiler()},
+	}
+	if runtime.GOARCH == "arm64" {
+		configs = append(configs, testConfig{name: "optimizing", config: opt.NewRuntimeConfigOptimizingCompiler()})
 	}
 
 	cwd, _ := os.Getwd()
