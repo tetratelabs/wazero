@@ -262,17 +262,8 @@ jobs:
               /wazero run -optimizing-compiler -mount=:/  /test/$bin -- -test.v
           done
 
-      - name: Run test binaries (Windows)
-        if: ${{ matrix.compiler != 'optimizing' && runner.os == 'Windows'  }}
-        run: |
-          cd ./internal/integration_test/stdlibs/testdata/tinygo
-          for bin in *.test; do
-            echo $bin
-            ~/wazerocli run -mount=:/ -mount=:/tmp $bin -- -test.v
-          done
-
       - name: Run test binaries
-        if: ${{ matrix.compiler != 'optimizing' && runner.os != 'Windows' }}
+        if: ${{ matrix.compiler != 'optimizing' }}
         run: |
           cd ./internal/integration_test/stdlibs
           go test -bench='./tinygo' -benchtime=1x
