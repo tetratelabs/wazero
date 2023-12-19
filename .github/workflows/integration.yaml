@@ -145,12 +145,8 @@ jobs:
           docker run --platform linux/${{ matrix.arch }} -v $(pwd)/internal/integration_test/stdlibs/testdata/zig:/test -v $(pwd)/wazerocli:/wazero -e WAZEROCLI=/wazero --tmpfs /tmp --rm -t wazero:test \
             /wazero run -optimizing-compiler -mount=:/ ./test/test.wasm
 
-      - name: Run built test binaries (Windows)
-        if: ${{ matrix.compiler != 'optimizing' && runner.os == 'Windows' }}
-        run: ./wazerocli run -mount=:/ ./internal/integration_test/stdlibs/testdata/zig/test.wasm
-
       - name: Run built test binaries
-        if: ${{ matrix.compiler != 'optimizing' && runner.os != 'Windows' }}
+        if: ${{ matrix.compiler != 'optimizing' }}
         run: |
           cd ./internal/integration_test/stdlibs
           go test -bench='./zig' -benchtime=1x
