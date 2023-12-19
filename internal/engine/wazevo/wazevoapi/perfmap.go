@@ -14,7 +14,7 @@ func init() {
 		pid := os.Getpid()
 		filename := "/tmp/perf-" + strconv.Itoa(pid) + ".map"
 
-		fh, err := os.OpenFile(filename, os.O_APPEND|os.O_RDWR|os.O_CREATE, 0644)
+		fh, err := os.OpenFile(filename, os.O_APPEND|os.O_RDWR|os.O_CREATE, 0o644)
 		if err != nil {
 			panic(err)
 		}
@@ -67,11 +67,13 @@ func (f *Perfmap) Flush(addr uintptr, functionOffsets []int) {
 	}()
 
 	for _, e := range f.entries {
-		f.fh.WriteString(fmt.Sprintf("%x %s %s\n",
+		if _, err := f.fh.WriteString(fmt.Sprintf("%x %s %s\n",
 			uintptr(e.offset)+addr+uintptr(functionOffsets[e.index]),
 			strconv.FormatUint(e.size, 16),
 			e.name,
-		))
+		)); err != nil {
+			panic(err)
+		}
 	}
 	f.entries = f.entries[:0]
 }
@@ -83,9 +85,12 @@ func (f *Perfmap) Clear() {
 
 // AddEntry writes a perfmap entry directly into the perfmap file, not using the entries.
 func (f *Perfmap) AddEntry(addr uintptr, size uint64, name string) {
-	f.fh.WriteString(fmt.Sprintf("%x %s %s\n",
+	_, err := f.fh.WriteString(fmt.Sprintf("%x %s %s\n",
 		addr,
 		strconv.FormatUint(size, 16),
 		name,
 	))
+	if err != nil {
+		panic(err)
+	}
 }

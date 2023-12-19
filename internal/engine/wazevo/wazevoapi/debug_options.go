@@ -46,6 +46,9 @@ const printTarget = -1
 
 // PrintEnabledIndex returns true if the current function index is the print target.
 func PrintEnabledIndex(ctx context.Context) bool {
+	if printTarget == -1 {
+		return true
+	}
 	return GetCurrentFunctionIndex(ctx) == printTarget
 }
 

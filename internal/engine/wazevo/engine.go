@@ -584,7 +584,7 @@ func (e *engine) compileSharedFunctions() {
 		e.sharedFunctions.memoryGrowExecutable = mmapExecutable(src)
 		if wazevoapi.PerfMapEnabled {
 			exe := e.sharedFunctions.memoryGrowExecutable
-			wazevoapi.PerfMap.AddEntry(uintptr(unsafe.Pointer(&exe[0])), uint64(len(exe)), fmt.Sprintf("memory_grow_trampoline"))
+			wazevoapi.PerfMap.AddEntry(uintptr(unsafe.Pointer(&exe[0])), uint64(len(exe)), "memory_grow_trampoline")
 		}
 	}
 
@@ -597,7 +597,7 @@ func (e *engine) compileSharedFunctions() {
 		e.sharedFunctions.tableGrowExecutable = mmapExecutable(src)
 		if wazevoapi.PerfMapEnabled {
 			exe := e.sharedFunctions.tableGrowExecutable
-			wazevoapi.PerfMap.AddEntry(uintptr(unsafe.Pointer(&exe[0])), uint64(len(exe)), fmt.Sprintf("table_grow_trampoline"))
+			wazevoapi.PerfMap.AddEntry(uintptr(unsafe.Pointer(&exe[0])), uint64(len(exe)), "table_grow_trampoline")
 		}
 	}
 
@@ -610,7 +610,7 @@ func (e *engine) compileSharedFunctions() {
 		e.sharedFunctions.checkModuleExitCode = mmapExecutable(src)
 		if wazevoapi.PerfMapEnabled {
 			exe := e.sharedFunctions.checkModuleExitCode
-			wazevoapi.PerfMap.AddEntry(uintptr(unsafe.Pointer(&exe[0])), uint64(len(exe)), fmt.Sprintf("check_module_exit_code_trampoline"))
+			wazevoapi.PerfMap.AddEntry(uintptr(unsafe.Pointer(&exe[0])), uint64(len(exe)), "check_module_exit_code_trampoline")
 		}
 	}
 
@@ -623,7 +623,7 @@ func (e *engine) compileSharedFunctions() {
 		e.sharedFunctions.refFuncExecutable = mmapExecutable(src)
 		if wazevoapi.PerfMapEnabled {
 			exe := e.sharedFunctions.refFuncExecutable
-			wazevoapi.PerfMap.AddEntry(uintptr(unsafe.Pointer(&exe[0])), uint64(len(exe)), fmt.Sprintf("ref_func_trampoline"))
+			wazevoapi.PerfMap.AddEntry(uintptr(unsafe.Pointer(&exe[0])), uint64(len(exe)), "ref_func_trampoline")
 		}
 	}
 
@@ -633,7 +633,7 @@ func (e *engine) compileSharedFunctions() {
 		e.sharedFunctions.stackGrowExecutable = mmapExecutable(src)
 		if wazevoapi.PerfMapEnabled {
 			exe := e.sharedFunctions.stackGrowExecutable
-			wazevoapi.PerfMap.AddEntry(uintptr(unsafe.Pointer(&exe[0])), uint64(len(exe)), fmt.Sprintf("stack_grow_trampoline"))
+			wazevoapi.PerfMap.AddEntry(uintptr(unsafe.Pointer(&exe[0])), uint64(len(exe)), "stack_grow_trampoline")
 		}
 	}
 
