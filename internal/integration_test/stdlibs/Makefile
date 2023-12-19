@@ -122,23 +122,27 @@ run:
 
 .PHONY: build.zig
 build.zig:
+	# --test-no-exec allows building of the test Wasm binary without executing command.
+	# We use find because the test.wasm will be something like ./zig-cache/o/dd6df1361b2134adc5eee9d027495436/test.wasm
 	@mkdir -p $(zig_bin)
 	@cd $(zigroot) && zig test --test-no-exec -target wasm32-wasi --zig-lib-dir $(zigroot)/lib $(zigroot)/lib/std/std.zig
-	@cp $(shell find $(zigroot) -name test.wasm) $(zig_bin)/test.wasm
+	@cp $$(find $(zigroot) -name test.wasm) $(zig_bin)/test.wasm
+	# The generated test binary is large and produces skewed results in favor of the optimized compiler.
+	# We also generate a stripped, optimized binary with wasm-opt.
 	@wasm-opt $(zig_bin)/test.wasm -O --strip-dwarf -o $(zig_bin)/test-opt.wasm
 
 .PHONY: build.tinygo
 build.tinygo:
 	@mkdir -p $(tinygo_bin)
-	@for value in $(tinygo_tests); do\
+	for value in $(tinygo_tests); do\
 		echo Building $${value}... ;\
-		tinygo test -target wasi -c -o $(tinygo_bin)/$${value//\//_}.test $${value} 2>&1 >/dev/null  ;\
+		tinygo test -target wasi -c -o $(tinygo_bin)/$$(echo $$value | sed -e 's/\//_/g').test $${value} 2>&1 >/dev/null  ;\
 	done
 
 .PHONY: build.gowasip1
 build.gowasip1:
 	@mkdir -p $(gowasip1_bin)
-	@cd $(goroot); \
+	@cd '$(goroot)'; \
 	for value in $(gowasip1_tests); do\
-	  	GOOS=wasip1 GOARCH=wasm go test -v -c -o $(gowasip1_bin)/$${value//\//_}.test ./$${value}; \
+	  	GOOS=wasip1 GOARCH=wasm go test -v -c -o $(gowasip1_bin)/$$(echo $$value | sed -e 's/\//_/g').test ./$${value}; \
 	done
