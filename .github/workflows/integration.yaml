@@ -433,49 +433,8 @@ jobs:
             popd
           done
 
-      - if: ${{ matrix.compiler != 'optimizing' && runner.os == 'Windows' }}
-        name: Run test binaries (Windows)
-        # Ack failures on Windows. https://github.com/tetratelabs/wazero/issues/1410
-        continue-on-error: true
-        run: |
-          GOOS=$(go env GOOS)
-          echo "Running $(find ~/tests -name *.test | wc -l) test binaries"
-
-          MOUNT=c:\\:/
-          SCRIPT="$HOME/tests.cmd"
-          # Trim `/c` from the in-Wasm GOROOT.
-          REAL_GOROOT=$(go env GOROOT)
-          GOROOT=$(cygpath -u $REAL_GOROOT | cut -c 3-)
-          # Append early exit on cmd.
-          POSTFIX="if %errorlevel% neq 0 exit /b %errorlevel%"
-          RUNNER="cmd //c %USERPROFILE%\tests.cmd"
-          EXTRAPARAMS="-mount=%TEMP%:/tmp"
-
-          # Go tests often look for files relative to the source. Change to the corresponding directory.
-          for bin in ~/tests/*.test; do
-            dir=$(basename $bin); dir=${dir%.test}; dir=${dir//_/\/}
-            pushd $REAL_GOROOT/$dir
-
-            # Trim `/c` from the in-Wasm pwd.
-            IN_WASM_PWD=$(pwd | cut -c 3-)
-            # Convert to a Windows path.
-            bin=`cygpath -w $bin`
-
-            # Create a script with all the tests (do not run yet).
-            echo ${MOUNT} ${IN_WASM_PWD} $GOROOT/$dir
-            COMMAND="~/wazerocli run -mount=${MOUNT} ${EXTRAPARAMS} -hostlogging=filesystem -env PWD=${IN_WASM_PWD} -env GOROOT=${GOROOT} -env GOOS=wasip1 $bin -- -test.short -test.v"
-            echo $COMMAND >> $SCRIPT
-            # Uncomment the following line for early exit on error on Windows.
-            # Otherwise the tests will report are successful evne on failure.
-            # echo $POSTFIX >> $SCRIPT
-            popd
-          done
-
-          # Run all the tests in their own shell.
-          $RUNNER
-
       - name: Run built test binaries
-        if: ${{ matrix.compiler != 'optimizing' && runner.os != 'Windows' }}
+        if: ${{ matrix.compiler != 'optimizing' }}
         run: |
           cd ./internal/integration_test/stdlibs
           go test -bench='./wasip1' -benchtime=1x

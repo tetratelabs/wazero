@@ -80,14 +80,32 @@ func BenchmarkStdlibs(b *testing.B) {
 				fsuffixstripped := strings.ReplaceAll(fname, ".test", "")
 				inferredpath := strings.ReplaceAll(fsuffixstripped, "_", "/")
 				testdir := filepath.Join(runtime.GOROOT(), inferredpath)
-
 				err = os.Chdir(testdir)
+
+				sysroot := filepath.VolumeName(testdir) + string(os.PathSeparator)
+				normalizedTestdir := normalizeOsPath(testdir)
+
 				modCfg := defaultModuleConfig().
 					WithFSConfig(
 						wazero.NewFSConfig().
-							WithDirMount("/", "/")).
-					WithEnv("PWD", testdir).
-					WithArgs(fname, "-test.short", "-test.v")
+							WithDirMount(sysroot, "/").
+							WithDirMount(os.TempDir(), "/tmp")).
+					WithEnv("PWD", normalizedTestdir)
+
+				args := []string{fname, "-test.short", "-test.v"}
+
+				// Skip tests that are fragile on Windows.
+				if runtime.GOOS == "windows" {
+					modCfg = modCfg.
+						WithEnv("GOROOT", normalizeOsPath(runtime.GOROOT()))
+
+					args = append(args,
+						"-test.skip=TestRenameCaseDifference/dir|"+
+							"TestDirFSPathsValid|TestDirFS|TestDevNullFile|"+
+							"TestOpenError|TestSymlinkWithTrailingSlash")
+				}
+				modCfg = modCfg.WithArgs(args...)
+
 				return bin, modCfg, err
 			},
 		},
@@ -137,6 +155,16 @@ func BenchmarkStdlibs(b *testing.B) {
 			}
 		})
 	}
+}
+
+// Normalize an absolute path to a Unix-style path, regardless if it is a Windows path.
+func normalizeOsPath(path string) string {
+	// Remove volume name. This is '/' on *Nix and 'C:' (with C being any letter identifier).
+	root := filepath.VolumeName(path)
+	testdirnoprefix, _ := strings.CutPrefix(path, root)
+	// Normalizes all the path separators to a Unix separator.
+	testdirnormalized := strings.ReplaceAll(testdirnoprefix, string(os.PathSeparator), "/")
+	return testdirnormalized
 }
 
 func defaultModuleConfig() wazero.ModuleConfig {
