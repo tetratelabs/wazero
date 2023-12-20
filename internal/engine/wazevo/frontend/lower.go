@@ -3381,9 +3381,6 @@ func (c *Compiler) memOpSetup(baseAddr ssa.Value, constOffset, operationSizeInBy
 		// We reuse the calculated absolute address even if the bound is not known to be safe.
 		address = known.absoluteAddr
 		if ceil <= known.bound {
-			if known.absoluteAddr == ssa.ValueInvalid {
-				panic("BUG")
-			}
 			return
 		}
 	}

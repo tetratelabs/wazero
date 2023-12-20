@@ -373,9 +373,6 @@ func (c *Compiler) getKnownSafeBound(v ssa.ValueID) *knownSafeBound {
 
 // recordKnownSafeBound records the given safe bound for the given value.
 func (c *Compiler) recordKnownSafeBound(v ssa.ValueID, safeBound uint64, absoluteAddr ssa.Value) {
-	if safeBound == 0 {
-		panic("safeBound must be non-zero")
-	}
 	if int(v) >= len(c.knownSafeBounds) {
 		c.knownSafeBounds = append(c.knownSafeBounds, make([]knownSafeBound, v+1)...)
 	}
