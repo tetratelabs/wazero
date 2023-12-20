@@ -21,6 +21,8 @@ env:  # Update this prior to requiring a higher minor version in go.mod
   GO_VERSION: "1.21"  # 1.xx == latest patch of 1.xx
   TINYGO_VERSION: "0.30.0"
   ZIG_VERSION: "0.11.0"
+  BINARYEN_VERSION: "116"
+  STDLIB_TESTS: "internal/integration_test/stdlibs"
 
 concurrency:
   # https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#example-using-concurrency-to-cancel-any-in-progress-job-or-run
@@ -36,6 +38,7 @@ jobs:
     env:
       ZIG_INSTALL: ~/zig-install
       ZIG_SOURCE: ~/zig-source
+      BINARYEN_INSTALL: ~/binaryen-install
 
     steps:
       - name: Checkout wazero
@@ -48,7 +51,7 @@ jobs:
           enableCrossOsArchive: true
           key: zig-stdlib-test-binary-${{ env.ZIG_VERSION }}
           path:
-            ./zigbin/
+            ${{ env.STDLIB_TESTS }}/testdata/zig
 
       - name: Install Zig build
         if: steps.binary-cache.outputs.cache-hit != 'true'
@@ -62,16 +65,20 @@ jobs:
           mkdir -p ${{ env.ZIG_SOURCE }}
           curl -sSL https://ziglang.org/download/${{ env.ZIG_VERSION }}/zig-${{ env.ZIG_VERSION }}.tar.xz | tar -xJ --strip-components=1 -C ${{ env.ZIG_SOURCE }}
 
+      - name: Install Binaryen build
+        if: steps.binary-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ${{ env.BINARYEN_INSTALL }}
+          curl -sSL https://github.com/WebAssembly/binaryen/releases/download/version_${{ env.BINARYEN_VERSION }}/binaryen-version_${{ env.BINARYEN_VERSION }}-x86_64-linux.tar.gz | tar -xz --strip-components=1 -C ${{ env.BINARYEN_INSTALL }}
+
       - name: Build Stdlib test binary
         if: steps.binary-cache.outputs.cache-hit != 'true'
         # --test-no-exec allows building of the test Wasm binary without executing command.
         # We use find because the test.wasm will be something like ./zig-cache/o/dd6df1361b2134adc5eee9d027495436/test.wasm
         run: |
-          mkdir ${{ github.workspace }}/zigbin
-          cd ${{ env.ZIG_SOURCE }}
-          ${{ env.ZIG_INSTALL }}/zig test --test-no-exec -target wasm32-wasi --zig-lib-dir ./lib ./lib/std/std.zig
-          _ZIG_TEST_BINARY_PATH=$(find . -name test.wasm)
-          cp ${_ZIG_TEST_BINARY_PATH} ${{ github.workspace }}/zigbin/test.wasm
+          PATH=${{ env.ZIG_INSTALL }}:${{ env.BINARYEN_INSTALL }}/bin:$PATH
+          cd ${{ env.STDLIB_TESTS }}
+          make build.zig zigroot=${{ env.ZIG_SOURCE }}
 
   zig:
     needs: build_zig_test_binary
@@ -101,13 +108,14 @@ jobs:
           fail-on-cache-miss: true
           key: zig-stdlib-test-binary-${{ env.ZIG_VERSION }}
           path:
-            ./zigbin/
+            ${{ env.STDLIB_TESTS }}/testdata/zig
 
       - uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - name: Build wazero
+      - if: ${{ matrix.compiler == 'optimizing' }}
+        name: Build wazero
         run: go build -o ./wazerocli ./cmd/wazero
         env:
           GOARCH: ${{ matrix.arch }}
@@ -136,12 +144,15 @@ jobs:
       - name: Run built test binaries (container)
         if: ${{ matrix.compiler == 'optimizing' }}
         run: |
-          docker run --platform linux/${{ matrix.arch }} -v $(pwd)/zigbin:/test -v $(pwd)/wazerocli:/wazero -e WAZEROCLI=/wazero --tmpfs /tmp --rm -t wazero:test \
+          docker run --platform linux/${{ matrix.arch }} -v $(pwd)/${{ env.STDLIB_TESTS }}/testdata/zig:/test -v $(pwd)/wazerocli:/wazero -e WAZEROCLI=/wazero --tmpfs /tmp --rm -t wazero:test \
             /wazero run -optimizing-compiler -mount=:/ ./test/test.wasm
 
       - name: Run built test binaries
         if: ${{ matrix.compiler != 'optimizing' }}
-        run: ./wazerocli run -mount=:/ ./zigbin/test.wasm
+        run: |
+          cd ${{ env.STDLIB_TESTS }}
+          go test -bench='./zig' -benchtime=1x
+
 
   build_tinygo_test_binary:
     name: Build TinyGo test binary
@@ -157,7 +168,7 @@ jobs:
           enableCrossOsArchive: true
           key: tinygo-test-binaries-${{ env.TINYGO_VERSION }}
           path:
-            ./tinygobin/
+            ${{ env.STDLIB_TESTS }}/testdata/tinygo
 
       - name: Install TinyGo
         if: steps.binary-cache.outputs.cache-hit != 'true'
@@ -181,48 +192,8 @@ jobs:
         #  - compress/zlib is skipped as it depends on the local files https://github.com/golang/go/blob/go1.20/src/compress/zlib/writer_test.go#L16-L30
         #  - debug/macho is skipped as it depends on the local files https://github.com/golang/go/blob/go1.20/src/debug/macho/file_test.go#L25
         run: |
-          mkdir ./tinygobin
-          for value in container/heap \
-            container/list \
-            container/ring \
-            crypto/des \
-            crypto/md5 \
-            crypto/rc4 \
-            crypto/sha1 \
-            crypto/sha256 \
-            crypto/sha512 \
-            embed/internal/embedtest \
-            encoding \
-            encoding/ascii85 \
-            encoding/base32 \
-            encoding/csv \
-            encoding/hex \
-            go/scanner \
-            hash \
-            hash/adler32 \
-            hash/crc64 \
-            hash/fnv \
-            html \
-            internal/itoa \
-            internal/profile \
-            math \
-            math/cmplx \
-            net \
-            net/http/internal/ascii \
-            net/mail \
-            os \
-            path \
-            reflect \
-            sync \
-            testing \
-            testing/iotest \
-            text/scanner \
-            unicode \
-            unicode/utf16 \
-            unicode/utf8
-          do
-            tinygo test -target wasi -c -o ./tinygobin/${value/\//_}.test $value
-          done
+          cd ${{ env.STDLIB_TESTS }}
+          make build.tinygo
 
   tinygo:
     needs: build_tinygo_test_binary
@@ -252,13 +223,14 @@ jobs:
           fail-on-cache-miss: true
           key: tinygo-test-binaries-${{ env.TINYGO_VERSION }}
           path:
-            ./tinygobin/
+            ${{ env.STDLIB_TESTS }}/testdata/tinygo
 
       - uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - name: Build wazero
+      - if: ${{ matrix.compiler == 'optimizing' }}
+        name: Build wazero
         run: go build -o ~/wazerocli ./cmd/wazero
         env:
           GOARCH: ${{ matrix.arch }}
@@ -286,7 +258,7 @@ jobs:
         if: ${{ matrix.compiler == 'optimizing' }}
         # This runs all tests compiled above in sequence. Note: This mounts /tmp to allow t.TempDir() in tests.
         run: |
-          cd ./tinygobin
+          cd ${{ env.STDLIB_TESTS }}/testdata/tinygo
           for bin in *.test; do
             echo $bin
             docker run --platform linux/${{ matrix.arch }} -v $(pwd):/test -v ~/wazerocli:/wazero -e WAZEROCLI=/wazero --tmpfs /tmp --rm -t wazero:test \
@@ -296,11 +268,8 @@ jobs:
       - name: Run test binaries
         if: ${{ matrix.compiler != 'optimizing' }}
         run: |
-          cd ./tinygobin
-          for bin in *.test; do
-            echo $bin
-            ~/wazerocli run -mount=:/ -mount=:/tmp $bin -- -test.v
-          done
+          cd ${{ env.STDLIB_TESTS }}
+          go test -bench='./tinygo' -benchtime=1x
 
   wasi-testsuite:
     name: wasi-testsuite
@@ -413,95 +382,29 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
 
+      - name: Checkout wazero
+        uses: actions/checkout@v3
+
       - name: Cache Go test binaries
         id: cache-go-test-binaries
         uses: actions/cache@v3
         with:
-          path: ~/tests
+          path:
+            ${{ env.STDLIB_TESTS }}/testdata/go
           # Use precise Go version from setup-go as patch version differences can effect tests.
           key: go-wasip1-binaries-${{ matrix.os }}-${{ steps.setup-go.outputs.go-version }}
+
+      - if: ${{ matrix.compiler == 'optimizing' }}
+        name: Build wazero
+        run: go build -o ~/wazerocli ./cmd/wazero
+        env:
+          GOARCH: ${{ matrix.arch }}
 
       - if: ${{ steps.cache-go-test-binaries.outputs.cache-hit != 'true' }}
         name: Build Test Binaries
         run: |
-          mkdir ~/tests
-          cd $(go env GOROOT)
-          # Choose important packages to limit execution time.
-          for value in src/archive/tar \
-            src/bufio \
-            src/bytes \
-            src/context \
-            src/encoding/ascii85 \
-            src/encoding/asn1 \
-            src/encoding/base32 \
-            src/encoding/base64 \
-            src/encoding/binary \
-            src/encoding/csv \
-            src/encoding/gob \
-            src/encoding/hex \
-            src/encoding/json \
-            src/encoding/pem \
-            src/encoding/xml \
-            src/errors \
-            src/expvar \
-            src/flag \
-            src/fmt \
-            src/hash \
-            src/hash/adler32 \
-            src/hash/crc32 \
-            src/hash/crc64 \
-            src/hash/fnv \
-            src/hash/maphash \
-            src/io \
-            src/io/fs \
-            src/io/ioutil \
-            src/log \
-            src/log/syslog \
-            src/maps \
-            src/math \
-            src/math/big \
-            src/math/bits \
-            src/math/cmplx \
-            src/math/rand \
-            src/mime \
-            src/mime/multipart \
-            src/mime/quotedprintable \
-            src/os \
-            src/os/exec \
-            src/os/signal \
-            src/os/user \
-            src/path \
-            src/reflect \
-            src/regexp \
-            src/regexp/syntax \
-            src/runtime \
-            src/runtime/internal/atomic \
-            src/runtime/internal/math \
-            src/runtime/internal/sys \
-            src/slices \
-            src/sort \
-            src/strconv \
-            src/strings \
-            src/sync \
-            src/sync/atomic \
-            src/syscall \
-            src/testing \
-            src/testing/fstest \
-            src/testing/iotest \
-            src/testing/quick \
-            src/time
-          do
-            echo "GOOS=wasip1 GOARCH=wasm go test -v -c -o ~/tests/${value//\//_}.test ./$value"
-            GOOS=wasip1 GOARCH=wasm go test -v -c -o ~/tests/${value//\//_}.test ./$value
-          done
-
-      - name: Checkout wazero
-        uses: actions/checkout@v3
-
-      - name: Build wazero
-        run: go build -o ~/wazerocli ./cmd/wazero
-        env:
-          GOARCH: ${{ matrix.arch }}
+          cd ${{ env.STDLIB_TESTS }}
+          make build.gowasip1
 
       - name: Set up QEMU
         if: ${{ matrix.compiler == 'optimizing' && matrix.arch == 'arm64' }}
@@ -520,12 +423,12 @@ jobs:
       - if: ${{ matrix.compiler == 'optimizing' }}
         name: Run test binaries (container)
         run: |
-          echo "Running $(find ~/tests -name *.test | wc -l) test binaries"
+          echo "Running $(find ${{ env.STDLIB_TESTS }}/testdata/go -name '*.test' | wc -l) test binaries"
 
           # Skip tests that are hideously slow (mostly compilation time) for running inside QEMU.
           skip_targets="src_encoding_json|src_runtime|src_os_exec|src_math_big|src_encoding_gob|src_time|src_archive_tar|src_math_rand|src_expvar|src_testing|src_os"
           # Go tests often look for files relative to the source. Change to the corresponding directory.
-          for bin in $(find ~/tests -name "*.test" | grep -vE "$skip_targets"); do
+          for bin in $(find $PWD/${{ env.STDLIB_TESTS }}/testdata/go -name '*.test' | grep -vE "$skip_targets"); do
             dir=$(basename $bin); dir=${dir%.test}; dir=${dir//_/\/}
             pushd $(go env GOROOT)/$dir
             # Mount / as /ROOT in docker and then remount /ROOT as / in wazero; $bin is now in /ROOT/$bin.
@@ -534,56 +437,8 @@ jobs:
             popd
           done
 
-      - if: ${{ matrix.compiler != 'optimizing' && runner.os != 'Windows' }}
-        name: Run test binaries
+      - name: Run built test binaries
+        if: ${{ matrix.compiler != 'optimizing' }}
         run: |
-          echo "Running $(find ~/tests -name *.test | wc -l) test binaries"
-
-          # Go tests often look for files relative to the source. Change to the corresponding directory.
-          for bin in ~/tests/*.test; do
-            dir=$(basename $bin); dir=${dir%.test}; dir=${dir//_/\/}
-            pushd $(go env GOROOT)/$dir
-            ~/wazerocli run -mount=/:/ -env PWD=$PWD $bin -- -test.short -test.v
-            popd
-          done
-
-      - if: ${{ runner.os == 'Windows' }}
-        name: Run test binaries (Windows)
-        # Ack failures on Windows. https://github.com/tetratelabs/wazero/issues/1410
-        continue-on-error: true
-        run: |
-          GOOS=$(go env GOOS)
-          echo "Running $(find ~/tests -name *.test | wc -l) test binaries"
-
-          MOUNT=c:\\:/
-          SCRIPT="$HOME/tests.cmd"
-          # Trim `/c` from the in-Wasm GOROOT.
-          REAL_GOROOT=$(go env GOROOT)
-          GOROOT=$(cygpath -u $REAL_GOROOT | cut -c 3-)
-          # Append early exit on cmd.
-          POSTFIX="if %errorlevel% neq 0 exit /b %errorlevel%"
-          RUNNER="cmd //c %USERPROFILE%\tests.cmd"
-          EXTRAPARAMS="-mount=%TEMP%:/tmp"
-
-          # Go tests often look for files relative to the source. Change to the corresponding directory.
-          for bin in ~/tests/*.test; do
-            dir=$(basename $bin); dir=${dir%.test}; dir=${dir//_/\/}
-            pushd $REAL_GOROOT/$dir
-
-            # Trim `/c` from the in-Wasm pwd.
-            IN_WASM_PWD=$(pwd | cut -c 3-)
-            # Convert to a Windows path.
-            bin=`cygpath -w $bin`
-
-            # Create a script with all the tests (do not run yet).
-            echo ${MOUNT} ${IN_WASM_PWD} $GOROOT/$dir
-            COMMAND="~/wazerocli run -mount=${MOUNT} ${EXTRAPARAMS} -hostlogging=filesystem -env PWD=${IN_WASM_PWD} -env GOROOT=${GOROOT} -env GOOS=wasip1 $bin -- -test.short -test.v"
-            echo $COMMAND >> $SCRIPT
-            # Uncomment the following line for early exit on error on Windows.
-            # Otherwise the tests will report are successful evne on failure.
-            # echo $POSTFIX >> $SCRIPT
-            popd
-          done
-
-          # Run all the tests in their own shell.
-          $RUNNER
+          cd ${{ env.STDLIB_TESTS }}
+          go test -bench='./wasip1' -benchtime=1x
