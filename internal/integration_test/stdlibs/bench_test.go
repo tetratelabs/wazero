@@ -161,7 +161,7 @@ func BenchmarkStdlibs(b *testing.B) {
 func normalizeOsPath(path string) string {
 	// Remove volume name. This is '/' on *Nix and 'C:' (with C being any letter identifier).
 	root := filepath.VolumeName(path)
-	testdirnoprefix, _ := strings.CutPrefix(path, root)
+	testdirnoprefix := path[len(root):]
 	// Normalizes all the path separators to a Unix separator.
 	testdirnormalized := strings.ReplaceAll(testdirnoprefix, string(os.PathSeparator), "/")
 	return testdirnormalized
