@@ -1416,6 +1416,8 @@ func (c *Compiler) lowerCurrentOpcode() {
 		builder.Seal(thenBlk)
 		builder.Seal(elseBlk)
 	case wasm.OpcodeElse:
+		c.clearSafeBounds() // Reset the safe bounds since we are entering the Else block.
+
 		ifctrl := state.ctrlPeekAt(0)
 		if unreachable := state.unreachable; unreachable && state.unreachableDepth > 0 {
 			// If it is currently in unreachable and is a nested if,
@@ -1443,6 +1445,8 @@ func (c *Compiler) lowerCurrentOpcode() {
 		builder.SetCurrentBlock(elseBlk)
 
 	case wasm.OpcodeEnd:
+		c.clearSafeBounds() // Reset the safe bounds since we are exiting the block.
+
 		if state.unreachableDepth > 0 {
 			state.unreachableDepth--
 			break
@@ -3368,24 +3372,38 @@ func (c *Compiler) lowerCallIndirect(typeIndex, tableIndex uint32) {
 
 // memOpSetup inserts the bounds check and calculates the address of the memory operation (loads/stores).
 func (c *Compiler) memOpSetup(baseAddr ssa.Value, constOffset, operationSizeInBytes uint64) (address ssa.Value) {
+	address = ssa.ValueInvalid
 	builder := c.ssaBuilder
 
+	baseAddrID := baseAddr.ID()
 	ceil := constOffset + operationSizeInBytes
+	if known := c.getKnownSafeBound(baseAddrID); known.valid() {
+		// We reuse the calculated absolute address even if the bound is not known to be safe.
+		address = known.absoluteAddr
+		if ceil <= known.bound {
+			if known.absoluteAddr == ssa.ValueInvalid {
+				panic("BUG")
+			}
+			return
+		}
+	}
+
 	ceilConst := builder.AllocateInstruction()
 	ceilConst.AsIconst64(ceil)
 	builder.InsertInstruction(ceilConst)
 
 	// We calculate the offset in 64-bit space.
-	extBaseAddr := builder.AllocateInstruction()
-	extBaseAddr.AsUExtend(baseAddr, 32, 64)
-	builder.InsertInstruction(extBaseAddr)
+	extBaseAddr := builder.AllocateInstruction().
+		AsUExtend(baseAddr, 32, 64).
+		Insert(builder).
+		Return()
 
 	// Note: memLen is already zero extended to 64-bit space at the load time.
 	memLen := c.getMemoryLenValue(false)
 
 	// baseAddrPlusCeil = baseAddr + ceil
 	baseAddrPlusCeil := builder.AllocateInstruction()
-	baseAddrPlusCeil.AsIadd(extBaseAddr.Return(), ceilConst.Return())
+	baseAddrPlusCeil.AsIadd(extBaseAddr, ceilConst.Return())
 	builder.InsertInstruction(baseAddrPlusCeil)
 
 	// Check for out of bounds memory access: `memLen >= baseAddrPlusCeil`.
@@ -3397,11 +3415,15 @@ func (c *Compiler) memOpSetup(baseAddr ssa.Value, constOffset, operationSizeInBy
 	builder.InsertInstruction(exitIfNZ)
 
 	// Load the value from memBase + extBaseAddr.
-	memBase := c.getMemoryBaseValue(false)
-	addrCalc := builder.AllocateInstruction()
-	addrCalc.AsIadd(memBase, extBaseAddr.Return())
-	builder.InsertInstruction(addrCalc)
-	return addrCalc.Return()
+	if address == ssa.ValueInvalid { // Reuse the value if the memBase is already calculated at this point.
+		memBase := c.getMemoryBaseValue(false)
+		address = builder.AllocateInstruction().
+			AsIadd(memBase, extBaseAddr).Insert(builder).Return()
+	}
+
+	// Record the bound ceil for this baseAddr is known to be safe for the subsequent memory access in the same block.
+	c.recordKnownSafeBound(baseAddrID, ceil, address)
+	return
 }
 
 func (c *Compiler) callMemmove(dst, src, size ssa.Value) {
@@ -3434,6 +3456,10 @@ func (c *Compiler) reloadAfterCall() {
 func (c *Compiler) reloadMemoryBaseLen() {
 	_ = c.getMemoryBaseValue(true)
 	_ = c.getMemoryLenValue(true)
+
+	// This function being called means that the memory base might have changed.
+	// Therefore, we need to clear the known safe bounds because we cache the absolute address of the memory access per each base offset.
+	c.clearSafeBounds()
 }
 
 // globalInstanceValueOffset is the offsetOf .Value field of wasm.GlobalInstance.
