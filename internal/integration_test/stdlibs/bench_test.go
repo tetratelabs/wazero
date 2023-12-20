@@ -58,7 +58,7 @@ func BenchmarkStdlibs(b *testing.B) {
 				bin, err := os.ReadFile(fpath)
 				fsconfig := wazero.NewFSConfig().
 					WithDirMount(".", "/").
-					WithDirMount("/tmp", "/tmp")
+					WithDirMount(os.TempDir(), "/tmp")
 				modCfg := defaultModuleConfig().
 					WithFSConfig(fsconfig).
 					WithArgs(fname, "-test.v")
