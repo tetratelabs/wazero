@@ -151,8 +151,7 @@ jobs:
         if: ${{ matrix.compiler != 'optimizing' }}
         run: |
           cd ${{ env.STDLIB_TESTS }}
-          go test -bench='./zig' -benchtime=1x
-
+          go test -bench='BenchmarkZig' -benchtime=1x
 
   build_tinygo_test_binary:
     name: Build TinyGo test binary
@@ -269,7 +268,7 @@ jobs:
         if: ${{ matrix.compiler != 'optimizing' }}
         run: |
           cd ${{ env.STDLIB_TESTS }}
-          go test -bench='./tinygo' -benchtime=1x
+          go test -bench='BenchmarkTinyGo' -benchtime=1x
 
   wasi-testsuite:
     name: wasi-testsuite
@@ -441,4 +440,4 @@ jobs:
         if: ${{ matrix.compiler != 'optimizing' }}
         run: |
           cd ${{ env.STDLIB_TESTS }}
-          go test -bench='./wasip1' -benchtime=1x
+          go test -bench='BenchmarkWasip1' -benchtime=1x
