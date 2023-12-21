@@ -20,12 +20,12 @@ func BenchmarkZig(b *testing.B) {
 	if runtime.GOARCH == "arm64" {
 		b.Run("optimizing", func(b *testing.B) {
 			c := opt.NewRuntimeConfigOptimizingCompiler()
-			runtBench(b, context.Background(), c, zigTestCase)
+			runtBenches(b, context.Background(), c, zigTestCase)
 		})
 	}
 	b.Run("baseline", func(b *testing.B) {
 		c := wazero.NewRuntimeConfigCompiler()
-		runtBench(b, context.Background(), c, zigTestCase)
+		runtBenches(b, context.Background(), c, zigTestCase)
 	})
 }
 
@@ -33,12 +33,12 @@ func BenchmarkTinyGo(b *testing.B) {
 	if runtime.GOARCH == "arm64" {
 		b.Run("optimizing", func(b *testing.B) {
 			c := opt.NewRuntimeConfigOptimizingCompiler()
-			runtBench(b, context.Background(), c, tinyGoTestCase)
+			runtBenches(b, context.Background(), c, tinyGoTestCase)
 		})
 	}
 	b.Run("baseline", func(b *testing.B) {
 		c := wazero.NewRuntimeConfigCompiler()
-		runtBench(b, context.Background(), c, tinyGoTestCase)
+		runtBenches(b, context.Background(), c, tinyGoTestCase)
 	})
 }
 
@@ -46,12 +46,12 @@ func BenchmarkWasip1(b *testing.B) {
 	if runtime.GOARCH == "arm64" {
 		b.Run("optimizing", func(b *testing.B) {
 			c := opt.NewRuntimeConfigOptimizingCompiler()
-			runtBench(b, context.Background(), c, wasip1TestCase)
+			runtBenches(b, context.Background(), c, wasip1TestCase)
 		})
 	}
 	b.Run("baseline", func(b *testing.B) {
 		c := wazero.NewRuntimeConfigCompiler()
-		runtBench(b, context.Background(), c, wasip1TestCase)
+		runtBenches(b, context.Background(), c, wasip1TestCase)
 	})
 }
 
@@ -136,7 +136,7 @@ var (
 	}
 )
 
-func runtBench(b *testing.B, ctx context.Context, rc wazero.RuntimeConfig, tc testCase) {
+func runtBenches(b *testing.B, ctx context.Context, rc wazero.RuntimeConfig, tc testCase) {
 	cwd, _ := os.Getwd()
 	files, err := os.ReadDir(tc.dir)
 	require.NoError(b, err)
@@ -152,27 +152,36 @@ func runtBench(b *testing.B, ctx context.Context, rc wazero.RuntimeConfig, tc te
 		if bin == nil {
 			continue
 		}
-		b.Run(fname, func(b *testing.B) {
-			r := wazero.NewRuntimeWithConfig(ctx, rc)
-			wasi_snapshot_preview1.MustInstantiate(ctx, r)
-			b.Cleanup(func() { r.Close(ctx) })
 
-			var cm wazero.CompiledModule
-			b.Run("Compile", func(b *testing.B) {
-				b.ResetTimer()
-				var err error
-				cm, err = r.CompileModule(ctx, bin)
+		for _, compile := range []bool{false, true} {
+			if compile {
+				b.Run("Compile/"+fname, func(b *testing.B) {
+					b.ResetTimer()
+					for i := 0; i < b.N; i++ {
+						r := wazero.NewRuntimeWithConfig(ctx, rc)
+						_, err := r.CompileModule(ctx, bin)
+						require.NoError(b, err)
+						require.NoError(b, r.Close(ctx))
+					}
+				})
+			} else {
+				r := wazero.NewRuntimeWithConfig(ctx, rc)
+				wasi_snapshot_preview1.MustInstantiate(ctx, r)
+				b.Cleanup(func() { r.Close(ctx) })
+
+				cm, err := r.CompileModule(ctx, bin)
 				require.NoError(b, err)
-			})
-
-			im, err := r.InstantiateModule(ctx, cm, modCfg)
-			require.NoError(b, err)
-			b.Run("Run", func(b *testing.B) {
-				b.ResetTimer()
-				_, err := im.ExportedFunction("_start").Call(ctx)
-				requireZeroExitCode(b, err)
-			})
-		})
+				b.Run("Run/"+fname, func(b *testing.B) {
+					b.ResetTimer()
+					for i := 0; i < b.N; i++ {
+						// Instantiate in the loop as _start cannot be called multiple times.
+						m, err := r.InstantiateModule(ctx, cm, modCfg)
+						requireZeroExitCode(b, err)
+						require.NoError(b, m.Close(ctx))
+					}
+				})
+			}
+		}
 	}
 }
 
@@ -194,8 +203,7 @@ func defaultModuleConfig() wazero.ModuleConfig {
 		WithRandSource(rand.Reader).
 		// Some tests require Stdout and Stderr to be present.
 		WithStdout(os.Stdout).
-		WithStderr(os.Stderr).
-		WithStartFunctions()
+		WithStderr(os.Stderr)
 }
 
 func requireZeroExitCode(b *testing.B, err error) {
