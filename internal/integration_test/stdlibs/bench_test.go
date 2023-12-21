@@ -46,7 +46,7 @@ func BenchmarkWasip1(b *testing.B) {
 	if runtime.GOARCH == "arm64" {
 		b.Run("optimizing", func(b *testing.B) {
 			c := opt.NewRuntimeConfigOptimizingCompiler()
-			runtBench(b, context.Background(), c, wasip1TestCase, false)
+			runtBenches(b, context.Background(), c, wasip1TestCase)
 		})
 	}
 	b.Run("baseline", func(b *testing.B) {
