@@ -137,11 +137,6 @@ var (
 )
 
 func runtBenches(b *testing.B, ctx context.Context, rc wazero.RuntimeConfig, tc testCase) {
-	runtBench(b, ctx, rc, tc, true)
-	runtBench(b, ctx, rc, tc, false)
-}
-
-func runtBench(b *testing.B, ctx context.Context, rc wazero.RuntimeConfig, tc testCase, compile bool) {
 	cwd, _ := os.Getwd()
 	files, err := os.ReadDir(tc.dir)
 	require.NoError(b, err)
@@ -157,32 +152,35 @@ func runtBench(b *testing.B, ctx context.Context, rc wazero.RuntimeConfig, tc te
 		if bin == nil {
 			continue
 		}
-		if compile {
-			b.Run("Compile/"+fname, func(b *testing.B) {
-				b.ResetTimer()
-				for i := 0; i < b.N; i++ {
-					r := wazero.NewRuntimeWithConfig(ctx, rc)
-					_, err := r.CompileModule(ctx, bin)
-					require.NoError(b, err)
-					require.NoError(b, r.Close(ctx))
-				}
-			})
-		} else {
-			r := wazero.NewRuntimeWithConfig(ctx, rc)
-			wasi_snapshot_preview1.MustInstantiate(ctx, r)
-			b.Cleanup(func() { r.Close(ctx) })
 
-			cm, err := r.CompileModule(ctx, bin)
-			require.NoError(b, err)
-			b.Run("Run/"+fname, func(b *testing.B) {
-				b.ResetTimer()
-				for i := 0; i < b.N; i++ {
-					// Instantiate in the loop as _start cannot be called multiple times.
-					m, err := r.InstantiateModule(ctx, cm, modCfg)
-					requireZeroExitCode(b, err)
-					require.NoError(b, m.Close(ctx))
-				}
-			})
+		for _, compile := range []bool{false, true} {
+			if compile {
+				b.Run("Compile/"+fname, func(b *testing.B) {
+					b.ResetTimer()
+					for i := 0; i < b.N; i++ {
+						r := wazero.NewRuntimeWithConfig(ctx, rc)
+						_, err := r.CompileModule(ctx, bin)
+						require.NoError(b, err)
+						require.NoError(b, r.Close(ctx))
+					}
+				})
+			} else {
+				r := wazero.NewRuntimeWithConfig(ctx, rc)
+				wasi_snapshot_preview1.MustInstantiate(ctx, r)
+				b.Cleanup(func() { r.Close(ctx) })
+
+				cm, err := r.CompileModule(ctx, bin)
+				require.NoError(b, err)
+				b.Run("Run/"+fname, func(b *testing.B) {
+					b.ResetTimer()
+					for i := 0; i < b.N; i++ {
+						// Instantiate in the loop as _start cannot be called multiple times.
+						m, err := r.InstantiateModule(ctx, cm, modCfg)
+						requireZeroExitCode(b, err)
+						require.NoError(b, m.Close(ctx))
+					}
+				})
+			}
 		}
 	}
 }
