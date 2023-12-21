@@ -1,6 +1,7 @@
 package wazevo_test
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"os"
@@ -57,50 +58,51 @@ func BenchmarkWasip1(b *testing.B) {
 
 type testCase struct {
 	name, dir    string
-	readTestCase func(fpath string, fname string) ([]byte, wazero.ModuleConfig, error)
+	readTestCase func(fpath string, fname string) (_ []byte, c wazero.ModuleConfig, stdout, stderr *bytes.Buffer, err error)
 }
 
 var (
 	zigTestCase = testCase{
 		name: "zig",
 		dir:  "testdata/zig/",
-		readTestCase: func(fpath string, fname string) ([]byte, wazero.ModuleConfig, error) {
+		readTestCase: func(fpath string, fname string) (_ []byte, c wazero.ModuleConfig, stdout, stderr *bytes.Buffer, err error) {
 			bin, err := os.ReadFile(fpath)
-			modCfg := defaultModuleConfig().
-				WithFSConfig(wazero.NewFSConfig().WithDirMount(".", "/")).
+			c, stdout, stderr = defaultModuleConfig()
+			c.WithFSConfig(wazero.NewFSConfig().WithDirMount(".", "/")).
 				WithArgs("test.wasm")
-
-			return bin, modCfg, err
+			return bin, c, stdout, stderr, err
 		},
 	}
 	tinyGoTestCase = testCase{
 		name: "tinygo",
 		dir:  "testdata/tinygo/",
-		readTestCase: func(fpath string, fname string) ([]byte, wazero.ModuleConfig, error) {
+		readTestCase: func(fpath string, fname string) (_ []byte, c wazero.ModuleConfig, stdout, stderr *bytes.Buffer, err error) {
 			if !strings.HasSuffix(fname, ".test") {
-				return nil, nil, nil
+				return nil, nil, nil, nil, nil
 			}
 			bin, err := os.ReadFile(fpath)
+
 			fsconfig := wazero.NewFSConfig().
 				WithDirMount(".", "/").
 				WithDirMount(os.TempDir(), "/tmp")
-			modCfg := defaultModuleConfig().
-				WithFSConfig(fsconfig).
+
+			c, stdout, stderr = defaultModuleConfig()
+			c.WithFSConfig(fsconfig).
 				WithArgs(fname, "-test.v")
 
-			return bin, modCfg, err
+			return bin, c, stdout, stderr, err
 		},
 	}
 	wasip1TestCase = testCase{
 		name: "wasip1",
 		dir:  "testdata/go/",
-		readTestCase: func(fpath string, fname string) ([]byte, wazero.ModuleConfig, error) {
+		readTestCase: func(fpath string, fname string) (_ []byte, c wazero.ModuleConfig, stdout, stderr *bytes.Buffer, err error) {
 			if !strings.HasSuffix(fname, ".test") {
-				return nil, nil, nil
+				return nil, nil, nil, nil, nil
 			}
 			bin, err := os.ReadFile(fpath)
 			if err != nil {
-				return nil, nil, err
+				return nil, nil, nil, nil, err
 			}
 			fsuffixstripped := strings.ReplaceAll(fname, ".test", "")
 			inferredpath := strings.ReplaceAll(fsuffixstripped, "_", "/")
@@ -110,18 +112,18 @@ var (
 			sysroot := filepath.VolumeName(testdir) + string(os.PathSeparator)
 			normalizedTestdir := normalizeOsPath(testdir)
 
-			modCfg := defaultModuleConfig().
-				WithFSConfig(
-					wazero.NewFSConfig().
-						WithDirMount(sysroot, "/").
-						WithDirMount(os.TempDir(), "/tmp")).
+			c, stdout, stderr = defaultModuleConfig()
+			c.WithFSConfig(
+				wazero.NewFSConfig().
+					WithDirMount(sysroot, "/").
+					WithDirMount(os.TempDir(), "/tmp")).
 				WithEnv("PWD", normalizedTestdir)
 
 			args := []string{fname, "-test.short", "-test.v"}
 
 			// Skip tests that are fragile on Windows.
 			if runtime.GOOS == "windows" {
-				modCfg = modCfg.
+				c = c.
 					WithEnv("GOROOT", normalizeOsPath(runtime.GOROOT()))
 
 				args = append(args,
@@ -129,9 +131,9 @@ var (
 						"TestDirFSPathsValid|TestDirFS|TestDevNullFile|"+
 						"TestOpenError|TestSymlinkWithTrailingSlash")
 			}
-			modCfg = modCfg.WithArgs(args...)
+			c = c.WithArgs(args...)
 
-			return bin, modCfg, err
+			return bin, c, stdout, stderr, err
 		},
 	}
 )
@@ -147,7 +149,7 @@ func runtBenches(b *testing.B, ctx context.Context, rc wazero.RuntimeConfig, tc 
 		require.NoError(b, err)
 
 		fpath := filepath.Join(cwd, tc.dir, fname)
-		bin, modCfg, err := tc.readTestCase(fpath, fname)
+		bin, modCfg, stdout, stderr, err := tc.readTestCase(fpath, fname)
 		require.NoError(b, err)
 		if bin == nil {
 			continue
@@ -176,7 +178,7 @@ func runtBenches(b *testing.B, ctx context.Context, rc wazero.RuntimeConfig, tc 
 					for i := 0; i < b.N; i++ {
 						// Instantiate in the loop as _start cannot be called multiple times.
 						m, err := r.InstantiateModule(ctx, cm, modCfg)
-						requireZeroExitCode(b, err)
+						requireZeroExitCode(b, err, stdout, stderr)
 						require.NoError(b, m.Close(ctx))
 					}
 				})
@@ -195,22 +197,26 @@ func normalizeOsPath(path string) string {
 	return testdirnormalized
 }
 
-func defaultModuleConfig() wazero.ModuleConfig {
-	return wazero.NewModuleConfig().
+func defaultModuleConfig() (c wazero.ModuleConfig, stdout, stderr *bytes.Buffer) {
+	// Note: do not use os.Stdout or os.Stderr as they will mess up the `-bench` output to be fed to the benchstat tool.
+	stdout = &bytes.Buffer{}
+	stderr = &bytes.Buffer{}
+	c = wazero.NewModuleConfig().
 		WithSysNanosleep().
 		WithSysNanotime().
 		WithSysWalltime().
 		WithRandSource(rand.Reader).
 		// Some tests require Stdout and Stderr to be present.
-		WithStdout(os.Stdout).
-		WithStderr(os.Stderr)
+		WithStdout(stdout).
+		WithStderr(stderr)
+	return
 }
 
-func requireZeroExitCode(b *testing.B, err error) {
+func requireZeroExitCode(b *testing.B, err error, stdout, stderr *bytes.Buffer) {
 	b.Helper()
 	if se, ok := err.(*sys.ExitError); ok {
 		if se.ExitCode() != 0 { // Don't err on success.
-			require.NoError(b, err)
+			require.NoError(b, err, "stdout: %s\nstderr: %s", stdout.String(), stderr.String())
 		}
 	}
 }
