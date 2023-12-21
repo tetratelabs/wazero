@@ -391,7 +391,7 @@ jobs:
           path:
             ${{ env.STDLIB_TESTS }}/testdata/go
           # Use precise Go version from setup-go as patch version differences can effect tests.
-          key: go-wasip1-binaries-${{ matrix.os }}-${{ steps.setup-go.outputs.go-version }}
+          key: go-wasip1-binaries-${{ matrix.os }}-${{ steps.setup-go.outputs.go-version }}-${{ matrix.arch }}
 
       - if: ${{ matrix.compiler == 'optimizing' }}
         name: Build wazero
