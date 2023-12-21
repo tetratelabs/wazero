@@ -92,9 +92,14 @@ func (m *moduleEngine) setupOpaque() {
 	// Note: imported functions are resolved in ResolveImportedFunction.
 
 	if globalOffset := offsets.GlobalsBegin; globalOffset >= 0 {
-		for _, g := range inst.Globals {
-			binary.LittleEndian.PutUint64(opaque[globalOffset:], uint64(uintptr(unsafe.Pointer(g))))
-			globalOffset += 8
+		for i, g := range inst.Globals {
+			if i < int(inst.Source.ImportGlobalCount) {
+				binary.LittleEndian.PutUint64(opaque[globalOffset:], uint64(uintptr(unsafe.Pointer(g))))
+			} else {
+				binary.LittleEndian.PutUint64(opaque[globalOffset:], g.Val)
+				binary.LittleEndian.PutUint64(opaque[globalOffset+8:], g.ValHi)
+			}
+			globalOffset += 16
 		}
 	}
 
