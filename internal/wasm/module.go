@@ -611,9 +611,16 @@ func (m *Module) validateDataCountSection() (err error) {
 
 func (m *ModuleInstance) buildGlobals(module *Module, funcRefResolver func(funcIndex Index) Reference) {
 	importedGlobals := m.Globals[:module.ImportGlobalCount]
+
+	me := m.Engine
+	engineOwnGlobal := me.OwnsGlobals()
 	for i := Index(0); i < Index(len(module.GlobalSection)); i++ {
 		gs := &module.GlobalSection[i]
 		g := &GlobalInstance{}
+		if engineOwnGlobal {
+			g.me = me
+			g.index = i + module.ImportGlobalCount
+		}
 		m.Globals[i+module.ImportGlobalCount] = g
 		g.Type = gs.Type
 		g.initialize(importedGlobals, &gs.Init, funcRefResolver)

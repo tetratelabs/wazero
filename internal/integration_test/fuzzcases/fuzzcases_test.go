@@ -483,8 +483,10 @@ func Test1792c(t *testing.T) {
 		_, err = f.Call(ctx, 0, 0, 0)
 		require.NoError(t, err)
 		m := mod.(*wasm.ModuleInstance)
-		require.Equal(t, uint64(5044022786561933312), m.Globals[0].Val)
-		require.Equal(t, uint64(9205357640488583168), m.Globals[0].ValHi)
+
+		lo, hi := m.Globals[0].Value()
+		require.Equal(t, uint64(5044022786561933312), lo)
+		require.Equal(t, uint64(9205357640488583168), hi)
 	})
 }
 
@@ -499,8 +501,9 @@ func Test1793a(t *testing.T) {
 		m := mod.(*wasm.ModuleInstance)
 		_, err = m.ExportedFunction("").Call(ctx)
 		require.NoError(t, err)
-		require.Equal(t, uint64(2531906066518671488), m.Globals[2].Val)
-		require.Equal(t, uint64(18446744073709551615), m.Globals[2].ValHi)
+		lo, hi := m.Globals[2].Value()
+		require.Equal(t, uint64(2531906066518671488), lo)
+		require.Equal(t, uint64(18446744073709551615), hi)
 	})
 }
 
@@ -515,8 +518,9 @@ func Test1793b(t *testing.T) {
 		m := mod.(*wasm.ModuleInstance)
 		_, err = m.ExportedFunction("").Call(ctx, 0, 0, 0, 0)
 		require.NoError(t, err)
-		require.Equal(t, uint64(18374967954648334335), m.Globals[1].Val)
-		require.Equal(t, uint64(18446744073709551615), m.Globals[1].ValHi)
+		lo, hi := m.Globals[1].Value()
+		require.Equal(t, uint64(18374967954648334335), lo)
+		require.Equal(t, uint64(18446744073709551615), hi)
 	})
 }
 
@@ -531,8 +535,9 @@ func Test1793c(t *testing.T) {
 		m := mod.(*wasm.ModuleInstance)
 		_, err = m.ExportedFunction("").Call(ctx, 0, 0)
 		require.NoError(t, err)
-		require.Equal(t, uint64(18446744073709551615), m.Globals[0].Val)
-		require.Equal(t, uint64(18446744073709551615), m.Globals[0].ValHi)
+		lo, hi := m.Globals[0].Value()
+		require.Equal(t, uint64(18446744073709551615), lo)
+		require.Equal(t, uint64(18446744073709551615), hi)
 	})
 }
 
@@ -577,8 +582,9 @@ func Test1797b(t *testing.T) {
 		m := mod.(*wasm.ModuleInstance)
 		_, err = m.ExportedFunction("\x00\x00\x00\x00\x00").Call(ctx, 0, 0, 0, 0, 0, 0)
 		require.NoError(t, err)
-		require.Equal(t, uint64(2666130977255796624), m.Globals[0].Val)
-		require.Equal(t, uint64(9223142857682330634), m.Globals[0].ValHi)
+		lo, hi := m.Globals[0].Value()
+		require.Equal(t, uint64(2666130977255796624), lo)
+		require.Equal(t, uint64(9223142857682330634), hi)
 	})
 }
 
@@ -610,8 +616,9 @@ func Test1797d(t *testing.T) {
 		params := make([]uint64, 20)
 		_, err = m.ExportedFunction("p").Call(ctx, params...)
 		require.NoError(t, err)
-		require.Equal(t, uint64(15092115255309870764), m.Globals[2].Val)
-		require.Equal(t, uint64(9241386435284803069), m.Globals[2].ValHi)
+		lo, hi := m.Globals[2].Value()
+		require.Equal(t, uint64(15092115255309870764), lo)
+		require.Equal(t, uint64(9241386435284803069), hi)
 	})
 }
 
@@ -665,8 +672,9 @@ func Test1817(t *testing.T) {
 		buf, ok := m.Memory().Read(15616, 16)
 		require.True(t, ok)
 		require.Equal(t, []uint8{0, 0, 0, 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, buf)
-		require.Equal(t, uint64(0x8000000080000000), m.Globals[0].Val)
-		require.Equal(t, uint64(0x8000000080000000), m.Globals[0].ValHi)
+		lo, hi := m.Globals[0].Value()
+		require.Equal(t, uint64(0x8000000080000000), lo)
+		require.Equal(t, uint64(0x8000000080000000), hi)
 	})
 }
 
@@ -681,8 +689,9 @@ func Test1820(t *testing.T) {
 		m := mod.(*wasm.ModuleInstance)
 		_, err = m.ExportedFunction("").Call(ctx)
 		require.NoError(t, err)
-		require.Equal(t, uint64(0xFFFFFFFFFFFF0000), m.Globals[1].Val)
-		require.Equal(t, uint64(0xFFFF), m.Globals[1].ValHi)
+		lo, hi := m.Globals[1].Value()
+		require.Equal(t, uint64(0xFFFFFFFFFFFF0000), lo)
+		require.Equal(t, uint64(0xFFFF), hi)
 	})
 }
 
@@ -698,8 +707,9 @@ func Test1823(t *testing.T) {
 		m := mod.(*wasm.ModuleInstance)
 		_, err = m.ExportedFunction("").Call(ctx)
 		require.NoError(t, err)
-		require.Equal(t, uint64(17282609607625994159), m.Globals[0].Val)
-		require.Equal(t, uint64(4671060543367625455), m.Globals[0].ValHi)
+		lo, hi := m.Globals[0].Value()
+		require.Equal(t, uint64(17282609607625994159), lo)
+		require.Equal(t, uint64(4671060543367625455), hi)
 	})
 }
 
@@ -714,8 +724,9 @@ func Test1825(t *testing.T) {
 		m := mod.(*wasm.ModuleInstance)
 		_, err = m.ExportedFunction("").Call(ctx)
 		require.NoError(t, err)
-		require.Equal(t, uint64(1099511627775), m.Globals[6].Val)
-		require.Equal(t, uint64(18446744073709551615), m.Globals[6].ValHi)
+		lo, hi := m.Globals[6].Value()
+		require.Equal(t, uint64(1099511627775), lo)
+		require.Equal(t, uint64(18446744073709551615), hi)
 	})
 }
 
@@ -730,8 +741,9 @@ func Test1826(t *testing.T) {
 		m := mod.(*wasm.ModuleInstance)
 		_, err = m.ExportedFunction("3").Call(ctx, 0, 0)
 		require.NoError(t, err)
-		require.Equal(t, uint64(1608723901141126568), m.Globals[0].Val)
-		require.Equal(t, uint64(0), m.Globals[0].ValHi)
+		lo, hi := m.Globals[0].Value()
+		require.Equal(t, uint64(1608723901141126568), lo)
+		require.Equal(t, uint64(0), hi)
 	})
 }
 
@@ -745,7 +757,8 @@ func Test1846(t *testing.T) {
 		m := mod.(*wasm.ModuleInstance)
 		_, err = m.ExportedFunction("").Call(ctx)
 		require.NoError(t, err)
-		require.Equal(t, math.Float64bits(2), m.Globals[0].Val)
-		require.Equal(t, uint64(0), m.Globals[0].ValHi)
+		lo, hi := m.Globals[0].Value()
+		require.Equal(t, math.Float64bits(2), lo)
+		require.Equal(t, uint64(0), hi)
 	})
 }

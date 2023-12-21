@@ -174,6 +174,20 @@ func (m *moduleEngine) NewFunction(index wasm.Index) api.Function {
 	return ce
 }
 
+// GetGlobalValue implements the same method as documented on wasm.ModuleEngine.
+func (m *moduleEngine) GetGlobalValue(i wasm.Index) (lo, hi uint64) {
+	offset := m.parent.offsets.GlobalInstanceOffset(i)
+	if i < m.module.Source.ImportGlobalCount {
+		g := uintptr(binary.LittleEndian.Uint64(m.opaque[offset:]))
+		ptr := (*wasm.GlobalInstance)(unsafe.Pointer(g))
+		return ptr.Value()
+	}
+	return binary.LittleEndian.Uint64(m.opaque[offset:]), binary.LittleEndian.Uint64(m.opaque[offset+8:])
+}
+
+// OwnsGlobals implements the same method as documented on wasm.ModuleEngine.
+func (m *moduleEngine) OwnsGlobals() bool { return true }
+
 // ResolveImportedFunction implements wasm.ModuleEngine.
 func (m *moduleEngine) ResolveImportedFunction(index, indexInImportedModule wasm.Index, importedModuleEngine wasm.ModuleEngine) {
 	executableOffset, moduleCtxOffset, typeIDOffset := m.parent.offsets.ImportedFunctionOffset(index)

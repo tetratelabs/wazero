@@ -3484,7 +3484,6 @@ func (c *Compiler) setWasmGlobalValue(index wasm.Index, v ssa.Value) {
 
 	// The value has changed to `v`, so we record it.
 	builder.DefineVariableInCurrentBB(variable, v)
-
 }
 
 func (c *Compiler) getWasmGlobalValue(index wasm.Index, forceLoad bool) (ret ssa.Value) {

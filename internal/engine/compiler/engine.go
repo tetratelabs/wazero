@@ -656,6 +656,14 @@ func (e *moduleEngine) ResolveImportedFunction(index, indexInImportedModule wasm
 	e.functions[index] = imported.functions[indexInImportedModule]
 }
 
+// GetGlobalValue implements the same method as documented on wasm.ModuleEngine.
+func (e *moduleEngine) GetGlobalValue(wasm.Index) (lo, hi uint64) {
+	panic("BUG: GetGlobalValue should never be called on compiler mode")
+}
+
+// OwnsGlobals implements the same method as documented on wasm.ModuleEngine.
+func (e *moduleEngine) OwnsGlobals() bool { return false }
+
 // ResolveImportedMemory implements wasm.ModuleEngine.
 func (e *moduleEngine) ResolveImportedMemory(wasm.ModuleEngine) {}
 
