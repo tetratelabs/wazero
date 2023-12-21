@@ -1659,7 +1659,31 @@ func (m *machine) lowerRotr(si *ssa.Instruction) {
 
 func (m *machine) lowerExtend(arg, ret ssa.Value, from, to byte, signed bool) {
 	rd := m.compiler.VRegOf(ret)
-	rn := m.getOperand_NR(m.compiler.ValueDefinition(arg), extModeNone)
+	def := m.compiler.ValueDefinition(arg)
+
+	if instr := def.Instr; !signed && from == 32 && instr != nil {
+		// We can optimize out the un-singed extend because:
+		// 	Writes to the W register set bits [63:32] of the X register to zero
+		//  https://developer.arm.com/documentation/den0024/a/An-Introduction-to-the-ARMv8-Instruction-Sets/The-ARMv8-instruction-sets/Distinguishing-between-32-bit-and-64-bit-A64-instructions
+		switch instr.Opcode() {
+		case
+			ssa.OpcodeIadd, ssa.OpcodeIsub, ssa.OpcodeLoad,
+			ssa.OpcodeBand, ssa.OpcodeBor, ssa.OpcodeBnot,
+			ssa.OpcodeIshl, ssa.OpcodeUshr, ssa.OpcodeSshr,
+			ssa.OpcodeRotl, ssa.OpcodeRotr,
+			ssa.OpcodeUload8, ssa.OpcodeUload16, ssa.OpcodeUload32:
+			// So, if the argument is the result of a 32-bit operation, we can just copy the register.
+			// It is highly likely that this copy will be optimized out after register allocation.
+			rn := m.compiler.VRegOf(arg)
+			mov := m.allocateInstr()
+			// Note: do not use move32 as it will be lowered to a 32-bit move, which is not copy (that is actually the impl of UExtend).
+			mov.asMove64(rd, rn)
+			m.insert(mov)
+			return
+		default:
+		}
+	}
+	rn := m.getOperand_NR(def, extModeNone)
 
 	ext := m.allocateInstr()
 	ext.asExtend(rd, rn.nr(), from, to, signed)
