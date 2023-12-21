@@ -68,7 +68,7 @@ var (
 		readTestCase: func(fpath string, fname string) (_ []byte, c wazero.ModuleConfig, stdout, stderr *os.File, err error) {
 			bin, err := os.ReadFile(fpath)
 			c, stdout, stderr = defaultModuleConfig()
-			c.WithFSConfig(wazero.NewFSConfig().WithDirMount(".", "/")).
+			c = c.WithFSConfig(wazero.NewFSConfig().WithDirMount(".", "/")).
 				WithArgs("test.wasm")
 			return bin, c, stdout, stderr, err
 		},
@@ -87,7 +87,7 @@ var (
 				WithDirMount(os.TempDir(), "/tmp")
 
 			c, stdout, stderr = defaultModuleConfig()
-			c.WithFSConfig(fsconfig).
+			c = c.WithFSConfig(fsconfig).
 				WithArgs(fname, "-test.v")
 
 			return bin, c, stdout, stderr, err
@@ -113,7 +113,7 @@ var (
 			normalizedTestdir := normalizeOsPath(testdir)
 
 			c, stdout, stderr = defaultModuleConfig()
-			c.WithFSConfig(
+			c = c.WithFSConfig(
 				wazero.NewFSConfig().
 					WithDirMount(sysroot, "/").
 					WithDirMount(os.TempDir(), "/tmp")).
