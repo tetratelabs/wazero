@@ -223,11 +223,13 @@ func requireZeroExitCode(b *testing.B, err error, stdout, stderr *os.File) {
 	b.Helper()
 	if se, ok := err.(*sys.ExitError); ok {
 		if se.ExitCode() != 0 { // Don't err on success.
-			stdoutBytes, err := io.ReadAll(stdout)
-			require.NoError(b, err)
-			stderrBytes, err := io.ReadAll(stderr)
-			require.NoError(b, err)
+			stdoutBytes, _ := io.ReadAll(stdout)
+			stderrBytes, _ := io.ReadAll(stderr)
 			require.NoError(b, err, "stdout: %s\nstderr: %s", string(stdoutBytes), string(stderrBytes))
 		}
+	} else if err != nil {
+		stdoutBytes, _ := io.ReadAll(stdout)
+		stderrBytes, _ := io.ReadAll(stderr)
+		require.NoError(b, err, "stdout: %s\nstderr: %s", string(stdoutBytes), string(stderrBytes))
 	}
 }
