@@ -1,9 +1,9 @@
 package wazevo_test
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -58,14 +58,14 @@ func BenchmarkWasip1(b *testing.B) {
 
 type testCase struct {
 	name, dir    string
-	readTestCase func(fpath string, fname string) (_ []byte, c wazero.ModuleConfig, stdout, stderr *bytes.Buffer, err error)
+	readTestCase func(fpath string, fname string) (_ []byte, c wazero.ModuleConfig, stdout, stderr *os.File, err error)
 }
 
 var (
 	zigTestCase = testCase{
 		name: "zig",
 		dir:  "testdata/zig/",
-		readTestCase: func(fpath string, fname string) (_ []byte, c wazero.ModuleConfig, stdout, stderr *bytes.Buffer, err error) {
+		readTestCase: func(fpath string, fname string) (_ []byte, c wazero.ModuleConfig, stdout, stderr *os.File, err error) {
 			bin, err := os.ReadFile(fpath)
 			c, stdout, stderr = defaultModuleConfig()
 			c.WithFSConfig(wazero.NewFSConfig().WithDirMount(".", "/")).
@@ -76,7 +76,7 @@ var (
 	tinyGoTestCase = testCase{
 		name: "tinygo",
 		dir:  "testdata/tinygo/",
-		readTestCase: func(fpath string, fname string) (_ []byte, c wazero.ModuleConfig, stdout, stderr *bytes.Buffer, err error) {
+		readTestCase: func(fpath string, fname string) (_ []byte, c wazero.ModuleConfig, stdout, stderr *os.File, err error) {
 			if !strings.HasSuffix(fname, ".test") {
 				return nil, nil, nil, nil, nil
 			}
@@ -96,7 +96,7 @@ var (
 	wasip1TestCase = testCase{
 		name: "wasip1",
 		dir:  "testdata/go/",
-		readTestCase: func(fpath string, fname string) (_ []byte, c wazero.ModuleConfig, stdout, stderr *bytes.Buffer, err error) {
+		readTestCase: func(fpath string, fname string) (_ []byte, c wazero.ModuleConfig, stdout, stderr *os.File, err error) {
 			if !strings.HasSuffix(fname, ".test") {
 				return nil, nil, nil, nil, nil
 			}
@@ -197,10 +197,17 @@ func normalizeOsPath(path string) string {
 	return testdirnormalized
 }
 
-func defaultModuleConfig() (c wazero.ModuleConfig, stdout, stderr *bytes.Buffer) {
+func defaultModuleConfig() (c wazero.ModuleConfig, stdout, stderr *os.File) {
+	var err error
 	// Note: do not use os.Stdout or os.Stderr as they will mess up the `-bench` output to be fed to the benchstat tool.
-	stdout = &bytes.Buffer{}
-	stderr = &bytes.Buffer{}
+	stdout, err = os.CreateTemp("", "")
+	if err != nil {
+		panic(err)
+	}
+	stderr, err = os.CreateTemp("", "")
+	if err != nil {
+		panic(err)
+	}
 	c = wazero.NewModuleConfig().
 		WithSysNanosleep().
 		WithSysNanotime().
@@ -212,11 +219,15 @@ func defaultModuleConfig() (c wazero.ModuleConfig, stdout, stderr *bytes.Buffer)
 	return
 }
 
-func requireZeroExitCode(b *testing.B, err error, stdout, stderr *bytes.Buffer) {
+func requireZeroExitCode(b *testing.B, err error, stdout, stderr *os.File) {
 	b.Helper()
 	if se, ok := err.(*sys.ExitError); ok {
 		if se.ExitCode() != 0 { // Don't err on success.
-			require.NoError(b, err, "stdout: %s\nstderr: %s", stdout.String(), stderr.String())
+			stdoutBytes, err := io.ReadAll(stdout)
+			require.NoError(b, err)
+			stderrBytes, err := io.ReadAll(stderr)
+			require.NoError(b, err)
+			require.NoError(b, err, "stdout: %s\nstderr: %s", string(stdoutBytes), string(stderrBytes))
 		}
 	}
 }
