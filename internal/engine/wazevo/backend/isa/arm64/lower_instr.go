@@ -1662,7 +1662,7 @@ func (m *machine) lowerExtend(arg, ret ssa.Value, from, to byte, signed bool) {
 	def := m.compiler.ValueDefinition(arg)
 
 	if instr := def.Instr; !signed && from == 32 && instr != nil {
-		// We can optimize out the un-singed extend because:
+		// We can optimize out the unsigned extend because:
 		// 	Writes to the W register set bits [63:32] of the X register to zero
 		//  https://developer.arm.com/documentation/den0024/a/An-Introduction-to-the-ARMv8-Instruction-Sets/The-ARMv8-instruction-sets/Distinguishing-between-32-bit-and-64-bit-A64-instructions
 		switch instr.Opcode() {
