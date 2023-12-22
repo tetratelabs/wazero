@@ -2092,8 +2092,11 @@ func testImportedMutableGlobalUpdate(t *testing.T, r wazero.Runtime) {
 			Name:       "g",
 			DescGlobal: wasm.GlobalType{ValType: i32, Mutable: true},
 		}},
-		TypeSection:     []wasm.FunctionType{{Results: []wasm.ValueType{i32}}},
-		ExportSection:   []wasm.Export{{Name: "", Type: wasm.ExternTypeFunc, Index: 0}},
+		TypeSection: []wasm.FunctionType{{Results: []wasm.ValueType{i32}}},
+		ExportSection: []wasm.Export{
+			{Name: "", Type: wasm.ExternTypeFunc, Index: 0},
+			{Name: "g", Type: wasm.ExternTypeGlobal, Index: 0},
+		},
 		FunctionSection: []wasm.Index{0},
 		CodeSection: []wasm.Code{
 			{Body: []byte{
@@ -2125,5 +2128,9 @@ func testImportedMutableGlobalUpdate(t *testing.T, r wazero.Runtime) {
 	require.NotNil(t, g)
 
 	v := g.Get()
+	require.Equal(t, uint64(2), v)
+
+	reExportedG := mainMod.ExportedGlobal("g")
+	v = reExportedG.Get()
 	require.Equal(t, uint64(2), v)
 }

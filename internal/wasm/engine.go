@@ -55,7 +55,7 @@ type ModuleEngine interface {
 	LookupFunction(t *TableInstance, typeId FunctionTypeID, tableOffset Index) (*ModuleInstance, Index)
 
 	// GetGlobalValue returns the value of the global variable at the given Index.
-	// Only called when OwnsGlobals() returns true.
+	// Only called when OwnsGlobals() returns true, and must not be called for imported globals
 	GetGlobalValue(idx Index) (lo, hi uint64)
 
 	// OwnsGlobals returns true if this ModuleEngine owns the global variables. If true, wasm.GlobalInstance's Val,ValHi should

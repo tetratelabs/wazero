@@ -193,9 +193,7 @@ func (m *moduleEngine) GetGlobalValue(i wasm.Index) (lo, hi uint64) {
 	offset := m.parent.offsets.GlobalInstanceOffset(i)
 	buf := m.opaque[offset:]
 	if i < m.module.Source.ImportGlobalCount {
-		g := uintptr(binary.LittleEndian.Uint64(buf))
-		ptr := (*wasm.GlobalInstance)(unsafe.Pointer(g))
-		return ptr.Value()
+		panic("GetGlobalValue should not be called for imported globals")
 	}
 	return binary.LittleEndian.Uint64(buf), binary.LittleEndian.Uint64(buf[8:])
 }
