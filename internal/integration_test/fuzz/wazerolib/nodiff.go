@@ -141,23 +141,26 @@ func ensureMutableGlobalsMatch(compilerMod, interpreterMod api.Module, requireNo
 			continue
 		}
 
+		cVal, cValHi := cg.Value()
+		iVal, iValHi := ig.Value()
+
 		var ok bool
 		switch ig.Type.ValType {
 		case wasm.ValueTypeI32, wasm.ValueTypeF32:
-			ok = uint32(cg.Val) == uint32(ig.Val)
+			ok = uint32(cVal) == uint32(iVal)
 		case wasm.ValueTypeI64, wasm.ValueTypeF64:
-			ok = cg.Val == ig.Val
+			ok = cVal == iVal
 		case wasm.ValueTypeV128:
-			ok = cg.Val == ig.Val && cg.ValHi == ig.ValHi
+			ok = cVal == iVal && cValHi == iValHi
 		default:
 			ok = true // Ignore other types.
 		}
 
 		if !ok {
 			if ig.Type.ValType == wasm.ValueTypeV128 {
-				requireNoError(fmt.Errorf("mutable global[%d] value mismatch: (%v,%v) != (%v,%v)", i, cg.Val, cg.ValHi, ig.Val, ig.ValHi))
+				requireNoError(fmt.Errorf("mutable global[%d] value mismatch: (%v,%v) != (%v,%v)", i, cVal, cValHi, iVal, iValHi))
 			} else {
-				requireNoError(fmt.Errorf("mutable global[%d] value mismatch: %v != %v", i, cg.Val, ig.Val))
+				requireNoError(fmt.Errorf("mutable global[%d] value mismatch: %v != %v", i, cVal, iVal))
 			}
 		}
 	}

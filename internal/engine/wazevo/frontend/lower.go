@@ -3459,21 +3459,25 @@ func (c *Compiler) reloadMemoryBaseLen() {
 	c.clearSafeBounds()
 }
 
-// globalInstanceValueOffset is the offsetOf .Value field of wasm.GlobalInstance.
-const globalInstanceValueOffset = 8
-
 func (c *Compiler) setWasmGlobalValue(index wasm.Index, v ssa.Value) {
 	variable := c.globalVariables[index]
-	instanceOffset := c.offset.GlobalInstanceOffset(index)
+	opaqueOffset := c.offset.GlobalInstanceOffset(index)
 
 	builder := c.ssaBuilder
-	loadGlobalInstPtr := builder.AllocateInstruction()
-	loadGlobalInstPtr.AsLoad(c.moduleCtxPtrValue, uint32(instanceOffset), ssa.TypeI64)
-	builder.InsertInstruction(loadGlobalInstPtr)
+	if index < c.m.ImportGlobalCount {
+		loadGlobalInstPtr := builder.AllocateInstruction()
+		loadGlobalInstPtr.AsLoad(c.moduleCtxPtrValue, uint32(opaqueOffset), ssa.TypeI64)
+		builder.InsertInstruction(loadGlobalInstPtr)
 
-	store := builder.AllocateInstruction()
-	store.AsStore(ssa.OpcodeStore, v, loadGlobalInstPtr.Return(), uint32(globalInstanceValueOffset))
-	builder.InsertInstruction(store)
+		store := builder.AllocateInstruction()
+		store.AsStore(ssa.OpcodeStore, v, loadGlobalInstPtr.Return(), uint32(0))
+		builder.InsertInstruction(store)
+
+	} else {
+		store := builder.AllocateInstruction()
+		store.AsStore(ssa.OpcodeStore, v, c.moduleCtxPtrValue, uint32(opaqueOffset))
+		builder.InsertInstruction(store)
+	}
 
 	// The value has changed to `v`, so we record it.
 	builder.DefineVariableInCurrentBB(variable, v)
@@ -3482,7 +3486,7 @@ func (c *Compiler) setWasmGlobalValue(index wasm.Index, v ssa.Value) {
 func (c *Compiler) getWasmGlobalValue(index wasm.Index, forceLoad bool) ssa.Value {
 	variable := c.globalVariables[index]
 	typ := c.globalVariablesTypes[index]
-	instanceOffset := c.offset.GlobalInstanceOffset(index)
+	opaqueOffset := c.offset.GlobalInstanceOffset(index)
 
 	builder := c.ssaBuilder
 	if !forceLoad {
@@ -3491,16 +3495,21 @@ func (c *Compiler) getWasmGlobalValue(index wasm.Index, forceLoad bool) ssa.Valu
 		}
 	}
 
-	loadGlobalInstPtr := builder.AllocateInstruction()
-	loadGlobalInstPtr.AsLoad(c.moduleCtxPtrValue, uint32(instanceOffset), ssa.TypeI64)
-	builder.InsertInstruction(loadGlobalInstPtr)
+	var load *ssa.Instruction
+	if index < c.m.ImportGlobalCount {
+		loadGlobalInstPtr := builder.AllocateInstruction()
+		loadGlobalInstPtr.AsLoad(c.moduleCtxPtrValue, uint32(opaqueOffset), ssa.TypeI64)
+		builder.InsertInstruction(loadGlobalInstPtr)
+		load = builder.AllocateInstruction().
+			AsLoad(loadGlobalInstPtr.Return(), uint32(0), typ)
+	} else {
+		load = builder.AllocateInstruction().
+			AsLoad(c.moduleCtxPtrValue, uint32(opaqueOffset), typ)
+	}
 
-	load := builder.AllocateInstruction()
-	load.AsLoad(loadGlobalInstPtr.Return(), uint32(globalInstanceValueOffset), typ)
-	builder.InsertInstruction(load)
-	ret := load.Return()
-	builder.DefineVariableInCurrentBB(variable, ret)
-	return ret
+	v := load.Insert(builder).Return()
+	builder.DefineVariableInCurrentBB(variable, v)
+	return v
 }
 
 const (

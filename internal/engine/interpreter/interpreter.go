@@ -87,6 +87,14 @@ type moduleEngine struct {
 	parentEngine *engine
 }
 
+// GetGlobalValue implements the same method as documented on wasm.ModuleEngine.
+func (e *moduleEngine) GetGlobalValue(wasm.Index) (lo, hi uint64) {
+	panic("BUG: GetGlobalValue should never be called on interpreter mode")
+}
+
+// OwnsGlobals implements the same method as documented on wasm.ModuleEngine.
+func (e *moduleEngine) OwnsGlobals() bool { return false }
+
 // callEngine holds context per moduleEngine.Call, and shared across all the
 // function calls originating from the same moduleEngine.Call execution.
 //

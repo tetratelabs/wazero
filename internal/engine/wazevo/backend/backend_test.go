@@ -1937,34 +1937,26 @@ L2:
 L1 (SSA Block: blk0):
 	mov x128?, x0
 	mov x129?, x1
-	ldr x130?, [x129?, #0x8]
-	ldr w131?, [x130?, #0x8]
-	ldr x132?, [x129?, #0x10]
-	ldr x133?, [x132?, #0x8]
-	ldr x134?, [x129?, #0x18]
-	ldr s135?, [x134?, #0x8]
-	ldr x136?, [x129?, #0x20]
-	ldr d137?, [x136?, #0x8]
+	ldr w130?, [x129?, #0x8]
+	ldr x131?, [x129?, #0x18]
+	ldr s132?, [x129?, #0x28]
+	ldr d133?, [x129?, #0x38]
 	str x129?, [x128?, #0x8]
 	mov x0, x128?
 	mov x1, x129?
 	bl f1
-	ldr x138?, [x129?, #0x8]
-	ldr w139?, [x138?, #0x8]
-	ldr x140?, [x129?, #0x10]
-	ldr x141?, [x140?, #0x8]
-	ldr x142?, [x129?, #0x18]
-	ldr s143?, [x142?, #0x8]
-	ldr x144?, [x129?, #0x20]
-	ldr d145?, [x144?, #0x8]
-	mov v3.8b, v145?.8b
-	mov v2.8b, v143?.8b
-	mov x3, x141?
-	mov x2, x139?
-	mov v1.8b, v137?.8b
-	mov v0.8b, v135?.8b
-	mov x1, x133?
-	mov x0, x131?
+	ldr w134?, [x129?, #0x8]
+	ldr x135?, [x129?, #0x18]
+	ldr s136?, [x129?, #0x28]
+	ldr d137?, [x129?, #0x38]
+	mov v3.8b, v137?.8b
+	mov v2.8b, v136?.8b
+	mov x3, x135?
+	mov x2, x134?
+	mov v1.8b, v133?.8b
+	mov v0.8b, v132?.8b
+	mov x1, x131?
+	mov x0, x130?
 	ret
 `,
 			afterFinalizeARM64: `
@@ -1974,29 +1966,21 @@ L1 (SSA Block: blk0):
 	orr x27, xzr, #0x20
 	str x27, [sp, #-0x10]!
 	str x1, [sp, #0x10]
-	ldr x8, [x1, #0x8]
-	ldr w8, [x8, #0x8]
+	ldr w8, [x1, #0x8]
 	str w8, [sp, #0x2c]
-	ldr x9, [x1, #0x10]
-	ldr x9, [x9, #0x8]
+	ldr x9, [x1, #0x18]
 	str x9, [sp, #0x24]
-	ldr x10, [x1, #0x18]
-	ldr s8, [x10, #0x8]
+	ldr s8, [x1, #0x28]
 	str s8, [sp, #0x20]
-	ldr x10, [x1, #0x20]
-	ldr d9, [x10, #0x8]
+	ldr d9, [x1, #0x38]
 	str d9, [sp, #0x18]
 	str x1, [x0, #0x8]
 	bl f1
 	ldr x8, [sp, #0x10]
-	ldr x9, [x8, #0x8]
-	ldr w9, [x9, #0x8]
-	ldr x10, [x8, #0x10]
-	ldr x10, [x10, #0x8]
-	ldr x11, [x8, #0x18]
-	ldr s8, [x11, #0x8]
-	ldr x8, [x8, #0x20]
-	ldr d9, [x8, #0x8]
+	ldr w9, [x8, #0x8]
+	ldr x10, [x8, #0x18]
+	ldr s8, [x8, #0x28]
+	ldr d9, [x8, #0x38]
 	mov v3.8b, v9.8b
 	mov v2.8b, v8.8b
 	mov x3, x10
@@ -2022,36 +2006,28 @@ L1 (SSA Block: blk0):
 			afterLoweringARM64: `
 L1 (SSA Block: blk0):
 	mov x129?, x1
-	ldr x131?, [x129?, #0x8]
-	orr w141?, wzr, #0x1
-	str w141?, [x131?, #0x8]
-	ldr x133?, [x129?, #0x10]
-	orr x140?, xzr, #0x2
-	str x140?, [x133?, #0x8]
-	ldr x135?, [x129?, #0x18]
-	ldr s139?, #8; b 8; data.f32 3.000000
-	str s139?, [x135?, #0x8]
-	ldr x137?, [x129?, #0x20]
-	ldr d138?, #8; b 16; data.f64 4.000000
-	str d138?, [x137?, #0x8]
+	orr w137?, wzr, #0x1
+	str w137?, [x129?, #0x8]
+	orr x136?, xzr, #0x2
+	str x136?, [x129?, #0x18]
+	ldr s135?, #8; b 8; data.f32 3.000000
+	str s135?, [x129?, #0x28]
+	ldr d134?, #8; b 16; data.f64 4.000000
+	str d134?, [x129?, #0x38]
 	ret
 `,
 			afterFinalizeARM64: `
 L1 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
-	ldr x8, [x1, #0x8]
-	orr w9, wzr, #0x1
-	str w9, [x8, #0x8]
-	ldr x8, [x1, #0x10]
-	orr x9, xzr, #0x2
-	str x9, [x8, #0x8]
-	ldr x8, [x1, #0x18]
+	orr w8, wzr, #0x1
+	str w8, [x1, #0x8]
+	orr x8, xzr, #0x2
+	str x8, [x1, #0x18]
 	ldr s8, #8; b 8; data.f32 3.000000
-	str s8, [x8, #0x8]
-	ldr x8, [x1, #0x20]
+	str s8, [x1, #0x28]
 	ldr d8, #8; b 16; data.f64 4.000000
-	str d8, [x8, #0x8]
+	str d8, [x1, #0x38]
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
 	ret
