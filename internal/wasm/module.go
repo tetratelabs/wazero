@@ -618,8 +618,8 @@ func (m *ModuleInstance) buildGlobals(module *Module, funcRefResolver func(funcI
 		gs := &module.GlobalSection[i]
 		g := &GlobalInstance{}
 		if engineOwnGlobal {
-			g.me = me
-			g.index = i + module.ImportGlobalCount
+			g.Me = me
+			g.Index = i + module.ImportGlobalCount
 		}
 		m.Globals[i+module.ImportGlobalCount] = g
 		g.Type = gs.Type

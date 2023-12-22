@@ -13,6 +13,7 @@ import (
 )
 
 func TestModuleEngine_setupOpaque(t *testing.T) {
+	const importedGlobalBegin = 99
 	for i, tc := range []struct {
 		offset wazevoapi.ModuleContextOffsetData
 		m      *wasm.ModuleInstance
@@ -56,10 +57,20 @@ func TestModuleEngine_setupOpaque(t *testing.T) {
 				AfterListenerTrampolines1stElement:  208,
 			},
 			m: &wasm.ModuleInstance{
-				Globals: []*wasm.GlobalInstance{{}, {}, {Val: 1}, {Val: 1, ValHi: 1230}},
+				Globals: []*wasm.GlobalInstance{
+					{
+						Me: &moduleEngine{
+							parent: &compiledModule{offsets: wazevoapi.ModuleContextOffsetData{GlobalsBegin: importedGlobalBegin}},
+							opaque: make([]byte, 1000),
+						},
+					},
+					{},
+					{Val: 1},
+					{Val: 1, ValHi: 1230},
+				},
 				Tables:  []*wasm.TableInstance{{}, {}, {}},
 				TypeIDs: make([]wasm.FunctionTypeID, 50),
-				Source:  &wasm.Module{ImportGlobalCount: 3},
+				Source:  &wasm.Module{ImportGlobalCount: 1},
 			},
 		},
 	} {
@@ -104,7 +115,8 @@ func TestModuleEngine_setupOpaque(t *testing.T) {
 				for i, g := range tc.m.Globals {
 					if i < int(tc.m.Source.ImportGlobalCount) {
 						actualPtr := uintptr(binary.LittleEndian.Uint64(m.opaque[int(tc.offset.GlobalsBegin)+16*i:]))
-						expPtr := uintptr(unsafe.Pointer(g))
+						imported := g.Me.(*moduleEngine)
+						expPtr := uintptr(unsafe.Pointer(&imported.opaque[importedGlobalBegin]))
 						require.Equal(t, expPtr, actualPtr)
 					} else {
 						actual := binary.LittleEndian.Uint64(m.opaque[int(tc.offset.GlobalsBegin)+16*i:])

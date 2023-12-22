@@ -3459,9 +3459,6 @@ func (c *Compiler) reloadMemoryBaseLen() {
 	c.clearSafeBounds()
 }
 
-// globalInstanceValueOffset is the offsetOf .Value field of wasm.GlobalInstance.
-const globalInstanceValueOffset = 8
-
 func (c *Compiler) setWasmGlobalValue(index wasm.Index, v ssa.Value) {
 	variable := c.globalVariables[index]
 	instanceOffset := c.offset.GlobalInstanceOffset(index)
@@ -3473,7 +3470,7 @@ func (c *Compiler) setWasmGlobalValue(index wasm.Index, v ssa.Value) {
 		builder.InsertInstruction(loadGlobalInstPtr)
 
 		store := builder.AllocateInstruction()
-		store.AsStore(ssa.OpcodeStore, v, loadGlobalInstPtr.Return(), uint32(globalInstanceValueOffset))
+		store.AsStore(ssa.OpcodeStore, v, loadGlobalInstPtr.Return(), uint32(0))
 		builder.InsertInstruction(store)
 
 	} else {
@@ -3505,7 +3502,7 @@ func (c *Compiler) getWasmGlobalValue(index wasm.Index, forceLoad bool) (ret ssa
 		builder.InsertInstruction(loadGlobalInstPtr)
 
 		load = builder.AllocateInstruction().
-			AsLoad(loadGlobalInstPtr.Return(), uint32(globalInstanceValueOffset), typ)
+			AsLoad(loadGlobalInstPtr.Return(), uint32(0), typ)
 	} else {
 		load = builder.AllocateInstruction().
 			AsLoad(c.moduleCtxPtrValue, uint32(instanceOffset), typ)

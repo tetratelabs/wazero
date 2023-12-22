@@ -143,11 +143,11 @@ type (
 		// ValHi is only used for vector type globals, and holds the higher bits of the vector.
 		// If me is non-nil, the value will not be updated and the current value is stored in the module engine.
 		ValHi uint64
-		// me is the module engine that owns this global instance.
+		// Me is the module engine that owns this global instance.
 		// The .Val and .ValHi fields are only valid when me is nil.
 		// If me is non-nil, the value is stored in the module engine.
-		me    ModuleEngine
-		index Index
+		Me    ModuleEngine
+		Index Index
 	}
 
 	// FunctionTypeID is a uniquely assigned integer for a function type.
@@ -580,8 +580,8 @@ func (g *GlobalInstance) String() string {
 }
 
 func (g *GlobalInstance) Value() (uint64, uint64) {
-	if g.me != nil {
-		return g.me.GetGlobalValue(g.index)
+	if g.Me != nil {
+		return g.Me.GetGlobalValue(g.Index)
 	}
 	return g.Val, g.ValHi
 }

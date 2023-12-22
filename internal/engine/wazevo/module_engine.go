@@ -49,7 +49,8 @@ type (
 	// 	    importedMemoryInstance                    *wasm.MemoryInstance (optional)
 	// 	    importedMemoryOwnerOpaqueCtx              *byte                (optional)
 	// 	    importedFunctions                         [# of importedFunctions]functionInstance
-	//      globals                                   []*wasm.GlobalInstance (optional)
+	//      importedGlobals                           []ImportedGlobal       (optional)
+	//      localGlobals                              []Global               (optional)
 	//      typeIDsBegin                              &wasm.ModuleInstance.TypeIDs[0]  (optional)
 	//      tables                                    []*wasm.TableInstance  (optional)
 	// 	    beforeListenerTrampolines1stElement       **byte                 (optional)
@@ -57,6 +58,15 @@ type (
 	//      dataInstances1stElement                   []wasm.DataInstance    (optional)
 	//      elementInstances1stElement                []wasm.ElementInstance (optional)
 	// 	}
+	//
+	//  type ImportedGlobal struct {
+	// 		*Global
+	// 		_ uint64 // padding
+	//  }
+	//
+	//  type Global struct {
+	// 		Val, ValHi uint64
+	//  }
 	//
 	// See wazevoapi.NewModuleContextOffsetData for the details of the offsets.
 	//
@@ -94,7 +104,11 @@ func (m *moduleEngine) setupOpaque() {
 	if globalOffset := offsets.GlobalsBegin; globalOffset >= 0 {
 		for i, g := range inst.Globals {
 			if i < int(inst.Source.ImportGlobalCount) {
-				binary.LittleEndian.PutUint64(opaque[globalOffset:], uint64(uintptr(unsafe.Pointer(g))))
+				importedME := g.Me.(*moduleEngine)
+				offset := importedME.parent.offsets.GlobalInstanceOffset(g.Index)
+				importedMEOpaque := importedME.opaque
+				binary.LittleEndian.PutUint64(opaque[globalOffset:],
+					uint64(uintptr(unsafe.Pointer(&importedMEOpaque[offset]))))
 			} else {
 				binary.LittleEndian.PutUint64(opaque[globalOffset:], g.Val)
 				binary.LittleEndian.PutUint64(opaque[globalOffset+8:], g.ValHi)
@@ -177,12 +191,13 @@ func (m *moduleEngine) NewFunction(index wasm.Index) api.Function {
 // GetGlobalValue implements the same method as documented on wasm.ModuleEngine.
 func (m *moduleEngine) GetGlobalValue(i wasm.Index) (lo, hi uint64) {
 	offset := m.parent.offsets.GlobalInstanceOffset(i)
+	buf := m.opaque[offset:]
 	if i < m.module.Source.ImportGlobalCount {
-		g := uintptr(binary.LittleEndian.Uint64(m.opaque[offset:]))
+		g := uintptr(binary.LittleEndian.Uint64(buf))
 		ptr := (*wasm.GlobalInstance)(unsafe.Pointer(g))
 		return ptr.Value()
 	}
-	return binary.LittleEndian.Uint64(m.opaque[offset:]), binary.LittleEndian.Uint64(m.opaque[offset+8:])
+	return binary.LittleEndian.Uint64(buf), binary.LittleEndian.Uint64(buf[8:])
 }
 
 // OwnsGlobals implements the same method as documented on wasm.ModuleEngine.

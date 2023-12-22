@@ -49,7 +49,7 @@ func (g mutableGlobal) String() string {
 	return g.g.String()
 }
 
-// Set implements the same method as documented on api.mutableGlobal.
+// Set implements the same method as documented on api.MutableGlobal.
 func (g mutableGlobal) Set(v uint64) {
 	g.g.Val = v
 }
