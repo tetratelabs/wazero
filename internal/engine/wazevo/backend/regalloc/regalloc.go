@@ -22,6 +22,7 @@ func NewAllocator(allocatableRegs *RegisterInfo) Allocator {
 		regInfo:               allocatableRegs,
 		blockLivenessDataPool: wazevoapi.NewPool[blockLivenessData](resetBlockLivenessData),
 		phiDefInstListPool:    wazevoapi.NewPool[phiDefInstList](resetPhiDefInstList),
+		blockStatePool:        wazevoapi.NewPool[blockState](resetBlockState),
 	}
 	a.state.reset()
 	for _, regs := range allocatableRegs.AllocatableRegisters {
@@ -65,8 +66,9 @@ type (
 		currentOccupants regInUseSet
 
 		// Following two fields are updated while iterating the blocks in the reverse postorder.
-		state       state
-		blockStates [] /* blockID to */ blockState
+		state               state
+		blockStatePool      wazevoapi.Pool[blockState]
+		blockIDToBlockState []*blockState
 	}
 
 	// blockLivenessData is a per-block information used during the register allocation.
@@ -96,7 +98,6 @@ type (
 		startRegs regInUseSet
 		// endRegs is a list of RealReg that are used at the end of the block. This is used to fix the merge edges.
 		endRegs regInUseSet
-		init    bool
 	}
 
 	vrState struct {
@@ -160,16 +161,16 @@ func (s *state) reset() {
 }
 
 func (a *Allocator) getBlockState(bID int) *blockState {
-	if bID >= len(a.blockStates) {
-		a.blockStates = append(a.blockStates, make([]blockState, (bID+1)-len(a.blockStates))...)
-		a.blockStates = a.blockStates[:cap(a.blockStates)]
+	if bID >= len(a.blockIDToBlockState) {
+		a.blockIDToBlockState = append(a.blockIDToBlockState, make([]*blockState, bID+1)...)
 	}
-	ret := &a.blockStates[bID]
-	if !ret.init {
-		ret.reset()
-		ret.init = true
+
+	st := a.blockIDToBlockState[bID]
+	if st == nil {
+		st = a.blockStatePool.Allocate()
+		a.blockIDToBlockState[bID] = st
 	}
-	return ret
+	return st
 }
 
 func (s *state) setVRegState(v VReg, r RealReg) {
@@ -297,12 +298,11 @@ func (s *state) resetAt(bs *blockState, liveIns map[VReg]struct{}) {
 	})
 }
 
-func (b *blockState) reset() {
+func resetBlockState(b *blockState) {
 	b.visited = false
 	b.endRegs.reset()
 	b.startRegs.reset()
 	b.startFromPredIndex = -1
-	b.init = false
 }
 
 func (b *blockState) dump(a *RegisterInfo) {
@@ -311,7 +311,6 @@ func (b *blockState) dump(a *RegisterInfo) {
 	fmt.Println("\t\t\tendRegs:", b.endRegs.format(a))
 	fmt.Println("\t\t\tstartFromPredIndex:", b.startFromPredIndex)
 	fmt.Println("\t\t\tvisited:", b.visited)
-	fmt.Println("\t\t\tinit:", b.init)
 }
 
 // DoAllocation performs register allocation on the given Function.
@@ -894,7 +893,7 @@ func (a *Allocator) scheduleSpill(f Function, vs *vrState) {
 		fmt.Printf("v%d is spilled in blk%d, lca=blk%d\n", v.ID(), definingBlk.ID(), pos.ID())
 	}
 	for pos != definingBlk {
-		st := a.blockStates[pos.ID()]
+		st := a.getBlockState(pos.ID())
 		for ii := 0; ii < 64; ii++ {
 			rr := RealReg(ii)
 			if st.startRegs.get(rr) == v {
@@ -932,11 +931,11 @@ func (a *Allocator) scheduleSpill(f Function, vs *vrState) {
 // Reset resets the allocator's internal state so that it can be reused.
 func (a *Allocator) Reset() {
 	a.state.reset()
-	for i, l := 0, len(a.blockStates); i <= a.maxBlockID && i < l; i++ {
+	for i := 0; i <= a.maxBlockID && i < len(a.blockIDToBlockState); i++ {
 		a.blockLivenessData[i] = nil
-		s := &a.blockStates[i]
-		s.reset()
+		a.blockIDToBlockState[i] = nil
 	}
+	a.blockStatePool.Reset()
 	a.blockLivenessDataPool.Reset()
 	a.phiDefInstListPool.Reset()
 
