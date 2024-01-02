@@ -46,10 +46,10 @@ func writeFd(fd uintptr, buf []byte) (int, sys.Errno) {
 	return -1, sys.ENOSYS
 }
 
-func readSocket(h syscall.Handle, buf []byte) (int, sys.Errno) {
+func readSocket(h uintptr, buf []byte) (int, sys.Errno) {
 	var overlapped syscall.Overlapped
 	var done uint32
-	errno := syscall.ReadFile(h, buf, &done, &overlapped)
+	errno := syscall.ReadFile(syscall.Handle(h), buf, &done, &overlapped)
 	if errno == syscall.ERROR_IO_PENDING {
 		errno = sys.EAGAIN
 	}
