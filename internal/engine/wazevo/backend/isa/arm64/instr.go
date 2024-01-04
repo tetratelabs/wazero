@@ -1408,7 +1408,7 @@ func (i *instruction) String() (str string) {
 			}
 		case condKindCondFlagSet:
 			if offset := i.condBrOffset(); offset != 0 {
-				if target == labelReturn {
+				if target == labelInvalid {
 					str = fmt.Sprintf("b.%s #%#x", c.flag(), offset)
 				} else {
 					str = fmt.Sprintf("b.%s #%#x, (%s)", c.flag(), offset, target.String())
