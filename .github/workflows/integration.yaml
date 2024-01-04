@@ -82,16 +82,26 @@ jobs:
 
   zig:
     needs: build_zig_test_binary
-    name: Zig (${{ matrix.os }}, ${{ matrix.arch }}, ${{ matrix.compiler }}-compiler)
-    runs-on: ${{ matrix.os }}
+    name: Zig (${{ matrix.os.name }}, ${{ matrix.arch }}, ${{ matrix.compiler }})
+    runs-on: ${{ matrix.os.version }}
     strategy:
       fail-fast: false # don't fail fast as sometimes failures are arch/OS specific
       matrix:
-        os:       [ubuntu-22.04, macos-12, windows-2022]
+        # version is too verbose to be present in the name, so we use the name instead.
+        # Note that it'd be better to use runner.os in the name, but the runner context is not available in the name field.
+        os:
+          - version: ubuntu-22.04
+            name: Ubuntu
+          - version: macos-12
+            name: macOS
+          - version: windows-2022
+            name: Windows
         compiler: [baseline]
         arch:     [amd64]
         include:
-          - os:       ubuntu-22.04
+          - os:
+              version: ubuntu-22.04
+              name: Ubuntu
             compiler: optimizing
             arch:     "arm64"
 
@@ -196,16 +206,26 @@ jobs:
 
   tinygo:
     needs: build_tinygo_test_binary
-    name: TinyGo (${{ matrix.os }}, ${{ matrix.arch }}, ${{ matrix.compiler }}-compiler)
-    runs-on: ${{ matrix.os }}
+    name: TinyGo (${{ matrix.os.name }}, ${{ matrix.arch }}, ${{ matrix.compiler }})
+    runs-on: ${{ matrix.os.version }}
     strategy:
       fail-fast: false # don't fail fast as sometimes failures are arch/OS specific
       matrix:
-        os:       [ubuntu-22.04, macos-12, windows-2022]
+        # version is too verbose to be present in the name, so we use the name instead.
+        # Note that it'd be better to use runner.os in the name, but the runner context is not available in the name field.
+        os:
+          - version: ubuntu-22.04
+            name: Ubuntu
+          - version: macos-12
+            name: macOS
+          - version: windows-2022
+            name: Windows
         compiler: [baseline]
         arch:     [amd64]
         include:
-          - os:       ubuntu-22.04
+          - os:
+              version: ubuntu-22.04
+              name: Ubuntu
             compiler: optimizing
             arch:     "arm64"
 
@@ -360,18 +380,28 @@ jobs:
   go_tests:
     # Due to the embedding of the GOROOT of the building env(https://github.com/golang/go/blob/3c59639b902fada0a2e5a6a35bafd10fc9183b89/src/os/os_test.go#L112),
     # we have to build and cache on each OS unlike others in this file.
-    name: Go (${{ matrix.os }}, Go-${{ matrix.go-version }}, ${{ matrix.arch }}, ${{ matrix.compiler }}-compiler)
-    runs-on: ${{ matrix.os }}
+    name: Go-${{ matrix.go-version }} (${{ matrix.os.name }}, ${{ matrix.arch }}, ${{ matrix.compiler }})
+    runs-on: ${{ matrix.os.version }}
     strategy:
       fail-fast: false # don't fail fast as sometimes failures are arch/OS specific
       matrix:
-        os:       [ubuntu-22.04, macos-12, windows-2022]
+        # version is too verbose to be present in the name, so we use the name instead.
+        # Note that it'd be better to use runner.os in the name, but the runner context is not available in the name field.
+        os:
+        - version: ubuntu-22.04
+          name: Ubuntu
+        - version: macos-12
+          name: macOS
+        - version: windows-2022
+          name: Windows
         compiler: [baseline]
         arch:     [amd64]
         go-version:
           - "1.21"  # Current Go version && The only version that supports wasip1.
         include:
-          - os:         ubuntu-22.04
+          - os:
+              version: ubuntu-22.04
+              name: Ubuntu
             compiler:   optimizing
             arch:       "arm64"
             go-version: "1.21"
@@ -391,7 +421,7 @@ jobs:
           path:
             ${{ env.STDLIB_TESTS }}/testdata/go
           # Use precise Go version from setup-go as patch version differences can effect tests.
-          key: go-wasip1-binaries-${{ matrix.os }}-${{ steps.setup-go.outputs.go-version }}-${{ matrix.arch }}
+          key: go-wasip1-binaries-${{ matrix.os.version }}-${{ steps.setup-go.outputs.go-version }}-${{ matrix.arch }}
 
       - if: ${{ matrix.compiler == 'optimizing' }}
         name: Build wazero
