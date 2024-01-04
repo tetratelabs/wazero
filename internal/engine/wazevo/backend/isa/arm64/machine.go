@@ -132,6 +132,7 @@ func (m *machine) Reset() {
 	m.spillSlotSize = 0
 	m.unresolvedAddressModes = m.unresolvedAddressModes[:0]
 	m.maxRequiredStackSizeForCalls = 0
+	m.executableContext.Reset()
 }
 
 // InitializeABI implements backend.Machine InitializeABI.
