@@ -3,7 +3,6 @@ package arm64
 // This file implements the interfaces required for register allocations. See regalloc/api.go.
 
 import (
-	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 )
@@ -16,7 +15,7 @@ type (
 		iter                   int
 		reversePostOrderBlocks []regAllocBlockImpl
 		// labelToRegAllocBlockIndex maps label to the index of reversePostOrderBlocks.
-		labelToRegAllocBlockIndex map[backend.Label]int
+		labelToRegAllocBlockIndex map[label]int
 		loopNestingForestRoots    []ssa.BasicBlock
 	}
 
@@ -25,8 +24,8 @@ type (
 		// f is the function this instruction belongs to. Used to reuse the regAllocFunctionImpl.predsSlice slice for Defs() and Uses().
 		f                         *regAllocFunctionImpl
 		sb                        ssa.BasicBlock
-		l                         backend.Label
-		pos                       *backend.LabelPosition[instruction]
+		l                         label
+		pos                       *labelPosition
 		loopNestingForestChildren []ssa.BasicBlock
 		cur                       *instruction
 		id                        int
@@ -34,7 +33,7 @@ type (
 	}
 )
 
-func (f *regAllocFunctionImpl) addBlock(sb ssa.BasicBlock, l backend.Label, pos *backend.LabelPosition[instruction]) {
+func (f *regAllocFunctionImpl) addBlock(sb ssa.BasicBlock, l label, pos *labelPosition) {
 	i := len(f.reversePostOrderBlocks)
 	f.reversePostOrderBlocks = append(f.reversePostOrderBlocks, regAllocBlockImpl{
 		f:   f,

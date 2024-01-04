@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
@@ -27,7 +26,7 @@ func (m *machine) LowerSingleBranch(br *ssa.Instruction) {
 		}
 		b := m.allocateInstr()
 		target := ectx.GetOrAllocateSSABlockLabel(targetBlk)
-		if target == backend.LabelReturn {
+		if target == labelReturn {
 			b.asRet(m.currentABI)
 		} else {
 			b.asBr(target)

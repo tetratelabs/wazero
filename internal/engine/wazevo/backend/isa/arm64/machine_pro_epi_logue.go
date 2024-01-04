@@ -3,7 +3,6 @@ package arm64
 import (
 	"fmt"
 
-	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 )
@@ -364,7 +363,7 @@ func (m *machine) insertStackBoundsCheck(requiredStackSize int64, cur *instructi
 
 	// b.ge #imm
 	cbr := m.allocateInstr()
-	cbr.asCondBr(ge.asCond(), backend.LabelInvalid, false /* ignored */)
+	cbr.asCondBr(ge.asCond(), labelInvalid, false /* ignored */)
 	cur = linkInstr(cur, cbr)
 
 	// Set the required stack size and set it to the exec context.

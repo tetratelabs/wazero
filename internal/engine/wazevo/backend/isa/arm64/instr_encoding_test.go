@@ -7,7 +7,6 @@ import (
 	"math"
 	"testing"
 
-	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -18,7 +17,7 @@ func Test_dummy(t *testing.T) {
 }
 
 func TestInstruction_encode(t *testing.T) {
-	dummyLabel := backend.Label(1)
+	dummyLabel := label(1)
 	for _, tc := range []struct {
 		setup func(*instruction)
 		want  string
@@ -1698,7 +1697,7 @@ func TestInstruction_encode_br_condflag(t *testing.T) {
 		{c: nv, want: "8f070054"},
 	} {
 		i := &instruction{}
-		i.asCondBr(tc.c.asCond(), backend.Label(1), false)
+		i.asCondBr(tc.c.asCond(), label(1), false)
 		i.condBrOffsetResolve(0xf0)
 		m := &mockCompiler{}
 		i.encode(m)

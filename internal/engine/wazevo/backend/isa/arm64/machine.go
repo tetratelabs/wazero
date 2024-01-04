@@ -82,11 +82,19 @@ type (
 	condBrReloc struct {
 		cbr *instruction
 		// currentLabelPos is the labelPosition within which condBr is defined.
-		currentLabelPos *backend.LabelPosition[instruction]
+		currentLabelPos *labelPosition
 		// Next block's labelPosition.
-		nextLabel backend.Label
+		nextLabel label
 		offset    int64
 	}
+
+	labelPosition = backend.LabelPosition[instruction]
+	label         = backend.Label
+)
+
+const (
+	labelReturn  = backend.LabelReturn
+	labelInvalid = backend.LabelInvalid
 )
 
 // NewBackend returns a new backend for arm64.
@@ -96,7 +104,7 @@ func NewBackend() backend.Machine {
 		executableContext: newExecutableContext(),
 	}
 	m.regAllocFn.m = m
-	m.regAllocFn.labelToRegAllocBlockIndex = make(map[backend.Label]int)
+	m.regAllocFn.labelToRegAllocBlockIndex = make(map[label]int)
 	return m
 }
 
@@ -157,13 +165,13 @@ func (m *machine) insert(i *instruction) {
 	ectx.PendingInstructions = append(ectx.PendingInstructions, i)
 }
 
-func (m *machine) insertBrTargetLabel() backend.Label {
+func (m *machine) insertBrTargetLabel() label {
 	nop, l := m.allocateBrTarget()
 	m.insert(nop)
 	return l
 }
 
-func (m *machine) allocateBrTarget() (nop *instruction, l backend.Label) {
+func (m *machine) allocateBrTarget() (nop *instruction, l label) {
 	ectx := m.executableContext
 	l = ectx.AllocateLabel()
 	nop = m.allocateInstr()
@@ -246,10 +254,10 @@ func (m *machine) ResolveRelativeAddresses(ctx context.Context) {
 
 	var fn string
 	var fnIndex int
-	var labelToSSABlockID map[backend.Label]ssa.BasicBlockID
+	var labelToSSABlockID map[label]ssa.BasicBlockID
 	if wazevoapi.PerfMapEnabled {
 		fn = wazevoapi.GetCurrentFunctionName(ctx)
-		labelToSSABlockID = make(map[backend.Label]ssa.BasicBlockID)
+		labelToSSABlockID = make(map[label]ssa.BasicBlockID)
 		for i, l := range ectx.SsaBlockIDToLabels {
 			labelToSSABlockID[l] = ssa.BasicBlockID(i)
 		}
@@ -270,7 +278,7 @@ func (m *machine) ResolveRelativeAddresses(ctx context.Context) {
 				}
 			case condBr:
 				if !cur.condBrOffsetResolved() {
-					var nextLabel backend.Label
+					var nextLabel label
 					if i < len(ectx.OrderedBlockLabels)-1 {
 						// Note: this is only used when the block ends with fallthrough,
 						// therefore can be safely assumed that the next block exists when it's needed.
@@ -357,7 +365,7 @@ func (m *machine) ResolveRelativeAddresses(ctx context.Context) {
 			}
 		case brTableSequence:
 			for i := range cur.targets {
-				l := backend.Label(cur.targets[i])
+				l := label(cur.targets[i])
 				offsetOfTarget := ectx.LabelPositions[l].BinaryOffset
 				diff := offsetOfTarget - (currentOffset + brTableSequenceOffsetTableBegin)
 				cur.targets[i] = uint32(diff)
@@ -378,7 +386,7 @@ const (
 	minSignedInt19 int64 = -(1 << 19)
 )
 
-func (m *machine) insertConditionalJumpTrampoline(cbr *instruction, currentBlk *backend.LabelPosition[instruction], nextLabel backend.Label) {
+func (m *machine) insertConditionalJumpTrampoline(cbr *instruction, currentBlk *labelPosition, nextLabel label) {
 	cur := currentBlk.End
 	originalTarget := cbr.condBrLabel()
 	endNext := cur.next
@@ -410,12 +418,12 @@ func (m *machine) insertConditionalJumpTrampoline(cbr *instruction, currentBlk *
 // Format implements backend.Machine.
 func (m *machine) Format() string {
 	ectx := m.executableContext
-	begins := map[*instruction]backend.Label{}
+	begins := map[*instruction]label{}
 	for l, pos := range ectx.LabelPositions {
 		begins[pos.Begin] = l
 	}
 
-	irBlocks := map[backend.Label]ssa.BasicBlockID{}
+	irBlocks := map[label]ssa.BasicBlockID{}
 	for i, l := range ectx.SsaBlockIDToLabels {
 		irBlocks[l] = ssa.BasicBlockID(i)
 	}
