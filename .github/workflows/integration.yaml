@@ -82,7 +82,7 @@ jobs:
 
   zig:
     needs: build_zig_test_binary
-    name: Zig (${{ matrix.os }}, ${{ matrix.arch }}, ${{ matrix.compiler }}-compiler)
+    name: Zig (${{ runner.os }}, ${{ matrix.arch }}, ${{ matrix.compiler }}-compiler)
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false # don't fail fast as sometimes failures are arch/OS specific
@@ -196,7 +196,7 @@ jobs:
 
   tinygo:
     needs: build_tinygo_test_binary
-    name: TinyGo (${{ matrix.os }}, ${{ matrix.arch }}, ${{ matrix.compiler }}-compiler)
+    name: TinyGo (${{ runner.os }}, ${{ matrix.arch }}, ${{ matrix.compiler }}-compiler)
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false # don't fail fast as sometimes failures are arch/OS specific
@@ -272,7 +272,7 @@ jobs:
 
   wasi-testsuite:
     name: wasi-testsuite
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ runner.os }}
     strategy:
       fail-fast: false # don't fail fast as sometimes failures are arch/OS specific
       matrix:
@@ -327,7 +327,7 @@ jobs:
             -r ../.github/wasi_testsuite_adapter.py
 
   gojs_stdlib:
-    name: Go (js) (${{ matrix.os }})
+    name: Go (js) (${{ runner.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false # don't fail fast as sometimes failures are arch/OS specific
@@ -360,7 +360,7 @@ jobs:
   go_tests:
     # Due to the embedding of the GOROOT of the building env(https://github.com/golang/go/blob/3c59639b902fada0a2e5a6a35bafd10fc9183b89/src/os/os_test.go#L112),
     # we have to build and cache on each OS unlike others in this file.
-    name: Go (${{ matrix.os }}, Go-${{ matrix.go-version }}, ${{ matrix.arch }}, ${{ matrix.compiler }}-compiler)
+    name: Go-${{ matrix.go-version }} (${{ runner.os }},${{ matrix.arch }}, ${{ matrix.compiler }}-compiler)
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false # don't fail fast as sometimes failures are arch/OS specific
