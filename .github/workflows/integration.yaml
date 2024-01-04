@@ -82,7 +82,7 @@ jobs:
 
   zig:
     needs: build_zig_test_binary
-    name: Zig (${{ matrix.os }}, ${{ matrix.arch }}, ${{ matrix.compiler }}-compiler)
+    name: Zig (${{ matrix.os }}, ${{ matrix.arch }}, ${{ matrix.compiler }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false # don't fail fast as sometimes failures are arch/OS specific
@@ -196,7 +196,7 @@ jobs:
 
   tinygo:
     needs: build_tinygo_test_binary
-    name: TinyGo (${{ matrix.os }}, ${{ matrix.arch }}, ${{ matrix.compiler }}-compiler)
+    name: TinyGo (${{ matrix.os }}, ${{ matrix.arch }}, ${{ matrix.compiler }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false # don't fail fast as sometimes failures are arch/OS specific
