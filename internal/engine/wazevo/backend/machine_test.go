@@ -26,6 +26,8 @@ type mockMachine struct {
 	rinfo                  *regalloc.RegisterInfo
 }
 
+func (m mockMachine) ExecutableContext() ExecutableContext { panic("implement me") }
+
 func (m mockMachine) CompileEntryPreamble(signature *ssa.Signature) []byte {
 	panic("TODO")
 }

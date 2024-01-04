@@ -36,6 +36,18 @@ type (
 	instructionKind int
 )
 
+func asNop0(i *instruction) {
+	i.kind = nop0
+}
+
+func setNext(i, next *instruction) {
+	i.next = next
+}
+
+func setPrev(i, prev *instruction) {
+	i.prev = prev
+}
+
 // IsCall implements regalloc.Instr IsCall.
 func (i *instruction) IsCall() bool {
 	return i.kind == call
@@ -625,7 +637,7 @@ func (i *instruction) asFpuCSel(rd, rn, rm operand, c condFlag, _64bit bool) {
 }
 
 func (i *instruction) asBr(target label) {
-	if target == returnLabel {
+	if target == labelReturn {
 		panic("BUG: call site should special case for returnLabel")
 	}
 	i.kind = br
@@ -1396,7 +1408,7 @@ func (i *instruction) String() (str string) {
 			}
 		case condKindCondFlagSet:
 			if offset := i.condBrOffset(); offset != 0 {
-				if target == invalidLabel {
+				if target == labelInvalid {
 					str = fmt.Sprintf("b.%s #%#x", c.flag(), offset)
 				} else {
 					str = fmt.Sprintf("b.%s #%#x, (%s)", c.flag(), offset, target.String())

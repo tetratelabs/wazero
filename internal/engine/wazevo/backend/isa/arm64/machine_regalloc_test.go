@@ -81,7 +81,7 @@ func TestRegAllocFunctionImpl_ReloadRegisterAfter(t *testing.T) {
 	require.Equal(t, iload.kind, uLoad64)
 	require.Equal(t, fload.kind, fpuLoad64)
 
-	m.rootInstr = i1
+	m.executableContext.RootInstr = i1
 	require.Equal(t, `
 	ldr d1, [sp, #0x18]
 	ldr x1, [sp, #0x10]
@@ -111,7 +111,7 @@ func TestRegAllocFunctionImpl_StoreRegisterBefore(t *testing.T) {
 	require.Equal(t, iload.kind, store64)
 	require.Equal(t, fload.kind, fpuStore64)
 
-	m.rootInstr = i1
+	m.executableContext.RootInstr = i1
 	require.Equal(t, `
 	str x1, [sp, #0x10]
 	str d1, [sp, #0x18]
@@ -183,7 +183,7 @@ func TestMachine_insertStoreRegisterAt(t *testing.T) {
 						m.insertStoreRegisterAt(x1VReg, i2, after)
 						m.insertStoreRegisterAt(v1VReg, i2, after)
 					}
-					m.rootInstr = i1
+					m.executableContext.RootInstr = i1
 					require.Equal(t, tc.expected, m.Format())
 				})
 			}
@@ -256,7 +256,7 @@ func TestMachine_insertReloadRegisterAt(t *testing.T) {
 						m.insertReloadRegisterAt(x1VReg, i2, after)
 						m.insertReloadRegisterAt(v1VReg, i2, after)
 					}
-					m.rootInstr = i1
+					m.executableContext.RootInstr = i1
 
 					require.Equal(t, tc.expected, m.Format())
 				})
@@ -338,7 +338,7 @@ func TestMachine_swap(t *testing.T) {
 			i2.prev = cur
 
 			m.swap(cur, tc.x1, tc.x2, tc.tmp)
-			m.rootInstr = cur
+			m.executableContext.RootInstr = cur
 
 			require.Equal(t, tc.expected, m.Format())
 		})

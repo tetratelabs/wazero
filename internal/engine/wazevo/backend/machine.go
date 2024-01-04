@@ -11,6 +11,8 @@ import (
 type (
 	// Machine is a backend for a specific ISA machine.
 	Machine interface {
+		ExecutableContext() ExecutableContext
+
 		// DisableStackCheck disables the stack check for the current compilation for debugging/testing.
 		DisableStackCheck()
 
@@ -27,10 +29,6 @@ type (
 		// SetCompiler sets the compilation context used for the lifetime of Machine.
 		// This is only called once per Machine, i.e. before the first compilation.
 		SetCompiler(Compiler)
-
-		// StartLoweringFunction is called when the lowering of the given function is started.
-		// maximumBlockID is the maximum value of ssa.BasicBlockID existing in the function.
-		StartLoweringFunction(maximumBlockID ssa.BasicBlockID)
 
 		// StartBlock is called when the compilation of the given block is started.
 		// The order of this being called is the reverse post order of the ssa.BasicBlock(s) as we iterate with
@@ -50,21 +48,8 @@ type (
 		// for optimization.
 		LowerInstr(*ssa.Instruction)
 
-		// EndBlock is called when the compilation of the current block is finished.
-		EndBlock()
-
-		// LinkAdjacentBlocks is called after finished lowering all blocks in order to create one single instruction list.
-		LinkAdjacentBlocks(prev, next ssa.BasicBlock)
-
-		// EndLoweringFunction is called when the lowering of the current function is finished.
-		EndLoweringFunction()
-
 		// Reset resets the machine state for the next compilation.
 		Reset()
-
-		// FlushPendingInstructions flushes the pending instructions to the buffer.
-		// This will be called after the lowering of each SSA Instruction.
-		FlushPendingInstructions()
 
 		// InsertMove inserts a move instruction from src to dst whose type is typ.
 		InsertMove(dst, src regalloc.VReg, typ ssa.Type)

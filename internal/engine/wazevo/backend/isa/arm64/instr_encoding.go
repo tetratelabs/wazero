@@ -10,7 +10,7 @@ import (
 
 // Encode implements backend.Machine Encode.
 func (m *machine) Encode() {
-	m.encode(m.rootInstr)
+	m.encode(m.executableContext.RootInstr)
 }
 
 func (m *machine) encode(root *instruction) {
