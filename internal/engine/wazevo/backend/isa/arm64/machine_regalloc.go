@@ -3,6 +3,7 @@ package arm64
 // This file implements the interfaces required for register allocations. See regalloc/api.go.
 
 import (
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 )
@@ -15,7 +16,7 @@ type (
 		iter                   int
 		reversePostOrderBlocks []regAllocBlockImpl
 		// labelToRegAllocBlockIndex maps label to the index of reversePostOrderBlocks.
-		labelToRegAllocBlockIndex map[label]int
+		labelToRegAllocBlockIndex map[backend.Label]int
 		loopNestingForestRoots    []ssa.BasicBlock
 	}
 
@@ -24,8 +25,8 @@ type (
 		// f is the function this instruction belongs to. Used to reuse the regAllocFunctionImpl.predsSlice slice for Defs() and Uses().
 		f                         *regAllocFunctionImpl
 		sb                        ssa.BasicBlock
-		l                         label
-		pos                       *labelPosition
+		l                         backend.Label
+		pos                       *backend.LabelPosition[instruction]
 		loopNestingForestChildren []ssa.BasicBlock
 		cur                       *instruction
 		id                        int
@@ -33,7 +34,7 @@ type (
 	}
 )
 
-func (f *regAllocFunctionImpl) addBlock(sb ssa.BasicBlock, l label, pos *labelPosition) {
+func (f *regAllocFunctionImpl) addBlock(sb ssa.BasicBlock, l backend.Label, pos *backend.LabelPosition[instruction]) {
 	i := len(f.reversePostOrderBlocks)
 	f.reversePostOrderBlocks = append(f.reversePostOrderBlocks, regAllocBlockImpl{
 		f:   f,
@@ -204,7 +205,7 @@ func (r *regAllocBlockImpl) Preds() int {
 func (r *regAllocBlockImpl) Pred(i int) regalloc.Block {
 	sb := r.sb
 	pred := sb.Pred(i)
-	l := r.f.m.ssaBlockIDToLabels[pred.ID()]
+	l := r.f.m.executableContext.SsaBlockIDToLabels[pred.ID()]
 	index := r.f.labelToRegAllocBlockIndex[l]
 	return &r.f.reversePostOrderBlocks[index]
 }
@@ -221,7 +222,7 @@ func (r *regAllocBlockImpl) Succ(i int) regalloc.Block {
 	if succ.ReturnBlock() {
 		return nil
 	}
-	l := r.f.m.ssaBlockIDToLabels[succ.ID()]
+	l := r.f.m.executableContext.SsaBlockIDToLabels[succ.ID()]
 	index := r.f.labelToRegAllocBlockIndex[l]
 	return &r.f.reversePostOrderBlocks[index]
 }
@@ -240,7 +241,7 @@ func (f *regAllocFunctionImpl) LoopNestingForestRoots() int {
 // LoopNestingForestRoot implements regalloc.Function LoopNestingForestRoot.
 func (f *regAllocFunctionImpl) LoopNestingForestRoot(i int) regalloc.Block {
 	blk := f.loopNestingForestRoots[i]
-	l := f.m.ssaBlockIDToLabels[blk.ID()]
+	l := f.m.executableContext.SsaBlockIDToLabels[blk.ID()]
 	index := f.labelToRegAllocBlockIndex[l]
 	return &f.reversePostOrderBlocks[index]
 }
@@ -254,21 +255,21 @@ func (r *regAllocBlockImpl) LoopNestingForestChildren() int {
 // LoopNestingForestChild implements regalloc.Block LoopNestingForestChild.
 func (r *regAllocBlockImpl) LoopNestingForestChild(i int) regalloc.Block {
 	blk := r.loopNestingForestChildren[i]
-	l := r.f.m.ssaBlockIDToLabels[blk.ID()]
+	l := r.f.m.executableContext.SsaBlockIDToLabels[blk.ID()]
 	index := r.f.labelToRegAllocBlockIndex[l]
 	return &r.f.reversePostOrderBlocks[index]
 }
 
 // InstrIteratorBegin implements regalloc.Block InstrIteratorBegin.
 func (r *regAllocBlockImpl) InstrIteratorBegin() regalloc.Instr {
-	r.cur = r.pos.begin
+	r.cur = r.pos.Begin
 	return r.cur
 }
 
 // InstrIteratorNext implements regalloc.Block InstrIteratorNext.
 func (r *regAllocBlockImpl) InstrIteratorNext() regalloc.Instr {
 	for {
-		if r.cur == r.pos.end {
+		if r.cur == r.pos.End {
 			return nil
 		}
 		instr := r.cur.next
@@ -284,14 +285,14 @@ func (r *regAllocBlockImpl) InstrIteratorNext() regalloc.Instr {
 
 // InstrRevIteratorBegin implements regalloc.Block InstrRevIteratorBegin.
 func (r *regAllocBlockImpl) InstrRevIteratorBegin() regalloc.Instr {
-	r.cur = r.pos.end
+	r.cur = r.pos.End
 	return r.cur
 }
 
 // InstrRevIteratorNext implements regalloc.Block InstrRevIteratorNext.
 func (r *regAllocBlockImpl) InstrRevIteratorNext() regalloc.Instr {
 	for {
-		if r.cur == r.pos.begin {
+		if r.cur == r.pos.Begin {
 			return nil
 		}
 		instr := r.cur.prev
@@ -390,7 +391,7 @@ func (m *machine) insertReloadRegisterAt(v regalloc.VReg, instr *instruction, af
 // LowestCommonAncestor implements regalloc.Function LowestCommonAncestor.
 func (f *regAllocFunctionImpl) LowestCommonAncestor(blk1, blk2 regalloc.Block) regalloc.Block {
 	ret := f.m.compiler.SSABuilder().LowestCommonAncestor(blk1.(*regAllocBlockImpl).sb, blk2.(*regAllocBlockImpl).sb)
-	l := f.m.ssaBlockIDToLabels[ret.ID()]
+	l := f.m.executableContext.SsaBlockIDToLabels[ret.ID()]
 	index := f.labelToRegAllocBlockIndex[l]
 	return &f.reversePostOrderBlocks[index]
 }
@@ -401,24 +402,24 @@ func (f *regAllocFunctionImpl) Idom(blk regalloc.Block) regalloc.Block {
 	if idom == nil {
 		panic("BUG: idom must not be nil")
 	}
-	l := f.m.ssaBlockIDToLabels[idom.ID()]
+	l := f.m.executableContext.SsaBlockIDToLabels[idom.ID()]
 	index := f.labelToRegAllocBlockIndex[l]
 	return &f.reversePostOrderBlocks[index]
 }
 
 // FirstInstr implements regalloc.Block FirstInstr.
 func (r *regAllocBlockImpl) FirstInstr() regalloc.Instr {
-	return r.pos.begin
+	return r.pos.Begin
 }
 
 // LastInstr implements regalloc.Block LastInstr.
 func (r *regAllocBlockImpl) LastInstr() regalloc.Instr {
 	if r.cachedLastInstr == nil {
-		cur := r.pos.end
+		cur := r.pos.End
 		for cur.kind == nop0 {
 			cur = cur.prev
-			if cur == r.pos.begin {
-				r.cachedLastInstr = r.pos.end
+			if cur == r.pos.Begin {
+				r.cachedLastInstr = r.pos.End
 				return r.cachedLastInstr
 			}
 		}
@@ -426,7 +427,7 @@ func (r *regAllocBlockImpl) LastInstr() regalloc.Instr {
 		case br:
 			r.cachedLastInstr = cur
 		default:
-			r.cachedLastInstr = r.pos.end
+			r.cachedLastInstr = r.pos.End
 		}
 	}
 	return r.cachedLastInstr

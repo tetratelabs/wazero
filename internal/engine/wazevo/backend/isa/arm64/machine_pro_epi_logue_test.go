@@ -100,14 +100,14 @@ func TestMachine_SetupPrologue(t *testing.T) {
 			m.currentABI = &tc.abi
 
 			root := m.allocateNop()
-			m.rootInstr = root
+			m.executableContext.RootInstr = root
 			udf := m.allocateInstr()
 			udf.asUDF()
 			root.next = udf
 			udf.prev = root
 
 			m.SetupPrologue()
-			require.Equal(t, root, m.rootInstr)
+			require.Equal(t, root, m.executableContext.RootInstr)
 			m.Encode()
 			require.Equal(t, tc.exp, m.Format())
 		})
@@ -213,14 +213,14 @@ func TestMachine_SetupEpilogue(t *testing.T) {
 			m.currentABI = &tc.abi
 
 			root := m.allocateNop()
-			m.rootInstr = root
+			m.executableContext.RootInstr = root
 			ret := m.allocateInstr()
 			ret.asRet(nil)
 			root.next = ret
 			ret.prev = root
 			m.SetupEpilogue()
 
-			require.Equal(t, root, m.rootInstr)
+			require.Equal(t, root, m.executableContext.RootInstr)
 			m.Encode()
 			require.Equal(t, tc.exp, m.Format())
 		})
@@ -263,9 +263,9 @@ func TestMachine_insertStackBoundsCheck(t *testing.T) {
 		tc := tc
 		t.Run(tc.exp, func(t *testing.T) {
 			_, _, m := newSetupWithMockContext()
-			m.rootInstr = m.allocateInstr()
-			m.rootInstr.asNop0()
-			m.insertStackBoundsCheck(tc.requiredStackSize, m.rootInstr)
+			m.executableContext.RootInstr = m.allocateInstr()
+			m.executableContext.RootInstr.asNop0()
+			m.insertStackBoundsCheck(tc.requiredStackSize, m.executableContext.RootInstr)
 			m.Encode()
 			require.Equal(t, tc.exp, m.Format())
 		})

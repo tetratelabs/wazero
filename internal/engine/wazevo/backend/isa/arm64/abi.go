@@ -309,9 +309,10 @@ func (a *abiImpl) callerGenFunctionReturnVReg(retIndex int, reg regalloc.VReg, s
 }
 
 func (m *machine) resolveAddressModeForOffsetAndInsert(cur *instruction, offset int64, dstBits byte, rn regalloc.VReg, allowTmpRegUse bool) (*instruction, addressMode) {
-	m.pendingInstructions = m.pendingInstructions[:0]
+	exct := m.executableContext
+	exct.PendingInstructions = exct.PendingInstructions[:0]
 	mode := m.resolveAddressModeForOffset(offset, dstBits, rn, allowTmpRegUse)
-	for _, instr := range m.pendingInstructions {
+	for _, instr := range exct.PendingInstructions {
 		cur = linkInstr(cur, instr)
 	}
 	return cur, mode

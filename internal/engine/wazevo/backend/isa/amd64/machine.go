@@ -20,6 +20,12 @@ type machine struct {
 	stackBoundsCheckDisabled bool
 }
 
+// ExecutableContext implements backend.Machine.
+func (m *machine) ExecutableContext() backend.ExecutableContext {
+	// TODO implement me
+	panic("implement me")
+}
+
 // DisableStackCheck implements backend.Machine.
 func (m *machine) DisableStackCheck() {
 	m.stackBoundsCheckDisabled = true
@@ -87,12 +93,6 @@ func (m *machine) EndBlock() {
 
 // LinkAdjacentBlocks implements backend.Machine.
 func (m *machine) LinkAdjacentBlocks(prev, next ssa.BasicBlock) {
-	// TODO implement me
-	panic("implement me")
-}
-
-// EndLoweringFunction implements backend.Machine.
-func (m *machine) EndLoweringFunction() {
 	// TODO implement me
 	panic("implement me")
 }

@@ -9,9 +9,8 @@ import (
 func (c *compiler) Lower() {
 	c.assignVirtualRegisters()
 	c.mach.InitializeABI(c.ssaBuilder.Signature())
-	c.mach.StartLoweringFunction(c.ssaBuilder.BlockIDMax())
+	c.mach.ExecutableContext().StartLoweringFunction(c.ssaBuilder.BlockIDMax())
 	c.lowerBlocks()
-	c.mach.EndLoweringFunction()
 }
 
 // lowerBlocks lowers each block in the ssa.Builder.
@@ -20,11 +19,13 @@ func (c *compiler) lowerBlocks() {
 	for blk := builder.BlockIteratorReversePostOrderBegin(); blk != nil; blk = builder.BlockIteratorReversePostOrderNext() {
 		c.lowerBlock(blk)
 	}
+
+	ectx := c.mach.ExecutableContext()
 	// After lowering all blocks, we need to link adjacent blocks to layout one single instruction list.
 	var prev ssa.BasicBlock
 	for next := builder.BlockIteratorReversePostOrderBegin(); next != nil; next = builder.BlockIteratorReversePostOrderNext() {
 		if prev != nil {
-			c.mach.LinkAdjacentBlocks(prev, next)
+			ectx.LinkAdjacentBlocks(prev, next)
 		}
 		prev = next
 	}
@@ -58,6 +59,7 @@ func (c *compiler) lowerBlock(blk ssa.BasicBlock) {
 	}
 
 	// Now start lowering the non-branching instructions.
+	ectx := mach.ExecutableContext()
 	for ; cur != nil; cur = cur.Prev() {
 		c.setCurrentGroupID(cur.GroupID())
 		if cur.Lowered() {
@@ -71,7 +73,7 @@ func (c *compiler) lowerBlock(blk ssa.BasicBlock) {
 		default:
 			mach.LowerInstr(cur)
 		}
-		mach.FlushPendingInstructions()
+		ectx.FlushPendingInstructions()
 	}
 
 	// Finally, if this is the entry block, we have to insert copies of arguments from the real location to the VReg.
@@ -79,7 +81,7 @@ func (c *compiler) lowerBlock(blk ssa.BasicBlock) {
 		c.lowerFunctionArguments(blk)
 	}
 
-	mach.EndBlock()
+	ectx.EndBlock()
 }
 
 // lowerBranches is called right after StartBlock and before any LowerInstr call if
@@ -88,13 +90,15 @@ func (c *compiler) lowerBlock(blk ssa.BasicBlock) {
 //
 // See ssa.Instruction IsBranching, and the comment on ssa.BasicBlock.
 func (c *compiler) lowerBranches(br0, br1 *ssa.Instruction) {
+	ectx := c.mach.ExecutableContext()
+
 	c.setCurrentGroupID(br0.GroupID())
 	c.mach.LowerSingleBranch(br0)
-	c.mach.FlushPendingInstructions()
+	ectx.FlushPendingInstructions()
 	if br1 != nil {
 		c.setCurrentGroupID(br1.GroupID())
 		c.mach.LowerConditionalBranch(br1)
-		c.mach.FlushPendingInstructions()
+		ectx.FlushPendingInstructions()
 	}
 
 	if br0.Opcode() == ssa.OpcodeJump {
@@ -109,10 +113,12 @@ func (c *compiler) lowerBranches(br0, br1 *ssa.Instruction) {
 			c.lowerBlockArguments(args, target)
 		}
 	}
-	c.mach.FlushPendingInstructions()
+	ectx.FlushPendingInstructions()
 }
 
 func (c *compiler) lowerFunctionArguments(entry ssa.BasicBlock) {
+	ectx := c.mach.ExecutableContext()
+
 	c.tmpVals = c.tmpVals[:0]
 	for i := 0; i < entry.Params(); i++ {
 		p := entry.Param(i)
@@ -124,7 +130,7 @@ func (c *compiler) lowerFunctionArguments(entry ssa.BasicBlock) {
 		}
 	}
 	c.mach.ABI().CalleeGenFunctionArgsToVRegs(c.tmpVals)
-	c.mach.FlushPendingInstructions()
+	ectx.FlushPendingInstructions()
 }
 
 func (c *compiler) lowerFunctionReturns(returns []ssa.Value) {

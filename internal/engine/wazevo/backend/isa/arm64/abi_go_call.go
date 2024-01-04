@@ -14,6 +14,7 @@ var calleeSavedRegistersSorted = []regalloc.VReg{
 
 // CompileGoFunctionTrampoline implements backend.Machine.
 func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *ssa.Signature, needModuleContextPtr bool) []byte {
+	exct := m.executableContext
 	argBegin := 1 // Skips exec context by default.
 	if needModuleContextPtr {
 		argBegin++
@@ -25,7 +26,7 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 
 	cur := m.allocateInstr()
 	cur.asNop0()
-	m.rootInstr = cur
+	exct.RootInstr = cur
 
 	// Execution context is always the first argument.
 	execCtrPtr := x0VReg
@@ -242,7 +243,7 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 	ret.asRet(nil)
 	linkInstr(cur, ret)
 
-	m.encode(m.rootInstr)
+	m.encode(m.executableContext.RootInstr)
 	return m.compiler.Buf()
 }
 
@@ -298,18 +299,20 @@ func (m *machine) restoreRegistersInExecutionContext(cur *instruction, regs []re
 }
 
 func (m *machine) lowerConstantI64AndInsert(cur *instruction, dst regalloc.VReg, v int64) *instruction {
-	m.pendingInstructions = m.pendingInstructions[:0]
+	exct := m.executableContext
+	exct.PendingInstructions = exct.PendingInstructions[:0]
 	m.lowerConstantI64(dst, v)
-	for _, instr := range m.pendingInstructions {
+	for _, instr := range exct.PendingInstructions {
 		cur = linkInstr(cur, instr)
 	}
 	return cur
 }
 
 func (m *machine) lowerConstantI32AndInsert(cur *instruction, dst regalloc.VReg, v int32) *instruction {
-	m.pendingInstructions = m.pendingInstructions[:0]
+	exct := m.executableContext
+	exct.PendingInstructions = exct.PendingInstructions[:0]
 	m.lowerConstantI32(dst, v)
-	for _, instr := range m.pendingInstructions {
+	for _, instr := range exct.PendingInstructions {
 		cur = linkInstr(cur, instr)
 	}
 	return cur

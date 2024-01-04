@@ -4,31 +4,8 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
-	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
-
-func TestMachine_insertAtHead(t *testing.T) {
-	t.Run("no head", func(t *testing.T) {
-		m := &machine{}
-		i := &instruction{kind: condBr}
-		m.insertAtPerBlockHead(i)
-		require.Equal(t, i, m.perBlockHead)
-		require.Equal(t, i, m.perBlockEnd)
-	})
-	t.Run("has head", func(t *testing.T) {
-		prevHead := &instruction{kind: br}
-		m := &machine{perBlockHead: prevHead, perBlockEnd: prevHead}
-		i := &instruction{kind: condBr}
-		m.insertAtPerBlockHead(i)
-		require.Equal(t, i, m.perBlockHead)
-		require.Equal(t, prevHead, m.perBlockEnd)
-		require.Equal(t, nil, prevHead.next)
-		require.Equal(t, i, prevHead.prev)
-		require.Equal(t, prevHead, i.next)
-		require.Equal(t, nil, i.prev)
-	})
-}
 
 func TestMachine_resolveAddressingMode(t *testing.T) {
 	t.Run("imm12/arg", func(t *testing.T) {
@@ -57,7 +34,7 @@ func TestMachine_resolveAddressingMode(t *testing.T) {
 	})
 
 	t.Run("tmp reg", func(t *testing.T) {
-		m := &machine{instrPool: wazevoapi.NewPool[instruction](resetInstruction)}
+		m := &machine{executableContext: newExecutableContext()}
 		root := &instruction{kind: udf}
 		i := &instruction{prev: root}
 		i.asULoad(operandNR(x17VReg), addressMode{
@@ -66,7 +43,7 @@ func TestMachine_resolveAddressingMode(t *testing.T) {
 		}, 64)
 		m.resolveAddressingMode(0, 0x40000001, i)
 
-		m.rootInstr = root
+		m.executableContext.RootInstr = root
 		require.Equal(t, `
 	udf
 	movz x27, #0x1, lsl 0
@@ -197,26 +174,28 @@ L200:
 			originalEndNext := m.allocateInstr()
 			originalEndNext.asExitSequence(x0VReg)
 
-			originLabelPos := m.allocateLabelPosition(originLabel)
-			originLabelPos.begin = cbr
-			originLabelPos.end = linkInstr(cbr, end)
-			originNextLabelPos := m.allocateLabelPosition(originLabelNext)
-			originNextLabelPos.begin = originalEndNext
-			linkInstr(originLabelPos.end, originalEndNext)
+			ectx := m.executableContext
 
-			m.labelPositions[originLabel] = originLabelPos
-			m.labelPositions[originLabelNext] = originNextLabelPos
+			originLabelPos := ectx.AllocateLabelPosition(originLabel)
+			originLabelPos.Begin = cbr
+			originLabelPos.End = linkInstr(cbr, end)
+			originNextLabelPos := ectx.AllocateLabelPosition(originLabelNext)
+			originNextLabelPos.Begin = originalEndNext
+			linkInstr(originLabelPos.End, originalEndNext)
 
-			m.rootInstr = cbr
+			ectx.LabelPositions[originLabel] = originLabelPos
+			ectx.LabelPositions[originLabelNext] = originNextLabelPos
+
+			ectx.RootInstr = cbr
 			require.Equal(t, tc.expBefore, m.Format())
 
-			m.nextLabel = 9999999
+			ectx.NextLabel = 9999999
 			m.insertConditionalJumpTrampoline(cbr, originLabelPos, originLabelNext)
 
 			require.Equal(t, tc.expAfter, m.Format())
 
 			// The original label position should be updated to the unconditional jump to the original target destination.
-			require.Equal(t, "b L12345", originLabelPos.end.String())
+			require.Equal(t, "b L12345", originLabelPos.End.String())
 		})
 	}
 }

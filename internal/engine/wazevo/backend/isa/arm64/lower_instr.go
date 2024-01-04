@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
@@ -17,6 +18,7 @@ import (
 
 // LowerSingleBranch implements backend.Machine.
 func (m *machine) LowerSingleBranch(br *ssa.Instruction) {
+	ectx := m.executableContext
 	switch br.Opcode() {
 	case ssa.OpcodeJump:
 		_, _, targetBlk := br.BranchData()
@@ -24,8 +26,8 @@ func (m *machine) LowerSingleBranch(br *ssa.Instruction) {
 			return
 		}
 		b := m.allocateInstr()
-		target := m.getOrAllocateSSABlockLabel(targetBlk)
-		if target == returnLabel {
+		target := ectx.GetOrAllocateSSABlockLabel(targetBlk)
+		if target == backend.LabelReturn {
 			b.asRet(m.currentABI)
 		} else {
 			b.asBr(target)
@@ -63,7 +65,7 @@ func (m *machine) lowerBrTable(i *ssa.Instruction) {
 	// TODO: reuse the slice!
 	labels := make([]uint32, len(targets))
 	for j, target := range targets {
-		labels[j] = uint32(m.getOrAllocateSSABlockLabel(target))
+		labels[j] = uint32(m.executableContext.GetOrAllocateSSABlockLabel(target))
 	}
 
 	brSequence.asBrTableSequence(adjustedIndex, labels)
@@ -72,16 +74,17 @@ func (m *machine) lowerBrTable(i *ssa.Instruction) {
 
 // LowerConditionalBranch implements backend.Machine.
 func (m *machine) LowerConditionalBranch(b *ssa.Instruction) {
+	exctx := m.executableContext
 	cval, args, targetBlk := b.BranchData()
 	if len(args) > 0 {
 		panic(fmt.Sprintf(
 			"conditional branch shouldn't have args; likely a bug in critical edge splitting: from %s to %s",
-			m.currentSSABlk,
+			exctx.CurrentSSABlk,
 			targetBlk,
 		))
 	}
 
-	target := m.getOrAllocateSSABlockLabel(targetBlk)
+	target := exctx.GetOrAllocateSSABlockLabel(targetBlk)
 	cvalDef := m.compiler.ValueDefinition(cval)
 
 	switch {
@@ -710,7 +713,7 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 	default:
 		panic("TODO: lowering " + op.String())
 	}
-	m.FlushPendingInstructions()
+	m.executableContext.FlushPendingInstructions()
 }
 
 func (m *machine) lowerShuffle(rd, rn, rm operand, lane1, lane2 uint64) {

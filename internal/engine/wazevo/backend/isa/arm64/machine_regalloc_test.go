@@ -3,6 +3,7 @@ package arm64
 import (
 	"testing"
 
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -11,11 +12,11 @@ import (
 func TestRegAllocFunctionImpl_addBlock(t *testing.T) {
 	ssab := ssa.NewBuilder()
 	sb1, sb2 := ssab.AllocateBasicBlock(), ssab.AllocateBasicBlock()
-	p1, p2 := &labelPosition{}, &labelPosition{}
+	p1, p2 := &backend.LabelPosition[instruction]{}, &backend.LabelPosition[instruction]{}
 
-	f := &regAllocFunctionImpl{labelToRegAllocBlockIndex: map[label]int{}}
-	f.addBlock(sb1, label(10), p1)
-	f.addBlock(sb2, label(20), p2)
+	f := &regAllocFunctionImpl{labelToRegAllocBlockIndex: map[backend.Label]int{}}
+	f.addBlock(sb1, backend.Label(10), p1)
+	f.addBlock(sb2, backend.Label(20), p2)
 
 	require.Equal(t, 2, len(f.labelToRegAllocBlockIndex))
 	require.Equal(t, 2, len(f.reversePostOrderBlocks))
@@ -27,8 +28,8 @@ func TestRegAllocFunctionImpl_addBlock(t *testing.T) {
 	require.Equal(t, p1, rb1.pos)
 	require.Equal(t, p2, rb2.pos)
 
-	require.Equal(t, label(10), rb1.l)
-	require.Equal(t, label(20), rb2.l)
+	require.Equal(t, backend.Label(10), rb1.l)
+	require.Equal(t, backend.Label(20), rb2.l)
 
 	require.Equal(t, sb1, rb1.sb)
 	require.Equal(t, sb2, rb2.sb)
@@ -81,7 +82,7 @@ func TestRegAllocFunctionImpl_ReloadRegisterAfter(t *testing.T) {
 	require.Equal(t, iload.kind, uLoad64)
 	require.Equal(t, fload.kind, fpuLoad64)
 
-	m.rootInstr = i1
+	m.executableContext.RootInstr = i1
 	require.Equal(t, `
 	ldr d1, [sp, #0x18]
 	ldr x1, [sp, #0x10]
@@ -111,7 +112,7 @@ func TestRegAllocFunctionImpl_StoreRegisterBefore(t *testing.T) {
 	require.Equal(t, iload.kind, store64)
 	require.Equal(t, fload.kind, fpuStore64)
 
-	m.rootInstr = i1
+	m.executableContext.RootInstr = i1
 	require.Equal(t, `
 	str x1, [sp, #0x10]
 	str d1, [sp, #0x18]
@@ -183,7 +184,7 @@ func TestMachine_insertStoreRegisterAt(t *testing.T) {
 						m.insertStoreRegisterAt(x1VReg, i2, after)
 						m.insertStoreRegisterAt(v1VReg, i2, after)
 					}
-					m.rootInstr = i1
+					m.executableContext.RootInstr = i1
 					require.Equal(t, tc.expected, m.Format())
 				})
 			}
@@ -256,7 +257,7 @@ func TestMachine_insertReloadRegisterAt(t *testing.T) {
 						m.insertReloadRegisterAt(x1VReg, i2, after)
 						m.insertReloadRegisterAt(v1VReg, i2, after)
 					}
-					m.rootInstr = i1
+					m.executableContext.RootInstr = i1
 
 					require.Equal(t, tc.expected, m.Format())
 				})
@@ -338,7 +339,7 @@ func TestMachine_swap(t *testing.T) {
 			i2.prev = cur
 
 			m.swap(cur, tc.x1, tc.x2, tc.tmp)
-			m.rootInstr = cur
+			m.executableContext.RootInstr = cur
 
 			require.Equal(t, tc.expected, m.Format())
 		})

@@ -3,13 +3,16 @@ package arm64
 import (
 	"fmt"
 
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 )
 
 // SetupPrologue implements backend.Machine.
 func (m *machine) SetupPrologue() {
-	cur := m.rootInstr
+	ectx := m.executableContext
+
+	cur := ectx.RootInstr
 	prevInitInst := cur.next
 
 	//
@@ -186,7 +189,8 @@ func (m *machine) createFrameSizeSlot(cur *instruction, s int64) *instruction {
 
 // SetupEpilogue implements backend.Machine.
 func (m *machine) SetupEpilogue() {
-	for cur := m.rootInstr; cur != nil; cur = cur.next {
+	ectx := m.executableContext
+	for cur := ectx.RootInstr; cur != nil; cur = cur.next {
 		if cur.kind == ret {
 			m.setupEpilogueAfter(cur.prev)
 			continue
@@ -360,7 +364,7 @@ func (m *machine) insertStackBoundsCheck(requiredStackSize int64, cur *instructi
 
 	// b.ge #imm
 	cbr := m.allocateInstr()
-	cbr.asCondBr(ge.asCond(), invalidLabel, false /* ignored */)
+	cbr.asCondBr(ge.asCond(), backend.LabelInvalid, false /* ignored */)
 	cur = linkInstr(cur, cbr)
 
 	// Set the required stack size and set it to the exec context.
@@ -407,9 +411,11 @@ func (m *machine) insertStackBoundsCheck(requiredStackSize int64, cur *instructi
 
 // CompileStackGrowCallSequence implements backend.Machine.
 func (m *machine) CompileStackGrowCallSequence() []byte {
+	ectx := m.executableContext
+
 	cur := m.allocateInstr()
 	cur.asNop0()
-	m.rootInstr = cur
+	ectx.RootInstr = cur
 
 	// Save the callee saved and argument registers.
 	cur = m.saveRegistersInExecutionContext(cur, saveRequiredRegs)
@@ -431,14 +437,16 @@ func (m *machine) CompileStackGrowCallSequence() []byte {
 	ret.asRet(nil)
 	linkInstr(cur, ret)
 
-	m.encode(m.rootInstr)
+	m.encode(ectx.RootInstr)
 	return m.compiler.Buf()
 }
 
 func (m *machine) addsAddOrSubStackPointer(cur *instruction, rd regalloc.VReg, diff int64, add bool) *instruction {
-	m.pendingInstructions = m.pendingInstructions[:0]
+	ectx := m.executableContext
+
+	ectx.PendingInstructions = ectx.PendingInstructions[:0]
 	m.insertAddOrSubStackPointer(rd, diff, add)
-	for _, inserted := range m.pendingInstructions {
+	for _, inserted := range ectx.PendingInstructions {
 		cur = linkInstr(cur, inserted)
 	}
 	return cur

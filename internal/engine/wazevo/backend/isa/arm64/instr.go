@@ -5,6 +5,7 @@ import (
 	"math"
 	"strings"
 
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 )
@@ -35,6 +36,18 @@ type (
 	// This controls how the instruction struct is interpreted.
 	instructionKind int
 )
+
+func asNop0(i *instruction) {
+	i.kind = nop0
+}
+
+func setNext(i, next *instruction) {
+	i.next = next
+}
+
+func setPrev(i, prev *instruction) {
+	i.prev = prev
+}
 
 // IsCall implements regalloc.Instr IsCall.
 func (i *instruction) IsCall() bool {
@@ -488,13 +501,13 @@ func (i *instruction) asNop0() *instruction {
 	return i
 }
 
-func (i *instruction) asNop0WithLabel(l label) {
+func (i *instruction) asNop0WithLabel(l backend.Label) {
 	i.kind = nop0
 	i.u1 = uint64(l)
 }
 
-func (i *instruction) nop0Label() label {
-	return label(i.u1)
+func (i *instruction) nop0Label() backend.Label {
+	return backend.Label(i.u1)
 }
 
 func (i *instruction) asRet(abi *abiImpl) {
@@ -624,8 +637,8 @@ func (i *instruction) asFpuCSel(rd, rn, rm operand, c condFlag, _64bit bool) {
 	}
 }
 
-func (i *instruction) asBr(target label) {
-	if target == returnLabel {
+func (i *instruction) asBr(target backend.Label) {
+	if target == backend.LabelReturn {
 		panic("BUG: call site should special case for returnLabel")
 	}
 	i.kind = br
@@ -642,8 +655,8 @@ func (i *instruction) brTableSequenceOffsetsResolved() {
 	i.u3 = 1 // indicate that the offsets are resolved, for debugging.
 }
 
-func (i *instruction) brLabel() label {
-	return label(i.u1)
+func (i *instruction) brLabel() backend.Label {
+	return backend.Label(i.u1)
 }
 
 // brOffsetResolved is called when the target label is resolved.
@@ -657,7 +670,7 @@ func (i *instruction) brOffset() int64 {
 }
 
 // asCondBr encodes a conditional branch instruction. is64bit is only needed when cond is not flag.
-func (i *instruction) asCondBr(c cond, target label, is64bit bool) {
+func (i *instruction) asCondBr(c cond, target backend.Label, is64bit bool) {
 	i.kind = condBr
 	i.u1 = c.asUint64()
 	i.u2 = uint64(target)
@@ -666,12 +679,12 @@ func (i *instruction) asCondBr(c cond, target label, is64bit bool) {
 	}
 }
 
-func (i *instruction) setCondBrTargets(target label) {
+func (i *instruction) setCondBrTargets(target backend.Label) {
 	i.u2 = uint64(target)
 }
 
-func (i *instruction) condBrLabel() label {
-	return label(i.u2)
+func (i *instruction) condBrLabel() backend.Label {
+	return backend.Label(i.u2)
 }
 
 // condBrOffsetResolve is called when the target label is resolved.
@@ -989,7 +1002,7 @@ func (i *instruction) String() (str string) {
 	switch i.kind {
 	case nop0:
 		if i.u1 != 0 {
-			l := label(i.u1)
+			l := backend.Label(i.u1)
 			str = fmt.Sprintf("%s:", l)
 		} else {
 			str = "nop0"
@@ -1371,7 +1384,7 @@ func (i *instruction) String() (str string) {
 	case ret:
 		str = "ret"
 	case br:
-		target := label(i.u1)
+		target := backend.Label(i.u1)
 		if i.u3 != 0 {
 			str = fmt.Sprintf("b #%#x (%s)", i.brOffset(), target.String())
 		} else {
@@ -1380,7 +1393,7 @@ func (i *instruction) String() (str string) {
 	case condBr:
 		size := is64SizeBitToSize(i.u3)
 		c := cond(i.u1)
-		target := label(i.u2)
+		target := backend.Label(i.u2)
 		switch c.kind() {
 		case condKindRegisterZero:
 			if !i.condBrOffsetResolved() {
@@ -1396,7 +1409,7 @@ func (i *instruction) String() (str string) {
 			}
 		case condKindCondFlagSet:
 			if offset := i.condBrOffset(); offset != 0 {
-				if target == invalidLabel {
+				if target == backend.LabelReturn {
 					str = fmt.Sprintf("b.%s #%#x", c.flag(), offset)
 				} else {
 					str = fmt.Sprintf("b.%s #%#x, (%s)", c.flag(), offset, target.String())
@@ -1411,7 +1424,7 @@ func (i *instruction) String() (str string) {
 		if i.u3 == 0 { // The offsets haven't been resolved yet.
 			labels := make([]string, len(i.targets))
 			for index, l := range i.targets {
-				labels[index] = label(l).String()
+				labels[index] = backend.Label(l).String()
 			}
 			str = fmt.Sprintf("br_table_sequence %s, [%s]",
 				formatVRegSized(i.rn.nr(), 64),
