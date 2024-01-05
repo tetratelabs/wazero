@@ -18,7 +18,8 @@ func NewBackend() backend.Machine {
 		asNop,
 	)
 	return &machine{
-		ectx: ectx,
+		ectx:     ectx,
+		regAlloc: regalloc.NewAllocator(regInfo),
 	}
 }
 
@@ -27,6 +28,8 @@ type machine struct {
 	c                        backend.Compiler
 	ectx                     *backend.ExecutableContextT[instruction]
 	stackBoundsCheckDisabled bool
+
+	regAlloc regalloc.Allocator
 
 	// abis maps ssa.SignatureID to the ABI implementation.
 	abis       []abiImpl
