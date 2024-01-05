@@ -121,6 +121,11 @@ spectest_v2_dir := $(spectest_base_dir)/v2
 spectest_v2_testdata_dir := $(spectest_v2_dir)/testdata
 # Latest draft state as of May 23, 2023.
 spec_version_v2 := 2e8912e88a3118a46b90e8ccb659e24b4e8f3c23
+spectest_threads_dir := $(spectest_base_dir)/threads
+spectest_threads_testdata_dir := $(spectest_threads_dir)/testdata
+# From https://github.com/WebAssembly/threads/tree/upstream-rebuild which has not been merged to main yet.
+# It will likely be renamed to main in the future - https://github.com/WebAssembly/threads/issues/216.
+spec_version_threads := 3635ca51a17e57e106988846c5b0e0cc48ac04fc
 
 .PHONY: build.spectest
 build.spectest:
@@ -163,6 +168,17 @@ build.spectest.v2: # Note: SIMD cases are placed in the "simd" subdirectory.
 		&& curl -sSL 'https://api.github.com/repos/WebAssembly/spec/contents/test/core/simd?ref=$(spec_version_v2)' | jq -r '.[]| .download_url' | grep -E ".wast" | xargs -Iurl curl -sJL url -O
 	@cd $(spectest_v2_testdata_dir) && for f in `find . -name '*.wast'`; do \
 		wast2json --debug-names --no-check $$f; \
+	done
+
+# Note: We currently cannot build the "threads" subdirectory that spawns threads due to missing support in wast2json.
+# https://github.com/WebAssembly/wabt/issues/2348#issuecomment-1878003959
+.PHONY: build.spectest.threads
+build.spectest.threads:
+	@mkdir -p $(spectest_threads_testdata_dir)
+	@cd $(spectest_threads_testdata_dir) \
+		&& curl -sSL 'https://api.github.com/repos/WebAssembly/threads/contents/test/core?ref=$(spec_version_threads)' | jq -r '.[]| .download_url' | grep -E "atomic.wast" | xargs -Iurl curl -sJL url -O
+	@cd $(spectest_threads_testdata_dir) && for f in `find . -name '*.wast'`; do \
+		wast2json --enable-threads --debug-names $$f; \
 	done
 
 .PHONY: test
