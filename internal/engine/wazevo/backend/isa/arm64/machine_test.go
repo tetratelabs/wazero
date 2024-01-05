@@ -79,7 +79,7 @@ func TestMachine_arg0OffsetFromSP(t *testing.T) {
 func TestMachine_ret0OffsetFromSP(t *testing.T) {
 	m := &machine{
 		clobberedRegs: make([]regalloc.VReg, 10), spillSlotSize: 16 * 8,
-		currentABI: &abiImpl{argStackSize: 180},
+		currentABI: &functionABI{ArgStackSize: 180},
 	}
 	require.Equal(t, int64(16*18)+32+180, m.ret0OffsetFromSP())
 }

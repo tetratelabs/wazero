@@ -20,8 +20,8 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 		argBegin++
 	}
 
-	abi := &abiImpl{m: m}
-	abi.init(sig)
+	abi := &functionABI{}
+	abi.Init(sig)
 	m.currentABI = abi
 
 	cur := m.allocateInstr()
@@ -70,7 +70,7 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 	cur = m.insertStackBoundsCheck(goCallStackSize+frameInfoSize, cur)
 
 	originalArg0Reg := x17VReg // Caller save, so we can use it for whatever we want.
-	if m.currentABI.alignedArgResultStackSlotSize() > 0 {
+	if m.currentABI.AlignedArgResultStackSlotSize() > 0 {
 		// At this point, SP points to `ReturnAddress`, so add 16 to get the original arg 0 slot.
 		cur = m.addsAddOrSubStackPointer(cur, originalArg0Reg, frameInfoSize, true)
 	}
@@ -102,8 +102,8 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 	copySp.asMove64(arg0ret0AddrReg, spVReg)
 	cur = linkInstr(cur, copySp)
 
-	for i := range abi.args[argBegin:] {
-		arg := &abi.args[argBegin+i]
+	for i := range abi.Args[argBegin:] {
+		arg := &abi.Args[argBegin+i]
 		store := m.allocateInstr()
 		var v regalloc.VReg
 		if arg.Kind == backend.ABIArgKindReg {
@@ -157,7 +157,7 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 	cur = m.restoreRegistersInExecutionContext(cur, calleeSavedRegistersSorted)
 
 	// Get the pointer to the arg[0]/ret[0]: We need to skip `frame_size + sliceSize`.
-	if len(abi.rets) > 0 {
+	if len(abi.Rets) > 0 {
 		cur = m.addsAddOrSubStackPointer(cur, arg0ret0AddrReg, frameInfoSize, true)
 	}
 
@@ -170,17 +170,17 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 	cur = linkInstr(cur, ldr)
 
 	originalRet0Reg := x17VReg // Caller save, so we can use it for whatever we want.
-	if m.currentABI.retStackSize > 0 {
-		cur = m.addsAddOrSubStackPointer(cur, originalRet0Reg, m.currentABI.argStackSize, true)
+	if m.currentABI.RetStackSize > 0 {
+		cur = m.addsAddOrSubStackPointer(cur, originalRet0Reg, m.currentABI.ArgStackSize, true)
 	}
 
 	// Make the SP point to the original address (above the result slot).
-	if s := m.currentABI.alignedArgResultStackSlotSize(); s > 0 {
+	if s := m.currentABI.AlignedArgResultStackSlotSize(); s > 0 {
 		cur = m.addsAddOrSubStackPointer(cur, spVReg, s, true)
 	}
 
-	for i := range abi.rets {
-		r := &abi.rets[i]
+	for i := range abi.Rets {
+		r := &abi.Rets[i]
 		if r.Kind == backend.ABIArgKindReg {
 			loadIntoReg := m.allocateInstr()
 			mode := addressMode{kind: addressModeKindPostIndex, rn: arg0ret0AddrReg}

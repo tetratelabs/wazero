@@ -2150,7 +2150,7 @@ func encodeBrTableSequence(c backend.Compiler, index regalloc.VReg, targets []ui
 	}
 }
 
-// encodeExitSequence matches the implementation detail of abiImpl.emitGoEntryPreamble.
+// encodeExitSequence matches the implementation detail of functionABI.emitGoEntryPreamble.
 func encodeExitSequence(c backend.Compiler, ctxReg regalloc.VReg) {
 	// Restore the FP, SP and LR, and return to the Go code:
 	// 		ldr lr,  [ctxReg, #GoReturnAddress]

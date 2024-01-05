@@ -11,54 +11,49 @@ import (
 
 // NewBackend returns a new backend for arm64.
 func NewBackend() backend.Machine {
-	m := &machine{}
-	return m
+	ectx := backend.NewExecutableContextT[instruction](
+		resetInstruction,
+		setNext,
+		setPrev,
+		asNop,
+	)
+	return &machine{
+		ectx: ectx,
+	}
 }
 
 // machine implements backend.Machine for amd64.
 type machine struct {
+	c                        backend.Compiler
+	ectx                     *backend.ExecutableContextT[instruction]
 	stackBoundsCheckDisabled bool
+
+	// abis maps ssa.SignatureID to the ABI implementation.
+	abis       []abiImpl
+	currentABI *abiImpl
+}
+
+// Reset implements backend.Machine.
+func (m *machine) Reset() {
+	m.stackBoundsCheckDisabled = false
+	m.ectx.Reset()
 }
 
 // ExecutableContext implements backend.Machine.
-func (m *machine) ExecutableContext() backend.ExecutableContext {
-	// TODO implement me
-	panic("implement me")
-}
+func (m *machine) ExecutableContext() backend.ExecutableContext { return m.ectx }
 
 // DisableStackCheck implements backend.Machine.
-func (m *machine) DisableStackCheck() {
-	m.stackBoundsCheckDisabled = true
-}
+func (m *machine) DisableStackCheck() { m.stackBoundsCheckDisabled = true }
+
+// SetCompiler implements backend.Machine.
+func (m *machine) SetCompiler(compiler backend.Compiler) { m.c = compiler }
 
 // RegisterInfo implements backend.Machine.
-func (m *machine) RegisterInfo() *regalloc.RegisterInfo {
-	// TODO implement me
-	panic("implement me")
-}
+func (m *machine) RegisterInfo() *regalloc.RegisterInfo { return regInfo }
 
 // InitializeABI implements backend.Machine.
 func (m *machine) InitializeABI(sig *ssa.Signature) {
-	// TODO implement me
-	panic("implement me")
-}
-
-// ABI implements backend.Machine.
-func (m *machine) ABI() backend.FunctionABI {
-	// TODO implement me
-	panic("implement me")
-}
-
-// SetCompiler implements backend.Machine.
-func (m *machine) SetCompiler(compiler backend.Compiler) {
-	// TODO implement me
-	panic("implement me")
-}
-
-// StartLoweringFunction implements backend.Machine.
-func (m *machine) StartLoweringFunction(maximumBlockID ssa.BasicBlockID) {
-	// TODO implement me
-	panic("implement me")
+	m.currentABI = m.getOrCreateFunctionABI(sig)
 }
 
 // StartBlock implements backend.Machine.
@@ -81,24 +76,6 @@ func (m *machine) LowerConditionalBranch(b *ssa.Instruction) {
 
 // LowerInstr implements backend.Machine.
 func (m *machine) LowerInstr(instruction *ssa.Instruction) {
-	// TODO implement me
-	panic("implement me")
-}
-
-// EndBlock implements backend.Machine.
-func (m *machine) EndBlock() {
-	// TODO implement me
-	panic("implement me")
-}
-
-// LinkAdjacentBlocks implements backend.Machine.
-func (m *machine) LinkAdjacentBlocks(prev, next ssa.BasicBlock) {
-	// TODO implement me
-	panic("implement me")
-}
-
-// Reset implements backend.Machine.
-func (m *machine) Reset() {
 	// TODO implement me
 	panic("implement me")
 }

@@ -121,5 +121,3 @@ func RegTypeOf(p ssa.Type) RegType {
 		panic("invalid type")
 	}
 }
-
-const RealRegsNumMax = 128

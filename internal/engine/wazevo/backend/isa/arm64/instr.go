@@ -26,7 +26,7 @@ type (
 		u1, u2, u3          uint64
 		rd, rm, rn, ra      operand
 		amode               addressMode
-		abi                 *abiImpl
+		abi                 *functionABI
 		targets             []uint32
 		addedBeforeRegAlloc bool
 	}
@@ -157,7 +157,7 @@ func (i *instruction) Defs(regs *[]regalloc.VReg) []regalloc.VReg {
 	case defKindRD:
 		*regs = append(*regs, i.rd.nr())
 	case defKindCall:
-		*regs = append(*regs, i.abi.retRealRegs...)
+		*regs = append(*regs, i.abi.RetRealRegs...)
 	default:
 		panic(fmt.Sprintf("defKind for %v not defined", i))
 	}
@@ -307,7 +307,7 @@ func (i *instruction) Uses(regs *[]regalloc.VReg) []regalloc.VReg {
 			*regs = append(*regs, rm)
 		}
 	case useKindRet:
-		*regs = append(*regs, i.abi.retRealRegs...)
+		*regs = append(*regs, i.abi.RetRealRegs...)
 	case useKindAMode:
 		if amodeRN := i.amode.rn; amodeRN.Valid() {
 			*regs = append(*regs, amodeRN)
@@ -329,10 +329,10 @@ func (i *instruction) Uses(regs *[]regalloc.VReg) []regalloc.VReg {
 			*regs = append(*regs, cnd.register())
 		}
 	case useKindCall:
-		*regs = append(*regs, i.abi.argRealRegs...)
+		*regs = append(*regs, i.abi.ArgRealRegs...)
 	case useKindCallInd:
 		*regs = append(*regs, i.rn.nr())
-		*regs = append(*regs, i.abi.argRealRegs...)
+		*regs = append(*regs, i.abi.ArgRealRegs...)
 	case useKindVecRRRRewrite:
 		*regs = append(*regs, i.rn.reg())
 		*regs = append(*regs, i.rm.reg())
@@ -446,13 +446,13 @@ func (i *instruction) AssignUse(index int, reg regalloc.VReg) {
 	}
 }
 
-func (i *instruction) asCall(ref ssa.FuncRef, abi *abiImpl) {
+func (i *instruction) asCall(ref ssa.FuncRef, abi *functionABI) {
 	i.kind = call
 	i.u1 = uint64(ref)
 	i.abi = abi
 }
 
-func (i *instruction) asCallIndirect(ptr regalloc.VReg, abi *abiImpl) {
+func (i *instruction) asCallIndirect(ptr regalloc.VReg, abi *functionABI) {
 	i.kind = callInd
 	i.rn = operandNR(ptr)
 	i.abi = abi
@@ -509,7 +509,7 @@ func (i *instruction) nop0Label() label {
 	return label(i.u1)
 }
 
-func (i *instruction) asRet(abi *abiImpl) {
+func (i *instruction) asRet(abi *functionABI) {
 	i.kind = ret
 	i.abi = abi
 }
