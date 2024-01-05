@@ -57,11 +57,6 @@ func (f functionABIRegInfo) ArgsResultsRegs() (argInts, argFloats, resultInt, re
 
 type abiImpl = backend.FunctionABI[functionABIRegInfo]
 
-// ParamRegs implements backend.Machine.
-func (m *machine) ParamRegs() (ints, floats []regalloc.RealReg) {
-	return intArgResultRegs, floatArgResultRegs
-}
-
 func (m *machine) getOrCreateFunctionABI(sig *ssa.Signature) *abiImpl {
 	if int(sig.ID) >= len(m.abis) {
 		m.abis = append(m.abis, make([]abiImpl, int(sig.ID)+1)...)
@@ -76,11 +71,13 @@ func (m *machine) getOrCreateFunctionABI(sig *ssa.Signature) *abiImpl {
 	return abi
 }
 
+// LowerParams implements backend.Machine.
 func (m *machine) LowerParams(params []ssa.Value) {
 	// TODO implement me
 	panic("implement me")
 }
 
+// LowerReturns implements backend.Machine.
 func (m *machine) LowerReturns(returns []ssa.Value) {
 	// TODO implement me
 	panic("implement me")

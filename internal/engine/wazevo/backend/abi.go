@@ -13,6 +13,7 @@ type FunctionABIRegInfo interface {
 }
 
 type (
+	// FunctionABI represents the ABI information for a function which corresponds to a ssa.Signature.
 	FunctionABI[R FunctionABIRegInfo] struct {
 		r           R
 		Initialized bool
