@@ -967,8 +967,9 @@ const (
 	OpcodeI64Extend16SName = "i64.extend16_s"
 	OpcodeI64Extend32SName = "i64.extend32_s"
 
-	OpcodeMiscPrefixName = "misc_prefix"
-	OpcodeVecPrefixName  = "vector_prefix"
+	OpcodeMiscPrefixName   = "misc_prefix"
+	OpcodeVecPrefixName    = "vector_prefix"
+	OpcodeAtomicPrefixName = "atomic_prefix"
 )
 
 var instructionNames = [256]string{
