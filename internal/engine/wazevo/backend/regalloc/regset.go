@@ -5,9 +5,19 @@ import (
 	"strings"
 )
 
-type regSet uint64
+// NewRegSet returns a new RegSet with the given registers.
+func NewRegSet(regs ...RealReg) RegSet {
+	var ret RegSet
+	for _, r := range regs {
+		ret = ret.add(r)
+	}
+	return ret
+}
 
-func (rs regSet) format(info *RegisterInfo) string { //nolint:unused
+// RegSet represents a set of registers.
+type RegSet uint64
+
+func (rs RegSet) format(info *RegisterInfo) string { //nolint:unused
 	var ret []string
 	for i := 0; i < 64; i++ {
 		if rs&(1<<uint(i)) != 0 {
@@ -17,18 +27,18 @@ func (rs regSet) format(info *RegisterInfo) string { //nolint:unused
 	return strings.Join(ret, ", ")
 }
 
-func (rs regSet) has(r RealReg) bool {
+func (rs RegSet) has(r RealReg) bool {
 	return rs&(1<<uint(r)) != 0
 }
 
-func (rs regSet) add(r RealReg) regSet {
+func (rs RegSet) add(r RealReg) RegSet {
 	if r >= 64 {
 		return rs
 	}
 	return rs | 1<<uint(r)
 }
 
-func (rs regSet) range_(f func(allocatedRealReg RealReg)) {
+func (rs RegSet) Range(f func(allocatedRealReg RealReg)) {
 	for i := 0; i < 64; i++ {
 		if rs&(1<<uint(i)) != 0 {
 			f(RealReg(i))
@@ -37,7 +47,7 @@ func (rs regSet) range_(f func(allocatedRealReg RealReg)) {
 }
 
 type regInUseSet struct {
-	set regSet
+	set RegSet
 	vrs [64]VReg
 }
 

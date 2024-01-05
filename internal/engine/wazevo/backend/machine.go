@@ -23,9 +23,6 @@ type (
 		// InitializeABI initializes the FunctionABI for the given signature.
 		InitializeABI(sig *ssa.Signature)
 
-		// ABI returns the FunctionABI used for the currently compiled function.
-		ABI() FunctionABI
-
 		// SetCompiler sets the compilation context used for the lifetime of Machine.
 		// This is only called once per Machine, i.e. before the first compilation.
 		SetCompiler(Compiler)
@@ -94,5 +91,11 @@ type (
 		// CompileEntryPreamble returns the sequence of instructions shared by multiple functions to
 		// enter the function from Go.
 		CompileEntryPreamble(signature *ssa.Signature) []byte
+
+		// LowerParams lowers the given parameters.
+		LowerParams(params []ssa.Value)
+
+		// LowerReturns lowers the given returns.
+		LowerReturns(returns []ssa.Value)
 	}
 )

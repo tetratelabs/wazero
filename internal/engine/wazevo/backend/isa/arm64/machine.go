@@ -16,9 +16,9 @@ type (
 	machine struct {
 		compiler          backend.Compiler
 		executableContext *backend.ExecutableContextT[instruction]
-		currentABI        *abiImpl
+		currentABI        *functionABI
 		// abis maps ssa.SignatureID to the ABI implementation.
-		abis []abiImpl
+		abis []functionABI
 
 		regAllocFn regAllocFunctionImpl
 
@@ -137,17 +137,12 @@ func (m *machine) Reset() {
 
 // InitializeABI implements backend.Machine InitializeABI.
 func (m *machine) InitializeABI(sig *ssa.Signature) {
-	m.currentABI = m.getOrCreateABIImpl(sig)
+	m.currentABI = m.getOrCreateFunctionABI(sig)
 }
 
 // DisableStackCheck implements backend.Machine DisableStackCheck.
 func (m *machine) DisableStackCheck() {
 	m.stackBoundsCheckDisabled = true
-}
-
-// ABI implements backend.Machine.
-func (m *machine) ABI() backend.FunctionABI {
-	return m.currentABI
 }
 
 // SetCompiler implements backend.Machine.
@@ -477,7 +472,7 @@ func (m *machine) arg0OffsetFromSP() int64 {
 }
 
 func (m *machine) ret0OffsetFromSP() int64 {
-	return m.arg0OffsetFromSP() + m.currentABI.argStackSize
+	return m.arg0OffsetFromSP() + m.currentABI.ArgStackSize
 }
 
 func (m *machine) requiredStackSize() int64 {

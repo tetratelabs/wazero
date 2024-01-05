@@ -39,8 +39,8 @@ type (
 		// AllocatableRegisters is a 2D array of allocatable RealReg, indexed by regTypeNum and regNum.
 		// The order matters: the first element is the most preferred one when allocating.
 		AllocatableRegisters [NumRegType][]RealReg
-		CalleeSavedRegisters [RealRegsNumMax]bool
-		CallerSavedRegisters [RealRegsNumMax]bool
+		CalleeSavedRegisters RegSet
+		CallerSavedRegisters RegSet
 		RealRegToVReg        []VReg
 		// RealRegName returns the name of the given RealReg for debugging.
 		RealRegName func(r RealReg) string
@@ -52,7 +52,7 @@ type (
 		// regInfo is static per ABI/ISA, and is initialized by the machine during Machine.PrepareRegisterAllocator.
 		regInfo *RegisterInfo
 		// allocatableSet is a set of allocatable RealReg derived from regInfo. Static per ABI/ISA.
-		allocatableSet           regSet
+		allocatableSet           RegSet
 		allocatedCalleeSavedRegs []VReg
 		blockLivenessDataPool    wazevoapi.Pool[blockLivenessData]
 		blockLivenessData        [] /* blockID to */ *blockLivenessData
@@ -88,7 +88,7 @@ type (
 		maxVRegIDEncountered int
 
 		// allocatedRegSet is a set of RealReg that are allocated during the allocation phase. This is reset per function.
-		allocatedRegSet regSet
+		allocatedRegSet RegSet
 	}
 
 	blockState struct {
@@ -156,7 +156,7 @@ func (s *state) reset() {
 		s.vrStates[i].reset()
 	}
 	s.maxVRegIDEncountered = -1
-	s.allocatedRegSet = regSet(0)
+	s.allocatedRegSet = RegSet(0)
 	s.regsInUse.reset()
 }
 
@@ -243,7 +243,7 @@ func (vs *vrState) recordReload(f Function, blk Block) {
 	}
 }
 
-func (s *state) findOrSpillAllocatable(a *Allocator, allocatable []RealReg, forbiddenMask regSet) (r RealReg) {
+func (s *state) findOrSpillAllocatable(a *Allocator, allocatable []RealReg, forbiddenMask RegSet) (r RealReg) {
 	r = RealRegInvalid
 	var lastUseAt programCounter = math.MinInt32
 	var spillVReg VReg
@@ -276,7 +276,7 @@ func (s *state) findOrSpillAllocatable(a *Allocator, allocatable []RealReg, forb
 	return r
 }
 
-func (s *state) findAllocatable(allocatable []RealReg, forbiddenMask regSet) RealReg {
+func (s *state) findAllocatable(allocatable []RealReg, forbiddenMask RegSet) RealReg {
 	for _, r := range allocatable {
 		if !s.regsInUse.has(r) && !forbiddenMask.has(r) {
 			return r
@@ -323,8 +323,8 @@ func (a *Allocator) DoAllocation(f Function) {
 
 func (a *Allocator) determineCalleeSavedRealRegs(f Function) {
 	a.allocatedCalleeSavedRegs = a.allocatedCalleeSavedRegs[:0]
-	a.state.allocatedRegSet.range_(func(allocatedRealReg RealReg) {
-		if a.regInfo.isCalleeSaved(allocatedRealReg) {
+	a.state.allocatedRegSet.Range(func(allocatedRealReg RealReg) {
+		if a.regInfo.CalleeSavedRegisters.has(allocatedRealReg) {
 			a.allocatedCalleeSavedRegs = append(a.allocatedCalleeSavedRegs, a.regInfo.RealRegToVReg[allocatedRealReg])
 		}
 	})
@@ -548,7 +548,7 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 			fmt.Println(instr)
 		}
 
-		var currentUsedSet regSet
+		var currentUsedSet RegSet
 		killSet := a.reals[:0]
 
 		// Gather the set of registers that will be used in the current instruction.
@@ -643,7 +643,7 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 					}
 					if r == RealRegInvalid {
 						typ := def.RegType()
-						r = s.findOrSpillAllocatable(a, a.regInfo.AllocatableRegisters[typ], regSet(0))
+						r = s.findOrSpillAllocatable(a, a.regInfo.AllocatableRegisters[typ], RegSet(0))
 					}
 					s.useRealReg(r, def)
 				}
@@ -690,7 +690,7 @@ func (a *Allocator) releaseCallerSavedRegs(addrReg RealReg) {
 			if v.IsRealReg() {
 				continue // This is the argument register as it's already used by VReg backed by the corresponding RealReg.
 			}
-			if !a.regInfo.isCallerSaved(allocated) {
+			if !a.regInfo.CallerSavedRegisters.has(allocated) {
 				// If this is not a caller-saved register, it is safe to keep it across the call.
 				continue
 			}
@@ -1009,12 +1009,4 @@ func (i *blockLivenessData) isKilledAt(vs *vrState, pos programCounter) bool {
 		}
 	}
 	return false
-}
-
-func (r *RegisterInfo) isCalleeSaved(reg RealReg) bool {
-	return r.CalleeSavedRegisters[reg]
-}
-
-func (r *RegisterInfo) isCallerSaved(reg RealReg) bool {
-	return r.CallerSavedRegisters[reg]
 }

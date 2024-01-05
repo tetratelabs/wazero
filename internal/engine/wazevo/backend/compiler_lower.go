@@ -129,12 +129,12 @@ func (c *compiler) lowerFunctionArguments(entry ssa.BasicBlock) {
 			c.tmpVals = append(c.tmpVals, ssa.ValueInvalid)
 		}
 	}
-	c.mach.ABI().CalleeGenFunctionArgsToVRegs(c.tmpVals)
+	c.mach.LowerParams(c.tmpVals)
 	ectx.FlushPendingInstructions()
 }
 
 func (c *compiler) lowerFunctionReturns(returns []ssa.Value) {
-	c.mach.ABI().CalleeGenVRegsToFunctionReturns(returns)
+	c.mach.LowerReturns(returns)
 }
 
 // lowerBlockArguments lowers how to pass arguments to the given successor block.

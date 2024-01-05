@@ -147,7 +147,7 @@ func (m *machine) SetupPrologue() {
 func (m *machine) createReturnAddrAndSizeOfArgRetSlot(cur *instruction) *instruction {
 	// First we decrement the stack pointer to point the arg0 slot.
 	var sizeOfArgRetReg regalloc.VReg
-	s := m.currentABI.alignedArgResultStackSlotSize()
+	s := m.currentABI.AlignedArgResultStackSlotSize()
 	if s > 0 {
 		cur = m.lowerConstantI64AndInsert(cur, tmpRegVReg, s)
 		sizeOfArgRetReg = tmpRegVReg
@@ -304,7 +304,7 @@ func (m *machine) setupEpilogueAfter(cur *instruction) {
 		addressModePreOrPostIndex(spVReg, 16 /* stack pointer must be 16-byte aligned. */, false /* increment after loads */), 64)
 	cur = linkInstr(cur, ldr)
 
-	if s := m.currentABI.alignedArgResultStackSlotSize(); s > 0 {
+	if s := m.currentABI.AlignedArgResultStackSlotSize(); s > 0 {
 		cur = m.addsAddOrSubStackPointer(cur, spVReg, s, true)
 	}
 

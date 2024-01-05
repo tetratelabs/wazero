@@ -10,7 +10,6 @@ import (
 
 // mockMachine implements Machine for testing.
 type mockMachine struct {
-	abi                    mockABI
 	startLoweringFunction  func(id ssa.BasicBlockID)
 	startBlock             func(block ssa.BasicBlock)
 	lowerSingleBranch      func(b *ssa.Instruction)
@@ -25,6 +24,10 @@ type mockMachine struct {
 	linkAdjacentBlocks     func(prev, next ssa.BasicBlock)
 	rinfo                  *regalloc.RegisterInfo
 }
+
+func (m mockMachine) LowerParams(params []ssa.Value) { panic("implement me") }
+
+func (m mockMachine) LowerReturns(returns []ssa.Value) { panic("implement me") }
 
 func (m mockMachine) ExecutableContext() ExecutableContext { panic("implement me") }
 
@@ -75,9 +78,6 @@ func (m mockMachine) LinkAdjacentBlocks(prev, next ssa.BasicBlock) { m.linkAdjac
 
 // InitializeABI implements Machine.InitializeABI.
 func (m mockMachine) InitializeABI(*ssa.Signature) {}
-
-// ABI implements Machine.ABI.
-func (m mockMachine) ABI() FunctionABI { return m.abi }
 
 // SetCompiler implements Machine.SetCompiler.
 func (m mockMachine) SetCompiler(Compiler) {}
@@ -144,18 +144,3 @@ func (m mockMachine) Format() string {
 func (m mockMachine) DisableStackCheck() {}
 
 var _ Machine = (*mockMachine)(nil)
-
-// mockABI implements ABI for testing.
-type mockABI struct{}
-
-func (m mockABI) EmitGoEntryPreamble() {}
-
-func (m mockABI) CalleeGenFunctionArgsToVRegs(regs []ssa.Value) {
-	panic("TODO")
-}
-
-func (m mockABI) CalleeGenVRegsToFunctionReturns(regs []ssa.Value) {
-	panic("TODO")
-}
-
-var _ FunctionABI = (*mockABI)(nil)
