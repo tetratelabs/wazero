@@ -16,21 +16,12 @@ type (
 		// DisableStackCheck disables the stack check for the current compilation for debugging/testing.
 		DisableStackCheck()
 
-		// RegisterInfo returns the set of registers that can be used for register allocation.
-		// This is only called once, and the result is shared across all compilations.
-		RegisterInfo() *regalloc.RegisterInfo
-
 		// InitializeABI initializes the FunctionABI for the given signature.
 		InitializeABI(sig *ssa.Signature)
 
 		// SetCompiler sets the compilation context used for the lifetime of Machine.
 		// This is only called once per Machine, i.e. before the first compilation.
 		SetCompiler(Compiler)
-
-		// StartBlock is called when the compilation of the given block is started.
-		// The order of this being called is the reverse post order of the ssa.BasicBlock(s) as we iterate with
-		// ssa.Builder BlockIteratorReversePostOrderBegin and BlockIteratorReversePostOrderEnd.
-		StartBlock(ssa.BasicBlock)
 
 		// LowerSingleBranch is called when the compilation of the given single branch is started.
 		LowerSingleBranch(b *ssa.Instruction)
@@ -61,8 +52,8 @@ type (
 		// This is only for testing purpose.
 		Format() string
 
-		// Function returns the currently compiled state as regalloc.Function so that we can perform register allocation.
-		Function() regalloc.Function
+		// RegAlloc does the register allocation after lowering.
+		RegAlloc()
 
 		// SetupPrologue inserts the prologue after register allocations.
 		SetupPrologue()

@@ -19,7 +19,6 @@ func newCompiler(_ context.Context, mach Machine, builder ssa.Builder) *compiler
 	c := &compiler{
 		mach: mach, ssaBuilder: builder,
 		nextVRegID: regalloc.VRegIDNonReservedBegin,
-		regAlloc:   regalloc.NewAllocator(mach.RegisterInfo()),
 	}
 	mach.SetCompiler(c)
 	return c
@@ -122,7 +121,6 @@ type compiler struct {
 	ssaValueRefCounts []int
 	// returnVRegs is the list of virtual registers that store the return values.
 	returnVRegs  []regalloc.VReg
-	regAlloc     regalloc.Allocator
 	varEdges     [][2]regalloc.VReg
 	varEdgeTypes []ssa.Type
 	constEdges   []struct {
@@ -179,8 +177,7 @@ func (c *compiler) Compile(ctx context.Context) ([]byte, []RelocationInfo, error
 
 // RegAlloc implements Compiler.RegAlloc.
 func (c *compiler) RegAlloc() {
-	regAllocFn := c.mach.Function()
-	c.regAlloc.DoAllocation(regAllocFn)
+	c.mach.RegAlloc()
 }
 
 // Finalize implements Compiler.Finalize.
@@ -290,7 +287,6 @@ func (c *compiler) Init() {
 	c.mach.Reset()
 	c.varEdges = c.varEdges[:0]
 	c.constEdges = c.constEdges[:0]
-	c.regAlloc.Reset()
 	c.buf = c.buf[:0]
 	c.sourceOffsets = c.sourceOffsets[:0]
 	c.relocations = c.relocations[:0]

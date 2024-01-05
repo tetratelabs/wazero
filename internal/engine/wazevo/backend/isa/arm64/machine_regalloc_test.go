@@ -8,56 +8,6 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
-func TestRegAllocFunctionImpl_addBlock(t *testing.T) {
-	ssab := ssa.NewBuilder()
-	sb1, sb2 := ssab.AllocateBasicBlock(), ssab.AllocateBasicBlock()
-	p1, p2 := &labelPosition{}, &labelPosition{}
-
-	f := &regAllocFunctionImpl{labelToRegAllocBlockIndex: map[label]int{}}
-	f.addBlock(sb1, label(10), p1)
-	f.addBlock(sb2, label(20), p2)
-
-	require.Equal(t, 2, len(f.labelToRegAllocBlockIndex))
-	require.Equal(t, 2, len(f.reversePostOrderBlocks))
-
-	rb1, rb2 := &f.reversePostOrderBlocks[0], &f.reversePostOrderBlocks[1]
-	require.Equal(t, f, rb1.f)
-	require.Equal(t, f, rb2.f)
-
-	require.Equal(t, p1, rb1.pos)
-	require.Equal(t, p2, rb2.pos)
-
-	require.Equal(t, label(10), rb1.l)
-	require.Equal(t, label(20), rb2.l)
-
-	require.Equal(t, sb1, rb1.sb)
-	require.Equal(t, sb2, rb2.sb)
-}
-
-func TestRegAllocFunctionImpl_PostOrderBlockIterator(t *testing.T) {
-	f := &regAllocFunctionImpl{reversePostOrderBlocks: []regAllocBlockImpl{{}, {}, {}}}
-	blk := f.PostOrderBlockIteratorBegin()
-	require.Equal(t, blk, &f.reversePostOrderBlocks[2])
-	blk = f.PostOrderBlockIteratorNext()
-	require.Equal(t, blk, &f.reversePostOrderBlocks[1])
-	blk = f.PostOrderBlockIteratorNext()
-	require.Equal(t, blk, &f.reversePostOrderBlocks[0])
-	blk = f.PostOrderBlockIteratorNext()
-	require.Nil(t, blk)
-}
-
-func TestRegAllocFunctionImpl_ReversePostOrderBlockIterator(t *testing.T) {
-	f := &regAllocFunctionImpl{reversePostOrderBlocks: []regAllocBlockImpl{{}, {}, {}}}
-	blk := f.ReversePostOrderBlockIteratorBegin()
-	require.Equal(t, blk, &f.reversePostOrderBlocks[0])
-	blk = f.ReversePostOrderBlockIteratorNext()
-	require.Equal(t, blk, &f.reversePostOrderBlocks[1])
-	blk = f.ReversePostOrderBlockIteratorNext()
-	require.Equal(t, blk, &f.reversePostOrderBlocks[2])
-	blk = f.ReversePostOrderBlockIteratorNext()
-	require.Nil(t, blk)
-}
-
 func TestRegAllocFunctionImpl_ReloadRegisterAfter(t *testing.T) {
 	ctx, _, m := newSetupWithMockContext()
 
@@ -66,9 +16,8 @@ func TestRegAllocFunctionImpl_ReloadRegisterAfter(t *testing.T) {
 	i1.next = i2
 	i2.prev = i1
 
-	f := &regAllocFunctionImpl{m: m}
-	f.ReloadRegisterAfter(x1VReg, i1)
-	f.ReloadRegisterAfter(v1VReg, i1)
+	m.InsertReloadRegisterAt(x1VReg, i1, true)
+	m.InsertReloadRegisterAt(v1VReg, i1, true)
 
 	require.NotEqual(t, i1, i2.prev)
 	require.NotEqual(t, i1.next, i2)
@@ -96,9 +45,8 @@ func TestRegAllocFunctionImpl_StoreRegisterBefore(t *testing.T) {
 	i1.next = i2
 	i2.prev = i1
 
-	f := &regAllocFunctionImpl{m: m}
-	f.StoreRegisterBefore(x1VReg, i2)
-	f.StoreRegisterBefore(v1VReg, i2)
+	m.InsertStoreRegisterAt(x1VReg, i2, false)
+	m.InsertStoreRegisterAt(v1VReg, i2, false)
 
 	require.NotEqual(t, i1, i2.prev)
 	require.NotEqual(t, i1.next, i2)
@@ -177,11 +125,11 @@ func TestMachine_insertStoreRegisterAt(t *testing.T) {
 					i2.prev = i1
 
 					if after {
-						m.insertStoreRegisterAt(v1VReg, i1, after)
-						m.insertStoreRegisterAt(x1VReg, i1, after)
+						m.InsertStoreRegisterAt(v1VReg, i1, after)
+						m.InsertStoreRegisterAt(x1VReg, i1, after)
 					} else {
-						m.insertStoreRegisterAt(x1VReg, i2, after)
-						m.insertStoreRegisterAt(v1VReg, i2, after)
+						m.InsertStoreRegisterAt(x1VReg, i2, after)
+						m.InsertStoreRegisterAt(v1VReg, i2, after)
 					}
 					m.executableContext.RootInstr = i1
 					require.Equal(t, tc.expected, m.Format())
@@ -250,11 +198,11 @@ func TestMachine_insertReloadRegisterAt(t *testing.T) {
 					i2.prev = i1
 
 					if after {
-						m.insertReloadRegisterAt(v1VReg, i1, after)
-						m.insertReloadRegisterAt(x1VReg, i1, after)
+						m.InsertReloadRegisterAt(v1VReg, i1, after)
+						m.InsertReloadRegisterAt(x1VReg, i1, after)
 					} else {
-						m.insertReloadRegisterAt(x1VReg, i2, after)
-						m.insertReloadRegisterAt(v1VReg, i2, after)
+						m.InsertReloadRegisterAt(x1VReg, i2, after)
+						m.InsertReloadRegisterAt(v1VReg, i2, after)
 					}
 					m.executableContext.RootInstr = i1
 
@@ -265,14 +213,13 @@ func TestMachine_insertReloadRegisterAt(t *testing.T) {
 	}
 }
 
-func TestRegAllocFunctionImpl_ClobberedRegisters(t *testing.T) {
+func TestRegMachine_ClobberedRegisters(t *testing.T) {
 	_, _, m := newSetupWithMockContext()
-	f := &regAllocFunctionImpl{m: m}
-	f.ClobberedRegisters([]regalloc.VReg{v19VReg, v19VReg, v19VReg, v19VReg})
+	m.ClobberedRegisters([]regalloc.VReg{v19VReg, v19VReg, v19VReg, v19VReg})
 	require.Equal(t, []regalloc.VReg{v19VReg, v19VReg, v19VReg, v19VReg}, m.clobberedRegs)
 }
 
-func TestMachine_swap(t *testing.T) {
+func TestMachineMachineswap(t *testing.T) {
 	for _, tc := range []struct {
 		x1, x2, tmp regalloc.VReg
 		expected    string
@@ -337,7 +284,7 @@ func TestMachine_swap(t *testing.T) {
 			cur.next = i2
 			i2.prev = cur
 
-			m.swap(cur, tc.x1, tc.x2, tc.tmp)
+			m.Swap(cur, tc.x1, tc.x2, tc.tmp)
 			m.executableContext.RootInstr = cur
 
 			require.Equal(t, tc.expected, m.Format())

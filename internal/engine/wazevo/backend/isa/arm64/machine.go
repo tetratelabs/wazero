@@ -20,7 +20,8 @@ type (
 		// abis maps ssa.SignatureID to the ABI implementation.
 		abis []functionABI
 
-		regAllocFn regAllocFunctionImpl
+		regAlloc   regalloc.Allocator
+		regAllocFn *backend.RegAllocFunction[*instruction, *machine]
 
 		// addendsWorkQueue is used during address lowering, defined here for reuse.
 		addendsWorkQueue queue[ssa.Value]
@@ -102,9 +103,8 @@ func NewBackend() backend.Machine {
 	m := &machine{
 		spillSlots:        make(map[regalloc.VRegID]int64),
 		executableContext: newExecutableContext(),
+		regAlloc:          regalloc.NewAllocator(regInfo),
 	}
-	m.regAllocFn.m = m
-	m.regAllocFn.labelToRegAllocBlockIndex = make(map[label]int)
 	return m
 }
 
@@ -117,9 +117,21 @@ func (m *machine) ExecutableContext() backend.ExecutableContext {
 	return m.executableContext
 }
 
+// RegAlloc implements backend.Machine Function.
+func (m *machine) RegAlloc() {
+	rf := m.regAllocFn
+	for _, pos := range m.executableContext.OrderedBlockLabels {
+		rf.AddBlock(pos.SB, pos.L, pos.Begin, pos.End)
+	}
+
+	m.regAllocStarted = true
+	m.regAlloc.DoAllocation(rf)
+	// Now that we know the final spill slot size, we must align spillSlotSize to 16 bytes.
+	m.spillSlotSize = (m.spillSlotSize + 15) &^ 15
+}
+
 // Reset implements backend.Machine.
 func (m *machine) Reset() {
-	m.regAllocStarted = false
 	m.clobberedRegs = m.clobberedRegs[:0]
 	for key := range m.spillSlots {
 		m.clobberedRegs = append(m.clobberedRegs, regalloc.VReg(key))
@@ -128,7 +140,9 @@ func (m *machine) Reset() {
 		delete(m.spillSlots, regalloc.VRegID(key))
 	}
 	m.clobberedRegs = m.clobberedRegs[:0]
-	m.regAllocFn.reset()
+	m.regAllocStarted = false
+	m.regAlloc.Reset()
+	m.regAllocFn.Reset()
 	m.spillSlotSize = 0
 	m.unresolvedAddressModes = m.unresolvedAddressModes[:0]
 	m.maxRequiredStackSizeForCalls = 0
@@ -148,12 +162,7 @@ func (m *machine) DisableStackCheck() {
 // SetCompiler implements backend.Machine.
 func (m *machine) SetCompiler(ctx backend.Compiler) {
 	m.compiler = ctx
-}
-
-// StartBlock implements backend.Machine.
-func (m *machine) StartBlock(blk ssa.BasicBlock) {
-	l, pos := m.executableContext.StartBlock(blk)
-	m.regAllocFn.addBlock(blk, l, pos)
+	m.regAllocFn = backend.NewRegAllocFunction[*instruction, *machine](m, ctx.SSABuilder(), ctx)
 }
 
 func (m *machine) insert(i *instruction) {

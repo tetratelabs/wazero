@@ -18,7 +18,8 @@ func NewBackend() backend.Machine {
 		asNop,
 	)
 	return &machine{
-		ectx: ectx,
+		ectx:     ectx,
+		regAlloc: regalloc.NewAllocator(regInfo),
 	}
 }
 
@@ -27,6 +28,8 @@ type machine struct {
 	c                        backend.Compiler
 	ectx                     *backend.ExecutableContextT[instruction]
 	stackBoundsCheckDisabled bool
+
+	regAlloc regalloc.Allocator
 
 	// abis maps ssa.SignatureID to the ABI implementation.
 	abis       []abiImpl
@@ -48,18 +51,9 @@ func (m *machine) DisableStackCheck() { m.stackBoundsCheckDisabled = true }
 // SetCompiler implements backend.Machine.
 func (m *machine) SetCompiler(compiler backend.Compiler) { m.c = compiler }
 
-// RegisterInfo implements backend.Machine.
-func (m *machine) RegisterInfo() *regalloc.RegisterInfo { return regInfo }
-
 // InitializeABI implements backend.Machine.
 func (m *machine) InitializeABI(sig *ssa.Signature) {
 	m.currentABI = m.getOrCreateFunctionABI(sig)
-}
-
-// StartBlock implements backend.Machine.
-func (m *machine) StartBlock(block ssa.BasicBlock) {
-	// TODO implement me
-	panic("implement me")
 }
 
 // LowerSingleBranch implements backend.Machine.
@@ -76,12 +70,6 @@ func (m *machine) LowerConditionalBranch(b *ssa.Instruction) {
 
 // LowerInstr implements backend.Machine.
 func (m *machine) LowerInstr(instruction *ssa.Instruction) {
-	// TODO implement me
-	panic("implement me")
-}
-
-// FlushPendingInstructions implements backend.Machine.
-func (m *machine) FlushPendingInstructions() {
 	// TODO implement me
 	panic("implement me")
 }
@@ -106,12 +94,6 @@ func (m *machine) InsertLoadConstant(instr *ssa.Instruction, vr regalloc.VReg) {
 
 // Format implements backend.Machine.
 func (m *machine) Format() string {
-	// TODO implement me
-	panic("implement me")
-}
-
-// Function implements backend.Machine.
-func (m *machine) Function() regalloc.Function {
 	// TODO implement me
 	panic("implement me")
 }
@@ -163,3 +145,6 @@ func (m *machine) CompileEntryPreamble(signature *ssa.Signature) []byte {
 	// TODO implement me
 	panic("implement me")
 }
+
+// RegAlloc implements backend.Machine.
+func (m *machine) RegAlloc() { panic("implement me") }
