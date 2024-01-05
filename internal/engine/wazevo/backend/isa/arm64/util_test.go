@@ -61,7 +61,7 @@ type mockCompiler struct {
 	buf         []byte
 }
 
-func (m *mockCompiler) SSABuilder() ssa.Builder { panic("TODO") }
+func (m *mockCompiler) SSABuilder() ssa.Builder { return nil }
 
 func (m *mockCompiler) LoopNestingForestRoots() []ssa.BasicBlock { panic("TODO") }
 

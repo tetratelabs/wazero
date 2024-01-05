@@ -318,7 +318,6 @@ func (a *Allocator) DoAllocation(f Function) {
 	a.livenessAnalysis(f)
 	a.alloc(f)
 	a.determineCalleeSavedRealRegs(f)
-	f.Done()
 }
 
 func (a *Allocator) determineCalleeSavedRealRegs(f Function) {
@@ -809,11 +808,11 @@ func (a *Allocator) reconcileEdge(f Function,
 			// This case is that the desired value is on the stack, but currentVReg is on the target register.
 			// We need to move the current value to the stack, and reload the desired value.
 			// TODO: we can do better here.
-			f.StoreRegisterBefore(currentVReg.SetRealReg(r), pred.LastInstr())
+			f.StoreRegisterBefore(currentVReg.SetRealReg(r), pred.LastInstrForInsertion())
 			delete(currentOccupantsRev, currentVReg)
 
 			s.getVRegState(desiredVReg).recordReload(f, pred)
-			f.ReloadRegisterBefore(desiredVReg.SetRealReg(r), pred.LastInstr())
+			f.ReloadRegisterBefore(desiredVReg.SetRealReg(r), pred.LastInstrForInsertion())
 			currentOccupants.add(r, desiredVReg)
 			currentOccupantsRev[desiredVReg] = r
 			return
@@ -849,12 +848,12 @@ func (a *Allocator) reconcileEdge(f Function,
 			f.InsertMoveBefore(
 				FromRealReg(r, typ),
 				desiredVReg.SetRealReg(currentReg),
-				pred.LastInstr(),
+				pred.LastInstrForInsertion(),
 			)
 			currentOccupants.remove(currentReg)
 		} else {
 			s.getVRegState(desiredVReg).recordReload(f, pred)
-			f.ReloadRegisterBefore(desiredVReg.SetRealReg(r), pred.LastInstr())
+			f.ReloadRegisterBefore(desiredVReg.SetRealReg(r), pred.LastInstrForInsertion())
 		}
 		currentOccupantsRev[desiredVReg] = r
 		currentOccupants.add(r, desiredVReg)

@@ -25,6 +25,8 @@ type mockMachine struct {
 	rinfo                  *regalloc.RegisterInfo
 }
 
+func (m mockMachine) RegAlloc() { panic("implement me") }
+
 func (m mockMachine) LowerParams(params []ssa.Value) { panic("implement me") }
 
 func (m mockMachine) LowerReturns(returns []ssa.Value) { panic("implement me") }

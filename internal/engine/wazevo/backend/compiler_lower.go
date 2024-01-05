@@ -33,7 +33,8 @@ func (c *compiler) lowerBlocks() {
 
 func (c *compiler) lowerBlock(blk ssa.BasicBlock) {
 	mach := c.mach
-	mach.StartBlock(blk)
+	ectx := mach.ExecutableContext()
+	ectx.StartBlock(blk)
 
 	// We traverse the instructions in reverse order because we might want to lower multiple
 	// instructions together.
@@ -59,7 +60,6 @@ func (c *compiler) lowerBlock(blk ssa.BasicBlock) {
 	}
 
 	// Now start lowering the non-branching instructions.
-	ectx := mach.ExecutableContext()
 	for ; cur != nil; cur = cur.Prev() {
 		c.setCurrentGroupID(cur.GroupID())
 		if cur.Lowered() {

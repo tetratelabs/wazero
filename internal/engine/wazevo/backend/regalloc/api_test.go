@@ -36,6 +36,7 @@ type (
 
 	// mockInstr implements Instr.
 	mockInstr struct {
+		next, prev                 *mockInstr
 		defs, uses                 []VReg
 		isCopy, isCall, isIndirect bool
 	}
@@ -58,6 +59,14 @@ func (m *mockFunction) loopNestingForestRoots(blocks ...*mockBlock) {
 }
 
 func newMockBlock(id int, instructions ...*mockInstr) *mockBlock {
+	if len(instructions) > 0 {
+		instructions[0].prev = nil
+		for i := 1; i < len(instructions); i++ {
+			instructions[i].prev = instructions[i-1]
+			instructions[i-1].next = instructions[i]
+		}
+		instructions[len(instructions)-1].next = nil
+	}
 	return &mockBlock{id: id, instructions: instructions}
 }
 
@@ -260,6 +269,9 @@ func (m *mockInstr) Defs(ret *[]VReg) []VReg {
 	return *ret
 }
 
+// AddedBeforeRegAlloc implements Instr.
+func (m *mockInstr) AddedBeforeRegAlloc() bool { return true }
+
 // Uses implements Instr.
 func (m *mockInstr) Uses(ret *[]VReg) []VReg {
 	*ret = append((*ret)[:0], m.uses...)
@@ -277,6 +289,12 @@ func (m *mockInstr) IsIndirectCall() bool { return m.isIndirect }
 
 // IsReturn implements Instr.
 func (m *mockInstr) IsReturn() bool { return false }
+
+// Next implements Instr.
+func (m *mockInstr) Next() Instr { return m.next }
+
+// Prev implements Instr.
+func (m *mockInstr) Prev() Instr { return m.prev }
 
 // Entry implements Entry.
 func (m *mockBlock) Entry() bool { return m._entry }
@@ -328,7 +346,24 @@ func (m *mockBlock) LoopNestingForestChild(i int) Block {
 	return m.lnfChildren[i]
 }
 
-func (m *mockBlock) LastInstr() Instr {
+func (m *mockBlock) BeginInstr() Instr {
+	if len(m.instructions) == 0 {
+		return nil
+	}
+	return m.instructions[0]
+}
+
+func (m *mockBlock) EndInstr() Instr {
+	if len(m.instructions) == 0 {
+		return nil
+	}
+	return m.instructions[len(m.instructions)-1]
+}
+
+func (m *mockBlock) LastInstrForInsertion() Instr {
+	if len(m.instructions) == 0 {
+		return nil
+	}
 	return m.instructions[len(m.instructions)-1]
 }
 
