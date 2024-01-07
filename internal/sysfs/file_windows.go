@@ -56,14 +56,41 @@ func writeFd(fd uintptr, buf []byte) (int, sys.Errno) {
 
 func readSocket(h uintptr, buf []byte) (int, sys.Errno) {
 	// Poll the socket to ensure that we never perform a blocking/overlapped Read.
+	//
+	// When the socket is closed by the remote peer, wsaPoll will return n=1 and
+	// errno=0, and syscall.ReadFile will return n=0 and errno=0 -- which indicates
+	// io.EOF.
 	if n, errno := wsaPoll(
 		[]pollFd{newPollFd(h, _POLLIN, 0)}, 0); !errors.Is(errno, sys.Errno(0)) {
 		return 0, sys.UnwrapOSError(errno)
 	} else if n <= 0 {
 		return 0, sys.EAGAIN
 	}
-	n, err := syscall.Read(syscall.Handle(h), buf)
-	return n, sys.UnwrapOSError(err)
+
+	// Properly use overlapped result.
+	//
+	// If hFile was opened with FILE_FLAG_OVERLAPPED, the following conditions are in effect:
+	//  - The lpOverlapped parameter must point to a valid and unique OVERLAPPED structure,
+	//  otherwise the function can incorrectly report that the read operation is complete.
+	//  - The lpNumberOfBytesRead parameter should be set to NULL. Use the GetOverlappedResult
+	//  function to get the actual number of bytes read. If the hFile parameter is associated
+	//  with an I/O completion port, you can also get the number of bytes read by calling the
+	//  GetQueuedCompletionStatus function.
+	//
+	// We are currently skipping checking if hFile was opened with FILE_FLAG_OVERLAPPED but using
+	// both lpOverlapped and lpNumberOfBytesRead.
+
+	var overlapped syscall.Overlapped
+	var done uint32
+	errno := syscall.ReadFile(syscall.Handle(h), buf, &done, &overlapped)
+	if errors.Is(errno, syscall.ERROR_IO_PENDING) {
+		nBytesTransferred, errno := getOverlappedResult(syscall.Handle(h), &overlapped, false)
+		if errors.Is(errno, _ERROR_IO_INCOMPLETE) {
+			return int(nBytesTransferred), sys.EAGAIN
+		}
+	}
+
+	return int(done), sys.UnwrapOSError(errno)
 }
 
 func writeSocket(fd uintptr, buf []byte) (int, sys.Errno) {
@@ -95,4 +122,20 @@ func peekNamedPipe(handle syscall.Handle) (uint32, syscall.Errno) {
 func rmdir(path string) sys.Errno {
 	err := syscall.Rmdir(path)
 	return sys.UnwrapOSError(err)
+}
+
+func getOverlappedResult(handle syscall.Handle, overlapped *syscall.Overlapped, wait bool) (uint32, syscall.Errno) {
+	var totalBytesAvail uint32
+	var bwait uintptr
+	if wait {
+		bwait = 0xFFFFFFFF
+	}
+	totalBytesPtr := unsafe.Pointer(&totalBytesAvail)
+	_, _, errno := syscall.SyscallN(
+		procGetOverlappedResult.Addr(),
+		uintptr(handle),                     // [in]  HANDLE       hFile,
+		uintptr(unsafe.Pointer(overlapped)), // [in]  LPOVERLAPPED lpOverlapped,
+		uintptr(totalBytesPtr),              // [out] LPDWORD      lpNumberOfBytesTransferred,
+		bwait)                               // [in]  BOOL         bWait
+	return totalBytesAvail, errno
 }
