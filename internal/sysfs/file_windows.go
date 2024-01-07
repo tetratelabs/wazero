@@ -19,7 +19,9 @@ var kernel32 = syscall.NewLazyDLL("kernel32.dll")
 
 // procPeekNamedPipe is the syscall.LazyProc in kernel32 for PeekNamedPipe
 var (
-	procPeekNamedPipe       = kernel32.NewProc("PeekNamedPipe")
+	// procPeekNamedPipe is the syscall.LazyProc in kernel32 for PeekNamedPipe
+	procPeekNamedPipe = kernel32.NewProc("PeekNamedPipe")
+	// procGetOverlappedResult is the syscall.LazyProc in kernel32 for GetOverlappedResult
 	procGetOverlappedResult = kernel32.NewProc("GetOverlappedResult")
 )
 
@@ -53,16 +55,15 @@ func writeFd(fd uintptr, buf []byte) (int, sys.Errno) {
 }
 
 func readSocket(h uintptr, buf []byte) (int, sys.Errno) {
-	var overlapped syscall.Overlapped
-	var done uint32
-	errno := syscall.ReadFile(syscall.Handle(h), buf, &done, &overlapped)
-	if errors.Is(errno, syscall.ERROR_IO_PENDING) {
-		done, errno = getOverlappedResult(syscall.Handle(h), &overlapped, false)
-		if errors.Is(errno, _ERROR_IO_INCOMPLETE) {
-			return int(done), sys.EAGAIN
-		}
+	// Poll the socket to ensure that we never perform a blocking/overlapped Read.
+	if n, errno := wsaPoll(
+		[]pollFd{newPollFd(h, _POLLIN, 0)}, 0); !errors.Is(errno, sys.Errno(0)) {
+		return 0, sys.UnwrapOSError(errno)
+	} else if n <= 0 {
+		return 0, sys.EAGAIN
 	}
-	return int(done), sys.UnwrapOSError(errno)
+	n, err := syscall.Read(syscall.Handle(h), buf)
+	return n, sys.UnwrapOSError(err)
 }
 
 func writeSocket(fd uintptr, buf []byte) (int, sys.Errno) {
@@ -73,22 +74,6 @@ func writeSocket(fd uintptr, buf []byte) (int, sys.Errno) {
 		errno = syscall.EAGAIN
 	}
 	return int(done), sys.UnwrapOSError(errno)
-}
-
-func getOverlappedResult(handle syscall.Handle, overlapped *syscall.Overlapped, wait bool) (uint32, syscall.Errno) {
-	var totalBytesAvail uint32
-	var bwait uintptr
-	if wait {
-		bwait = 0xFFFFFFFF
-	}
-	totalBytesPtr := unsafe.Pointer(&totalBytesAvail)
-	_, _, errno := syscall.SyscallN(
-		procGetOverlappedResult.Addr(),
-		uintptr(handle),                     // [in]  HANDLE       hFile,
-		uintptr(unsafe.Pointer(overlapped)), // [in]  LPOVERLAPPED lpOverlapped,
-		uintptr(totalBytesPtr),              // [out] LPDWORD      lpNumberOfBytesTransferred,
-		bwait)                               // [in]  BOOL         bWait
-	return totalBytesAvail, errno
 }
 
 // peekNamedPipe partially exposes PeekNamedPipe from the Win32 API
