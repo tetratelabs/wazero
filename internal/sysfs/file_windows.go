@@ -1,6 +1,7 @@
 package sysfs
 
 import (
+	"errors"
 	"syscall"
 	"unsafe"
 
@@ -10,12 +11,17 @@ import (
 const (
 	nonBlockingFileReadSupported  = true
 	nonBlockingFileWriteSupported = false
+
+	_ERROR_IO_INCOMPLETE = syscall.Errno(996)
 )
 
 var kernel32 = syscall.NewLazyDLL("kernel32.dll")
 
 // procPeekNamedPipe is the syscall.LazyProc in kernel32 for PeekNamedPipe
-var procPeekNamedPipe = kernel32.NewProc("PeekNamedPipe")
+var (
+	procPeekNamedPipe       = kernel32.NewProc("PeekNamedPipe")
+	procGetOverlappedResult = kernel32.NewProc("GetOverlappedResult")
+)
 
 // readFd returns ENOSYS on unsupported platforms.
 //
@@ -50,8 +56,11 @@ func readSocket(h uintptr, buf []byte) (int, sys.Errno) {
 	var overlapped syscall.Overlapped
 	var done uint32
 	errno := syscall.ReadFile(syscall.Handle(h), buf, &done, &overlapped)
-	if errno == syscall.ERROR_IO_PENDING {
-		errno = sys.EAGAIN
+	if errors.Is(errno, syscall.ERROR_IO_PENDING) {
+		done, errno = getOverlappedResult(syscall.Handle(h), &overlapped, false)
+		if errors.Is(errno, _ERROR_IO_INCOMPLETE) {
+			return int(done), sys.EAGAIN
+		}
 	}
 	return int(done), sys.UnwrapOSError(errno)
 }
@@ -60,10 +69,26 @@ func writeSocket(fd uintptr, buf []byte) (int, sys.Errno) {
 	var done uint32
 	var overlapped syscall.Overlapped
 	errno := syscall.WriteFile(syscall.Handle(fd), buf, &done, &overlapped)
-	if errno == syscall.ERROR_IO_PENDING {
+	if errors.Is(errno, syscall.ERROR_IO_PENDING) {
 		errno = syscall.EAGAIN
 	}
 	return int(done), sys.UnwrapOSError(errno)
+}
+
+func getOverlappedResult(handle syscall.Handle, overlapped *syscall.Overlapped, wait bool) (uint32, syscall.Errno) {
+	var totalBytesAvail uint32
+	var bwait uintptr
+	if wait {
+		bwait = 0xFFFFFFFF
+	}
+	totalBytesPtr := unsafe.Pointer(&totalBytesAvail)
+	_, _, errno := syscall.SyscallN(
+		procGetOverlappedResult.Addr(),
+		uintptr(handle),                     // [in]  HANDLE       hFile,
+		uintptr(unsafe.Pointer(overlapped)), // [in]  LPOVERLAPPED lpOverlapped,
+		uintptr(totalBytesPtr),              // [out] LPDWORD      lpNumberOfBytesTransferred,
+		bwait)                               // [in]  BOOL         bWait
+	return totalBytesAvail, errno
 }
 
 // peekNamedPipe partially exposes PeekNamedPipe from the Win32 API
