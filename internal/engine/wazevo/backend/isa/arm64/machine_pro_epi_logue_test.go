@@ -3,6 +3,7 @@ package arm64
 import (
 	"testing"
 
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
@@ -12,7 +13,7 @@ func TestMachine_SetupPrologue(t *testing.T) {
 		spillSlotSize int64
 		clobberedRegs []regalloc.VReg
 		exp           string
-		abi           functionABI
+		abi           backend.FunctionABI
 	}{
 		{
 			spillSlotSize: 0,
@@ -24,7 +25,7 @@ func TestMachine_SetupPrologue(t *testing.T) {
 		},
 		{
 			spillSlotSize: 0,
-			abi:           functionABI{ArgStackSize: 16, RetStackSize: 16},
+			abi:           backend.FunctionABI{ArgStackSize: 16, RetStackSize: 16},
 			exp: `
 	orr x27, xzr, #0x20
 	sub sp, sp, x27
@@ -74,7 +75,7 @@ func TestMachine_SetupPrologue(t *testing.T) {
 		},
 		{
 			spillSlotSize: 320,
-			abi:           functionABI{ArgStackSize: 320, RetStackSize: 160},
+			abi:           backend.FunctionABI{ArgStackSize: 320, RetStackSize: 160},
 			clobberedRegs: []regalloc.VReg{v18VReg, v19VReg, x18VReg, x25VReg},
 			exp: `
 	orr x27, xzr, #0x1e0
@@ -117,7 +118,7 @@ func TestMachine_SetupPrologue(t *testing.T) {
 func TestMachine_SetupEpilogue(t *testing.T) {
 	for _, tc := range []struct {
 		exp           string
-		abi           functionABI
+		abi           backend.FunctionABI
 		clobberedRegs []regalloc.VReg
 		spillSlotSize int64
 	}{
@@ -148,7 +149,7 @@ func TestMachine_SetupEpilogue(t *testing.T) {
 	add sp, sp, #0x20
 	ret
 `,
-			abi:           functionABI{ArgStackSize: 16, RetStackSize: 16},
+			abi:           backend.FunctionABI{ArgStackSize: 16, RetStackSize: 16},
 			spillSlotSize: 16 * 5,
 			clobberedRegs: nil,
 		},
@@ -201,7 +202,7 @@ func TestMachine_SetupEpilogue(t *testing.T) {
 	ret
 `,
 			spillSlotSize: 16 * 10,
-			abi:           functionABI{ArgStackSize: 16, RetStackSize: 320},
+			abi:           backend.FunctionABI{ArgStackSize: 16, RetStackSize: 320},
 			clobberedRegs: []regalloc.VReg{v18VReg, v27VReg, x18VReg, x25VReg},
 		},
 	} {

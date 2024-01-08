@@ -10,19 +10,24 @@ import (
 
 // mockMachine implements Machine for testing.
 type mockMachine struct {
-	startLoweringFunction  func(id ssa.BasicBlockID)
-	startBlock             func(block ssa.BasicBlock)
-	lowerSingleBranch      func(b *ssa.Instruction)
-	lowerConditionalBranch func(b *ssa.Instruction)
-	lowerInstr             func(instruction *ssa.Instruction)
-	endBlock               func()
-	endLoweringFunction    func()
-	reset                  func()
-	insertMove             func(dst, src regalloc.VReg)
-	insertLoadConstant     func(instr *ssa.Instruction, vr regalloc.VReg)
-	format                 func() string
-	linkAdjacentBlocks     func(prev, next ssa.BasicBlock)
-	rinfo                  *regalloc.RegisterInfo
+	argResultInts, argResultFloats []regalloc.RealReg
+	startLoweringFunction          func(id ssa.BasicBlockID)
+	startBlock                     func(block ssa.BasicBlock)
+	lowerSingleBranch              func(b *ssa.Instruction)
+	lowerConditionalBranch         func(b *ssa.Instruction)
+	lowerInstr                     func(instruction *ssa.Instruction)
+	endBlock                       func()
+	endLoweringFunction            func()
+	reset                          func()
+	insertMove                     func(dst, src regalloc.VReg)
+	insertLoadConstant             func(instr *ssa.Instruction, vr regalloc.VReg)
+	format                         func() string
+	linkAdjacentBlocks             func(prev, next ssa.BasicBlock)
+	rinfo                          *regalloc.RegisterInfo
+}
+
+func (m mockMachine) ArgsResultsRegs() (argResultInts, argResultFloats []regalloc.RealReg) {
+	return m.argResultInts, m.argResultFloats
 }
 
 func (m mockMachine) RegAlloc() { panic("implement me") }
@@ -78,8 +83,8 @@ func (m mockMachine) InsertReturn() { panic("TODO") }
 // LinkAdjacentBlocks implements Machine.LinkAdjacentBlocks.
 func (m mockMachine) LinkAdjacentBlocks(prev, next ssa.BasicBlock) { m.linkAdjacentBlocks(prev, next) }
 
-// InitializeABI implements Machine.InitializeABI.
-func (m mockMachine) InitializeABI(*ssa.Signature) {}
+// SetCurrentABI implements Machine.SetCurrentABI.
+func (m mockMachine) SetCurrentABI(*FunctionABI) {}
 
 // SetCompiler implements Machine.SetCompiler.
 func (m mockMachine) SetCompiler(Compiler) {}

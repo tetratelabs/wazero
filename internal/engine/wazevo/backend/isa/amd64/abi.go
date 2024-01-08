@@ -1,7 +1,6 @@
 package amd64
 
 import (
-	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 )
@@ -47,28 +46,9 @@ var regInfo = &regalloc.RegisterInfo{
 	},
 }
 
-// functionABIRegInfo implements backend.FunctionABIRegInfo.
-type functionABIRegInfo struct{}
-
-// ArgsResultsRegs implements backend.FunctionABIRegInfo.
-func (f functionABIRegInfo) ArgsResultsRegs() (argInts, argFloats, resultInt, resultFloats []regalloc.RealReg) {
-	return intArgResultRegs, floatArgResultRegs, intArgResultRegs, floatArgResultRegs
-}
-
-type abiImpl = backend.FunctionABI[functionABIRegInfo]
-
-func (m *machine) getOrCreateFunctionABI(sig *ssa.Signature) *abiImpl {
-	if int(sig.ID) >= len(m.abis) {
-		m.abis = append(m.abis, make([]abiImpl, int(sig.ID)+1)...)
-	}
-
-	abi := &m.abis[sig.ID]
-	if abi.Initialized {
-		return abi
-	}
-
-	abi.Init(sig)
-	return abi
+// ArgsResultsRegs implements backend.Machine.
+func (m *machine) ArgsResultsRegs() (argResultInts, argResultFloats []regalloc.RealReg) {
+	return intArgResultRegs, floatArgResultRegs
 }
 
 // LowerParams implements backend.Machine.

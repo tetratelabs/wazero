@@ -5,6 +5,7 @@ import (
 	"math"
 	"strings"
 
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 )
@@ -26,7 +27,7 @@ type (
 		u1, u2, u3          uint64
 		rd, rm, rn, ra      operand
 		amode               addressMode
-		abi                 *functionABI
+		abi                 *backend.FunctionABI
 		targets             []uint32
 		addedBeforeRegAlloc bool
 	}
@@ -461,13 +462,13 @@ func (i *instruction) AssignUse(index int, reg regalloc.VReg) {
 	}
 }
 
-func (i *instruction) asCall(ref ssa.FuncRef, abi *functionABI) {
+func (i *instruction) asCall(ref ssa.FuncRef, abi *backend.FunctionABI) {
 	i.kind = call
 	i.u1 = uint64(ref)
 	i.abi = abi
 }
 
-func (i *instruction) asCallIndirect(ptr regalloc.VReg, abi *functionABI) {
+func (i *instruction) asCallIndirect(ptr regalloc.VReg, abi *backend.FunctionABI) {
 	i.kind = callInd
 	i.rn = operandNR(ptr)
 	i.abi = abi
@@ -524,7 +525,7 @@ func (i *instruction) nop0Label() label {
 	return label(i.u1)
 }
 
-func (i *instruction) asRet(abi *functionABI) {
+func (i *instruction) asRet(abi *backend.FunctionABI) {
 	i.kind = ret
 	i.abi = abi
 }

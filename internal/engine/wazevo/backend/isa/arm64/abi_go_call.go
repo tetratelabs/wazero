@@ -20,8 +20,8 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 		argBegin++
 	}
 
-	abi := &functionABI{}
-	abi.Init(sig)
+	abi := &backend.FunctionABI{}
+	abi.Init(sig, intParamResultRegs, floatParamResultRegs)
 	m.currentABI = abi
 
 	cur := m.allocateInstr()

@@ -7,15 +7,9 @@ import (
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 )
 
-type FunctionABIRegInfo interface {
-	// ArgsResultsRegs returns the registers used for passing parameters.
-	ArgsResultsRegs() (argInts, argFloats, resultInt, resultFloats []regalloc.RealReg)
-}
-
 type (
 	// FunctionABI represents the ABI information for a function which corresponds to a ssa.Signature.
-	FunctionABI[R FunctionABIRegInfo] struct {
-		r           R
+	FunctionABI struct {
 		Initialized bool
 
 		Args, Rets                 []ABIArg
@@ -70,19 +64,17 @@ func (a ABIArgKind) String() string {
 }
 
 // Init initializes the abiImpl for the given signature.
-func (a *FunctionABI[M]) Init(sig *ssa.Signature) {
-	argInts, argFloats, resultInts, resultFloats := a.r.ArgsResultsRegs()
-
+func (a *FunctionABI) Init(sig *ssa.Signature, argResultInts, argResultFloats []regalloc.RealReg) {
 	if len(a.Rets) < len(sig.Results) {
 		a.Rets = make([]ABIArg, len(sig.Results))
 	}
 	a.Rets = a.Rets[:len(sig.Results)]
-	a.RetStackSize = a.setABIArgs(a.Rets, sig.Results, argInts, argFloats)
+	a.RetStackSize = a.setABIArgs(a.Rets, sig.Results, argResultInts, argResultFloats)
 	if argsNum := len(sig.Params); len(a.Args) < argsNum {
 		a.Args = make([]ABIArg, argsNum)
 	}
 	a.Args = a.Args[:len(sig.Params)]
-	a.ArgStackSize = a.setABIArgs(a.Args, sig.Params, resultInts, resultFloats)
+	a.ArgStackSize = a.setABIArgs(a.Args, sig.Params, argResultInts, argResultFloats)
 
 	// Gather the real registers usages in arg/return.
 	a.RetRealRegs = a.RetRealRegs[:0]
@@ -106,7 +98,7 @@ func (a *FunctionABI[M]) Init(sig *ssa.Signature) {
 
 // setABIArgs sets the ABI arguments in the given slice. This assumes that len(s) >= len(types)
 // where if len(s) > len(types), the last elements of s is for the multi-return slot.
-func (a *FunctionABI[M]) setABIArgs(s []ABIArg, types []ssa.Type, ints, floats []regalloc.RealReg) (stackSize int64) {
+func (a *FunctionABI) setABIArgs(s []ABIArg, types []ssa.Type, ints, floats []regalloc.RealReg) (stackSize int64) {
 	il, fl := len(ints), len(floats)
 
 	var stackOffset int64
@@ -145,7 +137,7 @@ func (a *FunctionABI[M]) setABIArgs(s []ABIArg, types []ssa.Type, ints, floats [
 	return stackOffset
 }
 
-func (a *FunctionABI[M]) AlignedArgResultStackSlotSize() int64 {
+func (a *FunctionABI) AlignedArgResultStackSlotSize() int64 {
 	stackSlotSize := a.RetStackSize + a.ArgStackSize
 	// Align stackSlotSize to 16 bytes.
 	stackSlotSize = (stackSlotSize + 15) &^ 15
