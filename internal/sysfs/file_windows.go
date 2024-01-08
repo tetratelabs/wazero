@@ -3,7 +3,6 @@ package sysfs
 import (
 	"errors"
 	"syscall"
-	"time"
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/experimental/sys"
@@ -99,15 +98,16 @@ func readSocket(h uintptr, buf []byte) (int, sys.Errno) {
 		if errno != nil {
 			return 0, sys.UnwrapOSError(errno) // This is a fatal error. CancelIo failed.
 		}
-		time.Sleep(1 * time.Nanosecond) // tmpfix: This is to make sure that I/O is cancelled before we wait for it. Otherwise, we will see ERROR_IO_PENDING.
+		// // Temp Fix: This is to make sure that I/O is cancelled before we wait for it.
+		// // Otherwise, we may still see ERROR_IO_PENDING.
+		// //
+		// // Disabled: This is not a good fix since it does not address the root cause.
+		// // And the alleged bug cannot be reproduced in any test.
+		// time.Sleep(1 * time.Nanosecond)
 
 		done, errno = getOverlappedResult(syscall.Handle(h), &overlapped, true) // wait for I/O to complete(cancel or finish). Overwrite done and errno.
 		if errors.Is(errno, syscall.ERROR_OPERATION_ABORTED) {
 			return int(done), sys.EAGAIN // This is one of the expected behavior, I/O was cancelled(completed) before finished.
-		} else if errors.Is(errno, _ERROR_IO_INCOMPLETE) {
-			return int(done), sys.ENOTSUP // Fatal: This will be unexpected. By passing true to wait, we should not see this error.
-		} else if errors.Is(errno, syscall.ERROR_IO_PENDING) {
-			return int(done), sys.ENOTSUP // Bug: This is unexpected. I/O must complete since we waited for it in GetOverlappedResult. However, if we skip time.Sleep, there is a chance we still see this error.
 		}
 	}
 
