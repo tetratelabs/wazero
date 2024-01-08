@@ -29,14 +29,23 @@ type machine struct {
 	ectx                     *backend.ExecutableContextT[instruction]
 	stackBoundsCheckDisabled bool
 
-	regAlloc   regalloc.Allocator
-	currentABI *backend.FunctionABI
+	regAlloc        regalloc.Allocator
+	regAllocFn      *backend.RegAllocFunction[*instruction, *machine]
+	regAllocStarted bool
+
+	spillSlotSize int64
+	currentABI    *backend.FunctionABI
+	clobberedRegs []regalloc.VReg
 }
 
 // Reset implements backend.Machine.
 func (m *machine) Reset() {
 	m.stackBoundsCheckDisabled = false
 	m.ectx.Reset()
+
+	m.regAllocFn.Reset()
+	m.regAlloc.Reset()
+	m.regAllocStarted = false
 }
 
 // ExecutableContext implements backend.Machine.
@@ -51,6 +60,19 @@ func (m *machine) SetCompiler(compiler backend.Compiler) { m.c = compiler }
 // SetCurrentABI implements backend.Machine.
 func (m *machine) SetCurrentABI(abi *backend.FunctionABI) {
 	m.currentABI = abi
+}
+
+// RegAlloc implements backend.Machine.
+func (m *machine) RegAlloc() {
+	rf := m.regAllocFn
+	for _, pos := range m.ectx.OrderedBlockLabels {
+		rf.AddBlock(pos.SB, pos.L, pos.Begin, pos.End)
+	}
+
+	m.regAllocStarted = true
+	m.regAlloc.DoAllocation(rf)
+	// Now that we know the final spill slot size, we must align spillSlotSize to 16 bytes.
+	m.spillSlotSize = (m.spillSlotSize + 15) &^ 15
 }
 
 // LowerSingleBranch implements backend.Machine.
@@ -142,6 +164,3 @@ func (m *machine) CompileEntryPreamble(signature *ssa.Signature) []byte {
 	// TODO implement me
 	panic("implement me")
 }
-
-// RegAlloc implements backend.Machine.
-func (m *machine) RegAlloc() { panic("implement me") }
