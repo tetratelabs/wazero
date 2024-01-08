@@ -61,6 +61,11 @@ type mockCompiler struct {
 	buf         []byte
 }
 
+func (m *mockCompiler) GetFunctionABI(sig *ssa.Signature) *backend.FunctionABI {
+	// TODO implement me
+	panic("implement me")
+}
+
 func (m *mockCompiler) SSABuilder() ssa.Builder { return nil }
 
 func (m *mockCompiler) LoopNestingForestRoots() []ssa.BasicBlock { panic("TODO") }

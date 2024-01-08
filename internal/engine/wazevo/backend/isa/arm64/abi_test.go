@@ -13,12 +13,12 @@ func TestAbiImpl_init(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		sig  *ssa.Signature
-		exp  functionABI
+		exp  backend.FunctionABI
 	}{
 		{
 			name: "empty sig",
 			sig:  &ssa.Signature{},
-			exp:  functionABI{},
+			exp:  backend.FunctionABI{},
 		},
 		{
 			name: "small sig",
@@ -26,7 +26,7 @@ func TestAbiImpl_init(t *testing.T) {
 				Params:  []ssa.Type{ssa.TypeI32, ssa.TypeF32, ssa.TypeI32},
 				Results: []ssa.Type{ssa.TypeI64, ssa.TypeF64},
 			},
-			exp: functionABI{
+			exp: backend.FunctionABI{
 				Args: []backend.ABIArg{
 					{Index: 0, Kind: backend.ABIArgKindReg, Reg: x0VReg, Type: ssa.TypeI32},
 					{Index: 1, Kind: backend.ABIArgKindReg, Reg: v0VReg, Type: ssa.TypeF32},
@@ -80,7 +80,7 @@ func TestAbiImpl_init(t *testing.T) {
 					ssa.TypeI64, ssa.TypeF64,
 				},
 			},
-			exp: functionABI{
+			exp: backend.FunctionABI{
 				ArgStackSize: 128, RetStackSize: 128,
 				Args: []backend.ABIArg{
 					{Index: 0, Kind: backend.ABIArgKindReg, Reg: x0VReg, Type: ssa.TypeI32},
@@ -178,7 +178,7 @@ func TestAbiImpl_init(t *testing.T) {
 					ssa.TypeI64, ssa.TypeF64,
 				},
 			},
-			exp: functionABI{
+			exp: backend.FunctionABI{
 				Args: []backend.ABIArg{
 					{Index: 0, Kind: backend.ABIArgKindReg, Reg: x0VReg, Type: ssa.TypeI32},
 					{Index: 1, Kind: backend.ABIArgKindReg, Reg: v0VReg, Type: ssa.TypeF32},
@@ -222,8 +222,8 @@ func TestAbiImpl_init(t *testing.T) {
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			abi := functionABI{}
-			abi.Init(tc.sig)
+			abi := backend.FunctionABI{}
+			abi.Init(tc.sig, intParamResultRegs, floatParamResultRegs)
 			require.Equal(t, tc.exp.Args, abi.Args)
 			require.Equal(t, tc.exp.Rets, abi.Rets)
 			require.Equal(t, tc.exp.ArgStackSize, abi.ArgStackSize)
@@ -264,7 +264,8 @@ func TestAbiImpl_callerGenVRegToFunctionArg_constant_inlining(t *testing.T) {
 
 	i64 := builder.AllocateInstruction().AsIconst64(10).Insert(builder)
 	f64 := builder.AllocateInstruction().AsF64const(3.14).Insert(builder)
-	abi := m.getOrCreateFunctionABI(&ssa.Signature{Params: []ssa.Type{ssa.TypeI64, ssa.TypeF64}})
+	abi := &backend.FunctionABI{}
+	abi.Init(&ssa.Signature{Params: []ssa.Type{ssa.TypeI64, ssa.TypeF64}}, intParamResultRegs, floatParamResultRegs)
 	m.callerGenVRegToFunctionArg(abi, 0, regalloc.VReg(100).SetRegType(regalloc.RegTypeInt), &backend.SSAValueDefinition{Instr: i64, RefCount: 1}, 0)
 	m.callerGenVRegToFunctionArg(abi, 1, regalloc.VReg(50).SetRegType(regalloc.RegTypeFloat), &backend.SSAValueDefinition{Instr: f64, RefCount: 1}, 0)
 	require.Equal(t, `movz x100?, #0xa, lsl 0

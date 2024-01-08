@@ -3,6 +3,7 @@ package arm64
 import (
 	"testing"
 
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
@@ -79,7 +80,7 @@ func TestMachine_arg0OffsetFromSP(t *testing.T) {
 func TestMachine_ret0OffsetFromSP(t *testing.T) {
 	m := &machine{
 		clobberedRegs: make([]regalloc.VReg, 10), spillSlotSize: 16 * 8,
-		currentABI: &functionABI{ArgStackSize: 180},
+		currentABI: &backend.FunctionABI{ArgStackSize: 180},
 	}
 	require.Equal(t, int64(16*18)+32+180, m.ret0OffsetFromSP())
 }

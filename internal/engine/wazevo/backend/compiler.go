@@ -16,9 +16,12 @@ func NewCompiler(ctx context.Context, mach Machine, builder ssa.Builder) Compile
 }
 
 func newCompiler(_ context.Context, mach Machine, builder ssa.Builder) *compiler {
+	argResultInts, argResultFloats := mach.ArgsResultsRegs()
 	c := &compiler{
 		mach: mach, ssaBuilder: builder,
-		nextVRegID: regalloc.VRegIDNonReservedBegin,
+		nextVRegID:      regalloc.VRegIDNonReservedBegin,
+		argResultInts:   argResultInts,
+		argResultFloats: argResultFloats,
 	}
 	mach.SetCompiler(c)
 	return c
@@ -96,6 +99,9 @@ type Compiler interface {
 
 	// Emit4Bytes appends 4 bytes to the buffer. Used during the code emission.
 	Emit4Bytes(b uint32)
+
+	// GetFunctionABI returns the ABI information for the given signature.
+	GetFunctionABI(sig *ssa.Signature) *FunctionABI
 }
 
 // RelocationInfo represents the relocation information for a call instruction.
@@ -135,6 +141,9 @@ type compiler struct {
 	buf             []byte
 	relocations     []RelocationInfo
 	sourceOffsets   []SourceOffsetInfo
+	// abis maps ssa.SignatureID to the ABI implementation.
+	abis                           []FunctionABI
+	argResultInts, argResultFloats []regalloc.RealReg
 }
 
 // SourceOffsetInfo is a data to associate the source offset with the executable offset.
@@ -379,4 +388,18 @@ func (c *compiler) Emit4Bytes(b uint32) {
 // Buf implements Compiler.Buf.
 func (c *compiler) Buf() []byte {
 	return c.buf
+}
+
+func (c *compiler) GetFunctionABI(sig *ssa.Signature) *FunctionABI {
+	if int(sig.ID) >= len(c.abis) {
+		c.abis = append(c.abis, make([]FunctionABI, int(sig.ID)+1)...)
+	}
+
+	abi := &c.abis[sig.ID]
+	if abi.Initialized {
+		return abi
+	}
+
+	abi.Init(sig, c.argResultInts, c.argResultFloats)
+	return abi
 }

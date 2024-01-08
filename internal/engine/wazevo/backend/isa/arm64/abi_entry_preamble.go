@@ -135,8 +135,9 @@ func (m *machine) goEntryPreamblePassResult(cur *instruction, resultSlicePtr reg
 }
 
 func (m *machine) constructEntryPreamble(sig *ssa.Signature) (root *instruction) {
-	abi := functionABI{}
-	abi.Init(sig)
+	abi := backend.FunctionABI{}
+	m.ArgsResultsRegs()
+	abi.Init(sig, intParamResultRegs, floatParamResultRegs)
 
 	root = m.allocateNop()
 

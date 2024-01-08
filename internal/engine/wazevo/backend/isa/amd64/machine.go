@@ -29,11 +29,8 @@ type machine struct {
 	ectx                     *backend.ExecutableContextT[instruction]
 	stackBoundsCheckDisabled bool
 
-	regAlloc regalloc.Allocator
-
-	// abis maps ssa.SignatureID to the ABI implementation.
-	abis       []abiImpl
-	currentABI *abiImpl
+	regAlloc   regalloc.Allocator
+	currentABI *backend.FunctionABI
 }
 
 // Reset implements backend.Machine.
@@ -51,9 +48,9 @@ func (m *machine) DisableStackCheck() { m.stackBoundsCheckDisabled = true }
 // SetCompiler implements backend.Machine.
 func (m *machine) SetCompiler(compiler backend.Compiler) { m.c = compiler }
 
-// InitializeABI implements backend.Machine.
-func (m *machine) InitializeABI(sig *ssa.Signature) {
-	m.currentABI = m.getOrCreateFunctionABI(sig)
+// SetCurrentABI implements backend.Machine.
+func (m *machine) SetCurrentABI(abi *backend.FunctionABI) {
+	m.currentABI = abi
 }
 
 // LowerSingleBranch implements backend.Machine.

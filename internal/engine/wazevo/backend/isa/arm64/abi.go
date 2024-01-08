@@ -56,28 +56,9 @@ var regInfo = &regalloc.RegisterInfo{
 	},
 }
 
-// functionABIRegInfo implements backend.FunctionABIRegInfo.
-type functionABIRegInfo struct{}
-
-// ArgsResultsRegs implements backend.FunctionABIRegInfo.
-func (f functionABIRegInfo) ArgsResultsRegs() (argInts, argFloats, resultInt, resultFloats []regalloc.RealReg) {
-	return intParamResultRegs, floatParamResultRegs, intParamResultRegs, floatParamResultRegs
-}
-
-type functionABI = backend.FunctionABI[functionABIRegInfo]
-
-func (m *machine) getOrCreateFunctionABI(sig *ssa.Signature) *functionABI {
-	if int(sig.ID) >= len(m.abis) {
-		m.abis = append(m.abis, make([]functionABI, int(sig.ID)+1)...)
-	}
-
-	abi := &m.abis[sig.ID]
-	if abi.Initialized {
-		return abi
-	}
-
-	abi.Init(sig)
-	return abi
+// ArgsResultsRegs implements backend.Machine.
+func (m *machine) ArgsResultsRegs() (argResultInts, argResultFloats []regalloc.RealReg) {
+	return intParamResultRegs, floatParamResultRegs
 }
 
 // LowerParams implements backend.FunctionABI.
@@ -198,7 +179,7 @@ func (m *machine) LowerReturns(rets []ssa.Value) {
 
 // callerGenVRegToFunctionArg is the opposite of GenFunctionArgToVReg, which is used to generate the
 // caller side of the function call.
-func (m *machine) callerGenVRegToFunctionArg(a *functionABI, argIndex int, reg regalloc.VReg, def *backend.SSAValueDefinition, slotBegin int64) {
+func (m *machine) callerGenVRegToFunctionArg(a *backend.FunctionABI, argIndex int, reg regalloc.VReg, def *backend.SSAValueDefinition, slotBegin int64) {
 	arg := &a.Args[argIndex]
 	if def != nil && def.IsFromInstr() {
 		// Constant instructions are inlined.
@@ -220,7 +201,7 @@ func (m *machine) callerGenVRegToFunctionArg(a *functionABI, argIndex int, reg r
 	}
 }
 
-func (m *machine) callerGenFunctionReturnVReg(a *functionABI, retIndex int, reg regalloc.VReg, slotBegin int64) {
+func (m *machine) callerGenFunctionReturnVReg(a *backend.FunctionABI, retIndex int, reg regalloc.VReg, slotBegin int64) {
 	r := &a.Rets[retIndex]
 	if r.Kind == backend.ABIArgKindReg {
 		m.InsertMove(reg, r.Reg, r.Type)
@@ -284,7 +265,7 @@ func (m *machine) lowerCall(si *ssa.Instruction) {
 	} else {
 		indirectCalleePtr, sigID, args = si.CallIndirectData()
 	}
-	calleeABI := m.getOrCreateFunctionABI(m.compiler.SSABuilder().ResolveSignature(sigID))
+	calleeABI := m.compiler.GetFunctionABI(m.compiler.SSABuilder().ResolveSignature(sigID))
 
 	stackSlotSize := calleeABI.AlignedArgResultStackSlotSize()
 	if m.maxRequiredStackSizeForCalls < stackSlotSize+16 {

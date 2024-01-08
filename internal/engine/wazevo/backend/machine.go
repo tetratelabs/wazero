@@ -16,8 +16,8 @@ type (
 		// DisableStackCheck disables the stack check for the current compilation for debugging/testing.
 		DisableStackCheck()
 
-		// InitializeABI initializes the FunctionABI for the given signature.
-		InitializeABI(sig *ssa.Signature)
+		// SetCurrentABI initializes the FunctionABI for the given signature.
+		SetCurrentABI(abi *FunctionABI)
 
 		// SetCompiler sets the compilation context used for the lifetime of Machine.
 		// This is only called once per Machine, i.e. before the first compilation.
@@ -88,5 +88,8 @@ type (
 
 		// LowerReturns lowers the given returns.
 		LowerReturns(returns []ssa.Value)
+
+		// ArgsResultsRegs returns the registers used for arguments and return values.
+		ArgsResultsRegs() (argResultInts, argResultFloats []regalloc.RealReg)
 	}
 )

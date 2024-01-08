@@ -623,7 +623,7 @@ func Test_goFunctionCallStoreStackResult(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				_, _, m := newSetupWithMockContext()
-				m.currentABI = &functionABI{ArgStackSize: 8}
+				m.currentABI = &backend.FunctionABI{ArgStackSize: 8}
 
 				nop := m.allocateNop()
 				m.goFunctionCallStoreStackResult(nop, spVReg, tc.result, tc.resultReg)

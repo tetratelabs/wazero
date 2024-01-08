@@ -16,9 +16,7 @@ type (
 	machine struct {
 		compiler          backend.Compiler
 		executableContext *backend.ExecutableContextT[instruction]
-		currentABI        *functionABI
-		// abis maps ssa.SignatureID to the ABI implementation.
-		abis []functionABI
+		currentABI        *backend.FunctionABI
 
 		regAlloc   regalloc.Allocator
 		regAllocFn *backend.RegAllocFunction[*instruction, *machine]
@@ -149,9 +147,9 @@ func (m *machine) Reset() {
 	m.executableContext.Reset()
 }
 
-// InitializeABI implements backend.Machine InitializeABI.
-func (m *machine) InitializeABI(sig *ssa.Signature) {
-	m.currentABI = m.getOrCreateFunctionABI(sig)
+// SetCurrentABI implements backend.Machine SetCurrentABI.
+func (m *machine) SetCurrentABI(abi *backend.FunctionABI) {
+	m.currentABI = abi
 }
 
 // DisableStackCheck implements backend.Machine DisableStackCheck.

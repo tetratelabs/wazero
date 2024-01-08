@@ -8,7 +8,7 @@ import (
 // Lower implements Compiler.Lower.
 func (c *compiler) Lower() {
 	c.assignVirtualRegisters()
-	c.mach.InitializeABI(c.ssaBuilder.Signature())
+	c.mach.SetCurrentABI(c.GetFunctionABI(c.ssaBuilder.Signature()))
 	c.mach.ExecutableContext().StartLoweringFunction(c.ssaBuilder.BlockIDMax())
 	c.lowerBlocks()
 }
