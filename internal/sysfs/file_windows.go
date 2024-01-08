@@ -3,6 +3,7 @@ package sysfs
 import (
 	"errors"
 	"syscall"
+	"time"
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/experimental/sys"
@@ -23,6 +24,8 @@ var (
 	procPeekNamedPipe = kernel32.NewProc("PeekNamedPipe")
 	// procGetOverlappedResult is the syscall.LazyProc in kernel32 for GetOverlappedResult
 	procGetOverlappedResult = kernel32.NewProc("GetOverlappedResult")
+	// procCreateEventW is the syscall.LazyProc in kernel32 for CreateEventW
+	procCreateEventW = kernel32.NewProc("CreateEventW")
 )
 
 // readFd returns ENOSYS on unsupported platforms.
@@ -81,12 +84,30 @@ func readSocket(h uintptr, buf []byte) (int, sys.Errno) {
 	// both lpOverlapped and lpNumberOfBytesRead.
 
 	var overlapped syscall.Overlapped
+
+	// Create an event to wait on.
+	if hEvent, err := createEventW(nil, true, false, nil); err != 0 {
+		return 0, sys.UnwrapOSError(err)
+	} else {
+		overlapped.HEvent = syscall.Handle(hEvent)
+	}
+
 	var done uint32
 	errno := syscall.ReadFile(syscall.Handle(h), buf, &done, &overlapped)
 	if errors.Is(errno, syscall.ERROR_IO_PENDING) {
-		nBytesTransferred, errno := getOverlappedResult(syscall.Handle(h), &overlapped, false)
-		if errors.Is(errno, _ERROR_IO_INCOMPLETE) {
-			return int(nBytesTransferred), sys.EAGAIN
+		errno = syscall.CancelIo(syscall.Handle(h))
+		if errno != nil {
+			return 0, sys.UnwrapOSError(errno) // This is a fatal error. CancelIo failed.
+		}
+		time.Sleep(1 * time.Nanosecond) // tmpfix: This is to make sure that I/O is cancelled before we wait for it. Otherwise, we will see ERROR_IO_PENDING.
+
+		done, errno = getOverlappedResult(syscall.Handle(h), &overlapped, true) // wait for I/O to complete(cancel or finish). Overwrite done and errno.
+		if errors.Is(errno, syscall.ERROR_OPERATION_ABORTED) {
+			return int(done), sys.EAGAIN // This is one of the expected behavior, I/O was cancelled(completed) before finished.
+		} else if errors.Is(errno, _ERROR_IO_INCOMPLETE) {
+			return int(done), sys.ENOTSUP // Fatal: This will be unexpected. By passing true to wait, we should not see this error.
+		} else if errors.Is(errno, syscall.ERROR_IO_PENDING) {
+			return int(done), sys.ENOTSUP // Bug: This is unexpected. I/O must complete since we waited for it in GetOverlappedResult. However, if we skip time.Sleep, there is a chance we still see this error.
 		}
 	}
 
@@ -138,4 +159,24 @@ func getOverlappedResult(handle syscall.Handle, overlapped *syscall.Overlapped, 
 		uintptr(totalBytesPtr),              // [out] LPDWORD      lpNumberOfBytesTransferred,
 		bwait)                               // [in]  BOOL         bWait
 	return totalBytesAvail, errno
+}
+
+func createEventW(lpEventAttributes *syscall.SecurityAttributes, bManualReset bool, bInitialState bool, lpName *uint16) (uintptr, syscall.Errno) {
+	var manualReset uintptr
+	var initialState uintptr
+	if bManualReset {
+		manualReset = 1
+	}
+	if bInitialState {
+		initialState = 1
+	}
+	handle, _, errno := syscall.SyscallN(
+		procCreateEventW.Addr(),
+		uintptr(unsafe.Pointer(lpEventAttributes)), // [in]     LPSECURITY_ATTRIBUTES lpEventAttributes,
+		manualReset,                     // [in]     BOOL                  bManualReset,
+		initialState,                    // [in]     BOOL                  bInitialState,
+		uintptr(unsafe.Pointer(lpName)), // [in, opt]LPCWSTR               lpName,
+	)
+
+	return handle, errno
 }
