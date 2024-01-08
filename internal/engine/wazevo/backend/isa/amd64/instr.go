@@ -20,6 +20,9 @@ func (i *instruction) Prev() regalloc.Instr {
 	return i.prev
 }
 
+// AddedBeforeRegAlloc implements regalloc.Instr.
+func (i *instruction) AddedBeforeRegAlloc() bool { return i.addedBeforeRegAlloc }
+
 // String implements regalloc.Instr.
 func (i *instruction) String() string {
 	// TODO implement me
@@ -70,12 +73,6 @@ func (i *instruction) IsIndirectCall() bool {
 
 // IsReturn implements regalloc.Instr.
 func (i *instruction) IsReturn() bool {
-	// TODO implement me
-	panic("implement me")
-}
-
-// AddedBeforeRegAlloc implements regalloc.Instr.
-func (i *instruction) AddedBeforeRegAlloc() bool {
 	// TODO implement me
 	panic("implement me")
 }
