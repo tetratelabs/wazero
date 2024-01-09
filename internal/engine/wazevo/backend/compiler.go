@@ -97,8 +97,14 @@ type Compiler interface {
 	// SourceOffsetInfo returns the source offset information for the current buffer offset.
 	SourceOffsetInfo() []SourceOffsetInfo
 
+	// EmitByte appends a byte to the buffer. Used during the code emission.
+	EmitByte(b byte)
+
 	// Emit4Bytes appends 4 bytes to the buffer. Used during the code emission.
 	Emit4Bytes(b uint32)
+
+	// Emit8Bytes appends 8 bytes to the buffer. Used during the code emission.
+	Emit8Bytes(b uint64)
 
 	// GetFunctionABI returns the ABI information for the given signature.
 	GetFunctionABI(sig *ssa.Signature) *FunctionABI
@@ -380,9 +386,19 @@ func (c *compiler) AddRelocationInfo(funcRef ssa.FuncRef) {
 	})
 }
 
-// Emit4Bytes implements Compiler.Add4Bytes.
+// Emit8Bytes implements Compiler.Emit8Bytes.
+func (c *compiler) Emit8Bytes(b uint64) {
+	c.buf = append(c.buf, byte(b), byte(b>>8), byte(b>>16), byte(b>>24), byte(b>>32), byte(b>>40), byte(b>>48), byte(b>>56))
+}
+
+// Emit4Bytes implements Compiler.Emit4Bytes.
 func (c *compiler) Emit4Bytes(b uint32) {
 	c.buf = append(c.buf, byte(b), byte(b>>8), byte(b>>16), byte(b>>24))
+}
+
+// EmitByte implements Compiler.EmitByte.
+func (c *compiler) EmitByte(b byte) {
+	c.buf = append(c.buf, b)
 }
 
 // Buf implements Compiler.Buf.

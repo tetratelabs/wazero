@@ -1,53 +1,12 @@
-package arm64
+package amd64
 
 import (
 	"context"
-	"strings"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 )
-
-func getPendingInstr(m *machine) *instruction {
-	return m.executableContext.PendingInstructions[0]
-}
-
-func formatEmittedInstructionsInCurrentBlock(m *machine) string {
-	m.executableContext.FlushPendingInstructions()
-	var strs []string
-	for cur := m.executableContext.PerBlockHead; cur != nil; cur = cur.next {
-		strs = append(strs, cur.String())
-	}
-	return strings.Join(strs, "\n")
-}
-
-func newSetup() (ssa.Builder, *machine) {
-	m := NewBackend().(*machine)
-	ssaB := ssa.NewBuilder()
-	backend.NewCompiler(context.Background(), m, ssaB)
-	blk := ssaB.AllocateBasicBlock()
-	ssaB.SetCurrentBlock(blk)
-	return ssaB, m
-}
-
-func newSetupWithMockContext() (*mockCompiler, ssa.Builder, *machine) {
-	ctx := newMockCompilationContext()
-	m := NewBackend().(*machine)
-	m.SetCompiler(ctx)
-	ssaB := ssa.NewBuilder()
-	blk := ssaB.AllocateBasicBlock()
-	ssaB.SetCurrentBlock(blk)
-	return ctx, ssaB, m
-}
-
-func regToVReg(reg regalloc.RealReg) regalloc.VReg {
-	return regalloc.VReg(0).SetRealReg(reg).SetRegType(regalloc.RegTypeInt)
-}
-
-func intToVReg(i int) regalloc.VReg {
-	return regalloc.VReg(i).SetRegType(regalloc.RegTypeInt)
-}
 
 // mockCompiler implements backend.Compiler for testing.
 type mockCompiler struct {
@@ -101,7 +60,7 @@ func (m *mockCompiler) Lower()                   {}
 func (m *mockCompiler) Format() string           { return "" }
 func (m *mockCompiler) Init()                    {}
 
-func newMockCompilationContext() *mockCompiler {
+func newMockCompilationContext() *mockCompiler { //nolint
 	return &mockCompiler{
 		vRegMap:     make(map[ssa.Value]regalloc.VReg),
 		definitions: make(map[ssa.Value]*backend.SSAValueDefinition),
