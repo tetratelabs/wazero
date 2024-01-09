@@ -81,7 +81,6 @@ func readSocket(h uintptr, buf []byte) (int, sys.Errno) {
 	//
 	// We are currently skipping checking if hFile was opened with FILE_FLAG_OVERLAPPED but using
 	// both lpOverlapped and lpNumberOfBytesRead.
-
 	var overlapped syscall.Overlapped
 
 	// Create an event to wait on.
@@ -98,12 +97,6 @@ func readSocket(h uintptr, buf []byte) (int, sys.Errno) {
 		if errno != nil {
 			return 0, sys.UnwrapOSError(errno) // This is a fatal error. CancelIo failed.
 		}
-		// // Temp Fix: This is to make sure that I/O is cancelled before we wait for it.
-		// // Otherwise, we may still see ERROR_IO_PENDING.
-		// //
-		// // Disabled: This is not a good fix since it does not address the root cause.
-		// // And the alleged bug cannot be reproduced in any test.
-		// time.Sleep(1 * time.Nanosecond)
 
 		done, errno = getOverlappedResult(syscall.Handle(h), &overlapped, true) // wait for I/O to complete(cancel or finish). Overwrite done and errno.
 		if errors.Is(errno, syscall.ERROR_OPERATION_ABORTED) {
