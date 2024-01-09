@@ -2,6 +2,8 @@ package amd64
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
@@ -23,20 +25,22 @@ func NewBackend() backend.Machine {
 	}
 }
 
-// machine implements backend.Machine for amd64.
-type machine struct {
-	c                        backend.Compiler
-	ectx                     *backend.ExecutableContextT[instruction]
-	stackBoundsCheckDisabled bool
+type (
+	// machine implements backend.Machine for amd64.
+	machine struct {
+		c                        backend.Compiler
+		ectx                     *backend.ExecutableContextT[instruction]
+		stackBoundsCheckDisabled bool
 
-	regAlloc        regalloc.Allocator
-	regAllocFn      *backend.RegAllocFunction[*instruction, *machine]
-	regAllocStarted bool
+		regAlloc        regalloc.Allocator
+		regAllocFn      *backend.RegAllocFunction[*instruction, *machine]
+		regAllocStarted bool
 
-	spillSlotSize int64
-	currentABI    *backend.FunctionABI
-	clobberedRegs []regalloc.VReg
-}
+		spillSlotSize int64
+		currentABI    *backend.FunctionABI
+		clobberedRegs []regalloc.VReg
+	}
+)
 
 // Reset implements backend.Machine.
 func (m *machine) Reset() {
@@ -75,6 +79,12 @@ func (m *machine) RegAlloc() {
 	m.spillSlotSize = (m.spillSlotSize + 15) &^ 15
 }
 
+// InsertReturn implements backend.Machine.
+func (m *machine) InsertReturn() {
+	i := m.allocateInstr().asRet(m.currentABI)
+	m.insert(i)
+}
+
 // LowerSingleBranch implements backend.Machine.
 func (m *machine) LowerSingleBranch(b *ssa.Instruction) {
 	// TODO implement me
@@ -95,26 +105,57 @@ func (m *machine) LowerInstr(instruction *ssa.Instruction) {
 
 // InsertMove implements backend.Machine.
 func (m *machine) InsertMove(dst, src regalloc.VReg, typ ssa.Type) {
-	// TODO implement me
-	panic("implement me")
-}
-
-// InsertReturn implements backend.Machine.
-func (m *machine) InsertReturn() {
-	// TODO implement me
-	panic("implement me")
-}
-
-// InsertLoadConstant implements backend.Machine.
-func (m *machine) InsertLoadConstant(instr *ssa.Instruction, vr regalloc.VReg) {
-	// TODO implement me
-	panic("implement me")
+	switch typ {
+	case ssa.TypeI32, ssa.TypeI64:
+		i := m.allocateInstr().asMovRR(src, dst, typ.Bits() == 64)
+		m.insert(i)
+	case ssa.TypeF32, ssa.TypeF64, ssa.TypeV128:
+		var op sseOpcode
+		switch typ {
+		case ssa.TypeF32:
+			op = sseOpcodeMovss
+		case ssa.TypeF64:
+			op = sseOpcodeMovsd
+		case ssa.TypeV128:
+			op = sseOpcodeMovdqa
+		}
+		i := m.allocateInstr().asXmmUnaryRmR(op, operand{kind: operandKindReg, r: src}, dst, typ.Bits() == 64)
+		m.insert(i)
+	default:
+		panic("BUG")
+	}
 }
 
 // Format implements backend.Machine.
 func (m *machine) Format() string {
-	// TODO implement me
-	panic("implement me")
+	ectx := m.ectx
+	begins := map[*instruction]backend.Label{}
+	for l, pos := range ectx.LabelPositions {
+		begins[pos.Begin] = l
+	}
+
+	irBlocks := map[backend.Label]ssa.BasicBlockID{}
+	for i, l := range ectx.SsaBlockIDToLabels {
+		irBlocks[l] = ssa.BasicBlockID(i)
+	}
+
+	var lines []string
+	for cur := ectx.RootInstr; cur != nil; cur = cur.next {
+		if l, ok := begins[cur]; ok {
+			var labelStr string
+			if blkID, ok := irBlocks[l]; ok {
+				labelStr = fmt.Sprintf("%s (SSA Block: %s):", l, blkID)
+			} else {
+				labelStr = fmt.Sprintf("%s:", l)
+			}
+			lines = append(lines, labelStr)
+		}
+		if cur.kind == nop0 {
+			continue
+		}
+		lines = append(lines, "\t"+cur.String())
+	}
+	return "\n" + strings.Join(lines, "\n") + "\n"
 }
 
 // SetupPrologue implements backend.Machine.
@@ -141,12 +182,6 @@ func (m *machine) ResolveRelocations(refToBinaryOffset map[ssa.FuncRef]int, bina
 	panic("implement me")
 }
 
-// Encode implements backend.Machine.
-func (m *machine) Encode() {
-	// TODO implement me
-	panic("implement me")
-}
-
 // CompileGoFunctionTrampoline implements backend.Machine.
 func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *ssa.Signature, needModuleContextPtr bool) []byte {
 	// TODO implement me
@@ -163,4 +198,18 @@ func (m *machine) CompileStackGrowCallSequence() []byte {
 func (m *machine) CompileEntryPreamble(signature *ssa.Signature) []byte {
 	// TODO implement me
 	panic("implement me")
+}
+
+// allocateInstr allocates an instruction.
+func (m *machine) allocateInstr() *instruction {
+	instr := m.ectx.InstructionPool.Allocate()
+	if !m.regAllocStarted {
+		instr.addedBeforeRegAlloc = true
+	}
+	return instr
+}
+
+func (m *machine) insert(i *instruction) {
+	ectx := m.ectx
+	ectx.PendingInstructions = append(ectx.PendingInstructions, i)
 }

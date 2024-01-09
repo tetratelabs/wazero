@@ -1,6 +1,8 @@
 package amd64
 
 import (
+	"fmt"
+
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 )
 
@@ -146,4 +148,38 @@ var regNames = [...]string{
 	xmm13: "xmm13",
 	xmm14: "xmm14",
 	xmm15: "xmm15",
+}
+
+func formatVRegSized(r regalloc.VReg, _64 bool) string {
+	if r.IsRealReg() {
+		if r.RegType() == regalloc.RegTypeInt {
+			rr := r.RealReg()
+			orig := regNames[rr]
+			if rr <= rdi {
+				if _64 {
+					return "%" + orig
+				} else {
+					return "%e" + orig[1:]
+				}
+			} else {
+				if _64 {
+					return "%" + orig
+				} else {
+					return "%" + orig + "d"
+				}
+			}
+		} else {
+			return "%" + regNames[r.RealReg()]
+		}
+	} else {
+		if r.RegType() == regalloc.RegTypeInt {
+			if _64 {
+				return fmt.Sprintf("%%r%d?", r.ID())
+			} else {
+				return fmt.Sprintf("%%r%dd?", r.ID())
+			}
+		} else {
+			return fmt.Sprintf("%%xmm%d?", r.ID())
+		}
+	}
 }
