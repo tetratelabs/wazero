@@ -938,6 +938,57 @@ func TestInstruction_format_encode(t *testing.T) {
 			want:       "685f173b8a",
 			wantFormat: "pushq $-1975838881",
 		},
+		{
+			setup: func(i *instruction) {
+				i.asAluRmiR(aluRmiROpcodeMul, newOperandReg(r15VReg), rdxVReg, true)
+			},
+			want:       "490fafd7",
+			wantFormat: "imul %r15, %rdx",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asAluRmiR(aluRmiROpcodeMul, newOperandReg(rcxVReg), r8VReg, false)
+			},
+			want:       "440fafc1",
+			wantFormat: "imul %ecx, %r8d",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asAluRmiR(aluRmiROpcodeMul, newOperandReg(rcxVReg), rsiVReg, false)
+			},
+			want:       "0faff1",
+			wantFormat: "imul %ecx, %esi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asAluRmiR(aluRmiROpcodeMul, newOperandImm32(76543210), rdxVReg, true)
+			},
+			want:       "4869d2eaf48f04",
+			wantFormat: "imul $76543210, %rdx",
+		},
+		{
+			setup: func(i *instruction) {
+				minusOne := int32(-1)
+				i.asAluRmiR(aluRmiROpcodeMul, newOperandImm32(uint32(minusOne)), rdxVReg, true)
+			},
+			want:       "486bd2ff",
+			wantFormat: "imul $-1, %rdx",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asAluRmiR(aluRmiROpcodeMul, newOperandImm32(76543210), rdxVReg, false)
+			},
+			want:       "69d2eaf48f04",
+			wantFormat: "imul $76543210, %edx",
+		},
+		{
+			setup: func(i *instruction) {
+				minusOne := int32(-1)
+				i.asAluRmiR(aluRmiROpcodeMul, newOperandImm32(uint32(minusOne)), rdxVReg, false)
+			},
+			want:       "6bd2ff",
+			wantFormat: "imul $-1, %edx",
+		},
 	} {
 		tc := tc
 		t.Run(tc.wantFormat, func(t *testing.T) {

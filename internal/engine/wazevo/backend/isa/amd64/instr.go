@@ -480,7 +480,7 @@ func (a aluRmiROpcode) String() string {
 	case aluRmiROpcodeXor:
 		return "xor"
 	case aluRmiROpcodeMul:
-		return "mul"
+		return "imul"
 	default:
 		panic("BUG")
 	}
