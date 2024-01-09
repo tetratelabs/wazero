@@ -989,6 +989,116 @@ func TestInstruction_format_encode(t *testing.T) {
 			want:       "6bd2ff",
 			wantFormat: "imul $-1, %edx",
 		},
+		{
+			setup: func(i *instruction) {
+				i.asAluRmiR(aluRmiROpcodeAdd, newOperandImm32(76543210), r15VReg, true)
+			},
+			want:       "4981c7eaf48f04",
+			wantFormat: "add $76543210, %r15",
+		},
+		{
+			setup: func(i *instruction) {
+				minusOne := int32(-1)
+				i.asAluRmiR(aluRmiROpcodeAdd, newOperandImm32(uint32(minusOne)), r15VReg, true)
+			},
+			want:       "4983c7ff",
+			wantFormat: "add $-1, %r15",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asAluRmiR(aluRmiROpcodeAdd, newOperandImm32(76543210), rsiVReg, true)
+			},
+			want:       "4881c6eaf48f04",
+			wantFormat: "add $76543210, %rsi",
+		},
+		{
+			setup: func(i *instruction) {
+				minusOne := int32(-1)
+				i.asAluRmiR(aluRmiROpcodeAdd, newOperandImm32(uint32(minusOne)), rsiVReg, true)
+			},
+			want:       "4883c6ff",
+			wantFormat: "add $-1, %rsi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asAluRmiR(aluRmiROpcodeAdd, newOperandImm32(76543210), r15VReg, false)
+			},
+			want:       "4181c7eaf48f04",
+			wantFormat: "add $76543210, %r15d",
+		},
+		{
+			setup: func(i *instruction) {
+				minusOne := int32(-1)
+				i.asAluRmiR(aluRmiROpcodeAdd, newOperandImm32(uint32(minusOne)), r15VReg, false)
+			},
+			want:       "4183c7ff",
+			wantFormat: "add $-1, %r15d",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asAluRmiR(aluRmiROpcodeAdd, newOperandImm32(76543210), rsiVReg, false)
+			},
+			want:       "81c6eaf48f04",
+			wantFormat: "add $76543210, %esi",
+		},
+		{
+			setup: func(i *instruction) {
+				minusOne := int32(-1)
+				i.asAluRmiR(aluRmiROpcodeAdd, newOperandImm32(uint32(minusOne)), rsiVReg, false)
+			},
+			want:       "83c6ff",
+			wantFormat: "add $-1, %esi",
+		},
+		{
+			setup:      func(i *instruction) { i.asAluRmiR(aluRmiROpcodeAdd, newOperandReg(raxVReg), rdxVReg, true) },
+			want:       "4801c2",
+			wantFormat: "add %rax, %rdx",
+		},
+		{
+			setup:      func(i *instruction) { i.asAluRmiR(aluRmiROpcodeAdd, newOperandReg(raxVReg), r15VReg, true) },
+			want:       "4901c7",
+			wantFormat: "add %rax, %r15",
+		},
+		{
+			setup:      func(i *instruction) { i.asAluRmiR(aluRmiROpcodeAdd, newOperandReg(r11VReg), r15VReg, true) },
+			want:       "4d01df",
+			wantFormat: "add %r11, %r15",
+		},
+		{
+			setup:      func(i *instruction) { i.asAluRmiR(aluRmiROpcodeAdd, newOperandReg(raxVReg), rdxVReg, false) },
+			want:       "01c2",
+			wantFormat: "add %eax, %edx",
+		},
+		{
+			setup:      func(i *instruction) { i.asAluRmiR(aluRmiROpcodeAdd, newOperandReg(raxVReg), r15VReg, false) },
+			want:       "4101c7",
+			wantFormat: "add %eax, %r15d",
+		},
+		{
+			setup:      func(i *instruction) { i.asAluRmiR(aluRmiROpcodeAdd, newOperandReg(r11VReg), r15VReg, false) },
+			want:       "4501df",
+			wantFormat: "add %r11d, %r15d",
+		},
+		{
+			setup:      func(i *instruction) { i.asAluRmiR(aluRmiROpcodeSub, newOperandReg(r11VReg), r15VReg, false) },
+			want:       "4529df",
+			wantFormat: "sub %r11d, %r15d",
+		},
+		{
+			setup:      func(i *instruction) { i.asAluRmiR(aluRmiROpcodeAnd, newOperandReg(r11VReg), r15VReg, false) },
+			want:       "4521df",
+			wantFormat: "and %r11d, %r15d",
+		},
+		{
+			setup:      func(i *instruction) { i.asAluRmiR(aluRmiROpcodeOr, newOperandReg(r11VReg), r15VReg, false) },
+			want:       "4509df",
+			wantFormat: "or %r11d, %r15d",
+		},
+		{
+			setup:      func(i *instruction) { i.asAluRmiR(aluRmiROpcodeXor, newOperandReg(r11VReg), r15VReg, false) },
+			want:       "4531df",
+			wantFormat: "xor %r11d, %r15d",
+		},
 	} {
 		tc := tc
 		t.Run(tc.wantFormat, func(t *testing.T) {
