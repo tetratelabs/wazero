@@ -409,9 +409,28 @@ func (i *instruction) encode(c backend.Compiler) {
 	case cmove:
 		panic("TODO")
 	case push64:
-		panic("TODO")
+		op := i.op1
+
+		switch op.kind {
+		case operandKindReg:
+			dst := regEncodings[op.r.RealReg()]
+			if dst.rexBit() > 0 {
+				c.EmitByte(rexEncodingDefault | 0x1)
+			}
+			c.EmitByte(0x50 | dst.encoding())
+		case operandKindMem:
+			panic("TODO")
+		case operandImm32:
+			c.EmitByte(0x68)
+			c.Emit4Bytes(op.imm32)
+		}
+
 	case pop64:
-		panic("TODO")
+		dst := regEncodings[i.op1.r.RealReg()]
+		if dst.rexBit() > 0 {
+			c.EmitByte(rexEncodingDefault | 0x1)
+		}
+		c.EmitByte(0x58 | dst.encoding())
 	case xmmMovRM:
 		panic("TODO")
 	case xmmLoadConst:

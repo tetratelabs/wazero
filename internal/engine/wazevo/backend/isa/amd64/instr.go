@@ -101,9 +101,9 @@ func (i *instruction) String() string {
 	case cmove:
 		panic("TODO")
 	case push64:
-		panic("TODO")
+		return fmt.Sprintf("pushq %s", i.op1.format(true))
 	case pop64:
-		panic("TODO")
+		return fmt.Sprintf("popq %s", i.op1.format(true))
 	case xmmMovRM:
 		panic("TODO")
 	case xmmLoadConst:
@@ -553,6 +553,21 @@ func (i *instruction) asXmmUnaryRmR(op sseOpcode, rm operand, rd regalloc.VReg, 
 	i.op2 = newOperandReg(rd)
 	i.u1 = uint64(op)
 	i.b1 = _64
+	return i
+}
+
+func (i *instruction) asPop64(rm regalloc.VReg) *instruction {
+	i.kind = pop64
+	i.op1 = newOperandReg(rm)
+	return i
+}
+
+func (i *instruction) asPush64(op operand) *instruction {
+	if op.kind != operandKindReg && op.kind != operandKindMem && op.kind != operandImm32 {
+		panic("BUG")
+	}
+	i.kind = push64
+	i.op1 = op
 	return i
 }
 

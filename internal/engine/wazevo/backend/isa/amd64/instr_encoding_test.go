@@ -874,6 +874,70 @@ func TestInstruction_format_encode(t *testing.T) {
 			want:       "f20f2ac7",
 			wantFormat: "cvtsi2sd %edi, %xmm0",
 		},
+		{
+			setup:      func(i *instruction) { i.asPop64(raxVReg) },
+			want:       "58",
+			wantFormat: "popq %rax",
+		},
+		{
+			setup:      func(i *instruction) { i.asPop64(rdiVReg) },
+			want:       "5f",
+			wantFormat: "popq %rdi",
+		},
+		{
+			setup:      func(i *instruction) { i.asPop64(r8VReg) },
+			want:       "4158",
+			wantFormat: "popq %r8",
+		},
+		{
+			setup:      func(i *instruction) { i.asPop64(r15VReg) },
+			want:       "415f",
+			wantFormat: "popq %r15",
+		},
+		{
+			setup:      func(i *instruction) { i.asPush64(newOperandReg(rdiVReg)) },
+			want:       "57",
+			wantFormat: "pushq %rdi",
+		},
+		{
+			setup:      func(i *instruction) { i.asPush64(newOperandReg(r8VReg)) },
+			want:       "4150",
+			wantFormat: "pushq %r8",
+		},
+		{
+			setup:      func(i *instruction) { i.asPush64(newOperandImm32(128)) },
+			want:       "6880000000",
+			wantFormat: "pushq $128",
+		},
+		{
+			setup:      func(i *instruction) { i.asPush64(newOperandImm32(0x31415927)) },
+			want:       "6827594131",
+			wantFormat: "pushq $826366247",
+		},
+		{
+			setup: func(i *instruction) {
+				v := int32(-128)
+				i.asPush64(newOperandImm32(uint32(v)))
+			},
+			want:       "6880ffffff",
+			wantFormat: "pushq $-128",
+		},
+		{
+			setup: func(i *instruction) {
+				v := int32(-129)
+				i.asPush64(newOperandImm32(uint32(v)))
+			},
+			want:       "687fffffff",
+			wantFormat: "pushq $-129",
+		},
+		{
+			setup: func(i *instruction) {
+				v := int32(-0x75c4e8a1)
+				i.asPush64(newOperandImm32(uint32(v)))
+			},
+			want:       "685f173b8a",
+			wantFormat: "pushq $-1975838881",
+		},
 	} {
 		tc := tc
 		t.Run(tc.wantFormat, func(t *testing.T) {
