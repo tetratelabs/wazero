@@ -94,7 +94,7 @@ func TestTcpConnFile_Read(t *testing.T) {
 	require.NoError(t, err)
 	defer tcp.Close() //nolint
 
-	// use a goroutine to asynchronously write to the TCP connection
+	// Use a goroutine to asynchronously write to the TCP connection
 	// with a delay that is visible to the test.
 	go func() {
 		time.Sleep(200 * time.Millisecond)
