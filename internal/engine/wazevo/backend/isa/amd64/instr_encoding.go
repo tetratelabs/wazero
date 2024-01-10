@@ -50,7 +50,82 @@ func (i *instruction) encode(c backend.Compiler) {
 		}
 
 	case aluRmiR:
-		panic("TODO")
+		var rex rexInfo
+		if i.b1 {
+			rex = rex.setW()
+		} else {
+			rex = rex.clearW()
+		}
+		aluOp := aluRmiROpcode(i.u1)
+
+		if aluOp == aluRmiROpcodeMul {
+			op1 := i.op1
+			switch op1.kind {
+			case operandKindReg:
+				src := regEncodings[op1.r.RealReg()]
+				dst := regEncodings[i.op2.r.RealReg()]
+				encodeRegReg(c, legacyPrefixesNone, 0x0faf, 2, dst, src, rex)
+			case operandKindMem:
+				panic("TODO")
+			case operandImm32:
+				imm8 := lower8willSignExtendTo32(op1.imm32)
+				var opc uint32
+				if imm8 {
+					opc = 0x6b
+				} else {
+					opc = 0x69
+				}
+				dst := regEncodings[i.op2.r.RealReg()]
+				encodeRegReg(c, legacyPrefixesNone, opc, 1, dst, dst, rex)
+				if imm8 {
+					c.EmitByte(byte(op1.imm32))
+				} else {
+					c.Emit4Bytes(op1.imm32)
+				}
+			}
+		} else {
+			var opcR, opcM, subOpcImm uint32
+			switch aluOp {
+			case aluRmiROpcodeAdd:
+				opcR, opcM, subOpcImm = 0x01, 0x03, 0x0
+			case aluRmiROpcodeSub:
+				opcR, opcM, subOpcImm = 0x29, 0x2b, 0x5
+			case aluRmiROpcodeAnd:
+				opcR, opcM, subOpcImm = 0x21, 0x23, 0x4
+			case aluRmiROpcodeOr:
+				opcR, opcM, subOpcImm = 0x09, 0x0b, 0x1
+			case aluRmiROpcodeXor:
+				opcR, opcM, subOpcImm = 0x31, 0x33, 0x6
+			default:
+				panic("BUG: invalid aluRmiROpcode")
+			}
+
+			op1 := i.op1
+			switch op1.kind {
+			case operandKindReg:
+				src := regEncodings[op1.r.RealReg()]
+				dst := regEncodings[i.op2.r.RealReg()]
+				encodeRegReg(c, legacyPrefixesNone, opcR, 1, src, dst, rex)
+			case operandKindMem:
+				fmt.Println(opcM)
+				panic("TODO")
+			case operandImm32:
+				imm8 := lower8willSignExtendTo32(op1.imm32)
+				var opc uint32
+				if imm8 {
+					opc = 0x83
+				} else {
+					opc = 0x81
+				}
+				dst := regEncodings[i.op2.r.RealReg()]
+				encodeRegReg(c, legacyPrefixesNone, opc, 1, regEnc(subOpcImm), dst, rex)
+				if imm8 {
+					c.EmitByte(byte(op1.imm32))
+				} else {
+					c.Emit4Bytes(op1.imm32)
+				}
+			}
+		}
 
 	case movRR:
 		src := regEncodings[i.op1.r.RealReg()]
@@ -409,9 +484,28 @@ func (i *instruction) encode(c backend.Compiler) {
 	case cmove:
 		panic("TODO")
 	case push64:
-		panic("TODO")
+		op := i.op1
+
+		switch op.kind {
+		case operandKindReg:
+			dst := regEncodings[op.r.RealReg()]
+			if dst.rexBit() > 0 {
+				c.EmitByte(rexEncodingDefault | 0x1)
+			}
+			c.EmitByte(0x50 | dst.encoding())
+		case operandKindMem:
+			panic("TODO")
+		case operandImm32:
+			c.EmitByte(0x68)
+			c.Emit4Bytes(op.imm32)
+		}
+
 	case pop64:
-		panic("TODO")
+		dst := regEncodings[i.op1.r.RealReg()]
+		if dst.rexBit() > 0 {
+			c.EmitByte(rexEncodingDefault | 0x1)
+		}
+		c.EmitByte(0x58 | dst.encoding())
 	case xmmMovRM:
 		panic("TODO")
 	case xmmLoadConst:
@@ -606,4 +700,9 @@ func (p legacyPrefixes) encode(c backend.Compiler) {
 func lower32willSignExtendTo64(x uint64) bool {
 	xs := int64(x)
 	return xs == int64(uint64(int32(xs)))
+}
+
+func lower8willSignExtendTo32(x uint32) bool {
+	xs := int32(x)
+	return xs == ((xs << 24) >> 24)
 }

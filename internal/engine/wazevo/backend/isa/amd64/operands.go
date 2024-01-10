@@ -34,7 +34,7 @@ func (o *operand) format(_64 bool) string {
 	case operandKindMem:
 		return o.amode.String()
 	case operandImm32:
-		return fmt.Sprintf("$%d", o.imm32)
+		return fmt.Sprintf("$%d", int32(o.imm32))
 	default:
 		panic("BUG: invalid operand kind")
 	}
@@ -42,6 +42,10 @@ func (o *operand) format(_64 bool) string {
 
 func newOperandReg(r regalloc.VReg) operand {
 	return operand{kind: operandKindReg, r: r}
+}
+
+func newOperandImm32(imm32 uint32) operand {
+	return operand{kind: operandImm32, imm32: imm32}
 }
 
 // nolint

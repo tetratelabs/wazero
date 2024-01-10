@@ -7,10 +7,6 @@ import (
 )
 
 // Amd64-specific registers.
-//
-// Note: naming convention intentionally matches the Go assembler: https://go.dev/doc/asm
-// See https://www.lri.fr/~filliatr/ens/compil/x86-64.pdf
-// See https://cs.brown.edu/courses/cs033/docs/guides/x64_cheatsheet.pdf
 const (
 	// rax is a gp register.
 	rax = regalloc.RealRegInvalid + 1 + iota
