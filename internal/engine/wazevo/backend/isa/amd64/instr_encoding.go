@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 )
 
 // Encode implements backend.Machine Encode.
@@ -552,8 +553,48 @@ func (i *instruction) encode(c backend.Compiler) {
 		panic("TODO")
 	case trapIf:
 		panic("TODO")
+
 	case ud2:
-		panic("TODO")
+		c.EmitByte(0x0f)
+		c.EmitByte(0x0b)
+
+	case call:
+		c.EmitByte(0xe8)
+		if i.u2 == 0 { // Meaning that the call target is a function value, and requires relocation.
+			c.AddRelocationInfo(ssa.FuncRef(i.u1))
+		}
+		// Note that this is zero as a placeholder for the call target if it's a function value.
+		c.Emit4Bytes(uint32(i.u2))
+
+	case callIndirect:
+		op := i.op1
+
+		const opcodeNum = 1
+		const opcode = 0xff
+		rex := rexInfo(0).clearW()
+		switch op.kind {
+		case operandKindReg:
+			dst := regEncodings[op.r.RealReg()]
+			encodeRegReg(c,
+				legacyPrefixesNone,
+				opcode, opcodeNum,
+				regEnc(2),
+				dst,
+				rex,
+			)
+		case operandKindMem:
+			m := op.amode
+			encodeRegMem(c,
+				legacyPrefixesNone,
+				opcode, opcodeNum,
+				regEnc(2),
+				m,
+				rex,
+			)
+		default:
+			panic("BUG: invalid operand kind")
+		}
+
 	default:
 		panic(fmt.Sprintf("TODO: %v", i.kind))
 	}
