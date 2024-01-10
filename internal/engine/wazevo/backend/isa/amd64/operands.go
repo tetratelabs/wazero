@@ -77,7 +77,7 @@ const (
 	// amodeRipRelative is a memory operand with RIP-relative addressing mode.
 	amodeRipRelative
 
-	// TODO: there are other addressing modes such as the one with base register is RIP or absent.
+	// TODO: there are other addressing modes such as the one with base register is absent.
 )
 
 // String implements fmt.Stringer.
