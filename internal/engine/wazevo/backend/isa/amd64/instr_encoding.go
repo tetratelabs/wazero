@@ -475,8 +475,11 @@ func (i *instruction) encode(c backend.Compiler) {
 		panic("TODO")
 	case mov64MR:
 		panic("TODO")
-	case loadEffectiveAddress:
-		panic("TODO")
+	case lea:
+		a := i.op1.amode
+		dst := regEncodings[i.op2.r.RealReg()]
+		encodeRegMem(c, legacyPrefixesNone, 0x8d, 1, dst, a, rexInfo(0).setW())
+
 	case movsxRmR:
 		panic("TODO")
 	case movRM:

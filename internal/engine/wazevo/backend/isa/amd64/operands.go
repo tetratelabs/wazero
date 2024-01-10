@@ -89,7 +89,18 @@ func newAmodeImmReg(imm32 uint32, base regalloc.VReg) amode {
 }
 
 func newAmodeRegRegShit(imm32 uint32, base, index regalloc.VReg, shift byte) amode {
+	if shift > 3 {
+		panic(fmt.Sprintf("BUG: invalid shift (must be 3>=): %d", shift))
+	}
 	return amode{kind: amodeRegRegShift, imm32: imm32, base: base, index: index, shift: shift}
+}
+
+func (a *amode) resolveRipRelative(imm32 uint32) {
+	if a.kind != amodeRipRelative {
+		panic("BUG: invalid amode kind")
+	}
+	a.imm32 = imm32
+	a.label = backend.LabelInvalid
 }
 
 func newAmodeRipRelative(label backend.Label) amode {

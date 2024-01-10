@@ -1337,6 +1337,39 @@ func TestInstruction_format_encode(t *testing.T) {
 			want:       "4531df",
 			wantFormat: "xor %r11d, %r15d",
 		},
+		{
+			setup:      func(i *instruction) { i.asLEA(newAmodeImmReg(0, rdiVReg), rdxVReg) },
+			want:       "488d17",
+			wantFormat: "lea (%rdi), %rdx",
+		},
+		{
+			setup:      func(i *instruction) { i.asLEA(newAmodeImmReg(0xffff, rdiVReg), rdxVReg) },
+			want:       "488d97ffff0000",
+			wantFormat: "lea 65535(%rdi), %rdx",
+		},
+		{
+			setup:      func(i *instruction) { i.asLEA(newAmodeRegRegShit(0xffff, rspVReg, r13VReg, 3), rdxVReg) },
+			want:       "4a8d94ecffff0000",
+			wantFormat: "lea 65535(%rsp,%r13,8), %rdx",
+		},
+		{
+			setup: func(i *instruction) {
+				a := newAmodeRipRelative(1)
+				a.resolveRipRelative(1234)
+				i.asLEA(a, r11VReg)
+			},
+			want:       "4c8d1dd2040000",
+			wantFormat: "lea 1234(%rip), %r11",
+		},
+		{
+			setup: func(i *instruction) {
+				a := newAmodeRipRelative(1)
+				a.resolveRipRelative(8)
+				i.asLEA(a, r11VReg)
+			},
+			want:       "4c8d1d08000000",
+			wantFormat: "lea 8(%rip), %r11",
+		},
 	} {
 		tc := tc
 		t.Run(tc.wantFormat, func(t *testing.T) {
