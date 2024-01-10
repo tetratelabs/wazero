@@ -1404,6 +1404,101 @@ func TestInstruction_format_encode(t *testing.T) {
 			want:       "ff900000ffff",
 			wantFormat: "callq *-65536(%rax)",
 		},
+		{
+			setup:      func(i *instruction) { i.asJmp(newOperandReg(r12VReg)) },
+			want:       "41ffe4",
+			wantFormat: "jmp %r12",
+		},
+		{
+			setup:      func(i *instruction) { i.asJmp(newOperandMem(newAmodeImmReg(0, raxVReg))) },
+			want:       "ff20",
+			wantFormat: "jmp (%rax)",
+		},
+		{
+			setup:      func(i *instruction) { i.asJmp(newOperandImm32(12345)) },
+			want:       "e939300000",
+			wantFormat: "jmp $12345",
+		},
+		{
+			setup:      func(i *instruction) { i.asJmpIf(condO, newOperandImm32(4)) },
+			want:       "0f8004000000",
+			wantFormat: "jo $4",
+		},
+		{
+			setup:      func(i *instruction) { i.asJmpIf(condNO, newOperandImm32(4)) },
+			want:       "0f8104000000",
+			wantFormat: "jno $4",
+		},
+		{
+			setup:      func(i *instruction) { i.asJmpIf(condB, newOperandImm32(4)) },
+			want:       "0f8204000000",
+			wantFormat: "jb $4",
+		},
+		{
+			setup:      func(i *instruction) { i.asJmpIf(condNB, newOperandImm32(4)) },
+			want:       "0f8304000000",
+			wantFormat: "jnb $4",
+		},
+		{
+			setup:      func(i *instruction) { i.asJmpIf(condZ, newOperandImm32(4)) },
+			want:       "0f8404000000",
+			wantFormat: "jz $4",
+		},
+		{
+			setup:      func(i *instruction) { i.asJmpIf(condNZ, newOperandImm32(4)) },
+			want:       "0f8504000000",
+			wantFormat: "jnz $4",
+		},
+		{
+			setup:      func(i *instruction) { i.asJmpIf(condBE, newOperandImm32(4)) },
+			want:       "0f8604000000",
+			wantFormat: "jbe $4",
+		},
+		{
+			setup:      func(i *instruction) { i.asJmpIf(condNBE, newOperandImm32(4)) },
+			want:       "0f8704000000",
+			wantFormat: "jnbe $4",
+		},
+		{
+			setup:      func(i *instruction) { i.asJmpIf(condS, newOperandImm32(4)) },
+			want:       "0f8804000000",
+			wantFormat: "js $4",
+		},
+		{
+			setup:      func(i *instruction) { i.asJmpIf(condNS, newOperandImm32(4)) },
+			want:       "0f8904000000",
+			wantFormat: "jns $4",
+		},
+		{
+			setup:      func(i *instruction) { i.asJmpIf(condL, newOperandImm32(4)) },
+			want:       "0f8c04000000",
+			wantFormat: "jl $4",
+		},
+		{
+			setup:      func(i *instruction) { i.asJmpIf(condNL, newOperandImm32(4)) },
+			want:       "0f8d04000000",
+			wantFormat: "jnl $4",
+		},
+		{
+			setup:      func(i *instruction) { i.asJmpIf(condLE, newOperandImm32(4)) },
+			want:       "0f8e04000000",
+			wantFormat: "jle $4",
+		},
+		{
+			setup:      func(i *instruction) { i.asJmpIf(condNLE, newOperandImm32(4)) },
+			want:       "0f8f04000000",
+			wantFormat: "jnle $4",
+		},
+		{
+			setup:      func(i *instruction) { i.asJmpIf(condP, newOperandImm32(4)) },
+			want:       "0f8a04000000",
+			wantFormat: "jp $4",
+		},
+		{
+			setup:      func(i *instruction) { i.asJmpIf(condNP, newOperandImm32(4)) },
+			want:       "0f8b04000000",
+			wantFormat: "jnp $4",
+		},
 	} {
 		tc := tc
 		t.Run(tc.wantFormat, func(t *testing.T) {

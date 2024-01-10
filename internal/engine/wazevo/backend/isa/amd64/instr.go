@@ -125,17 +125,13 @@ func (i *instruction) String() string {
 		panic("TODO")
 	case xmmRmRImm:
 		panic("TODO")
-	case jmpKnown:
-		panic("TODO")
+	case jmp:
+		return fmt.Sprintf("jmp %s", i.op1.format(true))
 	case jmpIf:
-		panic("TODO")
-	case jmpCond:
-		panic("TODO")
+		return fmt.Sprintf("j%s %s", cond(i.u1), i.op1.format(true))
 	case jmpTableSeq:
 		panic("TODO")
-	case jmpUnknown:
-		panic("TODO")
-	case trapIf:
+	case exitIf:
 		panic("TODO")
 	case ud2:
 		return "ud2"
@@ -338,22 +334,11 @@ const (
 	// Return.
 	ret
 
-	// Jump to a known target: jmp simm32.
-	jmpKnown
+	// Jump: jmp (reg, mem, imm32 or label)
+	jmp
 
-	// One-way conditional branch: jcond cond target.
-	///
-	// This instruction is useful when we have conditional jumps depending on more than two
-	// conditions, see for instance the lowering of Brz/brnz with Fcmp inputs.
-	///
-	// A note of caution: in contexts where the branch target is another block, this has to be the
-	// same successor as the one specified in the terminator branch of the current block.
-	// Otherwise, this might confuse register allocation by creating new invisible edges.
+	// Jump conditionally: jcond cond label.
 	jmpIf
-
-	// Two-way conditional branch: jcond cond target target.
-	// Emitted as a compound sequence; the MachBuffer will shrink it as appropriate.
-	jmpCond
 
 	// Jump-table sequence, as one compound instruction (see note in lower.rs for rationale).
 	// The generated code sequence is described in the emit's function match arm for this
@@ -361,11 +346,8 @@ const (
 	// See comment in lowering about the temporaries signedness.
 	jmpTableSeq
 
-	// Indirect jump: jmpq (reg mem).
-	jmpUnknown
-
-	// Traps if the condition code is set.
-	trapIf
+	// Exits the execution if the condition code is set.
+	exitIf
 
 	// An instruction that will always trigger the illegal instruction exception.
 	ud2
@@ -447,18 +429,14 @@ func (k instructionKind) String() string {
 		return "xmmCmpRmR"
 	case xmmRmRImm:
 		return "xmmRmRImm"
-	case jmpKnown:
-		return "jmpKnown"
 	case jmpIf:
 		return "jmpIf"
-	case jmpCond:
-		return "jmpCond"
+	case jmp:
+		return "jmp"
 	case jmpTableSeq:
 		return "jmpTableSeq"
-	case jmpUnknown:
-		return "jmpUnknown"
-	case trapIf:
-		return "trapIf"
+	case exitIf:
+		return "exitIf"
 	case ud2:
 		return "ud2"
 	default:
@@ -494,6 +472,19 @@ func (a aluRmiROpcode) String() string {
 	default:
 		panic("BUG")
 	}
+}
+
+func (i *instruction) asJmpIf(cond cond, target operand) *instruction {
+	i.kind = jmpIf
+	i.u1 = uint64(cond)
+	i.op1 = target
+	return i
+}
+
+func (i *instruction) asJmp(target operand) *instruction {
+	i.kind = jmp
+	i.op1 = target
+	return i
 }
 
 func (i *instruction) asLEA(a amode, rd regalloc.VReg) *instruction {
@@ -535,7 +526,7 @@ func (i *instruction) asImm(dst regalloc.VReg, value uint64, _64 bool) *instruct
 }
 
 func (i *instruction) asAluRmiR(op aluRmiROpcode, rm operand, rd regalloc.VReg, _64 bool) *instruction {
-	if rm.kind != operandKindReg && rm.kind != operandKindMem && rm.kind != operandImm32 {
+	if rm.kind != operandKindReg && rm.kind != operandKindMem && rm.kind != operandKindImm32 {
 		panic("BUG")
 	}
 	i.kind = aluRmiR
@@ -597,7 +588,7 @@ func (i *instruction) asPop64(rm regalloc.VReg) *instruction {
 }
 
 func (i *instruction) asPush64(op operand) *instruction {
-	if op.kind != operandKindReg && op.kind != operandKindMem && op.kind != operandImm32 {
+	if op.kind != operandKindReg && op.kind != operandKindMem && op.kind != operandKindImm32 {
 		panic("BUG")
 	}
 	i.kind = push64

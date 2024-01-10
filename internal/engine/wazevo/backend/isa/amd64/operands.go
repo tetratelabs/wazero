@@ -20,12 +20,15 @@ const (
 	// operandKindReg is an operand which is an integer Register.
 	operandKindReg operandKind = iota + 1
 
-	// operandKindMem is an operand which is either an integer Register or a value in Memory.  This can denote an 8, 16,
+	// operandKindMem is a value in Memory.
 	// 32, 64, or 128 bit value.
 	operandKindMem
 
-	// operandKindRegMemImm is either an integer Register, a value in Memory or an Immediate.
-	operandImm32
+	// operandKindImm32 is a signed-32-bit integer immediate value.
+	operandKindImm32
+
+	// operandKindLabel is a label.
+	operandKindLabel
 )
 
 func (o *operand) format(_64 bool) string {
@@ -34,11 +37,17 @@ func (o *operand) format(_64 bool) string {
 		return formatVRegSized(o.r, _64)
 	case operandKindMem:
 		return o.amode.String()
-	case operandImm32:
+	case operandKindImm32:
 		return fmt.Sprintf("$%d", int32(o.imm32))
+	case operandKindLabel:
+		return backend.Label(o.imm32).String()
 	default:
 		panic("BUG: invalid operand kind")
 	}
+}
+
+func newOperandLabel(label backend.Label) operand { //nolint:unused
+	return operand{kind: operandKindLabel, imm32: uint32(label)}
 }
 
 func newOperandReg(r regalloc.VReg) operand {
@@ -46,7 +55,7 @@ func newOperandReg(r regalloc.VReg) operand {
 }
 
 func newOperandImm32(imm32 uint32) operand {
-	return operand{kind: operandImm32, imm32: imm32}
+	return operand{kind: operandKindImm32, imm32: imm32}
 }
 
 func newOperandMem(amode amode) operand {
@@ -81,7 +90,7 @@ const (
 	// amodeRipRelative is a memory operand with RIP-relative addressing mode.
 	amodeRipRelative
 
-	// TODO: there are other addressing modes such as the one with base register is absent.
+	// TODO: there are other addressing modes such as the one without base register.
 )
 
 func newAmodeImmReg(imm32 uint32, base regalloc.VReg) amode {
