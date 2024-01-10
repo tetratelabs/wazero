@@ -3,6 +3,7 @@ package amd64
 import (
 	"fmt"
 
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 )
 
@@ -48,35 +49,90 @@ func newOperandImm32(imm32 uint32) operand {
 	return operand{kind: operandImm32, imm32: imm32}
 }
 
-// nolint
+func newOperandMem(amode amode) operand {
+	return operand{kind: operandKindMem, amode: amode}
+}
+
+// amode is a memory operand (addressing mode).
 type amode struct {
 	kind  amodeKind
 	imm32 uint32
-
-	// For amodeRegRegShit:
-
 	base  regalloc.VReg
+
+	// For amodeRegRegShift:
 	index regalloc.VReg
 	shift byte // 0, 1, 2, 3
+
+	// For amodeRipRelative.
+	// If kind == amodeRipRelative, and label is invalid,
+	// then imm32 should represent the resolved address.
+	label backend.Label
 }
 
 type amodeKind byte
 
 const (
-
-	// immediate sign-extended and a Register.
+	// amodeRegRegShift calcualtes sign-extend-32-to-64(Immediate) + base
 	amodeImmReg amodeKind = iota + 1
 
-	// sign-extend-32-to-64(Immediate) + Register1 + (Register2 << Shift)
-	amodeRegRegShit
+	// amodeRegRegShift calculates sign-extend-32-to-64(Immediate) + base + (Register2 << Shift)
+	amodeRegRegShift
+
+	// amodeRipRelative is a memory operand with RIP-relative addressing mode.
+	amodeRipRelative
+
+	// TODO: there are other addressing modes such as the one with base register is absent.
 )
 
+func newAmodeImmReg(imm32 uint32, base regalloc.VReg) amode {
+	return amode{kind: amodeImmReg, imm32: imm32, base: base}
+}
+
+func newAmodeRegRegShit(imm32 uint32, base, index regalloc.VReg, shift byte) amode {
+	if shift > 3 {
+		panic(fmt.Sprintf("BUG: invalid shift (must be 3>=): %d", shift))
+	}
+	return amode{kind: amodeRegRegShift, imm32: imm32, base: base, index: index, shift: shift}
+}
+
+func (a *amode) resolveRipRelative(imm32 uint32) {
+	if a.kind != amodeRipRelative {
+		panic("BUG: invalid amode kind")
+	}
+	a.imm32 = imm32
+	a.label = backend.LabelInvalid
+}
+
+func newAmodeRipRelative(label backend.Label) amode {
+	if label == backend.LabelInvalid {
+		panic("BUG: invalid label")
+	}
+	return amode{kind: amodeRipRelative, label: label}
+}
+
+// String implements fmt.Stringer.
 func (a *amode) String() string {
 	switch a.kind {
 	case amodeImmReg:
-		panic("TODO")
-	case amodeRegRegShit:
-		panic("TODO")
+		if a.imm32 == 0 {
+			return fmt.Sprintf("(%s)", formatVRegSized(a.base, true))
+		}
+		return fmt.Sprintf("%d(%s)", int32(a.imm32), formatVRegSized(a.base, true))
+	case amodeRegRegShift:
+		if a.imm32 == 0 {
+			return fmt.Sprintf(
+				"(%s,%s,%d)",
+				formatVRegSized(a.base, true), formatVRegSized(a.index, true), 1<<a.shift)
+		}
+		return fmt.Sprintf(
+			"%d(%s,%s,%d)",
+			int32(a.imm32), formatVRegSized(a.base, true), formatVRegSized(a.index, true), 1<<a.shift)
+	case amodeRipRelative:
+		if a.label != backend.LabelInvalid {
+			return fmt.Sprintf("%s(%%rip)", a.label)
+		} else {
+			return fmt.Sprintf("%d(%%rip)", int32(a.imm32))
+		}
 	}
 	panic("BUG: invalid amode kind")
 }

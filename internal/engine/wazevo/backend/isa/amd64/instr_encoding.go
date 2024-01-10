@@ -56,17 +56,20 @@ func (i *instruction) encode(c backend.Compiler) {
 		} else {
 			rex = rex.clearW()
 		}
-		aluOp := aluRmiROpcode(i.u1)
 
+		dst := regEncodings[i.op2.r.RealReg()]
+
+		aluOp := aluRmiROpcode(i.u1)
 		if aluOp == aluRmiROpcodeMul {
 			op1 := i.op1
+			const regMemOpc, regMemOpcNum = 0x0FAF, 2
 			switch op1.kind {
 			case operandKindReg:
 				src := regEncodings[op1.r.RealReg()]
-				dst := regEncodings[i.op2.r.RealReg()]
-				encodeRegReg(c, legacyPrefixesNone, 0x0faf, 2, dst, src, rex)
+				encodeRegReg(c, legacyPrefixesNone, regMemOpc, regMemOpcNum, dst, src, rex)
 			case operandKindMem:
-				panic("TODO")
+				m := i.op1.amode
+				encodeRegMem(c, legacyPrefixesNone, regMemOpc, regMemOpcNum, dst, m, rex)
 			case operandImm32:
 				imm8 := lower8willSignExtendTo32(op1.imm32)
 				var opc uint32
@@ -75,7 +78,6 @@ func (i *instruction) encode(c backend.Compiler) {
 				} else {
 					opc = 0x69
 				}
-				dst := regEncodings[i.op2.r.RealReg()]
 				encodeRegReg(c, legacyPrefixesNone, opc, 1, dst, dst, rex)
 				if imm8 {
 					c.EmitByte(byte(op1.imm32))
@@ -84,6 +86,7 @@ func (i *instruction) encode(c backend.Compiler) {
 				}
 			}
 		} else {
+			const opcodeNum = 1
 			var opcR, opcM, subOpcImm uint32
 			switch aluOp {
 			case aluRmiROpcodeAdd:
@@ -104,11 +107,10 @@ func (i *instruction) encode(c backend.Compiler) {
 			switch op1.kind {
 			case operandKindReg:
 				src := regEncodings[op1.r.RealReg()]
-				dst := regEncodings[i.op2.r.RealReg()]
-				encodeRegReg(c, legacyPrefixesNone, opcR, 1, src, dst, rex)
+				encodeRegReg(c, legacyPrefixesNone, opcR, opcodeNum, src, dst, rex)
 			case operandKindMem:
-				fmt.Println(opcM)
-				panic("TODO")
+				m := i.op1.amode
+				encodeRegMem(c, legacyPrefixesNone, opcM, opcodeNum, dst, m, rex)
 			case operandImm32:
 				imm8 := lower8willSignExtendTo32(op1.imm32)
 				var opc uint32
@@ -117,8 +119,7 @@ func (i *instruction) encode(c backend.Compiler) {
 				} else {
 					opc = 0x81
 				}
-				dst := regEncodings[i.op2.r.RealReg()]
-				encodeRegReg(c, legacyPrefixesNone, opc, 1, regEnc(subOpcImm), dst, rex)
+				encodeRegReg(c, legacyPrefixesNone, opc, opcodeNum, regEnc(subOpcImm), dst, rex)
 				if imm8 {
 					c.EmitByte(byte(op1.imm32))
 				} else {
@@ -326,13 +327,16 @@ func (i *instruction) encode(c backend.Compiler) {
 			panic(fmt.Sprintf("Unsupported sseOpcode: %s", op))
 		}
 
+		dst := regEncodings[i.op2.r.RealReg()]
+
+		rex := rexInfo(0).clearW()
 		op1 := i.op1
 		if op1.kind == operandKindReg {
 			src := regEncodings[op1.r.RealReg()]
-			dst := regEncodings[i.op2.r.RealReg()]
-			encodeRegReg(c, legPrex, opcode, opcodeNum, dst, src, rexInfo(0).clearW())
+			encodeRegReg(c, legPrex, opcode, opcodeNum, dst, src, rex)
 		} else if i.op1.kind == operandKindMem {
-			panic("TODO")
+			m := i.op1.amode
+			encodeRegMem(c, legPrex, opcode, opcodeNum, dst, m, rex)
 		} else {
 			panic("BUG: invalid operand kind")
 		}
@@ -358,14 +362,15 @@ func (i *instruction) encode(c backend.Compiler) {
 		} else {
 			rex = rex.clearW()
 		}
+		dst := regEncodings[i.op2.r.RealReg()]
 
 		op1 := i.op1
 		if op1.kind == operandKindReg {
 			src := regEncodings[op1.r.RealReg()]
-			dst := regEncodings[i.op2.r.RealReg()]
 			encodeRegReg(c, legPrefix, opcode, opcodeNum, dst, src, rex)
 		} else if i.op1.kind == operandKindMem {
-			panic("TODO")
+			m := i.op1.amode
+			encodeRegMem(c, legPrefix, opcode, opcodeNum, dst, m, rex)
 		} else {
 			panic("BUG: invalid operand kind")
 		}
@@ -438,13 +443,16 @@ func (i *instruction) encode(c backend.Compiler) {
 			panic(fmt.Sprintf("Unsupported sseOpcode: %s", op))
 		}
 
+		dst := regEncodings[i.op2.r.RealReg()]
+
+		rex := rexInfo(0).clearW()
 		op1 := i.op1
 		if op1.kind == operandKindReg {
 			src := regEncodings[op1.r.RealReg()]
-			dst := regEncodings[i.op2.r.RealReg()]
-			encodeRegReg(c, prefix, opcode, opcodeNum, dst, src, rexInfo(0).clearW())
+			encodeRegReg(c, prefix, opcode, opcodeNum, dst, src, rex)
 		} else if i.op1.kind == operandKindMem {
-			panic("TODO")
+			m := i.op1.amode
+			encodeRegMem(c, prefix, opcode, opcodeNum, dst, m, rex)
 		} else {
 			panic("BUG: invalid operand kind")
 		}
@@ -467,8 +475,11 @@ func (i *instruction) encode(c backend.Compiler) {
 		panic("TODO")
 	case mov64MR:
 		panic("TODO")
-	case loadEffectiveAddress:
-		panic("TODO")
+	case lea:
+		a := i.op1.amode
+		dst := regEncodings[i.op2.r.RealReg()]
+		encodeRegMem(c, legacyPrefixesNone, 0x8d, 1, dst, a, rexInfo(0).setW())
+
 	case movsxRmR:
 		panic("TODO")
 	case movRM:
@@ -494,7 +505,10 @@ func (i *instruction) encode(c backend.Compiler) {
 			}
 			c.EmitByte(0x50 | dst.encoding())
 		case operandKindMem:
-			panic("TODO")
+			m := op.amode
+			encodeRegMem(
+				c, legacyPrefixesNone, 0xff, 1, regEnc(6), m, rexInfo(0).clearW(),
+			)
 		case operandImm32:
 			c.EmitByte(0x68)
 			c.Emit4Bytes(op.imm32)
@@ -568,6 +582,110 @@ func encodeModRM(mod byte, reg byte, rm byte) byte {
 	return mod<<6 | reg<<3 | rm
 }
 
+func encodeSIB(shift byte, encIndex byte, encBase byte) byte {
+	return shift<<6 | encIndex<<3 | encBase
+}
+
+func encodeRegMem(
+	c backend.Compiler, legPrefixes legacyPrefixes, opcodes uint32, opcodeNum uint32, r regEnc, m amode, rex rexInfo,
+) {
+	legPrefixes.encode(c)
+
+	const (
+		modNoDisplacement    = 0b00
+		modShortDisplacement = 0b01
+		modLongDisplacement  = 0b10
+
+		useSBI = 4 // the encoding of rsp or r12 register.
+	)
+
+	switch m.kind {
+	case amodeImmReg:
+		base := m.base.RealReg()
+		baseEnc := regEncodings[base]
+
+		rex.encode(c, r, baseEnc)
+
+		for opcodeNum > 0 {
+			opcodeNum--
+			c.EmitByte(byte((opcodes >> (opcodeNum << 3)) & 0xff))
+		}
+
+		// SIB byte is the last byte of the memory encoding before the displacement
+		const sibByte = 0x24 // == encodeSIB(0, 4, 4)
+
+		immZero, baseRbp, baseR13 := m.imm32 == 0, base == rbp, base == r13
+		short := lower8willSignExtendTo32(m.imm32)
+		rspOrR12 := base == rsp || base == r12
+
+		if immZero && !baseRbp && !baseR13 { // rbp or r13 can't be used as base for without displacement encoding.
+			c.EmitByte(encodeModRM(modNoDisplacement, r.encoding(), baseEnc.encoding()))
+			if rspOrR12 {
+				c.EmitByte(sibByte)
+			}
+		} else if short { // Note: this includes the case where m.imm32 == 0 && base == rbp || base == r13.
+			c.EmitByte(encodeModRM(modShortDisplacement, r.encoding(), baseEnc.encoding()))
+			if rspOrR12 {
+				c.EmitByte(sibByte)
+			}
+			c.EmitByte(byte(m.imm32))
+		} else {
+			c.EmitByte(encodeModRM(modLongDisplacement, r.encoding(), baseEnc.encoding()))
+			if rspOrR12 {
+				c.EmitByte(sibByte)
+			}
+			c.Emit4Bytes(m.imm32)
+		}
+
+	case amodeRegRegShift:
+		base := m.base.RealReg()
+		baseEnc := regEncodings[base]
+		index := m.index.RealReg()
+		indexEnc := regEncodings[index]
+
+		if index == rsp {
+			panic("BUG: rsp can't be used as index of addressing mode")
+		}
+
+		rex.encodeForIndex(c, r, indexEnc, baseEnc)
+
+		for opcodeNum > 0 {
+			opcodeNum--
+			c.EmitByte(byte((opcodes >> (opcodeNum << 3)) & 0xff))
+		}
+
+		immZero, baseRbp, baseR13 := m.imm32 == 0, base == rbp, base == r13
+		if immZero && !baseRbp && !baseR13 { // rbp or r13 can't be used as base for without displacement encoding. (curious why? because it's interpreted as RIP relative addressing).
+			c.EmitByte(encodeModRM(modNoDisplacement, r.encoding(), useSBI))
+			c.EmitByte(encodeSIB(m.shift, indexEnc.encoding(), baseEnc.encoding()))
+		} else if lower8willSignExtendTo32(m.imm32) {
+			c.EmitByte(encodeModRM(modShortDisplacement, r.encoding(), useSBI))
+			c.EmitByte(encodeSIB(m.shift, indexEnc.encoding(), baseEnc.encoding()))
+			c.EmitByte(byte(m.imm32))
+		} else {
+			c.EmitByte(encodeModRM(modLongDisplacement, r.encoding(), useSBI))
+			c.EmitByte(encodeSIB(m.shift, indexEnc.encoding(), baseEnc.encoding()))
+			c.Emit4Bytes(m.imm32)
+		}
+
+	case amodeRipRelative:
+		if m.label != backend.LabelInvalid {
+			panic("BUG: label must be resolved for amodeRipRelative at this point")
+		}
+
+		rex.encode(c, r, 0)
+		for opcodeNum > 0 {
+			opcodeNum--
+			c.EmitByte(byte((opcodes >> (opcodeNum << 3)) & 0xff))
+		}
+
+		// Indicate "LEAQ [RIP + 32bit displacement].
+		// https://wiki.osdev.org/X86-64_Instruction_Encoding#32.2F64-bit_addressing
+		c.EmitByte(encodeModRM(0b00, r.encoding(), 0b101))
+		c.Emit4Bytes(m.imm32)
+	}
+}
+
 const (
 	rexEncodingDefault byte = 0x40
 	rexEncodingW            = rexEncodingDefault | 0x08
@@ -583,7 +701,7 @@ func (ri rexInfo) setW() rexInfo {
 	return ri | 0x01
 }
 
-func (ri rexInfo) clearW() rexInfo { //nolint
+func (ri rexInfo) clearW() rexInfo {
 	return ri & 0x02
 }
 
@@ -608,7 +726,7 @@ func (ri rexInfo) encode(c backend.Compiler, encR regEnc, encRM regEnc) {
 	}
 }
 
-func (ri rexInfo) encodeForIndex(c backend.Compiler, encR regEnc, encIndex regEnc, encBase regEnc) { //nolint
+func (ri rexInfo) encodeForIndex(c backend.Compiler, encR regEnc, encIndex regEnc, encBase regEnc) {
 	var w byte = 0
 	if ri&0x01 != 0 {
 		w = 0x01

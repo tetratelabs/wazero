@@ -84,8 +84,8 @@ func (i *instruction) String() string {
 		panic("TODO")
 	case mov64MR:
 		panic("TODO")
-	case loadEffectiveAddress:
-		panic("TODO")
+	case lea:
+		return fmt.Sprintf("lea %s, %s", i.op1.format(true), i.op2.format(true))
 	case movsxRmR:
 		panic("TODO")
 	case movRM:
@@ -245,7 +245,7 @@ const (
 	mov64MR
 
 	// Loads the memory address of addr into dst.
-	loadEffectiveAddress
+	lea
 
 	// Sign-extended loads and moves: movs (bl bq wl wq lq) addr reg.
 	movsxRmR
@@ -397,8 +397,8 @@ func (k instructionKind) String() string {
 		return "movzxRmR"
 	case mov64MR:
 		return "mov64MR"
-	case loadEffectiveAddress:
-		return "loadEffectiveAddress"
+	case lea:
+		return "lea"
 	case movsxRmR:
 		return "movsxRmR"
 	case movRM:
@@ -484,6 +484,13 @@ func (a aluRmiROpcode) String() string {
 	default:
 		panic("BUG")
 	}
+}
+
+func (i *instruction) asLEA(a amode, rd regalloc.VReg) *instruction {
+	i.kind = lea
+	i.op1 = newOperandMem(a)
+	i.op2 = newOperandReg(rd)
+	return i
 }
 
 func (i *instruction) asRet(abi *backend.FunctionABI) *instruction {
