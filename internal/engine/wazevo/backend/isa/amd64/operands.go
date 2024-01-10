@@ -20,11 +20,11 @@ const (
 	// operandKindReg is an operand which is an integer Register.
 	operandKindReg operandKind = iota + 1
 
-	// operandKindMem is an operand which is either an integer Register or a value in Memory.  This can denote an 8, 16,
+	// operandKindMem is a value in Memory.
 	// 32, 64, or 128 bit value.
 	operandKindMem
 
-	// operandKindRegMemImm is either an integer Register, a value in Memory or an Immediate.
+	// operandKindImm32 is a signed-32-bit integer immediate value.
 	operandKindImm32
 
 	// operandKindLabel is a label.
@@ -46,7 +46,7 @@ func (o *operand) format(_64 bool) string {
 	}
 }
 
-func newOperandLabel(label backend.Label) operand {
+func newOperandLabel(label backend.Label) operand { //nolint:unused
 	return operand{kind: operandKindLabel, imm32: uint32(label)}
 }
 
@@ -90,7 +90,7 @@ const (
 	// amodeRipRelative is a memory operand with RIP-relative addressing mode.
 	amodeRipRelative
 
-	// TODO: there are other addressing modes such as the one with base register is absent.
+	// TODO: there are other addressing modes such as the one without base register.
 )
 
 func newAmodeImmReg(imm32 uint32, base regalloc.VReg) amode {

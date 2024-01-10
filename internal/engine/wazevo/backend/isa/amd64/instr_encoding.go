@@ -527,6 +527,7 @@ func (i *instruction) encode(c backend.Compiler) {
 			c.EmitByte(rexEncodingDefault | 0x1)
 		}
 		c.EmitByte(0x58 | dst.encoding())
+
 	case xmmMovRM:
 		panic("TODO")
 	case xmmLoadConst:
