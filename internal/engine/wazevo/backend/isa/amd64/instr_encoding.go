@@ -568,6 +568,110 @@ func encodeModRM(mod byte, reg byte, rm byte) byte {
 	return mod<<6 | reg<<3 | rm
 }
 
+func encodeSIB(shift byte, encIndex byte, encBase byte) byte {
+	return shift<<6 | encIndex<<3 | encBase
+}
+
+func encodeRegMem(
+	c backend.Compiler, legPrefixes legacyPrefixes, opcodes uint32, opcodeNum uint32, r regEnc, m amode, rex rexInfo,
+) {
+	legPrefixes.encode(c)
+
+	const (
+		modNoDisplacement    = 0b00
+		modShortDisplacement = 0b01
+		modLongDisplacement  = 0b10
+
+		useSBI = 4 // the encoding of rsp or r12 register.
+	)
+
+	switch m.kind {
+	case amodeImmReg:
+		base := m.base.RealReg()
+		baseEnc := regEncodings[base]
+
+		rex.encode(c, r, baseEnc)
+
+		for opcodeNum > 0 {
+			opcodeNum--
+			c.EmitByte(byte((opcodes >> (opcodeNum << 3)) & 0xff))
+		}
+
+		// SIB byte is the last byte of the memory encoding before the displacement
+		const sibByte = 0x24 // == encodeSIB(0, 4, 4)
+
+		immZero, baseRbp, baseR13 := m.imm32 == 0, base == rbp, base == r13
+		short := lower8willSignExtendTo32(m.imm32)
+		rspOrR12 := base == rsp || base == r12
+
+		if immZero && !baseRbp && !baseR13 { // rbp or r13 can't be used as base for without displacement encoding.
+			c.EmitByte(encodeModRM(modNoDisplacement, r.encoding(), baseEnc.encoding()))
+			if rspOrR12 {
+				c.EmitByte(sibByte)
+			}
+		} else if short { // Note: this includes the case where m.imm32 == 0 && base == rbp || base == r13.
+			c.EmitByte(encodeModRM(modShortDisplacement, r.encoding(), baseEnc.encoding()))
+			if rspOrR12 {
+				c.EmitByte(sibByte)
+			}
+			c.EmitByte(byte(m.imm32))
+		} else {
+			c.EmitByte(encodeModRM(modLongDisplacement, r.encoding(), baseEnc.encoding()))
+			if rspOrR12 {
+				c.EmitByte(sibByte)
+			}
+			c.Emit4Bytes(m.imm32)
+		}
+
+	case amodeRegRegShit:
+		base := m.base.RealReg()
+		baseEnc := regEncodings[base]
+		index := m.index.RealReg()
+		indexEnc := regEncodings[index]
+
+		if index == rsp {
+			panic("BUG: rsp can't be used as index of addressing mode")
+		}
+
+		rex.encodeForIndex(c, r, indexEnc, baseEnc)
+
+		for opcodeNum > 0 {
+			opcodeNum--
+			c.EmitByte(byte((opcodes >> (opcodeNum << 3)) & 0xff))
+		}
+
+		immZero, baseRbp, baseR13 := m.imm32 == 0, base == rbp, base == r13
+		if immZero && !baseRbp && !baseR13 { // rbp or r13 can't be used as base for without displacement encoding. (curious why? because it's interpreted as RIP relative addressing).
+			c.EmitByte(encodeModRM(modNoDisplacement, r.encoding(), useSBI))
+			c.EmitByte(encodeSIB(m.shift, indexEnc.encoding(), baseEnc.encoding()))
+		} else if lower8willSignExtendTo32(m.imm32) {
+			c.EmitByte(encodeModRM(modShortDisplacement, r.encoding(), useSBI))
+			c.EmitByte(encodeSIB(m.shift, indexEnc.encoding(), baseEnc.encoding()))
+			c.EmitByte(byte(m.imm32))
+		} else {
+			c.EmitByte(encodeModRM(modLongDisplacement, r.encoding(), useSBI))
+			c.EmitByte(encodeSIB(m.shift, indexEnc.encoding(), baseEnc.encoding()))
+			c.Emit4Bytes(m.imm32)
+		}
+
+	case amodeRipRelative:
+		if m.label != backend.LabelInvalid {
+			panic("BUG: label must be resolved for amodeRipRelative at this point")
+		}
+
+		rex.encode(c, r, 0)
+		for opcodeNum > 0 {
+			opcodeNum--
+			c.EmitByte(byte((opcodes >> (opcodeNum << 3)) & 0xff))
+		}
+
+		// Indicate "LEAQ [RIP + 32bit displacement].
+		// https://wiki.osdev.org/X86-64_Instruction_Encoding#32.2F64-bit_addressing
+		c.EmitByte(encodeModRM(0b00, r.encoding(), 0b101))
+		c.Emit4Bytes(m.imm32)
+	}
+}
+
 const (
 	rexEncodingDefault byte = 0x40
 	rexEncodingW            = rexEncodingDefault | 0x08
@@ -583,7 +687,7 @@ func (ri rexInfo) setW() rexInfo {
 	return ri | 0x01
 }
 
-func (ri rexInfo) clearW() rexInfo { //nolint
+func (ri rexInfo) clearW() rexInfo {
 	return ri & 0x02
 }
 
@@ -608,7 +712,7 @@ func (ri rexInfo) encode(c backend.Compiler, encR regEnc, encRM regEnc) {
 	}
 }
 
-func (ri rexInfo) encodeForIndex(c backend.Compiler, encR regEnc, encIndex regEnc, encBase regEnc) { //nolint
+func (ri rexInfo) encodeForIndex(c backend.Compiler, encR regEnc, encIndex regEnc, encBase regEnc) {
 	var w byte = 0
 	if ri&0x01 != 0 {
 		w = 0x01
