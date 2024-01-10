@@ -111,6 +111,27 @@ func TestInstruction_format_encode(t *testing.T) {
 			want:       "f3450f58dd",
 			wantFormat: "addss %xmm13, %xmm11",
 		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmR(sseOpcodeAddss, newOperandMem(newAmodeImmReg(0, r13VReg)), xmm11VReg, true)
+			},
+			want:       "f3450f585d00",
+			wantFormat: "addss (%r13), %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmR(sseOpcodeAddss, newOperandMem(newAmodeImmReg(123, r13VReg)), xmm11VReg, true)
+			},
+			want:       "f3450f585d7b",
+			wantFormat: "addss 123(%r13), %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmR(sseOpcodeAddss, newOperandMem(newAmodeImmReg(1<<25, r13VReg)), xmm11VReg, true)
+			},
+			want:       "f3450f589d00000002",
+			wantFormat: "addss 33554432(%r13), %xmm11",
+		},
 		// addsd
 		{
 			setup:      func(i *instruction) { i.asXmmRmR(sseOpcodeAddsd, newOperandReg(xmm1VReg), xmm0VReg, true) },
@@ -121,6 +142,27 @@ func TestInstruction_format_encode(t *testing.T) {
 			setup:      func(i *instruction) { i.asXmmRmR(sseOpcodeAddsd, newOperandReg(xmm13VReg), xmm11VReg, false) },
 			want:       "f2450f58dd",
 			wantFormat: "addsd %xmm13, %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmR(sseOpcodeAddsd, newOperandMem(newAmodeImmReg(0, rbpVReg)), xmm11VReg, true)
+			},
+			want:       "f2440f585d00",
+			wantFormat: "addsd (%rbp), %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmR(sseOpcodeAddsd, newOperandMem(newAmodeImmReg(123, rbpVReg)), xmm11VReg, true)
+			},
+			want:       "f2440f585d7b",
+			wantFormat: "addsd 123(%rbp), %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmR(sseOpcodeAddsd, newOperandMem(newAmodeImmReg(1<<25, rbpVReg)), xmm11VReg, true)
+			},
+			want:       "f2440f589d00000002",
+			wantFormat: "addsd 33554432(%rbp), %xmm11",
 		},
 		// addps
 		{
@@ -794,6 +836,27 @@ func TestInstruction_format_encode(t *testing.T) {
 			want:       "660f3833c1",
 			wantFormat: "pmovzxwd %xmm1, %xmm0",
 		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmUnaryRmR(sseOpcodePmovzxwd, newOperandMem(newAmodeImmReg(0, rbpVReg)), xmm11VReg, true)
+			},
+			want:       "66440f38335d00",
+			wantFormat: "pmovzxwd (%rbp), %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmUnaryRmR(sseOpcodePmovzxwd, newOperandMem(newAmodeImmReg(123, rbpVReg)), xmm11VReg, true)
+			},
+			want:       "66440f38335d7b",
+			wantFormat: "pmovzxwd 123(%rbp), %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmUnaryRmR(sseOpcodePmovzxwd, newOperandMem(newAmodeImmReg(1<<25, rbpVReg)), xmm11VReg, true)
+			},
+			want:       "66440f38339d00000002",
+			wantFormat: "pmovzxwd 33554432(%rbp), %xmm11",
+		},
 		// pmovzxwq
 		{
 			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodePmovzxwq, newOperandReg(xmm1VReg), xmm0VReg, true) },
@@ -851,6 +914,27 @@ func TestInstruction_format_encode(t *testing.T) {
 			want:       "660f6ec7",
 			wantFormat: "movd %edi, %xmm0",
 		},
+		{
+			setup: func(i *instruction) {
+				i.asGprToXmm(sseOpcodeMovd, newOperandMem(newAmodeImmReg(0, rspVReg)), xmm0VReg, true)
+			},
+			want:       "66480f6e0424",
+			wantFormat: "movd (%rsp), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asGprToXmm(sseOpcodeMovd, newOperandMem(newAmodeImmReg(123, rspVReg)), xmm0VReg, true)
+			},
+			want:       "66480f6e44247b",
+			wantFormat: "movd 123(%rsp), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asGprToXmm(sseOpcodeMovd, newOperandMem(newAmodeImmReg(1<<25, rspVReg)), xmm0VReg, true)
+			},
+			want:       "66480f6e842400000002",
+			wantFormat: "movd 33554432(%rsp), %xmm0",
+		},
 		// movq
 		{
 			setup:      func(i *instruction) { i.asGprToXmm(sseOpcodeMovq, newOperandReg(rcxVReg), xmm0VReg, true) },
@@ -862,6 +946,27 @@ func TestInstruction_format_encode(t *testing.T) {
 			setup:      func(i *instruction) { i.asGprToXmm(sseOpcodeCvtsi2ss, newOperandReg(rdiVReg), xmm0VReg, true) },
 			want:       "f3480f2ac7",
 			wantFormat: "cvtsi2ss %rdi, %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asGprToXmm(sseOpcodeCvtsi2ss, newOperandMem(newAmodeImmReg(0, rspVReg)), xmm0VReg, true)
+			},
+			want:       "f3480f2a0424",
+			wantFormat: "cvtsi2ss (%rsp), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asGprToXmm(sseOpcodeCvtsi2ss, newOperandMem(newAmodeImmReg(123, rspVReg)), xmm0VReg, true)
+			},
+			want:       "f3480f2a44247b",
+			wantFormat: "cvtsi2ss 123(%rsp), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asGprToXmm(sseOpcodeCvtsi2ss, newOperandMem(newAmodeImmReg(1<<25, rspVReg)), xmm0VReg, true)
+			},
+			want:       "f3480f2a842400000002",
+			wantFormat: "cvtsi2ss 33554432(%rsp), %xmm0",
 		},
 		// cvtsi2sd
 		{
@@ -893,6 +998,16 @@ func TestInstruction_format_encode(t *testing.T) {
 			setup:      func(i *instruction) { i.asPop64(r15VReg) },
 			want:       "415f",
 			wantFormat: "popq %r15",
+		},
+		{
+			setup:      func(i *instruction) { i.asPush64(newOperandMem(newAmodeRegRegShit(0, rbpVReg, r13VReg, 2))) },
+			want:       "42ff74ad00",
+			wantFormat: "pushq (%rbp,%r13,4)",
+		},
+		{
+			setup:      func(i *instruction) { i.asPush64(newOperandMem(newAmodeRegRegShit(1, rspVReg, r13VReg, 2))) },
+			want:       "42ff74ac01",
+			wantFormat: "pushq 1(%rsp,%r13,4)",
 		},
 		{
 			setup:      func(i *instruction) { i.asPush64(newOperandMem(newAmodeRegRegShit(1<<14, rspVReg, r13VReg, 3))) },
@@ -1000,6 +1115,27 @@ func TestInstruction_format_encode(t *testing.T) {
 		},
 		{
 			setup: func(i *instruction) {
+				i.asAluRmiR(aluRmiROpcodeMul, newOperandMem(newAmodeImmReg(0, rdiVReg)), rdxVReg, true)
+			},
+			want:       "480faf17",
+			wantFormat: "imul (%rdi), %rdx",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asAluRmiR(aluRmiROpcodeMul, newOperandMem(newAmodeImmReg(99, rdiVReg)), rdxVReg, true)
+			},
+			want:       "480faf5763",
+			wantFormat: "imul 99(%rdi), %rdx",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asAluRmiR(aluRmiROpcodeMul, newOperandMem(newAmodeImmReg(1<<21, rdiVReg)), rdxVReg, true)
+			},
+			want:       "480faf9700002000",
+			wantFormat: "imul 2097152(%rdi), %rdx",
+		},
+		{
+			setup: func(i *instruction) {
 				i.asAluRmiR(aluRmiROpcodeMul, newOperandReg(r15VReg), rdxVReg, true)
 			},
 			want:       "490fafd7",
@@ -1048,6 +1184,27 @@ func TestInstruction_format_encode(t *testing.T) {
 			},
 			want:       "6bd2ff",
 			wantFormat: "imul $-1, %edx",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asAluRmiR(aluRmiROpcodeAdd, newOperandMem(newAmodeImmReg(0, r12VReg)), rdxVReg, true)
+			},
+			want:       "49031424",
+			wantFormat: "add (%r12), %rdx",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asAluRmiR(aluRmiROpcodeAdd, newOperandMem(newAmodeImmReg(123, r12VReg)), rdxVReg, true)
+			},
+			want:       "490354247b",
+			wantFormat: "add 123(%r12), %rdx",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asAluRmiR(aluRmiROpcodeAdd, newOperandMem(newAmodeImmReg(1<<25, r12VReg)), rdxVReg, true)
+			},
+			want:       "4903942400000002",
+			wantFormat: "add 33554432(%r12), %rdx",
 		},
 		{
 			setup: func(i *instruction) {
@@ -1143,6 +1300,27 @@ func TestInstruction_format_encode(t *testing.T) {
 			setup:      func(i *instruction) { i.asAluRmiR(aluRmiROpcodeSub, newOperandReg(r11VReg), r15VReg, false) },
 			want:       "4529df",
 			wantFormat: "sub %r11d, %r15d",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asAluRmiR(aluRmiROpcodeSub, newOperandMem(newAmodeImmReg(0, r13VReg)), rdxVReg, true)
+			},
+			want:       "492b5500",
+			wantFormat: "sub (%r13), %rdx",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asAluRmiR(aluRmiROpcodeSub, newOperandMem(newAmodeImmReg(123, r13VReg)), rdxVReg, true)
+			},
+			want:       "492b557b",
+			wantFormat: "sub 123(%r13), %rdx",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asAluRmiR(aluRmiROpcodeSub, newOperandMem(newAmodeImmReg(1<<25, r13VReg)), rdxVReg, true)
+			},
+			want:       "492b9500000002",
+			wantFormat: "sub 33554432(%r13), %rdx",
 		},
 		{
 			setup:      func(i *instruction) { i.asAluRmiR(aluRmiROpcodeAnd, newOperandReg(r11VReg), r15VReg, false) },

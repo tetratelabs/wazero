@@ -2,8 +2,8 @@ package amd64
 
 import (
 	"fmt"
-	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 )
 
@@ -59,7 +59,7 @@ type amode struct {
 	imm32 uint32
 	base  regalloc.VReg
 
-	// For amodeRegRegShit:
+	// For amodeRegRegShift:
 	index regalloc.VReg
 	shift byte // 0, 1, 2, 3
 
@@ -72,11 +72,11 @@ type amode struct {
 type amodeKind byte
 
 const (
-	// amodeRegRegShit calcualtes sign-extend-32-to-64(Immediate) + base
+	// amodeRegRegShift calcualtes sign-extend-32-to-64(Immediate) + base
 	amodeImmReg amodeKind = iota + 1
 
-	// amodeRegRegShit calculates sign-extend-32-to-64(Immediate) + base + (Register2 << Shift)
-	amodeRegRegShit
+	// amodeRegRegShift calculates sign-extend-32-to-64(Immediate) + base + (Register2 << Shift)
+	amodeRegRegShift
 
 	// amodeRipRelative is a memory operand with RIP-relative addressing mode.
 	amodeRipRelative
@@ -89,7 +89,7 @@ func newAmodeImmReg(imm32 uint32, base regalloc.VReg) amode {
 }
 
 func newAmodeRegRegShit(imm32 uint32, base, index regalloc.VReg, shift byte) amode {
-	return amode{kind: amodeRegRegShit, imm32: imm32, base: base, index: index, shift: shift}
+	return amode{kind: amodeRegRegShift, imm32: imm32, base: base, index: index, shift: shift}
 }
 
 func newAmodeRipRelative(label backend.Label) amode {
@@ -107,7 +107,7 @@ func (a *amode) String() string {
 			return fmt.Sprintf("(%s)", formatVRegSized(a.base, true))
 		}
 		return fmt.Sprintf("%d(%s)", int32(a.imm32), formatVRegSized(a.base, true))
-	case amodeRegRegShit:
+	case amodeRegRegShift:
 		if a.imm32 == 0 {
 			return fmt.Sprintf(
 				"(%s,%s,%d)",

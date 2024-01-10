@@ -634,7 +634,7 @@ func encodeRegMem(
 			c.Emit4Bytes(m.imm32)
 		}
 
-	case amodeRegRegShit:
+	case amodeRegRegShift:
 		base := m.base.RealReg()
 		baseEnc := regEncodings[base]
 		index := m.index.RealReg()
