@@ -56,17 +56,20 @@ func (i *instruction) encode(c backend.Compiler) {
 		} else {
 			rex = rex.clearW()
 		}
-		aluOp := aluRmiROpcode(i.u1)
 
+		dst := regEncodings[i.op2.r.RealReg()]
+
+		aluOp := aluRmiROpcode(i.u1)
 		if aluOp == aluRmiROpcodeMul {
 			op1 := i.op1
+			const regMemOpc, regMemOpcNum = 0x0FAF, 2
 			switch op1.kind {
 			case operandKindReg:
 				src := regEncodings[op1.r.RealReg()]
-				dst := regEncodings[i.op2.r.RealReg()]
-				encodeRegReg(c, legacyPrefixesNone, 0x0faf, 2, dst, src, rex)
+				encodeRegReg(c, legacyPrefixesNone, regMemOpc, regMemOpcNum, dst, src, rex)
 			case operandKindMem:
-				panic("TODO")
+				m := i.op1.amode
+				encodeRegMem(c, legacyPrefixesNone, regMemOpc, regMemOpcNum, dst, m, rex)
 			case operandImm32:
 				imm8 := lower8willSignExtendTo32(op1.imm32)
 				var opc uint32
@@ -75,7 +78,6 @@ func (i *instruction) encode(c backend.Compiler) {
 				} else {
 					opc = 0x69
 				}
-				dst := regEncodings[i.op2.r.RealReg()]
 				encodeRegReg(c, legacyPrefixesNone, opc, 1, dst, dst, rex)
 				if imm8 {
 					c.EmitByte(byte(op1.imm32))
@@ -84,6 +86,7 @@ func (i *instruction) encode(c backend.Compiler) {
 				}
 			}
 		} else {
+			const opcodeNum = 1
 			var opcR, opcM, subOpcImm uint32
 			switch aluOp {
 			case aluRmiROpcodeAdd:
@@ -104,11 +107,10 @@ func (i *instruction) encode(c backend.Compiler) {
 			switch op1.kind {
 			case operandKindReg:
 				src := regEncodings[op1.r.RealReg()]
-				dst := regEncodings[i.op2.r.RealReg()]
-				encodeRegReg(c, legacyPrefixesNone, opcR, 1, src, dst, rex)
+				encodeRegReg(c, legacyPrefixesNone, opcR, opcodeNum, src, dst, rex)
 			case operandKindMem:
-				fmt.Println(opcM)
-				panic("TODO")
+				m := i.op1.amode
+				encodeRegMem(c, legacyPrefixesNone, opcM, opcodeNum, dst, m, rex)
 			case operandImm32:
 				imm8 := lower8willSignExtendTo32(op1.imm32)
 				var opc uint32
@@ -117,8 +119,7 @@ func (i *instruction) encode(c backend.Compiler) {
 				} else {
 					opc = 0x81
 				}
-				dst := regEncodings[i.op2.r.RealReg()]
-				encodeRegReg(c, legacyPrefixesNone, opc, 1, regEnc(subOpcImm), dst, rex)
+				encodeRegReg(c, legacyPrefixesNone, opc, opcodeNum, regEnc(subOpcImm), dst, rex)
 				if imm8 {
 					c.EmitByte(byte(op1.imm32))
 				} else {
@@ -326,13 +327,16 @@ func (i *instruction) encode(c backend.Compiler) {
 			panic(fmt.Sprintf("Unsupported sseOpcode: %s", op))
 		}
 
+		dst := regEncodings[i.op2.r.RealReg()]
+
+		rex := rexInfo(0).clearW()
 		op1 := i.op1
 		if op1.kind == operandKindReg {
 			src := regEncodings[op1.r.RealReg()]
-			dst := regEncodings[i.op2.r.RealReg()]
-			encodeRegReg(c, legPrex, opcode, opcodeNum, dst, src, rexInfo(0).clearW())
+			encodeRegReg(c, legPrex, opcode, opcodeNum, dst, src, rex)
 		} else if i.op1.kind == operandKindMem {
-			panic("TODO")
+			m := i.op1.amode
+			encodeRegMem(c, legPrex, opcode, opcodeNum, dst, m, rex)
 		} else {
 			panic("BUG: invalid operand kind")
 		}
@@ -358,14 +362,15 @@ func (i *instruction) encode(c backend.Compiler) {
 		} else {
 			rex = rex.clearW()
 		}
+		dst := regEncodings[i.op2.r.RealReg()]
 
 		op1 := i.op1
 		if op1.kind == operandKindReg {
 			src := regEncodings[op1.r.RealReg()]
-			dst := regEncodings[i.op2.r.RealReg()]
 			encodeRegReg(c, legPrefix, opcode, opcodeNum, dst, src, rex)
 		} else if i.op1.kind == operandKindMem {
-			panic("TODO")
+			m := i.op1.amode
+			encodeRegMem(c, legPrefix, opcode, opcodeNum, dst, m, rex)
 		} else {
 			panic("BUG: invalid operand kind")
 		}
@@ -438,13 +443,16 @@ func (i *instruction) encode(c backend.Compiler) {
 			panic(fmt.Sprintf("Unsupported sseOpcode: %s", op))
 		}
 
+		dst := regEncodings[i.op2.r.RealReg()]
+
+		rex := rexInfo(0).clearW()
 		op1 := i.op1
 		if op1.kind == operandKindReg {
 			src := regEncodings[op1.r.RealReg()]
-			dst := regEncodings[i.op2.r.RealReg()]
-			encodeRegReg(c, prefix, opcode, opcodeNum, dst, src, rexInfo(0).clearW())
+			encodeRegReg(c, prefix, opcode, opcodeNum, dst, src, rex)
 		} else if i.op1.kind == operandKindMem {
-			panic("TODO")
+			m := i.op1.amode
+			encodeRegMem(c, prefix, opcode, opcodeNum, dst, m, rex)
 		} else {
 			panic("BUG: invalid operand kind")
 		}
