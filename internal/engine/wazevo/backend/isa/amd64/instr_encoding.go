@@ -502,7 +502,10 @@ func (i *instruction) encode(c backend.Compiler) {
 			}
 			c.EmitByte(0x50 | dst.encoding())
 		case operandKindMem:
-			panic("TODO")
+			m := op.amode
+			encodeRegMem(
+				c, legacyPrefixesNone, 0xff, 1, regEnc(6), m, rexInfo(0).clearW(),
+			)
 		case operandImm32:
 			c.EmitByte(0x68)
 			c.Emit4Bytes(op.imm32)

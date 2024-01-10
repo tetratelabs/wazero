@@ -895,6 +895,66 @@ func TestInstruction_format_encode(t *testing.T) {
 			wantFormat: "popq %r15",
 		},
 		{
+			setup:      func(i *instruction) { i.asPush64(newOperandMem(newAmodeRegRegShit(1<<14, rspVReg, r13VReg, 3))) },
+			want:       "42ffb4ec00400000",
+			wantFormat: "pushq 16384(%rsp,%r13,8)",
+		},
+		{
+			setup:      func(i *instruction) { i.asPush64(newOperandMem(newAmodeRegRegShit(1<<14, rspVReg, rcxVReg, 3))) },
+			want:       "ffb4cc00400000",
+			wantFormat: "pushq 16384(%rsp,%rcx,8)",
+		},
+		{
+			setup:      func(i *instruction) { i.asPush64(newOperandMem(newAmodeRegRegShit(1<<14, rspVReg, rbpVReg, 3))) },
+			want:       "ffb4ec00400000",
+			wantFormat: "pushq 16384(%rsp,%rbp,8)",
+		},
+		{
+			setup:      func(i *instruction) { i.asPush64(newOperandMem(newAmodeRegRegShit(1<<14, rsiVReg, rcxVReg, 3))) },
+			want:       "ffb4ce00400000",
+			wantFormat: "pushq 16384(%rsi,%rcx,8)",
+		},
+		{
+			setup:      func(i *instruction) { i.asPush64(newOperandMem(newAmodeRegRegShit(321, rsiVReg, rcxVReg, 3))) },
+			want:       "ffb4ce41010000",
+			wantFormat: "pushq 321(%rsi,%rcx,8)",
+		},
+		{
+			setup:      func(i *instruction) { i.asPush64(newOperandMem(newAmodeRegRegShit(0, rsiVReg, rcxVReg, 3))) },
+			want:       "ff34ce",
+			wantFormat: "pushq (%rsi,%rcx,8)",
+		},
+		{
+			setup:      func(i *instruction) { i.asPush64(newOperandMem(newAmodeRegRegShit(321, r9VReg, rbxVReg, 2))) },
+			want:       "41ffb49941010000",
+			wantFormat: "pushq 321(%r9,%rbx,4)",
+		},
+		{
+			setup:      func(i *instruction) { i.asPush64(newOperandMem(newAmodeRegRegShit(321, r9VReg, rbpVReg, 2))) },
+			want:       "41ffb4a941010000",
+			wantFormat: "pushq 321(%r9,%rbp,4)",
+		},
+		{
+			setup:      func(i *instruction) { i.asPush64(newOperandMem(newAmodeRegRegShit(321, r9VReg, r13VReg, 2))) },
+			want:       "43ffb4a941010000",
+			wantFormat: "pushq 321(%r9,%r13,4)",
+		},
+		{
+			setup:      func(i *instruction) { i.asPush64(newOperandMem(newAmodeRegRegShit(321, rbpVReg, r13VReg, 2))) },
+			want:       "42ffb4ad41010000",
+			wantFormat: "pushq 321(%rbp,%r13,4)",
+		},
+		{
+			setup:      func(i *instruction) { i.asPush64(newOperandMem(newAmodeRegRegShit(0, r9VReg, r13VReg, 2))) },
+			want:       "43ff34a9",
+			wantFormat: "pushq (%r9,%r13,4)",
+		},
+		{
+			setup:      func(i *instruction) { i.asPush64(newOperandMem(newAmodeRegRegShit(1<<20, r9VReg, r13VReg, 2))) },
+			want:       "43ffb4a900001000",
+			wantFormat: "pushq 1048576(%r9,%r13,4)",
+		},
+		{
 			setup:      func(i *instruction) { i.asPush64(newOperandReg(rdiVReg)) },
 			want:       "57",
 			wantFormat: "pushq %rdi",

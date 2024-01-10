@@ -49,6 +49,10 @@ func newOperandImm32(imm32 uint32) operand {
 	return operand{kind: operandImm32, imm32: imm32}
 }
 
+func newOperandMem(amode amode) operand {
+	return operand{kind: operandKindMem, amode: amode}
+}
+
 // amode is a memory operand (addressing mode).
 type amode struct {
 	kind  amodeKind
@@ -80,12 +84,35 @@ const (
 	// TODO: there are other addressing modes such as the one with base register is absent.
 )
 
+func newAmodeImmReg(imm32 uint32, base regalloc.VReg) amode {
+	return amode{kind: amodeImmReg, imm32: imm32, base: base}
+}
+
+func newAmodeRegRegShit(imm32 uint32, base, index regalloc.VReg, shift byte) amode {
+	return amode{kind: amodeRegRegShit, imm32: imm32, base: base, index: index, shift: shift}
+}
+
+func newAmodeRipRelative(label backend.Label) amode {
+	if label == backend.LabelInvalid {
+		panic("BUG: invalid label")
+	}
+	return amode{kind: amodeRipRelative, label: label}
+}
+
 // String implements fmt.Stringer.
 func (a *amode) String() string {
 	switch a.kind {
 	case amodeImmReg:
+		if a.imm32 == 0 {
+			return fmt.Sprintf("(%s)", formatVRegSized(a.base, true))
+		}
 		return fmt.Sprintf("%d(%s)", int32(a.imm32), formatVRegSized(a.base, true))
 	case amodeRegRegShit:
+		if a.imm32 == 0 {
+			return fmt.Sprintf(
+				"(%s,%s,%d)",
+				formatVRegSized(a.base, true), formatVRegSized(a.index, true), 1<<a.shift)
+		}
 		return fmt.Sprintf(
 			"%d(%s,%s,%d)",
 			int32(a.imm32), formatVRegSized(a.base, true), formatVRegSized(a.index, true), 1<<a.shift)
