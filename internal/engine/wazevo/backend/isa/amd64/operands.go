@@ -25,7 +25,10 @@ const (
 	operandKindMem
 
 	// operandKindRegMemImm is either an integer Register, a value in Memory or an Immediate.
-	operandImm32
+	operandKindImm32
+
+	// operandKindLabel is a label.
+	operandKindLabel
 )
 
 func (o *operand) format(_64 bool) string {
@@ -34,11 +37,17 @@ func (o *operand) format(_64 bool) string {
 		return formatVRegSized(o.r, _64)
 	case operandKindMem:
 		return o.amode.String()
-	case operandImm32:
+	case operandKindImm32:
 		return fmt.Sprintf("$%d", int32(o.imm32))
+	case operandKindLabel:
+		return backend.Label(o.imm32).String()
 	default:
 		panic("BUG: invalid operand kind")
 	}
+}
+
+func newOperandLabel(label backend.Label) operand {
+	return operand{kind: operandKindLabel, imm32: uint32(label)}
 }
 
 func newOperandReg(r regalloc.VReg) operand {
@@ -46,7 +55,7 @@ func newOperandReg(r regalloc.VReg) operand {
 }
 
 func newOperandImm32(imm32 uint32) operand {
-	return operand{kind: operandImm32, imm32: imm32}
+	return operand{kind: operandKindImm32, imm32: imm32}
 }
 
 func newOperandMem(amode amode) operand {

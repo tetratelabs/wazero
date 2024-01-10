@@ -71,7 +71,7 @@ func (i *instruction) encode(c backend.Compiler) {
 			case operandKindMem:
 				m := i.op1.amode
 				encodeRegMem(c, legacyPrefixesNone, regMemOpc, regMemOpcNum, dst, m, rex)
-			case operandImm32:
+			case operandKindImm32:
 				imm8 := lower8willSignExtendTo32(op1.imm32)
 				var opc uint32
 				if imm8 {
@@ -85,6 +85,8 @@ func (i *instruction) encode(c backend.Compiler) {
 				} else {
 					c.Emit4Bytes(op1.imm32)
 				}
+			default:
+				panic("BUG: invalid operand kind")
 			}
 		} else {
 			const opcodeNum = 1
@@ -112,7 +114,7 @@ func (i *instruction) encode(c backend.Compiler) {
 			case operandKindMem:
 				m := i.op1.amode
 				encodeRegMem(c, legacyPrefixesNone, opcM, opcodeNum, dst, m, rex)
-			case operandImm32:
+			case operandKindImm32:
 				imm8 := lower8willSignExtendTo32(op1.imm32)
 				var opc uint32
 				if imm8 {
@@ -126,6 +128,8 @@ func (i *instruction) encode(c backend.Compiler) {
 				} else {
 					c.Emit4Bytes(op1.imm32)
 				}
+			default:
+				panic("BUG: invalid operand kind")
 			}
 		}
 
@@ -510,9 +514,11 @@ func (i *instruction) encode(c backend.Compiler) {
 			encodeRegMem(
 				c, legacyPrefixesNone, 0xff, 1, regEnc(6), m, rexInfo(0).clearW(),
 			)
-		case operandImm32:
+		case operandKindImm32:
 			c.EmitByte(0x68)
 			c.Emit4Bytes(op.imm32)
+		default:
+			panic("BUG: invalid operand kind")
 		}
 
 	case pop64:
@@ -541,17 +547,56 @@ func (i *instruction) encode(c backend.Compiler) {
 		panic("TODO")
 	case xmmRmRImm:
 		panic("TODO")
-	case jmpKnown:
-		panic("TODO")
+	case jmp:
+		const (
+			regMemOpcode    = 0xff
+			regMemOpcodeNum = 1
+			regMemSubOpcode = 4
+		)
+		op := i.op1
+		switch op.kind {
+		case operandKindLabel:
+			panic("BUG: at this point label should have been resolved to imm32")
+		case operandKindImm32:
+			c.EmitByte(0xe9)
+			c.Emit4Bytes(op.imm32)
+		case operandKindMem:
+			m := op.amode
+			encodeRegMem(c,
+				legacyPrefixesNone,
+				regMemOpcode, regMemOpcodeNum,
+				regMemSubOpcode, m, rexInfo(0).clearW(),
+			)
+		case operandKindReg:
+			r := op.r.RealReg()
+			encodeRegReg(
+				c,
+				legacyPrefixesNone,
+				regMemOpcode, regMemOpcodeNum,
+				regMemSubOpcode,
+				regEncodings[r], rexInfo(0).clearW(),
+			)
+		default:
+			panic("BUG: invalid operand kind")
+		}
+
 	case jmpIf:
-		panic("TODO")
-	case jmpCond:
-		panic("TODO")
+		op := i.op1
+		switch op.kind {
+		case operandKindLabel:
+			panic("BUG: at this point label should have been resolved to imm32")
+		case operandKindImm32:
+			c.EmitByte(0x0f)
+			c.EmitByte(0x80 | cond(i.u1).encoding())
+			c.Emit4Bytes(op.imm32)
+		default:
+			panic("BUG: invalid operand kind")
+		}
+
 	case jmpTableSeq:
 		panic("TODO")
-	case jmpUnknown:
-		panic("TODO")
-	case trapIf:
+
+	case exitIf:
 		panic("TODO")
 
 	case ud2:
