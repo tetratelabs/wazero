@@ -5,6 +5,7 @@ import (
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 )
 
 type instruction struct {
@@ -12,7 +13,7 @@ type instruction struct {
 	prev, next          *instruction
 	abi                 *backend.FunctionABI
 	op1, op2            operand
-	u1                  uint64
+	u1, u2              uint64
 	b1                  bool
 	addedBeforeRegAlloc bool
 }
@@ -137,7 +138,15 @@ func (i *instruction) String() string {
 	case trapIf:
 		panic("TODO")
 	case ud2:
-		panic("TODO")
+		return "ud2"
+	case call:
+		if i.u2 > 0 {
+			return fmt.Sprintf("call $%d", int32(i.u2))
+		} else {
+			return fmt.Sprintf("call %s", ssa.FuncRef(i.u1))
+		}
+	case callIndirect:
+		return fmt.Sprintf("callq *%s", i.op1.format(true))
 	default:
 		panic(fmt.Sprintf("BUG: %v", i.kind))
 	}
@@ -320,6 +329,7 @@ const (
 	xmmRmRImm
 
 	// Direct call: call simm32.
+	// Note that the offset is the relative to the *current RIP*, which points to the first byte of the next instruction.
 	call
 
 	// Indirect call: callq (reg mem).
@@ -490,6 +500,23 @@ func (i *instruction) asLEA(a amode, rd regalloc.VReg) *instruction {
 	i.kind = lea
 	i.op1 = newOperandMem(a)
 	i.op2 = newOperandReg(rd)
+	return i
+}
+
+func (i *instruction) asCall(ref ssa.FuncRef, abi *backend.FunctionABI) *instruction {
+	i.kind = call
+	i.abi = abi
+	i.u1 = uint64(ref)
+	return i
+}
+
+func (i *instruction) asCallIndirect(ptr operand, abi *backend.FunctionABI) *instruction {
+	if ptr.kind != operandKindReg && ptr.kind != operandKindMem {
+		panic("BUG")
+	}
+	i.kind = callIndirect
+	i.abi = abi
+	i.op1 = ptr
 	return i
 }
 

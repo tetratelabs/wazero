@@ -1370,6 +1370,40 @@ func TestInstruction_format_encode(t *testing.T) {
 			want:       "4c8d1d08000000",
 			wantFormat: "lea 8(%rip), %r11",
 		},
+		{
+			setup:      func(i *instruction) { i.kind = ud2 },
+			want:       "0f0b",
+			wantFormat: "ud2",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asCall(0, nil)
+				i.u2 = 0xff
+			},
+			want:       "e8ff000000",
+			wantFormat: "call $255",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asCallIndirect(newOperandReg(r12VReg), nil)
+			},
+			want:       "41ffd4",
+			wantFormat: "callq *%r12",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asCallIndirect(newOperandMem(newAmodeImmReg(0, raxVReg)), nil)
+			},
+			want:       "ff10",
+			wantFormat: "callq *(%rax)",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asCallIndirect(newOperandMem(newAmodeImmReg(0xffff_0000, raxVReg)), nil)
+			},
+			want:       "ff900000ffff",
+			wantFormat: "callq *-65536(%rax)",
+		},
 	} {
 		tc := tc
 		t.Run(tc.wantFormat, func(t *testing.T) {
