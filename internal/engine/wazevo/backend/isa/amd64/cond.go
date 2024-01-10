@@ -25,6 +25,10 @@ const (
 	condS
 	// condNS represents (not-negative) condition.
 	condNS
+	// condP represents (parity) condition.
+	condP
+	// condNP represents (not parity) condition.
+	condNP
 	// condL represents (< signed) condition.
 	condL
 	// condNL represents (>= signed) condition.
@@ -33,10 +37,6 @@ const (
 	condLE
 	// condNLE represents (> signed) condition.
 	condNLE
-	// condP represents (parity) condition.
-	condP
-	// condNP represents (not parity) condition.
-	condNP
 )
 
 func (c cond) String() string {
