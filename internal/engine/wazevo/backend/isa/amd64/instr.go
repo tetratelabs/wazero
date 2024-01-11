@@ -572,9 +572,12 @@ func (i *instruction) asMovzxRmR(ext extMode, src operand, rd regalloc.VReg) *in
 	return i
 }
 
-func (i *instruction) asMov64MR(rm regalloc.VReg, rd regalloc.VReg) *instruction {
+func (i *instruction) asMov64MR(rm operand, rd regalloc.VReg) *instruction {
+	if rm.kind != operandKindMem {
+		panic("BUG")
+	}
 	i.kind = mov64MR
-	i.op1 = newOperandReg(rm)
+	i.op1 = rm
 	i.op2 = newOperandReg(rd)
 	return i
 }

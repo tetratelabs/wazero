@@ -516,9 +516,9 @@ func (i *instruction) encode(c backend.Compiler) {
 		}
 
 	case mov64MR:
-		src := regEncodings[i.op1.r.RealReg()]
+		m := i.op1.amode
 		dst := regEncodings[i.op2.r.RealReg()]
-		encodeRegReg(c, legacyPrefixesNone, 0x8b, 1, dst, src, rexInfo(0).setW())
+		encodeRegMem(c, legacyPrefixesNone, 0x8b, 1, dst, m, rexInfo(0).setW())
 
 	case lea:
 		a := i.op1.amode
