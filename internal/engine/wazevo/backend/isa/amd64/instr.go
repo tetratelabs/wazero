@@ -9,13 +9,13 @@ import (
 )
 
 type instruction struct {
-	kind                instructionKind
 	prev, next          *instruction
 	abi                 *backend.FunctionABI
 	op1, op2            operand
 	u1, u2              uint64
 	b1                  bool
 	addedBeforeRegAlloc bool
+	kind                instructionKind
 }
 
 // Next implements regalloc.Instr.
@@ -90,7 +90,18 @@ func (i *instruction) String() string {
 	case movsxRmR:
 		panic("TODO")
 	case movRM:
-		panic("TODO")
+		var suffix string
+		switch i.u1 {
+		case 1:
+			suffix = "b"
+		case 2:
+			suffix = "w"
+		case 4:
+			suffix = "l"
+		case 8:
+			suffix = "q"
+		}
+		return fmt.Sprintf("mov.%s %s, %s", suffix, i.op1.format(true), i.op2.format(true))
 	case shiftR:
 		panic("TODO")
 	case xmmRmiReg:
@@ -558,6 +569,17 @@ func (i *instruction) asGprToXmm(op sseOpcode, rm operand, rd regalloc.VReg, _64
 	i.op2 = newOperandReg(rd)
 	i.u1 = uint64(op)
 	i.b1 = _64
+	return i
+}
+
+func (i *instruction) movRM(rm regalloc.VReg, rd operand, size byte) *instruction {
+	if rd.kind != operandKindMem {
+		panic("BUG")
+	}
+	i.kind = movRM
+	i.op1 = newOperandReg(rm)
+	i.op2 = rd
+	i.u1 = uint64(size)
 	return i
 }
 

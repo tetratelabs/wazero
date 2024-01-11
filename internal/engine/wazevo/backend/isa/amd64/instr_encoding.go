@@ -527,8 +527,28 @@ func (i *instruction) encode(c backend.Compiler) {
 
 	case movsxRmR:
 		panic("TODO")
+
 	case movRM:
-		panic("TODO")
+		m := i.op2.amode
+		src := regEncodings[i.op1.r.RealReg()]
+
+		var rex rexInfo
+		switch i.u1 {
+		case 1:
+			if e := src.encoding(); e >= 4 && e <= 7 {
+				rex = rex.always()
+			}
+			encodeRegMem(c, legacyPrefixesNone, 0x88, 1, src, m, rex.clearW())
+		case 2:
+			encodeRegMem(c, legacyPrefixes0x66, 0x89, 1, src, m, rex.clearW())
+		case 4:
+			encodeRegMem(c, legacyPrefixesNone, 0x89, 1, src, m, rex.clearW())
+		case 8:
+			encodeRegMem(c, legacyPrefixesNone, 0x89, 1, src, m, rex.setW())
+		default:
+			panic("BUG: invalid size")
+		}
+
 	case shiftR:
 		panic("TODO")
 	case xmmRmiReg:
