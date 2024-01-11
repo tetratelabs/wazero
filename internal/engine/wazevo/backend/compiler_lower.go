@@ -68,7 +68,10 @@ func (c *compiler) lowerBlock(blk ssa.BasicBlock) {
 
 		switch cur.Opcode() {
 		case ssa.OpcodeReturn:
-			c.lowerFunctionReturns(cur.ReturnVals())
+			rets := cur.ReturnVals()
+			if len(rets) > 0 {
+				c.mach.LowerReturns(rets)
+			}
 			c.mach.InsertReturn()
 		default:
 			mach.LowerInstr(cur)
@@ -108,7 +111,9 @@ func (c *compiler) lowerBranches(br0, br1 *ssa.Instruction) {
 			panic("BUG: critical edge split failed")
 		}
 		if argExists && target.ReturnBlock() {
-			c.lowerFunctionReturns(args)
+			if len(args) > 0 {
+				c.mach.LowerReturns(args)
+			}
 		} else if argExists {
 			c.lowerBlockArguments(args, target)
 		}
@@ -131,10 +136,6 @@ func (c *compiler) lowerFunctionArguments(entry ssa.BasicBlock) {
 	}
 	c.mach.LowerParams(c.tmpVals)
 	ectx.FlushPendingInstructions()
-}
-
-func (c *compiler) lowerFunctionReturns(returns []ssa.Value) {
-	c.mach.LowerReturns(returns)
 }
 
 // lowerBlockArguments lowers how to pass arguments to the given successor block.

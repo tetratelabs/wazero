@@ -51,11 +51,11 @@ func TestE2E(t *testing.T) {
 	}{
 		{
 			name: "empty", m: testcases.Empty.Module,
+			calls: []callCase{{expResults: []uint64{}}},
 		},
 		{
 			name: "only_return", m: testcases.OnlyReturn.Module,
-			calls:     []callCase{{expResults: []uint64{}}},
-			skipAMD64: true,
+			calls: []callCase{{expResults: []uint64{}}},
 		},
 		{
 			name: "selects", m: testcases.Selects.Module,

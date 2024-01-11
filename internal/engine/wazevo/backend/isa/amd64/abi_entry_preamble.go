@@ -17,7 +17,7 @@ var (
 	goAllocatedStackPtr = rbxVReg
 	// paramResultSliceCopied is not used in the epilogue.
 	paramResultSliceCopied = r15VReg //nolint
-	// tmpRegVReg is not used in the epilogue.
+	// functionExecutable is not used in the epilogue.
 	functionExecutable = r14VReg
 )
 
@@ -25,7 +25,8 @@ var (
 func (m *machine) CompileEntryPreamble(sig *ssa.Signature) []byte {
 	root := m.compileEntryPreamble(sig)
 	m.encodeWithoutRelResolution(root)
-	return m.c.Buf()
+	buf := m.c.Buf()
+	return buf
 }
 
 func (m *machine) compileEntryPreamble(sig *ssa.Signature) *instruction {
