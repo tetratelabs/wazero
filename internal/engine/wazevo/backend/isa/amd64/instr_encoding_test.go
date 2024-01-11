@@ -1577,7 +1577,7 @@ func TestInstruction_format_encode(t *testing.T) {
 		},
 		{
 			setup:      func(i *instruction) { i.asMovsxRmR(extModeLQ, newOperandReg(raxVReg), rdiVReg) },
-			want:       "480fbff8",
+			want:       "4863f8",
 			wantFormat: "movsx.lq %rax, %rdi",
 		},
 		{
