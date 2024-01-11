@@ -88,7 +88,7 @@ func (i *instruction) String() string {
 	case lea:
 		return fmt.Sprintf("lea %s, %s", i.op1.format(true), i.op2.format(true))
 	case movsxRmR:
-		panic("TODO")
+		return fmt.Sprintf("movsx.%s %s, %s", extMode(i.u1), i.op1.format(true), i.op2.format(true))
 	case movRM:
 		var suffix string
 		switch i.u1 {
@@ -580,6 +580,17 @@ func (i *instruction) movRM(rm regalloc.VReg, rd operand, size byte) *instructio
 	i.op1 = newOperandReg(rm)
 	i.op2 = rd
 	i.u1 = uint64(size)
+	return i
+}
+
+func (i *instruction) asMovsxRmR(ext extMode, src operand, rd regalloc.VReg) *instruction {
+	if src.kind != operandKindReg && src.kind != operandKindMem {
+		panic("BUG")
+	}
+	i.kind = movsxRmR
+	i.op1 = src
+	i.op2 = newOperandReg(rd)
+	i.u1 = uint64(ext)
 	return i
 }
 

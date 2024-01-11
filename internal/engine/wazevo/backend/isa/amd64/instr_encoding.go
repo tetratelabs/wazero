@@ -476,22 +476,44 @@ func (i *instruction) encode(c backend.Compiler) {
 		panic("TODO")
 	case signExtendData:
 		panic("TODO")
-	case movzxRmR:
+	case movzxRmR, movsxRmR:
+		signed := i.kind == movsxRmR
+
 		ext := extMode(i.u1)
 		var opcode uint32
 		var opcodeNum uint32
 		var rex rexInfo
 		switch ext {
 		case extModeBL:
-			opcode, opcodeNum, rex = 0x0fb6, 2, rex.clearW()
+			if signed {
+				opcode, opcodeNum, rex = 0x0fbe, 2, rex.clearW()
+			} else {
+				opcode, opcodeNum, rex = 0x0fb6, 2, rex.clearW()
+			}
 		case extModeBQ:
-			opcode, opcodeNum, rex = 0x0fb6, 2, rex.setW()
+			if signed {
+				opcode, opcodeNum, rex = 0x0fbe, 2, rex.setW()
+			} else {
+				opcode, opcodeNum, rex = 0x0fb6, 2, rex.setW()
+			}
 		case extModeWL:
-			opcode, opcodeNum, rex = 0x0fb7, 2, rex.clearW()
+			if signed {
+				opcode, opcodeNum, rex = 0x0fbf, 2, rex.clearW()
+			} else {
+				opcode, opcodeNum, rex = 0x0fb7, 2, rex.clearW()
+			}
 		case extModeWQ:
-			opcode, opcodeNum, rex = 0x0fb7, 2, rex.setW()
+			if signed {
+				opcode, opcodeNum, rex = 0x0fbf, 2, rex.setW()
+			} else {
+				opcode, opcodeNum, rex = 0x0fb7, 2, rex.setW()
+			}
 		case extModeLQ:
-			opcode, opcodeNum, rex = 0x8b, 1, rex.setW()
+			if signed {
+				opcode, opcodeNum, rex = 0x63, 1, rex.setW()
+			} else {
+				opcode, opcodeNum, rex = 0x8b, 1, rex.clearW()
+			}
 		default:
 			panic("BUG: invalid extMode")
 		}
@@ -524,9 +546,6 @@ func (i *instruction) encode(c backend.Compiler) {
 		a := i.op1.amode
 		dst := regEncodings[i.op2.r.RealReg()]
 		encodeRegMem(c, legacyPrefixesNone, 0x8d, 1, dst, a, rexInfo(0).setW())
-
-	case movsxRmR:
-		panic("TODO")
 
 	case movRM:
 		m := i.op2.amode
