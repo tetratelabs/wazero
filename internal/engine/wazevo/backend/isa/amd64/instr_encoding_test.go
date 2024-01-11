@@ -1499,6 +1499,51 @@ func TestInstruction_format_encode(t *testing.T) {
 			want:       "0f8b04000000",
 			wantFormat: "jnp $4",
 		},
+		{
+			setup:      func(i *instruction) { i.asMov64MR(r12VReg, r15VReg) },
+			want:       "4d8bfc",
+			wantFormat: "movq %r12, %r15",
+		},
+		{
+			setup:      func(i *instruction) { i.asMov64MR(raxVReg, r15VReg) },
+			want:       "4c8bf8",
+			wantFormat: "movq %rax, %r15",
+		},
+		{
+			setup:      func(i *instruction) { i.asMov64MR(raxVReg, rdiVReg) },
+			want:       "488bf8",
+			wantFormat: "movq %rax, %rdi",
+		},
+		{
+			setup:      func(i *instruction) { i.asMovzxRmR(extModeBL, newOperandReg(raxVReg), rdiVReg) },
+			want:       "0fb6f8",
+			wantFormat: "movzx.bl %rax, %rdi",
+		},
+		{
+			setup:      func(i *instruction) { i.asMovzxRmR(extModeBL, newOperandReg(rbxVReg), rdiVReg) },
+			want:       "0fb6fb",
+			wantFormat: "movzx.bl %rbx, %rdi",
+		},
+		{
+			setup:      func(i *instruction) { i.asMovzxRmR(extModeBQ, newOperandReg(raxVReg), rdiVReg) },
+			want:       "480fb6f8",
+			wantFormat: "movzx.bq %rax, %rdi",
+		},
+		{
+			setup:      func(i *instruction) { i.asMovzxRmR(extModeBQ, newOperandReg(r15VReg), rdiVReg) },
+			want:       "490fb6ff",
+			wantFormat: "movzx.bq %r15, %rdi",
+		},
+		{
+			setup:      func(i *instruction) { i.asMovzxRmR(extModeWL, newOperandReg(raxVReg), rdiVReg) },
+			want:       "0fb7f8",
+			wantFormat: "movzx.wl %rax, %rdi",
+		},
+		{
+			setup:      func(i *instruction) { i.asMovzxRmR(extModeWQ, newOperandReg(raxVReg), rdiVReg) },
+			want:       "480fb7f8",
+			wantFormat: "movzx.wq %rax, %rdi",
+		},
 	} {
 		tc := tc
 		t.Run(tc.wantFormat, func(t *testing.T) {

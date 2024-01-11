@@ -82,9 +82,9 @@ func (i *instruction) String() string {
 	case signExtendData:
 		panic("TODO")
 	case movzxRmR:
-		panic("TODO")
+		return fmt.Sprintf("movzx.%s %s, %s", extMode(i.u1), i.op1.format(true), i.op2.format(true))
 	case mov64MR:
-		panic("TODO")
+		return fmt.Sprintf("movq %s, %s", i.op1.format(true), i.op2.format(true))
 	case lea:
 		return fmt.Sprintf("lea %s, %s", i.op1.format(true), i.op2.format(true))
 	case movsxRmR:
@@ -241,12 +241,12 @@ const (
 	// GPR to GPR move: mov (64 32) reg reg.
 	movRR
 
-	// Zero-extended loads, except for 64 bits: movz (bl bq wl wq lq) addr reg.
+	// movzxRmR is zero-extended loads or move (R to R), except for 64 bits: movz (bl bq wl wq lq) addr reg.
 	// Note that the lq variant doesn't really exist since the default zero-extend rule makes it
 	// unnecessary. For that case we emit the equivalent "movl AM, reg32".
 	movzxRmR
 
-	// A plain 64-bit integer load, since MovZX_RM_R can't represent that.
+	// mov64MR is a plain 64-bit integer load, since movzxRmR can't represent that.
 	mov64MR
 
 	// Loads the memory address of addr into dst.
@@ -558,6 +558,24 @@ func (i *instruction) asGprToXmm(op sseOpcode, rm operand, rd regalloc.VReg, _64
 	i.op2 = newOperandReg(rd)
 	i.u1 = uint64(op)
 	i.b1 = _64
+	return i
+}
+
+func (i *instruction) asMovzxRmR(ext extMode, src operand, rd regalloc.VReg) *instruction {
+	if src.kind != operandKindReg && src.kind != operandKindMem {
+		panic("BUG")
+	}
+	i.kind = movzxRmR
+	i.op1 = src
+	i.op2 = newOperandReg(rd)
+	i.u1 = uint64(ext)
+	return i
+}
+
+func (i *instruction) asMov64MR(rm regalloc.VReg, rd regalloc.VReg) *instruction {
+	i.kind = mov64MR
+	i.op1 = newOperandReg(rm)
+	i.op2 = newOperandReg(rd)
 	return i
 }
 

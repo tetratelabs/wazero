@@ -477,9 +477,49 @@ func (i *instruction) encode(c backend.Compiler) {
 	case signExtendData:
 		panic("TODO")
 	case movzxRmR:
-		panic("TODO")
+		ext := extMode(i.u1)
+		var opcode uint32
+		var opcodeNum uint32
+		var rex rexInfo
+		switch ext {
+		case extModeBL:
+			opcode, opcodeNum, rex = 0x0fb6, 2, rex.clearW()
+		case extModeBQ:
+			opcode, opcodeNum, rex = 0x0fb6, 2, rex.setW()
+		case extModeWL:
+			opcode, opcodeNum, rex = 0x0fb7, 2, rex.clearW()
+		case extModeWQ:
+			opcode, opcodeNum, rex = 0x0fb7, 2, rex.setW()
+		case extModeLQ:
+			opcode, opcodeNum, rex = 0x8b, 1, rex.setW()
+		default:
+			panic("BUG: invalid extMode")
+		}
+
+		op := i.op1
+		dst := regEncodings[i.op2.r.RealReg()]
+		switch op.kind {
+		case operandKindReg:
+			src := regEncodings[op.r.RealReg()]
+			if ext == extModeBL || ext == extModeBQ {
+				// Some destinations must be encoded with REX.R = 1.
+				if e := src.encoding(); e >= 4 && e <= 7 {
+					rex = rex.always()
+				}
+			}
+			encodeRegReg(c, legacyPrefixesNone, opcode, opcodeNum, dst, src, rex)
+		case operandKindMem:
+			m := op.amode
+			encodeRegMem(c, legacyPrefixesNone, opcode, opcodeNum, dst, m, rex)
+		default:
+			panic("BUG: invalid operand kind")
+		}
+
 	case mov64MR:
-		panic("TODO")
+		src := regEncodings[i.op1.r.RealReg()]
+		dst := regEncodings[i.op2.r.RealReg()]
+		encodeRegReg(c, legacyPrefixesNone, 0x8b, 1, dst, src, rexInfo(0).setW())
+
 	case lea:
 		a := i.op1.amode
 		dst := regEncodings[i.op2.r.RealReg()]
@@ -792,7 +832,7 @@ func (ri rexInfo) clearW() rexInfo {
 	return ri & 0x02
 }
 
-func (ri rexInfo) always() rexInfo { //nolint
+func (ri rexInfo) always() rexInfo {
 	return ri | 0x02
 }
 
