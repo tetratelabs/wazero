@@ -1,6 +1,7 @@
 package amd64
 
 import (
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 )
@@ -52,9 +53,21 @@ func (m *machine) ArgsResultsRegs() (argResultInts, argResultFloats []regalloc.R
 }
 
 // LowerParams implements backend.Machine.
-func (m *machine) LowerParams(params []ssa.Value) {
-	// TODO implement me
-	panic("implement me")
+func (m *machine) LowerParams(args []ssa.Value) {
+	a := m.currentABI
+
+	for i, ssaArg := range args {
+		if !ssaArg.Valid() {
+			continue
+		}
+		reg := m.c.VRegOf(ssaArg)
+		arg := &a.Args[i]
+		if arg.Kind == backend.ABIArgKindReg {
+			m.InsertMove(reg, arg.Reg, arg.Type)
+		} else {
+			panic("TODO: stack param")
+		}
+	}
 }
 
 // LowerReturns implements backend.Machine.

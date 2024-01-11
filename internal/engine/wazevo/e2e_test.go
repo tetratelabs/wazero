@@ -13,7 +13,6 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/experimental/logging"
-	"github.com/tetratelabs/wazero/experimental/opt"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/testcases"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
@@ -50,6 +49,14 @@ func TestE2E(t *testing.T) {
 		calls       []callCase
 		skipAMD64   bool
 	}{
+		{
+			name: "empty", m: testcases.Empty.Module,
+		},
+		{
+			name: "only_return", m: testcases.OnlyReturn.Module,
+			calls:     []callCase{{expResults: []uint64{}}},
+			skipAMD64: true,
+		},
 		{
 			name: "selects", m: testcases.Selects.Module,
 			skipAMD64: true,
@@ -101,7 +108,10 @@ func TestE2E(t *testing.T) {
 				{params: []uint64{30}, expResults: []uint64{0xcb228}},
 			},
 		},
-		{name: "call", m: testcases.Call.Module, calls: []callCase{{expResults: []uint64{45, 45}}}},
+		{
+			name: "call", m: testcases.Call.Module, calls: []callCase{{expResults: []uint64{45, 45}}},
+			skipAMD64: true,
+		},
 		{
 			name: "stack overflow",
 			m: &wasm.Module{
@@ -331,10 +341,10 @@ func TestE2E(t *testing.T) {
 		},
 	} {
 		tc := tc
-		if tc.skipAMD64 {
-			skipOnAmd64(t)
-		}
 		t.Run(tc.name, func(t *testing.T) {
+			if tc.skipAMD64 {
+				skipOnAmd64(t)
+			}
 			for i := 0; i < 2; i++ {
 				var name string
 				if i == 0 {
@@ -345,7 +355,7 @@ func TestE2E(t *testing.T) {
 				t.Run(name, func(t *testing.T) {
 					cache, err := wazero.NewCompilationCacheWithDir(tmp)
 					require.NoError(t, err)
-					config := opt.NewRuntimeConfigOptimizingCompiler().WithCompilationCache(cache)
+					config := newRuntimeConfigOptimizingCompiler().WithCompilationCache(cache)
 
 					ctx := context.Background()
 					r := wazero.NewRuntimeWithConfig(ctx, config)
@@ -412,7 +422,7 @@ func TestE2E_host_functions(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := tc.ctx
 
-			config := opt.NewRuntimeConfigOptimizingCompiler()
+			config := newRuntimeConfigOptimizingCompiler()
 
 			r := wazero.NewRuntimeWithConfig(ctx, config)
 			defer func() {
@@ -495,7 +505,7 @@ func TestE2E_host_functions(t *testing.T) {
 
 func TestE2E_stores(t *testing.T) {
 	skipOnAmd64(t)
-	config := opt.NewRuntimeConfigOptimizingCompiler()
+	config := newRuntimeConfigOptimizingCompiler()
 
 	ctx := context.Background()
 	r := wazero.NewRuntimeWithConfig(ctx, config)
@@ -583,7 +593,7 @@ func TestE2E_reexported_memory(t *testing.T) {
 		CodeSection:       []wasm.Code{{Body: []byte{wasm.OpcodeI32Const, 10, wasm.OpcodeMemoryGrow, 0, wasm.OpcodeEnd}}},
 	}
 
-	config := opt.NewRuntimeConfigOptimizingCompiler()
+	config := newRuntimeConfigOptimizingCompiler()
 
 	ctx := context.Background()
 	r := wazero.NewRuntimeWithConfig(ctx, config)
@@ -633,7 +643,7 @@ func TestStackUnwind_panic_in_host(t *testing.T) {
 		},
 	}
 
-	config := opt.NewRuntimeConfigOptimizingCompiler()
+	config := newRuntimeConfigOptimizingCompiler()
 
 	ctx := context.Background()
 	r := wazero.NewRuntimeWithConfig(ctx, config)
@@ -684,7 +694,7 @@ func TestStackUnwind_unreachable(t *testing.T) {
 		},
 	}
 
-	config := opt.NewRuntimeConfigOptimizingCompiler()
+	config := newRuntimeConfigOptimizingCompiler()
 	ctx := context.Background()
 	r := wazero.NewRuntimeWithConfig(ctx, config)
 	defer func() {
@@ -707,7 +717,7 @@ wasm stack trace:
 func TestListener_local(t *testing.T) {
 	skipOnAmd64(t)
 	var buf bytes.Buffer
-	config := opt.NewRuntimeConfigOptimizingCompiler()
+	config := newRuntimeConfigOptimizingCompiler()
 	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
 
 	r := wazero.NewRuntimeWithConfig(ctx, config)
@@ -736,7 +746,7 @@ func TestListener_local(t *testing.T) {
 func TestListener_imported(t *testing.T) {
 	skipOnAmd64(t)
 	var buf bytes.Buffer
-	config := opt.NewRuntimeConfigOptimizingCompiler()
+	config := newRuntimeConfigOptimizingCompiler()
 	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
 
 	r := wazero.NewRuntimeWithConfig(ctx, config)
@@ -788,7 +798,7 @@ func TestListener_long(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
-	config := opt.NewRuntimeConfigOptimizingCompiler()
+	config := newRuntimeConfigOptimizingCompiler()
 	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
 
 	r := wazero.NewRuntimeWithConfig(ctx, config)
@@ -839,7 +849,7 @@ func TestListener_long_as_is(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
-	config := opt.NewRuntimeConfigOptimizingCompiler()
+	config := newRuntimeConfigOptimizingCompiler()
 	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
 
 	r := wazero.NewRuntimeWithConfig(ctx, config)
@@ -889,7 +899,7 @@ func TestListener_long_many_consts(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
-	config := opt.NewRuntimeConfigOptimizingCompiler()
+	config := newRuntimeConfigOptimizingCompiler()
 	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
 
 	r := wazero.NewRuntimeWithConfig(ctx, config)
@@ -915,7 +925,7 @@ func TestListener_long_many_consts(t *testing.T) {
 // TestDWARF verifies that the DWARF based stack traces work as expected before/after compilation cache.
 func TestDWARF(t *testing.T) {
 	skipOnAmd64(t)
-	config := opt.NewRuntimeConfigOptimizingCompiler()
+	config := newRuntimeConfigOptimizingCompiler()
 	ctx := context.Background()
 
 	bin := dwarftestdata.ZigWasm
@@ -946,4 +956,13 @@ func TestDWARF(t *testing.T) {
 
 	err = r.Close(ctx)
 	require.NoError(t, err)
+}
+
+// newRuntimeConfigOptimizingCompiler is the same as opt.NewRuntimeConfigOptimizingCompiler
+// except that it doesn't check if it is on arm64 or not. Use this in tests until amd64 is completely supported.
+func newRuntimeConfigOptimizingCompiler() wazero.RuntimeConfig {
+	type enabler interface{ EnableOptimizingCompiler() }
+	c := wazero.NewRuntimeConfig()
+	c.(enabler).EnableOptimizingCompiler()
+	return c
 }

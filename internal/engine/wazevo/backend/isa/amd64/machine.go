@@ -8,7 +8,6 @@ import (
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
-	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 )
 
 // NewBackend returns a new backend for arm64.
@@ -39,6 +38,13 @@ type (
 		spillSlotSize int64
 		currentABI    *backend.FunctionABI
 		clobberedRegs []regalloc.VReg
+
+		labelResolutionPends []labelResolutionPend
+	}
+
+	labelResolutionPend struct {
+		instr  *instruction
+		offset int64
 	}
 )
 
@@ -59,7 +65,10 @@ func (m *machine) ExecutableContext() backend.ExecutableContext { return m.ectx 
 func (m *machine) DisableStackCheck() { m.stackBoundsCheckDisabled = true }
 
 // SetCompiler implements backend.Machine.
-func (m *machine) SetCompiler(compiler backend.Compiler) { m.c = compiler }
+func (m *machine) SetCompiler(c backend.Compiler) {
+	m.c = c
+	m.regAllocFn = backend.NewRegAllocFunction[*instruction, *machine](m, c.SSABuilder(), c)
+}
 
 // SetCurrentABI implements backend.Machine.
 func (m *machine) SetCurrentABI(abi *backend.FunctionABI) {
@@ -87,8 +96,26 @@ func (m *machine) InsertReturn() {
 
 // LowerSingleBranch implements backend.Machine.
 func (m *machine) LowerSingleBranch(b *ssa.Instruction) {
-	// TODO implement me
-	panic("implement me")
+	ectx := m.ectx
+	switch b.Opcode() {
+	case ssa.OpcodeJump:
+		_, _, targetBlk := b.BranchData()
+		if b.IsFallthroughJump() {
+			return
+		}
+		jmp := m.allocateInstr()
+		target := ectx.GetOrAllocateSSABlockLabel(targetBlk)
+		if target == backend.LabelReturn {
+			jmp.asRet(m.currentABI)
+		} else {
+			jmp.asJmp(newOperandLabel(target))
+		}
+		m.insert(jmp)
+	case ssa.OpcodeBrTable:
+		panic("TODO: implement me")
+	default:
+		panic("BUG: unexpected branch opcode" + b.Opcode().String())
+	}
 }
 
 // LowerConditionalBranch implements backend.Machine.
@@ -158,44 +185,54 @@ func (m *machine) Format() string {
 	return "\n" + strings.Join(lines, "\n") + "\n"
 }
 
-// SetupPrologue implements backend.Machine.
-func (m *machine) SetupPrologue() {
-	// TODO implement me
-	panic("implement me")
+func (m *machine) encodeWithoutRelResolution(root *instruction) {
+	for cur := root; cur != nil; cur = cur.next {
+		cur.encode(m.c)
+	}
 }
 
-// SetupEpilogue implements backend.Machine.
-func (m *machine) SetupEpilogue() {
-	// TODO implement me
-	panic("implement me")
-}
+// Encode implements backend.Machine Encode.
+func (m *machine) Encode(context.Context) {
+	ectx := m.ectx
+	bufPtr := m.c.BufPtr()
 
-// ResolveRelativeAddresses implements backend.Machine.
-func (m *machine) ResolveRelativeAddresses(ctx context.Context) {
-	// TODO implement me
-	panic("implement me")
+	m.labelResolutionPends = m.labelResolutionPends[:0]
+	for _, pos := range ectx.OrderedBlockLabels {
+		offset := int64(len(*bufPtr))
+		pos.BinaryOffset = offset
+		for cur := pos.Begin; cur != pos.End.next; cur = cur.next {
+			offset := int64(len(*bufPtr))
+			if cur.kind == nop0 {
+				l := cur.nop0Label()
+				if pos, ok := ectx.LabelPositions[l]; ok {
+					pos.BinaryOffset = offset
+				}
+			}
+
+			needLabelResolution := cur.encode(m.c)
+			if needLabelResolution {
+				m.labelResolutionPends = append(m.labelResolutionPends,
+					labelResolutionPend{instr: cur, offset: int64(offset)},
+				)
+			}
+		}
+	}
+
+	for i := range m.labelResolutionPends {
+		p := &m.labelResolutionPends[i]
+		switch p.instr.kind {
+		case jmp:
+			panic("TODO")
+		case jmpIf:
+			panic("TODO")
+		default:
+			panic("BUG")
+		}
+	}
 }
 
 // ResolveRelocations implements backend.Machine.
 func (m *machine) ResolveRelocations(refToBinaryOffset map[ssa.FuncRef]int, binary []byte, relocations []backend.RelocationInfo) {
-	// TODO implement me
-	panic("implement me")
-}
-
-// CompileGoFunctionTrampoline implements backend.Machine.
-func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *ssa.Signature, needModuleContextPtr bool) []byte {
-	// TODO implement me
-	panic("implement me")
-}
-
-// CompileStackGrowCallSequence implements backend.Machine.
-func (m *machine) CompileStackGrowCallSequence() []byte {
-	// TODO implement me
-	panic("implement me")
-}
-
-// CompileEntryPreamble implements backend.Machine.
-func (m *machine) CompileEntryPreamble(signature *ssa.Signature) []byte {
 	// TODO implement me
 	panic("implement me")
 }
@@ -209,7 +246,24 @@ func (m *machine) allocateInstr() *instruction {
 	return instr
 }
 
+func (m *machine) allocateNop() *instruction {
+	instr := m.allocateInstr()
+	instr.kind = nop0
+	return instr
+}
+
 func (m *machine) insert(i *instruction) {
 	ectx := m.ectx
 	ectx.PendingInstructions = append(ectx.PendingInstructions, i)
+}
+
+func (m *machine) allocateBrTarget() (nop *instruction, l backend.Label) { //nolint
+	ectx := m.ectx
+	l = ectx.AllocateLabel()
+	nop = m.allocateInstr()
+	nop.asNop0WithLabel(l)
+	pos := ectx.AllocateLabelPosition(l)
+	pos.Begin, pos.End = nop, nop
+	ectx.LabelPositions[l] = pos
+	return
 }

@@ -2219,9 +2219,6 @@ L1 (SSA Block: blk0):
 			default:
 				t.Fail()
 			}
-
-			// Sanity check on the final binary encoding.
-			be.Encode()
 		})
 	}
 }

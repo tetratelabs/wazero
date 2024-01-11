@@ -1,6 +1,7 @@
 package arm64
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
@@ -9,7 +10,8 @@ import (
 )
 
 // Encode implements backend.Machine Encode.
-func (m *machine) Encode() {
+func (m *machine) Encode(ctx context.Context) {
+	m.resolveRelativeAddresses(ctx)
 	m.encode(m.executableContext.RootInstr)
 }
 

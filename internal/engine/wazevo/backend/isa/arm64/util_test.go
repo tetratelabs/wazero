@@ -61,6 +61,8 @@ type mockCompiler struct {
 	buf         []byte
 }
 
+func (m *mockCompiler) BufPtr() *[]byte { return &m.buf }
+
 func (m *mockCompiler) GetFunctionABI(sig *ssa.Signature) *backend.FunctionABI {
 	// TODO implement me
 	panic("implement me")

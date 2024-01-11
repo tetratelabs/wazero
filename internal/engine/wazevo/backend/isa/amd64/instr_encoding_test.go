@@ -1666,7 +1666,7 @@ func TestInstruction_format_encode(t *testing.T) {
 		{
 			setup: func(i *instruction) {
 				a := newOperandMem(newAmodeImmReg(1<<20, raxVReg))
-				i.movRM(rcxVReg, a, 1)
+				i.asMovRM(rcxVReg, a, 1)
 			},
 			want:       "888800001000",
 			wantFormat: "mov.b %rcx, 1048576(%rax)",
@@ -1674,7 +1674,7 @@ func TestInstruction_format_encode(t *testing.T) {
 		{
 			setup: func(i *instruction) {
 				a := newOperandMem(newAmodeImmReg(1<<20, raxVReg))
-				i.movRM(rdiVReg, a, 1)
+				i.asMovRM(rdiVReg, a, 1)
 			},
 			want:       "88b800001000",
 			wantFormat: "mov.b %rdi, 1048576(%rax)",
@@ -1682,7 +1682,7 @@ func TestInstruction_format_encode(t *testing.T) {
 		{
 			setup: func(i *instruction) {
 				a := newOperandMem(newAmodeRegRegShit(1<<20, raxVReg, rcxVReg, 3))
-				i.movRM(rdiVReg, a, 2)
+				i.asMovRM(rdiVReg, a, 2)
 			},
 			want:       "6689bcc800001000",
 			wantFormat: "mov.w %rdi, 1048576(%rax,%rcx,8)",
@@ -1690,7 +1690,7 @@ func TestInstruction_format_encode(t *testing.T) {
 		{
 			setup: func(i *instruction) {
 				a := newOperandMem(newAmodeRegRegShit(123, raxVReg, rcxVReg, 0))
-				i.movRM(rdiVReg, a, 4)
+				i.asMovRM(rdiVReg, a, 4)
 			},
 			want:       "897c087b",
 			wantFormat: "mov.l %rdi, 123(%rax,%rcx,1)",
@@ -1698,7 +1698,7 @@ func TestInstruction_format_encode(t *testing.T) {
 		{
 			setup: func(i *instruction) {
 				a := newOperandMem(newAmodeRegRegShit(123, raxVReg, rcxVReg, 0))
-				i.movRM(rdiVReg, a, 8)
+				i.asMovRM(rdiVReg, a, 8)
 			},
 			want:       "48897c087b",
 			wantFormat: "mov.q %rdi, 123(%rax,%rcx,1)",

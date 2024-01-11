@@ -1,6 +1,7 @@
 package arm64
 
 import (
+	"context"
 	"sort"
 	"testing"
 
@@ -450,7 +451,7 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 
 			require.Equal(t, tc.exp, m.Format())
 
-			m.Encode()
+			m.Encode(context.Background())
 		})
 	}
 }
@@ -565,7 +566,7 @@ func Test_goFunctionCallLoadStackArg(t *testing.T) {
 				m.executableContext.RootInstr = nop
 
 				require.Equal(t, tc.exp, m.Format())
-				m.Encode()
+				m.Encode(context.Background())
 			})
 		})
 	}
@@ -631,7 +632,7 @@ func Test_goFunctionCallStoreStackResult(t *testing.T) {
 				m.executableContext.RootInstr = nop
 
 				require.Equal(t, tc.exp, m.Format())
-				m.Encode()
+				m.Encode(context.Background())
 			})
 		})
 	}

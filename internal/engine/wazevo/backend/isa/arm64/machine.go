@@ -242,8 +242,8 @@ func (m *machine) resolveAddressingMode(arg0offset, ret0offset int64, i *instruc
 	}
 }
 
-// ResolveRelativeAddresses implements backend.Machine.
-func (m *machine) ResolveRelativeAddresses(ctx context.Context) {
+// resolveRelativeAddresses resolves the relative addresses before encoding.
+func (m *machine) resolveRelativeAddresses(ctx context.Context) {
 	if len(m.unresolvedAddressModes) > 0 {
 		arg0offset, ret0offset := m.arg0OffsetFromSP(), m.ret0OffsetFromSP()
 		for _, i := range m.unresolvedAddressModes {
@@ -311,8 +311,6 @@ func (m *machine) ResolveRelativeAddresses(ctx context.Context) {
 				wazevoapi.PerfMap.AddModuleEntry(fnIndex, offset, uint64(size), fmt.Sprintf("%s:::::%s", fn, labelStr))
 			}
 		}
-
-		pos.BinarySize = size
 		offset += size
 	}
 
@@ -336,7 +334,7 @@ func (m *machine) ResolveRelativeAddresses(ctx context.Context) {
 		}
 	}
 	if needRerun {
-		m.ResolveRelativeAddresses(ctx)
+		m.resolveRelativeAddresses(ctx)
 		if wazevoapi.PerfMapEnabled {
 			wazevoapi.PerfMap.Clear()
 		}

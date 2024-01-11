@@ -62,15 +62,11 @@ type (
 		// This sets up the instructions for the inverse of SetupPrologue right before
 		SetupEpilogue()
 
-		// ResolveRelativeAddresses resolves the relative addresses after register allocations and prologue/epilogue setup.
-		// After this, the compiler is finally ready to emit machine code.
-		ResolveRelativeAddresses(ctx context.Context)
-
 		// ResolveRelocations resolves the relocations after emitting machine code.
 		ResolveRelocations(refToBinaryOffset map[ssa.FuncRef]int, binary []byte, relocations []RelocationInfo)
 
 		// Encode encodes the machine instructions to the Compiler.
-		Encode()
+		Encode(ctx context.Context)
 
 		// CompileGoFunctionTrampoline compiles the trampoline function  to call a Go function of the given exit code and signature.
 		CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *ssa.Signature, needModuleContextPtr bool) []byte

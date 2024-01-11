@@ -52,7 +52,7 @@ func (m mockMachine) CompileGoFunctionTrampoline(wazevoapi.ExitCode, *ssa.Signat
 }
 
 // Encode implements Machine.Encode.
-func (m mockMachine) Encode() {}
+func (m mockMachine) Encode(ctx context.Context) {}
 
 // ResolveRelocations implements Machine.ResolveRelocations.
 func (m mockMachine) ResolveRelocations(map[ssa.FuncRef]int, []byte, []RelocationInfo) {}
@@ -62,9 +62,6 @@ func (m mockMachine) SetupPrologue() {}
 
 // SetupEpilogue implements Machine.SetupEpilogue.
 func (m mockMachine) SetupEpilogue() {}
-
-// ResolveRelativeAddresses implements Machine.ResolveRelativeAddresses.
-func (m mockMachine) ResolveRelativeAddresses(ctx context.Context) {}
 
 // Function implements Machine.Function.
 func (m mockMachine) Function() (f regalloc.Function) { return }
