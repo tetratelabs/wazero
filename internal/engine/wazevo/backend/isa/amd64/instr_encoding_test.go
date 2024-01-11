@@ -1499,6 +1499,210 @@ func TestInstruction_format_encode(t *testing.T) {
 			want:       "0f8b04000000",
 			wantFormat: "jnp $4",
 		},
+		{
+			setup: func(i *instruction) {
+				i.asMov64MR(newOperandMem(
+					newAmodeImmReg(0, raxVReg),
+				), r15VReg)
+			},
+			want:       "4c8b38",
+			wantFormat: "movq (%rax), %r15",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asMov64MR(newOperandMem(
+					newAmodeImmReg(0, r12VReg),
+				), r15VReg)
+			},
+			want:       "4d8b3c24",
+			wantFormat: "movq (%r12), %r15",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asMov64MR(newOperandMem(
+					newAmodeImmReg(1, r12VReg),
+				), r15VReg)
+			},
+			want:       "4d8b7c2401",
+			wantFormat: "movq 1(%r12), %r15",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asMov64MR(newOperandMem(
+					newAmodeImmReg(1<<20, r12VReg),
+				), r15VReg)
+			},
+			want:       "4d8bbc2400001000",
+			wantFormat: "movq 1048576(%r12), %r15",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asMov64MR(newOperandMem(
+					newAmodeImmReg(1<<20, raxVReg),
+				), r15VReg)
+			},
+			want:       "4c8bb800001000",
+			wantFormat: "movq 1048576(%rax), %r15",
+		},
+		//
+		{
+			setup:      func(i *instruction) { i.asMovsxRmR(extModeBL, newOperandReg(raxVReg), rdiVReg) },
+			want:       "0fbef8",
+			wantFormat: "movsx.bl %rax, %rdi",
+		},
+		{
+			setup:      func(i *instruction) { i.asMovsxRmR(extModeBL, newOperandReg(rbxVReg), rdiVReg) },
+			want:       "0fbefb",
+			wantFormat: "movsx.bl %rbx, %rdi",
+		},
+		{
+			setup:      func(i *instruction) { i.asMovsxRmR(extModeBQ, newOperandReg(raxVReg), rdiVReg) },
+			want:       "480fbef8",
+			wantFormat: "movsx.bq %rax, %rdi",
+		},
+		{
+			setup:      func(i *instruction) { i.asMovsxRmR(extModeBQ, newOperandReg(r15VReg), rdiVReg) },
+			want:       "490fbeff",
+			wantFormat: "movsx.bq %r15, %rdi",
+		},
+		{
+			setup:      func(i *instruction) { i.asMovsxRmR(extModeWL, newOperandReg(raxVReg), rdiVReg) },
+			want:       "0fbff8",
+			wantFormat: "movsx.wl %rax, %rdi",
+		},
+		{
+			setup:      func(i *instruction) { i.asMovsxRmR(extModeWQ, newOperandReg(raxVReg), rdiVReg) },
+			want:       "480fbff8",
+			wantFormat: "movsx.wq %rax, %rdi",
+		},
+		{
+			setup:      func(i *instruction) { i.asMovsxRmR(extModeLQ, newOperandReg(raxVReg), rdiVReg) },
+			want:       "4863f8",
+			wantFormat: "movsx.lq %rax, %rdi",
+		},
+		{
+			setup:      func(i *instruction) { i.asMovzxRmR(extModeBL, newOperandReg(raxVReg), rdiVReg) },
+			want:       "0fb6f8",
+			wantFormat: "movzx.bl %rax, %rdi",
+		},
+		{
+			setup:      func(i *instruction) { i.asMovzxRmR(extModeBL, newOperandReg(rbxVReg), rdiVReg) },
+			want:       "0fb6fb",
+			wantFormat: "movzx.bl %rbx, %rdi",
+		},
+		{
+			setup:      func(i *instruction) { i.asMovzxRmR(extModeBQ, newOperandReg(raxVReg), rdiVReg) },
+			want:       "480fb6f8",
+			wantFormat: "movzx.bq %rax, %rdi",
+		},
+		{
+			setup:      func(i *instruction) { i.asMovzxRmR(extModeBQ, newOperandReg(r15VReg), rdiVReg) },
+			want:       "490fb6ff",
+			wantFormat: "movzx.bq %r15, %rdi",
+		},
+		{
+			setup:      func(i *instruction) { i.asMovzxRmR(extModeWL, newOperandReg(raxVReg), rdiVReg) },
+			want:       "0fb7f8",
+			wantFormat: "movzx.wl %rax, %rdi",
+		},
+		{
+			setup:      func(i *instruction) { i.asMovzxRmR(extModeWQ, newOperandReg(raxVReg), rdiVReg) },
+			want:       "480fb7f8",
+			wantFormat: "movzx.wq %rax, %rdi",
+		},
+		{
+			setup:      func(i *instruction) { i.asMovzxRmR(extModeLQ, newOperandReg(raxVReg), rdiVReg) },
+			want:       "8bf8",
+			wantFormat: "movzx.lq %rax, %rdi",
+		},
+		{
+			setup: func(i *instruction) {
+				a := newOperandMem(newAmodeImmReg(1<<20, raxVReg))
+				i.asMovsxRmR(extModeBQ, a, rdiVReg)
+			},
+			want:       "480fbeb800001000",
+			wantFormat: "movsx.bq 1048576(%rax), %rdi",
+		},
+		{
+			setup: func(i *instruction) {
+				a := newOperandMem(newAmodeImmReg(1<<20, raxVReg))
+				i.asMovsxRmR(extModeBL, a, rdiVReg)
+			},
+			want:       "0fbeb800001000",
+			wantFormat: "movsx.bl 1048576(%rax), %rdi",
+		},
+		{
+			setup: func(i *instruction) {
+				a := newOperandMem(newAmodeImmReg(1<<20, raxVReg))
+				i.asMovsxRmR(extModeWL, a, rdiVReg)
+			},
+			want:       "0fbfb800001000",
+			wantFormat: "movsx.wl 1048576(%rax), %rdi",
+		},
+		{
+			setup: func(i *instruction) {
+				a := newOperandMem(newAmodeImmReg(1<<20, raxVReg))
+				i.asMovsxRmR(extModeWQ, a, rdiVReg)
+			},
+			want:       "480fbfb800001000",
+			wantFormat: "movsx.wq 1048576(%rax), %rdi",
+		},
+		{
+			setup: func(i *instruction) {
+				a := newOperandMem(newAmodeImmReg(1<<20, raxVReg))
+				i.asMovsxRmR(extModeLQ, a, rdiVReg)
+			},
+			want:       "4863b800001000",
+			wantFormat: "movsx.lq 1048576(%rax), %rdi",
+		},
+		{
+			setup: func(i *instruction) {
+				a := newOperandMem(newAmodeImmReg(1<<20, raxVReg))
+				i.asMovzxRmR(extModeLQ, a, rdiVReg)
+			},
+			want:       "8bb800001000",
+			wantFormat: "movzx.lq 1048576(%rax), %rdi",
+		},
+		{
+			setup: func(i *instruction) {
+				a := newOperandMem(newAmodeImmReg(1<<20, raxVReg))
+				i.movRM(rcxVReg, a, 1)
+			},
+			want:       "888800001000",
+			wantFormat: "mov.b %rcx, 1048576(%rax)",
+		},
+		{
+			setup: func(i *instruction) {
+				a := newOperandMem(newAmodeImmReg(1<<20, raxVReg))
+				i.movRM(rdiVReg, a, 1)
+			},
+			want:       "88b800001000",
+			wantFormat: "mov.b %rdi, 1048576(%rax)",
+		},
+		{
+			setup: func(i *instruction) {
+				a := newOperandMem(newAmodeRegRegShit(1<<20, raxVReg, rcxVReg, 3))
+				i.movRM(rdiVReg, a, 2)
+			},
+			want:       "6689bcc800001000",
+			wantFormat: "mov.w %rdi, 1048576(%rax,%rcx,8)",
+		},
+		{
+			setup: func(i *instruction) {
+				a := newOperandMem(newAmodeRegRegShit(123, raxVReg, rcxVReg, 0))
+				i.movRM(rdiVReg, a, 4)
+			},
+			want:       "897c087b",
+			wantFormat: "mov.l %rdi, 123(%rax,%rcx,1)",
+		},
+		{
+			setup: func(i *instruction) {
+				a := newOperandMem(newAmodeRegRegShit(123, raxVReg, rcxVReg, 0))
+				i.movRM(rdiVReg, a, 8)
+			},
+			want:       "48897c087b",
+			wantFormat: "mov.q %rdi, 123(%rax,%rcx,1)",
+		},
 	} {
 		tc := tc
 		t.Run(tc.wantFormat, func(t *testing.T) {

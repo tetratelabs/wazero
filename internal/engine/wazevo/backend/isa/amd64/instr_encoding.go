@@ -476,19 +476,98 @@ func (i *instruction) encode(c backend.Compiler) {
 		panic("TODO")
 	case signExtendData:
 		panic("TODO")
-	case movzxRmR:
-		panic("TODO")
+	case movzxRmR, movsxRmR:
+		signed := i.kind == movsxRmR
+
+		ext := extMode(i.u1)
+		var opcode uint32
+		var opcodeNum uint32
+		var rex rexInfo
+		switch ext {
+		case extModeBL:
+			if signed {
+				opcode, opcodeNum, rex = 0x0fbe, 2, rex.clearW()
+			} else {
+				opcode, opcodeNum, rex = 0x0fb6, 2, rex.clearW()
+			}
+		case extModeBQ:
+			if signed {
+				opcode, opcodeNum, rex = 0x0fbe, 2, rex.setW()
+			} else {
+				opcode, opcodeNum, rex = 0x0fb6, 2, rex.setW()
+			}
+		case extModeWL:
+			if signed {
+				opcode, opcodeNum, rex = 0x0fbf, 2, rex.clearW()
+			} else {
+				opcode, opcodeNum, rex = 0x0fb7, 2, rex.clearW()
+			}
+		case extModeWQ:
+			if signed {
+				opcode, opcodeNum, rex = 0x0fbf, 2, rex.setW()
+			} else {
+				opcode, opcodeNum, rex = 0x0fb7, 2, rex.setW()
+			}
+		case extModeLQ:
+			if signed {
+				opcode, opcodeNum, rex = 0x63, 1, rex.setW()
+			} else {
+				opcode, opcodeNum, rex = 0x8b, 1, rex.clearW()
+			}
+		default:
+			panic("BUG: invalid extMode")
+		}
+
+		op := i.op1
+		dst := regEncodings[i.op2.r.RealReg()]
+		switch op.kind {
+		case operandKindReg:
+			src := regEncodings[op.r.RealReg()]
+			if ext == extModeBL || ext == extModeBQ {
+				// Some destinations must be encoded with REX.R = 1.
+				if e := src.encoding(); e >= 4 && e <= 7 {
+					rex = rex.always()
+				}
+			}
+			encodeRegReg(c, legacyPrefixesNone, opcode, opcodeNum, dst, src, rex)
+		case operandKindMem:
+			m := op.amode
+			encodeRegMem(c, legacyPrefixesNone, opcode, opcodeNum, dst, m, rex)
+		default:
+			panic("BUG: invalid operand kind")
+		}
+
 	case mov64MR:
-		panic("TODO")
+		m := i.op1.amode
+		dst := regEncodings[i.op2.r.RealReg()]
+		encodeRegMem(c, legacyPrefixesNone, 0x8b, 1, dst, m, rexInfo(0).setW())
+
 	case lea:
 		a := i.op1.amode
 		dst := regEncodings[i.op2.r.RealReg()]
 		encodeRegMem(c, legacyPrefixesNone, 0x8d, 1, dst, a, rexInfo(0).setW())
 
-	case movsxRmR:
-		panic("TODO")
 	case movRM:
-		panic("TODO")
+		m := i.op2.amode
+		src := regEncodings[i.op1.r.RealReg()]
+
+		var rex rexInfo
+		switch i.u1 {
+		case 1:
+			if e := src.encoding(); e >= 4 && e <= 7 {
+				rex = rex.always()
+			}
+			encodeRegMem(c, legacyPrefixesNone, 0x88, 1, src, m, rex.clearW())
+		case 2:
+			encodeRegMem(c, legacyPrefixes0x66, 0x89, 1, src, m, rex.clearW())
+		case 4:
+			encodeRegMem(c, legacyPrefixesNone, 0x89, 1, src, m, rex.clearW())
+		case 8:
+			encodeRegMem(c, legacyPrefixesNone, 0x89, 1, src, m, rex.setW())
+		default:
+			panic("BUG: invalid size")
+		}
+
 	case shiftR:
 		panic("TODO")
 	case xmmRmiReg:
@@ -792,7 +871,7 @@ func (ri rexInfo) clearW() rexInfo {
 	return ri & 0x02
 }
 
-func (ri rexInfo) always() rexInfo { //nolint
+func (ri rexInfo) always() rexInfo {
 	return ri | 0x02
 }
 
