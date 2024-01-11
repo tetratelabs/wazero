@@ -116,8 +116,5 @@ func (m *machine) setupEpilogueAfter(cur *instruction) {
 		cur = linkInstr(cur, m.allocateInstr().asMovRR(rbpVReg, rspVReg, true))
 	}
 
-	// Then, return to the caller.
-	cur = linkInstr(cur, m.allocateInstr().asRet(nil))
-
 	linkInstr(cur, prevNext)
 }
