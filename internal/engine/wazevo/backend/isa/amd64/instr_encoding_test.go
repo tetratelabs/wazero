@@ -1618,6 +1618,54 @@ func TestInstruction_format_encode(t *testing.T) {
 		{
 			setup: func(i *instruction) {
 				a := newOperandMem(newAmodeImmReg(1<<20, raxVReg))
+				i.asMovsxRmR(extModeBQ, a, rdiVReg)
+			},
+			want:       "480fbeb800001000",
+			wantFormat: "movsx.bq 1048576(%rax), %rdi",
+		},
+		{
+			setup: func(i *instruction) {
+				a := newOperandMem(newAmodeImmReg(1<<20, raxVReg))
+				i.asMovsxRmR(extModeBL, a, rdiVReg)
+			},
+			want:       "0fbeb800001000",
+			wantFormat: "movsx.bl 1048576(%rax), %rdi",
+		},
+		{
+			setup: func(i *instruction) {
+				a := newOperandMem(newAmodeImmReg(1<<20, raxVReg))
+				i.asMovsxRmR(extModeWL, a, rdiVReg)
+			},
+			want:       "0fbfb800001000",
+			wantFormat: "movsx.wl 1048576(%rax), %rdi",
+		},
+		{
+			setup: func(i *instruction) {
+				a := newOperandMem(newAmodeImmReg(1<<20, raxVReg))
+				i.asMovsxRmR(extModeWQ, a, rdiVReg)
+			},
+			want:       "480fbfb800001000",
+			wantFormat: "movsx.wq 1048576(%rax), %rdi",
+		},
+		{
+			setup: func(i *instruction) {
+				a := newOperandMem(newAmodeImmReg(1<<20, raxVReg))
+				i.asMovsxRmR(extModeLQ, a, rdiVReg)
+			},
+			want:       "4863b800001000",
+			wantFormat: "movsx.lq 1048576(%rax), %rdi",
+		},
+		{
+			setup: func(i *instruction) {
+				a := newOperandMem(newAmodeImmReg(1<<20, raxVReg))
+				i.asMovzxRmR(extModeLQ, a, rdiVReg)
+			},
+			want:       "8bb800001000",
+			wantFormat: "movzx.lq 1048576(%rax), %rdi",
+		},
+		{
+			setup: func(i *instruction) {
+				a := newOperandMem(newAmodeImmReg(1<<20, raxVReg))
 				i.movRM(rcxVReg, a, 1)
 			},
 			want:       "888800001000",
