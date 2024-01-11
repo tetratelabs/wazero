@@ -231,6 +231,9 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 		defer done()
 	}
 
+	// Either of these line will resolve the crash.....
+	// fmt.Printf("stackTop: %#x\n", &c.stack[len(c.stack)-1])
+	fmt.Printf("stackTop: %#x\n", c.executable)
 	entrypoint(c.preambleExecutable, c.executable, c.execCtxPtr, c.parent.opaquePtr, paramResultPtr, c.stackTop)
 	for {
 		switch ec := c.execCtx.exitCode; ec & wazevoapi.ExitCodeMask {
