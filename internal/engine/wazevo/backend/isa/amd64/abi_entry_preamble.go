@@ -16,9 +16,9 @@ var (
 	// goAllocatedStackPtr is not used in the epilogue.
 	goAllocatedStackPtr = rbxVReg
 	// paramResultSliceCopied is not used in the epilogue.
-	paramResultSliceCopied = r15VReg //nolint
+	paramResultSliceCopied = rsiVReg //nolint
 	// functionExecutable is not used in the epilogue.
-	functionExecutable = r14VReg
+	functionExecutable = rdiVReg
 )
 
 // CompileEntryPreamble implements backend.Machine.
@@ -93,4 +93,8 @@ func (m *machine) loadOrStore64AtExecutionCtx(execCtx regalloc.VReg, offset waze
 		instr.asMov64MR(mem, r)
 	}
 	return linkInstr(prev, instr)
+}
+
+func (m *machine) linkUD2(cur *instruction) *instruction {
+	return linkInstr(cur, m.allocateInstr().asUD2())
 }
