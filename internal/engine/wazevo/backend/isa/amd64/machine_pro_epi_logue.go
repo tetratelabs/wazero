@@ -25,15 +25,15 @@ func (m *machine) SetupPrologue() {
 	//                 |     .......     |
 	//                 |      arg 1      |
 	//                 |      arg 0      |
-	//                 |    Caller_RBP   |
 	//                 |   Return Addr   |
 	//       RSP ----> +-----------------+
 	//                    (low address)
 
-	// First, we update the RBP to the current RSP.
+	// First, we push the RBP, and update the RBP to the current RSP.
+	// 		push %rbp
 	// 		mov %rsp, %rbp
-	updateRBP := m.allocateInstr().asMovRR(rspVReg, rbpVReg, true)
-	cur = linkInstr(cur, updateRBP)
+	cur = linkInstr(cur, m.allocateInstr().asPush64(newOperandReg(rbpVReg)))
+	cur = linkInstr(cur, m.allocateInstr().asMovRR(rspVReg, rbpVReg, true))
 
 	if !m.stackBoundsCheckDisabled { //nolint
 		// TODO: stack bounds check
@@ -61,7 +61,7 @@ func (m *machine) SetupEpilogue() {
 
 		// Removes the redundant copy instruction.
 		// TODO: doing this in `SetupEpilogue` seems weird. Find a better home.
-		if cur.IsCopy() {
+		if cur.IsCopy() && cur.op1.r.RealReg() == cur.op2.r.RealReg() {
 			prev, next := cur.prev, cur.next
 			// Remove the copy instruction.
 			prev.next = next
@@ -87,9 +87,9 @@ func (m *machine) setupEpilogueAfter(cur *instruction) {
 	//          |     .......     |
 	//          |      arg 1      |
 	//          |      arg 0      |
-	//          |    Caller_RBP   |
-	//          |   ReturnAddress | <--- RBP
-	//          +-----------------+
+	//          |   ReturnAddress |
+	//          |   Caller_RBP    |
+	//          +-----------------+ <--- RBP
 	//          |    clobbered M  |
 	//          |   ............  |
 	//          |    clobbered 1  |
@@ -100,21 +100,18 @@ func (m *machine) setupEpilogueAfter(cur *instruction) {
 	//          +-----------------+ <--- RSP
 	//             (low address)
 
-	var spDecremented bool
 	if size := m.spillSlotSize; size > 0 {
-		spDecremented = true
 		panic("TODO: deallocate spill slots")
 	}
 	if regs := m.clobberedRegs; len(regs) > 0 {
-		spDecremented = true
 		panic("TODO: restore clobbered registers")
 	}
 
-	if spDecremented {
-		// Now roll back the RSP to the return address.
-		// 		mov  %rbp, %rsp
-		cur = linkInstr(cur, m.allocateInstr().asMovRR(rbpVReg, rspVReg, true))
-	}
+	// Now roll back the RSP to the return address, and pop the RBP.
+	// 		mov  %rbp, %rsp
+	// 		pop  %rbp
+	cur = linkInstr(cur, m.allocateInstr().asMovRR(rbpVReg, rspVReg, true))
+	cur = linkInstr(cur, m.allocateInstr().asPop64(rbpVReg))
 
 	linkInstr(cur, prevNext)
 }

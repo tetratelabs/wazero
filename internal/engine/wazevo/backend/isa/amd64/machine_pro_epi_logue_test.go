@@ -19,6 +19,7 @@ func TestMachine_SetupPrologue(t *testing.T) {
 		{
 			spillSlotSize: 0,
 			exp: `
+	pushq %rbp
 	movq %rsp, %rbp
 	ud2
 `,
@@ -57,6 +58,8 @@ func TestMachine_SetupEpilogue(t *testing.T) {
 	}{
 		{
 			exp: `
+	movq %rbp, %rsp
+	popq %rbp
 	ret
 `,
 			spillSlotSize: 0,

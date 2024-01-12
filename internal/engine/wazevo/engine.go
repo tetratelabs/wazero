@@ -170,7 +170,6 @@ func (exec *executables) compileEntryPreambles(m *wasm.Module, machine backend.M
 		buf := machine.CompileEntryPreamble(&sig)
 		executable := mmapExecutable(buf)
 		exec.entryPreambles[i] = executable
-		fmt.Printf("preabmel: %#x: %s\n", &executable[0], hex.EncodeToString(executable[:len(buf)]))
 
 		if wazevoapi.PerfMapEnabled {
 			wazevoapi.PerfMap.AddEntry(uintptr(unsafe.Pointer(&executable[0])),

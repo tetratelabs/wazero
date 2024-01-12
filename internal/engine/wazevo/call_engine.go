@@ -128,9 +128,7 @@ func (c *callEngine) Call(ctx context.Context, params ...uint64) ([]uint64, erro
 	}
 	paramResultSlice := make([]uint64, c.sizeOfParamResultSlice)
 	copy(paramResultSlice, params)
-	fmt.Printf("preambleExecutable: %v\n", c.preambleExecutable)
-	fmt.Printf("function executable: %v\n", c.executable)
-	fmt.Printf("stackTop: %#x\n", c.stackTop)
+	offset := c.parent.parent.functionOffsets[0]
 	if err := c.callWithStack(ctx, paramResultSlice); err != nil {
 		return nil, err
 	}
@@ -231,9 +229,9 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 		defer done()
 	}
 
-	// Either of these line will resolve the crash.....
-	// fmt.Printf("stackTop: %#x\n", &c.stack[len(c.stack)-1])
-	fmt.Printf("stackTop: %#x\n", c.executable)
+	if c.stackTop&(16-1) != 0 {
+		panic("BUG: stack must be aligned to 16 bytes")
+	}
 	entrypoint(c.preambleExecutable, c.executable, c.execCtxPtr, c.parent.opaquePtr, paramResultPtr, c.stackTop)
 	for {
 		switch ec := c.execCtx.exitCode; ec & wazevoapi.ExitCodeMask {
