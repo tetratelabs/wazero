@@ -872,9 +872,9 @@ const (
 func (s shiftROp) String() string {
 	switch s {
 	case shiftROpRotateLeft:
-		return "rotateLeft"
+		return "rol"
 	case shiftROpRotateRight:
-		return "rotateRight"
+		return "ror"
 	case shiftROpShiftLeft:
 		return "shl"
 	case shiftROpShiftRightLogical:

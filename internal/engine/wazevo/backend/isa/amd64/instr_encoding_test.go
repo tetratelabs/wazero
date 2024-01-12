@@ -1877,6 +1877,62 @@ func TestInstruction_format_encode(t *testing.T) {
 		},
 		{
 			setup: func(i *instruction) {
+				i.asShiftR(shiftROpRotateLeft, newOperandReg(rcxVReg), rdiVReg, false)
+			},
+			want:       "d3c7",
+			wantFormat: "roll %ecx, %edi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asShiftR(shiftROpRotateLeft, newOperandImm32(128), rdiVReg, false)
+			},
+			want:       "c1c780",
+			wantFormat: "roll $128, %edi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asShiftR(shiftROpRotateLeft, newOperandReg(rcxVReg), rdiVReg, true)
+			},
+			want:       "48d3c7",
+			wantFormat: "rolq %ecx, %rdi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asShiftR(shiftROpRotateLeft, newOperandImm32(128), rdiVReg, true)
+			},
+			want:       "48c1c780",
+			wantFormat: "rolq $128, %rdi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asShiftR(shiftROpRotateRight, newOperandReg(rcxVReg), rdiVReg, false)
+			},
+			want:       "d3cf",
+			wantFormat: "rorl %ecx, %edi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asShiftR(shiftROpRotateRight, newOperandImm32(128), rdiVReg, false)
+			},
+			want:       "c1cf80",
+			wantFormat: "rorl $128, %edi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asShiftR(shiftROpRotateRight, newOperandReg(rcxVReg), rdiVReg, true)
+			},
+			want:       "48d3cf",
+			wantFormat: "rorq %ecx, %rdi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asShiftR(shiftROpRotateRight, newOperandImm32(128), rdiVReg, true)
+			},
+			want:       "48c1cf80",
+			wantFormat: "rorq $128, %rdi",
+		},
+		{
+			setup: func(i *instruction) {
 				i.asShiftR(shiftROpShiftLeft, newOperandReg(rcxVReg), rdiVReg, false)
 			},
 			want:       "d3e7",
