@@ -500,8 +500,8 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 		} else {
 			rex = rexInfo(0).clearW()
 		}
-		subopcode := regEnc(2)
-		encodeRegReg(c, prefix, 0xf7, 1, subopcode, src, rex)
+		subopcode := uint8(2)
+		encodeEncEnc(c, prefix, 0xf7, 1, subopcode, uint8(src), rex)
 
 	case neg:
 		var prefix legacyPrefixes
@@ -512,8 +512,8 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 		} else {
 			rex = rexInfo(0).clearW()
 		}
-		subopcode := regEnc(3)
-		encodeRegReg(c, prefix, 0xf7, 1, subopcode, src, rex)
+		subopcode := uint8(3)
+		encodeEncEnc(c, prefix, 0xf7, 1, subopcode, uint8(src), rex)
 
 	case div:
 		panic("TODO")
@@ -799,6 +799,25 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 	return
 }
 
+func encodeEncEnc(
+	c backend.Compiler,
+	legPrefixes legacyPrefixes,
+	opcodes uint32,
+	opcodeNum uint32,
+	r uint8,
+	rm uint8,
+	rex rexInfo,
+) {
+	legPrefixes.encode(c)
+	rex.encode(c, r>>3, rm>>3)
+
+	for opcodeNum > 0 {
+		opcodeNum--
+		c.EmitByte(byte((opcodes >> (opcodeNum << 3)) & 0xff))
+	}
+	c.EmitByte(encodeModRM(3, r&0x7, rm&0x7))
+}
+
 func encodeRegReg(
 	c backend.Compiler,
 	legPrefixes legacyPrefixes,
@@ -808,14 +827,7 @@ func encodeRegReg(
 	rm regEnc,
 	rex rexInfo,
 ) {
-	legPrefixes.encode(c)
-	rex.encode(c, r, rm)
-
-	for opcodeNum > 0 {
-		opcodeNum--
-		c.EmitByte(byte((opcodes >> (opcodeNum << 3)) & 0xff))
-	}
-	c.EmitByte(encodeModRM(3, r.encoding(), rm.encoding()))
+	encodeEncEnc(c, legPrefixes, opcodes, opcodeNum, uint8(r), uint8(rm), rex)
 }
 
 func encodeModRM(mod byte, reg byte, rm byte) byte {
@@ -844,7 +856,7 @@ func encodeRegMem(
 		base := m.base.RealReg()
 		baseEnc := regEncodings[base]
 
-		rex.encode(c, r, baseEnc)
+		rex.encode(c, r.rexBit(), baseEnc.rexBit())
 
 		for opcodeNum > 0 {
 			opcodeNum--
@@ -913,7 +925,7 @@ func encodeRegMem(
 			panic("BUG: label must be resolved for amodeRipRelative at this point")
 		}
 
-		rex.encode(c, r, 0)
+		rex.encode(c, r.rexBit(), 0)
 		for opcodeNum > 0 {
 			opcodeNum--
 			c.EmitByte(byte((opcodes >> (opcodeNum << 3)) & 0xff))
@@ -953,13 +965,11 @@ func (ri rexInfo) notAlways() rexInfo { //nolint
 	return ri & 0x01
 }
 
-func (ri rexInfo) encode(c backend.Compiler, encR regEnc, encRM regEnc) {
+func (ri rexInfo) encode(c backend.Compiler, r uint8, b uint8) {
 	var w byte = 0
 	if ri&0x01 != 0 {
 		w = 0x01
 	}
-	r := encR.rexBit()
-	b := encRM.rexBit()
 	rex := rexEncodingDefault | w<<3 | r<<2 | b
 	if rex != rexEncodingDefault || ri&0x02 == 1 {
 		c.EmitByte(rex)
