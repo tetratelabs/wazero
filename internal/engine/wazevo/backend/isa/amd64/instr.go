@@ -70,17 +70,37 @@ func (i *instruction) String() string {
 	case unaryRmR:
 		return fmt.Sprintf("%s %s, %s", unaryRmROpcode(i.u1), i.op1.format(i.b1), i.op2.format(i.b1))
 	case not:
-		return fmt.Sprintf("not %s", i.op1.format(i.b1))
+		var op string
+		if i.b1 {
+			op = "notq"
+		} else {
+			op = "notl"
+		}
+		return fmt.Sprintf("%s %s", op, i.op1.format(i.b1))
 	case neg:
-		return fmt.Sprintf("neg %s", i.op1.format(i.b1))
+		var op string
+		if i.b1 {
+			op = "negq"
+		} else {
+			op = "negl"
+		}
+		return fmt.Sprintf("%s %s", op, i.op1.format(i.b1))
 	case div:
 		panic("TODO")
 	case mulHi:
-		if i.u1 != 0 {
-			return fmt.Sprintf("imul %s", i.op1.format(i.b1))
-		} else {
-			return fmt.Sprintf("mul %s", i.op1.format(i.b1))
+		signed, _64 := i.u1 != 0, i.b1
+		var op string
+		switch {
+		case signed && _64:
+			op = "imulq"
+		case !signed && _64:
+			op = "mulq"
+		case signed && !_64:
+			op = "imull"
+		case !signed && !_64:
+			op = "mull"
 		}
+		return fmt.Sprintf("%s %s", op, i.op1.format(i.b1))
 	case checkedDivOrRemSeq:
 		panic("TODO")
 	case signExtendData:

@@ -103,62 +103,62 @@ func TestInstruction_format_encode(t *testing.T) {
 		{
 			setup:      func(i *instruction) { i.asNot(newOperandReg(raxVReg), false) },
 			want:       "f7d0",
-			wantFormat: "not %eax",
+			wantFormat: "notl %eax",
 		},
 		{
 			setup:      func(i *instruction) { i.asNot(newOperandReg(raxVReg), true) },
 			want:       "48f7d0",
-			wantFormat: "not %rax",
+			wantFormat: "notq %rax",
 		},
 		{
 			setup:      func(i *instruction) { i.asNeg(newOperandReg(raxVReg), false) },
 			want:       "f7d8",
-			wantFormat: "neg %eax",
+			wantFormat: "negl %eax",
 		},
 		{
 			setup:      func(i *instruction) { i.asNeg(newOperandReg(raxVReg), true) },
 			want:       "48f7d8",
-			wantFormat: "neg %rax",
+			wantFormat: "negq %rax",
 		},
 		{
 			setup:      func(i *instruction) { i.asMulHi(newOperandReg(rsiVReg), true, false) },
 			want:       "f7ee",
-			wantFormat: "imul %esi",
+			wantFormat: "imull %esi",
 		},
 		{
 			setup:      func(i *instruction) { i.asMulHi(newOperandReg(r14VReg), false, false) },
 			want:       "41f7e6",
-			wantFormat: "mul %r14d",
+			wantFormat: "mull %r14d",
 		},
 		{
 			setup:      func(i *instruction) { i.asMulHi(newOperandReg(r15VReg), true, true) },
 			want:       "49f7ef",
-			wantFormat: "imul %r15",
+			wantFormat: "imulq %r15",
 		},
 		{
 			setup:      func(i *instruction) { i.asMulHi(newOperandReg(rdiVReg), false, true) },
 			want:       "48f7e7",
-			wantFormat: "mul %rdi",
+			wantFormat: "mulq %rdi",
 		},
 		{
 			setup:      func(i *instruction) { i.asMulHi(newOperandMem(newAmodeImmReg(123, rdiVReg)), true, false) },
 			want:       "f76f7b",
-			wantFormat: "imul 123(%edi)",
+			wantFormat: "imull 123(%rdi)",
 		},
 		{
 			setup:      func(i *instruction) { i.asMulHi(newOperandMem(newAmodeImmReg(123, rdiVReg)), false, false) },
 			want:       "f7677b",
-			wantFormat: "mul 123(%edi)",
+			wantFormat: "mull 123(%rdi)",
 		},
 		{
 			setup:      func(i *instruction) { i.asMulHi(newOperandMem(newAmodeImmReg(123, rdiVReg)), true, true) },
 			want:       "48f76f7b",
-			wantFormat: "imul 123(%rdi)",
+			wantFormat: "imulq 123(%rdi)",
 		},
 		{
 			setup:      func(i *instruction) { i.asMulHi(newOperandMem(newAmodeImmReg(123, rdiVReg)), false, true) },
 			want:       "48f7677b",
-			wantFormat: "mul 123(%rdi)",
+			wantFormat: "mulq 123(%rdi)",
 		},
 		// bsr
 		{
