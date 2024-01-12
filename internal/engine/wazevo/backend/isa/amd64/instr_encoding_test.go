@@ -140,6 +140,26 @@ func TestInstruction_format_encode(t *testing.T) {
 			want:       "48f7e7",
 			wantFormat: "mulq %rdi",
 		},
+		{
+			setup:      func(i *instruction) { i.asMulHi(newOperandMem(newAmodeImmReg(123, raxVReg)), true, false) },
+			want:       "f7687b",
+			wantFormat: "imull 123(%rax)",
+		},
+		{
+			setup:      func(i *instruction) { i.asMulHi(newOperandMem(newAmodeImmReg(123, raxVReg)), false, false) },
+			want:       "f7607b",
+			wantFormat: "mull 123(%rax)",
+		},
+		{
+			setup:      func(i *instruction) { i.asMulHi(newOperandMem(newAmodeImmReg(123, raxVReg)), true, true) },
+			want:       "48f7687b",
+			wantFormat: "imulq 123(%rax)",
+		},
+		{
+			setup:      func(i *instruction) { i.asMulHi(newOperandMem(newAmodeImmReg(123, raxVReg)), false, true) },
+			want:       "48f7607b",
+			wantFormat: "mulq 123(%rax)",
+		},
 		// bsr
 		{
 			setup:      func(i *instruction) { i.asUnaryRmR(unaryRmROpcodeBsr, newOperandReg(raxVReg), rdiVReg, false) },

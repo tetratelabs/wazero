@@ -744,7 +744,7 @@ func (i *instruction) asNeg(rm operand, _64 bool) *instruction {
 }
 
 func (i *instruction) asMulHi(rm operand, signed, _64 bool) *instruction {
-	if rm.kind != operandKindReg && (rm.kind != operandKindMem || _64) {
+	if rm.kind != operandKindReg && (rm.kind != operandKindMem) {
 		panic("BUG")
 	}
 	i.kind = mulHi
