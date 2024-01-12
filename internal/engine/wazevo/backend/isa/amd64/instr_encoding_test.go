@@ -1931,6 +1931,34 @@ func TestInstruction_format_encode(t *testing.T) {
 			want:       "48c1ef80",
 			wantFormat: "shrq $128, %rdi",
 		},
+		{
+			setup: func(i *instruction) {
+				i.asShiftR(shiftROpShiftRightArithmetic, newOperandReg(rcxVReg), rdiVReg, false)
+			},
+			want:       "d3ff",
+			wantFormat: "sarl %ecx, %edi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asShiftR(shiftROpShiftRightArithmetic, newOperandImm32(128), rdiVReg, false)
+			},
+			want:       "c1ff80",
+			wantFormat: "sarl $128, %edi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asShiftR(shiftROpShiftRightArithmetic, newOperandReg(rcxVReg), rdiVReg, true)
+			},
+			want:       "48d3ff",
+			wantFormat: "sarq %ecx, %rdi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asShiftR(shiftROpShiftRightArithmetic, newOperandImm32(128), rdiVReg, true)
+			},
+			want:       "48c1ff80",
+			wantFormat: "sarq $128, %rdi",
+		},
 	} {
 		tc := tc
 		t.Run(tc.wantFormat, func(t *testing.T) {

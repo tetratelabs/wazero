@@ -880,7 +880,7 @@ func (s shiftROp) String() string {
 	case shiftROpShiftRightLogical:
 		return "shr"
 	case shiftROpShiftRightArithmetic:
-		return "shiftRightArithmetic"
+		return "sar"
 	default:
 		panic("BUG")
 	}
