@@ -70,9 +70,9 @@ func (i *instruction) String() string {
 	case unaryRmR:
 		return fmt.Sprintf("%s %s, %s", unaryRmROpcode(i.u1), i.op1.format(i.b1), i.op2.format(i.b1))
 	case not:
-		panic("TODO")
+		return fmt.Sprintf("not %s", i.op1.format(i.b1))
 	case neg:
-		panic("TODO")
+		return fmt.Sprintf("neg %s", i.op1.format(i.b1))
 	case div:
 		panic("TODO")
 	case mulHi:
@@ -693,13 +693,22 @@ func (i *instruction) asMovRR(rm, rd regalloc.VReg, _64 bool) *instruction {
 	return i
 }
 
-func (i *instruction) asNot(rm operand, rd regalloc.VReg, _64 bool) *instruction {
+func (i *instruction) asNot(rm operand, _64 bool) *instruction {
 	if rm.kind != operandKindReg && rm.kind != operandKindMem {
 		panic("BUG")
 	}
 	i.kind = not
 	i.op1 = rm
-	i.op2 = newOperandReg(rd)
+	i.b1 = _64
+	return i
+}
+
+func (i *instruction) asNeg(rm operand, _64 bool) *instruction {
+	if rm.kind != operandKindReg && rm.kind != operandKindMem {
+		panic("BUG")
+	}
+	i.kind = neg
+	i.op1 = rm
 	i.b1 = _64
 	return i
 }

@@ -493,21 +493,28 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 
 	case not:
 		var prefix legacyPrefixes
-		var opcode uint32
-
-		src, dst := regEncodings[i.op1.r.RealReg()], regEncodings[i.op2.r.RealReg()]
-
+		src := regEncodings[i.op1.r.RealReg()]
 		rex := rexInfo(0)
 		if i.b1 { // 64 bit.
 			rex = rexInfo(0).setW()
 		} else {
 			rex = rexInfo(0).clearW()
 		}
-
-		encodeRegReg(c, prefix, opcode, 1, src, dst, rex)
+		subopcode := regEnc(2)
+		encodeRegReg(c, prefix, 0xf7, 1, subopcode, src, rex)
 
 	case neg:
-		panic("TODO")
+		var prefix legacyPrefixes
+		src := regEncodings[i.op1.r.RealReg()]
+		rex := rexInfo(0)
+		if i.b1 { // 64 bit.
+			rex = rexInfo(0).setW()
+		} else {
+			rex = rexInfo(0).clearW()
+		}
+		subopcode := regEnc(3)
+		encodeRegReg(c, prefix, 0xf7, 1, subopcode, src, rex)
+
 	case div:
 		panic("TODO")
 	case mulHi:

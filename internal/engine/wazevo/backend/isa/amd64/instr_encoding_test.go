@@ -100,6 +100,26 @@ func TestInstruction_format_encode(t *testing.T) {
 			want:       "4d89dc",
 			wantFormat: "movq %r11, %r12",
 		},
+		{
+			setup:      func(i *instruction) { i.asNot(newOperandReg(raxVReg), false) },
+			want:       "f7d0",
+			wantFormat: "not %eax",
+		},
+		{
+			setup:      func(i *instruction) { i.asNot(newOperandReg(raxVReg), true) },
+			want:       "48f7d0",
+			wantFormat: "not %rax",
+		},
+		{
+			setup:      func(i *instruction) { i.asNeg(newOperandReg(raxVReg), false) },
+			want:       "f7d8",
+			wantFormat: "neg %eax",
+		},
+		{
+			setup:      func(i *instruction) { i.asNeg(newOperandReg(raxVReg), true) },
+			want:       "48f7d8",
+			wantFormat: "neg %rax",
+		},
 		// bsr
 		{
 			setup:      func(i *instruction) { i.asUnaryRmR(unaryRmROpcodeBsr, newOperandReg(raxVReg), rdiVReg, false) },
