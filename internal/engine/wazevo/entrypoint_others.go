@@ -1,4 +1,4 @@
-//go:build !arm64
+//go:build !arm64 && !amd64
 
 package wazevo
 

@@ -1,6 +1,7 @@
 package arm64
 
 import (
+	"context"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
@@ -109,7 +110,7 @@ func TestMachine_SetupPrologue(t *testing.T) {
 
 			m.SetupPrologue()
 			require.Equal(t, root, m.executableContext.RootInstr)
-			m.Encode()
+			m.Encode(context.Background())
 			require.Equal(t, tc.exp, m.Format())
 		})
 	}
@@ -222,7 +223,7 @@ func TestMachine_SetupEpilogue(t *testing.T) {
 			m.SetupEpilogue()
 
 			require.Equal(t, root, m.executableContext.RootInstr)
-			m.Encode()
+			m.Encode(context.Background())
 			require.Equal(t, tc.exp, m.Format())
 		})
 	}
@@ -267,7 +268,7 @@ func TestMachine_insertStackBoundsCheck(t *testing.T) {
 			m.executableContext.RootInstr = m.allocateInstr()
 			m.executableContext.RootInstr.asNop0()
 			m.insertStackBoundsCheck(tc.requiredStackSize, m.executableContext.RootInstr)
-			m.Encode()
+			m.Encode(context.Background())
 			require.Equal(t, tc.exp, m.Format())
 		})
 	}

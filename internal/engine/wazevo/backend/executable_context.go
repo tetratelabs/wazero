@@ -199,7 +199,6 @@ type LabelPosition[Instr any] struct {
 	SB           ssa.BasicBlock
 	L            Label
 	Begin, End   *Instr
-	BinarySize   int64
 	BinaryOffset int64
 }
 

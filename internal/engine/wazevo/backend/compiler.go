@@ -2,7 +2,6 @@ package backend
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
@@ -51,14 +50,14 @@ type Compiler interface {
 	// RegAlloc performs the register allocation after Lower is called.
 	RegAlloc()
 
-	// Finalize performs the finalization of the compilation. This must be called after RegAlloc.
+	// Finalize performs the finalization of the compilation, including machine code emission.
+	// This must be called after RegAlloc.
 	Finalize(ctx context.Context)
-
-	// Encode encodes the machine code to the buffer.
-	Encode()
 
 	// Buf returns the buffer of the encoded machine code. This is only used for testing purpose.
 	Buf() []byte
+
+	BufPtr() *[]byte
 
 	// Format returns the debug string of the current state of the compiler.
 	Format() string
@@ -183,10 +182,6 @@ func (c *compiler) Compile(ctx context.Context) ([]byte, []RelocationInfo, error
 	if wazevoapi.DeterministicCompilationVerifierEnabled {
 		wazevoapi.VerifyOrSetDeterministicCompilationContextValue(ctx, "After Finalization", c.Format())
 	}
-	c.Encode()
-	if wazevoapi.DeterministicCompilationVerifierEnabled {
-		wazevoapi.VerifyOrSetDeterministicCompilationContextValue(ctx, "Encoded Machine code", hex.EncodeToString(c.buf))
-	}
 	return c.buf, c.relocations, nil
 }
 
@@ -199,12 +194,7 @@ func (c *compiler) RegAlloc() {
 func (c *compiler) Finalize(ctx context.Context) {
 	c.mach.SetupPrologue()
 	c.mach.SetupEpilogue()
-	c.mach.ResolveRelativeAddresses(ctx)
-}
-
-// Encode implements Compiler.Encode.
-func (c *compiler) Encode() {
-	c.mach.Encode()
+	c.mach.Encode(ctx)
 }
 
 // setCurrentGroupID sets the current instruction group ID.
@@ -404,6 +394,11 @@ func (c *compiler) EmitByte(b byte) {
 // Buf implements Compiler.Buf.
 func (c *compiler) Buf() []byte {
 	return c.buf
+}
+
+// BufPtr implements Compiler.BufPtr.
+func (c *compiler) BufPtr() *[]byte {
+	return &c.buf
 }
 
 func (c *compiler) GetFunctionABI(sig *ssa.Signature) *FunctionABI {

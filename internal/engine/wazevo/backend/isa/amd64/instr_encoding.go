@@ -7,18 +7,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 )
 
-// Encode implements backend.Machine Encode.
-func (m *machine) Encode() {
-	m.encode(m.ectx.RootInstr)
-}
-
-func (m *machine) encode(root *instruction) {
-	for cur := root; cur != nil; cur = cur.next {
-		cur.encode(m.c)
-	}
-}
-
-func (i *instruction) encode(c backend.Compiler) {
+func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 	switch i.kind {
 	case nop0:
 	case ret:
@@ -664,6 +653,7 @@ func (i *instruction) encode(c backend.Compiler) {
 		op := i.op1
 		switch op.kind {
 		case operandKindLabel:
+			needsLabelResolution = true
 			panic("BUG: at this point label should have been resolved to imm32")
 		case operandKindImm32:
 			c.EmitByte(0x0f)
@@ -723,6 +713,7 @@ func (i *instruction) encode(c backend.Compiler) {
 	default:
 		panic(fmt.Sprintf("TODO: %v", i.kind))
 	}
+	return
 }
 
 func encodeRegReg(

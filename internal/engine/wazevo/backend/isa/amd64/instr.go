@@ -160,15 +160,27 @@ func (i *instruction) String() string {
 }
 
 // Defs implements regalloc.Instr.
-func (i *instruction) Defs(i2 *[]regalloc.VReg) []regalloc.VReg {
-	// TODO implement me
-	panic("implement me")
+func (i *instruction) Defs(regs *[]regalloc.VReg) []regalloc.VReg {
+	*regs = (*regs)[:0]
+	switch dk := defKinds[i.kind]; dk {
+	case defKindNone:
+	case defKindOp2:
+		*regs = append(*regs, i.op2.r)
+	default:
+		panic(fmt.Sprintf("BUG: invalid defKind %s for %s", dk, i))
+	}
+	return *regs
 }
 
 // Uses implements regalloc.Instr.
-func (i *instruction) Uses(i2 *[]regalloc.VReg) []regalloc.VReg {
-	// TODO implement me
-	panic("implement me")
+func (i *instruction) Uses(regs *[]regalloc.VReg) []regalloc.VReg {
+	*regs = (*regs)[:0]
+	switch uk := useKinds[i.kind]; uk {
+	case useKindNone:
+	default:
+		panic(fmt.Sprintf("BUG: invalid useKind %s for %s", uk, i))
+	}
+	return *regs
 }
 
 // AssignUse implements regalloc.Instr.
@@ -185,8 +197,8 @@ func (i *instruction) AssignDef(reg regalloc.VReg) {
 
 // IsCopy implements regalloc.Instr.
 func (i *instruction) IsCopy() bool {
-	// TODO implement me
-	panic("implement me")
+	k := i.kind
+	return k == movRR || k == xmmUnaryRmR
 }
 
 func resetInstruction(i *instruction) {
@@ -203,6 +215,16 @@ func setPrev(i *instruction, prev *instruction) {
 
 func asNop(i *instruction) {
 	i.kind = nop0
+}
+
+func (i *instruction) asNop0WithLabel(label backend.Label) *instruction { //nolint
+	i.kind = nop0
+	i.u1 = uint64(label)
+	return i
+}
+
+func (i *instruction) nop0Label() backend.Label {
+	return backend.Label(i.u1)
 }
 
 type instructionKind int
@@ -362,6 +384,8 @@ const (
 
 	// An instruction that will always trigger the illegal instruction exception.
 	ud2
+
+	instrMax
 )
 
 func (k instructionKind) String() string {
@@ -572,7 +596,7 @@ func (i *instruction) asGprToXmm(op sseOpcode, rm operand, rd regalloc.VReg, _64
 	return i
 }
 
-func (i *instruction) movRM(rm regalloc.VReg, rd operand, size byte) *instruction {
+func (i *instruction) asMovRM(rm regalloc.VReg, rd operand, size byte) *instruction {
 	if rd.kind != operandKindMem {
 		panic("BUG")
 	}
@@ -602,6 +626,11 @@ func (i *instruction) asMovzxRmR(ext extMode, src operand, rd regalloc.VReg) *in
 	i.op1 = src
 	i.op2 = newOperandReg(rd)
 	i.u1 = uint64(ext)
+	return i
+}
+
+func (i *instruction) asUD2() *instruction {
+	i.kind = ud2
 	return i
 }
 
@@ -1139,5 +1168,58 @@ func (s sseOpcode) String() string {
 		return "xorpd"
 	default:
 		panic("BUG")
+	}
+}
+
+func linkInstr(prev, next *instruction) *instruction {
+	prev.next = next
+	next.prev = prev
+	return next
+}
+
+type defKind byte
+
+const (
+	defKindNone defKind = iota + 1
+	defKindOp2
+)
+
+var defKinds = [instrMax]defKind{
+	nop0: defKindNone,
+	ret:  defKindNone,
+}
+
+// String implements fmt.Stringer.
+func (d defKind) String() string {
+	switch d {
+	case defKindNone:
+		return "none"
+	case defKindOp2:
+		return "op2"
+	default:
+		return "invalid"
+	}
+}
+
+type useKind byte
+
+const (
+	useKindNone useKind = iota + 1
+	useKindOp1
+)
+
+var useKinds = [instrMax]useKind{
+	nop0: useKindNone,
+	ret:  useKindNone,
+}
+
+func (u useKind) String() string {
+	switch u {
+	case useKindNone:
+		return "none"
+	case useKindOp1:
+		return "op1"
+	default:
+		return "invalid"
 	}
 }

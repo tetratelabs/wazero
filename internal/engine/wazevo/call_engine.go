@@ -228,6 +228,9 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 		defer done()
 	}
 
+	if c.stackTop&(16-1) != 0 {
+		panic("BUG: stack must be aligned to 16 bytes")
+	}
 	entrypoint(c.preambleExecutable, c.executable, c.execCtxPtr, c.parent.opaquePtr, paramResultPtr, c.stackTop)
 	for {
 		switch ec := c.execCtx.exitCode; ec & wazevoapi.ExitCodeMask {

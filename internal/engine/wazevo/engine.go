@@ -292,7 +292,9 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 	}
 
 	// Resolve relocations for local function calls.
-	machine.ResolveRelocations(e.refToBinaryOffset, executable, e.rels)
+	if len(e.rels) > 0 {
+		machine.ResolveRelocations(e.refToBinaryOffset, executable, e.rels)
+	}
 
 	if runtime.GOARCH == "arm64" {
 		// On arm64, we cannot give all of rwx at the same time, so we change it to exec.
@@ -422,7 +424,7 @@ func (e *engine) compileHostModule(ctx context.Context, module *wasm.Module, lis
 
 		be.Init()
 		machine.CompileGoFunctionTrampoline(exitCode, &sig, true)
-		be.Encode()
+		be.Finalize(ctx)
 		body := be.Buf()
 
 		if wazevoapi.PerfMapEnabled {

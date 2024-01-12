@@ -8,6 +8,16 @@ import (
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 )
 
+func newSetupWithMockContext() (*mockCompiler, ssa.Builder, *machine) {
+	ctx := newMockCompilationContext()
+	m := NewBackend().(*machine)
+	m.SetCompiler(ctx)
+	ssaB := ssa.NewBuilder()
+	blk := ssaB.AllocateBasicBlock()
+	ssaB.SetCurrentBlock(blk)
+	return ctx, ssaB, m
+}
+
 // mockCompiler implements backend.Compiler for testing.
 type mockCompiler struct {
 	currentGID  ssa.InstructionGroupID
@@ -19,6 +29,8 @@ type mockCompiler struct {
 	relocs      []backend.RelocationInfo
 	buf         []byte
 }
+
+func (m *mockCompiler) BufPtr() *[]byte { return &m.buf }
 
 func (m *mockCompiler) GetFunctionABI(sig *ssa.Signature) *backend.FunctionABI {
 	// TODO implement me
