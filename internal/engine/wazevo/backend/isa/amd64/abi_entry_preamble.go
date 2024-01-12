@@ -95,6 +95,7 @@ func (m *machine) loadOrStore64AtExecutionCtx(execCtx regalloc.VReg, offset waze
 	return linkInstr(prev, instr)
 }
 
-func (m *machine) linkUD2(cur *instruction) *instruction {
+// This is for debugging.
+func (m *machine) linkUD2(cur *instruction) *instruction { //nolint
 	return linkInstr(cur, m.allocateInstr().asUD2())
 }

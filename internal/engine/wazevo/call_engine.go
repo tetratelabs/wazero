@@ -128,7 +128,6 @@ func (c *callEngine) Call(ctx context.Context, params ...uint64) ([]uint64, erro
 	}
 	paramResultSlice := make([]uint64, c.sizeOfParamResultSlice)
 	copy(paramResultSlice, params)
-	offset := c.parent.parent.functionOffsets[0]
 	if err := c.callWithStack(ctx, paramResultSlice); err != nil {
 		return nil, err
 	}

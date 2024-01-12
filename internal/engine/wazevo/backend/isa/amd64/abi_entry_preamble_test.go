@@ -20,7 +20,7 @@ func TestMachineCompileEntryPreamble(t *testing.T) {
 				Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64},
 			},
 			exp: `
-	movq %rdx, %rax
+	movq %rax, %rdx
 	mov.q %rbp, 16(%rax)
 	mov.q %rsp, 24(%rax)
 	movq %rbx, %rsp
