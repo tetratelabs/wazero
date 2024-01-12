@@ -878,7 +878,7 @@ func (s shiftROp) String() string {
 	case shiftROpShiftLeft:
 		return "shl"
 	case shiftROpShiftRightLogical:
-		return "shiftRightLogical"
+		return "shr"
 	case shiftROpShiftRightArithmetic:
 		return "shiftRightArithmetic"
 	default:
