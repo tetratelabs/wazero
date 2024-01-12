@@ -665,6 +665,18 @@ func TestAssemblerImpl_encodeNoneToNone(t *testing.T) {
 		actual := buf.Bytes()
 		require.Equal(t, []byte{0x0, 0x0, 0x0, 0x0}, actual, hex.EncodeToString(actual))
 	})
+	t.Run("dmb ish", func(t *testing.T) {
+		code := asm.CodeSegment{}
+		defer func() { require.NoError(t, code.Unmap()) }()
+
+		a := NewAssembler(asm.NilRegister)
+		buf := code.NextCodeSection()
+		err := a.encodeNoneToNone(buf, &nodeImpl{instruction: DMB})
+		require.NoError(t, err)
+
+		actual := buf.Bytes()
+		require.Equal(t, []byte{0xbf, 0x3b, 0x3, 0xd5}, actual, hex.EncodeToString(actual))
+	})
 }
 
 func Test_validateMemoryOffset(t *testing.T) {

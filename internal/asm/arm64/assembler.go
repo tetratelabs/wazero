@@ -12,9 +12,17 @@ type Assembler interface {
 	// specified as `srcBaseReg + srcOffsetReg` and dst is the register `dstReg`.
 	CompileMemoryWithRegisterOffsetToRegister(instruction asm.Instruction, srcBaseReg, srcOffsetReg, dstReg asm.Register)
 
+	// CompileMemoryWithRegisterSourceToRegister adds an instruction where source operand is the memory address
+	// and dst is the register `dstReg`.
+	CompileMemoryWithRegisterSourceToRegister(instruction asm.Instruction, srcReg, dstReg asm.Register)
+
 	// CompileRegisterToMemoryWithRegisterOffset adds an instruction where source operand is the register `srcReg`,
 	// and the destination is the memory address specified as `dstBaseReg + dstOffsetReg`
 	CompileRegisterToMemoryWithRegisterOffset(instruction asm.Instruction, srcReg, dstBaseReg, dstOffsetReg asm.Register)
+
+	// CompileRegisterToMemoryWithRegisterDest adds an instruction where source operand is the register `srcReg`,
+	// and the destination is the memory address specified as `dstReg`
+	CompileRegisterToMemoryWithRegisterDest(instruction asm.Instruction, srcReg, dstReg asm.Register)
 
 	// CompileTwoRegistersToRegister adds an instruction where source operands consists of two registers `src1` and `src2`,
 	// and the destination is the register `dst`.

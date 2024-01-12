@@ -658,6 +658,14 @@ func TestAssemblerImpl_EncodeMemoryToRegister(t *testing.T) {
 		{name: "FLDRS/RegisterOffset/dst=V30,base=R30,offset=0x100008", n: &nodeImpl{instruction: FLDRS, srcReg: RegR30, srcConst: 1048584, dstReg: RegV30}, exp: []byte{0xdb, 0x3, 0x44, 0x91, 0x7e, 0xb, 0x40, 0xbd}},
 		{name: "FLDRS/RegisterOffset/dst=V30,base=R30,offset=0xffff8", n: &nodeImpl{instruction: FLDRS, srcReg: RegR30, srcConst: 1048568, dstReg: RegV30}, exp: []byte{0xdb, 0xf3, 0x43, 0x91, 0x7e, 0xfb, 0x7f, 0xbd}},
 		{name: "FLDRS/RegisterOffset/dst=V30,base=R30,offset=RegR8", n: &nodeImpl{instruction: FLDRS, srcReg: RegR30, srcReg2: RegR8, dstReg: RegV30}, exp: []byte{0xde, 0x6b, 0x68, 0xbc}},
+		{name: "ldar x11, [x5]", n: &nodeImpl{instruction: LDARD, srcReg: RegR5, dstReg: RegR11}, exp: []byte{0xab, 0xfc, 0xdf, 0xc8}},
+		{name: "ldar x11, [x30]", n: &nodeImpl{instruction: LDARD, srcReg: RegR30, dstReg: RegR11}, exp: []byte{0xcb, 0xff, 0xdf, 0xc8}},
+		{name: "ldar w11, [x5]", n: &nodeImpl{instruction: LDARW, srcReg: RegR5, dstReg: RegR11}, exp: []byte{0xab, 0xfc, 0xdf, 0x88}},
+		{name: "ldar w11, [x30]", n: &nodeImpl{instruction: LDARW, srcReg: RegR30, dstReg: RegR11}, exp: []byte{0xcb, 0xff, 0xdf, 0x88}},
+		{name: "ldarh w11, [x5]", n: &nodeImpl{instruction: LDARH, srcReg: RegR5, dstReg: RegR11}, exp: []byte{0xab, 0xfc, 0xdf, 0x48}},
+		{name: "ldarh w11, [x30]", n: &nodeImpl{instruction: LDARH, srcReg: RegR30, dstReg: RegR11}, exp: []byte{0xcb, 0xff, 0xdf, 0x48}},
+		{name: "ldarb w11, [x5]", n: &nodeImpl{instruction: LDARB, srcReg: RegR5, dstReg: RegR11}, exp: []byte{0xab, 0xfc, 0xdf, 0x8}},
+		{name: "ldarb w11, [x30]", n: &nodeImpl{instruction: LDARB, srcReg: RegR30, dstReg: RegR11}, exp: []byte{0xcb, 0xff, 0xdf, 0x8}},
 	}
 
 	for _, tc := range tests {

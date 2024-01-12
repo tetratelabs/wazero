@@ -469,6 +469,10 @@ const (
 	ANDIMM64
 	// ANDW is the AND instruction, in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/AND--register-
 	ANDW
+	// ANDS is the ANDS instruction in 64-bit mode https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/ANDS--immediate---Bitwise-AND--immediate---setting-flags-?lang=en
+	ANDS
+	// ANDSW is the ANDS instruction in 32-bit mode https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/ANDS--immediate---Bitwise-AND--immediate---setting-flags-?lang=en
+	ANDSW
 	// ASR is the ASR instruction. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/ASR--register-
 	ASR
 	// ASRW is the ASR instruction, in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/ASR--register-
@@ -669,6 +673,10 @@ const (
 	ORR
 	// ORRW is the ORR instruction, in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/ORR--shifted-register-
 	ORRW
+	// ORN is the ORN instruction. https://developer.arm.com/documentation/ddi0602/2023-03/Base-Instructions/ORN--shifted-register---Bitwise-OR-NOT--shifted-register--?lang=en#ORN_32_log_shift
+	ORN
+	// ORNW is the ORN instruction, in 32-bit mode. https://developer.arm.com/documentation/ddi0602/2023-03/Base-Instructions/ORN--shifted-register---Bitwise-OR-NOT--shifted-register--?lang=en#ORN_32_log_shift
+	ORNW
 	// RBIT is the RBIT instruction. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/RBIT
 	RBIT
 	// RBITW is the RBIT instruction, in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/RBIT
@@ -931,6 +939,87 @@ const (
 	// FCVTN is the FCVTN instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FCVTN--FCVTN2--Floating-point-Convert-to-lower-precision-Narrow--vector--?lang=en
 	FCVTN
 
+	// LDARD is the LDAR instruction in 64-bit mode https://developer.arm.com/documentation/ddi0602/2023-03/Base-Instructions/LDAR--Load-Acquire-Register-
+	LDARD
+	// LDARD is the LDAR instruction in 32-bit mode https://developer.arm.com/documentation/ddi0602/2023-03/Base-Instructions/LDAR--Load-Acquire-Register-
+	LDARW
+	// LDARH is the LDARH instruction https://developer.arm.com/documentation/ddi0602/2023-03/Base-Instructions/LDARH--Load-Acquire-Register-Halfword-
+	LDARH
+	// LDARB is the LDARB instruction https://developer.arm.com/documentation/ddi0602/2023-03/Base-Instructions/LDARB--Load-Acquire-Register-Byte-
+	LDARB
+
+	// STLRD is the STLR instruction in 64-bit mode https://developer.arm.com/documentation/ddi0602/2023-03/Base-Instructions/STLR--Store-Release-Register-
+	STLRD
+	// STLRW is the STLR instruction in 64-bit mode https://developer.arm.com/documentation/ddi0602/2023-03/Base-Instructions/STLR--Store-Release-Register-
+	STLRW
+	// STLRH is the STLRH instruction https://developer.arm.com/documentation/ddi0602/2023-03/Base-Instructions/STLRH--Store-Release-Register-Halfword-
+	STLRH
+	// STLRB is the STLRB instruction https://developer.arm.com/documentation/ddi0602/2023-03/Base-Instructions/STLRB--Store-Release-Register-Byte-
+	STLRB
+
+	// Note, there is no LDSUB type of instruction, so sub needs to be implemented by first negating the second parameter.
+
+	// LDADDALD is the LDADDAL instruction in 64-bit mode https://developer.arm.com/documentation/ddi0602/2023-03/Base-Instructions/LDADD--LDADDA--LDADDAL--LDADDL--Atomic-add-on-word-or-doubleword-in-memory-
+	LDADDALD
+	// LDADDALW is the LDADDAL instruction in 32-bit mode https://developer.arm.com/documentation/ddi0602/2023-03/Base-Instructions/LDADD--LDADDA--LDADDAL--LDADDL--Atomic-add-on-word-or-doubleword-in-memory-
+	LDADDALW
+	// LDADDALH is the LDADDALH instruction https://developer.arm.com/documentation/ddi0602/2023-03/Base-Instructions/LDADDH--LDADDAH--LDADDALH--LDADDLH--Atomic-add-on-halfword-in-memory-
+	LDADDALH
+	// LDADDALB is the LDADDALB instruction https://developer.arm.com/documentation/ddi0602/2023-03/Base-Instructions/LDADDB--LDADDAB--LDADDALB--LDADDLB--Atomic-add-on-byte-in-memory-
+	LDADDALB
+
+	// Note, arm's CLR is equivalent to AND NOT
+
+	// LDCLRALD is the LDCLRAL instruction in 64-bit mode https://developer.arm.com/documentation/ddi0602/2023-03/Base-Instructions/LDCLR--LDCLRA--LDCLRAL--LDCLRL--Atomic-bit-clear-on-word-or-doubleword-in-memory-
+	LDCLRALD
+	// LDCLRALW is the LDCLRAL instruction in 32-bit mode https://developer.arm.com/documentation/ddi0602/2023-03/Base-Instructions/LDCLR--LDCLRA--LDCLRAL--LDCLRL--Atomic-bit-clear-on-word-or-doubleword-in-memory-
+	LDCLRALW
+	// LDCLRALH is the LDCLRALH instruction https://developer.arm.com/documentation/ddi0602/2023-03/Base-Instructions/LDCLRH--LDCLRAH--LDCLRALH--LDCLRLH--Atomic-bit-clear-on-halfword-in-memory-
+	LDCLRALH
+	// LDCLRALB is the LDCLRALB instruction https://developer.arm.com/documentation/ddi0602/2023-03/Base-Instructions/LDCLRB--LDCLRAB--LDCLRALB--LDCLRLB--Atomic-bit-clear-on-byte-in-memory-
+	LDCLRALB
+
+	// Note, arm's SET is equivalent to OR
+
+	// LDSETALD is the LDSETAL instruction in 64-bit mode https://developer.arm.com/documentation/ddi0602/2023-03/Base-Instructions/LDSET--LDSETA--LDSETAL--LDSETL--Atomic-bit-set-on-word-or-doubleword-in-memory-
+	LDSETALD
+	// LDSETALW is the LDSETAL instruction in 32-bit mode https://developer.arm.com/documentation/ddi0602/2023-03/Base-Instructions/LDSET--LDSETA--LDSETAL--LDSETL--Atomic-bit-set-on-word-or-doubleword-in-memory-
+	LDSETALW
+	// LDSETALH is the LDSETALH instruction https://developer.arm.com/documentation/ddi0602/2023-03/Base-Instructions/LDSETH--LDSETAH--LDSETALH--LDSETLH--Atomic-bit-set-on-halfword-in-memory-
+	LDSETALH
+	// LDSETALB is the LDSETALB instruction https://developer.arm.com/documentation/ddi0602/2023-03/Base-Instructions/LDSETB--LDSETAB--LDSETALB--LDSETLB--Atomic-bit-set-on-byte-in-memory-
+	LDSETALB
+
+	// LDEORALD is the LDEORAL instruction in 64-bit mode https://developer.arm.com/documentation/ddi0602/2023-03/Base-Instructions/LDEOR--LDEORA--LDEORAL--LDEORL--Atomic-bitwise-exclusive-OR-on-word-or-doubleword-in-memory-
+	LDEORALD
+	// LDEORALW is the LDEORAL instruction in 32-bit mode https://developer.arm.com/documentation/ddi0602/2023-03/Base-Instructions/LDEOR--LDEORA--LDEORAL--LDEORL--Atomic-bitwise-exclusive-OR-on-word-or-doubleword-in-memory-
+	LDEORALW
+	// LDEORALH is the LDEORALH instruction https://developer.arm.com/documentation/ddi0602/2023-03/Base-Instructions/LDEORH--LDEORAH--LDEORALH--LDEORLH--Atomic-bitwise-exclusive-OR-on-halfword-in-memory-
+	LDEORALH
+	// LDEORALB is the LDEORALB instruction https://developer.arm.com/documentation/ddi0602/2023-03/Base-Instructions/LDEORB--LDEORAB--LDEORALB--LDEORLB--Atomic-bitwise-exclusive-OR-on-byte-in-memory-
+	LDEORALB
+
+	// SWPALD is the SWPAL instruction in 64-bit mode https://developer.arm.com/documentation/ddi0602/2023-03/Base-Instructions/SWP--SWPA--SWPAL--SWPL--Swap-word-or-doubleword-in-memory-
+	SWPALD
+	// SWPALW is the SWPAL instruction in 32-bit mode https://developer.arm.com/documentation/ddi0602/2023-03/Base-Instructions/SWP--SWPA--SWPAL--SWPL--Swap-word-or-doubleword-in-memory-
+	SWPALW
+	// SWPALH is the SWPALH instruction https://developer.arm.com/documentation/ddi0602/2023-03/Base-Instructions/SWPH--SWPAH--SWPALH--SWPLH--Swap-halfword-in-memory-
+	SWPALH
+	// SWPALB is the SWPALB instruction https://developer.arm.com/documentation/ddi0602/2023-03/Base-Instructions/SWPB--SWPAB--SWPALB--SWPLB--Swap-byte-in-memory-
+	SWPALB
+
+	// CASALD is the CASAL instruction in 64-bit mode https://developer.arm.com/documentation/ddi0602/2023-03/Base-Instructions/CAS--CASA--CASAL--CASL--Compare-and-swap-word-or-doubleword-in-memory-
+	CASALD
+	// CASALW is the CASAL instruction in 32-bit mode https://developer.arm.com/documentation/ddi0602/2023-03/Base-Instructions/CAS--CASA--CASAL--CASL--Compare-and-swap-word-or-doubleword-in-memory-
+	CASALW
+	// CASALH is the CASALH instruction https://developer.arm.com/documentation/ddi0602/2023-03/Base-Instructions/CASH--CASA--CASALH--CASLH--Compare-and-swap-halfword-in-memory-
+	CASALH
+	// CASALB is the CASALB instruction https://developer.arm.com/documentation/ddi0602/2023-03/Base-Instructions/CASB--CASAB--CASALB--CASLB--Compare-and-swap-byte-in-memory-
+	CASALB
+
+	// DMB is the DMB instruction for inner-sharable domain https://developer.arm.com/documentation/ddi0596/2020-12/Base-Instructions/DMB--Data-Memory-Barrier-
+	DMB
+
 	// UDF is the UDF instruction https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/UDF--Permanently-Undefined-?lang=en
 	UDF
 
@@ -1043,6 +1132,10 @@ func InstructionName(i asm.Instruction) string {
 		return "ANDIMM64"
 	case ANDW:
 		return "ANDW"
+	case ANDS:
+		return "ANDS"
+	case ANDSW:
+		return "ANDSW"
 	case ASR:
 		return "ASR"
 	case ASRW:
@@ -1225,6 +1318,10 @@ func InstructionName(i asm.Instruction) string {
 		return "ORR"
 	case ORRW:
 		return "ORRW"
+	case ORN:
+		return "ORN"
+	case ORNW:
+		return "ORNW"
 	case RBIT:
 		return "RBIT"
 	case RBITW:
@@ -1457,6 +1554,72 @@ func InstructionName(i asm.Instruction) string {
 		return "FCVTL"
 	case FCVTN:
 		return "FCVTN"
+	case LDARD:
+		return "LDARD"
+	case LDARW:
+		return "LDARW"
+	case LDARH:
+		return "LDARH"
+	case LDARB:
+		return "LDARB"
+	case STLRD:
+		return "STLRD"
+	case STLRW:
+		return "STLRW"
+	case STLRH:
+		return "STLRH"
+	case STLRB:
+		return "STLRB"
+	case LDADDALD:
+		return "LDADDALD"
+	case LDADDALW:
+		return "LDADDALW"
+	case LDADDALH:
+		return "LDADDALH"
+	case LDADDALB:
+		return "LDADDALB"
+	case LDCLRALD:
+		return "LDCLRALD"
+	case LDCLRALW:
+		return "LDCLRALW"
+	case LDCLRALH:
+		return "LDCLRALH"
+	case LDCLRALB:
+		return "LDCLRALB"
+	case LDSETALD:
+		return "LDSETALD"
+	case LDSETALW:
+		return "LDSETALW"
+	case LDSETALH:
+		return "LDSETALH"
+	case LDSETALB:
+		return "LDSETALB"
+	case LDEORALD:
+		return "LDEORALD"
+	case LDEORALW:
+		return "LDEORALW"
+	case LDEORALH:
+		return "LDEORALH"
+	case LDEORALB:
+		return "LDEORALB"
+	case SWPALD:
+		return "SWPALD"
+	case SWPALW:
+		return "SWPALW"
+	case SWPALH:
+		return "SWPALH"
+	case SWPALB:
+		return "SWPALB"
+	case CASALD:
+		return "CASALD"
+	case CASALW:
+		return "CASALW"
+	case CASALH:
+		return "CASALH"
+	case CASALB:
+		return "CASALB"
+	case DMB:
+		return "DMB"
 	case FSTRD:
 		return "FSTRD"
 	case FSTRS:
