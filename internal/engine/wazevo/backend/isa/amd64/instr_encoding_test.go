@@ -1875,6 +1875,34 @@ func TestInstruction_format_encode(t *testing.T) {
 			want:       "66440f11797b",
 			wantFormat: "movupd %xmm15, 123(%rcx)",
 		},
+		{
+			setup: func(i *instruction) {
+				i.asShiftR(shiftROpShiftLeft, newOperandReg(rcxVReg), rdiVReg, false)
+			},
+			want:       "d3e7",
+			wantFormat: "shll %ecx, %edi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asShiftR(shiftROpShiftLeft, newOperandImm32(128), rdiVReg, false)
+			},
+			want:       "c1e780",
+			wantFormat: "shll $128, %edi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asShiftR(shiftROpShiftLeft, newOperandReg(rcxVReg), rdiVReg, true)
+			},
+			want:       "48d3e7",
+			wantFormat: "shlq %ecx, %rdi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asShiftR(shiftROpShiftLeft, newOperandImm32(128), rdiVReg, true)
+			},
+			want:       "48c1e780",
+			wantFormat: "shlq $128, %rdi",
+		},
 	} {
 		tc := tc
 		t.Run(tc.wantFormat, func(t *testing.T) {

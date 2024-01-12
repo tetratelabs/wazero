@@ -127,7 +127,27 @@ func (i *instruction) String() string {
 		}
 		return fmt.Sprintf("mov.%s %s, %s", suffix, i.op1.format(true), i.op2.format(true))
 	case shiftR:
-		panic("TODO")
+		_, _64 := i.u1 != 0, i.b1
+
+		var suffix string
+		if _64 {
+			suffix = "q"
+		} else {
+			suffix = "l"
+		}
+
+		//var op string
+		//switch {
+		//case signed && _64:
+		//	op = "sal"
+		//case !signed && _64:
+		//	op = "sar"
+		//case signed && !_64:
+		//	op = "shl"
+		//case !signed && !_64:
+		//	op = "shr"
+		//}
+		return fmt.Sprintf("%s%s %s, %s", shiftROp(i.u1), suffix, i.op1.format(false), i.op2.format(i.b1))
 	case xmmRmiReg:
 		panic("TODO")
 	case cmpRmiR:
@@ -762,6 +782,18 @@ func (i *instruction) asUnaryRmR(op unaryRmROpcode, rm operand, rd regalloc.VReg
 	return i
 }
 
+func (i *instruction) asShiftR(op shiftROp, amount operand, rd regalloc.VReg, _64 bool) *instruction {
+	if amount.kind != operandKindReg && amount.kind != operandKindImm32 {
+		panic("BUG")
+	}
+	i.kind = shiftR
+	i.op1 = amount
+	i.op2 = newOperandReg(rd)
+	i.u1 = uint64(op)
+	i.b1 = _64
+	return i
+}
+
 func (i *instruction) asXmmUnaryRmR(op sseOpcode, rm operand, rd regalloc.VReg, _64 bool) *instruction {
 	if rm.kind != operandKindReg && rm.kind != operandKindMem {
 		panic("BUG")
@@ -822,6 +854,33 @@ func (u unaryRmROpcode) String() string {
 		return "tzcnt"
 	case unaryRmROpcodePopcnt:
 		return "popcnt"
+	default:
+		panic("BUG")
+	}
+}
+
+type shiftROp byte
+
+const (
+	shiftROpRotateLeft           = 0
+	shiftROpRotateRight          = 1
+	shiftROpShiftLeft            = 4
+	shiftROpShiftRightLogical    = 5
+	shiftROpShiftRightArithmetic = 7
+)
+
+func (s shiftROp) String() string {
+	switch s {
+	case shiftROpRotateLeft:
+		return "rotateLeft"
+	case shiftROpRotateRight:
+		return "rotateRight"
+	case shiftROpShiftLeft:
+		return "shl"
+	case shiftROpShiftRightLogical:
+		return "shiftRightLogical"
+	case shiftROpShiftRightArithmetic:
+		return "shiftRightArithmetic"
 	default:
 		panic("BUG")
 	}

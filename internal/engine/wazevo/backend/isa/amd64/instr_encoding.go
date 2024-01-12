@@ -645,7 +645,32 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 		}
 
 	case shiftR:
-		panic("TODO")
+		src := regEncodings[i.op2.r.RealReg()]
+		amount := i.op1
+
+		var opcode uint32
+		var prefix legacyPrefixes
+		rex := rexInfo(0)
+		if i.b1 { // 64 bit.
+			rex = rexInfo(0).setW()
+		} else {
+			rex = rexInfo(0).clearW()
+		}
+
+		switch amount.kind {
+		case operandKindReg:
+			if amount.r != rcxVReg {
+				panic("BUG: invalid reg operand: must be rcx")
+			}
+			opcode, prefix = 0xd3, legacyPrefixesNone
+			encodeEncEnc(c, prefix, opcode, 1, uint8(i.u1), uint8(src), rex)
+		case operandKindImm32:
+			opcode, prefix = 0xc1, legacyPrefixesNone
+			encodeEncEnc(c, prefix, opcode, 1, uint8(i.u1), uint8(src), rex)
+			c.EmitByte(byte(amount.imm32))
+		default:
+			panic("BUG: invalid operand kind")
+		}
 	case xmmRmiReg:
 		panic("TODO")
 	case cmpRmiR:
