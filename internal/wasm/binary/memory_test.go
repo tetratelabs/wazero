@@ -163,6 +163,11 @@ func TestMemoryType(t *testing.T) {
 			memoryLimitPages: 512,
 			expected:         []byte{0x1, 0, 0x80, 0x80, 0x4},
 		},
+		{
+			name:     "min 0, max 1, shared",
+			input:    &wasm.Memory{Max: 1, IsMaxEncoded: true, IsShared: true},
+			expected: []byte{0x3, 0, 1},
+		},
 	}
 
 	for _, tt := range tests {
@@ -211,6 +216,11 @@ func TestDecodeMemoryType_Errors(t *testing.T) {
 			name:        "max > limit",
 			input:       []byte{0x1, 0, 0xff, 0xff, 0xff, 0xff, 0xf},
 			expectedErr: "max 4294967295 pages (3 Ti) over limit of 65536 pages (4 Gi)",
+		},
+		{
+			name:        "shared but no max",
+			input:       []byte{0x2, 0, 0x80, 0x80, 0x4},
+			expectedErr: "shared memory requires a maximum size to be specified",
 		},
 	}
 
