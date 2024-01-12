@@ -57,7 +57,8 @@ func (m *machine) compileEntryPreamble(sig *ssa.Signature) *instruction {
 		panic("TODO")
 	}
 
-	// Now ready to call the real function.
+	// Now ready to call the real function. Note that at this point stack pointer is already set to the Go-allocated,
+	// which is aligned to 16 bytes.
 	call := m.allocateInstr().asCallIndirect(newOperandReg(functionExecutable), &abi)
 	cur = linkInstr(cur, call)
 
