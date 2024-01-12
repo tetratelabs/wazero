@@ -127,26 +127,12 @@ func (i *instruction) String() string {
 		}
 		return fmt.Sprintf("mov.%s %s, %s", suffix, i.op1.format(true), i.op2.format(true))
 	case shiftR:
-		_, _64 := i.u1 != 0, i.b1
-
 		var suffix string
-		if _64 {
+		if i.b1 {
 			suffix = "q"
 		} else {
 			suffix = "l"
 		}
-
-		//var op string
-		//switch {
-		//case signed && _64:
-		//	op = "sal"
-		//case !signed && _64:
-		//	op = "sar"
-		//case signed && !_64:
-		//	op = "shl"
-		//case !signed && !_64:
-		//	op = "shr"
-		//}
 		return fmt.Sprintf("%s%s %s, %s", shiftROp(i.u1), suffix, i.op1.format(false), i.op2.format(i.b1))
 	case xmmRmiReg:
 		panic("TODO")
