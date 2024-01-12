@@ -51,8 +51,7 @@ type MemoryInstance struct {
 	definition api.MemoryDefinition
 
 	// Mux is used in interpreter mode to prevent overlapping calls to atomic instructions,
-	// introduced with WebAssembly threads proposal, and in all modes, to prevent overlapping
-	// calls to waiters.
+	// introduced with WebAssembly threads proposal.
 	Mux sync.RWMutex
 
 	// waiters implements atomic wait and notify. It is implemented similarly to golang.org/x/sync/semaphore,
