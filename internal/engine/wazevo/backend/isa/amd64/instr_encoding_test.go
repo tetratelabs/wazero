@@ -143,12 +143,12 @@ func TestInstruction_format_encode(t *testing.T) {
 		{
 			setup:      func(i *instruction) { i.asMulHi(newOperandMem(newAmodeImmReg(123, rdiVReg)), true, false) },
 			want:       "f76f7b",
-			wantFormat: "imull 123(%rdi)",
+			wantFormat: "imull 123(%edi)",
 		},
 		{
 			setup:      func(i *instruction) { i.asMulHi(newOperandMem(newAmodeImmReg(123, rdiVReg)), false, false) },
 			want:       "f7677b",
-			wantFormat: "mull 123(%rdi)",
+			wantFormat: "mull 123(%edi)",
 		},
 		{
 			setup:      func(i *instruction) { i.asMulHi(newOperandMem(newAmodeImmReg(123, rdiVReg)), true, true) },
