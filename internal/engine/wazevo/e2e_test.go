@@ -86,7 +86,6 @@ func TestE2E(t *testing.T) {
 		},
 		{
 			name: "consts", m: testcases.Constants.Module,
-			skipAMD64: true,
 			calls: []callCase{
 				{expResults: []uint64{1, 2, uint64(math.Float32bits(32.0)), math.Float64bits(64.0)}},
 			},

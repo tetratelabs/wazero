@@ -31,6 +31,22 @@ const (
 	operandKindLabel
 )
 
+// String implements fmt.Stringer.
+func (o operandKind) String() string {
+	switch o {
+	case operandKindReg:
+		return "reg"
+	case operandKindMem:
+		return "mem"
+	case operandKindImm32:
+		return "imm32"
+	case operandKindLabel:
+		return "label"
+	default:
+		panic("BUG: invalid operand kind")
+	}
+}
+
 func (o *operand) format(_64 bool) string {
 	switch o.kind {
 	case operandKindReg:
@@ -42,7 +58,7 @@ func (o *operand) format(_64 bool) string {
 	case operandKindLabel:
 		return backend.Label(o.imm32).String()
 	default:
-		panic("BUG: invalid operand kind")
+		panic(fmt.Sprintf("BUG: invalid operand: %s", o.kind))
 	}
 }
 
@@ -92,6 +108,41 @@ const (
 
 	// TODO: there are other addressing modes such as the one without base register.
 )
+
+func (a *amode) uses(rs *[]regalloc.VReg) {
+	switch a.kind {
+	case amodeImmReg:
+		*rs = append(*rs, a.base)
+	case amodeRegRegShift:
+		*rs = append(*rs, a.base, a.index)
+	case amodeRipRelative:
+		// nothing
+	default:
+		panic("BUG: invalid amode kind")
+	}
+}
+
+func (a *amode) assignUses(i int, reg regalloc.VReg) {
+	switch a.kind {
+	case amodeImmReg:
+		if i == 0 {
+			a.base = reg
+		} else {
+			panic("BUG: invalid amode assignment")
+		}
+	case amodeRegRegShift:
+		if i == 0 {
+			a.base = reg
+		} else if i == 1 {
+			a.index = reg
+		} else {
+			panic("BUG: invalid amode assignment")
+		}
+	case amodeRipRelative:
+	default:
+		panic("BUG: invalid amode assignment")
+	}
+}
 
 func newAmodeImmReg(imm32 uint32, base regalloc.VReg) amode {
 	return amode{kind: amodeImmReg, imm32: imm32, base: base}

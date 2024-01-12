@@ -64,9 +64,16 @@ func (m *machine) compileEntryPreamble(sig *ssa.Signature) *instruction {
 
 	//// ----------------------------------- epilogue ----------------------------------- ////
 
-	// TODO: read the results from regs and the stack, and set them correctly into the paramResultSlicePtr.
-	if len(abi.Rets) > 0 {
-		panic("TODO")
+	// Read the results from regs and the stack, and set them correctly into the paramResultSlicePtr.
+	var offset uint32
+	for i := range abi.Rets {
+		r := &abi.Rets[i]
+		cur = m.goEntryPreamblePassResult(cur, paramResultSlicePtr, offset, r)
+		if r.Type == ssa.TypeV128 {
+			offset += 16
+		} else {
+			offset += 8
+		}
 	}
 
 	// Finally, restore the original RBP and RSP.
@@ -99,4 +106,28 @@ func (m *machine) loadOrStore64AtExecutionCtx(execCtx regalloc.VReg, offset waze
 // This is for debugging.
 func (m *machine) linkUD2(cur *instruction) *instruction { //nolint
 	return linkInstr(cur, m.allocateInstr().asUD2())
+}
+
+func (m *machine) goEntryPreamblePassResult(cur *instruction, resultSlicePtr regalloc.VReg, offset uint32, result *backend.ABIArg) *instruction {
+	if result.Kind == backend.ABIArgKindStack {
+		panic("TODO")
+	}
+
+	r := result.Reg
+
+	store := m.allocateInstr()
+	switch result.Type {
+	case ssa.TypeI32:
+		store.asMovRM(r, newOperandMem(newAmodeImmReg(offset, resultSlicePtr)), 4)
+	case ssa.TypeI64:
+		store.asMovRM(r, newOperandMem(newAmodeImmReg(offset, resultSlicePtr)), 8)
+	case ssa.TypeF32:
+		store.asXmmMovRM(sseOpcodeMovss, r, newOperandMem(newAmodeImmReg(offset, resultSlicePtr)))
+	case ssa.TypeF64:
+		store.asXmmMovRM(sseOpcodeMovsd, r, newOperandMem(newAmodeImmReg(offset, resultSlicePtr)))
+	case ssa.TypeV128:
+		panic("TODO")
+	}
+
+	return linkInstr(cur, store)
 }
