@@ -125,9 +125,16 @@ func (m *machine) LowerConditionalBranch(b *ssa.Instruction) {
 }
 
 // LowerInstr implements backend.Machine.
-func (m *machine) LowerInstr(instruction *ssa.Instruction) {
-	// TODO implement me
-	panic("implement me")
+func (m *machine) LowerInstr(instr *ssa.Instruction) {
+	switch op := instr.Opcode(); op {
+	case ssa.OpcodeBrz, ssa.OpcodeBrnz, ssa.OpcodeJump, ssa.OpcodeBrTable:
+		panic("BUG: branching instructions are handled by LowerBranches")
+	case ssa.OpcodeReturn:
+		panic("BUG: return must be handled by backend.Compiler")
+	case ssa.OpcodeIconst, ssa.OpcodeF32const, ssa.OpcodeF64const: // Constant instructions are inlined.
+	default:
+		panic("TODO: lowering " + op.String())
+	}
 }
 
 // InsertMove implements backend.Machine.

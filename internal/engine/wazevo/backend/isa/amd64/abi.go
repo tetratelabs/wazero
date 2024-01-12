@@ -71,7 +71,25 @@ func (m *machine) LowerParams(args []ssa.Value) {
 }
 
 // LowerReturns implements backend.Machine.
-func (m *machine) LowerReturns(returns []ssa.Value) {
-	// TODO implement me
-	panic("implement me")
+func (m *machine) LowerReturns(rets []ssa.Value) {
+	a := m.currentABI
+
+	l := len(rets) - 1
+	for i := range rets {
+		// Reverse order in order to avoid overwriting the stack returns existing in the return registers.
+		ret := rets[l-i]
+		r := &a.Rets[l-i]
+		reg := m.c.VRegOf(ret)
+		if def := m.c.ValueDefinition(ret); def.IsFromInstr() {
+			// Constant instructions are inlined.
+			if inst := def.Instr; inst.Constant() {
+				m.InsertLoadConstant(inst, reg)
+			}
+		}
+		if r.Kind == backend.ABIArgKindReg {
+			m.InsertMove(r.Reg, reg, ret.Type())
+		} else {
+			panic("TODO")
+		}
+	}
 }

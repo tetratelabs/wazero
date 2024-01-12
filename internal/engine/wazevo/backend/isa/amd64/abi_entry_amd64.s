@@ -7,7 +7,7 @@ TEXT ·entrypoint(SB), NOSPLIT|NOFRAME, $0-48
 	MOVQ functionExectuable+8(FP), DI
 	MOVQ executionContextPtr+16(FP), AX      // First argument is passed in AX.
 	MOVQ moduleContextPtr+24(FP), CX         // Second argument is passed in CX.
-	MOVQ paramResultSlicePtr+32(FP), SI
+	MOVQ paramResultSlicePtr+32(FP), R12
 	MOVQ goAllocatedStackSlicePtr+40(FP), BX
 	JMP  R11
 

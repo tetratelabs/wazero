@@ -1703,6 +1703,78 @@ func TestInstruction_format_encode(t *testing.T) {
 			want:       "48897c087b",
 			wantFormat: "mov.q %rdi, 123(%rax,%rcx,1)",
 		},
+		{
+			setup: func(i *instruction) {
+				a := newOperandMem(newAmodeRegRegShit(123, raxVReg, rcxVReg, 0))
+				i.asXmmMovRM(sseOpcodeMovaps, xmm1VReg, a)
+			},
+			want:       "0f294c087b",
+			wantFormat: "movaps %xmm1, 123(%rax,%rcx,1)",
+		},
+		{
+			setup: func(i *instruction) {
+				a := newOperandMem(newAmodeImmReg(123, rcxVReg))
+				i.asXmmMovRM(sseOpcodeMovaps, xmm15VReg, a)
+			},
+			want:       "440f29797b",
+			wantFormat: "movaps %xmm15, 123(%rcx)",
+		},
+		{
+			setup: func(i *instruction) {
+				a := newOperandMem(newAmodeImmReg(123, rcxVReg))
+				i.asXmmMovRM(sseOpcodeMovapd, xmm15VReg, a)
+			},
+			want:       "66440f29797b",
+			wantFormat: "movapd %xmm15, 123(%rcx)",
+		},
+		{
+			setup: func(i *instruction) {
+				a := newOperandMem(newAmodeImmReg(123, rcxVReg))
+				i.asXmmMovRM(sseOpcodeMovdqa, xmm15VReg, a)
+			},
+			want:       "66440f7f797b",
+			wantFormat: "movdqa %xmm15, 123(%rcx)",
+		},
+		{
+			setup: func(i *instruction) {
+				a := newOperandMem(newAmodeImmReg(123, rcxVReg))
+				i.asXmmMovRM(sseOpcodeMovdqu, xmm15VReg, a)
+			},
+			want:       "f3440f7f797b",
+			wantFormat: "movdqu %xmm15, 123(%rcx)",
+		},
+		{
+			setup: func(i *instruction) {
+				a := newOperandMem(newAmodeImmReg(123, rcxVReg))
+				i.asXmmMovRM(sseOpcodeMovss, xmm15VReg, a)
+			},
+			want:       "f3440f11797b",
+			wantFormat: "movss %xmm15, 123(%rcx)",
+		},
+		{
+			setup: func(i *instruction) {
+				a := newOperandMem(newAmodeImmReg(123, rcxVReg))
+				i.asXmmMovRM(sseOpcodeMovsd, xmm15VReg, a)
+			},
+			want:       "f2440f11797b",
+			wantFormat: "movsd %xmm15, 123(%rcx)",
+		},
+		{
+			setup: func(i *instruction) {
+				a := newOperandMem(newAmodeImmReg(123, rcxVReg))
+				i.asXmmMovRM(sseOpcodeMovups, xmm15VReg, a)
+			},
+			want:       "440f11797b",
+			wantFormat: "movups %xmm15, 123(%rcx)",
+		},
+		{
+			setup: func(i *instruction) {
+				a := newOperandMem(newAmodeImmReg(123, rcxVReg))
+				i.asXmmMovRM(sseOpcodeMovupd, xmm15VReg, a)
+			},
+			want:       "66440f11797b",
+			wantFormat: "movupd %xmm15, 123(%rcx)",
+		},
 	} {
 		tc := tc
 		t.Run(tc.wantFormat, func(t *testing.T) {

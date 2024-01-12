@@ -13,7 +13,7 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 	case ret:
 		c.EmitByte(0xc3)
 	case imm:
-		dst := regEncodings[i.op1.r.RealReg()]
+		dst := regEncodings[i.op2.r.RealReg()]
 		con := i.u1
 		if i.b1 { // 64 bit.
 			if lower32willSignExtendTo64(con) {
@@ -597,7 +597,32 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 		c.EmitByte(0x58 | dst.encoding())
 
 	case xmmMovRM:
-		panic("TODO")
+		var legPrefix legacyPrefixes
+		var opcode uint32
+		const opcodeNum = 2
+		switch sseOpcode(i.u1) {
+		case sseOpcodeMovaps:
+			legPrefix, opcode = legacyPrefixesNone, 0x0f29
+		case sseOpcodeMovapd:
+			legPrefix, opcode = legacyPrefixes0x66, 0x0f29
+		case sseOpcodeMovdqa:
+			legPrefix, opcode = legacyPrefixes0x66, 0x0f7f
+		case sseOpcodeMovdqu:
+			legPrefix, opcode = legacyPrefixes0xF3, 0x0f7f
+		case sseOpcodeMovss:
+			legPrefix, opcode = legacyPrefixes0xF3, 0x0f11
+		case sseOpcodeMovsd:
+			legPrefix, opcode = legacyPrefixes0xF2, 0x0f11
+		case sseOpcodeMovups:
+			legPrefix, opcode = legacyPrefixesNone, 0x0f11
+		case sseOpcodeMovupd:
+			legPrefix, opcode = legacyPrefixes0x66, 0x0f11
+		default:
+			panic(fmt.Sprintf("Unsupported sseOpcode: %s", sseOpcode(i.u1)))
+		}
+
+		dst := regEncodings[i.op1.r.RealReg()]
+		encodeRegMem(c, legPrefix, opcode, opcodeNum, dst, i.op2.amode, rexInfo(0).clearW())
 	case xmmLoadConst:
 		panic("TODO")
 	case xmmToGpr:

@@ -49,9 +49,9 @@ func (i *instruction) String() string {
 		return "ret"
 	case imm:
 		if i.b1 {
-			return fmt.Sprintf("movabsq $%d, %s", int64(i.u1), i.op1.format(true))
+			return fmt.Sprintf("movabsq $%d, %s", int64(i.u1), i.op2.format(true))
 		} else {
-			return fmt.Sprintf("movl $%d, %s", int32(i.u1), i.op1.format(false))
+			return fmt.Sprintf("movl $%d, %s", int32(i.u1), i.op2.format(false))
 		}
 	case aluRmiR:
 		return fmt.Sprintf("%s %s, %s", aluRmiROpcode(i.u1), i.op1.format(i.b1), i.op2.format(i.b1))
@@ -117,7 +117,7 @@ func (i *instruction) String() string {
 	case pop64:
 		return fmt.Sprintf("popq %s", i.op1.format(true))
 	case xmmMovRM:
-		panic("TODO")
+		return fmt.Sprintf("%s %s, %s", sseOpcode(i.u1), i.op1.format(true), i.op2.format(true))
 	case xmmLoadConst:
 		panic("TODO")
 	case xmmToGpr:
@@ -155,7 +155,7 @@ func (i *instruction) String() string {
 	case callIndirect:
 		return fmt.Sprintf("callq *%s", i.op1.format(true))
 	default:
-		panic(fmt.Sprintf("BUG: %v", i.kind))
+		panic(fmt.Sprintf("BUG: %d", int(i.kind)))
 	}
 }
 
@@ -165,9 +165,12 @@ func (i *instruction) Defs(regs *[]regalloc.VReg) []regalloc.VReg {
 	switch dk := defKinds[i.kind]; dk {
 	case defKindNone:
 	case defKindOp2:
+		if !i.op2.r.Valid() {
+			panic("BUG" + i.String())
+		}
 		*regs = append(*regs, i.op2.r)
 	default:
-		panic(fmt.Sprintf("BUG: invalid defKind %s for %s", dk, i))
+		panic(fmt.Sprintf("BUG: invalid defKind \"%s\" for %s", dk, i))
 	}
 	return *regs
 }
@@ -177,6 +180,17 @@ func (i *instruction) Uses(regs *[]regalloc.VReg) []regalloc.VReg {
 	*regs = (*regs)[:0]
 	switch uk := useKinds[i.kind]; uk {
 	case useKindNone:
+	case useKindOp1:
+		op := i.op1
+		switch op.kind {
+		case operandKindReg:
+			*regs = append(*regs, op.r)
+		case operandKindMem:
+			op.amode.uses(regs)
+		case operandKindImm32, operandKindLabel:
+		default:
+			panic(fmt.Sprintf("BUG: invalid operand: %s", i))
+		}
 	default:
 		panic(fmt.Sprintf("BUG: invalid useKind %s for %s", uk, i))
 	}
@@ -185,14 +199,41 @@ func (i *instruction) Uses(regs *[]regalloc.VReg) []regalloc.VReg {
 
 // AssignUse implements regalloc.Instr.
 func (i *instruction) AssignUse(index int, v regalloc.VReg) {
-	// TODO implement me
-	panic("implement me")
+	switch uk := useKinds[i.kind]; uk {
+	case useKindNone:
+	case useKindOp1:
+		op := &i.op1
+		switch op.kind {
+		case operandKindReg:
+			if index != 0 {
+				panic("BUG")
+			}
+			if op.r.IsRealReg() {
+				panic("BUG already assigned: " + i.String())
+			}
+			op.r = v
+		case operandKindMem:
+			op.amode.assignUses(index, v)
+		default:
+			panic(fmt.Sprintf("BUG: invalid operand: %s", i))
+		}
+	default:
+		panic(fmt.Sprintf("BUG: invalid useKind %s for %s", uk, i))
+	}
 }
 
 // AssignDef implements regalloc.Instr.
 func (i *instruction) AssignDef(reg regalloc.VReg) {
-	// TODO implement me
-	panic("implement me")
+	switch dk := defKinds[i.kind]; dk {
+	case defKindNone:
+	case defKindOp2:
+		if !i.op2.r.Valid() {
+			panic("BUG already assigned" + i.String())
+		}
+		i.op2.r = reg
+	default:
+		panic(fmt.Sprintf("BUG: invalid defKind \"%s\" for %s", dk, i))
+	}
 }
 
 // IsCopy implements regalloc.Instr.
@@ -323,7 +364,7 @@ const (
 	// value. This is characteristic of mov instructions.
 	xmmUnaryRmR
 
-	// XMM (scalar or vector) unary op (from xmm to reg/mem): stores, movd, movq
+	// XMM (scalar or vector) unary op (from xmm to mem): stores, movd, movq
 	xmmMovRM
 
 	// XMM (vector) unary op (to move a constant value into an xmm register): movups
@@ -554,7 +595,7 @@ func (i *instruction) asRet(abi *backend.FunctionABI) *instruction {
 
 func (i *instruction) asImm(dst regalloc.VReg, value uint64, _64 bool) *instruction {
 	i.kind = imm
-	i.op1 = newOperandReg(dst)
+	i.op2 = newOperandReg(dst)
 	i.u1 = value
 	i.b1 = _64
 	return i
@@ -661,6 +702,17 @@ func (i *instruction) asXmmUnaryRmR(op sseOpcode, rm operand, rd regalloc.VReg, 
 	i.op2 = newOperandReg(rd)
 	i.u1 = uint64(op)
 	i.b1 = _64
+	return i
+}
+
+func (i *instruction) asXmmMovRM(op sseOpcode, rm regalloc.VReg, rd operand) *instruction {
+	if rd.kind != operandKindMem {
+		panic("BUG")
+	}
+	i.kind = xmmMovRM
+	i.op1 = newOperandReg(rm)
+	i.op2 = rd
+	i.u1 = uint64(op)
 	return i
 }
 
@@ -1185,8 +1237,12 @@ const (
 )
 
 var defKinds = [instrMax]defKind{
-	nop0: defKindNone,
-	ret:  defKindNone,
+	nop0:        defKindNone,
+	ret:         defKindNone,
+	movRR:       defKindOp2,
+	imm:         defKindOp2,
+	xmmUnaryRmR: defKindOp2,
+	gprToXmm:    defKindOp2,
 }
 
 // String implements fmt.Stringer.
@@ -1209,8 +1265,12 @@ const (
 )
 
 var useKinds = [instrMax]useKind{
-	nop0: useKindNone,
-	ret:  useKindNone,
+	nop0:        useKindNone,
+	ret:         useKindNone,
+	movRR:       useKindOp1,
+	imm:         useKindNone,
+	xmmUnaryRmR: useKindOp1,
+	gprToXmm:    useKindOp1,
 }
 
 func (u useKind) String() string {
