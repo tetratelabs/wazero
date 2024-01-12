@@ -39,7 +39,7 @@ func (m *machine) compileEntryPreamble(sig *ssa.Signature) *instruction {
 
 	// First, we save executionContextPtrReg into a callee-saved register so that it can be used in epilogue as well.
 	// 		mov %executionContextPtrReg, %savedExecutionContextPtr
-	cur := m.move64(executionContextPtrReg, savedExecutionContextPtr, root)
+	cur := m.move64(savedExecutionContextPtr, executionContextPtrReg, root)
 
 	// Next is to save the original RBP and RSP into the execution context.
 	// 		mov %rbp, wazevoapi.ExecutionContextOffsetOriginalFramePointer(%executionContextPtrReg)
