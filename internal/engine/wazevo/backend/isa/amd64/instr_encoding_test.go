@@ -120,6 +120,46 @@ func TestInstruction_format_encode(t *testing.T) {
 			want:       "48f7d8",
 			wantFormat: "neg %rax",
 		},
+		{
+			setup:      func(i *instruction) { i.asMulHi(newOperandReg(rsiVReg), true, false) },
+			want:       "f7ee",
+			wantFormat: "imul %esi",
+		},
+		{
+			setup:      func(i *instruction) { i.asMulHi(newOperandReg(r14VReg), false, false) },
+			want:       "41f7e6",
+			wantFormat: "mul %r14d",
+		},
+		{
+			setup:      func(i *instruction) { i.asMulHi(newOperandReg(r15VReg), true, true) },
+			want:       "49f7ef",
+			wantFormat: "imul %r15",
+		},
+		{
+			setup:      func(i *instruction) { i.asMulHi(newOperandReg(rdiVReg), false, true) },
+			want:       "48f7e7",
+			wantFormat: "mul %rdi",
+		},
+		{
+			setup:      func(i *instruction) { i.asMulHi(newOperandMem(newAmodeImmReg(123, rdiVReg)), true, false) },
+			want:       "f76f7b",
+			wantFormat: "imul 123(%edi)",
+		},
+		{
+			setup:      func(i *instruction) { i.asMulHi(newOperandMem(newAmodeImmReg(123, rdiVReg)), false, false) },
+			want:       "f7677b",
+			wantFormat: "mul 123(%edi)",
+		},
+		{
+			setup:      func(i *instruction) { i.asMulHi(newOperandMem(newAmodeImmReg(123, rdiVReg)), true, true) },
+			want:       "48f76f7b",
+			wantFormat: "imul 123(%rdi)",
+		},
+		{
+			setup:      func(i *instruction) { i.asMulHi(newOperandMem(newAmodeImmReg(123, rdiVReg)), false, true) },
+			want:       "48f7677b",
+			wantFormat: "mul 123(%rdi)",
+		},
 		// bsr
 		{
 			setup:      func(i *instruction) { i.asUnaryRmR(unaryRmROpcodeBsr, newOperandReg(raxVReg), rdiVReg, false) },

@@ -76,7 +76,11 @@ func (i *instruction) String() string {
 	case div:
 		panic("TODO")
 	case mulHi:
-		panic("TODO")
+		if i.u1 != 0 {
+			return fmt.Sprintf("imul %s", i.op1.format(i.b1))
+		} else {
+			return fmt.Sprintf("mul %s", i.op1.format(i.b1))
+		}
 	case checkedDivOrRemSeq:
 		panic("TODO")
 	case signExtendData:
@@ -710,6 +714,19 @@ func (i *instruction) asNeg(rm operand, _64 bool) *instruction {
 	i.kind = neg
 	i.op1 = rm
 	i.b1 = _64
+	return i
+}
+
+func (i *instruction) asMulHi(rm operand, signed, _64 bool) *instruction {
+	if rm.kind != operandKindReg && rm.kind != operandKindMem {
+		panic("BUG")
+	}
+	i.kind = mulHi
+	i.op1 = rm
+	i.b1 = _64
+	if signed {
+		i.u1 = 1
+	}
 	return i
 }
 

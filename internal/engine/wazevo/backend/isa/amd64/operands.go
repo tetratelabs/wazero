@@ -52,7 +52,7 @@ func (o *operand) format(_64 bool) string {
 	case operandKindReg:
 		return formatVRegSized(o.r, _64)
 	case operandKindMem:
-		return o.amode.String()
+		return o.amode.format(_64)
 	case operandKindImm32:
 		return fmt.Sprintf("$%d", int32(o.imm32))
 	case operandKindLabel:
@@ -171,22 +171,22 @@ func newAmodeRipRelative(label backend.Label) amode {
 }
 
 // String implements fmt.Stringer.
-func (a *amode) String() string {
+func (a *amode) format(_64 bool) string {
 	switch a.kind {
 	case amodeImmReg:
 		if a.imm32 == 0 {
-			return fmt.Sprintf("(%s)", formatVRegSized(a.base, true))
+			return fmt.Sprintf("(%s)", formatVRegSized(a.base, _64))
 		}
-		return fmt.Sprintf("%d(%s)", int32(a.imm32), formatVRegSized(a.base, true))
+		return fmt.Sprintf("%d(%s)", int32(a.imm32), formatVRegSized(a.base, _64))
 	case amodeRegRegShift:
 		if a.imm32 == 0 {
 			return fmt.Sprintf(
 				"(%s,%s,%d)",
-				formatVRegSized(a.base, true), formatVRegSized(a.index, true), 1<<a.shift)
+				formatVRegSized(a.base, true), formatVRegSized(a.index, _64), 1<<a.shift)
 		}
 		return fmt.Sprintf(
 			"%d(%s,%s,%d)",
-			int32(a.imm32), formatVRegSized(a.base, true), formatVRegSized(a.index, true), 1<<a.shift)
+			int32(a.imm32), formatVRegSized(a.base, _64), formatVRegSized(a.index, _64), 1<<a.shift)
 	case amodeRipRelative:
 		if a.label != backend.LabelInvalid {
 			return fmt.Sprintf("%s(%%rip)", a.label)
