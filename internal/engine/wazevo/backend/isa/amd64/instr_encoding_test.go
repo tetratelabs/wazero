@@ -100,6 +100,66 @@ func TestInstruction_format_encode(t *testing.T) {
 			want:       "4d89dc",
 			wantFormat: "movq %r11, %r12",
 		},
+		// bsr
+		{
+			setup:      func(i *instruction) { i.asUnaryRmR(unaryRmROpcodeBsr, newOperandReg(raxVReg), rdiVReg, false) },
+			want:       "0fbdf8",
+			wantFormat: "bsr %eax, %edi",
+		},
+		// bsf
+		{
+			setup:      func(i *instruction) { i.asUnaryRmR(unaryRmROpcodeBsf, newOperandReg(raxVReg), rdiVReg, false) },
+			want:       "0fbcf8",
+			wantFormat: "bsf %eax, %edi",
+		},
+		// tzcnt
+		{
+			setup:      func(i *instruction) { i.asUnaryRmR(unaryRmROpcodeTzcnt, newOperandReg(raxVReg), rdiVReg, false) },
+			want:       "f30fbcf8",
+			wantFormat: "tzcnt %eax, %edi",
+		},
+		// lzcnt
+		{
+			setup:      func(i *instruction) { i.asUnaryRmR(unaryRmROpcodeLzcnt, newOperandReg(raxVReg), rdiVReg, false) },
+			want:       "f30fbdf8",
+			wantFormat: "lzcnt %eax, %edi",
+		},
+		// popcnt
+		{
+			setup:      func(i *instruction) { i.asUnaryRmR(unaryRmROpcodePopcnt, newOperandReg(raxVReg), rdiVReg, false) },
+			want:       "f30fb8f8",
+			wantFormat: "popcnt %eax, %edi",
+		},
+		// bsr
+		{
+			setup:      func(i *instruction) { i.asUnaryRmR(unaryRmROpcodeBsr, newOperandReg(raxVReg), rdiVReg, true) },
+			want:       "480fbdf8",
+			wantFormat: "bsr %rax, %rdi",
+		},
+		// bsf
+		{
+			setup:      func(i *instruction) { i.asUnaryRmR(unaryRmROpcodeBsf, newOperandReg(raxVReg), rdiVReg, true) },
+			want:       "480fbcf8",
+			wantFormat: "bsf %rax, %rdi",
+		},
+		// tzcnt
+		{
+			setup:      func(i *instruction) { i.asUnaryRmR(unaryRmROpcodeTzcnt, newOperandReg(raxVReg), rdiVReg, true) },
+			want:       "f3480fbcf8",
+			wantFormat: "tzcnt %rax, %rdi",
+		},
+		// lzcnt
+		{
+			setup:      func(i *instruction) { i.asUnaryRmR(unaryRmROpcodeLzcnt, newOperandReg(raxVReg), rdiVReg, true) },
+			want:       "f3480fbdf8",
+			wantFormat: "lzcnt %rax, %rdi",
+		},
+		// popcnt
+		{
+			setup:      func(i *instruction) { i.asUnaryRmR(unaryRmROpcodePopcnt, newOperandReg(raxVReg), rdiVReg, true) },
+			want:       "f3480fb8f8",
+			wantFormat: "popcnt %rax, %rdi",
+		},
 		// addss
 		{
 			setup:      func(i *instruction) { i.asXmmRmR(sseOpcodeAddss, newOperandReg(xmm1VReg), xmm0VReg, true) },

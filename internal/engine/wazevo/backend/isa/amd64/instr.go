@@ -68,7 +68,7 @@ func (i *instruction) String() string {
 	case xmmUnaryRmR:
 		return fmt.Sprintf("%s %s, %s", sseOpcode(i.u1), i.op1.format(i.b1), i.op2.format(i.b1))
 	case unaryRmR:
-		panic("TODO")
+		return fmt.Sprintf("%s %s, %s", unaryRmROpcode(i.u1), i.op1.format(i.b1), i.op2.format(i.b1))
 	case not:
 		panic("TODO")
 	case neg:
@@ -693,6 +693,29 @@ func (i *instruction) asMovRR(rm, rd regalloc.VReg, _64 bool) *instruction {
 	return i
 }
 
+func (i *instruction) asNot(rm operand, rd regalloc.VReg, _64 bool) *instruction {
+	if rm.kind != operandKindReg && rm.kind != operandKindMem {
+		panic("BUG")
+	}
+	i.kind = not
+	i.op1 = rm
+	i.op2 = newOperandReg(rd)
+	i.b1 = _64
+	return i
+}
+
+func (i *instruction) asUnaryRmR(op unaryRmROpcode, rm operand, rd regalloc.VReg, _64 bool) *instruction {
+	if rm.kind != operandKindReg && rm.kind != operandKindMem {
+		panic("BUG")
+	}
+	i.kind = unaryRmR
+	i.op1 = rm
+	i.op2 = newOperandReg(rd)
+	i.u1 = uint64(op)
+	i.b1 = _64
+	return i
+}
+
 func (i *instruction) asXmmUnaryRmR(op sseOpcode, rm operand, rd regalloc.VReg, _64 bool) *instruction {
 	if rm.kind != operandKindReg && rm.kind != operandKindMem {
 		panic("BUG")
@@ -729,6 +752,33 @@ func (i *instruction) asPush64(op operand) *instruction {
 	i.kind = push64
 	i.op1 = op
 	return i
+}
+
+type unaryRmROpcode byte
+
+const (
+	unaryRmROpcodeBsr unaryRmROpcode = iota
+	unaryRmROpcodeBsf
+	unaryRmROpcodeLzcnt
+	unaryRmROpcodeTzcnt
+	unaryRmROpcodePopcnt
+)
+
+func (u unaryRmROpcode) String() string {
+	switch u {
+	case unaryRmROpcodeBsr:
+		return "bsr"
+	case unaryRmROpcodeBsf:
+		return "bsf"
+	case unaryRmROpcodeLzcnt:
+		return "lzcnt"
+	case unaryRmROpcodeTzcnt:
+		return "tzcnt"
+	case unaryRmROpcodePopcnt:
+		return "popcnt"
+	default:
+		panic("BUG")
+	}
 }
 
 type sseOpcode byte

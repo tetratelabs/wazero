@@ -452,9 +452,60 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 		}
 
 	case unaryRmR:
-		panic("TODO")
+		var prefix legacyPrefixes
+		var opcode uint32
+		var opcodeNum uint32
+		op := unaryRmROpcode(i.u1)
+		// We assume size is either 32 or 64.
+		switch op {
+		case unaryRmROpcodeBsr:
+			prefix, opcode, opcodeNum = legacyPrefixesNone, 0x0fbd, 2
+		case unaryRmROpcodeBsf:
+			prefix, opcode, opcodeNum = legacyPrefixesNone, 0x0fbc, 2
+		case unaryRmROpcodeLzcnt:
+			prefix, opcode, opcodeNum = legacyPrefixes0xF3, 0x0fbd, 2
+		case unaryRmROpcodeTzcnt:
+			prefix, opcode, opcodeNum = legacyPrefixes0xF3, 0x0fbc, 2
+		case unaryRmROpcodePopcnt:
+			prefix, opcode, opcodeNum = legacyPrefixes0xF3, 0x0fb8, 2
+		default:
+			panic(fmt.Sprintf("Unsupported unaryRmROpcode: %s", op))
+		}
+
+		dst := regEncodings[i.op2.r.RealReg()]
+
+		rex := rexInfo(0)
+		if i.b1 { // 64 bit.
+			rex = rexInfo(0).setW()
+		} else {
+			rex = rexInfo(0).clearW()
+		}
+		op1 := i.op1
+		if op1.kind == operandKindReg {
+			src := regEncodings[op1.r.RealReg()]
+			encodeRegReg(c, prefix, opcode, opcodeNum, dst, src, rex)
+		} else if i.op1.kind == operandKindMem {
+			m := i.op1.amode
+			encodeRegMem(c, prefix, opcode, opcodeNum, dst, m, rex)
+		} else {
+			panic("BUG: invalid operand kind")
+		}
+
 	case not:
-		panic("TODO")
+		var prefix legacyPrefixes
+		var opcode uint32
+
+		src, dst := regEncodings[i.op1.r.RealReg()], regEncodings[i.op2.r.RealReg()]
+
+		rex := rexInfo(0)
+		if i.b1 { // 64 bit.
+			rex = rexInfo(0).setW()
+		} else {
+			rex = rexInfo(0).clearW()
+		}
+
+		encodeRegReg(c, prefix, opcode, 1, src, dst, rex)
+
 	case neg:
 		panic("TODO")
 	case div:
