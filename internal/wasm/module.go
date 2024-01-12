@@ -766,6 +766,8 @@ type Memory struct {
 	Min, Cap, Max uint32
 	// IsMaxEncoded true if the Max is encoded in the original binary.
 	IsMaxEncoded bool
+	// IsShared true if the memory is shared for access from multiple agents.
+	IsShared bool
 }
 
 // Validate ensures values assigned to Min, Cap and Max are within valid thresholds.

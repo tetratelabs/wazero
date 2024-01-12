@@ -36,6 +36,7 @@ type MemoryInstance struct {
 
 	Buffer        []byte
 	Min, Cap, Max uint32
+	Shared        bool
 	// definition is known at compile time.
 	definition api.MemoryDefinition
 }
@@ -49,6 +50,7 @@ func NewMemoryInstance(memSec *Memory) *MemoryInstance {
 		Min:    memSec.Min,
 		Cap:    memSec.Cap,
 		Max:    memSec.Max,
+		Shared: memSec.IsShared,
 	}
 }
 

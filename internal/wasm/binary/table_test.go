@@ -93,6 +93,12 @@ func TestDecodeTableType_Errors(t *testing.T) {
 			expectedErr: "table min must be at most 134217728",
 			features:    api.CoreFeatureReferenceTypes,
 		},
+		{
+			name:        "shared",
+			input:       []byte{wasm.RefTypeFuncref, 0x2, 0},
+			expectedErr: "tables cannot be marked as shared",
+			// Shared tables are an error even if threads are enabled.
+		},
 	}
 
 	for _, tt := range tests {
