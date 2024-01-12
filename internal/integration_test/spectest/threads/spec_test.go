@@ -26,6 +26,5 @@ func TestCompiler(t *testing.T) {
 }
 
 func TestInterpreter(t *testing.T) {
-	t.Skip() // TODO: Delete after implementing interpreter support
 	spectest.Run(t, testcases, context.Background(), wazero.NewRuntimeConfigInterpreter().WithCoreFeatures(enabledFeatures))
 }

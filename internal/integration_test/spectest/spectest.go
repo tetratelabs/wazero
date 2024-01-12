@@ -287,6 +287,8 @@ func (c command) expectedError() (err error) {
 		panic("unreachable")
 	}
 	switch c.Text {
+	case "expected shared memory":
+		err = wasmruntime.ErrRuntimeExpectedSharedMemory
 	case "out of bounds memory access":
 		err = wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess
 	case "indirect call type mismatch", "indirect call":
@@ -299,6 +301,8 @@ func (c command) expectedError() (err error) {
 		err = wasmruntime.ErrRuntimeInvalidConversionToInteger
 	case "integer divide by zero":
 		err = wasmruntime.ErrRuntimeIntegerDivideByZero
+	case "unaligned atomic":
+		err = wasmruntime.ErrRuntimeUnalignedAtomic
 	case "unreachable":
 		err = wasmruntime.ErrRuntimeUnreachable
 	default:
@@ -336,7 +340,7 @@ func Run(t *testing.T, testDataFS embed.FS, ctx context.Context, config wazero.R
 
 	// If the go:embed path resolution was wrong, this fails.
 	// https://github.com/tetratelabs/wazero/issues/247
-	require.True(t, len(caseNames) > 1, "len(caseNames)=%d (not greater than one)", len(caseNames))
+	require.True(t, len(caseNames) > 0, "len(caseNames)=%d (not greater than zero)", len(caseNames))
 
 	for _, f := range caseNames {
 		RunCase(t, testDataFS, f, ctx, config, -1, 0, math.MaxInt)
