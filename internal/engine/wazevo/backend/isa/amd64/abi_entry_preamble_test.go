@@ -24,7 +24,7 @@ func TestMachineCompileEntryPreamble(t *testing.T) {
 	mov.q %rbp, 16(%rax)
 	mov.q %rsp, 24(%rax)
 	movq %rbx, %rsp
-	callq *%r14
+	callq *%rdi
 	movq 16(%rdx), %rbp
 	movq 24(%rdx), %rsp
 	ret
