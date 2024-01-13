@@ -164,61 +164,131 @@ func TestInstruction_format_encode(t *testing.T) {
 		{
 			setup:      func(i *instruction) { i.asUnaryRmR(unaryRmROpcodeBsr, newOperandReg(raxVReg), rdiVReg, false) },
 			want:       "0fbdf8",
-			wantFormat: "bsr %eax, %edi",
+			wantFormat: "bsrl %eax, %edi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asUnaryRmR(unaryRmROpcodeBsr, newOperandMem(newAmodeImmReg(123, raxVReg)), rdiVReg, false)
+			},
+			want:       "0fbd787b",
+			wantFormat: "bsrl 123(%rax), %edi",
 		},
 		// bsf
 		{
 			setup:      func(i *instruction) { i.asUnaryRmR(unaryRmROpcodeBsf, newOperandReg(raxVReg), rdiVReg, false) },
 			want:       "0fbcf8",
-			wantFormat: "bsf %eax, %edi",
+			wantFormat: "bsfl %eax, %edi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asUnaryRmR(unaryRmROpcodeBsf, newOperandMem(newAmodeImmReg(123, raxVReg)), rdiVReg, false)
+			},
+			want:       "0fbc787b",
+			wantFormat: "bsfl 123(%rax), %edi",
 		},
 		// tzcnt
 		{
 			setup:      func(i *instruction) { i.asUnaryRmR(unaryRmROpcodeTzcnt, newOperandReg(raxVReg), rdiVReg, false) },
 			want:       "f30fbcf8",
-			wantFormat: "tzcnt %eax, %edi",
+			wantFormat: "tzcntl %eax, %edi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asUnaryRmR(unaryRmROpcodeTzcnt, newOperandMem(newAmodeImmReg(123, raxVReg)), rdiVReg, false)
+			},
+			want:       "f30fbc787b",
+			wantFormat: "tzcntl 123(%rax), %edi",
 		},
 		// lzcnt
 		{
 			setup:      func(i *instruction) { i.asUnaryRmR(unaryRmROpcodeLzcnt, newOperandReg(raxVReg), rdiVReg, false) },
 			want:       "f30fbdf8",
-			wantFormat: "lzcnt %eax, %edi",
+			wantFormat: "lzcntl %eax, %edi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asUnaryRmR(unaryRmROpcodeLzcnt, newOperandMem(newAmodeImmReg(123, raxVReg)), rdiVReg, false)
+			},
+			want:       "f30fbd787b",
+			wantFormat: "lzcntl 123(%rax), %edi",
 		},
 		// popcnt
 		{
 			setup:      func(i *instruction) { i.asUnaryRmR(unaryRmROpcodePopcnt, newOperandReg(raxVReg), rdiVReg, false) },
 			want:       "f30fb8f8",
-			wantFormat: "popcnt %eax, %edi",
+			wantFormat: "popcntl %eax, %edi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asUnaryRmR(unaryRmROpcodePopcnt, newOperandMem(newAmodeImmReg(123, raxVReg)), rdiVReg, false)
+			},
+			want:       "f30fb8787b",
+			wantFormat: "popcntl 123(%rax), %edi",
 		},
 		// bsr
 		{
 			setup:      func(i *instruction) { i.asUnaryRmR(unaryRmROpcodeBsr, newOperandReg(raxVReg), rdiVReg, true) },
 			want:       "480fbdf8",
-			wantFormat: "bsr %rax, %rdi",
+			wantFormat: "bsrq %rax, %rdi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asUnaryRmR(unaryRmROpcodeBsr, newOperandMem(newAmodeImmReg(123, raxVReg)), rdiVReg, true)
+			},
+			want:       "480fbd787b",
+			wantFormat: "bsrq 123(%rax), %rdi",
 		},
 		// bsf
 		{
 			setup:      func(i *instruction) { i.asUnaryRmR(unaryRmROpcodeBsf, newOperandReg(raxVReg), rdiVReg, true) },
 			want:       "480fbcf8",
-			wantFormat: "bsf %rax, %rdi",
+			wantFormat: "bsfq %rax, %rdi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asUnaryRmR(unaryRmROpcodeBsf, newOperandMem(newAmodeImmReg(123, raxVReg)), rdiVReg, true)
+			},
+			want:       "480fbc787b",
+			wantFormat: "bsfq 123(%rax), %rdi",
 		},
 		// tzcnt
 		{
 			setup:      func(i *instruction) { i.asUnaryRmR(unaryRmROpcodeTzcnt, newOperandReg(raxVReg), rdiVReg, true) },
 			want:       "f3480fbcf8",
-			wantFormat: "tzcnt %rax, %rdi",
+			wantFormat: "tzcntq %rax, %rdi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asUnaryRmR(unaryRmROpcodeTzcnt, newOperandMem(newAmodeImmReg(123, raxVReg)), rdiVReg, true)
+			},
+			want:       "f3480fbc787b",
+			wantFormat: "tzcntq 123(%rax), %rdi",
 		},
 		// lzcnt
 		{
 			setup:      func(i *instruction) { i.asUnaryRmR(unaryRmROpcodeLzcnt, newOperandReg(raxVReg), rdiVReg, true) },
 			want:       "f3480fbdf8",
-			wantFormat: "lzcnt %rax, %rdi",
+			wantFormat: "lzcntq %rax, %rdi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asUnaryRmR(unaryRmROpcodeLzcnt, newOperandMem(newAmodeImmReg(123, raxVReg)), rdiVReg, true)
+			},
+			want:       "f3480fbd787b",
+			wantFormat: "lzcntq 123(%rax), %rdi",
 		},
 		// popcnt
 		{
 			setup:      func(i *instruction) { i.asUnaryRmR(unaryRmROpcodePopcnt, newOperandReg(raxVReg), rdiVReg, true) },
 			want:       "f3480fb8f8",
-			wantFormat: "popcnt %rax, %rdi",
+			wantFormat: "popcntq %rax, %rdi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asUnaryRmR(unaryRmROpcodePopcnt, newOperandMem(newAmodeImmReg(123, raxVReg)), rdiVReg, true)
+			},
+			want:       "f3480fb8787b",
+			wantFormat: "popcntq 123(%rax), %rdi",
 		},
 		// addss
 		{

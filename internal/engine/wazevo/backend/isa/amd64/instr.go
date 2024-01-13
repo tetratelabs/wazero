@@ -68,7 +68,13 @@ func (i *instruction) String() string {
 	case xmmUnaryRmR:
 		return fmt.Sprintf("%s %s, %s", sseOpcode(i.u1), i.op1.format(i.b1), i.op2.format(i.b1))
 	case unaryRmR:
-		return fmt.Sprintf("%s %s, %s", unaryRmROpcode(i.u1), i.op1.format(i.b1), i.op2.format(i.b1))
+		var suffix string
+		if i.b1 {
+			suffix = "q"
+		} else {
+			suffix = "l"
+		}
+		return fmt.Sprintf("%s%s %s, %s", unaryRmROpcode(i.u1), suffix, i.op1.format(i.b1), i.op2.format(i.b1))
 	case not:
 		var op string
 		if i.b1 {
