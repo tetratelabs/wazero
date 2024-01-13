@@ -52,7 +52,7 @@ type MemoryInstance struct {
 
 	// Mux is used in interpreter mode to prevent overlapping calls to atomic instructions,
 	// introduced with WebAssembly threads proposal.
-	Mux sync.RWMutex
+	Mux sync.Mutex
 
 	// waiters implements atomic wait and notify. It is implemented similarly to golang.org/x/sync/semaphore,
 	// with a fixed weight of 1 and no spurious notifications.
@@ -304,8 +304,9 @@ func (m *MemoryInstance) Wait32(offset uint32, exp uint32, timeout int64) uint64
 	w.mux.Lock()
 
 	addr := unsafe.Add(unsafe.Pointer(&m.Buffer[0]), offset)
-	// Must be atomic even though we have the lock since it can be modified
-	// concurrently by a non-wait instruction.
+	// Must be atomic since it can be modified by a different thread and we need to
+	// read the latest value. In interpreter mode, the value will be committed when
+	// unlocking Mux, in compiler mode the write will have been an atomic write.
 	cur := atomic.LoadUint32((*uint32)(addr))
 	if cur != exp {
 		w.mux.Unlock()
