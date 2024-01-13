@@ -7,7 +7,6 @@ import (
 	"math"
 	"reflect"
 	"sync"
-	"sync/atomic"
 	"time"
 	"unsafe"
 
@@ -299,15 +298,11 @@ func (m *MemoryInstance) writeUint64Le(offset uint32, v uint64) bool {
 }
 
 // Wait32 suspends the caller until the offset is notified by a different agent.
-func (m *MemoryInstance) Wait32(offset uint32, exp uint32, timeout int64) uint64 {
+func (m *MemoryInstance) Wait32(offset uint32, exp uint32, timeout int64, reader func(mem *MemoryInstance, offset uint32) uint32) uint64 {
 	w := m.getWaiters(offset)
 	w.mux.Lock()
 
-	addr := unsafe.Add(unsafe.Pointer(&m.Buffer[0]), offset)
-	// Must be atomic since it can be modified by a different thread and we need to
-	// read the latest value. In interpreter mode, the value will be committed when
-	// unlocking Mux, in compiler mode the write will have been an atomic write.
-	cur := atomic.LoadUint32((*uint32)(addr))
+	cur := reader(m, offset)
 	if cur != exp {
 		w.mux.Unlock()
 		return 1
@@ -317,14 +312,11 @@ func (m *MemoryInstance) Wait32(offset uint32, exp uint32, timeout int64) uint64
 }
 
 // Wait64 suspends the caller until the offset is notified by a different agent.
-func (m *MemoryInstance) Wait64(offset uint32, exp uint64, timeout int64) uint64 {
+func (m *MemoryInstance) Wait64(offset uint32, exp uint64, timeout int64, reader func(mem *MemoryInstance, offset uint32) uint64) uint64 {
 	w := m.getWaiters(offset)
 	w.mux.Lock()
 
-	addr := unsafe.Add(unsafe.Pointer(&m.Buffer[0]), offset)
-	// Must be atomic even though we have the lock since it can be modified
-	// concurrently by a non-wait instruction.
-	cur := atomic.LoadUint64((*uint64)(addr))
+	cur := reader(m, offset)
 	if cur != exp {
 		w.mux.Unlock()
 		return 1

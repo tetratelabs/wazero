@@ -3906,21 +3906,34 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			if !memoryInst.Shared {
 				panic(wasmruntime.ErrRuntimeExpectedSharedMemory)
 			}
-			if int(offset) >= len(memoryInst.Buffer) {
-				panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
-			}
 
 			switch wazeroir.UnsignedType(op.B1) {
 			case wazeroir.UnsignedTypeI32:
 				if offset%4 != 0 {
 					panic(wasmruntime.ErrRuntimeUnalignedAtomic)
 				}
-				ce.pushValue(memoryInst.Wait32(offset, uint32(exp), timeout))
+				if int(offset) > len(memoryInst.Buffer)-4 {
+					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+				}
+				ce.pushValue(memoryInst.Wait32(offset, uint32(exp), timeout, func(mem *wasm.MemoryInstance, offset uint32) uint32 {
+					mem.Mux.Lock()
+					defer mem.Mux.Unlock()
+					value, _ := mem.ReadUint32Le(offset)
+					return value
+				}))
 			case wazeroir.UnsignedTypeI64:
 				if offset%8 != 0 {
 					panic(wasmruntime.ErrRuntimeUnalignedAtomic)
 				}
-				ce.pushValue(memoryInst.Wait64(offset, exp, timeout))
+				if int(offset) > len(memoryInst.Buffer)-8 {
+					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+				}
+				ce.pushValue(memoryInst.Wait64(offset, exp, timeout, func(mem *wasm.MemoryInstance, offset uint32) uint64 {
+					mem.Mux.Lock()
+					defer mem.Mux.Unlock()
+					value, _ := mem.ReadUint64Le(offset)
+					return value
+				}))
 			}
 			frame.pc++
 		case wazeroir.OperationKindAtomicMemoryNotify:

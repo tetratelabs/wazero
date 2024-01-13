@@ -800,6 +800,10 @@ func BenchmarkWriteString(b *testing.B) {
 }
 
 func TestMemoryInstance_WaitNotifyOnce(t *testing.T) {
+	reader := func(mem *MemoryInstance, offset uint32) uint32 {
+		val, _ := mem.ReadUint32Le(offset)
+		return val
+	}
 	t.Run("no waiters", func(t *testing.T) {
 		mem := &MemoryInstance{Buffer: []byte{0, 0, 0, 0, 16, 0, 0, 0}, Min: 1, Shared: true}
 
@@ -813,7 +817,7 @@ func TestMemoryInstance_WaitNotifyOnce(t *testing.T) {
 		// Reuse same offset 3 times to verify reuse
 		for i := 0; i < 3; i++ {
 			go func() {
-				res := mem.Wait32(0, 0, -1)
+				res := mem.Wait32(0, 0, -1, reader)
 				propagateWaitResult(t, ch, res)
 			}()
 
@@ -830,11 +834,11 @@ func TestMemoryInstance_WaitNotifyOnce(t *testing.T) {
 
 		ch := make(chan string)
 		go func() {
-			res := mem.Wait32(0, 0, -1)
+			res := mem.Wait32(0, 0, -1, reader)
 			propagateWaitResult(t, ch, res)
 		}()
 		go func() {
-			res := mem.Wait32(0, 0, -1)
+			res := mem.Wait32(0, 0, -1, reader)
 			propagateWaitResult(t, ch, res)
 		}()
 
@@ -850,11 +854,11 @@ func TestMemoryInstance_WaitNotifyOnce(t *testing.T) {
 
 		ch := make(chan string)
 		go func() {
-			res := mem.Wait32(0, 0, -1)
+			res := mem.Wait32(0, 0, -1, reader)
 			propagateWaitResult(t, ch, res)
 		}()
 		go func() {
-			res := mem.Wait32(0, 0, -1)
+			res := mem.Wait32(0, 0, -1, reader)
 			propagateWaitResult(t, ch, res)
 		}()
 
@@ -871,11 +875,11 @@ func TestMemoryInstance_WaitNotifyOnce(t *testing.T) {
 
 		ch := make(chan string)
 		go func() {
-			res := mem.Wait32(0, 0, -1)
+			res := mem.Wait32(0, 0, -1, reader)
 			propagateWaitResult(t, ch, res)
 		}()
 		go func() {
-			res := mem.Wait32(1, 268435456, -1)
+			res := mem.Wait32(1, 268435456, -1, reader)
 			propagateWaitResult(t, ch, res)
 		}()
 
@@ -892,7 +896,7 @@ func TestMemoryInstance_WaitNotifyOnce(t *testing.T) {
 
 		ch := make(chan string)
 		go func() {
-			res := mem.Wait32(0, 0, 10 /* ns */)
+			res := mem.Wait32(0, 0, 10 /* ns */, reader)
 			propagateWaitResult(t, ch, res)
 		}()
 
