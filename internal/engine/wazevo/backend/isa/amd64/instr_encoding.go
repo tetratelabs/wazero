@@ -1061,7 +1061,7 @@ func (r regEnc) encoding() byte {
 }
 
 func regRexBit(r byte) byte {
-	return r >> 3 & 1
+	return r >> 3
 }
 
 func regEncoding(r byte) byte {
