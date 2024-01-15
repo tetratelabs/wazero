@@ -1866,7 +1866,7 @@ func TestInstruction_format_encode(t *testing.T) {
 				a := newOperandMem(newAmodeImmReg(1<<20, raxVReg))
 				i.asMovRM(rdiVReg, a, 1)
 			},
-			want:       "88b800001000",
+			want:       "4088b800001000",
 			wantFormat: "mov.b %rdi, 1048576(%rax)",
 		},
 		{
@@ -2104,6 +2104,658 @@ func TestInstruction_format_encode(t *testing.T) {
 			},
 			want:       "48c1ff80",
 			wantFormat: "sarq $128, %rdi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmiReg(sseOpcodePsllw, newOperandImm32(128), xmm11VReg)
+			},
+			want:       "66410f71f380",
+			wantFormat: "psllw $128, %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmiReg(sseOpcodePslld, newOperandImm32(128), xmm11VReg)
+			},
+			want:       "66410f72f380",
+			wantFormat: "pslld $128, %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmiReg(sseOpcodePsllq, newOperandImm32(128), xmm11VReg)
+			},
+			want:       "66410f73f380",
+			wantFormat: "psllq $128, %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmiReg(sseOpcodePsraw, newOperandImm32(128), xmm11VReg)
+			},
+			want:       "66410f71e380",
+			wantFormat: "psraw $128, %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmiReg(sseOpcodePsrad, newOperandImm32(128), xmm11VReg)
+			},
+			want:       "66410f72e380",
+			wantFormat: "psrad $128, %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmiReg(sseOpcodePsrlw, newOperandImm32(128), xmm11VReg)
+			},
+			want:       "66410f71d380",
+			wantFormat: "psrlw $128, %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmiReg(sseOpcodePsrld, newOperandImm32(128), xmm11VReg)
+			},
+			want:       "66410f72d380",
+			wantFormat: "psrld $128, %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmiReg(sseOpcodePsrlq, newOperandImm32(128), xmm11VReg)
+			},
+			want:       "66410f73d380",
+			wantFormat: "psrlq $128, %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmiReg(sseOpcodePsllw, newOperandReg(xmm13VReg), xmm11VReg)
+			},
+			want:       "66450ff1dd",
+			wantFormat: "psllw %xmm13, %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmiReg(sseOpcodePslld, newOperandReg(xmm13VReg), xmm11VReg)
+			},
+			want:       "66450ff2dd",
+			wantFormat: "pslld %xmm13, %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmiReg(sseOpcodePsllq, newOperandReg(xmm13VReg), xmm11VReg)
+			},
+			want:       "66450ff3dd",
+			wantFormat: "psllq %xmm13, %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmiReg(sseOpcodePsraw, newOperandReg(xmm13VReg), xmm11VReg)
+			},
+			want:       "66450fe1dd",
+			wantFormat: "psraw %xmm13, %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmiReg(sseOpcodePsrad, newOperandReg(xmm13VReg), xmm11VReg)
+			},
+			want:       "66450fe2dd",
+			wantFormat: "psrad %xmm13, %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmiReg(sseOpcodePsrlw, newOperandReg(xmm13VReg), xmm11VReg)
+			},
+			want:       "66450fd1dd",
+			wantFormat: "psrlw %xmm13, %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmiReg(sseOpcodePsrld, newOperandReg(xmm13VReg), xmm11VReg)
+			},
+			want:       "66450fd2dd",
+			wantFormat: "psrld %xmm13, %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmiReg(sseOpcodePsrlq, newOperandReg(xmm13VReg), xmm11VReg)
+			},
+			want:       "66450fd3dd",
+			wantFormat: "psrlq %xmm13, %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmiReg(sseOpcodePsllw, newOperandMem(newAmodeImmReg(128, r13VReg)), xmm11VReg)
+			},
+			want:       "66450ff19d80000000",
+			wantFormat: "psllw 128(%r13), %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmiReg(sseOpcodePslld, newOperandMem(newAmodeImmReg(128, r13VReg)), xmm11VReg)
+			},
+			want:       "66450ff29d80000000",
+			wantFormat: "pslld 128(%r13), %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmiReg(sseOpcodePsllq, newOperandMem(newAmodeImmReg(128, r13VReg)), xmm11VReg)
+			},
+			want:       "66450ff39d80000000",
+			wantFormat: "psllq 128(%r13), %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmiReg(sseOpcodePsraw, newOperandMem(newAmodeImmReg(128, r13VReg)), xmm11VReg)
+			},
+			want:       "66450fe19d80000000",
+			wantFormat: "psraw 128(%r13), %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmiReg(sseOpcodePsrad, newOperandMem(newAmodeImmReg(128, r13VReg)), xmm11VReg)
+			},
+			want:       "66450fe29d80000000",
+			wantFormat: "psrad 128(%r13), %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmiReg(sseOpcodePsrlw, newOperandMem(newAmodeImmReg(128, r13VReg)), xmm11VReg)
+			},
+			want:       "66450fd19d80000000",
+			wantFormat: "psrlw 128(%r13), %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmiReg(sseOpcodePsrld, newOperandMem(newAmodeImmReg(128, r13VReg)), xmm11VReg)
+			},
+			want:       "66450fd29d80000000",
+			wantFormat: "psrld 128(%r13), %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmiReg(sseOpcodePsrlq, newOperandMem(newAmodeImmReg(128, r13VReg)), xmm11VReg)
+			},
+			want:       "66450fd39d80000000",
+			wantFormat: "psrlq 128(%r13), %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asCmpRmiR(true, newOperandReg(r13VReg), rdiVReg, true)
+			},
+			want:       "4c39ef",
+			wantFormat: "cmpq %r13, %rdi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asCmpRmiR(false, newOperandReg(r13VReg), rdiVReg, true)
+			},
+			want:       "4c85ef",
+			wantFormat: "testq %r13, %rdi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asCmpRmiR(true, newOperandReg(r13VReg), rdiVReg, false)
+			},
+			want:       "4439ef",
+			wantFormat: "cmpl %r13d, %edi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asCmpRmiR(false, newOperandReg(r13VReg), rdiVReg, false)
+			},
+			want:       "4485ef",
+			wantFormat: "testl %r13d, %edi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asCmpRmiR(true, newOperandMem(newAmodeImmReg(128, r13VReg)), rdiVReg, true)
+			},
+			want:       "493bbd80000000",
+			wantFormat: "cmpq 128(%r13), %rdi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asCmpRmiR(false, newOperandMem(newAmodeImmReg(128, r13VReg)), rdiVReg, true)
+			},
+			want:       "4985bd80000000",
+			wantFormat: "testq %rdi, 128(%r13)",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asCmpRmiR(true, newOperandMem(newAmodeImmReg(128, r13VReg)), rdiVReg, false)
+			},
+			want:       "413bbd80000000",
+			wantFormat: "cmpl 128(%r13), %edi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asCmpRmiR(false, newOperandMem(newAmodeImmReg(128, r13VReg)), rdiVReg, false)
+			},
+			want:       "4185bd80000000",
+			wantFormat: "testl %edi, 128(%r13)",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asCmpRmiR(true, newOperandImm32(128), rdiVReg, true)
+			},
+			want:       "4881ff80000000",
+			wantFormat: "cmpq $128, %rdi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asCmpRmiR(false, newOperandImm32(128), rdiVReg, true)
+			},
+			want:       "48f7c780000000",
+			wantFormat: "testq $128, %rdi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asCmpRmiR(true, newOperandImm32(128), rdiVReg, false)
+			},
+			want:       "81ff80000000",
+			wantFormat: "cmpl $128, %edi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asCmpRmiR(false, newOperandImm32(128), rdiVReg, false)
+			},
+			want:       "f7c780000000",
+			wantFormat: "testl $128, %edi",
+		},
+		{
+			setup:      func(i *instruction) { i.asSetcc(condO, rsiVReg) },
+			want:       "400f90c6",
+			wantFormat: "seto %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asSetcc(condNO, rsiVReg) },
+			want:       "400f91c6",
+			wantFormat: "setno %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asSetcc(condB, rsiVReg) },
+			want:       "400f92c6",
+			wantFormat: "setb %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asSetcc(condNB, rsiVReg) },
+			want:       "400f93c6",
+			wantFormat: "setnb %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asSetcc(condZ, rsiVReg) },
+			want:       "400f94c6",
+			wantFormat: "setz %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asSetcc(condNZ, rsiVReg) },
+			want:       "400f95c6",
+			wantFormat: "setnz %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asSetcc(condBE, rsiVReg) },
+			want:       "400f96c6",
+			wantFormat: "setbe %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asSetcc(condNBE, rsiVReg) },
+			want:       "400f97c6",
+			wantFormat: "setnbe %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asSetcc(condS, rsiVReg) },
+			want:       "400f98c6",
+			wantFormat: "sets %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asSetcc(condNS, rsiVReg) },
+			want:       "400f99c6",
+			wantFormat: "setns %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asSetcc(condP, rsiVReg) },
+			want:       "400f9ac6",
+			wantFormat: "setp %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asSetcc(condNP, rsiVReg) },
+			want:       "400f9bc6",
+			wantFormat: "setnp %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asSetcc(condL, rsiVReg) },
+			want:       "400f9cc6",
+			wantFormat: "setl %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asSetcc(condNL, rsiVReg) },
+			want:       "400f9dc6",
+			wantFormat: "setnl %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asSetcc(condLE, rsiVReg) },
+			want:       "400f9ec6",
+			wantFormat: "setle %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asSetcc(condNLE, rsiVReg) },
+			want:       "400f9fc6",
+			wantFormat: "setnle %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condO, newOperandReg(rdiVReg), rsiVReg, true) },
+			want:       "480f40f7",
+			wantFormat: "cmovoq %rdi, %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condNO, newOperandReg(rdiVReg), rsiVReg, true) },
+			want:       "480f41f7",
+			wantFormat: "cmovnoq %rdi, %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condB, newOperandReg(rdiVReg), rsiVReg, true) },
+			want:       "480f42f7",
+			wantFormat: "cmovbq %rdi, %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condNB, newOperandReg(rdiVReg), rsiVReg, true) },
+			want:       "480f43f7",
+			wantFormat: "cmovnbq %rdi, %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condZ, newOperandReg(rdiVReg), rsiVReg, true) },
+			want:       "480f44f7",
+			wantFormat: "cmovzq %rdi, %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condNZ, newOperandReg(rdiVReg), rsiVReg, true) },
+			want:       "480f45f7",
+			wantFormat: "cmovnzq %rdi, %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condBE, newOperandReg(rdiVReg), rsiVReg, true) },
+			want:       "480f46f7",
+			wantFormat: "cmovbeq %rdi, %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condNBE, newOperandReg(rdiVReg), rsiVReg, true) },
+			want:       "480f47f7",
+			wantFormat: "cmovnbeq %rdi, %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condS, newOperandReg(rdiVReg), rsiVReg, true) },
+			want:       "480f48f7",
+			wantFormat: "cmovsq %rdi, %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condNS, newOperandReg(rdiVReg), rsiVReg, true) },
+			want:       "480f49f7",
+			wantFormat: "cmovnsq %rdi, %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condP, newOperandReg(rdiVReg), rsiVReg, true) },
+			want:       "480f4af7",
+			wantFormat: "cmovpq %rdi, %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condNP, newOperandReg(rdiVReg), rsiVReg, true) },
+			want:       "480f4bf7",
+			wantFormat: "cmovnpq %rdi, %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condL, newOperandReg(rdiVReg), rsiVReg, true) },
+			want:       "480f4cf7",
+			wantFormat: "cmovlq %rdi, %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condNL, newOperandReg(rdiVReg), rsiVReg, true) },
+			want:       "480f4df7",
+			wantFormat: "cmovnlq %rdi, %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condLE, newOperandReg(rdiVReg), rsiVReg, true) },
+			want:       "480f4ef7",
+			wantFormat: "cmovleq %rdi, %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condNLE, newOperandReg(rdiVReg), rsiVReg, true) },
+			want:       "480f4ff7",
+			wantFormat: "cmovnleq %rdi, %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condO, newOperandReg(rdiVReg), rsiVReg, false) },
+			want:       "0f40f7",
+			wantFormat: "cmovol %edi, %esi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condNO, newOperandReg(rdiVReg), rsiVReg, false) },
+			want:       "0f41f7",
+			wantFormat: "cmovnol %edi, %esi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condB, newOperandReg(rdiVReg), rsiVReg, false) },
+			want:       "0f42f7",
+			wantFormat: "cmovbl %edi, %esi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condNB, newOperandReg(rdiVReg), rsiVReg, false) },
+			want:       "0f43f7",
+			wantFormat: "cmovnbl %edi, %esi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condZ, newOperandReg(rdiVReg), rsiVReg, false) },
+			want:       "0f44f7",
+			wantFormat: "cmovzl %edi, %esi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condNZ, newOperandReg(rdiVReg), rsiVReg, false) },
+			want:       "0f45f7",
+			wantFormat: "cmovnzl %edi, %esi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condBE, newOperandReg(rdiVReg), rsiVReg, false) },
+			want:       "0f46f7",
+			wantFormat: "cmovbel %edi, %esi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condNBE, newOperandReg(rdiVReg), rsiVReg, false) },
+			want:       "0f47f7",
+			wantFormat: "cmovnbel %edi, %esi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condS, newOperandReg(rdiVReg), rsiVReg, false) },
+			want:       "0f48f7",
+			wantFormat: "cmovsl %edi, %esi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condNS, newOperandReg(rdiVReg), rsiVReg, false) },
+			want:       "0f49f7",
+			wantFormat: "cmovnsl %edi, %esi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condP, newOperandReg(rdiVReg), rsiVReg, false) },
+			want:       "0f4af7",
+			wantFormat: "cmovpl %edi, %esi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condNP, newOperandReg(rdiVReg), rsiVReg, false) },
+			want:       "0f4bf7",
+			wantFormat: "cmovnpl %edi, %esi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condL, newOperandReg(rdiVReg), rsiVReg, false) },
+			want:       "0f4cf7",
+			wantFormat: "cmovll %edi, %esi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condNL, newOperandReg(rdiVReg), rsiVReg, false) },
+			want:       "0f4df7",
+			wantFormat: "cmovnll %edi, %esi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condLE, newOperandReg(rdiVReg), rsiVReg, false) },
+			want:       "0f4ef7",
+			wantFormat: "cmovlel %edi, %esi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condNLE, newOperandReg(rdiVReg), rsiVReg, false) },
+			want:       "0f4ff7",
+			wantFormat: "cmovnlel %edi, %esi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condO, newOperandMem(newAmodeImmReg(123, raxVReg)), rsiVReg, true) },
+			want:       "480f40707b",
+			wantFormat: "cmovoq 123(%rax), %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condNO, newOperandMem(newAmodeImmReg(123, raxVReg)), rsiVReg, true) },
+			want:       "480f41707b",
+			wantFormat: "cmovnoq 123(%rax), %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condB, newOperandMem(newAmodeImmReg(123, raxVReg)), rsiVReg, true) },
+			want:       "480f42707b",
+			wantFormat: "cmovbq 123(%rax), %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condNB, newOperandMem(newAmodeImmReg(123, raxVReg)), rsiVReg, true) },
+			want:       "480f43707b",
+			wantFormat: "cmovnbq 123(%rax), %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condZ, newOperandMem(newAmodeImmReg(123, raxVReg)), rsiVReg, true) },
+			want:       "480f44707b",
+			wantFormat: "cmovzq 123(%rax), %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condNZ, newOperandMem(newAmodeImmReg(123, raxVReg)), rsiVReg, true) },
+			want:       "480f45707b",
+			wantFormat: "cmovnzq 123(%rax), %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condBE, newOperandMem(newAmodeImmReg(123, raxVReg)), rsiVReg, true) },
+			want:       "480f46707b",
+			wantFormat: "cmovbeq 123(%rax), %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condNBE, newOperandMem(newAmodeImmReg(123, raxVReg)), rsiVReg, true) },
+			want:       "480f47707b",
+			wantFormat: "cmovnbeq 123(%rax), %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condS, newOperandMem(newAmodeImmReg(123, raxVReg)), rsiVReg, true) },
+			want:       "480f48707b",
+			wantFormat: "cmovsq 123(%rax), %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condNS, newOperandMem(newAmodeImmReg(123, raxVReg)), rsiVReg, true) },
+			want:       "480f49707b",
+			wantFormat: "cmovnsq 123(%rax), %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condP, newOperandMem(newAmodeImmReg(123, raxVReg)), rsiVReg, true) },
+			want:       "480f4a707b",
+			wantFormat: "cmovpq 123(%rax), %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condNP, newOperandMem(newAmodeImmReg(123, raxVReg)), rsiVReg, true) },
+			want:       "480f4b707b",
+			wantFormat: "cmovnpq 123(%rax), %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condL, newOperandMem(newAmodeImmReg(123, raxVReg)), rsiVReg, true) },
+			want:       "480f4c707b",
+			wantFormat: "cmovlq 123(%rax), %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condNL, newOperandMem(newAmodeImmReg(123, raxVReg)), rsiVReg, true) },
+			want:       "480f4d707b",
+			wantFormat: "cmovnlq 123(%rax), %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condLE, newOperandMem(newAmodeImmReg(123, raxVReg)), rsiVReg, true) },
+			want:       "480f4e707b",
+			wantFormat: "cmovleq 123(%rax), %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condNLE, newOperandMem(newAmodeImmReg(123, raxVReg)), rsiVReg, true) },
+			want:       "480f4f707b",
+			wantFormat: "cmovnleq 123(%rax), %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condO, newOperandMem(newAmodeImmReg(123, raxVReg)), rsiVReg, false) },
+			want:       "0f40707b",
+			wantFormat: "cmovol 123(%rax), %esi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condNO, newOperandMem(newAmodeImmReg(123, raxVReg)), rsiVReg, false) },
+			want:       "0f41707b",
+			wantFormat: "cmovnol 123(%rax), %esi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condB, newOperandMem(newAmodeImmReg(123, raxVReg)), rsiVReg, false) },
+			want:       "0f42707b",
+			wantFormat: "cmovbl 123(%rax), %esi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condNB, newOperandMem(newAmodeImmReg(123, raxVReg)), rsiVReg, false) },
+			want:       "0f43707b",
+			wantFormat: "cmovnbl 123(%rax), %esi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condZ, newOperandMem(newAmodeImmReg(123, raxVReg)), rsiVReg, false) },
+			want:       "0f44707b",
+			wantFormat: "cmovzl 123(%rax), %esi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condNZ, newOperandMem(newAmodeImmReg(123, raxVReg)), rsiVReg, false) },
+			want:       "0f45707b",
+			wantFormat: "cmovnzl 123(%rax), %esi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condBE, newOperandMem(newAmodeImmReg(123, raxVReg)), rsiVReg, false) },
+			want:       "0f46707b",
+			wantFormat: "cmovbel 123(%rax), %esi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condNBE, newOperandMem(newAmodeImmReg(123, raxVReg)), rsiVReg, false) },
+			want:       "0f47707b",
+			wantFormat: "cmovnbel 123(%rax), %esi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condS, newOperandMem(newAmodeImmReg(123, raxVReg)), rsiVReg, false) },
+			want:       "0f48707b",
+			wantFormat: "cmovsl 123(%rax), %esi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condNS, newOperandMem(newAmodeImmReg(123, raxVReg)), rsiVReg, false) },
+			want:       "0f49707b",
+			wantFormat: "cmovnsl 123(%rax), %esi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condP, newOperandMem(newAmodeImmReg(123, raxVReg)), rsiVReg, false) },
+			want:       "0f4a707b",
+			wantFormat: "cmovpl 123(%rax), %esi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condNP, newOperandMem(newAmodeImmReg(123, raxVReg)), rsiVReg, false) },
+			want:       "0f4b707b",
+			wantFormat: "cmovnpl 123(%rax), %esi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condL, newOperandMem(newAmodeImmReg(123, raxVReg)), rsiVReg, false) },
+			want:       "0f4c707b",
+			wantFormat: "cmovll 123(%rax), %esi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condNL, newOperandMem(newAmodeImmReg(123, raxVReg)), rsiVReg, false) },
+			want:       "0f4d707b",
+			wantFormat: "cmovnll 123(%rax), %esi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condLE, newOperandMem(newAmodeImmReg(123, raxVReg)), rsiVReg, false) },
+			want:       "0f4e707b",
+			wantFormat: "cmovlel 123(%rax), %esi",
+		},
+		{
+			setup:      func(i *instruction) { i.asCmove(condNLE, newOperandMem(newAmodeImmReg(123, raxVReg)), rsiVReg, false) },
+			want:       "0f4f707b",
+			wantFormat: "cmovnlel 123(%rax), %esi",
 		},
 	} {
 		tc := tc

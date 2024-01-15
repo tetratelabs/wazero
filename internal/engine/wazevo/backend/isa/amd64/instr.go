@@ -141,13 +141,34 @@ func (i *instruction) String() string {
 		}
 		return fmt.Sprintf("%s%s %s, %s", shiftROp(i.u1), suffix, i.op1.format(false), i.op2.format(i.b1))
 	case xmmRmiReg:
-		panic("TODO")
+		return fmt.Sprintf("%s %s, %s", sseOpcode(i.u1), i.op1.format(true), i.op2.format(true))
 	case cmpRmiR:
-		panic("TODO")
+		var op, suffix string
+		if i.u1 != 0 {
+			op = "cmp"
+		} else {
+			op = "test"
+		}
+		if i.b1 {
+			suffix = "q"
+		} else {
+			suffix = "l"
+		}
+		if op == "test" && i.op1.kind == operandKindMem {
+			// Print consistently with AT&T syntax.
+			return fmt.Sprintf("%s%s %s, %s", op, suffix, i.op2.format(i.b1), i.op1.format(i.b1))
+		}
+		return fmt.Sprintf("%s%s %s, %s", op, suffix, i.op1.format(i.b1), i.op2.format(i.b1))
 	case setcc:
-		panic("TODO")
+		return fmt.Sprintf("set%s %s", cond(i.u1), i.op1.format(true))
 	case cmove:
-		panic("TODO")
+		var suffix string
+		if i.b1 {
+			suffix = "q"
+		} else {
+			suffix = "l"
+		}
+		return fmt.Sprintf("cmov%s%s %s, %s", cond(i.u1), suffix, i.op1.format(i.b1), i.op2.format(i.b1))
 	case push64:
 		return fmt.Sprintf("pushq %s", i.op1.format(true))
 	case pop64:
@@ -782,6 +803,47 @@ func (i *instruction) asShiftR(op shiftROp, amount operand, rd regalloc.VReg, _6
 	i.op1 = amount
 	i.op2 = newOperandReg(rd)
 	i.u1 = uint64(op)
+	i.b1 = _64
+	return i
+}
+
+func (i *instruction) asXmmRmiReg(op sseOpcode, rm operand, rd regalloc.VReg) *instruction {
+	if rm.kind != operandKindReg && rm.kind != operandKindImm32 && rm.kind != operandKindMem {
+		panic("BUG")
+	}
+	i.kind = xmmRmiReg
+	i.op1 = rm
+	i.op2 = newOperandReg(rd)
+	i.u1 = uint64(op)
+	return i
+}
+
+func (i *instruction) asCmpRmiR(cmpOrTest bool, rm operand, rd regalloc.VReg, _64 bool) *instruction {
+	if rm.kind != operandKindReg && rm.kind != operandKindImm32 && rm.kind != operandKindMem {
+		panic("BUG")
+	}
+	i.kind = cmpRmiR
+	i.op1 = rm
+	i.op2 = newOperandReg(rd)
+	if cmpOrTest {
+		i.u1 = 1
+	}
+	i.b1 = _64
+	return i
+}
+
+func (i *instruction) asSetcc(c cond, rd regalloc.VReg) *instruction {
+	i.kind = setcc
+	i.op1 = newOperandReg(rd)
+	i.u1 = uint64(c)
+	return i
+}
+
+func (i *instruction) asCmove(c cond, rm operand, rd regalloc.VReg, _64 bool) *instruction {
+	i.kind = cmove
+	i.op1 = rm
+	i.op2 = newOperandReg(rd)
+	i.u1 = uint64(c)
 	i.b1 = _64
 	return i
 }

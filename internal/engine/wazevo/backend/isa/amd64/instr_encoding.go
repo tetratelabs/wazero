@@ -672,13 +672,158 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 			panic("BUG: invalid operand kind")
 		}
 	case xmmRmiReg:
-		panic("TODO")
+		const legPrefix = legacyPrefixes0x66
+		rex := rexInfo(0).clearW()
+		dst := regEncodings[i.op2.r.RealReg()]
+
+		var opcode uint32
+		var regDigit uint8
+
+		op := sseOpcode(i.u1)
+		op1 := i.op1
+		if i.op1.kind == operandKindImm32 {
+			switch op {
+			case sseOpcodePsllw:
+				opcode, regDigit = 0x0f71, 6
+			case sseOpcodePslld:
+				opcode, regDigit = 0x0f72, 6
+			case sseOpcodePsllq:
+				opcode, regDigit = 0x0f73, 6
+			case sseOpcodePsraw:
+				opcode, regDigit = 0x0f71, 4
+			case sseOpcodePsrad:
+				opcode, regDigit = 0x0f72, 4
+			case sseOpcodePsrlw:
+				opcode, regDigit = 0x0f71, 2
+			case sseOpcodePsrld:
+				opcode, regDigit = 0x0f72, 2
+			case sseOpcodePsrlq:
+				opcode, regDigit = 0x0f73, 2
+			default:
+				panic("invalid opcode")
+			}
+
+			encodeEncEnc(c, legPrefix, opcode, 2, regDigit, uint8(dst), rex)
+			imm32 := op1.imm32
+			if imm32 > 0xff&imm32 {
+				panic("immediate value does not fit 1 byte")
+			}
+			c.EmitByte(uint8(imm32))
+		} else {
+			switch op {
+			case sseOpcodePsllw:
+				opcode = 0x0ff1
+			case sseOpcodePslld:
+				opcode = 0x0ff2
+			case sseOpcodePsllq:
+				opcode = 0x0ff3
+			case sseOpcodePsraw:
+				opcode = 0x0fe1
+			case sseOpcodePsrad:
+				opcode = 0x0fe2
+			case sseOpcodePsrlw:
+				opcode = 0x0fd1
+			case sseOpcodePsrld:
+				opcode = 0x0fd2
+			case sseOpcodePsrlq:
+				opcode = 0x0fd3
+			default:
+				panic("invalid opcode")
+			}
+
+			if op1.kind == operandKindReg {
+				reg := regEncodings[op1.r.RealReg()]
+				encodeRegReg(c, legPrefix, opcode, 2, dst, reg, rex)
+			} else if op1.kind == operandKindMem {
+				m := op1.amode
+				encodeRegMem(c, legPrefix, opcode, 2, dst, m, rex)
+			} else {
+				panic("BUG: invalid operand kind")
+			}
+		}
+
 	case cmpRmiR:
-		panic("TODO")
+		var opcode uint32
+		isCmp := i.u1 != 0
+		rex := rexInfo(0)
+		_64 := i.b1
+		if _64 { // 64 bit.
+			rex = rex.setW()
+		} else {
+			rex = rex.clearW()
+		}
+		dst := regEncodings[i.op2.r.RealReg()]
+		op1 := i.op1
+		switch op1.kind {
+		case operandKindReg:
+			reg := regEncodings[op1.r.RealReg()]
+			if isCmp {
+				opcode = 0x39
+			} else {
+				opcode = 0x85
+			}
+			// Here we swap the encoding of the operands for CMP to be consistent with the output of LLVM/GCC.
+			encodeRegReg(c, legacyPrefixesNone, opcode, 1, reg, dst, rex)
+
+		case operandKindMem:
+			if isCmp {
+				opcode = 0x3b
+			} else {
+				opcode = 0x85
+			}
+			m := op1.amode
+			encodeRegMem(c, legacyPrefixesNone, opcode, 1, dst, m, rex)
+
+		case operandKindImm32:
+			imm32 := op1.imm32
+			useImm8 := isCmp && lower8willSignExtendTo32(imm32)
+			var subopcode uint8
+
+			switch {
+			case isCmp && useImm8:
+				opcode, subopcode = 0x83, 7
+			case isCmp && !useImm8:
+				opcode, subopcode = 0x81, 7
+			default:
+				opcode, subopcode = 0xf7, 0
+			}
+			encodeEncEnc(c, legacyPrefixesNone, opcode, 1, subopcode, uint8(dst), rex)
+			if useImm8 {
+				c.EmitByte(uint8(imm32))
+			} else {
+				c.Emit4Bytes(imm32)
+			}
+
+		default:
+			panic("BUG: invalid operand kind")
+		}
 	case setcc:
-		panic("TODO")
+		cc := cond(i.u1)
+		dst := regEncodings[i.op1.r.RealReg()]
+		rex := rexInfo(0).clearW().always()
+		opcode := uint32(0x0f90) + uint32(cc)
+		encodeEncEnc(c, legacyPrefixesNone, opcode, 2, 0, uint8(dst), rex)
 	case cmove:
-		panic("TODO")
+		cc := cond(i.u1)
+		dst := regEncodings[i.op2.r.RealReg()]
+		rex := rexInfo(0)
+		if i.b1 { // 64 bit.
+			rex = rex.setW()
+		} else {
+			rex = rex.clearW()
+		}
+		opcode := uint32(0x0f40) + uint32(cc)
+		src := i.op1
+		switch src.kind {
+		case operandKindReg:
+			srcReg := regEncodings[src.r.RealReg()]
+			encodeRegReg(c, legacyPrefixesNone, opcode, 2, dst, srcReg, rex)
+		case operandKindMem:
+			m := src.amode
+			encodeRegMem(c, legacyPrefixesNone, opcode, 2, dst, m, rex)
+		default:
+			panic("BUG: invalid operand kind")
+		}
 	case push64:
 		op := i.op1
 
@@ -869,7 +1014,7 @@ func encodeEncEnc(
 		opcodeNum--
 		c.EmitByte(byte((opcodes >> (opcodeNum << 3)) & 0xff))
 	}
-	c.EmitByte(encodeModRM(3, r&0x7, rm&0x7))
+	c.EmitByte(encodeModRM(3, r&7, rm&7))
 }
 
 func encodeRegReg(
@@ -1031,7 +1176,7 @@ func (ri rexInfo) encode(c backend.Compiler, r uint8, b uint8) {
 		w = 0x01
 	}
 	rex := rexEncodingDefault | w<<3 | r<<2 | b
-	if rex != rexEncodingDefault || ri&0x02 == 1 {
+	if rex != rexEncodingDefault || ri&0x02 != 0 {
 		c.EmitByte(rex)
 	}
 }
