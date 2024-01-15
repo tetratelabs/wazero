@@ -813,13 +813,13 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 			rex = rex.clearW()
 		}
 		opcode := uint32(0x0f40) + uint32(cc)
-		op1 := i.op1
-		switch op1.kind {
+		src := i.op1
+		switch src.kind {
 		case operandKindReg:
-			src := regEncodings[i.op1.r.RealReg()]
-			encodeRegReg(c, legacyPrefixesNone, opcode, 2, dst, src, rex)
+			srcReg := regEncodings[src.r.RealReg()]
+			encodeRegReg(c, legacyPrefixesNone, opcode, 2, dst, srcReg, rex)
 		case operandKindMem:
-			m := op1.amode
+			m := src.amode
 			encodeRegMem(c, legacyPrefixesNone, opcode, 2, dst, m, rex)
 		default:
 			panic("BUG: invalid operand kind")

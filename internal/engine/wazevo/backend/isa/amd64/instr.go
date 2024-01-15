@@ -840,8 +840,8 @@ func (i *instruction) asSetcc(c cond, rd regalloc.VReg) *instruction {
 
 func (i *instruction) asCmove(c cond, rm operand, rd regalloc.VReg, _64 bool) *instruction {
 	i.kind = cmove
-	i.op1 = newOperandReg(rd)
-	i.op2 = rm
+	i.op1 = rm
+	i.op2 = newOperandReg(rd)
 	i.u1 = uint64(c)
 	i.b1 = _64
 	return i
