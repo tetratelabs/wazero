@@ -68,15 +68,45 @@ func (i *instruction) String() string {
 	case xmmUnaryRmR:
 		return fmt.Sprintf("%s %s, %s", sseOpcode(i.u1), i.op1.format(i.b1), i.op2.format(i.b1))
 	case unaryRmR:
-		panic("TODO")
+		var suffix string
+		if i.b1 {
+			suffix = "q"
+		} else {
+			suffix = "l"
+		}
+		return fmt.Sprintf("%s%s %s, %s", unaryRmROpcode(i.u1), suffix, i.op1.format(i.b1), i.op2.format(i.b1))
 	case not:
-		panic("TODO")
+		var op string
+		if i.b1 {
+			op = "notq"
+		} else {
+			op = "notl"
+		}
+		return fmt.Sprintf("%s %s", op, i.op1.format(i.b1))
 	case neg:
-		panic("TODO")
+		var op string
+		if i.b1 {
+			op = "negq"
+		} else {
+			op = "negl"
+		}
+		return fmt.Sprintf("%s %s", op, i.op1.format(i.b1))
 	case div:
 		panic("TODO")
 	case mulHi:
-		panic("TODO")
+		signed, _64 := i.u1 != 0, i.b1
+		var op string
+		switch {
+		case signed && _64:
+			op = "imulq"
+		case !signed && _64:
+			op = "mulq"
+		case signed && !_64:
+			op = "imull"
+		case !signed && !_64:
+			op = "mull"
+		}
+		return fmt.Sprintf("%s %s", op, i.op1.format(i.b1))
 	case checkedDivOrRemSeq:
 		panic("TODO")
 	case signExtendData:
@@ -103,7 +133,13 @@ func (i *instruction) String() string {
 		}
 		return fmt.Sprintf("mov.%s %s, %s", suffix, i.op1.format(true), i.op2.format(true))
 	case shiftR:
-		panic("TODO")
+		var suffix string
+		if i.b1 {
+			suffix = "q"
+		} else {
+			suffix = "l"
+		}
+		return fmt.Sprintf("%s%s %s, %s", shiftROp(i.u1), suffix, i.op1.format(false), i.op2.format(i.b1))
 	case xmmRmiReg:
 		panic("TODO")
 	case cmpRmiR:
@@ -693,6 +729,63 @@ func (i *instruction) asMovRR(rm, rd regalloc.VReg, _64 bool) *instruction {
 	return i
 }
 
+func (i *instruction) asNot(rm operand, _64 bool) *instruction {
+	if rm.kind != operandKindReg && rm.kind != operandKindMem {
+		panic("BUG")
+	}
+	i.kind = not
+	i.op1 = rm
+	i.b1 = _64
+	return i
+}
+
+func (i *instruction) asNeg(rm operand, _64 bool) *instruction {
+	if rm.kind != operandKindReg && rm.kind != operandKindMem {
+		panic("BUG")
+	}
+	i.kind = neg
+	i.op1 = rm
+	i.b1 = _64
+	return i
+}
+
+func (i *instruction) asMulHi(rm operand, signed, _64 bool) *instruction {
+	if rm.kind != operandKindReg && (rm.kind != operandKindMem) {
+		panic("BUG")
+	}
+	i.kind = mulHi
+	i.op1 = rm
+	i.b1 = _64
+	if signed {
+		i.u1 = 1
+	}
+	return i
+}
+
+func (i *instruction) asUnaryRmR(op unaryRmROpcode, rm operand, rd regalloc.VReg, _64 bool) *instruction {
+	if rm.kind != operandKindReg && rm.kind != operandKindMem {
+		panic("BUG")
+	}
+	i.kind = unaryRmR
+	i.op1 = rm
+	i.op2 = newOperandReg(rd)
+	i.u1 = uint64(op)
+	i.b1 = _64
+	return i
+}
+
+func (i *instruction) asShiftR(op shiftROp, amount operand, rd regalloc.VReg, _64 bool) *instruction {
+	if amount.kind != operandKindReg && amount.kind != operandKindImm32 {
+		panic("BUG")
+	}
+	i.kind = shiftR
+	i.op1 = amount
+	i.op2 = newOperandReg(rd)
+	i.u1 = uint64(op)
+	i.b1 = _64
+	return i
+}
+
 func (i *instruction) asXmmUnaryRmR(op sseOpcode, rm operand, rd regalloc.VReg, _64 bool) *instruction {
 	if rm.kind != operandKindReg && rm.kind != operandKindMem {
 		panic("BUG")
@@ -729,6 +822,60 @@ func (i *instruction) asPush64(op operand) *instruction {
 	i.kind = push64
 	i.op1 = op
 	return i
+}
+
+type unaryRmROpcode byte
+
+const (
+	unaryRmROpcodeBsr unaryRmROpcode = iota
+	unaryRmROpcodeBsf
+	unaryRmROpcodeLzcnt
+	unaryRmROpcodeTzcnt
+	unaryRmROpcodePopcnt
+)
+
+func (u unaryRmROpcode) String() string {
+	switch u {
+	case unaryRmROpcodeBsr:
+		return "bsr"
+	case unaryRmROpcodeBsf:
+		return "bsf"
+	case unaryRmROpcodeLzcnt:
+		return "lzcnt"
+	case unaryRmROpcodeTzcnt:
+		return "tzcnt"
+	case unaryRmROpcodePopcnt:
+		return "popcnt"
+	default:
+		panic("BUG")
+	}
+}
+
+type shiftROp byte
+
+const (
+	shiftROpRotateLeft           = 0
+	shiftROpRotateRight          = 1
+	shiftROpShiftLeft            = 4
+	shiftROpShiftRightLogical    = 5
+	shiftROpShiftRightArithmetic = 7
+)
+
+func (s shiftROp) String() string {
+	switch s {
+	case shiftROpRotateLeft:
+		return "rol"
+	case shiftROpRotateRight:
+		return "ror"
+	case shiftROpShiftLeft:
+		return "shl"
+	case shiftROpShiftRightLogical:
+		return "shr"
+	case shiftROpShiftRightArithmetic:
+		return "sar"
+	default:
+		panic("BUG")
+	}
 }
 
 type sseOpcode byte

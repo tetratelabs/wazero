@@ -100,6 +100,196 @@ func TestInstruction_format_encode(t *testing.T) {
 			want:       "4d89dc",
 			wantFormat: "movq %r11, %r12",
 		},
+		{
+			setup:      func(i *instruction) { i.asNot(newOperandReg(raxVReg), false) },
+			want:       "f7d0",
+			wantFormat: "notl %eax",
+		},
+		{
+			setup:      func(i *instruction) { i.asNot(newOperandReg(raxVReg), true) },
+			want:       "48f7d0",
+			wantFormat: "notq %rax",
+		},
+		{
+			setup:      func(i *instruction) { i.asNeg(newOperandReg(raxVReg), false) },
+			want:       "f7d8",
+			wantFormat: "negl %eax",
+		},
+		{
+			setup:      func(i *instruction) { i.asNeg(newOperandReg(raxVReg), true) },
+			want:       "48f7d8",
+			wantFormat: "negq %rax",
+		},
+		{
+			setup:      func(i *instruction) { i.asMulHi(newOperandReg(rsiVReg), true, false) },
+			want:       "f7ee",
+			wantFormat: "imull %esi",
+		},
+		{
+			setup:      func(i *instruction) { i.asMulHi(newOperandReg(r14VReg), false, false) },
+			want:       "41f7e6",
+			wantFormat: "mull %r14d",
+		},
+		{
+			setup:      func(i *instruction) { i.asMulHi(newOperandReg(r15VReg), true, true) },
+			want:       "49f7ef",
+			wantFormat: "imulq %r15",
+		},
+		{
+			setup:      func(i *instruction) { i.asMulHi(newOperandReg(rdiVReg), false, true) },
+			want:       "48f7e7",
+			wantFormat: "mulq %rdi",
+		},
+		{
+			setup:      func(i *instruction) { i.asMulHi(newOperandMem(newAmodeImmReg(123, raxVReg)), true, false) },
+			want:       "f7687b",
+			wantFormat: "imull 123(%rax)",
+		},
+		{
+			setup:      func(i *instruction) { i.asMulHi(newOperandMem(newAmodeImmReg(123, raxVReg)), false, false) },
+			want:       "f7607b",
+			wantFormat: "mull 123(%rax)",
+		},
+		{
+			setup:      func(i *instruction) { i.asMulHi(newOperandMem(newAmodeImmReg(123, raxVReg)), true, true) },
+			want:       "48f7687b",
+			wantFormat: "imulq 123(%rax)",
+		},
+		{
+			setup:      func(i *instruction) { i.asMulHi(newOperandMem(newAmodeImmReg(123, raxVReg)), false, true) },
+			want:       "48f7607b",
+			wantFormat: "mulq 123(%rax)",
+		},
+		// bsr
+		{
+			setup:      func(i *instruction) { i.asUnaryRmR(unaryRmROpcodeBsr, newOperandReg(raxVReg), rdiVReg, false) },
+			want:       "0fbdf8",
+			wantFormat: "bsrl %eax, %edi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asUnaryRmR(unaryRmROpcodeBsr, newOperandMem(newAmodeImmReg(123, raxVReg)), rdiVReg, false)
+			},
+			want:       "0fbd787b",
+			wantFormat: "bsrl 123(%rax), %edi",
+		},
+		// bsf
+		{
+			setup:      func(i *instruction) { i.asUnaryRmR(unaryRmROpcodeBsf, newOperandReg(raxVReg), rdiVReg, false) },
+			want:       "0fbcf8",
+			wantFormat: "bsfl %eax, %edi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asUnaryRmR(unaryRmROpcodeBsf, newOperandMem(newAmodeImmReg(123, raxVReg)), rdiVReg, false)
+			},
+			want:       "0fbc787b",
+			wantFormat: "bsfl 123(%rax), %edi",
+		},
+		// tzcnt
+		{
+			setup:      func(i *instruction) { i.asUnaryRmR(unaryRmROpcodeTzcnt, newOperandReg(raxVReg), rdiVReg, false) },
+			want:       "f30fbcf8",
+			wantFormat: "tzcntl %eax, %edi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asUnaryRmR(unaryRmROpcodeTzcnt, newOperandMem(newAmodeImmReg(123, raxVReg)), rdiVReg, false)
+			},
+			want:       "f30fbc787b",
+			wantFormat: "tzcntl 123(%rax), %edi",
+		},
+		// lzcnt
+		{
+			setup:      func(i *instruction) { i.asUnaryRmR(unaryRmROpcodeLzcnt, newOperandReg(raxVReg), rdiVReg, false) },
+			want:       "f30fbdf8",
+			wantFormat: "lzcntl %eax, %edi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asUnaryRmR(unaryRmROpcodeLzcnt, newOperandMem(newAmodeImmReg(123, raxVReg)), rdiVReg, false)
+			},
+			want:       "f30fbd787b",
+			wantFormat: "lzcntl 123(%rax), %edi",
+		},
+		// popcnt
+		{
+			setup:      func(i *instruction) { i.asUnaryRmR(unaryRmROpcodePopcnt, newOperandReg(raxVReg), rdiVReg, false) },
+			want:       "f30fb8f8",
+			wantFormat: "popcntl %eax, %edi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asUnaryRmR(unaryRmROpcodePopcnt, newOperandMem(newAmodeImmReg(123, raxVReg)), rdiVReg, false)
+			},
+			want:       "f30fb8787b",
+			wantFormat: "popcntl 123(%rax), %edi",
+		},
+		// bsr
+		{
+			setup:      func(i *instruction) { i.asUnaryRmR(unaryRmROpcodeBsr, newOperandReg(raxVReg), rdiVReg, true) },
+			want:       "480fbdf8",
+			wantFormat: "bsrq %rax, %rdi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asUnaryRmR(unaryRmROpcodeBsr, newOperandMem(newAmodeImmReg(123, raxVReg)), rdiVReg, true)
+			},
+			want:       "480fbd787b",
+			wantFormat: "bsrq 123(%rax), %rdi",
+		},
+		// bsf
+		{
+			setup:      func(i *instruction) { i.asUnaryRmR(unaryRmROpcodeBsf, newOperandReg(raxVReg), rdiVReg, true) },
+			want:       "480fbcf8",
+			wantFormat: "bsfq %rax, %rdi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asUnaryRmR(unaryRmROpcodeBsf, newOperandMem(newAmodeImmReg(123, raxVReg)), rdiVReg, true)
+			},
+			want:       "480fbc787b",
+			wantFormat: "bsfq 123(%rax), %rdi",
+		},
+		// tzcnt
+		{
+			setup:      func(i *instruction) { i.asUnaryRmR(unaryRmROpcodeTzcnt, newOperandReg(raxVReg), rdiVReg, true) },
+			want:       "f3480fbcf8",
+			wantFormat: "tzcntq %rax, %rdi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asUnaryRmR(unaryRmROpcodeTzcnt, newOperandMem(newAmodeImmReg(123, raxVReg)), rdiVReg, true)
+			},
+			want:       "f3480fbc787b",
+			wantFormat: "tzcntq 123(%rax), %rdi",
+		},
+		// lzcnt
+		{
+			setup:      func(i *instruction) { i.asUnaryRmR(unaryRmROpcodeLzcnt, newOperandReg(raxVReg), rdiVReg, true) },
+			want:       "f3480fbdf8",
+			wantFormat: "lzcntq %rax, %rdi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asUnaryRmR(unaryRmROpcodeLzcnt, newOperandMem(newAmodeImmReg(123, raxVReg)), rdiVReg, true)
+			},
+			want:       "f3480fbd787b",
+			wantFormat: "lzcntq 123(%rax), %rdi",
+		},
+		// popcnt
+		{
+			setup:      func(i *instruction) { i.asUnaryRmR(unaryRmROpcodePopcnt, newOperandReg(raxVReg), rdiVReg, true) },
+			want:       "f3480fb8f8",
+			wantFormat: "popcntq %rax, %rdi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asUnaryRmR(unaryRmROpcodePopcnt, newOperandMem(newAmodeImmReg(123, raxVReg)), rdiVReg, true)
+			},
+			want:       "f3480fb8787b",
+			wantFormat: "popcntq 123(%rax), %rdi",
+		},
 		// addss
 		{
 			setup:      func(i *instruction) { i.asXmmRmR(sseOpcodeAddss, newOperandReg(xmm1VReg), xmm0VReg, true) },
@@ -1774,6 +1964,146 @@ func TestInstruction_format_encode(t *testing.T) {
 			},
 			want:       "66440f11797b",
 			wantFormat: "movupd %xmm15, 123(%rcx)",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asShiftR(shiftROpRotateLeft, newOperandReg(rcxVReg), rdiVReg, false)
+			},
+			want:       "d3c7",
+			wantFormat: "roll %ecx, %edi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asShiftR(shiftROpRotateLeft, newOperandImm32(128), rdiVReg, false)
+			},
+			want:       "c1c780",
+			wantFormat: "roll $128, %edi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asShiftR(shiftROpRotateLeft, newOperandReg(rcxVReg), rdiVReg, true)
+			},
+			want:       "48d3c7",
+			wantFormat: "rolq %ecx, %rdi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asShiftR(shiftROpRotateLeft, newOperandImm32(128), rdiVReg, true)
+			},
+			want:       "48c1c780",
+			wantFormat: "rolq $128, %rdi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asShiftR(shiftROpRotateRight, newOperandReg(rcxVReg), rdiVReg, false)
+			},
+			want:       "d3cf",
+			wantFormat: "rorl %ecx, %edi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asShiftR(shiftROpRotateRight, newOperandImm32(128), rdiVReg, false)
+			},
+			want:       "c1cf80",
+			wantFormat: "rorl $128, %edi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asShiftR(shiftROpRotateRight, newOperandReg(rcxVReg), rdiVReg, true)
+			},
+			want:       "48d3cf",
+			wantFormat: "rorq %ecx, %rdi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asShiftR(shiftROpRotateRight, newOperandImm32(128), rdiVReg, true)
+			},
+			want:       "48c1cf80",
+			wantFormat: "rorq $128, %rdi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asShiftR(shiftROpShiftLeft, newOperandReg(rcxVReg), rdiVReg, false)
+			},
+			want:       "d3e7",
+			wantFormat: "shll %ecx, %edi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asShiftR(shiftROpShiftLeft, newOperandImm32(128), rdiVReg, false)
+			},
+			want:       "c1e780",
+			wantFormat: "shll $128, %edi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asShiftR(shiftROpShiftLeft, newOperandReg(rcxVReg), rdiVReg, true)
+			},
+			want:       "48d3e7",
+			wantFormat: "shlq %ecx, %rdi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asShiftR(shiftROpShiftLeft, newOperandImm32(128), rdiVReg, true)
+			},
+			want:       "48c1e780",
+			wantFormat: "shlq $128, %rdi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asShiftR(shiftROpShiftRightLogical, newOperandReg(rcxVReg), rdiVReg, false)
+			},
+			want:       "d3ef",
+			wantFormat: "shrl %ecx, %edi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asShiftR(shiftROpShiftRightLogical, newOperandImm32(128), rdiVReg, false)
+			},
+			want:       "c1ef80",
+			wantFormat: "shrl $128, %edi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asShiftR(shiftROpShiftRightLogical, newOperandReg(rcxVReg), rdiVReg, true)
+			},
+			want:       "48d3ef",
+			wantFormat: "shrq %ecx, %rdi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asShiftR(shiftROpShiftRightLogical, newOperandImm32(128), rdiVReg, true)
+			},
+			want:       "48c1ef80",
+			wantFormat: "shrq $128, %rdi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asShiftR(shiftROpShiftRightArithmetic, newOperandReg(rcxVReg), rdiVReg, false)
+			},
+			want:       "d3ff",
+			wantFormat: "sarl %ecx, %edi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asShiftR(shiftROpShiftRightArithmetic, newOperandImm32(128), rdiVReg, false)
+			},
+			want:       "c1ff80",
+			wantFormat: "sarl $128, %edi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asShiftR(shiftROpShiftRightArithmetic, newOperandReg(rcxVReg), rdiVReg, true)
+			},
+			want:       "48d3ff",
+			wantFormat: "sarq %ecx, %rdi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asShiftR(shiftROpShiftRightArithmetic, newOperandImm32(128), rdiVReg, true)
+			},
+			want:       "48c1ff80",
+			wantFormat: "sarq $128, %rdi",
 		},
 	} {
 		tc := tc
