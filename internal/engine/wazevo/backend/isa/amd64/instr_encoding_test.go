@@ -1866,7 +1866,7 @@ func TestInstruction_format_encode(t *testing.T) {
 				a := newOperandMem(newAmodeImmReg(1<<20, raxVReg))
 				i.asMovRM(rdiVReg, a, 1)
 			},
-			want:       "88b800001000",
+			want:       "4088b800001000",
 			wantFormat: "mov.b %rdi, 1048576(%rax)",
 		},
 		{
@@ -2356,6 +2356,87 @@ func TestInstruction_format_encode(t *testing.T) {
 			},
 			want:       "f7c780000000",
 			wantFormat: "testl $128, %edi",
+		},
+		{
+			setup:      func(i *instruction) { i.asSetcc(condO, rsiVReg) },
+			want:       "400f90c6",
+			wantFormat: "seto %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asSetcc(condNO, rsiVReg) },
+			want:       "400f91c6",
+			wantFormat: "setno %rsi",
+		},
+
+		{
+			setup:      func(i *instruction) { i.asSetcc(condB, rsiVReg) },
+			want:       "400f92c6",
+			wantFormat: "setb %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asSetcc(condNB, rsiVReg) },
+			want:       "400f93c6",
+			wantFormat: "setnb %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asSetcc(condZ, rsiVReg) },
+			want:       "400f94c6",
+			wantFormat: "setz %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asSetcc(condNZ, rsiVReg) },
+			want:       "400f95c6",
+			wantFormat: "setnz %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asSetcc(condBE, rsiVReg) },
+			want:       "400f96c6",
+			wantFormat: "setbe %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asSetcc(condNBE, rsiVReg) },
+			want:       "400f97c6",
+			wantFormat: "setnbe %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asSetcc(condS, rsiVReg) },
+			want:       "400f98c6",
+			wantFormat: "sets %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asSetcc(condNS, rsiVReg) },
+			want:       "400f99c6",
+			wantFormat: "setns %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asSetcc(condP, rsiVReg) },
+			want:       "400f9ac6",
+			wantFormat: "setp %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asSetcc(condNP, rsiVReg) },
+			want:       "400f9bc6",
+			wantFormat: "setnp %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asSetcc(condL, rsiVReg) },
+			want:       "400f9cc6",
+			wantFormat: "setl %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asSetcc(condNL, rsiVReg) },
+			want:       "400f9dc6",
+			wantFormat: "setnl %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asSetcc(condLE, rsiVReg) },
+			want:       "400f9ec6",
+			wantFormat: "setle %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asSetcc(condNLE, rsiVReg) },
+			want:       "400f9fc6",
+			wantFormat: "setnle %rsi",
 		},
 	} {
 		tc := tc

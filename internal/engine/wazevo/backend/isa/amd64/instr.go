@@ -159,7 +159,7 @@ func (i *instruction) String() string {
 		}
 		return fmt.Sprintf("%s%s %s, %s", op, suffix, i.op1.format(i.b1), i.op2.format(i.b1))
 	case setcc:
-		panic("TODO")
+		return fmt.Sprintf("set%s %s", cond(i.u1), i.op1.format(true))
 	case cmove:
 		panic("TODO")
 	case push64:
@@ -822,6 +822,13 @@ func (i *instruction) asCmpRmiR(cmpOrTest bool, rm operand, rd regalloc.VReg, _6
 		i.u1 = 1
 	}
 	i.b1 = _64
+	return i
+}
+
+func (i *instruction) asSetcc(c cond, rd regalloc.VReg) *instruction {
+	i.kind = setcc
+	i.op1 = newOperandReg(rd)
+	i.u1 = uint64(c)
 	return i
 }
 

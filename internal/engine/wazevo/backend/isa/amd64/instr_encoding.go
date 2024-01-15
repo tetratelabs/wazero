@@ -798,7 +798,11 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 			panic("BUG: invalid operand kind")
 		}
 	case setcc:
-		panic("TODO")
+		cc := cond(i.u1)
+		dst := regEncodings[i.op1.r.RealReg()]
+		rex := rexInfo(0).clearW().always()
+		opcode := uint32(0x0f90) + uint32(cc)
+		encodeEncEnc(c, legacyPrefixesNone, opcode, 2, 0, uint8(dst), rex)
 	case cmove:
 		panic("TODO")
 	case push64:
@@ -991,7 +995,7 @@ func encodeEncEnc(
 		opcodeNum--
 		c.EmitByte(byte((opcodes >> (opcodeNum << 3)) & 0xff))
 	}
-	c.EmitByte(encodeModRM(3, r&0x7, rm&0x7))
+	c.EmitByte(encodeModRM(3, r&7, rm&7))
 }
 
 func encodeRegReg(
@@ -1153,7 +1157,7 @@ func (ri rexInfo) encode(c backend.Compiler, r uint8, b uint8) {
 		w = 0x01
 	}
 	rex := rexEncodingDefault | w<<3 | r<<2 | b
-	if rex != rexEncodingDefault || ri&0x02 == 1 {
+	if rex != rexEncodingDefault || ri&0x02 != 0 {
 		c.EmitByte(rex)
 	}
 }
