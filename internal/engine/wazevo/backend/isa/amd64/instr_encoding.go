@@ -804,7 +804,26 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 		opcode := uint32(0x0f90) + uint32(cc)
 		encodeEncEnc(c, legacyPrefixesNone, opcode, 2, 0, uint8(dst), rex)
 	case cmove:
-		panic("TODO")
+		cc := cond(i.u1)
+		dst := regEncodings[i.op2.r.RealReg()]
+		rex := rexInfo(0)
+		if i.b1 { // 64 bit.
+			rex = rex.setW()
+		} else {
+			rex = rex.clearW()
+		}
+		opcode := uint32(0x0f40) + uint32(cc)
+		op1 := i.op1
+		switch op1.kind {
+		case operandKindReg:
+			src := regEncodings[i.op1.r.RealReg()]
+			encodeRegReg(c, legacyPrefixesNone, opcode, 2, dst, src, rex)
+		case operandKindMem:
+			m := op1.amode
+			encodeRegMem(c, legacyPrefixesNone, opcode, 2, dst, m, rex)
+		default:
+			panic("BUG: invalid operand kind")
+		}
 	case push64:
 		op := i.op1
 

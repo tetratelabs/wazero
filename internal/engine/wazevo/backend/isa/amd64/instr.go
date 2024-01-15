@@ -141,7 +141,7 @@ func (i *instruction) String() string {
 		}
 		return fmt.Sprintf("%s%s %s, %s", shiftROp(i.u1), suffix, i.op1.format(false), i.op2.format(i.b1))
 	case xmmRmiReg:
-		return fmt.Sprintf("%s %s, %s", sseOpcode(i.u1), i.op1.format(false), i.op2.format(true))
+		return fmt.Sprintf("%s %s, %s", sseOpcode(i.u1), i.op1.format(true), i.op2.format(true))
 	case cmpRmiR:
 		var op, suffix string
 		if i.u1 != 0 {
@@ -161,7 +161,13 @@ func (i *instruction) String() string {
 	case setcc:
 		return fmt.Sprintf("set%s %s", cond(i.u1), i.op1.format(true))
 	case cmove:
-		panic("TODO")
+		var suffix string
+		if i.b1 {
+			suffix = "q"
+		} else {
+			suffix = "l"
+		}
+		return fmt.Sprintf("cmov%s%s %s, %s", cond(i.u1), suffix, i.op1.format(i.b1), i.op2.format(i.b1))
 	case push64:
 		return fmt.Sprintf("pushq %s", i.op1.format(true))
 	case pop64:
@@ -829,6 +835,15 @@ func (i *instruction) asSetcc(c cond, rd regalloc.VReg) *instruction {
 	i.kind = setcc
 	i.op1 = newOperandReg(rd)
 	i.u1 = uint64(c)
+	return i
+}
+
+func (i *instruction) asCmove(c cond, rm operand, rd regalloc.VReg, _64 bool) *instruction {
+	i.kind = cmove
+	i.op1 = newOperandReg(rd)
+	i.op2 = rm
+	i.u1 = uint64(c)
+	i.b1 = _64
 	return i
 }
 
