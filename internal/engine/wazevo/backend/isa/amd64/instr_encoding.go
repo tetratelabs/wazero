@@ -672,7 +672,7 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 			panic("BUG: invalid operand kind")
 		}
 	case xmmRmiReg:
-		legPrefix := legacyPrefixes0x66
+		const legPrefix = legacyPrefixes0x66
 		rex := rexInfo(0).clearW()
 		dst := regEncodings[i.op2.r.RealReg()]
 
@@ -743,7 +743,60 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 		}
 
 	case cmpRmiR:
-		panic("TODO")
+		var opcode uint32
+		isCmp := i.u1 != 0
+		rex := rexInfo(0)
+		_64 := i.b1
+		if _64 { // 64 bit.
+			rex = rex.setW()
+		} else {
+			rex = rex.clearW()
+		}
+		dst := regEncodings[i.op2.r.RealReg()]
+		op1 := i.op1
+		switch op1.kind {
+		case operandKindReg:
+			reg := regEncodings[op1.r.RealReg()]
+			if isCmp {
+				opcode = 0x39
+			} else {
+				opcode = 0x85
+			}
+			// Here we swap the encoding of the operands for CMP to be consistent with the output of LLVM/GCC.
+			encodeRegReg(c, legacyPrefixesNone, opcode, 1, reg, dst, rex)
+
+		case operandKindMem:
+			if isCmp {
+				opcode = 0x3b
+			} else {
+				opcode = 0x85
+			}
+			m := op1.amode
+			encodeRegMem(c, legacyPrefixesNone, opcode, 1, dst, m, rex)
+
+		case operandKindImm32:
+			imm32 := op1.imm32
+			useImm8 := isCmp && lower8willSignExtendTo32(imm32)
+			var subopcode uint8
+
+			switch {
+			case isCmp && useImm8:
+				opcode, subopcode = 0x83, 7
+			case isCmp && !useImm8:
+				opcode, subopcode = 0x81, 7
+			default:
+				opcode, subopcode = 0xf7, 0
+			}
+			encodeEncEnc(c, legacyPrefixesNone, opcode, 1, subopcode, uint8(dst), rex)
+			if useImm8 {
+				c.EmitByte(uint8(imm32))
+			} else {
+				c.Emit4Bytes(imm32)
+			}
+
+		default:
+			panic("BUG: invalid operand kind")
+		}
 	case setcc:
 		panic("TODO")
 	case cmove:

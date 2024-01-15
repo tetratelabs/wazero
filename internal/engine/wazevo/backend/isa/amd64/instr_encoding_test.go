@@ -2273,6 +2273,90 @@ func TestInstruction_format_encode(t *testing.T) {
 			want:       "66450fd39d80000000",
 			wantFormat: "psrlq 128(%r13), %xmm11",
 		},
+		{
+			setup: func(i *instruction) {
+				i.asCmpRmiR(true, newOperandReg(r13VReg), rdiVReg, true)
+			},
+			want:       "4c39ef",
+			wantFormat: "cmpq %r13, %rdi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asCmpRmiR(false, newOperandReg(r13VReg), rdiVReg, true)
+			},
+			want:       "4c85ef",
+			wantFormat: "testq %r13, %rdi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asCmpRmiR(true, newOperandReg(r13VReg), rdiVReg, false)
+			},
+			want:       "4439ef",
+			wantFormat: "cmpl %r13d, %edi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asCmpRmiR(false, newOperandReg(r13VReg), rdiVReg, false)
+			},
+			want:       "4485ef",
+			wantFormat: "testl %r13d, %edi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asCmpRmiR(true, newOperandMem(newAmodeImmReg(128, r13VReg)), rdiVReg, true)
+			},
+			want:       "493bbd80000000",
+			wantFormat: "cmpq 128(%r13), %rdi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asCmpRmiR(false, newOperandMem(newAmodeImmReg(128, r13VReg)), rdiVReg, true)
+			},
+			want:       "4985bd80000000",
+			wantFormat: "testq %rdi, 128(%r13)",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asCmpRmiR(true, newOperandMem(newAmodeImmReg(128, r13VReg)), rdiVReg, false)
+			},
+			want:       "413bbd80000000",
+			wantFormat: "cmpl 128(%r13), %edi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asCmpRmiR(false, newOperandMem(newAmodeImmReg(128, r13VReg)), rdiVReg, false)
+			},
+			want:       "4185bd80000000",
+			wantFormat: "testl %edi, 128(%r13)",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asCmpRmiR(true, newOperandImm32(128), rdiVReg, true)
+			},
+			want:       "4881ff80000000",
+			wantFormat: "cmpq $128, %rdi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asCmpRmiR(false, newOperandImm32(128), rdiVReg, true)
+			},
+			want:       "48f7c780000000",
+			wantFormat: "testq $128, %rdi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asCmpRmiR(true, newOperandImm32(128), rdiVReg, false)
+			},
+			want:       "81ff80000000",
+			wantFormat: "cmpl $128, %edi",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asCmpRmiR(false, newOperandImm32(128), rdiVReg, false)
+			},
+			want:       "f7c780000000",
+			wantFormat: "testl $128, %edi",
+		},
 	} {
 		tc := tc
 		t.Run(tc.wantFormat, func(t *testing.T) {

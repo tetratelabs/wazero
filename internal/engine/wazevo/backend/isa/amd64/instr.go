@@ -143,7 +143,21 @@ func (i *instruction) String() string {
 	case xmmRmiReg:
 		return fmt.Sprintf("%s %s, %s", sseOpcode(i.u1), i.op1.format(false), i.op2.format(true))
 	case cmpRmiR:
-		panic("TODO")
+		var op, suffix string
+		if i.u1 != 0 {
+			op = "cmp"
+		} else {
+			op = "test"
+		}
+		if i.b1 {
+			suffix = "q"
+		} else {
+			suffix = "l"
+		}
+		if op == "test" && i.op1.kind == operandKindMem {
+			return fmt.Sprintf("%s%s %s, %s", op, suffix, i.op2.format(i.b1), i.op1.format(i.b1))
+		}
+		return fmt.Sprintf("%s%s %s, %s", op, suffix, i.op1.format(i.b1), i.op2.format(i.b1))
 	case setcc:
 		panic("TODO")
 	case cmove:
@@ -794,6 +808,20 @@ func (i *instruction) asXmmRmiReg(op sseOpcode, rm operand, rd regalloc.VReg) *i
 	i.op1 = rm
 	i.op2 = newOperandReg(rd)
 	i.u1 = uint64(op)
+	return i
+}
+
+func (i *instruction) asCmpRmiR(cmpOrTest bool, rm operand, rd regalloc.VReg, _64 bool) *instruction {
+	if rm.kind != operandKindReg && rm.kind != operandKindImm32 && rm.kind != operandKindMem {
+		panic("BUG")
+	}
+	i.kind = cmpRmiR
+	i.op1 = rm
+	i.op2 = newOperandReg(rd)
+	if cmpOrTest {
+		i.u1 = 1
+	}
+	i.b1 = _64
 	return i
 }
 
