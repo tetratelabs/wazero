@@ -155,6 +155,7 @@ func (i *instruction) String() string {
 			suffix = "l"
 		}
 		if op == "test" && i.op1.kind == operandKindMem {
+			// Print consistently with AT&T syntax.
 			return fmt.Sprintf("%s%s %s, %s", op, suffix, i.op2.format(i.b1), i.op1.format(i.b1))
 		}
 		return fmt.Sprintf("%s%s %s, %s", op, suffix, i.op1.format(i.b1), i.op2.format(i.b1))
