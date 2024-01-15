@@ -21,6 +21,58 @@ var (
 	functionExecutable = rdiVReg
 )
 
+func (m *machine) goEntryPreamblePassArg(cur *instruction, paramSlicePtr regalloc.VReg, arg *backend.ABIArg, argStartOffsetFromSP int64) *instruction {
+	typ := arg.Type
+	bits := typ.Bits()
+	isStackArg := arg.Kind == backend.ABIArgKindStack
+
+	var loadTargetReg operand
+	if !isStackArg {
+		loadTargetReg = newOperandReg(arg.Reg)
+	} else {
+		switch typ {
+		case ssa.TypeI32, ssa.TypeI64:
+			loadTargetReg = newOperandReg(r15VReg)
+		case ssa.TypeF32, ssa.TypeF64, ssa.TypeV128:
+			loadTargetReg = newOperandReg(xmm15VReg)
+		default:
+			panic("TODO?")
+		}
+	}
+
+	var postIndexImm int64
+	if typ == ssa.TypeV128 {
+		postIndexImm = 16 // v128 is represented as 2x64-bit in Go slice.
+	} else {
+		postIndexImm = 8
+	}
+	//loadMode := addressMode{kind: addressModeKindPostIndex, rn: paramSlicePtr, imm: postIndexImm}
+
+	//instr := m.allocateInstr()
+	//switch typ {
+	//case ssa.TypeI32:
+	//	instr.asULoad(loadTargetReg, loadMode, 32)
+	//case ssa.TypeI64:
+	//	instr.asULoad(loadTargetReg, loadMode, 64)
+	//case ssa.TypeF32:
+	//	instr.asFpuLoad(loadTargetReg, loadMode, 32)
+	//case ssa.TypeF64:
+	//	instr.asFpuLoad(loadTargetReg, loadMode, 64)
+	//case ssa.TypeV128:
+	//	instr.asFpuLoad(loadTargetReg, loadMode, 128)
+	//}
+	//cur = linkInstr(cur, instr)
+	//
+	//if isStackArg {
+	//	var storeMode addressMode
+	//	cur, storeMode = m.resolveAddressModeForOffsetAndInsert(cur, argStartOffsetFromSP+arg.Offset, bits, spVReg, true)
+	//	toStack := m.allocateInstr()
+	//	toStack.asStore(loadTargetReg, storeMode, bits)
+	//	cur = linkInstr(cur, toStack)
+	//}
+	return cur
+}
+
 // CompileEntryPreamble implements backend.Machine.
 func (m *machine) CompileEntryPreamble(sig *ssa.Signature) []byte {
 	root := m.compileEntryPreamble(sig)
@@ -53,8 +105,22 @@ func (m *machine) compileEntryPreamble(sig *ssa.Signature) *instruction {
 
 	// TODO: read the arguments from paramResultSliceCopied and set them correctly into the regs and stacks.
 	// 	The first two args are module context ptr and execution context ptr, and they are passed in %rax and %rcx.
-	if len(abi.Args) > 2 {
-		panic("TODO")
+	prReg := paramResultSlicePtr
+	if len(abi.Args) > 2 && len(abi.Rets) > 0 {
+		// paramResultSlicePtr is modified during the execution of goEntryPreamblePassArg,
+		// so copy it to another reg.
+		cur = m.move64(paramResultSliceCopied, paramResultSlicePtr, cur)
+		prReg = paramResultSliceCopied
+	}
+
+	stackSlotSize := abi.AlignedArgResultStackSlotSize()
+	for i := range abi.Args {
+		if i < 2 {
+			// module context ptr and execution context ptr are passed in x0 and x1 by the Go assembly function.
+			continue
+		}
+		arg := &abi.Args[i]
+		cur = m.goEntryPreamblePassArg(cur, prReg, arg, -stackSlotSize)
 	}
 
 	// Now ready to call the real function. Note that at this point stack pointer is already set to the Go-allocated,
