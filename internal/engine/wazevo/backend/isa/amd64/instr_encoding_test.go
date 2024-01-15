@@ -2105,6 +2105,174 @@ func TestInstruction_format_encode(t *testing.T) {
 			want:       "48c1ff80",
 			wantFormat: "sarq $128, %rdi",
 		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmiReg(sseOpcodePsllw, newOperandImm32(128), xmm11VReg)
+			},
+			want:       "66410f71f380",
+			wantFormat: "psllw $128, %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmiReg(sseOpcodePslld, newOperandImm32(128), xmm11VReg)
+			},
+			want:       "66410f72f380",
+			wantFormat: "pslld $128, %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmiReg(sseOpcodePsllq, newOperandImm32(128), xmm11VReg)
+			},
+			want:       "66410f73f380",
+			wantFormat: "psllq $128, %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmiReg(sseOpcodePsraw, newOperandImm32(128), xmm11VReg)
+			},
+			want:       "66410f71e380",
+			wantFormat: "psraw $128, %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmiReg(sseOpcodePsrad, newOperandImm32(128), xmm11VReg)
+			},
+			want:       "66410f72e380",
+			wantFormat: "psrad $128, %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmiReg(sseOpcodePsrlw, newOperandImm32(128), xmm11VReg)
+			},
+			want:       "66410f71d380",
+			wantFormat: "psrlw $128, %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmiReg(sseOpcodePsrld, newOperandImm32(128), xmm11VReg)
+			},
+			want:       "66410f72d380",
+			wantFormat: "psrld $128, %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmiReg(sseOpcodePsrlq, newOperandImm32(128), xmm11VReg)
+			},
+			want:       "66410f73d380",
+			wantFormat: "psrlq $128, %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmiReg(sseOpcodePsllw, newOperandReg(xmm13VReg), xmm11VReg)
+			},
+			want:       "66450ff1dd",
+			wantFormat: "psllw %xmm13, %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmiReg(sseOpcodePslld, newOperandReg(xmm13VReg), xmm11VReg)
+			},
+			want:       "66450ff2dd",
+			wantFormat: "pslld %xmm13, %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmiReg(sseOpcodePsllq, newOperandReg(xmm13VReg), xmm11VReg)
+			},
+			want:       "66450ff3dd",
+			wantFormat: "psllq %xmm13, %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmiReg(sseOpcodePsraw, newOperandReg(xmm13VReg), xmm11VReg)
+			},
+			want:       "66450fe1dd",
+			wantFormat: "psraw %xmm13, %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmiReg(sseOpcodePsrad, newOperandReg(xmm13VReg), xmm11VReg)
+			},
+			want:       "66450fe2dd",
+			wantFormat: "psrad %xmm13, %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmiReg(sseOpcodePsrlw, newOperandReg(xmm13VReg), xmm11VReg)
+			},
+			want:       "66450fd1dd",
+			wantFormat: "psrlw %xmm13, %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmiReg(sseOpcodePsrld, newOperandReg(xmm13VReg), xmm11VReg)
+			},
+			want:       "66450fd2dd",
+			wantFormat: "psrld %xmm13, %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmiReg(sseOpcodePsrlq, newOperandReg(xmm13VReg), xmm11VReg)
+			},
+			want:       "66450fd3dd",
+			wantFormat: "psrlq %xmm13, %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmiReg(sseOpcodePsllw, newOperandMem(newAmodeImmReg(128, r13VReg)), xmm11VReg)
+			},
+			want:       "66450ff19d80000000",
+			wantFormat: "psllw 128(%r13), %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmiReg(sseOpcodePslld, newOperandMem(newAmodeImmReg(128, r13VReg)), xmm11VReg)
+			},
+			want:       "66450ff29d80000000",
+			wantFormat: "pslld 128(%r13), %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmiReg(sseOpcodePsllq, newOperandMem(newAmodeImmReg(128, r13VReg)), xmm11VReg)
+			},
+			want:       "66450ff39d80000000",
+			wantFormat: "psllq 128(%r13), %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmiReg(sseOpcodePsraw, newOperandMem(newAmodeImmReg(128, r13VReg)), xmm11VReg)
+			},
+			want:       "66450fe19d80000000",
+			wantFormat: "psraw 128(%r13), %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmiReg(sseOpcodePsrad, newOperandMem(newAmodeImmReg(128, r13VReg)), xmm11VReg)
+			},
+			want:       "66450fe29d80000000",
+			wantFormat: "psrad 128(%r13), %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmiReg(sseOpcodePsrlw, newOperandMem(newAmodeImmReg(128, r13VReg)), xmm11VReg)
+			},
+			want:       "66450fd19d80000000",
+			wantFormat: "psrlw 128(%r13), %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmiReg(sseOpcodePsrld, newOperandMem(newAmodeImmReg(128, r13VReg)), xmm11VReg)
+			},
+			want:       "66450fd29d80000000",
+			wantFormat: "psrld 128(%r13), %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmiReg(sseOpcodePsrlq, newOperandMem(newAmodeImmReg(128, r13VReg)), xmm11VReg)
+			},
+			want:       "66450fd39d80000000",
+			wantFormat: "psrlq 128(%r13), %xmm11",
+		},
 	} {
 		tc := tc
 		t.Run(tc.wantFormat, func(t *testing.T) {

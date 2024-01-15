@@ -141,7 +141,7 @@ func (i *instruction) String() string {
 		}
 		return fmt.Sprintf("%s%s %s, %s", shiftROp(i.u1), suffix, i.op1.format(false), i.op2.format(i.b1))
 	case xmmRmiReg:
-		panic("TODO")
+		return fmt.Sprintf("%s %s, %s", sseOpcode(i.u1), i.op1.format(false), i.op2.format(true))
 	case cmpRmiR:
 		panic("TODO")
 	case setcc:
@@ -783,6 +783,17 @@ func (i *instruction) asShiftR(op shiftROp, amount operand, rd regalloc.VReg, _6
 	i.op2 = newOperandReg(rd)
 	i.u1 = uint64(op)
 	i.b1 = _64
+	return i
+}
+
+func (i *instruction) asXmmRmiReg(op sseOpcode, rm operand, rd regalloc.VReg) *instruction {
+	if rm.kind != operandKindReg && rm.kind != operandKindImm32 && rm.kind != operandKindMem {
+		panic("BUG")
+	}
+	i.kind = xmmRmiReg
+	i.op1 = rm
+	i.op2 = newOperandReg(rd)
+	i.u1 = uint64(op)
 	return i
 }
 

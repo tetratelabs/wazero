@@ -672,7 +672,76 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 			panic("BUG: invalid operand kind")
 		}
 	case xmmRmiReg:
-		panic("TODO")
+		legPrefix := legacyPrefixes0x66
+		rex := rexInfo(0).clearW()
+		dst := regEncodings[i.op2.r.RealReg()]
+
+		var opcode uint32
+		var regDigit uint8
+
+		op := sseOpcode(i.u1)
+		op1 := i.op1
+		if i.op1.kind == operandKindImm32 {
+			switch op {
+			case sseOpcodePsllw:
+				opcode, regDigit = 0x0f71, 6
+			case sseOpcodePslld:
+				opcode, regDigit = 0x0f72, 6
+			case sseOpcodePsllq:
+				opcode, regDigit = 0x0f73, 6
+			case sseOpcodePsraw:
+				opcode, regDigit = 0x0f71, 4
+			case sseOpcodePsrad:
+				opcode, regDigit = 0x0f72, 4
+			case sseOpcodePsrlw:
+				opcode, regDigit = 0x0f71, 2
+			case sseOpcodePsrld:
+				opcode, regDigit = 0x0f72, 2
+			case sseOpcodePsrlq:
+				opcode, regDigit = 0x0f73, 2
+			default:
+				panic("invalid opcode")
+			}
+
+			encodeEncEnc(c, legPrefix, opcode, 2, regDigit, uint8(dst), rex)
+			imm32 := op1.imm32
+			if imm32 > 0xff&imm32 {
+				panic("immediate value does not fit 1 byte")
+			}
+			c.EmitByte(uint8(imm32))
+		} else {
+			switch op {
+			case sseOpcodePsllw:
+				opcode = 0x0ff1
+			case sseOpcodePslld:
+				opcode = 0x0ff2
+			case sseOpcodePsllq:
+				opcode = 0x0ff3
+			case sseOpcodePsraw:
+				opcode = 0x0fe1
+			case sseOpcodePsrad:
+				opcode = 0x0fe2
+			case sseOpcodePsrlw:
+				opcode = 0x0fd1
+			case sseOpcodePsrld:
+				opcode = 0x0fd2
+			case sseOpcodePsrlq:
+				opcode = 0x0fd3
+			default:
+				panic("invalid opcode")
+			}
+
+			if op1.kind == operandKindReg {
+				reg := regEncodings[op1.r.RealReg()]
+				encodeRegReg(c, legPrefix, opcode, 2, dst, reg, rex)
+			} else if op1.kind == operandKindMem {
+				m := op1.amode
+				encodeRegMem(c, legPrefix, opcode, 2, dst, m, rex)
+			} else {
+				panic("BUG: invalid operand kind")
+			}
+		}
+
 	case cmpRmiR:
 		panic("TODO")
 	case setcc:
