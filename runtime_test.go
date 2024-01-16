@@ -806,6 +806,11 @@ func (e *mockEngine) Close() (err error) {
 	return
 }
 
+// IsCompiler implements the same method as documented on wasm.Engine.
+func (e *mockEngine) IsCompiler() bool {
+	return false
+}
+
 // TestNewRuntime_concurrent ensures that concurrent execution of NewRuntime is race-free.
 // This depends on -race flag.
 func TestNewRuntime_concurrent(t *testing.T) {

@@ -359,7 +359,7 @@ func (s *Store) instantiate(
 	}
 
 	m.buildGlobals(module, m.Engine.FunctionInstanceReference)
-	m.buildMemory(module)
+	m.buildMemory(module, s.Engine.IsCompiler())
 	m.Exports = module.Exports
 
 	// As of reference types proposal, data segment validation must happen after instantiation,

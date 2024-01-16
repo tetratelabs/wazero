@@ -647,10 +647,10 @@ func paramNames(localNames IndirectNameMap, funcIdx uint32, paramLen int) []stri
 	return nil
 }
 
-func (m *ModuleInstance) buildMemory(module *Module) {
+func (m *ModuleInstance) buildMemory(module *Module, compilerEngine bool) {
 	memSec := module.MemorySection
 	if memSec != nil {
-		m.MemoryInstance = NewMemoryInstance(memSec)
+		m.MemoryInstance = NewMemoryInstance(memSec, compilerEngine)
 		m.MemoryInstance.definition = &module.MemoryDefinitionSection[0]
 	}
 }
