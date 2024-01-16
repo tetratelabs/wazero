@@ -148,7 +148,7 @@ func newAmodeImmReg(imm32 uint32, base regalloc.VReg) amode {
 	return amode{kind: amodeImmReg, imm32: imm32, base: base}
 }
 
-func newAmodeRegRegShit(imm32 uint32, base, index regalloc.VReg, shift byte) amode {
+func newAmodeRegRegShift(imm32 uint32, base, index regalloc.VReg, shift byte) amode {
 	if shift > 3 {
 		panic(fmt.Sprintf("BUG: invalid shift (must be 3>=): %d", shift))
 	}
