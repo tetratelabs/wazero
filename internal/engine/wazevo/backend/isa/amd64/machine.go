@@ -149,6 +149,7 @@ func (m *machine) lowerStore(si *ssa.Instruction) {
 	base := m.c.VRegOf(ptr)
 
 	store := m.allocateInstr()
+	// TODO: optimization to find whether we could fit newAmodeRegRegShit.
 	store.asMovRM(rm, newOperandMem(newAmodeImmReg(offset, base)), storeSizeInBits/8)
 	m.insert(store)
 }
@@ -329,9 +330,9 @@ func (m *machine) ResolveRelocations(refToBinaryOffset map[ssa.FuncRef]int, bina
 	for _, r := range relocations {
 		instrOffset := r.Offset
 		calleeFnOffset := refToBinaryOffset[r.FuncRef]
-		// calleeFnOffset points to the next byte.
-		// call is 5 bytes: https://www.felixcloutier.com/x86/call
-		callInstr := binary[instrOffset-1 : instrOffset+4]
+		// calleeFnOffset points to the beginning of call target function.
+		// call is 5 bytes where the last 4 bytes represent the signed 32-bit offset. See the encoding of `call` instruction.
+		callInstrOffsetBytes := binary[instrOffset-1 : instrOffset+4]
 		diff := int64(calleeFnOffset) - (instrOffset)
 		// We backpatch in-place the relative value `diff`.
 		callInstr[1] = byte(diff)
