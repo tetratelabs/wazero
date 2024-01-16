@@ -19,9 +19,8 @@ func NewBackend() backend.Machine {
 		asNop,
 	)
 	return &machine{
-		spillSlots: make(map[regalloc.VRegID]int64),
-		ectx:       ectx,
-		regAlloc:   regalloc.NewAllocator(regInfo),
+		ectx:     ectx,
+		regAlloc: regalloc.NewAllocator(regInfo),
 	}
 }
 
@@ -37,7 +36,6 @@ type (
 		regAllocStarted bool
 
 		spillSlotSize int64
-		spillSlots    map[regalloc.VRegID]int64 // regalloc.VRegID to offset.
 		currentABI    *backend.FunctionABI
 		clobberedRegs []regalloc.VReg
 
@@ -96,17 +94,6 @@ func (m *machine) RegAlloc() {
 func (m *machine) InsertReturn() {
 	i := m.allocateInstr().asRet(m.currentABI)
 	m.insert(i)
-}
-
-func (m *machine) getVRegSpillSlotOffsetFromSP(id regalloc.VRegID, size byte) int64 {
-	offset, ok := m.spillSlots[id]
-	if !ok {
-		offset = m.spillSlotSize
-		// TODO: this should be aligned depending on the `size` to use Imm12 offset load/store as much as possible.
-		m.spillSlots[id] = offset
-		m.spillSlotSize += int64(size)
-	}
-	return offset + 16 // spill slot starts above the clobbered registers and the frame size.
 }
 
 // LowerSingleBranch implements backend.Machine.
@@ -234,34 +221,6 @@ func (m *machine) callerGenFunctionReturnVReg(a *backend.FunctionABI, retIndex i
 	} else {
 		panic("TODO")
 	}
-}
-
-func (m *machine) resolveAddressModeForOffset(offset int64, dstBits byte, rn regalloc.VReg) amode {
-	if rn.RegType() != regalloc.RegTypeInt {
-		panic("BUG: rn should be a pointer: " + formatVRegSized(rn, dstBits == 64))
-	}
-	var am amode
-	if offsetFitsInAddressModeKindRegUnsignedImm12(dstBits, offset) {
-		am = newAmodeImmReg(uint32(offset), rn)
-	} else {
-		panic("TODO")
-	}
-	return am
-}
-
-func (m *machine) resolveAddressModeForOffsetAndInsert(cur *instruction, offset int64, dstBits byte, rn regalloc.VReg) (*instruction, amode) {
-	exct := m.ectx
-	exct.PendingInstructions = exct.PendingInstructions[:0]
-	mode := m.resolveAddressModeForOffset(offset, dstBits, rn)
-	for _, instr := range exct.PendingInstructions {
-		cur = linkInstr(cur, instr)
-	}
-	return cur, mode
-}
-
-func offsetFitsInAddressModeKindRegUnsignedImm12(dstSizeInBits byte, offset int64) bool {
-	divisor := int64(dstSizeInBits) / 8
-	return 0 < offset && offset%divisor == 0 && offset/divisor < 4096
 }
 
 // InsertMove implements backend.Machine.
