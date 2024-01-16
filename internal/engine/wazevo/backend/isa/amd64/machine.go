@@ -39,6 +39,8 @@ type (
 		currentABI    *backend.FunctionABI
 		clobberedRegs []regalloc.VReg
 
+		maxRequiredStackSizeForCalls int64
+
 		labelResolutionPends []labelResolutionPend
 	}
 
@@ -132,8 +134,93 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 	case ssa.OpcodeReturn:
 		panic("BUG: return must be handled by backend.Compiler")
 	case ssa.OpcodeIconst, ssa.OpcodeF32const, ssa.OpcodeF64const: // Constant instructions are inlined.
+	case ssa.OpcodeCall:
+		m.lowerCall(instr)
+	case ssa.OpcodeStore:
+		m.lowerStore(instr)
 	default:
 		panic("TODO: lowering " + op.String())
+	}
+}
+
+func (m *machine) lowerStore(si *ssa.Instruction) {
+	value, ptr, offset, storeSizeInBits := si.StoreData()
+	rm := m.c.VRegOf(value)
+	base := m.c.VRegOf(ptr)
+
+	store := m.allocateInstr()
+	// TODO: optimization to find whether we could fit newAmodeRegRegShit.
+	store.asMovRM(rm, newOperandMem(newAmodeImmReg(offset, base)), storeSizeInBits/8)
+	m.insert(store)
+}
+
+func (m *machine) lowerCall(si *ssa.Instruction) {
+	isDirectCall := si.Opcode() == ssa.OpcodeCall
+	var directCallee ssa.FuncRef
+	var sigID ssa.SignatureID
+	var args []ssa.Value
+	if isDirectCall {
+		directCallee, sigID, args = si.CallData()
+	} else {
+		panic("TODO")
+	}
+	calleeABI := m.c.GetFunctionABI(m.c.SSABuilder().ResolveSignature(sigID))
+
+	stackSlotSize := calleeABI.AlignedArgResultStackSlotSize()
+	if m.maxRequiredStackSizeForCalls < stackSlotSize+16 {
+		m.maxRequiredStackSizeForCalls = stackSlotSize + 16 // return address frame.
+	}
+
+	for i, arg := range args {
+		reg := m.c.VRegOf(arg)
+		def := m.c.ValueDefinition(arg)
+		m.callerGenVRegToFunctionArg(calleeABI, i, reg, def, stackSlotSize)
+	}
+
+	if isDirectCall {
+		call := m.allocateInstr()
+		call.asCall(directCallee, calleeABI)
+		m.insert(call)
+	} else {
+		panic("TODO")
+	}
+
+	var index int
+	r1, rs := si.Returns()
+	if r1.Valid() {
+		m.callerGenFunctionReturnVReg(calleeABI, 0, m.c.VRegOf(r1), stackSlotSize)
+		index++
+	}
+
+	for _, r := range rs {
+		m.callerGenFunctionReturnVReg(calleeABI, index, m.c.VRegOf(r), stackSlotSize)
+		index++
+	}
+}
+
+// callerGenVRegToFunctionArg is the opposite of GenFunctionArgToVReg, which is used to generate the
+// caller side of the function call.
+func (m *machine) callerGenVRegToFunctionArg(a *backend.FunctionABI, argIndex int, reg regalloc.VReg, def *backend.SSAValueDefinition, slotBegin int64) {
+	arg := &a.Args[argIndex]
+	if def != nil && def.IsFromInstr() {
+		// Constant instructions are inlined.
+		if inst := def.Instr; inst.Constant() {
+			m.InsertLoadConstant(inst, reg)
+		}
+	}
+	if arg.Kind == backend.ABIArgKindReg {
+		m.InsertMove(arg.Reg, reg, arg.Type)
+	} else {
+		panic("TODO")
+	}
+}
+
+func (m *machine) callerGenFunctionReturnVReg(a *backend.FunctionABI, retIndex int, reg regalloc.VReg, slotBegin int64) {
+	r := &a.Rets[retIndex]
+	if r.Kind == backend.ABIArgKindReg {
+		m.InsertMove(reg, r.Reg, r.Type)
+	} else {
+		panic("TODO")
 	}
 }
 
@@ -240,8 +327,20 @@ func (m *machine) Encode(context.Context) {
 
 // ResolveRelocations implements backend.Machine.
 func (m *machine) ResolveRelocations(refToBinaryOffset map[ssa.FuncRef]int, binary []byte, relocations []backend.RelocationInfo) {
-	// TODO implement me
-	panic("implement me")
+	for _, r := range relocations {
+		instrOffset := r.Offset
+		calleeFnOffset := refToBinaryOffset[r.FuncRef]
+		// calleeFnOffset points to the beginning of call target function.
+		// call is 5 bytes where the last 4 bytes represent the signed 32-bit offset. See the encoding of `call` instruction.
+		// instrOffset is the offset of the last 4 bytes.
+		callInstrOffsetBytes := binary[instrOffset : instrOffset+4]
+		diff := int64(calleeFnOffset) - (instrOffset)
+		// We backpatch in-place the relative value `diff`.
+		callInstrOffsetBytes[0] = byte(diff)
+		callInstrOffsetBytes[1] = byte(diff >> 8)
+		callInstrOffsetBytes[2] = byte(diff >> 16)
+		callInstrOffsetBytes[3] = byte(diff >> 24)
+	}
 }
 
 // allocateInstr allocates an instruction.

@@ -108,6 +108,11 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
+			name: "call_simple", m: testcases.CallSimple.Module, calls: []callCase{{expResults: []uint64{40}}},
+			skipAMD64: false,
+		},
+
+		{
 			name: "call", m: testcases.Call.Module, calls: []callCase{{expResults: []uint64{45, 45}}},
 			skipAMD64: true,
 		},

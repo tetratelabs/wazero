@@ -337,6 +337,23 @@ var (
 			wasm.OpcodeEnd,
 		}, []wasm.ValueType{}),
 	}
+	CallSimple = TestCase{
+		Name: "call_simple",
+		Module: &wasm.Module{
+			TypeSection:     []wasm.FunctionType{v_i32, v_i32},
+			FunctionSection: []wasm.Index{0, 1},
+			CodeSection: []wasm.Code{
+				{Body: []byte{
+					// Call v_i32.
+					wasm.OpcodeCall, 1,
+					wasm.OpcodeEnd,
+				}},
+				// v_i32: return 40.
+				{Body: []byte{wasm.OpcodeI32Const, 40, wasm.OpcodeEnd}},
+			},
+			ExportSection: []wasm.Export{{Name: ExportedFunctionName, Index: 0, Type: wasm.ExternTypeFunc}},
+		},
+	}
 	Call = TestCase{
 		Name: "call",
 		Module: &wasm.Module{

@@ -226,6 +226,8 @@ func (i *instruction) Defs(regs *[]regalloc.VReg) []regalloc.VReg {
 			panic("BUG" + i.String())
 		}
 		*regs = append(*regs, i.op2.r)
+	case defKindCall:
+		*regs = append(*regs, i.abi.RetRealRegs...)
 	default:
 		panic(fmt.Sprintf("BUG: invalid defKind \"%s\" for %s", dk, i))
 	}
@@ -248,6 +250,8 @@ func (i *instruction) Uses(regs *[]regalloc.VReg) []regalloc.VReg {
 		default:
 			panic(fmt.Sprintf("BUG: invalid operand: %s", i))
 		}
+	case useKindCall:
+		*regs = append(*regs, i.abi.ArgRealRegs...)
 	default:
 		panic(fmt.Sprintf("BUG: invalid useKind %s for %s", uk, i))
 	}
@@ -1443,15 +1447,18 @@ type defKind byte
 const (
 	defKindNone defKind = iota + 1
 	defKindOp2
+	defKindCall
 )
 
 var defKinds = [instrMax]defKind{
 	nop0:        defKindNone,
 	ret:         defKindNone,
 	movRR:       defKindOp2,
+	movRM:       defKindNone,
 	imm:         defKindOp2,
 	xmmUnaryRmR: defKindOp2,
 	gprToXmm:    defKindOp2,
+	call:        defKindCall,
 }
 
 // String implements fmt.Stringer.
@@ -1461,6 +1468,8 @@ func (d defKind) String() string {
 		return "none"
 	case defKindOp2:
 		return "op2"
+	case defKindCall:
+		return "call"
 	default:
 		return "invalid"
 	}
@@ -1471,15 +1480,18 @@ type useKind byte
 const (
 	useKindNone useKind = iota + 1
 	useKindOp1
+	useKindCall
 )
 
 var useKinds = [instrMax]useKind{
 	nop0:        useKindNone,
 	ret:         useKindNone,
 	movRR:       useKindOp1,
+	movRM:       useKindOp1,
 	imm:         useKindNone,
 	xmmUnaryRmR: useKindOp1,
 	gprToXmm:    useKindOp1,
+	call:        useKindCall,
 }
 
 func (u useKind) String() string {
@@ -1488,6 +1500,8 @@ func (u useKind) String() string {
 		return "none"
 	case useKindOp1:
 		return "op1"
+	case useKindCall:
+		return "call"
 	default:
 		return "invalid"
 	}

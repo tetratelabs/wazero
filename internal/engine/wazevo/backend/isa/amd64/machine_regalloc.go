@@ -43,6 +43,5 @@ func (m *machine) LastInstrForInsertion(begin, end *instruction) *instruction {
 
 // SSABlockLabel implements backend.RegAllocFunctionMachine.
 func (m *machine) SSABlockLabel(id ssa.BasicBlockID) backend.Label {
-	// TODO implement me
-	panic("implement me")
+	return m.ectx.SsaBlockIDToLabels[id]
 }
