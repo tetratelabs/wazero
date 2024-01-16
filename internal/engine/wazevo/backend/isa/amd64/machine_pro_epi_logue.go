@@ -35,6 +35,20 @@ func (m *machine) SetupPrologue() {
 	cur = linkInstr(cur, m.allocateInstr().asPush64(newOperandReg(rbpVReg)))
 	cur = linkInstr(cur, m.allocateInstr().asMovRR(rspVReg, rbpVReg, true))
 
+	//                   (high address)                     (high address)
+	//       RBP ----> +-----------------+                +-----------------+
+	//                 |     .......     |                |     .......     |
+	//                 |      ret Y      |                |      ret Y      |
+	//                 |     .......     |                |     .......     |
+	//                 |      ret 0      |                |      ret 0      |
+	//                 |      arg X      |                |      arg X      |
+	//                 |     .......     |     ====>      |     .......     |
+	//                 |      arg 1      |                |      arg 1      |
+	//                 |      arg 0      |                |      arg 0      |
+	//                 |   Return Addr   |                |   Return Addr   |
+	//       RSP ----> +-----------------+                |    Frame Addr   |
+	//                    (low address)                   +-----------------+ <----- RSP, RBP
+	//
 	if !m.stackBoundsCheckDisabled { //nolint
 		// TODO: stack bounds check
 	}
