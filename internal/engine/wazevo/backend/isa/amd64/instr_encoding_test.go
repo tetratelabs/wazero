@@ -1190,72 +1190,72 @@ func TestInstruction_format_encode(t *testing.T) {
 			wantFormat: "popq %r15",
 		},
 		{
-			setup:      func(i *instruction) { i.asPush64(newOperandMem(newAmodeRegRegShit(0, rbpVReg, r13VReg, 2))) },
+			setup:      func(i *instruction) { i.asPush64(newOperandMem(newAmodeRegRegShift(0, rbpVReg, r13VReg, 2))) },
 			want:       "42ff74ad00",
 			wantFormat: "pushq (%rbp,%r13,4)",
 		},
 		{
-			setup:      func(i *instruction) { i.asPush64(newOperandMem(newAmodeRegRegShit(1, rspVReg, r13VReg, 2))) },
+			setup:      func(i *instruction) { i.asPush64(newOperandMem(newAmodeRegRegShift(1, rspVReg, r13VReg, 2))) },
 			want:       "42ff74ac01",
 			wantFormat: "pushq 1(%rsp,%r13,4)",
 		},
 		{
-			setup:      func(i *instruction) { i.asPush64(newOperandMem(newAmodeRegRegShit(1<<14, rspVReg, r13VReg, 3))) },
+			setup:      func(i *instruction) { i.asPush64(newOperandMem(newAmodeRegRegShift(1<<14, rspVReg, r13VReg, 3))) },
 			want:       "42ffb4ec00400000",
 			wantFormat: "pushq 16384(%rsp,%r13,8)",
 		},
 		{
-			setup:      func(i *instruction) { i.asPush64(newOperandMem(newAmodeRegRegShit(1<<14, rspVReg, rcxVReg, 3))) },
+			setup:      func(i *instruction) { i.asPush64(newOperandMem(newAmodeRegRegShift(1<<14, rspVReg, rcxVReg, 3))) },
 			want:       "ffb4cc00400000",
 			wantFormat: "pushq 16384(%rsp,%rcx,8)",
 		},
 		{
-			setup:      func(i *instruction) { i.asPush64(newOperandMem(newAmodeRegRegShit(1<<14, rspVReg, rbpVReg, 3))) },
+			setup:      func(i *instruction) { i.asPush64(newOperandMem(newAmodeRegRegShift(1<<14, rspVReg, rbpVReg, 3))) },
 			want:       "ffb4ec00400000",
 			wantFormat: "pushq 16384(%rsp,%rbp,8)",
 		},
 		{
-			setup:      func(i *instruction) { i.asPush64(newOperandMem(newAmodeRegRegShit(1<<14, rsiVReg, rcxVReg, 3))) },
+			setup:      func(i *instruction) { i.asPush64(newOperandMem(newAmodeRegRegShift(1<<14, rsiVReg, rcxVReg, 3))) },
 			want:       "ffb4ce00400000",
 			wantFormat: "pushq 16384(%rsi,%rcx,8)",
 		},
 		{
-			setup:      func(i *instruction) { i.asPush64(newOperandMem(newAmodeRegRegShit(321, rsiVReg, rcxVReg, 3))) },
+			setup:      func(i *instruction) { i.asPush64(newOperandMem(newAmodeRegRegShift(321, rsiVReg, rcxVReg, 3))) },
 			want:       "ffb4ce41010000",
 			wantFormat: "pushq 321(%rsi,%rcx,8)",
 		},
 		{
-			setup:      func(i *instruction) { i.asPush64(newOperandMem(newAmodeRegRegShit(0, rsiVReg, rcxVReg, 3))) },
+			setup:      func(i *instruction) { i.asPush64(newOperandMem(newAmodeRegRegShift(0, rsiVReg, rcxVReg, 3))) },
 			want:       "ff34ce",
 			wantFormat: "pushq (%rsi,%rcx,8)",
 		},
 		{
-			setup:      func(i *instruction) { i.asPush64(newOperandMem(newAmodeRegRegShit(321, r9VReg, rbxVReg, 2))) },
+			setup:      func(i *instruction) { i.asPush64(newOperandMem(newAmodeRegRegShift(321, r9VReg, rbxVReg, 2))) },
 			want:       "41ffb49941010000",
 			wantFormat: "pushq 321(%r9,%rbx,4)",
 		},
 		{
-			setup:      func(i *instruction) { i.asPush64(newOperandMem(newAmodeRegRegShit(321, r9VReg, rbpVReg, 2))) },
+			setup:      func(i *instruction) { i.asPush64(newOperandMem(newAmodeRegRegShift(321, r9VReg, rbpVReg, 2))) },
 			want:       "41ffb4a941010000",
 			wantFormat: "pushq 321(%r9,%rbp,4)",
 		},
 		{
-			setup:      func(i *instruction) { i.asPush64(newOperandMem(newAmodeRegRegShit(321, r9VReg, r13VReg, 2))) },
+			setup:      func(i *instruction) { i.asPush64(newOperandMem(newAmodeRegRegShift(321, r9VReg, r13VReg, 2))) },
 			want:       "43ffb4a941010000",
 			wantFormat: "pushq 321(%r9,%r13,4)",
 		},
 		{
-			setup:      func(i *instruction) { i.asPush64(newOperandMem(newAmodeRegRegShit(321, rbpVReg, r13VReg, 2))) },
+			setup:      func(i *instruction) { i.asPush64(newOperandMem(newAmodeRegRegShift(321, rbpVReg, r13VReg, 2))) },
 			want:       "42ffb4ad41010000",
 			wantFormat: "pushq 321(%rbp,%r13,4)",
 		},
 		{
-			setup:      func(i *instruction) { i.asPush64(newOperandMem(newAmodeRegRegShit(0, r9VReg, r13VReg, 2))) },
+			setup:      func(i *instruction) { i.asPush64(newOperandMem(newAmodeRegRegShift(0, r9VReg, r13VReg, 2))) },
 			want:       "43ff34a9",
 			wantFormat: "pushq (%r9,%r13,4)",
 		},
 		{
-			setup:      func(i *instruction) { i.asPush64(newOperandMem(newAmodeRegRegShit(1<<20, r9VReg, r13VReg, 2))) },
+			setup:      func(i *instruction) { i.asPush64(newOperandMem(newAmodeRegRegShift(1<<20, r9VReg, r13VReg, 2))) },
 			want:       "43ffb4a900001000",
 			wantFormat: "pushq 1048576(%r9,%r13,4)",
 		},
@@ -1538,7 +1538,7 @@ func TestInstruction_format_encode(t *testing.T) {
 			wantFormat: "lea 65535(%rdi), %rdx",
 		},
 		{
-			setup:      func(i *instruction) { i.asLEA(newAmodeRegRegShit(0xffff, rspVReg, r13VReg, 3), rdxVReg) },
+			setup:      func(i *instruction) { i.asLEA(newAmodeRegRegShift(0xffff, rspVReg, r13VReg, 3), rdxVReg) },
 			want:       "4a8d94ecffff0000",
 			wantFormat: "lea 65535(%rsp,%r13,8), %rdx",
 		},
@@ -1871,7 +1871,7 @@ func TestInstruction_format_encode(t *testing.T) {
 		},
 		{
 			setup: func(i *instruction) {
-				a := newOperandMem(newAmodeRegRegShit(1<<20, raxVReg, rcxVReg, 3))
+				a := newOperandMem(newAmodeRegRegShift(1<<20, raxVReg, rcxVReg, 3))
 				i.asMovRM(rdiVReg, a, 2)
 			},
 			want:       "6689bcc800001000",
@@ -1879,7 +1879,7 @@ func TestInstruction_format_encode(t *testing.T) {
 		},
 		{
 			setup: func(i *instruction) {
-				a := newOperandMem(newAmodeRegRegShit(123, raxVReg, rcxVReg, 0))
+				a := newOperandMem(newAmodeRegRegShift(123, raxVReg, rcxVReg, 0))
 				i.asMovRM(rdiVReg, a, 4)
 			},
 			want:       "897c087b",
@@ -1887,7 +1887,7 @@ func TestInstruction_format_encode(t *testing.T) {
 		},
 		{
 			setup: func(i *instruction) {
-				a := newOperandMem(newAmodeRegRegShit(123, raxVReg, rcxVReg, 0))
+				a := newOperandMem(newAmodeRegRegShift(123, raxVReg, rcxVReg, 0))
 				i.asMovRM(rdiVReg, a, 8)
 			},
 			want:       "48897c087b",
@@ -1895,7 +1895,7 @@ func TestInstruction_format_encode(t *testing.T) {
 		},
 		{
 			setup: func(i *instruction) {
-				a := newOperandMem(newAmodeRegRegShit(123, raxVReg, rcxVReg, 0))
+				a := newOperandMem(newAmodeRegRegShift(123, raxVReg, rcxVReg, 0))
 				i.asXmmMovRM(sseOpcodeMovaps, xmm1VReg, a)
 			},
 			want:       "0f294c087b",

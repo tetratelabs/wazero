@@ -149,7 +149,7 @@ func (m *machine) lowerStore(si *ssa.Instruction) {
 	base := m.c.VRegOf(ptr)
 
 	store := m.allocateInstr()
-	// TODO: optimization to find whether we could fit newAmodeRegRegShit.
+	// TODO: optimization to find whether we could fit newAmodeRegRegShift.
 	store.asMovRM(rm, newOperandMem(newAmodeImmReg(offset, base)), storeSizeInBits/8)
 	m.insert(store)
 }
