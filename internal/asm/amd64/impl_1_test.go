@@ -497,24 +497,26 @@ func TestAssemblerImpl_CompileMemoryToConst(t *testing.T) {
 
 func TestAssemblerImpl_encodeNoneToNone(t *testing.T) {
 	tests := []struct {
+		name   string
 		inst   asm.Instruction
 		exp    []byte
 		expErr bool
 	}{
-		{inst: ADDL, expErr: true},
-		{inst: CDQ, exp: []byte{0x99}},
-		{inst: CQO, exp: []byte{0x48, 0x99}},
-		{inst: NOP, exp: nil},
-		{inst: RET, exp: []byte{0xc3}},
-		{inst: REPMOVSQ, exp: []byte{0xf3, rexPrefixW, 0xa5}},
-		{inst: REPSTOSQ, exp: []byte{0xf3, rexPrefixW, 0xab}},
-		{inst: STD, exp: []byte{0xfd}},
-		{inst: CLD, exp: []byte{0xfc}},
+		{name: "addl", inst: ADDL, expErr: true},
+		{name: "cltd", inst: CDQ, exp: []byte{0x99}},
+		{name: "cqto", inst: CQO, exp: []byte{0x48, 0x99}},
+		{name: "nop", inst: NOP, exp: nil},
+		{name: "retq", inst: RET, exp: []byte{0xc3}},
+		{name: "rep movsq (%rsi), (%rdi)", inst: REPMOVSQ, exp: []byte{0xf3, 0x48, 0xa5}},
+		{name: "rep stosq %rax, (%rdi)", inst: REPSTOSQ, exp: []byte{0xf3, 0x48, 0xab}},
+		{name: "std", inst: STD, exp: []byte{0xfd}},
+		{name: "cld", inst: CLD, exp: []byte{0xfc}},
+		{name: "mfence", inst: MFENCE, exp: []byte{0x0f, 0xae, 0xf0}},
 	}
 
 	for _, tt := range tests {
 		tc := tt
-		t.Run(InstructionName(tc.inst), func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			code := asm.CodeSegment{}
 			defer func() { require.NoError(t, code.Unmap()) }()
 
