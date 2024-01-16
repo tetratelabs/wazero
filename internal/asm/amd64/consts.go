@@ -75,6 +75,14 @@ const (
 	CMPL
 	// CMPQ is the CMP instruction in 64-bit mode. https://www.felixcloutier.com/x86/cmp
 	CMPQ
+	// CMPXCHGQ is the CMPXCHG instruction in 64-bit mode. https://www.felixcloutier.com/x86/cmpxchg
+	CMPXCHGQ
+	// CMPXCHGL is the CMPXCHG instruction in 32-bit mode. https://www.felixcloutier.com/x86/cmpxchg
+	CMPXCHGL
+	// CMPXCHGW is the CMPXCHG instruction in 16-bit mode. https://www.felixcloutier.com/x86/cmpxchg
+	CMPXCHGW
+	// CMPXCHGW is the CMPXCHG instruction in 8-bit mode. https://www.felixcloutier.com/x86/cmpxchg
+	CMPXCHGB
 	// COMISD is the COMISD instruction. https://www.felixcloutier.com/x86/comisd
 	COMISD
 	// COMISS is the COMISS instruction. https://www.felixcloutier.com/x86/comiss
@@ -199,6 +207,12 @@ const (
 	MULSS
 	// NEGQ is the NEG instruction in 64-bit mode. https://www.felixcloutier.com/x86/neg
 	NEGQ
+	// NEGL is the NEG instruction in 32-bit mode. https://www.felixcloutier.com/x86/neg
+	NEGL
+	// NEGW is the NEG instruction in 16-bit mode. https://www.felixcloutier.com/x86/neg
+	NEGW
+	// NEGB is the NEG instruction in 8-bit mode. https://www.felixcloutier.com/x86/neg
+	NEGB
 	// ORL is the OR instruction in 32-bit mode. https://www.felixcloutier.com/x86/or
 	ORL
 	// ORPD is the ORPD instruction. https://www.felixcloutier.com/x86/orpd
@@ -311,6 +325,13 @@ const (
 	XORQ
 	// XCHGQ is the XCHG instruction in 64-bit mode. https://www.felixcloutier.com/x86/xchg
 	XCHGQ
+	// XCHGW is the XCHG instruction in 32-bit mode. https://www.felixcloutier.com/x86/xchg
+	XCHGW
+	// XCHGL is the XCHG instruction in 16-bit mode. https://www.felixcloutier.com/x86/xchg
+	XCHGL
+	// XCHGB is the XCHG instruction in 8-bit mode. https://www.felixcloutier.com/x86/xchg
+	XCHGB
+	// RET is the RET instruction. https://www.felixcloutier.com/x86/ret
 	// RET is the RET instruction. https://www.felixcloutier.com/x86/ret
 	RET
 	// JMP is the JMP instruction. https://www.felixcloutier.com/x86/jmp
@@ -568,6 +589,18 @@ const (
 	// CVTTPD2DQ is the CVTTPD2DQ instruction https://www.felixcloutier.com/x86/cvttpd2dq
 	CVTTPD2DQ
 
+	// XADDQ is the XADD instruction in 64-bit mode https://www.felixcloutier.com/x86/xadd
+	XADDQ
+	// XADDW is the XADD instruction in 16-bit mode https://www.felixcloutier.com/x86/xadd
+	XADDW
+	// XADDL is the XADD instruction in 32-bit mode https://www.felixcloutier.com/x86/xadd
+	XADDL
+	// XADDB is the XADD instruction in 8-bit mode https://www.felixcloutier.com/x86/xadd
+	XADDB
+
+	// MFENCE is the MFENCE instrution https://www.felixcloutier.com/x86/mfence
+	MFENCE
+
 	// instructionEnd is always placed at the bottom of this iota definition to be used in the test.
 	instructionEnd
 )
@@ -605,6 +638,14 @@ func InstructionName(instruction asm.Instruction) string {
 		return "CMPL"
 	case CMPQ:
 		return "CMPQ"
+	case CMPXCHGQ:
+		return "CMPXCHGQ"
+	case CMPXCHGL:
+		return "CMPXCHGL"
+	case CMPXCHGW:
+		return "CMPXCHGW"
+	case CMPXCHGB:
+		return "CMPXCHGB"
 	case COMISD:
 		return "COMISD"
 	case COMISS:
@@ -839,6 +880,12 @@ func InstructionName(instruction asm.Instruction) string {
 		return "XORQ"
 	case XCHGQ:
 		return "XCHGQ"
+	case XCHGW:
+		return "XCHGW"
+	case XCHGL:
+		return "XCHGL"
+	case XCHGB:
+		return "XCHGB"
 	case RET:
 		return "RET"
 	case JMP:
@@ -955,6 +1002,12 @@ func InstructionName(instruction asm.Instruction) string {
 		return "PUNPCKHBW"
 	case NEGQ:
 		return "NEGQ"
+	case NEGL:
+		return "NEGL"
+	case NEGW:
+		return "NEGW"
+	case NEGB:
+		return "NEGB"
 	case NONE:
 		return "NONE"
 	case CMPPS:
@@ -1099,6 +1152,16 @@ func InstructionName(instruction asm.Instruction) string {
 		return "PMADDUBSW"
 	case CVTTPD2DQ:
 		return "CVTTPD2DQ"
+	case XADDW:
+		return "XADDW"
+	case XADDQ:
+		return "XADDQ"
+	case XADDL:
+		return "XADDL"
+	case XADDB:
+		return "XADDB"
+	case MFENCE:
+		return "MFENCE"
 	}
 	panic(fmt.Errorf("unknown instruction %d", instruction))
 }
