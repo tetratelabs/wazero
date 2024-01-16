@@ -332,13 +332,14 @@ func (m *machine) ResolveRelocations(refToBinaryOffset map[ssa.FuncRef]int, bina
 		calleeFnOffset := refToBinaryOffset[r.FuncRef]
 		// calleeFnOffset points to the beginning of call target function.
 		// call is 5 bytes where the last 4 bytes represent the signed 32-bit offset. See the encoding of `call` instruction.
-		callInstrOffsetBytes := binary[instrOffset-1 : instrOffset+4]
+		// instrOffset is the offset of the last 4 bytes.
+		callInstrOffsetBytes := binary[instrOffset : instrOffset+4]
 		diff := int64(calleeFnOffset) - (instrOffset)
 		// We backpatch in-place the relative value `diff`.
-		callInstrOffsetBytes[1] = byte(diff)
-		callInstrOffsetBytes[2] = byte(diff >> 8)
-		callInstrOffsetBytes[3] = byte(diff >> 16)
-		callInstrOffsetBytes[4] = byte(diff >> 24)
+		callInstrOffsetBytes[0] = byte(diff)
+		callInstrOffsetBytes[1] = byte(diff >> 8)
+		callInstrOffsetBytes[2] = byte(diff >> 16)
+		callInstrOffsetBytes[3] = byte(diff >> 24)
 	}
 }
 
