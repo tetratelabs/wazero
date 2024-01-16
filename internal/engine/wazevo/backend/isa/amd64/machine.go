@@ -292,14 +292,7 @@ func (m *machine) callerGenVRegToFunctionArg(a *backend.FunctionABI, argIndex in
 	if arg.Kind == backend.ABIArgKindReg {
 		m.InsertMove(arg.Reg, reg, arg.Type)
 	} else {
-		// TODO: we could use pair store if there's consecutive stores for the same type.
-		//
-		// Note that at this point, stack pointer is already adjusted.
-		bits := arg.Type.Bits()
-		am := m.resolveAddressModeForOffset(arg.Offset-slotBegin, bits, rspVReg)
-		store := m.allocateInstr()
-		store.asMovRM(reg, newOperandMem(am), bits/8)
-		m.insert(store)
+		panic("TODO")
 	}
 }
 
@@ -308,18 +301,7 @@ func (m *machine) callerGenFunctionReturnVReg(a *backend.FunctionABI, retIndex i
 	if r.Kind == backend.ABIArgKindReg {
 		m.InsertMove(reg, r.Reg, r.Type)
 	} else {
-		// TODO: we could use pair load if there's consecutive loads for the same type.
-		dst := m.resolveAddressModeForOffset(a.ArgStackSize+r.Offset-slotBegin, r.Type.Bits(), rspVReg)
-		ldr := m.allocateInstr()
-		switch r.Type {
-		case ssa.TypeI32, ssa.TypeI64:
-			ldr.asLEA(dst, reg)
-		case ssa.TypeF32, ssa.TypeF64, ssa.TypeV128:
-			panic("TODO") // ldr.asFpuLoad(operandNR(reg), amode, r.Type.Bits())
-		default:
-			panic("BUG")
-		}
-		m.insert(ldr)
+		panic("TODO")
 	}
 }
 
@@ -454,8 +436,21 @@ func (m *machine) Encode(context.Context) {
 
 // ResolveRelocations implements backend.Machine.
 func (m *machine) ResolveRelocations(refToBinaryOffset map[ssa.FuncRef]int, binary []byte, relocations []backend.RelocationInfo) {
-	// TODO implement me
-	panic("implement me")
+	for _, r := range relocations {
+		instrOffset := r.Offset
+		fmt.Printf("instrOffset = %x\n", instrOffset)
+		calleeFnOffset := refToBinaryOffset[r.FuncRef]
+		fmt.Printf("calleeFnOffset = %x\n", calleeFnOffset)
+		callInstr := binary[instrOffset-1 : instrOffset+4]
+		fmt.Printf("callInstr = %x\n", callInstr)
+		diff := int64(calleeFnOffset) - (instrOffset)
+		fmt.Printf("diff = %d\n", diff)
+		callInstr[1] = byte(diff)
+		callInstr[2] = byte(diff >> 8)
+		callInstr[3] = byte(diff >> 16)
+		callInstr[4] = byte(diff >> 24)
+		fmt.Printf("\n---\n%x\n", binary)
+	}
 }
 
 // allocateInstr allocates an instruction.
