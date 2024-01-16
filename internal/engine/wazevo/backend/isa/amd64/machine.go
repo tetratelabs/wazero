@@ -438,18 +438,13 @@ func (m *machine) Encode(context.Context) {
 func (m *machine) ResolveRelocations(refToBinaryOffset map[ssa.FuncRef]int, binary []byte, relocations []backend.RelocationInfo) {
 	for _, r := range relocations {
 		instrOffset := r.Offset
-		fmt.Printf("instrOffset = %x\n", instrOffset)
 		calleeFnOffset := refToBinaryOffset[r.FuncRef]
-		fmt.Printf("calleeFnOffset = %x\n", calleeFnOffset)
 		callInstr := binary[instrOffset-1 : instrOffset+4]
-		fmt.Printf("callInstr = %x\n", callInstr)
 		diff := int64(calleeFnOffset) - (instrOffset)
-		fmt.Printf("diff = %d\n", diff)
 		callInstr[1] = byte(diff)
 		callInstr[2] = byte(diff >> 8)
 		callInstr[3] = byte(diff >> 16)
 		callInstr[4] = byte(diff >> 24)
-		fmt.Printf("\n---\n%x\n", binary)
 	}
 }
 
