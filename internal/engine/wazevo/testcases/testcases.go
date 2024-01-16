@@ -348,7 +348,7 @@ var (
 					wasm.OpcodeCall, 1,
 					wasm.OpcodeEnd,
 				}},
-				// v_i32: return 100.
+				// v_i32: return 40.
 				{Body: []byte{wasm.OpcodeI32Const, 40, wasm.OpcodeEnd}},
 			},
 			ExportSection: []wasm.Export{{Name: ExportedFunctionName, Index: 0, Type: wasm.ExternTypeFunc}},
