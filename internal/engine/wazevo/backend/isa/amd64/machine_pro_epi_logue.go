@@ -1,7 +1,5 @@
 package amd64
 
-import "log"
-
 // CompileStackGrowCallSequence implements backend.Machine.
 func (m *machine) CompileStackGrowCallSequence() []byte {
 	// TODO
@@ -42,13 +40,11 @@ func (m *machine) SetupPrologue() {
 	}
 
 	if regs := m.clobberedRegs; len(regs) > 0 {
-		// panic("TODO: save clobbered registers")
-		log.Println("TODO: save clobbered registers")
+		panic("TODO: save clobbered registers")
 	}
 
 	if size := m.spillSlotSize; size > 0 {
-		// panic("TODO: allocate spill slots")
-		log.Println("TODO: allocate spill slots")
+		panic("TODO: allocate spill slots")
 	}
 
 	linkInstr(cur, prevInitInst)
@@ -105,12 +101,10 @@ func (m *machine) setupEpilogueAfter(cur *instruction) {
 	//             (low address)
 
 	if size := m.spillSlotSize; size > 0 {
-		// panic("TODO: deallocate spill slots")
-		log.Println("TODO: deallocate spill slots")
+		panic("TODO: deallocate spill slots")
 	}
 	if regs := m.clobberedRegs; len(regs) > 0 {
-		// panic("TODO: restore clobbered registers")
-		log.Println("TODO: restore clobbered registers")
+		panic("TODO: restore clobbered registers")
 	}
 
 	// Now roll back the RSP to the return address, and pop the RBP.

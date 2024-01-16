@@ -151,8 +151,6 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		m.lowerCall(instr)
 	case ssa.OpcodeStore:
 		m.lowerStore(instr)
-	case ssa.OpcodeIadd:
-		m.lowerIadd(instr)
 	default:
 		panic("TODO: lowering " + op.String())
 	}
@@ -170,14 +168,13 @@ func (m *machine) lowerStore(si *ssa.Instruction) {
 
 func (m *machine) lowerCall(si *ssa.Instruction) {
 	isDirectCall := si.Opcode() == ssa.OpcodeCall
-	var indirectCalleePtr ssa.Value
 	var directCallee ssa.FuncRef
 	var sigID ssa.SignatureID
 	var args []ssa.Value
 	if isDirectCall {
 		directCallee, sigID, args = si.CallData()
 	} else {
-		indirectCalleePtr, sigID, args = si.CallIndirectData()
+		panic("TODO")
 	}
 	calleeABI := m.c.GetFunctionABI(m.c.SSABuilder().ResolveSignature(sigID))
 
@@ -197,7 +194,6 @@ func (m *machine) lowerCall(si *ssa.Instruction) {
 		call.asCall(directCallee, calleeABI)
 		m.insert(call)
 	} else {
-		_ = indirectCalleePtr
 		panic("TODO")
 	}
 
@@ -212,71 +208,6 @@ func (m *machine) lowerCall(si *ssa.Instruction) {
 		m.callerGenFunctionReturnVReg(calleeABI, index, m.c.VRegOf(r), stackSlotSize)
 		index++
 	}
-}
-
-func (m *machine) lowerIadd(si *ssa.Instruction) {
-	x, y := si.Arg2()
-	if !x.Type().IsInt() {
-		panic("BUG?")
-	}
-
-	_64 := x.Type().Bits() == 64
-
-	xDef := m.c.ValueDefinition(x)
-	yDef := m.c.ValueDefinition(y)
-
-	rn := m.getOperandGP(xDef)
-	rm := m.getOperandGP(yDef)
-
-	tmp := m.c.VRegOf(si.Return())
-	mov := m.allocateInstr()
-	mov.asMovRR(rn.r, tmp, _64)
-
-	alu := m.allocateInstr()
-	alu.asAluRmiR(aluRmiROpcodeAdd, rm, tmp, _64)
-	m.insert(alu)
-}
-
-func (m *machine) getOperandGP(def *backend.SSAValueDefinition) operand {
-	var v regalloc.VReg
-	if def.IsFromBlockParam() {
-		v = def.BlkParamVReg
-	} else {
-		instr := def.Instr
-		if instr.Constant() {
-			panic("TODO: instr.Constant")
-		} else {
-			if n := def.N; n == 0 {
-				v = m.c.VRegOf(instr.Return())
-			} else {
-				_, rs := instr.Returns()
-				v = m.c.VRegOf(rs[n-1])
-			}
-		}
-	}
-
-	r := v
-
-	//switch inBits := def.SSAValue().Type().Bits(); {
-	//case mode == extModeNone:
-	//case inBits == 32 && (mode == extModeZeroExtend32 || mode == extModeSignExtend32):
-	//case inBits == 32 && mode == extModeZeroExtend64:
-	//	extended := m.compiler.AllocateVReg(ssa.TypeI64)
-	//	ext := m.allocateInstr()
-	//	ext.asExtend(extended, v, 32, 64, false)
-	//	m.insert(ext)
-	//	r = extended
-	//case inBits == 32 && mode == extModeSignExtend64:
-	//	extended := m.compiler.AllocateVReg(ssa.TypeI64)
-	//	ext := m.allocateInstr()
-	//	ext.asExtend(extended, v, 32, 64, true)
-	//	m.insert(ext)
-	//	r = extended
-	//case inBits == 64 && (mode == extModeZeroExtend64 || mode == extModeSignExtend64):
-	//}
-	//return operandNR(r)
-
-	return newOperandReg(r)
 }
 
 // callerGenVRegToFunctionArg is the opposite of GenFunctionArgToVReg, which is used to generate the
