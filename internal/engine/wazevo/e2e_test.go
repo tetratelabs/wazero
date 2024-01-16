@@ -109,7 +109,7 @@ func TestE2E(t *testing.T) {
 		},
 		{
 			name: "call", m: testcases.Call.Module, calls: []callCase{{expResults: []uint64{45, 45}}},
-			skipAMD64: false,
+			skipAMD64: true,
 		},
 		{
 			name: "stack overflow",

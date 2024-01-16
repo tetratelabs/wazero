@@ -48,6 +48,7 @@ func (m *machine) SetupPrologue() {
 
 	if size := m.spillSlotSize; size > 0 {
 		// panic("TODO: allocate spill slots")
+		log.Println("TODO: allocate spill slots")
 	}
 
 	linkInstr(cur, prevInitInst)

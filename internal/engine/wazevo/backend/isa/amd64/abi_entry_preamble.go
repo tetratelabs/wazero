@@ -23,7 +23,6 @@ var (
 
 func (m *machine) goEntryPreamblePassArg(cur *instruction, paramSlicePtr regalloc.VReg, arg *backend.ABIArg, argStartOffsetFromSP int64) *instruction {
 	typ := arg.Type
-	bits := typ.Bits()
 	isStackArg := arg.Kind == backend.ABIArgKindStack
 
 	var loadTargetReg regalloc.VReg
@@ -65,7 +64,6 @@ func (m *machine) goEntryPreamblePassArg(cur *instruction, paramSlicePtr regallo
 
 	if isStackArg {
 		panic("TODO")
-		_ = bits
 		//	var storeMode addressMode
 		//	cur, storeMode = m.resolveAddressModeForOffsetAndInsert(cur, argStartOffsetFromSP+arg.Offset, bits, spVReg, true)
 		//	toStack := m.allocateInstr()

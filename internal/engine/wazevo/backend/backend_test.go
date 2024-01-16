@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/isa/amd64"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/isa/arm64"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/frontend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
@@ -18,7 +19,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	if runtime.GOARCH != "arm64" {
+	if runtime.GOARCH != "arm64" && runtime.GOARCH != "amd64" {
 		os.Exit(0)
 	}
 	os.Exit(m.Run())
@@ -28,6 +29,8 @@ func newMachine() backend.Machine {
 	switch runtime.GOARCH {
 	case "arm64":
 		return arm64.NewBackend()
+	case "amd64":
+		return amd64.NewBackend()
 	default:
 		panic("unsupported architecture")
 	}
@@ -41,7 +44,7 @@ func TestE2E(t *testing.T) {
 		m                                      *wasm.Module
 		targetIndex                            uint32
 		afterLoweringARM64, afterFinalizeARM64 string
-		// TODO: amd64.
+		afterLoweringAMD64, afterFinalizeAMD64 string
 	}
 
 	for _, tc := range []testCase{
@@ -681,6 +684,61 @@ L1 (SSA Block: blk0):
 	add sp, sp, #0x10
 	add sp, sp, #0x20
 	ldr x30, [sp], #0x10
+	ret
+`,
+			afterLoweringAMD64: `
+L1 (SSA Block: blk0):
+	movq %rax, %r128?
+	movq %rcx, %r129?
+	mov.q %r129?, 8(%r128?)
+	movq %r128?, %rax
+	movq %r129?, %rcx
+	call f1
+	movl %eax, %r130d?
+	mov.q %r129?, 8(%r128?)
+	movq %r128?, %rax
+	movq %r129?, %rcx
+	movl %r130d?, %ebx
+	movl $5, %r131d?
+	movl %r131d?, %esi
+	call f2
+	movl %eax, %r132d?
+	mov.q %r129?, 8(%r128?)
+	movq %r128?, %rax
+	movq %r129?, %rcx
+	movl %r132d?, %ebx
+	call f3
+	movl %eax, %r133d?
+	movl %ecx, %r134d?
+	movl %r134d?, %ecx
+	movl %r133d?, %eax
+	ret
+`,
+			afterFinalizeAMD64: `
+L1 (SSA Block: blk0):
+	pushq %rbp
+	movq %rsp, %rbp
+	mov.q %rax, 24(%rsp)
+	mov.q %rcx, 16(%rsp)
+	mov.q %rcx, 8(%r128?)
+	call f1
+	mov.l %rax, 32(%rsp)
+	lea 16(%rsp), %rcx
+	mov.q %rcx, 8(%r128?)
+	lea 24(%rsp), %rdx
+	movq %rdx, %rax
+	lea 32(%rsp), %rbx
+	movl $5, %esi
+	call f2
+	mov.l %rax, 36(%rsp)
+	lea 16(%rsp), %rcx
+	mov.q %rcx, 8(%r128?)
+	movq %rdx, %rax
+	lea 36(%rsp), %rdx
+	movl %edx, %ebx
+	call f3
+	movq %rbp, %rsp
+	popq %rbp
 	ret
 `,
 		},
@@ -2155,6 +2213,13 @@ L1 (SSA Block: blk0):
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			switch runtime.GOARCH {
+			case "amd64":
+				if tc.afterFinalizeAMD64 == "" {
+					t.Skip("amd64 not yet implemented")
+				}
+			}
+
 			ssab := ssa.NewBuilder()
 			offset := wazevoapi.NewModuleContextOffsetData(tc.m, false)
 			fc := frontend.NewFrontendCompiler(tc.m, ssab, &offset, false, false, false)
@@ -2197,6 +2262,10 @@ L1 (SSA Block: blk0):
 				if tc.afterLoweringARM64 != "" {
 					require.Equal(t, tc.afterLoweringARM64, be.Format())
 				}
+			case "amd64":
+				if tc.afterLoweringAMD64 != "" {
+					require.Equal(t, tc.afterLoweringAMD64, be.Format())
+				}
 			default:
 				t.Fail()
 			}
@@ -2216,6 +2285,8 @@ L1 (SSA Block: blk0):
 			switch runtime.GOARCH {
 			case "arm64":
 				require.Equal(t, tc.afterFinalizeARM64, be.Format())
+			case "amd64":
+				require.Equal(t, tc.afterFinalizeAMD64, be.Format())
 			default:
 				t.Fail()
 			}
