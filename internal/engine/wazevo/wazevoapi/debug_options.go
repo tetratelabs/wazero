@@ -19,17 +19,17 @@ import (
 const (
 	FrontEndLoggingEnabled = false
 	SSALoggingEnabled      = false
-	RegAllocLoggingEnabled = false
+	RegAllocLoggingEnabled = true
 )
 
 // ----- Output prints -----
 // These consts must be disabled by default. Enable them only when debugging.
 
 const (
-	PrintSSA                                 = false
+	PrintSSA                                 = true
 	PrintOptimizedSSA                        = false
 	PrintBlockLaidOutSSA                     = false
-	PrintSSAToBackendIRLowering              = false
+	PrintSSAToBackendIRLowering              = true
 	PrintRegisterAllocated                   = false
 	PrintFinalizedMachineCode                = false
 	PrintMachineCodeHexPerFunction           = printMachineCodeHexPerFunctionUnmodified || PrintMachineCodeHexPerFunctionDisassemblable //nolint

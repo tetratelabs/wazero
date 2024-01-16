@@ -2,6 +2,7 @@ package amd64
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
@@ -226,6 +227,8 @@ func (i *instruction) Defs(regs *[]regalloc.VReg) []regalloc.VReg {
 			panic("BUG" + i.String())
 		}
 		*regs = append(*regs, i.op2.r)
+	case defKindCall:
+		*regs = append(*regs, i.abi.RetRealRegs...)
 	default:
 		panic(fmt.Sprintf("BUG: invalid defKind \"%s\" for %s", dk, i))
 	}
@@ -237,6 +240,28 @@ func (i *instruction) Uses(regs *[]regalloc.VReg) []regalloc.VReg {
 	*regs = (*regs)[:0]
 	switch uk := useKinds[i.kind]; uk {
 	case useKindNone:
+	case useKindOp1Op2:
+		op := i.op1
+		switch op.kind {
+		case operandKindReg:
+			*regs = append(*regs, op.r)
+		case operandKindMem:
+			op.amode.uses(regs)
+		case operandKindImm32, operandKindLabel:
+		default:
+			panic(fmt.Sprintf("BUG: invalid operand: %s", i))
+		}
+
+		op = i.op2
+		switch op.kind {
+		case operandKindReg:
+			*regs = append(*regs, op.r)
+		case operandKindMem:
+			op.amode.uses(regs)
+		case operandKindImm32, operandKindLabel:
+		default:
+			panic(fmt.Sprintf("BUG: invalid operand: %s", i))
+		}
 	case useKindOp1:
 		op := i.op1
 		switch op.kind {
@@ -248,6 +273,8 @@ func (i *instruction) Uses(regs *[]regalloc.VReg) []regalloc.VReg {
 		default:
 			panic(fmt.Sprintf("BUG: invalid operand: %s", i))
 		}
+	case useKindCall:
+		*regs = append(*regs, i.abi.ArgRealRegs...)
 	default:
 		panic(fmt.Sprintf("BUG: invalid useKind %s for %s", uk, i))
 	}
@@ -258,6 +285,40 @@ func (i *instruction) Uses(regs *[]regalloc.VReg) []regalloc.VReg {
 func (i *instruction) AssignUse(index int, v regalloc.VReg) {
 	switch uk := useKinds[i.kind]; uk {
 	case useKindNone:
+	case useKindOp1Op2:
+		if index == 0 {
+			op := &i.op1
+			switch op.kind {
+			case operandKindReg:
+				if index != 0 {
+					panic("BUG")
+				}
+				if op.r.IsRealReg() {
+					panic("BUG already assigned: " + i.String())
+				}
+				op.r = v
+			case operandKindMem:
+				op.amode.assignUses(index, v)
+			default:
+				panic(fmt.Sprintf("BUG: invalid operand: %s", i))
+			}
+		} else {
+			op := &i.op2
+			switch op.kind {
+			case operandKindReg:
+				if index != 1 {
+					panic("BUG " + strconv.Itoa(index))
+				}
+				if op.r.IsRealReg() {
+					panic("BUG already assigned: " + i.String())
+				}
+				op.r = v
+			case operandKindMem:
+				op.amode.assignUses(index, v)
+			default:
+				panic(fmt.Sprintf("BUG: invalid operand: %s", i))
+			}
+		}
 	case useKindOp1:
 		op := &i.op1
 		switch op.kind {
@@ -1443,15 +1504,19 @@ type defKind byte
 const (
 	defKindNone defKind = iota + 1
 	defKindOp2
+	defKindCall
 )
 
 var defKinds = [instrMax]defKind{
 	nop0:        defKindNone,
 	ret:         defKindNone,
 	movRR:       defKindOp2,
+	movRM:       defKindNone,
 	imm:         defKindOp2,
+	aluRmiR:     defKindOp2,
 	xmmUnaryRmR: defKindOp2,
 	gprToXmm:    defKindOp2,
+	call:        defKindCall,
 }
 
 // String implements fmt.Stringer.
@@ -1461,6 +1526,8 @@ func (d defKind) String() string {
 		return "none"
 	case defKindOp2:
 		return "op2"
+	case defKindCall:
+		return "call"
 	default:
 		return "invalid"
 	}
@@ -1471,15 +1538,20 @@ type useKind byte
 const (
 	useKindNone useKind = iota + 1
 	useKindOp1
+	useKindOp1Op2
+	useKindCall
 )
 
 var useKinds = [instrMax]useKind{
 	nop0:        useKindNone,
 	ret:         useKindNone,
 	movRR:       useKindOp1,
+	movRM:       useKindOp1,
 	imm:         useKindNone,
 	xmmUnaryRmR: useKindOp1,
 	gprToXmm:    useKindOp1,
+	aluRmiR:     useKindOp1Op2,
+	call:        useKindCall,
 }
 
 func (u useKind) String() string {
@@ -1488,6 +1560,10 @@ func (u useKind) String() string {
 		return "none"
 	case useKindOp1:
 		return "op1"
+	case useKindOp1Op2:
+		return "op1op2"
+	case useKindCall:
+		return "call"
 	default:
 		return "invalid"
 	}

@@ -19,8 +19,9 @@ func NewBackend() backend.Machine {
 		asNop,
 	)
 	return &machine{
-		ectx:     ectx,
-		regAlloc: regalloc.NewAllocator(regInfo),
+		spillSlots: make(map[regalloc.VRegID]int64),
+		ectx:       ectx,
+		regAlloc:   regalloc.NewAllocator(regInfo),
 	}
 }
 
@@ -36,8 +37,11 @@ type (
 		regAllocStarted bool
 
 		spillSlotSize int64
+		spillSlots    map[regalloc.VRegID]int64 // regalloc.VRegID to offset.
 		currentABI    *backend.FunctionABI
 		clobberedRegs []regalloc.VReg
+
+		maxRequiredStackSizeForCalls int64
 
 		labelResolutionPends []labelResolutionPend
 	}
@@ -94,6 +98,17 @@ func (m *machine) InsertReturn() {
 	m.insert(i)
 }
 
+func (m *machine) getVRegSpillSlotOffsetFromSP(id regalloc.VRegID, size byte) int64 {
+	offset, ok := m.spillSlots[id]
+	if !ok {
+		offset = m.spillSlotSize
+		// TODO: this should be aligned depending on the `size` to use Imm12 offset load/store as much as possible.
+		m.spillSlots[id] = offset
+		m.spillSlotSize += int64(size)
+	}
+	return offset + 16 // spill slot starts above the clobbered registers and the frame size.
+}
+
 // LowerSingleBranch implements backend.Machine.
 func (m *machine) LowerSingleBranch(b *ssa.Instruction) {
 	ectx := m.ectx
@@ -132,9 +147,208 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 	case ssa.OpcodeReturn:
 		panic("BUG: return must be handled by backend.Compiler")
 	case ssa.OpcodeIconst, ssa.OpcodeF32const, ssa.OpcodeF64const: // Constant instructions are inlined.
+	case ssa.OpcodeCall:
+		m.lowerCall(instr)
+	case ssa.OpcodeStore:
+		m.lowerStore(instr)
+	case ssa.OpcodeIadd:
+		m.lowerIadd(instr)
 	default:
 		panic("TODO: lowering " + op.String())
 	}
+}
+
+func (m *machine) lowerStore(si *ssa.Instruction) {
+	value, ptr, offset, storeSizeInBits := si.StoreData()
+	rm := m.c.VRegOf(value)
+	base := m.c.VRegOf(ptr)
+
+	store := m.allocateInstr()
+	store.asMovRM(rm, newOperandMem(newAmodeImmReg(offset, base)), storeSizeInBits/8)
+	m.insert(store)
+}
+
+func (m *machine) lowerCall(si *ssa.Instruction) {
+	isDirectCall := si.Opcode() == ssa.OpcodeCall
+	var indirectCalleePtr ssa.Value
+	var directCallee ssa.FuncRef
+	var sigID ssa.SignatureID
+	var args []ssa.Value
+	if isDirectCall {
+		directCallee, sigID, args = si.CallData()
+	} else {
+		indirectCalleePtr, sigID, args = si.CallIndirectData()
+	}
+	calleeABI := m.c.GetFunctionABI(m.c.SSABuilder().ResolveSignature(sigID))
+
+	stackSlotSize := calleeABI.AlignedArgResultStackSlotSize()
+	if m.maxRequiredStackSizeForCalls < stackSlotSize+16 {
+		m.maxRequiredStackSizeForCalls = stackSlotSize + 16 // return address frame.
+	}
+
+	for i, arg := range args {
+		reg := m.c.VRegOf(arg)
+		def := m.c.ValueDefinition(arg)
+		m.callerGenVRegToFunctionArg(calleeABI, i, reg, def, stackSlotSize)
+	}
+
+	if isDirectCall {
+		call := m.allocateInstr()
+		call.asCall(directCallee, calleeABI)
+		m.insert(call)
+	} else {
+		_ = indirectCalleePtr
+		panic("TODO")
+	}
+
+	var index int
+	r1, rs := si.Returns()
+	if r1.Valid() {
+		m.callerGenFunctionReturnVReg(calleeABI, 0, m.c.VRegOf(r1), stackSlotSize)
+		index++
+	}
+
+	for _, r := range rs {
+		m.callerGenFunctionReturnVReg(calleeABI, index, m.c.VRegOf(r), stackSlotSize)
+		index++
+	}
+}
+
+func (m *machine) lowerIadd(si *ssa.Instruction) {
+	x, y := si.Arg2()
+	if !x.Type().IsInt() {
+		panic("BUG?")
+	}
+
+	_64 := x.Type().Bits() == 64
+
+	xDef := m.c.ValueDefinition(x)
+	yDef := m.c.ValueDefinition(y)
+
+	rn := m.getOperandGP(xDef)
+	rm := m.getOperandGP(yDef)
+
+	tmp := m.c.VRegOf(si.Return())
+	mov := m.allocateInstr()
+	mov.asMovRR(rn.r, tmp, _64)
+
+	alu := m.allocateInstr()
+	alu.asAluRmiR(aluRmiROpcodeAdd, rm, tmp, _64)
+	m.insert(alu)
+}
+
+func (m *machine) getOperandGP(def *backend.SSAValueDefinition) operand {
+	var v regalloc.VReg
+	if def.IsFromBlockParam() {
+		v = def.BlkParamVReg
+	} else {
+		instr := def.Instr
+		if instr.Constant() {
+			panic("TODO: instr.Constant")
+		} else {
+			if n := def.N; n == 0 {
+				v = m.c.VRegOf(instr.Return())
+			} else {
+				_, rs := instr.Returns()
+				v = m.c.VRegOf(rs[n-1])
+			}
+		}
+	}
+
+	r := v
+
+	//switch inBits := def.SSAValue().Type().Bits(); {
+	//case mode == extModeNone:
+	//case inBits == 32 && (mode == extModeZeroExtend32 || mode == extModeSignExtend32):
+	//case inBits == 32 && mode == extModeZeroExtend64:
+	//	extended := m.compiler.AllocateVReg(ssa.TypeI64)
+	//	ext := m.allocateInstr()
+	//	ext.asExtend(extended, v, 32, 64, false)
+	//	m.insert(ext)
+	//	r = extended
+	//case inBits == 32 && mode == extModeSignExtend64:
+	//	extended := m.compiler.AllocateVReg(ssa.TypeI64)
+	//	ext := m.allocateInstr()
+	//	ext.asExtend(extended, v, 32, 64, true)
+	//	m.insert(ext)
+	//	r = extended
+	//case inBits == 64 && (mode == extModeZeroExtend64 || mode == extModeSignExtend64):
+	//}
+	//return operandNR(r)
+
+	return newOperandReg(r)
+}
+
+// callerGenVRegToFunctionArg is the opposite of GenFunctionArgToVReg, which is used to generate the
+// caller side of the function call.
+func (m *machine) callerGenVRegToFunctionArg(a *backend.FunctionABI, argIndex int, reg regalloc.VReg, def *backend.SSAValueDefinition, slotBegin int64) {
+	arg := &a.Args[argIndex]
+	if def != nil && def.IsFromInstr() {
+		// Constant instructions are inlined.
+		if inst := def.Instr; inst.Constant() {
+			m.InsertLoadConstant(inst, reg)
+		}
+	}
+	if arg.Kind == backend.ABIArgKindReg {
+		m.InsertMove(arg.Reg, reg, arg.Type)
+	} else {
+		// TODO: we could use pair store if there's consecutive stores for the same type.
+		//
+		// Note that at this point, stack pointer is already adjusted.
+		bits := arg.Type.Bits()
+		am := m.resolveAddressModeForOffset(arg.Offset-slotBegin, bits, rspVReg)
+		store := m.allocateInstr()
+		store.asMovRM(reg, newOperandMem(am), bits/8)
+		m.insert(store)
+	}
+}
+
+func (m *machine) callerGenFunctionReturnVReg(a *backend.FunctionABI, retIndex int, reg regalloc.VReg, slotBegin int64) {
+	r := &a.Rets[retIndex]
+	if r.Kind == backend.ABIArgKindReg {
+		m.InsertMove(reg, r.Reg, r.Type)
+	} else {
+		// TODO: we could use pair load if there's consecutive loads for the same type.
+		dst := m.resolveAddressModeForOffset(a.ArgStackSize+r.Offset-slotBegin, r.Type.Bits(), rspVReg)
+		ldr := m.allocateInstr()
+		switch r.Type {
+		case ssa.TypeI32, ssa.TypeI64:
+			ldr.asLEA(dst, reg)
+		case ssa.TypeF32, ssa.TypeF64, ssa.TypeV128:
+			panic("TODO") // ldr.asFpuLoad(operandNR(reg), amode, r.Type.Bits())
+		default:
+			panic("BUG")
+		}
+		m.insert(ldr)
+	}
+}
+
+func (m *machine) resolveAddressModeForOffset(offset int64, dstBits byte, rn regalloc.VReg) amode {
+	if rn.RegType() != regalloc.RegTypeInt {
+		panic("BUG: rn should be a pointer: " + formatVRegSized(rn, dstBits == 64))
+	}
+	var am amode
+	if offsetFitsInAddressModeKindRegUnsignedImm12(dstBits, offset) {
+		am = newAmodeImmReg(uint32(offset), rn)
+	} else {
+		panic("TODO")
+	}
+	return am
+}
+
+func (m *machine) resolveAddressModeForOffsetAndInsert(cur *instruction, offset int64, dstBits byte, rn regalloc.VReg) (*instruction, amode) {
+	exct := m.ectx
+	exct.PendingInstructions = exct.PendingInstructions[:0]
+	mode := m.resolveAddressModeForOffset(offset, dstBits, rn)
+	for _, instr := range exct.PendingInstructions {
+		cur = linkInstr(cur, instr)
+	}
+	return cur, mode
+}
+
+func offsetFitsInAddressModeKindRegUnsignedImm12(dstSizeInBits byte, offset int64) bool {
+	divisor := int64(dstSizeInBits) / 8
+	return 0 < offset && offset%divisor == 0 && offset/divisor < 4096
 }
 
 // InsertMove implements backend.Machine.

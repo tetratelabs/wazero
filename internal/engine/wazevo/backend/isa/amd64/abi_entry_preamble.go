@@ -26,50 +26,52 @@ func (m *machine) goEntryPreamblePassArg(cur *instruction, paramSlicePtr regallo
 	bits := typ.Bits()
 	isStackArg := arg.Kind == backend.ABIArgKindStack
 
-	var loadTargetReg operand
+	var loadTargetReg regalloc.VReg
 	if !isStackArg {
-		loadTargetReg = newOperandReg(arg.Reg)
+		loadTargetReg = arg.Reg
 	} else {
 		switch typ {
 		case ssa.TypeI32, ssa.TypeI64:
-			loadTargetReg = newOperandReg(r15VReg)
+			loadTargetReg = r15VReg
 		case ssa.TypeF32, ssa.TypeF64, ssa.TypeV128:
-			loadTargetReg = newOperandReg(xmm15VReg)
+			loadTargetReg = xmm15VReg
 		default:
 			panic("TODO?")
 		}
 	}
 
-	var postIndexImm int64
+	var postIndexImm uint32
 	if typ == ssa.TypeV128 {
 		postIndexImm = 16 // v128 is represented as 2x64-bit in Go slice.
 	} else {
 		postIndexImm = 8
 	}
-	//loadMode := addressMode{kind: addressModeKindPostIndex, rn: paramSlicePtr, imm: postIndexImm}
+	loadMode := newAmodeImmReg(postIndexImm, paramSlicePtr)
 
-	//instr := m.allocateInstr()
-	//switch typ {
-	//case ssa.TypeI32:
-	//	instr.asULoad(loadTargetReg, loadMode, 32)
-	//case ssa.TypeI64:
-	//	instr.asULoad(loadTargetReg, loadMode, 64)
-	//case ssa.TypeF32:
-	//	instr.asFpuLoad(loadTargetReg, loadMode, 32)
-	//case ssa.TypeF64:
-	//	instr.asFpuLoad(loadTargetReg, loadMode, 64)
-	//case ssa.TypeV128:
-	//	instr.asFpuLoad(loadTargetReg, loadMode, 128)
-	//}
-	//cur = linkInstr(cur, instr)
-	//
-	//if isStackArg {
-	//	var storeMode addressMode
-	//	cur, storeMode = m.resolveAddressModeForOffsetAndInsert(cur, argStartOffsetFromSP+arg.Offset, bits, spVReg, true)
-	//	toStack := m.allocateInstr()
-	//	toStack.asStore(loadTargetReg, storeMode, bits)
-	//	cur = linkInstr(cur, toStack)
-	//}
+	instr := m.allocateInstr()
+	switch typ {
+	case ssa.TypeI32:
+		instr.asLEA(loadMode, loadTargetReg)
+	case ssa.TypeI64:
+		panic("TODO") // instr.asULoad(loadTargetReg, loadMode, 64)
+	case ssa.TypeF32:
+		panic("TODO") // instr.asFpuLoad(loadTargetReg, loadMode, 32)
+	case ssa.TypeF64:
+		panic("TODO") // instr.asFpuLoad(loadTargetReg, loadMode, 64)
+	case ssa.TypeV128:
+		panic("TODO") // instr.asFpuLoad(loadTargetReg, loadMode, 128)
+	}
+	cur = linkInstr(cur, instr)
+
+	if isStackArg {
+		panic("TODO")
+		_ = bits
+		//	var storeMode addressMode
+		//	cur, storeMode = m.resolveAddressModeForOffsetAndInsert(cur, argStartOffsetFromSP+arg.Offset, bits, spVReg, true)
+		//	toStack := m.allocateInstr()
+		//	toStack.asStore(loadTargetReg, storeMode, bits)
+		//	cur = linkInstr(cur, toStack)
+	}
 	return cur
 }
 
