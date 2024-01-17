@@ -891,7 +891,7 @@ func (a *Allocator) scheduleSpill(f Function, vs *vrState) {
 	if wazevoapi.RegAllocLoggingEnabled {
 		fmt.Printf("v%d is spilled in blk%d, lca=blk%d\n", v.ID(), definingBlk.ID(), pos.ID())
 	}
-	for pos != definingBlk {
+	for definingBlk != nil && pos != definingBlk {
 		st := a.getBlockState(pos.ID())
 		for ii := 0; ii < 64; ii++ {
 			rr := RealReg(ii)

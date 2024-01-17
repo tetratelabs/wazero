@@ -240,12 +240,10 @@ func (i *instruction) Uses(regs *[]regalloc.VReg) []regalloc.VReg {
 	switch uk := useKinds[i.kind]; uk {
 	case useKindNone:
 	case useKindOp1Reg:
-		op := i.op2
-		if op.kind != operandKindReg {
-			panic("BUG: unsupported operand")
-		}
-		*regs = append(*regs, op.r)
-		fallthrough
+		//if op.kind != operandKindReg {
+		//	panic("BUG: unsupported operand")
+		//}
+		*regs = append(*regs, i.op1.r, i.op2.r)
 	case useKindOp1:
 		op := i.op1
 		switch op.kind {
@@ -271,7 +269,7 @@ func (i *instruction) AssignUse(index int, v regalloc.VReg) {
 	case useKindNone:
 	case useKindOp1Reg:
 		if index == 1 {
-			op := i.op2
+			op := &i.op2
 			if op.kind != operandKindReg {
 				panic("BUG: unsupported operand")
 			}
@@ -280,8 +278,23 @@ func (i *instruction) AssignUse(index int, v regalloc.VReg) {
 			}
 			op.r = v
 			break
+		} else {
+			op := &i.op1
+			switch op.kind {
+			case operandKindReg:
+				if index != 0 {
+					panic("BUG")
+				}
+				if op.r.IsRealReg() {
+					panic("BUG already assigned: " + i.String())
+				}
+				op.r = v
+			case operandKindMem:
+				op.amode.assignUses(index, v)
+			default:
+				panic(fmt.Sprintf("BUG: invalid operand: %s", i))
+			}
 		}
-		fallthrough
 	case useKindOp1:
 		op := &i.op1
 		switch op.kind {
@@ -1474,7 +1487,7 @@ var defKinds = [instrMax]defKind{
 	ret:         defKindNone,
 	movRR:       defKindOp2,
 	movRM:       defKindNone,
-	aluRmiR:     defKindOp2,
+	aluRmiR:     defKindNone,
 	imm:         defKindOp2,
 	xmmUnaryRmR: defKindOp2,
 	gprToXmm:    defKindOp2,

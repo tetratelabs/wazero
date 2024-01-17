@@ -166,11 +166,11 @@ func (m *machine) lowerAluRmiROp(si *ssa.Instruction, op aluRmiROpcode) {
 	// rm is being overwritten, so we first copy its value to a temp register,
 	// in case it is referenced again later.
 	mov := m.allocateInstr()
-	mov.asMovRR(rm.r, tmp, _64)
+	mov.asMovRR(rn.r, tmp, _64)
 	m.insert(mov)
 
 	alu := m.allocateInstr()
-	alu.asAluRmiR(op, rn, tmp, _64)
+	alu.asAluRmiR(op, rm, tmp, _64)
 	m.insert(alu)
 
 	// tmp now contains the result, we copy it to the dest register.
