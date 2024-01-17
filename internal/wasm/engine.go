@@ -32,9 +32,6 @@ type Engine interface {
 	// Note: Input parameters must be pre-validated with wasm.Module Validate, to ensure no fields are invalid
 	// due to reasons such as out-of-bounds.
 	NewModuleEngine(module *Module, instance *ModuleInstance) (ModuleEngine, error)
-
-	// IsCompiler indicates whether this engine is using the compiler backend.
-	IsCompiler() bool
 }
 
 // ModuleEngine implements function calls for a given module.

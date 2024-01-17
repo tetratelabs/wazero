@@ -376,7 +376,7 @@ func Test_readAssemblyScriptString(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			mem := wasm.NewMemoryInstance(&wasm.Memory{Min: 1, Cap: 1, Max: 1}, false)
+			mem := wasm.NewMemoryInstance(&wasm.Memory{Min: 1, Cap: 1, Max: 1})
 			tc.memory(mem)
 
 			s, ok := readAssemblyScriptString(mem, uint32(tc.offset))

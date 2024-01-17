@@ -77,11 +77,6 @@ func (e *engine) getCompiledFunctions(module *wasm.Module) (fs []compiledFunctio
 	return
 }
 
-// IsCompiler implements the same method as documented on wasm.Engine.
-func (e *engine) IsCompiler() bool {
-	return false
-}
-
 // moduleEngine implements wasm.ModuleEngine
 type moduleEngine struct {
 	// codes are the compiled functions in a module instances.

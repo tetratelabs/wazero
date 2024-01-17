@@ -12,6 +12,8 @@ const (
 	mmapProtARM64 = syscall.PROT_READ | syscall.PROT_WRITE
 )
 
+const MmapSupported = true
+
 func mmapMemory(size int) ([]byte, error) {
 	return syscall.Mmap(
 		-1,

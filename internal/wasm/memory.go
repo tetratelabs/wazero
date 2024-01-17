@@ -63,7 +63,7 @@ type MemoryInstance struct {
 }
 
 // NewMemoryInstance creates a new instance based on the parameters in the SectionIDMemory.
-func NewMemoryInstance(memSec *Memory, compilerEngine bool) *MemoryInstance {
+func NewMemoryInstance(memSec *Memory) *MemoryInstance {
 	min := MemoryPagesToBytesNum(memSec.Min)
 	capacity := MemoryPagesToBytesNum(memSec.Cap)
 
@@ -77,7 +77,7 @@ func NewMemoryInstance(memSec *Memory, compilerEngine bool) *MemoryInstance {
 		// all threads implementations are effectively expected to use mmap for shared memory.
 		max := MemoryPagesToBytesNum(memSec.Max)
 		var b []byte
-		if compilerEngine {
+		if platform.MmapSupported {
 			var err error
 			b, err = platform.MmapMemory(int(max))
 			if err != nil {
@@ -85,8 +85,9 @@ func NewMemoryInstance(memSec *Memory, compilerEngine bool) *MemoryInstance {
 			}
 			mmappedMemory = true
 		} else {
-			// mmap may not be supported so we just preallocate a normal buffer. This will often be 4GB
-			// and likely isn't practical, but interpreter usage should be rare.
+			// mmap not supported so we just preallocate a normal buffer. This will often be large, i.e. ~4GB,
+			// and likely isn't practical, but interpreter usage should be rare and the Wasm binary can be
+			// edited to reduce max memory size if support for non-mmap platforms is required.
 			b = make([]byte, max)
 		}
 		buffer = b[:MemoryPagesToBytesNum(memSec.Min)]

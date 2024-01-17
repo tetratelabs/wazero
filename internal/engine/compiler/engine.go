@@ -649,11 +649,6 @@ func (e *engine) NewModuleEngine(module *wasm.Module, instance *wasm.ModuleInsta
 	return me, nil
 }
 
-// IsCompiler implements the same method on wasm.Engine.
-func (e *engine) IsCompiler() bool {
-	return true
-}
-
 // ResolveImportedFunction implements wasm.ModuleEngine.
 func (e *moduleEngine) ResolveImportedFunction(index, indexInImportedModule wasm.Index, importedModuleEngine wasm.ModuleEngine) {
 	imported := importedModuleEngine.(*moduleEngine)

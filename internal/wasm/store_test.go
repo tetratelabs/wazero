@@ -441,11 +441,6 @@ func (e *mockEngine) CompileModule(context.Context, *Module, []experimental.Func
 	return nil
 }
 
-// IsCompiler implements the same method as documented on wasm.Engine.
-func (e *mockEngine) IsCompiler() bool {
-	return false
-}
-
 // LookupFunction implements the same method as documented on wasm.Engine.
 func (e *mockModuleEngine) LookupFunction(_ *TableInstance, _ FunctionTypeID, offset Index) (*ModuleInstance, Index) {
 	if entry, ok := e.lookupEntries[offset]; ok {

@@ -694,11 +694,6 @@ func executablesFinalizer(exec *executables) {
 	exec.entryPreambles = nil
 }
 
-// IsCompiler implements the same method on wasm.Engine.
-func (e *engine) IsCompiler() bool {
-	return true
-}
-
 func mmapExecutable(src []byte) []byte {
 	executable, err := platform.MmapCodeSegment(len(src))
 	if err != nil {
