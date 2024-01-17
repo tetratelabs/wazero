@@ -96,6 +96,16 @@ func TestE2E(t *testing.T) {
 			calls:     []callCase{{expErr: "unreachable"}},
 		},
 		{
+			name: "add_sub_params_return", m: testcases.AddReturn.Module,
+			skipAMD64: false,
+			calls: []callCase{
+				{
+					params:     []uint64{},
+					expResults: []uint64{3},
+				},
+			},
+		},
+		{
 			name: "fibonacci_recursive", m: testcases.FibonacciRecursive.Module,
 			skipAMD64: true,
 			calls: []callCase{

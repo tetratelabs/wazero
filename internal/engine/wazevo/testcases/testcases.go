@@ -32,9 +32,20 @@ var (
 		byte(math.Float64bits(64.0) >> 56),
 		wasm.OpcodeEnd,
 	}, nil)}
-	Unreachable        = TestCase{Name: "unreachable", Module: SingleFunctionModule(vv, []byte{wasm.OpcodeUnreachable, wasm.OpcodeEnd}, nil)}
-	OnlyReturn         = TestCase{Name: "only_return", Module: SingleFunctionModule(vv, []byte{wasm.OpcodeReturn, wasm.OpcodeEnd}, nil)}
-	Params             = TestCase{Name: "params", Module: SingleFunctionModule(i32f32f64_v, []byte{wasm.OpcodeReturn, wasm.OpcodeEnd}, nil)}
+	Unreachable = TestCase{Name: "unreachable", Module: SingleFunctionModule(vv, []byte{wasm.OpcodeUnreachable, wasm.OpcodeEnd}, nil)}
+	OnlyReturn  = TestCase{Name: "only_return", Module: SingleFunctionModule(vv, []byte{wasm.OpcodeReturn, wasm.OpcodeEnd}, nil)}
+	Params      = TestCase{Name: "params", Module: SingleFunctionModule(i32f32f64_v, []byte{wasm.OpcodeReturn, wasm.OpcodeEnd}, nil)}
+	AddReturn   = TestCase{
+		Name: "add_sub_params_return",
+		Module: SingleFunctionModule(v_i32, []byte{
+			wasm.OpcodeI32Const, 4,
+			wasm.OpcodeI32Const, 5,
+			wasm.OpcodeI32Add,
+			wasm.OpcodeI32Const, 6,
+			wasm.OpcodeI32Sub,
+			wasm.OpcodeEnd,
+		}, nil),
+	}
 	AddSubParamsReturn = TestCase{
 		Name: "add_sub_params_return",
 		Module: SingleFunctionModule(i32i32_i32, []byte{

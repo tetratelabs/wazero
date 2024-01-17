@@ -138,9 +138,68 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		m.lowerCall(instr)
 	case ssa.OpcodeStore:
 		m.lowerStore(instr)
+	case ssa.OpcodeIadd:
+		m.lowerAluRmiROp(instr, aluRmiROpcodeAdd)
+	case ssa.OpcodeIsub:
+		m.lowerAluRmiROp(instr, aluRmiROpcodeSub)
 	default:
 		panic("TODO: lowering " + op.String())
 	}
+}
+
+func (m *machine) lowerAluRmiROp(si *ssa.Instruction, op aluRmiROpcode) {
+	x, y := si.Arg2()
+	if !x.Type().IsInt() {
+		panic("BUG?")
+	}
+
+	_64 := x.Type().Bits() == 64
+
+	xDef := m.c.ValueDefinition(x)
+	yDef := m.c.ValueDefinition(y)
+
+	rn := m.getOperand(xDef)
+	rm := m.getOperand(yDef)
+	rd := m.c.VRegOf(si.Return())
+	tmp := m.c.AllocateVReg(si.Return().Type())
+
+	// rm is being overwritten, so we first copy its value to a temp register,
+	// in case it is referenced again later.
+	mov := m.allocateInstr()
+	mov.asMovRR(rm.r, tmp, _64)
+	m.insert(mov)
+
+	alu := m.allocateInstr()
+	alu.asAluRmiR(op, rn, tmp, _64)
+	m.insert(alu)
+
+	// tmp now contains the result, we copy it to the dest register.
+	mov2 := m.allocateInstr()
+	mov2.asMovRR(tmp, rd, _64)
+	m.insert(mov2)
+}
+
+func (m *machine) getOperand(def *backend.SSAValueDefinition) operand {
+	var v regalloc.VReg
+	if def.IsFromBlockParam() {
+		// v = def.BlkParamVReg
+		panic("TODO")
+	} else {
+		instr := def.Instr
+		if instr.Constant() {
+			// We inline all the constant instructions so that we could reduce the register usage.
+			v = m.lowerConstant(instr)
+			instr.MarkLowered()
+		} else {
+			if n := def.N; n == 0 {
+				v = m.c.VRegOf(instr.Return())
+			} else {
+				_, rs := instr.Returns()
+				v = m.c.VRegOf(rs[n-1])
+			}
+		}
+	}
+	return newOperandReg(v)
 }
 
 func (m *machine) lowerStore(si *ssa.Instruction) {
