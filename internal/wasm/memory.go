@@ -12,6 +12,7 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/internalapi"
+	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/wasmruntime"
 )
 
@@ -56,19 +57,70 @@ type MemoryInstance struct {
 	// waiters implements atomic wait and notify. It is implemented similarly to golang.org/x/sync/semaphore,
 	// with a fixed weight of 1 and no spurious notifications.
 	waiters sync.Map
+
+	mmappedMemory bool
+	closed        bool
 }
 
 // NewMemoryInstance creates a new instance based on the parameters in the SectionIDMemory.
 func NewMemoryInstance(memSec *Memory) *MemoryInstance {
 	min := MemoryPagesToBytesNum(memSec.Min)
 	capacity := MemoryPagesToBytesNum(memSec.Cap)
-	return &MemoryInstance{
-		Buffer: make([]byte, min, capacity),
-		Min:    memSec.Min,
-		Cap:    memSec.Cap,
-		Max:    memSec.Max,
-		Shared: memSec.IsShared,
+
+	var buffer []byte
+	var cap uint32
+	mmappedMemory := false
+	if memSec.IsShared {
+		// Memory accesses can happen at the same time that memory is resized, meaning
+		// we cannot have the memory base move during operation. mmap allows allocating memory virtually so
+		// we can grow without changing the base. The spec requires max for shared memory currently because
+		// all threads implementations are effectively expected to use mmap for shared memory.
+		max := MemoryPagesToBytesNum(memSec.Max)
+		var b []byte
+		if platform.MmapSupported {
+			var err error
+			b, err = platform.MmapMemory(int(max))
+			if err != nil {
+				panic(fmt.Errorf("unable to mmap memory: %w", err))
+			}
+			mmappedMemory = true
+		} else {
+			// mmap not supported so we just preallocate a normal buffer. This will often be large, i.e. ~4GB,
+			// and likely isn't practical, but interpreter usage should be rare and the Wasm binary can be
+			// edited to reduce max memory size if support for non-mmap platforms is required.
+			b = make([]byte, max)
+		}
+		buffer = b[:MemoryPagesToBytesNum(memSec.Min)]
+		cap = memSec.Max
+	} else {
+		buffer = make([]byte, min, capacity)
+		cap = memSec.Cap
 	}
+
+	return &MemoryInstance{
+		Buffer:        buffer,
+		Min:           memSec.Min,
+		Cap:           cap,
+		Max:           memSec.Max,
+		Shared:        memSec.IsShared,
+		mmappedMemory: mmappedMemory,
+	}
+}
+
+func (m *MemoryInstance) Close() error {
+	if !m.mmappedMemory {
+		// No need to release anything for non-mmapped memory.
+		return nil
+	}
+
+	m.Mux.Lock()
+	defer m.Mux.Unlock()
+
+	if m.closed {
+		return nil
+	}
+	m.closed = true
+	return platform.MunmapCodeSegment(m.Buffer)
 }
 
 // Definition implements the same method as documented on api.Memory.
