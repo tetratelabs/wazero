@@ -109,7 +109,7 @@ func NewMemoryInstance(memSec *Memory) *MemoryInstance {
 
 func (m *MemoryInstance) Close() error {
 	if !m.mmappedMemory {
-		// No need to release anything for non-shared memory.
+		// No need to release anything for non-mmapped memory.
 		return nil
 	}
 
