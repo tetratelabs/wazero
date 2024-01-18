@@ -213,11 +213,15 @@ func (c *Compiler) resetUnreachable() {
 	c.unreachableState.on = false
 }
 
+// MemoryType is the type of memory in a compiled module.
 type MemoryType byte
 
 const (
+	// MemoryTypeNone indicates there is no memory.
 	MemoryTypeNone MemoryType = iota
+	// MemoryTypeStandard indicates there is a non-shared memory.
 	MemoryTypeStandard
+	// MemoryTypeShared indicates there is a shared memory.
 	MemoryTypeShared
 )
 

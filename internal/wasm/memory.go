@@ -266,11 +266,7 @@ func (m *MemoryInstance) Grow(delta uint32) (result uint32, ok bool) {
 		sp := (*reflect.SliceHeader)(unsafe.Pointer(&m.Buffer))
 		if m.Shared {
 			// Use atomic write to ensure new length is visible across threads.
-			if math.MaxInt == math.MaxInt32 {
-				atomic.StoreInt32((*int32)(unsafe.Pointer(&sp.Len)), int32(MemoryPagesToBytesNum(newPages)))
-			} else {
-				atomic.StoreInt64((*int64)(unsafe.Pointer(&sp.Len)), int64(MemoryPagesToBytesNum(newPages)))
-			}
+			atomic.StoreUintptr((*uintptr)(unsafe.Pointer(&sp.Len)), uintptr(MemoryPagesToBytesNum(newPages)))
 		} else {
 			sp.Len = int(MemoryPagesToBytesNum(newPages))
 		}
