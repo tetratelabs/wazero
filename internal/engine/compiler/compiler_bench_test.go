@@ -32,7 +32,7 @@ func BenchmarkCompiler_compileMemoryCopy(b *testing.B) {
 				}
 
 				compiler := newCompiler()
-				compiler.Init(&wasm.FunctionType{}, &wazeroir.CompilationResult{HasMemory: true}, false)
+				compiler.Init(&wasm.FunctionType{}, &wazeroir.CompilationResult{Memory: wazeroir.MemoryTypeStandard}, false)
 				err := compiler.compilePreamble()
 				require.NoError(b, err)
 
@@ -83,7 +83,7 @@ func BenchmarkCompiler_compileMemoryFill(b *testing.B) {
 			}()
 
 			compiler := newCompiler()
-			compiler.Init(&wasm.FunctionType{}, &wazeroir.CompilationResult{HasMemory: true}, false)
+			compiler.Init(&wasm.FunctionType{}, &wazeroir.CompilationResult{Memory: wazeroir.MemoryTypeStandard}, false)
 
 			var startOffset uint32 = 100
 			var value uint8 = 5

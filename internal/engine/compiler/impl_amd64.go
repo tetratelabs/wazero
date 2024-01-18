@@ -4938,7 +4938,7 @@ func (c *amd64Compiler) compileReservedStackBasePointerInitialization() {
 }
 
 func (c *amd64Compiler) compileReservedMemoryPointerInitialization() {
-	if c.ir.HasMemory || c.ir.UsesMemory {
+	if c.ir.Memory != wazeroir.MemoryTypeNone || c.ir.UsesMemory {
 		c.assembler.CompileMemoryToRegister(amd64.MOVQ,
 			amd64ReservedRegisterForCallEngine, callEngineModuleContextMemoryElement0AddressOffset,
 			amd64ReservedRegisterForMemory,
@@ -5065,7 +5065,7 @@ func (c *amd64Compiler) compileModuleContextInitialization() error {
 	// Note: if there's memory instruction in the function, memory instance must be non-nil.
 	// That is ensured by function validation at module instantiation phase, and that's
 	// why it is ok to skip the initialization if the module's memory instance is nil.
-	if c.ir.HasMemory {
+	if c.ir.Memory != wazeroir.MemoryTypeNone {
 		c.assembler.CompileMemoryToRegister(amd64.MOVQ,
 			amd64CallingConventionDestinationFunctionModuleInstanceAddressRegister, moduleInstanceMemoryOffset,
 			tmpRegister)

@@ -55,7 +55,7 @@ func TestCompiler_compileMemoryGrow(t *testing.T) {
 
 func TestCompiler_compileMemorySize(t *testing.T) {
 	env := newCompilerEnvironment()
-	compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, &wazeroir.CompilationResult{HasMemory: true})
+	compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, &wazeroir.CompilationResult{Memory: wazeroir.MemoryTypeStandard})
 
 	err := compiler.compilePreamble()
 	require.NoError(t, err)
@@ -242,7 +242,7 @@ func TestCompiler_compileLoad(t *testing.T) {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			env := newCompilerEnvironment()
-			compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, &wazeroir.CompilationResult{HasMemory: true})
+			compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, &wazeroir.CompilationResult{Memory: wazeroir.MemoryTypeStandard})
 
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
@@ -382,7 +382,7 @@ func TestCompiler_compileStore(t *testing.T) {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			env := newCompilerEnvironment()
-			compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, &wazeroir.CompilationResult{HasMemory: true})
+			compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, &wazeroir.CompilationResult{Memory: wazeroir.MemoryTypeStandard})
 
 			err := compiler.compilePreamble()
 			require.NoError(t, err)

@@ -202,7 +202,7 @@ func TestCompiler_compileMemoryCopy(t *testing.T) {
 		tc := tt
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			env := newCompilerEnvironment()
-			compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, &wazeroir.CompilationResult{HasMemory: true})
+			compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, &wazeroir.CompilationResult{Memory: wazeroir.MemoryTypeStandard})
 
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
@@ -289,7 +289,7 @@ func TestCompiler_compileMemoryFill(t *testing.T) {
 		tc := tt
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			env := newCompilerEnvironment()
-			compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, &wazeroir.CompilationResult{HasMemory: true})
+			compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, &wazeroir.CompilationResult{Memory: wazeroir.MemoryTypeStandard})
 
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
@@ -432,7 +432,7 @@ func TestCompiler_compileMemoryInit(t *testing.T) {
 			env.module().DataInstances = dataInstances
 
 			compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler, &wazeroir.CompilationResult{
-				HasDataInstances: true, HasMemory: true,
+				HasDataInstances: true, Memory: wazeroir.MemoryTypeStandard,
 			})
 
 			err := compiler.compilePreamble()

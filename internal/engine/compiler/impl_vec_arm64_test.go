@@ -16,7 +16,7 @@ import (
 func TestArm64Compiler_V128Shuffle_ConstTable_MiddleOfFunction(t *testing.T) {
 	env := newCompilerEnvironment()
 	compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler,
-		&wazeroir.CompilationResult{HasMemory: true})
+		&wazeroir.CompilationResult{Memory: wazeroir.MemoryTypeStandard})
 
 	err := compiler.compilePreamble()
 	require.NoError(t, err)
@@ -157,7 +157,7 @@ func TestArm64Compiler_V128Shuffle_combinations(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			env := newCompilerEnvironment()
 			compiler := env.requireNewCompiler(t, &wasm.FunctionType{}, newCompiler,
-				&wazeroir.CompilationResult{HasMemory: true})
+				&wazeroir.CompilationResult{Memory: wazeroir.MemoryTypeStandard})
 
 			err := compiler.compilePreamble()
 			require.NoError(t, err)

@@ -213,6 +213,14 @@ func (c *Compiler) resetUnreachable() {
 	c.unreachableState.on = false
 }
 
+type MemoryType byte
+
+const (
+	MemoryTypeNone MemoryType = iota
+	MemoryTypeStandard
+	MemoryTypeShared
+)
+
 type CompilationResult struct {
 	// Operations holds wazeroir operations compiled from Wasm instructions in a Wasm function.
 	Operations []UnionOperation
@@ -246,8 +254,8 @@ type CompilationResult struct {
 	Functions []wasm.Index
 	// Types holds all the types in the module from which this function is compiled.
 	Types []wasm.FunctionType
-	// HasMemory is true if the module from which this function is compiled has memory declaration.
-	HasMemory bool
+	// Memory indicates the type of memory of the module.
+	Memory MemoryType
 	// HasTable is true if the module from which this function is compiled has table declaration.
 	HasTable bool
 	// HasDataInstances is true if the module has data instances which might be used by memory.init or data.drop instructions.
@@ -264,8 +272,18 @@ func NewCompiler(enabledFeatures api.CoreFeatures, callFrameStackSizeInUint64 in
 		return nil, err
 	}
 
-	hasMemory, hasTable, hasDataInstances, hasElementInstances := mem != nil, len(tables) > 0,
+	hasTable, hasDataInstances, hasElementInstances := len(tables) > 0,
 		len(module.DataSection) > 0, len(module.ElementSection) > 0
+
+	var mt MemoryType
+	switch {
+	case mem == nil:
+		mt = MemoryTypeNone
+	case mem.IsShared:
+		mt = MemoryTypeShared
+	default:
+		mt = MemoryTypeStandard
+	}
 
 	types := module.TypeSection
 
@@ -278,7 +296,7 @@ func NewCompiler(enabledFeatures api.CoreFeatures, callFrameStackSizeInUint64 in
 			Globals:             globals,
 			Functions:           functions,
 			Types:               types,
-			HasMemory:           hasMemory,
+			Memory:              mt,
 			HasTable:            hasTable,
 			HasDataInstances:    hasDataInstances,
 			HasElementInstances: hasElementInstances,
