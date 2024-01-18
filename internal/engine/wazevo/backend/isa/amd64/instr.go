@@ -240,27 +240,26 @@ func (i *instruction) Uses(regs *[]regalloc.VReg) []regalloc.VReg {
 	switch uk := useKinds[i.kind]; uk {
 	case useKindNone:
 	case useKindOp1Op2:
-		op := i.op1
-		switch op.kind {
-		case operandKindReg:
-			*regs = append(*regs, op.r)
-		case operandKindMem:
-			op.amode.uses(regs)
-		case operandKindImm32, operandKindLabel:
+		op1, op2 := &i.op1, &i.op2
+		// The destination operand (op2) can be a register or a memory location;
+		// the source operand (op1) can be an immediate, a register, or a memory location.
+		// (However, two memory operands cannot be used in one instruction.)
+		switch {
+		case op1.kind == operandKindReg && op2.kind == operandKindReg:
+			*regs = append(*regs, op1.r, op2.r)
+		case op1.kind == operandKindMem && op2.kind == operandKindReg:
+			op1.amode.uses(regs)
+			*regs = append(*regs, op2.r)
+		case op1.kind == operandKindImm32 && op2.kind == operandKindReg:
+			*regs = append(*regs, op2.r)
+		case op1.kind == operandKindReg && op2.kind == operandKindMem:
+			*regs = append(*regs, op1.r)
+			op2.amode.uses(regs)
+		case op1.kind == operandKindImm32 && op2.kind == operandKindMem:
+			op2.amode.uses(regs)
 		default:
-			panic(fmt.Sprintf("BUG: invalid operand: %s", i))
+			panic(fmt.Sprintf("BUG: invalid operand pair: %s -- %s, %s", i, op1.kind, op2.kind))
 		}
-		op = i.op2
-		switch op.kind {
-		case operandKindReg:
-			*regs = append(*regs, op.r)
-		case operandKindMem:
-			op.amode.uses(regs)
-		case operandKindImm32, operandKindLabel:
-		default:
-			panic(fmt.Sprintf("BUG: invalid operand: %s", i))
-		}
-
 	case useKindOp1:
 		op := i.op1
 		switch op.kind {
@@ -285,43 +284,60 @@ func (i *instruction) AssignUse(index int, v regalloc.VReg) {
 	switch uk := useKinds[i.kind]; uk {
 	case useKindNone:
 	case useKindOp1Op2:
-		if index == 1 {
-			op := &i.op2
-			switch op.kind {
-			case operandKindReg:
-				if index != 1 {
-					panic("BUG")
-				}
-				if op.r.IsRealReg() {
-					panic("BUG already assigned: " + i.String())
-				}
-				op.r = v
-			case operandKindMem:
-				op.amode.assignUses(index, v)
-			default:
-				panic(fmt.Sprintf("BUG: invalid operand: %s", i))
+		op1, op2 := &i.op1, &i.op2
+		switch {
+		case op1.kind == operandKindReg && op2.kind == operandKindReg:
+			if op1.r.IsRealReg() || op2.r.IsRealReg() {
+				panic("BUG already assigned: " + i.String())
 			}
-			break
-		} else {
-			op := &i.op1
-			switch op.kind {
-			case operandKindReg:
-				if index != 0 {
-					panic("BUG")
-				}
-				if op.r.IsRealReg() {
-					panic("BUG already assigned: " + i.String())
-				}
-				op.r = v
-			case operandKindMem:
-				op.amode.assignUses(index, v)
-			case operandKindImm32:
-				// Ignore: no assignable reg.
-				panic("incorrect " + i.String())
-			default:
-				panic(fmt.Sprintf("BUG: invalid operand: %s", i))
+			if index == 0 {
+				op1.r = v
+			} else if index == 1 {
+				op2.r = v
+			} else {
+				panic("BUG")
 			}
+		case op1.kind == operandKindMem && op2.kind == operandKindReg:
+			if op1.r.IsRealReg() {
+				panic("BUG already assigned: " + i.String())
+			}
+			if index == 0 {
+				op2.amode.assignUses(index, v)
+			} else if index == 1 {
+				op1.r = v
+			} else {
+				panic("BUG")
+			}
+		case op1.kind == operandKindImm32 && op2.kind == operandKindReg:
+			if op2.r.IsRealReg() {
+				panic("BUG already assigned: " + i.String())
+			}
+			if index == 0 {
+				op2.r = v
+			} else {
+				panic("BUG")
+			}
+		case op1.kind == operandKindReg && op2.kind == operandKindMem:
+			if op1.r.IsRealReg() {
+				panic("BUG already assigned: " + i.String())
+			}
+			if index == 0 {
+				op1.r = v
+			} else if index == 1 {
+				op2.amode.assignUses(index, v)
+			} else {
+				panic("BUG")
+			}
+		case op1.kind == operandKindImm32 && op2.kind == operandKindMem:
+			if index == 0 {
+				op2.amode.assignUses(index, v)
+			} else {
+				panic("BUG")
+			}
+		default:
+			panic(fmt.Sprintf("BUG: invalid operand pair: %s -- %s, %s", i, op1.kind, op2.kind))
 		}
+
 	case useKindOp1:
 		op := &i.op1
 		switch op.kind {
