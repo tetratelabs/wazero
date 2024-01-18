@@ -301,13 +301,14 @@ func (i *instruction) AssignUse(index int, v regalloc.VReg) {
 				panic("BUG")
 			}
 		case op1.kind == operandKindMem && op2.kind == operandKindReg:
-			if index == 0 {
-				op2.amode.assignUses(index, v)
-			} else if index == 1 {
-				if op1.r.IsRealReg() {
+			nregs := op1.amode.nregs()
+			if index < nregs {
+				op1.amode.assignUses(index, v)
+			} else if index == nregs {
+				if op2.r.IsRealReg() {
 					panic("BUG already assigned: " + i.String())
 				}
-				op1.r = v
+				op2.r = v
 			} else {
 				panic("BUG")
 			}
@@ -326,13 +327,13 @@ func (i *instruction) AssignUse(index int, v regalloc.VReg) {
 					panic("BUG already assigned: " + i.String())
 				}
 				op1.r = v
-			} else if index == 1 {
+			} else if index < op2.amode.nregs() {
 				op2.amode.assignUses(index, v)
 			} else {
 				panic("BUG")
 			}
 		case op1.kind == operandKindImm32 && op2.kind == operandKindMem:
-			if index == 0 {
+			if index < op2.amode.nregs() {
 				op2.amode.assignUses(index, v)
 			} else {
 				panic("BUG")

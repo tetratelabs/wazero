@@ -124,6 +124,17 @@ func (a *amode) uses(rs *[]regalloc.VReg) {
 	}
 }
 
+func (a *amode) nregs() int {
+	switch a.kind {
+	case amodeImmReg:
+		return 1
+	case amodeRegRegShift:
+		return 2
+	default:
+		return 0
+	}
+}
+
 func (a *amode) assignUses(i int, reg regalloc.VReg) {
 	switch a.kind {
 	case amodeImmReg:
