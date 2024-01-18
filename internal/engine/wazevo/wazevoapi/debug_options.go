@@ -29,7 +29,7 @@ const (
 	PrintSSA                                 = false
 	PrintOptimizedSSA                        = false
 	PrintBlockLaidOutSSA                     = false
-	PrintSSAToBackendIRLowering              = true
+	PrintSSAToBackendIRLowering              = false
 	PrintRegisterAllocated                   = false
 	PrintFinalizedMachineCode                = false
 	PrintMachineCodeHexPerFunction           = printMachineCodeHexPerFunctionUnmodified || PrintMachineCodeHexPerFunctionDisassemblable //nolint
