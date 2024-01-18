@@ -158,8 +158,8 @@ func (m *machine) lowerAluRmiROp(si *ssa.Instruction, op aluRmiROpcode) {
 	xDef := m.c.ValueDefinition(x)
 	yDef := m.c.ValueDefinition(y)
 
-	rn := m.getOperand(xDef)
-	rm := m.getOperand(yDef)
+	rn := m.getOperand_Reg(xDef)
+	rm := m.getOperand_Imm32_Reg(yDef)
 	rd := m.c.VRegOf(si.Return())
 	tmp := m.c.AllocateVReg(si.Return().Type())
 
@@ -179,11 +179,23 @@ func (m *machine) lowerAluRmiROp(si *ssa.Instruction, op aluRmiROpcode) {
 	m.insert(mov2)
 }
 
-func (m *machine) getOperand(def *backend.SSAValueDefinition) operand {
+func (m *machine) getOperand_Imm32_Reg(def *backend.SSAValueDefinition) (op operand) {
+	if def.IsFromBlockParam() {
+		return newOperandReg(def.BlkParamVReg)
+	}
+
+	instr := def.Instr
+	if instr.Constant() {
+		amount := uint32(instr.ConstantVal())
+		return newOperandImm32(amount)
+	}
+	return m.getOperand_Reg(def)
+}
+
+func (m *machine) getOperand_Reg(def *backend.SSAValueDefinition) (op operand) {
 	var v regalloc.VReg
 	if def.IsFromBlockParam() {
-		// v = def.BlkParamVReg
-		panic("TODO")
+		v = def.BlkParamVReg
 	} else {
 		instr := def.Instr
 		if instr.Constant() {

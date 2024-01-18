@@ -239,11 +239,28 @@ func (i *instruction) Uses(regs *[]regalloc.VReg) []regalloc.VReg {
 	*regs = (*regs)[:0]
 	switch uk := useKinds[i.kind]; uk {
 	case useKindNone:
-	case useKindOp1Reg:
-		//if op.kind != operandKindReg {
-		//	panic("BUG: unsupported operand")
-		//}
-		*regs = append(*regs, i.op1.r, i.op2.r)
+	case useKindOp1Op2:
+		op := i.op1
+		switch op.kind {
+		case operandKindReg:
+			*regs = append(*regs, op.r)
+		case operandKindMem:
+			op.amode.uses(regs)
+		case operandKindImm32, operandKindLabel:
+		default:
+			panic(fmt.Sprintf("BUG: invalid operand: %s", i))
+		}
+		op = i.op2
+		switch op.kind {
+		case operandKindReg:
+			*regs = append(*regs, op.r)
+		case operandKindMem:
+			op.amode.uses(regs)
+		case operandKindImm32, operandKindLabel:
+		default:
+			panic(fmt.Sprintf("BUG: invalid operand: %s", i))
+		}
+
 	case useKindOp1:
 		op := i.op1
 		switch op.kind {
@@ -267,16 +284,23 @@ func (i *instruction) Uses(regs *[]regalloc.VReg) []regalloc.VReg {
 func (i *instruction) AssignUse(index int, v regalloc.VReg) {
 	switch uk := useKinds[i.kind]; uk {
 	case useKindNone:
-	case useKindOp1Reg:
+	case useKindOp1Op2:
 		if index == 1 {
 			op := &i.op2
-			if op.kind != operandKindReg {
-				panic("BUG: unsupported operand")
+			switch op.kind {
+			case operandKindReg:
+				if index != 1 {
+					panic("BUG")
+				}
+				if op.r.IsRealReg() {
+					panic("BUG already assigned: " + i.String())
+				}
+				op.r = v
+			case operandKindMem:
+				op.amode.assignUses(index, v)
+			default:
+				panic(fmt.Sprintf("BUG: invalid operand: %s", i))
 			}
-			if op.r.IsRealReg() {
-				panic("BUG already assigned: " + i.String())
-			}
-			op.r = v
 			break
 		} else {
 			op := &i.op1
@@ -291,6 +315,9 @@ func (i *instruction) AssignUse(index int, v regalloc.VReg) {
 				op.r = v
 			case operandKindMem:
 				op.amode.assignUses(index, v)
+			case operandKindImm32:
+				// Ignore: no assignable reg.
+				panic("incorrect " + i.String())
 			default:
 				panic(fmt.Sprintf("BUG: invalid operand: %s", i))
 			}
@@ -1513,7 +1540,7 @@ type useKind byte
 const (
 	useKindNone useKind = iota + 1
 	useKindOp1
-	useKindOp1Reg
+	useKindOp1Op2
 	useKindCall
 )
 
@@ -1522,7 +1549,7 @@ var useKinds = [instrMax]useKind{
 	ret:         useKindNone,
 	movRR:       useKindOp1,
 	movRM:       useKindOp1,
-	aluRmiR:     useKindOp1Reg,
+	aluRmiR:     useKindOp1Op2,
 	imm:         useKindNone,
 	xmmUnaryRmR: useKindOp1,
 	gprToXmm:    useKindOp1,
@@ -1535,8 +1562,8 @@ func (u useKind) String() string {
 		return "none"
 	case useKindOp1:
 		return "op1"
-	case useKindOp1Reg:
-		return "op1Reg"
+	case useKindOp1Op2:
+		return "op1op2"
 	case useKindCall:
 		return "call"
 	default:

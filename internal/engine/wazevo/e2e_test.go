@@ -96,12 +96,12 @@ func TestE2E(t *testing.T) {
 			calls:     []callCase{{expErr: "unreachable"}},
 		},
 		{
-			name: "add_sub_params_return", m: testcases.AddReturn.Module,
+			name: "add_sub_return", m: testcases.AddSubReturn.Module,
 			skipAMD64: false,
 			calls: []callCase{
 				{
 					params:     []uint64{},
-					expResults: []uint64{3},
+					expResults: []uint64{3, 3},
 				},
 			},
 		},
