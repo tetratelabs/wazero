@@ -186,10 +186,20 @@ func (m *machine) getOperand_Imm32_Reg(def *backend.SSAValueDefinition) (op oper
 
 	instr := def.Instr
 	if instr.Constant() {
-		amount := uint32(instr.ConstantVal())
-		return newOperandImm32(amount)
+		if op, ok := asImm32Operand(instr.ConstantVal()); ok {
+			instr.MarkLowered()
+			return op
+		}
 	}
 	return m.getOperand_Reg(def)
+}
+
+func asImm32Operand(val uint64) (op operand, ok bool) {
+	u32val := uint32(val)
+	if uint64(u32val) != val {
+		return operand{}, false
+	}
+	return newOperandImm32(u32val), true
 }
 
 func (m *machine) getOperand_Reg(def *backend.SSAValueDefinition) (op operand) {

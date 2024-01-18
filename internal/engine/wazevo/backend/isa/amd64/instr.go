@@ -287,41 +287,44 @@ func (i *instruction) AssignUse(index int, v regalloc.VReg) {
 		op1, op2 := &i.op1, &i.op2
 		switch {
 		case op1.kind == operandKindReg && op2.kind == operandKindReg:
-			if op1.r.IsRealReg() || op2.r.IsRealReg() {
-				panic("BUG already assigned: " + i.String())
-			}
 			if index == 0 {
+				if op1.r.IsRealReg() {
+					panic("BUG already assigned: " + i.String())
+				}
 				op1.r = v
 			} else if index == 1 {
+				if op2.r.IsRealReg() {
+					panic("BUG already assigned: " + i.String())
+				}
 				op2.r = v
 			} else {
 				panic("BUG")
 			}
 		case op1.kind == operandKindMem && op2.kind == operandKindReg:
-			if op1.r.IsRealReg() {
-				panic("BUG already assigned: " + i.String())
-			}
 			if index == 0 {
 				op2.amode.assignUses(index, v)
 			} else if index == 1 {
+				if op1.r.IsRealReg() {
+					panic("BUG already assigned: " + i.String())
+				}
 				op1.r = v
 			} else {
 				panic("BUG")
 			}
 		case op1.kind == operandKindImm32 && op2.kind == operandKindReg:
-			if op2.r.IsRealReg() {
-				panic("BUG already assigned: " + i.String())
-			}
 			if index == 0 {
+				if op2.r.IsRealReg() {
+					panic("BUG already assigned: " + i.String())
+				}
 				op2.r = v
 			} else {
 				panic("BUG")
 			}
 		case op1.kind == operandKindReg && op2.kind == operandKindMem:
-			if op1.r.IsRealReg() {
-				panic("BUG already assigned: " + i.String())
-			}
 			if index == 0 {
+				if op1.r.IsRealReg() {
+					panic("BUG already assigned: " + i.String())
+				}
 				op1.r = v
 			} else if index == 1 {
 				op2.amode.assignUses(index, v)

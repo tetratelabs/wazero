@@ -37,18 +37,18 @@ var (
 	Params       = TestCase{Name: "params", Module: SingleFunctionModule(i32f32f64_v, []byte{wasm.OpcodeReturn, wasm.OpcodeEnd}, nil)}
 	AddSubReturn = TestCase{
 		Name: "add_sub_params_return_const",
-		Module: SingleFunctionModule(wasm.FunctionType{Results: []wasm.ValueType{i32, i64}}, []byte{
+		Module: SingleFunctionModule(wasm.FunctionType{Results: []wasm.ValueType{i64, i32}}, []byte{
+			wasm.OpcodeI64Const, 3,
+			wasm.OpcodeI64Const, 0xff, 0xff, 0xff, 0xff, 0xff, 0,
+			wasm.OpcodeI64Add,
+			wasm.OpcodeI64Const, 0xff, 0xff, 0xff, 0xff, 0xff, 0,
+			wasm.OpcodeI64Sub,
+
 			wasm.OpcodeI32Const, 4,
 			wasm.OpcodeI32Const, 5,
 			wasm.OpcodeI32Add,
 			wasm.OpcodeI32Const, 6,
 			wasm.OpcodeI32Sub,
-
-			wasm.OpcodeI64Const, 4,
-			wasm.OpcodeI64Const, 5,
-			wasm.OpcodeI64Add,
-			wasm.OpcodeI64Const, 6,
-			wasm.OpcodeI64Sub,
 
 			wasm.OpcodeEnd,
 		}, nil),
