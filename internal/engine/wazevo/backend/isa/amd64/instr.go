@@ -241,9 +241,9 @@ func (i *instruction) Uses(regs *[]regalloc.VReg) []regalloc.VReg {
 	case useKindNone:
 	case useKindOp1Op2:
 		op1, op2 := &i.op1, &i.op2
-		// The destination operand (op2) can be a register or a memory location;
-		// the source operand (op1) can be an immediate, a register, or a memory location.
-		// (However, two memory operands cannot be used in one instruction.)
+		// The destination operand (op2) can be reg or mem,
+		// the source operand (op1) can be imm32, reg or mem,
+		// however op1 and op2 cannot be both mem.
 		switch {
 		case op1.kind == operandKindReg && op2.kind == operandKindReg:
 			*regs = append(*regs, op1.r, op2.r)
@@ -327,8 +327,8 @@ func (i *instruction) AssignUse(index int, v regalloc.VReg) {
 					panic("BUG already assigned: " + i.String())
 				}
 				op1.r = v
-			} else if index < op2.amode.nregs() {
-				op2.amode.assignUses(index, v)
+			} else if index <= op2.amode.nregs() {
+				op2.amode.assignUses(index-1, v)
 			} else {
 				panic("BUG")
 			}

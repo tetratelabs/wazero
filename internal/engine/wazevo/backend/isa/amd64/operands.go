@@ -130,8 +130,10 @@ func (a *amode) nregs() int {
 		return 1
 	case amodeRegRegShift:
 		return 2
-	default:
+	case amodeRipRelative:
 		return 0
+	default:
+		panic("BUG: invalid amode kind")
 	}
 }
 
