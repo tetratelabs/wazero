@@ -16,6 +16,7 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 	tests := []struct {
 		name           string
 		moduleInstance *wasm.ModuleInstance
+		memoryType     wazeroir.MemoryType
 	}{
 		{
 			name: "no nil",
@@ -30,6 +31,7 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 				DataInstances:    make([][]byte, 10),
 				ElementInstances: make([]wasm.ElementInstance, 10),
 			},
+			memoryType: wazeroir.MemoryTypeStandard,
 		},
 		{
 			name: "element instances nil",
@@ -41,6 +43,7 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 				DataInstances:    make([][]byte, 10),
 				ElementInstances: nil,
 			},
+			memoryType: wazeroir.MemoryTypeStandard,
 		},
 		{
 			name: "data instances nil",
@@ -52,6 +55,7 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 				DataInstances:    nil,
 				ElementInstances: make([]wasm.ElementInstance, 10),
 			},
+			memoryType: wazeroir.MemoryTypeStandard,
 		},
 		{
 			name: "globals nil",
@@ -62,6 +66,7 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 				DataInstances:    make([][]byte, 10),
 				ElementInstances: make([]wasm.ElementInstance, 10),
 			},
+			memoryType: wazeroir.MemoryTypeStandard,
 		},
 		{
 			name: "memory nil",
@@ -82,6 +87,7 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 				DataInstances:    make([][]byte, 10),
 				ElementInstances: make([]wasm.ElementInstance, 10),
 			},
+			memoryType: wazeroir.MemoryTypeStandard,
 		},
 		{
 			name: "table empty",
@@ -97,6 +103,14 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 			moduleInstance: &wasm.ModuleInstance{
 				MemoryInstance: &wasm.MemoryInstance{Buffer: make([]byte, 0)},
 			},
+			memoryType: wazeroir.MemoryTypeStandard,
+		},
+		{
+			name: "memory shared",
+			moduleInstance: &wasm.ModuleInstance{
+				MemoryInstance: &wasm.MemoryInstance{Buffer: make([]byte, 10), Shared: true},
+			},
+			memoryType: wazeroir.MemoryTypeShared,
 		},
 		{
 			name:           "all nil except mod engine",
@@ -112,7 +126,7 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 			ce := env.callEngine()
 
 			ir := &wazeroir.CompilationResult{
-				HasMemory:           tc.moduleInstance.MemoryInstance != nil,
+				Memory:              tc.memoryType,
 				HasTable:            len(tc.moduleInstance.Tables) > 0,
 				HasDataInstances:    len(tc.moduleInstance.DataInstances) > 0,
 				HasElementInstances: len(tc.moduleInstance.ElementInstances) > 0,

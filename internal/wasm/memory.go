@@ -7,6 +7,7 @@ import (
 	"math"
 	"reflect"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unsafe"
 
@@ -263,7 +264,12 @@ func (m *MemoryInstance) Grow(delta uint32) (result uint32, ok bool) {
 		return currentPages, true
 	} else { // We already have the capacity we need.
 		sp := (*reflect.SliceHeader)(unsafe.Pointer(&m.Buffer))
-		sp.Len = int(MemoryPagesToBytesNum(newPages))
+		if m.Shared {
+			// Use atomic write to ensure new length is visible across threads.
+			atomic.StoreUintptr((*uintptr)(unsafe.Pointer(&sp.Len)), uintptr(MemoryPagesToBytesNum(newPages)))
+		} else {
+			sp.Len = int(MemoryPagesToBytesNum(newPages))
+		}
 		return currentPages, true
 	}
 }

@@ -301,7 +301,7 @@ func TestCompile_BulkMemoryOperations(t *testing.T) {
 			NewOperationDataDrop(1),                      // []
 			NewOperationBr(NewLabel(LabelKindReturn, 0)), // return!
 		},
-		HasMemory:        true,
+		Memory:           MemoryTypeStandard,
 		UsesMemory:       true,
 		HasDataInstances: true,
 		LabelCallers:     map[Label]uint32{},
