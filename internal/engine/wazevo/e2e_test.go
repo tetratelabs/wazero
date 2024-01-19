@@ -101,7 +101,7 @@ func TestE2E(t *testing.T) {
 			calls: []callCase{
 				{
 					params:     []uint64{},
-					expResults: []uint64{3, 3, 3},
+					expResults: []uint64{3, 3, 3, 3},
 				},
 			},
 		},

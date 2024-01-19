@@ -37,24 +37,34 @@ var (
 	Params       = TestCase{Name: "params", Module: SingleFunctionModule(i32f32f64_v, []byte{wasm.OpcodeReturn, wasm.OpcodeEnd}, nil)}
 	AddSubReturn = TestCase{
 		Name: "add_sub_params_return_const",
-		Module: SingleFunctionModule(wasm.FunctionType{Results: []wasm.ValueType{i64, i64, i32}}, []byte{
-			wasm.OpcodeI64Const, 3,
-			wasm.OpcodeI64Const, 0xff, 0xff, 0xff, 0xff, 0xff, 0,
-			wasm.OpcodeI64Add,
-			wasm.OpcodeI64Const, 0xff, 0xff, 0xff, 0xff, 0xff, 0,
-			wasm.OpcodeI64Sub,
+		Module: SingleFunctionModule(wasm.FunctionType{Results: []wasm.ValueType{i32, i32, i64, i64}}, []byte{
+			// Small i32 constants should be inlined on arm64, amd64.
+			wasm.OpcodeI32Const, 4,
+			wasm.OpcodeI32Const, 5,
+			wasm.OpcodeI32Add,
+			wasm.OpcodeI32Const, 6,
+			wasm.OpcodeI32Sub,
 
+			// Large i32 constants should be inlined on amd4, load from register on arm64.
+			wasm.OpcodeI32Const, 3,
+			wasm.OpcodeI32Const, 0xff, 0xff, 0xff, 0xff, 0,
+			wasm.OpcodeI32Add,
+			wasm.OpcodeI32Const, 0xff, 0xff, 0xff, 0xff, 0,
+			wasm.OpcodeI32Sub,
+
+			// Small i64 constants should be inlined on arm64, amd64.
 			wasm.OpcodeI64Const, 4,
 			wasm.OpcodeI64Const, 5,
 			wasm.OpcodeI64Add,
 			wasm.OpcodeI64Const, 6,
 			wasm.OpcodeI64Sub,
 
-			wasm.OpcodeI32Const, 4,
-			wasm.OpcodeI32Const, 5,
-			wasm.OpcodeI32Add,
-			wasm.OpcodeI32Const, 6,
-			wasm.OpcodeI32Sub,
+			// Large i64 constants are load from register on arm64, amd64.
+			wasm.OpcodeI64Const, 3,
+			wasm.OpcodeI64Const, 0xff, 0xff, 0xff, 0xff, 0xff, 0,
+			wasm.OpcodeI64Add,
+			wasm.OpcodeI64Const, 0xff, 0xff, 0xff, 0xff, 0xff, 0,
+			wasm.OpcodeI64Sub,
 
 			wasm.OpcodeEnd,
 		}, nil),
