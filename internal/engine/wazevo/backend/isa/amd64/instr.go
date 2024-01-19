@@ -241,25 +241,22 @@ func (i *instruction) Uses(regs *[]regalloc.VReg) []regalloc.VReg {
 	case useKindNone:
 	case useKindOp1Op2:
 		op1, op2 := &i.op1, &i.op2
-		// The destination operand (op2) can be reg or mem,
-		// the source operand (op1) can be imm32, reg or mem,
-		// however op1 and op2 cannot be both mem.
-		switch {
-		case op1.kind == operandKindReg && op2.kind == operandKindReg:
-			*regs = append(*regs, op1.r, op2.r)
-		case op1.kind == operandKindMem && op2.kind == operandKindReg:
-			op1.amode.uses(regs)
-			*regs = append(*regs, op2.r)
-		case op1.kind == operandKindImm32 && op2.kind == operandKindReg:
-			*regs = append(*regs, op2.r)
-		case op1.kind == operandKindReg && op2.kind == operandKindMem:
+		// The destination operand (op2) can be only reg,
+		// the source operand (op1) can be imm32, reg or mem.
+		switch op1.kind {
+		case operandKindReg:
 			*regs = append(*regs, op1.r)
-			op2.amode.uses(regs)
-		case op1.kind == operandKindImm32 && op2.kind == operandKindMem:
-			op2.amode.uses(regs)
+		case operandKindMem:
+			op1.amode.uses(regs)
+		case operandKindImm32:
+			// Valid, no reg.
 		default:
 			panic(fmt.Sprintf("BUG: invalid operand pair: %s -- %s, %s", i, op1.kind, op2.kind))
 		}
+		if op2.kind != operandKindReg {
+			panic(fmt.Sprintf("BUG: unsupported operand op1 in %s -- %s", i, op1.kind))
+		}
+		*regs = append(*regs, op2.r)
 	case useKindOp1:
 		op := i.op1
 		switch op.kind {
@@ -285,8 +282,8 @@ func (i *instruction) AssignUse(index int, v regalloc.VReg) {
 	case useKindNone:
 	case useKindOp1Op2:
 		op1, op2 := &i.op1, &i.op2
-		switch {
-		case op1.kind == operandKindReg && op2.kind == operandKindReg:
+		switch op1.kind {
+		case operandKindReg:
 			if index == 0 {
 				if op1.r.IsRealReg() {
 					panic("BUG already assigned: " + i.String())
@@ -300,7 +297,7 @@ func (i *instruction) AssignUse(index int, v regalloc.VReg) {
 			} else {
 				panic("BUG")
 			}
-		case op1.kind == operandKindMem && op2.kind == operandKindReg:
+		case operandKindMem:
 			nregs := op1.amode.nregs()
 			if index < nregs {
 				op1.amode.assignUses(index, v)
@@ -312,29 +309,12 @@ func (i *instruction) AssignUse(index int, v regalloc.VReg) {
 			} else {
 				panic("BUG")
 			}
-		case op1.kind == operandKindImm32 && op2.kind == operandKindReg:
+		case operandKindImm32:
 			if index == 0 {
 				if op2.r.IsRealReg() {
 					panic("BUG already assigned: " + i.String())
 				}
 				op2.r = v
-			} else {
-				panic("BUG")
-			}
-		case op1.kind == operandKindReg && op2.kind == operandKindMem:
-			if index == 0 {
-				if op1.r.IsRealReg() {
-					panic("BUG already assigned: " + i.String())
-				}
-				op1.r = v
-			} else if index <= op2.amode.nregs() {
-				op2.amode.assignUses(index-1, v)
-			} else {
-				panic("BUG")
-			}
-		case op1.kind == operandKindImm32 && op2.kind == operandKindMem:
-			if index < op2.amode.nregs() {
-				op2.amode.assignUses(index, v)
 			} else {
 				panic("BUG")
 			}

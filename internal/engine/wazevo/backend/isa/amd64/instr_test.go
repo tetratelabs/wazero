@@ -1,9 +1,10 @@
 package amd64
 
 import (
+	"testing"
+
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/testing/require"
-	"testing"
 )
 
 func TestMachine_lowerAluRmiROp_Uses_AssignUse(t *testing.T) {
@@ -45,5 +46,4 @@ func TestMachine_lowerAluRmiROp_Uses_AssignUse(t *testing.T) {
 			require.Equal(t, tc.expected, instr.String())
 		})
 	}
-
 }
