@@ -2,10 +2,12 @@ package adhoc
 
 import (
 	_ "embed"
+	"runtime"
 	"testing"
 
 	wazero "github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/hammer"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
@@ -53,8 +55,13 @@ func TestThreadsNotEnabled(t *testing.T) {
 }
 
 func TestThreadsCompiler_hammer(t *testing.T) {
-	t.Skip() // TODO: Enable after threads compiler implementation
-	runAllTests(t, threadTests, wazero.NewRuntimeConfig().WithCoreFeatures(api.CoreFeaturesV2), false)
+	if !platform.CompilerSupported() {
+		t.Skip()
+	}
+	if runtime.GOARCH != "arm64" {
+		t.Skip() // TODO: Delete after implementing amd64 support
+	}
+	runAllTests(t, threadTests, wazero.NewRuntimeConfigCompiler().WithCoreFeatures(api.CoreFeaturesV2), false)
 }
 
 func TestThreadsInterpreter_hammer(t *testing.T) {
