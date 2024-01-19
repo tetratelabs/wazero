@@ -3,6 +3,7 @@ package spectest
 import (
 	"context"
 	"embed"
+	"runtime"
 	"testing"
 
 	"github.com/tetratelabs/wazero"
@@ -18,9 +19,11 @@ var testcases embed.FS
 const enabledFeatures = api.CoreFeaturesV2 // TODO: Enable threads feature after implementing interpreter support
 
 func TestCompiler(t *testing.T) {
-	t.Skip() // TODO: Delete after implementing compiler support
 	if !platform.CompilerSupported() {
 		t.Skip()
+	}
+	if runtime.GOARCH != "arm64" {
+		t.Skip() // TODO: Delete after implementing amd64 support
 	}
 	spectest.Run(t, testcases, context.Background(), wazero.NewRuntimeConfigCompiler().WithCoreFeatures(enabledFeatures))
 }
