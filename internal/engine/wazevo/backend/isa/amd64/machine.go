@@ -159,7 +159,7 @@ func (m *machine) lowerAluRmiROp(si *ssa.Instruction, op aluRmiROpcode) {
 	yDef := m.c.ValueDefinition(y)
 
 	rn := m.getOperand_Reg(xDef)
-	rm := m.getOperand_Imm32_Reg(yDef)
+	rm := m.getOperand_Mem_Imm32_Reg(yDef)
 	rd := m.c.VRegOf(si.Return())
 	tmp := m.c.AllocateVReg(si.Return().Type())
 
@@ -177,6 +177,26 @@ func (m *machine) lowerAluRmiROp(si *ssa.Instruction, op aluRmiROpcode) {
 	mov2 := m.allocateInstr()
 	mov2.asMovRR(tmp, rd, _64)
 	m.insert(mov2)
+}
+
+func (m *machine) getOperand_Mem_Imm32_Reg(def *backend.SSAValueDefinition) (op operand) {
+	if def.IsFromBlockParam() {
+		return newOperandReg(def.BlkParamVReg)
+	}
+
+	instr := def.Instr
+	switch instr.Opcode() {
+	case ssa.OpcodeLoad:
+		ptr, offset, _ := instr.LoadData()
+		reg := m.c.VRegOf(ptr)
+		op = newOperandMem(newAmodeImmReg(offset, reg))
+		instr.MarkLowered()
+		return op
+	case ssa.OpcodeUload8, ssa.OpcodeUload16, ssa.OpcodeUload32, ssa.OpcodeSload8, ssa.OpcodeSload16, ssa.OpcodeSload32:
+		panic("TODO")
+	default:
+		return m.getOperand_Reg(def)
+	}
 }
 
 func (m *machine) getOperand_Imm32_Reg(def *backend.SSAValueDefinition) (op operand) {
