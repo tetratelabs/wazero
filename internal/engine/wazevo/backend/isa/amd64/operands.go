@@ -99,7 +99,7 @@ type amode struct {
 type amodeKind byte
 
 const (
-	// amodeRegRegShift calcualtes sign-extend-32-to-64(Immediate) + base
+	// amodeRegRegShift calculates sign-extend-32-to-64(Immediate) + base
 	amodeImmReg amodeKind = iota + 1
 
 	// amodeRegRegShift calculates sign-extend-32-to-64(Immediate) + base + (Register2 << Shift)

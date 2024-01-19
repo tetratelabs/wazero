@@ -35,6 +35,11 @@ type (
 		regAllocFn      *backend.RegAllocFunction[*instruction, *machine]
 		regAllocStarted bool
 
+		// addendsWorkQueue is used during address lowering, defined here for reuse.
+		addendsWorkQueue queue[ssa.Value]
+		// addends64 is used during address lowering, defined here for reuse.
+		addends64 queue[regalloc.VReg]
+
 		spillSlotSize int64
 		currentABI    *backend.FunctionABI
 		clobberedRegs []regalloc.VReg
@@ -188,14 +193,13 @@ func (m *machine) getOperand_Mem_Imm32_Reg(def *backend.SSAValueDefinition) (op 
 	switch instr.Opcode() {
 	case ssa.OpcodeLoad:
 		ptr, offset, _ := instr.LoadData()
-		reg := m.c.VRegOf(ptr)
-		op = newOperandMem(newAmodeImmReg(offset, reg))
+		op = newOperandMem(m.lowerToAddressMode(ptr, offset))
 		instr.MarkLowered()
 		return op
 	case ssa.OpcodeUload8, ssa.OpcodeUload16, ssa.OpcodeUload32, ssa.OpcodeSload8, ssa.OpcodeSload16, ssa.OpcodeSload32:
 		panic("TODO")
 	default:
-		return m.getOperand_Reg(def)
+		return m.getOperand_Imm32_Reg(def)
 	}
 }
 
