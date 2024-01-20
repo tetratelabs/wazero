@@ -81,6 +81,7 @@ func TestMachine_SetupEpilogue(t *testing.T) {
 	}{
 		{
 			exp: `
+	movq %rbp, %rsp
 	popq %rbp
 	ret
 `,
@@ -97,6 +98,7 @@ func TestMachine_SetupEpilogue(t *testing.T) {
 	add $16, %rsp
 	movdqu (%rsp), %xmm15
 	add $16, %rsp
+	movq %rbp, %rsp
 	popq %rbp
 	ret
 `,

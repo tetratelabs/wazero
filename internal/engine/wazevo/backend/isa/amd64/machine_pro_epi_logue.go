@@ -194,8 +194,10 @@ func (m *machine) setupEpilogueAfter(cur *instruction) {
 		}
 	}
 
-	// Now roll back the RBP to the original, which results in RBP being the return address.
+	// Now roll back the RSP to RBP, and pop the caller's RBP.
+	// 		mov  %rbp, %rsp
 	// 		pop  %rbp
+	cur = linkInstr(cur, m.allocateInstr().asMovRR(rbpVReg, rspVReg, true))
 	cur = linkInstr(cur, m.allocateInstr().asPop64(rbpVReg))
 
 	linkInstr(cur, prevNext)
