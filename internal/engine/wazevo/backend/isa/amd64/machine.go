@@ -240,7 +240,7 @@ func (m *machine) InsertMove(dst, src regalloc.VReg, typ ssa.Type) {
 		case ssa.TypeV128:
 			op = sseOpcodeMovdqa
 		}
-		i := m.allocateInstr().asXmmUnaryRmR(op, operand{kind: operandKindReg, r: src}, dst, typ.Bits() == 64)
+		i := m.allocateInstr().asXmmUnaryRmR(op, newOperandReg(src), dst)
 		m.insert(i)
 	default:
 		panic("BUG")
