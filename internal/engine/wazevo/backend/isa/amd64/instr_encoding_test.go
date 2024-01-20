@@ -890,211 +890,211 @@ func TestInstruction_format_encode(t *testing.T) {
 		},
 		// cvtss2sd
 		{
-			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodeCvtss2sd, newOperandReg(xmm1VReg), xmm0VReg, true) },
+			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodeCvtss2sd, newOperandReg(xmm1VReg), xmm0VReg) },
 			want:       "f30f5ac1",
 			wantFormat: "cvtss2sd %xmm1, %xmm0",
 		},
 		// cvtsd2ss
 		{
-			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodeCvtsd2ss, newOperandReg(xmm1VReg), xmm0VReg, true) },
+			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodeCvtsd2ss, newOperandReg(xmm1VReg), xmm0VReg) },
 			want:       "f20f5ac1",
 			wantFormat: "cvtsd2ss %xmm1, %xmm0",
 		},
 		// movaps
 		{
-			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodeMovaps, newOperandReg(xmm1VReg), xmm0VReg, true) },
+			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodeMovaps, newOperandReg(xmm1VReg), xmm0VReg) },
 			want:       "0f28c1",
 			wantFormat: "movaps %xmm1, %xmm0",
 		},
 		// movapd
 		{
-			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodeMovapd, newOperandReg(xmm1VReg), xmm0VReg, true) },
+			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodeMovapd, newOperandReg(xmm1VReg), xmm0VReg) },
 			want:       "660f28c1",
 			wantFormat: "movapd %xmm1, %xmm0",
 		},
 		// movdqa
 		{
-			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodeMovdqa, newOperandReg(xmm1VReg), xmm0VReg, true) },
+			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodeMovdqa, newOperandReg(xmm1VReg), xmm0VReg) },
 			want:       "660f6fc1",
 			wantFormat: "movdqa %xmm1, %xmm0",
 		},
 		// movdqu
 		{
-			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodeMovdqu, newOperandReg(xmm1VReg), xmm0VReg, true) },
+			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodeMovdqu, newOperandReg(xmm1VReg), xmm0VReg) },
 			want:       "f30f6fc1",
 			wantFormat: "movdqu %xmm1, %xmm0",
 		},
 		// movsd
 		{
-			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodeMovsd, newOperandReg(xmm1VReg), xmm0VReg, true) },
+			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodeMovsd, newOperandReg(xmm1VReg), xmm0VReg) },
 			want:       "f20f10c1",
 			wantFormat: "movsd %xmm1, %xmm0",
 		},
 		// movss
 		{
-			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodeMovss, newOperandReg(xmm1VReg), xmm0VReg, true) },
+			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodeMovss, newOperandReg(xmm1VReg), xmm0VReg) },
 			want:       "f30f10c1",
 			wantFormat: "movss %xmm1, %xmm0",
 		},
 		// movups
 		{
-			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodeMovups, newOperandReg(xmm1VReg), xmm0VReg, true) },
+			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodeMovups, newOperandReg(xmm1VReg), xmm0VReg) },
 			want:       "0f10c1",
 			wantFormat: "movups %xmm1, %xmm0",
 		},
 		// movupd
 		{
-			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodeMovupd, newOperandReg(xmm1VReg), xmm0VReg, true) },
+			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodeMovupd, newOperandReg(xmm1VReg), xmm0VReg) },
 			want:       "660f10c1",
 			wantFormat: "movupd %xmm1, %xmm0",
 		},
 		// pabsb
 		{
-			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodePabsb, newOperandReg(xmm1VReg), xmm0VReg, true) },
+			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodePabsb, newOperandReg(xmm1VReg), xmm0VReg) },
 			want:       "660f381cc1",
 			wantFormat: "pabsb %xmm1, %xmm0",
 		},
 		// pabsw
 		{
-			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodePabsw, newOperandReg(xmm1VReg), xmm0VReg, true) },
+			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodePabsw, newOperandReg(xmm1VReg), xmm0VReg) },
 			want:       "660f381dc1",
 			wantFormat: "pabsw %xmm1, %xmm0",
 		},
 		// pabsd
 		{
-			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodePabsd, newOperandReg(xmm1VReg), xmm0VReg, true) },
+			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodePabsd, newOperandReg(xmm1VReg), xmm0VReg) },
 			want:       "660f381ec1",
 			wantFormat: "pabsd %xmm1, %xmm0",
 		},
 		// pmovsxbd
 		{
-			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodePmovsxbd, newOperandReg(xmm1VReg), xmm0VReg, true) },
+			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodePmovsxbd, newOperandReg(xmm1VReg), xmm0VReg) },
 			want:       "660f3821c1",
 			wantFormat: "pmovsxbd %xmm1, %xmm0",
 		},
 		// pmovsxbw
 		{
-			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodePmovsxbw, newOperandReg(xmm1VReg), xmm0VReg, true) },
+			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodePmovsxbw, newOperandReg(xmm1VReg), xmm0VReg) },
 			want:       "660f3820c1",
 			wantFormat: "pmovsxbw %xmm1, %xmm0",
 		},
 		// pmovsxbq
 		{
-			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodePmovsxbq, newOperandReg(xmm1VReg), xmm0VReg, true) },
+			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodePmovsxbq, newOperandReg(xmm1VReg), xmm0VReg) },
 			want:       "660f3822c1",
 			wantFormat: "pmovsxbq %xmm1, %xmm0",
 		},
 		// pmovsxwd
 		{
-			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodePmovsxwd, newOperandReg(xmm1VReg), xmm0VReg, true) },
+			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodePmovsxwd, newOperandReg(xmm1VReg), xmm0VReg) },
 			want:       "660f3823c1",
 			wantFormat: "pmovsxwd %xmm1, %xmm0",
 		},
 		// pmovsxwq
 		{
-			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodePmovsxwq, newOperandReg(xmm1VReg), xmm0VReg, true) },
+			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodePmovsxwq, newOperandReg(xmm1VReg), xmm0VReg) },
 			want:       "660f3824c1",
 			wantFormat: "pmovsxwq %xmm1, %xmm0",
 		},
 		// pmovsxdq
 		{
-			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodePmovsxdq, newOperandReg(xmm1VReg), xmm0VReg, true) },
+			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodePmovsxdq, newOperandReg(xmm1VReg), xmm0VReg) },
 			want:       "660f3825c1",
 			wantFormat: "pmovsxdq %xmm1, %xmm0",
 		},
 		// pmovzxbd
 		{
-			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodePmovzxbd, newOperandReg(xmm1VReg), xmm0VReg, true) },
+			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodePmovzxbd, newOperandReg(xmm1VReg), xmm0VReg) },
 			want:       "660f3831c1",
 			wantFormat: "pmovzxbd %xmm1, %xmm0",
 		},
 		// pmovzxbw
 		{
-			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodePmovzxbw, newOperandReg(xmm1VReg), xmm0VReg, true) },
+			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodePmovzxbw, newOperandReg(xmm1VReg), xmm0VReg) },
 			want:       "660f3830c1",
 			wantFormat: "pmovzxbw %xmm1, %xmm0",
 		},
 		// pmovzxbq
 		{
-			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodePmovzxbq, newOperandReg(xmm1VReg), xmm0VReg, true) },
+			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodePmovzxbq, newOperandReg(xmm1VReg), xmm0VReg) },
 			want:       "660f3832c1",
 			wantFormat: "pmovzxbq %xmm1, %xmm0",
 		},
 		// pmovzxwd
 		{
-			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodePmovzxwd, newOperandReg(xmm1VReg), xmm0VReg, true) },
+			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodePmovzxwd, newOperandReg(xmm1VReg), xmm0VReg) },
 			want:       "660f3833c1",
 			wantFormat: "pmovzxwd %xmm1, %xmm0",
 		},
 		{
 			setup: func(i *instruction) {
-				i.asXmmUnaryRmR(sseOpcodePmovzxwd, newOperandMem(newAmodeImmReg(0, rbpVReg)), xmm11VReg, true)
+				i.asXmmUnaryRmR(sseOpcodePmovzxwd, newOperandMem(newAmodeImmReg(0, rbpVReg)), xmm11VReg)
 			},
 			want:       "66440f38335d00",
 			wantFormat: "pmovzxwd (%rbp), %xmm11",
 		},
 		{
 			setup: func(i *instruction) {
-				i.asXmmUnaryRmR(sseOpcodePmovzxwd, newOperandMem(newAmodeImmReg(123, rbpVReg)), xmm11VReg, true)
+				i.asXmmUnaryRmR(sseOpcodePmovzxwd, newOperandMem(newAmodeImmReg(123, rbpVReg)), xmm11VReg)
 			},
 			want:       "66440f38335d7b",
 			wantFormat: "pmovzxwd 123(%rbp), %xmm11",
 		},
 		{
 			setup: func(i *instruction) {
-				i.asXmmUnaryRmR(sseOpcodePmovzxwd, newOperandMem(newAmodeImmReg(1<<25, rbpVReg)), xmm11VReg, true)
+				i.asXmmUnaryRmR(sseOpcodePmovzxwd, newOperandMem(newAmodeImmReg(1<<25, rbpVReg)), xmm11VReg)
 			},
 			want:       "66440f38339d00000002",
 			wantFormat: "pmovzxwd 33554432(%rbp), %xmm11",
 		},
 		// pmovzxwq
 		{
-			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodePmovzxwq, newOperandReg(xmm1VReg), xmm0VReg, true) },
+			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodePmovzxwq, newOperandReg(xmm1VReg), xmm0VReg) },
 			want:       "660f3834c1",
 			wantFormat: "pmovzxwq %xmm1, %xmm0",
 		},
 		// pmovzxdq
 		{
-			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodePmovzxdq, newOperandReg(xmm1VReg), xmm0VReg, true) },
+			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodePmovzxdq, newOperandReg(xmm1VReg), xmm0VReg) },
 			want:       "660f3835c1",
 			wantFormat: "pmovzxdq %xmm1, %xmm0",
 		},
 		// sqrtps
 		{
-			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodeSqrtps, newOperandReg(xmm1VReg), xmm0VReg, true) },
+			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodeSqrtps, newOperandReg(xmm1VReg), xmm0VReg) },
 			want:       "0f51c1",
 			wantFormat: "sqrtps %xmm1, %xmm0",
 		},
 		// sqrtpd
 		{
-			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodeSqrtpd, newOperandReg(xmm1VReg), xmm0VReg, true) },
+			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodeSqrtpd, newOperandReg(xmm1VReg), xmm0VReg) },
 			want:       "660f51c1",
 			wantFormat: "sqrtpd %xmm1, %xmm0",
 		},
 		// sqrtss
 		{
-			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodeSqrtss, newOperandReg(xmm1VReg), xmm0VReg, true) },
+			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodeSqrtss, newOperandReg(xmm1VReg), xmm0VReg) },
 			want:       "f30f51c1",
 			wantFormat: "sqrtss %xmm1, %xmm0",
 		},
 		// sqrtsd
 		{
-			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodeSqrtsd, newOperandReg(xmm1VReg), xmm0VReg, true) },
+			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodeSqrtsd, newOperandReg(xmm1VReg), xmm0VReg) },
 			want:       "f20f51c1",
 			wantFormat: "sqrtsd %xmm1, %xmm0",
 		},
 		{
-			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodeSqrtsd, newOperandReg(xmm15VReg), xmm0VReg, true) },
+			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodeSqrtsd, newOperandReg(xmm15VReg), xmm0VReg) },
 			want:       "f2410f51c7",
 			wantFormat: "sqrtsd %xmm15, %xmm0",
 		},
 		{
-			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodeSqrtsd, newOperandReg(xmm1VReg), xmm15VReg, true) },
+			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodeSqrtsd, newOperandReg(xmm1VReg), xmm15VReg) },
 			want:       "f2440f51f9",
 			wantFormat: "sqrtsd %xmm1, %xmm15",
 		},
 		{
-			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodeSqrtsd, newOperandReg(xmm11VReg), xmm15VReg, true) },
+			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodeSqrtsd, newOperandReg(xmm11VReg), xmm15VReg) },
 			want:       "f2450f51fb",
 			wantFormat: "sqrtsd %xmm11, %xmm15",
 		},

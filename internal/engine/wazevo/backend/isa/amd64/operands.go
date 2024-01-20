@@ -47,6 +47,8 @@ func (o operandKind) String() string {
 	}
 }
 
+// format returns the string representation of the operand.
+// _64 is only for the case where the operand is a register, and it's integer.
 func (o *operand) format(_64 bool) string {
 	switch o.kind {
 	case operandKindReg:

@@ -1,5 +1,7 @@
 package amd64
 
+import "github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
+
 // CompileStackGrowCallSequence implements backend.Machine.
 func (m *machine) CompileStackGrowCallSequence() []byte {
 	// TODO
@@ -30,11 +32,7 @@ func (m *machine) SetupPrologue() {
 	//                    (low address)
 
 	// First, we push the RBP, and update the RBP to the current RSP.
-	// 		push %rbp
-	// 		mov %rsp, %rbp
-	cur = linkInstr(cur, m.allocateInstr().asPush64(newOperandReg(rbpVReg)))
-	cur = linkInstr(cur, m.allocateInstr().asMovRR(rspVReg, rbpVReg, true))
-
+	//
 	//                   (high address)                     (high address)
 	//       RBP ----> +-----------------+                +-----------------+
 	//                 |     .......     |                |     .......     |
@@ -46,15 +44,54 @@ func (m *machine) SetupPrologue() {
 	//                 |      arg 1      |                |      arg 1      |
 	//                 |      arg 0      |                |      arg 0      |
 	//                 |   Return Addr   |                |   Return Addr   |
-	//       RSP ----> +-----------------+                |    Frame Addr   |
+	//       RSP ----> +-----------------+                |    Caller_RBP   |
 	//                    (low address)                   +-----------------+ <----- RSP, RBP
 	//
+	// 		push %rbp
+	// 		mov %rsp, %rbp
+	cur = linkInstr(cur, m.allocateInstr().asPush64(newOperandReg(rbpVReg)))
+	cur = linkInstr(cur, m.allocateInstr().asMovRR(rspVReg, rbpVReg, true))
+
 	if !m.stackBoundsCheckDisabled { //nolint
 		// TODO: stack bounds check
 	}
 
+	//
+	//            (high address)
+	//          +-----------------+                  +-----------------+
+	//          |     .......     |                  |     .......     |
+	//          |      ret Y      |                  |      ret Y      |
+	//          |     .......     |                  |     .......     |
+	//          |      ret 0      |                  |      ret 0      |
+	//          |      arg X      |                  |      arg X      |
+	//          |     .......     |                  |     .......     |
+	//          |      arg 1      |                  |      arg 1      |
+	//          |      arg 0      |                  |      arg 0      |
+	//          |      xxxxx      |                  |      xxxxx      |
+	//          |   Return Addr   |                  |   Return Addr   |
+	//          |    Caller_RBP   |      ====>       |    Caller_RBP   |
+	// RBP,RSP->+-----------------+                  +-----------------+ <----- RBP
+	//             (low address)                     |   clobbered M   |
+	//                                               |   clobbered 1   |
+	//                                               |   ...........   |
+	//                                               |   clobbered 0   |
+	//                                               +-----------------+ <----- RSP
+	//
 	if regs := m.clobberedRegs; len(regs) > 0 {
-		panic("TODO: save clobbered registers")
+		for i := range regs {
+			r := regs[len(regs)-1-i] // Reverse order.
+			if r.RegType() == regalloc.RegTypeInt {
+				cur = linkInstr(cur, m.allocateInstr().asPush64(newOperandReg(r)))
+			} else {
+				// Push the XMM register is not supported by the PUSH instruction.
+				spDec := m.allocateInstr().asAluRmiR(aluRmiROpcodeSub, newOperandImm32(uint32(16)), rspVReg, true)
+				cur = linkInstr(cur, spDec)
+				push := m.allocateInstr().asXmmMovRM(
+					sseOpcodeMovdqu, r, newOperandMem(newAmodeImmReg(0, rspVReg)),
+				)
+				cur = linkInstr(cur, push)
+			}
+		}
 	}
 
 	if size := m.spillSlotSize; size > 0 {
@@ -117,11 +154,47 @@ func (m *machine) setupEpilogueAfter(cur *instruction) {
 	if size := m.spillSlotSize; size > 0 {
 		panic("TODO: deallocate spill slots")
 	}
+
+	//
+	//             (high address)
+	//            +-----------------+                     +-----------------+
+	//            |     .......     |                     |     .......     |
+	//            |      ret Y      |                     |      ret Y      |
+	//            |     .......     |                     |     .......     |
+	//            |      ret 0      |                     |      ret 0      |
+	//            |      arg X      |                     |      arg X      |
+	//            |     .......     |                     |     .......     |
+	//            |      arg 1      |                     |      arg 1      |
+	//            |      arg 0      |                     |      arg 0      |
+	//            |   ReturnAddress |                     |   ReturnAddress |
+	//            |    Caller_RBP   |                     |    Caller_RBP   |
+	//   RBP ---> +-----------------+      ========>      +-----------------+ <---- RSP, RBP
+	//            |    clobbered M  |
+	//            |   ............  |
+	//            |    clobbered 1  |
+	//            |    clobbered 0  |
+	//   RSP ---> +-----------------+
+	//               (low address)
+	//
 	if regs := m.clobberedRegs; len(regs) > 0 {
-		panic("TODO: restore clobbered registers")
+		for _, r := range regs {
+			if r.RegType() == regalloc.RegTypeInt {
+				cur = linkInstr(cur, m.allocateInstr().asPop64(r))
+			} else {
+				// Pop the XMM register is not supported by the POP instruction.
+				pop := m.allocateInstr().asXmmUnaryRmR(
+					sseOpcodeMovdqu, newOperandMem(newAmodeImmReg(0, rspVReg)), r,
+				)
+				cur = linkInstr(cur, pop)
+				spInc := m.allocateInstr().asAluRmiR(
+					aluRmiROpcodeAdd, newOperandImm32(uint32(16)), rspVReg, true,
+				)
+				cur = linkInstr(cur, spInc)
+			}
+		}
 	}
 
-	// Now roll back the RSP to the return address, and pop the RBP.
+	// Now roll back the RSP to RBP, and pop the caller's RBP.
 	// 		mov  %rbp, %rsp
 	// 		pop  %rbp
 	cur = linkInstr(cur, m.allocateInstr().asMovRR(rbpVReg, rspVReg, true))
