@@ -24,6 +24,29 @@ func TestMachine_SetupPrologue(t *testing.T) {
 	ud2
 `,
 		},
+		{
+			exp: `
+	pushq %rbp
+	movq %rsp, %rbp
+	sub $16, %rsp
+	movdqu %xmm15, (%rsp)
+	sub $16, %rsp
+	movdqu %xmm1, (%rsp)
+	sub $16, %rsp
+	movdqu %xmm0, (%rsp)
+	pushq %rcx
+	pushq %rax
+	ud2
+`,
+			spillSlotSize: 0,
+			clobberedRegs: []regalloc.VReg{
+				raxVReg,
+				rcxVReg,
+				xmm0VReg,
+				xmm1VReg,
+				xmm15VReg,
+			},
+		},
 		// TODO: add more test cases.
 	} {
 		tc := tc
