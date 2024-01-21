@@ -5,6 +5,7 @@ import (
 	"math"
 	"strings"
 
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 )
@@ -26,7 +27,7 @@ type (
 		u1, u2, u3          uint64
 		rd, rm, rn, ra      operand
 		amode               addressMode
-		abi                 *abiImpl
+		abi                 *backend.FunctionABI
 		targets             []uint32
 		addedBeforeRegAlloc bool
 	}
@@ -35,6 +36,48 @@ type (
 	// This controls how the instruction struct is interpreted.
 	instructionKind int
 )
+
+func asNop0(i *instruction) {
+	i.kind = nop0
+}
+
+func setNext(i, next *instruction) {
+	i.next = next
+}
+
+func setPrev(i, prev *instruction) {
+	i.prev = prev
+}
+
+// IsCall implements regalloc.Instr IsCall.
+func (i *instruction) IsCall() bool {
+	return i.kind == call
+}
+
+// IsIndirectCall implements regalloc.Instr IsIndirectCall.
+func (i *instruction) IsIndirectCall() bool {
+	return i.kind == callInd
+}
+
+// IsReturn implements regalloc.Instr IsReturn.
+func (i *instruction) IsReturn() bool {
+	return i.kind == ret
+}
+
+// Next implements regalloc.Instr Next.
+func (i *instruction) Next() regalloc.Instr {
+	return i.next
+}
+
+// Prev implements regalloc.Instr Prev.
+func (i *instruction) Prev() regalloc.Instr {
+	return i.prev
+}
+
+// AddedBeforeRegAlloc implements regalloc.Instr AddedBeforeRegAlloc.
+func (i *instruction) AddedBeforeRegAlloc() bool {
+	return i.addedBeforeRegAlloc
+}
 
 type defKind byte
 
@@ -112,6 +155,7 @@ var defKinds = [numInstructionKinds]defKind{
 	vecTbl2:              defKindRD,
 	vecPermute:           defKindRD,
 	vecRRR:               defKindRD,
+	vecRRRRewrite:        defKindNone,
 	fpuToInt:             defKindRD,
 	intToFpu:             defKindRD,
 	cCmpImm:              defKindNone,
@@ -120,22 +164,24 @@ var defKinds = [numInstructionKinds]defKind{
 	emitSourceOffsetInfo: defKindNone,
 }
 
-// defs returns the list of regalloc.VReg that are defined by the instruction.
+// Defs returns the list of regalloc.VReg that are defined by the instruction.
 // In order to reduce the number of allocations, the caller can pass the slice to be used.
-func (i *instruction) defs(regs []regalloc.VReg) []regalloc.VReg {
+func (i *instruction) Defs(regs *[]regalloc.VReg) []regalloc.VReg {
+	*regs = (*regs)[:0]
 	switch defKinds[i.kind] {
 	case defKindNone:
 	case defKindRD:
-		regs = append(regs, i.rd.nr())
+		*regs = append(*regs, i.rd.nr())
 	case defKindCall:
-		regs = append(regs, i.abi.retRealRegs...)
+		*regs = append(*regs, i.abi.RetRealRegs...)
 	default:
 		panic(fmt.Sprintf("defKind for %v not defined", i))
 	}
-	return regs
+	return *regs
 }
 
-func (i *instruction) assignDef(reg regalloc.VReg) {
+// AssignDef implements regalloc.Instr AssignDef.
+func (i *instruction) AssignDef(reg regalloc.VReg) {
 	switch defKinds[i.kind] {
 	case defKindNone:
 	case defKindRD:
@@ -161,6 +207,7 @@ const (
 	useKindAMode
 	useKindRNAMode
 	useKindCond
+	useKindVecRRRRewrite
 )
 
 var useKinds = [numInstructionKinds]useKind{
@@ -230,6 +277,7 @@ var useKinds = [numInstructionKinds]useKind{
 	vecTbl:               useKindRNRM,
 	vecTbl2:              useKindRNRN1RM,
 	vecRRR:               useKindRNRM,
+	vecRRRRewrite:        useKindVecRRRRewrite,
 	vecPermute:           useKindRNRM,
 	fpuToInt:             useKindRN,
 	intToFpu:             useKindRN,
@@ -239,74 +287,79 @@ var useKinds = [numInstructionKinds]useKind{
 	emitSourceOffsetInfo: useKindNone,
 }
 
-// uses returns the list of regalloc.VReg that are used by the instruction.
+// Uses returns the list of regalloc.VReg that are used by the instruction.
 // In order to reduce the number of allocations, the caller can pass the slice to be used.
-func (i *instruction) uses(regs []regalloc.VReg) []regalloc.VReg {
+func (i *instruction) Uses(regs *[]regalloc.VReg) []regalloc.VReg {
+	*regs = (*regs)[:0]
 	switch useKinds[i.kind] {
 	case useKindNone:
 	case useKindRN:
 		if rn := i.rn.reg(); rn.Valid() {
-			regs = append(regs, rn)
+			*regs = append(*regs, rn)
 		}
 	case useKindRNRM:
 		if rn := i.rn.reg(); rn.Valid() {
-			regs = append(regs, rn)
+			*regs = append(*regs, rn)
 		}
 		if rm := i.rm.reg(); rm.Valid() {
-			regs = append(regs, rm)
+			*regs = append(*regs, rm)
 		}
 	case useKindRNRMRA:
 		if rn := i.rn.reg(); rn.Valid() {
-			regs = append(regs, rn)
+			*regs = append(*regs, rn)
 		}
 		if rm := i.rm.reg(); rm.Valid() {
-			regs = append(regs, rm)
+			*regs = append(*regs, rm)
 		}
 		if ra := i.ra.reg(); ra.Valid() {
-			regs = append(regs, ra)
+			*regs = append(*regs, ra)
 		}
 	case useKindRNRN1RM:
 		if rn := i.rn.reg(); rn.Valid() && rn.IsRealReg() {
 			rn1 := regalloc.FromRealReg(rn.RealReg()+1, rn.RegType())
-			regs = append(regs, rn, rn1)
+			*regs = append(*regs, rn, rn1)
 		}
 		if rm := i.rm.reg(); rm.Valid() {
-			regs = append(regs, rm)
+			*regs = append(*regs, rm)
 		}
 	case useKindRet:
-		regs = append(regs, i.abi.retRealRegs...)
+		*regs = append(*regs, i.abi.RetRealRegs...)
 	case useKindAMode:
 		if amodeRN := i.amode.rn; amodeRN.Valid() {
-			regs = append(regs, amodeRN)
+			*regs = append(*regs, amodeRN)
 		}
 		if amodeRM := i.amode.rm; amodeRM.Valid() {
-			regs = append(regs, amodeRM)
+			*regs = append(*regs, amodeRM)
 		}
 	case useKindRNAMode:
-		regs = append(regs, i.rn.reg())
+		*regs = append(*regs, i.rn.reg())
 		if amodeRN := i.amode.rn; amodeRN.Valid() {
-			regs = append(regs, amodeRN)
+			*regs = append(*regs, amodeRN)
 		}
 		if amodeRM := i.amode.rm; amodeRM.Valid() {
-			regs = append(regs, amodeRM)
+			*regs = append(*regs, amodeRM)
 		}
 	case useKindCond:
 		cnd := cond(i.u1)
 		if cnd.kind() != condKindCondFlagSet {
-			regs = append(regs, cnd.register())
+			*regs = append(*regs, cnd.register())
 		}
 	case useKindCall:
-		regs = append(regs, i.abi.argRealRegs...)
+		*regs = append(*regs, i.abi.ArgRealRegs...)
 	case useKindCallInd:
-		regs = append(regs, i.rn.nr())
-		regs = append(regs, i.abi.argRealRegs...)
+		*regs = append(*regs, i.rn.nr())
+		*regs = append(*regs, i.abi.ArgRealRegs...)
+	case useKindVecRRRRewrite:
+		*regs = append(*regs, i.rn.reg())
+		*regs = append(*regs, i.rm.reg())
+		*regs = append(*regs, i.rd.reg())
 	default:
 		panic(fmt.Sprintf("useKind for %v not defined", i))
 	}
-	return regs
+	return *regs
 }
 
-func (i *instruction) assignUse(index int, reg regalloc.VReg) {
+func (i *instruction) AssignUse(index int, reg regalloc.VReg) {
 	switch useKinds[i.kind] {
 	case useKindNone:
 	case useKindRN:
@@ -321,6 +374,20 @@ func (i *instruction) assignUse(index int, reg regalloc.VReg) {
 		} else {
 			if rm := i.rm.reg(); rm.Valid() {
 				i.rm = i.rm.assignReg(reg)
+			}
+		}
+	case useKindVecRRRRewrite:
+		if index == 0 {
+			if rn := i.rn.reg(); rn.Valid() {
+				i.rn = i.rn.assignReg(reg)
+			}
+		} else if index == 1 {
+			if rm := i.rm.reg(); rm.Valid() {
+				i.rm = i.rm.assignReg(reg)
+			}
+		} else {
+			if rd := i.rd.reg(); rd.Valid() {
+				i.rd = i.rd.assignReg(reg)
 			}
 		}
 	case useKindRNRN1RM:
@@ -395,13 +462,13 @@ func (i *instruction) assignUse(index int, reg regalloc.VReg) {
 	}
 }
 
-func (i *instruction) asCall(ref ssa.FuncRef, abi *abiImpl) {
+func (i *instruction) asCall(ref ssa.FuncRef, abi *backend.FunctionABI) {
 	i.kind = call
 	i.u1 = uint64(ref)
 	i.abi = abi
 }
 
-func (i *instruction) asCallIndirect(ptr regalloc.VReg, abi *abiImpl) {
+func (i *instruction) asCallIndirect(ptr regalloc.VReg, abi *backend.FunctionABI) {
 	i.kind = callInd
 	i.rn = operandNR(ptr)
 	i.abi = abi
@@ -458,7 +525,7 @@ func (i *instruction) nop0Label() label {
 	return label(i.u1)
 }
 
-func (i *instruction) asRet(abi *abiImpl) {
+func (i *instruction) asRet(abi *backend.FunctionABI) {
 	i.kind = ret
 	i.abi = abi
 }
@@ -554,10 +621,13 @@ func (i *instruction) asVecLoad1R(rd, rn operand, arr vecArrangement) {
 	i.u1 = uint64(arr)
 }
 
-func (i *instruction) asCSet(rd regalloc.VReg, c condFlag) {
+func (i *instruction) asCSet(rd regalloc.VReg, mask bool, c condFlag) {
 	i.kind = cSet
 	i.rd = operandNR(rd)
 	i.u1 = uint64(c)
+	if mask {
+		i.u2 = 1
+	}
 }
 
 func (i *instruction) asCSel(rd, rn, rm operand, c condFlag, _64bit bool) {
@@ -583,7 +653,7 @@ func (i *instruction) asFpuCSel(rd, rn, rm operand, c condFlag, _64bit bool) {
 }
 
 func (i *instruction) asBr(target label) {
-	if target == returnLabel {
+	if target == labelReturn {
 		panic("BUG: call site should special case for returnLabel")
 	}
 	i.kind = br
@@ -605,7 +675,7 @@ func (i *instruction) brLabel() label {
 }
 
 // brOffsetResolved is called when the target label is resolved.
-func (i *instruction) brOffsetResolved(offset int64) {
+func (i *instruction) brOffsetResolve(offset int64) {
 	i.u2 = uint64(offset)
 	i.u3 = 1 // indicate that the offset is resolved, for debugging.
 }
@@ -622,6 +692,10 @@ func (i *instruction) asCondBr(c cond, target label, is64bit bool) {
 	if is64bit {
 		i.u3 = 1
 	}
+}
+
+func (i *instruction) setCondBrTargets(target label) {
+	i.u2 = uint64(target)
 }
 
 func (i *instruction) condBrLabel() label {
@@ -799,9 +873,10 @@ func (i *instruction) asMove32(rd, rn regalloc.VReg) {
 	i.rn, i.rd = operandNR(rn), operandNR(rd)
 }
 
-func (i *instruction) asMove64(rd, rn regalloc.VReg) {
+func (i *instruction) asMove64(rd, rn regalloc.VReg) *instruction {
 	i.kind = mov64
 	i.rn, i.rd = operandNR(rn), operandNR(rd)
+	return i
 }
 
 func (i *instruction) asFpuMov64(rd, rn regalloc.VReg) {
@@ -809,9 +884,10 @@ func (i *instruction) asFpuMov64(rd, rn regalloc.VReg) {
 	i.rn, i.rd = operandNR(rn), operandNR(rd)
 }
 
-func (i *instruction) asFpuMov128(rd, rn regalloc.VReg) {
+func (i *instruction) asFpuMov128(rd, rn regalloc.VReg) *instruction {
 	i.kind = fpuMov128
 	i.rn, i.rd = operandNR(rn), operandNR(rd)
+	return i
 }
 
 func (i *instruction) asMovToVec(rd, rn operand, arr vecArrangement, index vecIndex) {
@@ -913,7 +989,16 @@ func (i *instruction) asVecRRR(op vecOp, rd, rn, rm operand, arr vecArrangement)
 	i.u2 = uint64(arr)
 }
 
-func (i *instruction) isCopy() bool {
+// asVecRRRRewrite encodes a vector instruction that rewrites the destination register.
+// IMPORTANT: the destination register must be already defined before this instruction.
+func (i *instruction) asVecRRRRewrite(op vecOp, rd, rn, rm operand, arr vecArrangement) {
+	i.kind = vecRRRRewrite
+	i.u1 = uint64(op)
+	i.rn, i.rd, i.rm = rn, rd, rm
+	i.u2 = uint64(arr)
+}
+
+func (i *instruction) IsCopy() bool {
 	op := i.kind
 	// We do not include mov32 as it is not a copy instruction in the sense that it does not preserve the upper 32 bits,
 	// and it is only used in the translation of IReduce, not the actual copy indeed.
@@ -1060,7 +1145,11 @@ func (i *instruction) String() (str string) {
 			condFlag(i.u1),
 		)
 	case cSet:
-		str = fmt.Sprintf("cset %s, %s", formatVRegSized(i.rd.nr(), 64), condFlag(i.u1))
+		if i.u2 != 0 {
+			str = fmt.Sprintf("csetm %s, %s", formatVRegSized(i.rd.nr(), 64), condFlag(i.u1))
+		} else {
+			str = fmt.Sprintf("cset %s, %s", formatVRegSized(i.rd.nr(), 64), condFlag(i.u1))
+		}
 	case cCmpImm:
 		size := is64SizeBitToSize(i.u3)
 		str = fmt.Sprintf("ccmp %s, #%#x, #%#x, %s",
@@ -1230,7 +1319,7 @@ func (i *instruction) String() (str string) {
 		)
 	case vecMiscNarrow:
 		panic("TODO")
-	case vecRRR:
+	case vecRRR, vecRRRRewrite:
 		str = fmt.Sprintf("%s %s, %s, %s",
 			vecOp(i.u1),
 			formatVRegVec(i.rd.nr(), vecArrangement(i.u2), vecIndexNone),
@@ -1335,7 +1424,7 @@ func (i *instruction) String() (str string) {
 			}
 		case condKindCondFlagSet:
 			if offset := i.condBrOffset(); offset != 0 {
-				if target == invalidLabel {
+				if target == labelInvalid {
 					str = fmt.Sprintf("b.%s #%#x", c.flag(), offset)
 				} else {
 					str = fmt.Sprintf("b.%s #%#x, (%s)", c.flag(), offset, target.String())
@@ -1517,6 +1606,11 @@ const (
 	vecMiscNarrow
 	// vecRRR represents a vector ALU operation.
 	vecRRR
+	// vecRRRRewrite is exactly the same as vecRRR except that this rewrites the destination register.
+	// For example, BSL instruction rewrites the destination register, and the existing value influences the result.
+	// Therefore, the "destination" register in vecRRRRewrite will be treated as "use" which makes the register outlive
+	// the instruction while this instruction doesn't have "def" in the context of register allocation.
+	vecRRRRewrite
 	// vecMisc represents a vector two register miscellaneous instruction.
 	vecMisc
 	// vecLanes represents a vector instruction across lanes.
@@ -1776,7 +1870,13 @@ func (b vecOp) String() string {
 	case vecOpUmlal:
 		return "umlal"
 	case vecOpFdiv:
-		return "fmul"
+		return "fdiv"
+	case vecOpFsqrt:
+		return "fsqrt"
+	case vecOpAbs:
+		return "abs"
+	case vecOpFabs:
+		return "fabs"
 	case vecOpNeg:
 		return "neg"
 	case vecOpFneg:
@@ -1807,8 +1907,6 @@ func (b vecOp) String() string {
 		return "uqxtn"
 	case vecOpSqxtun:
 		return "sqxtun"
-	case vecOpFsqrt:
-		return "fsqrt"
 	case vecOpRev64:
 		return "rev64"
 	case vecOpXtn:
@@ -1827,8 +1925,6 @@ func (b vecOp) String() string {
 		return "sshr"
 	case vecOpZip1:
 		return "zip1"
-	case vecOpFabs:
-		return "fabs"
 	case vecOpFmin:
 		return "fmin"
 	case vecOpFmax:

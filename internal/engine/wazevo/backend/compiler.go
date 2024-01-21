@@ -2,7 +2,6 @@ package backend
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
@@ -15,19 +14,13 @@ func NewCompiler(ctx context.Context, mach Machine, builder ssa.Builder) Compile
 	return newCompiler(ctx, mach, builder)
 }
 
-func newCompiler(ctx context.Context, mach Machine, builder ssa.Builder) *compiler {
-	registerSetDebug := false
-	if wazevoapi.RegAllocValidationEnabled {
-		registerSetDebug = wazevoapi.IsHighRegisterPressure(ctx)
-	}
-
+func newCompiler(_ context.Context, mach Machine, builder ssa.Builder) *compiler {
+	argResultInts, argResultFloats := mach.ArgsResultsRegs()
 	c := &compiler{
 		mach: mach, ssaBuilder: builder,
-		alreadyLowered:  make(map[*ssa.Instruction]bool),
-		vRegSet:         make(map[regalloc.VReg]bool),
-		ssaTypeOfVRegID: make(map[regalloc.VRegID]ssa.Type),
-		nextVRegID:      0,
-		regAlloc:        regalloc.NewAllocator(mach.RegisterInfo(registerSetDebug)),
+		nextVRegID:      regalloc.VRegIDNonReservedBegin,
+		argResultInts:   argResultInts,
+		argResultFloats: argResultFloats,
 	}
 	mach.SetCompiler(c)
 	return c
@@ -36,6 +29,9 @@ func newCompiler(ctx context.Context, mach Machine, builder ssa.Builder) *compil
 // Compiler is the backend of wazevo which takes ssa.Builder and Machine,
 // use the information there to emit the final machine code.
 type Compiler interface {
+	// SSABuilder returns the ssa.Builder used by this compiler.
+	SSABuilder() ssa.Builder
+
 	// Compile executes the following steps:
 	// 	1. Lower()
 	// 	2. RegAlloc()
@@ -54,14 +50,14 @@ type Compiler interface {
 	// RegAlloc performs the register allocation after Lower is called.
 	RegAlloc()
 
-	// Finalize performs the finalization of the compilation. This must be called after RegAlloc.
-	Finalize()
-
-	// Encode encodes the machine code to the buffer.
-	Encode()
+	// Finalize performs the finalization of the compilation, including machine code emission.
+	// This must be called after RegAlloc.
+	Finalize(ctx context.Context)
 
 	// Buf returns the buffer of the encoded machine code. This is only used for testing purpose.
 	Buf() []byte
+
+	BufPtr() *[]byte
 
 	// Format returns the debug string of the current state of the compiler.
 	Format() string
@@ -69,15 +65,8 @@ type Compiler interface {
 	// Init initializes the internal state of the compiler for the next compilation.
 	Init()
 
-	// ResolveSignature returns the ssa.Signature of the given ssa.SignatureID.
-	ResolveSignature(id ssa.SignatureID) *ssa.Signature
-
 	// AllocateVReg allocates a new virtual register of the given type.
 	AllocateVReg(typ ssa.Type) regalloc.VReg
-
-	// MarkLowered is used to mark the given instruction as already lowered
-	// which tells the compiler to skip it when traversing.
-	MarkLowered(inst *ssa.Instruction)
 
 	// ValueDefinition returns the definition of the given value.
 	ValueDefinition(ssa.Value) *SSAValueDefinition
@@ -107,8 +96,17 @@ type Compiler interface {
 	// SourceOffsetInfo returns the source offset information for the current buffer offset.
 	SourceOffsetInfo() []SourceOffsetInfo
 
+	// EmitByte appends a byte to the buffer. Used during the code emission.
+	EmitByte(b byte)
+
 	// Emit4Bytes appends 4 bytes to the buffer. Used during the code emission.
 	Emit4Bytes(b uint32)
+
+	// Emit8Bytes appends 8 bytes to the buffer. Used during the code emission.
+	Emit8Bytes(b uint64)
+
+	// GetFunctionABI returns the ABI information for the given signature.
+	GetFunctionABI(sig *ssa.Signature) *FunctionABI
 }
 
 // RelocationInfo represents the relocation information for a call instruction.
@@ -127,28 +125,30 @@ type compiler struct {
 	// nextVRegID is the next virtual register ID to be allocated.
 	nextVRegID regalloc.VRegID
 	// ssaValueToVRegs maps ssa.ValueID to regalloc.VReg.
-	ssaValueToVRegs []regalloc.VReg
+	ssaValueToVRegs [] /* VRegID to */ regalloc.VReg
 	// ssaValueDefinitions maps ssa.ValueID to its definition.
 	ssaValueDefinitions []SSAValueDefinition
 	// ssaValueRefCounts is a cached list obtained by ssa.Builder.ValueRefCounts().
 	ssaValueRefCounts []int
 	// returnVRegs is the list of virtual registers that store the return values.
-	returnVRegs    []regalloc.VReg
-	alreadyLowered map[*ssa.Instruction]bool
-	regAlloc       regalloc.Allocator
-	varEdges       [][2]regalloc.VReg
-	varEdgeTypes   []ssa.Type
-	constEdges     []struct {
+	returnVRegs  []regalloc.VReg
+	varEdges     [][2]regalloc.VReg
+	varEdgeTypes []ssa.Type
+	constEdges   []struct {
 		cInst *ssa.Instruction
 		dst   regalloc.VReg
 	}
-	vRegSet         map[regalloc.VReg]bool
+	vRegSet         []bool
+	vRegIDs         []regalloc.VRegID
 	tempRegs        []regalloc.VReg
 	tmpVals         []ssa.Value
-	ssaTypeOfVRegID map[regalloc.VRegID]ssa.Type
+	ssaTypeOfVRegID [] /* VRegID to */ ssa.Type
 	buf             []byte
 	relocations     []RelocationInfo
 	sourceOffsets   []SourceOffsetInfo
+	// abis maps ssa.SignatureID to the ABI implementation.
+	abis                           []FunctionABI
+	argResultInts, argResultFloats []regalloc.RealReg
 }
 
 // SourceOffsetInfo is a data to associate the source offset with the executable offset.
@@ -162,49 +162,39 @@ type SourceOffsetInfo struct {
 // Compile implements Compiler.Compile.
 func (c *compiler) Compile(ctx context.Context) ([]byte, []RelocationInfo, error) {
 	c.Lower()
-	if wazevoapi.PrintSSAToBackendIRLowering {
+	if wazevoapi.PrintSSAToBackendIRLowering && wazevoapi.PrintEnabledIndex(ctx) {
 		fmt.Printf("[[[after lowering for %s ]]]%s\n", wazevoapi.GetCurrentFunctionName(ctx), c.Format())
 	}
 	if wazevoapi.DeterministicCompilationVerifierEnabled {
 		wazevoapi.VerifyOrSetDeterministicCompilationContextValue(ctx, "After lowering to ISA specific IR", c.Format())
 	}
 	c.RegAlloc()
-	if wazevoapi.PrintRegisterAllocated {
+	if wazevoapi.PrintRegisterAllocated && wazevoapi.PrintEnabledIndex(ctx) {
 		fmt.Printf("[[[after regalloc for %s]]]%s\n", wazevoapi.GetCurrentFunctionName(ctx), c.Format())
 	}
 	if wazevoapi.DeterministicCompilationVerifierEnabled {
 		wazevoapi.VerifyOrSetDeterministicCompilationContextValue(ctx, "After Register Allocation", c.Format())
 	}
-	c.Finalize()
-	if wazevoapi.PrintFinalizedMachineCode {
+	c.Finalize(ctx)
+	if wazevoapi.PrintFinalizedMachineCode && wazevoapi.PrintEnabledIndex(ctx) {
 		fmt.Printf("[[[after finalize for %s]]]%s\n", wazevoapi.GetCurrentFunctionName(ctx), c.Format())
 	}
 	if wazevoapi.DeterministicCompilationVerifierEnabled {
 		wazevoapi.VerifyOrSetDeterministicCompilationContextValue(ctx, "After Finalization", c.Format())
-	}
-	c.Encode()
-	if wazevoapi.DeterministicCompilationVerifierEnabled {
-		wazevoapi.VerifyOrSetDeterministicCompilationContextValue(ctx, "Encoded Machine code", hex.EncodeToString(c.buf))
 	}
 	return c.buf, c.relocations, nil
 }
 
 // RegAlloc implements Compiler.RegAlloc.
 func (c *compiler) RegAlloc() {
-	regAllocFn := c.mach.Function()
-	c.regAlloc.DoAllocation(regAllocFn)
+	c.mach.RegAlloc()
 }
 
 // Finalize implements Compiler.Finalize.
-func (c *compiler) Finalize() {
+func (c *compiler) Finalize(ctx context.Context) {
 	c.mach.SetupPrologue()
 	c.mach.SetupEpilogue()
-	c.mach.ResolveRelativeAddresses()
-}
-
-// Encode implements Compiler.Encode.
-func (c *compiler) Encode() {
-	c.mach.Encode()
+	c.mach.Encode(ctx)
 }
 
 // setCurrentGroupID sets the current instruction group ID.
@@ -284,43 +274,27 @@ func (c *compiler) assignVirtualRegisters() {
 func (c *compiler) AllocateVReg(typ ssa.Type) regalloc.VReg {
 	regType := regalloc.RegTypeOf(typ)
 	r := regalloc.VReg(c.nextVRegID).SetRegType(regType)
-	c.ssaTypeOfVRegID[r.ID()] = typ
+
+	id := r.ID()
+	if int(id) >= len(c.ssaTypeOfVRegID) {
+		c.ssaTypeOfVRegID = append(c.ssaTypeOfVRegID, make([]ssa.Type, id+1)...)
+	}
+	c.ssaTypeOfVRegID[id] = typ
 	c.nextVRegID++
 	return r
 }
 
 // Init implements Compiler.Init.
 func (c *compiler) Init() {
-	for i, v := range c.ssaValueToVRegs {
-		c.ssaValueToVRegs[i] = regalloc.VRegInvalid
-		delete(c.ssaTypeOfVRegID, v.ID())
-	}
 	c.currentGID = 0
-	c.nextVRegID = 0
+	c.nextVRegID = regalloc.VRegIDNonReservedBegin
 	c.returnVRegs = c.returnVRegs[:0]
 	c.mach.Reset()
 	c.varEdges = c.varEdges[:0]
 	c.constEdges = c.constEdges[:0]
-
-	for key := range c.alreadyLowered {
-		c.alreadyLowered[key] = false
-	}
-	c.resetVRegSet()
-	c.regAlloc.Reset()
 	c.buf = c.buf[:0]
 	c.sourceOffsets = c.sourceOffsets[:0]
 	c.relocations = c.relocations[:0]
-}
-
-func (c *compiler) resetVRegSet() {
-	for key := range c.vRegSet {
-		c.vRegSet[key] = false
-	}
-}
-
-// MarkLowered implements Compiler.MarkLowered.
-func (c *compiler) MarkLowered(inst *ssa.Instruction) {
-	c.alreadyLowered[inst] = true
 }
 
 // ValueDefinition implements Compiler.ValueDefinition.
@@ -340,11 +314,7 @@ func (c *compiler) Format() string {
 
 // TypeOf implements Compiler.Format.
 func (c *compiler) TypeOf(v regalloc.VReg) ssa.Type {
-	typ, ok := c.ssaTypeOfVRegID[v.ID()]
-	if !ok {
-		panic(fmt.Sprintf("BUG: v%d is not a valid vreg", v.ID()))
-	}
-	return typ
+	return c.ssaTypeOfVRegID[v.ID()]
 }
 
 // MatchInstr implements Compiler.MatchInstr.
@@ -380,9 +350,9 @@ func (c *compiler) MatchInstrOneOf(def *SSAValueDefinition, opcodes []ssa.Opcode
 	return ssa.OpcodeInvalid
 }
 
-// ResolveSignature implements Compiler.ResolveSignature.
-func (c *compiler) ResolveSignature(id ssa.SignatureID) *ssa.Signature {
-	return c.ssaBuilder.ResolveSignature(id)
+// SSABuilder implements Compiler .SSABuilder.
+func (c *compiler) SSABuilder() ssa.Builder {
+	return c.ssaBuilder
 }
 
 // AddSourceOffsetInfo implements Compiler.AddSourceOffsetInfo.
@@ -406,12 +376,41 @@ func (c *compiler) AddRelocationInfo(funcRef ssa.FuncRef) {
 	})
 }
 
-// Emit4Bytes implements Compiler.Add4Bytes.
+// Emit8Bytes implements Compiler.Emit8Bytes.
+func (c *compiler) Emit8Bytes(b uint64) {
+	c.buf = append(c.buf, byte(b), byte(b>>8), byte(b>>16), byte(b>>24), byte(b>>32), byte(b>>40), byte(b>>48), byte(b>>56))
+}
+
+// Emit4Bytes implements Compiler.Emit4Bytes.
 func (c *compiler) Emit4Bytes(b uint32) {
 	c.buf = append(c.buf, byte(b), byte(b>>8), byte(b>>16), byte(b>>24))
+}
+
+// EmitByte implements Compiler.EmitByte.
+func (c *compiler) EmitByte(b byte) {
+	c.buf = append(c.buf, b)
 }
 
 // Buf implements Compiler.Buf.
 func (c *compiler) Buf() []byte {
 	return c.buf
+}
+
+// BufPtr implements Compiler.BufPtr.
+func (c *compiler) BufPtr() *[]byte {
+	return &c.buf
+}
+
+func (c *compiler) GetFunctionABI(sig *ssa.Signature) *FunctionABI {
+	if int(sig.ID) >= len(c.abis) {
+		c.abis = append(c.abis, make([]FunctionABI, int(sig.ID)+1)...)
+	}
+
+	abi := &c.abis[sig.ID]
+	if abi.Initialized {
+		return abi
+	}
+
+	abi.Init(sig, c.argResultInts, c.argResultFloats)
+	return abi
 }

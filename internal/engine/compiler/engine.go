@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/api"
@@ -437,6 +438,7 @@ const (
 	nativeCallStatusCodeTypeMismatchOnIndirectCall
 	nativeCallStatusIntegerOverflow
 	nativeCallStatusIntegerDivisionByZero
+	nativeCallStatusUnalignedAtomic
 	nativeCallStatusModuleClosed
 )
 
@@ -458,6 +460,8 @@ func (s nativeCallStatusCode) causePanic() {
 		err = wasmruntime.ErrRuntimeInvalidTableAccess
 	case nativeCallStatusCodeTypeMismatchOnIndirectCall:
 		err = wasmruntime.ErrRuntimeIndirectCallTypeMismatch
+	case nativeCallStatusUnalignedAtomic:
+		err = wasmruntime.ErrRuntimeUnalignedAtomic
 	}
 	panic(err)
 }
@@ -486,6 +490,8 @@ func (s nativeCallStatusCode) String() (ret string) {
 		ret = "integer division by zero"
 	case nativeCallStatusModuleClosed:
 		ret = "module closed"
+	case nativeCallStatusUnalignedAtomic:
+		ret = "unaligned atomic"
 	default:
 		panic("BUG")
 	}
@@ -655,6 +661,14 @@ func (e *moduleEngine) ResolveImportedFunction(index, indexInImportedModule wasm
 	// Copies the content from the import target moduleEngine.
 	e.functions[index] = imported.functions[indexInImportedModule]
 }
+
+// GetGlobalValue implements the same method as documented on wasm.ModuleEngine.
+func (e *moduleEngine) GetGlobalValue(wasm.Index) (lo, hi uint64) {
+	panic("BUG: GetGlobalValue should never be called on compiler mode")
+}
+
+// OwnsGlobals implements the same method as documented on wasm.ModuleEngine.
+func (e *moduleEngine) OwnsGlobals() bool { return false }
 
 // ResolveImportedMemory implements wasm.ModuleEngine.
 func (e *moduleEngine) ResolveImportedMemory(wasm.ModuleEngine) {}
@@ -1029,6 +1043,9 @@ const (
 	builtinFunctionIndexCheckExitCode
 	// builtinFunctionIndexBreakPoint is internal (only for wazero developers). Disabled by default.
 	builtinFunctionIndexBreakPoint
+	builtinFunctionMemoryWait32
+	builtinFunctionMemoryWait64
+	builtinFunctionMemoryNotify
 )
 
 func (ce *callEngine) execWasmFunction(ctx context.Context, m *wasm.ModuleInstance) {
@@ -1090,6 +1107,12 @@ entry:
 				ce.builtinFunctionGrowStack(caller.parent.stackPointerCeil)
 			case builtinFunctionIndexTableGrow:
 				ce.builtinFunctionTableGrow(caller.moduleInstance.Tables)
+			case builtinFunctionMemoryWait32:
+				ce.builtinFunctionMemoryWait32(caller.moduleInstance.MemoryInstance)
+			case builtinFunctionMemoryWait64:
+				ce.builtinFunctionMemoryWait64(caller.moduleInstance.MemoryInstance)
+			case builtinFunctionMemoryNotify:
+				ce.builtinFunctionMemoryNotify(caller.moduleInstance.MemoryInstance)
 			case builtinFunctionIndexFunctionListenerBefore:
 				ce.builtinFunctionFunctionListenerBefore(ctx, m, caller)
 			case builtinFunctionIndexFunctionListenerAfter:
@@ -1163,6 +1186,51 @@ func (ce *callEngine) builtinFunctionTableGrow(tables []*wasm.TableInstance) {
 	ref := ce.popValue()
 	res := table.Grow(uint32(num), uintptr(ref))
 	ce.pushValue(uint64(res))
+}
+
+func (ce *callEngine) builtinFunctionMemoryWait32(mem *wasm.MemoryInstance) {
+	if !mem.Shared {
+		panic(wasmruntime.ErrRuntimeExpectedSharedMemory)
+	}
+
+	timeout := int64(ce.popValue())
+	exp := uint32(ce.popValue())
+	addr := uintptr(ce.popValue())
+	base := uintptr(unsafe.Pointer(&mem.Buffer[0]))
+
+	offset := uint32(addr - base)
+
+	ce.pushValue(mem.Wait32(offset, exp, timeout, func(mem *wasm.MemoryInstance, offset uint32) uint32 {
+		addr := unsafe.Add(unsafe.Pointer(&mem.Buffer[0]), offset)
+		return atomic.LoadUint32((*uint32)(addr))
+	}))
+}
+
+func (ce *callEngine) builtinFunctionMemoryWait64(mem *wasm.MemoryInstance) {
+	if !mem.Shared {
+		panic(wasmruntime.ErrRuntimeExpectedSharedMemory)
+	}
+
+	timeout := int64(ce.popValue())
+	exp := ce.popValue()
+	addr := uintptr(ce.popValue())
+	base := uintptr(unsafe.Pointer(&mem.Buffer[0]))
+
+	offset := uint32(addr - base)
+
+	ce.pushValue(mem.Wait64(offset, exp, timeout, func(mem *wasm.MemoryInstance, offset uint32) uint64 {
+		addr := unsafe.Add(unsafe.Pointer(&mem.Buffer[0]), offset)
+		return atomic.LoadUint64((*uint64)(addr))
+	}))
+}
+
+func (ce *callEngine) builtinFunctionMemoryNotify(mem *wasm.MemoryInstance) {
+	count := ce.popValue()
+	addr := ce.popValue()
+
+	offset := uint32(uintptr(addr) - uintptr(unsafe.Pointer(&mem.Buffer[0])))
+
+	ce.pushValue(uint64(mem.Notify(offset, uint32(count))))
 }
 
 // snapshot implements experimental.Snapshot
@@ -1633,6 +1701,36 @@ func compileWasmFunction(buf asm.Buffer, cmp compiler, ir *wazeroir.CompilationR
 			err = cmp.compileV128Narrow(op)
 		case wazeroir.OperationKindV128ITruncSatFromF:
 			err = cmp.compileV128ITruncSatFromF(op)
+		case wazeroir.OperationKindAtomicLoad:
+			err = cmp.compileAtomicLoad(op)
+		case wazeroir.OperationKindAtomicLoad8:
+			err = cmp.compileAtomicLoad8(op)
+		case wazeroir.OperationKindAtomicLoad16:
+			err = cmp.compileAtomicLoad16(op)
+		case wazeroir.OperationKindAtomicStore:
+			err = cmp.compileAtomicStore(op)
+		case wazeroir.OperationKindAtomicStore8:
+			err = cmp.compileAtomicStore8(op)
+		case wazeroir.OperationKindAtomicStore16:
+			err = cmp.compileAtomicStore16(op)
+		case wazeroir.OperationKindAtomicRMW:
+			err = cmp.compileAtomicRMW(op)
+		case wazeroir.OperationKindAtomicRMW8:
+			err = cmp.compileAtomicRMW8(op)
+		case wazeroir.OperationKindAtomicRMW16:
+			err = cmp.compileAtomicRMW16(op)
+		case wazeroir.OperationKindAtomicRMWCmpxchg:
+			err = cmp.compileAtomicRMWCmpxchg(op)
+		case wazeroir.OperationKindAtomicRMW8Cmpxchg:
+			err = cmp.compileAtomicRMW8Cmpxchg(op)
+		case wazeroir.OperationKindAtomicRMW16Cmpxchg:
+			err = cmp.compileAtomicRMW16Cmpxchg(op)
+		case wazeroir.OperationKindAtomicMemoryWait:
+			err = cmp.compileAtomicMemoryWait(op)
+		case wazeroir.OperationKindAtomicMemoryNotify:
+			err = cmp.compileAtomicMemoryNotify(op)
+		case wazeroir.OperationKindAtomicFence:
+			err = cmp.compileAtomicFence(op)
 		case wazeroir.OperationKindBuiltinFunctionCheckExitCode:
 			err = cmp.compileBuiltinFunctionCheckExitCode()
 		default:

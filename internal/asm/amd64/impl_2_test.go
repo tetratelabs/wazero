@@ -192,17 +192,50 @@ func TestAssemblerImpl_EncodeNoneToRegister(t *testing.T) {
 		{name: "inst=SETPS/reg=R13", inst: SETPS, dst: RegR13, exp: []byte{0x41, 0xf, 0x9a, 0xc5}},
 		{name: "inst=SETPS/reg=R14", inst: SETPS, dst: RegR14, exp: []byte{0x41, 0xf, 0x9a, 0xc6}},
 		{name: "inst=SETPS/reg=R15", inst: SETPS, dst: RegR15, exp: []byte{0x41, 0xf, 0x9a, 0xc7}},
-		{name: "inst=NEGQ/reg=AX", inst: NEGQ, dst: RegAX, exp: []byte{0x48, 0xf7, 0xd8}},
-		{name: "inst=NEGQ/reg=BX", inst: NEGQ, dst: RegBX, exp: []byte{0x48, 0xf7, 0xdb}},
-		{name: "inst=NEGQ/reg=SP", inst: NEGQ, dst: RegSP, exp: []byte{0x48, 0xf7, 0xdc}},
-		{name: "inst=NEGQ/reg=BP", inst: NEGQ, dst: RegBP, exp: []byte{0x48, 0xf7, 0xdd}},
-		{name: "inst=NEGQ/reg=SI", inst: NEGQ, dst: RegSI, exp: []byte{0x48, 0xf7, 0xde}},
-		{name: "inst=NEGQ/reg=DI", inst: NEGQ, dst: RegDI, exp: []byte{0x48, 0xf7, 0xdf}},
-		{name: "inst=NEGQ/reg=R8", inst: NEGQ, dst: RegR8, exp: []byte{0x49, 0xf7, 0xd8}},
-		{name: "inst=NEGQ/reg=R9", inst: NEGQ, dst: RegR9, exp: []byte{0x49, 0xf7, 0xd9}},
-		{name: "inst=NEGQ/reg=R13", inst: NEGQ, dst: RegR13, exp: []byte{0x49, 0xf7, 0xdd}},
-		{name: "inst=NEGQ/reg=R14", inst: NEGQ, dst: RegR14, exp: []byte{0x49, 0xf7, 0xde}},
-		{name: "inst=NEGQ/reg=R15", inst: NEGQ, dst: RegR15, exp: []byte{0x49, 0xf7, 0xdf}},
+		{name: "negq %rax", inst: NEGQ, dst: RegAX, exp: []byte{0x48, 0xf7, 0xd8}},
+		{name: "negq %rbx", inst: NEGQ, dst: RegBX, exp: []byte{0x48, 0xf7, 0xdb}},
+		{name: "negq %rsp", inst: NEGQ, dst: RegSP, exp: []byte{0x48, 0xf7, 0xdc}},
+		{name: "negq %rbp", inst: NEGQ, dst: RegBP, exp: []byte{0x48, 0xf7, 0xdd}},
+		{name: "negq %rsi", inst: NEGQ, dst: RegSI, exp: []byte{0x48, 0xf7, 0xde}},
+		{name: "negq %rdi", inst: NEGQ, dst: RegDI, exp: []byte{0x48, 0xf7, 0xdf}},
+		{name: "negq %r8", inst: NEGQ, dst: RegR8, exp: []byte{0x49, 0xf7, 0xd8}},
+		{name: "negq %r9", inst: NEGQ, dst: RegR9, exp: []byte{0x49, 0xf7, 0xd9}},
+		{name: "negq %r13", inst: NEGQ, dst: RegR13, exp: []byte{0x49, 0xf7, 0xdd}},
+		{name: "negq %r14", inst: NEGQ, dst: RegR14, exp: []byte{0x49, 0xf7, 0xde}},
+		{name: "negq %r15", inst: NEGQ, dst: RegR15, exp: []byte{0x49, 0xf7, 0xdf}},
+		{name: "negw %ax", inst: NEGW, dst: RegAX, exp: []byte{0x66, 0xf7, 0xd8}},
+		{name: "negw %bx", inst: NEGW, dst: RegBX, exp: []byte{0x66, 0xf7, 0xdb}},
+		{name: "negw %sp", inst: NEGW, dst: RegSP, exp: []byte{0x66, 0xf7, 0xdc}},
+		{name: "negw %bp", inst: NEGW, dst: RegBP, exp: []byte{0x66, 0xf7, 0xdd}},
+		{name: "negw %si", inst: NEGW, dst: RegSI, exp: []byte{0x66, 0xf7, 0xde}},
+		{name: "negw %di", inst: NEGW, dst: RegDI, exp: []byte{0x66, 0xf7, 0xdf}},
+		{name: "negw %r8w", inst: NEGW, dst: RegR8, exp: []byte{0x66, 0x41, 0xf7, 0xd8}},
+		{name: "negw %r9w", inst: NEGW, dst: RegR9, exp: []byte{0x66, 0x41, 0xf7, 0xd9}},
+		{name: "negw %r13w", inst: NEGW, dst: RegR13, exp: []byte{0x66, 0x41, 0xf7, 0xdd}},
+		{name: "negw %r15w", inst: NEGW, dst: RegR14, exp: []byte{0x66, 0x41, 0xf7, 0xde}},
+		{name: "negw %r15w", inst: NEGW, dst: RegR15, exp: []byte{0x66, 0x41, 0xf7, 0xdf}},
+		{name: "negl %eax", inst: NEGL, dst: RegAX, exp: []byte{0xf7, 0xd8}},
+		{name: "negl %ebx", inst: NEGL, dst: RegBX, exp: []byte{0xf7, 0xdb}},
+		{name: "negl %esp", inst: NEGL, dst: RegSP, exp: []byte{0xf7, 0xdc}},
+		{name: "negl %ebp", inst: NEGL, dst: RegBP, exp: []byte{0xf7, 0xdd}},
+		{name: "negl %esi", inst: NEGL, dst: RegSI, exp: []byte{0xf7, 0xde}},
+		{name: "negl %edi", inst: NEGL, dst: RegDI, exp: []byte{0xf7, 0xdf}},
+		{name: "negl %r8d", inst: NEGL, dst: RegR8, exp: []byte{0x41, 0xf7, 0xd8}},
+		{name: "negl %r9d", inst: NEGL, dst: RegR9, exp: []byte{0x41, 0xf7, 0xd9}},
+		{name: "negl %r13d", inst: NEGL, dst: RegR13, exp: []byte{0x41, 0xf7, 0xdd}},
+		{name: "negl %r14d", inst: NEGL, dst: RegR14, exp: []byte{0x41, 0xf7, 0xde}},
+		{name: "negl %r15d", inst: NEGL, dst: RegR15, exp: []byte{0x41, 0xf7, 0xdf}},
+		{name: "negb %al", inst: NEGB, dst: RegAX, exp: []byte{0xf6, 0xd8}},
+		{name: "negb %bl", inst: NEGB, dst: RegBX, exp: []byte{0xf6, 0xdb}},
+		{name: "negb %ah", inst: NEGB, dst: RegSP, exp: []byte{0xf6, 0xdc}},
+		{name: "negb %ch", inst: NEGB, dst: RegBP, exp: []byte{0xf6, 0xdd}},
+		{name: "negb %dh", inst: NEGB, dst: RegSI, exp: []byte{0xf6, 0xde}},
+		{name: "negb %bh", inst: NEGB, dst: RegDI, exp: []byte{0xf6, 0xdf}},
+		{name: "negb %r8b", inst: NEGB, dst: RegR8, exp: []byte{0x41, 0xf6, 0xd8}},
+		{name: "negb %r9b", inst: NEGB, dst: RegR9, exp: []byte{0x41, 0xf6, 0xd9}},
+		{name: "negb %r13b", inst: NEGB, dst: RegR13, exp: []byte{0x41, 0xf6, 0xdd}},
+		{name: "negb %r14b", inst: NEGB, dst: RegR14, exp: []byte{0x41, 0xf6, 0xde}},
+		{name: "negb %r15b", inst: NEGB, dst: RegR15, exp: []byte{0x41, 0xf6, 0xdf}},
 		{name: "inst=INCQ/reg=AX", inst: INCQ, dst: RegAX, exp: []byte{0x48, 0xff, 0xc0}},
 		{name: "inst=INCQ/reg=BX", inst: INCQ, dst: RegBX, exp: []byte{0x48, 0xff, 0xc3}},
 		{name: "inst=INCQ/reg=SP", inst: INCQ, dst: RegSP, exp: []byte{0x48, 0xff, 0xc4}},
@@ -232,11 +265,13 @@ func TestAssemblerImpl_EncodeNoneToRegister(t *testing.T) {
 
 	for _, tc := range tests {
 		tc := tc
-		a := NewAssembler()
-		buf := code.NextCodeSection()
-		err := a.encodeNoneToRegister(buf, &nodeImpl{instruction: tc.inst, dstReg: tc.dst})
-		require.NoError(t, err, tc.name)
-		require.Equal(t, tc.exp, buf.Bytes(), tc.name)
+		t.Run(tc.name, func(t *testing.T) {
+			a := NewAssembler()
+			buf := code.NextCodeSection()
+			err := a.encodeNoneToRegister(buf, &nodeImpl{instruction: tc.inst, dstReg: tc.dst})
+			require.NoError(t, err, tc.name)
+			require.Equal(t, tc.exp, buf.Bytes(), tc.name)
+		})
 	}
 }
 

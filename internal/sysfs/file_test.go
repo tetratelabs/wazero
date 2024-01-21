@@ -147,6 +147,9 @@ func TestFileSetAppend(t *testing.T) {
 	require.EqualErrno(t, 0, f.SetAppend(false))
 	require.False(t, f.IsAppend())
 
+	_, errno = f.Seek(0, 0)
+	require.EqualErrno(t, 0, errno)
+
 	// without O_APPEND flag, the data writes at offset zero
 	_, errno = f.Write([]byte("wazero"))
 	require.EqualErrno(t, 0, errno)

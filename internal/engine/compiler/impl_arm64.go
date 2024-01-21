@@ -2852,9 +2852,7 @@ func (c *arm64Compiler) compileMemoryAccessOffsetSetup(offsetArg uint32, targetS
 	}
 
 	// "arm64ReservedRegisterForTemporary = len(memory.Buffer)"
-	c.assembler.CompileMemoryToRegister(arm64.LDRD,
-		arm64ReservedRegisterForCallEngine, callEngineModuleContextMemorySliceLenOffset,
-		arm64ReservedRegisterForTemporary)
+	c.compileLoadMemoryBufferLen(arm64ReservedRegisterForTemporary)
 
 	// Check if offsetRegister(= base+offsetArg+targetSizeInBytes) > len(memory.Buffer).
 	c.assembler.CompileTwoRegistersToNone(arm64.CMP, arm64ReservedRegisterForTemporary, offsetRegister)
@@ -2896,11 +2894,7 @@ func (c *arm64Compiler) compileMemorySize() error {
 	}
 
 	// "reg = len(memory.Buffer)"
-	c.assembler.CompileMemoryToRegister(
-		arm64.LDRD,
-		arm64ReservedRegisterForCallEngine, callEngineModuleContextMemorySliceLenOffset,
-		reg,
-	)
+	c.compileLoadMemoryBufferLen(reg)
 
 	// memory.size loads the page size of memory, so we have to divide by the page size.
 	// "reg = reg >> wasm.MemoryPageSizeInBits (== reg / wasm.MemoryPageSize) "
@@ -3142,9 +3136,7 @@ func (c *arm64Compiler) compileInitImpl(isTable bool, index, tableIndex uint32) 
 			tableInstanceAddressReg, tableInstanceTableLenOffset,
 			arm64ReservedRegisterForTemporary)
 	} else {
-		c.assembler.CompileMemoryToRegister(arm64.LDRD,
-			arm64ReservedRegisterForCallEngine, callEngineModuleContextMemorySliceLenOffset,
-			arm64ReservedRegisterForTemporary)
+		c.compileLoadMemoryBufferLen(arm64ReservedRegisterForTemporary)
 	}
 
 	c.assembler.CompileTwoRegistersToNone(arm64.CMP, arm64ReservedRegisterForTemporary, destinationOffset.register)
@@ -3328,9 +3320,7 @@ func (c *arm64Compiler) compileCopyImpl(isTable bool, srcTableIndex, dstTableInd
 			arm64ReservedRegisterForTemporary)
 	} else {
 		// arm64ReservedRegisterForTemporary = len(memoryInst.Buffer).
-		c.assembler.CompileMemoryToRegister(arm64.LDRD,
-			arm64ReservedRegisterForCallEngine, callEngineModuleContextMemorySliceLenOffset,
-			arm64ReservedRegisterForTemporary)
+		c.compileLoadMemoryBufferLen(arm64ReservedRegisterForTemporary)
 	}
 
 	// Check memory len >= sourceOffset.
@@ -3577,9 +3567,7 @@ func (c *arm64Compiler) compileFillImpl(isTable bool, tableIndex uint32) error {
 			arm64ReservedRegisterForTemporary)
 	} else {
 		// arm64ReservedRegisterForTemporary = len(memoryInst.Buffer).
-		c.assembler.CompileMemoryToRegister(arm64.LDRD,
-			arm64ReservedRegisterForCallEngine, callEngineModuleContextMemorySliceLenOffset,
-			arm64ReservedRegisterForTemporary)
+		c.compileLoadMemoryBufferLen(arm64ReservedRegisterForTemporary)
 	}
 
 	// Check  len >= destinationOffset.
@@ -4049,6 +4037,21 @@ func (c *arm64Compiler) allocateRegister(t registerType) (reg asm.Register, err 
 	return
 }
 
+func (c *arm64Compiler) compileLoadMemoryBufferLen(destReg asm.Register) {
+	if c.ir.Memory != wazeroir.MemoryTypeShared {
+		// No concurrent accesses so the length we cached during the preamble is still valid.
+		c.assembler.CompileMemoryToRegister(arm64.LDRD,
+			arm64ReservedRegisterForCallEngine, callEngineModuleContextMemorySliceLenOffset,
+			destReg)
+		return
+	}
+	// destReg = ce.moduleContext.MemoryInstance (pointer)
+	c.assembler.CompileMemoryToRegister(arm64.LDRD, arm64ReservedRegisterForCallEngine, callEngineModuleContextMemoryInstanceOffset, destReg)
+	// destReg = len(mem.Buffer)
+	c.assembler.CompileConstToRegister(arm64.ADD, memoryInstanceBufferLenOffset, destReg)
+	c.assembler.CompileMemoryWithRegisterSourceToRegister(arm64.LDARD, destReg, destReg)
+}
+
 // compileReleaseAllRegistersToStack adds instructions to store all the values located on
 // either general purpose or conditional registers onto the memory stack.
 // See releaseRegisterToStack.
@@ -4112,7 +4115,7 @@ func (c *arm64Compiler) compileReservedStackBasePointerRegisterInitialization() 
 }
 
 func (c *arm64Compiler) compileReservedMemoryRegisterInitialization() {
-	if c.ir.HasMemory || c.ir.UsesMemory {
+	if c.ir.Memory != wazeroir.MemoryTypeNone || c.ir.UsesMemory {
 		// "arm64ReservedRegisterForMemory = ce.MemoryElement0Address"
 		c.assembler.CompileMemoryToRegister(
 			arm64.LDRD,
@@ -4186,7 +4189,7 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 	// Note: if there's memory instruction in the function, memory instance must be non-nil.
 	// That is ensured by function validation at module instantiation phase, and that's
 	// why it is ok to skip the initialization if the module's memory instance is nil.
-	if c.ir.HasMemory {
+	if c.ir.Memory != wazeroir.MemoryTypeNone {
 		// "tmpX = moduleInstance.Memory"
 		c.assembler.CompileMemoryToRegister(
 			arm64.LDRD,

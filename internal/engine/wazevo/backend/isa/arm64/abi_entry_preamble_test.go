@@ -1,6 +1,7 @@
 package arm64
 
 import (
+	"context"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
@@ -396,8 +397,7 @@ func TestAbiImpl_constructEntryPreamble(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, _, m := newSetupWithMockContext()
-			abi := m.getOrCreateABIImpl(tc.sig)
-			m.rootInstr = abi.constructEntryPreamble()
+			m.executableContext.RootInstr = m.constructEntryPreamble(tc.sig)
 			require.Equal(t, tc.exp, m.Format())
 		})
 	}
@@ -532,10 +532,10 @@ func TestMachine_goEntryPreamblePassArg(t *testing.T) {
 		t.Run(tc.exp, func(t *testing.T) {
 			_, _, m := newSetupWithMockContext()
 			cur := m.allocateNop()
-			m.rootInstr = cur
+			m.executableContext.RootInstr = cur
 			m.goEntryPreamblePassArg(cur, paramSlicePtr, &tc.arg, tc.argSlotBeginOffsetFromSP)
 			require.Equal(t, tc.exp, m.Format())
-			m.Encode()
+			m.Encode(context.Background())
 		})
 	}
 }
@@ -685,10 +685,10 @@ func TestMachine_goEntryPreamblePassResult(t *testing.T) {
 		t.Run(tc.exp, func(t *testing.T) {
 			_, _, m := newSetupWithMockContext()
 			cur := m.allocateNop()
-			m.rootInstr = cur
+			m.executableContext.RootInstr = cur
 			m.goEntryPreamblePassResult(cur, paramSlicePtr, &tc.arg, tc.retStart)
 			require.Equal(t, tc.exp, m.Format())
-			m.Encode()
+			m.Encode(context.Background())
 		})
 	}
 }

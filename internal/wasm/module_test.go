@@ -811,6 +811,7 @@ func TestModule_buildGlobals(t *testing.T) {
 
 	mi := &ModuleInstance{
 		Globals: make([]*GlobalInstance, m.ImportGlobalCount+uint32(len(m.GlobalSection))),
+		Engine:  &mockModuleEngine{},
 	}
 
 	mi.Globals[0], mi.Globals[1] = imported[0], imported[1]

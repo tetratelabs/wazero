@@ -611,9 +611,16 @@ func (m *Module) validateDataCountSection() (err error) {
 
 func (m *ModuleInstance) buildGlobals(module *Module, funcRefResolver func(funcIndex Index) Reference) {
 	importedGlobals := m.Globals[:module.ImportGlobalCount]
+
+	me := m.Engine
+	engineOwnGlobal := me.OwnsGlobals()
 	for i := Index(0); i < Index(len(module.GlobalSection)); i++ {
 		gs := &module.GlobalSection[i]
 		g := &GlobalInstance{}
+		if engineOwnGlobal {
+			g.Me = me
+			g.Index = i + module.ImportGlobalCount
+		}
 		m.Globals[i+module.ImportGlobalCount] = g
 		g.Type = gs.Type
 		g.initialize(importedGlobals, &gs.Init, funcRefResolver)
@@ -759,6 +766,8 @@ type Memory struct {
 	Min, Cap, Max uint32
 	// IsMaxEncoded true if the Max is encoded in the original binary.
 	IsMaxEncoded bool
+	// IsShared true if the memory is shared for access from multiple agents.
+	IsShared bool
 }
 
 // Validate ensures values assigned to Min, Cap and Max are within valid thresholds.

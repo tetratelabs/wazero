@@ -6,13 +6,13 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
+	"runtime"
 	"testing"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/experimental/logging"
-	"github.com/tetratelabs/wazero/internal/engine/wazevo"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/testcases"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
@@ -29,6 +29,13 @@ const (
 	v128 = wasm.ValueTypeV128
 )
 
+// TODO: delete once we complete the implementation for amd64.
+func skipOnAmd64(t *testing.T) {
+	if runtime.GOARCH == "amd64" {
+		t.Skip("skip on amd64")
+	}
+}
+
 func TestE2E(t *testing.T) {
 	tmp := t.TempDir()
 	type callCase struct {
@@ -40,9 +47,19 @@ func TestE2E(t *testing.T) {
 		name        string
 		imported, m *wasm.Module
 		calls       []callCase
+		skipAMD64   bool
 	}{
 		{
+			name: "empty", m: testcases.Empty.Module,
+			calls: []callCase{{expResults: []uint64{}}},
+		},
+		{
+			name: "only_return", m: testcases.OnlyReturn.Module,
+			calls: []callCase{{expResults: []uint64{}}},
+		},
+		{
 			name: "selects", m: testcases.Selects.Module,
+			skipAMD64: true,
 			calls: []callCase{
 				{
 					params: []uint64{
@@ -62,6 +79,7 @@ func TestE2E(t *testing.T) {
 		},
 		{
 			name: "swap", m: testcases.SwapParamAndReturn.Module,
+			skipAMD64: true,
 			calls: []callCase{
 				{params: []uint64{math.MaxUint32, math.MaxInt32}, expResults: []uint64{math.MaxInt32, math.MaxUint32}},
 			},
@@ -74,10 +92,12 @@ func TestE2E(t *testing.T) {
 		},
 		{
 			name: "unreachable", m: testcases.Unreachable.Module,
-			calls: []callCase{{expErr: "unreachable"}},
+			skipAMD64: true,
+			calls:     []callCase{{expErr: "unreachable"}},
 		},
 		{
 			name: "fibonacci_recursive", m: testcases.FibonacciRecursive.Module,
+			skipAMD64: true,
 			calls: []callCase{
 				{params: []uint64{0}, expResults: []uint64{0}},
 				{params: []uint64{1}, expResults: []uint64{1}},
@@ -87,7 +107,13 @@ func TestE2E(t *testing.T) {
 				{params: []uint64{30}, expResults: []uint64{0xcb228}},
 			},
 		},
-		{name: "call", m: testcases.Call.Module, calls: []callCase{{expResults: []uint64{45, 45}}}},
+		{
+			name: "call_simple", m: testcases.CallSimple.Module, calls: []callCase{{expResults: []uint64{40}}},
+		},
+		{
+			name: "call", m: testcases.Call.Module, calls: []callCase{{expResults: []uint64{45, 45}}},
+			skipAMD64: true,
+		},
 		{
 			name: "stack overflow",
 			m: &wasm.Module{
@@ -96,14 +122,16 @@ func TestE2E(t *testing.T) {
 				CodeSection:     []wasm.Code{{Body: []byte{wasm.OpcodeCall, 0, wasm.OpcodeEnd}}},
 				ExportSection:   []wasm.Export{{Name: testcases.ExportedFunctionName, Index: 0, Type: wasm.ExternTypeFunc}},
 			},
+			skipAMD64: true,
 			calls: []callCase{
 				{expErr: "stack overflow"}, {expErr: "stack overflow"}, {expErr: "stack overflow"}, {expErr: "stack overflow"},
 			},
 		},
 		{
-			name:     "imported_function_call",
-			imported: testcases.ImportedFunctionCall.Imported,
-			m:        testcases.ImportedFunctionCall.Module,
+			name:      "imported_function_call",
+			imported:  testcases.ImportedFunctionCall.Imported,
+			m:         testcases.ImportedFunctionCall.Module,
+			skipAMD64: true,
 			calls: []callCase{
 				{params: []uint64{0}, expResults: []uint64{0}},
 				{params: []uint64{2}, expResults: []uint64{2 * 2}},
@@ -114,8 +142,9 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
-			name: "memory_store_basic",
-			m:    testcases.MemoryStoreBasic.Module,
+			name:      "memory_store_basic",
+			m:         testcases.MemoryStoreBasic.Module,
+			skipAMD64: true,
 			calls: []callCase{
 				{params: []uint64{0, 0xf}, expResults: []uint64{0xf}},
 				{params: []uint64{256, 0xff}, expResults: []uint64{0xff}},
@@ -125,8 +154,9 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
-			name: "memory_load_basic",
-			m:    testcases.MemoryLoadBasic.Module,
+			name:      "memory_load_basic",
+			m:         testcases.MemoryLoadBasic.Module,
+			skipAMD64: true,
 			calls: []callCase{
 				{params: []uint64{0}, expResults: []uint64{0x03_02_01_00}},
 				{params: []uint64{256}, expResults: []uint64{0x03_02_01_00}},
@@ -136,8 +166,9 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
-			name: "memory out of bounds",
-			m:    testcases.MemoryLoadBasic.Module,
+			name:      "memory out of bounds",
+			m:         testcases.MemoryLoadBasic.Module,
+			skipAMD64: true,
 			calls: []callCase{
 				{params: []uint64{uint64(wasm.MemoryPageSize)}, expErr: "out of bounds memory access"},
 				// We load I32, so we can't load from the last 3 bytes.
@@ -145,8 +176,9 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
-			name: "memory_loads",
-			m:    testcases.MemoryLoads.Module,
+			name:      "memory_loads",
+			m:         testcases.MemoryLoads.Module,
+			skipAMD64: true,
 			calls: []callCase{
 				// These expected results are derived by commenting out `configureWazevo(config)` below to run the old compiler, assuming that it is correct.
 				{params: []uint64{0}, expResults: []uint64{0x3020100, 0x706050403020100, 0x3020100, 0x706050403020100, 0x1211100f, 0x161514131211100f, 0x1211100f, 0x161514131211100f, 0x0, 0xf, 0x0, 0xf, 0x100, 0x100f, 0x100, 0x100f, 0x0, 0xf, 0x0, 0xf, 0x100, 0x100f, 0x100, 0x100f, 0x3020100, 0x1211100f, 0x3020100, 0x1211100f}},
@@ -160,40 +192,46 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
-			name: "globals_get",
-			m:    testcases.GlobalsGet.Module,
+			name:      "globals_get",
+			m:         testcases.GlobalsGet.Module,
+			skipAMD64: true,
 			calls: []callCase{
 				{expResults: []uint64{0x80000000, 0x8000000000000000, 0x7f7fffff, 0x7fefffffffffffff}},
 			},
 		},
 		{
-			name:  "globals_set",
-			m:     testcases.GlobalsSet.Module,
-			calls: []callCase{{expResults: []uint64{1, 2, uint64(math.Float32bits(3.0)), math.Float64bits(4.0)}}},
+			name:      "globals_set",
+			m:         testcases.GlobalsSet.Module,
+			skipAMD64: true,
+			calls:     []callCase{{expResults: []uint64{1, 2, uint64(math.Float32bits(3.0)), math.Float64bits(4.0)}}},
 		},
 		{
-			name: "globals_mutable",
-			m:    testcases.GlobalsMutable.Module,
+			name:      "globals_mutable",
+			m:         testcases.GlobalsMutable.Module,
+			skipAMD64: true,
 			calls: []callCase{{expResults: []uint64{
 				100, 200, uint64(math.Float32bits(300.0)), math.Float64bits(400.0),
 				1, 2, uint64(math.Float32bits(3.0)), math.Float64bits(4.0),
 			}}},
 		},
 		{
-			name:  "memory_size_grow",
-			m:     testcases.MemorySizeGrow.Module,
-			calls: []callCase{{expResults: []uint64{1, 2, 0xffffffff}}},
+			name:      "memory_size_grow",
+			m:         testcases.MemorySizeGrow.Module,
+			skipAMD64: true,
+			calls:     []callCase{{expResults: []uint64{1, 2, 0xffffffff}}},
 		},
 		{
-			name:     "imported_memory_grow",
-			imported: testcases.ImportedMemoryGrow.Imported,
-			m:        testcases.ImportedMemoryGrow.Module,
-			calls:    []callCase{{expResults: []uint64{1, 1, 11, 11}}},
+			name:      "imported_memory_grow",
+			imported:  testcases.ImportedMemoryGrow.Imported,
+			m:         testcases.ImportedMemoryGrow.Module,
+			skipAMD64: true,
+			calls:     []callCase{{expResults: []uint64{1, 1, 11, 11}}},
 		},
 		{
 			name: "call_indirect",
 			m:    testcases.CallIndirect.Module,
 			// parameter == table offset.
+			skipAMD64: true,
 			calls: []callCase{
 				{params: []uint64{0}, expErr: "indirect call type mismatch"},
 				{params: []uint64{1}, expResults: []uint64{10}},
@@ -203,8 +241,9 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
-			name: "br_table",
-			m:    testcases.BrTable.Module,
+			name:      "br_table",
+			m:         testcases.BrTable.Module,
+			skipAMD64: true,
 			calls: []callCase{
 				{params: []uint64{0}, expResults: []uint64{11}},
 				{params: []uint64{1}, expResults: []uint64{12}},
@@ -218,8 +257,9 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
-			name: "br_table_with_args",
-			m:    testcases.BrTableWithArg.Module,
+			name:      "br_table_with_args",
+			m:         testcases.BrTableWithArg.Module,
+			skipAMD64: true,
 			calls: []callCase{
 				{params: []uint64{0, 100}, expResults: []uint64{11 + 100}},
 				{params: []uint64{1, 100}, expResults: []uint64{12 + 100}},
@@ -233,8 +273,9 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
-			name: "multi_predecessor_local_ref",
-			m:    testcases.MultiPredecessorLocalRef.Module,
+			name:      "multi_predecessor_local_ref",
+			m:         testcases.MultiPredecessorLocalRef.Module,
+			skipAMD64: true,
 			calls: []callCase{
 				{params: []uint64{0, 100}, expResults: []uint64{100}},
 				{params: []uint64{1, 100}, expResults: []uint64{1}},
@@ -242,15 +283,17 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
-			name: "vector_bit_select",
-			m:    testcases.VecBitSelect.Module,
+			name:      "vector_bit_select",
+			m:         testcases.VecBitSelect.Module,
+			skipAMD64: true,
 			calls: []callCase{
 				{params: []uint64{1, 2, 3, 4, 5, 6}, expResults: []uint64{0x3, 0x2, 0x5, 0x6}},
 			},
 		},
 		{
-			name: "vector_shuffle",
-			m:    testcases.VecShuffle.Module,
+			name:      "vector_shuffle",
+			m:         testcases.VecShuffle.Module,
+			skipAMD64: true,
 			calls: []callCase{
 				{params: []uint64{0x01010101, 0x02020202, 0x03030303, 0x04040404}, expResults: []uint64{0x01010101, 0x04040404}},
 				{params: []uint64{0x03030303, 0x04040404, 0x01010101, 0x02020202}, expResults: []uint64{0x03030303, 0x02020202}},
@@ -260,8 +303,9 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
-			name: "vector_shuffle (1st only)",
-			m:    testcases.VecShuffleWithLane(1, 1, 1, 1, 0, 0, 0, 0, 10, 10, 10, 10, 0, 0, 0, 0),
+			name:      "vector_shuffle (1st only)",
+			m:         testcases.VecShuffleWithLane(1, 1, 1, 1, 0, 0, 0, 0, 10, 10, 10, 10, 0, 0, 0, 0),
+			skipAMD64: true,
 			calls: []callCase{
 				{params: []uint64{0x0000000000000b0a, 0x0c0000, 0xffffffffffffffff, 0xffffffffffffffff}, expResults: []uint64{0x0a0a0a0a0b0b0b0b, 0x0a0a0a0a0c0c0c0c}},
 				{params: []uint64{0x01010101, 0x02020202, 0x03030303, 0x04040404}, expResults: []uint64{0x0101010101010101, 0x101010102020202}},
@@ -272,8 +316,9 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
-			name: "vector_shuffle (2nd only)",
-			m:    testcases.VecShuffleWithLane(17, 17, 17, 17, 16, 16, 16, 16, 26, 26, 26, 26, 16, 16, 16, 16),
+			name:      "vector_shuffle (2nd only)",
+			m:         testcases.VecShuffleWithLane(17, 17, 17, 17, 16, 16, 16, 16, 26, 26, 26, 26, 16, 16, 16, 16),
+			skipAMD64: true,
 			calls: []callCase{
 				{params: []uint64{0xffffffffffffffff, 0xffffffffffffffff, 0x0000000000000b0a, 0x0c0000}, expResults: []uint64{0x0a0a0a0a0b0b0b0b, 0x0a0a0a0a0c0c0c0c}},
 				{params: []uint64{0x01010101, 0x02020202, 0x03030303, 0x04040404}, expResults: []uint64{0x303030303030303, 0x303030304040404}},
@@ -284,8 +329,9 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
-			name: "vector_shuffle (mixed)",
-			m:    testcases.VecShuffleWithLane(0, 17, 2, 19, 4, 21, 6, 23, 8, 25, 10, 27, 12, 29, 14, 31),
+			name:      "vector_shuffle (mixed)",
+			m:         testcases.VecShuffleWithLane(0, 17, 2, 19, 4, 21, 6, 23, 8, 25, 10, 27, 12, 29, 14, 31),
+			skipAMD64: true,
 			calls: []callCase{
 				{params: []uint64{0xff08ff07ff06ff05, 0xff04ff03ff02ff01, 0x18ff17ff16ff15ff, 0x14ff13ff12ff11ff}, expResults: []uint64{0x1808170716061505, 0x1404130312021101}},
 				{params: []uint64{0x01010101, 0x02020202, 0x03030303, 0x04040404}, expResults: []uint64{0x3010301, 0x4020402}},
@@ -298,6 +344,9 @@ func TestE2E(t *testing.T) {
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			if tc.skipAMD64 {
+				skipOnAmd64(t)
+			}
 			for i := 0; i < 2; i++ {
 				var name string
 				if i == 0 {
@@ -308,10 +357,7 @@ func TestE2E(t *testing.T) {
 				t.Run(name, func(t *testing.T) {
 					cache, err := wazero.NewCompilationCacheWithDir(tmp)
 					require.NoError(t, err)
-					config := wazero.NewRuntimeConfigCompiler().WithCompilationCache(cache)
-
-					// Configure the new optimizing backend!
-					wazevo.ConfigureWazevo(config)
+					config := newRuntimeConfigOptimizingCompiler().WithCompilationCache(cache)
 
 					ctx := context.Background()
 					r := wazero.NewRuntimeWithConfig(ctx, config)
@@ -363,6 +409,7 @@ func TestE2E(t *testing.T) {
 }
 
 func TestE2E_host_functions(t *testing.T) {
+	skipOnAmd64(t)
 	var buf bytes.Buffer
 	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
 
@@ -377,10 +424,7 @@ func TestE2E_host_functions(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := tc.ctx
 
-			config := wazero.NewRuntimeConfigCompiler()
-
-			// Configure the new optimizing backend!
-			wazevo.ConfigureWazevo(config)
+			config := newRuntimeConfigOptimizingCompiler()
 
 			r := wazero.NewRuntimeWithConfig(ctx, config)
 			defer func() {
@@ -462,10 +506,8 @@ func TestE2E_host_functions(t *testing.T) {
 }
 
 func TestE2E_stores(t *testing.T) {
-	config := wazero.NewRuntimeConfigCompiler()
-
-	// Configure the new optimizing backend!
-	wazevo.ConfigureWazevo(config)
+	skipOnAmd64(t)
+	config := newRuntimeConfigOptimizingCompiler()
 
 	ctx := context.Background()
 	r := wazero.NewRuntimeWithConfig(ctx, config)
@@ -532,6 +574,7 @@ func TestE2E_stores(t *testing.T) {
 }
 
 func TestE2E_reexported_memory(t *testing.T) {
+	skipOnAmd64(t)
 	m1 := &wasm.Module{
 		ExportSection: []wasm.Export{{Name: "mem", Type: wasm.ExternTypeMemory, Index: 0}},
 		MemorySection: &wasm.Memory{Min: 1},
@@ -552,10 +595,7 @@ func TestE2E_reexported_memory(t *testing.T) {
 		CodeSection:       []wasm.Code{{Body: []byte{wasm.OpcodeI32Const, 10, wasm.OpcodeMemoryGrow, 0, wasm.OpcodeEnd}}},
 	}
 
-	config := wazero.NewRuntimeConfigCompiler()
-
-	// Configure the new optimizing backend!
-	wazevo.ConfigureWazevo(config)
+	config := newRuntimeConfigOptimizingCompiler()
 
 	ctx := context.Background()
 	r := wazero.NewRuntimeWithConfig(ctx, config)
@@ -583,6 +623,7 @@ func TestE2E_reexported_memory(t *testing.T) {
 }
 
 func TestStackUnwind_panic_in_host(t *testing.T) {
+	skipOnAmd64(t)
 	unreachable := &wasm.Module{
 		ImportFunctionCount: 1,
 		ImportSection:       []wasm.Import{{Module: "host", Name: "cause_unreachable", Type: wasm.ExternTypeFunc, DescFunc: 0}},
@@ -604,10 +645,7 @@ func TestStackUnwind_panic_in_host(t *testing.T) {
 		},
 	}
 
-	config := wazero.NewRuntimeConfigCompiler()
-
-	// Configure the new optimizing backend!
-	wazevo.ConfigureWazevo(config)
+	config := newRuntimeConfigOptimizingCompiler()
 
 	ctx := context.Background()
 	r := wazero.NewRuntimeWithConfig(ctx, config)
@@ -639,6 +677,7 @@ wasm stack trace:
 }
 
 func TestStackUnwind_unreachable(t *testing.T) {
+	skipOnAmd64(t)
 	unreachable := &wasm.Module{
 		TypeSection:     []wasm.FunctionType{{}},
 		ExportSection:   []wasm.Export{{Name: "main", Type: wasm.ExternTypeFunc, Index: 0}},
@@ -657,11 +696,7 @@ func TestStackUnwind_unreachable(t *testing.T) {
 		},
 	}
 
-	config := wazero.NewRuntimeConfigCompiler()
-
-	// Configure the new optimizing backend!
-	wazevo.ConfigureWazevo(config)
-
+	config := newRuntimeConfigOptimizingCompiler()
 	ctx := context.Background()
 	r := wazero.NewRuntimeWithConfig(ctx, config)
 	defer func() {
@@ -682,12 +717,10 @@ wasm stack trace:
 }
 
 func TestListener_local(t *testing.T) {
+	skipOnAmd64(t)
 	var buf bytes.Buffer
-	config := wazero.NewRuntimeConfigCompiler()
+	config := newRuntimeConfigOptimizingCompiler()
 	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
-
-	// Configure the new optimizing backend!
-	wazevo.ConfigureWazevo(config)
 
 	r := wazero.NewRuntimeWithConfig(ctx, config)
 	defer func() {
@@ -713,12 +746,10 @@ func TestListener_local(t *testing.T) {
 }
 
 func TestListener_imported(t *testing.T) {
+	skipOnAmd64(t)
 	var buf bytes.Buffer
-	config := wazero.NewRuntimeConfigCompiler()
+	config := newRuntimeConfigOptimizingCompiler()
 	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
-
-	// Configure the new optimizing backend!
-	wazevo.ConfigureWazevo(config)
 
 	r := wazero.NewRuntimeWithConfig(ctx, config)
 	defer func() {
@@ -747,6 +778,7 @@ func TestListener_imported(t *testing.T) {
 }
 
 func TestListener_long(t *testing.T) {
+	skipOnAmd64(t)
 	pickOneParam := binaryencoding.EncodeModule(&wasm.Module{
 		TypeSection: []wasm.FunctionType{{Results: []wasm.ValueType{i32}, Params: []wasm.ValueType{
 			i32, i32, f32, f64, i64, i32, i32, v128, f32,
@@ -768,11 +800,8 @@ func TestListener_long(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
-	config := wazero.NewRuntimeConfigCompiler()
+	config := newRuntimeConfigOptimizingCompiler()
 	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
-
-	// Configure the new optimizing backend!
-	wazevo.ConfigureWazevo(config)
 
 	r := wazero.NewRuntimeWithConfig(ctx, config)
 	defer func() {
@@ -799,6 +828,7 @@ func TestListener_long(t *testing.T) {
 }
 
 func TestListener_long_as_is(t *testing.T) {
+	skipOnAmd64(t)
 	params := []wasm.ValueType{
 		i32, i64, i32, i64, i32, i64, i32, i64, i32, i64,
 		i32, i64, i32, i64, i32, i64, i32, i64, i32, i64,
@@ -821,11 +851,8 @@ func TestListener_long_as_is(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
-	config := wazero.NewRuntimeConfigCompiler()
+	config := newRuntimeConfigOptimizingCompiler()
 	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
-
-	// Configure the new optimizing backend!
-	wazevo.ConfigureWazevo(config)
 
 	r := wazero.NewRuntimeWithConfig(ctx, config)
 	defer func() {
@@ -852,6 +879,7 @@ func TestListener_long_as_is(t *testing.T) {
 }
 
 func TestListener_long_many_consts(t *testing.T) {
+	skipOnAmd64(t)
 	const paramNum = 61
 
 	var exp []uint64
@@ -873,11 +901,8 @@ func TestListener_long_many_consts(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
-	config := wazero.NewRuntimeConfigCompiler()
+	config := newRuntimeConfigOptimizingCompiler()
 	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
-
-	// Configure the new optimizing backend!
-	wazevo.ConfigureWazevo(config)
 
 	r := wazero.NewRuntimeWithConfig(ctx, config)
 	defer func() {
@@ -901,11 +926,9 @@ func TestListener_long_many_consts(t *testing.T) {
 
 // TestDWARF verifies that the DWARF based stack traces work as expected before/after compilation cache.
 func TestDWARF(t *testing.T) {
-	config := wazero.NewRuntimeConfigCompiler()
+	skipOnAmd64(t)
+	config := newRuntimeConfigOptimizingCompiler()
 	ctx := context.Background()
-
-	// Configure the new optimizing backend!
-	wazevo.ConfigureWazevo(config)
 
 	bin := dwarftestdata.ZigWasm
 
@@ -935,4 +958,13 @@ func TestDWARF(t *testing.T) {
 
 	err = r.Close(ctx)
 	require.NoError(t, err)
+}
+
+// newRuntimeConfigOptimizingCompiler is the same as opt.NewRuntimeConfigOptimizingCompiler
+// except that it doesn't check if it is on arm64 or not. Use this in tests until amd64 is completely supported.
+func newRuntimeConfigOptimizingCompiler() wazero.RuntimeConfig {
+	type enabler interface{ EnableOptimizingCompiler() }
+	c := wazero.NewRuntimeConfig()
+	c.(enabler).EnableOptimizingCompiler()
+	return c
 }

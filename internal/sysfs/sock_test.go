@@ -48,6 +48,8 @@ func TestTcpConnFile_Write(t *testing.T) {
 }
 
 func TestTcpConnFile_Read(t *testing.T) {
+	// Test #1: Read from a TCP connection with default synchrony
+	// (i.e., without explicitly setting the non-blocking flag).
 	listen, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 	defer listen.Close()
@@ -83,6 +85,51 @@ func TestTcpConnFile_Read(t *testing.T) {
 	require.Zero(t, errno)
 	require.NoError(t, err)
 	require.Equal(t, "waze", string(bytes))
+
+	// Test #2: Read from a TCP connection asynchronously (i.e., with
+	// the non-blocking flag set explicitly).
+	tcpAddr2, err := net.ResolveTCPAddr("tcp", listen.Addr().String())
+	require.NoError(t, err)
+	tcp2, err := net.DialTCP("tcp", nil, tcpAddr2)
+	require.NoError(t, err)
+	defer tcp.Close() //nolint
+
+	// Use a goroutine to asynchronously write to the TCP connection
+	// with a delay that is visible to the test.
+	go func() {
+		time.Sleep(200 * time.Millisecond)
+		n2, err := tcp2.Write([]byte("wazero"))
+		require.NoError(t, err)
+		require.NotEqual(t, 0, n2)
+	}()
+
+	conn2, err := listen.Accept()
+	require.NoError(t, err)
+	defer conn.Close()
+
+	bytes2 := make([]byte, 4)
+
+	require.NoError(t, err)
+	errno2 := sys.Errno(0)
+	file2 := newTcpConn(conn2.(*net.TCPConn))
+	errno2 = file2.(*tcpConnFile).SetNonblock(true)
+	require.Zero(t, errno2)
+
+	// Ensure we start by getting EAGAIN.
+	_, errno2 = file2.Read(bytes2)
+	require.Equal(t, sys.EAGAIN, errno2)
+
+	// Ensure we don't interrupt until we get a non-zero errno,
+	// and we retry on EAGAIN (i.e. when nonblocking is true).
+	for {
+		_, errno2 = file2.Read(bytes2)
+		if errno2 != sys.EAGAIN {
+			break
+		}
+	}
+	require.Zero(t, errno2)
+	require.NoError(t, err)
+	require.Equal(t, "waze", string(bytes2))
 }
 
 func TestTcpConnFile_Stat(t *testing.T) {

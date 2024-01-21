@@ -121,13 +121,22 @@ type Builder interface {
 
 	// SetCurrentSourceOffset sets the current source offset. The incoming instruction will be annotated with this offset.
 	SetCurrentSourceOffset(line SourceOffset)
+
+	// LoopNestingForestRoots returns the roots of the loop nesting forest.
+	LoopNestingForestRoots() []BasicBlock
+
+	// LowestCommonAncestor returns the lowest common ancestor in the dominator tree of the given BasicBlock(s).
+	LowestCommonAncestor(blk1, blk2 BasicBlock) BasicBlock
+
+	// Idom returns the immediate dominator of the given BasicBlock.
+	Idom(blk BasicBlock) BasicBlock
 }
 
 // NewBuilder returns a new Builder implementation.
 func NewBuilder() Builder {
 	return &builder{
-		instructionsPool:               wazevoapi.NewPool[Instruction](),
-		basicBlocksPool:                wazevoapi.NewPool[basicBlock](),
+		instructionsPool:               wazevoapi.NewPool[Instruction](resetInstruction),
+		basicBlocksPool:                wazevoapi.NewPool[basicBlock](resetBasicBlock),
 		valueAnnotations:               make(map[ValueID]string),
 		signatures:                     make(map[SignatureID]*Signature),
 		blkVisited:                     make(map[*basicBlock]int),
@@ -166,6 +175,10 @@ type builder struct {
 	// dominators stores the immediate dominator of each BasicBlock.
 	// The index is blockID of the BasicBlock.
 	dominators []*basicBlock
+	sparseTree dominatorSparseTree
+
+	// loopNestingForestRoots are the roots of the loop nesting forest.
+	loopNestingForestRoots []BasicBlock
 
 	// The followings are used for optimization passes/deterministic compilation.
 	instStack                      []*Instruction
@@ -195,8 +208,9 @@ func (b *builder) ReturnBlock() BasicBlock {
 
 // Init implements Builder.Reset.
 func (b *builder) Init(s *Signature) {
+	b.nextVariable = 0
 	b.currentSignature = s
-	b.returnBlk.reset()
+	resetBasicBlock(b.returnBlk)
 	b.instructionsPool.Reset()
 	b.basicBlocksPool.Reset()
 	b.donePasses = false
@@ -208,17 +222,13 @@ func (b *builder) Init(s *Signature) {
 	b.blkStack = b.blkStack[:0]
 	b.blkStack2 = b.blkStack2[:0]
 	b.dominators = b.dominators[:0]
+	b.loopNestingForestRoots = b.loopNestingForestRoots[:0]
 
 	for i := 0; i < b.basicBlocksPool.Allocated(); i++ {
 		blk := b.basicBlocksPool.View(i)
-		blk.reset()
 		delete(b.blkVisited, blk)
 	}
 	b.basicBlocksPool.Reset()
-
-	for i := Variable(0); i < b.nextVariable; i++ {
-		b.variables[i] = typeInvalid
-	}
 
 	for v := ValueID(0); v < b.nextValueID; v++ {
 		delete(b.valueAnnotations, v)
@@ -250,7 +260,7 @@ func (b *builder) AnnotateValue(value Value, a string) {
 // AllocateInstruction implements Builder.AllocateInstruction.
 func (b *builder) AllocateInstruction() *Instruction {
 	instr := b.instructionsPool.Allocate()
-	instr.reset()
+	instr.id = b.instructionsPool.Allocated()
 	return instr
 }
 
@@ -306,6 +316,11 @@ func (b *builder) allocateBasicBlock() *basicBlock {
 	blk.lastDefinitions = make(map[Variable]Value)
 	blk.unknownValues = make(map[Variable]Value)
 	return blk
+}
+
+// Idom implements Builder.Idom.
+func (b *builder) Idom(blk BasicBlock) BasicBlock {
+	return b.dominators[blk.ID()]
 }
 
 // InsertInstruction implements Builder.InsertInstruction.
@@ -829,12 +844,6 @@ func (b *builder) LayoutBlocks() {
 			bs = append(bs, blk.Name())
 		}
 		fmt.Println("ordered blocks: ", strings.Join(bs, ", "))
-		bs = bs[:0]
-		for visited := range b.blkVisited {
-			bs = append(bs, visited.Name())
-		}
-		sort.Slice(bs, func(i, j int) bool { return bs[i] < bs[j] })
-		fmt.Println("visited blocks: ", strings.Join(bs, ", "))
 	}
 
 	if wazevoapi.SSAValidationEnabled {
@@ -845,6 +854,10 @@ func (b *builder) LayoutBlocks() {
 			trampoline.validate(b)
 		}
 	}
+
+	// Critical edges are split, so we fix the loop nesting forest.
+	buildLoopNestingForest(b)
+	buildDominatorTree(b)
 
 	// Reuse the stack for the next iteration.
 	b.blkStack2 = uninsertedTrampolines[:0]
@@ -968,6 +981,11 @@ func (b *builder) splitCriticalEdge(pred, succ *basicBlock, predInfo *basicBlock
 	// where trampoline is a new basic block which is created to split the critical edge.
 
 	trampoline := b.allocateBasicBlock()
+	if int(trampoline.id) >= len(b.dominators) {
+		b.dominators = append(b.dominators, make([]*basicBlock, trampoline.id+1)...)
+	}
+	b.dominators[trampoline.id] = pred
+
 	originalBranch := predInfo.branch
 
 	// Replace originalBranch with the newBranch.
@@ -1035,4 +1053,14 @@ func (b *builder) InsertUndefined() {
 	instr := b.AllocateInstruction()
 	instr.opcode = OpcodeUndefined
 	b.InsertInstruction(instr)
+}
+
+// LoopNestingForestRoots implements Builder.LoopNestingForestRoots.
+func (b *builder) LoopNestingForestRoots() []BasicBlock {
+	return b.loopNestingForestRoots
+}
+
+// LowestCommonAncestor implements Builder.LowestCommonAncestor.
+func (b *builder) LowestCommonAncestor(blk1, blk2 BasicBlock) BasicBlock {
+	return b.sparseTree.findLCA(blk1.ID(), blk2.ID())
 }

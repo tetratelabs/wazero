@@ -1,8 +1,8 @@
 package arm64
 
 import (
+	"context"
 	"fmt"
-	"math"
 	"strings"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
@@ -14,34 +14,22 @@ import (
 type (
 	// machine implements backend.Machine.
 	machine struct {
-		compiler      backend.Compiler
-		currentABI    *abiImpl
-		currentSSABlk ssa.BasicBlock
-		// abis maps ssa.SignatureID to the ABI implementation.
-		abis      []abiImpl
-		instrPool wazevoapi.Pool[instruction]
-		// rootInstr is the root instruction of the currently-compiled function.
-		rootInstr *instruction
-		// perBlockHead and perBlockEnd are the head and tail of the instruction list per currently-compiled ssa.BasicBlock.
-		perBlockHead, perBlockEnd *instruction
-		// pendingInstructions are the instructions which are not yet emitted into the instruction list.
-		pendingInstructions []*instruction
-		regAllocFn          regAllocFunctionImpl
-		nextLabel           label
+		compiler          backend.Compiler
+		executableContext *backend.ExecutableContextT[instruction]
+		currentABI        *backend.FunctionABI
 
-		// ssaBlockIDToLabels maps an SSA block ID to the label.
-		ssaBlockIDToLabels []label
-		// labelToInstructions maps a label to the instructions of the region which the label represents.
-		labelPositions     map[label]*labelPosition
-		orderedBlockLabels []*labelPosition
-		labelPositionPool  wazevoapi.Pool[labelPosition]
+		regAlloc   regalloc.Allocator
+		regAllocFn *backend.RegAllocFunction[*instruction, *machine]
 
 		// addendsWorkQueue is used during address lowering, defined here for reuse.
-		addendsWorkQueue []ssa.Value
-		addends32        []addend32
+		addendsWorkQueue queue[ssa.Value]
+		addends32        queue[addend32]
 		// addends64 is used during address lowering, defined here for reuse.
-		addends64              []regalloc.VReg
+		addends64              queue[regalloc.VReg]
 		unresolvedAddressModes []*instruction
+
+		// condBrRelocs holds the conditional branches which need offset relocation.
+		condBrRelocs []condBrReloc
 
 		// spillSlotSize is the size of the stack slot in bytes used for spilling registers.
 		// During the execution of the function, the stack looks like:
@@ -90,49 +78,58 @@ type (
 		ext extendOp
 	}
 
-	// label represents a position in the generated code which is either
-	// a real instruction or the constant pool (e.g. jump tables).
-	//
-	// This is exactly the same as the traditional "label" in assembly code.
-	label uint32
-
-	// labelPosition represents the regions of the generated code which the label represents.
-	labelPosition struct {
-		begin, end   *instruction
-		binarySize   int64
-		binaryOffset int64
+	condBrReloc struct {
+		cbr *instruction
+		// currentLabelPos is the labelPosition within which condBr is defined.
+		currentLabelPos *labelPosition
+		// Next block's labelPosition.
+		nextLabel label
+		offset    int64
 	}
+
+	labelPosition = backend.LabelPosition[instruction]
+	label         = backend.Label
 )
 
 const (
-	invalidLabel = 0
-	returnLabel  = math.MaxUint32
+	labelReturn  = backend.LabelReturn
+	labelInvalid = backend.LabelInvalid
 )
 
 // NewBackend returns a new backend for arm64.
 func NewBackend() backend.Machine {
 	m := &machine{
-		instrPool:         wazevoapi.NewPool[instruction](),
-		labelPositionPool: wazevoapi.NewPool[labelPosition](),
-		labelPositions:    make(map[label]*labelPosition),
 		spillSlots:        make(map[regalloc.VRegID]int64),
-		nextLabel:         invalidLabel,
+		executableContext: newExecutableContext(),
+		regAlloc:          regalloc.NewAllocator(regInfo),
 	}
-	m.regAllocFn.m = m
-	m.regAllocFn.labelToRegAllocBlockIndex = make(map[label]int)
 	return m
+}
+
+func newExecutableContext() *backend.ExecutableContextT[instruction] {
+	return backend.NewExecutableContextT[instruction](resetInstruction, setNext, setPrev, asNop0)
+}
+
+// ExecutableContext implements backend.Machine.
+func (m *machine) ExecutableContext() backend.ExecutableContext {
+	return m.executableContext
+}
+
+// RegAlloc implements backend.Machine Function.
+func (m *machine) RegAlloc() {
+	rf := m.regAllocFn
+	for _, pos := range m.executableContext.OrderedBlockLabels {
+		rf.AddBlock(pos.SB, pos.L, pos.Begin, pos.End)
+	}
+
+	m.regAllocStarted = true
+	m.regAlloc.DoAllocation(rf)
+	// Now that we know the final spill slot size, we must align spillSlotSize to 16 bytes.
+	m.spillSlotSize = (m.spillSlotSize + 15) &^ 15
 }
 
 // Reset implements backend.Machine.
 func (m *machine) Reset() {
-	m.regAllocStarted = false
-	m.instrPool.Reset()
-	m.labelPositionPool.Reset()
-	m.currentSSABlk = nil
-	for l := label(0); l <= m.nextLabel; l++ {
-		delete(m.labelPositions, l)
-	}
-	m.pendingInstructions = m.pendingInstructions[:0]
 	m.clobberedRegs = m.clobberedRegs[:0]
 	for key := range m.spillSlots {
 		m.clobberedRegs = append(m.clobberedRegs, regalloc.VReg(key))
@@ -141,20 +138,18 @@ func (m *machine) Reset() {
 		delete(m.spillSlots, regalloc.VRegID(key))
 	}
 	m.clobberedRegs = m.clobberedRegs[:0]
-	m.orderedBlockLabels = m.orderedBlockLabels[:0]
-	m.regAllocFn.reset()
+	m.regAllocStarted = false
+	m.regAlloc.Reset()
+	m.regAllocFn.Reset()
 	m.spillSlotSize = 0
 	m.unresolvedAddressModes = m.unresolvedAddressModes[:0]
-	m.rootInstr = nil
-	m.ssaBlockIDToLabels = m.ssaBlockIDToLabels[:0]
-	m.perBlockHead, m.perBlockEnd = nil, nil
 	m.maxRequiredStackSizeForCalls = 0
-	m.nextLabel = invalidLabel
+	m.executableContext.Reset()
 }
 
-// InitializeABI implements backend.Machine InitializeABI.
-func (m *machine) InitializeABI(sig *ssa.Signature) {
-	m.currentABI = m.getOrCreateABIImpl(sig)
+// SetCurrentABI implements backend.Machine SetCurrentABI.
+func (m *machine) SetCurrentABI(abi *backend.FunctionABI) {
+	m.currentABI = abi
 }
 
 // DisableStackCheck implements backend.Machine DisableStackCheck.
@@ -162,130 +157,49 @@ func (m *machine) DisableStackCheck() {
 	m.stackBoundsCheckDisabled = true
 }
 
-// ABI implements backend.Machine.
-func (m *machine) ABI() backend.FunctionABI {
-	return m.currentABI
-}
-
-// allocateLabel allocates an unused label.
-func (m *machine) allocateLabel() label {
-	m.nextLabel++
-	return m.nextLabel
-}
-
 // SetCompiler implements backend.Machine.
 func (m *machine) SetCompiler(ctx backend.Compiler) {
 	m.compiler = ctx
-}
-
-// StartLoweringFunction implements backend.Machine.
-func (m *machine) StartLoweringFunction(max ssa.BasicBlockID) {
-	imax := int(max)
-	if len(m.ssaBlockIDToLabels) <= imax {
-		// Eagerly allocate labels for the blocks since the underlying slice will be used for the next iteration.
-		m.ssaBlockIDToLabels = append(m.ssaBlockIDToLabels, make([]label, imax+1)...)
-	}
-}
-
-// EndLoweringFunction implements backend.Machine.
-func (m *machine) EndLoweringFunction() {}
-
-// StartBlock implements backend.Machine.
-func (m *machine) StartBlock(blk ssa.BasicBlock) {
-	m.currentSSABlk = blk
-
-	l := m.ssaBlockIDToLabels[m.currentSSABlk.ID()]
-	if l == invalidLabel {
-		l = m.allocateLabel()
-		m.ssaBlockIDToLabels[blk.ID()] = l
-	}
-
-	end := m.allocateNop()
-	m.perBlockHead, m.perBlockEnd = end, end
-
-	labelPos, ok := m.labelPositions[l]
-	if !ok {
-		labelPos = m.allocateLabelPosition()
-		m.labelPositions[l] = labelPos
-	}
-	m.orderedBlockLabels = append(m.orderedBlockLabels, labelPos)
-	labelPos.begin, labelPos.end = end, end
-	m.regAllocFn.addBlock(blk, l, labelPos)
-}
-
-// EndBlock implements backend.Machine.
-func (m *machine) EndBlock() {
-	// Insert nop0 as the head of the block for convenience to simplify the logic of inserting instructions.
-	m.insertAtPerBlockHead(m.allocateNop())
-
-	l := m.ssaBlockIDToLabels[m.currentSSABlk.ID()]
-	m.labelPositions[l].begin = m.perBlockHead
-
-	if m.currentSSABlk.EntryBlock() {
-		m.rootInstr = m.perBlockHead
-	}
+	m.regAllocFn = backend.NewRegAllocFunction[*instruction, *machine](m, ctx.SSABuilder(), ctx)
 }
 
 func (m *machine) insert(i *instruction) {
-	m.pendingInstructions = append(m.pendingInstructions, i)
+	ectx := m.executableContext
+	ectx.PendingInstructions = append(ectx.PendingInstructions, i)
 }
 
 func (m *machine) insertBrTargetLabel() label {
-	l := m.allocateLabel()
-	nop := m.allocateInstr()
-	nop.asNop0WithLabel(l)
+	nop, l := m.allocateBrTarget()
 	m.insert(nop)
-	pos := m.allocateLabelPosition()
-	pos.begin, pos.end = nop, nop
-	m.labelPositions[l] = pos
 	return l
 }
 
-func (m *machine) allocateLabelPosition() *labelPosition {
-	l := m.labelPositionPool.Allocate()
-	*l = labelPosition{}
-	return l
-}
-
-func (m *machine) FlushPendingInstructions() {
-	l := len(m.pendingInstructions)
-	if l == 0 {
-		return
-	}
-	for i := l - 1; i >= 0; i-- { // reverse because we lower instructions in reverse order.
-		m.insertAtPerBlockHead(m.pendingInstructions[i])
-	}
-	m.pendingInstructions = m.pendingInstructions[:0]
-}
-
-func (m *machine) insertAtPerBlockHead(i *instruction) {
-	if m.perBlockHead == nil {
-		m.perBlockHead = i
-		m.perBlockEnd = i
-		return
-	}
-	i.next = m.perBlockHead
-	m.perBlockHead.prev = i
-	m.perBlockHead = i
-}
-
-// String implements backend.Machine.
-func (l label) String() string {
-	return fmt.Sprintf("L%d", l)
+func (m *machine) allocateBrTarget() (nop *instruction, l label) {
+	ectx := m.executableContext
+	l = ectx.AllocateLabel()
+	nop = m.allocateInstr()
+	nop.asNop0WithLabel(l)
+	pos := ectx.AllocateLabelPosition(l)
+	pos.Begin, pos.End = nop, nop
+	ectx.LabelPositions[l] = pos
+	return
 }
 
 // allocateInstr allocates an instruction.
 func (m *machine) allocateInstr() *instruction {
-	instr := m.instrPool.Allocate()
-	*instr = instruction{}
+	instr := m.executableContext.InstructionPool.Allocate()
 	if !m.regAllocStarted {
 		instr.addedBeforeRegAlloc = true
 	}
 	return instr
 }
 
+func resetInstruction(i *instruction) {
+	*i = instruction{}
+}
+
 func (m *machine) allocateNop() *instruction {
-	instr := m.instrPool.Allocate()
+	instr := m.allocateInstr()
 	instr.asNop0()
 	return instr
 }
@@ -328,8 +242,8 @@ func (m *machine) resolveAddressingMode(arg0offset, ret0offset int64, i *instruc
 	}
 }
 
-// ResolveRelativeAddresses implements backend.Machine.
-func (m *machine) ResolveRelativeAddresses() {
+// resolveRelativeAddresses resolves the relative addresses before encoding.
+func (m *machine) resolveRelativeAddresses(ctx context.Context) {
 	if len(m.unresolvedAddressModes) > 0 {
 		arg0offset, ret0offset := m.arg0OffsetFromSP(), m.ret0OffsetFromSP()
 		for _, i := range m.unresolvedAddressModes {
@@ -337,64 +251,123 @@ func (m *machine) ResolveRelativeAddresses() {
 		}
 	}
 
+	// Reuse the slice to gather the unresolved conditional branches.
+	cbrs := m.condBrRelocs[:0]
+	ectx := m.executableContext
+
+	var fn string
+	var fnIndex int
+	var labelToSSABlockID map[label]ssa.BasicBlockID
+	if wazevoapi.PerfMapEnabled {
+		fn = wazevoapi.GetCurrentFunctionName(ctx)
+		labelToSSABlockID = make(map[label]ssa.BasicBlockID)
+		for i, l := range ectx.SsaBlockIDToLabels {
+			labelToSSABlockID[l] = ssa.BasicBlockID(i)
+		}
+		fnIndex = wazevoapi.GetCurrentFunctionIndex(ctx)
+	}
+
 	// Next, in order to determine the offsets of relative jumps, we have to calculate the size of each label.
 	var offset int64
-	for _, pos := range m.orderedBlockLabels {
-		pos.binaryOffset = offset
+	for i, pos := range ectx.OrderedBlockLabels {
+		pos.BinaryOffset = offset
 		var size int64
-		for cur := pos.begin; ; cur = cur.next {
-			if cur.kind == nop0 {
+		for cur := pos.Begin; ; cur = cur.next {
+			switch cur.kind {
+			case nop0:
 				l := cur.nop0Label()
-				if pos, ok := m.labelPositions[l]; ok {
-					pos.binaryOffset = offset + size
+				if pos, ok := ectx.LabelPositions[l]; ok {
+					pos.BinaryOffset = offset + size
+				}
+			case condBr:
+				if !cur.condBrOffsetResolved() {
+					var nextLabel label
+					if i < len(ectx.OrderedBlockLabels)-1 {
+						// Note: this is only used when the block ends with fallthrough,
+						// therefore can be safely assumed that the next block exists when it's needed.
+						nextLabel = ectx.OrderedBlockLabels[i+1].L
+					}
+					cbrs = append(cbrs, condBrReloc{
+						cbr: cur, currentLabelPos: pos, offset: offset + size,
+						nextLabel: nextLabel,
+					})
 				}
 			}
 			size += cur.size()
-			if cur == pos.end {
+			if cur == pos.End {
 				break
 			}
 		}
-		pos.binarySize = size
+
+		if wazevoapi.PerfMapEnabled {
+			if size > 0 {
+				l := pos.L
+				var labelStr string
+				if blkID, ok := labelToSSABlockID[l]; ok {
+					labelStr = fmt.Sprintf("%s::SSA_Block[%s]", l, blkID)
+				} else {
+					labelStr = l.String()
+				}
+				wazevoapi.PerfMap.AddModuleEntry(fnIndex, offset, uint64(size), fmt.Sprintf("%s:::::%s", fn, labelStr))
+			}
+		}
 		offset += size
 	}
 
+	// Before resolving any offsets, we need to check if all the conditional branches can be resolved.
+	var needRerun bool
+	for i := range cbrs {
+		reloc := &cbrs[i]
+		cbr := reloc.cbr
+		offset := reloc.offset
+
+		target := cbr.condBrLabel()
+		offsetOfTarget := ectx.LabelPositions[target].BinaryOffset
+		diff := offsetOfTarget - offset
+		if divided := diff >> 2; divided < minSignedInt19 || divided > maxSignedInt19 {
+			// This case the conditional branch is too huge. We place the trampoline instructions at the end of the current block,
+			// and jump to it.
+			m.insertConditionalJumpTrampoline(cbr, reloc.currentLabelPos, reloc.nextLabel)
+			// Then, we need to recall this function to fix up the label offsets
+			// as they have changed after the trampoline is inserted.
+			needRerun = true
+		}
+	}
+	if needRerun {
+		m.resolveRelativeAddresses(ctx)
+		if wazevoapi.PerfMapEnabled {
+			wazevoapi.PerfMap.Clear()
+		}
+		return
+	}
+
 	var currentOffset int64
-	for cur := m.rootInstr; cur != nil; cur = cur.next {
+	for cur := ectx.RootInstr; cur != nil; cur = cur.next {
 		switch cur.kind {
 		case br:
 			target := cur.brLabel()
-			offsetOfTarget := m.labelPositions[target].binaryOffset
+			offsetOfTarget := ectx.LabelPositions[target].BinaryOffset
 			diff := offsetOfTarget - currentOffset
-			if diff%4 != 0 {
-				panic("BUG: offsets between b and the target must be a multiple of 4")
-			}
 			divided := diff >> 2
 			if divided < minSignedInt26 || divided > maxSignedInt26 {
 				// This means the currently compiled single function is extremely large.
-				panic("BUG: implement branch relocation for large unconditional branch larger than 26-bit range")
+				panic("too large function that requires branch relocation of large unconditional branch larger than 26-bit range")
 			}
-			cur.brOffsetResolved(diff)
+			cur.brOffsetResolve(diff)
 		case condBr:
 			if !cur.condBrOffsetResolved() {
 				target := cur.condBrLabel()
-				offsetOfTarget := m.labelPositions[target].binaryOffset
+				offsetOfTarget := ectx.LabelPositions[target].BinaryOffset
 				diff := offsetOfTarget - currentOffset
-				if diff%4 != 0 {
-					panic("BUG: offsets between b and the target must be a multiple of 4")
-				}
-				divided := diff >> 2
-				if divided < minSignedInt19 || divided > maxSignedInt19 {
-					// This case we can insert "trampoline block" in the middle and jump to it.
-					// After that, we need to re-calculate the offset of labels after the trampoline block by
-					// recursively calling this function.
-					panic("TODO: implement branch relocation for large conditional branch larger than 19-bit range")
+				if divided := diff >> 2; divided < minSignedInt19 || divided > maxSignedInt19 {
+					panic("BUG: branch relocation for large conditional branch larger than 19-bit range must be handled properly")
 				}
 				cur.condBrOffsetResolve(diff)
 			}
 		case brTableSequence:
 			for i := range cur.targets {
 				l := label(cur.targets[i])
-				offsetOfTarget := m.labelPositions[l].binaryOffset
+				offsetOfTarget := ectx.LabelPositions[l].BinaryOffset
 				diff := offsetOfTarget - (currentOffset + brTableSequenceOffsetTableBegin)
 				cur.targets[i] = uint32(diff)
 			}
@@ -414,39 +387,50 @@ const (
 	minSignedInt19 int64 = -(1 << 19)
 )
 
-func (m *machine) getOrAllocateSSABlockLabel(blk ssa.BasicBlock) label {
-	if blk.ReturnBlock() {
-		return returnLabel
-	}
-	l := m.ssaBlockIDToLabels[blk.ID()]
-	if l == invalidLabel {
-		l = m.allocateLabel()
-		m.ssaBlockIDToLabels[blk.ID()] = l
-	}
-	return l
-}
+func (m *machine) insertConditionalJumpTrampoline(cbr *instruction, currentBlk *labelPosition, nextLabel label) {
+	cur := currentBlk.End
+	originalTarget := cbr.condBrLabel()
+	endNext := cur.next
 
-// LinkAdjacentBlocks implements backend.Machine.
-func (m *machine) LinkAdjacentBlocks(prev, next ssa.BasicBlock) {
-	prevLabelPos := m.labelPositions[m.getOrAllocateSSABlockLabel(prev)]
-	nextLabelPos := m.labelPositions[m.getOrAllocateSSABlockLabel(next)]
-	prevLabelPos.end.next = nextLabelPos.begin
+	if cur.kind != br {
+		// If the current block ends with a conditional branch, we can just insert the trampoline after it.
+		// Otherwise, we need to insert "skip" instruction to skip the trampoline instructions.
+		skip := m.allocateInstr()
+		skip.asBr(nextLabel)
+		cur = linkInstr(cur, skip)
+	}
+
+	cbrNewTargetInstr, cbrNewTargetLabel := m.allocateBrTarget()
+	cbr.setCondBrTargets(cbrNewTargetLabel)
+	cur = linkInstr(cur, cbrNewTargetInstr)
+
+	// Then insert the unconditional branch to the original, which should be possible to get encoded
+	// as 26-bit offset should be enough for any practical application.
+	br := m.allocateInstr()
+	br.asBr(originalTarget)
+	cur = linkInstr(cur, br)
+
+	// Update the end of the current block.
+	currentBlk.End = cur
+
+	linkInstr(cur, endNext)
 }
 
 // Format implements backend.Machine.
 func (m *machine) Format() string {
+	ectx := m.executableContext
 	begins := map[*instruction]label{}
-	for l, pos := range m.labelPositions {
-		begins[pos.begin] = l
+	for l, pos := range ectx.LabelPositions {
+		begins[pos.Begin] = l
 	}
 
 	irBlocks := map[label]ssa.BasicBlockID{}
-	for i, l := range m.ssaBlockIDToLabels {
+	for i, l := range ectx.SsaBlockIDToLabels {
 		irBlocks[l] = ssa.BasicBlockID(i)
 	}
 
 	var lines []string
-	for cur := m.rootInstr; cur != nil; cur = cur.next {
+	for cur := ectx.RootInstr; cur != nil; cur = cur.next {
 		if l, ok := begins[cur]; ok {
 			var labelStr string
 			if blkID, ok := irBlocks[l]; ok {
@@ -479,7 +463,7 @@ func (m *machine) getVRegSpillSlotOffsetFromSP(id regalloc.VRegID, size byte) in
 		m.spillSlots[id] = offset
 		m.spillSlotSize += int64(size)
 	}
-	return offset + m.clobberedRegSlotSize() + 16 // spill slot starts above the clobbered registers and the frame size.
+	return offset + 16 // spill slot starts above the clobbered registers and the frame size.
 }
 
 func (m *machine) clobberedRegSlotSize() int64 {
@@ -493,7 +477,7 @@ func (m *machine) arg0OffsetFromSP() int64 {
 }
 
 func (m *machine) ret0OffsetFromSP() int64 {
-	return m.arg0OffsetFromSP() + m.currentABI.argStackSize
+	return m.arg0OffsetFromSP() + m.currentABI.ArgStackSize
 }
 
 func (m *machine) requiredStackSize() int64 {

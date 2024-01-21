@@ -69,8 +69,8 @@ func TestInstruction_String(t *testing.T) {
 }
 
 func TestInstruction_isCopy(t *testing.T) {
-	require.False(t, (&instruction{kind: mov32}).isCopy())
-	require.True(t, (&instruction{kind: mov64}).isCopy())
-	require.True(t, (&instruction{kind: fpuMov64}).isCopy())
-	require.True(t, (&instruction{kind: fpuMov128}).isCopy())
+	require.False(t, (&instruction{kind: mov32}).IsCopy())
+	require.True(t, (&instruction{kind: mov64}).IsCopy())
+	require.True(t, (&instruction{kind: fpuMov64}).IsCopy())
+	require.True(t, (&instruction{kind: fpuMov128}).IsCopy())
 }

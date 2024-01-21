@@ -83,8 +83,8 @@ func (f *osFile) SetAppend(enable bool) (errno experimentalsys.Errno) {
 		f.flag &= ^experimentalsys.O_APPEND
 	}
 
-	// Clear any create flag, as we are re-opening, not re-creating.
-	f.flag &= ^experimentalsys.O_CREAT
+	// Clear any create or trunc flag, as we are re-opening, not re-creating.
+	f.flag &= ^(experimentalsys.O_CREAT | experimentalsys.O_TRUNC)
 
 	// appendMode (bool) cannot be changed later, so we have to re-open the
 	// file. https://github.com/golang/go/blob/go1.20/src/os/file_unix.go#L60
@@ -98,9 +98,38 @@ func (f *osFile) reopen() (errno experimentalsys.Errno) {
 	// Clear any create flag, as we are re-opening, not re-creating.
 	f.flag &= ^experimentalsys.O_CREAT
 
+	var (
+		isDir  bool
+		offset int64
+		err    error
+	)
+
+	isDir, errno = f.IsDir()
+	if errno != 0 {
+		return errno
+	}
+
+	if !isDir {
+		offset, err = f.file.Seek(0, io.SeekCurrent)
+		if err != nil {
+			return experimentalsys.UnwrapOSError(err)
+		}
+	}
+
 	_ = f.close()
 	f.file, errno = OpenFile(f.path, f.flag, f.perm)
-	return
+	if errno != 0 {
+		return errno
+	}
+
+	if !isDir {
+		_, err = f.file.Seek(offset, io.SeekStart)
+		if err != nil {
+			return experimentalsys.UnwrapOSError(err)
+		}
+	}
+
+	return 0
 }
 
 // IsNonblock implements the same method as documented on fsapi.File

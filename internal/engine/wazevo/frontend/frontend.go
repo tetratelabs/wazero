@@ -50,7 +50,15 @@ type Compiler struct {
 	br            *bytes.Reader
 	loweringState loweringState
 
+	knownSafeBounds    []knownSafeBound
+	knownSafeBoundsSet []ssa.ValueID
+
 	execCtxPtrValue, moduleCtxPtrValue ssa.Value
+}
+
+type knownSafeBound struct {
+	bound        uint64
+	absoluteAddr ssa.Value
 }
 
 // NewFrontendCompiler returns a frontend Compiler.
@@ -353,4 +361,43 @@ func SignatureForListener(wasmSig *wasm.FunctionType) (*ssa.Signature, *ssa.Sign
 		afterSig.Params[i+2] = WasmTypeToSSAType(p)
 	}
 	return beforeSig, afterSig
+}
+
+// isBoundSafe returns true if the given value is known to be safe to access up to the given bound.
+func (c *Compiler) getKnownSafeBound(v ssa.ValueID) *knownSafeBound {
+	if int(v) >= len(c.knownSafeBounds) {
+		return nil
+	}
+	return &c.knownSafeBounds[v]
+}
+
+// recordKnownSafeBound records the given safe bound for the given value.
+func (c *Compiler) recordKnownSafeBound(v ssa.ValueID, safeBound uint64, absoluteAddr ssa.Value) {
+	if int(v) >= len(c.knownSafeBounds) {
+		c.knownSafeBounds = append(c.knownSafeBounds, make([]knownSafeBound, v+1)...)
+	}
+
+	if exiting := c.knownSafeBounds[v]; exiting.bound == 0 {
+		c.knownSafeBounds[v] = knownSafeBound{
+			bound:        safeBound,
+			absoluteAddr: absoluteAddr,
+		}
+		c.knownSafeBoundsSet = append(c.knownSafeBoundsSet, v)
+	} else if safeBound > exiting.bound {
+		c.knownSafeBounds[v].bound = safeBound
+	}
+}
+
+// clearSafeBounds clears the known safe bounds. This must be called
+// after the compilation of each block.
+func (c *Compiler) clearSafeBounds() {
+	for _, v := range c.knownSafeBoundsSet {
+		ptr := &c.knownSafeBounds[v]
+		ptr.bound = 0
+	}
+	c.knownSafeBoundsSet = c.knownSafeBoundsSet[:0]
+}
+
+func (k *knownSafeBound) valid() bool {
+	return k != nil && k.bound > 0
 }

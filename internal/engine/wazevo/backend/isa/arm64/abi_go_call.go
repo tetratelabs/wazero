@@ -14,18 +14,19 @@ var calleeSavedRegistersSorted = []regalloc.VReg{
 
 // CompileGoFunctionTrampoline implements backend.Machine.
 func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *ssa.Signature, needModuleContextPtr bool) []byte {
+	exct := m.executableContext
 	argBegin := 1 // Skips exec context by default.
 	if needModuleContextPtr {
 		argBegin++
 	}
 
-	abi := &abiImpl{m: m}
-	abi.init(sig)
+	abi := &backend.FunctionABI{}
+	abi.Init(sig, intParamResultRegs, floatParamResultRegs)
 	m.currentABI = abi
 
 	cur := m.allocateInstr()
 	cur.asNop0()
-	m.rootInstr = cur
+	exct.RootInstr = cur
 
 	// Execution context is always the first argument.
 	execCtrPtr := x0VReg
@@ -69,7 +70,7 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 	cur = m.insertStackBoundsCheck(goCallStackSize+frameInfoSize, cur)
 
 	originalArg0Reg := x17VReg // Caller save, so we can use it for whatever we want.
-	if m.currentABI.alignedArgResultStackSlotSize() > 0 {
+	if m.currentABI.AlignedArgResultStackSlotSize() > 0 {
 		// At this point, SP points to `ReturnAddress`, so add 16 to get the original arg 0 slot.
 		cur = m.addsAddOrSubStackPointer(cur, originalArg0Reg, frameInfoSize, true)
 	}
@@ -101,8 +102,8 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 	copySp.asMove64(arg0ret0AddrReg, spVReg)
 	cur = linkInstr(cur, copySp)
 
-	for i := range abi.args[argBegin:] {
-		arg := &abi.args[argBegin+i]
+	for i := range abi.Args[argBegin:] {
+		arg := &abi.Args[argBegin+i]
 		store := m.allocateInstr()
 		var v regalloc.VReg
 		if arg.Kind == backend.ABIArgKindReg {
@@ -156,7 +157,7 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 	cur = m.restoreRegistersInExecutionContext(cur, calleeSavedRegistersSorted)
 
 	// Get the pointer to the arg[0]/ret[0]: We need to skip `frame_size + sliceSize`.
-	if len(abi.rets) > 0 {
+	if len(abi.Rets) > 0 {
 		cur = m.addsAddOrSubStackPointer(cur, arg0ret0AddrReg, frameInfoSize, true)
 	}
 
@@ -169,17 +170,17 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 	cur = linkInstr(cur, ldr)
 
 	originalRet0Reg := x17VReg // Caller save, so we can use it for whatever we want.
-	if m.currentABI.retStackSize > 0 {
-		cur = m.addsAddOrSubStackPointer(cur, originalRet0Reg, m.currentABI.argStackSize, true)
+	if m.currentABI.RetStackSize > 0 {
+		cur = m.addsAddOrSubStackPointer(cur, originalRet0Reg, m.currentABI.ArgStackSize, true)
 	}
 
 	// Make the SP point to the original address (above the result slot).
-	if s := m.currentABI.alignedArgResultStackSlotSize(); s > 0 {
+	if s := m.currentABI.AlignedArgResultStackSlotSize(); s > 0 {
 		cur = m.addsAddOrSubStackPointer(cur, spVReg, s, true)
 	}
 
-	for i := range abi.rets {
-		r := &abi.rets[i]
+	for i := range abi.Rets {
+		r := &abi.Rets[i]
 		if r.Kind == backend.ABIArgKindReg {
 			loadIntoReg := m.allocateInstr()
 			mode := addressMode{kind: addressModeKindPostIndex, rn: arg0ret0AddrReg}
@@ -242,7 +243,7 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 	ret.asRet(nil)
 	linkInstr(cur, ret)
 
-	m.encode(m.rootInstr)
+	m.encode(m.executableContext.RootInstr)
 	return m.compiler.Buf()
 }
 
@@ -298,18 +299,20 @@ func (m *machine) restoreRegistersInExecutionContext(cur *instruction, regs []re
 }
 
 func (m *machine) lowerConstantI64AndInsert(cur *instruction, dst regalloc.VReg, v int64) *instruction {
-	m.pendingInstructions = m.pendingInstructions[:0]
+	exct := m.executableContext
+	exct.PendingInstructions = exct.PendingInstructions[:0]
 	m.lowerConstantI64(dst, v)
-	for _, instr := range m.pendingInstructions {
+	for _, instr := range exct.PendingInstructions {
 		cur = linkInstr(cur, instr)
 	}
 	return cur
 }
 
 func (m *machine) lowerConstantI32AndInsert(cur *instruction, dst regalloc.VReg, v int32) *instruction {
-	m.pendingInstructions = m.pendingInstructions[:0]
+	exct := m.executableContext
+	exct.PendingInstructions = exct.PendingInstructions[:0]
 	m.lowerConstantI32(dst, v)
-	for _, instr := range m.pendingInstructions {
+	for _, instr := range exct.PendingInstructions {
 		cur = linkInstr(cur, instr)
 	}
 	return cur

@@ -79,7 +79,7 @@ func (m *ModuleContextOffsetData) ImportedFunctionOffset(i wasm.Index) (
 
 // GlobalInstanceOffset returns an offset of the i-th global instance.
 func (m *ModuleContextOffsetData) GlobalInstanceOffset(i wasm.Index) Offset {
-	return m.GlobalsBegin + Offset(i)*8
+	return m.GlobalsBegin + Offset(i)*16
 }
 
 // Offset represents an offset of a field of a struct.
@@ -159,7 +159,7 @@ func NewModuleContextOffsetData(m *wasm.Module, withListener bool) ModuleContext
 	if globals := int(m.ImportGlobalCount) + len(m.GlobalSection); globals > 0 {
 		ret.GlobalsBegin = offset
 		// Pointers to *wasm.GlobalInstance.
-		offset += Offset(globals) * 8
+		offset += Offset(globals) * 16
 	} else {
 		ret.GlobalsBegin = -1
 	}

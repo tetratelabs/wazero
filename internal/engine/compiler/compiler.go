@@ -301,6 +301,37 @@ type compiler interface {
 	// compileV128ITruncSatFromF adds instructions to perform wazeroir.NewOperationV128ITruncSatFromF.
 	compileV128ITruncSatFromF(o *wazeroir.UnionOperation) error
 
+	// compileAtomicLoad adds instructions to perform wazeroir.NewOperationAtomicLoad.
+	compileAtomicLoad(o *wazeroir.UnionOperation) error
+	// compileAtomicLoad8 adds instructions to perform wazeroir.NewOperationAtomicLoad8.
+	compileAtomicLoad8(o *wazeroir.UnionOperation) error
+	// compileAtomicLoad16 adds instructions to perform wazeroir.NewOperationAtomicLoad16.
+	compileAtomicLoad16(o *wazeroir.UnionOperation) error
+	// compileAtomicStore adds instructions to perform wazeroir.NewOperationAtomicStore.
+	compileAtomicStore(o *wazeroir.UnionOperation) error
+	// compileAtomicStore8 adds instructions to perform wazeroir.NewOperationAtomicStore8.
+	compileAtomicStore8(o *wazeroir.UnionOperation) error
+	// compileAtomicStore16 adds instructions to perform wazeroir.NewOperationAtomicStore16.
+	compileAtomicStore16(o *wazeroir.UnionOperation) error
+	// compileAtomicRMW adds instructions to perform wazeroir.NewOperationAtomicRMW.
+	compileAtomicRMW(o *wazeroir.UnionOperation) error
+	// compileAtomicRMW8 adds instructions to perform wazeroir.NewOperationAtomicRMW8.
+	compileAtomicRMW8(o *wazeroir.UnionOperation) error
+	// compileAtomicRMW16 adds instructions to perform wazeroir.NewOperationAtomicRMW16.
+	compileAtomicRMW16(o *wazeroir.UnionOperation) error
+	// compileAtomicRMWCmpxchg adds instructions to perform wazeroir.NewOperationAtomicRMWCmpxchg.
+	compileAtomicRMWCmpxchg(o *wazeroir.UnionOperation) error
+	// compileAtomicRMW8Cmpxchg adds instructions to perform wazeroir.NewOperationAtomicRMW8Cmpxchg.
+	compileAtomicRMW8Cmpxchg(o *wazeroir.UnionOperation) error
+	// compileAtomicRMW16Cmpxchg adds instructions to perform wazeroir.NewOperationAtomicRMW16Cmpxchg.
+	compileAtomicRMW16Cmpxchg(o *wazeroir.UnionOperation) error
+	// compileAtomicMemoryWait adds instructions to perform wazeroir.NewOperationAtomicMemoryWait.
+	compileAtomicMemoryWait(o *wazeroir.UnionOperation) error
+	// compileAtomicMemoryNotify adds instructions to perform wazeroir.NewOperationAtomicMemoryNotify.
+	compileAtomicMemoryNotify(o *wazeroir.UnionOperation) error
+	// compileAtomicFence adds instructions to perform wazeroir.NewOperationAtomicFence
+	compileAtomicFence(o *wazeroir.UnionOperation) error
+
 	// compileBuiltinFunctionCheckExitCode adds instructions to perform wazeroir.OperationBuiltinFunctionCheckExitCode.
 	compileBuiltinFunctionCheckExitCode() error
 

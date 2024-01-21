@@ -1,6 +1,7 @@
 package arm64
 
 import (
+	"context"
 	"sort"
 	"testing"
 
@@ -13,11 +14,9 @@ import (
 
 func Test_calleeSavedRegistersSorted(t *testing.T) {
 	var exp []regalloc.VReg
-	for i, r := range regInfo.CalleeSavedRegisters {
-		if r {
-			exp = append(exp, regInfo.RealRegToVReg[i])
-		}
-	}
+	regInfo.CalleeSavedRegisters.Range(func(r regalloc.RealReg) {
+		exp = append(exp, regInfo.RealRegToVReg[r])
+	})
 	sort.Slice(exp, func(i, j int) bool {
 		return exp[i].RealReg() < exp[j].RealReg()
 	})
@@ -452,7 +451,7 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 
 			require.Equal(t, tc.exp, m.Format())
 
-			m.Encode()
+			m.Encode(context.Background())
 		})
 	}
 }
@@ -564,10 +563,10 @@ func Test_goFunctionCallLoadStackArg(t *testing.T) {
 				_, result := m.goFunctionCallLoadStackArg(nop, originalArg0Reg, tc.arg, intVReg, floatVReg)
 				require.Equal(t, tc.expResultReg, result)
 
-				m.rootInstr = nop
+				m.executableContext.RootInstr = nop
 
 				require.Equal(t, tc.exp, m.Format())
-				m.Encode()
+				m.Encode(context.Background())
 			})
 		})
 	}
@@ -625,15 +624,15 @@ func Test_goFunctionCallStoreStackResult(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				_, _, m := newSetupWithMockContext()
-				m.currentABI = &abiImpl{argStackSize: 8}
+				m.currentABI = &backend.FunctionABI{ArgStackSize: 8}
 
 				nop := m.allocateNop()
 				m.goFunctionCallStoreStackResult(nop, spVReg, tc.result, tc.resultReg)
 
-				m.rootInstr = nop
+				m.executableContext.RootInstr = nop
 
 				require.Equal(t, tc.exp, m.Format())
-				m.Encode()
+				m.Encode(context.Background())
 			})
 		})
 	}

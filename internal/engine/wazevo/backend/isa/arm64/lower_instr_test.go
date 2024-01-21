@@ -18,7 +18,7 @@ func TestMachine_LowerConditionalBranch(t *testing.T) {
 		brz bool, intCond ssa.IntegerCmpCond, floatCond ssa.FloatCmpCond,
 		ctx *mockCompiler, builder ssa.Builder, m *machine,
 	) (instr *ssa.Instruction, verify func(t *testing.T)) {
-		m.StartLoweringFunction(10)
+		m.executableContext.StartLoweringFunction(10)
 		entry := builder.CurrentBlock()
 		isInt := intCond != ssa.IntegerCmpCondInvalid
 
@@ -58,13 +58,12 @@ func TestMachine_LowerConditionalBranch(t *testing.T) {
 		}
 		builder.InsertInstruction(b)
 		return b, func(t *testing.T) {
-			_, ok := ctx.lowered[cmpInstr]
-			require.True(t, ok)
+			require.True(t, cmpInstr.Lowered())
 		}
 	}
 
 	icmpInSameGroupFromParamAndImm12 := func(brz bool, ctx *mockCompiler, builder ssa.Builder, m *machine) (instr *ssa.Instruction, verify func(t *testing.T)) {
-		m.StartLoweringFunction(10)
+		m.executableContext.StartLoweringFunction(10)
 		entry := builder.CurrentBlock()
 		v1 := entry.AddParam(builder, ssa.TypeI32)
 
@@ -92,8 +91,7 @@ func TestMachine_LowerConditionalBranch(t *testing.T) {
 		}
 		builder.InsertInstruction(b)
 		return b, func(t *testing.T) {
-			_, ok := ctx.lowered[icmp]
-			require.True(t, ok)
+			require.True(t, icmp.Lowered())
 		}
 	}
 
@@ -105,7 +103,7 @@ func TestMachine_LowerConditionalBranch(t *testing.T) {
 		{
 			name: "icmp in different group",
 			setup: func(ctx *mockCompiler, builder ssa.Builder, m *machine) (instr *ssa.Instruction, verify func(t *testing.T)) {
-				m.StartLoweringFunction(10)
+				m.executableContext.StartLoweringFunction(10)
 				entry := builder.CurrentBlock()
 				v1, v2 := entry.AddParam(builder, ssa.TypeI64), entry.AddParam(builder, ssa.TypeI64)
 
@@ -123,8 +121,7 @@ func TestMachine_LowerConditionalBranch(t *testing.T) {
 				// Indicate that currently compiling in the different group.
 				ctx.currentGID = 1000
 				return brz, func(t *testing.T) {
-					_, ok := ctx.lowered[icmp]
-					require.False(t, ok)
+					require.False(t, icmp.Lowered())
 				}
 			},
 			instructions: []string{"cbz w3?, (L1)"},
@@ -221,7 +218,7 @@ func TestMachine_LowerSingleBranch(t *testing.T) {
 		{
 			name: "b",
 			setup: func(ctx *mockCompiler, builder ssa.Builder, m *machine) (instr *ssa.Instruction) {
-				m.StartLoweringFunction(10)
+				m.executableContext.StartLoweringFunction(10)
 				jump := builder.AllocateInstruction()
 				jump.AsJump(nil, builder.AllocateBasicBlock())
 				builder.InsertInstruction(jump)
@@ -232,7 +229,7 @@ func TestMachine_LowerSingleBranch(t *testing.T) {
 		{
 			name: "ret",
 			setup: func(ctx *mockCompiler, builder ssa.Builder, m *machine) (instr *ssa.Instruction) {
-				m.StartLoweringFunction(10)
+				m.executableContext.StartLoweringFunction(10)
 				jump := builder.AllocateInstruction()
 				jump.AsJump(nil, builder.ReturnBlock())
 				builder.InsertInstruction(jump)
@@ -300,73 +297,79 @@ func TestMachine_lowerIDiv(t *testing.T) {
 			name: "32bit unsigned", _64bit: false, signed: false,
 			exp: `
 udiv w1?, w2?, w3?
+mov x1?, x65535?
 cbnz w3?, L1
-movz x1?, #0xa, lsl 0
-str w1?, [x65535?]
-mov x2?, sp
-str x2?, [x65535?, #0x38]
-adr x3?, #0x0
-str x3?, [x65535?, #0x30]
-exit_sequence x65535?
+movz x2?, #0xa, lsl 0
+str w2?, [x1?]
+mov x3?, sp
+str x3?, [x1?, #0x38]
+adr x4?, #0x0
+str x4?, [x1?, #0x30]
+exit_sequence x1?
 L1:
 `,
 		},
 		{name: "32bit signed", _64bit: false, signed: true, exp: `
 sdiv w1?, w2?, w3?
+mov x1?, x65535?
 cbnz w3?, L1
-movz x1?, #0xa, lsl 0
-str w1?, [x65535?]
-mov x2?, sp
-str x2?, [x65535?, #0x38]
-adr x3?, #0x0
-str x3?, [x65535?, #0x30]
-exit_sequence x65535?
+movz x2?, #0xa, lsl 0
+str w2?, [x1?]
+mov x3?, sp
+str x3?, [x1?, #0x38]
+adr x4?, #0x0
+str x4?, [x1?, #0x30]
+exit_sequence x1?
 L1:
 adds wzr, w3?, #0x1
 ccmp w2?, #0x1, #0x0, eq
+mov x5?, x65535?
 b.vc L2
-movz x4?, #0xb, lsl 0
-str w4?, [x65535?]
-mov x5?, sp
-str x5?, [x65535?, #0x38]
-adr x6?, #0x0
-str x6?, [x65535?, #0x30]
-exit_sequence x65535?
+movz x6?, #0xb, lsl 0
+str w6?, [x5?]
+mov x7?, sp
+str x7?, [x5?, #0x38]
+adr x8?, #0x0
+str x8?, [x5?, #0x30]
+exit_sequence x5?
 L2:
 `},
 		{name: "64bit unsigned", _64bit: true, signed: false, exp: `
 udiv x1?, x2?, x3?
+mov x1?, x65535?
 cbnz x3?, L1
-movz x1?, #0xa, lsl 0
-str w1?, [x65535?]
-mov x2?, sp
-str x2?, [x65535?, #0x38]
-adr x3?, #0x0
-str x3?, [x65535?, #0x30]
-exit_sequence x65535?
+movz x2?, #0xa, lsl 0
+str w2?, [x1?]
+mov x3?, sp
+str x3?, [x1?, #0x38]
+adr x4?, #0x0
+str x4?, [x1?, #0x30]
+exit_sequence x1?
 L1:
 `},
 		{name: "64bit signed", _64bit: true, signed: true, exp: `
 sdiv x1?, x2?, x3?
+mov x1?, x65535?
 cbnz x3?, L1
-movz x1?, #0xa, lsl 0
-str w1?, [x65535?]
-mov x2?, sp
-str x2?, [x65535?, #0x38]
-adr x3?, #0x0
-str x3?, [x65535?, #0x30]
-exit_sequence x65535?
+movz x2?, #0xa, lsl 0
+str w2?, [x1?]
+mov x3?, sp
+str x3?, [x1?, #0x38]
+adr x4?, #0x0
+str x4?, [x1?, #0x30]
+exit_sequence x1?
 L1:
 adds xzr, x3?, #0x1
 ccmp x2?, #0x1, #0x0, eq
+mov x5?, x65535?
 b.vc L2
-movz x4?, #0xb, lsl 0
-str w4?, [x65535?]
-mov x5?, sp
-str x5?, [x65535?, #0x38]
-adr x6?, #0x0
-str x6?, [x65535?, #0x30]
-exit_sequence x65535?
+movz x6?, #0xb, lsl 0
+str w6?, [x5?]
+mov x7?, sp
+str x7?, [x5?, #0x38]
+adr x8?, #0x0
+str x8?, [x5?, #0x30]
+exit_sequence x5?
 L2:
 `},
 	} {
@@ -375,7 +378,8 @@ L2:
 			rd, rn, rm := regalloc.VReg(1).SetRegType(regalloc.RegTypeInt),
 				regalloc.VReg(2).SetRegType(regalloc.RegTypeInt),
 				regalloc.VReg(3).SetRegType(regalloc.RegTypeInt)
-			_, _, m := newSetupWithMockContext()
+			mc, _, m := newSetupWithMockContext()
+			mc.typeOf = map[regalloc.VRegID]ssa.Type{execCtx.ID(): ssa.TypeI64, 2: ssa.TypeI64, 3: ssa.TypeI64}
 			m.lowerIDiv(execCtx, operandNR(rd), operandNR(rn), operandNR(rm), tc._64bit, tc.signed)
 			require.Equal(t, tc.exp, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
 		})
@@ -385,8 +389,8 @@ L2:
 func TestMachine_exitWithCode(t *testing.T) {
 	_, _, m := newSetupWithMockContext()
 	m.lowerExitWithCode(x1VReg, wazevoapi.ExitCodeGrowStack)
-	m.FlushPendingInstructions()
-	m.encode(m.perBlockHead)
+	m.executableContext.FlushPendingInstructions()
+	m.encode(m.executableContext.PerBlockHead)
 	require.Equal(t, `
 movz x1?, #0x1, lsl 0
 str w1?, [x1]
@@ -411,25 +415,28 @@ func TestMachine_lowerFpuToInt(t *testing.T) {
 msr fpsr, xzr
 fcvtzu w1, s2
 mrs x1? fpsr
+mov x2?, x15
+mov x3?, d2
 subs xzr, x1?, #0x1
 b.ne L2
-fcmp w2, w2
+fcmp w3?, w3?
+mov x4?, x2?
 b.vc L1
-movz x2?, #0xc, lsl 0
-str w2?, [x15]
-mov x3?, sp
-str x3?, [x15, #0x38]
-adr x4?, #0x0
-str x4?, [x15, #0x30]
-exit_sequence x15
-L1:
-movz x5?, #0xb, lsl 0
-str w5?, [x15]
+movz x5?, #0xc, lsl 0
+str w5?, [x4?]
 mov x6?, sp
-str x6?, [x15, #0x38]
+str x6?, [x4?, #0x38]
 adr x7?, #0x0
-str x7?, [x15, #0x30]
-exit_sequence x15
+str x7?, [x4?, #0x30]
+exit_sequence x4?
+L1:
+movz x8?, #0xb, lsl 0
+str w8?, [x2?]
+mov x9?, sp
+str x9?, [x2?, #0x38]
+adr x10?, #0x0
+str x10?, [x2?, #0x30]
+exit_sequence x2?
 L2:
 `,
 		},
@@ -442,12 +449,13 @@ fcvtzu w1, s2
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			_, _, m := newSetupWithMockContext()
-			m.lowerFpuToInt(operandNR(x1VReg), operandNR(x2VReg), x15VReg, false, false, false, tc.nontrapping)
+			mc, _, m := newSetupWithMockContext()
+			mc.typeOf = map[regalloc.VRegID]ssa.Type{v2VReg.ID(): ssa.TypeI64, x15VReg.ID(): ssa.TypeI64}
+			m.lowerFpuToInt(operandNR(x1VReg), operandNR(v2VReg), x15VReg, false, false, false, tc.nontrapping)
 			require.Equal(t, tc.expectedAsm, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
 
-			m.FlushPendingInstructions()
-			m.encode(m.perBlockHead)
+			m.executableContext.FlushPendingInstructions()
+			m.encode(m.executableContext.PerBlockHead)
 		})
 	}
 }
@@ -468,10 +476,11 @@ mul v2?.4s, v2?.4s, x2.4s
 xtn v1?.2s, x2.2s
 addp v2?.4s, v2?.4s, v2?.4s
 xtn v3?.2s, x15.2s
-shll x1.2s, v2?.2s
-umlal x1.2s, v3?.2s, v1?.2s
+shll v4?.2s, v2?.2s
+umlal v4?.2s, v3?.2s, v1?.2s
+mov x1.16b, v4?.16b
 `,
-			expectedBytes: "e009a04e009ca24e4028a10e00bca04ee029a10e0138a12e0180a02e",
+			expectedBytes: "e009a04e009ca24e4028a10e00bca04ee029a10e0038a12e0080a02e011ca04e",
 		},
 		{
 			name:        "8B",
@@ -527,8 +536,8 @@ mul x1.4s, x2.4s, x15.4s
 			m.lowerVIMul(operandNR(x1VReg), operandNR(x2VReg), operandNR(x15VReg), tc.arrangement)
 			require.Equal(t, tc.expectedAsm, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
 
-			m.FlushPendingInstructions()
-			m.encode(m.perBlockHead)
+			m.executableContext.FlushPendingInstructions()
+			m.encode(m.executableContext.PerBlockHead)
 			buf := m.compiler.Buf()
 			require.Equal(t, tc.expectedBytes, hex.EncodeToString(buf))
 		})
@@ -559,12 +568,12 @@ cset x15, ne
 			op:          ssa.OpcodeVallTrue,
 			arrangement: vecArrangement2D,
 			expectedAsm: `
-cmeq x15.2d, x1.2d, #0
-addp x15.2d, x15.2d, x15.2d
-fcmp x15, x15
+cmeq v1?.2d, x1.2d, #0
+addp v1?.2d, v1?.2d, v1?.2d
+fcmp d1?, d1?
 cset x15, eq
 `,
-			expectedBytes: "2f98e04eefbdef4ee0216f1eef179f9a",
+			expectedBytes: "2098e04e00bce04e0020601eef179f9a",
 		},
 		{
 			name:        "allTrue 8B",
@@ -632,8 +641,8 @@ cset x15, ne
 			m.lowerVcheckTrue(tc.op, operandNR(x1VReg), operandNR(x15VReg), tc.arrangement)
 			require.Equal(t, tc.expectedAsm, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
 
-			m.FlushPendingInstructions()
-			m.encode(m.perBlockHead)
+			m.executableContext.FlushPendingInstructions()
+			m.encode(m.executableContext.PerBlockHead)
 			buf := m.compiler.Buf()
 			require.Equal(t, tc.expectedBytes, hex.EncodeToString(buf))
 		})
@@ -717,8 +726,8 @@ add w15, w15, w1?, lsl #1
 			m.lowerVhighBits(operandNR(x1VReg), operandNR(x15VReg), tc.arrangement)
 			require.Equal(t, tc.expectedAsm, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
 
-			m.FlushPendingInstructions()
-			m.encode(m.perBlockHead)
+			m.executableContext.FlushPendingInstructions()
+			m.encode(m.executableContext.PerBlockHead)
 			buf := m.compiler.Buf()
 			require.Equal(t, tc.expectedBytes, hex.EncodeToString(buf))
 		})
@@ -766,8 +775,8 @@ tbl x1.16b, { v29.16b, v30.16b }, v1?.16b
 			m.lowerShuffle(operandNR(x1VReg), operandNR(x2VReg), operandNR(x15VReg), lane1, lane2)
 			require.Equal(t, tc.expectedAsm, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
 
-			m.FlushPendingInstructions()
-			m.encode(m.perBlockHead)
+			m.executableContext.FlushPendingInstructions()
+			m.encode(m.executableContext.PerBlockHead)
 			buf := m.compiler.Buf()
 			require.Equal(t, tc.expectedBytes, hex.EncodeToString(buf))
 		})
@@ -787,35 +796,35 @@ func TestMachine_lowerVShift(t *testing.T) {
 			op:          ssa.OpcodeVIshl,
 			arrangement: vecArrangement16B,
 			expectedAsm: `
-and s1?, w15, #0x7
-dup x1.16b, d1?
-sshl x1.16b, x2.16b, x1.16b
+and x1?, x15, #0x7
+dup v2?.16b, x1?
+sshl x1.16b, x2.16b, v2?.16b
 `,
-			expectedBytes: "e0090012010c014e4144214e",
+			expectedBytes: "e0094092000c014e4144204e",
 		},
 		{
 			name:        "VSshr",
 			op:          ssa.OpcodeVSshr,
 			arrangement: vecArrangement16B,
 			expectedAsm: `
-and s1?, w15, #0x7
-sub s1?, wzr, s1?
-dup x1.16b, d1?
-sshl x1.16b, x2.16b, x1.16b
+and x1?, x15, #0x7
+sub x1?, xzr, x1?
+dup v2?.16b, x1?
+sshl x1.16b, x2.16b, v2?.16b
 `,
-			expectedBytes: "e0090012e003004b010c014e4144214e",
+			expectedBytes: "e0094092e00300cb000c014e4144204e",
 		},
 		{
 			name:        "VUshr",
 			op:          ssa.OpcodeVUshr,
 			arrangement: vecArrangement16B,
 			expectedAsm: `
-and s1?, w15, #0x7
-sub s1?, wzr, s1?
-dup x1.16b, d1?
-ushl x1.16b, x2.16b, x1.16b
+and x1?, x15, #0x7
+sub x1?, xzr, x1?
+dup v2?.16b, x1?
+ushl x1.16b, x2.16b, v2?.16b
 `,
-			expectedBytes: "e0090012e003004b010c014e4144216e",
+			expectedBytes: "e0094092e00300cb000c014e4144206e",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -823,8 +832,8 @@ ushl x1.16b, x2.16b, x1.16b
 			m.lowerVShift(tc.op, operandNR(x1VReg), operandNR(x2VReg), operandNR(x15VReg), tc.arrangement)
 			require.Equal(t, tc.expectedAsm, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
 
-			m.FlushPendingInstructions()
-			m.encode(m.perBlockHead)
+			m.executableContext.FlushPendingInstructions()
+			m.encode(m.executableContext.PerBlockHead)
 			buf := m.compiler.Buf()
 			require.Equal(t, tc.expectedBytes, hex.EncodeToString(buf))
 		})
@@ -845,9 +854,11 @@ func TestMachine_lowerSelectVec(t *testing.T) {
 
 	m.lowerSelectVec(c, rn, rm, rd)
 	require.Equal(t, `
-sub x5?, xzr, x1?
-dup v4?.2d, x5?
-bsl v4?.16b, v2?.16b, v3?.16b
+subs wzr, w1?, wzr
+csetm x5?, ne
+dup v6?.2d, x5?
+bsl v6?.16b, v2?.16b, v3?.16b
+mov v4?.16b, v6?.16b
 `, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
 }
 
@@ -861,8 +872,9 @@ func TestMachine_lowerFcopysign(t *testing.T) {
 			exp: `
 movz w1?, #0x8000, lsl 16
 ins v2?.s[0], w1?
-mov v5?.8b, v3?.8b
-bit v5?.8b, v4?.8b, v2?.8b
+mov v6?.8b, v3?.8b
+bit v6?.8b, v4?.8b, v2?.8b
+mov v5?.8b, v6?.8b
 `,
 		},
 		{
@@ -870,8 +882,9 @@ bit v5?.8b, v4?.8b, v2?.8b
 			exp: `
 movz x1?, #0x8000, lsl 48
 ins v2?.d[0], x1?
-mov v5?.8b, v3?.8b
-bit v5?.8b, v4?.8b, v2?.8b
+mov v6?.8b, v3?.8b
+bit v6?.8b, v4?.8b, v2?.8b
+mov v5?.8b, v6?.8b
 `,
 		},
 	} {

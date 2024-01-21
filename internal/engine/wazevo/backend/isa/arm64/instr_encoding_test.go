@@ -140,10 +140,10 @@ func TestInstruction_encode(t *testing.T) {
 			i.asVecPermute(vecOpZip1, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
 		}},
 		{want: "411ca32e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpBit, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
+			i.asVecRRRRewrite(vecOpBit, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
 		}},
 		{want: "411ca36e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpBit, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
+			i.asVecRRRRewrite(vecOpBit, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
 		}},
 		{want: "411c236e", setup: func(i *instruction) {
 			i.asVecRRR(vecOpEOR, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
@@ -1098,8 +1098,10 @@ func TestInstruction_encode(t *testing.T) {
 		{want: "b21c4093", setup: func(i *instruction) { i.asExtend(x18VReg, x5VReg, 8, 64, true) }},
 		{want: "b23c4093", setup: func(i *instruction) { i.asExtend(x18VReg, x5VReg, 16, 64, true) }},
 		{want: "b27c4093", setup: func(i *instruction) { i.asExtend(x18VReg, x5VReg, 32, 64, true) }},
-		{want: "f2079f9a", setup: func(i *instruction) { i.asCSet(x18VReg, ne) }},
-		{want: "f2179f9a", setup: func(i *instruction) { i.asCSet(x18VReg, eq) }},
+		{want: "f2079f9a", setup: func(i *instruction) { i.asCSet(x18VReg, false, ne) }},
+		{want: "f2179f9a", setup: func(i *instruction) { i.asCSet(x18VReg, false, eq) }},
+		{want: "e0039fda", setup: func(i *instruction) { i.asCSet(x0VReg, true, ne) }},
+		{want: "f2139fda", setup: func(i *instruction) { i.asCSet(x18VReg, true, eq) }},
 		{want: "32008012", setup: func(i *instruction) { i.asMOVN(x18VReg, 1, 0, false) }},
 		{want: "52559512", setup: func(i *instruction) { i.asMOVN(x18VReg, 0xaaaa, 0, false) }},
 		{want: "f2ff9f12", setup: func(i *instruction) { i.asMOVN(x18VReg, 0xffff, 0, false) }},
@@ -1278,7 +1280,7 @@ func TestInstruction_encode(t *testing.T) {
 		}},
 		{want: "20000014", setup: func(i *instruction) {
 			i.asBr(dummyLabel)
-			i.brOffsetResolved(0x80)
+			i.brOffsetResolve(0x80)
 		}},
 		{want: "01040034", setup: func(i *instruction) {
 			i.asCondBr(registerAsRegZeroCond(x1VReg), dummyLabel, false)
@@ -1493,10 +1495,10 @@ func TestInstruction_encode(t *testing.T) {
 			i.asVecRRR(vecOpBic, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
 		}},
 		{want: "411c632e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpBsl, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
+			i.asVecRRRRewrite(vecOpBsl, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
 		}},
 		{want: "411c636e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpBsl, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
+			i.asVecRRRRewrite(vecOpBsl, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
 		}},
 		{want: "4158202e", setup: func(i *instruction) {
 			i.asVecMisc(vecOpNot, operandNR(v1VReg), operandNR(v2VReg), vecArrangement8B)

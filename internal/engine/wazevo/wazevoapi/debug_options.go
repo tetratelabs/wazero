@@ -40,19 +40,28 @@ const (
 	PrintMachineCodeHexPerFunctionDisassemblable = false
 )
 
-// ----- Validations -----
-// These consts must be enabled by default until we reach the point where we can disable them (e.g. multiple days of fuzzing passes).
+// printTarget is the function index to print the machine code. This is used for debugging to print the machine code
+// of a specific function.
+const printTarget = -1
 
+// PrintEnabledIndex returns true if the current function index is the print target.
+func PrintEnabledIndex(ctx context.Context) bool {
+	if printTarget == -1 {
+		return true
+	}
+	return GetCurrentFunctionIndex(ctx) == printTarget
+}
+
+// ----- Validations -----
 const (
-	RegAllocValidationEnabled = true
-	SSAValidationEnabled      = true
+	// SSAValidationEnabled enables the SSA validation. This is disabled by default since the operation is expensive.
+	SSAValidationEnabled = false
 )
 
 // ----- Stack Guard Check -----
-// These consts must be enabled by default until we reach the point where we can disable them (e.g. multiple days of fuzzing passes).
 const (
 	// StackGuardCheckEnabled enables the stack guard check to ensure that our stack bounds check works correctly.
-	StackGuardCheckEnabled       = true
+	StackGuardCheckEnabled       = false
 	StackGuardCheckGuardPageSize = 8096
 )
 
@@ -87,6 +96,7 @@ type (
 	}
 	verifierStateContextKey struct{}
 	currentFunctionNameKey  struct{}
+	currentFunctionIndexKey struct{}
 )
 
 // NewDeterministicCompilationVerifierContext creates a new context with the deterministic compilation verifier used per wasm.Module.
@@ -165,16 +175,26 @@ const NeedFunctionNameInContext = PrintSSA ||
 	PrintRegisterAllocated ||
 	PrintFinalizedMachineCode ||
 	PrintMachineCodeHexPerFunction ||
-	DeterministicCompilationVerifierEnabled
+	DeterministicCompilationVerifierEnabled ||
+	PerfMapEnabled
 
 // SetCurrentFunctionName sets the current function name to the given `functionName`.
-func SetCurrentFunctionName(ctx context.Context, functionName string) context.Context {
-	return context.WithValue(ctx, currentFunctionNameKey{}, functionName)
+func SetCurrentFunctionName(ctx context.Context, index int, functionName string) context.Context {
+	ctx = context.WithValue(ctx, currentFunctionNameKey{}, functionName)
+	ctx = context.WithValue(ctx, currentFunctionIndexKey{}, index)
+	return ctx
 }
 
 // GetCurrentFunctionName returns the current function name.
 func GetCurrentFunctionName(ctx context.Context) string {
-	return ctx.Value(currentFunctionNameKey{}).(string)
+	ret, _ := ctx.Value(currentFunctionNameKey{}).(string)
+	return ret
+}
+
+// GetCurrentFunctionIndex returns the current function index.
+func GetCurrentFunctionIndex(ctx context.Context) int {
+	ret, _ := ctx.Value(currentFunctionIndexKey{}).(int)
+	return ret
 }
 
 // ----- High Register Pressure -----

@@ -13,12 +13,12 @@ func TestAbiImpl_init(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		sig  *ssa.Signature
-		exp  abiImpl
+		exp  backend.FunctionABI
 	}{
 		{
 			name: "empty sig",
 			sig:  &ssa.Signature{},
-			exp:  abiImpl{},
+			exp:  backend.FunctionABI{},
 		},
 		{
 			name: "small sig",
@@ -26,19 +26,18 @@ func TestAbiImpl_init(t *testing.T) {
 				Params:  []ssa.Type{ssa.TypeI32, ssa.TypeF32, ssa.TypeI32},
 				Results: []ssa.Type{ssa.TypeI64, ssa.TypeF64},
 			},
-			exp: abiImpl{
-				m: nil,
-				args: []backend.ABIArg{
+			exp: backend.FunctionABI{
+				Args: []backend.ABIArg{
 					{Index: 0, Kind: backend.ABIArgKindReg, Reg: x0VReg, Type: ssa.TypeI32},
 					{Index: 1, Kind: backend.ABIArgKindReg, Reg: v0VReg, Type: ssa.TypeF32},
 					{Index: 2, Kind: backend.ABIArgKindReg, Reg: x1VReg, Type: ssa.TypeI32},
 				},
-				rets: []backend.ABIArg{
+				Rets: []backend.ABIArg{
 					{Index: 0, Kind: backend.ABIArgKindReg, Reg: x0VReg, Type: ssa.TypeI64},
 					{Index: 1, Kind: backend.ABIArgKindReg, Reg: v0VReg, Type: ssa.TypeF64},
 				},
-				argRealRegs: []regalloc.VReg{x0VReg, v0VReg, x1VReg},
-				retRealRegs: []regalloc.VReg{x0VReg, v0VReg},
+				ArgRealRegs: []regalloc.VReg{x0VReg, v0VReg, x1VReg},
+				RetRealRegs: []regalloc.VReg{x0VReg, v0VReg},
 			},
 		},
 		{
@@ -81,9 +80,9 @@ func TestAbiImpl_init(t *testing.T) {
 					ssa.TypeI64, ssa.TypeF64,
 				},
 			},
-			exp: abiImpl{
-				argStackSize: 128, retStackSize: 128,
-				args: []backend.ABIArg{
+			exp: backend.FunctionABI{
+				ArgStackSize: 128, RetStackSize: 128,
+				Args: []backend.ABIArg{
 					{Index: 0, Kind: backend.ABIArgKindReg, Reg: x0VReg, Type: ssa.TypeI32},
 					{Index: 1, Kind: backend.ABIArgKindReg, Reg: v0VReg, Type: ssa.TypeF32},
 					{Index: 2, Kind: backend.ABIArgKindReg, Reg: x1VReg, Type: ssa.TypeI64},
@@ -117,7 +116,7 @@ func TestAbiImpl_init(t *testing.T) {
 					{Index: 30, Kind: backend.ABIArgKindStack, Type: ssa.TypeI64, Offset: 112},
 					{Index: 31, Kind: backend.ABIArgKindStack, Type: ssa.TypeF64, Offset: 120},
 				},
-				rets: []backend.ABIArg{
+				Rets: []backend.ABIArg{
 					{Index: 0, Kind: backend.ABIArgKindReg, Reg: x0VReg, Type: ssa.TypeI32},
 					{Index: 1, Kind: backend.ABIArgKindReg, Reg: v0VReg, Type: ssa.TypeF32},
 					{Index: 2, Kind: backend.ABIArgKindReg, Reg: x1VReg, Type: ssa.TypeI64},
@@ -151,8 +150,8 @@ func TestAbiImpl_init(t *testing.T) {
 					{Index: 30, Kind: backend.ABIArgKindStack, Type: ssa.TypeI64, Offset: 112},
 					{Index: 31, Kind: backend.ABIArgKindStack, Type: ssa.TypeF64, Offset: 120},
 				},
-				retRealRegs: []regalloc.VReg{x0VReg, v0VReg, x1VReg, v1VReg, x2VReg, v2VReg, x3VReg, v3VReg, x4VReg, v4VReg, x5VReg, v5VReg, x6VReg, v6VReg, x7VReg, v7VReg},
-				argRealRegs: []regalloc.VReg{x0VReg, v0VReg, x1VReg, v1VReg, x2VReg, v2VReg, x3VReg, v3VReg, x4VReg, v4VReg, x5VReg, v5VReg, x6VReg, v6VReg, x7VReg, v7VReg},
+				RetRealRegs: []regalloc.VReg{x0VReg, v0VReg, x1VReg, v1VReg, x2VReg, v2VReg, x3VReg, v3VReg, x4VReg, v4VReg, x5VReg, v5VReg, x6VReg, v6VReg, x7VReg, v7VReg},
+				ArgRealRegs: []regalloc.VReg{x0VReg, v0VReg, x1VReg, v1VReg, x2VReg, v2VReg, x3VReg, v3VReg, x4VReg, v4VReg, x5VReg, v5VReg, x6VReg, v6VReg, x7VReg, v7VReg},
 			},
 		},
 		{
@@ -179,8 +178,8 @@ func TestAbiImpl_init(t *testing.T) {
 					ssa.TypeI64, ssa.TypeF64,
 				},
 			},
-			exp: abiImpl{
-				args: []backend.ABIArg{
+			exp: backend.FunctionABI{
+				Args: []backend.ABIArg{
 					{Index: 0, Kind: backend.ABIArgKindReg, Reg: x0VReg, Type: ssa.TypeI32},
 					{Index: 1, Kind: backend.ABIArgKindReg, Reg: v0VReg, Type: ssa.TypeF32},
 					{Index: 2, Kind: backend.ABIArgKindReg, Reg: x1VReg, Type: ssa.TypeI64},
@@ -198,7 +197,7 @@ func TestAbiImpl_init(t *testing.T) {
 					{Index: 14, Kind: backend.ABIArgKindReg, Reg: x7VReg, Type: ssa.TypeI64},
 					{Index: 15, Kind: backend.ABIArgKindReg, Reg: v7VReg, Type: ssa.TypeF64},
 				},
-				rets: []backend.ABIArg{
+				Rets: []backend.ABIArg{
 					{Index: 0, Kind: backend.ABIArgKindReg, Reg: x0VReg, Type: ssa.TypeI32},
 					{Index: 1, Kind: backend.ABIArgKindReg, Reg: v0VReg, Type: ssa.TypeF32},
 					{Index: 2, Kind: backend.ABIArgKindReg, Reg: x1VReg, Type: ssa.TypeI64},
@@ -216,21 +215,21 @@ func TestAbiImpl_init(t *testing.T) {
 					{Index: 14, Kind: backend.ABIArgKindReg, Reg: x7VReg, Type: ssa.TypeI64},
 					{Index: 15, Kind: backend.ABIArgKindReg, Reg: v7VReg, Type: ssa.TypeF64},
 				},
-				retRealRegs: []regalloc.VReg{x0VReg, v0VReg, x1VReg, v1VReg, x2VReg, v2VReg, x3VReg, v3VReg, x4VReg, v4VReg, x5VReg, v5VReg, x6VReg, v6VReg, x7VReg, v7VReg},
-				argRealRegs: []regalloc.VReg{x0VReg, v0VReg, x1VReg, v1VReg, x2VReg, v2VReg, x3VReg, v3VReg, x4VReg, v4VReg, x5VReg, v5VReg, x6VReg, v6VReg, x7VReg, v7VReg},
+				RetRealRegs: []regalloc.VReg{x0VReg, v0VReg, x1VReg, v1VReg, x2VReg, v2VReg, x3VReg, v3VReg, x4VReg, v4VReg, x5VReg, v5VReg, x6VReg, v6VReg, x7VReg, v7VReg},
+				ArgRealRegs: []regalloc.VReg{x0VReg, v0VReg, x1VReg, v1VReg, x2VReg, v2VReg, x3VReg, v3VReg, x4VReg, v4VReg, x5VReg, v5VReg, x6VReg, v6VReg, x7VReg, v7VReg},
 			},
 		},
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			abi := abiImpl{}
-			abi.init(tc.sig)
-			require.Equal(t, tc.exp.args, abi.args)
-			require.Equal(t, tc.exp.rets, abi.rets)
-			require.Equal(t, tc.exp.argStackSize, abi.argStackSize)
-			require.Equal(t, tc.exp.retStackSize, abi.retStackSize)
-			require.Equal(t, tc.exp.retRealRegs, abi.retRealRegs)
-			require.Equal(t, tc.exp.argRealRegs, abi.argRealRegs)
+			abi := backend.FunctionABI{}
+			abi.Init(tc.sig, intParamResultRegs, floatParamResultRegs)
+			require.Equal(t, tc.exp.Args, abi.Args)
+			require.Equal(t, tc.exp.Rets, abi.Rets)
+			require.Equal(t, tc.exp.ArgStackSize, abi.ArgStackSize)
+			require.Equal(t, tc.exp.RetStackSize, abi.RetStackSize)
+			require.Equal(t, tc.exp.RetRealRegs, abi.RetRealRegs)
+			require.Equal(t, tc.exp.ArgRealRegs, abi.ArgRealRegs)
 		})
 	}
 }
@@ -265,9 +264,10 @@ func TestAbiImpl_callerGenVRegToFunctionArg_constant_inlining(t *testing.T) {
 
 	i64 := builder.AllocateInstruction().AsIconst64(10).Insert(builder)
 	f64 := builder.AllocateInstruction().AsF64const(3.14).Insert(builder)
-	abi := m.getOrCreateABIImpl(&ssa.Signature{Params: []ssa.Type{ssa.TypeI64, ssa.TypeF64}})
-	abi.callerGenVRegToFunctionArg(0, regalloc.VReg(100).SetRegType(regalloc.RegTypeInt), &backend.SSAValueDefinition{Instr: i64, RefCount: 1}, 0)
-	abi.callerGenVRegToFunctionArg(1, regalloc.VReg(50).SetRegType(regalloc.RegTypeFloat), &backend.SSAValueDefinition{Instr: f64, RefCount: 1}, 0)
+	abi := &backend.FunctionABI{}
+	abi.Init(&ssa.Signature{Params: []ssa.Type{ssa.TypeI64, ssa.TypeF64}}, intParamResultRegs, floatParamResultRegs)
+	m.callerGenVRegToFunctionArg(abi, 0, regalloc.VReg(100).SetRegType(regalloc.RegTypeInt), &backend.SSAValueDefinition{Instr: i64, RefCount: 1}, 0)
+	m.callerGenVRegToFunctionArg(abi, 1, regalloc.VReg(50).SetRegType(regalloc.RegTypeFloat), &backend.SSAValueDefinition{Instr: f64, RefCount: 1}, 0)
 	require.Equal(t, `movz x100?, #0xa, lsl 0
 mov x0, x100?
 ldr d50?, #8; b 16; data.f64 3.140000

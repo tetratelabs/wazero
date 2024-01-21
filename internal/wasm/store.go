@@ -138,9 +138,16 @@ type (
 	GlobalInstance struct {
 		Type GlobalType
 		// Val holds a 64-bit representation of the actual value.
+		// If me is non-nil, the value will not be updated and the current value is stored in the module engine.
 		Val uint64
 		// ValHi is only used for vector type globals, and holds the higher bits of the vector.
+		// If me is non-nil, the value will not be updated and the current value is stored in the module engine.
 		ValHi uint64
+		// Me is the module engine that owns this global instance.
+		// The .Val and .ValHi fields are only valid when me is nil.
+		// If me is non-nil, the value is stored in the module engine.
+		Me    ModuleEngine
+		Index Index
 	}
 
 	// FunctionTypeID is a uniquely assigned integer for a function type.
@@ -570,6 +577,13 @@ func (g *GlobalInstance) String() string {
 	default:
 		panic(fmt.Errorf("BUG: unknown value type %X", g.Type.ValType))
 	}
+}
+
+func (g *GlobalInstance) Value() (uint64, uint64) {
+	if g.Me != nil {
+		return g.Me.GetGlobalValue(g.Index)
+	}
+	return g.Val, g.ValHi
 }
 
 func (s *Store) GetFunctionTypeIDs(ts []FunctionType) ([]FunctionTypeID, error) {

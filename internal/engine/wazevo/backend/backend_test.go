@@ -67,14 +67,17 @@ L1 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
 	subs xzr, x4, x5
-	csel w0, w2, w3, eq
+	csel w8, w2, w3, eq
 	subs wzr, w3, wzr
-	csel x1, x4, x5, ne
+	csel x9, x4, x5, ne
 	fcmp d2, d3
 	fcsel s8, s0, s1, gt
 	fcmp s0, s1
-	fcsel d1, d2, d3, ne
+	fcsel d9, d2, d3, ne
+	mov v1.8b, v9.8b
 	mov v0.8b, v8.8b
+	mov x1, x9
+	mov x0, x8
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
 	ret
@@ -84,24 +87,28 @@ L1 (SSA Block: blk0):
 			name: "consts", m: testcases.Constants.Module,
 			afterLoweringARM64: `
 L1 (SSA Block: blk0):
-	ldr d5?, #8; b 16; data.f64 64.000000
-	mov v1.8b, v5?.8b
-	ldr s4?, #8; b 8; data.f32 32.000000
-	mov v0.8b, v4?.8b
-	orr x3?, xzr, #0x2
-	mov x1, x3?
-	orr w2?, wzr, #0x1
-	mov x0, x2?
+	ldr d133?, #8; b 16; data.f64 64.000000
+	mov v1.8b, v133?.8b
+	ldr s132?, #8; b 8; data.f32 32.000000
+	mov v0.8b, v132?.8b
+	orr x131?, xzr, #0x2
+	mov x1, x131?
+	orr w130?, wzr, #0x1
+	mov x0, x130?
 	ret
 `,
 			afterFinalizeARM64: `
 L1 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
-	ldr d1, #8; b 16; data.f64 64.000000
-	ldr s0, #8; b 8; data.f32 32.000000
-	orr x1, xzr, #0x2
-	orr w0, wzr, #0x1
+	ldr d8, #8; b 16; data.f64 64.000000
+	mov v1.8b, v8.8b
+	ldr s8, #8; b 8; data.f32 32.000000
+	mov v0.8b, v8.8b
+	orr x8, xzr, #0x2
+	mov x1, x8
+	orr w8, wzr, #0x1
+	mov x0, x8
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
 	ret
@@ -111,11 +118,11 @@ L1 (SSA Block: blk0):
 			name: "add sub params return", m: testcases.AddSubParamsReturn.Module,
 			afterLoweringARM64: `
 L1 (SSA Block: blk0):
-	mov x2?, x2
-	mov x3?, x3
-	add w4?, w2?, w3?
-	sub w5?, w4?, w2?
-	mov x0, x5?
+	mov x130?, x2
+	mov x131?, x3
+	add w132?, w130?, w131?
+	sub w133?, w132?, w130?
+	mov x0, x133?
 	ret
 `,
 			afterFinalizeARM64: `
@@ -123,7 +130,8 @@ L1 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
 	add w8, w2, w3
-	sub w0, w8, w2
+	sub w8, w8, w2
+	mov x0, x8
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
 	ret
@@ -133,26 +141,26 @@ L1 (SSA Block: blk0):
 			name: "locals params", m: testcases.LocalsParams.Module,
 			afterLoweringARM64: `
 L1 (SSA Block: blk0):
-	mov x2?, x2
-	mov v3?.8b, v0.8b
-	mov v4?.8b, v1.8b
-	add x5?, x2?, x2?
-	sub x6?, x5?, x2?
-	fadd s7?, s3?, s3?
-	fsub s8?, s7?, s3?
-	fmul s9?, s8?, s3?
-	fdiv s10?, s9?, s3?
-	fmax s11?, s10?, s3?
-	fmin s12?, s11?, s3?
-	fadd d13?, d4?, d4?
-	fsub d14?, d13?, d4?
-	fmul d15?, d14?, d4?
-	fdiv d16?, d15?, d4?
-	fmax d17?, d16?, d4?
-	fmin d18?, d17?, d4?
-	mov v1.8b, v18?.8b
-	mov v0.8b, v12?.8b
-	mov x0, x6?
+	mov x130?, x2
+	mov v131?.8b, v0.8b
+	mov v132?.8b, v1.8b
+	add x133?, x130?, x130?
+	sub x134?, x133?, x130?
+	fadd s135?, s131?, s131?
+	fsub s136?, s135?, s131?
+	fmul s137?, s136?, s131?
+	fdiv s138?, s137?, s131?
+	fmax s139?, s138?, s131?
+	fmin s140?, s139?, s131?
+	fadd d141?, d132?, d132?
+	fsub d142?, d141?, d132?
+	fmul d143?, d142?, d132?
+	fdiv d144?, d143?, d132?
+	fmax d145?, d144?, d132?
+	fmin d146?, d145?, d132?
+	mov v1.8b, v146?.8b
+	mov v0.8b, v140?.8b
+	mov x0, x134?
 	ret
 `,
 			afterFinalizeARM64: `
@@ -160,19 +168,22 @@ L1 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
 	add x8, x2, x2
-	sub x0, x8, x2
+	sub x8, x8, x2
 	fadd s8, s0, s0
 	fsub s8, s8, s0
 	fmul s8, s8, s0
 	fdiv s8, s8, s0
 	fmax s8, s8, s0
-	fmin s0, s8, s0
-	fadd d8, d1, d1
-	fsub d8, d8, d1
-	fmul d8, d8, d1
-	fdiv d8, d8, d1
-	fmax d8, d8, d1
-	fmin d1, d8, d1
+	fmin s8, s8, s0
+	fadd d9, d1, d1
+	fsub d9, d9, d1
+	fmul d9, d9, d1
+	fdiv d9, d9, d1
+	fmax d9, d9, d1
+	fmin d9, d9, d1
+	mov v1.8b, v9.8b
+	mov v0.8b, v8.8b
+	mov x0, x8
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
 	ret
@@ -182,17 +193,18 @@ L1 (SSA Block: blk0):
 			name: "local_param_return", m: testcases.LocalParamReturn.Module,
 			afterLoweringARM64: `
 L1 (SSA Block: blk0):
-	mov x2?, x2
-	mov x3?, xzr
-	mov x1, x3?
-	mov x0, x2?
+	mov x130?, x2
+	mov x131?, xzr
+	mov x1, x131?
+	mov x0, x130?
 	ret
 `,
 			afterFinalizeARM64: `
 L1 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
-	mov x1, xzr
+	mov x8, xzr
+	mov x1, x8
 	mov x0, x2
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
@@ -203,10 +215,10 @@ L1 (SSA Block: blk0):
 			name: "swap_param_and_return", m: testcases.SwapParamAndReturn.Module,
 			afterLoweringARM64: `
 L1 (SSA Block: blk0):
-	mov x2?, x2
-	mov x3?, x3
-	mov x1, x2?
-	mov x0, x3?
+	mov x130?, x2
+	mov x131?, x3
+	mov x1, x130?
+	mov x0, x131?
 	ret
 `,
 			afterFinalizeARM64: `
@@ -224,11 +236,11 @@ L1 (SSA Block: blk0):
 			name: "swap_params_and_return", m: testcases.SwapParamsAndReturn.Module,
 			afterLoweringARM64: `
 L1 (SSA Block: blk0):
-	mov x2?, x2
-	mov x3?, x3
+	mov x130?, x2
+	mov x131?, x3
 L2 (SSA Block: blk1):
-	mov x1, x2?
-	mov x0, x3?
+	mov x1, x130?
+	mov x0, x131?
 	ret
 `,
 			afterFinalizeARM64: `
@@ -264,31 +276,27 @@ L2 (SSA Block: blk1):
 			name: "block_br_if", m: testcases.BlockBrIf.Module,
 			afterLoweringARM64: `
 L1 (SSA Block: blk0):
-	mov x0?, x0
-	mov x3?, xzr
-	cbz w3?, (L2)
-L3 (SSA Block: blk1):
+	mov x128?, x0
+	mov x131?, xzr
+	cbnz w131?, L2
+L3 (SSA Block: blk2):
+	movz x132?, #0x3, lsl 0
+	str w132?, [x128?]
+	mov x133?, sp
+	str x133?, [x128?, #0x38]
+	adr x134?, #0x0
+	str x134?, [x128?, #0x30]
+	exit_sequence x128?
+L2 (SSA Block: blk1):
 	ret
-L2 (SSA Block: blk2):
-	movz x4?, #0x3, lsl 0
-	str w4?, [x0?]
-	mov x5?, sp
-	str x5?, [x0?, #0x38]
-	adr x6?, #0x0
-	str x6?, [x0?, #0x30]
-	exit_sequence x0?
 `,
 			afterFinalizeARM64: `
 L1 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
 	mov x8, xzr
-	cbz w8, #0x10 L2
-L3 (SSA Block: blk1):
-	add sp, sp, #0x10
-	ldr x30, [sp], #0x10
-	ret
-L2 (SSA Block: blk2):
+	cbnz w8, #0x34 (L2)
+L3 (SSA Block: blk2):
 	movz x8, #0x3, lsl 0
 	str w8, [x0]
 	mov x8, sp
@@ -296,6 +304,10 @@ L2 (SSA Block: blk2):
 	adr x8, #0x0
 	str x8, [x0, #0x30]
 	exit_sequence x0
+L2 (SSA Block: blk1):
+	add sp, sp, #0x10
+	ldr x30, [sp], #0x10
+	ret
 `,
 		},
 		{
@@ -317,15 +329,15 @@ L2 (SSA Block: blk1):
 			name: "loop_with_param_results", m: testcases.LoopBrWithParamResults.Module,
 			afterLoweringARM64: `
 L1 (SSA Block: blk0):
-	mov x2?, x2
+	mov x130?, x2
 L2 (SSA Block: blk1):
-	orr w5?, wzr, #0x1
-	cbz w5?, (L3)
+	orr w133?, wzr, #0x1
+	cbz w133?, (L3)
 L4 (SSA Block: blk4):
 	b L2
 L3 (SSA Block: blk3):
 L5 (SSA Block: blk2):
-	mov x0, x2?
+	mov x0, x130?
 	ret
 `,
 			afterFinalizeARM64: `
@@ -350,8 +362,8 @@ L5 (SSA Block: blk2):
 			afterLoweringARM64: `
 L1 (SSA Block: blk0):
 L2 (SSA Block: blk1):
-	orr w3?, wzr, #0x1
-	cbz w3?, (L3)
+	orr w131?, wzr, #0x1
+	cbz w131?, (L3)
 L4 (SSA Block: blk4):
 	b L2
 L3 (SSA Block: blk3):
@@ -396,11 +408,11 @@ L2 (SSA Block: blk1):
 			// Instead, we can do it during the code generation phase where we actually resolve the label offsets.
 			afterLoweringARM64: `
 L1 (SSA Block: blk0):
-	mov x3?, xzr
-	cbnz w3?, L2
-L3 (SSA Block: blk2):
+	mov x131?, xzr
+	cbz w131?, (L2)
+L3 (SSA Block: blk1):
 	b L4
-L2 (SSA Block: blk1):
+L2 (SSA Block: blk2):
 L4 (SSA Block: blk3):
 	ret
 `,
@@ -409,10 +421,10 @@ L1 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
 	mov x8, xzr
-	cbnz w8, #0x8 (L2)
-L3 (SSA Block: blk2):
+	cbz w8, #0x8 L2
+L3 (SSA Block: blk1):
 	b #0x4 (L4)
-L2 (SSA Block: blk1):
+L2 (SSA Block: blk2):
 L4 (SSA Block: blk3):
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
@@ -423,12 +435,12 @@ L4 (SSA Block: blk3):
 			name: "if_else", m: testcases.IfElse.Module,
 			afterLoweringARM64: `
 L1 (SSA Block: blk0):
-	mov x3?, xzr
-	cbnz w3?, L2
-L3 (SSA Block: blk2):
-	ret
-L2 (SSA Block: blk1):
+	mov x131?, xzr
+	cbz w131?, (L2)
+L3 (SSA Block: blk1):
 L4 (SSA Block: blk3):
+	ret
+L2 (SSA Block: blk2):
 	ret
 `,
 			afterFinalizeARM64: `
@@ -436,13 +448,13 @@ L1 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
 	mov x8, xzr
-	cbnz w8, #0x10 (L2)
-L3 (SSA Block: blk2):
+	cbz w8, #0x10 L2
+L3 (SSA Block: blk1):
+L4 (SSA Block: blk3):
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
 	ret
-L2 (SSA Block: blk1):
-L4 (SSA Block: blk3):
+L2 (SSA Block: blk2):
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
 	ret
@@ -452,16 +464,16 @@ L4 (SSA Block: blk3):
 			name: "single_predecessor_local_refs", m: testcases.SinglePredecessorLocalRefs.Module,
 			afterLoweringARM64: `
 L1 (SSA Block: blk0):
-	mov x4?, xzr
-	cbnz w4?, L2
-L3 (SSA Block: blk2):
-L4 (SSA Block: blk3):
-	mov x2?, xzr
-	mov x0, x2?
+	mov x132?, xzr
+	cbz w132?, (L2)
+L3 (SSA Block: blk1):
+	mov x131?, xzr
+	mov x0, x131?
 	ret
-L2 (SSA Block: blk1):
-	mov x3?, xzr
-	mov x0, x3?
+L2 (SSA Block: blk2):
+L4 (SSA Block: blk3):
+	mov x130?, xzr
+	mov x0, x130?
 	ret
 `,
 			afterFinalizeARM64: `
@@ -469,15 +481,17 @@ L1 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
 	mov x8, xzr
-	cbnz w8, #0x14 (L2)
-L3 (SSA Block: blk2):
-L4 (SSA Block: blk3):
-	mov x0, xzr
+	cbz w8, #0x18 L2
+L3 (SSA Block: blk1):
+	mov x8, xzr
+	mov x0, x8
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
 	ret
-L2 (SSA Block: blk1):
-	mov x0, xzr
+L2 (SSA Block: blk2):
+L4 (SSA Block: blk3):
+	mov x8, xzr
+	mov x0, x8
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
 	ret
@@ -487,29 +501,29 @@ L2 (SSA Block: blk1):
 			name: "multi_predecessor_local_ref", m: testcases.MultiPredecessorLocalRef.Module,
 			afterLoweringARM64: `
 L1 (SSA Block: blk0):
-	mov x2?, x2
-	mov x3?, x3
-	cbnz w2?, L2
-L3 (SSA Block: blk2):
-	mov x4?, x3?
+	mov x130?, x2
+	mov x131?, x3
+	cbz w130?, (L2)
+L3 (SSA Block: blk1):
+	mov x132?, x130?
 	b L4
-L2 (SSA Block: blk1):
-	mov x4?, x2?
+L2 (SSA Block: blk2):
+	mov x132?, x131?
 L4 (SSA Block: blk3):
-	mov x0, x4?
+	mov x0, x132?
 	ret
 `,
 			afterFinalizeARM64: `
 L1 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
-	cbnz w2, #0xc (L2)
-L3 (SSA Block: blk2):
-	mov x0, x3
+	cbz w2, #0x8 L2
+L3 (SSA Block: blk1):
 	b #0x8 (L4)
-L2 (SSA Block: blk1):
-	mov x0, x2
+L2 (SSA Block: blk2):
+	mov x2, x3
 L4 (SSA Block: blk3):
+	mov x0, x2
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
 	ret
@@ -519,9 +533,9 @@ L4 (SSA Block: blk3):
 			name: "reference_value_from_unsealed_block", m: testcases.ReferenceValueFromUnsealedBlock.Module,
 			afterLoweringARM64: `
 L1 (SSA Block: blk0):
-	mov x2?, x2
+	mov x130?, x2
 L2 (SSA Block: blk1):
-	mov x0, x2?
+	mov x0, x130?
 	ret
 `,
 			afterFinalizeARM64: `
@@ -539,16 +553,16 @@ L2 (SSA Block: blk1):
 			name: "reference_value_from_unsealed_block2", m: testcases.ReferenceValueFromUnsealedBlock2.Module,
 			afterLoweringARM64: `
 L1 (SSA Block: blk0):
-	mov x2?, x2
+	mov x130?, x2
 L2 (SSA Block: blk1):
-	cbz w2?, (L3)
+	cbz w130?, (L3)
 L4 (SSA Block: blk5):
 	b L2
 L3 (SSA Block: blk4):
 L5 (SSA Block: blk3):
 L6 (SSA Block: blk2):
-	mov x3?, xzr
-	mov x0, x3?
+	mov x131?, xzr
+	mov x0, x131?
 	ret
 `,
 			afterFinalizeARM64: `
@@ -562,7 +576,8 @@ L4 (SSA Block: blk5):
 L3 (SSA Block: blk4):
 L5 (SSA Block: blk3):
 L6 (SSA Block: blk2):
-	mov x0, xzr
+	mov x8, xzr
+	mov x0, x8
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
 	ret
@@ -573,25 +588,24 @@ L6 (SSA Block: blk2):
 			// TODO: we should be able to invert cbnz in so that L2 can end with fallthrough. investigate builder.LayoutBlocks function.
 			afterLoweringARM64: `
 L1 (SSA Block: blk0):
-	mov x2?, x2
-	mov x3?, x2?
+	mov x130?, x2
+	mov x131?, x130?
 L2 (SSA Block: blk1):
-	cbnz w3?, L4
+	cbnz w131?, L4
 	b L3
 L4 (SSA Block: blk5):
 	ret
 L3 (SSA Block: blk4):
 L5 (SSA Block: blk3):
-	orr w3?, wzr, #0x1
+	orr w131?, wzr, #0x1
 	b L2
 `,
 			afterFinalizeARM64: `
 L1 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
-	mov x8, x2
 L2 (SSA Block: blk1):
-	cbnz w8, #0x8 (L4)
+	cbnz w2, #0x8 (L4)
 	b #0x10 (L3)
 L4 (SSA Block: blk5):
 	add sp, sp, #0x10
@@ -600,72 +614,72 @@ L4 (SSA Block: blk5):
 L3 (SSA Block: blk4):
 L5 (SSA Block: blk3):
 	orr w8, wzr, #0x1
-	b #-0x18 (L2)
+	mov x2, x8
+	b #-0x1c (L2)
 `,
 		},
 		{
 			name: "call", m: testcases.Call.Module,
 			afterLoweringARM64: `
 L1 (SSA Block: blk0):
-	mov x0?, x0
-	mov x1?, x1
-	str x1?, [x0?, #0x8]
-	mov x0, x0?
-	mov x1, x1?
+	mov x128?, x0
+	mov x129?, x1
+	str x129?, [x128?, #0x8]
+	mov x0, x128?
+	mov x1, x129?
 	bl f1
-	mov x2?, x0
-	str x1?, [x0?, #0x8]
-	mov x0, x0?
-	mov x1, x1?
-	mov x2, x2?
-	movz w3?, #0x5, lsl 0
-	mov x3, x3?
+	mov x130?, x0
+	str x129?, [x128?, #0x8]
+	mov x0, x128?
+	mov x1, x129?
+	mov x2, x130?
+	movz w131?, #0x5, lsl 0
+	mov x3, x131?
 	bl f2
-	mov x4?, x0
-	str x1?, [x0?, #0x8]
-	mov x0, x0?
-	mov x1, x1?
-	mov x2, x4?
+	mov x132?, x0
+	str x129?, [x128?, #0x8]
+	mov x0, x128?
+	mov x1, x129?
+	mov x2, x132?
 	bl f3
-	mov x5?, x0
-	mov x6?, x1
-	mov x1, x6?
-	mov x0, x5?
+	mov x133?, x0
+	mov x134?, x1
+	mov x1, x134?
+	mov x0, x133?
 	ret
 `,
 			afterFinalizeARM64: `
 L1 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
-	sub sp, sp, #0x10
-	orr x27, xzr, #0x10
+	sub sp, sp, #0x20
+	orr x27, xzr, #0x20
 	str x27, [sp, #-0x10]!
-	mov x9, x0
-	mov x8, x1
-	str x8, [x9, #0x8]
-	mov x0, x9
-	mov x1, x8
-	str x9, [sp, #0x10]
-	str x8, [sp, #0x18]
+	str x0, [sp, #0x18]
+	str x1, [sp, #0x10]
+	str x1, [x0, #0x8]
 	bl f1
-	ldr x8, [sp, #0x18]
-	ldr x9, [sp, #0x10]
-	mov x2, x0
+	str w0, [sp, #0x20]
+	ldr x8, [sp, #0x10]
+	ldr x9, [sp, #0x18]
 	str x8, [x9, #0x8]
 	mov x0, x9
 	mov x1, x8
-	movz w3, #0x5, lsl 0
-	str x9, [sp, #0x10]
-	str x8, [sp, #0x18]
+	ldr w10, [sp, #0x20]
+	mov x2, x10
+	movz w10, #0x5, lsl 0
+	mov x3, x10
 	bl f2
-	ldr x8, [sp, #0x18]
-	ldr x9, [sp, #0x10]
-	mov x2, x0
+	str w0, [sp, #0x24]
+	ldr x8, [sp, #0x10]
+	ldr x9, [sp, #0x18]
 	str x8, [x9, #0x8]
 	mov x0, x9
 	mov x1, x8
+	ldr w8, [sp, #0x24]
+	mov x2, x8
 	bl f3
 	add sp, sp, #0x10
-	add sp, sp, #0x10
+	add sp, sp, #0x20
 	ldr x30, [sp], #0x10
 	ret
 `,
@@ -674,74 +688,76 @@ L1 (SSA Block: blk0):
 			name: "call_many_params", m: testcases.CallManyParams.Module,
 			afterLoweringARM64: `
 L1 (SSA Block: blk0):
-	mov x0?, x0
-	mov x1?, x1
-	mov x2?, x2
-	mov x3?, x3
-	mov v4?.8b, v0.8b
-	mov v5?.8b, v1.8b
-	str x1?, [x0?, #0x8]
-	mov x0, x0?
-	mov x1, x1?
-	mov x2, x2?
-	mov x3, x3?
-	mov v0.8b, v4?.8b
-	mov v1.8b, v5?.8b
-	mov x4, x2?
-	mov x5, x3?
-	mov v2.8b, v4?.8b
-	mov v3.8b, v5?.8b
-	mov x6, x2?
-	mov x7, x3?
-	mov v4.8b, v4?.8b
-	mov v5.8b, v5?.8b
-	str w2?, [sp, #-0xd0]
-	str x3?, [sp, #-0xc8]
-	mov v6.8b, v4?.8b
-	mov v7.8b, v5?.8b
-	str w2?, [sp, #-0xc0]
-	str x3?, [sp, #-0xb8]
-	str s4?, [sp, #-0xb0]
-	str d5?, [sp, #-0xa8]
-	str w2?, [sp, #-0xa0]
-	str x3?, [sp, #-0x98]
-	str s4?, [sp, #-0x90]
-	str d5?, [sp, #-0x88]
-	str w2?, [sp, #-0x80]
-	str x3?, [sp, #-0x78]
-	str s4?, [sp, #-0x70]
-	str d5?, [sp, #-0x68]
-	str w2?, [sp, #-0x60]
-	str x3?, [sp, #-0x58]
-	str s4?, [sp, #-0x50]
-	str d5?, [sp, #-0x48]
-	str w2?, [sp, #-0x40]
-	str x3?, [sp, #-0x38]
-	str s4?, [sp, #-0x30]
-	str d5?, [sp, #-0x28]
-	str w2?, [sp, #-0x20]
-	str x3?, [sp, #-0x18]
-	str s4?, [sp, #-0x10]
-	str d5?, [sp, #-0x8]
+	mov x128?, x0
+	mov x129?, x1
+	mov x130?, x2
+	mov x131?, x3
+	mov v132?.8b, v0.8b
+	mov v133?.8b, v1.8b
+	str x129?, [x128?, #0x8]
+	mov x0, x128?
+	mov x1, x129?
+	mov x2, x130?
+	mov x3, x131?
+	mov v0.8b, v132?.8b
+	mov v1.8b, v133?.8b
+	mov x4, x130?
+	mov x5, x131?
+	mov v2.8b, v132?.8b
+	mov v3.8b, v133?.8b
+	mov x6, x130?
+	mov x7, x131?
+	mov v4.8b, v132?.8b
+	mov v5.8b, v133?.8b
+	str w130?, [sp, #-0xd0]
+	str x131?, [sp, #-0xc8]
+	mov v6.8b, v132?.8b
+	mov v7.8b, v133?.8b
+	str w130?, [sp, #-0xc0]
+	str x131?, [sp, #-0xb8]
+	str s132?, [sp, #-0xb0]
+	str d133?, [sp, #-0xa8]
+	str w130?, [sp, #-0xa0]
+	str x131?, [sp, #-0x98]
+	str s132?, [sp, #-0x90]
+	str d133?, [sp, #-0x88]
+	str w130?, [sp, #-0x80]
+	str x131?, [sp, #-0x78]
+	str s132?, [sp, #-0x70]
+	str d133?, [sp, #-0x68]
+	str w130?, [sp, #-0x60]
+	str x131?, [sp, #-0x58]
+	str s132?, [sp, #-0x50]
+	str d133?, [sp, #-0x48]
+	str w130?, [sp, #-0x40]
+	str x131?, [sp, #-0x38]
+	str s132?, [sp, #-0x30]
+	str d133?, [sp, #-0x28]
+	str w130?, [sp, #-0x20]
+	str x131?, [sp, #-0x18]
+	str s132?, [sp, #-0x10]
+	str d133?, [sp, #-0x8]
 	bl f1
 	ret
 `,
 			afterFinalizeARM64: `
 L1 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
-	str xzr, [sp, #-0x10]!
-	mov x8, x2
-	mov x9, x3
-	mov v8.8b, v0.8b
-	mov v9.8b, v1.8b
+	sub sp, sp, #0x20
+	orr x27, xzr, #0x20
+	str x27, [sp, #-0x10]!
+	str w2, [sp, #0x10]
+	str x3, [sp, #0x14]
+	str s0, [sp, #0x1c]
+	str d1, [sp, #0x20]
 	str x1, [x0, #0x8]
-	mov x2, x8
-	mov x3, x9
-	mov v0.8b, v8.8b
-	mov v1.8b, v9.8b
+	ldr w8, [sp, #0x10]
 	mov x4, x8
+	ldr x9, [sp, #0x14]
 	mov x5, x9
+	ldr s8, [sp, #0x1c]
 	mov v2.8b, v8.8b
+	ldr d9, [sp, #0x20]
 	mov v3.8b, v9.8b
 	mov x6, x8
 	mov x7, x9
@@ -777,6 +793,7 @@ L1 (SSA Block: blk0):
 	str d9, [sp, #-0x8]
 	bl f1
 	add sp, sp, #0x10
+	add sp, sp, #0x20
 	ldr x30, [sp], #0x10
 	ret
 `,
@@ -785,100 +802,100 @@ L1 (SSA Block: blk0):
 			name: "call_many_returns", m: testcases.CallManyReturns.Module,
 			afterLoweringARM64: `
 L1 (SSA Block: blk0):
-	mov x0?, x0
-	mov x1?, x1
-	mov x2?, x2
-	mov x3?, x3
-	mov v4?.8b, v0.8b
-	mov v5?.8b, v1.8b
-	str x1?, [x0?, #0x8]
-	mov x0, x0?
-	mov x1, x1?
-	mov x2, x2?
-	mov x3, x3?
-	mov v0.8b, v4?.8b
-	mov v1.8b, v5?.8b
+	mov x128?, x0
+	mov x129?, x1
+	mov x130?, x2
+	mov x131?, x3
+	mov v132?.8b, v0.8b
+	mov v133?.8b, v1.8b
+	str x129?, [x128?, #0x8]
+	mov x0, x128?
+	mov x1, x129?
+	mov x2, x130?
+	mov x3, x131?
+	mov v0.8b, v132?.8b
+	mov v1.8b, v133?.8b
 	bl f1
-	mov x6?, x0
-	mov x7?, x1
-	mov v8?.8b, v0.8b
-	mov v9?.8b, v1.8b
-	mov x10?, x2
-	mov x11?, x3
-	mov v12?.8b, v2.8b
-	mov v13?.8b, v3.8b
-	mov x14?, x4
-	mov x15?, x5
-	mov v16?.8b, v4.8b
-	mov v17?.8b, v5.8b
-	mov x18?, x6
-	mov x19?, x7
-	mov v20?.8b, v6.8b
-	mov v21?.8b, v7.8b
-	ldr w22?, [sp, #-0xc0]
-	ldr x23?, [sp, #-0xb8]
-	ldr s24?, [sp, #-0xb0]
-	ldr d25?, [sp, #-0xa8]
-	ldr w26?, [sp, #-0xa0]
-	ldr x27?, [sp, #-0x98]
-	ldr s28?, [sp, #-0x90]
-	ldr d29?, [sp, #-0x88]
-	ldr w30?, [sp, #-0x80]
-	ldr x31?, [sp, #-0x78]
-	ldr s32?, [sp, #-0x70]
-	ldr d33?, [sp, #-0x68]
-	ldr w34?, [sp, #-0x60]
-	ldr x35?, [sp, #-0x58]
-	ldr s36?, [sp, #-0x50]
-	ldr d37?, [sp, #-0x48]
-	ldr w38?, [sp, #-0x40]
-	ldr x39?, [sp, #-0x38]
-	ldr s40?, [sp, #-0x30]
-	ldr d41?, [sp, #-0x28]
-	ldr w42?, [sp, #-0x20]
-	ldr x43?, [sp, #-0x18]
-	ldr s44?, [sp, #-0x10]
-	ldr d45?, [sp, #-0x8]
-	str d45?, [#ret_space, #0xb8]
-	str s44?, [#ret_space, #0xb0]
-	str x43?, [#ret_space, #0xa8]
-	str w42?, [#ret_space, #0xa0]
-	str d41?, [#ret_space, #0x98]
-	str s40?, [#ret_space, #0x90]
-	str x39?, [#ret_space, #0x88]
-	str w38?, [#ret_space, #0x80]
-	str d37?, [#ret_space, #0x78]
-	str s36?, [#ret_space, #0x70]
-	str x35?, [#ret_space, #0x68]
-	str w34?, [#ret_space, #0x60]
-	str d33?, [#ret_space, #0x58]
-	str s32?, [#ret_space, #0x50]
-	str x31?, [#ret_space, #0x48]
-	str w30?, [#ret_space, #0x40]
-	str d29?, [#ret_space, #0x38]
-	str s28?, [#ret_space, #0x30]
-	str x27?, [#ret_space, #0x28]
-	str w26?, [#ret_space, #0x20]
-	str d25?, [#ret_space, #0x18]
-	str s24?, [#ret_space, #0x10]
-	str x23?, [#ret_space, #0x8]
-	str w22?, [#ret_space, #0x0]
-	mov v7.8b, v21?.8b
-	mov v6.8b, v20?.8b
-	mov x7, x19?
-	mov x6, x18?
-	mov v5.8b, v17?.8b
-	mov v4.8b, v16?.8b
-	mov x5, x15?
-	mov x4, x14?
-	mov v3.8b, v13?.8b
-	mov v2.8b, v12?.8b
-	mov x3, x11?
-	mov x2, x10?
-	mov v1.8b, v9?.8b
-	mov v0.8b, v8?.8b
-	mov x1, x7?
-	mov x0, x6?
+	mov x134?, x0
+	mov x135?, x1
+	mov v136?.8b, v0.8b
+	mov v137?.8b, v1.8b
+	mov x138?, x2
+	mov x139?, x3
+	mov v140?.8b, v2.8b
+	mov v141?.8b, v3.8b
+	mov x142?, x4
+	mov x143?, x5
+	mov v144?.8b, v4.8b
+	mov v145?.8b, v5.8b
+	mov x146?, x6
+	mov x147?, x7
+	mov v148?.8b, v6.8b
+	mov v149?.8b, v7.8b
+	ldr w150?, [sp, #-0xc0]
+	ldr x151?, [sp, #-0xb8]
+	ldr s152?, [sp, #-0xb0]
+	ldr d153?, [sp, #-0xa8]
+	ldr w154?, [sp, #-0xa0]
+	ldr x155?, [sp, #-0x98]
+	ldr s156?, [sp, #-0x90]
+	ldr d157?, [sp, #-0x88]
+	ldr w158?, [sp, #-0x80]
+	ldr x159?, [sp, #-0x78]
+	ldr s160?, [sp, #-0x70]
+	ldr d161?, [sp, #-0x68]
+	ldr w162?, [sp, #-0x60]
+	ldr x163?, [sp, #-0x58]
+	ldr s164?, [sp, #-0x50]
+	ldr d165?, [sp, #-0x48]
+	ldr w166?, [sp, #-0x40]
+	ldr x167?, [sp, #-0x38]
+	ldr s168?, [sp, #-0x30]
+	ldr d169?, [sp, #-0x28]
+	ldr w170?, [sp, #-0x20]
+	ldr x171?, [sp, #-0x18]
+	ldr s172?, [sp, #-0x10]
+	ldr d173?, [sp, #-0x8]
+	str d173?, [#ret_space, #0xb8]
+	str s172?, [#ret_space, #0xb0]
+	str x171?, [#ret_space, #0xa8]
+	str w170?, [#ret_space, #0xa0]
+	str d169?, [#ret_space, #0x98]
+	str s168?, [#ret_space, #0x90]
+	str x167?, [#ret_space, #0x88]
+	str w166?, [#ret_space, #0x80]
+	str d165?, [#ret_space, #0x78]
+	str s164?, [#ret_space, #0x70]
+	str x163?, [#ret_space, #0x68]
+	str w162?, [#ret_space, #0x60]
+	str d161?, [#ret_space, #0x58]
+	str s160?, [#ret_space, #0x50]
+	str x159?, [#ret_space, #0x48]
+	str w158?, [#ret_space, #0x40]
+	str d157?, [#ret_space, #0x38]
+	str s156?, [#ret_space, #0x30]
+	str x155?, [#ret_space, #0x28]
+	str w154?, [#ret_space, #0x20]
+	str d153?, [#ret_space, #0x18]
+	str s152?, [#ret_space, #0x10]
+	str x151?, [#ret_space, #0x8]
+	str w150?, [#ret_space, #0x0]
+	mov v7.8b, v149?.8b
+	mov v6.8b, v148?.8b
+	mov x7, x147?
+	mov x6, x146?
+	mov v5.8b, v145?.8b
+	mov v4.8b, v144?.8b
+	mov x5, x143?
+	mov x4, x142?
+	mov v3.8b, v141?.8b
+	mov v2.8b, v140?.8b
+	mov x3, x139?
+	mov x2, x138?
+	mov v1.8b, v137?.8b
+	mov v0.8b, v136?.8b
+	mov x1, x135?
+	mov x0, x134?
 	ret
 `,
 			afterFinalizeARM64: `
@@ -894,54 +911,54 @@ L1 (SSA Block: blk0):
 	str x27, [sp, #-0x10]!
 	str x1, [x0, #0x8]
 	bl f1
-	ldr w20, [sp, #-0xc0]
-	ldr x19, [sp, #-0xb8]
-	ldr s19, [sp, #-0xb0]
-	ldr d18, [sp, #-0xa8]
-	ldr w17, [sp, #-0xa0]
-	ldr x16, [sp, #-0x98]
-	ldr s17, [sp, #-0x90]
-	ldr d16, [sp, #-0x88]
-	ldr w15, [sp, #-0x80]
-	ldr x14, [sp, #-0x78]
-	ldr s15, [sp, #-0x70]
-	ldr d14, [sp, #-0x68]
-	ldr w13, [sp, #-0x60]
-	ldr x12, [sp, #-0x58]
-	ldr s13, [sp, #-0x50]
-	ldr d12, [sp, #-0x48]
-	ldr w11, [sp, #-0x40]
-	ldr x10, [sp, #-0x38]
-	ldr s11, [sp, #-0x30]
-	ldr d10, [sp, #-0x28]
-	ldr w9, [sp, #-0x20]
-	ldr x8, [sp, #-0x18]
-	ldr s9, [sp, #-0x10]
-	ldr d8, [sp, #-0x8]
-	str d8, [sp, #0x118]
-	str s9, [sp, #0x110]
-	str x8, [sp, #0x108]
-	str w9, [sp, #0x100]
-	str d10, [sp, #0xf8]
-	str s11, [sp, #0xf0]
-	str x10, [sp, #0xe8]
-	str w11, [sp, #0xe0]
-	str d12, [sp, #0xd8]
-	str s13, [sp, #0xd0]
-	str x12, [sp, #0xc8]
-	str w13, [sp, #0xc0]
-	str d14, [sp, #0xb8]
-	str s15, [sp, #0xb0]
-	str x14, [sp, #0xa8]
-	str w15, [sp, #0xa0]
-	str d16, [sp, #0x98]
-	str s17, [sp, #0x90]
-	str x16, [sp, #0x88]
-	str w17, [sp, #0x80]
-	str d18, [sp, #0x78]
-	str s19, [sp, #0x70]
-	str x19, [sp, #0x68]
-	str w20, [sp, #0x60]
+	ldr w8, [sp, #-0xc0]
+	ldr x9, [sp, #-0xb8]
+	ldr s8, [sp, #-0xb0]
+	ldr d9, [sp, #-0xa8]
+	ldr w10, [sp, #-0xa0]
+	ldr x11, [sp, #-0x98]
+	ldr s10, [sp, #-0x90]
+	ldr d11, [sp, #-0x88]
+	ldr w12, [sp, #-0x80]
+	ldr x13, [sp, #-0x78]
+	ldr s12, [sp, #-0x70]
+	ldr d13, [sp, #-0x68]
+	ldr w14, [sp, #-0x60]
+	ldr x15, [sp, #-0x58]
+	ldr s14, [sp, #-0x50]
+	ldr d15, [sp, #-0x48]
+	ldr w16, [sp, #-0x40]
+	ldr x17, [sp, #-0x38]
+	ldr s16, [sp, #-0x30]
+	ldr d17, [sp, #-0x28]
+	ldr w19, [sp, #-0x20]
+	ldr x20, [sp, #-0x18]
+	ldr s18, [sp, #-0x10]
+	ldr d19, [sp, #-0x8]
+	str d19, [sp, #0x118]
+	str s18, [sp, #0x110]
+	str x20, [sp, #0x108]
+	str w19, [sp, #0x100]
+	str d17, [sp, #0xf8]
+	str s16, [sp, #0xf0]
+	str x17, [sp, #0xe8]
+	str w16, [sp, #0xe0]
+	str d15, [sp, #0xd8]
+	str s14, [sp, #0xd0]
+	str x15, [sp, #0xc8]
+	str w14, [sp, #0xc0]
+	str d13, [sp, #0xb8]
+	str s12, [sp, #0xb0]
+	str x13, [sp, #0xa8]
+	str w12, [sp, #0xa0]
+	str d11, [sp, #0x98]
+	str s10, [sp, #0x90]
+	str x11, [sp, #0x88]
+	str w10, [sp, #0x80]
+	str d9, [sp, #0x78]
+	str s8, [sp, #0x70]
+	str x9, [sp, #0x68]
+	str w8, [sp, #0x60]
 	add sp, sp, #0x10
 	ldr q19, [sp], #0x10
 	ldr q18, [sp], #0x10
@@ -957,37 +974,42 @@ L1 (SSA Block: blk0):
 			m:    testcases.IntegerExtensions.Module,
 			afterLoweringARM64: `
 L1 (SSA Block: blk0):
-	mov x2?, x2
-	mov x3?, x3
-	sxtw x4?, w2?
-	uxtw x5?, w2?
-	sxtb x6?, w3?
-	sxth x7?, w3?
-	sxtw x8?, w3?
-	sxtb w9?, w2?
-	sxth w10?, w2?
-	mov x6, x10?
-	mov x5, x9?
-	mov x4, x8?
-	mov x3, x7?
-	mov x2, x6?
-	mov x1, x5?
-	mov x0, x4?
+	mov x130?, x2
+	mov x131?, x3
+	sxtw x132?, w130?
+	uxtw x133?, w130?
+	sxtb x134?, w131?
+	sxth x135?, w131?
+	sxtw x136?, w131?
+	sxtb w137?, w130?
+	sxth w138?, w130?
+	mov x6, x138?
+	mov x5, x137?
+	mov x4, x136?
+	mov x3, x135?
+	mov x2, x134?
+	mov x1, x133?
+	mov x0, x132?
 	ret
 `,
 			afterFinalizeARM64: `
 L1 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
-	mov x8, x2
-	mov x9, x3
-	sxtw x0, w8
-	uxtw x1, w8
-	sxtb x2, w9
-	sxth x3, w9
-	sxtw x4, w9
-	sxtb w5, w8
-	sxth w6, w8
+	sxtw x8, w2
+	uxtw x9, w2
+	sxtb x10, w3
+	sxth x11, w3
+	sxtw x12, w3
+	sxtb w13, w2
+	sxth w14, w2
+	mov x6, x14
+	mov x5, x13
+	mov x4, x12
+	mov x3, x11
+	mov x2, x10
+	mov x1, x9
+	mov x0, x8
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
 	ret
@@ -997,49 +1019,54 @@ L1 (SSA Block: blk0):
 			name: "integer bit counts", m: testcases.IntegerBitCounts.Module,
 			afterLoweringARM64: `
 L1 (SSA Block: blk0):
-	mov x2?, x2
-	mov x3?, x3
-	clz w4?, w2?
-	rbit w17?, w2?
-	clz w5?, w17?
-	ins v14?.d[0], x2?
-	cnt v15?.16b, v14?.16b
-	uaddlv h16?, v15?.8b
-	mov x6?, v16?.d[0]
-	clz x7?, x3?
-	rbit x13?, x3?
-	clz x8?, x13?
-	ins v10?.d[0], x3?
-	cnt v11?.16b, v10?.16b
-	uaddlv h12?, v11?.8b
-	mov x9?, v12?.d[0]
-	mov x5, x9?
-	mov x4, x8?
-	mov x3, x7?
-	mov x2, x6?
-	mov x1, x5?
-	mov x0, x4?
+	mov x130?, x2
+	mov x131?, x3
+	clz w132?, w130?
+	rbit w145?, w130?
+	clz w133?, w145?
+	ins v142?.d[0], x130?
+	cnt v143?.16b, v142?.16b
+	uaddlv h144?, v143?.8b
+	mov x134?, v144?.d[0]
+	clz x135?, x131?
+	rbit x141?, x131?
+	clz x136?, x141?
+	ins v138?.d[0], x131?
+	cnt v139?.16b, v138?.16b
+	uaddlv h140?, v139?.8b
+	mov x137?, v140?.d[0]
+	mov x5, x137?
+	mov x4, x136?
+	mov x3, x135?
+	mov x2, x134?
+	mov x1, x133?
+	mov x0, x132?
 	ret
 `,
 			afterFinalizeARM64: `
 L1 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
-	mov x8, x3
-	clz w0, w2
+	clz w8, w2
 	rbit w9, w2
-	clz w1, w9
+	clz w9, w9
 	ins v8.d[0], x2
 	cnt v8.16b, v8.16b
 	uaddlv h8, v8.8b
-	mov x2, v8.d[0]
-	clz x3, x8
-	rbit x9, x8
-	clz x4, x9
-	ins v8.d[0], x8
+	mov x10, v8.d[0]
+	clz x11, x3
+	rbit x12, x3
+	clz x12, x12
+	ins v8.d[0], x3
 	cnt v8.16b, v8.16b
 	uaddlv h8, v8.8b
-	mov x5, v8.d[0]
+	mov x13, v8.d[0]
+	mov x5, x13
+	mov x4, x12
+	mov x3, x11
+	mov x2, x10
+	mov x1, x9
+	mov x0, x8
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
 	ret
@@ -1053,36 +1080,49 @@ L1 (SSA Block: blk0):
 	orr x27, xzr, #0x20
 	sub sp, sp, x27
 	stp x30, x27, [sp, #-0x10]!
-	str xzr, [sp, #-0x10]!
+	str x19, [sp, #-0x10]!
+	str x20, [sp, #-0x10]!
+	orr x27, xzr, #0x20
+	str x27, [sp, #-0x10]!
 	fcmp s0, s1
-	cset x0, eq
+	cset x8, eq
 	fcmp s0, s1
-	cset x1, ne
+	cset x9, ne
 	fcmp s0, s1
-	cset x2, mi
+	cset x10, mi
 	fcmp s0, s1
-	cset x3, gt
+	cset x11, gt
 	fcmp s0, s1
-	cset x4, ls
+	cset x12, ls
 	fcmp s0, s1
-	cset x5, ge
+	cset x13, ge
 	fcmp d2, d3
-	cset x6, eq
+	cset x14, eq
 	fcmp d2, d3
-	cset x7, ne
+	cset x15, ne
 	fcmp d2, d3
-	cset x11, mi
+	cset x16, mi
 	fcmp d2, d3
-	cset x10, gt
+	cset x17, gt
 	fcmp d2, d3
-	cset x9, ls
+	cset x19, ls
 	fcmp d2, d3
-	cset x8, ge
-	str w8, [sp, #0x38]
-	str w9, [sp, #0x30]
-	str w10, [sp, #0x28]
-	str w11, [sp, #0x20]
+	cset x20, ge
+	str w20, [sp, #0x58]
+	str w19, [sp, #0x50]
+	str w17, [sp, #0x48]
+	str w16, [sp, #0x40]
+	mov x7, x15
+	mov x6, x14
+	mov x5, x13
+	mov x4, x12
+	mov x3, x11
+	mov x2, x10
+	mov x1, x9
+	mov x0, x8
 	add sp, sp, #0x10
+	ldr x20, [sp], #0x10
+	ldr x19, [sp], #0x10
 	ldr x30, [sp], #0x10
 	add sp, sp, #0x20
 	ret
@@ -1095,193 +1135,225 @@ L1 (SSA Block: blk0):
 L1 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
-	mov x8, x0
 	msr fpsr, xzr
-	fcvtzs x0, d0
+	fcvtzs x8, d0
 	mrs x9 fpsr
+	mov x10, x0
+	mov v8.16b, v0.16b
 	subs xzr, x9, #0x1
-	b.ne #0x6c, (L17)
-	fcmp d0, d0
+	b.ne #0x70, (L17)
+	fcmp d8, d8
+	mov x9, x10
 	b.vc #0x34, (L16)
-	movz x9, #0xc, lsl 0
-	str w9, [x8]
-	mov x9, sp
-	str x9, [x8, #0x38]
-	adr x9, #0x0
-	str x9, [x8, #0x30]
-	exit_sequence x8
+	movz x11, #0xc, lsl 0
+	str w11, [x9]
+	mov x11, sp
+	str x11, [x9, #0x38]
+	adr x11, #0x0
+	str x11, [x9, #0x30]
+	exit_sequence x9
 L16:
 	movz x9, #0xb, lsl 0
-	str w9, [x8]
+	str w9, [x10]
 	mov x9, sp
-	str x9, [x8, #0x38]
+	str x9, [x10, #0x38]
 	adr x9, #0x0
-	str x9, [x8, #0x30]
-	exit_sequence x8
+	str x9, [x10, #0x30]
+	exit_sequence x10
 L17:
 	msr fpsr, xzr
-	fcvtzs x1, s1
-	mrs x9 fpsr
-	subs xzr, x9, #0x1
-	b.ne #0x6c, (L15)
-	fcmp s1, s1
+	fcvtzs x9, s1
+	mrs x10 fpsr
+	mov x11, x0
+	mov v8.16b, v1.16b
+	subs xzr, x10, #0x1
+	b.ne #0x70, (L15)
+	fcmp s8, s8
+	mov x10, x11
 	b.vc #0x34, (L14)
-	movz x9, #0xc, lsl 0
-	str w9, [x8]
-	mov x9, sp
-	str x9, [x8, #0x38]
-	adr x9, #0x0
-	str x9, [x8, #0x30]
-	exit_sequence x8
+	movz x12, #0xc, lsl 0
+	str w12, [x10]
+	mov x12, sp
+	str x12, [x10, #0x38]
+	adr x12, #0x0
+	str x12, [x10, #0x30]
+	exit_sequence x10
 L14:
-	movz x9, #0xb, lsl 0
-	str w9, [x8]
-	mov x9, sp
-	str x9, [x8, #0x38]
-	adr x9, #0x0
-	str x9, [x8, #0x30]
-	exit_sequence x8
+	movz x10, #0xb, lsl 0
+	str w10, [x11]
+	mov x10, sp
+	str x10, [x11, #0x38]
+	adr x10, #0x0
+	str x10, [x11, #0x30]
+	exit_sequence x11
 L15:
 	msr fpsr, xzr
-	fcvtzs w2, d0
-	mrs x9 fpsr
-	subs xzr, x9, #0x1
-	b.ne #0x6c, (L13)
-	fcmp d0, d0
+	fcvtzs w10, d0
+	mrs x11 fpsr
+	mov x12, x0
+	mov v8.16b, v0.16b
+	subs xzr, x11, #0x1
+	b.ne #0x70, (L13)
+	fcmp d8, d8
+	mov x11, x12
 	b.vc #0x34, (L12)
-	movz x9, #0xc, lsl 0
-	str w9, [x8]
-	mov x9, sp
-	str x9, [x8, #0x38]
-	adr x9, #0x0
-	str x9, [x8, #0x30]
-	exit_sequence x8
+	movz x13, #0xc, lsl 0
+	str w13, [x11]
+	mov x13, sp
+	str x13, [x11, #0x38]
+	adr x13, #0x0
+	str x13, [x11, #0x30]
+	exit_sequence x11
 L12:
-	movz x9, #0xb, lsl 0
-	str w9, [x8]
-	mov x9, sp
-	str x9, [x8, #0x38]
-	adr x9, #0x0
-	str x9, [x8, #0x30]
-	exit_sequence x8
+	movz x11, #0xb, lsl 0
+	str w11, [x12]
+	mov x11, sp
+	str x11, [x12, #0x38]
+	adr x11, #0x0
+	str x11, [x12, #0x30]
+	exit_sequence x12
 L13:
 	msr fpsr, xzr
-	fcvtzs w3, s1
-	mrs x9 fpsr
-	subs xzr, x9, #0x1
-	b.ne #0x6c, (L11)
-	fcmp s1, s1
+	fcvtzs w11, s1
+	mrs x12 fpsr
+	mov x13, x0
+	mov v8.16b, v1.16b
+	subs xzr, x12, #0x1
+	b.ne #0x70, (L11)
+	fcmp s8, s8
+	mov x12, x13
 	b.vc #0x34, (L10)
-	movz x9, #0xc, lsl 0
-	str w9, [x8]
-	mov x9, sp
-	str x9, [x8, #0x38]
-	adr x9, #0x0
-	str x9, [x8, #0x30]
-	exit_sequence x8
+	movz x14, #0xc, lsl 0
+	str w14, [x12]
+	mov x14, sp
+	str x14, [x12, #0x38]
+	adr x14, #0x0
+	str x14, [x12, #0x30]
+	exit_sequence x12
 L10:
-	movz x9, #0xb, lsl 0
-	str w9, [x8]
-	mov x9, sp
-	str x9, [x8, #0x38]
-	adr x9, #0x0
-	str x9, [x8, #0x30]
-	exit_sequence x8
+	movz x12, #0xb, lsl 0
+	str w12, [x13]
+	mov x12, sp
+	str x12, [x13, #0x38]
+	adr x12, #0x0
+	str x12, [x13, #0x30]
+	exit_sequence x13
 L11:
 	msr fpsr, xzr
-	fcvtzu x4, d0
-	mrs x9 fpsr
-	subs xzr, x9, #0x1
-	b.ne #0x6c, (L9)
-	fcmp d0, d0
+	fcvtzu x12, d0
+	mrs x13 fpsr
+	mov x14, x0
+	mov v8.16b, v0.16b
+	subs xzr, x13, #0x1
+	b.ne #0x70, (L9)
+	fcmp d8, d8
+	mov x13, x14
 	b.vc #0x34, (L8)
-	movz x9, #0xc, lsl 0
-	str w9, [x8]
-	mov x9, sp
-	str x9, [x8, #0x38]
-	adr x9, #0x0
-	str x9, [x8, #0x30]
-	exit_sequence x8
+	movz x15, #0xc, lsl 0
+	str w15, [x13]
+	mov x15, sp
+	str x15, [x13, #0x38]
+	adr x15, #0x0
+	str x15, [x13, #0x30]
+	exit_sequence x13
 L8:
-	movz x9, #0xb, lsl 0
-	str w9, [x8]
-	mov x9, sp
-	str x9, [x8, #0x38]
-	adr x9, #0x0
-	str x9, [x8, #0x30]
-	exit_sequence x8
+	movz x13, #0xb, lsl 0
+	str w13, [x14]
+	mov x13, sp
+	str x13, [x14, #0x38]
+	adr x13, #0x0
+	str x13, [x14, #0x30]
+	exit_sequence x14
 L9:
 	msr fpsr, xzr
-	fcvtzu x5, s1
-	mrs x9 fpsr
-	subs xzr, x9, #0x1
-	b.ne #0x6c, (L7)
-	fcmp s1, s1
+	fcvtzu x13, s1
+	mrs x14 fpsr
+	mov x15, x0
+	mov v8.16b, v1.16b
+	subs xzr, x14, #0x1
+	b.ne #0x70, (L7)
+	fcmp s8, s8
+	mov x14, x15
 	b.vc #0x34, (L6)
-	movz x9, #0xc, lsl 0
-	str w9, [x8]
-	mov x9, sp
-	str x9, [x8, #0x38]
-	adr x9, #0x0
-	str x9, [x8, #0x30]
-	exit_sequence x8
+	movz x16, #0xc, lsl 0
+	str w16, [x14]
+	mov x16, sp
+	str x16, [x14, #0x38]
+	adr x16, #0x0
+	str x16, [x14, #0x30]
+	exit_sequence x14
 L6:
-	movz x9, #0xb, lsl 0
-	str w9, [x8]
-	mov x9, sp
-	str x9, [x8, #0x38]
-	adr x9, #0x0
-	str x9, [x8, #0x30]
-	exit_sequence x8
+	movz x14, #0xb, lsl 0
+	str w14, [x15]
+	mov x14, sp
+	str x14, [x15, #0x38]
+	adr x14, #0x0
+	str x14, [x15, #0x30]
+	exit_sequence x15
 L7:
 	msr fpsr, xzr
-	fcvtzu w6, d0
-	mrs x9 fpsr
-	subs xzr, x9, #0x1
-	b.ne #0x6c, (L5)
-	fcmp d0, d0
+	fcvtzu w14, d0
+	mrs x15 fpsr
+	mov x16, x0
+	mov v8.16b, v0.16b
+	subs xzr, x15, #0x1
+	b.ne #0x70, (L5)
+	fcmp d8, d8
+	mov x15, x16
 	b.vc #0x34, (L4)
-	movz x9, #0xc, lsl 0
-	str w9, [x8]
-	mov x9, sp
-	str x9, [x8, #0x38]
-	adr x9, #0x0
-	str x9, [x8, #0x30]
-	exit_sequence x8
+	movz x17, #0xc, lsl 0
+	str w17, [x15]
+	mov x17, sp
+	str x17, [x15, #0x38]
+	adr x17, #0x0
+	str x17, [x15, #0x30]
+	exit_sequence x15
 L4:
-	movz x9, #0xb, lsl 0
-	str w9, [x8]
-	mov x9, sp
-	str x9, [x8, #0x38]
-	adr x9, #0x0
-	str x9, [x8, #0x30]
-	exit_sequence x8
+	movz x15, #0xb, lsl 0
+	str w15, [x16]
+	mov x15, sp
+	str x15, [x16, #0x38]
+	adr x15, #0x0
+	str x15, [x16, #0x30]
+	exit_sequence x16
 L5:
 	msr fpsr, xzr
-	fcvtzu w7, s1
-	mrs x9 fpsr
-	subs xzr, x9, #0x1
-	b.ne #0x6c, (L3)
-	fcmp s1, s1
+	fcvtzu w15, s1
+	mrs x16 fpsr
+	mov v8.16b, v1.16b
+	subs xzr, x16, #0x1
+	b.ne #0x70, (L3)
+	fcmp s8, s8
+	mov x16, x0
 	b.vc #0x34, (L2)
-	movz x9, #0xc, lsl 0
-	str w9, [x8]
-	mov x9, sp
-	str x9, [x8, #0x38]
-	adr x9, #0x0
-	str x9, [x8, #0x30]
-	exit_sequence x8
+	movz x17, #0xc, lsl 0
+	str w17, [x16]
+	mov x17, sp
+	str x17, [x16, #0x38]
+	adr x17, #0x0
+	str x17, [x16, #0x30]
+	exit_sequence x16
 L2:
-	movz x9, #0xb, lsl 0
-	str w9, [x8]
-	mov x9, sp
-	str x9, [x8, #0x38]
-	adr x9, #0x0
-	str x9, [x8, #0x30]
-	exit_sequence x8
+	movz x16, #0xb, lsl 0
+	str w16, [x0]
+	mov x16, sp
+	str x16, [x0, #0x38]
+	adr x16, #0x0
+	str x16, [x0, #0x30]
+	exit_sequence x0
 L3:
-	fcvt s0, d0
-	fcvt d1, s1
+	fcvt s8, d0
+	fcvt d9, s1
+	mov v1.8b, v9.8b
+	mov v0.8b, v8.8b
+	mov x7, x15
+	mov x6, x14
+	mov x5, x13
+	mov x4, x12
+	mov x3, x11
+	mov x2, x10
+	mov x1, x9
+	mov x0, x8
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
 	ret
@@ -1294,14 +1366,22 @@ L3:
 L1 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
-	fcvtzs x0, d0
-	fcvtzs x1, s1
-	fcvtzs w2, d0
-	fcvtzs w3, s1
-	fcvtzu x4, d0
-	fcvtzu x5, s1
-	fcvtzu w6, d0
-	fcvtzu w7, s1
+	fcvtzs x8, d0
+	fcvtzs x9, s1
+	fcvtzs w10, d0
+	fcvtzs w11, s1
+	fcvtzu x12, d0
+	fcvtzu x13, s1
+	fcvtzu w14, d0
+	fcvtzu w15, s1
+	mov x7, x15
+	mov x6, x14
+	mov x5, x13
+	mov x4, x12
+	mov x3, x11
+	mov x2, x10
+	mov x1, x9
+	mov x0, x8
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
 	ret
@@ -1312,128 +1392,128 @@ L1 (SSA Block: blk0):
 			m:    testcases.ManyMiddleValues.Module,
 			afterLoweringARM64: `
 L1 (SSA Block: blk0):
-	mov x2?, x2
-	mov v3?.8b, v0.8b
-	orr w161?, wzr, #0x1
-	madd w5?, w2?, w161?, wzr
-	orr w160?, wzr, #0x2
-	madd w7?, w2?, w160?, wzr
-	orr w159?, wzr, #0x3
-	madd w9?, w2?, w159?, wzr
-	orr w158?, wzr, #0x4
-	madd w11?, w2?, w158?, wzr
-	movz w157?, #0x5, lsl 0
-	madd w13?, w2?, w157?, wzr
-	orr w156?, wzr, #0x6
-	madd w15?, w2?, w156?, wzr
-	orr w155?, wzr, #0x7
-	madd w17?, w2?, w155?, wzr
-	orr w154?, wzr, #0x8
-	madd w19?, w2?, w154?, wzr
-	movz w153?, #0x9, lsl 0
-	madd w21?, w2?, w153?, wzr
-	movz w152?, #0xa, lsl 0
-	madd w23?, w2?, w152?, wzr
-	movz w151?, #0xb, lsl 0
-	madd w25?, w2?, w151?, wzr
-	orr w150?, wzr, #0xc
-	madd w27?, w2?, w150?, wzr
-	movz w149?, #0xd, lsl 0
-	madd w29?, w2?, w149?, wzr
-	orr w148?, wzr, #0xe
-	madd w31?, w2?, w148?, wzr
-	orr w147?, wzr, #0xf
-	madd w33?, w2?, w147?, wzr
-	orr w146?, wzr, #0x10
-	madd w35?, w2?, w146?, wzr
-	movz w145?, #0x11, lsl 0
-	madd w37?, w2?, w145?, wzr
-	movz w144?, #0x12, lsl 0
-	madd w39?, w2?, w144?, wzr
-	movz w143?, #0x13, lsl 0
-	madd w41?, w2?, w143?, wzr
-	movz w142?, #0x14, lsl 0
-	madd w43?, w2?, w142?, wzr
-	add w44?, w41?, w43?
-	add w45?, w39?, w44?
-	add w46?, w37?, w45?
-	add w47?, w35?, w46?
-	add w48?, w33?, w47?
-	add w49?, w31?, w48?
-	add w50?, w29?, w49?
-	add w51?, w27?, w50?
-	add w52?, w25?, w51?
-	add w53?, w23?, w52?
-	add w54?, w21?, w53?
-	add w55?, w19?, w54?
-	add w56?, w17?, w55?
-	add w57?, w15?, w56?
-	add w58?, w13?, w57?
-	add w59?, w11?, w58?
-	add w60?, w9?, w59?
-	add w61?, w7?, w60?
-	add w62?, w5?, w61?
-	ldr s141?, #8; b 8; data.f32 1.000000
-	fmul s64?, s3?, s141?
-	ldr s140?, #8; b 8; data.f32 2.000000
-	fmul s66?, s3?, s140?
-	ldr s139?, #8; b 8; data.f32 3.000000
-	fmul s68?, s3?, s139?
-	ldr s138?, #8; b 8; data.f32 4.000000
-	fmul s70?, s3?, s138?
-	ldr s137?, #8; b 8; data.f32 5.000000
-	fmul s72?, s3?, s137?
-	ldr s136?, #8; b 8; data.f32 6.000000
-	fmul s74?, s3?, s136?
-	ldr s135?, #8; b 8; data.f32 7.000000
-	fmul s76?, s3?, s135?
-	ldr s134?, #8; b 8; data.f32 8.000000
-	fmul s78?, s3?, s134?
-	ldr s133?, #8; b 8; data.f32 9.000000
-	fmul s80?, s3?, s133?
-	ldr s132?, #8; b 8; data.f32 10.000000
-	fmul s82?, s3?, s132?
-	ldr s131?, #8; b 8; data.f32 11.000000
-	fmul s84?, s3?, s131?
-	ldr s130?, #8; b 8; data.f32 12.000000
-	fmul s86?, s3?, s130?
-	ldr s129?, #8; b 8; data.f32 13.000000
-	fmul s88?, s3?, s129?
-	ldr s128?, #8; b 8; data.f32 14.000000
-	fmul s90?, s3?, s128?
-	ldr s127?, #8; b 8; data.f32 15.000000
-	fmul s92?, s3?, s127?
-	ldr s126?, #8; b 8; data.f32 16.000000
-	fmul s94?, s3?, s126?
-	ldr s125?, #8; b 8; data.f32 17.000000
-	fmul s96?, s3?, s125?
-	ldr s124?, #8; b 8; data.f32 18.000000
-	fmul s98?, s3?, s124?
-	ldr s123?, #8; b 8; data.f32 19.000000
-	fmul s100?, s3?, s123?
-	ldr s122?, #8; b 8; data.f32 20.000000
-	fmul s102?, s3?, s122?
-	fadd s103?, s100?, s102?
-	fadd s104?, s98?, s103?
-	fadd s105?, s96?, s104?
-	fadd s106?, s94?, s105?
-	fadd s107?, s92?, s106?
-	fadd s108?, s90?, s107?
-	fadd s109?, s88?, s108?
-	fadd s110?, s86?, s109?
-	fadd s111?, s84?, s110?
-	fadd s112?, s82?, s111?
-	fadd s113?, s80?, s112?
-	fadd s114?, s78?, s113?
-	fadd s115?, s76?, s114?
-	fadd s116?, s74?, s115?
-	fadd s117?, s72?, s116?
-	fadd s118?, s70?, s117?
-	fadd s119?, s68?, s118?
-	fadd s120?, s66?, s119?
-	fadd s121?, s64?, s120?
-	mov v0.8b, v121?.8b
-	mov x0, x62?
+	mov x130?, x2
+	mov v131?.8b, v0.8b
+	orr w289?, wzr, #0x1
+	madd w133?, w130?, w289?, wzr
+	orr w288?, wzr, #0x2
+	madd w135?, w130?, w288?, wzr
+	orr w287?, wzr, #0x3
+	madd w137?, w130?, w287?, wzr
+	orr w286?, wzr, #0x4
+	madd w139?, w130?, w286?, wzr
+	movz w285?, #0x5, lsl 0
+	madd w141?, w130?, w285?, wzr
+	orr w284?, wzr, #0x6
+	madd w143?, w130?, w284?, wzr
+	orr w283?, wzr, #0x7
+	madd w145?, w130?, w283?, wzr
+	orr w282?, wzr, #0x8
+	madd w147?, w130?, w282?, wzr
+	movz w281?, #0x9, lsl 0
+	madd w149?, w130?, w281?, wzr
+	movz w280?, #0xa, lsl 0
+	madd w151?, w130?, w280?, wzr
+	movz w279?, #0xb, lsl 0
+	madd w153?, w130?, w279?, wzr
+	orr w278?, wzr, #0xc
+	madd w155?, w130?, w278?, wzr
+	movz w277?, #0xd, lsl 0
+	madd w157?, w130?, w277?, wzr
+	orr w276?, wzr, #0xe
+	madd w159?, w130?, w276?, wzr
+	orr w275?, wzr, #0xf
+	madd w161?, w130?, w275?, wzr
+	orr w274?, wzr, #0x10
+	madd w163?, w130?, w274?, wzr
+	movz w273?, #0x11, lsl 0
+	madd w165?, w130?, w273?, wzr
+	movz w272?, #0x12, lsl 0
+	madd w167?, w130?, w272?, wzr
+	movz w271?, #0x13, lsl 0
+	madd w169?, w130?, w271?, wzr
+	movz w270?, #0x14, lsl 0
+	madd w171?, w130?, w270?, wzr
+	add w172?, w169?, w171?
+	add w173?, w167?, w172?
+	add w174?, w165?, w173?
+	add w175?, w163?, w174?
+	add w176?, w161?, w175?
+	add w177?, w159?, w176?
+	add w178?, w157?, w177?
+	add w179?, w155?, w178?
+	add w180?, w153?, w179?
+	add w181?, w151?, w180?
+	add w182?, w149?, w181?
+	add w183?, w147?, w182?
+	add w184?, w145?, w183?
+	add w185?, w143?, w184?
+	add w186?, w141?, w185?
+	add w187?, w139?, w186?
+	add w188?, w137?, w187?
+	add w189?, w135?, w188?
+	add w190?, w133?, w189?
+	ldr s269?, #8; b 8; data.f32 1.000000
+	fmul s192?, s131?, s269?
+	ldr s268?, #8; b 8; data.f32 2.000000
+	fmul s194?, s131?, s268?
+	ldr s267?, #8; b 8; data.f32 3.000000
+	fmul s196?, s131?, s267?
+	ldr s266?, #8; b 8; data.f32 4.000000
+	fmul s198?, s131?, s266?
+	ldr s265?, #8; b 8; data.f32 5.000000
+	fmul s200?, s131?, s265?
+	ldr s264?, #8; b 8; data.f32 6.000000
+	fmul s202?, s131?, s264?
+	ldr s263?, #8; b 8; data.f32 7.000000
+	fmul s204?, s131?, s263?
+	ldr s262?, #8; b 8; data.f32 8.000000
+	fmul s206?, s131?, s262?
+	ldr s261?, #8; b 8; data.f32 9.000000
+	fmul s208?, s131?, s261?
+	ldr s260?, #8; b 8; data.f32 10.000000
+	fmul s210?, s131?, s260?
+	ldr s259?, #8; b 8; data.f32 11.000000
+	fmul s212?, s131?, s259?
+	ldr s258?, #8; b 8; data.f32 12.000000
+	fmul s214?, s131?, s258?
+	ldr s257?, #8; b 8; data.f32 13.000000
+	fmul s216?, s131?, s257?
+	ldr s256?, #8; b 8; data.f32 14.000000
+	fmul s218?, s131?, s256?
+	ldr s255?, #8; b 8; data.f32 15.000000
+	fmul s220?, s131?, s255?
+	ldr s254?, #8; b 8; data.f32 16.000000
+	fmul s222?, s131?, s254?
+	ldr s253?, #8; b 8; data.f32 17.000000
+	fmul s224?, s131?, s253?
+	ldr s252?, #8; b 8; data.f32 18.000000
+	fmul s226?, s131?, s252?
+	ldr s251?, #8; b 8; data.f32 19.000000
+	fmul s228?, s131?, s251?
+	ldr s250?, #8; b 8; data.f32 20.000000
+	fmul s230?, s131?, s250?
+	fadd s231?, s228?, s230?
+	fadd s232?, s226?, s231?
+	fadd s233?, s224?, s232?
+	fadd s234?, s222?, s233?
+	fadd s235?, s220?, s234?
+	fadd s236?, s218?, s235?
+	fadd s237?, s216?, s236?
+	fadd s238?, s214?, s237?
+	fadd s239?, s212?, s238?
+	fadd s240?, s210?, s239?
+	fadd s241?, s208?, s240?
+	fadd s242?, s206?, s241?
+	fadd s243?, s204?, s242?
+	fadd s244?, s202?, s243?
+	fadd s245?, s200?, s244?
+	fadd s246?, s198?, s245?
+	fadd s247?, s196?, s246?
+	fadd s248?, s194?, s247?
+	fadd s249?, s192?, s248?
+	mov v0.8b, v249?.8b
+	mov x0, x190?
 	ret
 `,
 			afterFinalizeARM64: `
@@ -1517,7 +1597,7 @@ L1 (SSA Block: blk0):
 	add w11, w11, w12
 	add w10, w10, w11
 	add w9, w9, w10
-	add w0, w8, w9
+	add w8, w8, w9
 	ldr s8, #8; b 8; data.f32 1.000000
 	fmul s8, s0, s8
 	ldr s9, #8; b 8; data.f32 2.000000
@@ -1576,7 +1656,9 @@ L1 (SSA Block: blk0):
 	fadd s11, s11, s12
 	fadd s10, s10, s11
 	fadd s9, s9, s10
-	fadd s0, s8, s9
+	fadd s8, s8, s9
+	mov v0.8b, v8.8b
+	mov x0, x8
 	add sp, sp, #0x10
 	ldr q27, [sp], #0x10
 	ldr q26, [sp], #0x10
@@ -1604,31 +1686,36 @@ L1 (SSA Block: blk0):
 			name: "imported_function_call", m: testcases.ImportedFunctionCall.Module,
 			afterLoweringARM64: `
 L1 (SSA Block: blk0):
-	mov x0?, x0
-	mov x1?, x1
-	mov x2?, x2
-	str x1?, [x0?, #0x8]
-	ldr x3?, [x1?, #0x8]
-	ldr x4?, [x1?, #0x10]
-	mov x0, x0?
-	mov x1, x4?
-	mov x2, x2?
-	mov x3, x2?
-	bl x3?
-	mov x5?, x0
-	mov x0, x5?
+	mov x128?, x0
+	mov x129?, x1
+	mov x130?, x2
+	str x129?, [x128?, #0x8]
+	ldr x131?, [x129?, #0x8]
+	ldr x132?, [x129?, #0x10]
+	mov x0, x128?
+	mov x1, x132?
+	mov x2, x130?
+	mov x3, x130?
+	bl x131?
+	mov x133?, x0
+	mov x0, x133?
 	ret
 `,
 			afterFinalizeARM64: `
 L1 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
-	str xzr, [sp, #-0x10]!
-	mov x3, x2
+	sub sp, sp, #0x10
+	orr x27, xzr, #0x10
+	str x27, [sp, #-0x10]!
+	str w2, [sp, #0x10]
 	str x1, [x0, #0x8]
 	ldr x8, [x1, #0x8]
-	ldr x1, [x1, #0x10]
-	mov x2, x3
+	ldr x9, [x1, #0x10]
+	mov x1, x9
+	ldr w9, [sp, #0x10]
+	mov x3, x9
 	bl x8
+	add sp, sp, #0x10
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
 	ret
@@ -1638,26 +1725,27 @@ L1 (SSA Block: blk0):
 			name: "memory_load_basic", m: testcases.MemoryLoadBasic.Module,
 			afterLoweringARM64: `
 L1 (SSA Block: blk0):
-	mov x0?, x0
-	mov x1?, x1
-	mov x2?, x2
-	uxtw x4?, w2?
-	ldr w5?, [x1?, #0x10]
-	add x6?, x4?, #0x4
-	subs xzr, x5?, x6?
+	mov x128?, x0
+	mov x129?, x1
+	mov x130?, x2
+	uxtw x132?, w130?
+	ldr w133?, [x129?, #0x10]
+	add x134?, x132?, #0x4
+	subs xzr, x133?, x134?
+	mov x140?, x128?
 	b.hs L2
-	movz x12?, #0x4, lsl 0
-	str w12?, [x0?]
-	mov x13?, sp
-	str x13?, [x0?, #0x38]
-	adr x14?, #0x0
-	str x14?, [x0?, #0x30]
-	exit_sequence x0?
+	movz x141?, #0x4, lsl 0
+	str w141?, [x140?]
+	mov x142?, sp
+	str x142?, [x140?, #0x38]
+	adr x143?, #0x0
+	str x143?, [x140?, #0x30]
+	exit_sequence x140?
 L2:
-	ldr x8?, [x1?, #0x8]
-	add x11?, x8?, x4?
-	ldr w10?, [x11?]
-	mov x0, x10?
+	ldr x136?, [x129?, #0x8]
+	add x139?, x136?, x132?
+	ldr w138?, [x139?]
+	mov x0, x138?
 	ret
 `,
 			afterFinalizeARM64: `
@@ -1665,9 +1753,9 @@ L1 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
 	uxtw x8, w2
-	ldr w10, [x1, #0x10]
-	add x9, x8, #0x4
-	subs xzr, x10, x9
+	ldr w9, [x1, #0x10]
+	add x10, x8, #0x4
+	subs xzr, x9, x10
 	b.hs #0x34, (L2)
 	movz x9, #0x4, lsl 0
 	str w9, [x0]
@@ -1679,7 +1767,8 @@ L1 (SSA Block: blk0):
 L2:
 	ldr x9, [x1, #0x8]
 	add x8, x9, x8
-	ldr w0, [x8]
+	ldr w8, [x8]
+	mov x0, x8
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
 	ret
@@ -1692,11 +1781,140 @@ L1 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
 	mov x8, xzr
-	uxtw x10, w8
-	ldr w8, [x1, #0x10]
-	add x9, x10, #0x4
-	subs xzr, x8, x9
+	uxtw x8, w8
+	ldr w9, [x1, #0x10]
+	add x10, x8, #0x4
+	subs xzr, x9, x10
+	mov x10, x0
 	b.hs #0x34, (L10)
+	movz x11, #0x4, lsl 0
+	str w11, [x10]
+	mov x11, sp
+	str x11, [x10, #0x38]
+	adr x11, #0x0
+	str x11, [x10, #0x30]
+	exit_sequence x10
+L10:
+	ldr x10, [x1, #0x8]
+	add x8, x10, x8
+	str w2, [x8]
+	orr w8, wzr, #0x8
+	uxtw x8, w8
+	add x11, x8, #0x8
+	subs xzr, x9, x11
+	mov x11, x0
+	b.hs #0x34, (L9)
+	movz x12, #0x4, lsl 0
+	str w12, [x11]
+	mov x12, sp
+	str x12, [x11, #0x38]
+	adr x12, #0x0
+	str x12, [x11, #0x30]
+	exit_sequence x11
+L9:
+	add x8, x10, x8
+	str x3, [x8]
+	orr w8, wzr, #0x10
+	uxtw x8, w8
+	add x11, x8, #0x4
+	subs xzr, x9, x11
+	mov x11, x0
+	b.hs #0x34, (L8)
+	movz x12, #0x4, lsl 0
+	str w12, [x11]
+	mov x12, sp
+	str x12, [x11, #0x38]
+	adr x12, #0x0
+	str x12, [x11, #0x30]
+	exit_sequence x11
+L8:
+	add x8, x10, x8
+	str s0, [x8]
+	orr w8, wzr, #0x18
+	uxtw x8, w8
+	add x11, x8, #0x8
+	subs xzr, x9, x11
+	mov x11, x0
+	b.hs #0x34, (L7)
+	movz x12, #0x4, lsl 0
+	str w12, [x11]
+	mov x12, sp
+	str x12, [x11, #0x38]
+	adr x12, #0x0
+	str x12, [x11, #0x30]
+	exit_sequence x11
+L7:
+	add x8, x10, x8
+	str d1, [x8]
+	orr w8, wzr, #0x20
+	uxtw x8, w8
+	add x11, x8, #0x1
+	subs xzr, x9, x11
+	mov x11, x0
+	b.hs #0x34, (L6)
+	movz x12, #0x4, lsl 0
+	str w12, [x11]
+	mov x12, sp
+	str x12, [x11, #0x38]
+	adr x12, #0x0
+	str x12, [x11, #0x30]
+	exit_sequence x11
+L6:
+	add x8, x10, x8
+	strb w2, [x8]
+	movz w8, #0x28, lsl 0
+	uxtw x8, w8
+	add x11, x8, #0x2
+	subs xzr, x9, x11
+	mov x11, x0
+	b.hs #0x34, (L5)
+	movz x12, #0x4, lsl 0
+	str w12, [x11]
+	mov x12, sp
+	str x12, [x11, #0x38]
+	adr x12, #0x0
+	str x12, [x11, #0x30]
+	exit_sequence x11
+L5:
+	add x8, x10, x8
+	strh w2, [x8]
+	orr w8, wzr, #0x30
+	uxtw x8, w8
+	add x11, x8, #0x1
+	subs xzr, x9, x11
+	mov x11, x0
+	b.hs #0x34, (L4)
+	movz x12, #0x4, lsl 0
+	str w12, [x11]
+	mov x12, sp
+	str x12, [x11, #0x38]
+	adr x12, #0x0
+	str x12, [x11, #0x30]
+	exit_sequence x11
+L4:
+	add x8, x10, x8
+	strb w3, [x8]
+	orr w8, wzr, #0x38
+	uxtw x8, w8
+	add x11, x8, #0x2
+	subs xzr, x9, x11
+	mov x11, x0
+	b.hs #0x34, (L3)
+	movz x12, #0x4, lsl 0
+	str w12, [x11]
+	mov x12, sp
+	str x12, [x11, #0x38]
+	adr x12, #0x0
+	str x12, [x11, #0x30]
+	exit_sequence x11
+L3:
+	add x8, x10, x8
+	strh w3, [x8]
+	orr w8, wzr, #0x40
+	uxtw x8, w8
+	add x11, x8, #0x4
+	subs xzr, x9, x11
+	b.hs #0x34, (L2)
 	movz x9, #0x4, lsl 0
 	str w9, [x0]
 	mov x9, sp
@@ -1704,129 +1922,8 @@ L1 (SSA Block: blk0):
 	adr x9, #0x0
 	str x9, [x0, #0x30]
 	exit_sequence x0
-L10:
-	ldr x9, [x1, #0x8]
-	add x10, x9, x10
-	str w2, [x10]
-	orr w10, wzr, #0x8
-	uxtw x10, w10
-	add x11, x10, #0x8
-	subs xzr, x8, x11
-	b.hs #0x34, (L9)
-	movz x11, #0x4, lsl 0
-	str w11, [x0]
-	mov x11, sp
-	str x11, [x0, #0x38]
-	adr x11, #0x0
-	str x11, [x0, #0x30]
-	exit_sequence x0
-L9:
-	add x10, x9, x10
-	str x3, [x10]
-	orr w10, wzr, #0x10
-	uxtw x10, w10
-	add x11, x10, #0x4
-	subs xzr, x8, x11
-	b.hs #0x34, (L8)
-	movz x11, #0x4, lsl 0
-	str w11, [x0]
-	mov x11, sp
-	str x11, [x0, #0x38]
-	adr x11, #0x0
-	str x11, [x0, #0x30]
-	exit_sequence x0
-L8:
-	add x10, x9, x10
-	str s0, [x10]
-	orr w10, wzr, #0x18
-	uxtw x10, w10
-	add x11, x10, #0x8
-	subs xzr, x8, x11
-	b.hs #0x34, (L7)
-	movz x11, #0x4, lsl 0
-	str w11, [x0]
-	mov x11, sp
-	str x11, [x0, #0x38]
-	adr x11, #0x0
-	str x11, [x0, #0x30]
-	exit_sequence x0
-L7:
-	add x10, x9, x10
-	str d1, [x10]
-	orr w10, wzr, #0x20
-	uxtw x10, w10
-	add x11, x10, #0x1
-	subs xzr, x8, x11
-	b.hs #0x34, (L6)
-	movz x11, #0x4, lsl 0
-	str w11, [x0]
-	mov x11, sp
-	str x11, [x0, #0x38]
-	adr x11, #0x0
-	str x11, [x0, #0x30]
-	exit_sequence x0
-L6:
-	add x10, x9, x10
-	strb w2, [x10]
-	movz w10, #0x28, lsl 0
-	uxtw x10, w10
-	add x11, x10, #0x2
-	subs xzr, x8, x11
-	b.hs #0x34, (L5)
-	movz x11, #0x4, lsl 0
-	str w11, [x0]
-	mov x11, sp
-	str x11, [x0, #0x38]
-	adr x11, #0x0
-	str x11, [x0, #0x30]
-	exit_sequence x0
-L5:
-	add x10, x9, x10
-	strh w2, [x10]
-	orr w10, wzr, #0x30
-	uxtw x10, w10
-	add x11, x10, #0x1
-	subs xzr, x8, x11
-	b.hs #0x34, (L4)
-	movz x11, #0x4, lsl 0
-	str w11, [x0]
-	mov x11, sp
-	str x11, [x0, #0x38]
-	adr x11, #0x0
-	str x11, [x0, #0x30]
-	exit_sequence x0
-L4:
-	add x10, x9, x10
-	strb w3, [x10]
-	orr w10, wzr, #0x38
-	uxtw x10, w10
-	add x11, x10, #0x2
-	subs xzr, x8, x11
-	b.hs #0x34, (L3)
-	movz x11, #0x4, lsl 0
-	str w11, [x0]
-	mov x11, sp
-	str x11, [x0, #0x38]
-	adr x11, #0x0
-	str x11, [x0, #0x30]
-	exit_sequence x0
-L3:
-	add x10, x9, x10
-	strh w3, [x10]
-	orr w10, wzr, #0x40
-	uxtw x10, w10
-	add x11, x10, #0x4
-	subs xzr, x8, x11
-	b.hs #0x34, (L2)
-	movz x8, #0x4, lsl 0
-	str w8, [x0]
-	mov x8, sp
-	str x8, [x0, #0x38]
-	adr x8, #0x0
-	str x8, [x0, #0x30]
-	exit_sequence x0
 L2:
-	add x8, x9, x10
+	add x8, x10, x8
 	str w3, [x8]
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
@@ -1838,36 +1935,28 @@ L2:
 			m:    testcases.GlobalsMutable.Module,
 			afterLoweringARM64: `
 L1 (SSA Block: blk0):
-	mov x0?, x0
-	mov x1?, x1
-	ldr x2?, [x1?, #0x8]
-	ldr w3?, [x2?, #0x8]
-	ldr x4?, [x1?, #0x10]
-	ldr x5?, [x4?, #0x8]
-	ldr x6?, [x1?, #0x18]
-	ldr s7?, [x6?, #0x8]
-	ldr x8?, [x1?, #0x20]
-	ldr d9?, [x8?, #0x8]
-	str x1?, [x0?, #0x8]
-	mov x0, x0?
-	mov x1, x1?
+	mov x128?, x0
+	mov x129?, x1
+	ldr w130?, [x129?, #0x8]
+	ldr x131?, [x129?, #0x18]
+	ldr s132?, [x129?, #0x28]
+	ldr d133?, [x129?, #0x38]
+	str x129?, [x128?, #0x8]
+	mov x0, x128?
+	mov x1, x129?
 	bl f1
-	ldr x10?, [x1?, #0x8]
-	ldr w11?, [x10?, #0x8]
-	ldr x12?, [x1?, #0x10]
-	ldr x13?, [x12?, #0x8]
-	ldr x14?, [x1?, #0x18]
-	ldr s15?, [x14?, #0x8]
-	ldr x16?, [x1?, #0x20]
-	ldr d17?, [x16?, #0x8]
-	mov v3.8b, v17?.8b
-	mov v2.8b, v15?.8b
-	mov x3, x13?
-	mov x2, x11?
-	mov v1.8b, v9?.8b
-	mov v0.8b, v7?.8b
-	mov x1, x5?
-	mov x0, x3?
+	ldr w134?, [x129?, #0x8]
+	ldr x135?, [x129?, #0x18]
+	ldr s136?, [x129?, #0x28]
+	ldr d137?, [x129?, #0x38]
+	mov v3.8b, v137?.8b
+	mov v2.8b, v136?.8b
+	mov x3, x135?
+	mov x2, x134?
+	mov v1.8b, v133?.8b
+	mov v0.8b, v132?.8b
+	mov x1, x131?
+	mov x0, x130?
 	ret
 `,
 			afterFinalizeARM64: `
@@ -1876,37 +1965,33 @@ L1 (SSA Block: blk0):
 	sub sp, sp, #0x20
 	orr x27, xzr, #0x20
 	str x27, [sp, #-0x10]!
-	mov x10, x1
-	ldr x8, [x10, #0x8]
-	ldr w8, [x8, #0x8]
-	ldr x9, [x10, #0x10]
-	ldr x9, [x9, #0x8]
-	ldr x11, [x10, #0x18]
-	ldr s0, [x11, #0x8]
-	ldr x11, [x10, #0x20]
-	ldr d1, [x11, #0x8]
-	str x10, [x0, #0x8]
-	mov x1, x10
-	str x10, [sp, #0x10]
-	str w8, [sp, #0x18]
-	str x9, [sp, #0x1c]
-	str s0, [sp, #0x24]
-	str d1, [sp, #0x28]
+	str x1, [sp, #0x10]
+	ldr w8, [x1, #0x8]
+	str w8, [sp, #0x2c]
+	ldr x9, [x1, #0x18]
+	str x9, [sp, #0x24]
+	ldr s8, [x1, #0x28]
+	str s8, [sp, #0x20]
+	ldr d9, [x1, #0x38]
+	str d9, [sp, #0x18]
+	str x1, [x0, #0x8]
 	bl f1
-	ldr d1, [sp, #0x28]
-	ldr s0, [sp, #0x24]
-	ldr x9, [sp, #0x1c]
-	ldr w8, [sp, #0x18]
-	ldr x10, [sp, #0x10]
-	ldr x11, [x10, #0x8]
-	ldr w2, [x11, #0x8]
-	ldr x11, [x10, #0x10]
-	ldr x3, [x11, #0x8]
-	ldr x11, [x10, #0x18]
-	ldr s2, [x11, #0x8]
-	ldr x10, [x10, #0x20]
-	ldr d3, [x10, #0x8]
-	mov x1, x9
+	ldr x8, [sp, #0x10]
+	ldr w9, [x8, #0x8]
+	ldr x10, [x8, #0x18]
+	ldr s8, [x8, #0x28]
+	ldr d9, [x8, #0x38]
+	mov v3.8b, v9.8b
+	mov v2.8b, v8.8b
+	mov x3, x10
+	mov x2, x9
+	ldr d8, [sp, #0x18]
+	mov v1.8b, v8.8b
+	ldr s8, [sp, #0x20]
+	mov v0.8b, v8.8b
+	ldr x8, [sp, #0x24]
+	mov x1, x8
+	ldr w8, [sp, #0x2c]
 	mov x0, x8
 	add sp, sp, #0x10
 	add sp, sp, #0x20
@@ -1920,37 +2005,29 @@ L1 (SSA Block: blk0):
 			targetIndex: 1,
 			afterLoweringARM64: `
 L1 (SSA Block: blk0):
-	mov x1?, x1
-	ldr x3?, [x1?, #0x8]
-	orr w13?, wzr, #0x1
-	str w13?, [x3?, #0x8]
-	ldr x5?, [x1?, #0x10]
-	orr x12?, xzr, #0x2
-	str x12?, [x5?, #0x8]
-	ldr x7?, [x1?, #0x18]
-	ldr s11?, #8; b 8; data.f32 3.000000
-	str s11?, [x7?, #0x8]
-	ldr x9?, [x1?, #0x20]
-	ldr d10?, #8; b 16; data.f64 4.000000
-	str d10?, [x9?, #0x8]
+	mov x129?, x1
+	orr w137?, wzr, #0x1
+	str w137?, [x129?, #0x8]
+	orr x136?, xzr, #0x2
+	str x136?, [x129?, #0x18]
+	ldr s135?, #8; b 8; data.f32 3.000000
+	str s135?, [x129?, #0x28]
+	ldr d134?, #8; b 16; data.f64 4.000000
+	str d134?, [x129?, #0x38]
 	ret
 `,
 			afterFinalizeARM64: `
 L1 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
-	ldr x9, [x1, #0x8]
 	orr w8, wzr, #0x1
-	str w8, [x9, #0x8]
-	ldr x9, [x1, #0x10]
+	str w8, [x1, #0x8]
 	orr x8, xzr, #0x2
-	str x8, [x9, #0x8]
-	ldr x8, [x1, #0x18]
+	str x8, [x1, #0x18]
 	ldr s8, #8; b 8; data.f32 3.000000
-	str s8, [x8, #0x8]
-	ldr x8, [x1, #0x20]
+	str s8, [x1, #0x28]
 	ldr d8, #8; b 16; data.f64 4.000000
-	str d8, [x8, #0x8]
+	str d8, [x1, #0x38]
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
 	ret
@@ -1962,42 +2039,42 @@ L1 (SSA Block: blk0):
 			targetIndex: 0,
 			afterLoweringARM64: `
 L1 (SSA Block: blk0):
-	mov x2?, x2
-	orr w9?, wzr, #0x6
-	subs wzr, w2?, w9?
-	csel w10?, w9?, w2?, hs
-	br_table_sequence x10?, [L2, L3, L4, L5, L6, L7, L8]
+	mov x130?, x2
+	orr w137?, wzr, #0x6
+	subs wzr, w130?, w137?
+	csel w138?, w137?, w130?, hs
+	br_table_sequence x138?, [L2, L3, L4, L5, L6, L7, L8]
 L2 (SSA Block: blk7):
 	b L9
 L3 (SSA Block: blk8):
 L10 (SSA Block: blk5):
-	orr w3?, wzr, #0xc
-	mov x0, x3?
+	orr w131?, wzr, #0xc
+	mov x0, x131?
 	ret
 L4 (SSA Block: blk9):
 L11 (SSA Block: blk4):
-	movz w4?, #0xd, lsl 0
-	mov x0, x4?
+	movz w132?, #0xd, lsl 0
+	mov x0, x132?
 	ret
 L5 (SSA Block: blk10):
 L12 (SSA Block: blk3):
-	orr w5?, wzr, #0xe
-	mov x0, x5?
+	orr w133?, wzr, #0xe
+	mov x0, x133?
 	ret
 L6 (SSA Block: blk11):
 L13 (SSA Block: blk2):
-	orr w6?, wzr, #0xf
-	mov x0, x6?
+	orr w134?, wzr, #0xf
+	mov x0, x134?
 	ret
 L7 (SSA Block: blk12):
 L14 (SSA Block: blk1):
-	orr w7?, wzr, #0x10
-	mov x0, x7?
+	orr w135?, wzr, #0x10
+	mov x0, x135?
 	ret
 L8 (SSA Block: blk13):
 L9 (SSA Block: blk6):
-	movz w8?, #0xb, lsl 0
-	mov x0, x8?
+	movz w136?, #0xb, lsl 0
+	mov x0, x136?
 	ret
 `,
 			afterFinalizeARM64: `
@@ -2007,42 +2084,48 @@ L1 (SSA Block: blk0):
 	orr w8, wzr, #0x6
 	subs wzr, w2, w8
 	csel w8, w8, w2, hs
-	adr x27, #16; ldrsw x8, [x27, x8, UXTW 2]; add x27, x27, x8; br x27; [0x1c 0x20 0x30 0x40 0x50 0x60 0x70]
+	adr x27, #16; ldrsw x8, [x27, x8, UXTW 2]; add x27, x27, x8; br x27; [0x1c 0x20 0x34 0x48 0x5c 0x70 0x84]
 L2 (SSA Block: blk7):
-	b #0x54 (L9)
+	b #0x68 (L9)
 L3 (SSA Block: blk8):
 L10 (SSA Block: blk5):
-	orr w0, wzr, #0xc
+	orr w8, wzr, #0xc
+	mov x0, x8
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
 	ret
 L4 (SSA Block: blk9):
 L11 (SSA Block: blk4):
-	movz w0, #0xd, lsl 0
+	movz w8, #0xd, lsl 0
+	mov x0, x8
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
 	ret
 L5 (SSA Block: blk10):
 L12 (SSA Block: blk3):
-	orr w0, wzr, #0xe
+	orr w8, wzr, #0xe
+	mov x0, x8
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
 	ret
 L6 (SSA Block: blk11):
 L13 (SSA Block: blk2):
-	orr w0, wzr, #0xf
+	orr w8, wzr, #0xf
+	mov x0, x8
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
 	ret
 L7 (SSA Block: blk12):
 L14 (SSA Block: blk1):
-	orr w0, wzr, #0x10
+	orr w8, wzr, #0x10
+	mov x0, x8
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
 	ret
 L8 (SSA Block: blk13):
 L9 (SSA Block: blk6):
-	movz w0, #0xb, lsl 0
+	movz w8, #0xb, lsl 0
+	mov x0, x8
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
 	ret
@@ -2054,12 +2137,18 @@ L9 (SSA Block: blk6):
 			afterFinalizeARM64: `
 L1 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
-	str xzr, [sp, #-0x10]!
+	str q29, [sp, #-0x10]!
+	str q30, [sp, #-0x10]!
+	orr x27, xzr, #0x20
+	str x27, [sp, #-0x10]!
 	mov v29.16b, v0.16b
 	mov v30.16b, v1.16b
 	ldr q8, #8; b 32; data.v128  0706050403020100 1f1e1d1c1b1a1918
-	tbl v0.16b, { v29.16b, v30.16b }, v8.16b
+	tbl v8.16b, { v29.16b, v30.16b }, v8.16b
+	mov v0.16b, v8.16b
 	add sp, sp, #0x10
+	ldr q30, [sp], #0x10
+	ldr q29, [sp], #0x10
 	ldr x30, [sp], #0x10
 	ret
 `,
@@ -2118,7 +2207,7 @@ L1 (SSA Block: blk0):
 				fmt.Println(be.Format())
 			}
 
-			be.Finalize()
+			be.Finalize(context.Background())
 			if verbose {
 				fmt.Println("============ finalization result ============")
 				fmt.Println(be.Format())
@@ -2130,9 +2219,6 @@ L1 (SSA Block: blk0):
 			default:
 				t.Fail()
 			}
-
-			// Sanity check on the final binary encoding.
-			be.Encode()
 		})
 	}
 }

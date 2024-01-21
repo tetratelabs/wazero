@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 )
@@ -13,6 +14,7 @@ import (
 // Note that passes suffixed with "Opt" are the optimization passes, meaning that they edit the instructions and blocks
 // while the other passes are not, like passEstimateBranchProbabilities does not edit them, but only calculates the additional information.
 func (b *builder) RunPasses() {
+	passSortSuccessors(b)
 	passDeadBlockEliminationOpt(b)
 	passRedundantPhiEliminationOpt(b)
 	// The result of passCalculateImmediateDominators will be used by various passes below.
@@ -348,5 +350,26 @@ func passNopInstElimination(b *builder) {
 				}
 			}
 		}
+	}
+}
+
+// passSortSuccessors sorts the successors of each block in the natural program order.
+func passSortSuccessors(b *builder) {
+	for i := 0; i < b.basicBlocksPool.Allocated(); i++ {
+		blk := b.basicBlocksPool.View(i)
+		sort.SliceStable(blk.success, func(i, j int) bool {
+			iBlk, jBlk := blk.success[i], blk.success[j]
+			if jBlk.ReturnBlock() {
+				return true
+			}
+			if iBlk.ReturnBlock() {
+				return false
+			}
+			iRoot, jRoot := iBlk.rootInstr, jBlk.rootInstr
+			if iRoot == nil || jRoot == nil { // For testing.
+				return true
+			}
+			return iBlk.rootInstr.id < jBlk.rootInstr.id
+		})
 	}
 }

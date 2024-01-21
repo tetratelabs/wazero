@@ -142,10 +142,8 @@ func TestMachine_getOperand_SR_NR(t *testing.T) {
 		def = &backend.SSAValueDefinition{Instr: ishl, N: 0}
 		mode = extModeNone
 		verify = func(t *testing.T) {
-			_, ok := ctx.lowered[ishl]
-			require.True(t, ok)
-			_, ok = ctx.lowered[amount]
-			require.True(t, ok)
+			require.True(t, ishl.Lowered())
+			require.True(t, amount.Lowered())
 		}
 		return
 	}
@@ -233,10 +231,8 @@ func TestMachine_getOperand_SR_NR(t *testing.T) {
 				def = &backend.SSAValueDefinition{Instr: ishl, N: 0}
 				mode = extModeNone
 				verify = func(t *testing.T) {
-					_, ok := ctx.lowered[ishl]
-					require.True(t, ok)
-					_, ok = ctx.lowered[amount]
-					require.True(t, ok)
+					require.True(t, ishl.Lowered())
+					require.True(t, amount.Lowered())
 				}
 				return
 			},
@@ -265,10 +261,8 @@ func TestMachine_getOperand_SR_NR(t *testing.T) {
 				def = &backend.SSAValueDefinition{Instr: ishl, N: 0}
 				mode = extModeNone
 				verify = func(t *testing.T) {
-					_, ok := ctx.lowered[ishl]
-					require.True(t, ok)
-					_, ok = ctx.lowered[amount]
-					require.True(t, ok)
+					require.True(t, ishl.Lowered())
+					require.True(t, amount.Lowered())
 				}
 				return
 			},
@@ -280,7 +274,6 @@ func TestMachine_getOperand_SR_NR(t *testing.T) {
 			setup: func(ctx *mockCompiler, builder ssa.Builder, m *machine) (def *backend.SSAValueDefinition, mode extMode, verify func(t *testing.T)) {
 				def, mode, _ = ishlWithConstAmount(ctx, builder, m)
 				ctx.currentGID = 1230
-				verify = func(t *testing.T) { require.Equal(t, 0, len(ctx.lowered)) }
 				return
 			},
 			exp: operandNR(regalloc.VReg(10)),
@@ -290,7 +283,6 @@ func TestMachine_getOperand_SR_NR(t *testing.T) {
 			setup: func(ctx *mockCompiler, builder ssa.Builder, m *machine) (def *backend.SSAValueDefinition, mode extMode, verify func(t *testing.T)) {
 				def, mode, _ = ishlWithConstAmount(ctx, builder, m)
 				def.RefCount = 10
-				verify = func(t *testing.T) { require.Equal(t, 0, len(ctx.lowered)) }
 				return
 			},
 			exp: operandNR(regalloc.VReg(10)),
@@ -301,7 +293,9 @@ func TestMachine_getOperand_SR_NR(t *testing.T) {
 			def, mode, verify := tc.setup(ctx, b, m)
 			actual := m.getOperand_SR_NR(def, mode)
 			require.Equal(t, tc.exp, actual)
-			verify(t)
+			if verify != nil {
+				verify(t)
+			}
 			require.Equal(t, strings.Join(tc.instructions, "\n"), formatEmittedInstructionsInCurrentBlock(m))
 		})
 	}
@@ -369,8 +363,7 @@ func TestMachine_getOperand_ER_SR_NR(t *testing.T) {
 					ctx.definitions[v] = &backend.SSAValueDefinition{BlkParamVReg: regalloc.VReg(10), BlockParamValue: extArg}
 					def = &backend.SSAValueDefinition{Instr: ext, N: 0}
 					return def, extModeNone, func(t *testing.T) {
-						_, ok := ctx.lowered[ext]
-						require.True(t, ok)
+						require.True(t, ext.Lowered())
 					}
 				},
 				exp: c.exp,
@@ -589,8 +582,7 @@ func TestMachine_getOperand_ER_SR_NR(t *testing.T) {
 						}
 						def = &backend.SSAValueDefinition{Instr: ext, N: 0}
 						return def, c.mode, func(t *testing.T) {
-							_, ok := ctx.lowered[ext]
-							require.Equal(t, c.lowered, ok)
+							require.Equal(t, c.lowered, ext.Lowered())
 						}
 					},
 					exp:          c.exp,

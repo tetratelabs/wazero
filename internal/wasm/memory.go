@@ -1,14 +1,20 @@
 package wasm
 
 import (
+	"container/list"
 	"encoding/binary"
 	"fmt"
 	"math"
 	"reflect"
+	"sync"
+	"sync/atomic"
+	"time"
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/internalapi"
+	"github.com/tetratelabs/wazero/internal/platform"
+	"github.com/tetratelabs/wazero/internal/wasmruntime"
 )
 
 const (
@@ -26,6 +32,11 @@ const (
 // compile-time check to ensure MemoryInstance implements api.Memory
 var _ api.Memory = &MemoryInstance{}
 
+type waiters struct {
+	mux sync.Mutex
+	l   *list.List
+}
+
 // MemoryInstance represents a memory instance in a store, and implements api.Memory.
 //
 // Note: In WebAssembly 1.0 (20191205), there may be up to one Memory per store, which means the precise memory is always
@@ -36,20 +47,81 @@ type MemoryInstance struct {
 
 	Buffer        []byte
 	Min, Cap, Max uint32
+	Shared        bool
 	// definition is known at compile time.
 	definition api.MemoryDefinition
+
+	// Mux is used in interpreter mode to prevent overlapping calls to atomic instructions,
+	// introduced with WebAssembly threads proposal.
+	Mux sync.Mutex
+
+	// waiters implements atomic wait and notify. It is implemented similarly to golang.org/x/sync/semaphore,
+	// with a fixed weight of 1 and no spurious notifications.
+	waiters sync.Map
+
+	mmappedMemory bool
+	closed        bool
 }
 
 // NewMemoryInstance creates a new instance based on the parameters in the SectionIDMemory.
 func NewMemoryInstance(memSec *Memory) *MemoryInstance {
 	min := MemoryPagesToBytesNum(memSec.Min)
 	capacity := MemoryPagesToBytesNum(memSec.Cap)
-	return &MemoryInstance{
-		Buffer: make([]byte, min, capacity),
-		Min:    memSec.Min,
-		Cap:    memSec.Cap,
-		Max:    memSec.Max,
+
+	var buffer []byte
+	var cap uint32
+	mmappedMemory := false
+	if memSec.IsShared {
+		// Memory accesses can happen at the same time that memory is resized, meaning
+		// we cannot have the memory base move during operation. mmap allows allocating memory virtually so
+		// we can grow without changing the base. The spec requires max for shared memory currently because
+		// all threads implementations are effectively expected to use mmap for shared memory.
+		max := MemoryPagesToBytesNum(memSec.Max)
+		var b []byte
+		if platform.MmapSupported {
+			var err error
+			b, err = platform.MmapMemory(int(max))
+			if err != nil {
+				panic(fmt.Errorf("unable to mmap memory: %w", err))
+			}
+			mmappedMemory = true
+		} else {
+			// mmap not supported so we just preallocate a normal buffer. This will often be large, i.e. ~4GB,
+			// and likely isn't practical, but interpreter usage should be rare and the Wasm binary can be
+			// edited to reduce max memory size if support for non-mmap platforms is required.
+			b = make([]byte, max)
+		}
+		buffer = b[:MemoryPagesToBytesNum(memSec.Min)]
+		cap = memSec.Max
+	} else {
+		buffer = make([]byte, min, capacity)
+		cap = memSec.Cap
 	}
+
+	return &MemoryInstance{
+		Buffer:        buffer,
+		Min:           memSec.Min,
+		Cap:           cap,
+		Max:           memSec.Max,
+		Shared:        memSec.IsShared,
+		mmappedMemory: mmappedMemory,
+	}
+}
+
+func (m *MemoryInstance) Close() error {
+	if !m.mmappedMemory {
+		// No need to release anything for non-mmapped memory.
+		return nil
+	}
+
+	m.Mux.Lock()
+	defer m.Mux.Unlock()
+
+	if m.closed {
+		return nil
+	}
+	m.closed = true
+	return platform.MunmapCodeSegment(m.Buffer)
 }
 
 // Definition implements the same method as documented on api.Memory.
@@ -192,7 +264,12 @@ func (m *MemoryInstance) Grow(delta uint32) (result uint32, ok bool) {
 		return currentPages, true
 	} else { // We already have the capacity we need.
 		sp := (*reflect.SliceHeader)(unsafe.Pointer(&m.Buffer))
-		sp.Len = int(MemoryPagesToBytesNum(newPages))
+		if m.Shared {
+			// Use atomic write to ensure new length is visible across threads.
+			atomic.StoreUintptr((*uintptr)(unsafe.Pointer(&sp.Len)), uintptr(MemoryPagesToBytesNum(newPages)))
+		} else {
+			sp.Len = int(MemoryPagesToBytesNum(newPages))
+		}
 		return currentPages, true
 	}
 }
@@ -276,4 +353,104 @@ func (m *MemoryInstance) writeUint64Le(offset uint32, v uint64) bool {
 	}
 	binary.LittleEndian.PutUint64(m.Buffer[offset:], v)
 	return true
+}
+
+// Wait32 suspends the caller until the offset is notified by a different agent.
+func (m *MemoryInstance) Wait32(offset uint32, exp uint32, timeout int64, reader func(mem *MemoryInstance, offset uint32) uint32) uint64 {
+	w := m.getWaiters(offset)
+	w.mux.Lock()
+
+	cur := reader(m, offset)
+	if cur != exp {
+		w.mux.Unlock()
+		return 1
+	}
+
+	return m.wait(w, timeout)
+}
+
+// Wait64 suspends the caller until the offset is notified by a different agent.
+func (m *MemoryInstance) Wait64(offset uint32, exp uint64, timeout int64, reader func(mem *MemoryInstance, offset uint32) uint64) uint64 {
+	w := m.getWaiters(offset)
+	w.mux.Lock()
+
+	cur := reader(m, offset)
+	if cur != exp {
+		w.mux.Unlock()
+		return 1
+	}
+
+	return m.wait(w, timeout)
+}
+
+func (m *MemoryInstance) wait(w *waiters, timeout int64) uint64 {
+	if w.l == nil {
+		w.l = list.New()
+	}
+
+	// The specification requires a trap if the number of existing waiters + 1 == 2^32, so we add a check here.
+	// In practice, it is unlikely the application would ever accumulate such a large number of waiters as it
+	// indicates several GB of RAM used just for the list of waiters.
+	// https://github.com/WebAssembly/threads/blob/main/proposals/threads/Overview.md#wait
+	if uint64(w.l.Len()+1) == 1<<32 {
+		w.mux.Unlock()
+		panic(wasmruntime.ErrRuntimeTooManyWaiters)
+	}
+
+	ready := make(chan struct{})
+	elem := w.l.PushBack(ready)
+	w.mux.Unlock()
+
+	if timeout < 0 {
+		<-ready
+		return 0
+	} else {
+		select {
+		case <-ready:
+			return 0
+		case <-time.After(time.Duration(timeout)):
+			// While we could see if the channel completed by now and ignore the timeout, similar to x/sync/semaphore,
+			// the Wasm spec doesn't specify this behavior, so we keep things simple by prioritizing the timeout.
+			w.mux.Lock()
+			w.l.Remove(elem)
+			w.mux.Unlock()
+			return 2
+		}
+	}
+}
+
+func (m *MemoryInstance) getWaiters(offset uint32) *waiters {
+	wAny, ok := m.waiters.Load(offset)
+	if !ok {
+		// The first time an address is waited on, simultaneous waits will cause extra allocations.
+		// Further operations will be loaded above, which is also the general pattern of usage with
+		// mutexes.
+		wAny, _ = m.waiters.LoadOrStore(offset, &waiters{})
+	}
+
+	return wAny.(*waiters)
+}
+
+// Notify wakes up at most count waiters at the given offset.
+func (m *MemoryInstance) Notify(offset uint32, count uint32) uint32 {
+	wAny, ok := m.waiters.Load(offset)
+	if !ok {
+		return 0
+	}
+	w := wAny.(*waiters)
+
+	w.mux.Lock()
+	defer w.mux.Unlock()
+	if w.l == nil {
+		return 0
+	}
+
+	res := uint32(0)
+	for num := w.l.Len(); num > 0 && res < count; num = w.l.Len() {
+		w := w.l.Remove(w.l.Front()).(chan struct{})
+		close(w)
+		res++
+	}
+
+	return res
 }

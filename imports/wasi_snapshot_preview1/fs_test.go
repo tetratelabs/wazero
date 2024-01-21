@@ -480,6 +480,42 @@ func Test_fdFdstatGet_StdioNonblock(t *testing.T) {
 	}
 }
 
+func Test_fdFdstatSetFlagsWithTrunc(t *testing.T) {
+	tmpDir := t.TempDir()
+	fileName := "test"
+
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().
+		WithFSConfig(wazero.NewFSConfig().WithDirMount(tmpDir, "/")))
+	defer r.Close(testCtx)
+
+	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
+	preopen := fsc.RootFS()
+
+	fd, errno := fsc.OpenFile(preopen, fileName, experimentalsys.O_RDWR|experimentalsys.O_CREAT|experimentalsys.O_EXCL|experimentalsys.O_TRUNC, 0o600)
+	require.EqualErrno(t, 0, errno)
+
+	// Write the initial text to the file.
+	f, ok := fsc.LookupFile(fd)
+	require.True(t, ok)
+	n, _ := f.File.Write([]byte("abc"))
+	require.Equal(t, n, 3)
+
+	buf, err := os.ReadFile(joinPath(tmpDir, fileName))
+	require.NoError(t, err)
+	require.Equal(t, "abc", string(buf))
+
+	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdFdstatSetFlagsName, uint64(fd), uint64(0))
+	require.Equal(t, `
+==> wasi_snapshot_preview1.fd_fdstat_set_flags(fd=4,flags=)
+<== errno=ESUCCESS
+`, "\n"+log.String())
+	log.Reset()
+
+	buf, err = os.ReadFile(joinPath(tmpDir, fileName))
+	require.NoError(t, err)
+	require.Equal(t, "abc", string(buf))
+}
+
 func Test_fdFdstatSetFlags(t *testing.T) {
 	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
 
@@ -561,6 +597,13 @@ func Test_fdFdstatSetFlags(t *testing.T) {
 `, "\n"+log.String()) // FIXME? flags==0 prints 'flags='
 	log.Reset()
 
+	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdSeekName, uint64(fd), uint64(0), uint64(0), uint64(1024))
+	require.Equal(t, `
+==> wasi_snapshot_preview1.fd_seek(fd=4,offset=0,whence=0)
+<== (newoffset=0,errno=ESUCCESS)
+`, "\n"+log.String())
+	log.Reset()
+
 	// Without O_APPEND flag, the data is written at the beginning.
 	writeWazero()
 	requireFileContent("wazero6789" + "wazero")
@@ -572,6 +615,16 @@ func Test_fdFdstatSetFlags(t *testing.T) {
 <== errno=ESUCCESS
 `, "\n"+log.String()) // FIXME? flags==1 prints 'flags=APPEND'
 	log.Reset()
+
+	// Restoring the O_APPEND flag should not reset fd offset.
+	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdTellName, uint64(fd), uint64(1024))
+	require.Equal(t, `
+==> wasi_snapshot_preview1.fd_tell(fd=4,result.offset=1024)
+<== errno=ESUCCESS
+`, "\n"+log.String())
+	log.Reset()
+	offset, _ := mod.Memory().Read(1024, 4)
+	require.Equal(t, offset, []byte{6, 0, 0, 0})
 
 	// with O_APPEND flag, the data is appended to buffer.
 	writeWazero()
@@ -782,7 +835,7 @@ func Test_fdFilestatSetSize(t *testing.T) {
 
 	tests := []struct {
 		name                     string
-		size                     uint32
+		size                     uint64
 		content, expectedContent []byte
 		expectedLog              string
 		expectedErrno            wasip1.Errno
@@ -828,6 +881,17 @@ func Test_fdFilestatSetSize(t *testing.T) {
 			expectedLog: `
 ==> wasi_snapshot_preview1.fd_filestat_set_size(fd=4,size=106)
 <== errno=ESUCCESS
+`,
+		},
+		{
+			name:            "large size",
+			content:         []byte(""),
+			expectedContent: []byte(""),
+			size:            math.MaxUint64,
+			expectedErrno:   wasip1.ErrnoInval,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_filestat_set_size(fd=4,size=-1)
+<== errno=EINVAL
 `,
 		},
 	}

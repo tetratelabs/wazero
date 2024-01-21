@@ -9,7 +9,9 @@ import (
 
 // SetupPrologue implements backend.Machine.
 func (m *machine) SetupPrologue() {
-	cur := m.rootInstr
+	ectx := m.executableContext
+
+	cur := ectx.RootInstr
 	prevInitInst := cur.next
 
 	//
@@ -41,6 +43,39 @@ func (m *machine) SetupPrologue() {
 		panic(fmt.Sprintf("BUG: spillSlotSize=%d, spillSlots=%v\n", m.spillSlotSize, m.spillSlots))
 	}
 
+	if regs := m.clobberedRegs; len(regs) > 0 {
+		//
+		//            (high address)                  (high address)
+		//          +-----------------+             +-----------------+
+		//          |     .......     |             |     .......     |
+		//          |      ret Y      |             |      ret Y      |
+		//          |     .......     |             |     .......     |
+		//          |      ret 0      |             |      ret 0      |
+		//          |      arg X      |             |      arg X      |
+		//          |     .......     |             |     .......     |
+		//          |      arg 1      |             |      arg 1      |
+		//          |      arg 0      |             |      arg 0      |
+		//          | size_of_arg_ret |             | size_of_arg_ret |
+		//          |   ReturnAddress |             |  ReturnAddress  |
+		//  SP----> +-----------------+    ====>    +-----------------+
+		//             (low address)                |   clobbered M   |
+		//                                          |   ............  |
+		//                                          |   clobbered 0   |
+		//                                          +-----------------+ <----- SP
+		//                                             (low address)
+		//
+		_amode := addressModePreOrPostIndex(spVReg,
+			-16,  // stack pointer must be 16-byte aligned.
+			true, // Decrement before store.
+		)
+		for _, vr := range regs {
+			// TODO: pair stores to reduce the number of instructions.
+			store := m.allocateInstr()
+			store.asStore(operandNR(vr), _amode, regTypeToRegisterSizeInBits(vr.RegType()))
+			cur = linkInstr(cur, store)
+		}
+	}
+
 	if size := m.spillSlotSize; size > 0 {
 		// Check if size is 16-byte aligned.
 		if size&0xf != 0 {
@@ -64,51 +99,15 @@ func (m *machine) SetupPrologue() {
 		//          |  size_of_arg_ret |
 		//          |   ReturnAddress  |
 		//          +------------------+
-		//          |   spill slot M   |
+		//          |    clobbered M   |
+		//          |   ............   |
+		//          |    clobbered 0   |
+		//          |   spill slot N   |
 		//          |   ............   |
 		//          |   spill slot 2   |
-		//          |   spill slot 1   |
+		//          |   spill slot 0   |
 		//  SP----> +------------------+
 		//             (low address)
-	}
-
-	if regs := m.clobberedRegs; len(regs) > 0 {
-		//
-		//            (high address)                  (high address)
-		//          +-----------------+             +-----------------+
-		//          |     .......     |             |     .......     |
-		//          |      ret Y      |             |      ret Y      |
-		//          |     .......     |             |     .......     |
-		//          |      ret 0      |             |      ret 0      |
-		//          |      arg X      |             |      arg X      |
-		//          |     .......     |             |     .......     |
-		//          |      arg 1      |             |      arg 1      |
-		//          |      arg 0      |             |      arg 0      |
-		//          | size_of_arg_ret |             | size_of_arg_ret |
-		//          |   ReturnAddress |             |  ReturnAddress  |
-		//          +-----------------+    ====>    +-----------------+
-		//          |   ...........   |             |   ...........   |
-		//          |   spill slot M  |             |   spill slot M  |
-		//          |   ............  |             |   ............  |
-		//          |   spill slot 2  |             |   spill slot 2  |
-		//          |   spill slot 1  |             |   spill slot 1  |
-		//  SP----> +-----------------+             |   spill slot 1  |
-		//             (low address)                |   clobbered N   |
-		//                                          |   ............  |
-		//                                          |   clobbered 0   |
-		//                                          +-----------------+ <----- SP
-		//                                             (low address)
-		//
-		_amode := addressModePreOrPostIndex(spVReg,
-			-16,  // stack pointer must be 16-byte aligned.
-			true, // Decrement before store.
-		)
-		for _, vr := range regs {
-			// TODO: pair stores to reduce the number of instructions.
-			store := m.allocateInstr()
-			store.asStore(operandNR(vr), _amode, regTypeToRegisterSizeInBits(vr.RegType()))
-			cur = linkInstr(cur, store)
-		}
 	}
 
 	// We push the frame size into the stack to make it possible to unwind stack:
@@ -127,15 +126,14 @@ func (m *machine) SetupPrologue() {
 	//         | size_of_arg_ret |                | size_of_arg_ret |
 	//         |  ReturnAddress  |                |  ReturnAddress  |
 	//         +-----------------+      ==>       +-----------------+ <----+
-	//         |   ...........   |                |   ...........   |      |
-	//         |   spill slot M  |                |   spill slot M  |      |
+	//         |   clobbered  M  |                |   clobbered  M  |      |
 	//         |   ............  |                |   ............  |      |
-	//         |   spill slot 2  |                |   spill slot 2  |      |
-	//         |   spill slot 1  |                |   spill slot 1  |      | frame size
-	//         |   spill slot 1  |                |   spill slot 1  |      |
-	//         |   clobbered N   |                |   clobbered N   |      |
+	//         |   clobbered  2  |                |   clobbered  2  |      |
+	//         |   clobbered  1  |                |   clobbered  1  |      | frame size
+	//         |   clobbered  0  |                |   clobbered  0  |      |
+	//         |   spill slot N  |                |   spill slot N  |      |
 	//         |   ............  |                |   ............  |      |
-	//         |   clobbered 0   |                |   clobbered 0   | <----+
+	//         |   spill slot 0  |                |   spill slot 0  | <----+
 	// SP--->  +-----------------+                |     xxxxxx      |  ;; unused space to make it 16-byte aligned.
 	//                                            |   frame_size    |
 	//                                            +-----------------+ <---- SP
@@ -149,7 +147,7 @@ func (m *machine) SetupPrologue() {
 func (m *machine) createReturnAddrAndSizeOfArgRetSlot(cur *instruction) *instruction {
 	// First we decrement the stack pointer to point the arg0 slot.
 	var sizeOfArgRetReg regalloc.VReg
-	s := m.currentABI.alignedArgResultStackSlotSize()
+	s := m.currentABI.AlignedArgResultStackSlotSize()
 	if s > 0 {
 		cur = m.lowerConstantI64AndInsert(cur, tmpRegVReg, s)
 		sizeOfArgRetReg = tmpRegVReg
@@ -190,7 +188,8 @@ func (m *machine) createFrameSizeSlot(cur *instruction, s int64) *instruction {
 
 // SetupEpilogue implements backend.Machine.
 func (m *machine) SetupEpilogue() {
-	for cur := m.rootInstr; cur != nil; cur = cur.next {
+	ectx := m.executableContext
+	for cur := ectx.RootInstr; cur != nil; cur = cur.next {
 		if cur.kind == ret {
 			m.setupEpilogueAfter(cur.prev)
 			continue
@@ -198,7 +197,7 @@ func (m *machine) SetupEpilogue() {
 
 		// Removes the redundant copy instruction.
 		// TODO: doing this in `SetupEpilogue` seems weird. Find a better home.
-		if cur.isCopy() && cur.rn.realReg() == cur.rd.realReg() {
+		if cur.IsCopy() && cur.rn.realReg() == cur.rd.realReg() {
 			prev, next := cur.prev, cur.next
 			// Remove the copy instruction.
 			prev.next = next
@@ -215,6 +214,35 @@ func (m *machine) setupEpilogueAfter(cur *instruction) {
 	// We've stored the frame size in the prologue, and now that we are about to return from this function, we won't need it anymore.
 	cur = m.addsAddOrSubStackPointer(cur, spVReg, 16, true)
 
+	if s := m.spillSlotSize; s > 0 {
+		// Adjust SP to the original value:
+		//
+		//            (high address)                        (high address)
+		//          +-----------------+                  +-----------------+
+		//          |     .......     |                  |     .......     |
+		//          |      ret Y      |                  |      ret Y      |
+		//          |     .......     |                  |     .......     |
+		//          |      ret 0      |                  |      ret 0      |
+		//          |      arg X      |                  |      arg X      |
+		//          |     .......     |                  |     .......     |
+		//          |      arg 1      |                  |      arg 1      |
+		//          |      arg 0      |                  |      arg 0      |
+		//          |      xxxxx      |                  |      xxxxx      |
+		//          |   ReturnAddress |                  |   ReturnAddress |
+		//          +-----------------+      ====>       +-----------------+
+		//          |    clobbered M  |                  |    clobbered M  |
+		//          |   ............  |                  |   ............  |
+		//          |    clobbered 1  |                  |    clobbered 1  |
+		//          |    clobbered 0  |                  |    clobbered 0  |
+		//          |   spill slot N  |                  +-----------------+ <---- SP
+		//          |   ............  |
+		//          |   spill slot 0  |
+		//   SP---> +-----------------+
+		//             (low address)
+		//
+		cur = m.addsAddOrSubStackPointer(cur, spVReg, s, true)
+	}
+
 	// First we need to restore the clobbered registers.
 	if len(m.clobberedRegs) > 0 {
 		//            (high address)
@@ -227,17 +255,13 @@ func (m *machine) setupEpilogueAfter(cur *instruction) {
 		//          |     .......     |                      |     .......     |
 		//          |      arg 1      |                      |      arg 1      |
 		//          |      arg 0      |                      |      arg 0      |
+		//          |      xxxxx      |                      |      xxxxx      |
 		//          |   ReturnAddress |                      |   ReturnAddress |
-		//          +-----------------+      ========>       +-----------------+
-		//          |   ...........   |                      |   ...........   |
-		//          |   spill slot M  |                      |   spill slot M  |
-		//          |   ............  |                      |   ............  |
-		//          |   spill slot 2  |                      |   spill slot 2  |
-		//          |   spill slot 1  |                      |   spill slot 1  |
-		//          |   clobbered 0   |               SP---> +-----------------+
+		//          +-----------------+      ========>       +-----------------+ <---- SP
+		//          |   clobbered M   |
 		//          |   clobbered 1   |
 		//          |   ...........   |
-		//          |   clobbered N   |
+		//          |   clobbered 0   |
 		//   SP---> +-----------------+
 		//             (low address)
 
@@ -260,33 +284,6 @@ func (m *machine) setupEpilogueAfter(cur *instruction) {
 		}
 	}
 
-	if s := m.spillSlotSize; s > 0 {
-		// Adjust SP to the original value:
-		//
-		//            (high address)                        (high address)
-		//          +-----------------+                  +-----------------+
-		//          |     .......     |                  |     .......     |
-		//          |      ret Y      |                  |      ret Y      |
-		//          |     .......     |                  |     .......     |
-		//          |      ret 0      |                  |      ret 0      |
-		//          |      arg X      |                  |      arg X      |
-		//          |     .......     |                  |     .......     |
-		//          |      arg 1      |                  |      arg 1      |
-		//          |      arg 0      |                  |      arg 0      |
-		//          |      xxxxx      |                  |      xxxxx      |
-		//          |   ReturnAddress |                  |   ReturnAddress |
-		//          +-----------------+      ====>       +-----------------+ <---- SP
-		//          |   ...........   |                     (low address)
-		//          |   spill slot M  |
-		//          |   ............  |
-		//          |   spill slot 2  |
-		//          |   spill slot 1  |
-		//   SP---> +-----------------+
-		//             (low address)
-		//
-		cur = m.addsAddOrSubStackPointer(cur, spVReg, s, true)
-	}
-
 	// Reload the return address (lr).
 	//
 	//            +-----------------+          +-----------------+
@@ -307,7 +304,7 @@ func (m *machine) setupEpilogueAfter(cur *instruction) {
 		addressModePreOrPostIndex(spVReg, 16 /* stack pointer must be 16-byte aligned. */, false /* increment after loads */), 64)
 	cur = linkInstr(cur, ldr)
 
-	if s := m.currentABI.alignedArgResultStackSlotSize(); s > 0 {
+	if s := m.currentABI.AlignedArgResultStackSlotSize(); s > 0 {
 		cur = m.addsAddOrSubStackPointer(cur, spVReg, s, true)
 	}
 
@@ -366,7 +363,7 @@ func (m *machine) insertStackBoundsCheck(requiredStackSize int64, cur *instructi
 
 	// b.ge #imm
 	cbr := m.allocateInstr()
-	cbr.asCondBr(ge.asCond(), invalidLabel, false /* ignored */)
+	cbr.asCondBr(ge.asCond(), labelInvalid, false /* ignored */)
 	cur = linkInstr(cur, cbr)
 
 	// Set the required stack size and set it to the exec context.
@@ -413,9 +410,11 @@ func (m *machine) insertStackBoundsCheck(requiredStackSize int64, cur *instructi
 
 // CompileStackGrowCallSequence implements backend.Machine.
 func (m *machine) CompileStackGrowCallSequence() []byte {
+	ectx := m.executableContext
+
 	cur := m.allocateInstr()
 	cur.asNop0()
-	m.rootInstr = cur
+	ectx.RootInstr = cur
 
 	// Save the callee saved and argument registers.
 	cur = m.saveRegistersInExecutionContext(cur, saveRequiredRegs)
@@ -437,14 +436,16 @@ func (m *machine) CompileStackGrowCallSequence() []byte {
 	ret.asRet(nil)
 	linkInstr(cur, ret)
 
-	m.encode(m.rootInstr)
+	m.encode(ectx.RootInstr)
 	return m.compiler.Buf()
 }
 
 func (m *machine) addsAddOrSubStackPointer(cur *instruction, rd regalloc.VReg, diff int64, add bool) *instruction {
-	m.pendingInstructions = m.pendingInstructions[:0]
+	ectx := m.executableContext
+
+	ectx.PendingInstructions = ectx.PendingInstructions[:0]
 	m.insertAddOrSubStackPointer(rd, diff, add)
-	for _, inserted := range m.pendingInstructions {
+	for _, inserted := range ectx.PendingInstructions {
 		cur = linkInstr(cur, inserted)
 	}
 	return cur

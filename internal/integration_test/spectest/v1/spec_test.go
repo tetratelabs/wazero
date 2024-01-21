@@ -7,7 +7,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/internal/engine/wazevo"
+	"github.com/tetratelabs/wazero/experimental/opt"
 	"github.com/tetratelabs/wazero/internal/integration_test/spectest"
 	"github.com/tetratelabs/wazero/internal/platform"
 )
@@ -24,10 +24,9 @@ func TestInterpreter(t *testing.T) {
 }
 
 func TestWazevo(t *testing.T) {
-	c := wazero.NewRuntimeConfigCompiler().WithCoreFeatures(api.CoreFeaturesV1)
 	if runtime.GOARCH != "arm64" {
 		t.Skip()
 	}
-	wazevo.ConfigureWazevo(c)
+	c := opt.NewRuntimeConfigOptimizingCompiler().WithCoreFeatures(api.CoreFeaturesV1)
 	spectest.Run(t, Testcases, context.Background(), c)
 }

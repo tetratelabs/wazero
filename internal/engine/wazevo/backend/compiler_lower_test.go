@@ -50,6 +50,10 @@ func TestCompiler_lowerBlockArguments(t *testing.T) {
 							target regalloc.VReg
 						}{instr: instr, target: vr})
 					},
+					argResultInts: []regalloc.RealReg{regalloc.RealReg(0), regalloc.RealReg(1)},
+					argResultFloats: []regalloc.RealReg{
+						regalloc.RealReg(2), regalloc.RealReg(3), regalloc.RealReg(4), regalloc.RealReg(5),
+					},
 				}
 
 				c := newCompiler(context.Background(), m, builder)

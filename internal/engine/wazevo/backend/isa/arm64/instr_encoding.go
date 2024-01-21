@@ -1,6 +1,7 @@
 package arm64
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
@@ -9,8 +10,9 @@ import (
 )
 
 // Encode implements backend.Machine Encode.
-func (m *machine) Encode() {
-	m.encode(m.rootInstr)
+func (m *machine) Encode(ctx context.Context) {
+	m.resolveRelativeAddresses(ctx)
+	m.encode(m.executableContext.RootInstr)
 }
 
 func (m *machine) encode(root *instruction) {
@@ -214,9 +216,15 @@ func (i *instruction) encode(c backend.Compiler) {
 	case cSet:
 		rd := regNumberInEncoding[i.rd.realReg()]
 		cf := condFlag(i.u1)
-		// https://developer.arm.com/documentation/ddi0602/2022-06/Base-Instructions/CSET--Conditional-Set--an-alias-of-CSINC-
-		// Note that we set 64bit version here.
-		c.Emit4Bytes(0b1001101010011111<<16 | uint32(cf.invert())<<12 | 0b111111<<5 | rd)
+		if i.u2 == 1 {
+			// https://developer.arm.com/documentation/ddi0602/2022-03/Base-Instructions/CSETM--Conditional-Set-Mask--an-alias-of-CSINV-
+			// Note that we set 64bit version here.
+			c.Emit4Bytes(0b1101101010011111<<16 | uint32(cf.invert())<<12 | 0b011111<<5 | rd)
+		} else {
+			// https://developer.arm.com/documentation/ddi0602/2022-06/Base-Instructions/CSET--Conditional-Set--an-alias-of-CSINC-
+			// Note that we set 64bit version here.
+			c.Emit4Bytes(0b1001101010011111<<16 | uint32(cf.invert())<<12 | 0b111111<<5 | rd)
+		}
 	case extend:
 		c.Emit4Bytes(encodeExtend(i.u3 == 1, byte(i.u1), byte(i.u2), regNumberInEncoding[i.rd.realReg()], regNumberInEncoding[i.rn.realReg()]))
 	case fpuCmp:
@@ -350,6 +358,11 @@ func (i *instruction) encode(c backend.Compiler) {
 			i.u3 == 1,
 		))
 	case vecRRR:
+		if op := vecOp(i.u1); op == vecOpBsl || op == vecOpBit || op == vecOpUmlal {
+			panic(fmt.Sprintf("vecOp %s must use vecRRRRewrite instead of vecRRR", op.String()))
+		}
+		fallthrough
+	case vecRRRRewrite:
 		c.Emit4Bytes(encodeVecRRR(
 			vecOp(i.u1),
 			regNumberInEncoding[i.rd.realReg()],
@@ -2139,7 +2152,7 @@ func encodeBrTableSequence(c backend.Compiler, index regalloc.VReg, targets []ui
 	}
 }
 
-// encodeExitSequence matches the implementation detail of abiImpl.emitGoEntryPreamble.
+// encodeExitSequence matches the implementation detail of functionABI.emitGoEntryPreamble.
 func encodeExitSequence(c backend.Compiler, ctxReg regalloc.VReg) {
 	// Restore the FP, SP and LR, and return to the Go code:
 	// 		ldr lr,  [ctxReg, #GoReturnAddress]

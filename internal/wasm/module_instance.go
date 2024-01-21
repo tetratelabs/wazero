@@ -157,6 +157,12 @@ func (m *ModuleInstance) ensureResourcesClosed(ctx context.Context) (err error) 
 		m.Sys = nil
 	}
 
+	if mem := m.MemoryInstance; mem != nil {
+		if err = mem.Close(); err != nil {
+			return err
+		}
+	}
+
 	if m.CodeCloser == nil {
 		return
 	}

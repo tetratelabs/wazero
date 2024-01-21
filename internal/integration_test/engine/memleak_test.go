@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/internal/engine/wazevo"
+	"github.com/tetratelabs/wazero/experimental/opt"
 )
 
 func TestMemoryLeak(t *testing.T) {
@@ -61,8 +61,7 @@ func testMemoryLeakInstantiateRuntimeAndModule(isWazevo bool) error {
 
 	var r wazero.Runtime
 	if isWazevo {
-		c := wazero.NewRuntimeConfigInterpreter()
-		wazevo.ConfigureWazevo(c)
+		c := opt.NewRuntimeConfigOptimizingCompiler()
 		r = wazero.NewRuntimeWithConfig(ctx, c)
 	} else {
 		r = wazero.NewRuntime(ctx)

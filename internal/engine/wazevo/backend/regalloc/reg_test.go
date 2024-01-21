@@ -23,5 +23,5 @@ func TestVReg_String(t *testing.T) {
 func Test_FromRealReg(t *testing.T) {
 	r := FromRealReg(5, RegTypeInt)
 	require.Equal(t, RealReg(5), r.RealReg())
-	require.Equal(t, VRegID(vRegIDReservedForRealBegin+5), r.ID())
+	require.Equal(t, VRegID(5), r.ID())
 }

@@ -1416,6 +1416,8 @@ func (c *Compiler) lowerCurrentOpcode() {
 		builder.Seal(thenBlk)
 		builder.Seal(elseBlk)
 	case wasm.OpcodeElse:
+		c.clearSafeBounds() // Reset the safe bounds since we are entering the Else block.
+
 		ifctrl := state.ctrlPeekAt(0)
 		if unreachable := state.unreachable; unreachable && state.unreachableDepth > 0 {
 			// If it is currently in unreachable and is a nested if,
@@ -1443,6 +1445,8 @@ func (c *Compiler) lowerCurrentOpcode() {
 		builder.SetCurrentBlock(elseBlk)
 
 	case wasm.OpcodeEnd:
+		c.clearSafeBounds() // Reset the safe bounds since we are exiting the block.
+
 		if state.unreachableDepth > 0 {
 			state.unreachableDepth--
 			break
@@ -1692,6 +1696,9 @@ func (c *Compiler) lowerCurrentOpcode() {
 			state.pc += 8
 			hi := binary.LittleEndian.Uint64(c.wasmFunctionBody[state.pc:])
 			state.pc += 7
+			if state.unreachable {
+				break
+			}
 			ret := builder.AllocateInstruction().AsVconst(lo, hi).Insert(builder).Return()
 			state.push(ret)
 		case wasm.OpcodeVecV128Load:
@@ -3094,13 +3101,14 @@ func (c *Compiler) lowerCurrentOpcode() {
 			state.push(ret)
 		case wasm.OpcodeVecV128i8x16Shuffle:
 			state.pc++
+			laneIndexes := c.wasmFunctionBody[state.pc : state.pc+16]
+			state.pc += 15
 			if state.unreachable {
 				break
 			}
 			v2 := state.pop()
 			v1 := state.pop()
-			ret := builder.AllocateInstruction().AsShuffle(v1, v2, c.wasmFunctionBody[state.pc:state.pc+16]).Insert(builder).Return()
-			state.pc += 15
+			ret := builder.AllocateInstruction().AsShuffle(v1, v2, laneIndexes).Insert(builder).Return()
 			state.push(ret)
 
 		case wasm.OpcodeVecI8x16Swizzle:
@@ -3364,24 +3372,35 @@ func (c *Compiler) lowerCallIndirect(typeIndex, tableIndex uint32) {
 
 // memOpSetup inserts the bounds check and calculates the address of the memory operation (loads/stores).
 func (c *Compiler) memOpSetup(baseAddr ssa.Value, constOffset, operationSizeInBytes uint64) (address ssa.Value) {
+	address = ssa.ValueInvalid
 	builder := c.ssaBuilder
 
+	baseAddrID := baseAddr.ID()
 	ceil := constOffset + operationSizeInBytes
+	if known := c.getKnownSafeBound(baseAddrID); known.valid() {
+		// We reuse the calculated absolute address even if the bound is not known to be safe.
+		address = known.absoluteAddr
+		if ceil <= known.bound {
+			return
+		}
+	}
+
 	ceilConst := builder.AllocateInstruction()
 	ceilConst.AsIconst64(ceil)
 	builder.InsertInstruction(ceilConst)
 
 	// We calculate the offset in 64-bit space.
-	extBaseAddr := builder.AllocateInstruction()
-	extBaseAddr.AsUExtend(baseAddr, 32, 64)
-	builder.InsertInstruction(extBaseAddr)
+	extBaseAddr := builder.AllocateInstruction().
+		AsUExtend(baseAddr, 32, 64).
+		Insert(builder).
+		Return()
 
 	// Note: memLen is already zero extended to 64-bit space at the load time.
 	memLen := c.getMemoryLenValue(false)
 
 	// baseAddrPlusCeil = baseAddr + ceil
 	baseAddrPlusCeil := builder.AllocateInstruction()
-	baseAddrPlusCeil.AsIadd(extBaseAddr.Return(), ceilConst.Return())
+	baseAddrPlusCeil.AsIadd(extBaseAddr, ceilConst.Return())
 	builder.InsertInstruction(baseAddrPlusCeil)
 
 	// Check for out of bounds memory access: `memLen >= baseAddrPlusCeil`.
@@ -3393,11 +3412,15 @@ func (c *Compiler) memOpSetup(baseAddr ssa.Value, constOffset, operationSizeInBy
 	builder.InsertInstruction(exitIfNZ)
 
 	// Load the value from memBase + extBaseAddr.
-	memBase := c.getMemoryBaseValue(false)
-	addrCalc := builder.AllocateInstruction()
-	addrCalc.AsIadd(memBase, extBaseAddr.Return())
-	builder.InsertInstruction(addrCalc)
-	return addrCalc.Return()
+	if address == ssa.ValueInvalid { // Reuse the value if the memBase is already calculated at this point.
+		memBase := c.getMemoryBaseValue(false)
+		address = builder.AllocateInstruction().
+			AsIadd(memBase, extBaseAddr).Insert(builder).Return()
+	}
+
+	// Record the bound ceil for this baseAddr is known to be safe for the subsequent memory access in the same block.
+	c.recordKnownSafeBound(baseAddrID, ceil, address)
+	return
 }
 
 func (c *Compiler) callMemmove(dst, src, size ssa.Value) {
@@ -3430,23 +3453,31 @@ func (c *Compiler) reloadAfterCall() {
 func (c *Compiler) reloadMemoryBaseLen() {
 	_ = c.getMemoryBaseValue(true)
 	_ = c.getMemoryLenValue(true)
-}
 
-// globalInstanceValueOffset is the offsetOf .Value field of wasm.GlobalInstance.
-const globalInstanceValueOffset = 8
+	// This function being called means that the memory base might have changed.
+	// Therefore, we need to clear the known safe bounds because we cache the absolute address of the memory access per each base offset.
+	c.clearSafeBounds()
+}
 
 func (c *Compiler) setWasmGlobalValue(index wasm.Index, v ssa.Value) {
 	variable := c.globalVariables[index]
-	instanceOffset := c.offset.GlobalInstanceOffset(index)
+	opaqueOffset := c.offset.GlobalInstanceOffset(index)
 
 	builder := c.ssaBuilder
-	loadGlobalInstPtr := builder.AllocateInstruction()
-	loadGlobalInstPtr.AsLoad(c.moduleCtxPtrValue, uint32(instanceOffset), ssa.TypeI64)
-	builder.InsertInstruction(loadGlobalInstPtr)
+	if index < c.m.ImportGlobalCount {
+		loadGlobalInstPtr := builder.AllocateInstruction()
+		loadGlobalInstPtr.AsLoad(c.moduleCtxPtrValue, uint32(opaqueOffset), ssa.TypeI64)
+		builder.InsertInstruction(loadGlobalInstPtr)
 
-	store := builder.AllocateInstruction()
-	store.AsStore(ssa.OpcodeStore, v, loadGlobalInstPtr.Return(), uint32(globalInstanceValueOffset))
-	builder.InsertInstruction(store)
+		store := builder.AllocateInstruction()
+		store.AsStore(ssa.OpcodeStore, v, loadGlobalInstPtr.Return(), uint32(0))
+		builder.InsertInstruction(store)
+
+	} else {
+		store := builder.AllocateInstruction()
+		store.AsStore(ssa.OpcodeStore, v, c.moduleCtxPtrValue, uint32(opaqueOffset))
+		builder.InsertInstruction(store)
+	}
 
 	// The value has changed to `v`, so we record it.
 	builder.DefineVariableInCurrentBB(variable, v)
@@ -3455,7 +3486,7 @@ func (c *Compiler) setWasmGlobalValue(index wasm.Index, v ssa.Value) {
 func (c *Compiler) getWasmGlobalValue(index wasm.Index, forceLoad bool) ssa.Value {
 	variable := c.globalVariables[index]
 	typ := c.globalVariablesTypes[index]
-	instanceOffset := c.offset.GlobalInstanceOffset(index)
+	opaqueOffset := c.offset.GlobalInstanceOffset(index)
 
 	builder := c.ssaBuilder
 	if !forceLoad {
@@ -3464,16 +3495,21 @@ func (c *Compiler) getWasmGlobalValue(index wasm.Index, forceLoad bool) ssa.Valu
 		}
 	}
 
-	loadGlobalInstPtr := builder.AllocateInstruction()
-	loadGlobalInstPtr.AsLoad(c.moduleCtxPtrValue, uint32(instanceOffset), ssa.TypeI64)
-	builder.InsertInstruction(loadGlobalInstPtr)
+	var load *ssa.Instruction
+	if index < c.m.ImportGlobalCount {
+		loadGlobalInstPtr := builder.AllocateInstruction()
+		loadGlobalInstPtr.AsLoad(c.moduleCtxPtrValue, uint32(opaqueOffset), ssa.TypeI64)
+		builder.InsertInstruction(loadGlobalInstPtr)
+		load = builder.AllocateInstruction().
+			AsLoad(loadGlobalInstPtr.Return(), uint32(0), typ)
+	} else {
+		load = builder.AllocateInstruction().
+			AsLoad(c.moduleCtxPtrValue, uint32(opaqueOffset), typ)
+	}
 
-	load := builder.AllocateInstruction()
-	load.AsLoad(loadGlobalInstPtr.Return(), uint32(globalInstanceValueOffset), typ)
-	builder.InsertInstruction(load)
-	ret := load.Return()
-	builder.DefineVariableInCurrentBB(variable, ret)
-	return ret
+	v := load.Insert(builder).Return()
+	builder.DefineVariableInCurrentBB(variable, v)
+	return v
 }
 
 const (

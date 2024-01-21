@@ -16,18 +16,27 @@ import (
 var ctx = context.Background()
 
 func TestMain(m *testing.M) {
-	if runtime.GOARCH != "arm64" {
+	if runtime.GOARCH != "arm64" && runtime.GOARCH != "amd64" {
 		os.Exit(0)
 	}
 	os.Exit(m.Run())
 }
 
+// TODO: delete once we complete the implementation for amd64.
+func skipOnAmd64(t *testing.T) {
+	if runtime.GOARCH == "amd64" {
+		t.Skip("skip on amd64")
+	}
+}
+
 func TestNewEngine(t *testing.T) {
+	skipOnAmd64(t)
 	e := NewEngine(ctx, api.CoreFeaturesV1, nil)
 	require.NotNil(t, e)
 }
 
 func TestEngine_CompiledModuleCount(t *testing.T) {
+	skipOnAmd64(t)
 	e, ok := NewEngine(ctx, api.CoreFeaturesV1, nil).(*engine)
 	require.True(t, ok)
 	require.Equal(t, uint32(0), e.CompiledModuleCount())
@@ -36,6 +45,7 @@ func TestEngine_CompiledModuleCount(t *testing.T) {
 }
 
 func TestEngine_DeleteCompiledModule(t *testing.T) {
+	skipOnAmd64(t)
 	e, ok := NewEngine(ctx, api.CoreFeaturesV1, nil).(*engine)
 	require.True(t, ok)
 	id := wasm.ModuleID{0xaa}

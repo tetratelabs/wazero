@@ -341,7 +341,7 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 				b.Seal(b2)
 				b.Seal(b3)
 			},
-			exp: []BasicBlockID{0, 2, 1, 3},
+			exp: []BasicBlockID{0, 1, 2, 3},
 		},
 		{
 			name: "loop towards loop header in fallthrough",
@@ -462,7 +462,7 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 				b.Seal(b5)
 			},
 			// The trampoline 6 is placed right after 4, which is the hot path of the loop.
-			exp: []BasicBlockID{0, 1, 2, 3, 4, 6, 5},
+			exp: []BasicBlockID{0, 1, 3, 2, 4, 6, 5},
 		},
 		{
 			name: "multiple critical edges",

@@ -463,7 +463,13 @@ func (e *mockEngine) NewModuleEngine(_ *Module, _ *ModuleInstance) (ModuleEngine
 	return &mockModuleEngine{callFailIndex: e.callFailIndex, resolveImportsCalled: map[Index]Index{}}, nil
 }
 
-// mockModuleEngine implements the same method as documented on wasm.ModuleEngine.
+// GetGlobalValue implements the same method as documented on wasm.ModuleEngine.
+func (e *mockModuleEngine) GetGlobalValue(idx Index) (lo, hi uint64) { panic("BUG") }
+
+// OwnsGlobals implements the same method as documented on wasm.ModuleEngine.
+func (e *mockModuleEngine) OwnsGlobals() bool { return false }
+
+// DoneInstantiation implements the same method as documented on wasm.ModuleEngine.
 func (e *mockModuleEngine) DoneInstantiation() {}
 
 // FunctionInstanceReference implements the same method as documented on wasm.ModuleEngine.

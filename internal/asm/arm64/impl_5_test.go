@@ -804,6 +804,22 @@ func TestAssemblerImpl_EncodeRegisterToMemory(t *testing.T) {
 		{name: "FSTRS/ConstOffset/src=V30,base=R30,offset=0x7ffffff8", n: &nodeImpl{instruction: FSTRS, srcReg: RegV30, dstReg: RegR30, dstConst: 2147483640}, exp: []byte{0x1b, 0x0, 0x0, 0x18, 0xde, 0x6b, 0x3b, 0xbc}},
 		{name: "FSTRS/ConstOffset/src=V30,base=R30,offset=0x10000004", n: &nodeImpl{instruction: FSTRS, srcReg: RegV30, dstReg: RegR30, dstConst: 268435460}, exp: []byte{0x1b, 0x0, 0x0, 0x18, 0xde, 0x6b, 0x3b, 0xbc}},
 		{name: "FSTRS/RegisterOffset/src=V30,base=R30,offset=RegR8", n: &nodeImpl{instruction: FSTRS, srcReg: RegV30, dstReg: RegR30, dstReg2: RegR8}, exp: []byte{0xde, 0x6b, 0x28, 0xbc}},
+		{name: "stlr x0, [x0]", n: &nodeImpl{instruction: STLRD, srcReg: RegR0, dstReg: RegR0}, exp: []byte{0x0, 0xfc, 0x9f, 0xc8}},
+		{name: "stlr x0, [x30]", n: &nodeImpl{instruction: STLRD, srcReg: RegR0, dstReg: RegR30}, exp: []byte{0xc0, 0xff, 0x9f, 0xc8}},
+		{name: "stlr x30, [x0]", n: &nodeImpl{instruction: STLRD, srcReg: RegR30, dstReg: RegR0}, exp: []byte{0x1e, 0xfc, 0x9f, 0xc8}},
+		{name: "stlr x30, [x30]", n: &nodeImpl{instruction: STLRD, srcReg: RegR30, dstReg: RegR30}, exp: []byte{0xde, 0xff, 0x9f, 0xc8}},
+		{name: "stlr w0, [x0]", n: &nodeImpl{instruction: STLRW, srcReg: RegR0, dstReg: RegR0}, exp: []byte{0x0, 0xfc, 0x9f, 0x88}},
+		{name: "stlr w0, [x30]", n: &nodeImpl{instruction: STLRW, srcReg: RegR0, dstReg: RegR30}, exp: []byte{0xc0, 0xff, 0x9f, 0x88}},
+		{name: "stlr w30, [x0]", n: &nodeImpl{instruction: STLRW, srcReg: RegR30, dstReg: RegR0}, exp: []byte{0x1e, 0xfc, 0x9f, 0x88}},
+		{name: "stlr w30, [x30]", n: &nodeImpl{instruction: STLRW, srcReg: RegR30, dstReg: RegR30}, exp: []byte{0xde, 0xff, 0x9f, 0x88}},
+		{name: "stlrh w0, [x0]", n: &nodeImpl{instruction: STLRH, srcReg: RegR0, dstReg: RegR0}, exp: []byte{0x0, 0xfc, 0x9f, 0x48}},
+		{name: "stlrh w0, [x30]", n: &nodeImpl{instruction: STLRH, srcReg: RegR0, dstReg: RegR30}, exp: []byte{0xc0, 0xff, 0x9f, 0x48}},
+		{name: "stlrh w30, [x0]", n: &nodeImpl{instruction: STLRH, srcReg: RegR30, dstReg: RegR0}, exp: []byte{0x1e, 0xfc, 0x9f, 0x48}},
+		{name: "stlrh w30, [x30]", n: &nodeImpl{instruction: STLRH, srcReg: RegR30, dstReg: RegR30}, exp: []byte{0xde, 0xff, 0x9f, 0x48}},
+		{name: "stlrb w0, [x0]", n: &nodeImpl{instruction: STLRB, srcReg: RegR0, dstReg: RegR0}, exp: []byte{0x0, 0xfc, 0x9f, 0x8}},
+		{name: "stlrb w0, [x30]", n: &nodeImpl{instruction: STLRB, srcReg: RegR0, dstReg: RegR30}, exp: []byte{0xc0, 0xff, 0x9f, 0x8}},
+		{name: "stlrb w30, [x0]", n: &nodeImpl{instruction: STLRB, srcReg: RegR30, dstReg: RegR0}, exp: []byte{0x1e, 0xfc, 0x9f, 0x8}},
+		{name: "stlrb w30, [x30]", n: &nodeImpl{instruction: STLRB, srcReg: RegR30, dstReg: RegR30}, exp: []byte{0xde, 0xff, 0x9f, 0x8}},
 	}
 
 	for _, tc := range tests {

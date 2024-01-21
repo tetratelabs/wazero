@@ -1,5 +1,13 @@
 package ssa
 
+import (
+	"fmt"
+	"math"
+	"strings"
+
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
+)
+
 // passCalculateImmediateDominators calculates immediate dominators for each basic block.
 // The result is stored in b.dominators. This make it possible for the following passes to
 // use builder.isDominatedBy to check if a block is dominated by another block.
@@ -155,4 +163,150 @@ func subPassLoopDetection(b *builder) {
 			}
 		}
 	}
+}
+
+// buildLoopNestingForest builds the loop nesting forest for the function.
+// This must be called after branch splitting since it relies on the CFG.
+func buildLoopNestingForest(b *builder) {
+	ent := b.entryBlk()
+	doms := b.dominators
+	for _, blk := range b.reversePostOrderedBasicBlocks {
+		n := doms[blk.id]
+		for !n.loopHeader && n != ent {
+			n = doms[n.id]
+		}
+
+		if n == ent && blk.loopHeader {
+			b.loopNestingForestRoots = append(b.loopNestingForestRoots, blk)
+		} else if n == ent {
+		} else if n.loopHeader {
+			n.loopNestingForestChildren = append(n.loopNestingForestChildren, blk)
+		}
+	}
+
+	if wazevoapi.SSALoggingEnabled {
+		for _, root := range b.loopNestingForestRoots {
+			printLoopNestingForest(root.(*basicBlock), 0)
+		}
+	}
+}
+
+func printLoopNestingForest(root *basicBlock, depth int) {
+	fmt.Println(strings.Repeat("\t", depth), "loop nesting forest root:", root.ID())
+	for _, child := range root.loopNestingForestChildren {
+		fmt.Println(strings.Repeat("\t", depth+1), "child:", child.ID())
+		if child.LoopHeader() {
+			printLoopNestingForest(child.(*basicBlock), depth+2)
+		}
+	}
+}
+
+type dominatorSparseTree struct {
+	time         int
+	euler        []*basicBlock
+	first, depth []int
+	table        [][]int
+}
+
+// buildDominatorTree builds the dominator tree for the function, and constructs builder.sparseTree.
+func buildDominatorTree(b *builder) {
+	// First we materialize the children of each node in the dominator tree.
+	idoms := b.dominators
+	for _, blk := range b.reversePostOrderedBasicBlocks {
+		parent := idoms[blk.id]
+		if parent == nil {
+			panic("BUG")
+		} else if parent == blk {
+			// This is the entry block.
+			continue
+		}
+		if prev := parent.child; prev == nil {
+			parent.child = blk
+		} else {
+			parent.child = blk
+			blk.sibling = prev
+		}
+	}
+
+	// Reset the state from the previous computation.
+	n := b.basicBlocksPool.Allocated()
+	st := &b.sparseTree
+	st.euler = append(st.euler[:0], make([]*basicBlock, 2*n-1)...)
+	st.first = append(st.first[:0], make([]int, n)...)
+	for i := range st.first {
+		st.first[i] = -1
+	}
+	st.depth = append(st.depth[:0], make([]int, 2*n-1)...)
+	st.time = 0
+
+	// Start building the sparse tree.
+	st.eulerTour(b.entryBlk(), 0)
+	st.buildSparseTable()
+}
+
+func (dt *dominatorSparseTree) eulerTour(node *basicBlock, height int) {
+	if wazevoapi.SSALoggingEnabled {
+		fmt.Println(strings.Repeat("\t", height), "euler tour:", node.ID())
+	}
+	dt.euler[dt.time] = node
+	dt.depth[dt.time] = height
+	if dt.first[node.id] == -1 {
+		dt.first[node.id] = dt.time
+	}
+	dt.time++
+
+	for child := node.child; child != nil; child = child.sibling {
+		dt.eulerTour(child, height+1)
+		dt.euler[dt.time] = node // add the current node again after visiting a child
+		dt.depth[dt.time] = height
+		dt.time++
+	}
+}
+
+// buildSparseTable builds a sparse table for RMQ queries.
+func (dt *dominatorSparseTree) buildSparseTable() {
+	n := len(dt.depth)
+	k := int(math.Log2(float64(n))) + 1
+	table := dt.table
+
+	if n >= len(table) {
+		table = append(table, make([][]int, n+1)...)
+	}
+	for i := range table {
+		if len(table[i]) < k {
+			table[i] = append(table[i], make([]int, k)...)
+		}
+		table[i][0] = i
+	}
+
+	for j := 1; 1<<j <= n; j++ {
+		for i := 0; i+(1<<j)-1 < n; i++ {
+			if dt.depth[table[i][j-1]] < dt.depth[table[i+(1<<(j-1))][j-1]] {
+				table[i][j] = table[i][j-1]
+			} else {
+				table[i][j] = table[i+(1<<(j-1))][j-1]
+			}
+		}
+	}
+	dt.table = table
+}
+
+// rmq performs a range minimum query on the sparse table.
+func (dt *dominatorSparseTree) rmq(l, r int) int {
+	table := dt.table
+	depth := dt.depth
+	j := int(math.Log2(float64(r - l + 1)))
+	if depth[table[l][j]] <= depth[table[r-(1<<j)+1][j]] {
+		return table[l][j]
+	}
+	return table[r-(1<<j)+1][j]
+}
+
+// findLCA finds the LCA using the Euler tour and RMQ.
+func (dt *dominatorSparseTree) findLCA(u, v BasicBlockID) *basicBlock {
+	first := dt.first
+	if first[u] > first[v] {
+		u, v = v, u
+	}
+	return dt.euler[dt.rmq(first[u], first[v])]
 }

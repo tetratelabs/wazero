@@ -464,7 +464,7 @@ var fdFilestatSetSize = newHostFunc(wasip1.FdFilestatSetSizeName, fdFilestatSetS
 
 func fdFilestatSetSizeFn(_ context.Context, mod api.Module, params []uint64) experimentalsys.Errno {
 	fd := int32(params[0])
-	size := uint32(params[1])
+	size := int64(params[1])
 
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 
@@ -472,7 +472,7 @@ func fdFilestatSetSizeFn(_ context.Context, mod api.Module, params []uint64) exp
 	if f, ok := fsc.LookupFile(fd); !ok {
 		return experimentalsys.EBADF
 	} else {
-		return f.File.Truncate(int64(size))
+		return f.File.Truncate(size)
 	}
 }
 

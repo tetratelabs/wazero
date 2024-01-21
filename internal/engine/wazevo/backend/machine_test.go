@@ -1,6 +1,8 @@
 package backend
 
 import (
+	"context"
+
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
@@ -8,21 +10,33 @@ import (
 
 // mockMachine implements Machine for testing.
 type mockMachine struct {
-	abi                    mockABI
-	startLoweringFunction  func(id ssa.BasicBlockID)
-	startBlock             func(block ssa.BasicBlock)
-	lowerSingleBranch      func(b *ssa.Instruction)
-	lowerConditionalBranch func(b *ssa.Instruction)
-	lowerInstr             func(instruction *ssa.Instruction)
-	endBlock               func()
-	endLoweringFunction    func()
-	reset                  func()
-	insertMove             func(dst, src regalloc.VReg)
-	insertLoadConstant     func(instr *ssa.Instruction, vr regalloc.VReg)
-	format                 func() string
-	linkAdjacentBlocks     func(prev, next ssa.BasicBlock)
-	rinfo                  *regalloc.RegisterInfo
+	argResultInts, argResultFloats []regalloc.RealReg
+	startLoweringFunction          func(id ssa.BasicBlockID)
+	startBlock                     func(block ssa.BasicBlock)
+	lowerSingleBranch              func(b *ssa.Instruction)
+	lowerConditionalBranch         func(b *ssa.Instruction)
+	lowerInstr                     func(instruction *ssa.Instruction)
+	endBlock                       func()
+	endLoweringFunction            func()
+	reset                          func()
+	insertMove                     func(dst, src regalloc.VReg)
+	insertLoadConstant             func(instr *ssa.Instruction, vr regalloc.VReg)
+	format                         func() string
+	linkAdjacentBlocks             func(prev, next ssa.BasicBlock)
+	rinfo                          *regalloc.RegisterInfo
 }
+
+func (m mockMachine) ArgsResultsRegs() (argResultInts, argResultFloats []regalloc.RealReg) {
+	return m.argResultInts, m.argResultFloats
+}
+
+func (m mockMachine) RegAlloc() { panic("implement me") }
+
+func (m mockMachine) LowerParams(params []ssa.Value) { panic("implement me") }
+
+func (m mockMachine) LowerReturns(returns []ssa.Value) { panic("implement me") }
+
+func (m mockMachine) ExecutableContext() ExecutableContext { panic("implement me") }
 
 func (m mockMachine) CompileEntryPreamble(signature *ssa.Signature) []byte {
 	panic("TODO")
@@ -38,7 +52,7 @@ func (m mockMachine) CompileGoFunctionTrampoline(wazevoapi.ExitCode, *ssa.Signat
 }
 
 // Encode implements Machine.Encode.
-func (m mockMachine) Encode() {}
+func (m mockMachine) Encode(ctx context.Context) {}
 
 // ResolveRelocations implements Machine.ResolveRelocations.
 func (m mockMachine) ResolveRelocations(map[ssa.FuncRef]int, []byte, []RelocationInfo) {}
@@ -49,14 +63,11 @@ func (m mockMachine) SetupPrologue() {}
 // SetupEpilogue implements Machine.SetupEpilogue.
 func (m mockMachine) SetupEpilogue() {}
 
-// ResolveRelativeAddresses implements Machine.ResolveRelativeAddresses.
-func (m mockMachine) ResolveRelativeAddresses() {}
-
 // Function implements Machine.Function.
 func (m mockMachine) Function() (f regalloc.Function) { return }
 
 // RegisterInfo implements Machine.RegisterInfo.
-func (m mockMachine) RegisterInfo(bool) *regalloc.RegisterInfo {
+func (m mockMachine) RegisterInfo() *regalloc.RegisterInfo {
 	if m.rinfo != nil {
 		return m.rinfo
 	}
@@ -69,11 +80,8 @@ func (m mockMachine) InsertReturn() { panic("TODO") }
 // LinkAdjacentBlocks implements Machine.LinkAdjacentBlocks.
 func (m mockMachine) LinkAdjacentBlocks(prev, next ssa.BasicBlock) { m.linkAdjacentBlocks(prev, next) }
 
-// InitializeABI implements Machine.InitializeABI.
-func (m mockMachine) InitializeABI(*ssa.Signature) {}
-
-// ABI implements Machine.ABI.
-func (m mockMachine) ABI() FunctionABI { return m.abi }
+// SetCurrentABI implements Machine.SetCurrentABI.
+func (m mockMachine) SetCurrentABI(*FunctionABI) {}
 
 // SetCompiler implements Machine.SetCompiler.
 func (m mockMachine) SetCompiler(Compiler) {}
@@ -140,18 +148,3 @@ func (m mockMachine) Format() string {
 func (m mockMachine) DisableStackCheck() {}
 
 var _ Machine = (*mockMachine)(nil)
-
-// mockABI implements ABI for testing.
-type mockABI struct{}
-
-func (m mockABI) EmitGoEntryPreamble() {}
-
-func (m mockABI) CalleeGenFunctionArgsToVRegs(regs []ssa.Value) {
-	panic("TODO")
-}
-
-func (m mockABI) CalleeGenVRegsToFunctionReturns(regs []ssa.Value) {
-	panic("TODO")
-}
-
-var _ FunctionABI = (*mockABI)(nil)

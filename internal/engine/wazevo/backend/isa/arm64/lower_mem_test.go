@@ -3,6 +3,7 @@ package arm64
 import (
 	"fmt"
 	"math"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -355,8 +356,7 @@ func TestMachine_collectAddends(t *testing.T) {
 				iadd3 := insertIadd(ctx, b, iadd1.Return(), iadd2.Return())
 				return iadd3.Return(), func(t *testing.T) {
 					for _, instr := range []*ssa.Instruction{iadd1, iadd2, iadd3} {
-						_, lowerd := ctx.lowered[instr]
-						require.True(t, lowerd)
+						require.True(t, instr.Lowered())
 					}
 				}
 			},
@@ -371,8 +371,7 @@ func TestMachine_collectAddends(t *testing.T) {
 				iadd3 := insertIadd(ctx, b, iadd1.Return(), iadd2.Return())
 				return iadd3.Return(), func(t *testing.T) {
 					for _, instr := range []*ssa.Instruction{iadd1, iadd2, iadd3} {
-						_, lowerd := ctx.lowered[instr]
-						require.True(t, lowerd)
+						require.True(t, instr.Lowered())
 					}
 				}
 			},
@@ -390,8 +389,7 @@ func TestMachine_collectAddends(t *testing.T) {
 
 				return iadd4.Return(), func(t *testing.T) {
 					for _, instr := range []*ssa.Instruction{iadd1, iadd2, iadd3, iadd4} {
-						_, lowerd := ctx.lowered[instr]
-						require.True(t, lowerd)
+						require.True(t, instr.Lowered())
 					}
 					// Param must be zero-extended.
 					require.Equal(t, "uxtw x1?, w1000?", formatEmittedInstructionsInCurrentBlock(m))
@@ -411,8 +409,7 @@ func TestMachine_collectAddends(t *testing.T) {
 				iadd4 := insertIadd(ctx, b, param, ext.Return())
 				return iadd4.Return(), func(t *testing.T) {
 					for _, instr := range []*ssa.Instruction{ext, iadd4} {
-						_, lowerd := ctx.lowered[instr]
-						require.True(t, lowerd)
+						require.True(t, instr.Lowered())
 					}
 				}
 			},
@@ -430,8 +427,7 @@ func TestMachine_collectAddends(t *testing.T) {
 				iadd4 := insertIadd(ctx, b, param, ext.Return())
 				return iadd4.Return(), func(t *testing.T) {
 					for _, instr := range []*ssa.Instruction{ext, iadd4} {
-						_, lowerd := ctx.lowered[instr]
-						require.True(t, lowerd)
+						require.True(t, instr.Lowered())
 					}
 				}
 			},
@@ -449,8 +445,7 @@ func TestMachine_collectAddends(t *testing.T) {
 				iadd4 := insertIadd(ctx, b, param, ext.Return())
 				return iadd4.Return(), func(t *testing.T) {
 					for _, instr := range []*ssa.Instruction{ext, iadd4} {
-						_, lowerd := ctx.lowered[instr]
-						require.True(t, lowerd)
+						require.True(t, instr.Lowered())
 					}
 				}
 			},
@@ -466,8 +461,7 @@ func TestMachine_collectAddends(t *testing.T) {
 				iadd4 := insertIadd(ctx, b, param, ext.Return())
 				return iadd4.Return(), func(t *testing.T) {
 					for _, instr := range []*ssa.Instruction{ext, iadd4} {
-						_, lowerd := ctx.lowered[instr]
-						require.True(t, lowerd)
+						require.True(t, instr.Lowered())
 					}
 				}
 			},
@@ -478,9 +472,9 @@ func TestMachine_collectAddends(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx, b, m := newSetupWithMockContext()
 			ptr, verify := tc.setup(ctx, b, m)
-			actual32s, actual64s, actualOffset := m.collectAddends(ptr)
-			require.Equal(t, tc.exp32s, actual32s)
-			require.Equal(t, tc.exp64s, actual64s)
+			actual32sQ, actual64sQ, actualOffset := m.collectAddends(ptr)
+			require.Equal(t, tc.exp32s, actual32sQ.data)
+			require.Equal(t, tc.exp64s, actual64sQ.data)
 			require.Equal(t, tc.offset, actualOffset)
 			verify(t)
 		})
@@ -571,18 +565,6 @@ func TestMachine_addRegToReg64Ext(t *testing.T) {
 			require.Equal(t, rd, regalloc.VReg(nextVRegID).SetRegType(regalloc.RegTypeInt))
 		})
 	}
-}
-
-func Test_dequeue(t *testing.T) {
-	ints := []int{1, 2, 3}
-	one, intPopped := dequeue(ints)
-	require.Equal(t, 1, one)
-	require.Equal(t, []int{2, 3}, intPopped)
-
-	strs := []string{"a", "b", "c"}
-	a, strPopped := dequeue(strs)
-	require.Equal(t, "a", a)
-	require.Equal(t, []string{"b", "c"}, strPopped)
 }
 
 func TestMachine_lowerToAddressModeFromAddends(t *testing.T) {
@@ -829,7 +811,16 @@ func TestMachine_lowerToAddressModeFromAddends(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx, _, m := newSetupWithMockContext()
 			ctx.vRegCounter = int(nextVReg.ID()) - 1
-			actual := m.lowerToAddressModeFromAddends(tc.a32s, tc.a64s, tc.dstSizeInBits, tc.offset)
+
+			var a32s queue[addend32]
+			var a64s queue[regalloc.VReg]
+			for _, a32 := range tc.a32s {
+				a32s.enqueue(a32)
+			}
+			for _, a64 := range tc.a64s {
+				a64s.enqueue(a64)
+			}
+			actual := m.lowerToAddressModeFromAddends(&a32s, &a64s, tc.dstSizeInBits, tc.offset)
 			require.Equal(t, strings.Join(tc.insts, "\n"), formatEmittedInstructionsInCurrentBlock(m))
 			require.Equal(t, tc.exp, actual, actual.format(tc.dstSizeInBits))
 		})
@@ -852,5 +843,74 @@ func Test_extLoadSizeSign(t *testing.T) {
 		size, signed := extLoadSignSize(tc.op)
 		require.Equal(t, tc.expSize, size)
 		require.Equal(t, tc.signed, signed)
+	}
+}
+
+func Test_lowerLoadSplatFromAddressMode(t *testing.T) {
+	positiveTests := make(map[addressModeKind]bool)
+	nextVReg := regalloc.VReg(100).SetRegType(regalloc.RegTypeInt)
+
+	for _, tc := range []struct {
+		amode       addressMode
+		expected    string
+		expectPanic bool
+	}{
+		{
+			amode: addressMode{kind: addressModeKindRegReg, rn: x0VReg, rm: x1VReg},
+			expected: `
+add x100?, x0, x1
+ld1r {x10.4s}, [x100?]
+`,
+		},
+		{
+			amode: addressMode{kind: addressModeKindRegUnsignedImm12, rn: x0VReg, imm: 15616},
+			expected: `
+movz x101?, #0x3d00, lsl 0
+add x100?, x0, x101?
+ld1r {x10.4s}, [x100?]
+`,
+		},
+		{
+			amode: addressMode{kind: addressModeKindRegUnsignedImm12, rn: x15VReg, imm: 0},
+			expected: `
+ld1r {x10.4s}, [x15]
+`,
+		},
+		{
+			amode: addressMode{kind: addressModeKindRegSignedImm9, rn: x0VReg, imm: 42},
+			expected: `
+add x100?, x0, #0x2a
+ld1r {x10.4s}, [x100?]
+`,
+		},
+	} {
+		tc := tc
+		t.Run("address mode "+strconv.Itoa(int(tc.amode.kind)), func(t *testing.T) {
+			ctx, _, m := newSetupWithMockContext()
+			ctx.vRegCounter = int(nextVReg.ID()) - 1
+			positiveTests[tc.amode.kind] = true
+
+			m.lowerLoadSplatFromAddressMode(operandNR(x10VReg), tc.amode, ssa.VecLaneI32x4)
+			require.Equal(t, tc.expected, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
+		})
+	}
+
+	// Must panic for all other addressModeKinds.
+	for k := 0; k <= int(addressModeKindResultStackSpace); k++ {
+		amk := addressModeKind(k)
+		if positiveTests[amk] {
+			continue
+		}
+
+		ctx, _, m := newSetupWithMockContext()
+		ctx.vRegCounter = int(nextVReg.ID()) - 1
+
+		t.Run("address mode "+strconv.Itoa(k), func(t *testing.T) {
+			err := require.CapturePanic(func() {
+				m.lowerLoadSplatFromAddressMode(operandNR(x10VReg), addressMode{kind: amk}, ssa.VecLaneI32x4)
+			})
+			require.Contains(t, err.Error(), "unsupported address mode for LoadSplat")
+		})
+
 	}
 }

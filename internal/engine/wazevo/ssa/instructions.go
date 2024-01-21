@@ -16,6 +16,8 @@ type Opcode uint32
 // for all instructions, and therefore each field has different meaning
 // depending on Opcode.
 type Instruction struct {
+	// id is the unique ID of this instruction which ascends from 0 following the order of program.
+	id         int
 	opcode     Opcode
 	u1, u2     uint64
 	v          Value
@@ -27,11 +29,12 @@ type Instruction struct {
 	targets    []BasicBlock
 	prev, next *Instruction
 
-	rValue       Value
-	rValues      []Value
-	gid          InstructionGroupID
-	sourceOffset SourceOffset
-	live         bool
+	rValue         Value
+	rValues        []Value
+	gid            InstructionGroupID
+	sourceOffset   SourceOffset
+	live           bool
+	alreadyLowered bool
 }
 
 // SourceOffset represents the offset of the source of an instruction.
@@ -63,8 +66,18 @@ func (i *Instruction) GroupID() InstructionGroupID {
 	return i.gid
 }
 
-// reset resets this instruction to the initial state.
-func (i *Instruction) reset() {
+// MarkLowered marks this instruction as already lowered.
+func (i *Instruction) MarkLowered() {
+	i.alreadyLowered = true
+}
+
+// Lowered returns true if this instruction is already lowered.
+func (i *Instruction) Lowered() bool {
+	return i.alreadyLowered
+}
+
+// resetInstruction resets this instruction to the initial state.
+func resetInstruction(i *Instruction) {
 	*i = Instruction{}
 	i.v = ValueInvalid
 	i.v2 = ValueInvalid
@@ -828,14 +841,14 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeVbitselect:   returnTypesFnV128,
 	OpcodeVanyTrue:     returnTypesFnI32,
 	OpcodeVallTrue:     returnTypesFnI32,
-	OpcodeVhighBits:    returnTypesFnV128,
+	OpcodeVhighBits:    returnTypesFnI32,
 	OpcodeVIadd:        returnTypesFnV128,
 	OpcodeVSaddSat:     returnTypesFnV128,
 	OpcodeVUaddSat:     returnTypesFnV128,
 	OpcodeVIsub:        returnTypesFnV128,
 	OpcodeVSsubSat:     returnTypesFnV128,
 	OpcodeVUsubSat:     returnTypesFnV128,
-	OpcodeVIcmp:        returnTypesFnI32,
+	OpcodeVIcmp:        returnTypesFnV128,
 	OpcodeVImin:        returnTypesFnV128,
 	OpcodeVUmin:        returnTypesFnV128,
 	OpcodeVImax:        returnTypesFnV128,
@@ -977,7 +990,7 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeVFsub:              returnTypesFnV128,
 	OpcodeVFmul:              returnTypesFnV128,
 	OpcodeVFdiv:              returnTypesFnV128,
-	OpcodeVFcmp:              returnTypesFnI32,
+	OpcodeVFcmp:              returnTypesFnV128,
 	OpcodeVCeil:              returnTypesFnV128,
 	OpcodeVFloor:             returnTypesFnV128,
 	OpcodeVTrunc:             returnTypesFnV128,
@@ -1406,7 +1419,7 @@ func (i *Instruction) AsVIcmp(x, y Value, c IntegerCmpCond, lane VecLane) *Instr
 	i.v2 = y
 	i.u1 = uint64(c)
 	i.u2 = uint64(lane)
-	i.typ = TypeI32
+	i.typ = TypeV128
 	return i
 }
 
@@ -1416,7 +1429,7 @@ func (i *Instruction) AsVFcmp(x, y Value, c FloatCmpCond, lane VecLane) *Instruc
 	i.v = x
 	i.v2 = y
 	i.u1 = uint64(c)
-	i.typ = TypeI32
+	i.typ = TypeV128
 	i.u2 = uint64(lane)
 	return i
 }

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 	"unsafe"
 
@@ -130,6 +131,9 @@ func requireNoDiff(wasmBin []byte, checkMemory bool, requireNoError func(err err
 
 func ensureMutableGlobalsMatch(compilerMod, interpreterMod api.Module, requireNoError func(err error)) {
 	ci, ii := compilerMod.(*wasm.ModuleInstance), interpreterMod.(*wasm.ModuleInstance)
+	if len(ci.Globals) == 0 {
+		return
+	}
 	for i := range ci.Globals[:len(ci.Globals)-1] { // The last global is the fuel, so we can ignore it.
 		cg := ci.Globals[i]
 		ig := ii.Globals[i]
@@ -137,23 +141,26 @@ func ensureMutableGlobalsMatch(compilerMod, interpreterMod api.Module, requireNo
 			continue
 		}
 
+		cVal, cValHi := cg.Value()
+		iVal, iValHi := ig.Value()
+
 		var ok bool
 		switch ig.Type.ValType {
 		case wasm.ValueTypeI32, wasm.ValueTypeF32:
-			ok = uint32(cg.Val) == uint32(ig.Val)
+			ok = uint32(cVal) == uint32(iVal)
 		case wasm.ValueTypeI64, wasm.ValueTypeF64:
-			ok = cg.Val == ig.Val
+			ok = cVal == iVal
 		case wasm.ValueTypeV128:
-			ok = cg.Val == ig.Val && cg.ValHi == ig.ValHi
+			ok = cVal == iVal && cValHi == iValHi
 		default:
 			ok = true // Ignore other types.
 		}
 
 		if !ok {
 			if ig.Type.ValType == wasm.ValueTypeV128 {
-				requireNoError(fmt.Errorf("mutable global[%d] value mismatch: (%v,%v) != (%v,%v)", i, cg.Val, cg.ValHi, ig.Val, ig.ValHi))
+				requireNoError(fmt.Errorf("mutable global[%d] value mismatch: (%v,%v) != (%v,%v)", i, cVal, cValHi, iVal, iValHi))
 			} else {
-				requireNoError(fmt.Errorf("mutable global[%d] value mismatch: %v != %v", i, cg.Val, ig.Val))
+				requireNoError(fmt.Errorf("mutable global[%d] value mismatch: %v != %v", i, cVal, iVal))
 			}
 		}
 	}
@@ -272,8 +279,16 @@ const valueTypeVector = 0x7b
 func ensureInvocationResultMatch(compiledMod, interpreterMod api.Module, exportedFunctions map[string]api.FunctionDefinition) (err error) {
 	ctx := context.Background()
 
+	// In order to do the deterministic execution, we need to sort the exported functions.
+	var names []string
+	for f := range exportedFunctions {
+		names = append(names, f)
+	}
+	sort.Strings(names)
+
 outer:
-	for name, def := range exportedFunctions {
+	for _, name := range names {
+		def := exportedFunctions[name]
 		resultTypes := def.ResultTypes()
 		for _, rt := range resultTypes {
 			switch rt {
@@ -346,9 +361,12 @@ func ensureInvocationError(compilerErr, interpErr error) error {
 		interpErrMsg = interpErrMsg[:strings.Index(interpErrMsg, "\n")]
 	}
 
-	if strings.Contains(compilerErrMsg, "stack overflow") && strings.Contains(interpErrMsg, "unreachable") {
+	if compiledStackOverFlow := strings.Contains(compilerErrMsg, "stack overflow"); compiledStackOverFlow && strings.Contains(interpErrMsg, "unreachable") {
 		// Compiler is more likely to reach stack overflow than interpreter, so we allow this case. This case is most likely
 		// that interpreter reached the unreachable out of "fuel".
+		return nil
+	} else if interpreterStackOverFlow := strings.Contains(interpErrMsg, "stack overflow"); compiledStackOverFlow && interpreterStackOverFlow {
+		// Both compiler and interpreter reached stack overflow, so we ignore diff in the content of the traces.
 		return nil
 	}
 
@@ -376,10 +394,16 @@ func ensureInstantiationError(compilerErr, interpErr error) (okToInvoke bool, er
 		interpErrMsg = interpErrMsg[:strings.Index(interpErrMsg, "\n")]
 	}
 
+	if strings.Contains(compilerErrMsg, "stack overflow") && strings.Contains(interpErrMsg, "unreachable") {
+		// This is the case where the compiler reached stack overflow, but the interpreter reached the unreachable out of "fuel" during
+		// start function invocation. This is fine.
+		return false, nil
+	}
+
 	if !allowedErrorDuringInstantiation(compilerErrMsg) {
-		return false, fmt.Errorf("invalid error occur with compiler: %v", compilerErr)
+		return false, fmt.Errorf("invalid error occur with compiler: %v vs interpreter: %v", compilerErr, interpErr)
 	} else if !allowedErrorDuringInstantiation(interpErrMsg) {
-		return false, fmt.Errorf("invalid error occur with interpreter: %v", interpErrMsg)
+		return false, fmt.Errorf("invalid error occur with interpreter: %v vs compiler: %v", interpErr, compilerErr)
 	}
 
 	if compilerErrMsg != interpErrMsg {
