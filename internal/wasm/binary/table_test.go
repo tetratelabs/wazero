@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -98,6 +99,7 @@ func TestDecodeTableType_Errors(t *testing.T) {
 			input:       []byte{wasm.RefTypeFuncref, 0x2, 0},
 			expectedErr: "tables cannot be marked as shared",
 			// Shared tables are an error even if threads are enabled.
+			features: experimental.CoreFeaturesThreads,
 		},
 	}
 

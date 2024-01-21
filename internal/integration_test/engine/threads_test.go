@@ -6,6 +6,7 @@ import (
 
 	wazero "github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/hammer"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -47,7 +48,6 @@ var threadTests = map[string]testCase{
 }
 
 func TestThreadsNotEnabled(t *testing.T) {
-	t.Skip() // TODO: Enable after threads feature flag added
 	r := wazero.NewRuntime(testCtx)
 	_, err := r.Instantiate(testCtx, mutexWasm)
 	require.EqualError(t, err, "section memory: shared memory requested but threads feature not enabled")
@@ -57,11 +57,11 @@ func TestThreadsCompiler_hammer(t *testing.T) {
 	if !platform.CompilerSupported() {
 		t.Skip()
 	}
-	runAllTests(t, threadTests, wazero.NewRuntimeConfigCompiler().WithCoreFeatures(api.CoreFeaturesV2), false)
+	runAllTests(t, threadTests, wazero.NewRuntimeConfigCompiler().WithCoreFeatures(api.CoreFeaturesV2|experimental.CoreFeaturesThreads), false)
 }
 
 func TestThreadsInterpreter_hammer(t *testing.T) {
-	runAllTests(t, threadTests, wazero.NewRuntimeConfigInterpreter().WithCoreFeatures(api.CoreFeaturesV2), false)
+	runAllTests(t, threadTests, wazero.NewRuntimeConfigInterpreter().WithCoreFeatures(api.CoreFeaturesV2|experimental.CoreFeaturesThreads), false)
 }
 
 func incrementGuardedByMutex(t *testing.T, r wazero.Runtime) {
