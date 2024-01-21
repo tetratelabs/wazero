@@ -50,27 +50,6 @@ func (m *machine) lowerToAddressModeFromAddends(a64s *queue[regalloc.VReg], offs
 	return
 }
 
-func (m *machine) addConstToReg64(rd regalloc.VReg, c int64) regalloc.VReg {
-	alu := m.allocateInstr()
-	u64 := uint64(c)
-	if imm32Op, ok := asImm32Operand(u64); ok {
-		alu.asAluRmiR(aluRmiROpcodeAdd, imm32Op, rd, true)
-	} else {
-		tmp := m.c.AllocateVReg(ssa.TypeI64)
-		m.lowerIconst(tmp, u64, true)
-		alu.asAluRmiR(aluRmiROpcodeAdd, newOperandReg(tmp), rd, true)
-	}
-	m.insert(alu)
-	return rd
-}
-
-func (m *machine) addReg64ToReg64(rd, rm regalloc.VReg) regalloc.VReg {
-	alu := m.allocateInstr()
-	alu.asAluRmiR(aluRmiROpcodeAdd, newOperandReg(rm), rd, true)
-	m.insert(alu)
-	return rd
-}
-
 var addendsMatchOpcodes = [4]ssa.Opcode{ssa.OpcodeUExtend, ssa.OpcodeSExtend, ssa.OpcodeIadd, ssa.OpcodeIconst}
 
 func (m *machine) collectAddends(ptr ssa.Value) (addends64 *queue[regalloc.VReg], offset int64) {
@@ -136,6 +115,27 @@ func (m *machine) collectAddends(ptr ssa.Value) (addends64 *queue[regalloc.VReg]
 type queue[T any] struct {
 	index int
 	data  []T
+}
+
+func (m *machine) addConstToReg64(rd regalloc.VReg, c int64) regalloc.VReg {
+	alu := m.allocateInstr()
+	u64 := uint64(c)
+	if imm32Op, ok := asImm32Operand(u64); ok {
+		alu.asAluRmiR(aluRmiROpcodeAdd, imm32Op, rd, true)
+	} else {
+		tmp := m.c.AllocateVReg(ssa.TypeI64)
+		m.lowerIconst(tmp, u64, true)
+		alu.asAluRmiR(aluRmiROpcodeAdd, newOperandReg(tmp), rd, true)
+	}
+	m.insert(alu)
+	return rd
+}
+
+func (m *machine) addReg64ToReg64(rd, rm regalloc.VReg) regalloc.VReg {
+	alu := m.allocateInstr()
+	alu.asAluRmiR(aluRmiROpcodeAdd, newOperandReg(rm), rd, true)
+	m.insert(alu)
+	return rd
 }
 
 func (q *queue[T]) enqueue(v T) {

@@ -268,3 +268,45 @@ func TestMachine_collectAddends(t *testing.T) {
 		})
 	}
 }
+
+func TestMachine_addReg64ToReg64(t *testing.T) {
+	for _, tc := range []struct {
+		exp    string
+		rn, rm regalloc.VReg
+	}{
+		{
+			exp: "add %rcx, %rax",
+			rn:  raxVReg,
+			rm:  rcxVReg,
+		},
+		{
+			exp: "add %rbx, %rdx",
+			rn:  rdxVReg,
+			rm:  rbxVReg,
+		},
+	} {
+		tc := tc
+		t.Run(tc.exp, func(t *testing.T) {
+			_, _, m := newSetupWithMockContext()
+			rd := m.addReg64ToReg64(tc.rn, tc.rm)
+			require.Equal(t, tc.exp, formatEmittedInstructionsInCurrentBlock(m))
+			require.Equal(t, rd, tc.rn)
+		})
+	}
+}
+
+func TestMachine_addConstToReg64(t *testing.T) {
+	t.Run("imm32", func(t *testing.T) {
+		c := int64(1 << 30)
+		_, _, m := newSetupWithMockContext()
+		m.addConstToReg64(raxVReg, c)
+		require.Equal(t, `add $1073741824, %rax`, formatEmittedInstructionsInCurrentBlock(m))
+	})
+	t.Run("non imm32", func(t *testing.T) {
+		c := int64(1 << 32)
+		_, _, m := newSetupWithMockContext()
+		m.addConstToReg64(raxVReg, c)
+		require.Equal(t, `movabsq $4294967296, %r1?
+add %r1?, %rax`, formatEmittedInstructionsInCurrentBlock(m))
+	})
+}

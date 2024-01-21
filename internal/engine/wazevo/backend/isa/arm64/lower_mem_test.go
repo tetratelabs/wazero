@@ -490,7 +490,7 @@ func TestMachine_addConstToReg64(t *testing.T) {
 		m.addConstToReg64(regalloc.FromRealReg(x15, regalloc.RegTypeInt), c)
 		require.Equal(t, `add x100?, x15, #0xaaa`, formatEmittedInstructionsInCurrentBlock(m))
 	})
-	t.Run("positive imm12", func(t *testing.T) {
+	t.Run("negative imm12", func(t *testing.T) {
 		c := int64(-0xaaa)
 		ctx, _, m := newSetupWithMockContext()
 		ctx.vRegCounter = nextVRegID - 1
