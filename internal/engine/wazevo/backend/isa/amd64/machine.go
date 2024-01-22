@@ -8,7 +8,6 @@ import (
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
-	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 )
 
 // NewBackend returns a new backend for arm64.
@@ -36,11 +35,6 @@ type (
 		regAllocFn      *backend.RegAllocFunction[*instruction, *machine]
 		regAllocStarted bool
 
-		// addendsWorkQueue is used during address lowering, defined here for reuse.
-		addendsWorkQueue wazevoapi.Queue[ssa.Value]
-		// addends64 is used during address lowering, defined here for reuse.
-		addends64 wazevoapi.Queue[addend64]
-
 		spillSlotSize int64
 		currentABI    *backend.FunctionABI
 		clobberedRegs []regalloc.VReg
@@ -48,11 +42,6 @@ type (
 		maxRequiredStackSizeForCalls int64
 
 		labelResolutionPends []labelResolutionPend
-	}
-
-	addend64 struct {
-		r     regalloc.VReg
-		shift byte
 	}
 
 	labelResolutionPend struct {
