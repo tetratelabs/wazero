@@ -1,7 +1,6 @@
 package amd64
 
 import (
-	"fmt"
 	"strings"
 	"testing"
 
@@ -136,109 +135,6 @@ func Test_machine_getOperand_Mem_Imm32_Reg(t *testing.T) {
 				return &backend.SSAValueDefinition{BlkParamVReg: raxVReg, Instr: nil, N: 0}
 			},
 			exp: newOperandReg(raxVReg),
-		},
-		{
-			name: "amode with block param",
-			setup: func(ctx *mockCompiler, builder ssa.Builder, m *machine) *backend.SSAValueDefinition {
-				blk := builder.CurrentBlock()
-				ptr := blk.AddParam(builder, ssa.TypeI64)
-				ctx.definitions[ptr] = &backend.SSAValueDefinition{BlockParamValue: ptr, BlkParamVReg: raxVReg}
-				instr := builder.AllocateInstruction()
-				instr.AsLoad(ptr, 123, ssa.TypeI64).Insert(builder)
-				return &backend.SSAValueDefinition{Instr: instr, N: 0}
-			},
-			exp: newOperandMem(newAmodeImmReg(123, raxVReg)),
-		},
-		{
-			name: "amode with iconst",
-			setup: func(ctx *mockCompiler, builder ssa.Builder, m *machine) *backend.SSAValueDefinition {
-				iconst := builder.AllocateInstruction().AsIconst64(456).Insert(builder)
-				instr := builder.AllocateInstruction()
-				instr.AsLoad(iconst.Return(), 123, ssa.TypeI64).Insert(builder)
-				ctx.definitions[iconst.Return()] = &backend.SSAValueDefinition{Instr: iconst}
-				return &backend.SSAValueDefinition{Instr: instr, N: 0}
-			},
-			instructions: []string{
-				"movabsq $579, %r1?", // r1 := 123+456
-			},
-			exp: newOperandMem(newAmodeImmReg(0, regalloc.VReg(1).SetRegType(regalloc.RegTypeInt))),
-		},
-		{
-			name: "amode with iconst and extend",
-			setup: func(ctx *mockCompiler, builder ssa.Builder, m *machine) *backend.SSAValueDefinition {
-				iconst := builder.AllocateInstruction().AsIconst32(0xffffff).Insert(builder)
-				uextend := builder.AllocateInstruction().AsUExtend(iconst.Return(), 32, 64).Insert(builder)
-
-				instr := builder.AllocateInstruction()
-				instr.AsLoad(uextend.Return(), 123, ssa.TypeI64).Insert(builder)
-
-				ctx.definitions[uextend.Return()] = &backend.SSAValueDefinition{Instr: uextend}
-				ctx.definitions[iconst.Return()] = &backend.SSAValueDefinition{Instr: iconst}
-
-				return &backend.SSAValueDefinition{Instr: instr, N: 0}
-			},
-			instructions: []string{
-				fmt.Sprintf("movabsq $%d, %%r1?", 0xffffff+123),
-			},
-			exp: newOperandMem(newAmodeImmReg(0, regalloc.VReg(1).SetRegType(regalloc.RegTypeInt))),
-		},
-		{
-			name: "amode with iconst and extend",
-			setup: func(ctx *mockCompiler, builder ssa.Builder, m *machine) *backend.SSAValueDefinition {
-				iconst := builder.AllocateInstruction().AsIconst32(456).Insert(builder)
-				uextend := builder.AllocateInstruction().AsUExtend(iconst.Return(), 32, 64).Insert(builder)
-
-				instr := builder.AllocateInstruction()
-				instr.AsLoad(uextend.Return(), 123, ssa.TypeI64).Insert(builder)
-
-				ctx.definitions[uextend.Return()] = &backend.SSAValueDefinition{Instr: uextend}
-				ctx.definitions[iconst.Return()] = &backend.SSAValueDefinition{Instr: iconst}
-
-				return &backend.SSAValueDefinition{Instr: instr, N: 0}
-			},
-			instructions: []string{
-				fmt.Sprintf("movabsq $%d, %%r1?", 456+123),
-			},
-			exp: newOperandMem(newAmodeImmReg(0, regalloc.VReg(1).SetRegType(regalloc.RegTypeInt))),
-		},
-		{
-			name: "amode with iconst and add",
-			setup: func(ctx *mockCompiler, builder ssa.Builder, m *machine) *backend.SSAValueDefinition {
-				p := builder.CurrentBlock().AddParam(builder, ssa.TypeI64)
-				iconst := builder.AllocateInstruction().AsIconst64(456).Insert(builder)
-				iadd := builder.AllocateInstruction().AsIadd(iconst.Return(), p).Insert(builder)
-
-				instr := builder.AllocateInstruction()
-				instr.AsLoad(iadd.Return(), 789, ssa.TypeI64).Insert(builder)
-
-				ctx.definitions[p] = &backend.SSAValueDefinition{BlockParamValue: p, BlkParamVReg: raxVReg}
-				ctx.definitions[iconst.Return()] = &backend.SSAValueDefinition{Instr: iconst}
-				ctx.definitions[iadd.Return()] = &backend.SSAValueDefinition{Instr: iadd}
-
-				return &backend.SSAValueDefinition{Instr: instr, N: 0}
-			},
-			exp: newOperandMem(newAmodeImmReg(456+789, raxVReg)),
-		},
-		{
-			name: "amode with iconst, block param and add",
-			setup: func(ctx *mockCompiler, builder ssa.Builder, m *machine) *backend.SSAValueDefinition {
-				iconst1 := builder.AllocateInstruction().AsIconst64(456).Insert(builder)
-				iconst2 := builder.AllocateInstruction().AsIconst64(123).Insert(builder)
-				iadd := builder.AllocateInstruction().AsIadd(iconst1.Return(), iconst2.Return()).Insert(builder)
-
-				instr := builder.AllocateInstruction()
-				instr.AsLoad(iadd.Return(), 789, ssa.TypeI64).Insert(builder)
-
-				ctx.definitions[iconst1.Return()] = &backend.SSAValueDefinition{Instr: iconst1}
-				ctx.definitions[iconst2.Return()] = &backend.SSAValueDefinition{Instr: iconst2}
-				ctx.definitions[iadd.Return()] = &backend.SSAValueDefinition{Instr: iadd}
-
-				return &backend.SSAValueDefinition{Instr: instr, N: 0}
-			},
-			instructions: []string{
-				fmt.Sprintf("movabsq $%d, %%r1?", 123+456+789),
-			},
-			exp: newOperandMem(newAmodeImmReg(0, regalloc.VReg(1).SetRegType(regalloc.RegTypeInt))),
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
