@@ -22,10 +22,10 @@ type (
 		regAllocFn *backend.RegAllocFunction[*instruction, *machine]
 
 		// addendsWorkQueue is used during address lowering, defined here for reuse.
-		addendsWorkQueue queue[ssa.Value]
-		addends32        queue[addend32]
+		addendsWorkQueue wazevoapi.Queue[ssa.Value]
+		addends32        wazevoapi.Queue[addend32]
 		// addends64 is used during address lowering, defined here for reuse.
-		addends64              queue[regalloc.VReg]
+		addends64              wazevoapi.Queue[regalloc.VReg]
 		unresolvedAddressModes []*instruction
 
 		// condBrRelocs holds the conditional branches which need offset relocation.

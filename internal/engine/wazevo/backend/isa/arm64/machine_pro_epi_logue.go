@@ -259,8 +259,8 @@ func (m *machine) setupEpilogueAfter(cur *instruction) {
 		//          |   ReturnAddress |                      |   ReturnAddress |
 		//          +-----------------+      ========>       +-----------------+ <---- SP
 		//          |   clobbered M   |
-		//          |   clobbered 1   |
 		//          |   ...........   |
+		//          |   clobbered 1   |
 		//          |   clobbered 0   |
 		//   SP---> +-----------------+
 		//             (low address)

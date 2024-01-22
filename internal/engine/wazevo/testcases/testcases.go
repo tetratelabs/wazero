@@ -32,9 +32,43 @@ var (
 		byte(math.Float64bits(64.0) >> 56),
 		wasm.OpcodeEnd,
 	}, nil)}
-	Unreachable        = TestCase{Name: "unreachable", Module: SingleFunctionModule(vv, []byte{wasm.OpcodeUnreachable, wasm.OpcodeEnd}, nil)}
-	OnlyReturn         = TestCase{Name: "only_return", Module: SingleFunctionModule(vv, []byte{wasm.OpcodeReturn, wasm.OpcodeEnd}, nil)}
-	Params             = TestCase{Name: "params", Module: SingleFunctionModule(i32f32f64_v, []byte{wasm.OpcodeReturn, wasm.OpcodeEnd}, nil)}
+	Unreachable  = TestCase{Name: "unreachable", Module: SingleFunctionModule(vv, []byte{wasm.OpcodeUnreachable, wasm.OpcodeEnd}, nil)}
+	OnlyReturn   = TestCase{Name: "only_return", Module: SingleFunctionModule(vv, []byte{wasm.OpcodeReturn, wasm.OpcodeEnd}, nil)}
+	Params       = TestCase{Name: "params", Module: SingleFunctionModule(i32f32f64_v, []byte{wasm.OpcodeReturn, wasm.OpcodeEnd}, nil)}
+	AddSubReturn = TestCase{
+		Name: "add_sub_params_return_const",
+		Module: SingleFunctionModule(wasm.FunctionType{Results: []wasm.ValueType{i32, i32, i64, i64}}, []byte{
+			// Small i32 constants should be inlined on arm64, amd64.
+			wasm.OpcodeI32Const, 4,
+			wasm.OpcodeI32Const, 5,
+			wasm.OpcodeI32Add,
+			wasm.OpcodeI32Const, 6,
+			wasm.OpcodeI32Sub,
+
+			// Large i32 constants should be inlined on amd4, load from register on arm64.
+			wasm.OpcodeI32Const, 3,
+			wasm.OpcodeI32Const, 0xff, 0xff, 0xff, 0xff, 0,
+			wasm.OpcodeI32Add,
+			wasm.OpcodeI32Const, 0xff, 0xff, 0xff, 0xff, 0,
+			wasm.OpcodeI32Sub,
+
+			// Small i64 constants should be inlined on arm64, amd64.
+			wasm.OpcodeI64Const, 4,
+			wasm.OpcodeI64Const, 5,
+			wasm.OpcodeI64Add,
+			wasm.OpcodeI64Const, 6,
+			wasm.OpcodeI64Sub,
+
+			// Large i64 constants are load from register on arm64, amd64.
+			wasm.OpcodeI64Const, 3,
+			wasm.OpcodeI64Const, 0xff, 0xff, 0xff, 0xff, 0xff, 0,
+			wasm.OpcodeI64Add,
+			wasm.OpcodeI64Const, 0xff, 0xff, 0xff, 0xff, 0xff, 0,
+			wasm.OpcodeI64Sub,
+
+			wasm.OpcodeEnd,
+		}, nil),
+	}
 	AddSubParamsReturn = TestCase{
 		Name: "add_sub_params_return",
 		Module: SingleFunctionModule(i32i32_i32, []byte{

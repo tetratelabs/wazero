@@ -5,6 +5,16 @@ import (
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 )
 
+// lowerConstant allocates a new VReg and inserts the instruction to load the constant value.
+func (m *machine) lowerConstant(instr *ssa.Instruction) (vr regalloc.VReg) {
+	val := instr.Return()
+	valType := val.Type()
+
+	vr = m.c.AllocateVReg(valType)
+	m.InsertLoadConstant(instr, vr)
+	return
+}
+
 // InsertLoadConstant implements backend.Machine.
 func (m *machine) InsertLoadConstant(instr *ssa.Instruction, vr regalloc.VReg) {
 	val := instr.Return()

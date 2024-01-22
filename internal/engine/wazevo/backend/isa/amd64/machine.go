@@ -138,9 +138,45 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		m.lowerCall(instr)
 	case ssa.OpcodeStore:
 		m.lowerStore(instr)
+	case ssa.OpcodeIadd:
+		m.lowerAluRmiROp(instr, aluRmiROpcodeAdd)
+	case ssa.OpcodeIsub:
+		m.lowerAluRmiROp(instr, aluRmiROpcodeSub)
 	default:
 		panic("TODO: lowering " + op.String())
 	}
+}
+
+func (m *machine) lowerAluRmiROp(si *ssa.Instruction, op aluRmiROpcode) {
+	x, y := si.Arg2()
+	if !x.Type().IsInt() {
+		panic("BUG?")
+	}
+
+	_64 := x.Type().Bits() == 64
+
+	xDef, yDef := m.c.ValueDefinition(x), m.c.ValueDefinition(y)
+
+	// TODO: commutative args can be swapped if one of them is an immediate.
+	rn := m.getOperand_Reg(xDef)
+	rm := m.getOperand_Mem_Imm32_Reg(yDef)
+	rd := m.c.VRegOf(si.Return())
+	tmp := m.c.AllocateVReg(si.Return().Type())
+
+	// rm is being overwritten, so we first copy its value to a temp register,
+	// in case it is referenced again later.
+	mov := m.allocateInstr()
+	mov.asMovRR(rn.r, tmp, _64)
+	m.insert(mov)
+
+	alu := m.allocateInstr()
+	alu.asAluRmiR(op, rm, tmp, _64)
+	m.insert(alu)
+
+	// tmp now contains the result, we copy it to the dest register.
+	mov2 := m.allocateInstr()
+	mov2.asMovRR(tmp, rd, _64)
+	m.insert(mov2)
 }
 
 func (m *machine) lowerStore(si *ssa.Instruction) {
