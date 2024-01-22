@@ -37,7 +37,7 @@ type (
 		regAllocStarted bool
 
 		spillSlotSize int64
-		spillSlots    map[regalloc.VRegID]int64 // regalloc.VRegID to offset.
+		spillSlots    map[regalloc.VRegID]int64
 		currentABI    *backend.FunctionABI
 		clobberedRegs []regalloc.VReg
 
@@ -378,14 +378,11 @@ func (m *machine) Encode(context.Context) {
 // ResolveRelocations implements backend.Machine.
 func (m *machine) ResolveRelocations(refToBinaryOffset map[ssa.FuncRef]int, binary []byte, relocations []backend.RelocationInfo) {
 	for _, r := range relocations {
-		instrOffset := r.Offset
+		offset := r.Offset
 		calleeFnOffset := refToBinaryOffset[r.FuncRef]
-		// calleeFnOffset points to the beginning of call target function.
-		// call is 5 bytes where the last 4 bytes represent the signed 32-bit offset. See the encoding of `call` instruction.
-		// instrOffset is the offset of the last 4 bytes.
-		callInstrOffsetBytes := binary[instrOffset : instrOffset+4]
-		diff := int64(calleeFnOffset) - (instrOffset)
-		// We backpatch in-place the relative value `diff`.
+		// offset is the offset of the last 4 bytes of the call instruction.
+		callInstrOffsetBytes := binary[offset : offset+4]
+		diff := int64(calleeFnOffset) - (offset)
 		callInstrOffsetBytes[0] = byte(diff)
 		callInstrOffsetBytes[1] = byte(diff >> 8)
 		callInstrOffsetBytes[2] = byte(diff >> 16)
