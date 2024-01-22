@@ -360,7 +360,7 @@ func (i *instruction) AssignDef(reg regalloc.VReg) {
 // IsCopy implements regalloc.Instr.
 func (i *instruction) IsCopy() bool {
 	k := i.kind
-	return k == movRR || k == xmmUnaryRmR
+	return k == movRR || (k == xmmUnaryRmR && i.op1.kind == operandKindReg)
 }
 
 func resetInstruction(i *instruction) {
@@ -1514,9 +1514,12 @@ var defKinds = [instrMax]defKind{
 	ret:         defKindNone,
 	movRR:       defKindOp2,
 	movRM:       defKindNone,
+	xmmMovRM:    defKindNone,
 	aluRmiR:     defKindNone,
 	imm:         defKindOp2,
 	xmmUnaryRmR: defKindOp2,
+	mov64MR:     defKindOp2,
+	movzxRmR:    defKindOp2,
 	gprToXmm:    defKindOp2,
 	call:        defKindCall,
 }
@@ -1549,9 +1552,12 @@ var useKinds = [instrMax]useKind{
 	ret:         useKindNone,
 	movRR:       useKindOp1,
 	movRM:       useKindOp1,
+	xmmMovRM:    useKindOp1,
 	aluRmiR:     useKindOp1Op2,
 	imm:         useKindNone,
 	xmmUnaryRmR: useKindOp1,
+	mov64MR:     useKindOp1,
+	movzxRmR:    useKindOp1,
 	gprToXmm:    useKindOp1,
 	call:        useKindCall,
 }

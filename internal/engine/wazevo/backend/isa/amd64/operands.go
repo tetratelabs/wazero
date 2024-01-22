@@ -103,6 +103,11 @@ const (
 	// amodeRegRegShift calculates sign-extend-32-to-64(Immediate) + base
 	amodeImmReg amodeKind = iota + 1
 
+	// amodeImmRBP is the same as amodeImmReg, but the base register is fixed to RBP.
+	// The only differece is that it doesn't tell the register allocator to use RBP which is distracting for the
+	// register allocator.
+	amodeImmRBP
+
 	// amodeRegRegShift calculates sign-extend-32-to-64(Immediate) + base + (Register2 << Shift)
 	amodeRegRegShift
 
@@ -118,8 +123,7 @@ func (a *amode) uses(rs *[]regalloc.VReg) {
 		*rs = append(*rs, a.base)
 	case amodeRegRegShift:
 		*rs = append(*rs, a.base, a.index)
-	case amodeRipRelative:
-		// nothing
+	case amodeRipRelative, amodeImmRBP:
 	default:
 		panic("BUG: invalid amode kind")
 	}
@@ -131,7 +135,7 @@ func (a *amode) nregs() int {
 		return 1
 	case amodeRegRegShift:
 		return 2
-	case amodeRipRelative:
+	case amodeRipRelative, amodeImmRBP:
 		return 0
 	default:
 		panic("BUG: invalid amode kind")
@@ -164,6 +168,10 @@ func newAmodeImmReg(imm32 uint32, base regalloc.VReg) amode {
 	return amode{kind: amodeImmReg, imm32: imm32, base: base}
 }
 
+func newAmodeImmRBPReg(imm32 uint32) amode {
+	return amode{kind: amodeImmRBP, imm32: imm32, base: rbpVReg}
+}
+
 func newAmodeRegRegShift(imm32 uint32, base, index regalloc.VReg, shift byte) amode {
 	if shift > 3 {
 		panic(fmt.Sprintf("BUG: invalid shift (must be 3>=): %d", shift))
@@ -189,7 +197,7 @@ func newAmodeRipRelative(label backend.Label) amode {
 // String implements fmt.Stringer.
 func (a *amode) String() string {
 	switch a.kind {
-	case amodeImmReg:
+	case amodeImmReg, amodeImmRBP:
 		if a.imm32 == 0 {
 			return fmt.Sprintf("(%s)", formatVRegSized(a.base, true))
 		}

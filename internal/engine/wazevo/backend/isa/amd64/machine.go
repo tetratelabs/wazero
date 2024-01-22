@@ -19,8 +19,9 @@ func NewBackend() backend.Machine {
 		asNop,
 	)
 	return &machine{
-		ectx:     ectx,
-		regAlloc: regalloc.NewAllocator(regInfo),
+		ectx:       ectx,
+		regAlloc:   regalloc.NewAllocator(regInfo),
+		spillSlots: map[regalloc.VRegID]int64{},
 	}
 }
 
@@ -36,6 +37,7 @@ type (
 		regAllocStarted bool
 
 		spillSlotSize int64
+		spillSlots    map[regalloc.VRegID]int64
 		currentABI    *backend.FunctionABI
 		clobberedRegs []regalloc.VReg
 
@@ -52,12 +54,24 @@ type (
 
 // Reset implements backend.Machine.
 func (m *machine) Reset() {
+	m.clobberedRegs = m.clobberedRegs[:0]
+	for key := range m.spillSlots {
+		m.clobberedRegs = append(m.clobberedRegs, regalloc.VReg(key))
+	}
+	for _, key := range m.clobberedRegs {
+		delete(m.spillSlots, regalloc.VRegID(key))
+	}
+
 	m.stackBoundsCheckDisabled = false
 	m.ectx.Reset()
 
 	m.regAllocFn.Reset()
 	m.regAlloc.Reset()
 	m.regAllocStarted = false
+	m.clobberedRegs = m.clobberedRegs[:0]
+
+	m.spillSlotSize = 0
+	m.maxRequiredStackSizeForCalls = 0
 }
 
 // ExecutableContext implements backend.Machine.
@@ -364,14 +378,11 @@ func (m *machine) Encode(context.Context) {
 // ResolveRelocations implements backend.Machine.
 func (m *machine) ResolveRelocations(refToBinaryOffset map[ssa.FuncRef]int, binary []byte, relocations []backend.RelocationInfo) {
 	for _, r := range relocations {
-		instrOffset := r.Offset
+		offset := r.Offset
 		calleeFnOffset := refToBinaryOffset[r.FuncRef]
-		// calleeFnOffset points to the beginning of call target function.
-		// call is 5 bytes where the last 4 bytes represent the signed 32-bit offset. See the encoding of `call` instruction.
-		// instrOffset is the offset of the last 4 bytes.
-		callInstrOffsetBytes := binary[instrOffset : instrOffset+4]
-		diff := int64(calleeFnOffset) - (instrOffset)
-		// We backpatch in-place the relative value `diff`.
+		// offset is the offset of the last 4 bytes of the call instruction.
+		callInstrOffsetBytes := binary[offset : offset+4]
+		diff := int64(calleeFnOffset) - (offset)
 		callInstrOffsetBytes[0] = byte(diff)
 		callInstrOffsetBytes[1] = byte(diff >> 8)
 		callInstrOffsetBytes[2] = byte(diff >> 16)
@@ -408,4 +419,14 @@ func (m *machine) allocateBrTarget() (nop *instruction, l backend.Label) { //nol
 	pos.Begin, pos.End = nop, nop
 	ectx.LabelPositions[l] = pos
 	return
+}
+
+func (m *machine) getVRegSpillSlotOffsetFromSP(id regalloc.VRegID, size byte) int64 {
+	offset, ok := m.spillSlots[id]
+	if !ok {
+		offset = m.spillSlotSize
+		m.spillSlots[id] = offset
+		m.spillSlotSize += int64(size)
+	}
+	return offset
 }

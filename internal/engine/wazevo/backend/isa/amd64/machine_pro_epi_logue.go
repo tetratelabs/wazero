@@ -95,7 +95,34 @@ func (m *machine) SetupPrologue() {
 	}
 
 	if size := m.spillSlotSize; size > 0 {
-		panic("TODO: allocate spill slots")
+		// Simply decrease the RSP to allocate the spill slots.
+		// 		sub $size, %rsp
+		cur = linkInstr(cur, m.allocateInstr().asAluRmiR(aluRmiROpcodeSub, newOperandImm32(uint32(size)), rspVReg, true))
+
+		// At this point, we have the stack layout as follows:
+		//
+		//            (high address)
+		//          +-----------------+
+		//          |     .......     |
+		//          |      ret Y      |
+		//          |     .......     |
+		//          |      ret 0      |
+		//          |      arg X      |
+		//          |     .......     |
+		//          |      arg 1      |
+		//          |      arg 0      |
+		//          |   ReturnAddress |
+		//          |   Caller_RBP    |
+		//          +-----------------+ <--- RBP
+		//          |    clobbered M  |
+		//          |   ............  |
+		//          |    clobbered 1  |
+		//          |    clobbered 0  |
+		//          |   spill slot N  |
+		//          |   ............  |
+		//          |   spill slot 0  |
+		//          +-----------------+ <--- RSP
+		//             (low address)
 	}
 
 	linkInstr(cur, prevInitInst)
@@ -152,7 +179,9 @@ func (m *machine) setupEpilogueAfter(cur *instruction) {
 	//             (low address)
 
 	if size := m.spillSlotSize; size > 0 {
-		panic("TODO: deallocate spill slots")
+		// Simply increase the RSP to free the spill slots.
+		// 		add $size, %rsp
+		cur = linkInstr(cur, m.allocateInstr().asAluRmiR(aluRmiROpcodeAdd, newOperandImm32(uint32(size)), rspVReg, true))
 	}
 
 	//
