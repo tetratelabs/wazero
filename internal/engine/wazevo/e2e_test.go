@@ -105,6 +105,16 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
+			name: "many_params_many_results",
+			m:    testcases.ManyParamsManyResults.Module,
+			calls: []callCase{
+				{
+					params:     []uint64{},
+					expResults: []uint64{3, 3, 3, 3},
+				},
+			},
+		},
+		{
 			name: "fibonacci_recursive", m: testcases.FibonacciRecursive.Module,
 			skipAMD64: true,
 			calls: []callCase{
