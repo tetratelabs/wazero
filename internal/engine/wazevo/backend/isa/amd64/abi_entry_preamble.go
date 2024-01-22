@@ -141,7 +141,7 @@ func (m *machine) goEntryPreamblePassArg(cur *instruction, paramSlicePtr regallo
 	case ssa.TypeF64:
 		load.asXmmUnaryRmR(sseOpcodeMovsd, a, dst)
 	case ssa.TypeV128:
-		panic("TODO")
+		load.asXmmUnaryRmR(sseOpcodeMovdqu, a, dst)
 	}
 
 	if arg.Kind == backend.ABIArgKindStack {
@@ -160,17 +160,18 @@ func (m *machine) goEntryPreamblePassResult(cur *instruction, resultSlicePtr reg
 	r := result.Reg
 
 	store := m.allocateInstr()
+	a := newOperandMem(newAmodeImmReg(offset, resultSlicePtr))
 	switch result.Type {
 	case ssa.TypeI32:
-		store.asMovRM(r, newOperandMem(newAmodeImmReg(offset, resultSlicePtr)), 4)
+		store.asMovRM(r, a, 4)
 	case ssa.TypeI64:
-		store.asMovRM(r, newOperandMem(newAmodeImmReg(offset, resultSlicePtr)), 8)
+		store.asMovRM(r, a, 8)
 	case ssa.TypeF32:
-		store.asXmmMovRM(sseOpcodeMovss, r, newOperandMem(newAmodeImmReg(offset, resultSlicePtr)))
+		store.asXmmMovRM(sseOpcodeMovss, r, a)
 	case ssa.TypeF64:
-		store.asXmmMovRM(sseOpcodeMovsd, r, newOperandMem(newAmodeImmReg(offset, resultSlicePtr)))
+		store.asXmmMovRM(sseOpcodeMovsd, r, a)
 	case ssa.TypeV128:
-		panic("TODO")
+		store.asXmmMovRM(sseOpcodeMovdqu, r, a)
 	}
 
 	return linkInstr(cur, store)
