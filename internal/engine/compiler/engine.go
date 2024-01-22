@@ -787,11 +787,13 @@ func (ce *callEngine) call(ctx context.Context, params, results []uint64) (_ []u
 		defer done()
 	}
 
+	snapshotEnabled := false
 	if ctx.Value(experimental.EnableSnapshotterKey{}) != nil {
 		ctx = context.WithValue(ctx, experimental.SnapshotterKey{}, ce)
+		snapshotEnabled = true
 	}
 
-	ce.execWasmFunction(ctx, m)
+	ce.execWasmFunction(ctx, m, snapshotEnabled)
 
 	// This returns a safe copy of the results, instead of a slice view. If we
 	// returned a re-slice, the caller could accidentally or purposefully
@@ -1048,7 +1050,7 @@ const (
 	builtinFunctionMemoryNotify
 )
 
-func (ce *callEngine) execWasmFunction(ctx context.Context, m *wasm.ModuleInstance) {
+func (ce *callEngine) execWasmFunction(ctx context.Context, m *wasm.ModuleInstance, snapshotEnabled bool) {
 	codeAddr := ce.initialFn.codeInitialAddress
 	modAddr := ce.initialFn.moduleInstance
 
@@ -1075,19 +1077,21 @@ entry:
 
 			fn := calleeHostFunction.parent.goFunc
 			func() {
-				defer func() {
-					if r := recover(); r != nil {
-						if s, ok := r.(*snapshot); ok {
-							if s.ce == ce {
-								s.doRestore()
+				if snapshotEnabled {
+					defer func() {
+						if r := recover(); r != nil {
+							if s, ok := r.(*snapshot); ok {
+								if s.ce == ce {
+									s.doRestore()
+								} else {
+									panic(r)
+								}
 							} else {
 								panic(r)
 							}
-						} else {
-							panic(r)
 						}
-					}
-				}()
+					}()
+				}
 				switch fn := fn.(type) {
 				case api.GoModuleFunction:
 					fn.Call(ctx, ce.callerModuleInstance, stack)

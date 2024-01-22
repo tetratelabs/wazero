@@ -735,22 +735,24 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			frame.pc = op.Us[v]
 		case wazeroir.OperationKindCall:
 			func() {
-				defer func() {
-					if r := recover(); r != nil {
-						if s, ok := r.(*snapshot); ok {
-							if s.ce == ce {
-								s.doRestore()
-								frame = ce.frames[len(ce.frames)-1]
-								body = frame.f.parent.body
-								bodyLen = uint64(len(body))
+				if ctx.Value(experimental.EnableSnapshotterKey{}) != nil {
+					defer func() {
+						if r := recover(); r != nil {
+							if s, ok := r.(*snapshot); ok {
+								if s.ce == ce {
+									s.doRestore()
+									frame = ce.frames[len(ce.frames)-1]
+									body = frame.f.parent.body
+									bodyLen = uint64(len(body))
+								} else {
+									panic(r)
+								}
 							} else {
 								panic(r)
 							}
-						} else {
-							panic(r)
 						}
-					}
-				}()
+					}()
+				}
 				ce.callFunction(ctx, f.moduleInstance, &functions[op.U1])
 			}()
 			frame.pc++
