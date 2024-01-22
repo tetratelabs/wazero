@@ -17,29 +17,28 @@ func (m *machine) lowerToAddressMode(ptr ssa.Value, offsetBase uint32) (am amode
 //
 // Extracted as a separate function for easy testing.
 func (m *machine) lowerToAddressModeFromAddends(a64s *queue[regalloc.VReg], offset int64) (am amode) {
-	if !a64s.empty() {
-		if base := a64s.dequeue(); a64s.empty() && lower32willSignExtendTo64(uint64(offset)) {
-			// Absorb the offset into the amode with no index.
-			am = newAmodeImmReg(uint32(offset), base)
-			offset = 0
-		} else if !a64s.empty() {
-			if index := a64s.dequeue(); lower32willSignExtendTo64(uint64(offset)) {
-				// Absorb the offset into the amode with an index.
-				am = newAmodeRegRegShift(uint32(offset), base, index, 0)
-				offset = 0
-			} else {
-				// Offset is too large to be absorbed into the amode, will be added later.
-				am = newAmodeRegRegShift(0, base, index, 0)
-			}
-		} else {
-			am = newAmodeImmReg(0, base)
-		}
-	} else {
+	if a64s.empty() {
 		// Only static offsets.
 		tmpReg := m.c.AllocateVReg(ssa.TypeI64)
 		m.lowerIconst(tmpReg, uint64(offset), true)
 		am = newAmodeImmReg(0, tmpReg)
 		offset = 0
+	} else if base := a64s.dequeue(); a64s.empty() {
+		if lower32willSignExtendTo64(uint64(offset)) {
+			// Absorb the offset into the amode with no index.
+			am = newAmodeImmReg(uint32(offset), base)
+			offset = 0
+		} else {
+			// Offset is too large to be absorbed into the amode, will be added later.
+			am = newAmodeImmReg(0, base)
+		}
+	} else if index := a64s.dequeue(); lower32willSignExtendTo64(uint64(offset)) {
+		// Absorb the offset into the amode with an index.
+		am = newAmodeRegRegShift(uint32(offset), base, index, 0)
+		offset = 0
+	} else {
+		// Offset is too large to be absorbed into the amode, will be added later.
+		am = newAmodeRegRegShift(0, base, index, 0)
 	}
 
 	baseReg := am.base
