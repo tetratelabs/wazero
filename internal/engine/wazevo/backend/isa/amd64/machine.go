@@ -19,8 +19,9 @@ func NewBackend() backend.Machine {
 		asNop,
 	)
 	return &machine{
-		ectx:     ectx,
-		regAlloc: regalloc.NewAllocator(regInfo),
+		ectx:       ectx,
+		regAlloc:   regalloc.NewAllocator(regInfo),
+		spillSlots: map[regalloc.VRegID]int64{},
 	}
 }
 
@@ -36,6 +37,7 @@ type (
 		regAllocStarted bool
 
 		spillSlotSize int64
+		spillSlots    map[regalloc.VRegID]int64 // regalloc.VRegID to offset.
 		currentABI    *backend.FunctionABI
 		clobberedRegs []regalloc.VReg
 
@@ -408,4 +410,14 @@ func (m *machine) allocateBrTarget() (nop *instruction, l backend.Label) { //nol
 	pos.Begin, pos.End = nop, nop
 	ectx.LabelPositions[l] = pos
 	return
+}
+
+func (m *machine) getVRegSpillSlotOffsetFromSP(id regalloc.VRegID, size byte) int64 {
+	offset, ok := m.spillSlots[id]
+	if !ok {
+		offset = m.spillSlotSize
+		m.spillSlots[id] = offset
+		m.spillSlotSize += int64(size)
+	}
+	return offset
 }
