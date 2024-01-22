@@ -5,6 +5,7 @@ import (
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 )
 
 type operand struct {
@@ -210,4 +211,80 @@ func (a *amode) String() string {
 		}
 	}
 	panic("BUG: invalid amode kind")
+}
+
+func (m *machine) getOperand_Mem_Imm32_Reg(def *backend.SSAValueDefinition) (op operand) {
+	if def.IsFromBlockParam() {
+		return newOperandReg(def.BlkParamVReg)
+	}
+
+	if opcode := m.c.MatchInstrOneOf(def, []ssa.Opcode{
+		ssa.OpcodeLoad,
+		ssa.OpcodeUload8, ssa.OpcodeUload16, ssa.OpcodeUload32,
+		ssa.OpcodeSload8, ssa.OpcodeSload16, ssa.OpcodeSload32,
+	}); opcode != ssa.OpcodeInvalid {
+		switch opcode {
+		case ssa.OpcodeLoad, ssa.OpcodeUload32, ssa.OpcodeSload32:
+			instr := def.Instr
+			ptr, offset, _ := instr.LoadData()
+			op = newOperandMem(m.lowerToAddressMode(ptr, offset))
+			instr.MarkLowered()
+			return op
+		default:
+			panic("TODO: " + opcode.String())
+		}
+	}
+	return m.getOperand_Imm32_Reg(def)
+}
+
+func (m *machine) getOperand_Imm32_Reg(def *backend.SSAValueDefinition) (op operand) {
+	if def.IsFromBlockParam() {
+		return newOperandReg(def.BlkParamVReg)
+	}
+
+	instr := def.Instr
+	if instr.Constant() {
+		if op, ok := asImm32Operand(instr.ConstantVal()); ok {
+			instr.MarkLowered()
+			return op
+		}
+	}
+	return m.getOperand_Reg(def)
+}
+
+func asImm32(val uint64) (uint32, bool) {
+	u32val := uint32(val)
+	if uint64(u32val) != val {
+		return 0, false
+	}
+	return u32val, true
+}
+
+func asImm32Operand(val uint64) (operand, bool) {
+	if u32val, ok := asImm32(val); ok {
+		return newOperandImm32(u32val), true
+	}
+	return operand{}, false
+}
+
+func (m *machine) getOperand_Reg(def *backend.SSAValueDefinition) (op operand) {
+	var v regalloc.VReg
+	if def.IsFromBlockParam() {
+		v = def.BlkParamVReg
+	} else {
+		instr := def.Instr
+		if instr.Constant() {
+			// We inline all the constant instructions so that we could reduce the register usage.
+			v = m.lowerConstant(instr)
+			instr.MarkLowered()
+		} else {
+			if n := def.N; n == 0 {
+				v = m.c.VRegOf(instr.Return())
+			} else {
+				_, rs := instr.Returns()
+				v = m.c.VRegOf(rs[n-1])
+			}
+		}
+	}
+	return newOperandReg(v)
 }

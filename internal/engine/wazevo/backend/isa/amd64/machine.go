@@ -160,9 +160,9 @@ func (m *machine) lowerAluRmiROp(si *ssa.Instruction, op aluRmiROpcode) {
 
 	_64 := x.Type().Bits() == 64
 
-	xDef := m.c.ValueDefinition(x)
-	yDef := m.c.ValueDefinition(y)
+	xDef, yDef := m.c.ValueDefinition(x), m.c.ValueDefinition(y)
 
+	// TODO: commutative args can be swapped if one of them is an immediate.
 	rn := m.getOperand_Reg(xDef)
 	rm := m.getOperand_Mem_Imm32_Reg(yDef)
 	rd := m.c.VRegOf(si.Return())
@@ -182,71 +182,6 @@ func (m *machine) lowerAluRmiROp(si *ssa.Instruction, op aluRmiROpcode) {
 	mov2 := m.allocateInstr()
 	mov2.asMovRR(tmp, rd, _64)
 	m.insert(mov2)
-}
-
-func (m *machine) getOperand_Mem_Imm32_Reg(def *backend.SSAValueDefinition) (op operand) {
-	if def.IsFromBlockParam() {
-		return newOperandReg(def.BlkParamVReg)
-	}
-
-	if m.c.MatchInstr(def, ssa.OpcodeLoad) {
-		instr := def.Instr
-		ptr, offset, _ := instr.LoadData()
-		op = newOperandMem(m.lowerToAddressMode(ptr, offset))
-		instr.MarkLowered()
-		return op
-	} else if opcode := m.c.MatchInstrOneOf(def, []ssa.Opcode{
-		ssa.OpcodeUload8, ssa.OpcodeUload16, ssa.OpcodeUload32,
-		ssa.OpcodeSload8, ssa.OpcodeSload16, ssa.OpcodeSload32,
-	}); opcode != ssa.OpcodeInvalid {
-		panic("TODO")
-	}
-	return m.getOperand_Imm32_Reg(def)
-}
-
-func (m *machine) getOperand_Imm32_Reg(def *backend.SSAValueDefinition) (op operand) {
-	if def.IsFromBlockParam() {
-		return newOperandReg(def.BlkParamVReg)
-	}
-
-	instr := def.Instr
-	if instr.Constant() {
-		if op, ok := asImm32Operand(instr.ConstantVal()); ok {
-			instr.MarkLowered()
-			return op
-		}
-	}
-	return m.getOperand_Reg(def)
-}
-
-func asImm32Operand(val uint64) (op operand, ok bool) {
-	u32val := uint32(val)
-	if uint64(u32val) != val {
-		return operand{}, false
-	}
-	return newOperandImm32(u32val), true
-}
-
-func (m *machine) getOperand_Reg(def *backend.SSAValueDefinition) (op operand) {
-	var v regalloc.VReg
-	if def.IsFromBlockParam() {
-		v = def.BlkParamVReg
-	} else {
-		instr := def.Instr
-		if instr.Constant() {
-			// We inline all the constant instructions so that we could reduce the register usage.
-			v = m.lowerConstant(instr)
-			instr.MarkLowered()
-		} else {
-			if n := def.N; n == 0 {
-				v = m.c.VRegOf(instr.Return())
-			} else {
-				_, rs := instr.Returns()
-				v = m.c.VRegOf(rs[n-1])
-			}
-		}
-	}
-	return newOperandReg(v)
 }
 
 func (m *machine) lowerStore(si *ssa.Instruction) {

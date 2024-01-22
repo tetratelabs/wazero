@@ -85,7 +85,6 @@ func TestMachine_lowerToAddressModeFromAddends(t *testing.T) {
 			},
 			exp: newAmodeRegRegShift(0, x1, x2, 0),
 		},
-		// TODO: add more tests
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx, _, m := newSetupWithMockContext()
