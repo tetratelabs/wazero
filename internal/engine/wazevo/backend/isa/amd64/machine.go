@@ -54,12 +54,24 @@ type (
 
 // Reset implements backend.Machine.
 func (m *machine) Reset() {
+	m.clobberedRegs = m.clobberedRegs[:0]
+	for key := range m.spillSlots {
+		m.clobberedRegs = append(m.clobberedRegs, regalloc.VReg(key))
+	}
+	for _, key := range m.clobberedRegs {
+		delete(m.spillSlots, regalloc.VRegID(key))
+	}
+
 	m.stackBoundsCheckDisabled = false
 	m.ectx.Reset()
 
 	m.regAllocFn.Reset()
 	m.regAlloc.Reset()
 	m.regAllocStarted = false
+	m.clobberedRegs = m.clobberedRegs[:0]
+
+	m.spillSlotSize = 0
+	m.maxRequiredStackSizeForCalls = 0
 }
 
 // ExecutableContext implements backend.Machine.
