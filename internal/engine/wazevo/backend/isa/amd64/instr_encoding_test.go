@@ -930,11 +930,25 @@ func TestInstruction_format_encode(t *testing.T) {
 			want:       "f20f10c1",
 			wantFormat: "movsd %xmm1, %xmm0",
 		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmUnaryRmR(sseOpcodeMovsd, newOperandMem(newAmodeImmReg(16, r12VReg)), xmm0VReg)
+			},
+			want:       "f2410f10442410",
+			wantFormat: "movsd 16(%r12), %xmm0",
+		},
 		// movss
 		{
 			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodeMovss, newOperandReg(xmm1VReg), xmm0VReg) },
 			want:       "f30f10c1",
 			wantFormat: "movss %xmm1, %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmUnaryRmR(sseOpcodeMovss, newOperandMem(newAmodeImmReg(160, r12VReg)), xmm15VReg)
+			},
+			want:       "f3450f10bc24a0000000",
+			wantFormat: "movss 160(%r12), %xmm15",
 		},
 		// movups
 		{
