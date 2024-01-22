@@ -183,7 +183,6 @@ func (m *machine) goEntryPreamblePassArg(cur *instruction, paramSlicePtr regallo
 }
 
 func (m *machine) goEntryPreamblePassResult(cur *instruction, resultSlicePtr regalloc.VReg, offsetInResultSlice uint32, result *backend.ABIArg, resultStackSlotBeginOffset uint32) *instruction {
-
 	var r regalloc.VReg
 	if result.Kind == backend.ABIArgKindStack {
 		// Load the value to the temporary.
