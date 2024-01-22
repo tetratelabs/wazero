@@ -18,13 +18,19 @@ func (m *machine) lowerToAddressMode(ptr ssa.Value, offsetBase uint32) (am amode
 // Extracted as a separate function for easy testing.
 func (m *machine) lowerToAddressModeFromAddends(a64s *queue[regalloc.VReg], offset int64) (am amode) {
 	if !a64s.empty() {
-		base := a64s.dequeue()
-		if lower32willSignExtendTo64(uint64(offset)) {
+		if base := a64s.dequeue(); a64s.empty() && lower32willSignExtendTo64(uint64(offset)) {
+			// Absorb the offset into the amode with no index.
 			am = newAmodeImmReg(uint32(offset), base)
 			offset = 0
 		} else if !a64s.empty() {
-			index := a64s.dequeue()
-			am = newAmodeRegRegShift(0, base, index, 0)
+			if index := a64s.dequeue(); lower32willSignExtendTo64(uint64(offset)) {
+				// Absorb the offset into the amode with an index.
+				am = newAmodeRegRegShift(uint32(offset), base, index, 0)
+				offset = 0
+			} else {
+				// Offset is too large to be absorbed into the amode, will be added later.
+				am = newAmodeRegRegShift(0, base, index, 0)
+			}
 		} else {
 			am = newAmodeImmReg(0, base)
 		}
@@ -102,6 +108,7 @@ func (m *machine) collectAddends(ptr ssa.Value) (addends64 *queue[regalloc.VReg]
 				def.Instr.MarkLowered()
 				continue
 			}
+			// Note: case Ishl x, y could be handled too when the offset amount is <= 3.
 		default:
 			// If the addend is not one of them, we simply use it as-is.
 			m.addends64.enqueue(m.getOperand_Reg(def).r)

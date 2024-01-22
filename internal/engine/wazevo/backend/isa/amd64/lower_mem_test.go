@@ -51,8 +51,13 @@ func TestMachine_lowerToAddressModeFromAddends(t *testing.T) {
 			name:   "two a64 with imm32",
 			a64s:   []regalloc.VReg{x1, x2},
 			offset: 1 << 16,
-			insts:  []string{"add %rcx, %rax"},
-			exp:    newAmodeImmReg(1<<16, x1),
+			exp:    newAmodeRegRegShift(1<<16, x1, x2, 0),
+		},
+		{
+			name:   "two a64 with offset fitting",
+			a64s:   []regalloc.VReg{x1, x2},
+			offset: 1 << 30,
+			exp:    newAmodeRegRegShift(1<<30, x1, x2, 0),
 		},
 		{
 			name:   "two a64 with offset not fitting",
@@ -69,10 +74,9 @@ func TestMachine_lowerToAddressModeFromAddends(t *testing.T) {
 			a64s:   []regalloc.VReg{x1, x2, x3},
 			offset: 1 << 16,
 			insts: []string{
-				"add %rcx, %rax",
 				"add %rdx, %rax",
 			},
-			exp: newAmodeImmReg(1<<16, x1),
+			exp: newAmodeRegRegShift(1<<16, x1, x2, 0),
 		},
 		{
 			name:   "three a64 with offset not fitting",
