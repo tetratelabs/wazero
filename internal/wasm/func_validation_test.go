@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
@@ -4247,13 +4248,13 @@ func TestModule_funcValidation_Atomic(t *testing.T) {
 				}
 
 				t.Run("with memory", func(t *testing.T) {
-					err := m.validateFunction(&stacks{}, api.CoreFeaturesV2,
+					err := m.validateFunction(&stacks{}, experimental.CoreFeaturesThreads,
 						0, []Index{0}, nil, &Memory{}, []Table{}, nil, bytes.NewReader(nil))
 					require.NoError(t, err)
 				})
 
 				t.Run("without memory", func(t *testing.T) {
-					err := m.validateFunction(&stacks{}, api.CoreFeaturesV2,
+					err := m.validateFunction(&stacks{}, experimental.CoreFeaturesThreads,
 						0, []Index{0}, nil, nil, []Table{}, nil, bytes.NewReader(nil))
 					// Only fence doesn't require memory
 					if tc.name == "memory.atomic.fence" {
@@ -4276,7 +4277,7 @@ func TestModule_funcValidation_Atomic(t *testing.T) {
 			FunctionSection: []Index{0},
 			CodeSection:     []Code{{Body: body}},
 		}
-		err := m.validateFunction(&stacks{}, api.CoreFeaturesV2,
+		err := m.validateFunction(&stacks{}, experimental.CoreFeaturesThreads,
 			0, []Index{0}, nil, &Memory{}, []Table{}, nil, bytes.NewReader(nil))
 		require.Error(t, err, "invalid immediate value for atomic.fence")
 	})
@@ -4839,7 +4840,7 @@ func TestModule_funcValidation_Atomic(t *testing.T) {
 					FunctionSection: []Index{0},
 					CodeSection:     []Code{{Body: body}},
 				}
-				err := m.validateFunction(&stacks{}, api.CoreFeaturesV2,
+				err := m.validateFunction(&stacks{}, experimental.CoreFeaturesThreads,
 					0, []Index{0}, nil, &Memory{}, []Table{}, nil, bytes.NewReader(nil))
 				require.Error(t, err, "invalid memory alignment")
 			})

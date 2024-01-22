@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"fmt"
 
+	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -12,6 +14,7 @@ import (
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-memory
 func decodeMemory(
 	r *bytes.Reader,
+	enabledFeatures api.CoreFeatures,
 	memorySizer func(minPages uint32, maxPages *uint32) (min, capacity, max uint32),
 	memoryLimitPages uint32,
 ) (*wasm.Memory, error) {
@@ -21,7 +24,9 @@ func decodeMemory(
 	}
 
 	if shared {
-		// TODO(anuraaga): Check threads feature is enabled
+		if !enabledFeatures.IsEnabled(experimental.CoreFeaturesThreads) {
+			return nil, fmt.Errorf("shared memory requested but threads feature not enabled")
+		}
 
 		// This restriction may be lifted in the future.
 		// https://webassembly.github.io/threads/core/binary/types.html#memory-types
