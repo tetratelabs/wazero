@@ -1057,7 +1057,7 @@ func encodeEncMem(
 	)
 
 	switch m.kind {
-	case amodeImmReg:
+	case amodeImmReg, amodeImmRBP:
 		base := m.base.RealReg()
 		baseEnc := regEncodings[base]
 
@@ -1140,6 +1140,8 @@ func encodeEncMem(
 		// https://wiki.osdev.org/X86-64_Instruction_Encoding#32.2F64-bit_addressing
 		c.EmitByte(encodeModRM(0b00, regEncoding(r), 0b101))
 		c.Emit4Bytes(m.imm32)
+	default:
+		panic("BUG: invalid addressing mode")
 	}
 }
 
