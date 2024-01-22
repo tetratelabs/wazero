@@ -5,6 +5,7 @@ import (
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 )
 
 type (
@@ -310,35 +311,35 @@ func (m *machine) lowerToAddressMode(ptr ssa.Value, offsetBase uint32, size byte
 // During the construction, this might emit additional instructions.
 //
 // Extracted as a separate function for easy testing.
-func (m *machine) lowerToAddressModeFromAddends(a32s *queue[addend32], a64s *queue[regalloc.VReg], size byte, offset int64) (amode addressMode) {
-	switch a64sExist, a32sExist := !a64s.empty(), !a32s.empty(); {
+func (m *machine) lowerToAddressModeFromAddends(a32s *wazevoapi.Queue[addend32], a64s *wazevoapi.Queue[regalloc.VReg], size byte, offset int64) (amode addressMode) {
+	switch a64sExist, a32sExist := !a64s.Empty(), !a32s.Empty(); {
 	case a64sExist && a32sExist:
 		var base regalloc.VReg
-		base = a64s.dequeue()
+		base = a64s.Dequeue()
 		var a32 addend32
-		a32 = a32s.dequeue()
+		a32 = a32s.Dequeue()
 		amode = addressMode{kind: addressModeKindRegExtended, rn: base, rm: a32.r, extOp: a32.ext}
 	case a64sExist && offsetFitsInAddressModeKindRegUnsignedImm12(size, offset):
 		var base regalloc.VReg
-		base = a64s.dequeue()
+		base = a64s.Dequeue()
 		amode = addressMode{kind: addressModeKindRegUnsignedImm12, rn: base, imm: offset}
 		offset = 0
 	case a64sExist && offsetFitsInAddressModeKindRegSignedImm9(offset):
 		var base regalloc.VReg
-		base = a64s.dequeue()
+		base = a64s.Dequeue()
 		amode = addressMode{kind: addressModeKindRegSignedImm9, rn: base, imm: offset}
 		offset = 0
 	case a64sExist:
 		var base regalloc.VReg
-		base = a64s.dequeue()
-		if !a64s.empty() {
-			index := a64s.dequeue()
+		base = a64s.Dequeue()
+		if !a64s.Empty() {
+			index := a64s.Dequeue()
 			amode = addressMode{kind: addressModeKindRegReg, rn: base, rm: index, extOp: extendOpUXTX /* indicates index reg is 64-bit */}
 		} else {
 			amode = addressMode{kind: addressModeKindRegUnsignedImm12, rn: base, imm: 0}
 		}
 	case a32sExist:
-		base32 := a32s.dequeue()
+		base32 := a32s.Dequeue()
 
 		// First we need 64-bit base.
 		base := m.compiler.AllocateVReg(ssa.TypeI64)
@@ -350,8 +351,8 @@ func (m *machine) lowerToAddressModeFromAddends(a32s *queue[addend32], a64s *que
 		baseExt.asExtend(base, base32.r, 32, 64, signed)
 		m.insert(baseExt)
 
-		if !a32s.empty() {
-			index := a32s.dequeue()
+		if !a32s.Empty() {
+			index := a32s.Dequeue()
 			amode = addressMode{kind: addressModeKindRegExtended, rn: base, rm: index.r, extOp: index.ext}
 		} else {
 			amode = addressMode{kind: addressModeKindRegUnsignedImm12, rn: base, imm: 0}
@@ -368,13 +369,13 @@ func (m *machine) lowerToAddressModeFromAddends(a32s *queue[addend32], a64s *que
 		baseReg = m.addConstToReg64(baseReg, offset) // baseReg += offset
 	}
 
-	for !a64s.empty() {
-		a64 := a64s.dequeue()
+	for !a64s.Empty() {
+		a64 := a64s.Dequeue()
 		baseReg = m.addReg64ToReg64(baseReg, a64) // baseReg += a64
 	}
 
-	for !a32s.empty() {
-		a32 := a32s.dequeue()
+	for !a32s.Empty() {
+		a32 := a32s.Dequeue()
 		baseReg = m.addRegToReg64Ext(baseReg, a32.r, a32.ext) // baseReg += (a32 extended to 64-bit)
 	}
 	amode.rn = baseReg
@@ -383,22 +384,22 @@ func (m *machine) lowerToAddressModeFromAddends(a32s *queue[addend32], a64s *que
 
 var addendsMatchOpcodes = [4]ssa.Opcode{ssa.OpcodeUExtend, ssa.OpcodeSExtend, ssa.OpcodeIadd, ssa.OpcodeIconst}
 
-func (m *machine) collectAddends(ptr ssa.Value) (addends32 *queue[addend32], addends64 *queue[regalloc.VReg], offset int64) {
-	m.addendsWorkQueue.reset()
-	m.addends32.reset()
-	m.addends64.reset()
-	m.addendsWorkQueue.enqueue(ptr)
+func (m *machine) collectAddends(ptr ssa.Value) (addends32 *wazevoapi.Queue[addend32], addends64 *wazevoapi.Queue[regalloc.VReg], offset int64) {
+	m.addendsWorkQueue.Reset()
+	m.addends32.Reset()
+	m.addends64.Reset()
+	m.addendsWorkQueue.Enqueue(ptr)
 
-	for !m.addendsWorkQueue.empty() {
-		v := m.addendsWorkQueue.dequeue()
+	for !m.addendsWorkQueue.Empty() {
+		v := m.addendsWorkQueue.Dequeue()
 
 		def := m.compiler.ValueDefinition(v)
 		switch op := m.compiler.MatchInstrOneOf(def, addendsMatchOpcodes[:]); op {
 		case ssa.OpcodeIadd:
 			// If the addend is an add, we recursively collect its operands.
 			x, y := def.Instr.Arg2()
-			m.addendsWorkQueue.enqueue(x)
-			m.addendsWorkQueue.enqueue(y)
+			m.addendsWorkQueue.Enqueue(x)
+			m.addendsWorkQueue.Enqueue(y)
 			def.Instr.MarkLowered()
 		case ssa.OpcodeIconst:
 			// If the addend is constant, we just statically merge it into the offset.
@@ -414,7 +415,7 @@ func (m *machine) collectAddends(ptr ssa.Value) (addends32 *queue[addend32], add
 			switch input := def.Instr.Arg(); input.Type().Bits() {
 			case 64:
 				// If the input is already 64-bit, this extend is a no-op. TODO: shouldn't this be optimized out at much earlier stage? no?
-				m.addends64.enqueue(m.getOperand_NR(m.compiler.ValueDefinition(input), extModeNone).nr())
+				m.addends64.Enqueue(m.getOperand_NR(m.compiler.ValueDefinition(input), extModeNone).nr())
 				def.Instr.MarkLowered()
 				continue
 			case 32:
@@ -435,7 +436,7 @@ func (m *machine) collectAddends(ptr ssa.Value) (addends32 *queue[addend32], add
 					// Sign-extension of a 32-bit constant can be merged into the offset.
 					offset += int64(int32(inputDef.Instr.ConstantVal())) // sign-extend!
 				default:
-					m.addends32.enqueue(addend32{r: m.getOperand_NR(inputDef, extModeNone).nr(), ext: ext})
+					m.addends32.Enqueue(addend32{r: m.getOperand_NR(inputDef, extModeNone).nr(), ext: ext})
 				}
 				def.Instr.MarkLowered()
 				continue
@@ -446,7 +447,7 @@ func (m *machine) collectAddends(ptr ssa.Value) (addends32 *queue[addend32], add
 			panic("TODO: add tests")
 		default:
 			// If the addend is not one of them, we simply use it as-is (without merging!), optionally zero-extending it.
-			m.addends64.enqueue(m.getOperand_NR(def, extModeZeroExtend64 /* optional zero ext */).nr())
+			m.addends64.Enqueue(m.getOperand_NR(def, extModeZeroExtend64 /* optional zero ext */).nr())
 		}
 	}
 	return &m.addends32, &m.addends64, offset
@@ -482,29 +483,4 @@ func (m *machine) addRegToReg64Ext(rn, rm regalloc.VReg, ext extendOp) (rd regal
 	alu.asALU(aluOpAdd, operandNR(rd), operandNR(rn), operandER(rm, ext, 64), true)
 	m.insert(alu)
 	return
-}
-
-// queue is the resettable queue where the underlying slice is reused.
-type queue[T any] struct {
-	index int
-	data  []T
-}
-
-func (q *queue[T]) enqueue(v T) {
-	q.data = append(q.data, v)
-}
-
-func (q *queue[T]) dequeue() (ret T) {
-	ret = q.data[q.index]
-	q.index++
-	return
-}
-
-func (q *queue[T]) empty() bool {
-	return q.index >= len(q.data)
-}
-
-func (q *queue[T]) reset() {
-	q.index = 0
-	q.data = q.data[:0]
 }

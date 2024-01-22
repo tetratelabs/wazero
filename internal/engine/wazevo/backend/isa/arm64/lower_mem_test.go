@@ -2,6 +2,7 @@ package arm64
 
 import (
 	"fmt"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 	"math"
 	"strconv"
 	"strings"
@@ -473,8 +474,8 @@ func TestMachine_collectAddends(t *testing.T) {
 			ctx, b, m := newSetupWithMockContext()
 			ptr, verify := tc.setup(ctx, b, m)
 			actual32sQ, actual64sQ, actualOffset := m.collectAddends(ptr)
-			require.Equal(t, tc.exp32s, actual32sQ.data)
-			require.Equal(t, tc.exp64s, actual64sQ.data)
+			require.Equal(t, tc.exp32s, actual32sQ.Data)
+			require.Equal(t, tc.exp64s, actual64sQ.Data)
 			require.Equal(t, tc.offset, actualOffset)
 			verify(t)
 		})
@@ -812,13 +813,13 @@ func TestMachine_lowerToAddressModeFromAddends(t *testing.T) {
 			ctx, _, m := newSetupWithMockContext()
 			ctx.vRegCounter = int(nextVReg.ID()) - 1
 
-			var a32s queue[addend32]
-			var a64s queue[regalloc.VReg]
+			var a32s wazevoapi.Queue[addend32]
+			var a64s wazevoapi.Queue[regalloc.VReg]
 			for _, a32 := range tc.a32s {
-				a32s.enqueue(a32)
+				a32s.Enqueue(a32)
 			}
 			for _, a64 := range tc.a64s {
-				a64s.enqueue(a64)
+				a64s.Enqueue(a64)
 			}
 			actual := m.lowerToAddressModeFromAddends(&a32s, &a64s, tc.dstSizeInBits, tc.offset)
 			require.Equal(t, strings.Join(tc.insts, "\n"), formatEmittedInstructionsInCurrentBlock(m))

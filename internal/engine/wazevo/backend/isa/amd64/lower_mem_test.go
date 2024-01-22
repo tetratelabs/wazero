@@ -1,6 +1,7 @@
 package amd64
 
 import (
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 	"math"
 	"strings"
 	"testing"
@@ -149,9 +150,9 @@ func TestMachine_lowerToAddressModeFromAddends(t *testing.T) {
 			ctx, _, m := newSetupWithMockContext()
 			ctx.vRegCounter = int(nextVReg.ID()) - 1
 
-			var a64s queue[addend64]
+			var a64s wazevoapi.Queue[addend64]
 			for _, a64 := range tc.a64s {
-				a64s.enqueue(a64)
+				a64s.Enqueue(a64)
 			}
 			actual := m.lowerToAddressModeFromAddends(&a64s, tc.offset)
 			require.Equal(t, strings.Join(tc.insts, "\n"), formatEmittedInstructionsInCurrentBlock(m))
@@ -343,7 +344,7 @@ func TestMachine_collectAddends(t *testing.T) {
 			ctx, b, m := newSetupWithMockContext()
 			ptr, verify := tc.setup(ctx, b, m)
 			actual64sQ, actualOffset := m.collectAddends(ptr)
-			require.Equal(t, tc.exp64s, actual64sQ.data)
+			require.Equal(t, tc.exp64s, actual64sQ.Data)
 			require.Equal(t, tc.offset, actualOffset)
 			verify(t)
 		})

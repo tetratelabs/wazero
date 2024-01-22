@@ -3,6 +3,7 @@ package amd64
 import (
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 )
 
 // lowerToAddressMode converts a pointer to an addressMode that can be used as an operand for load/store instructions.
@@ -16,14 +17,14 @@ func (m *machine) lowerToAddressMode(ptr ssa.Value, offsetBase uint32) (am amode
 // During the construction, this might emit additional instructions.
 //
 // Extracted as a separate function for easy testing.
-func (m *machine) lowerToAddressModeFromAddends(a64s *queue[addend64], offset int64) (am amode) {
-	if a64s.empty() {
+func (m *machine) lowerToAddressModeFromAddends(a64s *wazevoapi.Queue[addend64], offset int64) (am amode) {
+	if a64s.Empty() {
 		// Only static offsets.
 		tmpReg := m.c.AllocateVReg(ssa.TypeI64)
 		m.lowerIconst(tmpReg, uint64(offset), true)
 		am = newAmodeImmReg(0, tmpReg)
 		offset = 0
-	} else if base := a64s.dequeue(); a64s.empty() {
+	} else if base := a64s.Dequeue(); a64s.Empty() {
 		if base.shift != 0 {
 			panic("FIXME: must implement amodeImmRegShift")
 		}
@@ -35,7 +36,7 @@ func (m *machine) lowerToAddressModeFromAddends(a64s *queue[addend64], offset in
 			// Offset is too large to be absorbed into the amode, will be added later.
 			am = newAmodeImmReg(0, base.r)
 		}
-	} else if index := a64s.dequeue(); lower32willSignExtendTo64(uint64(offset)) {
+	} else if index := a64s.Dequeue(); lower32willSignExtendTo64(uint64(offset)) {
 		if index.shift != 0 && base.shift != 0 {
 			panic("FIXME: cannot absorb two shifted registers, must lower one to a shift instruction.")
 		}
@@ -65,8 +66,8 @@ func (m *machine) lowerToAddressModeFromAddends(a64s *queue[addend64], offset in
 		baseReg = m.addConstToReg64(baseReg, offset) // baseReg += offset
 	}
 
-	for !a64s.empty() {
-		a64 := a64s.dequeue()
+	for !a64s.Empty() {
+		a64 := a64s.Dequeue()
 		baseReg = m.addReg64ToReg64(baseReg, a64.r, a64.shift) // baseReg += a64
 	}
 
@@ -76,21 +77,21 @@ func (m *machine) lowerToAddressModeFromAddends(a64s *queue[addend64], offset in
 
 var addendsMatchOpcodes = [5]ssa.Opcode{ssa.OpcodeUExtend, ssa.OpcodeSExtend, ssa.OpcodeIadd, ssa.OpcodeIconst, ssa.OpcodeIshl}
 
-func (m *machine) collectAddends(ptr ssa.Value) (addends64 *queue[addend64], offset int64) {
-	m.addendsWorkQueue.reset()
-	m.addends64.reset()
-	m.addendsWorkQueue.enqueue(ptr)
+func (m *machine) collectAddends(ptr ssa.Value) (addends64 *wazevoapi.Queue[addend64], offset int64) {
+	m.addendsWorkQueue.Reset()
+	m.addends64.Reset()
+	m.addendsWorkQueue.Enqueue(ptr)
 
-	for !m.addendsWorkQueue.empty() {
-		v := m.addendsWorkQueue.dequeue()
+	for !m.addendsWorkQueue.Empty() {
+		v := m.addendsWorkQueue.Dequeue()
 
 		def := m.c.ValueDefinition(v)
 		switch op := m.c.MatchInstrOneOf(def, addendsMatchOpcodes[:]); op {
 		case ssa.OpcodeIadd:
 			// If the addend is an add, we recursively collect its operands.
 			x, y := def.Instr.Arg2()
-			m.addendsWorkQueue.enqueue(x)
-			m.addendsWorkQueue.enqueue(y)
+			m.addendsWorkQueue.Enqueue(x)
+			m.addendsWorkQueue.Enqueue(y)
 			def.Instr.MarkLowered()
 		case ssa.OpcodeIconst:
 			// If the addend is constant, we just statically merge it into the offset.
@@ -106,7 +107,7 @@ func (m *machine) collectAddends(ptr ssa.Value) (addends64 *queue[addend64], off
 			switch input := def.Instr.Arg(); input.Type().Bits() {
 			case 64:
 				// If the input is already 64-bit, this extend is a no-op. TODO: shouldn't this be optimized out at much earlier stage? no?
-				m.addends64.enqueue(addend64{r: m.getOperand_Reg(m.c.ValueDefinition(input)).r})
+				m.addends64.Enqueue(addend64{r: m.getOperand_Reg(m.c.ValueDefinition(input)).r})
 				def.Instr.MarkLowered()
 				continue
 			case 32:
@@ -133,22 +134,15 @@ func (m *machine) collectAddends(ptr ssa.Value) (addends64 *queue[addend64], off
 			if !amountDef.IsFromInstr() || !amountDef.Instr.Constant() || amountDef.Instr.ConstantVal() > 3 {
 				continue
 			}
-			m.addends64.enqueue(addend64{r: m.getOperand_Reg(m.c.ValueDefinition(x)).r, shift: uint8(amountDef.Instr.ConstantVal())})
+			m.addends64.Enqueue(addend64{r: m.getOperand_Reg(m.c.ValueDefinition(x)).r, shift: uint8(amountDef.Instr.ConstantVal())})
 			def.Instr.MarkLowered()
 			amountDef.Instr.MarkLowered()
 		default:
 			// If the addend is not one of them, we simply use it as-is.
-			m.addends64.enqueue(addend64{r: m.getOperand_Reg(def).r})
+			m.addends64.Enqueue(addend64{r: m.getOperand_Reg(def).r})
 		}
 	}
 	return &m.addends64, offset
-}
-
-// FIXME: this can be shared.
-// queue is the resettable queue where the underlying slice is reused.
-type queue[T any] struct {
-	index int
-	data  []T
 }
 
 func (m *machine) addConstToReg64(rd regalloc.VReg, c int64) regalloc.VReg {
@@ -180,23 +174,4 @@ func (m *machine) addReg64ToReg64(rd, rm regalloc.VReg, shift byte) regalloc.VRe
 		m.insert(alu)
 	}
 	return rd
-}
-
-func (q *queue[T]) enqueue(v T) {
-	q.data = append(q.data, v)
-}
-
-func (q *queue[T]) dequeue() (ret T) {
-	ret = q.data[q.index]
-	q.index++
-	return
-}
-
-func (q *queue[T]) empty() bool {
-	return q.index >= len(q.data)
-}
-
-func (q *queue[T]) reset() {
-	q.index = 0
-	q.data = q.data[:0]
 }
