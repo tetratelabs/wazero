@@ -38,7 +38,7 @@ type (
 		// addendsWorkQueue is used during address lowering, defined here for reuse.
 		addendsWorkQueue queue[ssa.Value]
 		// addends64 is used during address lowering, defined here for reuse.
-		addends64 queue[regalloc.VReg]
+		addends64 queue[addend64]
 
 		spillSlotSize int64
 		currentABI    *backend.FunctionABI
@@ -47,6 +47,11 @@ type (
 		maxRequiredStackSizeForCalls int64
 
 		labelResolutionPends []labelResolutionPend
+	}
+
+	addend64 struct {
+		r     regalloc.VReg
+		shift byte
 	}
 
 	labelResolutionPend struct {

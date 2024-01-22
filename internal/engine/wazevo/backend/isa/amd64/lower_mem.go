@@ -16,7 +16,7 @@ func (m *machine) lowerToAddressMode(ptr ssa.Value, offsetBase uint32) (am amode
 // During the construction, this might emit additional instructions.
 //
 // Extracted as a separate function for easy testing.
-func (m *machine) lowerToAddressModeFromAddends(a64s *queue[regalloc.VReg], offset int64) (am amode) {
+func (m *machine) lowerToAddressModeFromAddends(a64s *queue[addend64], offset int64) (am amode) {
 	if a64s.empty() {
 		// Only static offsets.
 		tmpReg := m.c.AllocateVReg(ssa.TypeI64)
@@ -24,21 +24,40 @@ func (m *machine) lowerToAddressModeFromAddends(a64s *queue[regalloc.VReg], offs
 		am = newAmodeImmReg(0, tmpReg)
 		offset = 0
 	} else if base := a64s.dequeue(); a64s.empty() {
+		if base.shift != 0 {
+			panic("FIXME: must implement amodeImmRegShift")
+		}
 		if lower32willSignExtendTo64(uint64(offset)) {
 			// Absorb the offset into the amode with no index.
-			am = newAmodeImmReg(uint32(offset), base)
+			am = newAmodeImmReg(uint32(offset), base.r)
 			offset = 0
 		} else {
 			// Offset is too large to be absorbed into the amode, will be added later.
-			am = newAmodeImmReg(0, base)
+			am = newAmodeImmReg(0, base.r)
 		}
 	} else if index := a64s.dequeue(); lower32willSignExtendTo64(uint64(offset)) {
+		if index.shift != 0 && base.shift != 0 {
+			panic("FIXME: cannot absorb two shifted registers, must lower one to a shift instruction.")
+		}
+		if index.shift == 0 && base.shift != 0 {
+			// Swap base and index.
+			base, index = index, base
+		}
+
 		// Absorb the offset into the amode with an index.
-		am = newAmodeRegRegShift(uint32(offset), base, index, 0)
+		am = newAmodeRegRegShift(uint32(offset), base.r, index.r, index.shift)
 		offset = 0
 	} else {
+		if index.shift != 0 && base.shift != 0 {
+			panic("FIXME: cannot absorb two shifted registers, must lower one to a shift instruction.")
+		}
+		if index.shift == 0 && base.shift != 0 {
+			// Swap base and index.
+			base, index = index, base
+		}
+
 		// Offset is too large to be absorbed into the amode, will be added later.
-		am = newAmodeRegRegShift(0, base, index, 0)
+		am = newAmodeRegRegShift(0, base.r, index.r, index.shift)
 	}
 
 	baseReg := am.base
@@ -48,16 +67,16 @@ func (m *machine) lowerToAddressModeFromAddends(a64s *queue[regalloc.VReg], offs
 
 	for !a64s.empty() {
 		a64 := a64s.dequeue()
-		baseReg = m.addReg64ToReg64(baseReg, a64) // baseReg += a64
+		baseReg = m.addReg64ToReg64(baseReg, a64.r, a64.shift) // baseReg += a64
 	}
 
 	am.base = baseReg
 	return
 }
 
-var addendsMatchOpcodes = [4]ssa.Opcode{ssa.OpcodeUExtend, ssa.OpcodeSExtend, ssa.OpcodeIadd, ssa.OpcodeIconst}
+var addendsMatchOpcodes = [5]ssa.Opcode{ssa.OpcodeUExtend, ssa.OpcodeSExtend, ssa.OpcodeIadd, ssa.OpcodeIconst, ssa.OpcodeIshl}
 
-func (m *machine) collectAddends(ptr ssa.Value) (addends64 *queue[regalloc.VReg], offset int64) {
+func (m *machine) collectAddends(ptr ssa.Value) (addends64 *queue[addend64], offset int64) {
 	m.addendsWorkQueue.reset()
 	m.addends64.reset()
 	m.addendsWorkQueue.enqueue(ptr)
@@ -87,7 +106,7 @@ func (m *machine) collectAddends(ptr ssa.Value) (addends64 *queue[regalloc.VReg]
 			switch input := def.Instr.Arg(); input.Type().Bits() {
 			case 64:
 				// If the input is already 64-bit, this extend is a no-op. TODO: shouldn't this be optimized out at much earlier stage? no?
-				m.addends64.enqueue(m.getOperand_Reg(m.c.ValueDefinition(input)).r)
+				m.addends64.enqueue(addend64{r: m.getOperand_Reg(m.c.ValueDefinition(input)).r})
 				def.Instr.MarkLowered()
 				continue
 			case 32:
@@ -107,10 +126,19 @@ func (m *machine) collectAddends(ptr ssa.Value) (addends64 *queue[regalloc.VReg]
 				def.Instr.MarkLowered()
 				continue
 			}
-			// Note: case Ishl x, y could be handled too when the offset amount is <= 3.
+		case ssa.OpcodeIshl:
+			// If the addend is a shift, we can only handle it if the shift amount is a constant.
+			x, amount := def.Instr.Arg2()
+			amountDef := m.c.ValueDefinition(amount)
+			if !amountDef.IsFromInstr() || !amountDef.Instr.Constant() || amountDef.Instr.ConstantVal() > 3 {
+				continue
+			}
+			m.addends64.enqueue(addend64{r: m.getOperand_Reg(m.c.ValueDefinition(x)).r, shift: uint8(amountDef.Instr.ConstantVal())})
+			def.Instr.MarkLowered()
+			amountDef.Instr.MarkLowered()
 		default:
 			// If the addend is not one of them, we simply use it as-is.
-			m.addends64.enqueue(m.getOperand_Reg(def).r)
+			m.addends64.enqueue(addend64{r: m.getOperand_Reg(def).r})
 		}
 	}
 	return &m.addends64, offset
@@ -137,10 +165,20 @@ func (m *machine) addConstToReg64(rd regalloc.VReg, c int64) regalloc.VReg {
 	return rd
 }
 
-func (m *machine) addReg64ToReg64(rd, rm regalloc.VReg) regalloc.VReg {
-	alu := m.allocateInstr()
-	alu.asAluRmiR(aluRmiROpcodeAdd, newOperandReg(rm), rd, true)
-	m.insert(alu)
+func (m *machine) addReg64ToReg64(rd, rm regalloc.VReg, shift byte) regalloc.VReg {
+	if shift == 0 {
+		alu := m.allocateInstr()
+		alu.asAluRmiR(aluRmiROpcodeAdd, newOperandReg(rm), rd, true)
+		m.insert(alu)
+	} else {
+		shifted := m.allocateInstr()
+		shifted.asShiftR(shiftROpShiftLeft, newOperandImm32(uint32(shift)), rd, true)
+		m.insert(shifted)
+
+		alu := m.allocateInstr()
+		alu.asAluRmiR(aluRmiROpcodeAdd, newOperandReg(rm), rd, true)
+		m.insert(alu)
+	}
 	return rd
 }
 

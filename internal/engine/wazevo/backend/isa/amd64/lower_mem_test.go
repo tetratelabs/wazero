@@ -18,7 +18,7 @@ func TestMachine_lowerToAddressModeFromAddends(t *testing.T) {
 	_ = nextNextVReg
 	for _, tc := range []struct {
 		name   string
-		a64s   []regalloc.VReg
+		a64s   []addend64
 		offset int64
 		exp    amode
 		insts  []string
@@ -37,31 +37,31 @@ func TestMachine_lowerToAddressModeFromAddends(t *testing.T) {
 		},
 		{
 			name:   "one a64 with imm32",
-			a64s:   []regalloc.VReg{x1},
+			a64s:   []addend64{{r: x1}},
 			offset: 4095,
 			exp:    newAmodeImmReg(4095, x1),
 		},
 		{
 			name:   "one a64 with imm32",
-			a64s:   []regalloc.VReg{x1},
+			a64s:   []addend64{{r: x1}},
 			offset: 1 << 16,
 			exp:    newAmodeImmReg(1<<16, x1),
 		},
 		{
 			name:   "two a64 with imm32",
-			a64s:   []regalloc.VReg{x1, x2},
+			a64s:   []addend64{{r: x1}, {r: x2}},
 			offset: 1 << 16,
 			exp:    newAmodeRegRegShift(1<<16, x1, x2, 0),
 		},
 		{
 			name:   "two a64 with offset fitting",
-			a64s:   []regalloc.VReg{x1, x2},
+			a64s:   []addend64{{r: x1}, {r: x2}},
 			offset: 1 << 30,
 			exp:    newAmodeRegRegShift(1<<30, x1, x2, 0),
 		},
 		{
 			name:   "two a64 with offset not fitting",
-			a64s:   []regalloc.VReg{x1, x2},
+			a64s:   []addend64{{r: x1}, {r: x2}},
 			offset: 1 << 48,
 			insts: []string{
 				"movabsq $281474976710656, %r100?",
@@ -71,7 +71,7 @@ func TestMachine_lowerToAddressModeFromAddends(t *testing.T) {
 		},
 		{
 			name:   "three a64 with imm32",
-			a64s:   []regalloc.VReg{x1, x2, x3},
+			a64s:   []addend64{{r: x1}, {r: x2}, {r: x3}},
 			offset: 1 << 16,
 			insts: []string{
 				"add %rdx, %rax",
@@ -80,11 +80,66 @@ func TestMachine_lowerToAddressModeFromAddends(t *testing.T) {
 		},
 		{
 			name:   "three a64 with offset not fitting",
-			a64s:   []regalloc.VReg{x1, x2, x3},
+			a64s:   []addend64{{r: x1}, {r: x2}, {r: x3}},
 			offset: 1 << 32,
 			insts: []string{
 				"movabsq $4294967296, %r100?",
 				"add %r100?, %rax",
+				"add %rdx, %rax",
+			},
+			exp: newAmodeRegRegShift(0, x1, x2, 0),
+		},
+		{
+			name:   "three a64 shl second (index, base swapped), offset fitting",
+			a64s:   []addend64{{r: x1, shift: 2}, {r: x2}, {r: x3}},
+			offset: 1 << 30,
+			insts: []string{
+				"add %rdx, %rcx",
+			},
+			exp: newAmodeRegRegShift(1<<30, x2, x1, 2),
+		},
+		{
+			name:   "three a64 shl last, offset fitting",
+			a64s:   []addend64{{r: x1}, {r: x2}, {r: x3, shift: 2}},
+			offset: 1 << 32,
+			insts: []string{
+				"movabsq $4294967296, %r100?",
+				"add %r100?, %rax",
+				"shlq $2, %rax",
+				"add %rdx, %rax",
+			},
+			exp: newAmodeRegRegShift(0, x1, x2, 0),
+		},
+		{
+			name:   "three a64 shl first, offset not fitting",
+			a64s:   []addend64{{r: x1}, {r: x2, shift: 2}, {r: x3}},
+			offset: 1 << 32,
+			insts: []string{
+				"movabsq $4294967296, %r100?",
+				"add %r100?, %rax",
+				"add %rdx, %rax",
+			},
+			exp: newAmodeRegRegShift(0, x1, x2, 2),
+		},
+		{
+			name:   "three a64 shl first (index, base swapped), offset not fitting",
+			a64s:   []addend64{{r: x1, shift: 2}, {r: x2}, {r: x3}},
+			offset: 1 << 32,
+			insts: []string{
+				"movabsq $4294967296, %r100?",
+				"add %r100?, %rcx",
+				"add %rdx, %rcx",
+			},
+			exp: newAmodeRegRegShift(0, x2, x1, 2),
+		},
+		{
+			name:   "three a64 shl last, offset not fitting",
+			a64s:   []addend64{{r: x1}, {r: x2}, {r: x3, shift: 2}},
+			offset: 1 << 32,
+			insts: []string{
+				"movabsq $4294967296, %r100?",
+				"add %r100?, %rax",
+				"shlq $2, %rax",
 				"add %rdx, %rax",
 			},
 			exp: newAmodeRegRegShift(0, x1, x2, 0),
@@ -94,7 +149,7 @@ func TestMachine_lowerToAddressModeFromAddends(t *testing.T) {
 			ctx, _, m := newSetupWithMockContext()
 			ctx.vRegCounter = int(nextVReg.ID()) - 1
 
-			var a64s queue[regalloc.VReg]
+			var a64s queue[addend64]
 			for _, a64 := range tc.a64s {
 				a64s.enqueue(a64)
 			}
@@ -144,11 +199,18 @@ func TestMachine_collectAddends(t *testing.T) {
 		m.definitions[inst.Return()] = &backend.SSAValueDefinition{Instr: inst}
 		return inst
 	}
+	insertIshl := func(m *mockCompiler, b ssa.Builder, x, amount ssa.Value) *ssa.Instruction {
+		inst := b.AllocateInstruction()
+		inst.AsIshl(x, amount)
+		b.InsertInstruction(inst)
+		m.definitions[inst.Return()] = &backend.SSAValueDefinition{Instr: inst}
+		return inst
+	}
 
 	for _, tc := range []struct {
 		name   string
 		setup  func(*mockCompiler, ssa.Builder, *machine) (ptr ssa.Value, verify func(t *testing.T))
-		exp64s []regalloc.VReg
+		exp64s []addend64
 		offset int64
 	}{
 		{
@@ -157,7 +219,7 @@ func TestMachine_collectAddends(t *testing.T) {
 				ptr = addParam(ctx, b, ssa.TypeI64)
 				return ptr, func(t *testing.T) {}
 			},
-			exp64s: []regalloc.VReg{v1000},
+			exp64s: []addend64{{r: v1000}},
 		},
 		{
 			name: "i32 constant folded",
@@ -205,7 +267,7 @@ func TestMachine_collectAddends(t *testing.T) {
 					}
 				}
 			},
-			exp64s: []regalloc.VReg{v1000 /* == param */},
+			exp64s: []addend64{{r: v1000 /* == param */}},
 			offset: 1 + 2 + 3 - 1,
 		},
 		{
@@ -223,7 +285,7 @@ func TestMachine_collectAddends(t *testing.T) {
 					}
 				}
 			},
-			exp64s: []regalloc.VReg{v1000 /* == param */},
+			exp64s: []addend64{{r: v1000 /* == param */}},
 			offset: -1,
 		},
 		{
@@ -241,7 +303,7 @@ func TestMachine_collectAddends(t *testing.T) {
 					}
 				}
 			},
-			exp64s: []regalloc.VReg{v1000 /* == param */},
+			exp64s: []addend64{{r: v1000} /* == param */},
 			offset: math.MaxUint32, // zero-extended -1
 		},
 		{
@@ -257,7 +319,23 @@ func TestMachine_collectAddends(t *testing.T) {
 					}
 				}
 			},
-			exp64s: []regalloc.VReg{v1000, v1000},
+			exp64s: []addend64{{r: v1000}, {r: v1000}},
+		},
+		{
+			name: "one 64 value + shl",
+			setup: func(ctx *mockCompiler, b ssa.Builder, m *machine) (ptr ssa.Value, verify func(t *testing.T)) {
+				// (iadd (ishl param, 2), param)
+				param := addParam(ctx, b, ssa.TypeI64)
+				i64Const := insertI64Const(ctx, b, 2)
+				ishl := insertIshl(ctx, b, param, i64Const.Return())
+				iadd := insertIadd(ctx, b, param, ishl.Return())
+				return iadd.Return(), func(t *testing.T) {
+					for _, instr := range []*ssa.Instruction{i64Const, ishl, iadd} {
+						require.True(t, instr.Lowered())
+					}
+				}
+			},
+			exp64s: []addend64{{r: v1000}, {r: v1000, shift: 2}},
 		},
 	} {
 		tc := tc
@@ -276,6 +354,7 @@ func TestMachine_addReg64ToReg64(t *testing.T) {
 	for _, tc := range []struct {
 		exp    string
 		rn, rm regalloc.VReg
+		shift  byte
 	}{
 		{
 			exp: "add %rcx, %rax",
@@ -287,11 +366,18 @@ func TestMachine_addReg64ToReg64(t *testing.T) {
 			rn:  rdxVReg,
 			rm:  rbxVReg,
 		},
+		{
+			exp: `shlq $1, %rdx
+add %rbx, %rdx`,
+			rn:    rdxVReg,
+			rm:    rbxVReg,
+			shift: 1,
+		},
 	} {
 		tc := tc
 		t.Run(tc.exp, func(t *testing.T) {
 			_, _, m := newSetupWithMockContext()
-			rd := m.addReg64ToReg64(tc.rn, tc.rm)
+			rd := m.addReg64ToReg64(tc.rn, tc.rm, tc.shift)
 			require.Equal(t, tc.exp, formatEmittedInstructionsInCurrentBlock(m))
 			require.Equal(t, rd, tc.rn)
 		})
