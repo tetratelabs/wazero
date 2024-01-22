@@ -512,6 +512,9 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 			panic(fmt.Sprintf("BUG: at lease one predecessor should be visited for blk%d", blk.ID()))
 		}
 		for _, u := range s.argRealRegs {
+			fmt.Printf("BUG: useRealReg: the real register (%s) is already used: %s\n",
+				a.regInfo.RealRegName(u.RealReg()),
+				s.regsInUse.format(a.regInfo))
 			s.useRealReg(u.RealReg(), u)
 		}
 	} else if predState != nil {

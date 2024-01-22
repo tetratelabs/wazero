@@ -80,20 +80,18 @@ func (m *machine) LowerParams(args []ssa.Value) {
 			//          |    Caller_RBP   |
 			//          +-----------------+ <-- RBP
 			//          |   ...........   |
-			//          |   spill slot M  |
+			//          |   clobbered  M  |
 			//          |   ............  |
-			//          |   spill slot 2  |
-			//          |   spill slot 1  |
-			//          |   clobbered 0   |
-			//          |   clobbered 1   |
+			//          |   clobbered  0  |
+			//          |   spill slot N  |
 			//          |   ...........   |
-			//          |   clobbered N   |
+			//          |   spill slot 0  |
 			//   RSP--> +-----------------+
 			//             (low address)
 
 			// Load the value from the arg stack slot above the current RBP.
 			load := m.allocateInstr()
-			mem := newOperandMem(newAmodeImmReg(uint32(arg.Offset+16), rbpVReg))
+			mem := newOperandMem(newAmodeImmRBPReg(uint32(arg.Offset + 16)))
 			switch arg.Type {
 			case ssa.TypeI32:
 				load.asMovzxRmR(extModeLQ, mem, reg)
@@ -108,6 +106,7 @@ func (m *machine) LowerParams(args []ssa.Value) {
 			default:
 				panic("BUG")
 			}
+			m.insert(load)
 		}
 	}
 }
@@ -146,20 +145,18 @@ func (m *machine) LowerReturns(rets []ssa.Value) {
 			//          |    Caller_RBP   |
 			//          +-----------------+ <-- RBP
 			//          |   ...........   |
-			//          |   spill slot M  |
+			//          |   clobbered  M  |
 			//          |   ............  |
-			//          |   spill slot 2  |
-			//          |   spill slot 1  |
-			//          |   clobbered 0   |
-			//          |   clobbered 1   |
+			//          |   clobbered  0  |
+			//          |   spill slot N  |
 			//          |   ...........   |
-			//          |   clobbered N   |
+			//          |   spill slot 0  |
 			//   RSP--> +-----------------+
 			//             (low address)
 
 			// Store the value to the return stack slot above the current RBP.
 			store := m.allocateInstr()
-			mem := newOperandMem(newAmodeImmReg(uint32(a.ArgStackSize+16+r.Offset), rbpVReg))
+			mem := newOperandMem(newAmodeImmRBPReg(uint32(a.ArgStackSize + 16 + r.Offset)))
 			switch r.Type {
 			case ssa.TypeI32:
 				store.asMovRM(reg, mem, 4)
