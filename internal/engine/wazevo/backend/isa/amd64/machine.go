@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 	"strings"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
@@ -48,8 +49,9 @@ type (
 	}
 
 	labelResolutionPend struct {
-		instr  *instruction
-		offset int64
+		instr *instruction
+		// imm32Offset is the offset of the last 4 bytes of the instruction.
+		imm32Offset int64
 	}
 )
 
@@ -204,9 +206,59 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		m.lowerAluRmiROp(instr, aluRmiROpcodeAdd)
 	case ssa.OpcodeIsub:
 		m.lowerAluRmiROp(instr, aluRmiROpcodeSub)
+	case ssa.OpcodeExitWithCode:
+		execCtx, code := instr.ExitWithCodeData()
+		m.lowerExitWithCode(m.c.VRegOf(execCtx), code)
 	default:
 		panic("TODO: lowering " + op.String())
 	}
+}
+
+func (m *machine) lowerExitWithCode(execCtx regalloc.VReg, code wazevoapi.ExitCode) {
+	// First we set the exit code in the execution context.
+	exitCodeReg := m.c.AllocateVReg(ssa.TypeI32)
+	m.lowerIconst(exitCodeReg, uint64(code), false)
+
+	setExitCode := m.allocateInstr().asMovRM(
+		exitCodeReg,
+		newOperandMem(newAmodeImmReg(wazevoapi.ExecutionContextOffsetExitCodeOffset.U32(), execCtx)),
+		4,
+	)
+	m.insert(setExitCode)
+
+	// Next is to save RBP and RBP.
+	saveRsp := m.allocateInstr().asMovRM(
+		rspVReg,
+		newOperandMem(newAmodeImmReg(wazevoapi.ExecutionContextOffsetStackPointerBeforeGoCall.U32(), execCtx)),
+		4,
+	)
+	m.insert(saveRsp)
+	saveRbp := m.allocateInstr().asMovRM(
+		rbpVReg,
+		newOperandMem(newAmodeImmReg(wazevoapi.ExecutionContextOffsetFramePointerBeforeGoCall.U32(), execCtx)),
+		4,
+	)
+	m.insert(saveRbp)
+
+	// Next is to save the return address.
+	readRip := m.allocateInstr()
+	m.insert(readRip)
+	ripReg := m.c.AllocateVReg(ssa.TypeI64)
+	saveRip := m.allocateInstr().asMovRM(
+		ripReg,
+		newOperandMem(newAmodeImmReg(wazevoapi.ExecutionContextOffsetGoCallReturnAddress.U32(), execCtx)),
+		4,
+	)
+	m.insert(saveRip)
+
+	// Finally exit.
+	exitSq := m.allocateInstr().asExitSeq(execCtx)
+	m.insert(exitSq)
+
+	// Insert the label for the return address.
+	nop, l := m.allocateBrTarget()
+	readRip.asLEA(newAmodeRipRelative(l), ripReg)
+	m.insert(nop)
 }
 
 func (m *machine) lowerAluRmiROp(si *ssa.Instruction, op aluRmiROpcode) {
@@ -404,7 +456,7 @@ func (m *machine) Encode(context.Context) {
 			needLabelResolution := cur.encode(m.c)
 			if needLabelResolution {
 				m.labelResolutionPends = append(m.labelResolutionPends,
-					labelResolutionPend{instr: cur, offset: offset},
+					labelResolutionPend{instr: cur, imm32Offset: int64(len(*bufPtr)) - 4},
 				)
 			}
 		}
@@ -412,16 +464,12 @@ func (m *machine) Encode(context.Context) {
 
 	for i := range m.labelResolutionPends {
 		p := &m.labelResolutionPends[i]
-		target := p.instr.jmpLabel()
-		targetOffset := ectx.LabelPositions[target].BinaryOffset
 		switch p.instr.kind {
-		case jmp:
-			imm32Offset := p.offset + 1                       // +1 because p.offset is the beginning of the instruction.
-			jmpOffset := int32(targetOffset - (p.offset + 5)) // +5 because jmp is 5 bytes long.
-			binary.LittleEndian.PutUint32((*bufPtr)[imm32Offset:], uint32(jmpOffset))
-		case jmpIf:
-			imm32Offset := p.offset + 2                       // +2 because p.offset is the beginning of the instruction.
-			jmpOffset := int32(targetOffset - (p.offset + 6)) // +6 because jmpIf is 6 bytes long.
+		case jmp, jmpIf, lea:
+			target := p.instr.jmpLabel()
+			targetOffset := ectx.LabelPositions[target].BinaryOffset
+			imm32Offset := p.imm32Offset
+			jmpOffset := int32(targetOffset - (p.imm32Offset + 4)) // +4 because RIP points to the next instruction.
 			binary.LittleEndian.PutUint32((*bufPtr)[imm32Offset:], uint32(jmpOffset))
 		default:
 			panic("BUG")

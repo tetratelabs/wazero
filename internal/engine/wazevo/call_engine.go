@@ -80,6 +80,8 @@ type (
 		refFuncTrampolineAddress *byte
 		// memmoveAddress holds the address of memmove function implemented by Go runtime. See memmove.go.
 		memmoveAddress uintptr
+		// framePointerBeforeGoCall holds the frame pointer before calling a Go function. Note: only used in amd64.
+		framePointerBeforeGoCall uintptr
 	}
 )
 

@@ -197,10 +197,10 @@ func (i *instruction) String() string {
 		return fmt.Sprintf("jmp %s", i.op1.format(true))
 	case jmpIf:
 		return fmt.Sprintf("j%s %s", cond(i.u1), i.op1.format(true))
-	case jmpTableSeq:
+	case jmpTableSequence:
 		panic("TODO")
-	case exitIf:
-		panic("TODO")
+	case exitSequence:
+		return fmt.Sprintf("exit_seuqnce %s", i.op1.format(true))
 	case ud2:
 		return "ud2"
 	case call:
@@ -543,10 +543,10 @@ const (
 	// The generated code sequence is described in the emit's function match arm for this
 	// instruction.
 	// See comment in lowering about the temporaries signedness.
-	jmpTableSeq
+	jmpTableSequence
 
-	// Exits the execution if the condition code is set.
-	exitIf
+	// exitSequence exits the execution and go back to the Go world.
+	exitSequence
 
 	// An instruction that will always trigger the illegal instruction exception.
 	ud2
@@ -634,10 +634,10 @@ func (k instructionKind) String() string {
 		return "jmpIf"
 	case jmp:
 		return "jmp"
-	case jmpTableSeq:
+	case jmpTableSequence:
 		return "jmpTableSeq"
-	case exitIf:
-		return "exitIf"
+	case exitSequence:
+		return "exit_sequence"
 	case ud2:
 		return "ud2"
 	default:
@@ -689,10 +689,12 @@ func (i *instruction) asJmp(target operand) *instruction {
 }
 
 func (i *instruction) jmpLabel() backend.Label {
-	if i.kind != jmp && i.kind != jmpIf {
+	switch i.kind {
+	case jmp, jmpIf, lea:
+		return i.op1.label()
+	default:
 		panic("BUG")
 	}
-	return i.op1.label()
 }
 
 func (i *instruction) asLEA(a amode, rd regalloc.VReg) *instruction {
@@ -920,6 +922,12 @@ func (i *instruction) asCmove(c cond, rm operand, rd regalloc.VReg, _64 bool) *i
 	i.op2 = newOperandReg(rd)
 	i.u1 = uint64(c)
 	i.b1 = _64
+	return i
+}
+
+func (i *instruction) asExitSeq(execCtx regalloc.VReg) *instruction {
+	i.kind = exitSequence
+	i.op1 = newOperandReg(execCtx)
 	return i
 }
 
@@ -1521,22 +1529,24 @@ const (
 )
 
 var defKinds = [instrMax]defKind{
-	nop0:        defKindNone,
-	ret:         defKindNone,
-	movRR:       defKindOp2,
-	movRM:       defKindNone,
-	xmmMovRM:    defKindNone,
-	aluRmiR:     defKindNone,
-	imm:         defKindOp2,
-	xmmUnaryRmR: defKindOp2,
-	mov64MR:     defKindOp2,
-	movzxRmR:    defKindOp2,
-	gprToXmm:    defKindOp2,
-	call:        defKindCall,
-	ud2:         defKindNone,
-	jmp:         defKindNone,
-	jmpIf:       defKindNone,
-	cmpRmiR:     defKindNone,
+	nop0:         defKindNone,
+	ret:          defKindNone,
+	movRR:        defKindOp2,
+	movRM:        defKindNone,
+	xmmMovRM:     defKindNone,
+	aluRmiR:      defKindNone,
+	imm:          defKindOp2,
+	xmmUnaryRmR:  defKindOp2,
+	mov64MR:      defKindOp2,
+	movzxRmR:     defKindOp2,
+	gprToXmm:     defKindOp2,
+	call:         defKindCall,
+	ud2:          defKindNone,
+	jmp:          defKindNone,
+	jmpIf:        defKindNone,
+	cmpRmiR:      defKindNone,
+	exitSequence: defKindNone,
+	lea:          defKindOp2,
 }
 
 // String implements fmt.Stringer.
@@ -1566,22 +1576,24 @@ const (
 )
 
 var useKinds = [instrMax]useKind{
-	nop0:        useKindNone,
-	ret:         useKindNone,
-	movRR:       useKindOp1,
-	movRM:       useKindOp1RegOp2,
-	xmmMovRM:    useKindOp1RegOp2,
-	aluRmiR:     useKindOp1Op2Reg,
-	imm:         useKindNone,
-	xmmUnaryRmR: useKindOp1,
-	mov64MR:     useKindOp1,
-	movzxRmR:    useKindOp1,
-	gprToXmm:    useKindOp1,
-	call:        useKindCall,
-	ud2:         useKindNone,
-	jmpIf:       useKindOp1,
-	jmp:         useKindOp1,
-	cmpRmiR:     useKindOp1Op2Reg,
+	nop0:         useKindNone,
+	ret:          useKindNone,
+	movRR:        useKindOp1,
+	movRM:        useKindOp1RegOp2,
+	xmmMovRM:     useKindOp1RegOp2,
+	aluRmiR:      useKindOp1Op2Reg,
+	imm:          useKindNone,
+	xmmUnaryRmR:  useKindOp1,
+	mov64MR:      useKindOp1,
+	movzxRmR:     useKindOp1,
+	gprToXmm:     useKindOp1,
+	call:         useKindCall,
+	ud2:          useKindNone,
+	jmpIf:        useKindOp1,
+	jmp:          useKindOp1,
+	cmpRmiR:      useKindOp1Op2Reg,
+	exitSequence: useKindOp1,
+	lea:          useKindOp1,
 }
 
 func (u useKind) String() string {

@@ -2771,6 +2771,14 @@ func TestInstruction_format_encode(t *testing.T) {
 			want:       "0f4f707b",
 			wantFormat: "cmovnlel 123(%rax), %esi",
 		},
+		{
+			setup: func(i *instruction) { i.asExitSeq(r15VReg) },
+			// movq 0x10(%r15), %rbp
+			// movq 0x18(%r15), %rsp
+			// retq
+			want:       "498b6f10498b6718c3",
+			wantFormat: "exit_seuqnce %r15",
+		},
 	} {
 		tc := tc
 		t.Run(tc.wantFormat, func(t *testing.T) {

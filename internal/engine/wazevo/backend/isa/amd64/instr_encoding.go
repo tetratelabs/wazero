@@ -2,6 +2,8 @@ package amd64
 
 import (
 	"fmt"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
@@ -11,7 +13,7 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 	switch i.kind {
 	case nop0:
 	case ret:
-		c.EmitByte(0xc3)
+		encodeRet(c)
 	case imm:
 		dst := regEncodings[i.op2.r.RealReg()]
 		con := i.u1
@@ -615,10 +617,10 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 
 	case mov64MR:
 		m := i.op1.amode
-		dst := regEncodings[i.op2.r.RealReg()]
-		encodeRegMem(c, legacyPrefixesNone, 0x8b, 1, dst, m, rexInfo(0).setW())
+		encodeLoad64(c, m, i.op2.r.RealReg())
 
 	case lea:
+		needsLabelResolution = true
 		a := i.op1.amode
 		dst := regEncodings[i.op2.r.RealReg()]
 		encodeRegMem(c, legacyPrefixesNone, 0x8d, 1, dst, a, rexInfo(0).setW())
@@ -946,11 +948,17 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 			panic("BUG: invalid operand kind")
 		}
 
-	case jmpTableSeq:
+	case jmpTableSequence:
 		panic("TODO")
 
-	case exitIf:
-		panic("TODO")
+	case exitSequence:
+		execCtx := i.op1.r
+
+		// Restore the RBP, RSP, and return to the Go code:
+		encodeLoad64(c, newAmodeImmReg(wazevoapi.ExecutionContextOffsetOriginalFramePointer.U32(), execCtx), rbp)
+		encodeLoad64(c, newAmodeImmReg(wazevoapi.ExecutionContextOffsetOriginalStackPointer.U32(), execCtx), rsp)
+		// Then return.
+		encodeRet(c)
 
 	case ud2:
 		c.EmitByte(0x0f)
@@ -997,6 +1005,15 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 		panic(fmt.Sprintf("TODO: %v", i.kind))
 	}
 	return
+}
+
+func encodeLoad64(c backend.Compiler, m amode, rd regalloc.RealReg) {
+	dst := regEncodings[rd]
+	encodeRegMem(c, legacyPrefixesNone, 0x8b, 1, dst, m, rexInfo(0).setW())
+}
+
+func encodeRet(c backend.Compiler) {
+	c.EmitByte(0xc3)
 }
 
 func encodeEncEnc(
@@ -1127,10 +1144,6 @@ func encodeEncMem(
 		}
 
 	case amodeRipRelative:
-		if m.label != backend.LabelInvalid {
-			panic("BUG: label must be resolved for amodeRipRelative at this point")
-		}
-
 		rex.encode(c, regRexBit(r), 0)
 		for opcodeNum > 0 {
 			opcodeNum--
@@ -1140,6 +1153,8 @@ func encodeEncMem(
 		// Indicate "LEAQ [RIP + 32bit displacement].
 		// https://wiki.osdev.org/X86-64_Instruction_Encoding#32.2F64-bit_addressing
 		c.EmitByte(encodeModRM(0b00, regEncoding(r), 0b101))
+
+		// This will be resolved later, so we just emit a placeholder. (m.imm32 for testing).
 		c.Emit4Bytes(m.imm32)
 	default:
 		panic("BUG: invalid addressing mode")
