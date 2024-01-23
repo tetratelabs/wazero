@@ -59,7 +59,7 @@ type MemoryInstance struct {
 	// with a fixed weight of 1 and no spurious notifications.
 	waiters sync.Map
 
-	mmappedMemory bool
+	mmappedBuffer []byte
 	closed        bool
 }
 
@@ -70,7 +70,7 @@ func NewMemoryInstance(memSec *Memory) *MemoryInstance {
 
 	var buffer []byte
 	var cap uint32
-	mmappedMemory := false
+	var mmappedBuffer []byte
 	if memSec.IsShared {
 		// Memory accesses can happen at the same time that memory is resized, meaning
 		// we cannot have the memory base move during operation. mmap allows allocating memory virtually so
@@ -78,13 +78,13 @@ func NewMemoryInstance(memSec *Memory) *MemoryInstance {
 		// all threads implementations are effectively expected to use mmap for shared memory.
 		max := MemoryPagesToBytesNum(memSec.Max)
 		var b []byte
-		if platform.MmapSupported {
+		if platform.MmapSupported && max > 0 {
 			var err error
 			b, err = platform.MmapMemory(int(max))
 			if err != nil {
 				panic(fmt.Errorf("unable to mmap memory: %w", err))
 			}
-			mmappedMemory = true
+			mmappedBuffer = b
 		} else {
 			// mmap not supported so we just preallocate a normal buffer. This will often be large, i.e. ~4GB,
 			// and likely isn't practical, but interpreter usage should be rare and the Wasm binary can be
@@ -104,12 +104,12 @@ func NewMemoryInstance(memSec *Memory) *MemoryInstance {
 		Cap:           cap,
 		Max:           memSec.Max,
 		Shared:        memSec.IsShared,
-		mmappedMemory: mmappedMemory,
+		mmappedBuffer: mmappedBuffer,
 	}
 }
 
 func (m *MemoryInstance) Close() error {
-	if !m.mmappedMemory {
+	if m.mmappedBuffer == nil {
 		// No need to release anything for non-mmapped memory.
 		return nil
 	}
@@ -121,7 +121,7 @@ func (m *MemoryInstance) Close() error {
 		return nil
 	}
 	m.closed = true
-	return platform.MunmapCodeSegment(m.Buffer)
+	return platform.MunmapCodeSegment(m.mmappedBuffer)
 }
 
 // Definition implements the same method as documented on api.Memory.
