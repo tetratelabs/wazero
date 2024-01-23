@@ -738,15 +738,11 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 				if ctx.Value(experimental.EnableSnapshotterKey{}) != nil {
 					defer func() {
 						if r := recover(); r != nil {
-							if s, ok := r.(*snapshot); ok {
-								if s.ce == ce {
-									s.doRestore()
-									frame = ce.frames[len(ce.frames)-1]
-									body = frame.f.parent.body
-									bodyLen = uint64(len(body))
-								} else {
-									panic(r)
-								}
+							if s, ok := r.(*snapshot); ok && s.ce == ce {
+								s.doRestore()
+								frame = ce.frames[len(ce.frames)-1]
+								body = frame.f.parent.body
+								bodyLen = uint64(len(body))
 							} else {
 								panic(r)
 							}

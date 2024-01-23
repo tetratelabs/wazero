@@ -1080,12 +1080,8 @@ entry:
 				if snapshotEnabled {
 					defer func() {
 						if r := recover(); r != nil {
-							if s, ok := r.(*snapshot); ok {
-								if s.ce == ce {
-									s.doRestore()
-								} else {
-									panic(r)
-								}
+							if s, ok := r.(*snapshot); ok && s.ce == ce {
+								s.doRestore()
 							} else {
 								panic(r)
 							}
