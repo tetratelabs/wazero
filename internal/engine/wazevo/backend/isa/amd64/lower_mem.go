@@ -6,7 +6,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 )
 
-var addendsMatchOpcodes = [5]ssa.Opcode{ssa.OpcodeUExtend, ssa.OpcodeSExtend, ssa.OpcodeIadd, ssa.OpcodeIconst, ssa.OpcodeIshl}
+var addendsMatchOpcodes = [...]ssa.Opcode{ssa.OpcodeUExtend, ssa.OpcodeSExtend, ssa.OpcodeIadd, ssa.OpcodeIconst, ssa.OpcodeIshl}
 
 type (
 	addend64 struct {
@@ -147,13 +147,10 @@ func (m *machine) lowerAddendFromInstr(instr *ssa.Instruction) addend64 {
 		// If the addend is a shift, we can only handle it if the shift amount is a constant.
 		x, amount := instr.Arg2()
 		amountDef := m.c.ValueDefinition(amount)
-		if !amountDef.IsFromInstr() || !amountDef.Instr.Constant() || amountDef.Instr.ConstantVal() > 3 {
-			return addend64{m.getOperand_Reg(m.c.ValueDefinition(instr.Return())).r, 0, 0}
+		if amountDef.IsFromInstr() && amountDef.Instr.Constant() && amountDef.Instr.ConstantVal() <= 3 {
+			return addend64{m.getOperand_Reg(m.c.ValueDefinition(x)).r, 0, uint8(amountDef.Instr.ConstantVal())}
 		}
-		instr.MarkLowered()
-		amountDef.Instr.MarkLowered()
-		return addend64{m.getOperand_Reg(m.c.ValueDefinition(x)).r, 0, uint8(amountDef.Instr.ConstantVal())}
-
+		return addend64{m.getOperand_Reg(m.c.ValueDefinition(x)).r, 0, 0}
 	}
 	panic("BUG: invalid opcode")
 }
