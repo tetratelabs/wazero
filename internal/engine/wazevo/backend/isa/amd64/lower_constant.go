@@ -5,6 +5,16 @@ import (
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 )
 
+// lowerConstant allocates a new VReg and inserts the instruction to load the constant value.
+func (m *machine) lowerConstant(instr *ssa.Instruction) (vr regalloc.VReg) {
+	val := instr.Return()
+	valType := val.Type()
+
+	vr = m.c.AllocateVReg(valType)
+	m.InsertLoadConstant(instr, vr)
+	return
+}
+
 // InsertLoadConstant implements backend.Machine.
 func (m *machine) InsertLoadConstant(instr *ssa.Instruction, vr regalloc.VReg) {
 	val := instr.Return()
@@ -28,7 +38,7 @@ func (m *machine) InsertLoadConstant(instr *ssa.Instruction, vr regalloc.VReg) {
 
 func (m *machine) lowerFconst(dst regalloc.VReg, c uint64, _64 bool) {
 	if c == 0 {
-		xor := m.allocateInstr().asXmmRmR(sseOpcodeXorpd, operand{kind: operandKindReg, r: dst}, dst, _64)
+		xor := m.allocateInstr().asXmmRmR(sseOpcodeXorpd, newOperandReg(dst), dst, _64)
 		m.insert(xor)
 	} else {
 		var tmpType ssa.Type
@@ -41,7 +51,7 @@ func (m *machine) lowerFconst(dst regalloc.VReg, c uint64, _64 bool) {
 		loadToGP := m.allocateInstr().asImm(tmpInt, c, _64)
 		m.insert(loadToGP)
 
-		movToXmm := m.allocateInstr().asGprToXmm(sseOpcodeMovq, operand{kind: operandKindReg, r: tmpInt}, dst, _64)
+		movToXmm := m.allocateInstr().asGprToXmm(sseOpcodeMovq, newOperandReg(tmpInt), dst, _64)
 		m.insert(movToXmm)
 	}
 }
@@ -49,7 +59,7 @@ func (m *machine) lowerFconst(dst regalloc.VReg, c uint64, _64 bool) {
 func (m *machine) lowerIconst(dst regalloc.VReg, c uint64, _64 bool) {
 	i := m.allocateInstr()
 	if c == 0 {
-		i.asAluRmiR(aluRmiROpcodeXor, operand{kind: operandKindReg, r: dst}, dst, _64)
+		i.asAluRmiR(aluRmiROpcodeXor, newOperandReg(dst), dst, _64)
 	} else {
 		i.asImm(dst, c, _64)
 	}

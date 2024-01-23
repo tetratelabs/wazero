@@ -19,8 +19,9 @@ func NewBackend() backend.Machine {
 		asNop,
 	)
 	return &machine{
-		ectx:     ectx,
-		regAlloc: regalloc.NewAllocator(regInfo),
+		ectx:       ectx,
+		regAlloc:   regalloc.NewAllocator(regInfo),
+		spillSlots: map[regalloc.VRegID]int64{},
 	}
 }
 
@@ -36,6 +37,7 @@ type (
 		regAllocStarted bool
 
 		spillSlotSize int64
+		spillSlots    map[regalloc.VRegID]int64
 		currentABI    *backend.FunctionABI
 		clobberedRegs []regalloc.VReg
 
@@ -52,12 +54,24 @@ type (
 
 // Reset implements backend.Machine.
 func (m *machine) Reset() {
+	m.clobberedRegs = m.clobberedRegs[:0]
+	for key := range m.spillSlots {
+		m.clobberedRegs = append(m.clobberedRegs, regalloc.VReg(key))
+	}
+	for _, key := range m.clobberedRegs {
+		delete(m.spillSlots, regalloc.VRegID(key))
+	}
+
 	m.stackBoundsCheckDisabled = false
 	m.ectx.Reset()
 
 	m.regAllocFn.Reset()
 	m.regAlloc.Reset()
 	m.regAllocStarted = false
+	m.clobberedRegs = m.clobberedRegs[:0]
+
+	m.spillSlotSize = 0
+	m.maxRequiredStackSizeForCalls = 0
 }
 
 // ExecutableContext implements backend.Machine.
@@ -138,9 +152,45 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		m.lowerCall(instr)
 	case ssa.OpcodeStore:
 		m.lowerStore(instr)
+	case ssa.OpcodeIadd:
+		m.lowerAluRmiROp(instr, aluRmiROpcodeAdd)
+	case ssa.OpcodeIsub:
+		m.lowerAluRmiROp(instr, aluRmiROpcodeSub)
 	default:
 		panic("TODO: lowering " + op.String())
 	}
+}
+
+func (m *machine) lowerAluRmiROp(si *ssa.Instruction, op aluRmiROpcode) {
+	x, y := si.Arg2()
+	if !x.Type().IsInt() {
+		panic("BUG?")
+	}
+
+	_64 := x.Type().Bits() == 64
+
+	xDef, yDef := m.c.ValueDefinition(x), m.c.ValueDefinition(y)
+
+	// TODO: commutative args can be swapped if one of them is an immediate.
+	rn := m.getOperand_Reg(xDef)
+	rm := m.getOperand_Mem_Imm32_Reg(yDef)
+	rd := m.c.VRegOf(si.Return())
+	tmp := m.c.AllocateVReg(si.Return().Type())
+
+	// rm is being overwritten, so we first copy its value to a temp register,
+	// in case it is referenced again later.
+	mov := m.allocateInstr()
+	mov.asMovRR(rn.r, tmp, _64)
+	m.insert(mov)
+
+	alu := m.allocateInstr()
+	alu.asAluRmiR(op, rm, tmp, _64)
+	m.insert(alu)
+
+	// tmp now contains the result, we copy it to the dest register.
+	mov2 := m.allocateInstr()
+	mov2.asMovRR(tmp, rd, _64)
+	m.insert(mov2)
 }
 
 func (m *machine) lowerStore(si *ssa.Instruction) {
@@ -328,14 +378,11 @@ func (m *machine) Encode(context.Context) {
 // ResolveRelocations implements backend.Machine.
 func (m *machine) ResolveRelocations(refToBinaryOffset map[ssa.FuncRef]int, binary []byte, relocations []backend.RelocationInfo) {
 	for _, r := range relocations {
-		instrOffset := r.Offset
+		offset := r.Offset
 		calleeFnOffset := refToBinaryOffset[r.FuncRef]
-		// calleeFnOffset points to the beginning of call target function.
-		// call is 5 bytes where the last 4 bytes represent the signed 32-bit offset. See the encoding of `call` instruction.
-		// instrOffset is the offset of the last 4 bytes.
-		callInstrOffsetBytes := binary[instrOffset : instrOffset+4]
-		diff := int64(calleeFnOffset) - (instrOffset)
-		// We backpatch in-place the relative value `diff`.
+		// offset is the offset of the last 4 bytes of the call instruction.
+		callInstrOffsetBytes := binary[offset : offset+4]
+		diff := int64(calleeFnOffset) - (offset)
 		callInstrOffsetBytes[0] = byte(diff)
 		callInstrOffsetBytes[1] = byte(diff >> 8)
 		callInstrOffsetBytes[2] = byte(diff >> 16)
@@ -372,4 +419,14 @@ func (m *machine) allocateBrTarget() (nop *instruction, l backend.Label) { //nol
 	pos.Begin, pos.End = nop, nop
 	ectx.LabelPositions[l] = pos
 	return
+}
+
+func (m *machine) getVRegSpillSlotOffsetFromSP(id regalloc.VRegID, size byte) int64 {
+	offset, ok := m.spillSlots[id]
+	if !ok {
+		offset = m.spillSlotSize
+		m.spillSlots[id] = offset
+		m.spillSlotSize += int64(size)
+	}
+	return offset
 }

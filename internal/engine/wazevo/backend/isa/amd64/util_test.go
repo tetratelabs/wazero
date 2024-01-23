@@ -2,6 +2,7 @@ package amd64
 
 import (
 	"context"
+	"strings"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
@@ -134,4 +135,13 @@ func (m *mockCompiler) MatchInstrOneOf(def *backend.SSAValueDefinition, opcodes 
 // Compile implements backend.Compiler.
 func (m *mockCompiler) Compile(context.Context) (_ []byte, _ []backend.RelocationInfo, _ error) {
 	return
+}
+
+func formatEmittedInstructionsInCurrentBlock(m *machine) string {
+	m.ectx.FlushPendingInstructions()
+	var strs []string
+	for cur := m.ectx.PerBlockHead; cur != nil; cur = cur.next {
+		strs = append(strs, cur.String())
+	}
+	return strings.Join(strs, "\n")
 }

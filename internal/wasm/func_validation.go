@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/leb128"
 )
 
@@ -1411,7 +1412,9 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			// Atomic instructions come with two bytes where the first byte is always OpcodeAtomicPrefix,
 			// and the second byte determines the actual instruction.
 			atomicOpcode := body[pc]
-			// TODO: Check that CoreFeatureThreads is enabled
+			if err := enabledFeatures.RequireEnabled(experimental.CoreFeaturesThreads); err != nil {
+				return fmt.Errorf("%s invalid as %v", atomicInstructionName[atomicOpcode], err)
+			}
 			pc++
 
 			if atomicOpcode == OpcodeAtomicFence {

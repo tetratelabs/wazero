@@ -7,6 +7,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/integration_test/spectest"
 	"github.com/tetratelabs/wazero/internal/platform"
 )
@@ -15,7 +16,7 @@ import (
 //go:embed testdata/*.json
 var testcases embed.FS
 
-const enabledFeatures = api.CoreFeaturesV2 // TODO: Enable threads feature after implementing interpreter support
+const enabledFeatures = api.CoreFeaturesV2 | experimental.CoreFeaturesThreads
 
 func TestCompiler(t *testing.T) {
 	if !platform.CompilerSupported() {

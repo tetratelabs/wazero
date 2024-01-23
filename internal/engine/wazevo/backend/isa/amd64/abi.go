@@ -65,7 +65,48 @@ func (m *machine) LowerParams(args []ssa.Value) {
 		if arg.Kind == backend.ABIArgKindReg {
 			m.InsertMove(reg, arg.Reg, arg.Type)
 		} else {
-			panic("TODO: stack param")
+			//
+			//            (high address)
+			//          +-----------------+
+			//          |     .......     |
+			//          |      ret Y      |
+			//          |     .......     |
+			//          |      ret 0      |
+			//          |      arg X      |
+			//          |     .......     |
+			//          |      arg 1      |
+			//          |      arg 0      |
+			//          |   ReturnAddress |
+			//          |    Caller_RBP   |
+			//          +-----------------+ <-- RBP
+			//          |   ...........   |
+			//          |   clobbered  M  |
+			//          |   ............  |
+			//          |   clobbered  0  |
+			//          |   spill slot N  |
+			//          |   ...........   |
+			//          |   spill slot 0  |
+			//   RSP--> +-----------------+
+			//             (low address)
+
+			// Load the value from the arg stack slot above the current RBP.
+			load := m.allocateInstr()
+			mem := newOperandMem(newAmodeImmRBPReg(uint32(arg.Offset + 16)))
+			switch arg.Type {
+			case ssa.TypeI32:
+				load.asMovzxRmR(extModeLQ, mem, reg)
+			case ssa.TypeI64:
+				load.asMov64MR(mem, reg)
+			case ssa.TypeF32:
+				load.asXmmUnaryRmR(sseOpcodeMovss, mem, reg)
+			case ssa.TypeF64:
+				load.asXmmUnaryRmR(sseOpcodeMovsd, mem, reg)
+			case ssa.TypeV128:
+				load.asXmmUnaryRmR(sseOpcodeMovdqu, mem, reg)
+			default:
+				panic("BUG")
+			}
+			m.insert(load)
 		}
 	}
 }
@@ -89,7 +130,46 @@ func (m *machine) LowerReturns(rets []ssa.Value) {
 		if r.Kind == backend.ABIArgKindReg {
 			m.InsertMove(r.Reg, reg, ret.Type())
 		} else {
-			panic("TODO")
+			//
+			//            (high address)
+			//          +-----------------+
+			//          |     .......     |
+			//          |      ret Y      |
+			//          |     .......     |
+			//          |      ret 0      |
+			//          |      arg X      |
+			//          |     .......     |
+			//          |      arg 1      |
+			//          |      arg 0      |
+			//          |   ReturnAddress |
+			//          |    Caller_RBP   |
+			//          +-----------------+ <-- RBP
+			//          |   ...........   |
+			//          |   clobbered  M  |
+			//          |   ............  |
+			//          |   clobbered  0  |
+			//          |   spill slot N  |
+			//          |   ...........   |
+			//          |   spill slot 0  |
+			//   RSP--> +-----------------+
+			//             (low address)
+
+			// Store the value to the return stack slot above the current RBP.
+			store := m.allocateInstr()
+			mem := newOperandMem(newAmodeImmRBPReg(uint32(a.ArgStackSize + 16 + r.Offset)))
+			switch r.Type {
+			case ssa.TypeI32:
+				store.asMovRM(reg, mem, 4)
+			case ssa.TypeI64:
+				store.asMovRM(reg, mem, 8)
+			case ssa.TypeF32:
+				store.asXmmMovRM(sseOpcodeMovss, reg, mem)
+			case ssa.TypeF64:
+				store.asXmmMovRM(sseOpcodeMovsd, reg, mem)
+			case ssa.TypeV128:
+				store.asXmmMovRM(sseOpcodeMovdqu, reg, mem)
+			}
+			m.insert(store)
 		}
 	}
 }

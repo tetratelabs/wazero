@@ -9,21 +9,21 @@ import (
 
 var (
 	executionContextPtrReg = raxVReg
+
+	// Followings are callee saved registers. They can be used freely in the entry preamble
+	// since the preamble is called via Go assembly function which has stack-based ABI.
+
 	// savedExecutionContextPtr also must be a callee-saved reg so that they can be used in the prologue and epilogue.
 	savedExecutionContextPtr = rdxVReg
-	// paramResultSlicePtr must be callee-saved reg so that they can be used in the prologue and epilogue.
-	paramResultSlicePtr = r12VReg //nolint
-	// goAllocatedStackPtr is not used in the epilogue.
-	goAllocatedStackPtr = rbxVReg
-	// paramResultSliceCopied is not used in the epilogue.
-	paramResultSliceCopied = rsiVReg //nolint
-	// functionExecutable is not used in the epilogue.
-	functionExecutable = rdiVReg
+	// paramResultSlicePtr must match with entrypoint function in abi_entry_amd64.s.
+	paramResultSlicePtr = r12VReg
+	// goAllocatedStackPtr must match with entrypoint function in abi_entry_amd64.s.
+	goAllocatedStackPtr = r13VReg
+	// functionExecutable must match with entrypoint function in abi_entry_amd64.s.
+	functionExecutable = r14VReg
+	tmpIntReg          = r15VReg
+	tmpXmmReg          = xmm15VReg
 )
-
-func (m *machine) goEntryPreamblePassArg(cur *instruction, paramSlicePtr regalloc.VReg, arg *backend.ABIArg, argStartOffsetFromSP int64) *instruction {
-	panic("TODO")
-}
 
 // CompileEntryPreamble implements backend.Machine.
 func (m *machine) CompileEntryPreamble(sig *ssa.Signature) []byte {
@@ -55,24 +55,26 @@ func (m *machine) compileEntryPreamble(sig *ssa.Signature) *instruction {
 	// 		mov %goAllocatedStackPtr, %rsp
 	cur = m.move64(goAllocatedStackPtr, rspVReg, cur)
 
-	// TODO: read the arguments from paramResultSliceCopied and set them correctly into the regs and stacks.
-	// 	The first two args are module context ptr and execution context ptr, and they are passed in %rax and %rcx.
-	prReg := paramResultSlicePtr
-	if len(abi.Args) > 2 && len(abi.Rets) > 0 {
-		// paramResultSlicePtr is modified during the execution of goEntryPreamblePassArg,
-		// so copy it to another reg.
-		cur = m.move64(paramResultSliceCopied, paramResultSlicePtr, cur)
-		prReg = paramResultSliceCopied
+	if stackSlotSize := abi.AlignedArgResultStackSlotSize(); stackSlotSize > 0 {
+		// Allocate stack slots for the arguments and return values.
+		// 		sub $stackSlotSize, %rsp
+		spDec := m.allocateInstr().asAluRmiR(aluRmiROpcodeSub, newOperandImm32(uint32(stackSlotSize)), rspVReg, true)
+		cur = linkInstr(cur, spDec)
 	}
 
-	stackSlotSize := abi.AlignedArgResultStackSlotSize()
+	var offset uint32
 	for i := range abi.Args {
 		if i < 2 {
 			// module context ptr and execution context ptr are passed in x0 and x1 by the Go assembly function.
 			continue
 		}
 		arg := &abi.Args[i]
-		cur = m.goEntryPreamblePassArg(cur, prReg, arg, -stackSlotSize)
+		cur = m.goEntryPreamblePassArg(cur, paramResultSlicePtr, offset, arg)
+		if arg.Type == ssa.TypeV128 {
+			offset += 16
+		} else {
+			offset += 8
+		}
 	}
 
 	// Now ready to call the real function. Note that at this point stack pointer is already set to the Go-allocated,
@@ -83,10 +85,10 @@ func (m *machine) compileEntryPreamble(sig *ssa.Signature) *instruction {
 	//// ----------------------------------- epilogue ----------------------------------- ////
 
 	// Read the results from regs and the stack, and set them correctly into the paramResultSlicePtr.
-	var offset uint32
+	offset = 0
 	for i := range abi.Rets {
 		r := &abi.Rets[i]
-		cur = m.goEntryPreamblePassResult(cur, paramResultSlicePtr, offset, r)
+		cur = m.goEntryPreamblePassResult(cur, paramResultSlicePtr, offset, r, uint32(abi.ArgStackSize))
 		if r.Type == ssa.TypeV128 {
 			offset += 16
 		} else {
@@ -126,25 +128,104 @@ func (m *machine) linkUD2(cur *instruction) *instruction { //nolint
 	return linkInstr(cur, m.allocateInstr().asUD2())
 }
 
-func (m *machine) goEntryPreamblePassResult(cur *instruction, resultSlicePtr regalloc.VReg, offset uint32, result *backend.ABIArg) *instruction {
-	if result.Kind == backend.ABIArgKindStack {
-		panic("TODO")
+func (m *machine) goEntryPreamblePassArg(cur *instruction, paramSlicePtr regalloc.VReg, offsetInParamSlice uint32, arg *backend.ABIArg) *instruction {
+	var dst regalloc.VReg
+	argTyp := arg.Type
+	if arg.Kind == backend.ABIArgKindStack {
+		// Caller saved registers ca
+		switch argTyp {
+		case ssa.TypeI32, ssa.TypeI64:
+			dst = tmpIntReg
+		case ssa.TypeF32, ssa.TypeF64, ssa.TypeV128:
+			dst = tmpXmmReg
+		default:
+			panic("BUG")
+		}
+	} else {
+		dst = arg.Reg
 	}
 
-	r := result.Reg
+	load := m.allocateInstr()
+	a := newOperandMem(newAmodeImmReg(offsetInParamSlice, paramSlicePtr))
+	switch arg.Type {
+	case ssa.TypeI32:
+		load.asMovzxRmR(extModeLQ, a, dst)
+	case ssa.TypeI64:
+		load.asMov64MR(a, dst)
+	case ssa.TypeF32:
+		load.asXmmUnaryRmR(sseOpcodeMovss, a, dst)
+	case ssa.TypeF64:
+		load.asXmmUnaryRmR(sseOpcodeMovsd, a, dst)
+	case ssa.TypeV128:
+		load.asXmmUnaryRmR(sseOpcodeMovdqu, a, dst)
+	}
+
+	cur = linkInstr(cur, load)
+	if arg.Kind == backend.ABIArgKindStack {
+		// Store back to the stack.
+		store := m.allocateInstr()
+		a := newOperandMem(newAmodeImmReg(uint32(arg.Offset), rspVReg))
+		switch arg.Type {
+		case ssa.TypeI32:
+			store.asMovRM(dst, a, 4)
+		case ssa.TypeI64:
+			store.asMovRM(dst, a, 8)
+		case ssa.TypeF32:
+			store.asXmmMovRM(sseOpcodeMovss, dst, a)
+		case ssa.TypeF64:
+			store.asXmmMovRM(sseOpcodeMovsd, dst, a)
+		case ssa.TypeV128:
+			store.asXmmMovRM(sseOpcodeMovdqu, dst, a)
+		}
+		cur = linkInstr(cur, store)
+	}
+	return cur
+}
+
+func (m *machine) goEntryPreamblePassResult(cur *instruction, resultSlicePtr regalloc.VReg, offsetInResultSlice uint32, result *backend.ABIArg, resultStackSlotBeginOffset uint32) *instruction {
+	var r regalloc.VReg
+	if result.Kind == backend.ABIArgKindStack {
+		// Load the value to the temporary.
+		load := m.allocateInstr()
+		offset := resultStackSlotBeginOffset + uint32(result.Offset)
+		a := newOperandMem(newAmodeImmReg(offset, rspVReg))
+		switch result.Type {
+		case ssa.TypeI32:
+			r = tmpIntReg
+			load.asMovzxRmR(extModeLQ, a, r)
+		case ssa.TypeI64:
+			r = tmpIntReg
+			load.asMov64MR(a, r)
+		case ssa.TypeF32:
+			r = tmpXmmReg
+			load.asXmmUnaryRmR(sseOpcodeMovss, a, r)
+		case ssa.TypeF64:
+			r = tmpXmmReg
+			load.asXmmUnaryRmR(sseOpcodeMovsd, a, r)
+		case ssa.TypeV128:
+			r = tmpXmmReg
+			load.asXmmUnaryRmR(sseOpcodeMovdqu, a, r)
+		default:
+			panic("BUG")
+		}
+		cur = linkInstr(cur, load)
+	} else {
+		r = result.Reg
+	}
 
 	store := m.allocateInstr()
+	a := newOperandMem(newAmodeImmReg(offsetInResultSlice, resultSlicePtr))
 	switch result.Type {
 	case ssa.TypeI32:
-		store.asMovRM(r, newOperandMem(newAmodeImmReg(offset, resultSlicePtr)), 4)
+		store.asMovRM(r, a, 4)
 	case ssa.TypeI64:
-		store.asMovRM(r, newOperandMem(newAmodeImmReg(offset, resultSlicePtr)), 8)
+		store.asMovRM(r, a, 8)
 	case ssa.TypeF32:
-		store.asXmmMovRM(sseOpcodeMovss, r, newOperandMem(newAmodeImmReg(offset, resultSlicePtr)))
+		store.asXmmMovRM(sseOpcodeMovss, r, a)
 	case ssa.TypeF64:
-		store.asXmmMovRM(sseOpcodeMovsd, r, newOperandMem(newAmodeImmReg(offset, resultSlicePtr)))
+		store.asXmmMovRM(sseOpcodeMovsd, r, a)
 	case ssa.TypeV128:
-		panic("TODO")
+		store.asXmmMovRM(sseOpcodeMovdqu, r, a)
 	}
 
 	return linkInstr(cur, store)

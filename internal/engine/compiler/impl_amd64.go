@@ -3449,8 +3449,9 @@ func (c *amd64Compiler) compileMemoryAccessCeilSetup(offsetArg uint32, targetSiz
 	}
 
 	// Now we compare the value with the memory length which is held by callEngine.
-	c.assembler.CompileMemoryToRegister(amd64.CMPQ,
-		amd64ReservedRegisterForCallEngine, callEngineModuleContextMemorySliceLenOffset, result)
+	if err := c.compileCompareWithMemorySliceLen(result); err != nil {
+		return asm.NilRegister, err
+	}
 
 	// Trap if the value is out-of-bounds of memory length.
 	c.compileMaybeExitFromNativeCode(amd64.JCC, nativeCallStatusCodeMemoryOutOfBounds)
@@ -3541,7 +3542,15 @@ func (c *amd64Compiler) compileMemorySize() error {
 	}
 	loc := c.pushRuntimeValueLocationOnRegister(reg, runtimeValueTypeI32)
 
-	c.assembler.CompileMemoryToRegister(amd64.MOVQ, amd64ReservedRegisterForCallEngine, callEngineModuleContextMemorySliceLenOffset, loc.register)
+	if c.ir.Memory != wazeroir.MemoryTypeShared {
+		// No concurrent accesses so the length we cached during the preamble is still valid.
+		c.assembler.CompileMemoryToRegister(amd64.MOVQ, amd64ReservedRegisterForCallEngine, callEngineModuleContextMemorySliceLenOffset, loc.register)
+	} else {
+		c.assembler.CompileMemoryToRegister(amd64.MOVQ,
+			amd64ReservedRegisterForCallEngine, callEngineModuleContextMemoryInstanceOffset,
+			loc.register)
+		c.assembler.CompileMemoryToRegister(amd64.MOVQ, loc.register, memoryInstanceBufferLenOffset, loc.register)
+	}
 
 	// WebAssembly's memory.size returns the page size (65536) of memory region.
 	// That is equivalent to divide the len of memory slice by 65536 and
@@ -3617,9 +3626,9 @@ func (c *amd64Compiler) compileInitImpl(isTable bool, index, tableIndex uint32) 
 		// Compare length.
 		c.assembler.CompileMemoryToRegister(amd64.CMPQ, tmp, tableInstanceTableLenOffset, destinationOffset.register)
 	} else {
-		c.assembler.CompileMemoryToRegister(amd64.CMPQ,
-			amd64ReservedRegisterForCallEngine, callEngineModuleContextMemorySliceLenOffset,
-			destinationOffset.register)
+		if err := c.compileCompareWithMemorySliceLen(destinationOffset.register); err != nil {
+			return err
+		}
 	}
 
 	c.compileMaybeExitFromNativeCode(amd64.JCC, outOfBoundsErrorStatus)
@@ -3839,8 +3848,9 @@ func (c *amd64Compiler) compileMemoryCopy() error {
 	c.assembler.CompileRegisterToRegister(amd64.CMOVQCS, destinationOffset.register, tmp)
 
 	// Check maximum bounds and if exceeds the length, exit with out of bounds error.
-	c.assembler.CompileMemoryToRegister(amd64.CMPQ,
-		amd64ReservedRegisterForCallEngine, callEngineModuleContextMemorySliceLenOffset, tmp)
+	if err := c.compileCompareWithMemorySliceLen(tmp); err != nil {
+		return err
+	}
 	c.compileMaybeExitFromNativeCode(amd64.JCC, nativeCallStatusCodeMemoryOutOfBounds)
 
 	// Skip zero size.
@@ -3958,9 +3968,9 @@ func (c *amd64Compiler) compileFillImpl(isTable bool, tableIndex uint32) error {
 			tmp, tableInstanceTableLenOffset,
 			destinationOffset.register)
 	} else {
-		c.assembler.CompileMemoryToRegister(amd64.CMPQ,
-			amd64ReservedRegisterForCallEngine, callEngineModuleContextMemorySliceLenOffset,
-			destinationOffset.register)
+		if err := c.compileCompareWithMemorySliceLen(destinationOffset.register); err != nil {
+			return err
+		}
 	}
 	if isTable {
 		c.compileMaybeExitFromNativeCode(amd64.JCC, nativeCallStatusCodeInvalidTableAccess)
@@ -5170,6 +5180,30 @@ func (c *amd64Compiler) compileMaybeSwapRegisters(reg1, reg2 asm.Register) {
 	if reg1 != reg2 {
 		c.assembler.CompileRegisterToRegister(amd64.XCHGQ, reg1, reg2)
 	}
+}
+
+func (c *amd64Compiler) compileCompareWithMemorySliceLen(addrReg asm.Register) error {
+	if c.ir.Memory != wazeroir.MemoryTypeShared {
+		// No concurrent accesses so the length we cached during the preamble is still valid.
+		c.assembler.CompileMemoryToRegister(amd64.CMPQ,
+			amd64ReservedRegisterForCallEngine, callEngineModuleContextMemorySliceLenOffset, addrReg)
+		return nil
+	}
+	// Obtain the temporary registers to be used in the followings.
+	tmpRegister, err := c.allocateRegister(registerTypeGeneralPurpose)
+	if err != nil {
+		return err
+	}
+
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ,
+		amd64ReservedRegisterForCallEngine, callEngineModuleContextMemoryInstanceOffset,
+		tmpRegister)
+
+	c.assembler.CompileMemoryToRegister(amd64.CMPQ, tmpRegister, memoryInstanceBufferLenOffset, addrReg)
+
+	c.locationStack.markRegisterUnused(tmpRegister)
+
+	return nil
 }
 
 // compilePreventCrossedTargetRegisters swaps registers in such a way, that for neither runtimeValueLocation from locs its

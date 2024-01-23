@@ -96,6 +96,35 @@ func TestE2E(t *testing.T) {
 			calls:     []callCase{{expErr: "unreachable"}},
 		},
 		{
+			name: "add_sub_return", m: testcases.AddSubReturn.Module,
+			calls: []callCase{
+				{
+					params:     []uint64{},
+					expResults: []uint64{3, 3, 3, 3},
+				},
+			},
+		},
+		{
+			name: "many_params_many_results",
+			m:    testcases.ManyParamsManyResults.Module,
+			calls: []callCase{
+				{
+					params: []uint64{
+						1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+						1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+						1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+						1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+					},
+					expResults: []uint64{
+						10, 9, 8, 7, 6, 5, 4, 3, 2, 1,
+						10, 9, 8, 7, 6, 5, 4, 3, 2, 1,
+						10, 9, 8, 7, 6, 5, 4, 3, 2, 1,
+						10, 9, 8, 7, 6, 5, 4, 3, 2, 1,
+					},
+				},
+			},
+		},
+		{
 			name: "fibonacci_recursive", m: testcases.FibonacciRecursive.Module,
 			skipAMD64: true,
 			calls: []callCase{
@@ -393,7 +422,6 @@ func TestE2E(t *testing.T) {
 							} else {
 								require.NoError(t, err)
 								require.Equal(t, len(cc.expResults), len(result))
-								require.Equal(t, cc.expResults, result)
 								for i := range cc.expResults {
 									if cc.expResults[i] != result[i] {
 										t.Errorf("result[%d]: exp %d, got %d", i, cc.expResults[i], result[i])

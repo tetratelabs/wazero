@@ -89,14 +89,12 @@ func (m *machine) LowerParams(args []ssa.Value) {
 			//          |   ReturnAddress |      |
 			//          +-----------------+      |
 			//          |   ...........   |      |
-			//          |   spill slot M  |      |   argStackOffset: is unknown at this point of compilation.
+			//          |   clobbered  M  |      |   argStackOffset: is unknown at this point of compilation.
 			//          |   ............  |      |
-			//          |   spill slot 2  |      |
-			//          |   spill slot 1  |      |
-			//          |   clobbered 0   |      |
-			//          |   clobbered 1   |      |
+			//          |   clobbered  0  |      |
+			//          |   spill slot N  |      |
 			//          |   ...........   |      |
-			//          |   clobbered N   |      |
+			//          |   spill slot 0  |      |
 			//   SP---> +-----------------+    <-+
 			//             (low address)
 

@@ -39,15 +39,26 @@ func TestMachine_SetupPrologue(t *testing.T) {
 	ud2
 `,
 			spillSlotSize: 0,
-			clobberedRegs: []regalloc.VReg{
-				raxVReg,
-				rcxVReg,
-				xmm0VReg,
-				xmm1VReg,
-				xmm15VReg,
-			},
+			clobberedRegs: []regalloc.VReg{raxVReg, rcxVReg, xmm0VReg, xmm1VReg, xmm15VReg},
 		},
-		// TODO: add more test cases.
+		{
+			exp: `
+	pushq %rbp
+	movq %rsp, %rbp
+	sub $16, %rsp
+	movdqu %xmm15, (%rsp)
+	sub $16, %rsp
+	movdqu %xmm1, (%rsp)
+	sub $16, %rsp
+	movdqu %xmm0, (%rsp)
+	pushq %rcx
+	pushq %rax
+	sub $48, %rsp
+	ud2
+`,
+			spillSlotSize: 48,
+			clobberedRegs: []regalloc.VReg{raxVReg, rcxVReg, xmm0VReg, xmm1VReg, xmm15VReg},
+		},
 	} {
 		tc := tc
 		t.Run(tc.exp, func(t *testing.T) {
@@ -103,15 +114,26 @@ func TestMachine_SetupEpilogue(t *testing.T) {
 	ret
 `,
 			spillSlotSize: 0,
-			clobberedRegs: []regalloc.VReg{
-				raxVReg,
-				rcxVReg,
-				xmm0VReg,
-				xmm1VReg,
-				xmm15VReg,
-			},
+			clobberedRegs: []regalloc.VReg{raxVReg, rcxVReg, xmm0VReg, xmm1VReg, xmm15VReg},
 		},
-		// TODO: add more test cases.
+		{
+			exp: `
+	add $160, %rsp
+	popq %rax
+	popq %rcx
+	movdqu (%rsp), %xmm0
+	add $16, %rsp
+	movdqu (%rsp), %xmm1
+	add $16, %rsp
+	movdqu (%rsp), %xmm15
+	add $16, %rsp
+	movq %rbp, %rsp
+	popq %rbp
+	ret
+`,
+			spillSlotSize: 160,
+			clobberedRegs: []regalloc.VReg{raxVReg, rcxVReg, xmm0VReg, xmm1VReg, xmm15VReg},
+		},
 	} {
 		tc := tc
 		t.Run(tc.exp, func(t *testing.T) {

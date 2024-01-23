@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -187,7 +189,11 @@ func TestMemoryType(t *testing.T) {
 				expectedDecoded.Max = tmax
 			}
 
-			binary, err := decodeMemory(bytes.NewReader(b), newMemorySizer(tmax, false), tmax)
+			features := api.CoreFeaturesV2
+			if tc.input.IsShared {
+				features = features.SetEnabled(experimental.CoreFeaturesThreads, true)
+			}
+			binary, err := decodeMemory(bytes.NewReader(b), features, newMemorySizer(tmax, false), tmax)
 			require.NoError(t, err)
 			require.Equal(t, binary, expectedDecoded)
 		})
@@ -198,9 +204,10 @@ func TestDecodeMemoryType_Errors(t *testing.T) {
 	max := wasm.MemoryLimitPages
 
 	tests := []struct {
-		name        string
-		input       []byte
-		expectedErr string
+		name           string
+		input          []byte
+		threadsEnabled bool
+		expectedErr    string
 	}{
 		{
 			name:        "max < min",
@@ -218,9 +225,15 @@ func TestDecodeMemoryType_Errors(t *testing.T) {
 			expectedErr: "max 4294967295 pages (3 Ti) over limit of 65536 pages (4 Gi)",
 		},
 		{
-			name:        "shared but no max",
+			name:        "shared but no threads",
 			input:       []byte{0x2, 0, 0x80, 0x80, 0x4},
-			expectedErr: "shared memory requires a maximum size to be specified",
+			expectedErr: "shared memory requested but threads feature not enabled",
+		},
+		{
+			name:           "shared but no max",
+			input:          []byte{0x2, 0, 0x80, 0x80, 0x4},
+			threadsEnabled: true,
+			expectedErr:    "shared memory requires a maximum size to be specified",
 		},
 	}
 
@@ -228,7 +241,14 @@ func TestDecodeMemoryType_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := decodeMemory(bytes.NewReader(tc.input), newMemorySizer(max, false), max)
+			features := api.CoreFeaturesV2
+			if tc.threadsEnabled {
+				features = features.SetEnabled(experimental.CoreFeaturesThreads, true)
+			} else {
+				// Allow test to work if threads is ever added to default features by explicitly removing threads features
+				features = features.SetEnabled(experimental.CoreFeaturesThreads, false)
+			}
+			_, err := decodeMemory(bytes.NewReader(tc.input), features, newMemorySizer(max, false), max)
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}
