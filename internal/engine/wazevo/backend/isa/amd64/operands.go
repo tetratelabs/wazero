@@ -218,21 +218,12 @@ func (m *machine) getOperand_Mem_Imm32_Reg(def *backend.SSAValueDefinition) (op 
 		return newOperandReg(def.BlkParamVReg)
 	}
 
-	if opcode := m.c.MatchInstrOneOf(def, []ssa.Opcode{
-		ssa.OpcodeLoad,
-		ssa.OpcodeUload8, ssa.OpcodeUload16, ssa.OpcodeUload32,
-		ssa.OpcodeSload8, ssa.OpcodeSload16, ssa.OpcodeSload32,
-	}); opcode != ssa.OpcodeInvalid {
-		switch opcode {
-		case ssa.OpcodeLoad, ssa.OpcodeUload32, ssa.OpcodeSload32:
-			instr := def.Instr
-			ptr, offset, _ := instr.LoadData()
-			op = newOperandMem(m.lowerToAddressMode(ptr, offset))
-			instr.MarkLowered()
-			return op
-		default:
-			panic("TODO: " + opcode.String())
-		}
+	if m.c.MatchInstr(def, ssa.OpcodeLoad) {
+		instr := def.Instr
+		ptr, offset, _ := instr.LoadData()
+		op = newOperandMem(m.lowerToAddressMode(ptr, offset))
+		instr.MarkLowered()
+		return op
 	}
 	return m.getOperand_Imm32_Reg(def)
 }
