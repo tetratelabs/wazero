@@ -69,6 +69,13 @@ func newOperandLabel(label backend.Label) operand { //nolint:unused
 	return operand{kind: operandKindLabel, imm32: uint32(label)}
 }
 
+func (o *operand) label() backend.Label {
+	if o.kind != operandKindLabel {
+		panic("BUG: invalid operand kind")
+	}
+	return backend.Label(o.imm32)
+}
+
 func newOperandReg(r regalloc.VReg) operand {
 	return operand{kind: operandKindReg, r: r}
 }

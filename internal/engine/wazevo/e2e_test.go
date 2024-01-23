@@ -79,7 +79,6 @@ func TestE2E(t *testing.T) {
 		},
 		{
 			name: "swap", m: testcases.SwapParamAndReturn.Module,
-			skipAMD64: true,
 			calls: []callCase{
 				{params: []uint64{math.MaxUint32, math.MaxInt32}, expResults: []uint64{math.MaxInt32, math.MaxUint32}},
 			},
@@ -126,7 +125,6 @@ func TestE2E(t *testing.T) {
 		},
 		{
 			name: "fibonacci_recursive", m: testcases.FibonacciRecursive.Module,
-			skipAMD64: true,
 			calls: []callCase{
 				{params: []uint64{0}, expResults: []uint64{0}},
 				{params: []uint64{1}, expResults: []uint64{1}},

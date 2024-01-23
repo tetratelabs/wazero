@@ -2,6 +2,7 @@ package amd64
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"strings"
 
@@ -134,10 +135,57 @@ func (m *machine) LowerSingleBranch(b *ssa.Instruction) {
 	}
 }
 
+var condBranchMatches = [...]ssa.Opcode{ssa.OpcodeIcmp, ssa.OpcodeFcmp}
+
 // LowerConditionalBranch implements backend.Machine.
 func (m *machine) LowerConditionalBranch(b *ssa.Instruction) {
-	// TODO implement me
-	panic("implement me")
+	exctx := m.ectx
+	cval, args, targetBlk := b.BranchData()
+	if len(args) > 0 {
+		panic(fmt.Sprintf(
+			"conditional branch shouldn't have args; likely a bug in critical edge splitting: from %s to %s",
+			exctx.CurrentSSABlk,
+			targetBlk,
+		))
+	}
+
+	target := exctx.GetOrAllocateSSABlockLabel(targetBlk)
+	cvalDef := m.c.ValueDefinition(cval)
+
+	switch m.c.MatchInstrOneOf(cvalDef, condBranchMatches[:]) {
+	case ssa.OpcodeIcmp:
+		cvalInstr := cvalDef.Instr
+		x, y, c := cvalInstr.IcmpData()
+
+		cc := condFromSSAIntCmpCond(c)
+		if b.Opcode() == ssa.OpcodeBrz {
+			cc = cc.invert()
+		}
+
+		// First, perform the comparison and set the flag.
+		xd, yd := m.c.ValueDefinition(x), m.c.ValueDefinition(y)
+		m.lowerIcmpToFlag(xd, yd, x.Type() == ssa.TypeI64)
+
+		// Then perform the conditional branch.
+		m.insert(m.allocateInstr().asJmpIf(cc, newOperandLabel(target)))
+		cvalDef.Instr.MarkLowered()
+	case ssa.OpcodeFcmp:
+		panic("TODO")
+	default:
+		v := m.getOperand_Reg(cvalDef)
+
+		var cc cond
+		if b.Opcode() == ssa.OpcodeBrz {
+			cc = condZ
+		} else {
+			cc = condNZ
+		}
+
+		// Perform test %v, %v to set the flag.
+		cmp := m.allocateInstr().asCmpRmiR(false, v, v.r, false)
+		m.insert(cmp)
+		m.insert(m.allocateInstr().asJmpIf(cc, newOperandLabel(target)))
+	}
 }
 
 // LowerInstr implements backend.Machine.
@@ -356,7 +404,7 @@ func (m *machine) Encode(context.Context) {
 			needLabelResolution := cur.encode(m.c)
 			if needLabelResolution {
 				m.labelResolutionPends = append(m.labelResolutionPends,
-					labelResolutionPend{instr: cur, offset: int64(offset)},
+					labelResolutionPend{instr: cur, offset: offset},
 				)
 			}
 		}
@@ -364,11 +412,15 @@ func (m *machine) Encode(context.Context) {
 
 	for i := range m.labelResolutionPends {
 		p := &m.labelResolutionPends[i]
+		target := p.instr.jmpLabel()
+		targetOffset := ectx.LabelPositions[target].BinaryOffset
 		switch p.instr.kind {
 		case jmp:
 			panic("TODO")
 		case jmpIf:
-			panic("TODO")
+			imm32Offset := p.offset + 2                       // +2 because p.offset is the beginning of the instruction.
+			jmpOffset := int32(targetOffset - (p.offset + 6)) // +6 because jmpIf is 6 bytes long.
+			binary.LittleEndian.PutUint32((*bufPtr)[imm32Offset:], uint32(jmpOffset))
 		default:
 			panic("BUG")
 		}
@@ -388,6 +440,13 @@ func (m *machine) ResolveRelocations(refToBinaryOffset map[ssa.FuncRef]int, bina
 		callInstrOffsetBytes[2] = byte(diff >> 16)
 		callInstrOffsetBytes[3] = byte(diff >> 24)
 	}
+}
+
+func (m *machine) lowerIcmpToFlag(xd, yd *backend.SSAValueDefinition, _64 bool) {
+	x := m.getOperand_Reg(xd)
+	y := m.getOperand_Mem_Imm32_Reg(yd)
+	cmp := m.allocateInstr().asCmpRmiR(true, y, x.r, _64)
+	m.insert(cmp)
 }
 
 // allocateInstr allocates an instruction.
