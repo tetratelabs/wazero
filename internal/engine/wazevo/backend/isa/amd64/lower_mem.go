@@ -9,7 +9,7 @@ import (
 var addendsMatchOpcodes = [...]ssa.Opcode{ssa.OpcodeUExtend, ssa.OpcodeSExtend, ssa.OpcodeIadd, ssa.OpcodeIconst, ssa.OpcodeIshl}
 
 type (
-	addend64 struct {
+	addend struct {
 		r     regalloc.VReg
 		off   int64
 		shift byte
@@ -46,7 +46,7 @@ func (m *machine) lowerToAddressMode(ptr ssa.Value, offsetBase uint32) (am amode
 	}
 }
 
-func (m *machine) lowerAddendsToAmode(x, y addend64, offBase int32) amode {
+func (m *machine) lowerAddendsToAmode(x, y addend, offBase int32) amode {
 	if x.r != regalloc.VRegInvalid && x.off != 0 || y.r != regalloc.VRegInvalid && y.off != 0 {
 		panic("invalid input")
 	}
@@ -101,46 +101,46 @@ func (m *machine) lowerAddendsToAmode(x, y addend64, offBase int32) amode {
 	}
 }
 
-func (m *machine) lowerAddend(x *backend.SSAValueDefinition) addend64 {
+func (m *machine) lowerAddend(x *backend.SSAValueDefinition) addend {
 	if x.IsFromBlockParam() {
-		return addend64{x.BlkParamVReg, 0, 0}
+		return addend{x.BlkParamVReg, 0, 0}
 	}
 	// Ensure the addend is not referenced in multiple places; we will discard nested Iadds.
 	op := m.c.MatchInstrOneOf(x, addendsMatchOpcodes[:])
 	if op != ssa.OpcodeInvalid && op != ssa.OpcodeIadd {
 		return m.lowerAddendFromInstr(x.Instr)
 	}
-	return addend64{m.getOperand_Reg(x).r, 0, 0}
+	return addend{m.getOperand_Reg(x).r, 0, 0}
 }
 
 // lowerAddendFromInstr takes an instruction returns a Vreg and an offset that can be used in an address mode.
 // The Vreg is regalloc.VRegInvalid if the addend cannot be lowered to a register.
 // The offset is 0 if the addend can be lowered to a register.
-func (m *machine) lowerAddendFromInstr(instr *ssa.Instruction) addend64 {
+func (m *machine) lowerAddendFromInstr(instr *ssa.Instruction) addend {
 	instr.MarkLowered()
 	switch op := instr.Opcode(); op {
 	case ssa.OpcodeIconst:
 		u64 := instr.ConstantVal()
 		if instr.Return().Type().Bits() == 32 {
-			return addend64{regalloc.VRegInvalid, int64(int32(u64)), 0} // sign-extend.
+			return addend{regalloc.VRegInvalid, int64(int32(u64)), 0} // sign-extend.
 		} else {
-			return addend64{regalloc.VRegInvalid, int64(u64), 0}
+			return addend{regalloc.VRegInvalid, int64(u64), 0}
 		}
 	case ssa.OpcodeUExtend, ssa.OpcodeSExtend:
 		input := instr.Arg()
 		inputDef := m.c.ValueDefinition(input)
 		switch input.Type().Bits() {
 		case 64:
-			return addend64{m.getOperand_Reg(inputDef).r, 0, 0}
+			return addend{m.getOperand_Reg(inputDef).r, 0, 0}
 		case 32:
 			constInst := inputDef.IsFromInstr() && inputDef.Instr.Constant()
 			switch {
 			case constInst && op == ssa.OpcodeSExtend:
-				return addend64{regalloc.VRegInvalid, int64(uint32(inputDef.Instr.ConstantVal())), 0}
+				return addend{regalloc.VRegInvalid, int64(uint32(inputDef.Instr.ConstantVal())), 0}
 			case constInst && op == ssa.OpcodeUExtend:
-				return addend64{regalloc.VRegInvalid, int64(int32(inputDef.Instr.ConstantVal())), 0} // sign-extend!
+				return addend{regalloc.VRegInvalid, int64(int32(inputDef.Instr.ConstantVal())), 0} // sign-extend!
 			default:
-				return addend64{m.getOperand_Reg(inputDef).r, 0, 0}
+				return addend{m.getOperand_Reg(inputDef).r, 0, 0}
 			}
 		}
 	case ssa.OpcodeIshl:
@@ -148,9 +148,9 @@ func (m *machine) lowerAddendFromInstr(instr *ssa.Instruction) addend64 {
 		x, amount := instr.Arg2()
 		amountDef := m.c.ValueDefinition(amount)
 		if amountDef.IsFromInstr() && amountDef.Instr.Constant() && amountDef.Instr.ConstantVal() <= 3 {
-			return addend64{m.getOperand_Reg(m.c.ValueDefinition(x)).r, 0, uint8(amountDef.Instr.ConstantVal())}
+			return addend{m.getOperand_Reg(m.c.ValueDefinition(x)).r, 0, uint8(amountDef.Instr.ConstantVal())}
 		}
-		return addend64{m.getOperand_Reg(m.c.ValueDefinition(x)).r, 0, 0}
+		return addend{m.getOperand_Reg(m.c.ValueDefinition(x)).r, 0, 0}
 	}
 	panic("BUG: invalid opcode")
 }

@@ -157,21 +157,21 @@ func TestMachine_lowerAddendFromInstr(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		in   func(*mockCompiler, ssa.Builder, *machine) *ssa.Instruction
-		exp  addend64
+		exp  addend
 	}{
 		{
 			name: "iconst64",
 			in: func(ctx *mockCompiler, b ssa.Builder, m *machine) *ssa.Instruction {
 				return b.AllocateInstruction().AsIconst64(123 << 32).Insert(b)
 			},
-			exp: addend64{regalloc.VRegInvalid, 123 << 32, 0},
+			exp: addend{regalloc.VRegInvalid, 123 << 32, 0},
 		},
 		{
 			name: "iconst32",
 			in: func(ctx *mockCompiler, b ssa.Builder, m *machine) *ssa.Instruction {
 				return b.AllocateInstruction().AsIconst32(123).Insert(b)
 			},
-			exp: addend64{regalloc.VRegInvalid, 123, 0},
+			exp: addend{regalloc.VRegInvalid, 123, 0},
 		},
 		{
 			name: "uextend const32",
@@ -180,7 +180,7 @@ func TestMachine_lowerAddendFromInstr(t *testing.T) {
 				ctx.definitions[iconst32.Return()] = &backend.SSAValueDefinition{Instr: iconst32}
 				return b.AllocateInstruction().AsUExtend(iconst32.Return(), 32, 64).Insert(b)
 			},
-			exp: addend64{regalloc.VRegInvalid, 123, 0},
+			exp: addend{regalloc.VRegInvalid, 123, 0},
 		},
 		{
 			name: "uextend const64",
@@ -189,7 +189,7 @@ func TestMachine_lowerAddendFromInstr(t *testing.T) {
 				ctx.definitions[p] = &backend.SSAValueDefinition{BlkParamVReg: raxVReg, BlockParamValue: p}
 				return b.AllocateInstruction().AsUExtend(p, 32, 64).Insert(b)
 			},
-			exp: addend64{raxVReg, 0, 0},
+			exp: addend{raxVReg, 0, 0},
 		},
 		{
 			name: "uextend param i32",
@@ -198,7 +198,7 @@ func TestMachine_lowerAddendFromInstr(t *testing.T) {
 				ctx.definitions[p] = &backend.SSAValueDefinition{BlkParamVReg: raxVReg, BlockParamValue: p}
 				return b.AllocateInstruction().AsUExtend(p, 32, 64).Insert(b)
 			},
-			exp: addend64{raxVReg, 0, 0},
+			exp: addend{raxVReg, 0, 0},
 		},
 		{
 			name: "sextend const32",
@@ -207,7 +207,7 @@ func TestMachine_lowerAddendFromInstr(t *testing.T) {
 				ctx.definitions[iconst32.Return()] = &backend.SSAValueDefinition{Instr: iconst32}
 				return b.AllocateInstruction().AsSExtend(iconst32.Return(), 32, 64).Insert(b)
 			},
-			exp: addend64{regalloc.VRegInvalid, 123, 0},
+			exp: addend{regalloc.VRegInvalid, 123, 0},
 		},
 		{
 			name: "sextend const64",
@@ -216,7 +216,7 @@ func TestMachine_lowerAddendFromInstr(t *testing.T) {
 				ctx.definitions[p] = &backend.SSAValueDefinition{BlkParamVReg: raxVReg, BlockParamValue: p}
 				return b.AllocateInstruction().AsSExtend(p, 32, 64).Insert(b)
 			},
-			exp: addend64{raxVReg, 0, 0},
+			exp: addend{raxVReg, 0, 0},
 		},
 		{
 			name: "sextend param i32",
@@ -225,7 +225,7 @@ func TestMachine_lowerAddendFromInstr(t *testing.T) {
 				ctx.definitions[p] = &backend.SSAValueDefinition{BlkParamVReg: raxVReg, BlockParamValue: p}
 				return b.AllocateInstruction().AsSExtend(p, 32, 64).Insert(b)
 			},
-			exp: addend64{raxVReg, 0, 0},
+			exp: addend{raxVReg, 0, 0},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -244,59 +244,59 @@ func TestMachine_lowerAddendsToAmode(t *testing.T) {
 	_ = nextNextVReg
 	for _, tc := range []struct {
 		name   string
-		x, y   addend64
+		x, y   addend
 		offset int32
 		exp    amode
 		insts  []string
 	}{
 		{
 			name: "only offset",
-			x:    addend64{r: regalloc.VRegInvalid}, y: addend64{r: regalloc.VRegInvalid},
+			x:    addend{r: regalloc.VRegInvalid}, y: addend{r: regalloc.VRegInvalid},
 			offset: 4095,
 			insts:  []string{"movabsq $4095, %r100?"},
 			exp:    newAmodeImmReg(0, nextVReg),
 		},
 		{
 			name: "only offset, offx, offy",
-			x:    addend64{r: regalloc.VRegInvalid, off: 1}, y: addend64{r: regalloc.VRegInvalid, off: 2},
+			x:    addend{r: regalloc.VRegInvalid, off: 1}, y: addend{r: regalloc.VRegInvalid, off: 2},
 			offset: 4095,
 			insts:  []string{"movabsq $4098, %r100?"},
 			exp:    newAmodeImmReg(0, nextVReg),
 		},
 		{
 			name: "only offset, offx, offy; not fitting",
-			x:    addend64{r: regalloc.VRegInvalid, off: 1 << 30}, y: addend64{r: regalloc.VRegInvalid, off: 2 << 30},
+			x:    addend{r: regalloc.VRegInvalid, off: 1 << 30}, y: addend{r: regalloc.VRegInvalid, off: 2 << 30},
 			offset: 4095,
 			insts:  []string{"movabsq $3221229567, %r100?"},
 			exp:    newAmodeImmReg(0, nextVReg),
 		},
 		{
 			name: "one a64 with imm32",
-			x:    addend64{r: x1}, y: addend64{r: regalloc.VRegInvalid},
+			x:    addend{r: x1}, y: addend{r: regalloc.VRegInvalid},
 			offset: 4095,
 			exp:    newAmodeImmReg(4095, x1),
 		},
 		{
 			name: "one a64 with imm32",
-			x:    addend64{r: x1}, y: addend64{r: regalloc.VRegInvalid},
+			x:    addend{r: x1}, y: addend{r: regalloc.VRegInvalid},
 			offset: 1 << 16,
 			exp:    newAmodeImmReg(1<<16, x1),
 		},
 		{
 			name: "two a64 with imm32",
-			x:    addend64{r: x1}, y: addend64{r: x2},
+			x:    addend{r: x1}, y: addend{r: x2},
 			offset: 1 << 16,
 			exp:    newAmodeRegRegShift(1<<16, x1, x2, 0),
 		},
 		{
 			name: "two a64 with offset fitting",
-			x:    addend64{r: x1}, y: addend64{r: x2},
+			x:    addend{r: x1}, y: addend{r: x2},
 			offset: 1 << 30,
 			exp:    newAmodeRegRegShift(1<<30, x1, x2, 0),
 		},
 		{
 			name: "rx with offset not fitting",
-			x:    addend64{r: x1}, y: addend64{r: regalloc.VRegInvalid, off: 1 << 30},
+			x:    addend{r: x1}, y: addend{r: regalloc.VRegInvalid, off: 1 << 30},
 			offset: 1 << 30,
 			insts: []string{
 				"movabsq $2147483648, %r100?",
@@ -305,7 +305,7 @@ func TestMachine_lowerAddendsToAmode(t *testing.T) {
 		},
 		{
 			name: "ry with offset not fitting",
-			x:    addend64{r: regalloc.VRegInvalid, off: 1 << 30}, y: addend64{r: x1},
+			x:    addend{r: regalloc.VRegInvalid, off: 1 << 30}, y: addend{r: x1},
 			offset: 1 << 30,
 			insts: []string{
 				"movabsq $2147483648, %r100?",
@@ -314,7 +314,7 @@ func TestMachine_lowerAddendsToAmode(t *testing.T) {
 		},
 		{
 			name: "rx with shift, ry with shift, offset != 0",
-			x:    addend64{r: x1, shift: 2}, y: addend64{r: x2, shift: 3},
+			x:    addend{r: x1, shift: 2}, y: addend{r: x2, shift: 3},
 			offset: 1 << 30,
 			insts: []string{
 				"shlq $2, %rax",
@@ -323,19 +323,19 @@ func TestMachine_lowerAddendsToAmode(t *testing.T) {
 		},
 		{
 			name: "rx, ry with shift, offset != 0",
-			x:    addend64{r: x1}, y: addend64{r: x2, shift: 3},
+			x:    addend{r: x1}, y: addend{r: x2, shift: 3},
 			offset: 1 << 30,
 			exp:    newAmodeRegRegShift(1<<30, x1, x2, 3),
 		},
 		{
 			name: "rx with shift, ry, offset != 0",
-			x:    addend64{r: x1, shift: 3}, y: addend64{r: x2},
+			x:    addend{r: x1, shift: 3}, y: addend{r: x2},
 			offset: 1 << 30,
 			exp:    newAmodeRegRegShift(1<<30, x2, x1, 3),
 		},
 		{
 			name: "rx with shift, ry invalid, offset != 0",
-			x:    addend64{r: x1, shift: 3}, y: addend64{r: regalloc.VRegInvalid},
+			x:    addend{r: x1, shift: 3}, y: addend{r: regalloc.VRegInvalid},
 			offset: 1 << 30,
 			insts: []string{
 				"xor %r100?, %r100?",
@@ -344,7 +344,7 @@ func TestMachine_lowerAddendsToAmode(t *testing.T) {
 		},
 		{
 			name: "rx invalid, rx with shift, offset != 0",
-			x:    addend64{r: regalloc.VRegInvalid}, y: addend64{r: x1, shift: 3},
+			x:    addend{r: regalloc.VRegInvalid}, y: addend{r: x1, shift: 3},
 			offset: 1 << 30,
 			insts: []string{
 				"xor %r100?, %r100?",
