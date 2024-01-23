@@ -382,7 +382,7 @@ func (m *machine) ResolveRelocations(refToBinaryOffset map[ssa.FuncRef]int, bina
 		calleeFnOffset := refToBinaryOffset[r.FuncRef]
 		// offset is the offset of the last 4 bytes of the call instruction.
 		callInstrOffsetBytes := binary[offset : offset+4]
-		diff := int64(calleeFnOffset) - (offset)
+		diff := int64(calleeFnOffset) - (offset + 4) // +4 because we want the offset of the next instruction (In x64, RIP always points to the next instruction).
 		callInstrOffsetBytes[0] = byte(diff)
 		callInstrOffsetBytes[1] = byte(diff >> 8)
 		callInstrOffsetBytes[2] = byte(diff >> 16)

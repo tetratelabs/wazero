@@ -136,13 +136,8 @@ func TestE2E(t *testing.T) {
 				{params: []uint64{30}, expResults: []uint64{0xcb228}},
 			},
 		},
-		{
-			name: "call_simple", m: testcases.CallSimple.Module, calls: []callCase{{expResults: []uint64{40}}},
-		},
-		{
-			name: "call", m: testcases.Call.Module, calls: []callCase{{expResults: []uint64{45, 45}}},
-			skipAMD64: true,
-		},
+		{name: "call_simple", m: testcases.CallSimple.Module, calls: []callCase{{expResults: []uint64{40}}}},
+		{name: "call", m: testcases.Call.Module, calls: []callCase{{expResults: []uint64{45, 45}}}},
 		{
 			name: "stack overflow",
 			m: &wasm.Module{
