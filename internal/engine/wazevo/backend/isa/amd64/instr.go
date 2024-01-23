@@ -688,6 +688,13 @@ func (i *instruction) asJmp(target operand) *instruction {
 	return i
 }
 
+func (i *instruction) jmpLabel() backend.Label {
+	if i.kind != jmp && i.kind != jmpIf {
+		panic("BUG")
+	}
+	return i.op1.label()
+}
+
 func (i *instruction) asLEA(a amode, rd regalloc.VReg) *instruction {
 	i.kind = lea
 	i.op1 = newOperandMem(a)
@@ -886,14 +893,14 @@ func (i *instruction) asXmmRmiReg(op sseOpcode, rm operand, rd regalloc.VReg) *i
 	return i
 }
 
-func (i *instruction) asCmpRmiR(cmpOrTest bool, rm operand, rd regalloc.VReg, _64 bool) *instruction {
+func (i *instruction) asCmpRmiR(cmp bool, rm operand, rd regalloc.VReg, _64 bool) *instruction {
 	if rm.kind != operandKindReg && rm.kind != operandKindImm32 && rm.kind != operandKindMem {
 		panic("BUG")
 	}
 	i.kind = cmpRmiR
 	i.op1 = rm
 	i.op2 = newOperandReg(rd)
-	if cmpOrTest {
+	if cmp {
 		i.u1 = 1
 	}
 	i.b1 = _64
@@ -1527,6 +1534,9 @@ var defKinds = [instrMax]defKind{
 	gprToXmm:    defKindOp2,
 	call:        defKindCall,
 	ud2:         defKindNone,
+	jmp:         defKindNone,
+	jmpIf:       defKindNone,
+	cmpRmiR:     defKindNone,
 }
 
 // String implements fmt.Stringer.
@@ -1569,6 +1579,9 @@ var useKinds = [instrMax]useKind{
 	gprToXmm:    useKindOp1,
 	call:        useKindCall,
 	ud2:         useKindNone,
+	jmpIf:       useKindOp1,
+	jmp:         useKindOp1,
+	cmpRmiR:     useKindOp1Op2Reg,
 }
 
 func (u useKind) String() string {
