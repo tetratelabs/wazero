@@ -97,6 +97,17 @@ func Test_machine_lowerToAddressMode(t *testing.T) {
 			},
 			am: newAmodeImmReg(0, nextVReg),
 		},
+		{
+			name: "redundant uextend param64",
+			in: func(ctx *mockCompiler, b ssa.Builder, m *machine) (ptr ssa.Value, offset uint32) {
+				p := b.CurrentBlock().AddParam(b, ssa.TypeI64)
+				uextend := b.AllocateInstruction().AsUExtend(p, 64, 64).Insert(b)
+				ctx.definitions[p] = &backend.SSAValueDefinition{BlockParamValue: p, BlkParamVReg: raxVReg}
+				ctx.definitions[uextend.Return()] = &backend.SSAValueDefinition{Instr: uextend}
+				return uextend.Return(), 1 << 30
+			},
+			am: newAmodeImmReg(1<<30, raxVReg),
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx, b, m := newSetupWithMockContext()

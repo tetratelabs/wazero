@@ -21,12 +21,13 @@ func (m *machine) lowerToAddressMode(ptr ssa.Value, offsetBase uint32) (am amode
 	} else {
 		// If it is not an Iadd, then we lower the one addend.
 		r, off := m.lowerAddend(def)
-		off += int64(offBase)
-		if r != regalloc.VRegInvalid && lower32willSignExtendTo64(uint64(off)) {
-			return newAmodeImmReg(uint32(off), r)
+		// off is always 0 if r is valid.
+		if r != regalloc.VRegInvalid {
+			return newAmodeImmReg(offsetBase, r)
 		} else {
+			off64 := off + int64(offBase)
 			tmpReg := m.c.AllocateVReg(ssa.TypeI64)
-			m.lowerIconst(tmpReg, uint64(off), true)
+			m.lowerIconst(tmpReg, uint64(off64), true)
 			return newAmodeImmReg(0, tmpReg)
 		}
 	}
