@@ -787,10 +787,9 @@ func (ce *callEngine) call(ctx context.Context, params, results []uint64) (_ []u
 		defer done()
 	}
 
-	snapshotEnabled := false
-	if ctx.Value(experimental.EnableSnapshotterKey{}) != nil {
+	snapshotEnabled := ctx.Value(experimental.EnableSnapshotterKey{}) != nil
+	if snapshotEnabled {
 		ctx = context.WithValue(ctx, experimental.SnapshotterKey{}, ce)
-		snapshotEnabled = true
 	}
 
 	ce.execWasmFunction(ctx, m, snapshotEnabled)
