@@ -46,9 +46,10 @@ fn run(data: &[u8]) -> Result<()> {
     config.max_funcs = config.max_funcs.max(1);
 
     // Enables threading. TODO: remove after threads support in wazevo.
-    if std::env::var("WAZERO_FUZZ_WAZEVO").ok().unwrap().is_empty() {
-        config.threads_enabled = true;
-    }
+    // Enables threading. TODO: remove after threads support in wazevo.
+    config.threads_enabled = std::env::var("WAZERO_FUZZ_WAZEVO")
+        .ok()
+        .map_or(true, |env| env.is_empty());
 
     // Generate the random module via wasm-smith.
     let mut module = wasm_smith::Module::new(config.clone(), &mut u)?;

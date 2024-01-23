@@ -27,9 +27,9 @@ fn main() {
     let mut command = process::Command::new("go");
     command.current_dir(&wazero_fuzz_lib_dir);
     command.arg("build");
-    command.args(&["-buildmode", "c-archive"]);
-    command.args(&["-o", library_out_path.as_str()]);
-    command.args(&[library_source_path.as_str()]);
+    command.args(["-buildmode", "c-archive"]);
+    command.args(["-o", library_out_path.as_str()]);
+    command.args([library_source_path.as_str()]);
     command.env("GOARCH", goarch);
     command.env("CGO_ENABLED", "1");
 
