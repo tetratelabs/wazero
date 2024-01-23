@@ -1,6 +1,7 @@
 package amd64
 
 import (
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 )
@@ -9,46 +10,17 @@ var addendsMatchOpcodes = [5]ssa.Opcode{ssa.OpcodeUExtend, ssa.OpcodeSExtend, ss
 
 // lowerToAddressMode converts a pointer to an addressMode that can be used as an operand for load/store instructions.
 func (m *machine) lowerToAddressMode(ptr ssa.Value, offsetBase uint32) (am amode) {
-	if !lower32willSignExtendTo64(uint64(offsetBase)) {
-		// If the offset is too large to be absorbed into the amode, we just load the offset into a register.
-		tmpReg := m.c.AllocateVReg(ssa.TypeI64)
-		m.lowerIconst(tmpReg, uint64(offsetBase), true)
-		return newAmodeImmReg(0, tmpReg)
-	}
-
 	offBase := int32(offsetBase)
 	def := m.c.ValueDefinition(ptr)
 	if op := m.c.MatchInstrOneOf(def, addendsMatchOpcodes[:]); op == ssa.OpcodeIadd {
 		x, y := def.Instr.Arg2()
 		xDef, yDef := m.c.ValueDefinition(x), m.c.ValueDefinition(y)
-		rx, offx := m.lowerAddend(xDef.Instr)
-		ry, offy := m.lowerAddend(yDef.Instr)
-
-		u64 := uint64(int64(offBase) + offx + offy)
-		if u64 == 0 || lower32willSignExtendTo64(u64) {
-			u32 := uint32(u64)
-			switch {
-			// We assume rx, ry are valid iff offx, offy are 0.
-			case rx != regalloc.VRegInvalid && ry != regalloc.VRegInvalid:
-				return newAmodeRegRegShift(u32, rx, ry, 0)
-			case rx != regalloc.VRegInvalid && ry == regalloc.VRegInvalid:
-				return newAmodeImmReg(u32, rx)
-			case rx == regalloc.VRegInvalid && ry != regalloc.VRegInvalid:
-				return newAmodeImmReg(u32, ry)
-			default: // Both are invalid: use the offset.
-				// TODO: if offset == 0, xor vreg, vreg.
-				tmpReg := m.c.AllocateVReg(ssa.TypeI64)
-				m.lowerIconst(tmpReg, u64, true)
-				return newAmodeImmReg(0, tmpReg)
-			}
-		} else {
-			tmpReg := m.c.AllocateVReg(ssa.TypeI64)
-			m.lowerIconst(tmpReg, u64, true)
-			return newAmodeImmReg(0, tmpReg)
-		}
+		rx, offx := m.lowerAddend(xDef)
+		ry, offy := m.lowerAddend(yDef)
+		return m.lowerAddendsToAmode(rx, ry, offx, offy, offBase)
 	} else {
 		// If it is not an Iadd, then we lower the one addend.
-		r, off := m.lowerAddend(def.Instr)
+		r, off := m.lowerAddend(def)
 		off += int64(offBase)
 		if r != regalloc.VRegInvalid && lower32willSignExtendTo64(uint64(off)) {
 			return newAmodeImmReg(uint32(off), r)
@@ -60,10 +32,53 @@ func (m *machine) lowerToAddressMode(ptr ssa.Value, offsetBase uint32) (am amode
 	}
 }
 
-// lowerAddend takes an instruction returns a Vreg and an offset that can be used in an address mode.
+func (m *machine) lowerAddendsToAmode(rx, ry regalloc.VReg, offx, offy int64, offBase int32) amode {
+	if rx != regalloc.VRegInvalid && offx != 0 || ry != regalloc.VRegInvalid && offy != 0 {
+		panic("invalid input")
+	}
+	u64 := uint64(int64(offBase) + offx + offy)
+	if u64 != 0 && !lower32willSignExtendTo64(u64) {
+		tmpReg := m.c.AllocateVReg(ssa.TypeI64)
+		m.lowerIconst(tmpReg, u64, true)
+		// Blank u64 as it has been already lowered.
+		u64 = 0
+		// We already know that either rx or ry is invalid,
+		// so we overwrite it with the temporary register.
+		if rx == regalloc.VRegInvalid {
+			rx = tmpReg
+		} else {
+			ry = tmpReg
+		}
+	}
+
+	u32 := uint32(u64)
+	switch {
+	// We assume rx, ry are valid iff offx, offy are 0.
+	case rx != regalloc.VRegInvalid && ry != regalloc.VRegInvalid:
+		return newAmodeRegRegShift(u32, rx, ry, 0)
+	case rx != regalloc.VRegInvalid && ry == regalloc.VRegInvalid:
+		return newAmodeImmReg(u32, rx)
+	case rx == regalloc.VRegInvalid && ry != regalloc.VRegInvalid:
+		return newAmodeImmReg(u32, ry)
+	default: // Both are invalid: use the offset.
+		// TODO: if offset == 0, xor vreg, vreg.
+		tmpReg := m.c.AllocateVReg(ssa.TypeI64)
+		m.lowerIconst(tmpReg, u64, true)
+		return newAmodeImmReg(0, tmpReg)
+	}
+}
+
+func (m *machine) lowerAddend(x *backend.SSAValueDefinition) (regalloc.VReg, int64) {
+	if x.IsFromBlockParam() {
+		return x.BlkParamVReg, 0
+	}
+	return m.lowerAddendFromInstr(x.Instr)
+}
+
+// lowerAddendFromInstr takes an instruction returns a Vreg and an offset that can be used in an address mode.
 // The Vreg is regalloc.VRegInvalid if the addend cannot be lowered to a register.
 // The offset is 0 if the addend can be lowered to a register.
-func (m *machine) lowerAddend(instr *ssa.Instruction) (regalloc.VReg, int64) {
+func (m *machine) lowerAddendFromInstr(instr *ssa.Instruction) (regalloc.VReg, int64) {
 	switch op := instr.Opcode(); op {
 	case ssa.OpcodeIconst:
 		instr.MarkLowered()
@@ -74,13 +89,14 @@ func (m *machine) lowerAddend(instr *ssa.Instruction) (regalloc.VReg, int64) {
 			return regalloc.VRegInvalid, int64(u64)
 		}
 	case ssa.OpcodeUExtend, ssa.OpcodeSExtend:
-		switch input := instr.Arg(); input.Type().Bits() {
+		input := instr.Arg()
+		inputDef := m.c.ValueDefinition(input)
+		switch input.Type().Bits() {
 		case 64:
-			r := m.getOperand_Reg(m.c.ValueDefinition(input)).r
+			r := m.getOperand_Reg(inputDef).r
 			instr.MarkLowered()
 			return r, 0
 		case 32:
-			inputDef := m.c.ValueDefinition(input)
 			constInst := inputDef.IsFromInstr() && inputDef.Instr.Constant()
 			switch {
 			case constInst && op == ssa.OpcodeSExtend:
@@ -89,6 +105,10 @@ func (m *machine) lowerAddend(instr *ssa.Instruction) (regalloc.VReg, int64) {
 			case constInst && op == ssa.OpcodeUExtend:
 				instr.MarkLowered()
 				return regalloc.VRegInvalid, int64(int32(inputDef.Instr.ConstantVal())) // sign-extend!
+			default:
+				r := m.getOperand_Reg(inputDef).r
+				instr.MarkLowered()
+				return r, 0
 			}
 		}
 	}
