@@ -60,8 +60,8 @@ func ExampleCoreFeaturesThreads() {
 	// Channel to synchronize end of goroutines.
 	endCh := make(chan struct{})
 
-	// We start up 8 goroutines and run for 6000 iterations each. The count should reach
-	// 48000, at the end, but it would not if threads weren't working!
+	// We start up 8 goroutines and run for 100000 iterations each. The count should reach
+	// 800000, at the end, but it would not if threads weren't working!
 	for i := 0; i < 8; i++ {
 		go func() {
 			defer func() { endCh <- struct{}{} }()
@@ -71,7 +71,7 @@ func ExampleCoreFeaturesThreads() {
 			// among arbitrary goroutine invocations.
 			child := createChildModule(r, mod, wasmCompiled)
 			fn := child.mod.ExportedFunction("run")
-			for i := 0; i < 6000; i++ {
+			for i := 0; i < 100000; i++ {
 				_, err := fn.Call(ctx)
 				if err != nil {
 					log.Panicln(err)
@@ -92,7 +92,7 @@ func ExampleCoreFeaturesThreads() {
 		log.Panicln(err)
 	}
 	fmt.Println(res[0])
-	// Output: 48000
+	// Output: 800000
 }
 
 type childModule struct {
