@@ -1559,15 +1559,9 @@ var useKinds = [instrMax]useKind{
 	nop0:        useKindNone,
 	ret:         useKindNone,
 	movRR:       useKindOp1,
-<<<<<<< HEAD
-	movRM:       useKindOp1,
-	xmmMovRM:    useKindOp1,
-	aluRmiR:     useKindOp1Op2,
-=======
 	movRM:       useKindOp1RegOp2,
 	xmmMovRM:    useKindOp1RegOp2,
 	aluRmiR:     useKindOp1Op2Reg,
->>>>>>> b3d8198f (wazevo(amd64): fixes ResolveRelocations)
 	imm:         useKindNone,
 	xmmUnaryRmR: useKindOp1,
 	mov64MR:     useKindOp1,
