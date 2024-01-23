@@ -72,7 +72,12 @@ func (m *machine) lowerAddend(x *backend.SSAValueDefinition) (regalloc.VReg, int
 	if x.IsFromBlockParam() {
 		return x.BlkParamVReg, 0
 	}
-	return m.lowerAddendFromInstr(x.Instr)
+	// Ensure the addend is not referenced in multiple places; we will discard nested Iadds.
+	op := m.c.MatchInstrOneOf(x, addendsMatchOpcodes[:])
+	if op != ssa.OpcodeInvalid && op != ssa.OpcodeIadd {
+		return m.lowerAddendFromInstr(x.Instr)
+	}
+	return m.getOperand_Reg(x).r, 0
 }
 
 // lowerAddendFromInstr takes an instruction returns a Vreg and an offset that can be used in an address mode.
