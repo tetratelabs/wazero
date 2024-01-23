@@ -46,7 +46,6 @@ fn run(data: &[u8]) -> Result<()> {
     config.max_funcs = config.max_funcs.max(1);
 
     // Enables threading. TODO: remove after threads support in wazevo.
-    // Enables threading. TODO: remove after threads support in wazevo.
     config.threads_enabled = std::env::var("WAZERO_FUZZ_WAZEVO")
         .ok()
         .map_or(true, |env| env.is_empty());
