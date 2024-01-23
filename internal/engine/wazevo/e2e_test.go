@@ -295,9 +295,8 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
-			name:      "multi_predecessor_local_ref",
-			m:         testcases.MultiPredecessorLocalRef.Module,
-			skipAMD64: true,
+			name: "multi_predecessor_local_ref",
+			m:    testcases.MultiPredecessorLocalRef.Module,
 			calls: []callCase{
 				{params: []uint64{0, 100}, expResults: []uint64{100}},
 				{params: []uint64{1, 100}, expResults: []uint64{1}},

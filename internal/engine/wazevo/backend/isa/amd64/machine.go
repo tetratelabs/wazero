@@ -416,7 +416,9 @@ func (m *machine) Encode(context.Context) {
 		targetOffset := ectx.LabelPositions[target].BinaryOffset
 		switch p.instr.kind {
 		case jmp:
-			panic("TODO")
+			imm32Offset := p.offset + 1                       // +1 because p.offset is the beginning of the instruction.
+			jmpOffset := int32(targetOffset - (p.offset + 5)) // +5 because jmp is 5 bytes long.
+			binary.LittleEndian.PutUint32((*bufPtr)[imm32Offset:], uint32(jmpOffset))
 		case jmpIf:
 			imm32Offset := p.offset + 2                       // +2 because p.offset is the beginning of the instruction.
 			jmpOffset := int32(targetOffset - (p.offset + 6)) // +6 because jmpIf is 6 bytes long.
