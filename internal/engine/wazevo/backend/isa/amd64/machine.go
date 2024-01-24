@@ -206,6 +206,16 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		m.lowerAluRmiROp(instr, aluRmiROpcodeAdd)
 	case ssa.OpcodeIsub:
 		m.lowerAluRmiROp(instr, aluRmiROpcodeSub)
+	case ssa.OpcodeImul:
+		m.lowerAluRmiROp(instr, aluRmiROpcodeMul)
+	case ssa.OpcodeBand:
+		m.lowerAluRmiROp(instr, aluRmiROpcodeAnd)
+	case ssa.OpcodeBor:
+		m.lowerAluRmiROp(instr, aluRmiROpcodeOr)
+	case ssa.OpcodeBxor:
+		m.lowerAluRmiROp(instr, aluRmiROpcodeXor)
+	case ssa.OpcodeUndefined:
+		m.insert(m.allocateInstr().asUD2())
 	case ssa.OpcodeExitWithCode:
 		execCtx, code := instr.ExitWithCodeData()
 		m.lowerExitWithCode(m.c.VRegOf(execCtx), code)

@@ -59,7 +59,7 @@ var (
 			wasm.OpcodeI64Const, 6,
 			wasm.OpcodeI64Sub,
 
-			// Large i64 constants are load from register on arm64, amd64.
+			// Large i64 constants are loaded from register on arm64, amd64.
 			wasm.OpcodeI64Const, 3,
 			wasm.OpcodeI64Const, 0xff, 0xff, 0xff, 0xff, 0xff, 0,
 			wasm.OpcodeI64Add,
@@ -79,6 +79,29 @@ var (
 			wasm.OpcodeI32Sub,
 			wasm.OpcodeEnd,
 		}, nil),
+	}
+	ArithmReturn = TestCase{
+		Name: "add_sub_params_return",
+		Module: SingleFunctionModule(
+			wasm.FunctionType{
+				Params:  []wasm.ValueType{i32, i32},
+				Results: []wasm.ValueType{i32, i32, i32, i32},
+			},
+			[]byte{
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeI32Mul,
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeI32And,
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeI32Or,
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeI32Xor,
+				wasm.OpcodeEnd,
+			}, nil),
 	}
 	Locals       = TestCase{Name: "locals", Module: SingleFunctionModule(vv, []byte{wasm.OpcodeEnd}, []wasm.ValueType{i32, i64, f32, f64})}
 	LocalsParams = TestCase{

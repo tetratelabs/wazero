@@ -103,6 +103,16 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
+			name: "arithm_return", m: testcases.ArithmReturn.Module,
+			calls: []callCase{
+				{
+					params:     []uint64{10, 21},
+					expResults: []uint64{10 * 21, 10 & 21, 10 | 21, 10 ^ 21},
+				},
+			},
+		},
+
+		{
 			name: "many_params_many_results",
 			m:    testcases.ManyParamsManyResults.Module,
 			calls: []callCase{
