@@ -214,6 +214,12 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		m.lowerAluRmiROp(instr, aluRmiROpcodeOr)
 	case ssa.OpcodeBxor:
 		m.lowerAluRmiROp(instr, aluRmiROpcodeXor)
+	case ssa.OpcodeIshl:
+		m.lowerShiftR(instr, shiftROpShiftLeft)
+	case ssa.OpcodeSshr:
+		m.lowerShiftR(instr, shiftROpShiftRightArithmetic)
+	case ssa.OpcodeUshr:
+		m.lowerShiftR(instr, shiftROpShiftRightLogical)
 	case ssa.OpcodeUndefined:
 		m.insert(m.allocateInstr().asUD2())
 	case ssa.OpcodeExitWithCode:
@@ -287,7 +293,7 @@ func (m *machine) lowerAluRmiROp(si *ssa.Instruction, op aluRmiROpcode) {
 	rd := m.c.VRegOf(si.Return())
 	tmp := m.c.AllocateVReg(si.Return().Type())
 
-	// rm is being overwritten, so we first copy its value to a temp register,
+	// rn is being overwritten, so we first copy its value to a temp register,
 	// in case it is referenced again later.
 	mov := m.allocateInstr()
 	mov.asMovRR(rn.r, tmp, _64)
@@ -301,6 +307,50 @@ func (m *machine) lowerAluRmiROp(si *ssa.Instruction, op aluRmiROpcode) {
 	mov2 := m.allocateInstr()
 	mov2.asMovRR(tmp, rd, _64)
 	m.insert(mov2)
+}
+
+func (m *machine) lowerShiftR(si *ssa.Instruction, op shiftROp) {
+	x, amt := si.Arg2()
+	if !x.Type().IsInt() {
+		panic("BUG?")
+	}
+	_64 := x.Type().Bits() == 64
+
+	xDef, amtDef := m.c.ValueDefinition(x), m.c.ValueDefinition(amt)
+
+	opAmt := m.getOperand_Imm32_Reg(amtDef)
+	rx := m.getOperand_Reg(xDef)
+	rd := m.c.VRegOf(si.Return())
+	tmpDst := m.c.AllocateVReg(si.Return().Type())
+
+	// rx is being overwritten, so we first copy its value to a temp register,
+	// in case it is referenced again later.
+	mov := m.allocateInstr()
+	mov.asMovRR(rx.r, tmpDst, _64)
+	m.insert(mov)
+
+	if opAmt.r != regalloc.VRegInvalid {
+		// If opAmt is a register we must copy its value to rcx,
+		// because shiftR encoding mandates that the shift amount is in rcx.
+		mov := m.allocateInstr()
+		mov.asMovRR(opAmt.r, rcxVReg, _64)
+		m.insert(mov)
+
+		alu := m.allocateInstr()
+		alu.asShiftR(op, newOperandReg(rcxVReg), tmpDst, _64)
+		m.insert(alu)
+
+	} else {
+		alu := m.allocateInstr()
+		alu.asShiftR(op, opAmt, tmpDst, _64)
+		m.insert(alu)
+	}
+
+	// tmp now contains the result, we copy it to the dest register.
+	mov2 := m.allocateInstr()
+	mov2.asMovRR(tmpDst, rd, _64)
+	m.insert(mov2)
+
 }
 
 func (m *machine) lowerStore(si *ssa.Instruction) {

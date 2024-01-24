@@ -84,8 +84,10 @@ var (
 		Name: "add_sub_params_return",
 		Module: SingleFunctionModule(
 			wasm.FunctionType{
-				Params:  []wasm.ValueType{i32, i32},
-				Results: []wasm.ValueType{i32, i32, i32, i32},
+				Params: []wasm.ValueType{i32, i32, i32},
+				Results: []wasm.ValueType{
+					i32, i32, i32, i32,
+					i32, i32, i32},
 			},
 			[]byte{
 				wasm.OpcodeLocalGet, 0,
@@ -100,6 +102,17 @@ var (
 				wasm.OpcodeLocalGet, 0,
 				wasm.OpcodeLocalGet, 1,
 				wasm.OpcodeI32Xor,
+
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeI32Shl,
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeI32ShrS,
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeI32ShrU,
+
 				wasm.OpcodeEnd,
 			}, nil),
 	}
