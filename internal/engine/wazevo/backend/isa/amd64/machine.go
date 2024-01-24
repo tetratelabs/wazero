@@ -230,13 +230,13 @@ func (m *machine) lowerExitWithCode(execCtx regalloc.VReg, code wazevoapi.ExitCo
 	saveRsp := m.allocateInstr().asMovRM(
 		rspVReg,
 		newOperandMem(newAmodeImmReg(wazevoapi.ExecutionContextOffsetStackPointerBeforeGoCall.U32(), execCtx)),
-		4,
+		8,
 	)
 	m.insert(saveRsp)
 	saveRbp := m.allocateInstr().asMovRM(
 		rbpVReg,
 		newOperandMem(newAmodeImmReg(wazevoapi.ExecutionContextOffsetFramePointerBeforeGoCall.U32(), execCtx)),
-		4,
+		8,
 	)
 	m.insert(saveRbp)
 
@@ -247,7 +247,7 @@ func (m *machine) lowerExitWithCode(execCtx regalloc.VReg, code wazevoapi.ExitCo
 	saveRip := m.allocateInstr().asMovRM(
 		ripReg,
 		newOperandMem(newAmodeImmReg(wazevoapi.ExecutionContextOffsetGoCallReturnAddress.U32(), execCtx)),
-		4,
+		8,
 	)
 	m.insert(saveRip)
 

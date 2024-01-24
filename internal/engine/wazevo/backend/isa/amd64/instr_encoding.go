@@ -957,7 +957,6 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 		// Restore the RBP, RSP, and return to the Go code:
 		encodeLoad64(c, newAmodeImmReg(wazevoapi.ExecutionContextOffsetOriginalFramePointer.U32(), execCtx), rbp)
 		encodeLoad64(c, newAmodeImmReg(wazevoapi.ExecutionContextOffsetOriginalStackPointer.U32(), execCtx), rsp)
-		// Then return.
 		encodeRet(c)
 
 	case ud2:
