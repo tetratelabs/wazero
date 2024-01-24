@@ -1778,9 +1778,8 @@ func constExprF64(i float64) wasm.ConstantExpression {
 
 func constExprV128(lo, hi uint64) wasm.ConstantExpression {
 	return wasm.ConstantExpression{
-		Opcode: wasm.OpcodeVecPrefix,
+		Opcode: wasm.OpcodeVecV128Const,
 		Data: []byte{
-			wasm.OpcodeVecV128Const,
 			byte(lo), byte(lo >> 8), byte(lo >> 16), byte(lo >> 24),
 			byte(lo >> 32), byte(lo >> 40), byte(lo >> 48), byte(lo >> 56),
 			byte(hi), byte(hi >> 8), byte(hi >> 16), byte(hi >> 24),

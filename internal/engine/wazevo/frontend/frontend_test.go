@@ -1185,7 +1185,8 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 	v3:i64 = Load module_ctx, 0x18
 	v4:f32 = Load module_ctx, 0x28
 	v5:f64 = Load module_ctx, 0x38
-	Jump blk_ret, v2, v3, v4, v5
+	v6:v128 = Load module_ctx, 0x48
+	Jump blk_ret, v2, v3, v4, v5, v6
 `,
 		},
 		{
