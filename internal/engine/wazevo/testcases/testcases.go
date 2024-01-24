@@ -122,8 +122,9 @@ var (
 				wasm.OpcodeLocalGet, 0,
 				wasm.OpcodeLocalGet, 1,
 				wasm.OpcodeI32Rotr,
+				// Exercise the case where the amount is an immediate.
+				wasm.OpcodeI32Const, 10,
 				wasm.OpcodeLocalGet, 0,
-				wasm.OpcodeLocalGet, 1,
 				wasm.OpcodeI32Rotl,
 
 				// i64
@@ -154,8 +155,9 @@ var (
 				wasm.OpcodeLocalGet, 3,
 				wasm.OpcodeLocalGet, 4,
 				wasm.OpcodeI64Rotr,
+				// Exercise the case where the amount is an immediate.
+				wasm.OpcodeI64Const, 10,
 				wasm.OpcodeLocalGet, 3,
-				wasm.OpcodeLocalGet, 4,
 				wasm.OpcodeI64Rotl,
 
 				wasm.OpcodeEnd,
