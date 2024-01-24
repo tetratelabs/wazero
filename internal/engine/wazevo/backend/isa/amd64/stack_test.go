@@ -44,7 +44,12 @@ func addressOf(v *byte) uint64 {
 }
 
 func TestAdjustStackAfterGrown(t *testing.T) {
-	oldStack := make([]byte, 512)
+	// In order to allocate slices on Go heap, we need to allocSlice function.
+	allocSlice := func(size int) []byte {
+		return make([]byte, size)
+	}
+
+	oldStack := allocSlice(512)
 
 	oldRsp := uintptr(unsafe.Pointer(&oldStack[0]))
 	rbpIndex := uintptr(32)
@@ -52,7 +57,7 @@ func TestAdjustStackAfterGrown(t *testing.T) {
 	binary.LittleEndian.PutUint64(oldStack[rbpIndex+16:], addressOf(&oldStack[32+rbpIndex]))
 	binary.LittleEndian.PutUint64(oldStack[rbpIndex+32:], addressOf(&oldStack[160+rbpIndex]))
 
-	newStack := make([]byte, 1024)
+	newStack := allocSlice(1024)
 	rsp := uintptr(unsafe.Pointer(&newStack[0]))
 	rbp := rsp + rbpIndex
 	copy(newStack, oldStack)
