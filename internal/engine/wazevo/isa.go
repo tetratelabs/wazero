@@ -32,6 +32,8 @@ func unwindStack(sp, fp, top uintptr, returnAddresses []uintptr) []uintptr {
 	}
 }
 
+// goCallStackView is a function to get a view of the stack before a Go call, which
+// is the view of the stack allocated in CompileGoFunctionTrampoline.
 func goCallStackView(stackPointerBeforeGoCall *uint64) []uint64 {
 	switch runtime.GOARCH {
 	case "arm64":

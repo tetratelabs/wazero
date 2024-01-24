@@ -57,14 +57,13 @@ func UnwindStack(_, rbp, top uintptr, returnAddresses []uintptr) []uintptr {
 	return returnAddresses
 }
 
-// GoCallStackView is a function to get a view of the stack before a Go call, which
-// is the view of the stack allocated in CompileGoFunctionTrampoline.
+// GoCallStackView implements wazevo.goCallStackView.
 func GoCallStackView(stackPointerBeforeGoCall *uint64) []uint64 {
 	panic("implement me")
 }
 
-func AdjustStackAfterGrown(oldsp, sp, rbp, top uintptr) {
-	diff := uint64(sp - oldsp)
+func AdjustStackAfterGrown(oldRsp, rsp, rbp, top uintptr) {
+	diff := uint64(rsp - oldRsp)
 
 	stackBuf := stackView(rbp, top)
 	for i := uint64(0); i < uint64(len(stackBuf)); {
