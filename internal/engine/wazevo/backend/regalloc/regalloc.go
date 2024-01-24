@@ -888,6 +888,10 @@ func (a *Allocator) scheduleSpill(f Function, vs *vrState) {
 	pos := vs.lca
 	definingBlk := vs.defBlk
 	r := RealRegInvalid
+	if definingBlk == nil {
+		panic(fmt.Sprintf("BUG: definingBlk should not be nil for %s. This is likley a bug in backend lowering logic", vs.v.String()))
+	}
+
 	if wazevoapi.RegAllocLoggingEnabled {
 		fmt.Printf("v%d is spilled in blk%d, lca=blk%d\n", v.ID(), definingBlk.ID(), pos.ID())
 	}
