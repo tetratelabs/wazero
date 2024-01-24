@@ -62,7 +62,7 @@ func (i *instruction) String() string {
 			return fmt.Sprintf("movl %s, %s", i.op1.format(false), i.op2.format(false))
 		}
 	case xmmRmR:
-		return fmt.Sprintf("%s %s, %s", sseOpcode(i.u1), i.op1.format(i.b1), i.op2.format(i.b1))
+		return fmt.Sprintf("%s %s, %s", sseOpcode(i.u1), i.op1.format(false), i.op2.format(false))
 	case gprToXmm:
 		return fmt.Sprintf("%s %s, %s", sseOpcode(i.u1), i.op1.format(i.b1), i.op2.format(i.b1))
 	case xmmUnaryRmR:
@@ -778,7 +778,7 @@ func (i *instruction) asAluRmiR(op aluRmiROpcode, rm operand, rd regalloc.VReg, 
 	return i
 }
 
-func (i *instruction) asXmmRmR(op sseOpcode, rm operand, rd regalloc.VReg, _64 bool) *instruction {
+func (i *instruction) asXmmRmR(op sseOpcode, rm operand, rd regalloc.VReg) *instruction {
 	if rm.kind != operandKindReg && rm.kind != operandKindMem {
 		panic("BUG")
 	}
@@ -786,7 +786,6 @@ func (i *instruction) asXmmRmR(op sseOpcode, rm operand, rd regalloc.VReg, _64 b
 	i.op1 = rm
 	i.op2 = newOperandReg(rd)
 	i.u1 = uint64(op)
-	i.b1 = _64
 	return i
 }
 

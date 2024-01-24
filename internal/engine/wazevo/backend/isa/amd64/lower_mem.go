@@ -21,10 +21,12 @@ func (m *machine) lowerToAddressMode(ptr ssa.Value, offsetBase uint32) (am amode
 	offBase := int32(offsetBase)
 	def := m.c.ValueDefinition(ptr)
 	if op := m.c.MatchInstrOneOf(def, addendsMatchOpcodes[:]); op == ssa.OpcodeIadd {
-		x, y := def.Instr.Arg2()
+		add := def.Instr
+		x, y := add.Arg2()
 		xDef, yDef := m.c.ValueDefinition(x), m.c.ValueDefinition(y)
 		ax := m.lowerAddend(xDef)
 		ay := m.lowerAddend(yDef)
+		add.MarkLowered()
 		return m.lowerAddendsToAmode(ax, ay, offBase)
 	} else {
 		// If it is not an Iadd, then we lower the one addend.
@@ -50,6 +52,7 @@ func (m *machine) lowerAddendsToAmode(x, y addend, offBase int32) amode {
 	if x.r != regalloc.VRegInvalid && x.off != 0 || y.r != regalloc.VRegInvalid && y.off != 0 {
 		panic("invalid input")
 	}
+
 	u64 := uint64(int64(offBase) + x.off + y.off)
 	if u64 != 0 && !lower32willSignExtendTo64(u64) {
 		tmpReg := m.c.AllocateVReg(ssa.TypeI64)
