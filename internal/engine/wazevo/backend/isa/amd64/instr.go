@@ -200,7 +200,7 @@ func (i *instruction) String() string {
 	case jmpTableSequence:
 		panic("TODO")
 	case exitSequence:
-		return fmt.Sprintf("exit_seuqnce %s", i.op1.format(true))
+		return fmt.Sprintf("exit_sequence %s", i.op1.format(true))
 	case ud2:
 		return "ud2"
 	case call:

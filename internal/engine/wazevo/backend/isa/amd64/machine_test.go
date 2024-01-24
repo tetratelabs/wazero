@@ -261,11 +261,11 @@ func TestMachine_lowerExitWithCode(t *testing.T) {
 	require.Equal(t, `
 	movl $6, %r1d?
 	mov.l %r1?, (%r15)
-	mov.l %rsp, 56(%r15)
-	mov.l %rbp, 1152(%r15)
+	mov.q %rsp, 56(%r15)
+	mov.q %rbp, 1152(%r15)
 	lea L1(%rip), %r2?
-	mov.l %r2?, 48(%r15)
-	exit_seuqnce %r15
+	mov.q %r2?, 48(%r15)
+	exit_sequence %r15
 L1:
 	ud2
 `, m.Format())

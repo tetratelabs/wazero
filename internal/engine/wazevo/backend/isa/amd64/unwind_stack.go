@@ -6,14 +6,14 @@ import (
 	"unsafe"
 )
 
-func UnwindStack(sp, top uintptr, returnAddresses []uintptr) []uintptr {
-	l := int(top - sp)
+func UnwindStack(_, fp, top uintptr, returnAddresses []uintptr) []uintptr {
+	l := int(top - fp)
 
 	var stackBuf []byte
 	{
 		// TODO: use unsafe.Slice after floor version is set to Go 1.20.
 		hdr := (*reflect.SliceHeader)(unsafe.Pointer(&stackBuf))
-		hdr.Data = sp
+		hdr.Data = fp
 		hdr.Len = l
 		hdr.Cap = l
 	}
@@ -30,8 +30,8 @@ func UnwindStack(sp, top uintptr, returnAddresses []uintptr) []uintptr {
 		//    |      arg 1      |
 		//    |      arg 0      |
 		//    |  ReturnAddress  |
-		//    |  Caller_RBP     |
-		//    +-----------------+ <---- RBP
+		//    |   Caller_RBP    |
+		//    +-----------------+ <---- Caller_RBP
 		//    |   ...........   |
 		//    |   clobbered  M  |
 		//    |   ............  |
@@ -40,14 +40,14 @@ func UnwindStack(sp, top uintptr, returnAddresses []uintptr) []uintptr {
 		//    |   ............  |
 		//    |   spill slot 0  |
 		//    |  ReturnAddress  |
-		//    |  Caller_RBP     |
-		//    +-----------------+ <---- SP
+		//    |   Caller_RBP    |
+		//    +-----------------+ <---- RBP
 		//       (low address)
 
 		callerRBP := binary.LittleEndian.Uint64(stackBuf[i:])
 		retAddr := binary.LittleEndian.Uint64(stackBuf[i+8:])
 		returnAddresses = append(returnAddresses, uintptr(retAddr))
-		i = callerRBP - uint64(sp)
+		i = callerRBP - uint64(fp)
 	}
 	return returnAddresses
 }

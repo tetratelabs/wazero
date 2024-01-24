@@ -2777,7 +2777,7 @@ func TestInstruction_format_encode(t *testing.T) {
 			// movq 0x18(%r15), %rsp
 			// retq
 			want:       "498b6f10498b6718c3",
-			wantFormat: "exit_seuqnce %r15",
+			wantFormat: "exit_sequence %r15",
 		},
 	} {
 		tc := tc
