@@ -2779,6 +2779,11 @@ func TestInstruction_format_encode(t *testing.T) {
 			want:       "498b6f10498b6718c3",
 			wantFormat: "exit_sequence %r15",
 		},
+		{
+			setup:      func(i *instruction) { i.asV128ConstIsland(0xffffffff_eeeeeeee, 0xaaaaaaaa_bbbbbbbb) },
+			want:       "eeeeeeeeffffffffbbbbbbbbaaaaaaaa",
+			wantFormat: "v128ConstIsland (0xffffffffeeeeeeee, 0xaaaaaaaabbbbbbbb)",
+		},
 	} {
 		tc := tc
 		t.Run(tc.wantFormat, func(t *testing.T) {
