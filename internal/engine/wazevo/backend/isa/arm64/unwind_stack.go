@@ -6,8 +6,7 @@ import (
 	"unsafe"
 )
 
-// UnwindStack is a function to unwind the stack, and appends return addresses to `returnAddresses` slice.
-// The implementation must be aligned with the ABI/Calling convention as in machine_pro_epi_logue.go/abi.go.
+// UnwindStack implements wazevo.unwindStack.
 func UnwindStack(sp, _, top uintptr, returnAddresses []uintptr) []uintptr {
 	l := int(top - sp)
 
