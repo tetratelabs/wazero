@@ -38,7 +38,7 @@ func (m *machine) InsertLoadConstant(instr *ssa.Instruction, vr regalloc.VReg) {
 
 func (m *machine) lowerFconst(dst regalloc.VReg, c uint64, _64 bool) {
 	if c == 0 {
-		xor := m.allocateInstr().asXmmRmR(sseOpcodeXorpd, newOperandReg(dst), dst, _64)
+		xor := m.allocateInstr().asXmmUnaryRmR(sseOpcodeXorpd, newOperandReg(dst), dst)
 		m.insert(xor)
 	} else {
 		var tmpType ssa.Type
@@ -58,10 +58,6 @@ func (m *machine) lowerFconst(dst regalloc.VReg, c uint64, _64 bool) {
 
 func (m *machine) lowerIconst(dst regalloc.VReg, c uint64, _64 bool) {
 	i := m.allocateInstr()
-	if c == 0 {
-		i.asAluRmiR(aluRmiROpcodeXor, newOperandReg(dst), dst, _64)
-	} else {
-		i.asImm(dst, c, _64)
-	}
+	i.asImm(dst, c, _64)
 	m.insert(i)
 }

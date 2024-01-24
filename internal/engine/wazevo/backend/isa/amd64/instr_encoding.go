@@ -435,6 +435,10 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 			prefix, opcode, opcodeNum = legacyPrefixes0xF3, 0x0F51, 2
 		case sseOpcodeSqrtsd:
 			prefix, opcode, opcodeNum = legacyPrefixes0xF2, 0x0F51, 2
+		case sseOpcodeXorps:
+			prefix, opcode, opcodeNum = legacyPrefixesNone, 0x0F57, 2
+		case sseOpcodeXorpd:
+			prefix, opcode, opcodeNum = legacyPrefixes0x66, 0x0F57, 2
 		default:
 			panic(fmt.Sprintf("Unsupported sseOpcode: %s", op))
 		}

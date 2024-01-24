@@ -200,7 +200,7 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 	case ssa.OpcodeIconst, ssa.OpcodeF32const, ssa.OpcodeF64const: // Constant instructions are inlined.
 	case ssa.OpcodeCall, ssa.OpcodeCallIndirect:
 		m.lowerCall(instr)
-	case ssa.OpcodeStore:
+	case ssa.OpcodeStore, ssa.OpcodeIstore8, ssa.OpcodeIstore16, ssa.OpcodeIstore32:
 		m.lowerStore(instr)
 	case ssa.OpcodeIadd:
 		m.lowerAluRmiROp(instr, aluRmiROpcodeAdd)
@@ -513,6 +513,8 @@ func (m *machine) lowerStore(si *ssa.Instruction) {
 		store.asXmmMovRM(sseOpcodeMovsd, rm.r, mem)
 	case ssa.TypeV128:
 		store.asXmmMovRM(sseOpcodeMovdqu, rm.r, mem)
+	default:
+		panic("BUG")
 	}
 	m.insert(store)
 }

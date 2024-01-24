@@ -182,9 +182,8 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
-			name:      "memory_store_basic",
-			m:         testcases.MemoryStoreBasic.Module,
-			skipAMD64: true,
+			name: "memory_store_basic",
+			m:    testcases.MemoryStoreBasic.Module,
 			calls: []callCase{
 				{params: []uint64{0, 0xf}, expResults: []uint64{0xf}},
 				{params: []uint64{256, 0xff}, expResults: []uint64{0xff}},
