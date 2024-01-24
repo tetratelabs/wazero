@@ -103,6 +103,27 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
+			name: "arithm_return", m: testcases.ArithmReturn.Module,
+			calls: []callCase{
+				{
+					params: []uint64{
+						21, 10, 0xf0,
+						21, 10, 0xf0,
+					},
+					expResults: []uint64{
+						21 * 10, 21 & 10, 21 | 10, 21 ^ 10,
+						21 << 10, 21 >> 10, 0xf0 >> 10,
+						88080384, 20971520,
+
+						21 * 10, 21 & 10, 21 | 10, 21 ^ 10,
+						21 << 10, 21 >> 10, 0xf0 >> 10,
+						378302368699121664, 20971520,
+					},
+				},
+			},
+		},
+
+		{
 			name: "many_params_many_results",
 			m:    testcases.ManyParamsManyResults.Module,
 			calls: []callCase{

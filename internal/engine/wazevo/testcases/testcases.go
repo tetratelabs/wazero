@@ -59,7 +59,7 @@ var (
 			wasm.OpcodeI64Const, 6,
 			wasm.OpcodeI64Sub,
 
-			// Large i64 constants are load from register on arm64, amd64.
+			// Large i64 constants are loaded from register on arm64, amd64.
 			wasm.OpcodeI64Const, 3,
 			wasm.OpcodeI64Const, 0xff, 0xff, 0xff, 0xff, 0xff, 0,
 			wasm.OpcodeI64Add,
@@ -79,6 +79,89 @@ var (
 			wasm.OpcodeI32Sub,
 			wasm.OpcodeEnd,
 		}, nil),
+	}
+	ArithmReturn = TestCase{
+		Name: "add_sub_params_return",
+		Module: SingleFunctionModule(
+			wasm.FunctionType{
+				Params: []wasm.ValueType{i32, i32, i32, i64, i64, i64},
+				Results: []wasm.ValueType{
+					i32, i32, i32, i32,
+					i32, i32, i32,
+					i32, i32,
+
+					i64, i64, i64, i64,
+					i64, i64, i64,
+					i64, i64,
+				},
+			},
+			[]byte{
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeI32Mul,
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeI32And,
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeI32Or,
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeI32Xor,
+
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeI32Shl,
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 2,
+				wasm.OpcodeI32ShrS,
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeI32ShrU,
+
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeI32Rotr,
+				// Exercise the case where the amount is an immediate.
+				wasm.OpcodeI32Const, 10,
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeI32Rotl,
+
+				// i64
+
+				wasm.OpcodeLocalGet, 3,
+				wasm.OpcodeLocalGet, 4,
+				wasm.OpcodeI64Mul,
+				wasm.OpcodeLocalGet, 3,
+				wasm.OpcodeLocalGet, 4,
+				wasm.OpcodeI64And,
+				wasm.OpcodeLocalGet, 3,
+				wasm.OpcodeLocalGet, 4,
+				wasm.OpcodeI64Or,
+				wasm.OpcodeLocalGet, 3,
+				wasm.OpcodeLocalGet, 4,
+				wasm.OpcodeI64Xor,
+
+				wasm.OpcodeLocalGet, 3,
+				wasm.OpcodeLocalGet, 4,
+				wasm.OpcodeI64Shl,
+				wasm.OpcodeLocalGet, 5,
+				wasm.OpcodeLocalGet, 4,
+				wasm.OpcodeI64ShrS,
+				wasm.OpcodeLocalGet, 3,
+				wasm.OpcodeLocalGet, 4,
+				wasm.OpcodeI64ShrU,
+
+				wasm.OpcodeLocalGet, 3,
+				wasm.OpcodeLocalGet, 4,
+				wasm.OpcodeI64Rotr,
+				// Exercise the case where the amount is an immediate.
+				wasm.OpcodeI64Const, 10,
+				wasm.OpcodeLocalGet, 3,
+				wasm.OpcodeI64Rotl,
+
+				wasm.OpcodeEnd,
+			}, nil),
 	}
 	Locals       = TestCase{Name: "locals", Module: SingleFunctionModule(vv, []byte{wasm.OpcodeEnd}, []wasm.ValueType{i32, i64, f32, f64})}
 	LocalsParams = TestCase{

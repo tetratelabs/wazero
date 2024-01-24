@@ -998,11 +998,11 @@ func (u unaryRmROpcode) String() string {
 type shiftROp byte
 
 const (
-	shiftROpRotateLeft           = 0
-	shiftROpRotateRight          = 1
-	shiftROpShiftLeft            = 4
-	shiftROpShiftRightLogical    = 5
-	shiftROpShiftRightArithmetic = 7
+	shiftROpRotateLeft           shiftROp = 0
+	shiftROpRotateRight          shiftROp = 1
+	shiftROpShiftLeft            shiftROp = 4
+	shiftROpShiftRightLogical    shiftROp = 5
+	shiftROpShiftRightArithmetic shiftROp = 7
 )
 
 func (s shiftROp) String() string {
@@ -1535,6 +1535,7 @@ var defKinds = [instrMax]defKind{
 	movRM:        defKindNone,
 	xmmMovRM:     defKindNone,
 	aluRmiR:      defKindNone,
+	shiftR:       defKindNone,
 	imm:          defKindOp2,
 	xmmUnaryRmR:  defKindOp2,
 	mov64MR:      defKindOp2,
@@ -1582,6 +1583,7 @@ var useKinds = [instrMax]useKind{
 	movRM:        useKindOp1RegOp2,
 	xmmMovRM:     useKindOp1RegOp2,
 	aluRmiR:      useKindOp1Op2Reg,
+	shiftR:       useKindOp1Op2Reg,
 	imm:          useKindNone,
 	xmmUnaryRmR:  useKindOp1,
 	mov64MR:      useKindOp1,
