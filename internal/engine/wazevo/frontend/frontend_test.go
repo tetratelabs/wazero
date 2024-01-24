@@ -1202,7 +1202,9 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 	Store v4, module_ctx, 0x28
 	v5:f64 = F64const 4.000000
 	Store v5, module_ctx, 0x38
-	Jump blk_ret, v2, v3, v4, v5
+	v6:v128 = Vconst 000000000000000a 0000000000000014
+	Store v6, module_ctx, 0x48
+	Jump blk_ret, v2, v3, v4, v5, v6
 `,
 		},
 		{
