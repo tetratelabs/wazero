@@ -453,21 +453,6 @@ func TestMachine_collectAddends(t *testing.T) {
 			exp64s: []regalloc.VReg{v1000 /* == param */},
 			offset: math.MaxUint32, // zero-extended -1
 		},
-		{
-			name: "one 64 value + redundant extension",
-			setup: func(ctx *mockCompiler, b ssa.Builder, m *machine) (ptr ssa.Value, verify func(t *testing.T)) {
-				param := addParam(ctx, b, ssa.TypeI64)
-				ext := insertExt(ctx, b, param, 64, 64, true)
-				ctx.vRegMap[ext.Arg()] = v2000
-				iadd4 := insertIadd(ctx, b, param, ext.Return())
-				return iadd4.Return(), func(t *testing.T) {
-					for _, instr := range []*ssa.Instruction{ext, iadd4} {
-						require.True(t, instr.Lowered())
-					}
-				}
-			},
-			exp64s: []regalloc.VReg{v1000, v1000},
-		},
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {

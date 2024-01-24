@@ -129,19 +129,17 @@ func (m *machine) lowerAddendFromInstr(instr *ssa.Instruction) addend {
 	case ssa.OpcodeUExtend, ssa.OpcodeSExtend:
 		input := instr.Arg()
 		inputDef := m.c.ValueDefinition(input)
-		switch input.Type().Bits() {
-		case 64:
+		if input.Type().Bits() != 32 {
+			panic("BUG: invalid input type " + input.Type().String())
+		}
+		constInst := inputDef.IsFromInstr() && inputDef.Instr.Constant()
+		switch {
+		case constInst && op == ssa.OpcodeSExtend:
+			return addend{regalloc.VRegInvalid, int64(uint32(inputDef.Instr.ConstantVal())), 0}
+		case constInst && op == ssa.OpcodeUExtend:
+			return addend{regalloc.VRegInvalid, int64(int32(inputDef.Instr.ConstantVal())), 0} // sign-extend!
+		default:
 			return addend{m.getOperand_Reg(inputDef).r, 0, 0}
-		case 32:
-			constInst := inputDef.IsFromInstr() && inputDef.Instr.Constant()
-			switch {
-			case constInst && op == ssa.OpcodeSExtend:
-				return addend{regalloc.VRegInvalid, int64(uint32(inputDef.Instr.ConstantVal())), 0}
-			case constInst && op == ssa.OpcodeUExtend:
-				return addend{regalloc.VRegInvalid, int64(int32(inputDef.Instr.ConstantVal())), 0} // sign-extend!
-			default:
-				return addend{m.getOperand_Reg(inputDef).r, 0, 0}
-			}
 		}
 	case ssa.OpcodeIshl:
 		// If the addend is a shift, we can only handle it if the shift amount is a constant.
