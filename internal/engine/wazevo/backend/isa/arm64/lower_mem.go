@@ -412,39 +412,32 @@ func (m *machine) collectAddends(ptr ssa.Value) (addends32 *wazevoapi.Queue[adde
 			}
 			def.Instr.MarkLowered()
 		case ssa.OpcodeUExtend, ssa.OpcodeSExtend:
-			switch input := def.Instr.Arg(); input.Type().Bits() {
-			case 64:
-				// If the input is already 64-bit, this extend is a no-op. TODO: shouldn't this be optimized out at much earlier stage? no?
-				m.addends64.Enqueue(m.getOperand_NR(m.compiler.ValueDefinition(input), extModeNone).nr())
-				def.Instr.MarkLowered()
-				continue
-			case 32:
-				var ext extendOp
-				if op == ssa.OpcodeUExtend {
-					ext = extendOpUXTW
-				} else {
-					ext = extendOpSXTW
-				}
-
-				inputDef := m.compiler.ValueDefinition(input)
-				constInst := inputDef.IsFromInstr() && inputDef.Instr.Constant()
-				switch {
-				case constInst && ext == extendOpUXTW:
-					// Zero-extension of a 32-bit constant can be merged into the offset.
-					offset += int64(uint32(inputDef.Instr.ConstantVal()))
-				case constInst && ext == extendOpSXTW:
-					// Sign-extension of a 32-bit constant can be merged into the offset.
-					offset += int64(int32(inputDef.Instr.ConstantVal())) // sign-extend!
-				default:
-					m.addends32.Enqueue(addend32{r: m.getOperand_NR(inputDef, extModeNone).nr(), ext: ext})
-				}
-				def.Instr.MarkLowered()
-				continue
+			input := def.Instr.Arg()
+			if input.Type().Bits() != 32 {
+				panic("illegal size: " + input.Type().String())
 			}
-			// If this is the extension smaller than 32 bits, this cannot be merged into addressing mode since
-			// arm64 requires index registers must be at least 32 bits (extension modes can only be applied in 32 bits).
-			// fallthrough
-			panic("TODO: add tests")
+
+			var ext extendOp
+			if op == ssa.OpcodeUExtend {
+				ext = extendOpUXTW
+			} else {
+				ext = extendOpSXTW
+			}
+
+			inputDef := m.compiler.ValueDefinition(input)
+			constInst := inputDef.IsFromInstr() && inputDef.Instr.Constant()
+			switch {
+			case constInst && ext == extendOpUXTW:
+				// Zero-extension of a 32-bit constant can be merged into the offset.
+				offset += int64(uint32(inputDef.Instr.ConstantVal()))
+			case constInst && ext == extendOpSXTW:
+				// Sign-extension of a 32-bit constant can be merged into the offset.
+				offset += int64(int32(inputDef.Instr.ConstantVal())) // sign-extend!
+			default:
+				m.addends32.Enqueue(addend32{r: m.getOperand_NR(inputDef, extModeNone).nr(), ext: ext})
+			}
+			def.Instr.MarkLowered()
+			continue
 		default:
 			// If the addend is not one of them, we simply use it as-is (without merging!), optionally zero-extending it.
 			m.addends64.Enqueue(m.getOperand_NR(def, extModeZeroExtend64 /* optional zero ext */).nr())

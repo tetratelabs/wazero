@@ -10,7 +10,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
-func Test_machine_lowerToAddressMode(t *testing.T) {
+func TestMachine_lowerToAddressMode(t *testing.T) {
 	nextVReg, nextNextVReg := regalloc.VReg(100).SetRegType(regalloc.RegTypeInt), regalloc.VReg(101).SetRegType(regalloc.RegTypeInt)
 	_, _ = nextVReg, nextNextVReg
 	for _, tc := range []struct {
@@ -82,31 +82,6 @@ func Test_machine_lowerToAddressMode(t *testing.T) {
 				"movabsq $123, %r100?",
 			},
 			am: newAmodeImmReg(0, nextVReg),
-		},
-		{
-			name: "redundant uextend const64",
-			in: func(ctx *mockCompiler, b ssa.Builder, m *machine) (ptr ssa.Value, offset uint32) {
-				iconst32 := b.AllocateInstruction().AsIconst64(123).Insert(b)
-				uextend := b.AllocateInstruction().AsUExtend(iconst32.Return(), 64, 64).Insert(b)
-				ctx.definitions[iconst32.Return()] = &backend.SSAValueDefinition{Instr: iconst32}
-				ctx.definitions[uextend.Return()] = &backend.SSAValueDefinition{Instr: uextend}
-				return uextend.Return(), 0
-			},
-			insts: []string{
-				"movabsq $123, %r100?",
-			},
-			am: newAmodeImmReg(0, nextVReg),
-		},
-		{
-			name: "redundant uextend param64",
-			in: func(ctx *mockCompiler, b ssa.Builder, m *machine) (ptr ssa.Value, offset uint32) {
-				p := b.CurrentBlock().AddParam(b, ssa.TypeI64)
-				uextend := b.AllocateInstruction().AsUExtend(p, 64, 64).Insert(b)
-				ctx.definitions[p] = &backend.SSAValueDefinition{BlockParamValue: p, BlkParamVReg: raxVReg}
-				ctx.definitions[uextend.Return()] = &backend.SSAValueDefinition{Instr: uextend}
-				return uextend.Return(), 1 << 30
-			},
-			am: newAmodeImmReg(1<<30, raxVReg),
 		},
 		{
 			name: "Ishl param64, const",
@@ -185,7 +160,7 @@ func TestMachine_lowerAddendFromInstr(t *testing.T) {
 		{
 			name: "uextend const64",
 			in: func(ctx *mockCompiler, b ssa.Builder, m *machine) *ssa.Instruction {
-				p := b.CurrentBlock().AddParam(b, ssa.TypeI64)
+				p := b.CurrentBlock().AddParam(b, ssa.TypeI32)
 				ctx.definitions[p] = &backend.SSAValueDefinition{BlkParamVReg: raxVReg, BlockParamValue: p}
 				return b.AllocateInstruction().AsUExtend(p, 32, 64).Insert(b)
 			},
@@ -212,7 +187,7 @@ func TestMachine_lowerAddendFromInstr(t *testing.T) {
 		{
 			name: "sextend const64",
 			in: func(ctx *mockCompiler, b ssa.Builder, m *machine) *ssa.Instruction {
-				p := b.CurrentBlock().AddParam(b, ssa.TypeI64)
+				p := b.CurrentBlock().AddParam(b, ssa.TypeI32)
 				ctx.definitions[p] = &backend.SSAValueDefinition{BlkParamVReg: raxVReg, BlockParamValue: p}
 				return b.AllocateInstruction().AsSExtend(p, 32, 64).Insert(b)
 			},
