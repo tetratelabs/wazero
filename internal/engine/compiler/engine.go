@@ -787,7 +787,12 @@ func (ce *callEngine) call(ctx context.Context, params, results []uint64) (_ []u
 		defer done()
 	}
 
-	ce.execWasmFunction(ctx, m)
+	snapshotEnabled := ctx.Value(experimental.EnableSnapshotterKey{}) != nil
+	if snapshotEnabled {
+		ctx = context.WithValue(ctx, experimental.SnapshotterKey{}, ce)
+	}
+
+	ce.execWasmFunction(ctx, m, snapshotEnabled)
 
 	// This returns a safe copy of the results, instead of a slice view. If we
 	// returned a re-slice, the caller could accidentally or purposefully
@@ -853,6 +858,11 @@ func callFrameOffset(funcType *wasm.FunctionType) (ret int) {
 //
 // This is defined for testability.
 func (ce *callEngine) deferredOnCall(ctx context.Context, m *wasm.ModuleInstance, recovered interface{}) (err error) {
+	if s, ok := recovered.(*snapshot); ok {
+		// A snapshot that wasn't handled was created by a different call engine possibly from a nested wasm invocation,
+		// let it propagate up to be handled by the caller.
+		panic(s)
+	}
 	if recovered != nil {
 		builder := wasmdebug.NewErrorBuilder()
 
@@ -1039,7 +1049,7 @@ const (
 	builtinFunctionMemoryNotify
 )
 
-func (ce *callEngine) execWasmFunction(ctx context.Context, m *wasm.ModuleInstance) {
+func (ce *callEngine) execWasmFunction(ctx context.Context, m *wasm.ModuleInstance, snapshotEnabled bool) {
 	codeAddr := ce.initialFn.codeInitialAddress
 	modAddr := ce.initialFn.moduleInstance
 
@@ -1065,12 +1075,25 @@ entry:
 			stack := ce.stack[base : base+stackLen]
 
 			fn := calleeHostFunction.parent.goFunc
-			switch fn := fn.(type) {
-			case api.GoModuleFunction:
-				fn.Call(ctx, ce.callerModuleInstance, stack)
-			case api.GoFunction:
-				fn.Call(ctx, stack)
-			}
+			func() {
+				if snapshotEnabled {
+					defer func() {
+						if r := recover(); r != nil {
+							if s, ok := r.(*snapshot); ok && s.ce == ce {
+								s.doRestore()
+							} else {
+								panic(r)
+							}
+						}
+					}()
+				}
+				switch fn := fn.(type) {
+				case api.GoModuleFunction:
+					fn.Call(ctx, ce.callerModuleInstance, stack)
+				case api.GoFunction:
+					fn.Call(ctx, stack)
+				}
+			}()
 
 			codeAddr, modAddr = ce.returnAddress, ce.moduleInstance
 			goto entry
@@ -1215,6 +1238,58 @@ func (ce *callEngine) builtinFunctionMemoryNotify(mem *wasm.MemoryInstance) {
 	offset := uint32(uintptr(addr) - uintptr(unsafe.Pointer(&mem.Buffer[0])))
 
 	ce.pushValue(uint64(mem.Notify(offset, uint32(count))))
+}
+
+// snapshot implements experimental.Snapshot
+type snapshot struct {
+	stackPointer            uint64
+	stackBasePointerInBytes uint64
+	returnAddress           uint64
+	hostBase                int
+	stack                   []uint64
+
+	ret []uint64
+
+	ce *callEngine
+}
+
+// Snapshot implements the same method as documented on experimental.Snapshotter.
+func (ce *callEngine) Snapshot() experimental.Snapshot {
+	hostBase := int(ce.stackBasePointerInBytes >> 3)
+
+	stackTop := int(ce.stackTopIndex())
+	stack := make([]uint64, stackTop)
+	copy(stack, ce.stack[:stackTop])
+
+	return &snapshot{
+		stackPointer:            ce.stackContext.stackPointer,
+		stackBasePointerInBytes: ce.stackBasePointerInBytes,
+		returnAddress:           uint64(ce.returnAddress),
+		hostBase:                hostBase,
+		stack:                   stack,
+		ce:                      ce,
+	}
+}
+
+// Restore implements the same method as documented on experimental.Snapshot.
+func (s *snapshot) Restore(ret []uint64) {
+	s.ret = ret
+	panic(s)
+}
+
+func (s *snapshot) doRestore() {
+	ce := s.ce
+	ce.stackContext.stackPointer = s.stackPointer
+	ce.stackContext.stackBasePointerInBytes = s.stackBasePointerInBytes
+	copy(ce.stack, s.stack)
+	ce.returnAddress = uintptr(s.returnAddress)
+	copy(ce.stack[s.hostBase:], s.ret)
+}
+
+// Error implements the same method on error.
+func (s *snapshot) Error() string {
+	return "unhandled snapshot restore, this generally indicates restore was called from a different " +
+		"exported function invocation than snapshot"
 }
 
 // stackIterator implements experimental.StackIterator.

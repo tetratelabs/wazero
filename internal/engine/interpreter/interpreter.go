@@ -224,6 +224,53 @@ func functionFromUintptr(ptr uintptr) *function {
 	return *(**function)(unsafe.Pointer(wrapped))
 }
 
+type snapshot struct {
+	stack  []uint64
+	frames []*callFrame
+	pc     uint64
+
+	ret []uint64
+
+	ce *callEngine
+}
+
+// Snapshot implements the same method as documented on experimental.Snapshotter.
+func (ce *callEngine) Snapshot() experimental.Snapshot {
+	stack := make([]uint64, len(ce.stack))
+	copy(stack, ce.stack)
+
+	frames := make([]*callFrame, len(ce.frames))
+	copy(frames, ce.frames)
+
+	return &snapshot{
+		stack:  stack,
+		frames: frames,
+		ce:     ce,
+	}
+}
+
+// Restore implements the same method as documented on experimental.Snapshot.
+func (s *snapshot) Restore(ret []uint64) {
+	s.ret = ret
+	panic(s)
+}
+
+func (s *snapshot) doRestore() {
+	ce := s.ce
+
+	ce.stack = s.stack
+	ce.frames = s.frames
+	ce.frames[len(ce.frames)-1].pc = s.pc
+
+	copy(ce.stack[len(ce.stack)-len(s.ret):], s.ret)
+}
+
+// Error implements the same method on error.
+func (s *snapshot) Error() string {
+	return "unhandled snapshot restore, this generally indicates restore was called from a different " +
+		"exported function invocation than snapshot"
+}
+
 // stackIterator implements experimental.StackIterator.
 type stackIterator struct {
 	stack   []uint64
@@ -520,6 +567,10 @@ func (ce *callEngine) call(ctx context.Context, params, results []uint64) (_ []u
 		}
 	}
 
+	if ctx.Value(experimental.EnableSnapshotterKey{}) != nil {
+		ctx = context.WithValue(ctx, experimental.SnapshotterKey{}, ce)
+	}
+
 	defer func() {
 		// If the module closed during the call, and the call didn't err for another reason, set an ExitError.
 		if err == nil {
@@ -563,6 +614,12 @@ type functionListenerInvocation struct {
 // with the call frame stack traces. Also, reset the state of callEngine
 // so that it can be used for the subsequent calls.
 func (ce *callEngine) recoverOnCall(ctx context.Context, m *wasm.ModuleInstance, v interface{}) (err error) {
+	if s, ok := v.(*snapshot); ok {
+		// A snapshot that wasn't handled was created by a different call engine possibly from a nested wasm invocation,
+		// let it propagate up to be handled by the caller.
+		panic(s)
+	}
+
 	builder := wasmdebug.NewErrorBuilder()
 	frameCount := len(ce.frames)
 	functionListeners := make([]functionListenerInvocation, 0, 16)
@@ -677,7 +734,23 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			ce.drop(op.Us[v+1])
 			frame.pc = op.Us[v]
 		case wazeroir.OperationKindCall:
-			ce.callFunction(ctx, f.moduleInstance, &functions[op.U1])
+			func() {
+				if ctx.Value(experimental.EnableSnapshotterKey{}) != nil {
+					defer func() {
+						if r := recover(); r != nil {
+							if s, ok := r.(*snapshot); ok && s.ce == ce {
+								s.doRestore()
+								frame = ce.frames[len(ce.frames)-1]
+								body = frame.f.parent.body
+								bodyLen = uint64(len(body))
+							} else {
+								panic(r)
+							}
+						}
+					}()
+				}
+				ce.callFunction(ctx, f.moduleInstance, &functions[op.U1])
+			}()
 			frame.pc++
 		case wazeroir.OperationKindCallIndirect:
 			offset := ce.popValue()
