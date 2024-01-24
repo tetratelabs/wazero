@@ -2078,10 +2078,12 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 		case wazeroir.OperationKindV128Store:
 			hi, lo := ce.popValue(), ce.popValue()
 			offset := ce.popMemoryOffset(op)
-			if ok := memoryInst.WriteUint64Le(offset, lo); !ok {
+			// Write the upper bytes first to trigger an early error if the memory access is out of bounds.
+			// Otherwise, the lower bytes might be written to memory, but the upper bytes might not.
+			if ok := memoryInst.WriteUint64Le(offset+8, hi); !ok {
 				panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 			}
-			if ok := memoryInst.WriteUint64Le(offset+8, hi); !ok {
+			if ok := memoryInst.WriteUint64Le(offset, lo); !ok {
 				panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 			}
 			frame.pc++
