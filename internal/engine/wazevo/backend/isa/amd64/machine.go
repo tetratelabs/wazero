@@ -419,22 +419,21 @@ func (m *machine) lowerShiftR(si *ssa.Instruction, op shiftROp) {
 
 func (m *machine) lowerStore(si *ssa.Instruction) {
 	value, ptr, offset, storeSizeInBits := si.StoreData()
-	rm := m.c.VRegOf(value)
-	base := m.c.VRegOf(ptr)
+	rm := m.getOperand_Reg(m.c.ValueDefinition(value))
+	mem := newOperandMem(m.lowerToAddressMode(ptr, offset))
 
 	store := m.allocateInstr()
-	mem := newOperandMem(newAmodeImmReg(offset, base))
 	switch value.Type() {
 	case ssa.TypeI32:
-		store.asMovRM(rm, mem, storeSizeInBits/8)
+		store.asMovRM(rm.r, mem, storeSizeInBits/8)
 	case ssa.TypeI64:
-		store.asMovRM(rm, mem, storeSizeInBits/8)
+		store.asMovRM(rm.r, mem, storeSizeInBits/8)
 	case ssa.TypeF32:
-		store.asXmmMovRM(sseOpcodeMovss, rm, mem)
+		store.asXmmMovRM(sseOpcodeMovss, rm.r, mem)
 	case ssa.TypeF64:
-		store.asXmmMovRM(sseOpcodeMovsd, rm, mem)
+		store.asXmmMovRM(sseOpcodeMovsd, rm.r, mem)
 	case ssa.TypeV128:
-		store.asXmmMovRM(sseOpcodeMovdqu, rm, mem)
+		store.asXmmMovRM(sseOpcodeMovdqu, rm.r, mem)
 	}
 	m.insert(store)
 }
