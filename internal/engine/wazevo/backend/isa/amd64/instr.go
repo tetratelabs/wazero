@@ -999,10 +999,10 @@ type shiftROp byte
 
 const (
 	shiftROpRotateLeft           shiftROp = 0
-	shiftROpRotateRight                   = 1
-	shiftROpShiftLeft                     = 4
-	shiftROpShiftRightLogical             = 5
-	shiftROpShiftRightArithmetic          = 7
+	shiftROpRotateRight          shiftROp = 1
+	shiftROpShiftLeft            shiftROp = 4
+	shiftROpShiftRightLogical    shiftROp = 5
+	shiftROpShiftRightArithmetic shiftROp = 7
 )
 
 func (s shiftROp) String() string {

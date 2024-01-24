@@ -218,6 +218,10 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		m.lowerShiftR(instr, shiftROpShiftLeft)
 	case ssa.OpcodeSshr:
 		m.lowerShiftR(instr, shiftROpShiftRightArithmetic)
+	case ssa.OpcodeRotl:
+		m.lowerShiftR(instr, shiftROpRotateLeft)
+	case ssa.OpcodeRotr:
+		m.lowerShiftR(instr, shiftROpRotateRight)
 	case ssa.OpcodeUshr:
 		m.lowerShiftR(instr, shiftROpShiftRightLogical)
 	case ssa.OpcodeUndefined:
@@ -350,7 +354,6 @@ func (m *machine) lowerShiftR(si *ssa.Instruction, op shiftROp) {
 	mov2 := m.allocateInstr()
 	mov2.asMovRR(tmpDst, rd, _64)
 	m.insert(mov2)
-
 }
 
 func (m *machine) lowerStore(si *ssa.Instruction) {

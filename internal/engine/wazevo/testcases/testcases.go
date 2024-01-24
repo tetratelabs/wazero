@@ -84,10 +84,16 @@ var (
 		Name: "add_sub_params_return",
 		Module: SingleFunctionModule(
 			wasm.FunctionType{
-				Params: []wasm.ValueType{i32, i32, i32},
+				Params: []wasm.ValueType{i32, i32, i32, i64, i64, i64},
 				Results: []wasm.ValueType{
 					i32, i32, i32, i32,
-					i32, i32, i32},
+					i32, i32, i32,
+					i32, i32,
+
+					i64, i64, i64, i64,
+					i64, i64, i64,
+					i64, i64,
+				},
 			},
 			[]byte{
 				wasm.OpcodeLocalGet, 0,
@@ -107,11 +113,50 @@ var (
 				wasm.OpcodeLocalGet, 1,
 				wasm.OpcodeI32Shl,
 				wasm.OpcodeLocalGet, 0,
-				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeLocalGet, 2,
 				wasm.OpcodeI32ShrS,
 				wasm.OpcodeLocalGet, 0,
 				wasm.OpcodeLocalGet, 1,
 				wasm.OpcodeI32ShrU,
+
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeI32Rotr,
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeI32Rotl,
+
+				// i64
+
+				wasm.OpcodeLocalGet, 3,
+				wasm.OpcodeLocalGet, 4,
+				wasm.OpcodeI64Mul,
+				wasm.OpcodeLocalGet, 3,
+				wasm.OpcodeLocalGet, 4,
+				wasm.OpcodeI64And,
+				wasm.OpcodeLocalGet, 3,
+				wasm.OpcodeLocalGet, 4,
+				wasm.OpcodeI64Or,
+				wasm.OpcodeLocalGet, 3,
+				wasm.OpcodeLocalGet, 4,
+				wasm.OpcodeI64Xor,
+
+				wasm.OpcodeLocalGet, 3,
+				wasm.OpcodeLocalGet, 4,
+				wasm.OpcodeI64Shl,
+				wasm.OpcodeLocalGet, 5,
+				wasm.OpcodeLocalGet, 4,
+				wasm.OpcodeI64ShrS,
+				wasm.OpcodeLocalGet, 3,
+				wasm.OpcodeLocalGet, 4,
+				wasm.OpcodeI64ShrU,
+
+				wasm.OpcodeLocalGet, 3,
+				wasm.OpcodeLocalGet, 4,
+				wasm.OpcodeI64Rotr,
+				wasm.OpcodeLocalGet, 3,
+				wasm.OpcodeLocalGet, 4,
+				wasm.OpcodeI64Rotl,
 
 				wasm.OpcodeEnd,
 			}, nil),

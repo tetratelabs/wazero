@@ -278,28 +278,6 @@ func asImm32Operand(val uint64) (operand, bool) {
 	return operand{}, false
 }
 
-func (m *machine) getOperand_Mem_Reg(def *backend.SSAValueDefinition) (op operand) {
-	var v regalloc.VReg
-	if def.IsFromBlockParam() {
-		v = def.BlkParamVReg
-	} else {
-		instr := def.Instr
-		if instr.Constant() {
-			// We inline all the constant instructions so that we could reduce the register usage.
-			v = m.lowerConstant(instr)
-			instr.MarkLowered()
-		} else {
-			if n := def.N; n == 0 {
-				v = m.c.VRegOf(instr.Return())
-			} else {
-				_, rs := instr.Returns()
-				v = m.c.VRegOf(rs[n-1])
-			}
-		}
-	}
-	return newOperandReg(v)
-}
-
 func (m *machine) getOperand_Reg(def *backend.SSAValueDefinition) (op operand) {
 	var v regalloc.VReg
 	if def.IsFromBlockParam() {
