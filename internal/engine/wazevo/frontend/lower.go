@@ -3439,8 +3439,9 @@ func (c *Compiler) reloadAfterCall() {
 	// Note that when these are not used in the following instructions, they will be optimized out.
 	// So in any ways, we define them!
 
-	// After calling any function, memory buffer might have changed. So we need to re-defined the variable.
-	if c.needMemory {
+	// After calling any function, memory buffer might have changed. So we need to re-define the variable.
+	// However, if the memory is shared, we don't need to reload the memory base and length as the base will never change.
+	if c.needMemory && !c.memoryShared {
 		c.reloadMemoryBaseLen()
 	}
 
