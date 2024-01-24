@@ -1884,6 +1884,8 @@ func (m *machine) lowerExitIfTrueWithCode(execCtxVReg regalloc.VReg, cond ssa.Va
 	signed := c.Signed()
 	m.lowerIcmpToFlag(x, y, signed)
 
+	// We need to copy the execution context to a temp register, because if it's spilled,
+	// it might end up being reloaded inside the exiting branch.
 	execCtxTmp := m.copyToTmp(execCtxVReg)
 
 	// We have to skip the entire exit sequence if the condition is false.

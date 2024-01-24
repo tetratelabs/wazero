@@ -194,9 +194,8 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
-			name:      "memory_load_basic",
-			m:         testcases.MemoryLoadBasic.Module,
-			skipAMD64: true,
+			name: "memory_load_basic",
+			m:    testcases.MemoryLoadBasic.Module,
 			calls: []callCase{
 				{params: []uint64{0}, expResults: []uint64{0x03_02_01_00}},
 				{params: []uint64{256}, expResults: []uint64{0x03_02_01_00}},
@@ -206,9 +205,8 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
-			name:      "memory out of bounds",
-			m:         testcases.MemoryLoadBasic.Module,
-			skipAMD64: true,
+			name: "memory out of bounds",
+			m:    testcases.MemoryLoadBasic.Module,
 			calls: []callCase{
 				{params: []uint64{uint64(wasm.MemoryPageSize)}, expErr: "out of bounds memory access"},
 				// We load I32, so we can't load from the last 3 bytes.
@@ -216,11 +214,9 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
-			name:      "memory_loads",
-			m:         testcases.MemoryLoads.Module,
-			skipAMD64: true,
+			name: "memory_loads",
+			m:    testcases.MemoryLoads.Module,
 			calls: []callCase{
-				// These expected results are derived by commenting out `configureWazevo(config)` below to run the old compiler, assuming that it is correct.
 				{params: []uint64{0}, expResults: []uint64{0x3020100, 0x706050403020100, 0x3020100, 0x706050403020100, 0x1211100f, 0x161514131211100f, 0x1211100f, 0x161514131211100f, 0x0, 0xf, 0x0, 0xf, 0x100, 0x100f, 0x100, 0x100f, 0x0, 0xf, 0x0, 0xf, 0x100, 0x100f, 0x100, 0x100f, 0x3020100, 0x1211100f, 0x3020100, 0x1211100f}},
 				{params: []uint64{1}, expResults: []uint64{0x4030201, 0x807060504030201, 0x4030201, 0x807060504030201, 0x13121110, 0x1716151413121110, 0x13121110, 0x1716151413121110, 0x1, 0x10, 0x1, 0x10, 0x201, 0x1110, 0x201, 0x1110, 0x1, 0x10, 0x1, 0x10, 0x201, 0x1110, 0x201, 0x1110, 0x4030201, 0x13121110, 0x4030201, 0x13121110}},
 				{params: []uint64{8}, expResults: []uint64{0xb0a0908, 0xf0e0d0c0b0a0908, 0xb0a0908, 0xf0e0d0c0b0a0908, 0x1a191817, 0x1e1d1c1b1a191817, 0x1a191817, 0x1e1d1c1b1a191817, 0x8, 0x17, 0x8, 0x17, 0x908, 0x1817, 0x908, 0x1817, 0x8, 0x17, 0x8, 0x17, 0x908, 0x1817, 0x908, 0x1817, 0xb0a0908, 0x1a191817, 0xb0a0908, 0x1a191817}},
