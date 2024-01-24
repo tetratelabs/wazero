@@ -41,6 +41,7 @@ type Compiler struct {
 	wasmFunctionBodyOffsetInCodeSection   uint64
 	memoryBaseVariable, memoryLenVariable ssa.Variable
 	needMemory                            bool
+	memoryShared                          bool
 	globalVariables                       []ssa.Variable
 	globalVariablesTypes                  []ssa.Type
 	mutableGlobalVariablesIndexes         []wasm.Index // index to ^.
@@ -261,7 +262,17 @@ func (c *Compiler) declareWasmLocals(entry ssa.BasicBlock) {
 }
 
 func (c *Compiler) declareNecessaryVariables() {
-	c.needMemory = c.m.ImportMemoryCount > 0 || c.m.MemorySection != nil
+	if c.needMemory = c.m.MemorySection != nil; c.needMemory {
+		c.memoryShared = c.m.MemorySection.IsShared
+	} else if c.needMemory = c.m.ImportMemoryCount > 0; c.needMemory {
+		for _, imp := range c.m.ImportSection {
+			if imp.Type == wasm.ExternTypeMemory {
+				c.memoryShared = imp.DescMem.IsShared
+				break
+			}
+		}
+	}
+
 	if c.needMemory {
 		c.memoryBaseVariable = c.ssaBuilder.DeclareVariable(ssa.TypeI64)
 		c.memoryLenVariable = c.ssaBuilder.DeclareVariable(ssa.TypeI64)
