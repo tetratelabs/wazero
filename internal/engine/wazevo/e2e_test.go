@@ -239,10 +239,11 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
-			name:      "globals_set",
-			m:         testcases.GlobalsSet.Module,
-			skipAMD64: true,
-			calls:     []callCase{{expResults: []uint64{1, 2, uint64(math.Float32bits(3.0)), math.Float64bits(4.0)}}},
+			name: "globals_set",
+			m:    testcases.GlobalsSet.Module,
+			calls: []callCase{{expResults: []uint64{
+				1, 2, uint64(math.Float32bits(3.0)), math.Float64bits(4.0), 10, 20,
+			}}},
 		},
 		{
 			name:      "globals_mutable",

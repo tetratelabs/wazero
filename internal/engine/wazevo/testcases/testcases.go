@@ -1330,9 +1330,9 @@ var (
 	}
 
 	GlobalsSet = TestCase{
-		Name: "globals_get",
+		Name: "globals_set",
 		Module: &wasm.Module{
-			TypeSection:     []wasm.FunctionType{{Results: []wasm.ValueType{i32, i64, f32, f64}}},
+			TypeSection:     []wasm.FunctionType{{Results: []wasm.ValueType{i32, i64, f32, f64, v128}}},
 			ExportSection:   []wasm.Export{{Name: ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 0}},
 			FunctionSection: []wasm.Index{0},
 			GlobalSection: []wasm.Global{
@@ -1352,6 +1352,10 @@ var (
 					Type: wasm.GlobalType{ValType: wasm.ValueTypeF64, Mutable: true},
 					Init: constExprF64(0),
 				},
+				{
+					Type: wasm.GlobalType{ValType: wasm.ValueTypeV128, Mutable: true},
+					Init: constExprV128(0, 0),
+				},
 			},
 			CodeSection: []wasm.Code{
 				{Body: []byte{
@@ -1367,6 +1371,10 @@ var (
 					wasm.OpcodeF64Const, 0, 0, 0, 0, 0, 0, 16, 64, // 4.0
 					wasm.OpcodeGlobalSet, 3,
 					wasm.OpcodeGlobalGet, 3,
+					wasm.OpcodeVecPrefix, wasm.OpcodeVecV128Const,
+					10, 0, 0, 0, 0, 0, 0, 0, 20, 0, 0, 0, 0, 0, 0, 0,
+					wasm.OpcodeGlobalSet, 4,
+					wasm.OpcodeGlobalGet, 4,
 					wasm.OpcodeEnd,
 				}},
 			},

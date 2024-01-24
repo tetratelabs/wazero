@@ -32,7 +32,7 @@ func (m *machine) InsertLoadConstant(instr *ssa.Instruction, vr regalloc.VReg) {
 	case ssa.TypeI32, ssa.TypeI64:
 		m.lowerIconst(vr, v, bits == 64)
 	default:
-		panic("TODO")
+		panic("BUG")
 	}
 }
 

@@ -643,7 +643,7 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 		case 8:
 			encodeRegMem(c, legacyPrefixesNone, 0x89, 1, src, m, rex.setW())
 		default:
-			panic("BUG: invalid size")
+			panic(fmt.Sprintf("BUG: invalid size %d: %s", i.u1, i.String()))
 		}
 
 	case shiftR:
@@ -999,6 +999,13 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 		default:
 			panic("BUG: invalid operand kind")
 		}
+
+	case v128ConstIsland:
+		lo, hi := i.u1, i.u2
+		c.Emit4Bytes(uint32(lo))
+		c.Emit4Bytes(uint32(lo >> 32))
+		c.Emit4Bytes(uint32(hi))
+		c.Emit4Bytes(uint32(hi >> 32))
 
 	default:
 		panic(fmt.Sprintf("TODO: %v", i.kind))

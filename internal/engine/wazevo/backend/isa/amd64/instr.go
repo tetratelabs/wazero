@@ -211,6 +211,8 @@ func (i *instruction) String() string {
 		}
 	case callIndirect:
 		return fmt.Sprintf("callq *%s", i.op1.format(true))
+	case v128ConstIsland:
+		return fmt.Sprintf("v128ConstIsland (%#x, %#x)", i.u1, i.u2)
 	default:
 		panic(fmt.Sprintf("BUG: %d", int(i.kind)))
 	}
@@ -575,6 +577,9 @@ const (
 	// An instruction that will always trigger the illegal instruction exception.
 	ud2
 
+	// v128ConstIsland is 16 bytes (128-bit) constant that will be loaded into an XMM.
+	v128ConstIsland
+
 	instrMax
 )
 
@@ -662,6 +667,8 @@ func (k instructionKind) String() string {
 		return "jmpTableSeq"
 	case exitSequence:
 		return "exit_sequence"
+	case v128ConstIsland:
+		return "v128ConstIsland"
 	case ud2:
 		return "ud2"
 	default:
@@ -963,6 +970,13 @@ func (i *instruction) asXmmUnaryRmR(op sseOpcode, rm operand, rd regalloc.VReg) 
 	i.op1 = rm
 	i.op2 = newOperandReg(rd)
 	i.u1 = uint64(op)
+	return i
+}
+
+func (i *instruction) asV128ConstIsland(lo, hi uint64) *instruction {
+	i.kind = v128ConstIsland
+	i.u1 = lo
+	i.u2 = hi
 	return i
 }
 
@@ -1553,26 +1567,27 @@ const (
 )
 
 var defKinds = [instrMax]defKind{
-	nop0:         defKindNone,
-	ret:          defKindNone,
-	movRR:        defKindOp2,
-	movRM:        defKindNone,
-	xmmMovRM:     defKindNone,
-	aluRmiR:      defKindNone,
-	shiftR:       defKindNone,
-	imm:          defKindOp2,
-	xmmUnaryRmR:  defKindOp2,
-	mov64MR:      defKindOp2,
-	movzxRmR:     defKindOp2,
-	gprToXmm:     defKindOp2,
-	call:         defKindCall,
-	callIndirect: defKindCall,
-	ud2:          defKindNone,
-	jmp:          defKindNone,
-	jmpIf:        defKindNone,
-	cmpRmiR:      defKindNone,
-	exitSequence: defKindNone,
-	lea:          defKindOp2,
+	nop0:            defKindNone,
+	ret:             defKindNone,
+	movRR:           defKindOp2,
+	movRM:           defKindNone,
+	xmmMovRM:        defKindNone,
+	aluRmiR:         defKindNone,
+	shiftR:          defKindNone,
+	imm:             defKindOp2,
+	xmmUnaryRmR:     defKindOp2,
+	mov64MR:         defKindOp2,
+	movzxRmR:        defKindOp2,
+	gprToXmm:        defKindOp2,
+	call:            defKindCall,
+	callIndirect:    defKindCall,
+	ud2:             defKindNone,
+	jmp:             defKindNone,
+	jmpIf:           defKindNone,
+	cmpRmiR:         defKindNone,
+	exitSequence:    defKindNone,
+	lea:             defKindOp2,
+	v128ConstIsland: defKindNone,
 }
 
 // String implements fmt.Stringer.
@@ -1603,26 +1618,27 @@ const (
 )
 
 var useKinds = [instrMax]useKind{
-	nop0:         useKindNone,
-	ret:          useKindNone,
-	movRR:        useKindOp1,
-	movRM:        useKindOp1RegOp2,
-	xmmMovRM:     useKindOp1RegOp2,
-	aluRmiR:      useKindOp1Op2Reg,
-	shiftR:       useKindOp1Op2Reg,
-	imm:          useKindNone,
-	xmmUnaryRmR:  useKindOp1,
-	mov64MR:      useKindOp1,
-	movzxRmR:     useKindOp1,
-	gprToXmm:     useKindOp1,
-	call:         useKindCall,
-	callIndirect: useKindCallInd,
-	ud2:          useKindNone,
-	jmpIf:        useKindOp1,
-	jmp:          useKindOp1,
-	cmpRmiR:      useKindOp1Op2Reg,
-	exitSequence: useKindOp1,
-	lea:          useKindOp1,
+	nop0:            useKindNone,
+	ret:             useKindNone,
+	movRR:           useKindOp1,
+	movRM:           useKindOp1RegOp2,
+	xmmMovRM:        useKindOp1RegOp2,
+	aluRmiR:         useKindOp1Op2Reg,
+	shiftR:          useKindOp1Op2Reg,
+	imm:             useKindNone,
+	xmmUnaryRmR:     useKindOp1,
+	mov64MR:         useKindOp1,
+	movzxRmR:        useKindOp1,
+	gprToXmm:        useKindOp1,
+	call:            useKindCall,
+	callIndirect:    useKindCallInd,
+	ud2:             useKindNone,
+	jmpIf:           useKindOp1,
+	jmp:             useKindOp1,
+	cmpRmiR:         useKindOp1Op2Reg,
+	exitSequence:    useKindOp1,
+	lea:             useKindOp1,
+	v128ConstIsland: useKindNone,
 }
 
 func (u useKind) String() string {

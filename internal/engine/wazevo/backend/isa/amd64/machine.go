@@ -233,9 +233,39 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		dst := instr.Return()
 		ptr, offset, typ := instr.LoadData()
 		m.lowerLoad(ptr, offset, typ, dst)
+	case ssa.OpcodeVconst:
+		result := instr.Return()
+		lo, hi := instr.VconstData()
+		m.lowerVconst(result, lo, hi)
 	default:
 		panic("TODO: lowering " + op.String())
 	}
+}
+
+func (m *machine) lowerVconst(res ssa.Value, lo, hi uint64) {
+	dst := m.c.VRegOf(res)
+
+	load := m.allocateInstr()
+	jmp := m.allocateInstr()
+
+	constLabelNop, constLabel := m.allocateBrTarget()
+	constIsland := m.allocateInstr().asV128ConstIsland(lo, hi)
+	afterLoadNop, afterLoadLabel := m.allocateBrTarget()
+
+	// 		movdqu constLabel(%rip), %dst
+	//		jmp    afterConst
+	// constLabel:
+	//		constIsland $lo, $hi
+	// afterLoad:
+
+	m.insert(load)
+	m.insert(jmp)
+	m.insert(constLabelNop)
+	m.insert(constIsland)
+	m.insert(afterLoadNop)
+
+	load.asXmmUnaryRmR(sseOpcodeMovdqu, newOperandMem(newAmodeRipRelative(constLabel)), dst)
+	jmp.asJmp(newOperandLabel(afterLoadLabel))
 }
 
 func (m *machine) lowerLoad(ptr ssa.Value, offset uint32, typ ssa.Type, ret ssa.Value) {
@@ -387,8 +417,19 @@ func (m *machine) lowerStore(si *ssa.Instruction) {
 	base := m.c.VRegOf(ptr)
 
 	store := m.allocateInstr()
-	// TODO: optimization to find whether we could fit newAmodeRegRegShift.
-	store.asMovRM(rm, newOperandMem(newAmodeImmReg(offset, base)), storeSizeInBits/8)
+	mem := newOperandMem(newAmodeImmReg(offset, base))
+	switch value.Type() {
+	case ssa.TypeI32:
+		store.asMovRM(rm, mem, storeSizeInBits/8)
+	case ssa.TypeI64:
+		store.asMovRM(rm, mem, storeSizeInBits/8)
+	case ssa.TypeF32:
+		store.asXmmMovRM(sseOpcodeMovss, rm, mem)
+	case ssa.TypeF64:
+		store.asXmmMovRM(sseOpcodeMovsd, rm, mem)
+	case ssa.TypeV128:
+		store.asXmmMovRM(sseOpcodeMovdqu, rm, mem)
+	}
 	m.insert(store)
 }
 
