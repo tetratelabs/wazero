@@ -70,10 +70,15 @@ func newOperandLabel(label backend.Label) operand { //nolint:unused
 }
 
 func (o *operand) label() backend.Label {
-	if o.kind != operandKindLabel {
-		panic("BUG: invalid operand kind")
+	switch o.kind {
+	case operandKindLabel:
+		return backend.Label(o.imm32)
+	case operandKindMem:
+		if o.amode.kind == amodeRipRelative {
+			return o.amode.label
+		}
 	}
-	return backend.Label(o.imm32)
+	panic("BUG: invalid operand kind")
 }
 
 func newOperandReg(r regalloc.VReg) operand {

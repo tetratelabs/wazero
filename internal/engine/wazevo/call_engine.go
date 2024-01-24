@@ -80,6 +80,8 @@ type (
 		refFuncTrampolineAddress *byte
 		// memmoveAddress holds the address of memmove function implemented by Go runtime. See memmove.go.
 		memmoveAddress uintptr
+		// framePointerBeforeGoCall holds the frame pointer before calling a Go function. Note: only used in amd64.
+		framePointerBeforeGoCall uintptr
 	}
 )
 
@@ -199,7 +201,12 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 			if lsn != nil {
 				listeners = append(listeners, listenerForAbort{def, lsn})
 			}
-			returnAddrs := unwindStack(uintptr(unsafe.Pointer(c.execCtx.stackPointerBeforeGoCall)), c.stackTop, nil)
+			returnAddrs := unwindStack(
+				uintptr(unsafe.Pointer(c.execCtx.stackPointerBeforeGoCall)),
+				c.execCtx.framePointerBeforeGoCall,
+				c.stackTop,
+				nil,
+			)
 			for _, retAddr := range returnAddrs[:len(returnAddrs)-1] { // the last return addr is the trampoline, so we skip it.
 				def, lsn = c.addFrame(builder, retAddr)
 				if lsn != nil {
@@ -472,7 +479,7 @@ func (si *stackIterator) reset(c *callEngine, onHostCall bool) {
 	} else {
 		si.retAddrs = si.retAddrs[:0]
 	}
-	si.retAddrs = unwindStack(uintptr(unsafe.Pointer(c.execCtx.stackPointerBeforeGoCall)), c.stackTop, si.retAddrs)
+	si.retAddrs = unwindStack(uintptr(unsafe.Pointer(c.execCtx.stackPointerBeforeGoCall)), c.execCtx.framePointerBeforeGoCall, c.stackTop, si.retAddrs)
 	si.retAddrs = si.retAddrs[:len(si.retAddrs)-1] // the last return addr is the trampoline, so we skip it.
 	si.retAddrCursor = 0
 	si.eng = c.parent.parent.parent
