@@ -72,9 +72,10 @@ type (
 		EndInstr() Instr
 		// LastInstrForInsertion returns the last instruction in this block where instructions will be inserted before it.
 		// Such insertions only happen when we need to insert spill/reload instructions to adjust the merge edges.
-		// If the very last instruction is the unconditional branching, then the returned instruction is the one before it.
-		// Note that at the time of register allocation, all the critical edges are already split, so there is no need
+		// At the time of register allocation, all the critical edges are already split, so there is no need
 		// to worry about the case where branching instruction has multiple successors.
+		// Therefore, usually, it is the nop instruction, but if the block ends with an unconditional branching, then it returns
+		// the unconditional branch, not the nop. In other words it is either nop or unconditional branch.
 		LastInstrForInsertion() Instr
 		// Preds returns the number of predecessors of this block in the CFG.
 		Preds() int

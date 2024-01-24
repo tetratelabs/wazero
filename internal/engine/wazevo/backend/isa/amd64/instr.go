@@ -239,24 +239,26 @@ func (i *instruction) Uses(regs *[]regalloc.VReg) []regalloc.VReg {
 	*regs = (*regs)[:0]
 	switch uk := useKinds[i.kind]; uk {
 	case useKindNone:
-	case useKindOp1Op2:
-		op1, op2 := &i.op1, &i.op2
+	case useKindOp1Op2Reg, useKindOp1RegOp2:
+		opAny, opReg := &i.op1, &i.op2
+		if uk == useKindOp1RegOp2 {
+			opAny, opReg = opReg, opAny
+		}
 		// The destination operand (op2) can be only reg,
 		// the source operand (op1) can be imm32, reg or mem.
-		switch op1.kind {
+		switch opAny.kind {
 		case operandKindReg:
-			*regs = append(*regs, op1.r)
+			*regs = append(*regs, opAny.r)
 		case operandKindMem:
-			op1.amode.uses(regs)
+			opAny.amode.uses(regs)
 		case operandKindImm32:
-			// Valid, no reg.
 		default:
-			panic(fmt.Sprintf("BUG: invalid operand pair: %s -- %s, %s", i, op1.kind, op2.kind))
+			panic(fmt.Sprintf("BUG: invalid operand: %s", i))
 		}
-		if op2.kind != operandKindReg {
-			panic(fmt.Sprintf("BUG: unsupported operand op1 in %s -- %s", i, op1.kind))
+		if opReg.kind != operandKindReg {
+			panic(fmt.Sprintf("BUG: invalid operand: %s", i))
 		}
-		*regs = append(*regs, op2.r)
+		*regs = append(*regs, opReg.r)
 	case useKindOp1:
 		op := i.op1
 		switch op.kind {
@@ -280,48 +282,50 @@ func (i *instruction) Uses(regs *[]regalloc.VReg) []regalloc.VReg {
 func (i *instruction) AssignUse(index int, v regalloc.VReg) {
 	switch uk := useKinds[i.kind]; uk {
 	case useKindNone:
-	case useKindOp1Op2:
-		op1, op2 := &i.op1, &i.op2
-		switch op1.kind {
+	case useKindOp1Op2Reg, useKindOp1RegOp2:
+		op, opMustBeReg := &i.op1, &i.op2
+		if uk == useKindOp1RegOp2 {
+			op, opMustBeReg = opMustBeReg, op
+		}
+		switch op.kind {
 		case operandKindReg:
 			if index == 0 {
-				if op1.r.IsRealReg() {
+				if op.r.IsRealReg() {
 					panic("BUG already assigned: " + i.String())
 				}
-				op1.r = v
+				op.r = v
 			} else if index == 1 {
-				if op2.r.IsRealReg() {
+				if opMustBeReg.r.IsRealReg() {
 					panic("BUG already assigned: " + i.String())
 				}
-				op2.r = v
+				opMustBeReg.r = v
 			} else {
 				panic("BUG")
 			}
 		case operandKindMem:
-			nregs := op1.amode.nregs()
+			nregs := op.amode.nregs()
 			if index < nregs {
-				op1.amode.assignUses(index, v)
+				op.amode.assignUses(index, v)
 			} else if index == nregs {
-				if op2.r.IsRealReg() {
+				if opMustBeReg.r.IsRealReg() {
 					panic("BUG already assigned: " + i.String())
 				}
-				op2.r = v
+				opMustBeReg.r = v
 			} else {
 				panic("BUG")
 			}
 		case operandKindImm32:
 			if index == 0 {
-				if op2.r.IsRealReg() {
+				if opMustBeReg.r.IsRealReg() {
 					panic("BUG already assigned: " + i.String())
 				}
-				op2.r = v
+				opMustBeReg.r = v
 			} else {
 				panic("BUG")
 			}
 		default:
-			panic(fmt.Sprintf("BUG: invalid operand pair: %s -- %s, %s", i, op1.kind, op2.kind))
+			panic(fmt.Sprintf("BUG: invalid operand pair: %s", i))
 		}
-
 	case useKindOp1:
 		op := &i.op1
 		switch op.kind {
@@ -684,6 +688,13 @@ func (i *instruction) asJmp(target operand) *instruction {
 	return i
 }
 
+func (i *instruction) jmpLabel() backend.Label {
+	if i.kind != jmp && i.kind != jmpIf {
+		panic("BUG")
+	}
+	return i.op1.label()
+}
+
 func (i *instruction) asLEA(a amode, rd regalloc.VReg) *instruction {
 	i.kind = lea
 	i.op1 = newOperandMem(a)
@@ -882,14 +893,14 @@ func (i *instruction) asXmmRmiReg(op sseOpcode, rm operand, rd regalloc.VReg) *i
 	return i
 }
 
-func (i *instruction) asCmpRmiR(cmpOrTest bool, rm operand, rd regalloc.VReg, _64 bool) *instruction {
+func (i *instruction) asCmpRmiR(cmp bool, rm operand, rd regalloc.VReg, _64 bool) *instruction {
 	if rm.kind != operandKindReg && rm.kind != operandKindImm32 && rm.kind != operandKindMem {
 		panic("BUG")
 	}
 	i.kind = cmpRmiR
 	i.op1 = rm
 	i.op2 = newOperandReg(rd)
-	if cmpOrTest {
+	if cmp {
 		i.u1 = 1
 	}
 	i.b1 = _64
@@ -1522,6 +1533,10 @@ var defKinds = [instrMax]defKind{
 	movzxRmR:    defKindOp2,
 	gprToXmm:    defKindOp2,
 	call:        defKindCall,
+	ud2:         defKindNone,
+	jmp:         defKindNone,
+	jmpIf:       defKindNone,
+	cmpRmiR:     defKindNone,
 }
 
 // String implements fmt.Stringer.
@@ -1543,7 +1558,10 @@ type useKind byte
 const (
 	useKindNone useKind = iota + 1
 	useKindOp1
-	useKindOp1Op2
+	// useKindOp1Op2Reg is Op1 can be any operand, Op2 must be a register.
+	useKindOp1Op2Reg
+	// useKindOp1RegOp2 is Op1 must be a register, Op2 can be any operand.
+	useKindOp1RegOp2
 	useKindCall
 )
 
@@ -1551,15 +1569,19 @@ var useKinds = [instrMax]useKind{
 	nop0:        useKindNone,
 	ret:         useKindNone,
 	movRR:       useKindOp1,
-	movRM:       useKindOp1,
-	xmmMovRM:    useKindOp1,
-	aluRmiR:     useKindOp1Op2,
+	movRM:       useKindOp1RegOp2,
+	xmmMovRM:    useKindOp1RegOp2,
+	aluRmiR:     useKindOp1Op2Reg,
 	imm:         useKindNone,
 	xmmUnaryRmR: useKindOp1,
 	mov64MR:     useKindOp1,
 	movzxRmR:    useKindOp1,
 	gprToXmm:    useKindOp1,
 	call:        useKindCall,
+	ud2:         useKindNone,
+	jmpIf:       useKindOp1,
+	jmp:         useKindOp1,
+	cmpRmiR:     useKindOp1Op2Reg,
 }
 
 func (u useKind) String() string {
@@ -1568,8 +1590,10 @@ func (u useKind) String() string {
 		return "none"
 	case useKindOp1:
 		return "op1"
-	case useKindOp1Op2:
-		return "op1op2"
+	case useKindOp1Op2Reg:
+		return "op1op2Reg"
+	case useKindOp1RegOp2:
+		return "op1RegOp2"
 	case useKindCall:
 		return "call"
 	default:

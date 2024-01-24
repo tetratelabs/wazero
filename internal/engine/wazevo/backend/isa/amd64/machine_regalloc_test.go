@@ -17,8 +17,8 @@ func TestMachine_InsertStoreRegisterAt(t *testing.T) {
 			spillSlotSize: 16,
 			expected: `
 	ud2
-	movsd 16(%rsp), %xmm1
-	movq 24(%rsp), %rax
+	movsd %xmm1, 16(%rsp)
+	mov.q %rax, 24(%rsp)
 	ret
 `,
 		},
@@ -26,8 +26,8 @@ func TestMachine_InsertStoreRegisterAt(t *testing.T) {
 			spillSlotSize: 160,
 			expected: `
 	ud2
-	movsd 160(%rsp), %xmm1
-	movq 168(%rsp), %rax
+	movsd %xmm1, 160(%rsp)
+	mov.q %rax, 168(%rsp)
 	ret
 `,
 		},
@@ -52,11 +52,11 @@ func TestMachine_InsertStoreRegisterAt(t *testing.T) {
 					i2.prev = i1
 
 					if after {
-						m.InsertReloadRegisterAt(raxVReg, i1, after)
-						m.InsertReloadRegisterAt(xmm1VReg, i1, after)
+						m.InsertStoreRegisterAt(raxVReg, i1, after)
+						m.InsertStoreRegisterAt(xmm1VReg, i1, after)
 					} else {
-						m.InsertReloadRegisterAt(xmm1VReg, i2, after)
-						m.InsertReloadRegisterAt(raxVReg, i2, after)
+						m.InsertStoreRegisterAt(xmm1VReg, i2, after)
+						m.InsertStoreRegisterAt(raxVReg, i2, after)
 					}
 					m.ectx.RootInstr = i1
 					require.Equal(t, tc.expected, m.Format())
@@ -120,6 +120,43 @@ func TestMachine_InsertReloadRegisterAt(t *testing.T) {
 					require.Equal(t, tc.expected, m.Format())
 				})
 			}
+		})
+	}
+}
+
+func TestMachine_InsertMoveBefore(t *testing.T) {
+	for _, tc := range []struct {
+		src, dst regalloc.VReg
+		expected string
+	}{
+		{
+			src: raxVReg,
+			dst: rdxVReg,
+			expected: `
+	ud2
+	movq %rax, %rdx
+	ret
+`,
+		},
+		{
+			src: xmm1VReg,
+			dst: xmm2VReg,
+			expected: `
+	ud2
+	movdqu %xmm1, %xmm2
+	ret
+`,
+		},
+	} {
+		t.Run(tc.expected, func(t *testing.T) {
+			_, _, m := newSetupWithMockContext()
+			i1, i2 := m.allocateInstr().asUD2(), m.allocateInstr().asRet(nil)
+			i1.next = i2
+			i2.prev = i1
+
+			m.InsertMoveBefore(tc.dst, tc.src, i2)
+			m.ectx.RootInstr = i1
+			require.Equal(t, tc.expected, m.Format())
 		})
 	}
 }

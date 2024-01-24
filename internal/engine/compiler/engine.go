@@ -1174,8 +1174,16 @@ func (ce *callEngine) builtinFunctionMemoryGrow(mem *wasm.MemoryInstance) {
 
 	// Update the moduleContext fields as they become stale after the update ^^.
 	bufSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&mem.Buffer))
-	ce.moduleContext.memorySliceLen = uint64(bufSliceHeader.Len)
-	ce.moduleContext.memoryElement0Address = bufSliceHeader.Data
+	if mem.Shared {
+		// Use atomic to ensure visibility for good measure. Though in practice, we know
+		// the data address should never change for shared memory, and the length field
+		// in the context is ignored.
+		atomic.StoreUint64(&ce.moduleContext.memorySliceLen, uint64(bufSliceHeader.Len))
+		atomic.StoreUintptr(&ce.moduleContext.memoryElement0Address, bufSliceHeader.Data)
+	} else {
+		ce.moduleContext.memorySliceLen = uint64(bufSliceHeader.Len)
+		ce.moduleContext.memoryElement0Address = bufSliceHeader.Data
+	}
 }
 
 func (ce *callEngine) builtinFunctionTableGrow(tables []*wasm.TableInstance) {

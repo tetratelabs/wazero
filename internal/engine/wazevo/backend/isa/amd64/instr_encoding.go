@@ -907,7 +907,8 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 		op := i.op1
 		switch op.kind {
 		case operandKindLabel:
-			panic("BUG: at this point label should have been resolved to imm32")
+			needsLabelResolution = true
+			fallthrough
 		case operandKindImm32:
 			c.EmitByte(0xe9)
 			c.Emit4Bytes(op.imm32)
@@ -936,7 +937,7 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 		switch op.kind {
 		case operandKindLabel:
 			needsLabelResolution = true
-			panic("BUG: at this point label should have been resolved to imm32")
+			fallthrough
 		case operandKindImm32:
 			c.EmitByte(0x0f)
 			c.EmitByte(0x80 | cond(i.u1).encoding())

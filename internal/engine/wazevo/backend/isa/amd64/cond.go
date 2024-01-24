@@ -78,7 +78,7 @@ func (c cond) String() string {
 	}
 }
 
-func condFromSSAIntCmpCond(origin ssa.IntegerCmpCond) cond { // nolint:unused
+func condFromSSAIntCmpCond(origin ssa.IntegerCmpCond) cond {
 	switch origin {
 	case ssa.IntegerCmpCondEqual:
 		return condZ
@@ -126,4 +126,43 @@ func condFromSSAFloatCmpCond(origin ssa.FloatCmpCond) cond { // nolint:unused
 
 func (c cond) encoding() byte {
 	return byte(c)
+}
+
+func (c cond) invert() cond {
+	switch c {
+	case condO:
+		return condNO
+	case condNO:
+		return condO
+	case condB:
+		return condNB
+	case condNB:
+		return condB
+	case condZ:
+		return condNZ
+	case condNZ:
+		return condZ
+	case condBE:
+		return condNBE
+	case condNBE:
+		return condBE
+	case condS:
+		return condNS
+	case condNS:
+		return condS
+	case condP:
+		return condNP
+	case condNP:
+		return condP
+	case condL:
+		return condNL
+	case condNL:
+		return condL
+	case condLE:
+		return condNLE
+	case condNLE:
+		return condLE
+	default:
+		panic("unreachable")
+	}
 }

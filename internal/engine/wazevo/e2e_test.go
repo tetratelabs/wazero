@@ -79,7 +79,6 @@ func TestE2E(t *testing.T) {
 		},
 		{
 			name: "swap", m: testcases.SwapParamAndReturn.Module,
-			skipAMD64: true,
 			calls: []callCase{
 				{params: []uint64{math.MaxUint32, math.MaxInt32}, expResults: []uint64{math.MaxInt32, math.MaxUint32}},
 			},
@@ -126,7 +125,6 @@ func TestE2E(t *testing.T) {
 		},
 		{
 			name: "fibonacci_recursive", m: testcases.FibonacciRecursive.Module,
-			skipAMD64: true,
 			calls: []callCase{
 				{params: []uint64{0}, expResults: []uint64{0}},
 				{params: []uint64{1}, expResults: []uint64{1}},
@@ -136,13 +134,8 @@ func TestE2E(t *testing.T) {
 				{params: []uint64{30}, expResults: []uint64{0xcb228}},
 			},
 		},
-		{
-			name: "call_simple", m: testcases.CallSimple.Module, calls: []callCase{{expResults: []uint64{40}}},
-		},
-		{
-			name: "call", m: testcases.Call.Module, calls: []callCase{{expResults: []uint64{45, 45}}},
-			skipAMD64: true,
-		},
+		{name: "call_simple", m: testcases.CallSimple.Module, calls: []callCase{{expResults: []uint64{40}}}},
+		{name: "call", m: testcases.Call.Module, calls: []callCase{{expResults: []uint64{45, 45}}}},
 		{
 			name: "stack overflow",
 			m: &wasm.Module{
@@ -302,9 +295,8 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
-			name:      "multi_predecessor_local_ref",
-			m:         testcases.MultiPredecessorLocalRef.Module,
-			skipAMD64: true,
+			name: "multi_predecessor_local_ref",
+			m:    testcases.MultiPredecessorLocalRef.Module,
 			calls: []callCase{
 				{params: []uint64{0, 100}, expResults: []uint64{100}},
 				{params: []uint64{1, 100}, expResults: []uint64{1}},

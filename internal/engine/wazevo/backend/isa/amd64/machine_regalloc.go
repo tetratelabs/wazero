@@ -8,8 +8,22 @@ import (
 
 // InsertMoveBefore implements backend.RegAllocFunctionMachine.
 func (m *machine) InsertMoveBefore(dst, src regalloc.VReg, instr *instruction) {
-	// TODO implement me
-	panic("implement me")
+	typ := src.RegType()
+	if typ != dst.RegType() {
+		panic("BUG: src and dst must have the same type")
+	}
+
+	mov := m.allocateInstr()
+	if typ == regalloc.RegTypeInt {
+		mov.asMovRR(src, dst, true)
+	} else {
+		mov.asXmmUnaryRmR(sseOpcodeMovdqu, newOperandReg(src), dst)
+	}
+
+	cur := instr.prev
+	prevNext := cur.next
+	cur = linkInstr(cur, mov)
+	linkInstr(cur, prevNext)
 }
 
 // InsertStoreRegisterAt implements backend.RegAllocFunctionMachine.
@@ -97,8 +111,19 @@ func (m *machine) Swap(cur *instruction, x1, x2, tmp regalloc.VReg) {
 
 // LastInstrForInsertion implements backend.RegAllocFunctionMachine.
 func (m *machine) LastInstrForInsertion(begin, end *instruction) *instruction {
-	// TODO implement me
-	panic("implement me")
+	cur := end
+	for cur.kind == nop0 {
+		cur = cur.prev
+		if cur == begin {
+			return end
+		}
+	}
+	switch cur.kind {
+	case jmp:
+		return cur
+	default:
+		return end
+	}
 }
 
 // SSABlockLabel implements backend.RegAllocFunctionMachine.
