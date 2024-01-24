@@ -198,7 +198,7 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 	case ssa.OpcodeReturn:
 		panic("BUG: return must be handled by backend.Compiler")
 	case ssa.OpcodeIconst, ssa.OpcodeF32const, ssa.OpcodeF64const: // Constant instructions are inlined.
-	case ssa.OpcodeCall:
+	case ssa.OpcodeCall, ssa.OpcodeCallIndirect:
 		m.lowerCall(instr)
 	case ssa.OpcodeStore:
 		m.lowerStore(instr)
@@ -229,9 +229,32 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 	case ssa.OpcodeExitWithCode:
 		execCtx, code := instr.ExitWithCodeData()
 		m.lowerExitWithCode(m.c.VRegOf(execCtx), code)
+	case ssa.OpcodeLoad:
+		dst := instr.Return()
+		ptr, offset, typ := instr.LoadData()
+		m.lowerLoad(ptr, offset, typ, dst)
 	default:
 		panic("TODO: lowering " + op.String())
 	}
+}
+
+func (m *machine) lowerLoad(ptr ssa.Value, offset uint32, typ ssa.Type, ret ssa.Value) {
+	mem := newOperandMem(m.lowerToAddressMode(ptr, offset))
+	dst := m.c.VRegOf(ret)
+	load := m.allocateInstr()
+	switch typ {
+	case ssa.TypeI32:
+		load.asMovzxRmR(extModeLQ, mem, dst)
+	case ssa.TypeI64:
+		load.asMov64MR(mem, dst)
+	case ssa.TypeF32:
+		load.asXmmUnaryRmR(sseOpcodeMovss, mem, dst)
+	case ssa.TypeF64:
+		load.asXmmUnaryRmR(sseOpcodeMovsd, mem, dst)
+	case ssa.TypeV128:
+		load.asXmmUnaryRmR(sseOpcodeMovdqu, mem, dst)
+	}
+	m.insert(load)
 }
 
 func (m *machine) lowerExitWithCode(execCtx regalloc.VReg, code wazevoapi.ExitCode) {
@@ -371,13 +394,14 @@ func (m *machine) lowerStore(si *ssa.Instruction) {
 
 func (m *machine) lowerCall(si *ssa.Instruction) {
 	isDirectCall := si.Opcode() == ssa.OpcodeCall
+	var indirectCalleePtr ssa.Value
 	var directCallee ssa.FuncRef
 	var sigID ssa.SignatureID
 	var args []ssa.Value
 	if isDirectCall {
 		directCallee, sigID, args = si.CallData()
 	} else {
-		panic("TODO")
+		indirectCalleePtr, sigID, args = si.CallIndirectData()
 	}
 	calleeABI := m.c.GetFunctionABI(m.c.SSABuilder().ResolveSignature(sigID))
 
@@ -393,11 +417,12 @@ func (m *machine) lowerCall(si *ssa.Instruction) {
 	}
 
 	if isDirectCall {
-		call := m.allocateInstr()
-		call.asCall(directCallee, calleeABI)
+		call := m.allocateInstr().asCall(directCallee, calleeABI)
 		m.insert(call)
 	} else {
-		panic("TODO")
+		ptrOp := m.getOperand_Mem_Reg(m.c.ValueDefinition(indirectCalleePtr))
+		callInd := m.allocateInstr().asCallIndirect(ptrOp, calleeABI)
+		m.insert(callInd)
 	}
 
 	var index int
