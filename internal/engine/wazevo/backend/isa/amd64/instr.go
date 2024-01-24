@@ -274,7 +274,6 @@ func (i *instruction) Uses(regs *[]regalloc.VReg) []regalloc.VReg {
 		op := i.op1
 		switch op.kind {
 		case operandKindReg:
-			fmt.Printf("op1: %s\n", op.format(true))
 			*regs = append(*regs, op.r)
 		case operandKindMem:
 			op.amode.uses(regs)
