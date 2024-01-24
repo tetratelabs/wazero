@@ -122,7 +122,6 @@ func TestE2E(t *testing.T) {
 				},
 			},
 		},
-
 		{
 			name: "many_params_many_results",
 			m:    testcases.ManyParamsManyResults.Module,
@@ -170,10 +169,9 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
-			name:      "imported_function_call",
-			imported:  testcases.ImportedFunctionCall.Imported,
-			m:         testcases.ImportedFunctionCall.Module,
-			skipAMD64: true,
+			name:     "imported_function_call",
+			imported: testcases.ImportedFunctionCall.Imported,
+			m:        testcases.ImportedFunctionCall.Module,
 			calls: []callCase{
 				{params: []uint64{0}, expResults: []uint64{0}},
 				{params: []uint64{2}, expResults: []uint64{2 * 2}},
@@ -234,9 +232,8 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
-			name:      "globals_get",
-			m:         testcases.GlobalsGet.Module,
-			skipAMD64: true,
+			name: "globals_get",
+			m:    testcases.GlobalsGet.Module,
 			calls: []callCase{
 				{expResults: []uint64{0x80000000, 0x8000000000000000, 0x7f7fffff, 0x7fefffffffffffff}},
 			},

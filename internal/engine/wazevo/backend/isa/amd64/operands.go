@@ -233,6 +233,20 @@ func (a *amode) String() string {
 	panic("BUG: invalid amode kind")
 }
 
+func (m *machine) getOperand_Mem_Reg(def *backend.SSAValueDefinition) (op operand) {
+	if def.IsFromBlockParam() {
+		return newOperandReg(def.BlkParamVReg)
+	}
+	if m.c.MatchInstr(def, ssa.OpcodeLoad) {
+		instr := def.Instr
+		ptr, offset, _ := instr.LoadData()
+		op = newOperandMem(m.lowerToAddressMode(ptr, offset))
+		instr.MarkLowered()
+		return op
+	}
+	return m.getOperand_Reg(def)
+}
+
 func (m *machine) getOperand_Mem_Imm32_Reg(def *backend.SSAValueDefinition) (op operand) {
 	if def.IsFromBlockParam() {
 		return newOperandReg(def.BlkParamVReg)

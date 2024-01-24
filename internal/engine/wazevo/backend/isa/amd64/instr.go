@@ -270,6 +270,18 @@ func (i *instruction) Uses(regs *[]regalloc.VReg) []regalloc.VReg {
 		default:
 			panic(fmt.Sprintf("BUG: invalid operand: %s", i))
 		}
+	case useKindCallInd:
+		op := i.op1
+		switch op.kind {
+		case operandKindReg:
+			fmt.Printf("op1: %s\n", op.format(true))
+			*regs = append(*regs, op.r)
+		case operandKindMem:
+			op.amode.uses(regs)
+		default:
+			panic(fmt.Sprintf("BUG: invalid operand: %s", i))
+		}
+		*regs = append(*regs, i.abi.ArgRealRegs...)
 	case useKindCall:
 		*regs = append(*regs, i.abi.ArgRealRegs...)
 	default:
@@ -282,6 +294,19 @@ func (i *instruction) Uses(regs *[]regalloc.VReg) []regalloc.VReg {
 func (i *instruction) AssignUse(index int, v regalloc.VReg) {
 	switch uk := useKinds[i.kind]; uk {
 	case useKindNone:
+	case useKindCallInd:
+		if index != 0 {
+			panic("BUG")
+		}
+		op := &i.op1
+		switch op.kind {
+		case operandKindReg:
+			op.r = v
+		case operandKindMem:
+			op.amode.assignUses(index, v)
+		default:
+			panic("BUG")
+		}
 	case useKindOp1Op2Reg, useKindOp1RegOp2:
 		op, opMustBeReg := &i.op1, &i.op2
 		if uk == useKindOp1RegOp2 {
@@ -1542,6 +1567,7 @@ var defKinds = [instrMax]defKind{
 	movzxRmR:     defKindOp2,
 	gprToXmm:     defKindOp2,
 	call:         defKindCall,
+	callIndirect: defKindCall,
 	ud2:          defKindNone,
 	jmp:          defKindNone,
 	jmpIf:        defKindNone,
@@ -1574,6 +1600,7 @@ const (
 	// useKindOp1RegOp2 is Op1 must be a register, Op2 can be any operand.
 	useKindOp1RegOp2
 	useKindCall
+	useKindCallInd
 )
 
 var useKinds = [instrMax]useKind{
@@ -1590,6 +1617,7 @@ var useKinds = [instrMax]useKind{
 	movzxRmR:     useKindOp1,
 	gprToXmm:     useKindOp1,
 	call:         useKindCall,
+	callIndirect: useKindCallInd,
 	ud2:          useKindNone,
 	jmpIf:        useKindOp1,
 	jmp:          useKindOp1,

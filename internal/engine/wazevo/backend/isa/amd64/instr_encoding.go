@@ -979,6 +979,7 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 		rex := rexInfo(0).clearW()
 		switch op.kind {
 		case operandKindReg:
+			fmt.Printf("callIndirect: %v\n", regInfo.RealRegName(op.r.RealReg()))
 			dst := regEncodings[op.r.RealReg()]
 			encodeRegReg(c,
 				legacyPrefixesNone,
