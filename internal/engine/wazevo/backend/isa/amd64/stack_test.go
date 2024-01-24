@@ -38,3 +38,32 @@ func TestUnwindStack(t *testing.T) {
 		})
 	}
 }
+
+func addressOf(v *byte) uint64 {
+	return uint64(uintptr(unsafe.Pointer(v)))
+}
+
+func TestAdjustStackAfterGrown(t *testing.T) {
+	// In order to allocate slices on Go heap, we need to allocSlice function.
+	allocSlice := func(size int) []byte {
+		return make([]byte, size)
+	}
+
+	oldStack := allocSlice(512)
+	oldRsp := uintptr(unsafe.Pointer(&oldStack[0]))
+	rbpIndex := uintptr(32)
+	binary.LittleEndian.PutUint64(oldStack[rbpIndex:], addressOf(&oldStack[16+rbpIndex]))
+	binary.LittleEndian.PutUint64(oldStack[rbpIndex+16:], addressOf(&oldStack[32+rbpIndex]))
+	binary.LittleEndian.PutUint64(oldStack[rbpIndex+32:], addressOf(&oldStack[160+rbpIndex]))
+
+	newStack := allocSlice(1024)
+	rsp := uintptr(unsafe.Pointer(&newStack[0]))
+	rbp := rsp + rbpIndex
+	// Coy old stack to new stack which contains the old pointers to the old stack elements.
+	copy(newStack, oldStack)
+
+	AdjustStackAfterGrown(oldRsp, rsp, rbp, uintptr(addressOf(&newStack[len(newStack)-1])))
+	require.Equal(t, addressOf(&newStack[rbpIndex+16]), binary.LittleEndian.Uint64(newStack[rbpIndex:]))
+	require.Equal(t, addressOf(&newStack[rbpIndex+32]), binary.LittleEndian.Uint64(newStack[rbpIndex+16:]))
+	require.Equal(t, addressOf(&newStack[rbpIndex+160]), binary.LittleEndian.Uint64(newStack[rbpIndex+32:]))
+}

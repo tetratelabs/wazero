@@ -6,8 +6,7 @@ import (
 	"unsafe"
 )
 
-// UnwindStack is a function to unwind the stack, and appends return addresses to `returnAddresses` slice.
-// The implementation must be aligned with the ABI/Calling convention as in machine_pro_epi_logue.go/abi.go.
+// UnwindStack implements wazevo.unwindStack.
 func UnwindStack(sp, _, top uintptr, returnAddresses []uintptr) []uintptr {
 	l := int(top - sp)
 
@@ -60,8 +59,7 @@ func UnwindStack(sp, _, top uintptr, returnAddresses []uintptr) []uintptr {
 	return returnAddresses
 }
 
-// GoCallStackView is a function to get a view of the stack before a Go call, which
-// is the view of the stack allocated in CompileGoFunctionTrampoline.
+// GoCallStackView implements wazevo.goCallStackView.
 func GoCallStackView(stackPointerBeforeGoCall *uint64) []uint64 {
 	//                  (high address)
 	//              +-----------------+ <----+

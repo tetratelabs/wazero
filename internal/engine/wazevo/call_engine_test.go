@@ -18,7 +18,7 @@ func TestCallEngine_init(t *testing.T) {
 func TestCallEngine_growStack(t *testing.T) {
 	t.Run("stack overflow", func(t *testing.T) {
 		c := &callEngine{stack: make([]byte, callStackCeiling+1)}
-		_, err := c.growStack()
+		_, _, err := c.growStack()
 		require.Error(t, err)
 	})
 
@@ -33,9 +33,10 @@ func TestCallEngine_growStack(t *testing.T) {
 			execCtx: executionContext{
 				stackGrowRequiredSize:    160,
 				stackPointerBeforeGoCall: (*uint64)(unsafe.Pointer(&s[10])),
+				framePointerBeforeGoCall: uintptr(unsafe.Pointer(&s[14])),
 			},
 		}
-		newSP, err := c.growStack()
+		newSP, newFp, err := c.growStack()
 		require.NoError(t, err)
 		require.Equal(t, 160+32*2+16, len(c.stack))
 
@@ -52,6 +53,7 @@ func TestCallEngine_growStack(t *testing.T) {
 		require.Equal(t, []byte{10, 11, 12, 13, 14}, view)
 		require.True(t, newSP >= uintptr(unsafe.Pointer(c.execCtx.stackBottomPtr)))
 		require.True(t, newSP <= c.stackTop)
+		require.Equal(t, newFp-newSP, uintptr(4))
 	})
 }
 

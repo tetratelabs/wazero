@@ -244,15 +244,17 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 		case wazevoapi.ExitCodeOK:
 			return nil
 		case wazevoapi.ExitCodeGrowStack:
-			var newsp uintptr
+			oldsp := uintptr(unsafe.Pointer(c.execCtx.stackPointerBeforeGoCall))
+			var newsp, newfp uintptr
 			if wazevoapi.StackGuardCheckEnabled {
-				newsp, err = c.growStackWithGuarded()
+				newsp, newfp, err = c.growStackWithGuarded()
 			} else {
-				newsp, err = c.growStack()
+				newsp, newfp, err = c.growStack()
 			}
 			if err != nil {
 				return err
 			}
+			adjustStackAfterGrown(oldsp, oldsp, newsp, newfp)
 			c.execCtx.exitCode = wazevoapi.ExitCodeOK
 			afterGoFunctionCallEntrypoint(c.execCtx.goCallReturnAddress, c.execCtxPtr, newsp)
 		case wazevoapi.ExitCodeGrowMemory:
@@ -407,11 +409,11 @@ func opaqueViewFromPtr(ptr uintptr) []byte {
 
 const callStackCeiling = uintptr(50000000) // in uint64 (8 bytes) == 400000000 bytes in total == 400mb.
 
-func (c *callEngine) growStackWithGuarded() (newSP uintptr, err error) {
+func (c *callEngine) growStackWithGuarded() (newSP uintptr, newFP uintptr, err error) {
 	if wazevoapi.StackGuardCheckEnabled {
 		wazevoapi.CheckStackGuardPage(c.stack)
 	}
-	newSP, err = c.growStack()
+	newSP, newFP, err = c.growStack()
 	if err != nil {
 		return
 	}
@@ -422,7 +424,7 @@ func (c *callEngine) growStackWithGuarded() (newSP uintptr, err error) {
 }
 
 // growStack grows the stack, and returns the new stack pointer.
-func (c *callEngine) growStack() (newSP uintptr, err error) {
+func (c *callEngine) growStack() (newSP, newFP uintptr, err error) {
 	currentLen := uintptr(len(c.stack))
 	if callStackCeiling < currentLen {
 		err = wasmruntime.ErrRuntimeStackOverflow
@@ -433,6 +435,7 @@ func (c *callEngine) growStack() (newSP uintptr, err error) {
 	newStack := make([]byte, newLen)
 
 	relSp := c.stackTop - uintptr(unsafe.Pointer(c.execCtx.stackPointerBeforeGoCall))
+	relFp := c.stackTop - c.execCtx.framePointerBeforeGoCall
 
 	// Copy the existing contents in the previous Go-allocated stack into the new one.
 	var prevStackAligned, newStackAligned []byte
@@ -445,6 +448,7 @@ func (c *callEngine) growStack() (newSP uintptr, err error) {
 	newTop := alignedStackTop(newStack)
 	{
 		newSP = newTop - relSp
+		newFP = newTop - relFp
 		sh := (*reflect.SliceHeader)(unsafe.Pointer(&newStackAligned))
 		sh.Data = newSP
 		sh.Len = int(relSp)
