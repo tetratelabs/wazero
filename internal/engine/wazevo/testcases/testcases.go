@@ -1291,7 +1291,7 @@ var (
 	GlobalsGet = TestCase{
 		Name: "globals_get",
 		Module: &wasm.Module{
-			TypeSection:     []wasm.FunctionType{{Results: []wasm.ValueType{i32, i64, f32, f64}}},
+			TypeSection:     []wasm.FunctionType{{Results: []wasm.ValueType{i32, i64, f32, f64, v128}}},
 			ExportSection:   []wasm.Export{{Name: ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 0}},
 			FunctionSection: []wasm.Index{0},
 			GlobalSection: []wasm.Global{
@@ -1311,6 +1311,10 @@ var (
 					Type: wasm.GlobalType{ValType: wasm.ValueTypeF64, Mutable: false},
 					Init: constExprF64(math.MaxFloat64),
 				},
+				{
+					Type: wasm.GlobalType{ValType: wasm.ValueTypeV128, Mutable: false},
+					Init: constExprV128(1234, 5678),
+				},
 			},
 			CodeSection: []wasm.Code{
 				{Body: []byte{
@@ -1318,6 +1322,7 @@ var (
 					wasm.OpcodeGlobalGet, 1,
 					wasm.OpcodeGlobalGet, 2,
 					wasm.OpcodeGlobalGet, 3,
+					wasm.OpcodeGlobalGet, 4,
 					wasm.OpcodeEnd,
 				}},
 			},
@@ -1767,6 +1772,19 @@ func constExprF64(i float64) wasm.ConstantExpression {
 		Data: []byte{
 			byte(b), byte(b >> 8), byte(b >> 16), byte(b >> 24),
 			byte(b >> 32), byte(b >> 40), byte(b >> 48), byte(b >> 56),
+		},
+	}
+}
+
+func constExprV128(lo, hi uint64) wasm.ConstantExpression {
+	return wasm.ConstantExpression{
+		Opcode: wasm.OpcodeVecPrefix,
+		Data: []byte{
+			wasm.OpcodeVecV128Const,
+			byte(lo), byte(lo >> 8), byte(lo >> 16), byte(lo >> 24),
+			byte(lo >> 32), byte(lo >> 40), byte(lo >> 48), byte(lo >> 56),
+			byte(hi), byte(hi >> 8), byte(hi >> 16), byte(hi >> 24),
+			byte(hi >> 32), byte(hi >> 40), byte(hi >> 48), byte(hi >> 56),
 		},
 	}
 }

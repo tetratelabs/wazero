@@ -235,7 +235,7 @@ func TestE2E(t *testing.T) {
 			name: "globals_get",
 			m:    testcases.GlobalsGet.Module,
 			calls: []callCase{
-				{expResults: []uint64{0x80000000, 0x8000000000000000, 0x7f7fffff, 0x7fefffffffffffff}},
+				{expResults: []uint64{0x80000000, 0x8000000000000000, 0x7f7fffff, 0x7fefffffffffffff, 1234, 5678}},
 			},
 		},
 		{
