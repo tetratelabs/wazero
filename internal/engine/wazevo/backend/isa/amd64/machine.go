@@ -229,17 +229,63 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 	case ssa.OpcodeExitWithCode:
 		execCtx, code := instr.ExitWithCodeData()
 		m.lowerExitWithCode(m.c.VRegOf(execCtx), code)
+	case ssa.OpcodeExitIfTrueWithCode:
+		execCtx, c, code := instr.ExitIfTrueWithCodeData()
+		m.lowerExitIfTrueWithCode(m.c.VRegOf(execCtx), c, code)
 	case ssa.OpcodeLoad:
-		dst := instr.Return()
 		ptr, offset, typ := instr.LoadData()
+		dst := m.c.VRegOf(instr.Return())
 		m.lowerLoad(ptr, offset, typ, dst)
+	case ssa.OpcodeUload8, ssa.OpcodeUload16, ssa.OpcodeUload32, ssa.OpcodeSload8, ssa.OpcodeSload16, ssa.OpcodeSload32:
+		ptr, offset, _ := instr.LoadData()
+		ret := m.c.VRegOf(instr.Return())
+		m.lowerExtLoad(op, ptr, offset, ret)
 	case ssa.OpcodeVconst:
 		result := instr.Return()
 		lo, hi := instr.VconstData()
 		m.lowerVconst(result, lo, hi)
+	case ssa.OpcodeSExtend, ssa.OpcodeUExtend:
+		from, to, signed := instr.ExtendData()
+		m.lowerExtend(instr.Arg(), instr.Return(), from, to, signed)
 	default:
 		panic("TODO: lowering " + op.String())
 	}
+}
+
+func (m *machine) lowerExtend(_arg, ret ssa.Value, from, to byte, signed bool) {
+	rd := m.c.VRegOf(ret)
+	arg := m.getOperand_Mem_Reg(m.c.ValueDefinition(_arg))
+
+	ext := m.allocateInstr()
+	switch {
+	case from == 8 && to == 16 && signed:
+		ext.asMovsxRmR(extModeBQ, arg, rd)
+	case from == 8 && to == 16 && !signed:
+		ext.asMovzxRmR(extModeBQ, arg, rd)
+	case from == 8 && to == 32 && signed:
+		ext.asMovsxRmR(extModeBQ, arg, rd)
+	case from == 8 && to == 32 && !signed:
+		ext.asMovzxRmR(extModeBQ, arg, rd)
+	case from == 8 && to == 64 && signed:
+		ext.asMovsxRmR(extModeBQ, arg, rd)
+	case from == 8 && to == 64 && !signed:
+		ext.asMovzxRmR(extModeBQ, arg, rd)
+	case from == 16 && to == 32 && signed:
+		ext.asMovsxRmR(extModeWQ, arg, rd)
+	case from == 16 && to == 32 && !signed:
+		ext.asMovzxRmR(extModeWQ, arg, rd)
+	case from == 16 && to == 64 && signed:
+		ext.asMovsxRmR(extModeWQ, arg, rd)
+	case from == 16 && to == 64 && !signed:
+		ext.asMovzxRmR(extModeWQ, arg, rd)
+	case from == 32 && to == 64 && signed:
+		ext.asMovsxRmR(extModeLQ, arg, rd)
+	case from == 32 && to == 64 && !signed:
+		ext.asMovzxRmR(extModeLQ, arg, rd)
+	default:
+		panic(fmt.Sprintf("BUG: unhandled extend: from=%d, to=%d, signed=%t", from, to, signed))
+	}
+	m.insert(ext)
 }
 
 func (m *machine) lowerVconst(res ssa.Value, lo, hi uint64) {
@@ -274,9 +320,8 @@ func (m *machine) lowerVconst(res ssa.Value, lo, hi uint64) {
 	jmp.asJmp(newOperandLabel(afterLoadLabel))
 }
 
-func (m *machine) lowerLoad(ptr ssa.Value, offset uint32, typ ssa.Type, ret ssa.Value) {
+func (m *machine) lowerLoad(ptr ssa.Value, offset uint32, typ ssa.Type, dst regalloc.VReg) {
 	mem := newOperandMem(m.lowerToAddressMode(ptr, offset))
-	dst := m.c.VRegOf(ret)
 	load := m.allocateInstr()
 	switch typ {
 	case ssa.TypeI32:
@@ -289,11 +334,56 @@ func (m *machine) lowerLoad(ptr ssa.Value, offset uint32, typ ssa.Type, ret ssa.
 		load.asXmmUnaryRmR(sseOpcodeMovsd, mem, dst)
 	case ssa.TypeV128:
 		load.asXmmUnaryRmR(sseOpcodeMovdqu, mem, dst)
+	default:
+		panic("BUG")
 	}
 	m.insert(load)
 }
 
-func (m *machine) lowerExitWithCode(execCtx regalloc.VReg, code wazevoapi.ExitCode) {
+func (m *machine) lowerExtLoad(op ssa.Opcode, ptr ssa.Value, offset uint32, dst regalloc.VReg) {
+	mem := newOperandMem(m.lowerToAddressMode(ptr, offset))
+	load := m.allocateInstr()
+	switch op {
+	case ssa.OpcodeUload8:
+		load.asMovzxRmR(extModeBQ, mem, dst)
+	case ssa.OpcodeUload16:
+		load.asMovzxRmR(extModeWQ, mem, dst)
+	case ssa.OpcodeUload32:
+		load.asMovzxRmR(extModeLQ, mem, dst)
+	case ssa.OpcodeSload8:
+		load.asMovsxRmR(extModeBQ, mem, dst)
+	case ssa.OpcodeSload16:
+		load.asMovsxRmR(extModeWQ, mem, dst)
+	case ssa.OpcodeSload32:
+		load.asMovsxRmR(extModeLQ, mem, dst)
+	default:
+		panic("BUG")
+	}
+	m.insert(load)
+}
+
+func (m *machine) lowerExitIfTrueWithCode(execCtx regalloc.VReg, cond ssa.Value, code wazevoapi.ExitCode) {
+	condDef := m.c.ValueDefinition(cond)
+	if !m.c.MatchInstr(condDef, ssa.OpcodeIcmp) {
+		panic("TODO: ExitIfTrue must come after Icmp at the moment: " + condDef.Instr.Opcode().String())
+	}
+	cvalInstr := condDef.Instr
+	cvalInstr.MarkLowered()
+
+	// We need to copy the execution context to a temp register, because if it's spilled,
+	// it might end up being reloaded inside the exiting branch.
+	execCtxTmp := m.copyToTmp(execCtx)
+
+	x, y, c := cvalInstr.IcmpData()
+	m.lowerIcmpToFlag(m.c.ValueDefinition(x), m.c.ValueDefinition(y), x.Type() == ssa.TypeI64)
+
+	jmpIf := m.allocateInstr()
+	m.insert(jmpIf)
+	l := m.lowerExitWithCode(execCtxTmp, code)
+	jmpIf.asJmpIf(condFromSSAIntCmpCond(c).invert(), newOperandLabel(l))
+}
+
+func (m *machine) lowerExitWithCode(execCtx regalloc.VReg, code wazevoapi.ExitCode) (afterLabel backend.Label) {
 	// First we set the exit code in the execution context.
 	exitCodeReg := m.c.AllocateVReg(ssa.TypeI32)
 	m.lowerIconst(exitCodeReg, uint64(code), false)
@@ -338,6 +428,7 @@ func (m *machine) lowerExitWithCode(execCtx regalloc.VReg, code wazevoapi.ExitCo
 	nop, l := m.allocateBrTarget()
 	readRip.asLEA(newAmodeRipRelative(l), ripReg)
 	m.insert(nop)
+	return l
 }
 
 func (m *machine) lowerAluRmiROp(si *ssa.Instruction, op aluRmiROpcode) {
@@ -354,22 +445,17 @@ func (m *machine) lowerAluRmiROp(si *ssa.Instruction, op aluRmiROpcode) {
 	rn := m.getOperand_Reg(xDef)
 	rm := m.getOperand_Mem_Imm32_Reg(yDef)
 	rd := m.c.VRegOf(si.Return())
-	tmp := m.c.AllocateVReg(si.Return().Type())
 
 	// rn is being overwritten, so we first copy its value to a temp register,
 	// in case it is referenced again later.
-	mov := m.allocateInstr()
-	mov.asMovRR(rn.r, tmp, _64)
-	m.insert(mov)
+	tmp := m.copyToTmp(rn.r)
 
 	alu := m.allocateInstr()
 	alu.asAluRmiR(op, rm, tmp, _64)
 	m.insert(alu)
 
 	// tmp now contains the result, we copy it to the dest register.
-	mov2 := m.allocateInstr()
-	mov2.asMovRR(tmp, rd, _64)
-	m.insert(mov2)
+	m.copyTo(rn.r, rd)
 }
 
 func (m *machine) lowerShiftR(si *ssa.Instruction, op shiftROp) {
@@ -384,20 +470,15 @@ func (m *machine) lowerShiftR(si *ssa.Instruction, op shiftROp) {
 	opAmt := m.getOperand_Imm32_Reg(amtDef)
 	rx := m.getOperand_Reg(xDef)
 	rd := m.c.VRegOf(si.Return())
-	tmpDst := m.c.AllocateVReg(si.Return().Type())
 
 	// rx is being overwritten, so we first copy its value to a temp register,
 	// in case it is referenced again later.
-	mov := m.allocateInstr()
-	mov.asMovRR(rx.r, tmpDst, _64)
-	m.insert(mov)
+	tmpDst := m.copyToTmp(rx.r)
 
 	if opAmt.r != regalloc.VRegInvalid {
 		// If opAmt is a register we must copy its value to rcx,
 		// because shiftR encoding mandates that the shift amount is in rcx.
-		mov := m.allocateInstr()
-		mov.asMovRR(opAmt.r, rcxVReg, _64)
-		m.insert(mov)
+		m.copyTo(opAmt.r, rcxVReg)
 
 		alu := m.allocateInstr()
 		alu.asShiftR(op, newOperandReg(rcxVReg), tmpDst, _64)
@@ -412,9 +493,7 @@ func (m *machine) lowerShiftR(si *ssa.Instruction, op shiftROp) {
 	}
 
 	// tmp now contains the result, we copy it to the dest register.
-	mov2 := m.allocateInstr()
-	mov2.asMovRR(tmpDst, rd, _64)
-	m.insert(mov2)
+	m.copyTo(tmpDst, rd)
 }
 
 func (m *machine) lowerStore(si *ssa.Instruction) {
@@ -674,4 +753,22 @@ func (m *machine) getVRegSpillSlotOffsetFromSP(id regalloc.VRegID, size byte) in
 		m.spillSlotSize += int64(size)
 	}
 	return offset
+}
+
+func (m *machine) copyTo(src regalloc.VReg, dst regalloc.VReg) {
+	typ := m.c.TypeOf(src)
+	mov := m.allocateInstr()
+	if typ.IsInt() {
+		mov.asMovRR(src, dst, true)
+	} else {
+		mov.asXmmUnaryRmR(sseOpcodeMovdqu, newOperandReg(src), dst)
+	}
+	m.insert(mov)
+}
+
+func (m *machine) copyToTmp(v regalloc.VReg) regalloc.VReg {
+	typ := m.c.TypeOf(v)
+	tmp := m.c.AllocateVReg(typ)
+	m.copyTo(v, tmp)
+	return tmp
 }
