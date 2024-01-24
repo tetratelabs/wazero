@@ -762,3 +762,22 @@ func Test1846(t *testing.T) {
 		require.Equal(t, uint64(0), hi)
 	})
 }
+
+// Test1847 verifies that an attempt to write a v128 value to an OOB memory location
+// does not result in a partial write (e.g. lower 64 bits) to memory.
+func Test1949(t *testing.T) {
+	if !platform.CompilerSupported() {
+		return
+	}
+	const offset = 65526
+	run(t, func(t *testing.T, r wazero.Runtime) {
+		mod, err := r.Instantiate(ctx, getWasmBinary(t, "1949"))
+		require.NoError(t, err)
+		_, err = mod.ExportedFunction("").Call(ctx)
+		require.Error(t, err)
+
+		read, ok := mod.Memory().Read(offset, 8)
+		require.True(t, ok)
+		require.Equal(t, []byte{0xfe, 0xca, 0xfe, 0xca, 0, 0, 0, 0}, read)
+	})
+}
