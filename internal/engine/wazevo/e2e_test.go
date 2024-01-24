@@ -715,7 +715,6 @@ wasm stack trace:
 }
 
 func TestStackUnwind_unreachable(t *testing.T) {
-	skipOnAmd64(t)
 	unreachable := &wasm.Module{
 		TypeSection:     []wasm.FunctionType{{}},
 		ExportSection:   []wasm.Export{{Name: "main", Type: wasm.ExternTypeFunc, Index: 0}},
