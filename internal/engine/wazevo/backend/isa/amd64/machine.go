@@ -455,7 +455,7 @@ func (m *machine) lowerAluRmiROp(si *ssa.Instruction, op aluRmiROpcode) {
 	m.insert(alu)
 
 	// tmp now contains the result, we copy it to the dest register.
-	m.copyTo(rn.r, rd)
+	m.copyTo(tmp, rd)
 }
 
 func (m *machine) lowerShiftR(si *ssa.Instruction, op shiftROp) {

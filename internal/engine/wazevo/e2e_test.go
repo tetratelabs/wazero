@@ -194,9 +194,8 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
-			name:      "memory_load_basic",
-			m:         testcases.MemoryLoadBasic.Module,
-			skipAMD64: true,
+			name: "memory_load_basic",
+			m:    testcases.MemoryLoadBasic.Module,
 			calls: []callCase{
 				{params: []uint64{0}, expResults: []uint64{0x03_02_01_00}},
 				{params: []uint64{256}, expResults: []uint64{0x03_02_01_00}},
@@ -206,9 +205,8 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
-			name:      "memory out of bounds",
-			m:         testcases.MemoryLoadBasic.Module,
-			skipAMD64: true,
+			name: "memory out of bounds",
+			m:    testcases.MemoryLoadBasic.Module,
 			calls: []callCase{
 				{params: []uint64{uint64(wasm.MemoryPageSize)}, expErr: "out of bounds memory access"},
 				// We load I32, so we can't load from the last 3 bytes.
