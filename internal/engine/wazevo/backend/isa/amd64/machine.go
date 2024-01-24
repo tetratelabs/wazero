@@ -243,28 +243,34 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 }
 
 func (m *machine) lowerVconst(res ssa.Value, lo, hi uint64) {
+	// TODO: use xor when lo == hi == 0.
+
 	dst := m.c.VRegOf(res)
 
-	load := m.allocateInstr()
+	islandAddr := m.c.AllocateVReg(ssa.TypeI64)
+	lea := m.allocateInstr()
+	load := m.allocateInstr().asXmmUnaryRmR(sseOpcodeMovdqu, newOperandMem(newAmodeImmReg(0, islandAddr)), dst)
 	jmp := m.allocateInstr()
 
 	constLabelNop, constLabel := m.allocateBrTarget()
 	constIsland := m.allocateInstr().asV128ConstIsland(lo, hi)
 	afterLoadNop, afterLoadLabel := m.allocateBrTarget()
 
-	// 		movdqu constLabel(%rip), %dst
+	// 		lea    constLabel(%rip), %islandAddr
+	// 		movdqu (%islandAddr), %dst
 	//		jmp    afterConst
 	// constLabel:
 	//		constIsland $lo, $hi
-	// afterLoad:
+	// afterConst:
 
+	m.insert(lea)
 	m.insert(load)
 	m.insert(jmp)
 	m.insert(constLabelNop)
 	m.insert(constIsland)
 	m.insert(afterLoadNop)
 
-	load.asXmmUnaryRmR(sseOpcodeMovdqu, newOperandMem(newAmodeRipRelative(constLabel)), dst)
+	lea.asLEA(newAmodeRipRelative(constLabel), islandAddr)
 	jmp.asJmp(newOperandLabel(afterLoadLabel))
 }
 
