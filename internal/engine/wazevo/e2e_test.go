@@ -123,6 +123,15 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
+			name: "integer bit counts", m: testcases.IntegerBitCounts.Module,
+			calls: []callCase{{
+				params: []uint64{10, 100},
+				expResults: []uint64{
+					28, 1, 2, 57, 2, 3,
+				},
+			}},
+		},
+		{
 			name: "many_params_many_results",
 			m:    testcases.ManyParamsManyResults.Module,
 			calls: []callCase{
