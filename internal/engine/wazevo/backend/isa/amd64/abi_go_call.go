@@ -254,7 +254,7 @@ func (m *machine) storeReturnAddressAndExit(cur *instruction, execCtx regalloc.V
 	readRip := m.allocateInstr()
 	cur = linkInstr(cur, readRip)
 
-	ripReg := m.c.AllocateVReg(ssa.TypeI64)
+	ripReg := r12VReg // Callee saved which is already saved.
 	saveRip := m.allocateInstr().asMovRM(
 		ripReg,
 		newOperandMem(newAmodeImmReg(wazevoapi.ExecutionContextOffsetGoCallReturnAddress.U32(), execCtx)),

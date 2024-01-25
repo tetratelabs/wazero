@@ -270,7 +270,6 @@ func (m *machine) getOperand_Imm32_Reg(def *backend.SSAValueDefinition) (op oper
 	instr := def.Instr
 	if instr.Constant() {
 		if op, ok := asImm32Operand(instr.ConstantVal()); ok {
-			fmt.Println("come")
 			instr.MarkLowered()
 			return op
 		}

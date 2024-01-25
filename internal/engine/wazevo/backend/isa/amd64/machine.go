@@ -491,8 +491,6 @@ func (m *machine) lowerShiftR(si *ssa.Instruction, op shiftROp) {
 		m.insert(alu)
 
 	} else {
-		println("::::::SONO QUI")
-
 		alu := m.allocateInstr()
 		alu.asShiftR(op, opAmt, tmpDst, _64)
 		m.insert(alu)
