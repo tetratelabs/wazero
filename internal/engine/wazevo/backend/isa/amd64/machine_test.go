@@ -9,6 +9,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
+	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
@@ -269,4 +270,162 @@ func TestMachine_lowerExitWithCode(t *testing.T) {
 L1:
 	ud2
 `, m.Format())
+}
+
+func Test_machine_lowerClz(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		setup    func(*mockCompiler, ssa.Builder, *machine) *backend.SSAValueDefinition
+		cpuFlags platform.CpuFeatureFlags
+		tpe      ssa.Type
+		exp      string
+	}{
+		{
+			name:     "no extra flags (64)",
+			cpuFlags: &mockCpuFlags{},
+			tpe:      ssa.TypeI64,
+			exp: `
+	testq %rax, %rax
+	jnz L1
+	movabsq $64, %rcx
+	jmp L2
+L1:
+	bsrq %rax, %rcx
+	xor $63, %rcx
+L2:
+`,
+		},
+		{
+			name:     "ABM (64)",
+			cpuFlags: &mockCpuFlags{extraFlags: platform.CpuExtraFeatureAmd64ABM},
+			tpe:      ssa.TypeI64,
+			exp: `
+	lzcntq %rax, %rcx
+`,
+		},
+		{
+			name:     "no extra flags (32)",
+			cpuFlags: &mockCpuFlags{},
+			tpe:      ssa.TypeI32,
+			exp: `
+	testl %eax, %eax
+	jnz L1
+	movl $32, %ecx
+	jmp L2
+L1:
+	bsrl %eax, %ecx
+	xor $31, %ecx
+L2:
+`,
+		},
+		{
+			name:     "ABM (32)",
+			cpuFlags: &mockCpuFlags{extraFlags: platform.CpuExtraFeatureAmd64ABM},
+			tpe:      ssa.TypeI32,
+			exp: `
+	lzcntl %eax, %ecx
+`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, b, m := newSetupWithMockContext()
+			p := b.CurrentBlock().AddParam(b, tc.tpe)
+			m.cpuFeatures = tc.cpuFlags
+
+			ctx.definitions[p] = &backend.SSAValueDefinition{BlockParamValue: p, BlkParamVReg: raxVReg}
+			ctx.vRegMap[0] = rcxVReg
+			instr := &ssa.Instruction{}
+			instr.AsClz(p)
+			m.lowerClz(instr)
+			m.ectx.FlushPendingInstructions()
+			m.ectx.RootInstr = m.ectx.PerBlockHead
+			require.Equal(t, tc.exp, m.Format())
+		})
+	}
+}
+
+func Test_machine_lowerCtz(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		setup    func(*mockCompiler, ssa.Builder, *machine) *backend.SSAValueDefinition
+		cpuFlags platform.CpuFeatureFlags
+		tpe      ssa.Type
+		exp      string
+	}{
+		{
+			name:     "no extra flags (64)",
+			cpuFlags: &mockCpuFlags{},
+			tpe:      ssa.TypeI64,
+			exp: `
+	testq %rax, %rax
+	jnz L1
+	movabsq $64, %rcx
+	jmp L2
+L1:
+	bsfq %rax, %rcx
+L2:
+`,
+		},
+		{
+			name:     "ABM (64)",
+			cpuFlags: &mockCpuFlags{extraFlags: platform.CpuExtraFeatureAmd64ABM},
+			tpe:      ssa.TypeI64,
+			exp: `
+	tzcntq %rax, %rcx
+`,
+		},
+		{
+			name:     "no extra flags (32)",
+			cpuFlags: &mockCpuFlags{},
+			tpe:      ssa.TypeI32,
+			exp: `
+	testl %eax, %eax
+	jnz L1
+	movl $32, %ecx
+	jmp L2
+L1:
+	bsfl %eax, %ecx
+L2:
+`,
+		},
+		{
+			name:     "ABM (32)",
+			cpuFlags: &mockCpuFlags{extraFlags: platform.CpuExtraFeatureAmd64ABM},
+			tpe:      ssa.TypeI32,
+			exp: `
+	tzcntl %eax, %ecx
+`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, b, m := newSetupWithMockContext()
+			p := b.CurrentBlock().AddParam(b, tc.tpe)
+			m.cpuFeatures = tc.cpuFlags
+
+			ctx.definitions[p] = &backend.SSAValueDefinition{BlockParamValue: p, BlkParamVReg: raxVReg}
+			ctx.vRegMap[0] = rcxVReg
+			instr := &ssa.Instruction{}
+			instr.AsCtz(p)
+			m.lowerCtz(instr)
+			m.ectx.FlushPendingInstructions()
+			m.ectx.RootInstr = m.ectx.PerBlockHead
+			require.Equal(t, tc.exp, m.Format())
+		})
+	}
+}
+
+// mockCpuFlags implements platform.CpuFeatureFlags
+type mockCpuFlags struct {
+	flags      platform.CpuFeature
+	extraFlags platform.CpuFeature
+}
+
+// Has implements the method of the same name in platform.CpuFeatureFlags
+func (f *mockCpuFlags) Has(flag platform.CpuFeature) bool {
+	return (f.flags & flag) != 0
+}
+
+// HasExtra implements the method of the same name in platform.CpuFeatureFlags
+func (f *mockCpuFlags) HasExtra(flag platform.CpuFeature) bool {
+	return (f.extraFlags & flag) != 0
 }

@@ -470,17 +470,17 @@ func TestAmd64Compiler_preventCrossedTargetdRegisters(t *testing.T) {
 
 // mockCpuFlags implements platform.CpuFeatureFlags
 type mockCpuFlags struct {
-	flags      uint64
-	extraFlags uint64
+	flags      platform.CpuFeature
+	extraFlags platform.CpuFeature
 }
 
 // Has implements the method of the same name in platform.CpuFeatureFlags
-func (f *mockCpuFlags) Has(flag uint64) bool {
+func (f *mockCpuFlags) Has(flag platform.CpuFeature) bool {
 	return (f.flags & flag) != 0
 }
 
 // HasExtra implements the method of the same name in platform.CpuFeatureFlags
-func (f *mockCpuFlags) HasExtra(flag uint64) bool {
+func (f *mockCpuFlags) HasExtra(flag platform.CpuFeature) bool {
 	return (f.extraFlags & flag) != 0
 }
 
@@ -498,7 +498,7 @@ func TestAmd64Compiler_ensureClz_ABM(t *testing.T) {
 			expectedCode: "b80a000000f3480fbdc0",
 			cpuFeatures: &mockCpuFlags{
 				flags:      0,
-				extraFlags: platform.CpuExtraFeatureABM,
+				extraFlags: platform.CpuExtraFeatureAmd64ABM,
 			},
 		},
 		{
@@ -556,7 +556,7 @@ func TestAmd64Compiler_ensureCtz_ABM(t *testing.T) {
 			expectedCode: "b80a000000f3480fbcc0",
 			cpuFeatures: &mockCpuFlags{
 				flags:      0,
-				extraFlags: platform.CpuExtraFeatureABM,
+				extraFlags: platform.CpuExtraFeatureAmd64ABM,
 			},
 		},
 		{

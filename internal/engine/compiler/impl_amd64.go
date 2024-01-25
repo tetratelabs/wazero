@@ -1268,7 +1268,7 @@ func (c *amd64Compiler) compileClz(o *wazeroir.UnionOperation) error {
 	}
 
 	unsignedInt := wazeroir.UnsignedInt(o.B1)
-	if c.cpuFeatures.HasExtra(platform.CpuExtraFeatureABM) {
+	if c.cpuFeatures.HasExtra(platform.CpuExtraFeatureAmd64ABM) {
 		if unsignedInt == wazeroir.UnsignedInt32 {
 			c.assembler.CompileRegisterToRegister(amd64.LZCNTL, target.register, target.register)
 		} else {
@@ -1331,7 +1331,7 @@ func (c *amd64Compiler) compileCtz(o *wazeroir.UnionOperation) error {
 	}
 
 	unsignedInt := wazeroir.UnsignedInt(o.B1)
-	if c.cpuFeatures.HasExtra(platform.CpuExtraFeatureABM) {
+	if c.cpuFeatures.HasExtra(platform.CpuExtraFeatureAmd64ABM) {
 		if unsignedInt == wazeroir.UnsignedInt32 {
 			c.assembler.CompileRegisterToRegister(amd64.TZCNTL, target.register, target.register)
 		} else {

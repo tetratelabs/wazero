@@ -10,6 +10,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
+	"github.com/tetratelabs/wazero/internal/platform"
 )
 
 // NewBackend returns a new backend for arm64.
@@ -21,9 +22,10 @@ func NewBackend() backend.Machine {
 		asNop,
 	)
 	return &machine{
-		ectx:       ectx,
-		regAlloc:   regalloc.NewAllocator(regInfo),
-		spillSlots: map[regalloc.VRegID]int64{},
+		ectx:        ectx,
+		cpuFeatures: platform.CpuFeatures,
+		regAlloc:    regalloc.NewAllocator(regInfo),
+		spillSlots:  map[regalloc.VRegID]int64{},
 	}
 }
 
@@ -33,6 +35,8 @@ type (
 		c                        backend.Compiler
 		ectx                     *backend.ExecutableContextT[instruction]
 		stackBoundsCheckDisabled bool
+
+		cpuFeatures platform.CpuFeatureFlags
 
 		regAlloc        regalloc.Allocator
 		regAllocFn      *backend.RegAllocFunction[*instruction, *machine]
@@ -218,12 +222,18 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		m.lowerShiftR(instr, shiftROpShiftLeft)
 	case ssa.OpcodeSshr:
 		m.lowerShiftR(instr, shiftROpShiftRightArithmetic)
+	case ssa.OpcodeUshr:
+		m.lowerShiftR(instr, shiftROpShiftRightLogical)
 	case ssa.OpcodeRotl:
 		m.lowerShiftR(instr, shiftROpRotateLeft)
 	case ssa.OpcodeRotr:
 		m.lowerShiftR(instr, shiftROpRotateRight)
-	case ssa.OpcodeUshr:
-		m.lowerShiftR(instr, shiftROpShiftRightLogical)
+	case ssa.OpcodeClz:
+		m.lowerClz(instr)
+	case ssa.OpcodeCtz:
+		m.lowerCtz(instr)
+	case ssa.OpcodePopcnt:
+		m.lowerUnaryRmR(instr, unaryRmROpcodePopcnt)
 	case ssa.OpcodeUndefined:
 		m.insert(m.allocateInstr().asUD2())
 	case ssa.OpcodeExitWithCode:
@@ -318,6 +328,132 @@ func (m *machine) lowerVconst(res ssa.Value, lo, hi uint64) {
 
 	lea.asLEA(newAmodeRipRelative(constLabel), islandAddr)
 	jmp.asJmp(newOperandLabel(afterLoadLabel))
+}
+
+func (m *machine) lowerCtz(instr *ssa.Instruction) {
+	if m.cpuFeatures.HasExtra(platform.CpuExtraFeatureAmd64ABM) {
+		m.lowerUnaryRmR(instr, unaryRmROpcodeTzcnt)
+	} else {
+		// On processors that do not support TZCNT, the BSF instruction is
+		// executed instead. The key difference between TZCNT and BSF
+		// instruction is that if source operand is zero, the content of
+		// destination operand is undefined.
+		// https://www.felixcloutier.com/x86/tzcnt.html
+
+		x := instr.Arg()
+		if !x.Type().IsInt() {
+			panic("BUG?")
+		}
+		_64 := x.Type().Bits() == 64
+
+		xDef := m.c.ValueDefinition(x)
+		rm := m.getOperand_Reg(xDef)
+		rd := m.c.VRegOf(instr.Return())
+
+		// First, we have to check if the target is non-zero.
+		test := m.allocateInstr()
+		test.asCmpRmiR(false, rm, rm.r, _64)
+		m.insert(test)
+
+		jmpNz := m.allocateInstr() // Will backpatch the operands later.
+		m.insert(jmpNz)
+
+		// If the value is zero, we just push the const value.
+		m.lowerIconst(rd, uint64(x.Type().Bits()), _64)
+
+		// Now jump right after the non-zero case.
+		jmpAtEnd := m.allocateInstr() // Will backpatch later.
+		m.insert(jmpAtEnd)
+
+		// jmpNz target label is set here.
+		nop, nz := m.allocateBrTarget()
+		jmpNz.asJmpIf(condNZ, newOperandLabel(nz))
+		m.insert(nop)
+
+		// Emit the non-zero case.
+		bsr := m.allocateInstr()
+		bsr.asUnaryRmR(unaryRmROpcodeBsf, rm, rd, _64)
+		m.insert(bsr)
+
+		// jmpAtEnd target label is set here.
+		nopEnd, end := m.allocateBrTarget()
+		jmpAtEnd.asJmp(newOperandLabel(end))
+		m.insert(nopEnd)
+	}
+}
+
+func (m *machine) lowerClz(instr *ssa.Instruction) {
+	if m.cpuFeatures.HasExtra(platform.CpuExtraFeatureAmd64ABM) {
+		m.lowerUnaryRmR(instr, unaryRmROpcodeLzcnt)
+	} else {
+		// On processors that do not support LZCNT, we combine BSR (calculating
+		// most significant set bit) with XOR. This logic is described in
+		// "Replace Raw Assembly Code with Builtin Intrinsics" section in:
+		// https://developer.apple.com/documentation/apple-silicon/addressing-architectural-differences-in-your-macos-code.
+
+		x := instr.Arg()
+		if !x.Type().IsInt() {
+			panic("BUG?")
+		}
+		_64 := x.Type().Bits() == 64
+
+		xDef := m.c.ValueDefinition(x)
+		rm := m.getOperand_Reg(xDef)
+		rd := m.c.VRegOf(instr.Return())
+
+		// First, we have to check if the rm is non-zero as BSR is undefined
+		// on zero. See https://www.felixcloutier.com/x86/bsr.
+		test := m.allocateInstr()
+		test.asCmpRmiR(false, rm, rm.r, _64)
+		m.insert(test)
+
+		jmpNz := m.allocateInstr() // Will backpatch later.
+		m.insert(jmpNz)
+
+		// If the value is zero, we just push the const value.
+		m.lowerIconst(rd, uint64(x.Type().Bits()), _64)
+
+		// Now jump right after the non-zero case.
+		jmpAtEnd := m.allocateInstr() // Will backpatch later.
+		m.insert(jmpAtEnd)
+
+		// jmpNz target label is set here.
+		nop, nz := m.allocateBrTarget()
+		jmpNz.asJmpIf(condNZ, newOperandLabel(nz))
+		m.insert(nop)
+
+		// Emit the non-zero case.
+		tmp := m.c.VRegOf(instr.Return())
+		bsr := m.allocateInstr()
+		bsr.asUnaryRmR(unaryRmROpcodeBsr, rm, tmp, _64)
+		m.insert(bsr)
+
+		// Now we XOR the value with the bit length minus one.
+		xor := m.allocateInstr()
+		xor.asAluRmiR(aluRmiROpcodeXor, newOperandImm32(uint32(x.Type().Bits()-1)), tmp, _64)
+		m.insert(xor)
+
+		// jmpAtEnd target label is set here.
+		nopEnd, end := m.allocateBrTarget()
+		jmpAtEnd.asJmp(newOperandLabel(end))
+		m.insert(nopEnd)
+	}
+}
+
+func (m *machine) lowerUnaryRmR(si *ssa.Instruction, op unaryRmROpcode) {
+	x := si.Arg()
+	if !x.Type().IsInt() {
+		panic("BUG?")
+	}
+	_64 := x.Type().Bits() == 64
+
+	xDef := m.c.ValueDefinition(x)
+	rm := m.getOperand_Imm32_Reg(xDef)
+	rd := m.c.VRegOf(si.Return())
+
+	instr := m.allocateInstr()
+	instr.asUnaryRmR(op, rm, rd, _64)
+	m.insert(instr)
 }
 
 func (m *machine) lowerLoad(ptr ssa.Value, offset uint32, typ ssa.Type, dst regalloc.VReg) {
