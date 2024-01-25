@@ -94,7 +94,17 @@ func (i *instruction) String() string {
 		}
 		return fmt.Sprintf("%s %s", op, i.op1.format(i.b1))
 	case div:
-		panic("TODO")
+		var prefix string
+		var op string
+		if i.b1 {
+			op = "divq"
+		} else {
+			op = "divl"
+		}
+		if i.u1 != 0 {
+			prefix = "i"
+		}
+		return fmt.Sprintf("%s%s %s", prefix, op, i.op1.format(i.b1))
 	case mulHi:
 		signed, _64 := i.u1 != 0, i.b1
 		var op string
@@ -112,7 +122,13 @@ func (i *instruction) String() string {
 	case checkedDivOrRemSeq:
 		panic("TODO")
 	case signExtendData:
-		panic("TODO")
+		var op string
+		if i.b1 {
+			op = "cqo"
+		} else {
+			op = "cdq"
+		}
+		return op
 	case movzxRmR:
 		return fmt.Sprintf("movzx.%s %s, %s", extMode(i.u1), i.op1.format(true), i.op2.format(true))
 	case mov64MR:
@@ -843,8 +859,24 @@ func (i *instruction) asMovzxRmR(ext extMode, src operand, rd regalloc.VReg) *in
 	return i
 }
 
+func (i *instruction) asSignExtendData(_64 bool) *instruction {
+	i.kind = signExtendData
+	i.b1 = _64
+	return i
+}
+
 func (i *instruction) asUD2() *instruction {
 	i.kind = ud2
+	return i
+}
+
+func (i *instruction) asDiv(rn operand, signed bool, _64 bool) *instruction {
+	i.kind = div
+	i.op1 = rn
+	i.b1 = _64
+	if signed {
+		i.u1 = 1
+	}
 	return i
 }
 
@@ -1576,6 +1608,8 @@ const (
 
 var defKinds = [instrMax]defKind{
 	nop0:            defKindNone,
+	div:             defKindNone,
+	signExtendData:  defKindNone,
 	ret:             defKindNone,
 	movRR:           defKindOp2,
 	movRM:           defKindNone,
@@ -1632,6 +1666,8 @@ const (
 
 var useKinds = [instrMax]useKind{
 	nop0:            useKindNone,
+	div:             useKindOp1,
+	signExtendData:  useKindNone,
 	ret:             useKindNone,
 	movRR:           useKindOp1,
 	movRM:           useKindOp1RegOp2,

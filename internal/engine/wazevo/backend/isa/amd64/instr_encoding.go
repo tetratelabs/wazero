@@ -522,7 +522,29 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 		encodeEncEnc(c, prefix, 0xf7, 1, subopcode, uint8(src), rex)
 
 	case div:
-		panic("TODO")
+		rex := rexInfo(0)
+		if i.b1 { // 64 bit.
+			rex = rexInfo(0).setW()
+		} else {
+			rex = rexInfo(0).clearW()
+		}
+		var subopcode uint8
+		if i.u1 != 0 { // 64 bit.
+			subopcode = 7
+		} else {
+			subopcode = 6
+		}
+
+		divisor := i.op1
+		if divisor.kind == operandKindReg {
+			src := regEncodings[divisor.r.RealReg()]
+			encodeEncEnc(c, legacyPrefixesNone, 0xf7, 1, subopcode, uint8(src), rex)
+		} else if divisor.kind == operandKindMem {
+			m := divisor.amode
+			encodeEncMem(c, legacyPrefixesNone, 0xf7, 1, subopcode, m, rex)
+		} else {
+			panic("BUG: invalid operand kind")
+		}
 
 	case mulHi:
 		var prefix legacyPrefixes
@@ -558,7 +580,12 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 	case checkedDivOrRemSeq:
 		panic("TODO")
 	case signExtendData:
-		panic("TODO")
+		if i.b1 { // 64 bit.
+			c.EmitByte(0x48)
+			c.EmitByte(0x99)
+		} else {
+			c.EmitByte(0x99)
+		}
 	case movzxRmR, movsxRmR:
 		signed := i.kind == movsxRmR
 

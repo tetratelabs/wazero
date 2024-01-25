@@ -123,6 +123,19 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
+			name: "div_return", m: testcases.DivReturn.Module,
+			calls: []callCase{
+				{
+					params:     []uint64{21, 10, 21, 10},
+					expResults: []uint64{21 / 10, 21 % 10, 21 / 10, 21 % 10, 21 / 10, 21 % 10, 21 / 10, 21 % 10},
+				},
+				{
+					params: []uint64{21, 0, 1, 1},
+					expErr: "wasm error: integer divide by zero",
+				},
+			},
+		},
+		{
 			name: "integer bit counts", m: testcases.IntegerBitCounts.Module,
 			calls: []callCase{{
 				params: []uint64{10, 100},

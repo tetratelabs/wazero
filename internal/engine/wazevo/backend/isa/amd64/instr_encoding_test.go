@@ -71,6 +71,56 @@ func TestInstruction_format_encode(t *testing.T) {
 			wantFormat: "movabsq $-126, %rcx",
 		},
 		{
+			setup:      func(i *instruction) { i.asSignExtendData(false) },
+			want:       "99",
+			wantFormat: "cdq",
+		},
+		{
+			setup:      func(i *instruction) { i.asSignExtendData(true) },
+			want:       "4899",
+			wantFormat: "cqo",
+		},
+		{
+			setup:      func(i *instruction) { i.asDiv(newOperandReg(raxVReg), true, true) },
+			want:       "48f7f8",
+			wantFormat: "idivq %rax",
+		},
+		{
+			setup:      func(i *instruction) { i.asDiv(newOperandReg(raxVReg), false, true) },
+			want:       "48f7f0",
+			wantFormat: "divq %rax",
+		},
+		{
+			setup:      func(i *instruction) { i.asDiv(newOperandReg(raxVReg), true, false) },
+			want:       "f7f8",
+			wantFormat: "idivl %eax",
+		},
+		{
+			setup:      func(i *instruction) { i.asDiv(newOperandReg(raxVReg), false, false) },
+			want:       "f7f0",
+			wantFormat: "divl %eax",
+		},
+		{
+			setup:      func(i *instruction) { i.asDiv(newOperandMem(newAmodeImmReg(123, raxVReg)), true, true) },
+			want:       "48f7787b",
+			wantFormat: "idivq 123(%rax)",
+		},
+		{
+			setup:      func(i *instruction) { i.asDiv(newOperandMem(newAmodeImmReg(123, raxVReg)), false, true) },
+			want:       "48f7707b",
+			wantFormat: "divq 123(%rax)",
+		},
+		{
+			setup:      func(i *instruction) { i.asDiv(newOperandMem(newAmodeImmReg(123, raxVReg)), true, false) },
+			want:       "f7787b",
+			wantFormat: "idivl 123(%rax)",
+		},
+		{
+			setup:      func(i *instruction) { i.asDiv(newOperandMem(newAmodeImmReg(123, raxVReg)), false, false) },
+			want:       "f7707b",
+			wantFormat: "divl 123(%rax)",
+		},
+		{
 			setup:      func(i *instruction) { i.asMovRR(raxVReg, rdiVReg, false) },
 			want:       "89c7",
 			wantFormat: "movl %eax, %edi",

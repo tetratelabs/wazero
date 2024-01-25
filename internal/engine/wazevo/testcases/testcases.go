@@ -163,6 +163,49 @@ var (
 				wasm.OpcodeEnd,
 			}, nil),
 	}
+	DivReturn = TestCase{
+		Name: "div return",
+		Module: SingleFunctionModule(
+			wasm.FunctionType{
+				Params:  []wasm.ValueType{i32, i32, i64, i64},
+				Results: []wasm.ValueType{i32, i32, i32, i32, i64, i64, i64, i64},
+			},
+			[]byte{
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeI32DivU,
+
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeI32RemU,
+
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeI32DivS,
+
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeI32RemS,
+
+				wasm.OpcodeLocalGet, 2,
+				wasm.OpcodeLocalGet, 3,
+				wasm.OpcodeI64DivU,
+
+				wasm.OpcodeLocalGet, 2,
+				wasm.OpcodeLocalGet, 3,
+				wasm.OpcodeI64RemU,
+
+				wasm.OpcodeLocalGet, 2,
+				wasm.OpcodeLocalGet, 3,
+				wasm.OpcodeI64DivS,
+
+				wasm.OpcodeLocalGet, 2,
+				wasm.OpcodeLocalGet, 3,
+				wasm.OpcodeI64RemS,
+
+				wasm.OpcodeEnd,
+			}, nil),
+	}
 	Locals       = TestCase{Name: "locals", Module: SingleFunctionModule(vv, []byte{wasm.OpcodeEnd}, []wasm.ValueType{i32, i64, f32, f64})}
 	LocalsParams = TestCase{
 		Name: "locals_params",
