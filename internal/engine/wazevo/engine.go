@@ -588,8 +588,6 @@ func (e *engine) compileSharedFunctions() {
 			exe := e.sharedFunctions.memoryGrowExecutable
 			wazevoapi.PerfMap.AddEntry(uintptr(unsafe.Pointer(&exe[0])), uint64(len(exe)), "memory_grow_trampoline")
 		}
-		fmt.Println(hex.EncodeToString(src))
-
 	}
 
 	e.be.Init()

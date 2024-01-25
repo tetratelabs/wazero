@@ -169,7 +169,7 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 	cur = m.restoreRegistersInExecutionContext(cur, execCtrPtr, calleeSavedVRegs)
 
 	// We don't need the slice size anymore, so pop it.
-	m.addRSP(8, cur)
+	cur = m.addRSP(8, cur)
 
 	// Ready to set up the results.
 	offsetInGoSlice = 0
@@ -206,7 +206,7 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 
 	// Finally ready to return.
 	cur = m.revertRBPRSP(cur)
-	cur = linkInstr(cur, m.allocateInstr().asRet(nil))
+	linkInstr(cur, m.allocateInstr().asRet(nil))
 
 	m.encodeWithoutSSA(exct.RootInstr)
 	return m.c.Buf()
