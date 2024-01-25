@@ -519,30 +519,36 @@ func (m *machine) lowerExitIfTrueWithCode(execCtx regalloc.VReg, cond ssa.Value,
 	jmpIf.asJmpIf(condFromSSAIntCmpCond(c).invert(), newOperandLabel(l))
 }
 
+func (m *machine) allocateExitInstructions(execCtx, exitCodeReg regalloc.VReg) (setExitCode, saveRsp, saveRbp *instruction) {
+	setExitCode = m.allocateInstr().asMovRM(
+		exitCodeReg,
+		newOperandMem(newAmodeImmReg(wazevoapi.ExecutionContextOffsetExitCodeOffset.U32(), execCtx)),
+		4,
+	)
+	saveRsp = m.allocateInstr().asMovRM(
+		rspVReg,
+		newOperandMem(newAmodeImmReg(wazevoapi.ExecutionContextOffsetStackPointerBeforeGoCall.U32(), execCtx)),
+		8,
+	)
+
+	saveRbp = m.allocateInstr().asMovRM(
+		rbpVReg,
+		newOperandMem(newAmodeImmReg(wazevoapi.ExecutionContextOffsetFramePointerBeforeGoCall.U32(), execCtx)),
+		8,
+	)
+	return
+}
+
 func (m *machine) lowerExitWithCode(execCtx regalloc.VReg, code wazevoapi.ExitCode) (afterLabel backend.Label) {
 	// First we set the exit code in the execution context.
 	exitCodeReg := m.c.AllocateVReg(ssa.TypeI32)
 	m.lowerIconst(exitCodeReg, uint64(code), false)
 
-	setExitCode := m.allocateInstr().asMovRM(
-		exitCodeReg,
-		newOperandMem(newAmodeImmReg(wazevoapi.ExecutionContextOffsetExitCodeOffset.U32(), execCtx)),
-		4,
-	)
-	m.insert(setExitCode)
+	setExitCode, saveRsp, saveRbp := m.allocateExitInstructions(execCtx, exitCodeReg)
 
-	// Next is to save RBP and RBP.
-	saveRsp := m.allocateInstr().asMovRM(
-		rspVReg,
-		newOperandMem(newAmodeImmReg(wazevoapi.ExecutionContextOffsetStackPointerBeforeGoCall.U32(), execCtx)),
-		8,
-	)
+	// Set exit code, save RSP and RBP.
+	m.insert(setExitCode)
 	m.insert(saveRsp)
-	saveRbp := m.allocateInstr().asMovRM(
-		rbpVReg,
-		newOperandMem(newAmodeImmReg(wazevoapi.ExecutionContextOffsetFramePointerBeforeGoCall.U32(), execCtx)),
-		8,
-	)
 	m.insert(saveRbp)
 
 	// Next is to save the return address.
@@ -621,8 +627,6 @@ func (m *machine) lowerShiftR(si *ssa.Instruction, op shiftROp) {
 		m.insert(alu)
 
 	} else {
-		println("::::::SONO QUI")
-
 		alu := m.allocateInstr()
 		alu.asShiftR(op, opAmt, tmpDst, _64)
 		m.insert(alu)
@@ -782,9 +786,40 @@ func (m *machine) Format() string {
 	return "\n" + strings.Join(lines, "\n") + "\n"
 }
 
-func (m *machine) encodeWithoutRelResolution(root *instruction) {
+func (m *machine) encodeWithoutSSA(root *instruction) {
+	m.labelResolutionPends = m.labelResolutionPends[:0]
+	ectx := m.ectx
+
+	bufPtr := m.c.BufPtr()
 	for cur := root; cur != nil; cur = cur.next {
-		cur.encode(m.c)
+		offset := int64(len(*bufPtr))
+		if cur.kind == nop0 {
+			l := cur.nop0Label()
+			if pos, ok := ectx.LabelPositions[l]; ok {
+				pos.BinaryOffset = offset
+			}
+		}
+
+		needLabelResolution := cur.encode(m.c)
+		if needLabelResolution {
+			m.labelResolutionPends = append(m.labelResolutionPends,
+				labelResolutionPend{instr: cur, imm32Offset: int64(len(*bufPtr)) - 4},
+			)
+		}
+	}
+
+	for i := range m.labelResolutionPends {
+		p := &m.labelResolutionPends[i]
+		switch p.instr.kind {
+		case jmp, jmpIf, lea:
+			target := p.instr.jmpLabel()
+			targetOffset := ectx.LabelPositions[target].BinaryOffset
+			imm32Offset := p.imm32Offset
+			jmpOffset := int32(targetOffset - (p.imm32Offset + 4)) // +4 because RIP points to the next instruction.
+			binary.LittleEndian.PutUint32((*bufPtr)[imm32Offset:], uint32(jmpOffset))
+		default:
+			panic("BUG")
+		}
 	}
 }
 

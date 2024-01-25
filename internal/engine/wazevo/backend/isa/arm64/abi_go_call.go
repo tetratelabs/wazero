@@ -66,7 +66,7 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 	const frameInfoSize = 16 // == frame_size + sliceSize.
 
 	// Next, we should allocate the stack for the Go function call if necessary.
-	goCallStackSize, sliceSizeInBytes := goFunctionCallRequiredStackSize(sig, argBegin)
+	goCallStackSize, sliceSizeInBytes := backend.GoFunctionCallRequiredStackSize(sig, argBegin)
 	cur = m.insertStackBoundsCheck(goCallStackSize+frameInfoSize, cur)
 
 	originalArg0Reg := x17VReg // Caller save, so we can use it for whatever we want.
@@ -78,7 +78,6 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 	// Save the callee saved registers.
 	cur = m.saveRegistersInExecutionContext(cur, calleeSavedRegistersSorted)
 
-	// Next, we need to store all the arguments to the stack in the typical Wasm stack style.
 	if needModuleContextPtr {
 		offset := wazevoapi.ExecutionContextOffsetGoFunctionCallCalleeModuleContextOpaque.I64()
 		if !offsetFitsInAddressModeKindRegUnsignedImm12(64, offset) {
@@ -102,6 +101,7 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 	copySp.asMove64(arg0ret0AddrReg, spVReg)
 	cur = linkInstr(cur, copySp)
 
+	// Next, we need to store all the arguments to the stack in the typical Wasm stack style.
 	for i := range abi.Args[argBegin:] {
 		arg := &abi.Args[argBegin+i]
 		store := m.allocateInstr()
@@ -371,35 +371,6 @@ func (m *machine) saveCurrentStackPointer(cur *instruction, execCtr regalloc.VRe
 		}, 64)
 	cur = linkInstr(cur, strSp)
 	return cur
-}
-
-// goFunctionCallRequiredStackSize returns the size of the stack required for the Go function call.
-func goFunctionCallRequiredStackSize(sig *ssa.Signature, argBegin int) (ret, retUnaligned int64) {
-	var paramNeededInBytes, resultNeededInBytes int64
-	for _, p := range sig.Params[argBegin:] {
-		s := int64(p.Size())
-		if s < 8 {
-			s = 8 // We use uint64 for all basic types, except SIMD v128.
-		}
-		paramNeededInBytes += s
-	}
-	for _, r := range sig.Results {
-		s := int64(r.Size())
-		if s < 8 {
-			s = 8 // We use uint64 for all basic types, except SIMD v128.
-		}
-		resultNeededInBytes += s
-	}
-
-	if paramNeededInBytes > resultNeededInBytes {
-		ret = paramNeededInBytes
-	} else {
-		ret = resultNeededInBytes
-	}
-	retUnaligned = ret
-	// Align to 16 bytes.
-	ret = (ret + 15) &^ 15
-	return
 }
 
 func (m *machine) goFunctionCallLoadStackArg(cur *instruction, originalArg0Reg regalloc.VReg, arg *backend.ABIArg, intVReg, floatVReg regalloc.VReg) (*instruction, regalloc.VReg) {

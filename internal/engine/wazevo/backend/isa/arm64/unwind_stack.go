@@ -72,11 +72,12 @@ func GoCallStackView(stackPointerBeforeGoCall *uint64) []uint64 {
 	//              |   frame_size    |
 	//              +-----------------+ <---- stackPointerBeforeGoCall
 	//                 (low address)
-	size := *(*uint64)(unsafe.Pointer(uintptr(unsafe.Pointer(stackPointerBeforeGoCall)) + 8))
+	ptr := unsafe.Pointer(stackPointerBeforeGoCall)
+	size := *(*uint64)(unsafe.Add(ptr, 8))
 	var view []uint64
 	{
 		sh := (*reflect.SliceHeader)(unsafe.Pointer(&view))
-		sh.Data = uintptr(unsafe.Pointer(stackPointerBeforeGoCall)) + 16 // skips the (frame_size, sliceSize).
+		sh.Data = uintptr(unsafe.Add(ptr, 16)) // skips the (frame_size, sliceSize).
 		sh.Len = int(size)
 		sh.Cap = int(size)
 	}

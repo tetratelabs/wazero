@@ -59,7 +59,25 @@ func UnwindStack(_, rbp, top uintptr, returnAddresses []uintptr) []uintptr {
 
 // GoCallStackView implements wazevo.goCallStackView.
 func GoCallStackView(stackPointerBeforeGoCall *uint64) []uint64 {
-	panic("implement me")
+	//                  (high address)
+	//              +-----------------+ <----+
+	//              |   xxxxxxxxxxx   |      | ;; optional unused space to make it 16-byte aligned.
+	//           ^  |  arg[N]/ret[M]  |      |
+	// sliceSize |  |  ............   |      | SizeInBytes/8
+	//           |  |  arg[1]/ret[1]  |      |
+	//           v  |  arg[0]/ret[0]  | <----+
+	//              |   SizeInBytes   |
+	//              +-----------------+ <---- stackPointerBeforeGoCall
+	//                 (low address)
+	size := *stackPointerBeforeGoCall / 8
+	var view []uint64
+	{
+		sh := (*reflect.SliceHeader)(unsafe.Pointer(&view))
+		sh.Data = uintptr(unsafe.Pointer(stackPointerBeforeGoCall)) + 8 // skips the(sliceSize.
+		sh.Len = int(size)
+		sh.Cap = int(size)
+	}
+	return view
 }
 
 func AdjustStackAfterGrown(oldRsp, rsp, rbp, top uintptr) {
