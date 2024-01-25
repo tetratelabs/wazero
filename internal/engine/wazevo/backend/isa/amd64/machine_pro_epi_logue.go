@@ -6,7 +6,7 @@ import "github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 func (m *machine) CompileStackGrowCallSequence() []byte {
 	// TODO
 	ud2 := m.allocateInstr().asUD2()
-	m.encodeWithoutRelResolution(ud2)
+	m.encodeWithoutSSA(ud2)
 	return m.c.Buf()
 }
 
@@ -47,10 +47,7 @@ func (m *machine) SetupPrologue() {
 	//       RSP ----> +-----------------+                |    Caller_RBP   |
 	//                    (low address)                   +-----------------+ <----- RSP, RBP
 	//
-	// 		push %rbp
-	// 		mov %rsp, %rbp
-	cur = linkInstr(cur, m.allocateInstr().asPush64(newOperandReg(rbpVReg)))
-	cur = linkInstr(cur, m.allocateInstr().asMovRR(rspVReg, rbpVReg, true))
+	cur = m.setupRBPRSP(cur)
 
 	if !m.stackBoundsCheckDisabled { //nolint
 		// TODO: stack bounds check
@@ -84,8 +81,7 @@ func (m *machine) SetupPrologue() {
 				cur = linkInstr(cur, m.allocateInstr().asPush64(newOperandReg(r)))
 			} else {
 				// Push the XMM register is not supported by the PUSH instruction.
-				spDec := m.allocateInstr().asAluRmiR(aluRmiROpcodeSub, newOperandImm32(uint32(16)), rspVReg, true)
-				cur = linkInstr(cur, spDec)
+				cur = m.addRSP(-16, cur)
 				push := m.allocateInstr().asXmmMovRM(
 					sseOpcodeMovdqu, r, newOperandMem(newAmodeImmReg(0, rspVReg)),
 				)
@@ -215,19 +211,37 @@ func (m *machine) setupEpilogueAfter(cur *instruction) {
 					sseOpcodeMovdqu, newOperandMem(newAmodeImmReg(0, rspVReg)), r,
 				)
 				cur = linkInstr(cur, pop)
-				spInc := m.allocateInstr().asAluRmiR(
-					aluRmiROpcodeAdd, newOperandImm32(uint32(16)), rspVReg, true,
-				)
-				cur = linkInstr(cur, spInc)
+				cur = m.addRSP(16, cur)
 			}
 		}
 	}
 
 	// Now roll back the RSP to RBP, and pop the caller's RBP.
-	// 		mov  %rbp, %rsp
-	// 		pop  %rbp
-	cur = linkInstr(cur, m.allocateInstr().asMovRR(rbpVReg, rspVReg, true))
-	cur = linkInstr(cur, m.allocateInstr().asPop64(rbpVReg))
+	cur = m.revertRBPRSP(cur)
 
 	linkInstr(cur, prevNext)
+}
+
+func (m *machine) addRSP(offset int32, cur *instruction) *instruction {
+	if offset == 0 {
+		return cur
+	}
+	opcode := aluRmiROpcodeAdd
+	if offset < 0 {
+		opcode = aluRmiROpcodeSub
+		offset = -offset
+	}
+	return linkInstr(cur, m.allocateInstr().asAluRmiR(opcode, newOperandImm32(uint32(offset)), rspVReg, true))
+}
+
+func (m *machine) setupRBPRSP(cur *instruction) *instruction {
+	cur = linkInstr(cur, m.allocateInstr().asPush64(newOperandReg(rbpVReg)))
+	cur = linkInstr(cur, m.allocateInstr().asMovRR(rspVReg, rbpVReg, true))
+	return cur
+}
+
+func (m *machine) revertRBPRSP(cur *instruction) *instruction {
+	cur = linkInstr(cur, m.allocateInstr().asMovRR(rbpVReg, rspVReg, true))
+	cur = linkInstr(cur, m.allocateInstr().asPop64(rbpVReg))
+	return cur
 }

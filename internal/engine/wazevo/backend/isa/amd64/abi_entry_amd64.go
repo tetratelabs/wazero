@@ -6,4 +6,4 @@ func entrypoint(preambleExecutable, functionExecutable *byte, executionContextPt
 
 // afterGoFunctionCallEntrypoint enters the machine code after growing the stack.
 // This implements wazevo.afterGoFunctionCallEntrypoint, and see the comments there for detail.
-func afterGoFunctionCallEntrypoint(executable *byte, executionContextPtr uintptr, stackPointer uintptr)
+func afterGoFunctionCallEntrypoint(executable *byte, executionContextPtr uintptr, stackPointer, framePointer uintptr)

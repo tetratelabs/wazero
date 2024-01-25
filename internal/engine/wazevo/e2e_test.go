@@ -249,10 +249,9 @@ func TestE2E(t *testing.T) {
 			}}},
 		},
 		{
-			name:      "memory_size_grow",
-			m:         testcases.MemorySizeGrow.Module,
-			skipAMD64: true,
-			calls:     []callCase{{expResults: []uint64{1, 2, 0xffffffff}}},
+			name:  "memory_size_grow",
+			m:     testcases.MemorySizeGrow.Module,
+			calls: []callCase{{expResults: []uint64{1, 2, 0xffffffff}}},
 		},
 		{
 			name:      "imported_memory_grow",

@@ -65,10 +65,6 @@ func (o *operand) format(_64 bool) string {
 	}
 }
 
-func newOperandLabel(label backend.Label) operand { //nolint:unused
-	return operand{kind: operandKindLabel, imm32: uint32(label)}
-}
-
 func (o *operand) label() backend.Label {
 	switch o.kind {
 	case operandKindLabel:
@@ -81,16 +77,20 @@ func (o *operand) label() backend.Label {
 	panic("BUG: invalid operand kind")
 }
 
+func newOperandLabel(label backend.Label) operand {
+	return operand{kind: operandKindLabel, imm32: uint32(label), r: regalloc.VRegInvalid}
+}
+
 func newOperandReg(r regalloc.VReg) operand {
 	return operand{kind: operandKindReg, r: r}
 }
 
 func newOperandImm32(imm32 uint32) operand {
-	return operand{kind: operandKindImm32, imm32: imm32}
+	return operand{kind: operandKindImm32, imm32: imm32, r: regalloc.VRegInvalid}
 }
 
 func newOperandMem(amode amode) operand {
-	return operand{kind: operandKindMem, amode: amode}
+	return operand{kind: operandKindMem, amode: amode, r: regalloc.VRegInvalid}
 }
 
 // amode is a memory operand (addressing mode).
@@ -270,6 +270,7 @@ func (m *machine) getOperand_Imm32_Reg(def *backend.SSAValueDefinition) (op oper
 	instr := def.Instr
 	if instr.Constant() {
 		if op, ok := asImm32Operand(instr.ConstantVal()); ok {
+			fmt.Println("come")
 			instr.MarkLowered()
 			return op
 		}

@@ -10,6 +10,6 @@ func entrypoint(preambleExecutable, functionExecutable *byte, executionContextPt
 	panic(runtime.GOARCH)
 }
 
-func afterGoFunctionCallEntrypoint(executable *byte, executionContextPtr uintptr, stackPointer uintptr) {
+func afterGoFunctionCallEntrypoint(executable *byte, executionContextPtr uintptr, stackPointer, framePointer uintptr) {
 	panic(runtime.GOARCH)
 }

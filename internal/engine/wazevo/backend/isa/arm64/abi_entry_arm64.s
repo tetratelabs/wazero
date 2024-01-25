@@ -13,7 +13,7 @@ TEXT ·entrypoint(SB), NOSPLIT|NOFRAME, $0-48
 	MOVD goAllocatedStackSlicePtr+40(FP), R26
 	JMP  (R27)
 
-TEXT ·afterGoFunctionCallEntrypoint(SB), NOSPLIT|NOFRAME, $0-24
+TEXT ·afterGoFunctionCallEntrypoint(SB), NOSPLIT|NOFRAME, $0-32
 	MOVD goCallReturnAddress+0(FP), R20
 	MOVD executionContextPtr+8(FP), R0
 	MOVD stackPointer+16(FP), R19

@@ -28,7 +28,7 @@ var (
 // CompileEntryPreamble implements backend.Machine.
 func (m *machine) CompileEntryPreamble(sig *ssa.Signature) []byte {
 	root := m.compileEntryPreamble(sig)
-	m.encodeWithoutRelResolution(root)
+	m.encodeWithoutSSA(root)
 	buf := m.c.Buf()
 	return buf
 }
@@ -46,10 +46,7 @@ func (m *machine) compileEntryPreamble(sig *ssa.Signature) *instruction {
 	cur := m.move64(executionContextPtrReg, savedExecutionContextPtr, root)
 
 	// Next is to save the original RBP and RSP into the execution context.
-	// 		mov %rbp, wazevoapi.ExecutionContextOffsetOriginalFramePointer(%executionContextPtrReg)
-	// 		mov %rsp, wazevoapi.ExecutionContextOffsetOriginalStackPointer(%executionContextPtrReg)
-	cur = m.loadOrStore64AtExecutionCtx(executionContextPtrReg, wazevoapi.ExecutionContextOffsetOriginalFramePointer, rbpVReg, true, cur)
-	cur = m.loadOrStore64AtExecutionCtx(executionContextPtrReg, wazevoapi.ExecutionContextOffsetOriginalStackPointer, rspVReg, true, cur)
+	cur = m.saveOriginalRSPRBP(cur)
 
 	// Now set the RSP to the Go-allocated stack pointer.
 	// 		mov %goAllocatedStackPtr, %rsp
@@ -97,14 +94,29 @@ func (m *machine) compileEntryPreamble(sig *ssa.Signature) *instruction {
 	}
 
 	// Finally, restore the original RBP and RSP.
-	// 		mov wazevoapi.ExecutionContextOffsetOriginalFramePointer(%executionContextPtrReg), %rbp
-	// 		mov wazevoapi.ExecutionContextOffsetOriginalStackPointer(%executionContextPtrReg), %rsp
-	cur = m.loadOrStore64AtExecutionCtx(savedExecutionContextPtr, wazevoapi.ExecutionContextOffsetOriginalFramePointer, rbpVReg, false, cur)
-	cur = m.loadOrStore64AtExecutionCtx(savedExecutionContextPtr, wazevoapi.ExecutionContextOffsetOriginalStackPointer, rspVReg, false, cur)
+	cur = m.restoreOriginalRSPRBP(cur)
 
 	ret := m.allocateInstr().asRet(&abi)
 	linkInstr(cur, ret)
 	return root
+}
+
+// saveOriginalRSPRBP saves the original RSP and RBP into the execution context.
+func (m *machine) saveOriginalRSPRBP(cur *instruction) *instruction {
+	// 		mov %rbp, wazevoapi.ExecutionContextOffsetOriginalFramePointer(%executionContextPtrReg)
+	// 		mov %rsp, wazevoapi.ExecutionContextOffsetOriginalStackPointer(%executionContextPtrReg)
+	cur = m.loadOrStore64AtExecutionCtx(executionContextPtrReg, wazevoapi.ExecutionContextOffsetOriginalFramePointer, rbpVReg, true, cur)
+	cur = m.loadOrStore64AtExecutionCtx(executionContextPtrReg, wazevoapi.ExecutionContextOffsetOriginalStackPointer, rspVReg, true, cur)
+	return cur
+}
+
+// restoreOriginalRSPRBP restores the original RSP and RBP from the execution context.
+func (m *machine) restoreOriginalRSPRBP(cur *instruction) *instruction {
+	// 		mov wazevoapi.ExecutionContextOffsetOriginalFramePointer(%executionContextPtrReg), %rbp
+	// 		mov wazevoapi.ExecutionContextOffsetOriginalStackPointer(%executionContextPtrReg), %rsp
+	cur = m.loadOrStore64AtExecutionCtx(savedExecutionContextPtr, wazevoapi.ExecutionContextOffsetOriginalFramePointer, rbpVReg, false, cur)
+	cur = m.loadOrStore64AtExecutionCtx(savedExecutionContextPtr, wazevoapi.ExecutionContextOffsetOriginalStackPointer, rspVReg, false, cur)
+	return cur
 }
 
 func (m *machine) move64(src, dst regalloc.VReg, prev *instruction) *instruction {
