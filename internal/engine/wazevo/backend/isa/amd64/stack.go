@@ -83,8 +83,8 @@ func GoCallStackView(stackPointerBeforeGoCall *uint64) []uint64 {
 func AdjustStackAfterGrown(oldRsp, rsp, rbp, top uintptr) {
 	diff := uint64(rsp - oldRsp)
 
-	stackBuf := stackView(rbp, top)
-	for i := uint64(0); i < uint64(len(stackBuf)); {
+	newBuf := stackView(rbp, top)
+	for i := uint64(0); i < uint64(len(newBuf)); {
 		//       (high address)
 		//    +-----------------+
 		//    |     .......     |
@@ -110,9 +110,13 @@ func AdjustStackAfterGrown(oldRsp, rsp, rbp, top uintptr) {
 		//    +-----------------+ <---- RBP
 		//       (low address)
 
-		callerRBP := binary.LittleEndian.Uint64(stackBuf[i:])
+		callerRBP := binary.LittleEndian.Uint64(newBuf[i:])
+		if callerRBP == 0 {
+			// End of stack.
+			break
+		}
 		adjustedCallerRBP := callerRBP + diff
-		binary.LittleEndian.PutUint64(stackBuf[i:], adjustedCallerRBP)
+		binary.LittleEndian.PutUint64(newBuf[i:], adjustedCallerRBP)
 		i = adjustedCallerRBP - uint64(rbp)
 	}
 }

@@ -172,7 +172,6 @@ func TestE2E(t *testing.T) {
 				CodeSection:     []wasm.Code{{Body: []byte{wasm.OpcodeCall, 0, wasm.OpcodeEnd}}},
 				ExportSection:   []wasm.Export{{Name: testcases.ExportedFunctionName, Index: 0, Type: wasm.ExternTypeFunc}},
 			},
-			skipAMD64: true,
 			calls: []callCase{
 				{expErr: "stack overflow"}, {expErr: "stack overflow"}, {expErr: "stack overflow"}, {expErr: "stack overflow"},
 			},
@@ -750,7 +749,6 @@ wasm stack trace:
 }
 
 func TestListener_local(t *testing.T) {
-	skipOnAmd64(t)
 	var buf bytes.Buffer
 	config := newRuntimeConfigOptimizingCompiler()
 	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
@@ -958,7 +956,6 @@ func TestListener_long_many_consts(t *testing.T) {
 
 // TestDWARF verifies that the DWARF based stack traces work as expected before/after compilation cache.
 func TestDWARF(t *testing.T) {
-	skipOnAmd64(t)
 	config := newRuntimeConfigOptimizingCompiler()
 	ctx := context.Background()
 

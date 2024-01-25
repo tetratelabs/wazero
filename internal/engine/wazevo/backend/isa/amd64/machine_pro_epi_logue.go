@@ -2,14 +2,6 @@ package amd64
 
 import "github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 
-// CompileStackGrowCallSequence implements backend.Machine.
-func (m *machine) CompileStackGrowCallSequence() []byte {
-	// TODO
-	ud2 := m.allocateInstr().asUD2()
-	m.encodeWithoutSSA(ud2)
-	return m.c.Buf()
-}
-
 // SetupPrologue implements backend.Machine.
 func (m *machine) SetupPrologue() {
 	cur := m.ectx.RootInstr
@@ -49,8 +41,8 @@ func (m *machine) SetupPrologue() {
 	//
 	cur = m.setupRBPRSP(cur)
 
-	if !m.stackBoundsCheckDisabled { //nolint
-		// TODO: stack bounds check
+	if !m.stackBoundsCheckDisabled {
+		cur = m.insertStackBoundsCheck(m.requiredStackSize(), cur)
 	}
 
 	//

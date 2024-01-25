@@ -345,7 +345,7 @@ func (m *machine) insertStackBoundsCheck(requiredStackSize int64, cur *instructi
 		cur = linkInstr(cur, sub)
 	}
 
-	tmp2 := x11VReg // Callee save, so it is safe to use it here in the prologue.
+	tmp2 := x11VReg // Caller save, so it is safe to use it here in the prologue.
 
 	// ldr tmp2, [executionContext #StackBottomPtr]
 	ldr := m.allocateInstr()

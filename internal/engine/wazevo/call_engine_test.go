@@ -59,9 +59,9 @@ func TestCallEngine_growStack(t *testing.T) {
 
 func TestCallEngine_requiredInitialStackSize(t *testing.T) {
 	c := &callEngine{}
-	require.Equal(t, 512, c.requiredInitialStackSize())
+	require.Equal(t, 10240, c.requiredInitialStackSize())
 	c.sizeOfParamResultSlice = 10
-	require.Equal(t, 512, c.requiredInitialStackSize())
-	c.sizeOfParamResultSlice = 120
-	require.Equal(t, 120*16+32+16, c.requiredInitialStackSize())
+	require.Equal(t, 10240, c.requiredInitialStackSize())
+	c.sizeOfParamResultSlice = 1000
+	require.Equal(t, 1000*16+32+16, c.requiredInitialStackSize())
 }

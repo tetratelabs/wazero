@@ -14,7 +14,7 @@ var calleeSavedVRegs = []regalloc.VReg{
 
 // CompileGoFunctionTrampoline implements backend.Machine.
 func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *ssa.Signature, needModuleContextPtr bool) []byte {
-	exct := m.ectx
+	ectx := m.ectx
 	argBegin := 1 // Skips exec context by default.
 	if needModuleContextPtr {
 		argBegin++
@@ -25,7 +25,7 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 	m.currentABI = abi
 
 	cur := m.allocateNop()
-	exct.RootInstr = cur
+	ectx.RootInstr = cur
 
 	// Execution context is always the first argument.
 	execCtrPtr := raxVReg
@@ -49,9 +49,7 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 	cur = m.setupRBPRSP(cur)
 
 	goSliceSizeAligned, goSliceSizeAlignedUnaligned := backend.GoFunctionCallRequiredStackSize(sig, argBegin)
-	if !m.stackBoundsCheckDisabled { //nolint
-		// TODO: stack bounds check
-	}
+	cur = m.insertStackBoundsCheck(goSliceSizeAligned+8 /* size of the Go slice */, cur)
 
 	// Save the callee saved registers.
 	cur = m.saveRegistersInExecutionContext(cur, execCtrPtr, calleeSavedVRegs)
@@ -208,7 +206,7 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 	cur = m.revertRBPRSP(cur)
 	linkInstr(cur, m.allocateInstr().asRet(nil))
 
-	m.encodeWithoutSSA(exct.RootInstr)
+	m.encodeWithoutSSA(ectx.RootInstr)
 	return m.c.Buf()
 }
 
@@ -268,5 +266,112 @@ func (m *machine) storeReturnAddressAndExit(cur *instruction, execCtx regalloc.V
 	nop, l := m.allocateBrTarget()
 	cur = linkInstr(cur, nop)
 	readRip.asLEA(newAmodeRipRelative(l), ripReg)
+	return cur
+}
+
+// saveRequiredRegs is the set of registers that must be saved/restored during growing stack when there's insufficient
+// stack space left. Basically this is the all allocatable registers except for RSP and RBP, and RAX which contains the
+// execution context pointer. ExecCtx pointer is always the first argument so we don't need to save it.
+var stackGrowSaveVRegs = []regalloc.VReg{
+	rdxVReg, r12VReg, r13VReg, r14VReg, r15VReg,
+	rcxVReg, rbxVReg, rsiVReg, rdiVReg, r8VReg, r9VReg, r10VReg, r11VReg,
+	xmm8VReg, xmm9VReg, xmm10VReg, xmm11VReg, xmm12VReg, xmm13VReg, xmm14VReg, xmm15VReg,
+	xmm0VReg, xmm1VReg, xmm2VReg, xmm3VReg, xmm4VReg, xmm5VReg, xmm6VReg, xmm7VReg,
+}
+
+// CompileStackGrowCallSequence implements backend.Machine.
+func (m *machine) CompileStackGrowCallSequence() []byte {
+	ectx := m.ectx
+
+	cur := m.allocateNop()
+	ectx.RootInstr = cur
+
+	cur = m.setupRBPRSP(cur)
+
+	// Execution context is always the first argument.
+	execCtrPtr := raxVReg
+
+	// Save the callee saved and argument registers.
+	cur = m.saveRegistersInExecutionContext(cur, execCtrPtr, stackGrowSaveVRegs)
+
+	// Load the exitCode to the register.
+	exitCodeReg := r12VReg // Already saved.
+	cur = linkInstr(cur, m.allocateInstr().asImm(exitCodeReg, uint64(wazevoapi.ExitCodeGrowStack), false))
+
+	setExitCode, saveRsp, saveRbp := m.allocateExitInstructions(execCtrPtr, exitCodeReg)
+	cur = linkInstr(cur, setExitCode)
+	cur = linkInstr(cur, saveRsp)
+	cur = linkInstr(cur, saveRbp)
+
+	// Ready to exit the execution.
+	cur = m.storeReturnAddressAndExit(cur, execCtrPtr)
+
+	// After the exit, restore the saved registers.
+	cur = m.restoreRegistersInExecutionContext(cur, execCtrPtr, stackGrowSaveVRegs)
+
+	// Finally ready to return.
+	cur = m.revertRBPRSP(cur)
+	linkInstr(cur, m.allocateInstr().asRet(nil))
+
+	m.encodeWithoutSSA(ectx.RootInstr)
+	return m.c.Buf()
+}
+
+// insertStackBoundsCheck will insert the instructions after `cur` to check the
+// stack bounds, and if there's no sufficient spaces required for the function,
+// exit the execution and try growing it in Go world.
+func (m *machine) insertStackBoundsCheck(requiredStackSize int64, cur *instruction) *instruction {
+	//		add $requiredStackSize, %rsp ;; Temporarily update the sp.
+	// 		cmp ExecutionContextOffsetStackBottomPtr(%rax), %rsp ;; Compare the stack bottom and the sp.
+	// 		ja .ok
+	//		sub $requiredStackSize, %rsp ;; Reverse the temporary update.
+	//      pushq r15 ;; save the temporary.
+	//		mov $requiredStackSize, %r15
+	//		mov %15, ExecutionContextOffsetStackGrowRequiredSize(%rax) ;; Set the required size in the execution context.
+	//      popq r15 ;; restore the temporary.
+	//		callq *ExecutionContextOffsetStackGrowCallTrampolineAddress(%rax) ;; Call the Go function to grow the stack.
+	//		jmp .cont
+	// .ok:
+	//		sub $requiredStackSize, %rsp ;; Reverse the temporary update.
+	// .cont:
+	cur = m.addRSP(-int32(requiredStackSize), cur)
+	cur = linkInstr(cur, m.allocateInstr().asCmpRmiR(true,
+		newOperandMem(newAmodeImmReg(wazevoapi.ExecutionContextOffsetStackBottomPtr.U32(), raxVReg)),
+		rspVReg, true))
+
+	ja := m.allocateInstr()
+	cur = linkInstr(cur, ja)
+
+	cur = m.addRSP(int32(requiredStackSize), cur)
+
+	// Save the temporary.
+
+	cur = linkInstr(cur, m.allocateInstr().asPush64(newOperandReg(r15VReg)))
+	// Load the required size to the temporary.
+	cur = linkInstr(cur, m.allocateInstr().asImm(r15VReg, uint64(requiredStackSize), true))
+	// Set the required size in the execution context.
+	cur = linkInstr(cur, m.allocateInstr().asMovRM(r15VReg,
+		newOperandMem(newAmodeImmReg(wazevoapi.ExecutionContextOffsetStackGrowRequiredSize.U32(), raxVReg)), 8))
+	// Restore the temporary.
+	cur = linkInstr(cur, m.allocateInstr().asPop64(r15VReg))
+	// Call the Go function to grow the stack.
+	cur = linkInstr(cur, m.allocateInstr().asCallIndirect(newOperandMem(newAmodeImmReg(
+		wazevoapi.ExecutionContextOffsetStackGrowCallTrampolineAddress.U32(), raxVReg)), nil))
+	// Jump to the continuation.
+	jmpToCont := m.allocateInstr()
+	cur = linkInstr(cur, jmpToCont)
+
+	// .ok:
+	okInstr, ok := m.allocateBrTarget()
+	cur = linkInstr(cur, okInstr)
+	ja.asJmpIf(condNBE, newOperandLabel(ok))
+	// On the ok path, we only need to reverse the temporary update.
+	cur = m.addRSP(int32(requiredStackSize), cur)
+
+	// .cont:
+	contInstr, cont := m.allocateBrTarget()
+	cur = linkInstr(cur, contInstr)
+	jmpToCont.asJmp(newOperandLabel(cont))
+
 	return cur
 }
