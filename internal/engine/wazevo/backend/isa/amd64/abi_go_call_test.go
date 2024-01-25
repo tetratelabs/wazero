@@ -2,11 +2,12 @@ package amd64
 
 import (
 	"context"
+	"testing"
+
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 	"github.com/tetratelabs/wazero/internal/testing/require"
-	"testing"
 )
 
 func Test_calleeSavedVRegs(t *testing.T) {
