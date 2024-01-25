@@ -674,7 +674,7 @@ func (m *machine) lowerCall(si *ssa.Instruction) {
 
 	stackSlotSize := calleeABI.AlignedArgResultStackSlotSize()
 	if m.maxRequiredStackSizeForCalls < stackSlotSize+16 {
-		m.maxRequiredStackSizeForCalls = stackSlotSize + 16 // return address frame.
+		m.maxRequiredStackSizeForCalls = stackSlotSize + 16 // 16 == return address + RBP.
 	}
 
 	for i, arg := range args {
@@ -944,4 +944,23 @@ func (m *machine) copyToTmp(v regalloc.VReg) regalloc.VReg {
 	tmp := m.c.AllocateVReg(typ)
 	m.copyTo(v, tmp)
 	return tmp
+}
+
+func (m *machine) requiredStackSize() int64 {
+	return m.maxRequiredStackSizeForCalls +
+		m.frameSize() +
+		16 + // Need for stack checking.
+		16 // return address and the caller RBP.
+}
+
+func (m *machine) frameSize() int64 {
+	s := m.clobberedRegSlotSize() + m.spillSlotSize
+	if s&0xf != 0 {
+		panic(fmt.Errorf("BUG: frame size %d is not 16-byte aligned", s))
+	}
+	return s
+}
+
+func (m *machine) clobberedRegSlotSize() int64 {
+	return int64(len(m.clobberedRegs) * 16)
 }

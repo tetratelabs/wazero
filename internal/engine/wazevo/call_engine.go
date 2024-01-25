@@ -86,7 +86,7 @@ type (
 )
 
 func (c *callEngine) requiredInitialStackSize() int {
-	const initialStackSizeDefault = 512
+	const initialStackSizeDefault = 10240
 	stackSize := initialStackSizeDefault
 	paramResultInBytes := c.sizeOfParamResultSlice * 8 * 2 // * 8 because uint64 is 8 bytes, and *2 because we need both separated param/result slots.
 	required := paramResultInBytes + 32 + 16               // 32 is enough to accommodate the call frame info, and 16 exists just in case when []byte is not aligned to 16 bytes.
@@ -254,7 +254,7 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 			if err != nil {
 				return err
 			}
-			adjustStackAfterGrown(oldsp, oldsp, newsp, newfp)
+			adjustStackAfterGrown(oldsp, newsp, newfp, c.stackTop)
 			c.execCtx.exitCode = wazevoapi.ExitCodeOK
 			afterGoFunctionCallEntrypoint(c.execCtx.goCallReturnAddress, c.execCtxPtr, newsp, newfp)
 		case wazevoapi.ExitCodeGrowMemory:
