@@ -447,7 +447,6 @@ func TestE2E(t *testing.T) {
 }
 
 func TestE2E_host_functions(t *testing.T) {
-	skipOnAmd64(t)
 	var buf bytes.Buffer
 	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
 
@@ -611,7 +610,6 @@ func TestE2E_stores(t *testing.T) {
 }
 
 func TestE2E_reexported_memory(t *testing.T) {
-	skipOnAmd64(t)
 	m1 := &wasm.Module{
 		ExportSection: []wasm.Export{{Name: "mem", Type: wasm.ExternTypeMemory, Index: 0}},
 		MemorySection: &wasm.Memory{Min: 1},
@@ -660,7 +658,6 @@ func TestE2E_reexported_memory(t *testing.T) {
 }
 
 func TestStackUnwind_panic_in_host(t *testing.T) {
-	skipOnAmd64(t)
 	unreachable := &wasm.Module{
 		ImportFunctionCount: 1,
 		ImportSection:       []wasm.Import{{Module: "host", Name: "cause_unreachable", Type: wasm.ExternTypeFunc, DescFunc: 0}},
@@ -782,7 +779,6 @@ func TestListener_local(t *testing.T) {
 }
 
 func TestListener_imported(t *testing.T) {
-	skipOnAmd64(t)
 	var buf bytes.Buffer
 	config := newRuntimeConfigOptimizingCompiler()
 	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
