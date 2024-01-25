@@ -262,6 +262,7 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 			mem := mod.MemoryInstance
 			s := goCallStackView(c.execCtx.stackPointerBeforeGoCall)
 			argRes := &s[0]
+			fmt.Println("memory_grow arg:", *argRes)
 			if res, ok := mem.Grow(uint32(*argRes)); !ok {
 				*argRes = uint64(0xffffffff) // = -1 in signed 32-bit integer.
 			} else {
@@ -276,6 +277,7 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 					putLocalMemory(importedMemOwner, 8 /* local memory begins at 8 */, mem)
 				}
 			}
+			fmt.Println("memory_grow res:", *argRes)
 			c.execCtx.exitCode = wazevoapi.ExitCodeOK
 			afterGoFunctionCallEntrypoint(c.execCtx.goCallReturnAddress, c.execCtxPtr, uintptr(unsafe.Pointer(c.execCtx.stackPointerBeforeGoCall)), c.execCtx.framePointerBeforeGoCall)
 		case wazevoapi.ExitCodeTableGrow:

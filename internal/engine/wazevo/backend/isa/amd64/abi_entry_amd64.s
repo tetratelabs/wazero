@@ -21,7 +21,8 @@ TEXT ·afterGoFunctionCallEntrypoint(SB), NOSPLIT|NOFRAME, $0-32
     MOVQ SP, 24(AX)  // 24 == ExecutionContextOffsetOriginalStackPointer
 
     // Then set the stack pointer and frame pointer to the values we got from the Go runtime.
-    MOVQ stackPointer+16(FP), SP
     MOVQ framePointer+24(FP), BP
+    // WARNING: do not update SP before BP, because the Go translates (FP) as (SP) + 8.
+    MOVQ stackPointer+16(FP), SP
 
 	JMP  CX

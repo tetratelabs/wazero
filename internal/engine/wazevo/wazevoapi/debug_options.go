@@ -19,7 +19,7 @@ import (
 const (
 	FrontEndLoggingEnabled = false
 	SSALoggingEnabled      = false
-	RegAllocLoggingEnabled = true
+	RegAllocLoggingEnabled = false
 )
 
 // ----- Output prints -----
@@ -28,10 +28,10 @@ const (
 const (
 	PrintSSA                                 = false
 	PrintOptimizedSSA                        = false
-	PrintBlockLaidOutSSA                     = true
-	PrintSSAToBackendIRLowering              = true
+	PrintBlockLaidOutSSA                     = false
+	PrintSSAToBackendIRLowering              = false
 	PrintRegisterAllocated                   = false
-	PrintFinalizedMachineCode                = true
+	PrintFinalizedMachineCode                = false
 	PrintMachineCodeHexPerFunction           = printMachineCodeHexPerFunctionUnmodified || PrintMachineCodeHexPerFunctionDisassemblable //nolint
 	printMachineCodeHexPerFunctionUnmodified = false
 	// PrintMachineCodeHexPerFunctionDisassemblable prints the machine code while modifying the actual result

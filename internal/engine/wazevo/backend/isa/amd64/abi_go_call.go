@@ -166,7 +166,7 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 	cur = m.storeReturnAddressAndExit(cur, execCtrPtr)
 
 	// After the call, we need to restore the callee saved registers.
-	cur = m.restoreRegistersInExecutionContext(cur, calleeSavedVRegs)
+	cur = m.restoreRegistersInExecutionContext(cur, execCtrPtr, calleeSavedVRegs)
 
 	// We don't need the slice size anymore, so pop it.
 	m.addRSP(8, cur)
@@ -231,11 +231,11 @@ func (m *machine) saveRegistersInExecutionContext(cur *instruction, execCtx rega
 	return cur
 }
 
-func (m *machine) restoreRegistersInExecutionContext(cur *instruction, regs []regalloc.VReg) *instruction {
+func (m *machine) restoreRegistersInExecutionContext(cur *instruction, execCtx regalloc.VReg, regs []regalloc.VReg) *instruction {
 	offset := wazevoapi.ExecutionContextOffsetSavedRegistersBegin.I64()
 	for _, v := range regs {
 		load := m.allocateInstr()
-		mem := newOperandMem(newAmodeImmReg(uint32(offset), v))
+		mem := newOperandMem(newAmodeImmReg(uint32(offset), execCtx))
 		switch v.RegType() {
 		case regalloc.RegTypeInt:
 			load.asMov64MR(mem, v)
