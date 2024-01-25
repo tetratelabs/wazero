@@ -265,7 +265,6 @@ func TestE2E(t *testing.T) {
 			name: "call_indirect",
 			m:    testcases.CallIndirect.Module,
 			// parameter == table offset.
-			skipAMD64: true,
 			calls: []callCase{
 				{params: []uint64{0}, expErr: "indirect call type mismatch"},
 				{params: []uint64{1}, expResults: []uint64{10}},
@@ -538,7 +537,6 @@ func TestE2E_host_functions(t *testing.T) {
 }
 
 func TestE2E_stores(t *testing.T) {
-	skipOnAmd64(t)
 	config := newRuntimeConfigOptimizingCompiler()
 
 	ctx := context.Background()

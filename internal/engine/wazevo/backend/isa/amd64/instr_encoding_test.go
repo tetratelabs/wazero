@@ -1895,11 +1895,43 @@ func TestInstruction_format_encode(t *testing.T) {
 		},
 		{
 			setup: func(i *instruction) {
+				a := newOperandMem(newAmodeRegRegShift(1, rcxVReg, rdxVReg, 0))
+				i.asMovRM(rsiVReg, a, 1)
+			},
+			want:       "4088741101",
+			wantFormat: "mov.b %rsi, 1(%rcx,%rdx,1)",
+		},
+		{
+			setup: func(i *instruction) {
+				a := newOperandMem(newAmodeRegRegShift(1, rcxVReg, rdxVReg, 1))
+				i.asMovRM(rdiVReg, a, 1)
+			},
+			want:       "40887c5101",
+			wantFormat: "mov.b %rdi, 1(%rcx,%rdx,2)",
+		},
+		{
+			setup: func(i *instruction) {
+				a := newOperandMem(newAmodeRegRegShift(1, rcxVReg, rdxVReg, 1))
+				i.asMovRM(rdiVReg, a, 2)
+			},
+			want:       "66897c5101",
+			wantFormat: "mov.w %rdi, 1(%rcx,%rdx,2)",
+		},
+		{
+			setup: func(i *instruction) {
 				a := newOperandMem(newAmodeRegRegShift(1<<20, raxVReg, rcxVReg, 3))
 				i.asMovRM(rdiVReg, a, 2)
 			},
 			want:       "6689bcc800001000",
 			wantFormat: "mov.w %rdi, 1048576(%rax,%rcx,8)",
+		},
+		{
+			setup: func(i *instruction) {
+				a := newOperandMem(newAmodeRegRegShift(1<<20, rcxVReg, rdxVReg, 3))
+				i.asMovRM(rdiVReg, a, 2)
+			},
+			want:       "6689bcd100001000",
+			wantFormat: "mov.w %rdi, 1048576(%rcx,%rdx,8)",
 		},
 		{
 			setup: func(i *instruction) {
