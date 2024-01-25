@@ -538,7 +538,6 @@ func TestE2E_host_functions(t *testing.T) {
 }
 
 func TestE2E_stores(t *testing.T) {
-	skipOnAmd64(t)
 	config := newRuntimeConfigOptimizingCompiler()
 
 	ctx := context.Background()

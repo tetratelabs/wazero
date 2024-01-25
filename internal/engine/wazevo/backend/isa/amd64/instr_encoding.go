@@ -1218,7 +1218,7 @@ func (ri rexInfo) encodeForIndex(c backend.Compiler, encR regEnc, encIndex regEn
 	x := encIndex.rexBit()
 	b := encBase.rexBit()
 	rex := byte(0x40) | w<<3 | r<<2 | x<<1 | b
-	if rex != 0x40 || ri&0x02 == 1 {
+	if rex != 0x40 || ri&0x02 != 0 {
 		c.EmitByte(rex)
 	}
 }
