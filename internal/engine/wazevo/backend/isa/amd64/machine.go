@@ -235,45 +235,7 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 	case ssa.OpcodePopcnt:
 		m.lowerUnaryRmR(instr, unaryRmROpcodePopcnt)
 	case ssa.OpcodeFadd, ssa.OpcodeFsub, ssa.OpcodeFmul, ssa.OpcodeFdiv:
-		x, y := instr.Arg2()
-		if !x.Type().IsFloat() {
-			panic("BUG?")
-		}
-		var op2 sseOpcode
-		if x.Type().Bits() == 64 {
-			switch instr.Opcode() {
-			case ssa.OpcodeFadd:
-				op2 = sseOpcodeAddsd
-			case ssa.OpcodeFsub:
-				op2 = sseOpcodeSubsd
-			case ssa.OpcodeFmul:
-				op2 = sseOpcodeMulsd
-			case ssa.OpcodeFdiv:
-				op2 = sseOpcodeDivsd
-			default:
-				panic("BUG")
-			}
-		} else {
-			switch instr.Opcode() {
-			case ssa.OpcodeFadd:
-				op2 = sseOpcodeAddss
-			case ssa.OpcodeFsub:
-				op2 = sseOpcodeSubss
-			case ssa.OpcodeFmul:
-				op2 = sseOpcodeMulss
-			case ssa.OpcodeFdiv:
-				op2 = sseOpcodeDivss
-			default:
-				panic("BUG")
-			}
-		}
-
-		xDef, yDef := m.c.ValueDefinition(x), m.c.ValueDefinition(y)
-		rn := m.getOperand_Mem_Reg(xDef)
-		rm := m.getOperand_Reg(yDef)
-		rd := m.c.VRegOf(instr.Return())
-
-		m.lowerXmmRmR(op2, rn, rm, rd, x.Type())
+		m.lowerXmmRmR(instr)
 	case ssa.OpcodeFabs:
 		m.lowerFabsFneg(instr)
 	case ssa.OpcodeFneg:
@@ -682,21 +644,61 @@ func (m *machine) lowerShiftR(si *ssa.Instruction, op shiftROp) {
 	m.copyTo(tmpDst, rd)
 }
 
-func (m *machine) lowerXmmRmR(op sseOpcode, rn, rm operand, rd regalloc.VReg, tpe ssa.Type) {
+func (m *machine) lowerXmmRmR(instr *ssa.Instruction) {
+	x, y := instr.Arg2()
+	if !x.Type().IsFloat() {
+		panic("BUG?")
+	}
+	_64 := x.Type().Bits() == 64
+
+	var op sseOpcode
+	if _64 {
+		switch instr.Opcode() {
+		case ssa.OpcodeFadd:
+			op = sseOpcodeAddsd
+		case ssa.OpcodeFsub:
+			op = sseOpcodeSubsd
+		case ssa.OpcodeFmul:
+			op = sseOpcodeMulsd
+		case ssa.OpcodeFdiv:
+			op = sseOpcodeDivsd
+		default:
+			panic("BUG")
+		}
+	} else {
+		switch instr.Opcode() {
+		case ssa.OpcodeFadd:
+			op = sseOpcodeAddss
+		case ssa.OpcodeFsub:
+			op = sseOpcodeSubss
+		case ssa.OpcodeFmul:
+			op = sseOpcodeMulss
+		case ssa.OpcodeFdiv:
+			op = sseOpcodeDivss
+		default:
+			panic("BUG")
+		}
+	}
+
+	xDef, yDef := m.c.ValueDefinition(x), m.c.ValueDefinition(y)
+	rn := m.getOperand_Mem_Reg(xDef)
+	rm := m.getOperand_Reg(yDef)
+	rd := m.c.VRegOf(instr.Return())
+
 	// rn is being overwritten, so we first copy its value to a temp register,
 	// in case it is referenced again later.
-	tmp := m.c.AllocateVReg(tpe)
+	tmp := m.c.AllocateVReg(x.Type())
 	if rn.kind == operandKindReg {
 		m.copyTo(rn.r, tmp)
 	} else {
 		mov := m.allocateInstr()
-		var movOp sseOpcode
-		if tpe.Bits() == 64 {
-			movOp = sseOpcodeMovsd
+		var op sseOpcode
+		if _64 {
+			op = sseOpcodeMovd
 		} else {
-			movOp = sseOpcodeMovss
+			op = sseOpcodeMovss
 		}
-		mov.asXmmUnaryRmR(movOp, rn, tmp)
+		mov.asXmmUnaryRmR(op, rm, tmp)
 		m.insert(mov)
 	}
 
