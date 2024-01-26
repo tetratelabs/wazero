@@ -81,7 +81,7 @@ var (
 		}, nil),
 	}
 	ArithmReturn = TestCase{
-		Name: "add_sub_params_return",
+		Name: "arithm return",
 		Module: SingleFunctionModule(
 			wasm.FunctionType{
 				Params: []wasm.ValueType{i32, i32, i32, i64, i64, i64},
