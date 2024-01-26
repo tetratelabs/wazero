@@ -53,7 +53,8 @@ type (
 	}
 
 	labelResolutionPend struct {
-		instr *instruction
+		instr       *instruction
+		instrOffset int64
 		// imm32Offset is the offset of the last 4 bytes of the instruction.
 		imm32Offset int64
 	}
@@ -135,13 +136,58 @@ func (m *machine) LowerSingleBranch(b *ssa.Instruction) {
 		}
 		m.insert(jmp)
 	case ssa.OpcodeBrTable:
-		panic("TODO: implement me")
+		index, target := b.BrTableData()
+		m.lowerBrTable(index, target)
 	default:
 		panic("BUG: unexpected branch opcode" + b.Opcode().String())
 	}
 }
 
 var condBranchMatches = [...]ssa.Opcode{ssa.OpcodeIcmp, ssa.OpcodeFcmp}
+
+func (m *machine) lowerBrTable(index ssa.Value, targets []ssa.BasicBlock) {
+	_v := m.getOperand_Reg(m.c.ValueDefinition(index))
+	v := m.copyToTmp(_v.r)
+
+	// First, we need to do the bounds check.
+	maxIndex := m.c.AllocateVReg(ssa.TypeI32)
+	m.lowerIconst(maxIndex, uint64(len(targets)-1), false)
+	cmp := m.allocateInstr().asCmpRmiR(true, newOperandReg(maxIndex), v, false)
+	m.insert(cmp)
+
+	// Then do the conditional move maxIndex to v if v > maxIndex.
+	cmov := m.allocateInstr().asCmove(condNB, newOperandReg(maxIndex), v, false)
+	m.insert(cmov)
+
+	// Now that v has the correct index. Load the address of the jump table into the addr.
+	addr := m.c.AllocateVReg(ssa.TypeI64)
+	leaJmpTableAddr := m.allocateInstr()
+	m.insert(leaJmpTableAddr)
+
+	// Then add the target's offset into jmpTableAddr.
+	loadTargetOffsetFromJmpTable := m.allocateInstr().asAluRmiR(aluRmiROpcodeAdd,
+		// Shift by 3 because each entry is 8 bytes.
+		newOperandMem(newAmodeRegRegShift(0, addr, v, 3)), addr, true)
+	m.insert(loadTargetOffsetFromJmpTable)
+
+	// Now ready to jump.
+	jmp := m.allocateInstr().asJmp(newOperandReg(addr))
+	m.insert(jmp)
+
+	jmpTableBegin, jmpTableBeginLabel := m.allocateBrTarget()
+	m.insert(jmpTableBegin)
+	leaJmpTableAddr.asLEA(newAmodeRipRelative(jmpTableBeginLabel), addr)
+
+	jmpTable := m.allocateInstr()
+	// TODO: reuse the slice!
+	labels := make([]uint32, len(targets))
+	for j, target := range targets {
+		labels[j] = uint32(m.ectx.GetOrAllocateSSABlockLabel(target))
+	}
+
+	jmpTable.asJmpTableSequence(labels)
+	m.insert(jmpTable)
+}
 
 // LowerConditionalBranch implements backend.Machine.
 func (m *machine) LowerConditionalBranch(b *ssa.Instruction) {
@@ -883,12 +929,13 @@ func (m *machine) Encode(context.Context) {
 			needLabelResolution := cur.encode(m.c)
 			if needLabelResolution {
 				m.labelResolutionPends = append(m.labelResolutionPends,
-					labelResolutionPend{instr: cur, imm32Offset: int64(len(*bufPtr)) - 4},
+					labelResolutionPend{instr: cur, instrOffset: offset, imm32Offset: int64(len(*bufPtr)) - 4},
 				)
 			}
 		}
 	}
 
+	buf := *bufPtr
 	for i := range m.labelResolutionPends {
 		p := &m.labelResolutionPends[i]
 		switch p.instr.kind {
@@ -897,7 +944,15 @@ func (m *machine) Encode(context.Context) {
 			targetOffset := ectx.LabelPositions[target].BinaryOffset
 			imm32Offset := p.imm32Offset
 			jmpOffset := int32(targetOffset - (p.imm32Offset + 4)) // +4 because RIP points to the next instruction.
-			binary.LittleEndian.PutUint32((*bufPtr)[imm32Offset:], uint32(jmpOffset))
+			binary.LittleEndian.PutUint32(buf[imm32Offset:], uint32(jmpOffset))
+		case jmpTableIsland:
+			tableBegin := p.instrOffset
+			// Each entry is the offset from the beginning of the jmpTableIsland instruction in 8 bytes.
+			for i, l := range p.instr.targets {
+				targetOffset := ectx.LabelPositions[backend.Label(l)].BinaryOffset
+				jmpOffset := targetOffset - tableBegin
+				binary.LittleEndian.PutUint64(buf[tableBegin+int64(i)*8:], uint64(jmpOffset))
+			}
 		default:
 			panic("BUG")
 		}

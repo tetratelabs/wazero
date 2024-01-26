@@ -280,9 +280,8 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
-			name:      "br_table",
-			m:         testcases.BrTable.Module,
-			skipAMD64: true,
+			name: "br_table",
+			m:    testcases.BrTable.Module,
 			calls: []callCase{
 				{params: []uint64{0}, expResults: []uint64{11}},
 				{params: []uint64{1}, expResults: []uint64{12}},
@@ -296,9 +295,8 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
-			name:      "br_table_with_args",
-			m:         testcases.BrTableWithArg.Module,
-			skipAMD64: true,
+			name: "br_table_with_args",
+			m:    testcases.BrTableWithArg.Module,
 			calls: []callCase{
 				{params: []uint64{0, 100}, expResults: []uint64{11 + 100}},
 				{params: []uint64{1, 100}, expResults: []uint64{12 + 100}},

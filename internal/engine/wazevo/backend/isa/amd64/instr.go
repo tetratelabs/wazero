@@ -2,6 +2,7 @@ package amd64
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
@@ -16,6 +17,7 @@ type instruction struct {
 	b1                  bool
 	addedBeforeRegAlloc bool
 	kind                instructionKind
+	targets             []uint32
 }
 
 // Next implements regalloc.Instr.
@@ -197,8 +199,12 @@ func (i *instruction) String() string {
 		return fmt.Sprintf("jmp %s", i.op1.format(true))
 	case jmpIf:
 		return fmt.Sprintf("j%s %s", cond(i.u1), i.op1.format(true))
-	case jmpTableSequence:
-		panic("TODO")
+	case jmpTableIsland:
+		labels := make([]string, len(i.targets))
+		for index, l := range i.targets {
+			labels[index] = backend.Label(l).String()
+		}
+		return fmt.Sprintf("jump_table_island [%s]", strings.Join(labels, ", "))
 	case exitSequence:
 		return fmt.Sprintf("exit_sequence %s", i.op1.format(true))
 	case ud2:
@@ -565,11 +571,8 @@ const (
 	// Jump conditionally: jcond cond label.
 	jmpIf
 
-	// Jump-table sequence, as one compound instruction (see note in lower.rs for rationale).
-	// The generated code sequence is described in the emit's function match arm for this
-	// instruction.
-	// See comment in lowering about the temporaries signedness.
-	jmpTableSequence
+	// jmpTableIsland is to emit the jump table.
+	jmpTableIsland
 
 	// exitSequence exits the execution and go back to the Go world.
 	exitSequence
@@ -663,8 +666,8 @@ func (k instructionKind) String() string {
 		return "jmpIf"
 	case jmp:
 		return "jmp"
-	case jmpTableSequence:
-		return "jmpTableSeq"
+	case jmpTableIsland:
+		return "jmpTableIsland"
 	case exitSequence:
 		return "exit_sequence"
 	case v128ConstIsland:
@@ -710,6 +713,12 @@ func (i *instruction) asJmpIf(cond cond, target operand) *instruction {
 	i.kind = jmpIf
 	i.u1 = uint64(cond)
 	i.op1 = target
+	return i
+}
+
+func (i *instruction) asJmpTableSequence(targets []uint32) *instruction {
+	i.kind = jmpTableIsland
+	i.targets = targets
 	return i
 }
 
@@ -1580,11 +1589,13 @@ var defKinds = [instrMax]defKind{
 	movsxRmR:        defKindOp2,
 	movzxRmR:        defKindOp2,
 	gprToXmm:        defKindOp2,
+	cmove:           defKindNone,
 	call:            defKindCall,
 	callIndirect:    defKindCall,
 	ud2:             defKindNone,
 	jmp:             defKindNone,
 	jmpIf:           defKindNone,
+	jmpTableIsland:  defKindNone,
 	cmpRmiR:         defKindNone,
 	exitSequence:    defKindNone,
 	lea:             defKindOp2,
@@ -1624,6 +1635,7 @@ var useKinds = [instrMax]useKind{
 	movRR:           useKindOp1,
 	movRM:           useKindOp1RegOp2,
 	xmmMovRM:        useKindOp1RegOp2,
+	cmove:           useKindOp1Op2Reg,
 	aluRmiR:         useKindOp1Op2Reg,
 	shiftR:          useKindOp1Op2Reg,
 	imm:             useKindNone,
@@ -1642,6 +1654,7 @@ var useKinds = [instrMax]useKind{
 	exitSequence:    useKindOp1,
 	lea:             useKindOp1,
 	v128ConstIsland: useKindNone,
+	jmpTableIsland:  useKindNone,
 }
 
 func (u useKind) String() string {
