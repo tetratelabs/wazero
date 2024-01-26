@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-	"math"
 	"strings"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
@@ -1157,17 +1156,8 @@ func (m *machine) copyTo(src regalloc.VReg, dst regalloc.VReg) {
 }
 
 func (m *machine) copyToTmp(v regalloc.VReg) regalloc.VReg {
-	var tmp regalloc.VReg
-	if v.IsRealReg() {
-		if v.RegType() == regalloc.RegTypeInt {
-			tmp = m.c.AllocateVReg(ssa.TypeI64)
-		} else {
-			tmp = m.c.AllocateVReg(ssa.TypeV128)
-		}
-	} else {
-		typ := m.c.TypeOf(v)
-		tmp = m.c.AllocateVReg(typ)
-	}
+	typ := m.c.TypeOf(v)
+	tmp := m.c.AllocateVReg(typ)
 	m.copyTo(v, tmp)
 	return tmp
 }
@@ -1201,7 +1191,7 @@ func (m *machine) lowerIDivRem(si *ssa.Instruction, isDiv bool, signed bool) {
 	xDef, yDef := m.c.ValueDefinition(x), m.c.ValueDefinition(y)
 	xr := m.getOperand_Reg(xDef)
 	yr := m.getOperand_Reg(yDef)
-	ctxVRrg := m.c.VRegOf(execCtx)
+	ctxVReg := m.c.VRegOf(execCtx)
 	rd := m.c.VRegOf(si.Return())
 
 	// Ensure yr is not zero.
@@ -1212,14 +1202,18 @@ func (m *machine) lowerIDivRem(si *ssa.Instruction, isDiv bool, signed bool) {
 	jnz := m.allocateInstr()
 	m.insert(jnz)
 
-	nz := m.lowerExitWithCode(ctxVRrg, wazevoapi.ExitCodeIntegerDivisionByZero)
+	// We need to copy the execution context to a temp register, because if it's spilled,
+	// it might end up being reloaded inside the exiting branch.
+	execCtxTmp := m.copyToTmp(ctxVReg)
+	nz := m.lowerExitWithCode(execCtxTmp, wazevoapi.ExitCodeIntegerDivisionByZero)
 
 	// If not zero, we can proceed with the division.
 	jnz.asJmpIf(condNZ, newOperandLabel(nz))
 
 	// We are going to need rax and rdx, so we save them to temp registers.
-	raxTmp := m.copyToTmp(raxVReg)
-	rdxTmp := m.copyToTmp(rdxVReg)
+	raxTmp, rdxTmp := m.c.AllocateVReg(ssa.TypeI64), m.c.AllocateVReg(ssa.TypeI64)
+	m.copyTo(raxVReg, raxTmp)
+	m.copyTo(rdxVReg, rdxTmp)
 
 	m.copyTo(xr.r, raxVReg)
 
@@ -1232,7 +1226,7 @@ func (m *machine) lowerIDivRem(si *ssa.Instruction, isDiv bool, signed bool) {
 
 			// First, we check if the divisor is -1.
 			cmp := m.allocateInstr()
-			cmp.asCmpRmiR(false, newOperandImm32(0xffffffff), yr.r, _64)
+			cmp.asCmpRmiR(true, newOperandImm32(0xffffffff), yr.r, _64)
 			m.insert(cmp)
 
 			ifNotNeg1 := m.allocateInstr()
@@ -1240,11 +1234,9 @@ func (m *machine) lowerIDivRem(si *ssa.Instruction, isDiv bool, signed bool) {
 
 			var minInt uint64
 			if _64 {
-				i := math.MinInt64
-				minInt = uint64(i)
+				minInt = 0x8000000000000000
 			} else {
-				i := math.MinInt32
-				minInt = uint64(i)
+				minInt = 0x80000000
 			}
 			tmp := m.c.AllocateVReg(si.Return().Type())
 			m.lowerIconst(tmp, minInt, _64)
@@ -1252,7 +1244,7 @@ func (m *machine) lowerIDivRem(si *ssa.Instruction, isDiv bool, signed bool) {
 			// Next we check if the quotient is the most negative value for the signed integer, i.e.
 			// if we are trying to do (math.MinInt32 / -1) or (math.MinInt64 / -1) respectively.
 			cmp2 := m.allocateInstr()
-			cmp2.asCmpRmiR(false, newOperandReg(tmp), yr.r, _64)
+			cmp2.asCmpRmiR(true, newOperandReg(tmp), yr.r, _64)
 			m.insert(cmp2)
 
 			ifNotMinInt := m.allocateInstr()
@@ -1261,12 +1253,10 @@ func (m *machine) lowerIDivRem(si *ssa.Instruction, isDiv bool, signed bool) {
 			// Trap if we are trying to do (math.MinInt32 / -1) or (math.MinInt64 / -1),
 			// as that is the overflow in division as the result becomes 2^31 which is larger than
 			// the maximum of signed 32-bit int (2^31-1).
-			// end := m.lowerExitWithCode(ctxVRrg, wazevoapi.ExitCodeIntegerOverflow)
-			nop, end := m.allocateBrTarget()
-			m.insert(nop)
+			execCtxTmp := m.copyToTmp(ctxVReg)
+			end := m.lowerExitWithCode(execCtxTmp, wazevoapi.ExitCodeIntegerOverflow)
 			ifNotNeg1.asJmpIf(condNZ, newOperandLabel(end))
 			ifNotMinInt.asJmpIf(condNZ, newOperandLabel(end))
-
 		} else {
 			// If it is remainder, zeros DX register and compare the divisor to -1.
 			xor := m.allocateInstr()
