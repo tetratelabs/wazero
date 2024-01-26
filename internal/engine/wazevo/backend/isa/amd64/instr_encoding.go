@@ -952,8 +952,11 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 			panic("BUG: invalid operand kind")
 		}
 
-	case jmpTableSequence:
-		panic("TODO")
+	case jmpTableIsland:
+		needsLabelResolution = true
+		for range i.targets {
+			c.Emit8Bytes(0)
+		}
 
 	case exitSequence:
 		execCtx := i.op1.r
@@ -1006,10 +1009,8 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 
 	case v128ConstIsland:
 		lo, hi := i.u1, i.u2
-		c.Emit4Bytes(uint32(lo))
-		c.Emit4Bytes(uint32(lo >> 32))
-		c.Emit4Bytes(uint32(hi))
-		c.Emit4Bytes(uint32(hi >> 32))
+		c.Emit8Bytes(lo)
+		c.Emit8Bytes(hi)
 
 	default:
 		panic(fmt.Sprintf("TODO: %v", i.kind))
