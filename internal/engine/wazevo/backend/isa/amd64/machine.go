@@ -236,6 +236,10 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		m.lowerUnaryRmR(instr, unaryRmROpcodePopcnt)
 	case ssa.OpcodeFadd, ssa.OpcodeFsub, ssa.OpcodeFmul, ssa.OpcodeFdiv:
 		m.lowerXmmRmR(instr)
+	case ssa.OpcodeFabs:
+		m.lowerFabsFneg(instr)
+	case ssa.OpcodeFneg:
+		m.lowerFabsFneg(instr)
 	case ssa.OpcodeSqrt:
 		m.lowerSqrt(instr)
 	case ssa.OpcodeUndefined:
@@ -712,6 +716,46 @@ func (m *machine) lowerSqrt(instr *ssa.Instruction) {
 	xmm := m.allocateInstr()
 	xmm.asXmmUnaryRmR(op, rm, rd)
 	m.insert(xmm)
+}
+
+func (m *machine) lowerFabsFneg(instr *ssa.Instruction) {
+	x := instr.Arg()
+	if !x.Type().IsFloat() {
+		panic("BUG")
+	}
+	_64 := x.Type().Bits() == 64
+	var op sseOpcode
+	var mask uint64
+	if _64 {
+		switch instr.Opcode() {
+		case ssa.OpcodeFabs:
+			mask, op = 0x7fffffffffffffff, sseOpcodeAndpd
+		case ssa.OpcodeFneg:
+			mask, op = 0x8000000000000000, sseOpcodeXorpd
+		}
+	} else {
+		switch instr.Opcode() {
+		case ssa.OpcodeFabs:
+			mask, op = 0x7fffffff, sseOpcodeAndps
+		case ssa.OpcodeFneg:
+			mask, op = 0x80000000, sseOpcodeXorps
+		}
+	}
+
+	tmp := m.c.AllocateVReg(x.Type())
+
+	xDef := m.c.ValueDefinition(x)
+	rm := m.getOperand_Reg(xDef)
+	rd := m.c.VRegOf(instr.Return())
+
+	m.lowerFconst(tmp, mask, _64)
+
+	xmm := m.allocateInstr()
+	xmm.asXmmRmR(op, rm, tmp)
+	m.insert(xmm)
+
+	m.copyTo(tmp, rd)
+
 }
 
 func (m *machine) lowerStore(si *ssa.Instruction) {

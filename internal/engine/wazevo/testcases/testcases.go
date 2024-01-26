@@ -993,8 +993,15 @@ var (
 		Name: "float_arithm",
 		Module: SingleFunctionModule(wasm.FunctionType{
 			Params:  []wasm.ValueType{f64, f64, f32, f32},
-			Results: []wasm.ValueType{f64, f64, f64, f64, f64, f32, f32, f32, f32, f32},
+			Results: []wasm.ValueType{f64, f64, f64, f64, f64, f64, f64, f32, f32, f32, f32, f32, f32, f32},
 		}, []byte{
+			wasm.OpcodeLocalGet, 0,
+			wasm.OpcodeF64Neg,
+
+			wasm.OpcodeLocalGet, 0,
+			wasm.OpcodeF64Neg,
+			wasm.OpcodeF64Abs,
+
 			wasm.OpcodeLocalGet, 0,
 			wasm.OpcodeF64Sqrt,
 
@@ -1015,6 +1022,12 @@ var (
 			wasm.OpcodeF64Div,
 
 			// 32-bit floats.
+			wasm.OpcodeLocalGet, 2,
+			wasm.OpcodeF32Neg,
+
+			wasm.OpcodeLocalGet, 2,
+			wasm.OpcodeF32Neg,
+			wasm.OpcodeF32Abs,
 
 			wasm.OpcodeLocalGet, 2,
 			wasm.OpcodeF32Sqrt,
