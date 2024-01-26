@@ -677,6 +677,9 @@ func (m *machine) lowerCall(si *ssa.Instruction) {
 		m.maxRequiredStackSizeForCalls = stackSlotSize + 16 // 16 == return address + RBP.
 	}
 
+	// Note: See machine.SetupPrologue for the stack layout.
+	// The stack pointer decrease/increase will be inserted later in the compilation.
+
 	for i, arg := range args {
 		reg := m.c.VRegOf(arg)
 		def := m.c.ValueDefinition(arg)
@@ -707,7 +710,7 @@ func (m *machine) lowerCall(si *ssa.Instruction) {
 
 // callerGenVRegToFunctionArg is the opposite of GenFunctionArgToVReg, which is used to generate the
 // caller side of the function call.
-func (m *machine) callerGenVRegToFunctionArg(a *backend.FunctionABI, argIndex int, reg regalloc.VReg, def *backend.SSAValueDefinition, slotBegin int64) {
+func (m *machine) callerGenVRegToFunctionArg(a *backend.FunctionABI, argIndex int, reg regalloc.VReg, def *backend.SSAValueDefinition, stackSlotSize int64) {
 	arg := &a.Args[argIndex]
 	if def != nil && def.IsFromInstr() {
 		// Constant instructions are inlined.
@@ -718,16 +721,52 @@ func (m *machine) callerGenVRegToFunctionArg(a *backend.FunctionABI, argIndex in
 	if arg.Kind == backend.ABIArgKindReg {
 		m.InsertMove(arg.Reg, reg, arg.Type)
 	} else {
-		panic("TODO")
+		store := m.allocateInstr()
+		mem := newOperandMem(newAmodeImmReg(
+			// -stackSlotSize because the stack pointer is not yet decreased.
+			uint32(arg.Offset-stackSlotSize), rspVReg))
+		switch arg.Type {
+		case ssa.TypeI32:
+			store.asMovRM(reg, mem, 4)
+		case ssa.TypeI64:
+			store.asMovRM(reg, mem, 8)
+		case ssa.TypeF32:
+			store.asXmmMovRM(sseOpcodeMovss, reg, mem)
+		case ssa.TypeF64:
+			store.asXmmMovRM(sseOpcodeMovsd, reg, mem)
+		case ssa.TypeV128:
+			store.asXmmMovRM(sseOpcodeMovdqu, reg, mem)
+		default:
+			panic("BUG")
+		}
+		m.insert(store)
 	}
 }
 
-func (m *machine) callerGenFunctionReturnVReg(a *backend.FunctionABI, retIndex int, reg regalloc.VReg, slotBegin int64) {
+func (m *machine) callerGenFunctionReturnVReg(a *backend.FunctionABI, retIndex int, reg regalloc.VReg, stackSlotSize int64) {
 	r := &a.Rets[retIndex]
 	if r.Kind == backend.ABIArgKindReg {
 		m.InsertMove(reg, r.Reg, r.Type)
 	} else {
-		panic("TODO")
+		load := m.allocateInstr()
+		mem := newOperandMem(newAmodeImmReg(
+			// -stackSlotSize because the stack pointer is not yet decreased.
+			uint32(a.ArgStackSize+r.Offset-stackSlotSize), rspVReg))
+		switch r.Type {
+		case ssa.TypeI32:
+			load.asMovzxRmR(extModeLQ, mem, reg)
+		case ssa.TypeI64:
+			load.asMov64MR(mem, reg)
+		case ssa.TypeF32:
+			load.asXmmUnaryRmR(sseOpcodeMovss, mem, reg)
+		case ssa.TypeF64:
+			load.asXmmUnaryRmR(sseOpcodeMovsd, mem, reg)
+		case ssa.TypeV128:
+			load.asXmmUnaryRmR(sseOpcodeMovdqu, mem, reg)
+		default:
+			panic("BUG")
+		}
+		m.insert(load)
 	}
 }
 
