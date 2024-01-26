@@ -237,7 +237,7 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 	case ssa.OpcodeFadd, ssa.OpcodeFsub, ssa.OpcodeFmul, ssa.OpcodeFdiv:
 		m.lowerXmmRmR(instr)
 	case ssa.OpcodeSqrt:
-		m.lowerXmmUnaryRmR(instr)
+		m.lowerSqrt(instr)
 	case ssa.OpcodeUndefined:
 		m.insert(m.allocateInstr().asUD2())
 	case ssa.OpcodeExitWithCode:
@@ -690,6 +690,28 @@ func (m *machine) lowerXmmRmR(instr *ssa.Instruction) {
 	m.insert(xmm)
 
 	m.copyTo(tmp, rd)
+}
+
+func (m *machine) lowerSqrt(instr *ssa.Instruction) {
+	x := instr.Arg()
+	if !x.Type().IsFloat() {
+		panic("BUG")
+	}
+	_64 := x.Type().Bits() == 64
+	var op sseOpcode
+	if _64 {
+		op = sseOpcodeSqrtsd
+	} else {
+		op = sseOpcodeSqrtss
+	}
+
+	xDef := m.c.ValueDefinition(x)
+	rm := m.getOperand_Mem_Reg(xDef)
+	rd := m.c.VRegOf(instr.Return())
+
+	xmm := m.allocateInstr()
+	xmm.asXmmUnaryRmR(op, rm, rd)
+	m.insert(xmm)
 }
 
 func (m *machine) lowerStore(si *ssa.Instruction) {
