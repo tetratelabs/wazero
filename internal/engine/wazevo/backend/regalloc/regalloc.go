@@ -620,7 +620,11 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 				if !def.IsRealReg() {
 					panic("BUG: multiple defs should be on real registers")
 				}
-				s.useRealReg(def.RealReg(), def)
+				r := def.RealReg()
+				if s.regsInUse.has(r) {
+					s.releaseRealReg(r)
+				}
+				s.useRealReg(r, def)
 			}
 		case len(defs) == 1:
 			def := defs[0]
