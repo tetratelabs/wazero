@@ -755,7 +755,6 @@ func (m *machine) lowerFabsFneg(instr *ssa.Instruction) {
 	m.insert(xmm)
 
 	m.copyTo(tmp, rd)
-
 }
 
 func (m *machine) lowerStore(si *ssa.Instruction) {
