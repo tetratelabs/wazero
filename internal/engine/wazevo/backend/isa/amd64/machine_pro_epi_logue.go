@@ -125,6 +125,24 @@ func (m *machine) SetupEpilogue() {
 			continue
 		}
 
+		if abi := cur.abi; abi != nil {
+			// At this point, reg alloc is done, therefore we can safely insert dec/inc RPS instruction
+			// right before/after the call instruction. If this is done before reg alloc, the stack slot
+			// can point to the wrong location and therefore results in a wrong value.
+			// TODO: doing this in `SetupEpilogue` seems weird. Find a better home.
+			call := cur
+			next := call.next
+			if size := uint32(abi.AlignedArgResultStackSlotSize()); size > 0 {
+				dec := m.allocateInstr().asAluRmiR(aluRmiROpcodeSub, newOperandImm32(size), rspVReg, true)
+				linkInstr(call.prev, dec)
+				linkInstr(dec, call)
+				inc := m.allocateInstr().asAluRmiR(aluRmiROpcodeAdd, newOperandImm32(size), rspVReg, true)
+				linkInstr(call, inc)
+				linkInstr(inc, next)
+			}
+			continue
+		}
+
 		// Removes the redundant copy instruction.
 		// TODO: doing this in `SetupEpilogue` seems weird. Find a better home.
 		if cur.IsCopy() && cur.op1.r.RealReg() == cur.op2.r.RealReg() {

@@ -808,7 +808,6 @@ func TestListener_imported(t *testing.T) {
 }
 
 func TestListener_long(t *testing.T) {
-	skipOnAmd64(t)
 	pickOneParam := binaryencoding.EncodeModule(&wasm.Module{
 		TypeSection: []wasm.FunctionType{{Results: []wasm.ValueType{i32}, Params: []wasm.ValueType{
 			i32, i32, f32, f64, i64, i32, i32, v128, f32,
@@ -858,7 +857,6 @@ func TestListener_long(t *testing.T) {
 }
 
 func TestListener_long_as_is(t *testing.T) {
-	skipOnAmd64(t)
 	params := []wasm.ValueType{
 		i32, i64, i32, i64, i32, i64, i32, i64, i32, i64,
 		i32, i64, i32, i64, i32, i64, i32, i64, i32, i64,
@@ -909,7 +907,6 @@ func TestListener_long_as_is(t *testing.T) {
 }
 
 func TestListener_long_many_consts(t *testing.T) {
-	skipOnAmd64(t)
 	const paramNum = 61
 
 	var exp []uint64
