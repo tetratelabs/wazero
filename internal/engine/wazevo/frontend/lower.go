@@ -3151,6 +3151,34 @@ func (c *Compiler) lowerCurrentOpcode() {
 		default:
 			panic("TODO: unsupported vector instruction: " + wasm.VectorInstructionName(vecOp))
 		}
+	case wasm.OpcodeAtomicPrefix:
+		state.pc++
+		atomicOp := c.wasmFunctionBody[state.pc]
+		switch atomicOp {
+		case wasm.OpcodeAtomicMemoryWait32, wasm.OpcodeAtomicMemoryWait64:
+			_, offset := c.readMemArg()
+			if state.unreachable {
+				break
+			}
+			var opSize uint64
+			switch atomicOp {
+			case wasm.OpcodeAtomicMemoryWait32:
+				opSize = 4
+			case wasm.OpcodeAtomicMemoryWait64:
+				opSize = 8
+			}
+
+			timeout := state.pop()
+			exp := state.pop()
+			baseAddr := state.pop()
+			addr := c.memOpSetup(baseAddr, uint64(offset), opSize)
+			result := builder.AllocateInstruction().
+				AsMemoryWait(timeout, exp, addr, opSize).
+				Insert(builder).Return()
+			state.push(result)
+		default:
+			panic("TODO: unsupported atomic instruction: " + wasm.AtomicInstructionName(atomicOp))
+		}
 	case wasm.OpcodeRefFunc:
 		funcIndex := c.readI32u()
 		if state.unreachable {

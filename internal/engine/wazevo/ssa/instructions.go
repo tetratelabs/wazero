@@ -648,6 +648,10 @@ const (
 	// `fence`.
 	OpcodeFence
 
+	// OpcodeMemoryWait ...
+	// `v = memory_wait MemFlags, t, x, p`.
+	OpcodeMemoryWait
+
 	// opcodeEnd marks the end of the opcode list.
 	opcodeEnd
 )
@@ -819,6 +823,7 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeVFcvtToUintSat:     sideEffectNone,
 	OpcodeVFcvtToSintSat:     sideEffectNone,
 	OpcodeVZeroExtLoad:       sideEffectNone,
+	OpcodeMemoryWait:         sideEffectStrict,
 }
 
 // sideEffect returns true if this instruction has side effects.
@@ -999,6 +1004,7 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeVMinPseudo:         returnTypesFnV128,
 	OpcodeVFcvtToUintSat:     returnTypesFnV128,
 	OpcodeVFcvtToSintSat:     returnTypesFnV128,
+	OpcodeMemoryWait:         returnTypesFnI32,
 }
 
 // AsLoad initializes this instruction as a store instruction with OpcodeLoad.
@@ -2344,6 +2350,15 @@ func (i *Instruction) ExtendFromToBits() (from, to byte) {
 	return
 }
 
+func (i *Instruction) AsMemoryWait(timeout, exp, ptr Value, opSize uint64) *Instruction {
+	i.opcode = OpcodeMemoryWait
+	i.v = timeout
+	i.v2 = exp
+	i.v3 = ptr
+	i.typ = exp.Type()
+	return i
+}
+
 // Format returns a string representation of this instruction with the given builder.
 // For debugging purposes only.
 func (i *Instruction) Format(b Builder) string {
@@ -2478,7 +2493,8 @@ func (i *Instruction) Format(b Builder) string {
 		}
 		// Prints Shuffle.[0 1 2 3 4 5 6 7 ...] v2, v3
 		instSuffix = fmt.Sprintf(".%v %s, %s", lanes, i.v.Format(b), i.v2.Format(b))
-
+	case OpcodeMemoryWait:
+		instSuffix = fmt.Sprintf("_%s, %s, %s, %s", i.typ, i.v.Format(b), i.v2.Format(b), i.v3.Format(b))
 	default:
 		panic(fmt.Sprintf("TODO: format for %s", i.opcode))
 	}
@@ -2741,6 +2757,8 @@ func (o Opcode) String() (ret string) {
 		return "AtomicStore"
 	case OpcodeFence:
 		return "Fence"
+	case OpcodeMemoryWait:
+		return "MemoryWait"
 	case OpcodeVbor:
 		return "Vbor"
 	case OpcodeVbxor:

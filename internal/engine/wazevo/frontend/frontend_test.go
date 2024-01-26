@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/testcases"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
@@ -1615,12 +1616,42 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:v128, v3:v128)
 	Jump blk_ret, v4
 `,
 		},
+		{
+			name: "MemoryWait",
+			m:    testcases.MemoryWait.Module,
+			exp: `
+blk0: (exec_ctx:i64, module_ctx:i64)
+	v2:i32 = Iconst_32 0x5
+	v3:i32 = Iconst_32 0x0
+	v4:i64 = Iconst_64 0xa
+	v5:i64 = Iconst_64 0x4
+	v6:i64 = UExtend v2, 32->64
+	v7:i64 = Uload32 module_ctx, 0x10
+	v8:i64 = Iadd v6, v5
+	v9:i32 = Icmp lt_u, v7, v8
+	ExitIfTrue v9, exec_ctx, memory_out_of_bounds
+	v10:i64 = Load module_ctx, 0x8
+	v11:i64 = Iadd v10, v6
+	v12:i32 = MemoryWait_i32, v4, v3, v11
+	v13:i32 = Iconst_32 0x5
+	v14:i64 = Iconst_64 0x0
+	v15:i64 = Iconst_64 0xa
+	v16:i64 = Iconst_64 0x8
+	v17:i64 = UExtend v13, 32->64
+	v18:i64 = Iadd v17, v16
+	v19:i32 = Icmp lt_u, v7, v18
+	ExitIfTrue v19, exec_ctx, memory_out_of_bounds
+	v20:i64 = Iadd v10, v17
+	v21:i32 = MemoryWait_i64, v15, v14, v20
+	Jump blk_ret
+`,
+		},
 	} {
 
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			// Just in case let's check the test module is valid.
-			err := tc.m.Validate(api.CoreFeaturesV2)
+			err := tc.m.Validate(api.CoreFeaturesV2 | experimental.CoreFeaturesThreads)
 			require.NoError(t, err, "invalid test case module!")
 
 			b := ssa.NewBuilder()
