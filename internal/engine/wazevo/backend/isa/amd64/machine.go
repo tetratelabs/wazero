@@ -677,8 +677,8 @@ func (m *machine) lowerXmmRmR(instr *ssa.Instruction) {
 	}
 
 	xDef, yDef := m.c.ValueDefinition(x), m.c.ValueDefinition(y)
-	rm := m.getOperand_Mem_Reg(xDef)
-	rn := m.getOperand_Reg(yDef)
+	rn := m.getOperand_Mem_Reg(xDef)
+	rm := m.getOperand_Reg(yDef)
 	rd := m.c.VRegOf(instr.Return())
 
 	// rn is being overwritten, so we first copy its value to a temp register,
