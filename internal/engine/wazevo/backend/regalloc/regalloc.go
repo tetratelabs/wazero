@@ -610,12 +610,16 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 		defs := instr.Defs(&a.vs)
 		switch {
 		case len(defs) > 1:
-			if !call {
-				panic("only call can have multiple defs")
-			}
-			// Call's defining register are all caller-saved registers.
-			// Therefore, we can assume that all of them are allocatable.
+			// Some instructions define multiple values on real registers.
+			// E.g. call instructions (following calling convention) / div instruction on x64 that defines both rax and rdx.
+			//
+			// Note that currently I assume that such instructions define only the pre colored real registers, not the VRegs
+			// that require allocations. If we need to support such case, we need to add the logic to handle it here,
+			// though is there any such instruction?
 			for _, def := range defs {
+				if !def.IsRealReg() {
+					panic("BUG: multiple defs should be on real registers")
+				}
 				s.useRealReg(def.RealReg(), def)
 			}
 		case len(defs) == 1:
