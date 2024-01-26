@@ -1660,13 +1660,15 @@ const (
 	useKindOp1Op2Reg
 	// useKindOp1RegOp2 is Op1 must be a register, Op2 can be any operand.
 	useKindOp1RegOp2
+	useKindRaxRdx
+	useKindRdx
 	useKindCall
 	useKindCallInd
 )
 
 var useKinds = [instrMax]useKind{
 	nop0:            useKindNone,
-	div:             useKindOp1,
+	div:             useKindRaxRdx,
 	signExtendData:  useKindNone,
 	ret:             useKindNone,
 	movRR:           useKindOp1,
