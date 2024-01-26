@@ -133,6 +133,10 @@ func TestE2E(t *testing.T) {
 					params: []uint64{21, 0, 1, 1},
 					expErr: "wasm error: integer divide by zero",
 				},
+				//{
+				//	params: []uint64{1, 1, 21, 0},
+				//	expErr: "wasm error: integer divide by zero",
+				//},
 			},
 		},
 		{
