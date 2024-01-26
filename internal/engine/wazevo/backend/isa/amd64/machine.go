@@ -688,18 +688,11 @@ func (m *machine) lowerXmmRmR(instr *ssa.Instruction) {
 	// rn is being overwritten, so we first copy its value to a temp register,
 	// in case it is referenced again later.
 	tmp := m.c.AllocateVReg(x.Type())
-	if rn.kind == operandKindReg {
-		m.copyTo(rn.r, tmp)
+	if rn.r != regalloc.VRegInvalid {
+		m.insert(m.allocateInstr().asMovRR(rn.r, tmp, _64))
 	} else {
-		mov := m.allocateInstr()
-		var op sseOpcode
-		if _64 {
-			op = sseOpcodeMovd
-		} else {
-			op = sseOpcodeMovss
-		}
-		mov.asXmmUnaryRmR(op, rm, tmp)
-		m.insert(mov)
+		tmp = m.c.AllocateVReg(x.Type())
+		m.insert(m.allocateInstr().asLEA(rn.amode, tmp))
 	}
 
 	xmm := m.allocateInstr()
