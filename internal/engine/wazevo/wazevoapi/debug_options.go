@@ -31,7 +31,7 @@ const (
 	PrintBlockLaidOutSSA                     = false
 	PrintSSAToBackendIRLowering              = false
 	PrintRegisterAllocated                   = false
-	PrintFinalizedMachineCode                = true
+	PrintFinalizedMachineCode                = false
 	PrintMachineCodeHexPerFunction           = printMachineCodeHexPerFunctionUnmodified || PrintMachineCodeHexPerFunctionDisassemblable //nolint
 	printMachineCodeHexPerFunctionUnmodified = false
 	// PrintMachineCodeHexPerFunctionDisassemblable prints the machine code while modifying the actual result

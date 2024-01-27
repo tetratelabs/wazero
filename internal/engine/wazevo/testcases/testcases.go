@@ -228,7 +228,6 @@ var (
 				Results: []wasm.ValueType{i32, i32},
 			},
 			[]byte{
-
 				wasm.OpcodeLocalGet, 2,
 				wasm.OpcodeLocalGet, 3,
 				wasm.OpcodeI32RemS,
