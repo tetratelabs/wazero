@@ -1962,7 +1962,7 @@ func (i *Instruction) AsExitIfTrueWithCode(ctx, c Value, code wazevoapi.ExitCode
 	return i
 }
 
-// AsExitIfTrueWithCode initializes this instruction as a trap instruction with OpcodeExitIfTrueWithCode.
+// AsExitIfTrueWithCode initializes this instruction as a trap instruction with OpcodeExitIfCondWithCode.
 func (i *Instruction) AsExitIfCondWithCode(ctx Value, cond IntegerCmpCond, code wazevoapi.ExitCode) *Instruction {
 	i.opcode = OpcodeExitIfCondWithCode
 	i.v = ctx
