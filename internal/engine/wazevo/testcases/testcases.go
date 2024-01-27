@@ -81,7 +81,7 @@ var (
 		}, nil),
 	}
 	ArithmReturn = TestCase{
-		Name: "add_sub_params_return",
+		Name: "arithm return",
 		Module: SingleFunctionModule(
 			wasm.FunctionType{
 				Params: []wasm.ValueType{i32, i32, i32, i64, i64, i64},
@@ -985,6 +985,68 @@ var (
 			wasm.OpcodeLocalGet, 2,
 			wasm.OpcodeLocalGet, 3,
 			wasm.OpcodeF64Ge,
+
+			wasm.OpcodeEnd,
+		}, []wasm.ValueType{}),
+	}
+	FloatArithm = TestCase{
+		Name: "float_arithm",
+		Module: SingleFunctionModule(wasm.FunctionType{
+			Params:  []wasm.ValueType{f64, f64, f32, f32},
+			Results: []wasm.ValueType{f64, f64, f64, f64, f64, f64, f64, f32, f32, f32, f32, f32, f32, f32},
+		}, []byte{
+			wasm.OpcodeLocalGet, 0,
+			wasm.OpcodeF64Neg,
+
+			wasm.OpcodeLocalGet, 0,
+			wasm.OpcodeF64Neg,
+			wasm.OpcodeF64Abs,
+
+			wasm.OpcodeLocalGet, 0,
+			wasm.OpcodeF64Sqrt,
+
+			wasm.OpcodeLocalGet, 0,
+			wasm.OpcodeLocalGet, 1,
+			wasm.OpcodeF64Add,
+
+			wasm.OpcodeLocalGet, 0,
+			wasm.OpcodeLocalGet, 1,
+			wasm.OpcodeF64Sub,
+
+			wasm.OpcodeLocalGet, 0,
+			wasm.OpcodeLocalGet, 1,
+			wasm.OpcodeF64Mul,
+
+			wasm.OpcodeLocalGet, 0,
+			wasm.OpcodeLocalGet, 1,
+			wasm.OpcodeF64Div,
+
+			// 32-bit floats.
+			wasm.OpcodeLocalGet, 2,
+			wasm.OpcodeF32Neg,
+
+			wasm.OpcodeLocalGet, 2,
+			wasm.OpcodeF32Neg,
+			wasm.OpcodeF32Abs,
+
+			wasm.OpcodeLocalGet, 2,
+			wasm.OpcodeF32Sqrt,
+
+			wasm.OpcodeLocalGet, 2,
+			wasm.OpcodeLocalGet, 3,
+			wasm.OpcodeF32Add,
+
+			wasm.OpcodeLocalGet, 2,
+			wasm.OpcodeLocalGet, 3,
+			wasm.OpcodeF32Sub,
+
+			wasm.OpcodeLocalGet, 2,
+			wasm.OpcodeLocalGet, 3,
+			wasm.OpcodeF32Mul,
+
+			wasm.OpcodeLocalGet, 2,
+			wasm.OpcodeLocalGet, 3,
+			wasm.OpcodeF32Div,
 
 			wasm.OpcodeEnd,
 		}, []wasm.ValueType{}),

@@ -344,7 +344,7 @@ L2:
 	}
 }
 
-func Test_machine_lowerCtz(t *testing.T) {
+func TestMachine_lowerCtz(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
 		setup    func(*mockCompiler, ssa.Builder, *machine) *backend.SSAValueDefinition

@@ -523,6 +523,7 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 
 	case div:
 		panic("TODO")
+
 	case mulHi:
 		var prefix legacyPrefixes
 		rex := rexInfo(0)

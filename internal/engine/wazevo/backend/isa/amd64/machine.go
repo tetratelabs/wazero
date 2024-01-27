@@ -280,6 +280,14 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		m.lowerCtz(instr)
 	case ssa.OpcodePopcnt:
 		m.lowerUnaryRmR(instr, unaryRmROpcodePopcnt)
+	case ssa.OpcodeFadd, ssa.OpcodeFsub, ssa.OpcodeFmul, ssa.OpcodeFdiv:
+		m.lowerXmmRmR(instr)
+	case ssa.OpcodeFabs:
+		m.lowerFabsFneg(instr)
+	case ssa.OpcodeFneg:
+		m.lowerFabsFneg(instr)
+	case ssa.OpcodeSqrt:
+		m.lowerSqrt(instr)
 	case ssa.OpcodeUndefined:
 		m.insert(m.allocateInstr().asUD2())
 	case ssa.OpcodeExitWithCode:
@@ -680,6 +688,116 @@ func (m *machine) lowerShiftR(si *ssa.Instruction, op shiftROp) {
 
 	// tmp now contains the result, we copy it to the dest register.
 	m.copyTo(tmpDst, rd)
+}
+
+func (m *machine) lowerXmmRmR(instr *ssa.Instruction) {
+	x, y := instr.Arg2()
+	if !x.Type().IsFloat() {
+		panic("BUG?")
+	}
+	_64 := x.Type().Bits() == 64
+
+	var op sseOpcode
+	if _64 {
+		switch instr.Opcode() {
+		case ssa.OpcodeFadd:
+			op = sseOpcodeAddsd
+		case ssa.OpcodeFsub:
+			op = sseOpcodeSubsd
+		case ssa.OpcodeFmul:
+			op = sseOpcodeMulsd
+		case ssa.OpcodeFdiv:
+			op = sseOpcodeDivsd
+		default:
+			panic("BUG")
+		}
+	} else {
+		switch instr.Opcode() {
+		case ssa.OpcodeFadd:
+			op = sseOpcodeAddss
+		case ssa.OpcodeFsub:
+			op = sseOpcodeSubss
+		case ssa.OpcodeFmul:
+			op = sseOpcodeMulss
+		case ssa.OpcodeFdiv:
+			op = sseOpcodeDivss
+		default:
+			panic("BUG")
+		}
+	}
+
+	xDef, yDef := m.c.ValueDefinition(x), m.c.ValueDefinition(y)
+	rn := m.getOperand_Mem_Reg(yDef)
+	rm := m.getOperand_Reg(xDef)
+	rd := m.c.VRegOf(instr.Return())
+
+	// rm is being overwritten, so we first copy its value to a temp register,
+	// in case it is referenced again later.
+	tmp := m.copyToTmp(rm.r)
+
+	xmm := m.allocateInstr().asXmmRmR(op, rn, tmp)
+	m.insert(xmm)
+
+	m.copyTo(tmp, rd)
+}
+
+func (m *machine) lowerSqrt(instr *ssa.Instruction) {
+	x := instr.Arg()
+	if !x.Type().IsFloat() {
+		panic("BUG")
+	}
+	_64 := x.Type().Bits() == 64
+	var op sseOpcode
+	if _64 {
+		op = sseOpcodeSqrtsd
+	} else {
+		op = sseOpcodeSqrtss
+	}
+
+	xDef := m.c.ValueDefinition(x)
+	rm := m.getOperand_Mem_Reg(xDef)
+	rd := m.c.VRegOf(instr.Return())
+
+	xmm := m.allocateInstr().asXmmUnaryRmR(op, rm, rd)
+	m.insert(xmm)
+}
+
+func (m *machine) lowerFabsFneg(instr *ssa.Instruction) {
+	x := instr.Arg()
+	if !x.Type().IsFloat() {
+		panic("BUG")
+	}
+	_64 := x.Type().Bits() == 64
+	var op sseOpcode
+	var mask uint64
+	if _64 {
+		switch instr.Opcode() {
+		case ssa.OpcodeFabs:
+			mask, op = 0x7fffffffffffffff, sseOpcodeAndpd
+		case ssa.OpcodeFneg:
+			mask, op = 0x8000000000000000, sseOpcodeXorpd
+		}
+	} else {
+		switch instr.Opcode() {
+		case ssa.OpcodeFabs:
+			mask, op = 0x7fffffff, sseOpcodeAndps
+		case ssa.OpcodeFneg:
+			mask, op = 0x80000000, sseOpcodeXorps
+		}
+	}
+
+	tmp := m.c.AllocateVReg(x.Type())
+
+	xDef := m.c.ValueDefinition(x)
+	rm := m.getOperand_Reg(xDef)
+	rd := m.c.VRegOf(instr.Return())
+
+	m.lowerFconst(tmp, mask, _64)
+
+	xmm := m.allocateInstr().asXmmRmR(op, rm, tmp)
+	m.insert(xmm)
+
+	m.copyTo(tmp, rd)
 }
 
 func (m *machine) lowerStore(si *ssa.Instruction) {

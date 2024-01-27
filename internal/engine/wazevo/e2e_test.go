@@ -152,6 +152,35 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
+			name: "float_arithm", m: testcases.FloatArithm.Module,
+			calls: []callCase{
+				{
+					params: []uint64{
+						math.Float64bits(25), math.Float64bits(5), uint64(math.Float32bits(25)), uint64(math.Float32bits(5)),
+					},
+					expResults: []uint64{
+						math.Float64bits(-25),
+						math.Float64bits(25),
+
+						math.Float64bits(5),
+						math.Float64bits(30),
+						math.Float64bits(20),
+						math.Float64bits(125),
+						math.Float64bits(5),
+
+						uint64(math.Float32bits(-25)),
+						uint64(math.Float32bits(25)),
+
+						uint64(math.Float32bits(5)),
+						uint64(math.Float32bits(30)),
+						uint64(math.Float32bits(20)),
+						uint64(math.Float32bits(125)),
+						uint64(math.Float32bits(5)),
+					},
+				},
+			},
+		},
+		{
 			name: "fibonacci_recursive", m: testcases.FibonacciRecursive.Module,
 			calls: []callCase{
 				{params: []uint64{0}, expResults: []uint64{0}},
