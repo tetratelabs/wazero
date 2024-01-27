@@ -326,7 +326,7 @@ const (
 	// OpcodeIcmpImm compares an integer value with the immediate value on the given condition: `v = icmp_imm Cond, x, Y`.
 	OpcodeIcmpImm
 
-	// OpcodeIaddImm performs a bitwise AND with the immediate value and updates condition flags.
+	// OpcodeIandsImm performs a bitwise AND with the immediate value and updates condition flags.
 	OpcodeIandsImm
 
 	// OpcodeIadd performs an integer addition: `v = Iadd x, y`.
@@ -1112,8 +1112,8 @@ func (i *Instruction) AsIconst32(v uint32) *Instruction {
 	return i
 }
 
-// AsIaddImm initializes this instruction as an integer bitwise and instruction with OpcodeIandImm.
-func (i *Instruction) AsIandImm(x Value, y uint64) *Instruction {
+// AsIaddImm initializes this instruction as an integer bitwise and instruction with OpcodeIandsImm.
+func (i *Instruction) AsIandsImm(x Value, y uint64) *Instruction {
 	i.opcode = OpcodeIandsImm
 	i.v = x
 	i.u1 = y

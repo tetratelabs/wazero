@@ -3476,7 +3476,7 @@ func (c *Compiler) memAlignmentCheck(addr ssa.Value, operationSizeInBytes uint64
 	}
 
 	builder := c.ssaBuilder
-	builder.AllocateInstruction().AsIandImm(addr, checkBits).Insert(builder)
+	builder.AllocateInstruction().AsIandsImm(addr, checkBits).Insert(builder)
 	builder.AllocateInstruction().AsExitIfCondWithCode(c.execCtxPtrValue, ssa.IntegerCmpCondEqual, wazevoapi.ExitCodeUnalignedAtomic).
 		Insert(builder)
 }
