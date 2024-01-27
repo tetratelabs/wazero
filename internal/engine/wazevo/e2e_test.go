@@ -123,67 +123,83 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
-			name: "div_return", m: testcases.DivReturn.Module,
+			name: "divrem_unsigned_return", m: testcases.DivUReturn.Module,
+			calls: []callCase{
+				//{
+				//	params: []uint64{
+				//		21, 10, 21, 10, 21, 10, 21, 10,
+				//	},
+				//	expResults: []uint64{
+				//		21 / 10, 21 % 10, 21 / 10, 21 % 10,
+				//	},
+				//},
+				//{
+				//	params: []uint64{
+				//		21, 0, 1, 1, 1, 1, 1, 1,
+				//	},
+				//	expErr: "wasm error: integer divide by zero",
+				//},
+				//{
+				//	params: []uint64{
+				//		1, 1, 21, 0, 1, 1, 1, 1,
+				//	},
+				//	expErr: "wasm error: integer divide by zero",
+				//},
+				{
+					params: []uint64{
+						1, 1, 1, 1, 21, 0, 1, 1, // <-- this crashes
+					},
+					expErr: "wasm error: integer divide by zero",
+				},
+				{
+					params: []uint64{
+						0x80000000, 0xffffffff, 1, 1, 1, 1, 1, 1,
+					},
+					expResults: []uint64{0, 0, 1, 0},
+				},
+				{
+					params: []uint64{
+						1, 1, 0x80000000, 0xffffffff, 1, 1, 1, 1,
+					},
+					expResults: []uint64{1, 0x80000000, 1, 0},
+				},
+			},
+		},
+		{
+			name: "divrem_signed_return", m: testcases.DivSReturn.Module,
 			calls: []callCase{
 				{
 					params: []uint64{
 						21, 10, 21, 10, 21, 10, 21, 10,
-						21, 10, 21, 10, 21, 10, 21, 10,
 					},
 					expResults: []uint64{
-						21 / 10, 21 % 10, 21 / 10, 21 % 10,
 						21 / 10, 21 % 10, 21 / 10, 21 % 10,
 					},
 				},
 				{
 					params: []uint64{
 						21, 0, 1, 1, 1, 1, 1, 1,
-						1, 1, 1, 1, 1, 1, 1, 1,
 					},
 					expErr: "wasm error: integer divide by zero",
 				},
 				{
 					params: []uint64{
 						1, 1, 21, 0, 1, 1, 1, 1,
-						1, 1, 1, 1, 1, 1, 1, 1,
 					},
 					expErr: "wasm error: integer divide by zero",
 				},
-				//{
-				//	params: []uint64{
-				//		1, 1, 1, 1, 21, 0, 1, 1,
-				//		1, 1, 1, 1, 1, 1, 1, 1,
-				//	},
-				//	expErr: "wasm error: integer divide by zero",
-				//},
-				//{
-				//	params: []uint64{
-				//		1, 1, 1, 1, 1, 1, 21, 0,
-				//		1, 1, 1, 1, 1, 1, 1, 1,
-				//	},
-				//	expErr: "wasm error: integer divide by zero",
-				//},
-
-				//
-				//{
-				//	params: []uint64{
-				//		0x80000000, 0xffffffff, 1, 1, 1, 1, 1, 1,
-				//		1, 1, 1, 1, 1, 1, 1, 1,
-				//	},
-				//	expErr: "wasm error: integer overflow",
-				//},
-				//{
-				//	params: []uint64{
-				//		1, 1, 1, 1, 1, 1, 1, 1,
-				//		0x8000000000000000, 0xffffffffffffffff, 1, 1, 1, 1, 1, 1,
-				//	},
-				//	expErr: "wasm error: integer overflow",
-				//},
-
-				//{
-				//	params: []uint64{1, 1, 0x8000000000000000, 0xffffffffffffffff},
-				//	expErr: "wasm error: integer overflow",
-				//},
+				{
+					params: []uint64{
+						0x80000000, 0xffffffff, 1, 1, 1, 1, 1, 1,
+					},
+					expErr: "wasm error: integer overflow",
+				},
+				{
+					params: []uint64{
+						1, 1, 0x80000000, 0xffffffff, 1, 1, 1, 1,
+					},
+					expResults: []uint64{1, 0, 1, 0},
+				},
 			},
 		},
 		{

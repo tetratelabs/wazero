@@ -411,23 +411,31 @@ func (i *instruction) AssignUse(index int, v regalloc.VReg) {
 			panic(fmt.Sprintf("BUG: invalid operand: %s", i))
 		}
 	case useKindOp1Rax:
-		op := &i.op1
-		switch op.kind {
-		case operandKindReg:
-			if index != 0 {
-				panic("BUG")
+		if index == 0 {
+			op := &i.op1
+			switch op.kind {
+			case operandKindReg:
+				if index != 0 {
+					panic("BUG")
+				}
+				if op.r.IsRealReg() {
+					panic("BUG already assigned: " + i.String())
+				}
+				op.r = v
+			case operandKindMem:
+				op.amode.assignUses(index, v)
+			default:
+				panic(fmt.Sprintf("BUG: invalid operand: %s", i))
 			}
-			if op.r.IsRealReg() {
-				panic("BUG already assigned: " + i.String())
-			}
-			op.r = v
-		case operandKindMem:
-			op.amode.assignUses(index, v)
-		default:
-			panic(fmt.Sprintf("BUG: invalid operand: %s", i))
+		} else if index == 1 {
+			// Do nothing.
+		} else {
+			panic("BUG")
 		}
 	case useKindRax:
-		// Nothing to do.
+		if index != 0 {
+			panic("BUG")
+		}
 	default:
 		panic(fmt.Sprintf("BUG: invalid useKind %s for %s", uk, i))
 	}

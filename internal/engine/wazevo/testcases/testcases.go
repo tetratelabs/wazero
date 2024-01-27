@@ -163,12 +163,12 @@ var (
 				wasm.OpcodeEnd,
 			}, nil),
 	}
-	DivReturn = TestCase{
-		Name: "div return",
+	DivUReturn = TestCase{
+		Name: "div return unsigned",
 		Module: SingleFunctionModule(
 			wasm.FunctionType{
-				Params:  []wasm.ValueType{i32, i32, i32, i32, i32, i32, i32, i32, i64, i64, i64, i64, i64, i64, i64, i64},
-				Results: []wasm.ValueType{i32, i32, i32, i32, i64, i64, i64, i64},
+				Params:  []wasm.ValueType{i32, i32, i32, i32, i64, i64, i64, i64},
+				Results: []wasm.ValueType{i32, i32, i64, i64},
 			},
 			[]byte{
 				wasm.OpcodeLocalGet, 0,
@@ -181,26 +181,37 @@ var (
 
 				wasm.OpcodeLocalGet, 4,
 				wasm.OpcodeLocalGet, 5,
-				wasm.OpcodeI32DivS,
+				wasm.OpcodeI64DivU,
 
 				wasm.OpcodeLocalGet, 6,
 				wasm.OpcodeLocalGet, 7,
-				wasm.OpcodeI32RemS,
-
-				wasm.OpcodeLocalGet, 8,
-				wasm.OpcodeLocalGet, 9,
-				wasm.OpcodeI64DivU,
-
-				wasm.OpcodeLocalGet, 10,
-				wasm.OpcodeLocalGet, 11,
 				wasm.OpcodeI64RemU,
 
-				wasm.OpcodeLocalGet, 12,
-				wasm.OpcodeLocalGet, 13,
+				wasm.OpcodeEnd,
+			}, nil),
+	}
+	DivSReturn = TestCase{
+		Name: "div return unsigned",
+		Module: SingleFunctionModule(
+			wasm.FunctionType{
+				Params:  []wasm.ValueType{i32, i32, i32, i32, i64, i64, i64, i64},
+				Results: []wasm.ValueType{i32, i32, i64, i64},
+			},
+			[]byte{
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeI32DivS,
+
+				wasm.OpcodeLocalGet, 2,
+				wasm.OpcodeLocalGet, 3,
+				wasm.OpcodeI32RemS,
+
+				wasm.OpcodeLocalGet, 4,
+				wasm.OpcodeLocalGet, 5,
 				wasm.OpcodeI64DivS,
 
-				wasm.OpcodeLocalGet, 14,
-				wasm.OpcodeLocalGet, 15,
+				wasm.OpcodeLocalGet, 6,
+				wasm.OpcodeLocalGet, 7,
 				wasm.OpcodeI64RemS,
 
 				wasm.OpcodeEnd,

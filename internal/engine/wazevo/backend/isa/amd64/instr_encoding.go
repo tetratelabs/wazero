@@ -529,7 +529,7 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 			rex = rexInfo(0).clearW()
 		}
 		var subopcode uint8
-		if i.u1 != 0 { // 64 bit.
+		if i.u1 != 0 { // Signed.
 			subopcode = 7
 		} else {
 			subopcode = 6
