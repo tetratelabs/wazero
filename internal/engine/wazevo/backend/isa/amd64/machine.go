@@ -1204,8 +1204,8 @@ func (m *machine) lowerIDivRem(si *ssa.Instruction, isDiv bool, signed bool) {
 
 	// We need to copy the execution context to a temp register, because if it's spilled,
 	// it might end up being reloaded inside the exiting branch.
-	// execCtxTmp := m.copyToTmp(ctxVReg)
-	nz := m.lowerExitWithCode(ctxVReg, wazevoapi.ExitCodeIntegerDivisionByZero)
+	execCtxTmp := m.copyToTmp(ctxVReg)
+	nz := m.lowerExitWithCode(execCtxTmp, wazevoapi.ExitCodeIntegerDivisionByZero)
 
 	// If not zero, we can proceed with the division.
 	jnz.asJmpIf(condNZ, newOperandLabel(nz))
@@ -1214,7 +1214,73 @@ func (m *machine) lowerIDivRem(si *ssa.Instruction, isDiv bool, signed bool) {
 
 	var ifRemNeg1 *instruction
 	if signed {
-		ifRemNeg1 = m.prepareDivRemSigned(si, isDiv, _64, yr, xr, ctxVReg, ifRemNeg1)
+		var neg1 uint64
+		if _64 {
+			neg1 = 0xffffffffffffffff
+		} else {
+			neg1 = 0xffffffff
+		}
+		tmp1 := m.c.AllocateVReg(si.Return().Type())
+		m.lowerIconst(tmp1, neg1, _64)
+
+		if isDiv {
+			// For signed division, we have to have branches for "math.MinInt{32,64} / -1"
+			// case which results in the floating point exception via division error as
+			// the resulting value exceeds the maximum of signed int.
+
+			// First, we check if the divisor is -1.
+			cmp := m.allocateInstr()
+			cmp.asCmpRmiR(true, newOperandReg(tmp1), yr.r, _64)
+			m.insert(cmp)
+
+			ifNotNeg1 := m.allocateInstr()
+			m.insert(ifNotNeg1)
+
+			var minInt uint64
+			if _64 {
+				minInt = 0x8000000000000000
+			} else {
+				minInt = 0x80000000
+			}
+			tmp := m.c.AllocateVReg(si.Return().Type())
+			m.lowerIconst(tmp, minInt, _64)
+
+			// Next we check if the quotient is the most negative value for the signed integer, i.e.
+			// if we are trying to do (math.MinInt32 / -1) or (math.MinInt64 / -1) respectively.
+			cmp2 := m.allocateInstr()
+			cmp2.asCmpRmiR(true, newOperandReg(tmp), xr.r, _64)
+			m.insert(cmp2)
+
+			ifNotMinInt := m.allocateInstr()
+			m.insert(ifNotMinInt)
+
+			// Trap if we are trying to do (math.MinInt32 / -1) or (math.MinInt64 / -1),
+			// as that is the overflow in division as the result becomes 2^31 which is larger than
+			// the maximum of signed 32-bit int (2^31-1).
+			execCtxTmp2 := m.copyToTmp(ctxVReg)
+			end := m.lowerExitWithCode(execCtxTmp2, wazevoapi.ExitCodeIntegerOverflow)
+			ifNotNeg1.asJmpIf(condNZ, newOperandLabel(end))
+			ifNotMinInt.asJmpIf(condNZ, newOperandLabel(end))
+		} else {
+			// If it is remainder, zeros DX register and compare the divisor to -1.
+			xor := m.allocateInstr()
+			xor.asAluRmiR(aluRmiROpcodeXor, newOperandReg(rdxVReg), rdxVReg, _64)
+			m.insert(xor)
+
+			// We check if the divisor is -1.
+			cmp := m.allocateInstr()
+			cmp.asCmpRmiR(true, newOperandReg(tmp1), yr.r, _64)
+			m.insert(cmp)
+
+			ifRemNeg1 = m.allocateInstr()
+			m.insert(ifRemNeg1)
+		}
+
+		// Sign-extend DX register to have 2*x.Type().Bits() dividend over DX and AX registers.
+		sed := m.allocateInstr()
+		sed.asSignExtendData(_64)
+		m.insert(sed)
+		ifRemNeg1 = ifRemNeg1
 	} else {
 		// Zeros DX register to have 2*x.Type().Bits() dividend over DX and AX registers.
 		xor := m.allocateInstr()
