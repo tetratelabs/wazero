@@ -681,16 +681,15 @@ func (m *machine) lowerXmmRmR(instr *ssa.Instruction) {
 	}
 
 	xDef, yDef := m.c.ValueDefinition(x), m.c.ValueDefinition(y)
-	rn := m.getOperand_Mem_Reg(xDef)
-	rm := m.getOperand_Reg(yDef)
+	rn := m.getOperand_Mem_Reg(yDef)
+	rm := m.getOperand_Reg(xDef)
 	rd := m.c.VRegOf(instr.Return())
 
-	// rn is being overwritten, so we first copy its value to a temp register,
+	// rm is being overwritten, so we first copy its value to a temp register,
 	// in case it is referenced again later.
-	tmp := m.copyToTmp(rn.r)
+	tmp := m.copyToTmp(rm.r)
 
-	xmm := m.allocateInstr()
-	xmm.asXmmRmR(op, rm, tmp)
+	xmm := m.allocateInstr().asXmmRmR(op, rn, tmp)
 	m.insert(xmm)
 
 	m.copyTo(tmp, rd)
@@ -713,8 +712,7 @@ func (m *machine) lowerSqrt(instr *ssa.Instruction) {
 	rm := m.getOperand_Mem_Reg(xDef)
 	rd := m.c.VRegOf(instr.Return())
 
-	xmm := m.allocateInstr()
-	xmm.asXmmUnaryRmR(op, rm, rd)
+	xmm := m.allocateInstr().asXmmUnaryRmR(op, rm, rd)
 	m.insert(xmm)
 }
 
@@ -750,8 +748,7 @@ func (m *machine) lowerFabsFneg(instr *ssa.Instruction) {
 
 	m.lowerFconst(tmp, mask, _64)
 
-	xmm := m.allocateInstr()
-	xmm.asXmmRmR(op, rm, tmp)
+	xmm := m.allocateInstr().asXmmRmR(op, rm, tmp)
 	m.insert(xmm)
 
 	m.copyTo(tmp, rd)
