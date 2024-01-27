@@ -200,6 +200,9 @@ const (
 	// OpcodeExitIfTrueWithCode exits the execution immediately if the value `c` is not zero.
 	OpcodeExitIfTrueWithCode
 
+	// OpcodeExitIfEqWithCode exits the execution immediately if the condition flag is set.
+	OpcodeExitIfCondWithCode
+
 	// OpcodeReturn returns from the function: `return rvalues`.
 	OpcodeReturn
 
@@ -322,6 +325,9 @@ const (
 
 	// OpcodeIcmpImm compares an integer value with the immediate value on the given condition: `v = icmp_imm Cond, x, Y`.
 	OpcodeIcmpImm
+
+	// OpcodeIaddImm performs a bitwise AND with the immediate value and updates condition flags.
+	OpcodeIandsImm
 
 	// OpcodeIadd performs an integer addition: `v = Iadd x, y`.
 	OpcodeIadd
@@ -648,10 +654,6 @@ const (
 	// `fence`.
 	OpcodeFence
 
-	// OpcodeMemoryWait ...
-	// `v = memory_wait MemFlags, t, x, p`.
-	OpcodeMemoryWait
-
 	// opcodeEnd marks the end of the opcode list.
 	opcodeEnd
 )
@@ -695,6 +697,7 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeImul:               sideEffectNone,
 	OpcodeIsub:               sideEffectNone,
 	OpcodeIcmp:               sideEffectNone,
+	OpcodeIandsImm:           sideEffectNone,
 	OpcodeExtractlane:        sideEffectNone,
 	OpcodeInsertlane:         sideEffectNone,
 	OpcodeBand:               sideEffectNone,
@@ -738,6 +741,7 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeIstore32:           sideEffectStrict,
 	OpcodeExitWithCode:       sideEffectStrict,
 	OpcodeExitIfTrueWithCode: sideEffectStrict,
+	OpcodeExitIfCondWithCode: sideEffectStrict,
 	OpcodeReturn:             sideEffectStrict,
 	OpcodeBrz:                sideEffectStrict,
 	OpcodeBrnz:               sideEffectStrict,
@@ -823,7 +827,6 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeVFcvtToUintSat:     sideEffectNone,
 	OpcodeVFcvtToSintSat:     sideEffectNone,
 	OpcodeVZeroExtLoad:       sideEffectNone,
-	OpcodeMemoryWait:         sideEffectStrict,
 }
 
 // sideEffect returns true if this instruction has side effects.
@@ -962,10 +965,12 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeIstore32:           returnTypesFnNoReturns,
 	OpcodeExitWithCode:       returnTypesFnNoReturns,
 	OpcodeExitIfTrueWithCode: returnTypesFnNoReturns,
+	OpcodeExitIfCondWithCode: returnTypesFnNoReturns,
 	OpcodeReturn:             returnTypesFnNoReturns,
 	OpcodeBrz:                returnTypesFnNoReturns,
 	OpcodeBrnz:               returnTypesFnNoReturns,
 	OpcodeBrTable:            returnTypesFnNoReturns,
+	OpcodeIandsImm:           returnTypesFnNoReturns,
 	OpcodeUload8:             returnTypesFnSingle,
 	OpcodeUload16:            returnTypesFnSingle,
 	OpcodeUload32:            returnTypesFnSingle,
@@ -1004,7 +1009,6 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeVMinPseudo:         returnTypesFnV128,
 	OpcodeVFcvtToUintSat:     returnTypesFnV128,
 	OpcodeVFcvtToSintSat:     returnTypesFnV128,
-	OpcodeMemoryWait:         returnTypesFnI32,
 }
 
 // AsLoad initializes this instruction as a store instruction with OpcodeLoad.
@@ -1105,6 +1109,15 @@ func (i *Instruction) AsIconst32(v uint32) *Instruction {
 	i.opcode = OpcodeIconst
 	i.typ = TypeI32
 	i.u1 = uint64(v)
+	return i
+}
+
+// AsIaddImm initializes this instruction as an integer bitwise and instruction with OpcodeIandImm.
+func (i *Instruction) AsIandImm(x Value, y uint64) *Instruction {
+	i.opcode = OpcodeIandsImm
+	i.v = x
+	i.u1 = y
+	i.typ = x.Type()
 	return i
 }
 
@@ -1949,6 +1962,15 @@ func (i *Instruction) AsExitIfTrueWithCode(ctx, c Value, code wazevoapi.ExitCode
 	return i
 }
 
+// AsExitIfTrueWithCode initializes this instruction as a trap instruction with OpcodeExitIfTrueWithCode.
+func (i *Instruction) AsExitIfCondWithCode(ctx Value, cond IntegerCmpCond, code wazevoapi.ExitCode) *Instruction {
+	i.opcode = OpcodeExitIfCondWithCode
+	i.v = ctx
+	i.u1 = uint64(cond)
+	i.u2 = uint64(code)
+	return i
+}
+
 // ExitWithCodeData returns the context and exit code of OpcodeExitWithCode.
 func (i *Instruction) ExitWithCodeData() (ctx Value, code wazevoapi.ExitCode) {
 	return i.v, wazevoapi.ExitCode(i.u1)
@@ -2350,15 +2372,6 @@ func (i *Instruction) ExtendFromToBits() (from, to byte) {
 	return
 }
 
-func (i *Instruction) AsMemoryWait(timeout, exp, ptr Value, opSize uint64) *Instruction {
-	i.opcode = OpcodeMemoryWait
-	i.v = timeout
-	i.v2 = exp
-	i.v3 = ptr
-	i.typ = exp.Type()
-	return i
-}
-
 // Format returns a string representation of this instruction with the given builder.
 // For debugging purposes only.
 func (i *Instruction) Format(b Builder) string {
@@ -2368,12 +2381,16 @@ func (i *Instruction) Format(b Builder) string {
 		instSuffix = fmt.Sprintf(" %s, %s", i.v.Format(b), wazevoapi.ExitCode(i.u1))
 	case OpcodeExitIfTrueWithCode:
 		instSuffix = fmt.Sprintf(" %s, %s, %s", i.v2.Format(b), i.v.Format(b), wazevoapi.ExitCode(i.u1))
+	case OpcodeExitIfCondWithCode:
+		instSuffix = fmt.Sprintf(" %s, %s, %s", IntegerCmpCond(i.u1), i.v.Format(b), wazevoapi.ExitCode(i.u2))
 	case OpcodeIadd, OpcodeIsub, OpcodeImul, OpcodeFadd, OpcodeFsub, OpcodeFmin, OpcodeFmax, OpcodeFdiv, OpcodeFmul:
 		instSuffix = fmt.Sprintf(" %s, %s", i.v.Format(b), i.v2.Format(b))
 	case OpcodeIcmp:
 		instSuffix = fmt.Sprintf(" %s, %s, %s", IntegerCmpCond(i.u1), i.v.Format(b), i.v2.Format(b))
 	case OpcodeFcmp:
 		instSuffix = fmt.Sprintf(" %s, %s, %s", FloatCmpCond(i.u1), i.v.Format(b), i.v2.Format(b))
+	case OpcodeIandsImm:
+		instSuffix = fmt.Sprintf(" %s, %#x", i.v.Format(b), i.u1)
 	case OpcodeSExtend, OpcodeUExtend:
 		instSuffix = fmt.Sprintf(" %s, %d->%d", i.v.Format(b), i.u1>>8, i.u1&0xff)
 	case OpcodeCall, OpcodeCallIndirect:
@@ -2493,8 +2510,6 @@ func (i *Instruction) Format(b Builder) string {
 		}
 		// Prints Shuffle.[0 1 2 3 4 5 6 7 ...] v2, v3
 		instSuffix = fmt.Sprintf(".%v %s, %s", lanes, i.v.Format(b), i.v2.Format(b))
-	case OpcodeMemoryWait:
-		instSuffix = fmt.Sprintf("_%s, %s, %s, %s", i.typ, i.v.Format(b), i.v2.Format(b), i.v3.Format(b))
 	default:
 		panic(fmt.Sprintf("TODO: format for %s", i.opcode))
 	}
@@ -2567,6 +2582,8 @@ func (o Opcode) String() (ret string) {
 		return "Exit"
 	case OpcodeExitIfTrueWithCode:
 		return "ExitIfTrue"
+	case OpcodeExitIfCondWithCode:
+		return "ExitIfCond"
 	case OpcodeReturn:
 		return "Return"
 	case OpcodeCall:
@@ -2627,6 +2644,8 @@ func (o Opcode) String() (ret string) {
 		return "Icmp"
 	case OpcodeIcmpImm:
 		return "IcmpImm"
+	case OpcodeIandsImm:
+		return "IandsImm"
 	case OpcodeVIcmp:
 		return "VIcmp"
 	case OpcodeIadd:
@@ -2757,8 +2776,6 @@ func (o Opcode) String() (ret string) {
 		return "AtomicStore"
 	case OpcodeFence:
 		return "Fence"
-	case OpcodeMemoryWait:
-		return "MemoryWait"
 	case OpcodeVbor:
 		return "Vbor"
 	case OpcodeVbxor:

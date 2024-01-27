@@ -1622,29 +1622,40 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:v128, v3:v128)
 			m:        testcases.MemoryWait.Module,
 			features: api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
 			exp: `
+signatures:
+	sig6: i64i64i64i32i32_i32
+
 blk0: (exec_ctx:i64, module_ctx:i64)
 	v2:i32 = Iconst_32 0x5
 	v3:i32 = Iconst_32 0x0
 	v4:i64 = Iconst_64 0xa
-	v5:i64 = Iconst_64 0x4
-	v6:i64 = UExtend v2, 32->64
-	v7:i64 = Uload32 module_ctx, 0x10
-	v8:i64 = Iadd v6, v5
-	v9:i32 = Icmp lt_u, v7, v8
-	ExitIfTrue v9, exec_ctx, memory_out_of_bounds
-	v10:i64 = Load module_ctx, 0x8
-	v11:i64 = Iadd v10, v6
-	v12:i32 = MemoryWait_i32, v4, v3, v11
-	v13:i32 = Iconst_32 0x5
-	v14:i64 = Iconst_64 0x0
-	v15:i64 = Iconst_64 0xa
-	v16:i64 = Iconst_64 0x8
-	v17:i64 = UExtend v13, 32->64
-	v18:i64 = Iadd v17, v16
-	v19:i32 = Icmp lt_u, v7, v18
-	ExitIfTrue v19, exec_ctx, memory_out_of_bounds
-	v20:i64 = Iadd v10, v17
-	v21:i32 = MemoryWait_i64, v15, v14, v20
+	v5:i32 = Iconst_32 0x4
+	v6:i64 = Iconst_64 0x4
+	v7:i64 = UExtend v2, 32->64
+	v8:i64 = Uload32 module_ctx, 0x10
+	v9:i64 = Iadd v7, v6
+	v10:i32 = Icmp lt_u, v8, v9
+	ExitIfTrue v10, exec_ctx, memory_out_of_bounds
+	v11:i64 = Load module_ctx, 0x8
+	v12:i64 = Iadd v11, v7
+	IandsImm v12, 0x3
+	ExitIfCond eq, exec_ctx, unaligned_atomic
+	v13:i64 = Load exec_ctx, 0x488
+	v14:i32 = CallIndirect v13:sig6, module_ctx, v4, v3, v12, v5
+	v15:i32 = Iconst_32 0x5
+	v16:i64 = Iconst_64 0x0
+	v17:i64 = Iconst_64 0xa
+	v18:i32 = Iconst_32 0x8
+	v19:i64 = Iconst_64 0x8
+	v20:i64 = UExtend v15, 32->64
+	v21:i64 = Iadd v20, v19
+	v22:i32 = Icmp lt_u, v8, v21
+	ExitIfTrue v22, exec_ctx, memory_out_of_bounds
+	v23:i64 = Iadd v11, v20
+	IandsImm v23, 0x7
+	ExitIfCond eq, exec_ctx, unaligned_atomic
+	v24:i64 = Load exec_ctx, 0x488
+	v25:i32 = CallIndirect v24:sig6, module_ctx, v17, v16, v23, v18
 	Jump blk_ret
 `,
 		},
@@ -1754,6 +1765,7 @@ func TestCompiler_declareSignatures(t *testing.T) {
 			{ID: 6, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI32, ssa.TypeI32, ssa.TypeI64}, Results: []ssa.Type{ssa.TypeI32}},
 			{ID: 7, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI32}, Results: []ssa.Type{ssa.TypeI64}},
 			{ID: 8, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI32}},
+			{ID: 9, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI64, ssa.TypeI32, ssa.TypeI32}, Results: []ssa.Type{ssa.TypeI32}},
 		}
 
 		require.Equal(t, len(expected), len(declaredSigs))
@@ -1790,6 +1802,7 @@ func TestCompiler_declareSignatures(t *testing.T) {
 			{ID: 14, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI32, ssa.TypeI32, ssa.TypeI64}, Results: []ssa.Type{ssa.TypeI32}},
 			{ID: 15, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI32}, Results: []ssa.Type{ssa.TypeI64}},
 			{ID: 16, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI32}},
+			{ID: 17, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI64, ssa.TypeI32, ssa.TypeI32}, Results: []ssa.Type{ssa.TypeI32}},
 		}
 		require.Equal(t, len(expected), len(declaredSigs))
 		for i := 0; i < len(declaredSigs); i++ {

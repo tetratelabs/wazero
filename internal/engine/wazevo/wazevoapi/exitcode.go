@@ -26,6 +26,7 @@ const (
 	ExitCodeCallGoFunctionWithListener
 	ExitCodeTableGrow
 	ExitCodeRefFunc
+	ExitCodeUnalignedAtomic
 	exitCodeMax
 )
 
@@ -46,6 +47,8 @@ func (e ExitCode) String() string {
 		return "unreachable"
 	case ExitCodeMemoryOutOfBounds:
 		return "memory_out_of_bounds"
+	case ExitCodeUnalignedAtomic:
+		return "unaligned_atomic"
 	case ExitCodeTableOutOfBounds:
 		return "table_out_of_bounds"
 	case ExitCodeIndirectCallNullPointer:

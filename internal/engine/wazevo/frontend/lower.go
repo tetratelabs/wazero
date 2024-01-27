@@ -3167,15 +3167,25 @@ func (c *Compiler) lowerCurrentOpcode() {
 			case wasm.OpcodeAtomicMemoryWait64:
 				opSize = 8
 			}
+			size := builder.AllocateInstruction().AsIconst32(uint32(opSize)).Insert(builder)
 
 			timeout := state.pop()
 			exp := state.pop()
 			baseAddr := state.pop()
 			addr := c.memOpSetup(baseAddr, uint64(offset), opSize)
-			result := builder.AllocateInstruction().
-				AsMemoryWait(timeout, exp, addr, opSize).
+			c.memAlignmentCheck(addr, opSize)
+
+			memoryWaitPtr := builder.AllocateInstruction().
+				AsLoad(c.execCtxPtrValue,
+					wazevoapi.ExecutionContextOffsetMemoryWaitAddress.U32(),
+					ssa.TypeI64,
+				).Insert(builder).Return()
+
+			args := []ssa.Value{c.moduleCtxPtrValue, timeout, exp, addr, size.Return()}
+			memoryWaitRet := builder.AllocateInstruction().
+				AsCallIndirect(memoryWaitPtr, &c.memoryWaitSig, args).
 				Insert(builder).Return()
-			state.push(result)
+			state.push(memoryWaitRet)
 		default:
 			panic("TODO: unsupported atomic instruction: " + wasm.AtomicInstructionName(atomicOp))
 		}
@@ -3449,6 +3459,26 @@ func (c *Compiler) memOpSetup(baseAddr ssa.Value, constOffset, operationSizeInBy
 	// Record the bound ceil for this baseAddr is known to be safe for the subsequent memory access in the same block.
 	c.recordKnownSafeBound(baseAddrID, ceil, address)
 	return
+}
+
+func (c *Compiler) memAlignmentCheck(addr ssa.Value, operationSizeInBytes uint64) {
+	if operationSizeInBytes == 1 {
+		return // No alignment restrictions when accessing a byte
+	}
+	var checkBits uint64
+	switch operationSizeInBytes {
+	case 2:
+		checkBits = 0b1
+	case 4:
+		checkBits = 0b11
+	case 8:
+		checkBits = 0b111
+	}
+
+	builder := c.ssaBuilder
+	builder.AllocateInstruction().AsIandImm(addr, checkBits).Insert(builder)
+	builder.AllocateInstruction().AsExitIfCondWithCode(c.execCtxPtrValue, ssa.IntegerCmpCondEqual, wazevoapi.ExitCodeUnalignedAtomic).
+		Insert(builder)
 }
 
 func (c *Compiler) callMemmove(dst, src, size ssa.Value) {

@@ -21,6 +21,7 @@ type Compiler struct {
 	signatures             map[*wasm.FunctionType]*ssa.Signature
 	listenerSignatures     map[*wasm.FunctionType][2]*ssa.Signature
 	memoryGrowSig          ssa.Signature
+	memoryWaitSig          ssa.Signature
 	checkModuleExitCodeSig ssa.Signature
 	tableGrowSig           ssa.Signature
 	refFuncSig             ssa.Signature
@@ -142,6 +143,15 @@ func (c *Compiler) declareSignatures(listenerOn bool) {
 		Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI32},
 	}
 	c.ssaBuilder.DeclareSignature(&c.memmoveSig)
+
+	c.memoryWaitSig = ssa.Signature{
+		ID: c.memmoveSig.ID + 1,
+		// module context, timeout, expected, address, size
+		Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI64, ssa.TypeI32, ssa.TypeI32},
+		// Returns the status.
+		Results: []ssa.Type{ssa.TypeI32},
+	}
+	c.ssaBuilder.DeclareSignature(&c.memoryWaitSig)
 }
 
 // SignatureForWasmFunctionType returns the ssa.Signature for the given wasm.FunctionType.

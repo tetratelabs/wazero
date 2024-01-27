@@ -82,6 +82,8 @@ type (
 		memmoveAddress uintptr
 		// framePointerBeforeGoCall holds the frame pointer before calling a Go function. Note: only used in amd64.
 		framePointerBeforeGoCall uintptr
+		// memoryWaitAddress holds the address of memory wait trampoline function.
+		memoryWaitAddress *byte
 	}
 )
 
