@@ -1210,11 +1210,6 @@ func (m *machine) lowerIDivRem(si *ssa.Instruction, isDiv bool, signed bool) {
 	// If not zero, we can proceed with the division.
 	jnz.asJmpIf(condNZ, newOperandLabel(nz))
 
-	// We are going to need rax and rdx, so we save them to temp registers.
-	raxTmp, rdxTmp := m.c.AllocateVReg(ssa.TypeI64), m.c.AllocateVReg(ssa.TypeI64)
-	m.copyTo(raxVReg, raxTmp)
-	m.copyTo(rdxVReg, rdxTmp)
-
 	m.copyTo(xr.r, raxVReg)
 
 	var ifRemNeg1 *instruction
@@ -1299,8 +1294,4 @@ func (m *machine) lowerIDivRem(si *ssa.Instruction, isDiv bool, signed bool) {
 		m.insert(nop)
 		ifRemNeg1.asJmpIf(condZ, newOperandLabel(end))
 	}
-
-	// Restore rax, rdx.
-	m.copyTo(raxTmp, raxVReg)
-	m.copyTo(rdxTmp, rdxVReg)
 }

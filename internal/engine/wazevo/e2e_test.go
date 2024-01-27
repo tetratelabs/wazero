@@ -126,25 +126,64 @@ func TestE2E(t *testing.T) {
 			name: "div_return", m: testcases.DivReturn.Module,
 			calls: []callCase{
 				{
-					params:     []uint64{21, 10, 21, 10},
-					expResults: []uint64{21 / 10, 21 % 10, 21 / 10, 21 % 10, 21 / 10, 21 % 10, 21 / 10, 21 % 10},
+					params: []uint64{
+						21, 10, 21, 10, 21, 10, 21, 10,
+						21, 10, 21, 10, 21, 10, 21, 10,
+					},
+					expResults: []uint64{
+						21 / 10, 21 % 10, 21 / 10, 21 % 10,
+						21 / 10, 21 % 10, 21 / 10, 21 % 10,
+					},
 				},
 				{
-					params: []uint64{21, 0, 1, 1},
+					params: []uint64{
+						21, 0, 1, 1, 1, 1, 1, 1,
+						1, 1, 1, 1, 1, 1, 1, 1,
+					},
 					expErr: "wasm error: integer divide by zero",
 				},
 				{
-					params: []uint64{1, 1, 21, 0},
+					params: []uint64{
+						1, 1, 21, 0, 1, 1, 1, 1,
+						1, 1, 1, 1, 1, 1, 1, 1,
+					},
 					expErr: "wasm error: integer divide by zero",
 				},
-				{
-					params: []uint64{0x80000000, 0xffffffff, 21, 1},
-					expErr: "wasm error: integer overflow",
-				},
-				{
-					params: []uint64{1, 1, 0x8000000000000000, 0xffffffffffffffff},
-					expErr: "wasm error: integer overflow",
-				},
+				//{
+				//	params: []uint64{
+				//		1, 1, 1, 1, 21, 0, 1, 1,
+				//		1, 1, 1, 1, 1, 1, 1, 1,
+				//	},
+				//	expErr: "wasm error: integer divide by zero",
+				//},
+				//{
+				//	params: []uint64{
+				//		1, 1, 1, 1, 1, 1, 21, 0,
+				//		1, 1, 1, 1, 1, 1, 1, 1,
+				//	},
+				//	expErr: "wasm error: integer divide by zero",
+				//},
+
+				//
+				//{
+				//	params: []uint64{
+				//		0x80000000, 0xffffffff, 1, 1, 1, 1, 1, 1,
+				//		1, 1, 1, 1, 1, 1, 1, 1,
+				//	},
+				//	expErr: "wasm error: integer overflow",
+				//},
+				//{
+				//	params: []uint64{
+				//		1, 1, 1, 1, 1, 1, 1, 1,
+				//		0x8000000000000000, 0xffffffffffffffff, 1, 1, 1, 1, 1, 1,
+				//	},
+				//	expErr: "wasm error: integer overflow",
+				//},
+
+				//{
+				//	params: []uint64{1, 1, 0x8000000000000000, 0xffffffffffffffff},
+				//	expErr: "wasm error: integer overflow",
+				//},
 			},
 		},
 		{

@@ -167,7 +167,7 @@ var (
 		Name: "div return",
 		Module: SingleFunctionModule(
 			wasm.FunctionType{
-				Params:  []wasm.ValueType{i32, i32, i64, i64},
+				Params:  []wasm.ValueType{i32, i32, i32, i32, i32, i32, i32, i32, i64, i64, i64, i64, i64, i64, i64, i64},
 				Results: []wasm.ValueType{i32, i32, i32, i32, i64, i64, i64, i64},
 			},
 			[]byte{
@@ -175,32 +175,32 @@ var (
 				wasm.OpcodeLocalGet, 1,
 				wasm.OpcodeI32DivU,
 
-				wasm.OpcodeLocalGet, 0,
-				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeLocalGet, 2,
+				wasm.OpcodeLocalGet, 3,
 				wasm.OpcodeI32RemU,
 
-				wasm.OpcodeLocalGet, 0,
-				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeLocalGet, 4,
+				wasm.OpcodeLocalGet, 5,
 				wasm.OpcodeI32DivS,
 
-				wasm.OpcodeLocalGet, 0,
-				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeLocalGet, 6,
+				wasm.OpcodeLocalGet, 7,
 				wasm.OpcodeI32RemS,
 
-				wasm.OpcodeLocalGet, 2,
-				wasm.OpcodeLocalGet, 3,
+				wasm.OpcodeLocalGet, 8,
+				wasm.OpcodeLocalGet, 9,
 				wasm.OpcodeI64DivU,
 
-				wasm.OpcodeLocalGet, 2,
-				wasm.OpcodeLocalGet, 3,
+				wasm.OpcodeLocalGet, 10,
+				wasm.OpcodeLocalGet, 11,
 				wasm.OpcodeI64RemU,
 
-				wasm.OpcodeLocalGet, 2,
-				wasm.OpcodeLocalGet, 3,
+				wasm.OpcodeLocalGet, 12,
+				wasm.OpcodeLocalGet, 13,
 				wasm.OpcodeI64DivS,
 
-				wasm.OpcodeLocalGet, 2,
-				wasm.OpcodeLocalGet, 3,
+				wasm.OpcodeLocalGet, 14,
+				wasm.OpcodeLocalGet, 15,
 				wasm.OpcodeI64RemS,
 
 				wasm.OpcodeEnd,
