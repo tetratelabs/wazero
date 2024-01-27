@@ -28,6 +28,7 @@ func TestCompiler_LowerToSSA(t *testing.T) {
 		exp string
 		// expAfterOpt is not empty when we want to check the result after optimization passes.
 		expAfterOpt string
+		features    api.CoreFeatures
 	}{
 		{
 			name: "empty", m: testcases.Empty.Module,
@@ -1617,8 +1618,9 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:v128, v3:v128)
 `,
 		},
 		{
-			name: "MemoryWait",
-			m:    testcases.MemoryWait.Module,
+			name:     "MemoryWait",
+			m:        testcases.MemoryWait.Module,
+			features: api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
 			exp: `
 blk0: (exec_ctx:i64, module_ctx:i64)
 	v2:i32 = Iconst_32 0x5
@@ -1651,7 +1653,11 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			// Just in case let's check the test module is valid.
-			err := tc.m.Validate(api.CoreFeaturesV2 | experimental.CoreFeaturesThreads)
+			features := tc.features
+			if features == 0 {
+				features = api.CoreFeaturesV2
+			}
+			err := tc.m.Validate(features)
 			require.NoError(t, err, "invalid test case module!")
 
 			b := ssa.NewBuilder()
