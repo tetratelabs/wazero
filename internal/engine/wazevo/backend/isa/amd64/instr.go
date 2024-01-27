@@ -252,6 +252,11 @@ func (i *instruction) Defs(regs *[]regalloc.VReg) []regalloc.VReg {
 		*regs = append(*regs, i.op2.r)
 	case defKindCall:
 		*regs = append(*regs, i.abi.RetRealRegs...)
+	case defKindRdx:
+		*regs = append(*regs, rdxVReg)
+	case defKindRaxRdx:
+		*regs = append(*regs, raxVReg, rdxVReg)
+
 	default:
 		panic(fmt.Sprintf("BUG: invalid defKind \"%s\" for %s", dk, i))
 	}
@@ -307,6 +312,21 @@ func (i *instruction) Uses(regs *[]regalloc.VReg) []regalloc.VReg {
 		*regs = append(*regs, i.abi.ArgRealRegs...)
 	case useKindCall:
 		*regs = append(*regs, i.abi.ArgRealRegs...)
+	case useKindRax:
+		*regs = append(*regs, raxVReg)
+	case useKindOp1Rax:
+		op := i.op1
+		switch op.kind {
+		case operandKindReg:
+			*regs = append(*regs, op.r)
+		case operandKindMem:
+			op.amode.uses(regs)
+		case operandKindImm32, operandKindLabel:
+		default:
+			panic(fmt.Sprintf("BUG: invalid operand: %s", i))
+		}
+		*regs = append(*regs, raxVReg)
+
 	default:
 		panic(fmt.Sprintf("BUG: invalid useKind %s for %s", uk, i))
 	}
@@ -390,6 +410,24 @@ func (i *instruction) AssignUse(index int, v regalloc.VReg) {
 		default:
 			panic(fmt.Sprintf("BUG: invalid operand: %s", i))
 		}
+	case useKindOp1Rax:
+		op := &i.op1
+		switch op.kind {
+		case operandKindReg:
+			if index != 0 {
+				panic("BUG")
+			}
+			if op.r.IsRealReg() {
+				panic("BUG already assigned: " + i.String())
+			}
+			op.r = v
+		case operandKindMem:
+			op.amode.assignUses(index, v)
+		default:
+			panic(fmt.Sprintf("BUG: invalid operand: %s", i))
+		}
+	case useKindRax:
+		// Nothing to do.
 	default:
 		panic(fmt.Sprintf("BUG: invalid useKind %s for %s", uk, i))
 	}
@@ -1604,12 +1642,14 @@ const (
 	defKindNone defKind = iota + 1
 	defKindOp2
 	defKindCall
+	defKindRdx
+	defKindRaxRdx
 )
 
 var defKinds = [instrMax]defKind{
 	nop0:            defKindNone,
-	div:             defKindNone,
-	signExtendData:  defKindNone,
+	div:             defKindRaxRdx,
+	signExtendData:  defKindRdx,
 	ret:             defKindNone,
 	movRR:           defKindOp2,
 	movRM:           defKindNone,
@@ -1646,6 +1686,10 @@ func (d defKind) String() string {
 		return "op2"
 	case defKindCall:
 		return "call"
+	case defKindRdx:
+		return "rdx"
+	case defKindRaxRdx:
+		return "raxrdx"
 	default:
 		return "invalid"
 	}
@@ -1660,16 +1704,18 @@ const (
 	useKindOp1Op2Reg
 	// useKindOp1RegOp2 is Op1 must be a register, Op2 can be any operand.
 	useKindOp1RegOp2
-	useKindRaxRdx
-	useKindRdx
+	// useKindRax is %rax is used (for instance in signExtendData).
+	useKindRax
+	// useKindOp1Rax is Op1 must be a reg, mem operand; the other operand is implicitly %rax.
+	useKindOp1Rax
 	useKindCall
 	useKindCallInd
 )
 
 var useKinds = [instrMax]useKind{
 	nop0:            useKindNone,
-	div:             useKindRaxRdx,
-	signExtendData:  useKindNone,
+	div:             useKindOp1Rax,
+	signExtendData:  useKindRax,
 	ret:             useKindNone,
 	movRR:           useKindOp1,
 	movRM:           useKindOp1RegOp2,
@@ -1709,6 +1755,12 @@ func (u useKind) String() string {
 		return "op1RegOp2"
 	case useKindCall:
 		return "call"
+	case useKindCallInd:
+		return "callInd"
+	case useKindOp1Rax:
+		return "op1rax"
+	case useKindRax:
+		return "rax"
 	default:
 		return "invalid"
 	}

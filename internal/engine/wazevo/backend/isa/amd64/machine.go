@@ -1244,7 +1244,7 @@ func (m *machine) lowerIDivRem(si *ssa.Instruction, isDiv bool, signed bool) {
 			// Next we check if the quotient is the most negative value for the signed integer, i.e.
 			// if we are trying to do (math.MinInt32 / -1) or (math.MinInt64 / -1) respectively.
 			cmp2 := m.allocateInstr()
-			cmp2.asCmpRmiR(true, newOperandReg(tmp), yr.r, _64)
+			cmp2.asCmpRmiR(true, newOperandReg(tmp), xr.r, _64)
 			m.insert(cmp2)
 
 			ifNotMinInt := m.allocateInstr()
