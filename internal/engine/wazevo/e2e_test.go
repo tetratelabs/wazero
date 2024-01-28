@@ -187,10 +187,10 @@ func TestE2E(t *testing.T) {
 					params: []uint64{21, 0, 1, 1},
 					expErr: "wasm error: integer divide by zero",
 				},
-				//{ // This fails.
-				//	params: []uint64{1, 1, 21, 0},
-				//	expErr: "wasm error: integer divide by zero",
-				//},
+				{ // This fails.
+					params: []uint64{1, 1, 21, 0},
+					expErr: "wasm error: integer divide by zero",
+				},
 				{
 					params: []uint64{0x80000000, 0xffffffff, 1, 1},
 					expErr: "wasm error: integer overflow",
@@ -213,10 +213,10 @@ func TestE2E(t *testing.T) {
 					params: []uint64{1, 1, 21, 0},
 					expErr: "wasm error: integer divide by zero",
 				},
-				//{ // This now fails.
-				//	params: []uint64{0x80000000, 0xffffffff, 1, 1},
-				//	expErr: "wasm error: integer overflow",
-				//},
+				{ // This now fails.
+					params: []uint64{0x80000000, 0xffffffff, 1, 1},
+					expErr: "wasm error: integer overflow",
+				},
 				{
 					params:     []uint64{1, 1, 0x80000000, 0xffffffff},
 					expResults: []uint64{0, 1},
@@ -234,10 +234,10 @@ func TestE2E(t *testing.T) {
 					params: []uint64{21, 0, 1, 1},
 					expErr: "wasm error: integer divide by zero",
 				},
-				//{ // This fails.
-				//	params: []uint64{1, 1, 21, 0},
-				//	expErr: "wasm error: integer divide by zero",
-				//},
+				{ // This fails.
+					params: []uint64{1, 1, 21, 0},
+					expErr: "wasm error: integer divide by zero",
+				},
 				{
 					params: []uint64{0x8000000000000000, 0xffffffffffffffff, 1, 1},
 					expErr: "wasm error: integer overflow",

@@ -1199,12 +1199,13 @@ func (m *machine) lowerIDivRem(si *ssa.Instruction, isDiv bool, signed bool) {
 	test.asCmpRmiR(false, yr, yr.r, _64)
 	m.insert(test)
 
+	// We need to copy the execution context to a temp register *BEFORE BRANCHING*, because if it's spilled,
+	// it might end up being reloaded inside the exiting branch.
+	execCtxTmp := m.copyToTmp(ctxVReg)
+
 	jnz := m.allocateInstr()
 	m.insert(jnz)
 
-	// We need to copy the execution context to a temp register, because if it's spilled,
-	// it might end up being reloaded inside the exiting branch.
-	execCtxTmp := m.copyToTmp(ctxVReg)
 	nz := m.lowerExitWithCode(execCtxTmp, wazevoapi.ExitCodeIntegerDivisionByZero)
 
 	// If not zero, we can proceed with the division.
@@ -1233,6 +1234,9 @@ func (m *machine) lowerIDivRem(si *ssa.Instruction, isDiv bool, signed bool) {
 			cmp.asCmpRmiR(true, newOperandReg(tmp1), yr.r, _64)
 			m.insert(cmp)
 
+			// Again, we need to copy the execution context to a temp register *BEFORE BRANCHING*, because if it's spilled,
+			// it might end up being reloaded inside the exiting branch.
+			execCtxTmp2 := m.copyToTmp(execCtxTmp)
 			ifNotNeg1 := m.allocateInstr()
 			m.insert(ifNotNeg1)
 
@@ -1257,7 +1261,6 @@ func (m *machine) lowerIDivRem(si *ssa.Instruction, isDiv bool, signed bool) {
 			// Trap if we are trying to do (math.MinInt32 / -1) or (math.MinInt64 / -1),
 			// as that is the overflow in division as the result becomes 2^31 which is larger than
 			// the maximum of signed 32-bit int (2^31-1).
-			execCtxTmp2 := m.copyToTmp(ctxVReg)
 			end := m.lowerExitWithCode(execCtxTmp2, wazevoapi.ExitCodeIntegerOverflow)
 			ifNotNeg1.asJmpIf(condNZ, newOperandLabel(end))
 			ifNotMinInt.asJmpIf(condNZ, newOperandLabel(end))
