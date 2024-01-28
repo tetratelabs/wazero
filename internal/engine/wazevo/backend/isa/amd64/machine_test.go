@@ -414,10 +414,6 @@ L2:
 	}
 }
 
-func TestMachine_lowerIDivRem(t *testing.T) {
-	// TODO
-}
-
 // mockCpuFlags implements platform.CpuFeatureFlags
 type mockCpuFlags struct {
 	flags      platform.CpuFeature
