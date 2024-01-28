@@ -123,6 +123,128 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
+			name: "divrem_unsigned_return", m: testcases.DivUReturn32.Module,
+			calls: []callCase{
+				{
+					params:     []uint64{21, 10, 21, 10},
+					expResults: []uint64{21 / 10, 21 % 10},
+				},
+				{
+					params: []uint64{21, 0, 1, 1},
+					expErr: "wasm error: integer divide by zero",
+				},
+				{
+					params: []uint64{1, 1, 21, 0},
+					expErr: "wasm error: integer divide by zero",
+				},
+				{
+					params: []uint64{
+						0x80000000, 0xffffffff, 1, 1,
+					},
+					expResults: []uint64{0, 0},
+				},
+				{
+					params: []uint64{
+						1, 1, 0x80000000, 0xffffffff,
+					},
+					expResults: []uint64{1, 0x80000000},
+				},
+			},
+		},
+		{
+			name: "divrem_unsigned_return", m: testcases.DivUReturn64.Module,
+			calls: []callCase{
+				{
+					params:     []uint64{21, 10, 21, 10},
+					expResults: []uint64{21 / 10, 21 % 10},
+				},
+				{
+					params: []uint64{21, 0, 1, 1},
+					expErr: "wasm error: integer divide by zero",
+				},
+				{
+					params: []uint64{1, 1, 21, 0},
+					expErr: "wasm error: integer divide by zero",
+				},
+				{
+					params:     []uint64{0x80000000, 0xffffffff, 1, 1},
+					expResults: []uint64{0, 0},
+				},
+				{
+					params:     []uint64{1, 1, 0x80000000, 0xffffffff},
+					expResults: []uint64{1, 0x80000000},
+				},
+			},
+		},
+		{
+			name: "divrem_signed_return32", m: testcases.DivSReturn32.Module,
+			calls: []callCase{
+				{
+					params:     []uint64{21, 10, 21, 10},
+					expResults: []uint64{21 / 10, 21 % 10},
+				},
+				{
+					params: []uint64{21, 0, 1, 1},
+					expErr: "wasm error: integer divide by zero",
+				},
+				{
+					params: []uint64{1, 1, 21, 0},
+					expErr: "wasm error: integer divide by zero",
+				},
+				{
+					params: []uint64{0x80000000, 0xffffffff, 1, 1},
+					expErr: "wasm error: integer overflow",
+				},
+				{
+					params:     []uint64{1, 1, 0x80000000, 0xffffffff},
+					expResults: []uint64{1, 0},
+				},
+			},
+		},
+
+		{
+			name: "divrem_signed_return32 inverted rem div order (different crash)", m: testcases.DivSReturn32_weird.Module,
+			calls: []callCase{
+				{
+					params: []uint64{21, 0, 1, 1},
+					expErr: "wasm error: integer divide by zero",
+				},
+				{
+					params: []uint64{1, 1, 21, 0},
+					expErr: "wasm error: integer divide by zero",
+				},
+				{
+					params: []uint64{0x80000000, 0xffffffff, 1, 1},
+					expErr: "wasm error: integer overflow",
+				},
+				{
+					params:     []uint64{1, 1, 0x80000000, 0xffffffff},
+					expResults: []uint64{0, 1},
+				},
+			},
+		},
+		{
+			name: "divrem_signed_return64", m: testcases.DivSReturn64.Module,
+			calls: []callCase{
+				{
+					params:     []uint64{21, 10, 21, 10},
+					expResults: []uint64{21 / 10, 21 % 10},
+				},
+				{
+					params: []uint64{21, 0, 1, 1},
+					expErr: "wasm error: integer divide by zero",
+				},
+				{
+					params: []uint64{1, 1, 21, 0},
+					expErr: "wasm error: integer divide by zero",
+				},
+				{
+					params: []uint64{0x8000000000000000, 0xffffffffffffffff, 1, 1},
+					expErr: "wasm error: integer overflow",
+				},
+			},
+		},
+		{
 			name: "integer bit counts", m: testcases.IntegerBitCounts.Module,
 			calls: []callCase{{
 				params: []uint64{10, 100},

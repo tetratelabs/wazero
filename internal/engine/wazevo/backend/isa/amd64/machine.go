@@ -258,6 +258,10 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		m.lowerAluRmiROp(instr, aluRmiROpcodeSub)
 	case ssa.OpcodeImul:
 		m.lowerAluRmiROp(instr, aluRmiROpcodeMul)
+	case ssa.OpcodeSdiv, ssa.OpcodeUdiv, ssa.OpcodeSrem, ssa.OpcodeUrem:
+		isDiv := op == ssa.OpcodeSdiv || op == ssa.OpcodeUdiv
+		isSigned := op == ssa.OpcodeSdiv || op == ssa.OpcodeSrem
+		m.lowerIDivRem(instr, isDiv, isSigned)
 	case ssa.OpcodeBand:
 		m.lowerAluRmiROp(instr, aluRmiROpcodeAnd)
 	case ssa.OpcodeBor:
@@ -1175,4 +1179,131 @@ func (m *machine) frameSize() int64 {
 
 func (m *machine) clobberedRegSlotSize() int64 {
 	return int64(len(m.clobberedRegs) * 16)
+}
+
+func (m *machine) lowerIDivRem(si *ssa.Instruction, isDiv bool, signed bool) {
+	x, y, execCtx := si.Arg3()
+	if !x.Type().IsInt() {
+		panic("BUG?")
+	}
+	_64 := x.Type().Bits() == 64
+
+	xDef, yDef := m.c.ValueDefinition(x), m.c.ValueDefinition(y)
+	xr := m.getOperand_Reg(xDef)
+	yr := m.getOperand_Reg(yDef)
+	ctxVReg := m.c.VRegOf(execCtx)
+	rd := m.c.VRegOf(si.Return())
+
+	// Ensure yr is not zero.
+	test := m.allocateInstr()
+	test.asCmpRmiR(false, yr, yr.r, _64)
+	m.insert(test)
+
+	// We need to copy the execution context to a temp register *BEFORE BRANCHING*, because if it's spilled,
+	// it might end up being reloaded inside the exiting branch.
+	execCtxTmp := m.copyToTmp(ctxVReg)
+
+	jnz := m.allocateInstr()
+	m.insert(jnz)
+
+	nz := m.lowerExitWithCode(execCtxTmp, wazevoapi.ExitCodeIntegerDivisionByZero)
+
+	// If not zero, we can proceed with the division.
+	jnz.asJmpIf(condNZ, newOperandLabel(nz))
+
+	m.copyTo(xr.r, raxVReg)
+
+	var ifRemNeg1 *instruction
+	if signed {
+		var neg1 uint64
+		if _64 {
+			neg1 = 0xffffffffffffffff
+		} else {
+			neg1 = 0xffffffff
+		}
+		tmp1 := m.c.AllocateVReg(si.Return().Type())
+		m.lowerIconst(tmp1, neg1, _64)
+
+		if isDiv {
+			// For signed division, we have to have branches for "math.MinInt{32,64} / -1"
+			// case which results in the floating point exception via division error as
+			// the resulting value exceeds the maximum of signed int.
+
+			// First, we check if the divisor is -1.
+			cmp := m.allocateInstr()
+			cmp.asCmpRmiR(true, newOperandReg(tmp1), yr.r, _64)
+			m.insert(cmp)
+
+			// Again, we need to copy the execution context to a temp register *BEFORE BRANCHING*, because if it's spilled,
+			// it might end up being reloaded inside the exiting branch.
+			execCtxTmp2 := m.copyToTmp(execCtxTmp)
+			ifNotNeg1 := m.allocateInstr()
+			m.insert(ifNotNeg1)
+
+			var minInt uint64
+			if _64 {
+				minInt = 0x8000000000000000
+			} else {
+				minInt = 0x80000000
+			}
+			tmp := m.c.AllocateVReg(si.Return().Type())
+			m.lowerIconst(tmp, minInt, _64)
+
+			// Next we check if the quotient is the most negative value for the signed integer, i.e.
+			// if we are trying to do (math.MinInt32 / -1) or (math.MinInt64 / -1) respectively.
+			cmp2 := m.allocateInstr()
+			cmp2.asCmpRmiR(true, newOperandReg(tmp), xr.r, _64)
+			m.insert(cmp2)
+
+			ifNotMinInt := m.allocateInstr()
+			m.insert(ifNotMinInt)
+
+			// Trap if we are trying to do (math.MinInt32 / -1) or (math.MinInt64 / -1),
+			// as that is the overflow in division as the result becomes 2^31 which is larger than
+			// the maximum of signed 32-bit int (2^31-1).
+			end := m.lowerExitWithCode(execCtxTmp2, wazevoapi.ExitCodeIntegerOverflow)
+			ifNotNeg1.asJmpIf(condNZ, newOperandLabel(end))
+			ifNotMinInt.asJmpIf(condNZ, newOperandLabel(end))
+		} else {
+			// If it is remainder, zeros DX register and compare the divisor to -1.
+			xor := m.allocateInstr()
+			xor.asAluRmiR(aluRmiROpcodeXor, newOperandReg(rdxVReg), rdxVReg, _64)
+			m.insert(xor)
+
+			// We check if the divisor is -1.
+			cmp := m.allocateInstr()
+			cmp.asCmpRmiR(true, newOperandReg(tmp1), yr.r, _64)
+			m.insert(cmp)
+
+			ifRemNeg1 = m.allocateInstr()
+			m.insert(ifRemNeg1)
+		}
+
+		// Sign-extend DX register to have 2*x.Type().Bits() dividend over DX and AX registers.
+		sed := m.allocateInstr()
+		sed.asSignExtendData(_64)
+		m.insert(sed)
+	} else {
+		// Zeros DX register to have 2*x.Type().Bits() dividend over DX and AX registers.
+		xor := m.allocateInstr()
+		xor.asAluRmiR(aluRmiROpcodeXor, newOperandReg(rdxVReg), rdxVReg, _64)
+		m.insert(xor)
+	}
+
+	div := m.allocateInstr()
+	div.asDiv(yr, signed, _64)
+	m.insert(div)
+
+	nop, end := m.allocateBrTarget()
+	m.insert(nop)
+	// If we are compiling a Rem instruction, when the divisor is -1 we land at the end of the function.
+	if ifRemNeg1 != nil {
+		ifRemNeg1.asJmpIf(condZ, newOperandLabel(end))
+	}
+
+	if isDiv {
+		m.copyTo(raxVReg, rd)
+	} else {
+		m.copyTo(rdxVReg, rd)
+	}
 }

@@ -94,7 +94,17 @@ func (i *instruction) String() string {
 		}
 		return fmt.Sprintf("%s %s", op, i.op1.format(i.b1))
 	case div:
-		panic("TODO")
+		var prefix string
+		var op string
+		if i.b1 {
+			op = "divq"
+		} else {
+			op = "divl"
+		}
+		if i.u1 != 0 {
+			prefix = "i"
+		}
+		return fmt.Sprintf("%s%s %s", prefix, op, i.op1.format(i.b1))
 	case mulHi:
 		signed, _64 := i.u1 != 0, i.b1
 		var op string
@@ -112,7 +122,13 @@ func (i *instruction) String() string {
 	case checkedDivOrRemSeq:
 		panic("TODO")
 	case signExtendData:
-		panic("TODO")
+		var op string
+		if i.b1 {
+			op = "cqo"
+		} else {
+			op = "cdq"
+		}
+		return op
 	case movzxRmR:
 		return fmt.Sprintf("movzx.%s %s, %s", extMode(i.u1), i.op1.format(true), i.op2.format(true))
 	case mov64MR:
@@ -236,6 +252,11 @@ func (i *instruction) Defs(regs *[]regalloc.VReg) []regalloc.VReg {
 		*regs = append(*regs, i.op2.r)
 	case defKindCall:
 		*regs = append(*regs, i.abi.RetRealRegs...)
+	case defKindRdx:
+		*regs = append(*regs, rdxVReg)
+	case defKindRaxRdx:
+		*regs = append(*regs, raxVReg, rdxVReg)
+
 	default:
 		panic(fmt.Sprintf("BUG: invalid defKind \"%s\" for %s", dk, i))
 	}
@@ -291,6 +312,21 @@ func (i *instruction) Uses(regs *[]regalloc.VReg) []regalloc.VReg {
 		*regs = append(*regs, i.abi.ArgRealRegs...)
 	case useKindCall:
 		*regs = append(*regs, i.abi.ArgRealRegs...)
+	case useKindRax:
+		*regs = append(*regs, raxVReg)
+	case useKindOp1Rax:
+		op := i.op1
+		switch op.kind {
+		case operandKindReg:
+			*regs = append(*regs, op.r)
+		case operandKindMem:
+			op.amode.uses(regs)
+		case operandKindImm32, operandKindLabel:
+		default:
+			panic(fmt.Sprintf("BUG: invalid operand: %s", i))
+		}
+		*regs = append(*regs, raxVReg)
+
 	default:
 		panic(fmt.Sprintf("BUG: invalid useKind %s for %s", uk, i))
 	}
@@ -373,6 +409,32 @@ func (i *instruction) AssignUse(index int, v regalloc.VReg) {
 			op.amode.assignUses(index, v)
 		default:
 			panic(fmt.Sprintf("BUG: invalid operand: %s", i))
+		}
+	case useKindOp1Rax:
+		if index == 0 {
+			op := &i.op1
+			switch op.kind {
+			case operandKindReg:
+				if index != 0 {
+					panic("BUG")
+				}
+				if op.r.IsRealReg() {
+					panic("BUG already assigned: " + i.String())
+				}
+				op.r = v
+			case operandKindMem:
+				op.amode.assignUses(index, v)
+			default:
+				panic(fmt.Sprintf("BUG: invalid operand: %s", i))
+			}
+		} else if index == 1 {
+			// Do nothing.
+		} else {
+			panic("BUG")
+		}
+	case useKindRax:
+		if index != 0 {
+			panic("BUG")
 		}
 	default:
 		panic(fmt.Sprintf("BUG: invalid useKind %s for %s", uk, i))
@@ -843,8 +905,24 @@ func (i *instruction) asMovzxRmR(ext extMode, src operand, rd regalloc.VReg) *in
 	return i
 }
 
+func (i *instruction) asSignExtendData(_64 bool) *instruction {
+	i.kind = signExtendData
+	i.b1 = _64
+	return i
+}
+
 func (i *instruction) asUD2() *instruction {
 	i.kind = ud2
+	return i
+}
+
+func (i *instruction) asDiv(rn operand, signed bool, _64 bool) *instruction {
+	i.kind = div
+	i.op1 = rn
+	i.b1 = _64
+	if signed {
+		i.u1 = 1
+	}
 	return i
 }
 
@@ -1572,10 +1650,14 @@ const (
 	defKindNone defKind = iota + 1
 	defKindOp2
 	defKindCall
+	defKindRdx
+	defKindRaxRdx
 )
 
 var defKinds = [instrMax]defKind{
 	nop0:            defKindNone,
+	div:             defKindRaxRdx,
+	signExtendData:  defKindRdx,
 	ret:             defKindNone,
 	movRR:           defKindOp2,
 	movRM:           defKindNone,
@@ -1612,6 +1694,10 @@ func (d defKind) String() string {
 		return "op2"
 	case defKindCall:
 		return "call"
+	case defKindRdx:
+		return "rdx"
+	case defKindRaxRdx:
+		return "raxrdx"
 	default:
 		return "invalid"
 	}
@@ -1626,12 +1712,18 @@ const (
 	useKindOp1Op2Reg
 	// useKindOp1RegOp2 is Op1 must be a register, Op2 can be any operand.
 	useKindOp1RegOp2
+	// useKindRax is %rax is used (for instance in signExtendData).
+	useKindRax
+	// useKindOp1Rax is Op1 must be a reg, mem operand; the other operand is implicitly %rax.
+	useKindOp1Rax
 	useKindCall
 	useKindCallInd
 )
 
 var useKinds = [instrMax]useKind{
 	nop0:            useKindNone,
+	div:             useKindOp1Rax,
+	signExtendData:  useKindRax,
 	ret:             useKindNone,
 	movRR:           useKindOp1,
 	movRM:           useKindOp1RegOp2,
@@ -1671,6 +1763,12 @@ func (u useKind) String() string {
 		return "op1RegOp2"
 	case useKindCall:
 		return "call"
+	case useKindCallInd:
+		return "callInd"
+	case useKindOp1Rax:
+		return "op1rax"
+	case useKindRax:
+		return "rax"
 	default:
 		return "invalid"
 	}
