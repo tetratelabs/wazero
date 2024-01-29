@@ -341,6 +341,9 @@ func (m *machine) lowerIcmp(instr *ssa.Instruction) {
 	rd := m.c.VRegOf(instr.Return())
 	scc := m.allocateInstr().asSetcc(condFromSSAIntCmpCond(c), rd)
 	m.insert(scc)
+	// On amd64, setcc only sets the first byte of the register, so we need to zero extend it to match
+	// the semantics of Icmp that sets either 0 or 1.
+	m.insert(m.allocateInstr().asMovzxRmR(extModeBQ, newOperandReg(rd), rd))
 }
 
 func (m *machine) lowerSelect(x, y, cval, ret ssa.Value) {

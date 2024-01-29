@@ -1215,7 +1215,7 @@ func TestSpectestV1(t *testing.T) {
 		return
 	}
 
-	config := opt.NewRuntimeConfigOptimizingCompiler()
+	config := opt.NewRuntimeConfigOptimizingCompiler().WithCoreFeatures(api.CoreFeaturesV1)
 
 	for _, tc := range []struct {
 		name string
@@ -1236,7 +1236,7 @@ func TestSpectestV1(t *testing.T) {
 		//{name: "conversions"},
 		{name: "const"},
 		{name: "data"},
-		//{name: "elem"},
+		{name: "elem"},
 		//{name: "endianness"},
 		{name: "exports"},
 		//{name: "f32"},
@@ -1245,15 +1245,15 @@ func TestSpectestV1(t *testing.T) {
 		//{name: "f64"},
 		//{name: "f64_bitwise"},
 		//{name: "f64_cmp"},
-		//{name: "fac"},
+		{name: "fac"},
 		//{name: "float_exprs"},
 		//{name: "float_literals"},
 		{name: "float_memory"},
 		//{name: "float_misc"},
-		//{name: "func"},
+		{name: "func"},
 		{name: "func_ptrs"},
 		{name: "forward"},
-		//{name: "globals"},
+		{name: "globals"},
 		//{name: "if"},
 		//{name: "imports"},
 		{name: "inline-module"},
@@ -1263,7 +1263,7 @@ func TestSpectestV1(t *testing.T) {
 		{name: "int_literals"},
 		{name: "labels"},
 		//{name: "left-to-right"},
-		//{name: "linking"},
+		{name: "linking"},
 		//{name: "load"},
 		//{name: "loop"},
 		//{name: "local_get"},
@@ -1271,11 +1271,11 @@ func TestSpectestV1(t *testing.T) {
 		//{name: "local_tee"},
 		//{name: "memory"},
 		{name: "memory_size"},
-		//{name: "memory_grow"},
+		{name: "memory_grow"},
 		{name: "memory_redundancy"},
 		{name: "memory_trap"},
 		{name: "names"},
-		//{name: "nop"},
+		{name: "nop"},
 		{name: "return"},
 		//{name: "select"},
 		{name: "start"},
@@ -1284,10 +1284,10 @@ func TestSpectestV1(t *testing.T) {
 		//{name: "switch"},
 		{name: "skip-stack-guard-page"},
 		{name: "token"},
-		//{name: "type"},
+		{name: "type"},
 		//{name: "traps"},
 		{name: "unreachable"},
-		//{name: "unreached-invalid"},
+		{name: "unreached-invalid"},
 		{name: "unwind"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
