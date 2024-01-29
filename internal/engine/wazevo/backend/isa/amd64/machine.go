@@ -315,8 +315,96 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 	case ssa.OpcodeSExtend, ssa.OpcodeUExtend:
 		from, to, signed := instr.ExtendData()
 		m.lowerExtend(instr.Arg(), instr.Return(), from, to, signed)
+	case ssa.OpcodeIcmp:
+		m.lowerIcmp(instr)
+	case ssa.OpcodeSelect:
+		cval, x, y := instr.SelectData()
+		m.lowerSelect(x, y, cval, instr.Return())
 	default:
 		panic("TODO: lowering " + op.String())
+	}
+}
+
+func (m *machine) lowerIcmp(instr *ssa.Instruction) {
+	x, y, c := instr.IcmpData()
+	m.lowerIcmpToFlag(m.c.ValueDefinition(x), m.c.ValueDefinition(y), x.Type() == ssa.TypeI64)
+	rd := m.c.VRegOf(instr.Return())
+	scc := m.allocateInstr().asSetcc(condFromSSAIntCmpCond(c), rd)
+	m.insert(scc)
+}
+
+func (m *machine) lowerSelect(x, y, cval, ret ssa.Value) {
+	xo, yo := m.getOperand_Mem_Reg(m.c.ValueDefinition(x)), m.getOperand_Reg(m.c.ValueDefinition(y))
+	rd := m.c.VRegOf(ret)
+
+	var cond cond
+	cvalDef := m.c.ValueDefinition(cval)
+	switch m.c.MatchInstrOneOf(cvalDef, condBranchMatches[:]) {
+	case ssa.OpcodeIcmp:
+		icmp := cvalDef.Instr
+		xc, yc, cc := icmp.IcmpData()
+		m.lowerIcmpToFlag(m.c.ValueDefinition(xc), m.c.ValueDefinition(yc), xc.Type() == ssa.TypeI64)
+		cond = condFromSSAIntCmpCond(cc)
+		icmp.Lowered()
+	default: // TODO: match ssa.OpcodeFcmp for optimization, but seems a bit complex.
+		cv := m.getOperand_Reg(cvalDef).r
+		test := m.allocateInstr().asCmpRmiR(false, newOperandReg(cv), cv, false)
+		m.insert(test)
+		cond = condNZ
+	}
+
+	if typ := x.Type(); typ.IsInt() {
+		_64 := typ.Bits() == 64
+		mov := m.allocateInstr()
+		switch yo.kind {
+		case operandKindReg:
+			mov.asMovRR(yo.r, rd, _64)
+		case operandKindMem:
+			if _64 {
+				mov.asMov64MR(yo, rd)
+			} else {
+				mov.asMovzxRmR(extModeLQ, yo, rd)
+			}
+		default:
+			panic("BUG")
+		}
+		m.insert(mov)
+		cmov := m.allocateInstr().asCmove(cond, xo, rd, _64)
+		m.insert(cmov)
+	} else {
+		mov := m.allocateInstr()
+		switch typ {
+		case ssa.TypeF32:
+			mov.asXmmUnaryRmR(sseOpcodeMovss, yo, rd)
+		case ssa.TypeF64:
+			mov.asXmmUnaryRmR(sseOpcodeMovsd, yo, rd)
+		case ssa.TypeV128:
+			mov.asXmmUnaryRmR(sseOpcodeMovdqu, yo, rd)
+		default:
+			panic("BUG")
+		}
+		m.insert(mov)
+
+		jcc := m.allocateInstr()
+		m.insert(jcc)
+
+		cmov := m.allocateInstr()
+		m.insert(cmov)
+		switch typ {
+		case ssa.TypeF32:
+			cmov.asXmmUnaryRmR(sseOpcodeMovss, xo, rd)
+		case ssa.TypeF64:
+			cmov.asXmmUnaryRmR(sseOpcodeMovsd, xo, rd)
+		case ssa.TypeV128:
+			cmov.asXmmUnaryRmR(sseOpcodeMovdqu, xo, rd)
+		default:
+			panic("BUG")
+		}
+
+		nop, end := m.allocateBrTarget()
+		m.insert(nop)
+
+		jcc.asJmpIf(cond.invert(), newOperandLabel(end))
 	}
 }
 
@@ -506,7 +594,7 @@ func (m *machine) lowerUnaryRmR(si *ssa.Instruction, op unaryRmROpcode) {
 	_64 := x.Type().Bits() == 64
 
 	xDef := m.c.ValueDefinition(x)
-	rm := m.getOperand_Imm32_Reg(xDef)
+	rm := m.getOperand_Mem_Reg(xDef)
 	rd := m.c.VRegOf(si.Return())
 
 	instr := m.allocateInstr()

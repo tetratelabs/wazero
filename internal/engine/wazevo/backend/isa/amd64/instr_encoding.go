@@ -833,7 +833,7 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 		}
 	case setcc:
 		cc := cond(i.u1)
-		dst := regEncodings[i.op1.r.RealReg()]
+		dst := regEncodings[i.op2.r.RealReg()]
 		rex := rexInfo(0).clearW().always()
 		opcode := uint32(0x0f90) + uint32(cc)
 		encodeEncEnc(c, legacyPrefixesNone, opcode, 2, 0, uint8(dst), rex)
@@ -925,8 +925,6 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 	case cvtFloatToUintSeq:
 		panic("TODO")
 	case xmmMinMaxSeq:
-		panic("TODO")
-	case xmmCmove:
 		panic("TODO")
 	case xmmCmpRmR:
 		panic("TODO")

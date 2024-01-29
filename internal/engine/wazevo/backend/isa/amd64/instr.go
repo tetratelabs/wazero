@@ -178,7 +178,7 @@ func (i *instruction) String() string {
 		}
 		return fmt.Sprintf("%s%s %s, %s", op, suffix, i.op1.format(i.b1), i.op2.format(i.b1))
 	case setcc:
-		return fmt.Sprintf("set%s %s", cond(i.u1), i.op1.format(true))
+		return fmt.Sprintf("set%s %s", cond(i.u1), i.op2.format(true))
 	case cmove:
 		var suffix string
 		if i.b1 {
@@ -204,8 +204,6 @@ func (i *instruction) String() string {
 	case cvtFloatToUintSeq:
 		panic("TODO")
 	case xmmMinMaxSeq:
-		panic("TODO")
-	case xmmCmove:
 		panic("TODO")
 	case xmmCmpRmR:
 		panic("TODO")
@@ -609,10 +607,6 @@ const (
 	// A sequence to compute min/max with the proper NaN semantics for xmm registers.
 	xmmMinMaxSeq
 
-	// XMM (scalar) conditional move.
-	// Overwrites the destination register if cc is set.
-	xmmCmove
-
 	// Float comparisons/tests: cmp (b w l q) (reg addr imm) reg.
 	xmmCmpRmR
 
@@ -725,8 +719,6 @@ func (k instructionKind) String() string {
 		return "cvtFloatToUintSeq"
 	case xmmMinMaxSeq:
 		return "xmmMinMaxSeq"
-	case xmmCmove:
-		return "xmmCmove"
 	case xmmCmpRmR:
 		return "xmmCmpRmR"
 	case xmmRmRImm:
@@ -1021,13 +1013,13 @@ func (i *instruction) asXmmRmiReg(op sseOpcode, rm operand, rd regalloc.VReg) *i
 	return i
 }
 
-func (i *instruction) asCmpRmiR(cmp bool, rm operand, rd regalloc.VReg, _64 bool) *instruction {
+func (i *instruction) asCmpRmiR(cmp bool, rm operand, rn regalloc.VReg, _64 bool) *instruction {
 	if rm.kind != operandKindReg && rm.kind != operandKindImm32 && rm.kind != operandKindMem {
 		panic("BUG")
 	}
 	i.kind = cmpRmiR
 	i.op1 = rm
-	i.op2 = newOperandReg(rd)
+	i.op2 = newOperandReg(rn)
 	if cmp {
 		i.u1 = 1
 	}
@@ -1037,7 +1029,7 @@ func (i *instruction) asCmpRmiR(cmp bool, rm operand, rd regalloc.VReg, _64 bool
 
 func (i *instruction) asSetcc(c cond, rd regalloc.VReg) *instruction {
 	i.kind = setcc
-	i.op1 = newOperandReg(rd)
+	i.op2 = newOperandReg(rd)
 	i.u1 = uint64(c)
 	return i
 }
@@ -1699,6 +1691,7 @@ var defKinds = [instrMax]defKind{
 	exitSequence:    defKindNone,
 	lea:             defKindOp2,
 	v128ConstIsland: defKindNone,
+	setcc:           defKindOp2,
 }
 
 // String implements fmt.Stringer.
@@ -1765,6 +1758,7 @@ var useKinds = [instrMax]useKind{
 	lea:             useKindOp1,
 	v128ConstIsland: useKindNone,
 	jmpTableIsland:  useKindNone,
+	setcc:           useKindNone,
 }
 
 func (u useKind) String() string {
