@@ -26,6 +26,8 @@ const (
 	ExitCodeCallGoFunctionWithListener
 	ExitCodeTableGrow
 	ExitCodeRefFunc
+	ExitCodeMemoryWait32
+	ExitCodeMemoryWait64
 	ExitCodeUnalignedAtomic
 	exitCodeMax
 )
@@ -77,6 +79,10 @@ func (e ExitCode) String() string {
 		return "table_grow"
 	case ExitCodeRefFunc:
 		return "ref_func"
+	case ExitCodeMemoryWait32:
+		return "memory_wait32"
+	case ExitCodeMemoryWait64:
+		return "memory_wait64"
 	}
 	panic("TODO")
 }

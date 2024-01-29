@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"reflect"
+	"sync/atomic"
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/api"
@@ -82,8 +83,10 @@ type (
 		memmoveAddress uintptr
 		// framePointerBeforeGoCall holds the frame pointer before calling a Go function. Note: only used in amd64.
 		framePointerBeforeGoCall uintptr
-		// memoryWaitAddress holds the address of memory wait trampoline function.
-		memoryWaitAddress *byte
+		// memoryWait32TrampolineAddress holds the address of memory_wait32 trampoline function.
+		memoryWait32TrampolineAddress *byte
+		// memoryWait32TrampolineAddress holds the address of memory_wait64 trampoline function.
+		memoryWait64TrampolineAddress *byte
 	}
 )
 
@@ -383,6 +386,46 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 			c.execCtx.exitCode = wazevoapi.ExitCodeOK
 			afterGoFunctionCallEntrypoint(c.execCtx.goCallReturnAddress, c.execCtxPtr,
 				uintptr(unsafe.Pointer(c.execCtx.stackPointerBeforeGoCall)), c.execCtx.framePointerBeforeGoCall)
+		case wazevoapi.ExitCodeMemoryWait32:
+			mod := c.callerModuleInstance()
+			mem := mod.MemoryInstance
+			if !mem.Shared {
+				panic(wasmruntime.ErrRuntimeExpectedSharedMemory)
+			}
+
+			s := goCallStackView(c.execCtx.stackPointerBeforeGoCall)
+			timeout, exp, addr := int64(s[0]), uint32(s[1]), uintptr(s[2])
+			base := uintptr(unsafe.Pointer(&mem.Buffer[0]))
+
+			offset := uint32(addr - base)
+			res := mem.Wait32(offset, exp, timeout, func(mem *wasm.MemoryInstance, offset uint32) uint32 {
+				addr := unsafe.Add(unsafe.Pointer(&mem.Buffer[0]), offset)
+				return atomic.LoadUint32((*uint32)(addr))
+			})
+			s[0] = uint64(res)
+			c.execCtx.exitCode = wazevoapi.ExitCodeOK
+			afterGoFunctionCallEntrypoint(c.execCtx.goCallReturnAddress, c.execCtxPtr,
+				uintptr(unsafe.Pointer(c.execCtx.stackPointerBeforeGoCall)), c.execCtx.framePointerBeforeGoCall)
+		case wazevoapi.ExitCodeMemoryWait64:
+			mod := c.callerModuleInstance()
+			mem := mod.MemoryInstance
+			if !mem.Shared {
+				panic(wasmruntime.ErrRuntimeExpectedSharedMemory)
+			}
+
+			s := goCallStackView(c.execCtx.stackPointerBeforeGoCall)
+			timeout, exp, addr := int64(s[0]), uint64(s[1]), uintptr(s[2])
+			base := uintptr(unsafe.Pointer(&mem.Buffer[0]))
+
+			offset := uint32(addr - base)
+			res := mem.Wait64(offset, exp, timeout, func(mem *wasm.MemoryInstance, offset uint32) uint64 {
+				addr := unsafe.Add(unsafe.Pointer(&mem.Buffer[0]), offset)
+				return atomic.LoadUint64((*uint64)(addr))
+			})
+			s[0] = uint64(res)
+			c.execCtx.exitCode = wazevoapi.ExitCodeOK
+			afterGoFunctionCallEntrypoint(c.execCtx.goCallReturnAddress, c.execCtxPtr,
+				uintptr(unsafe.Pointer(c.execCtx.stackPointerBeforeGoCall)), c.execCtx.framePointerBeforeGoCall)
 		case wazevoapi.ExitCodeUnreachable:
 			panic(wasmruntime.ErrRuntimeUnreachable)
 		case wazevoapi.ExitCodeMemoryOutOfBounds:
@@ -399,6 +442,8 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 			panic(wasmruntime.ErrRuntimeIntegerDivideByZero)
 		case wazevoapi.ExitCodeInvalidConversionToInteger:
 			panic(wasmruntime.ErrRuntimeInvalidConversionToInteger)
+		case wazevoapi.ExitCodeUnalignedAtomic:
+			panic(wasmruntime.ErrRuntimeUnalignedAtomic)
 		default:
 			panic("BUG")
 		}

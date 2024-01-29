@@ -1618,50 +1618,62 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:v128, v3:v128)
 `,
 		},
 		{
-			name:     "MemoryWait",
-			m:        testcases.MemoryWait.Module,
+			name:     "MemoryWait32",
+			m:        testcases.MemoryWait32.Module,
 			features: api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
 			exp: `
 signatures:
-	sig6: i64i64i64i32i32_i32
+	sig6: i64i64i32i64_i32
 
 blk0: (exec_ctx:i64, module_ctx:i64)
 	v2:i32 = Iconst_32 0x5
 	v3:i32 = Iconst_32 0x0
 	v4:i64 = Iconst_64 0xa
-	v5:i32 = Iconst_32 0x4
-	v6:i64 = Iconst_64 0x4
-	v7:i64 = UExtend v2, 32->64
-	v8:i64 = Uload32 module_ctx, 0x10
-	v9:i64 = Iadd v7, v6
-	v10:i32 = Icmp lt_u, v8, v9
-	ExitIfTrue v10, exec_ctx, memory_out_of_bounds
-	v11:i64 = Load module_ctx, 0x8
-	v12:i64 = Iadd v11, v7
-	v13:i64 = Iconst_64 0x3
-	v14:i64 = Band v12, v13
-	v15:i64 = Iconst_64 0x0
-	v16:i32 = Icmp neq, v14, v15
-	ExitIfTrue v16, exec_ctx, unaligned_atomic
-	v17:i64 = Load exec_ctx, 0x488
-	v18:i32 = CallIndirect v17:sig6, module_ctx, v4, v3, v12, v5
-	v19:i32 = Iconst_32 0x5
-	v20:i64 = Iconst_64 0x0
-	v21:i64 = Iconst_64 0xa
-	v22:i32 = Iconst_32 0x8
-	v23:i64 = Iconst_64 0x8
-	v24:i64 = UExtend v19, 32->64
-	v25:i64 = Iadd v24, v23
-	v26:i32 = Icmp lt_u, v8, v25
-	ExitIfTrue v26, exec_ctx, memory_out_of_bounds
-	v27:i64 = Iadd v11, v24
-	v28:i64 = Iconst_64 0x7
-	v29:i64 = Band v27, v28
-	v30:i64 = Iconst_64 0x0
-	v31:i32 = Icmp neq, v29, v30
-	ExitIfTrue v31, exec_ctx, unaligned_atomic
-	v32:i64 = Load exec_ctx, 0x488
-	v33:i32 = CallIndirect v32:sig6, module_ctx, v21, v20, v27, v22
+	v5:i64 = Iconst_64 0x4
+	v6:i64 = UExtend v2, 32->64
+	v7:i64 = Uload32 module_ctx, 0x10
+	v8:i64 = Iadd v6, v5
+	v9:i32 = Icmp lt_u, v7, v8
+	ExitIfTrue v9, exec_ctx, memory_out_of_bounds
+	v10:i64 = Load module_ctx, 0x8
+	v11:i64 = Iadd v10, v6
+	v12:i64 = Iconst_64 0x3
+	v13:i64 = Band v11, v12
+	v14:i64 = Iconst_64 0x0
+	v15:i32 = Icmp neq, v13, v14
+	ExitIfTrue v15, exec_ctx, unaligned_atomic
+	v16:i64 = Load exec_ctx, 0x488
+	v17:i32 = CallIndirect v16:sig6, exec_ctx, v4, v3, v11
+	Jump blk_ret
+`,
+		},
+		{
+			name:     "MemoryWait64",
+			m:        testcases.MemoryWait64.Module,
+			features: api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
+			exp: `
+signatures:
+	sig7: i64i64i64i64_i32
+
+blk0: (exec_ctx:i64, module_ctx:i64)
+	v2:i32 = Iconst_32 0x5
+	v3:i64 = Iconst_64 0x0
+	v4:i64 = Iconst_64 0xa
+	v5:i64 = Iconst_64 0x8
+	v6:i64 = UExtend v2, 32->64
+	v7:i64 = Uload32 module_ctx, 0x10
+	v8:i64 = Iadd v6, v5
+	v9:i32 = Icmp lt_u, v7, v8
+	ExitIfTrue v9, exec_ctx, memory_out_of_bounds
+	v10:i64 = Load module_ctx, 0x8
+	v11:i64 = Iadd v10, v6
+	v12:i64 = Iconst_64 0x7
+	v13:i64 = Band v11, v12
+	v14:i64 = Iconst_64 0x0
+	v15:i32 = Icmp neq, v13, v14
+	ExitIfTrue v15, exec_ctx, unaligned_atomic
+	v16:i64 = Load exec_ctx, 0x490
+	v17:i32 = CallIndirect v16:sig7, exec_ctx, v4, v3, v11
 	Jump blk_ret
 `,
 		},
@@ -1771,7 +1783,8 @@ func TestCompiler_declareSignatures(t *testing.T) {
 			{ID: 6, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI32, ssa.TypeI32, ssa.TypeI64}, Results: []ssa.Type{ssa.TypeI32}},
 			{ID: 7, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI32}, Results: []ssa.Type{ssa.TypeI64}},
 			{ID: 8, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI32}},
-			{ID: 9, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI64, ssa.TypeI32, ssa.TypeI32}, Results: []ssa.Type{ssa.TypeI32}},
+			{ID: 9, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI32, ssa.TypeI64}, Results: []ssa.Type{ssa.TypeI32}},
+			{ID: 10, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI64, ssa.TypeI64}, Results: []ssa.Type{ssa.TypeI32}},
 		}
 
 		require.Equal(t, len(expected), len(declaredSigs))
@@ -1808,7 +1821,8 @@ func TestCompiler_declareSignatures(t *testing.T) {
 			{ID: 14, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI32, ssa.TypeI32, ssa.TypeI64}, Results: []ssa.Type{ssa.TypeI32}},
 			{ID: 15, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI32}, Results: []ssa.Type{ssa.TypeI64}},
 			{ID: 16, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI32}},
-			{ID: 17, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI64, ssa.TypeI32, ssa.TypeI32}, Results: []ssa.Type{ssa.TypeI32}},
+			{ID: 17, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI32, ssa.TypeI64}, Results: []ssa.Type{ssa.TypeI32}},
+			{ID: 18, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI64, ssa.TypeI64}, Results: []ssa.Type{ssa.TypeI32}},
 		}
 		require.Equal(t, len(expected), len(declaredSigs))
 		for i := 0; i < len(declaredSigs); i++ {

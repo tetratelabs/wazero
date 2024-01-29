@@ -3161,13 +3161,18 @@ func (c *Compiler) lowerCurrentOpcode() {
 				break
 			}
 			var opSize uint64
+			var trampoline wazevoapi.Offset
+			var sig *ssa.Signature
 			switch atomicOp {
 			case wasm.OpcodeAtomicMemoryWait32:
 				opSize = 4
+				trampoline = wazevoapi.ExecutionContextOffsetMemoryWait32TrampolineAddress
+				sig = &c.memoryWait32Sig
 			case wasm.OpcodeAtomicMemoryWait64:
 				opSize = 8
+				trampoline = wazevoapi.ExecutionContextOffsetMemoryWait64TrampolineAddress
+				sig = &c.memoryWait64Sig
 			}
-			size := builder.AllocateInstruction().AsIconst32(uint32(opSize)).Insert(builder)
 
 			timeout := state.pop()
 			exp := state.pop()
@@ -3177,13 +3182,13 @@ func (c *Compiler) lowerCurrentOpcode() {
 
 			memoryWaitPtr := builder.AllocateInstruction().
 				AsLoad(c.execCtxPtrValue,
-					wazevoapi.ExecutionContextOffsetMemoryWaitAddress.U32(),
+					trampoline.U32(),
 					ssa.TypeI64,
 				).Insert(builder).Return()
 
-			args := []ssa.Value{c.moduleCtxPtrValue, timeout, exp, addr, size.Return()}
+			args := []ssa.Value{c.execCtxPtrValue, timeout, exp, addr}
 			memoryWaitRet := builder.AllocateInstruction().
-				AsCallIndirect(memoryWaitPtr, &c.memoryWaitSig, args).
+				AsCallIndirect(memoryWaitPtr, sig, args).
 				Insert(builder).Return()
 			state.push(memoryWaitRet)
 		default:
