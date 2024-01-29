@@ -594,7 +594,7 @@ func (m *machine) lowerUnaryRmR(si *ssa.Instruction, op unaryRmROpcode) {
 	_64 := x.Type().Bits() == 64
 
 	xDef := m.c.ValueDefinition(x)
-	rm := m.getOperand_Imm32_Reg(xDef)
+	rm := m.getOperand_Mem_Reg(xDef)
 	rd := m.c.VRegOf(si.Return())
 
 	instr := m.allocateInstr()
