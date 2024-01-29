@@ -105,8 +105,29 @@ func (m *machine) ClobberedRegisters(regs []regalloc.VReg) {
 
 // Swap implements backend.RegAllocFunctionMachine.
 func (m *machine) Swap(cur *instruction, x1, x2, tmp regalloc.VReg) {
-	// TODO implement me
-	panic("implement me")
+	if x1.RegType() == regalloc.RegTypeInt {
+		prevNext := cur.next
+		xc := m.allocateInstr().asXCHG(x1, x2)
+		cur = linkInstr(cur, xc)
+		linkInstr(cur, prevNext)
+	} else {
+		if tmp.Valid() {
+			prevNext := cur.next
+			m.InsertMoveBefore(tmp, x1, prevNext)
+			m.InsertMoveBefore(x1, x2, prevNext)
+			m.InsertMoveBefore(x2, tmp, prevNext)
+		} else {
+			prevNext := cur.next
+			r2 := x2.RealReg()
+			// Temporarily spill x1 to stack.
+			cur = m.InsertStoreRegisterAt(x1, cur, true).prev
+			// Then move x2 to x1.
+			cur = linkInstr(cur, m.allocateInstr().asXmmUnaryRmR(sseOpcodeMovdqa, newOperandReg(x2), x1))
+			linkInstr(cur, prevNext)
+			// Then reload the original value on x1 from stack to r2.
+			cur = m.InsertReloadRegisterAt(x1.SetRealReg(r2), cur, true)
+		}
+	}
 }
 
 // LastInstrForInsertion implements backend.RegAllocFunctionMachine.
