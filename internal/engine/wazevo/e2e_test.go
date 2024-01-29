@@ -282,7 +282,8 @@ func TestE2E(t *testing.T) {
 			calls: []callCase{
 				{
 					params: []uint64{
-						math.Float64bits(25), math.Float64bits(5), uint64(math.Float32bits(25)), uint64(math.Float32bits(5)),
+						math.Float64bits(25), math.Float64bits(5), math.Float64bits(1.4),
+						uint64(math.Float32bits(25)), uint64(math.Float32bits(5)), uint64(math.Float32bits(1.4)),
 					},
 					expResults: []uint64{
 						math.Float64bits(-25),
@@ -294,6 +295,11 @@ func TestE2E(t *testing.T) {
 						math.Float64bits(125),
 						math.Float64bits(5),
 
+						math.Float64bits(1),
+						math.Float64bits(1),
+						math.Float64bits(2),
+						math.Float64bits(1),
+
 						uint64(math.Float32bits(-25)),
 						uint64(math.Float32bits(25)),
 
@@ -302,6 +308,70 @@ func TestE2E(t *testing.T) {
 						uint64(math.Float32bits(20)),
 						uint64(math.Float32bits(125)),
 						uint64(math.Float32bits(5)),
+
+						uint64(math.Float32bits(1)),
+						uint64(math.Float32bits(1)),
+						uint64(math.Float32bits(2)),
+						uint64(math.Float32bits(1)),
+					},
+				},
+			},
+		},
+		{
+			name: "min_max_float", m: testcases.MinMaxFloat.Module,
+			calls: []callCase{
+				{
+					params: []uint64{
+						math.Float64bits(25), math.Float64bits(5),
+						uint64(math.Float32bits(25)), uint64(math.Float32bits(5)),
+					},
+					expResults: []uint64{
+						math.Float64bits(5),
+						math.Float64bits(25),
+						uint64(math.Float32bits(5)),
+						uint64(math.Float32bits(25)),
+					},
+				},
+				{
+					// Left-hand side is NaN.
+					params: []uint64{
+						0x7ff8000000000001, math.Float64bits(5),
+						uint64(0x7ff80001), uint64(math.Float32bits(5)),
+					},
+					expResults: []uint64{
+						0x7ff8000000000001,
+						0x7ff8000000000001,
+
+						uint64(0x7ff80001),
+						uint64(0x7ff80001),
+					},
+				},
+				{
+					// Both NaN.
+					params: []uint64{
+						0x7ff8000000000001, 0x7ff8000000000001,
+						uint64(0x7ff80001), uint64(0x7ff80001),
+					},
+					expResults: []uint64{
+						0x7ff8000000000001,
+						0x7ff8000000000001,
+
+						uint64(0x7ff80001),
+						uint64(0x7ff80001),
+					},
+				},
+				{
+					// Negative zero and zero.
+					params: []uint64{
+						0x8000000000000000, 0,
+						uint64(0), uint64(0x80000000),
+					},
+					expResults: []uint64{
+						0x8000000000000000,
+						0,
+
+						uint64(0x80000000),
+						uint64(0),
 					},
 				},
 			},
@@ -586,7 +656,7 @@ func TestE2E(t *testing.T) {
 								require.Equal(t, len(cc.expResults), len(result))
 								for i := range cc.expResults {
 									if cc.expResults[i] != result[i] {
-										t.Errorf("result[%d]: exp %d, got %d", i, cc.expResults[i], result[i])
+										t.Errorf("result[%d]: exp %x, got %x", i, cc.expResults[i], result[i])
 									}
 								}
 							}

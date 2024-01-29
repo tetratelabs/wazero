@@ -290,6 +290,16 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		m.lowerFabsFneg(instr)
 	case ssa.OpcodeFneg:
 		m.lowerFabsFneg(instr)
+	case ssa.OpcodeCeil:
+		m.lowerRound(instr, roundingModeUp)
+	case ssa.OpcodeFloor:
+		m.lowerRound(instr, roundingModeDown)
+	case ssa.OpcodeTrunc:
+		m.lowerRound(instr, roundingModeZero)
+	case ssa.OpcodeNearest:
+		m.lowerRound(instr, roundingModeNearest)
+	case ssa.OpcodeFmin, ssa.OpcodeFmax:
+		m.lowerFminFmax(instr)
 	case ssa.OpcodeSqrt:
 		m.lowerSqrt(instr)
 	case ssa.OpcodeUndefined:
@@ -1394,4 +1404,138 @@ func (m *machine) lowerIDivRem(si *ssa.Instruction, isDiv bool, signed bool) {
 	} else {
 		m.copyTo(rdxVReg, rd)
 	}
+}
+
+func (m *machine) lowerRound(instr *ssa.Instruction, imm roundingMode) {
+	x := instr.Arg()
+	if !x.Type().IsFloat() {
+		panic("BUG?")
+	}
+	var op sseOpcode
+	if x.Type().Bits() == 64 {
+		op = sseOpcodeRoundsd
+	} else {
+		op = sseOpcodeRoundss
+	}
+
+	xDef := m.c.ValueDefinition(x)
+	rm := m.getOperand_Mem_Reg(xDef)
+	rd := m.c.VRegOf(instr.Return())
+
+	xmm := m.allocateInstr().asXmmUnaryRmRImm(op, uint8(imm), rm, rd)
+	m.insert(xmm)
+}
+
+func (m *machine) lowerFminFmax(instr *ssa.Instruction) {
+	x, y := instr.Arg2()
+	if !x.Type().IsFloat() {
+		panic("BUG?")
+	}
+
+	_64 := x.Type().Bits() == 64
+	isMin := instr.Opcode() == ssa.OpcodeFmin
+	var minMaxOp sseOpcode
+
+	switch {
+	case _64 && isMin:
+		minMaxOp = sseOpcodeMinpd
+	case _64 && !isMin:
+		minMaxOp = sseOpcodeMaxpd
+	case !_64 && isMin:
+		minMaxOp = sseOpcodeMinps
+	case !_64 && !isMin:
+		minMaxOp = sseOpcodeMaxps
+	}
+
+	xDef, yDef := m.c.ValueDefinition(x), m.c.ValueDefinition(y)
+	rm := m.getOperand_Reg(xDef)
+	rn := m.getOperand_Mem_Reg(yDef)
+	rd := m.c.VRegOf(instr.Return())
+
+	tmp := m.copyToTmp(rm.r)
+
+	// Check if this is (either x1 or x2 is NaN) or (x1 equals x2) case.
+	cmp := m.allocateInstr()
+	if _64 {
+		cmp.asXmmCmpRmR(sseOpcodeUcomisd, rn, tmp)
+	} else {
+		cmp.asXmmCmpRmR(sseOpcodeUcomiss, rn, tmp)
+	}
+	m.insert(cmp)
+
+	// At this point, we have the three cases of conditional flags below
+	// (See https://www.felixcloutier.com/x86/ucomiss#operation for detail.)
+	//
+	// 1) Two values are NaN-free and different: All flags are cleared.
+	// 2) Two values are NaN-free and equal: Only ZF flags is set.
+	// 3) One of Two values is NaN: ZF, PF and CF flags are set.
+
+	// Jump instruction to handle 1) case by checking the ZF flag
+	// as ZF is only set for 2) and 3) cases.
+	nanFreeOrDiffJump := m.allocateInstr()
+	m.insert(nanFreeOrDiffJump)
+
+	// Start handling 2) and 3).
+
+	// Jump if one of two values is NaN by checking the parity flag (PF).
+	ifIsNan := m.allocateInstr()
+	m.insert(ifIsNan)
+
+	// Start handling 2) NaN-free and equal.
+
+	// Before we exit this case, we have to ensure that positive zero (or negative zero for min instruction) is
+	// returned if two values are positive and negative zeros.
+	var op sseOpcode
+	switch {
+	case !_64 && isMin:
+		op = sseOpcodeOrps
+	case _64 && isMin:
+		op = sseOpcodeOrpd
+	case !_64 && !isMin:
+		op = sseOpcodeAndps
+	case _64 && !isMin:
+		op = sseOpcodeAndpd
+	}
+	orAnd := m.allocateInstr()
+	orAnd.asXmmRmR(op, rn, tmp)
+	m.insert(orAnd)
+
+	// Done, jump to end.
+	sameExitJump := m.allocateInstr()
+	m.insert(sameExitJump)
+
+	// Start handling 3) either is NaN.
+	isNanTarget, isNan := m.allocateBrTarget()
+	m.insert(isNanTarget)
+	ifIsNan.asJmpIf(condP, newOperandLabel(isNan))
+
+	// We emit the ADD instruction to produce the NaN in tmp.
+	add := m.allocateInstr()
+	if _64 {
+		add.asXmmRmR(sseOpcodeAddsd, rn, tmp)
+	} else {
+		add.asXmmRmR(sseOpcodeAddss, rn, tmp)
+	}
+	m.insert(add)
+
+	// Exit from the NaN case branch.
+	nanExitJmp := m.allocateInstr()
+	m.insert(nanExitJmp)
+
+	// Start handling 1).
+	doMinMaxTarget, doMinMax := m.allocateBrTarget()
+	m.insert(doMinMaxTarget)
+	nanFreeOrDiffJump.asJmpIf(condNZ, newOperandLabel(doMinMax))
+
+	// Now handle the NaN-free and different values case.
+	minMax := m.allocateInstr()
+	minMax.asXmmRmR(minMaxOp, rn, tmp)
+	m.insert(minMax)
+
+	endNop, end := m.allocateBrTarget()
+	m.insert(endNop)
+	nanExitJmp.asJmp(newOperandLabel(end))
+	sameExitJump.asJmp(newOperandLabel(end))
+
+	m.copyTo(tmp, rd)
 }

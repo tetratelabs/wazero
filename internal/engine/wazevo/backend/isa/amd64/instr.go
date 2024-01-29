@@ -69,6 +69,8 @@ func (i *instruction) String() string {
 		return fmt.Sprintf("%s %s, %s", sseOpcode(i.u1), i.op1.format(i.b1), i.op2.format(i.b1))
 	case xmmUnaryRmR:
 		return fmt.Sprintf("%s %s, %s", sseOpcode(i.u1), i.op1.format(false), i.op2.format(false))
+	case xmmUnaryRmRImm:
+		return fmt.Sprintf("%s $%d, %s, %s", sseOpcode(i.u1), roundingMode(i.u2), i.op1.format(false), i.op2.format(false))
 	case unaryRmR:
 		var suffix string
 		if i.b1 {
@@ -206,7 +208,7 @@ func (i *instruction) String() string {
 	case xmmMinMaxSeq:
 		panic("TODO")
 	case xmmCmpRmR:
-		panic("TODO")
+		return fmt.Sprintf("%s %s, %s", sseOpcode(i.u1), i.op1.format(false), i.op2.format(false))
 	case xmmRmRImm:
 		panic("TODO")
 	case jmp:
@@ -583,6 +585,13 @@ const (
 	// value. This is characteristic of mov instructions.
 	xmmUnaryRmR
 
+	// XMM (scalar or vector) unary op with immediate: roundss, roundsd, etc.
+	//
+	// This differs from XMM_RM_R_IMM in that the dst register of
+	// XmmUnaryRmRImm is not used in the computation of the instruction dst
+	// value and so does not have to be a previously valid value.
+	xmmUnaryRmRImm
+
 	// XMM (scalar or vector) unary op (from xmm to mem): stores, movd, movq
 	xmmMovRM
 
@@ -667,6 +676,8 @@ func (k instructionKind) String() string {
 		return "gprToXmm"
 	case xmmUnaryRmR:
 		return "xmmUnaryRmR"
+	case xmmUnaryRmRImm:
+		return "xmmUnaryRmRImm"
 	case unaryRmR:
 		return "unaryRmR"
 	case not:
@@ -1054,6 +1065,29 @@ func (i *instruction) asXmmUnaryRmR(op sseOpcode, rm operand, rd regalloc.VReg) 
 		panic("BUG")
 	}
 	i.kind = xmmUnaryRmR
+	i.op1 = rm
+	i.op2 = newOperandReg(rd)
+	i.u1 = uint64(op)
+	return i
+}
+
+func (i *instruction) asXmmUnaryRmRImm(op sseOpcode, imm uint8, rm operand, rd regalloc.VReg) *instruction {
+	if rm.kind != operandKindReg && rm.kind != operandKindMem {
+		panic("BUG")
+	}
+	i.kind = xmmUnaryRmRImm
+	i.op1 = rm
+	i.op2 = newOperandReg(rd)
+	i.u1 = uint64(op)
+	i.u2 = uint64(imm)
+	return i
+}
+
+func (i *instruction) asXmmCmpRmR(op sseOpcode, rm operand, rd regalloc.VReg) *instruction {
+	if rm.kind != operandKindReg && rm.kind != operandKindMem {
+		panic("BUG")
+	}
+	i.kind = xmmCmpRmR
 	i.op1 = rm
 	i.op2 = newOperandReg(rd)
 	i.u1 = uint64(op)
@@ -1646,6 +1680,30 @@ func (s sseOpcode) String() string {
 	}
 }
 
+type roundingMode uint8
+
+const (
+	roundingModeNearest roundingMode = iota
+	roundingModeDown
+	roundingModeUp
+	roundingModeZero
+)
+
+func (r roundingMode) String() string {
+	switch r {
+	case roundingModeNearest:
+		return "nearest"
+	case roundingModeDown:
+		return "down"
+	case roundingModeUp:
+		return "up"
+	case roundingModeZero:
+		return "zero"
+	default:
+		panic("BUG")
+	}
+}
+
 func linkInstr(prev, next *instruction) *instruction {
 	prev.next = next
 	next.prev = prev
@@ -1675,6 +1733,8 @@ var defKinds = [instrMax]defKind{
 	imm:             defKindOp2,
 	unaryRmR:        defKindOp2,
 	xmmUnaryRmR:     defKindOp2,
+	xmmUnaryRmRImm:  defKindOp2,
+	xmmCmpRmR:       defKindOp2,
 	xmmRmR:          defKindNone,
 	mov64MR:         defKindOp2,
 	movsxRmR:        defKindOp2,
@@ -1743,6 +1803,8 @@ var useKinds = [instrMax]useKind{
 	imm:             useKindNone,
 	unaryRmR:        useKindOp1,
 	xmmUnaryRmR:     useKindOp1,
+	xmmUnaryRmRImm:  useKindOp1,
+	xmmCmpRmR:       useKindOp1Op2Reg,
 	xmmRmR:          useKindOp1Op2Reg,
 	mov64MR:         useKindOp1,
 	movzxRmR:        useKindOp1,
