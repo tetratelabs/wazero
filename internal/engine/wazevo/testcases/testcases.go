@@ -1088,8 +1088,11 @@ var (
 	FloatArithm = TestCase{
 		Name: "float_arithm",
 		Module: SingleFunctionModule(wasm.FunctionType{
-			Params:  []wasm.ValueType{f64, f64, f32, f32},
-			Results: []wasm.ValueType{f64, f64, f64, f64, f64, f64, f64, f32, f32, f32, f32, f32, f32, f32},
+			Params: []wasm.ValueType{f64, f64, f64, f32, f32, f32},
+			Results: []wasm.ValueType{
+				f64, f64, f64, f64, f64, f64, f64, f64, f64, f64, f64,
+				f32, f32, f32, f32, f32, f32, f32, f32, f32, f32, f32,
+			},
 		}, []byte{
 			wasm.OpcodeLocalGet, 0,
 			wasm.OpcodeF64Neg,
@@ -1117,32 +1120,85 @@ var (
 			wasm.OpcodeLocalGet, 1,
 			wasm.OpcodeF64Div,
 
-			// 32-bit floats.
 			wasm.OpcodeLocalGet, 2,
-			wasm.OpcodeF32Neg,
+			wasm.OpcodeF64Nearest,
 
 			wasm.OpcodeLocalGet, 2,
+			wasm.OpcodeF64Floor,
+
+			wasm.OpcodeLocalGet, 2,
+			wasm.OpcodeF64Ceil,
+
+			wasm.OpcodeLocalGet, 2,
+			wasm.OpcodeF64Trunc,
+
+			// 32-bit floats.
+			wasm.OpcodeLocalGet, 3,
+			wasm.OpcodeF32Neg,
+
+			wasm.OpcodeLocalGet, 3,
 			wasm.OpcodeF32Neg,
 			wasm.OpcodeF32Abs,
 
-			wasm.OpcodeLocalGet, 2,
+			wasm.OpcodeLocalGet, 3,
 			wasm.OpcodeF32Sqrt,
 
-			wasm.OpcodeLocalGet, 2,
 			wasm.OpcodeLocalGet, 3,
+			wasm.OpcodeLocalGet, 4,
 			wasm.OpcodeF32Add,
 
-			wasm.OpcodeLocalGet, 2,
 			wasm.OpcodeLocalGet, 3,
+			wasm.OpcodeLocalGet, 4,
 			wasm.OpcodeF32Sub,
 
+			wasm.OpcodeLocalGet, 3,
+			wasm.OpcodeLocalGet, 4,
+			wasm.OpcodeF32Mul,
+
+			wasm.OpcodeLocalGet, 3,
+			wasm.OpcodeLocalGet, 4,
+			wasm.OpcodeF32Div,
+
+			wasm.OpcodeLocalGet, 5,
+			wasm.OpcodeF32Nearest,
+
+			wasm.OpcodeLocalGet, 5,
+			wasm.OpcodeF32Floor,
+
+			wasm.OpcodeLocalGet, 5,
+			wasm.OpcodeF32Ceil,
+
+			wasm.OpcodeLocalGet, 5,
+			wasm.OpcodeF32Trunc,
+
+			wasm.OpcodeEnd,
+		}, []wasm.ValueType{}),
+	}
+	MinMaxFloat = TestCase{
+		Name: "min_max_float",
+		Module: SingleFunctionModule(wasm.FunctionType{
+			Params: []wasm.ValueType{f64, f64, f32, f32},
+			Results: []wasm.ValueType{
+				f64, f64,
+				f32, f32,
+			},
+		}, []byte{
+			wasm.OpcodeLocalGet, 0,
+			wasm.OpcodeLocalGet, 1,
+			wasm.OpcodeF64Min,
+
+			wasm.OpcodeLocalGet, 0,
+			wasm.OpcodeLocalGet, 1,
+			wasm.OpcodeF64Max,
+
+			// 32-bit floats.
 			wasm.OpcodeLocalGet, 2,
 			wasm.OpcodeLocalGet, 3,
-			wasm.OpcodeF32Mul,
+			wasm.OpcodeF32Min,
 
 			wasm.OpcodeLocalGet, 2,
 			wasm.OpcodeLocalGet, 3,
-			wasm.OpcodeF32Div,
+			wasm.OpcodeF32Max,
 
 			wasm.OpcodeEnd,
 		}, []wasm.ValueType{}),

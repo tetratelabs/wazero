@@ -457,6 +457,36 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 			panic("BUG: invalid operand kind")
 		}
 
+	case xmmUnaryRmRImm:
+		var prefix legacyPrefixes
+		var opcode uint32
+		var opcodeNum uint32
+		op := sseOpcode(i.u1)
+		switch op {
+		case sseOpcodeRoundps:
+			prefix, opcode, opcodeNum = legacyPrefixes0x66, 0x0f3a08, 3
+		case sseOpcodeRoundss:
+			prefix, opcode, opcodeNum = legacyPrefixes0x66, 0x0f3a0a, 3
+		case sseOpcodeRoundpd:
+			prefix, opcode, opcodeNum = legacyPrefixes0x66, 0x0f3a09, 3
+		case sseOpcodeRoundsd:
+			prefix, opcode, opcodeNum = legacyPrefixes0x66, 0x0f3a0b, 3
+		}
+		rex := rexInfo(0).clearW()
+		dst := regEncodings[i.op2.r.RealReg()]
+		op1 := i.op1
+		if op1.kind == operandKindReg {
+			src := regEncodings[op1.r.RealReg()]
+			encodeRegReg(c, prefix, opcode, opcodeNum, dst, src, rex)
+		} else if i.op1.kind == operandKindMem {
+			m := i.op1.amode
+			encodeRegMem(c, prefix, opcode, opcodeNum, dst, m, rex)
+		} else {
+			panic("BUG: invalid operand kind")
+		}
+
+		c.EmitByte(byte(i.u2))
+
 	case unaryRmR:
 		var prefix legacyPrefixes
 		var opcode uint32
@@ -929,7 +959,43 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 	case xmmCmove:
 		panic("TODO")
 	case xmmCmpRmR:
-		panic("TODO")
+		var prefix legacyPrefixes
+		var opcode uint32
+		var opcodeNum uint32
+		rex := rexInfo(0)
+		_64 := i.b1
+		if _64 { // 64 bit.
+			rex = rex.setW()
+		} else {
+			rex = rex.clearW()
+		}
+
+		op := sseOpcode(i.u1)
+		switch op {
+		case sseOpcodePtest:
+			prefix, opcode, opcodeNum = legacyPrefixes0x66, 0x0f3817, 3
+		case sseOpcodeUcomisd:
+			prefix, opcode, opcodeNum = legacyPrefixes0x66, 0x0f2e, 2
+		case sseOpcodeUcomiss:
+			prefix, opcode, opcodeNum = legacyPrefixesNone, 0x0f2e, 2
+		default:
+			panic(fmt.Sprintf("Unsupported sseOpcode: %s", op))
+		}
+
+		dst := regEncodings[i.op2.r.RealReg()]
+		op1 := i.op1
+		switch op1.kind {
+		case operandKindReg:
+			reg := regEncodings[op1.r.RealReg()]
+			encodeRegReg(c, prefix, opcode, opcodeNum, dst, reg, rex)
+
+		case operandKindMem:
+			m := op1.amode
+			encodeRegMem(c, prefix, opcode, opcodeNum, dst, m, rex)
+
+		default:
+			panic("BUG: invalid operand kind")
+		}
 	case xmmRmRImm:
 		panic("TODO")
 	case jmp:
