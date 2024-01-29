@@ -3476,9 +3476,12 @@ func (c *Compiler) memAlignmentCheck(addr ssa.Value, operationSizeInBytes uint64
 	}
 
 	builder := c.ssaBuilder
-	builder.AllocateInstruction().AsIandsImm(addr, checkBits).Insert(builder)
-	builder.AllocateInstruction().AsExitIfCondWithCode(c.execCtxPtrValue, ssa.IntegerCmpCondEqual, wazevoapi.ExitCodeUnalignedAtomic).
-		Insert(builder)
+
+	mask := builder.AllocateInstruction().AsIconst64(checkBits).Insert(builder).Return()
+	masked := builder.AllocateInstruction().AsBand(addr, mask).Insert(builder).Return()
+	zero := builder.AllocateInstruction().AsIconst64(0).Insert(builder).Return()
+	cmp := builder.AllocateInstruction().AsIcmp(masked, zero, ssa.IntegerCmpCondNotEqual).Insert(builder).Return()
+	builder.AllocateInstruction().AsExitIfTrueWithCode(c.execCtxPtrValue, cmp, wazevoapi.ExitCodeUnalignedAtomic).Insert(builder)
 }
 
 func (c *Compiler) callMemmove(dst, src, size ssa.Value) {

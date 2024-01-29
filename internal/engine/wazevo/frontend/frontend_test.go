@@ -1638,24 +1638,30 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 	ExitIfTrue v10, exec_ctx, memory_out_of_bounds
 	v11:i64 = Load module_ctx, 0x8
 	v12:i64 = Iadd v11, v7
-	IandsImm v12, 0x3
-	ExitIfCond eq, exec_ctx, unaligned_atomic
-	v13:i64 = Load exec_ctx, 0x488
-	v14:i32 = CallIndirect v13:sig6, module_ctx, v4, v3, v12, v5
-	v15:i32 = Iconst_32 0x5
-	v16:i64 = Iconst_64 0x0
-	v17:i64 = Iconst_64 0xa
-	v18:i32 = Iconst_32 0x8
-	v19:i64 = Iconst_64 0x8
-	v20:i64 = UExtend v15, 32->64
-	v21:i64 = Iadd v20, v19
-	v22:i32 = Icmp lt_u, v8, v21
-	ExitIfTrue v22, exec_ctx, memory_out_of_bounds
-	v23:i64 = Iadd v11, v20
-	IandsImm v23, 0x7
-	ExitIfCond eq, exec_ctx, unaligned_atomic
-	v24:i64 = Load exec_ctx, 0x488
-	v25:i32 = CallIndirect v24:sig6, module_ctx, v17, v16, v23, v18
+	v13:i64 = Iconst_64 0x3
+	v14:i64 = Band v12, v13
+	v15:i64 = Iconst_64 0x0
+	v16:i32 = Icmp neq, v14, v15
+	ExitIfTrue v16, exec_ctx, unaligned_atomic
+	v17:i64 = Load exec_ctx, 0x488
+	v18:i32 = CallIndirect v17:sig6, module_ctx, v4, v3, v12, v5
+	v19:i32 = Iconst_32 0x5
+	v20:i64 = Iconst_64 0x0
+	v21:i64 = Iconst_64 0xa
+	v22:i32 = Iconst_32 0x8
+	v23:i64 = Iconst_64 0x8
+	v24:i64 = UExtend v19, 32->64
+	v25:i64 = Iadd v24, v23
+	v26:i32 = Icmp lt_u, v8, v25
+	ExitIfTrue v26, exec_ctx, memory_out_of_bounds
+	v27:i64 = Iadd v11, v24
+	v28:i64 = Iconst_64 0x7
+	v29:i64 = Band v27, v28
+	v30:i64 = Iconst_64 0x0
+	v31:i32 = Icmp neq, v29, v30
+	ExitIfTrue v31, exec_ctx, unaligned_atomic
+	v32:i64 = Load exec_ctx, 0x488
+	v33:i32 = CallIndirect v32:sig6, module_ctx, v21, v20, v27, v22
 	Jump blk_ret
 `,
 		},
