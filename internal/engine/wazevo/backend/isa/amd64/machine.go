@@ -300,6 +300,8 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		m.lowerRound(instr, roundingModeNearest)
 	case ssa.OpcodeFmin, ssa.OpcodeFmax:
 		m.lowerFminFmax(instr)
+	case ssa.OpcodeFcopysign:
+		m.lowerFcopysign(instr)
 	case ssa.OpcodeSqrt:
 		m.lowerSqrt(instr)
 	case ssa.OpcodeUndefined:
@@ -1539,6 +1541,41 @@ func (m *machine) lowerFminFmax(instr *ssa.Instruction) {
 	m.insert(endNop)
 	nanExitJmp.asJmp(newOperandLabel(end))
 	sameExitJump.asJmp(newOperandLabel(end))
+
+	m.copyTo(tmp, rd)
+}
+
+func (m *machine) lowerFcopysign(instr *ssa.Instruction) {
+	x, y := instr.Arg2()
+	if !x.Type().IsFloat() {
+		panic("BUG")
+	}
+
+	_64 := x.Type().Bits() == 64
+
+	xDef, yDef := m.c.ValueDefinition(x), m.c.ValueDefinition(y)
+	rm := m.getOperand_Reg(xDef)
+	rn := m.getOperand_Reg(yDef)
+	rd := m.c.VRegOf(instr.Return())
+
+	// Clear the non-sign bits of src via AND with the mask.
+	var opAnd, opOr sseOpcode
+	var mask uint64
+	if _64 {
+		mask, opAnd, opOr = 0x8000000000000000, sseOpcodeAndpd, sseOpcodeOrpd
+	} else {
+		mask, opAnd, opOr = 0x80000000, sseOpcodeAndps, sseOpcodeOrps
+	}
+
+	tmp := m.c.AllocateVReg(x.Type())
+	m.lowerFconst(tmp, mask, _64)
+
+	and := m.allocateInstr().asXmmRmR(opAnd, rn, tmp)
+	m.insert(and)
+
+	// Finally, copy the sign bit of src to dst.
+	or := m.allocateInstr().asXmmRmR(opOr, rm, tmp)
+	m.insert(or)
 
 	m.copyTo(tmp, rd)
 }

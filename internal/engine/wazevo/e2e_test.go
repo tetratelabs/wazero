@@ -300,6 +300,8 @@ func TestE2E(t *testing.T) {
 						math.Float64bits(2),
 						math.Float64bits(1),
 
+						math.Float64bits(-25),
+
 						uint64(math.Float32bits(-25)),
 						uint64(math.Float32bits(25)),
 
@@ -313,6 +315,8 @@ func TestE2E(t *testing.T) {
 						uint64(math.Float32bits(1)),
 						uint64(math.Float32bits(2)),
 						uint64(math.Float32bits(1)),
+
+						uint64(math.Float32bits(-25)),
 					},
 				},
 			},

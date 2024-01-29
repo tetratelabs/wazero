@@ -1090,8 +1090,8 @@ var (
 		Module: SingleFunctionModule(wasm.FunctionType{
 			Params: []wasm.ValueType{f64, f64, f64, f32, f32, f32},
 			Results: []wasm.ValueType{
-				f64, f64, f64, f64, f64, f64, f64, f64, f64, f64, f64,
-				f32, f32, f32, f32, f32, f32, f32, f32, f32, f32, f32,
+				f64, f64, f64, f64, f64, f64, f64, f64, f64, f64, f64, f64,
+				f32, f32, f32, f32, f32, f32, f32, f32, f32, f32, f32, f32,
 			},
 		}, []byte{
 			wasm.OpcodeLocalGet, 0,
@@ -1132,6 +1132,11 @@ var (
 			wasm.OpcodeLocalGet, 2,
 			wasm.OpcodeF64Trunc,
 
+			wasm.OpcodeLocalGet, 0,
+			wasm.OpcodeLocalGet, 1,
+			wasm.OpcodeF64Neg,
+			wasm.OpcodeF64Copysign,
+
 			// 32-bit floats.
 			wasm.OpcodeLocalGet, 3,
 			wasm.OpcodeF32Neg,
@@ -1170,6 +1175,11 @@ var (
 
 			wasm.OpcodeLocalGet, 5,
 			wasm.OpcodeF32Trunc,
+
+			wasm.OpcodeLocalGet, 3,
+			wasm.OpcodeLocalGet, 4,
+			wasm.OpcodeF32Neg,
+			wasm.OpcodeF32Copysign,
 
 			wasm.OpcodeEnd,
 		}, []wasm.ValueType{}),
