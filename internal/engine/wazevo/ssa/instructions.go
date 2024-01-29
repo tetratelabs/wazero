@@ -551,8 +551,7 @@ const (
 	// `v = bmask x`.
 	OpcodeBmask
 
-	// OpcodeIreduce ...
-	// `v = ireduce x`.
+	// OpcodeIreduce narrow the given integer: `v = Ireduce x`.
 	OpcodeIreduce
 
 	// OpcodeSnarrow converts two input vectors x, y into a smaller lane vector by narrowing each lane, signed `v = Snarrow.lane x, y`.
