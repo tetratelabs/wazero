@@ -330,6 +330,16 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 	case ssa.OpcodeSelect:
 		cval, x, y := instr.SelectData()
 		m.lowerSelect(x, y, cval, instr.Return())
+	case ssa.OpcodeIreduce:
+		rn := m.getOperand_Mem_Reg(m.c.ValueDefinition(instr.Arg()))
+		retVal := instr.Return()
+		rd := m.c.VRegOf(retVal)
+
+		if retVal.Type() != ssa.TypeI32 {
+			panic("TODO?: Ireduce to non-i32")
+		}
+		m.insert(m.allocateInstr().asMovzxRmR(extModeLQ, rn, rd))
+
 	default:
 		panic("TODO: lowering " + op.String())
 	}
@@ -369,30 +379,33 @@ func (m *machine) lowerSelect(x, y, cval, ret ssa.Value) {
 	if typ := x.Type(); typ.IsInt() {
 		_64 := typ.Bits() == 64
 		mov := m.allocateInstr()
+		tmp := m.c.AllocateVReg(typ)
 		switch yo.kind {
 		case operandKindReg:
-			mov.asMovRR(yo.r, rd, _64)
+			mov.asMovRR(yo.r, tmp, _64)
 		case operandKindMem:
 			if _64 {
-				mov.asMov64MR(yo, rd)
+				mov.asMov64MR(yo, tmp)
 			} else {
-				mov.asMovzxRmR(extModeLQ, yo, rd)
+				mov.asMovzxRmR(extModeLQ, yo, tmp)
 			}
 		default:
 			panic("BUG")
 		}
 		m.insert(mov)
-		cmov := m.allocateInstr().asCmove(cond, xo, rd, _64)
+		cmov := m.allocateInstr().asCmove(cond, xo, tmp, _64)
 		m.insert(cmov)
+		m.insert(m.allocateInstr().asMovRR(tmp, rd, _64))
 	} else {
 		mov := m.allocateInstr()
+		tmp := m.c.AllocateVReg(typ)
 		switch typ {
 		case ssa.TypeF32:
-			mov.asXmmUnaryRmR(sseOpcodeMovss, yo, rd)
+			mov.asXmmUnaryRmR(sseOpcodeMovss, yo, tmp)
 		case ssa.TypeF64:
-			mov.asXmmUnaryRmR(sseOpcodeMovsd, yo, rd)
+			mov.asXmmUnaryRmR(sseOpcodeMovsd, yo, tmp)
 		case ssa.TypeV128:
-			mov.asXmmUnaryRmR(sseOpcodeMovdqu, yo, rd)
+			mov.asXmmUnaryRmR(sseOpcodeMovdqu, yo, tmp)
 		default:
 			panic("BUG")
 		}
@@ -405,11 +418,11 @@ func (m *machine) lowerSelect(x, y, cval, ret ssa.Value) {
 		m.insert(cmov)
 		switch typ {
 		case ssa.TypeF32:
-			cmov.asXmmUnaryRmR(sseOpcodeMovss, xo, rd)
+			cmov.asXmmUnaryRmR(sseOpcodeMovss, xo, tmp)
 		case ssa.TypeF64:
-			cmov.asXmmUnaryRmR(sseOpcodeMovsd, xo, rd)
+			cmov.asXmmUnaryRmR(sseOpcodeMovsd, xo, tmp)
 		case ssa.TypeV128:
-			cmov.asXmmUnaryRmR(sseOpcodeMovdqu, xo, rd)
+			cmov.asXmmUnaryRmR(sseOpcodeMovdqu, xo, tmp)
 		default:
 			panic("BUG")
 		}
@@ -418,6 +431,7 @@ func (m *machine) lowerSelect(x, y, cval, ret ssa.Value) {
 		m.insert(nop)
 
 		jcc.asJmpIf(cond.invert(), newOperandLabel(end))
+		m.insert(m.allocateInstr().asXmmUnaryRmR(sseOpcodeMovdqu, newOperandReg(tmp), rd))
 	}
 }
 
