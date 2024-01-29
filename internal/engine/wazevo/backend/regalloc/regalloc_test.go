@@ -360,9 +360,6 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 					actual := a.blockLivenessData[blockID]
 					exp := tc.exp[blockID]
 					initMapInInfo(exp)
-					fmt.Printf("\n[exp for block[%d]]\n%v\n[actual for block[%d]]\n%v\n",
-						blockID, exp.Format(a.regInfo), blockID, actual.Format(a.regInfo))
-
 					require.Equal(t, exp.liveOuts, actual.liveOuts, "live outs")
 					require.Equal(t, exp.liveIns, actual.liveIns, "live ins")
 				})
