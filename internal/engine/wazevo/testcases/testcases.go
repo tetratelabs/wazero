@@ -1687,16 +1687,15 @@ var (
 	MemoryWait32 = TestCase{
 		Name: "memory_wait32",
 		Module: &wasm.Module{
-			TypeSection:     []wasm.FunctionType{{Params: []wasm.ValueType{}, Results: []wasm.ValueType{}}},
+			TypeSection:     []wasm.FunctionType{{Params: []wasm.ValueType{i32, i32, i64}, Results: []wasm.ValueType{i32}}},
 			ExportSection:   []wasm.Export{{Name: ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 0}},
 			MemorySection:   &wasm.Memory{Min: 1, Max: 1, IsMaxEncoded: true, IsShared: true},
 			FunctionSection: []wasm.Index{0},
 			CodeSection: []wasm.Code{{Body: []byte{
-				wasm.OpcodeI32Const, 5,
-				wasm.OpcodeI32Const, 0,
-				wasm.OpcodeI64Const, 10,
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeLocalGet, 2,
 				wasm.OpcodeAtomicPrefix, wasm.OpcodeAtomicMemoryWait32, 0x1, 0,
-				wasm.OpcodeDrop,
 				wasm.OpcodeEnd,
 			}}},
 		},
@@ -1705,16 +1704,15 @@ var (
 	MemoryWait64 = TestCase{
 		Name: "memory_wait64",
 		Module: &wasm.Module{
-			TypeSection:     []wasm.FunctionType{{Params: []wasm.ValueType{}, Results: []wasm.ValueType{}}},
+			TypeSection:     []wasm.FunctionType{{Params: []wasm.ValueType{i32, i64, i64}, Results: []wasm.ValueType{i32}}},
 			ExportSection:   []wasm.Export{{Name: ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 0}},
 			MemorySection:   &wasm.Memory{Min: 1, Max: 1, IsMaxEncoded: true, IsShared: true},
 			FunctionSection: []wasm.Index{0},
 			CodeSection: []wasm.Code{{Body: []byte{
-				wasm.OpcodeI32Const, 5,
-				wasm.OpcodeI64Const, 0,
-				wasm.OpcodeI64Const, 10,
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeLocalGet, 2,
 				wasm.OpcodeAtomicPrefix, wasm.OpcodeAtomicMemoryWait64, 0x2, 0,
-				wasm.OpcodeDrop,
 				wasm.OpcodeEnd,
 			}}},
 		},

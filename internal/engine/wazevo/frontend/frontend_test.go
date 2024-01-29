@@ -1625,10 +1625,7 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:v128, v3:v128)
 signatures:
 	sig6: i64i64i32i64_i32
 
-blk0: (exec_ctx:i64, module_ctx:i64)
-	v2:i32 = Iconst_32 0x5
-	v3:i32 = Iconst_32 0x0
-	v4:i64 = Iconst_64 0xa
+blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i32, v4:i64)
 	v5:i64 = Iconst_64 0x4
 	v6:i64 = UExtend v2, 32->64
 	v7:i64 = Uload32 module_ctx, 0x10
@@ -1644,7 +1641,7 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 	ExitIfTrue v15, exec_ctx, unaligned_atomic
 	v16:i64 = Load exec_ctx, 0x488
 	v17:i32 = CallIndirect v16:sig6, exec_ctx, v4, v3, v11
-	Jump blk_ret
+	Jump blk_ret, v17
 `,
 		},
 		{
@@ -1655,10 +1652,7 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 signatures:
 	sig7: i64i64i64i64_i32
 
-blk0: (exec_ctx:i64, module_ctx:i64)
-	v2:i32 = Iconst_32 0x5
-	v3:i64 = Iconst_64 0x0
-	v4:i64 = Iconst_64 0xa
+blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i64, v4:i64)
 	v5:i64 = Iconst_64 0x8
 	v6:i64 = UExtend v2, 32->64
 	v7:i64 = Uload32 module_ctx, 0x10
@@ -1674,7 +1668,7 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 	ExitIfTrue v15, exec_ctx, unaligned_atomic
 	v16:i64 = Load exec_ctx, 0x490
 	v17:i32 = CallIndirect v16:sig7, exec_ctx, v4, v3, v11
-	Jump blk_ret
+	Jump blk_ret, v17
 `,
 		},
 	} {
