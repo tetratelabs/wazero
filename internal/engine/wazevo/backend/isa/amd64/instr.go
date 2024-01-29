@@ -235,6 +235,8 @@ func (i *instruction) String() string {
 		return fmt.Sprintf("callq *%s", i.op1.format(true))
 	case v128ConstIsland:
 		return fmt.Sprintf("v128ConstIsland (%#x, %#x)", i.u1, i.u2)
+	case xchg:
+		return fmt.Sprintf("xchg %s, %s", i.op1.format(true), i.op2.format(true))
 	default:
 		panic(fmt.Sprintf("BUG: %d", int(i.kind)))
 	}
@@ -642,6 +644,11 @@ const (
 	// An instruction that will always trigger the illegal instruction exception.
 	ud2
 
+	// xchg swaps the contents of two gp registers.
+	// The instruction doesn't make sense before register allocation, so it doensn't
+	// have useKinds and defKinds to avoid being used by the register allocator.
+	xchg
+
 	// v128ConstIsland is 16 bytes (128-bit) constant that will be loaded into an XMM.
 	v128ConstIsland
 
@@ -736,6 +743,8 @@ func (k instructionKind) String() string {
 		return "v128ConstIsland"
 	case ud2:
 		return "ud2"
+	case xchg:
+		return "xchg"
 	default:
 		panic("BUG")
 	}
@@ -1089,6 +1098,13 @@ func (i *instruction) asPush64(op operand) *instruction {
 	}
 	i.kind = push64
 	i.op1 = op
+	return i
+}
+
+func (i *instruction) asXCHG(rm, rd regalloc.VReg) *instruction {
+	i.kind = xchg
+	i.op1 = newOperandReg(rm)
+	i.op2 = newOperandReg(rd)
 	return i
 }
 

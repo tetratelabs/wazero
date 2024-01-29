@@ -1040,6 +1040,12 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 		c.Emit8Bytes(lo)
 		c.Emit8Bytes(hi)
 
+	case xchg:
+		r1, r2 := i.op1.r.RealReg(), i.op2.r.RealReg()
+
+		enc1, enc2 := regEncodings[r1], regEncodings[r2]
+		encodeRegReg(c, legacyPrefixesNone, 0x87, 1, enc2, enc1, rexInfo(0).setW())
+
 	default:
 		panic(fmt.Sprintf("TODO: %v", i.kind))
 	}

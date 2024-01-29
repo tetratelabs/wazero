@@ -160,3 +160,73 @@ func TestMachine_InsertMoveBefore(t *testing.T) {
 		})
 	}
 }
+
+func TestMachineSwap(t *testing.T) {
+	for _, tc := range []struct {
+		x1, x2, tmp regalloc.VReg
+		expected    string
+	}{
+		{
+			x1:  r15VReg,
+			x2:  raxVReg,
+			tmp: rdiVReg,
+			expected: `
+	ud2
+	xchg %r15, %rax
+	exit_sequence %rsi
+`,
+		},
+		{
+			x1: r15VReg,
+			x2: raxVReg,
+			expected: `
+	ud2
+	xchg %r15, %rax
+	exit_sequence %rsi
+`,
+		},
+		{
+			x1:  xmm1VReg,
+			x2:  xmm12VReg,
+			tmp: xmm11VReg,
+			expected: `
+	ud2
+	movdqu %xmm1, %xmm11
+	movdqu %xmm12, %xmm1
+	movdqu %xmm11, %xmm12
+	exit_sequence %rsi
+`,
+		},
+		{
+			x1: xmm1VReg,
+			x2: xmm12VReg,
+			// Tmp not given.
+			expected: `
+	ud2
+	movsd %xmm1, (%rsp)
+	movdqa %xmm12, %xmm1
+	movsd (%rsp), %xmm12
+	exit_sequence %rsi
+`,
+		},
+	} {
+		t.Run(tc.expected, func(t *testing.T) {
+			ctx, _, m := newSetupWithMockContext()
+
+			ctx.typeOf = map[regalloc.VRegID]ssa.Type{
+				r15VReg.ID(): ssa.TypeI64, raxVReg.ID(): ssa.TypeI64,
+				xmm1VReg.ID(): ssa.TypeF64, xmm12VReg.ID(): ssa.TypeF64,
+			}
+			cur, i2 := m.allocateInstr().asUD2(), m.allocateInstr().asExitSeq(rsiVReg)
+			cur.next = i2
+			i2.prev = cur
+
+			m.Swap(cur, tc.x1, tc.x2, tc.tmp)
+			m.ectx.RootInstr = cur
+
+			require.Equal(t, tc.expected, m.Format())
+
+			m.encodeWithoutSSA(cur)
+		})
+	}
+}

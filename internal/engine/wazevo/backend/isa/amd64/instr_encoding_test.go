@@ -2876,6 +2876,21 @@ func TestInstruction_format_encode(t *testing.T) {
 			want:       "eeeeeeeeffffffffbbbbbbbbaaaaaaaa",
 			wantFormat: "v128ConstIsland (0xffffffffeeeeeeee, 0xaaaaaaaabbbbbbbb)",
 		},
+		{
+			setup:      func(i *instruction) { i.asXCHG(r11VReg, r14VReg) },
+			want:       "4d87f3",
+			wantFormat: "xchg %r11, %r14",
+		},
+		{
+			setup:      func(i *instruction) { i.asXCHG(r15VReg, raxVReg) },
+			want:       "4987c7",
+			wantFormat: "xchg %r15, %rax",
+		},
+		{
+			setup:      func(i *instruction) { i.asXCHG(rbxVReg, rsiVReg) },
+			want:       "4887f3",
+			wantFormat: "xchg %rbx, %rsi",
+		},
 	} {
 		tc := tc
 		t.Run(tc.wantFormat, func(t *testing.T) {
