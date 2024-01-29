@@ -125,7 +125,7 @@ func (m *machine) Swap(cur *instruction, x1, x2, tmp regalloc.VReg) {
 			cur = linkInstr(cur, m.allocateInstr().asXmmUnaryRmR(sseOpcodeMovdqa, newOperandReg(x2), x1))
 			linkInstr(cur, prevNext)
 			// Then reload the original value on x1 from stack to r2.
-			cur = m.InsertReloadRegisterAt(x1.SetRealReg(r2), cur, true)
+			m.InsertReloadRegisterAt(x1.SetRealReg(r2), cur, true)
 		}
 	}
 }
