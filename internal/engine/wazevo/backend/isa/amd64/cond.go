@@ -37,6 +37,8 @@ const (
 	condLE
 	// condNLE represents (> signed) condition.
 	condNLE
+
+	condInvalid
 )
 
 func (c cond) String() string {
@@ -105,7 +107,7 @@ func condFromSSAIntCmpCond(origin ssa.IntegerCmpCond) cond {
 	}
 }
 
-func condFromSSAFloatCmpCond(origin ssa.FloatCmpCond) cond { // nolint:unused
+func condFromSSAFloatCmpCond(origin ssa.FloatCmpCond) cond {
 	switch origin {
 	case ssa.FloatCmpCondEqual:
 		return condZ
