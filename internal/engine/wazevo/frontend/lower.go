@@ -3160,6 +3160,9 @@ func (c *Compiler) lowerCurrentOpcode() {
 			if state.unreachable {
 				break
 			}
+
+			c.storeCallerModuleContext()
+
 			var opSize uint64
 			var trampoline wazevoapi.Offset
 			var sig *ssa.Signature

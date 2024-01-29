@@ -1626,6 +1626,7 @@ signatures:
 	sig6: i64i64i32i64_i32
 
 blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i32, v4:i64)
+	Store module_ctx, exec_ctx, 0x8
 	v5:i64 = Iconst_64 0x4
 	v6:i64 = UExtend v2, 32->64
 	v7:i64 = Uload32 module_ctx, 0x10
@@ -1653,6 +1654,7 @@ signatures:
 	sig7: i64i64i64i64_i32
 
 blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i64, v4:i64)
+	Store module_ctx, exec_ctx, 0x8
 	v5:i64 = Iconst_64 0x8
 	v6:i64 = UExtend v2, 32->64
 	v7:i64 = Uload32 module_ctx, 0x10
