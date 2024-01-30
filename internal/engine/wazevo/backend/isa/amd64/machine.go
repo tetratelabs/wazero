@@ -225,9 +225,17 @@ func (m *machine) LowerConditionalBranch(b *ssa.Instruction) {
 		cvalInstr := cvalDef.Instr
 
 		f1, f2, and := m.lowerFcmpToFlags(cvalInstr)
+		isBrz := b.Opcode() == ssa.OpcodeBrz
+		if isBrz {
+			f1 = f1.invert()
+		}
 		if f2 == condInvalid {
 			m.insert(m.allocateInstr().asJmpIf(f1, newOperandLabel(target)))
 		} else {
+			if isBrz {
+				f2 = f2.invert()
+				and = !and
+			}
 			jmp1, jmp2 := m.allocateInstr(), m.allocateInstr()
 			m.insert(jmp1)
 			m.insert(jmp2)

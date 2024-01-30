@@ -1,6 +1,10 @@
 package amd64
 
-import "github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
+import (
+	"fmt"
+
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
+)
 
 type cond byte
 
@@ -109,18 +113,12 @@ func condFromSSAIntCmpCond(origin ssa.IntegerCmpCond) cond {
 
 func condFromSSAFloatCmpCond(origin ssa.FloatCmpCond) cond {
 	switch origin {
-	case ssa.FloatCmpCondEqual:
-		return condZ
-	case ssa.FloatCmpCondNotEqual:
-		return condNZ
-	case ssa.FloatCmpCondLessThan:
-		return condB
 	case ssa.FloatCmpCondGreaterThanOrEqual:
 		return condNB
 	case ssa.FloatCmpCondGreaterThan:
 		return condNBE
-	case ssa.FloatCmpCondLessThanOrEqual:
-		return condBE
+	case ssa.FloatCmpCondEqual, ssa.FloatCmpCondNotEqual, ssa.FloatCmpCondLessThan, ssa.FloatCmpCondLessThanOrEqual:
+		panic(fmt.Sprintf("cond %s must be treated as a special case", origin))
 	default:
 		panic("unreachable")
 	}

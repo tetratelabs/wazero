@@ -606,6 +606,16 @@ func TestE2E(t *testing.T) {
 				{params: []uint64{0x00000000, 0x11111111, 0x11111111, 0xffffffff}, expResults: []uint64{0x11001100, 0xff11ff11}},
 			},
 		},
+		{
+			name: "float_le",
+			m:    testcases.FloatLe.Module,
+			calls: []callCase{
+				{params: []uint64{math.Float64bits(1.0)}, expResults: []uint64{1, 1}},
+				{params: []uint64{math.Float64bits(0.0)}, expResults: []uint64{1, 1}},
+				{params: []uint64{math.Float64bits(1.1)}, expResults: []uint64{0, 0}},
+				{params: []uint64{math.Float64bits(math.NaN())}, expResults: []uint64{0, 0}},
+			},
+		},
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
@@ -661,6 +671,8 @@ func TestE2E(t *testing.T) {
 								for i := range cc.expResults {
 									if cc.expResults[i] != result[i] {
 										t.Errorf("result[%d]: exp %x, got %x", i, cc.expResults[i], result[i])
+									} else {
+										t.Logf("result[%d]: %x", i, result[i])
 									}
 								}
 							}
@@ -1234,7 +1246,7 @@ func TestSpectestV1(t *testing.T) {
 		{name: "binary"},
 		{name: "binary-leb128"},
 		{name: "call"},
-		//{name: "call_indirect"},
+		{name: "call_indirect"},
 		{name: "comments"},
 		{name: "custom"},
 		//{name: "conversions"},
@@ -1318,7 +1330,7 @@ func TestSpectestV2(t *testing.T) {
 		{"i64"},
 		{"br"},
 		{"call"},
-		//{"call_indirect"},
+		{"call_indirect"},
 		//{"conversions"},
 		{"global"},
 		{"if"},

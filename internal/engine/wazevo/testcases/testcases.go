@@ -1184,6 +1184,34 @@ var (
 			wasm.OpcodeEnd,
 		}, []wasm.ValueType{}),
 	}
+	FloatLe = TestCase{
+		Name: "float_le",
+		Module: SingleFunctionModule(wasm.FunctionType{
+			Params:  []wasm.ValueType{f64},
+			Results: []wasm.ValueType{i64, i64},
+		}, []byte{
+			wasm.OpcodeLocalGet, 0,
+			wasm.OpcodeF64Const, 0, 0, 0, 0, 0, 0, 240, 63, // 1.0
+			wasm.OpcodeF64Le,
+			wasm.OpcodeIf, blockSignature_vv,
+			wasm.OpcodeI64Const, 1,
+			wasm.OpcodeLocalGet, 0,
+			wasm.OpcodeF64Const, 0, 0, 0, 0, 0, 0, 240, 63, // 1.0
+			wasm.OpcodeF64Le,
+			wasm.OpcodeI64ExtendI32U,
+			wasm.OpcodeReturn,
+			wasm.OpcodeElse,
+			wasm.OpcodeI64Const, 0,
+			wasm.OpcodeLocalGet, 0,
+			wasm.OpcodeF64Const, 0, 0, 0, 0, 0, 0, 240, 63, // 1.0
+			wasm.OpcodeF64Le,
+			wasm.OpcodeI64ExtendI32U,
+			wasm.OpcodeReturn,
+			wasm.OpcodeEnd,
+			wasm.OpcodeUnreachable,
+			wasm.OpcodeEnd,
+		}, []wasm.ValueType{}),
+	}
 	MinMaxFloat = TestCase{
 		Name: "min_max_float",
 		Module: SingleFunctionModule(wasm.FunctionType{
