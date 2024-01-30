@@ -1263,7 +1263,7 @@ func TestSpectestV1(t *testing.T) {
 		//{name: "float_exprs"},
 		//{name: "float_literals"},
 		{name: "float_memory"},
-		//{name: "float_misc"},
+		{name: "float_misc"},
 		{name: "func"},
 		{name: "func_ptrs"},
 		{name: "forward"},
