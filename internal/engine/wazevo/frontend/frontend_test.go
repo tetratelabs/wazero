@@ -1716,7 +1716,7 @@ func TestCompiler_declareSignatures(t *testing.T) {
 			{ID: 5, Params: []ssa.Type{ssa.TypeI64}},
 			{ID: 6, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI32, ssa.TypeI32, ssa.TypeI64}, Results: []ssa.Type{ssa.TypeI32}},
 			{ID: 7, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI32}, Results: []ssa.Type{ssa.TypeI64}},
-			{ID: 8, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI32}},
+			{ID: 8, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI64}},
 		}
 
 		require.Equal(t, len(expected), len(declaredSigs))
@@ -1752,7 +1752,7 @@ func TestCompiler_declareSignatures(t *testing.T) {
 			{ID: 13, Params: []ssa.Type{ssa.TypeI64}},
 			{ID: 14, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI32, ssa.TypeI32, ssa.TypeI64}, Results: []ssa.Type{ssa.TypeI32}},
 			{ID: 15, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI32}, Results: []ssa.Type{ssa.TypeI64}},
-			{ID: 16, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI32}},
+			{ID: 16, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI64}},
 		}
 		require.Equal(t, len(expected), len(declaredSigs))
 		for i := 0; i < len(declaredSigs); i++ {

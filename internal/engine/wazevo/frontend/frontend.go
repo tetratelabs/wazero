@@ -138,9 +138,12 @@ func (c *Compiler) declareSignatures(listenerOn bool) {
 
 	c.memmoveSig = ssa.Signature{
 		ID: c.refFuncSig.ID + 1,
-		// dst, src, and the byte count.
-		Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI32},
+		// dst, src, and the byte count where the order is depending on the architecture.
+		// https://github.com/golang/go/blob/65f056d07ad1db7dd4fb23c4d35cf7b8bd0d6008/src/runtime/memmove_amd64.s#L36-L41
+		// https://github.com/golang/go/blob/65f056d07ad1db7dd4fb23c4d35cf7b8bd0d6008/src/runtime/memmove_arm64.s#L11-L13
+		Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI64},
 	}
+
 	c.ssaBuilder.DeclareSignature(&c.memmoveSig)
 }
 
