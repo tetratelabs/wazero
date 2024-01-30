@@ -3,7 +3,6 @@ package adhoc
 import (
 	"context"
 	"fmt"
-	"github.com/tetratelabs/wazero/internal/platform"
 	"log"
 	"runtime"
 	"strconv"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/experimental/opt"
+	"github.com/tetratelabs/wazero/internal/platform"
 )
 
 func TestMemoryLeak(t *testing.T) {
