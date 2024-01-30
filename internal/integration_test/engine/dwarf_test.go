@@ -33,6 +33,9 @@ func TestEngineInterpreter_DWARF(t *testing.T) {
 }
 
 func TestEngineWazevo_DWARF(t *testing.T) {
+	if !platform.CompilerSupported() {
+		t.Skip()
+	}
 	config := opt.NewRuntimeConfigOptimizingCompiler()
 	runAllTests(t, dwarfTests, config, true)
 }

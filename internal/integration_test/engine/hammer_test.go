@@ -32,6 +32,9 @@ func TestEngineInterpreter_hammer(t *testing.T) {
 }
 
 func TestEngineWazevo_hammer(t *testing.T) {
+	if !platform.CompilerSupported() {
+		t.Skip()
+	}
 	c := opt.NewRuntimeConfigOptimizingCompiler()
 	runAllTests(t, hammers, c, true)
 }

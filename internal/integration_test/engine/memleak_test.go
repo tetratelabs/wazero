@@ -3,6 +3,7 @@ package adhoc
 import (
 	"context"
 	"fmt"
+	"github.com/tetratelabs/wazero/internal/platform"
 	"log"
 	"runtime"
 	"strconv"
@@ -16,6 +17,10 @@ import (
 func TestMemoryLeak(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping memory leak test in short mode.")
+	}
+
+	if !platform.CompilerSupported() {
+		t.Skip()
 	}
 
 	for _, tc := range []struct {

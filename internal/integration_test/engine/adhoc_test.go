@@ -94,6 +94,9 @@ const i32, i64, f32, f64, v128 = wasm.ValueTypeI32, wasm.ValueTypeI64, wasm.Valu
 var memoryCapacityPages = uint32(2)
 
 func TestEngineWazevo(t *testing.T) {
+	if !platform.CompilerSupported() {
+		t.Skip()
+	}
 	config := opt.NewRuntimeConfigOptimizingCompiler()
 	runAllTests(t, tests, config.WithCloseOnContextDone(true), true)
 }
