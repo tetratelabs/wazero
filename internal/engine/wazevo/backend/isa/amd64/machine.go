@@ -1482,9 +1482,8 @@ func (m *machine) lowerIDivRem(si *ssa.Instruction, isDiv bool, signed bool) {
 		m.insert(sed)
 	} else {
 		// Zeros DX register to have 2*x.Type().Bits() dividend over DX and AX registers.
-		xor := m.allocateInstr()
-		xor.asAluRmiR(aluRmiROpcodeXor, newOperandReg(rdxVReg), rdxVReg, _64)
-		m.insert(xor)
+		zeros := m.allocateInstr().asZeros(rdxVReg)
+		m.insert(zeros)
 	}
 
 	div := m.allocateInstr()
