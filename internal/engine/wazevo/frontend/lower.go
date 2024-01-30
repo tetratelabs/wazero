@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
-	"runtime"
 	"strings"
 
 	"github.com/tetratelabs/wazero/api"
@@ -3425,15 +3424,7 @@ func (c *Compiler) memOpSetup(baseAddr ssa.Value, constOffset, operationSizeInBy
 }
 
 func (c *Compiler) callMemmove(dst, src, size ssa.Value) {
-	var args []ssa.Value
-	if runtime.GOARCH == "amd64" {
-		// https://github.com/golang/go/blob/65f056d07ad1db7dd4fb23c4d35cf7b8bd0d6008/src/runtime/memmove_amd64.s#L36-L41
-		args = []ssa.Value{dst, size, src} // TODO: reuse the slice.
-	} else {
-		// https://github.com/golang/go/blob/65f056d07ad1db7dd4fb23c4d35cf7b8bd0d6008/src/runtime/memmove_arm64.s#L11-L13
-		args = []ssa.Value{dst, src, size} // TODO: reuse the slice.
-	}
-
+	args := []ssa.Value{dst, src, size} // TODO: reuse the slice.
 	if size.Type() != ssa.TypeI64 {
 		panic("TODO: memmove size must be i64")
 	}

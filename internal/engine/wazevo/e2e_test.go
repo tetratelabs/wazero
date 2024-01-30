@@ -207,7 +207,7 @@ func TestE2E(t *testing.T) {
 		},
 
 		{
-			name: "divrem_signed_return32 inverted rem div order (different crash)", m: testcases.DivSReturn32_weird.Module,
+			name: "divrem_signed_return32 inverted rem div order", m: testcases.DivSReturn32_weird.Module,
 			calls: []callCase{
 				{
 					params: []uint64{21, 0, 1, 1},

@@ -1471,8 +1471,7 @@ func (m *machine) lowerIDivRem(si *ssa.Instruction, isDiv bool, signed bool) {
 			ifNotMinInt.asJmpIf(condNZ, newOperandLabel(end))
 		} else {
 			// If it is remainder, zeros DX register and compare the divisor to -1.
-			xor := m.allocateInstr()
-			xor.asAluRmiR(aluRmiROpcodeXor, newOperandReg(rdxVReg), rdxVReg, _64)
+			xor := m.allocateInstr().asZeros(rdxVReg)
 			m.insert(xor)
 
 			// We check if the divisor is -1.

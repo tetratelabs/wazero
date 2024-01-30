@@ -64,7 +64,7 @@ L2:
 	movdqu %xmm13, 256(%rax)
 	movdqu %xmm14, 272(%rax)
 	movdqu %xmm15, 288(%rax)
-	mov.q %rcx, 1120(%rax)
+	mov.q %rbx, 1120(%rax)
 	sub $32, %rsp
 	movsd %xmm0, (%rsp)
 	pushq $32
@@ -77,7 +77,7 @@ L2:
 	exit_sequence %rax
 L3:
 	add $8, %rsp
-	movq 8(%rsp), %rcx
+	movq 8(%rsp), %rbx
 	movss 16(%rsp), %xmm0
 	movsd 24(%rsp), %xmm1
 	movq 96(%rax), %rdx
@@ -136,12 +136,12 @@ L2:
 	movdqu %xmm13, 256(%rax)
 	movdqu %xmm14, 272(%rax)
 	movdqu %xmm15, 288(%rax)
-	mov.q %rcx, 1120(%rax)
+	mov.q %rbx, 1120(%rax)
 	sub $32, %rsp
 	movsd %xmm0, (%rsp)
 	movsd %xmm1, 8(%rsp)
-	mov.l %rbx, 16(%rsp)
-	mov.l %rsi, 24(%rsp)
+	mov.l %rcx, 16(%rsp)
+	mov.l %rdi, 24(%rsp)
 	pushq $32
 	movl $25606, %r12d
 	mov.l %r12, (%rax)
@@ -207,7 +207,7 @@ L2:
 	movdqu %xmm14, 272(%rax)
 	movdqu %xmm15, 288(%rax)
 	sub $16, %rsp
-	mov.l %rcx, (%rsp)
+	mov.l %rbx, (%rsp)
 	pushq $8
 	movl $2, %r12d
 	mov.l %r12, (%rax)
@@ -284,17 +284,17 @@ L2:
 	movdqu %xmm13, 256(%rax)
 	movdqu %xmm14, 272(%rax)
 	movdqu %xmm15, 288(%rax)
-	mov.q %rcx, 1120(%rax)
+	mov.q %rbx, 1120(%rax)
 	sub $240, %rsp
 	movsd %xmm0, (%rsp)
 	movsd %xmm1, 8(%rsp)
 	movdqu %xmm2, 16(%rsp)
-	mov.l %rbx, 32(%rsp)
-	mov.q %rsi, 40(%rsp)
+	mov.l %rcx, 32(%rsp)
+	mov.q %rdi, 40(%rsp)
 	movss %xmm3, 48(%rsp)
 	movsd %xmm4, 56(%rsp)
 	movdqu %xmm5, 64(%rsp)
-	mov.l %rdi, 80(%rsp)
+	mov.l %rsi, 80(%rsp)
 	mov.q %r8, 88(%rsp)
 	movss %xmm6, 96(%rsp)
 	movsd %xmm7, 104(%rsp)
@@ -316,16 +316,16 @@ L3:
 	add $8, %rsp
 	movsd (%rsp), %xmm0
 	movdqu 8(%rsp), %xmm1
-	movq 32(%rsp), %rcx
+	movq 32(%rsp), %rbx
 	movss 40(%rsp), %xmm2
 	movsd 48(%rsp), %xmm3
 	movdqu 56(%rsp), %xmm4
-	movzx.lq 72(%rsp), %rbx
-	movq 80(%rsp), %rsi
+	movzx.lq 72(%rsp), %rcx
+	movq 80(%rsp), %rdi
 	movss 88(%rsp), %xmm5
 	movsd 96(%rsp), %xmm6
 	movdqu 104(%rsp), %xmm7
-	movzx.lq 120(%rsp), %rdi
+	movzx.lq 120(%rsp), %rsi
 	movq 128(%rsp), %r8
 	movss 136(%rsp), %xmm15
 	movss %xmm15, 40(%rbp)
