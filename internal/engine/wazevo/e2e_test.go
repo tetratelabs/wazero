@@ -671,8 +671,6 @@ func TestE2E(t *testing.T) {
 								for i := range cc.expResults {
 									if cc.expResults[i] != result[i] {
 										t.Errorf("result[%d]: exp %x, got %x", i, cc.expResults[i], result[i])
-									} else {
-										t.Logf("result[%d]: %x", i, result[i])
 									}
 								}
 							}
