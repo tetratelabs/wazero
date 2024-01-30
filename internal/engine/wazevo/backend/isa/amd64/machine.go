@@ -222,7 +222,27 @@ func (m *machine) LowerConditionalBranch(b *ssa.Instruction) {
 		m.insert(m.allocateInstr().asJmpIf(cc, newOperandLabel(target)))
 		cvalDef.Instr.MarkLowered()
 	case ssa.OpcodeFcmp:
-		panic("TODO")
+		cvalInstr := cvalDef.Instr
+
+		f1, f2, and := m.lowerFcmpToFlags(cvalInstr)
+		if f2 == condInvalid {
+			m.insert(m.allocateInstr().asJmpIf(f1, newOperandLabel(target)))
+		} else {
+			jmp1, jmp2 := m.allocateInstr(), m.allocateInstr()
+			m.insert(jmp1)
+			m.insert(jmp2)
+			notTaken, notTakenLabel := m.allocateBrTarget()
+			m.insert(notTaken)
+			if and {
+				jmp1.asJmpIf(f1.invert(), newOperandLabel(notTakenLabel))
+				jmp2.asJmpIf(f2, newOperandLabel(target))
+			} else {
+				jmp1.asJmpIf(f1, newOperandLabel(target))
+				jmp2.asJmpIf(f2, newOperandLabel(target))
+			}
+		}
+
+		cvalDef.Instr.MarkLowered()
 	default:
 		v := m.getOperand_Reg(cvalDef)
 
@@ -327,6 +347,8 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		m.lowerExtend(instr.Arg(), instr.Return(), from, to, signed)
 	case ssa.OpcodeIcmp:
 		m.lowerIcmp(instr)
+	case ssa.OpcodeFcmp:
+		m.lowerFcmp(instr)
 	case ssa.OpcodeSelect:
 		cval, x, y := instr.SelectData()
 		m.lowerSelect(x, y, cval, instr.Return())
@@ -345,15 +367,39 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 	}
 }
 
+func (m *machine) lowerFcmp(instr *ssa.Instruction) {
+	f1, f2, and := m.lowerFcmpToFlags(instr)
+	rd := m.c.VRegOf(instr.Return())
+	if f2 == condInvalid {
+		tmp := m.c.AllocateVReg(ssa.TypeI32)
+		m.insert(m.allocateInstr().asSetcc(f1, tmp))
+		// On amd64, setcc only sets the first byte of the register, so we need to zero extend it to match
+		// the semantics of Icmp that sets either 0 or 1.
+		m.insert(m.allocateInstr().asMovzxRmR(extModeBQ, newOperandReg(tmp), rd))
+	} else {
+		tmp1, tmp2 := m.c.AllocateVReg(ssa.TypeI32), m.c.AllocateVReg(ssa.TypeI32)
+		m.insert(m.allocateInstr().asSetcc(f1, tmp1))
+		m.insert(m.allocateInstr().asSetcc(f2, tmp2))
+		var op aluRmiROpcode
+		if and {
+			op = aluRmiROpcodeAnd
+		} else {
+			op = aluRmiROpcodeOr
+		}
+		m.insert(m.allocateInstr().asAluRmiR(op, newOperandReg(tmp1), tmp2, false))
+		m.insert(m.allocateInstr().asMovzxRmR(extModeBQ, newOperandReg(tmp2), rd))
+	}
+}
+
 func (m *machine) lowerIcmp(instr *ssa.Instruction) {
 	x, y, c := instr.IcmpData()
 	m.lowerIcmpToFlag(m.c.ValueDefinition(x), m.c.ValueDefinition(y), x.Type() == ssa.TypeI64)
 	rd := m.c.VRegOf(instr.Return())
-	scc := m.allocateInstr().asSetcc(condFromSSAIntCmpCond(c), rd)
-	m.insert(scc)
+	tmp := m.c.AllocateVReg(ssa.TypeI32)
+	m.insert(m.allocateInstr().asSetcc(condFromSSAIntCmpCond(c), tmp))
 	// On amd64, setcc only sets the first byte of the register, so we need to zero extend it to match
 	// the semantics of Icmp that sets either 0 or 1.
-	m.insert(m.allocateInstr().asMovzxRmR(extModeBQ, newOperandReg(rd), rd))
+	m.insert(m.allocateInstr().asMovzxRmR(extModeBQ, newOperandReg(tmp), rd))
 }
 
 func (m *machine) lowerSelect(x, y, cval, ret ssa.Value) {
@@ -1216,6 +1262,40 @@ func (m *machine) lowerIcmpToFlag(xd, yd *backend.SSAValueDefinition, _64 bool) 
 	y := m.getOperand_Mem_Imm32_Reg(yd)
 	cmp := m.allocateInstr().asCmpRmiR(true, y, x.r, _64)
 	m.insert(cmp)
+}
+
+func (m *machine) lowerFcmpToFlags(instr *ssa.Instruction) (f1, f2 cond, and bool) {
+	x, y, c := instr.FcmpData()
+	switch c {
+	case ssa.FloatCmpCondEqual:
+		f1, f2 = condNP, condZ
+		and = true
+	case ssa.FloatCmpCondNotEqual:
+		f1, f2 = condP, condNZ
+	case ssa.FloatCmpCondLessThan:
+		f1 = condFromSSAFloatCmpCond(ssa.FloatCmpCondGreaterThan)
+		f2 = condInvalid
+		x, y = y, x
+	case ssa.FloatCmpCondLessThanOrEqual:
+		f1 = condFromSSAFloatCmpCond(ssa.FloatCmpCondGreaterThanOrEqual)
+		f2 = condInvalid
+		x, y = y, x
+	default:
+		f1 = condFromSSAFloatCmpCond(c)
+		f2 = condInvalid
+	}
+
+	var opc sseOpcode
+	if x.Type() == ssa.TypeF32 {
+		opc = sseOpcodeUcomiss
+	} else {
+		opc = sseOpcodeUcomisd
+	}
+
+	xr := m.getOperand_Reg(m.c.ValueDefinition(x))
+	yr := m.getOperand_Mem_Reg(m.c.ValueDefinition(y))
+	m.insert(m.allocateInstr().asXmmCmpRmR(opc, yr, xr.r))
+	return
 }
 
 // allocateInstr allocates an instruction.
