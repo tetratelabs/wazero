@@ -3,7 +3,6 @@ package adhoc
 import (
 	"bufio"
 	_ "embed"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -34,7 +33,7 @@ func TestEngineInterpreter_DWARF(t *testing.T) {
 }
 
 func TestEngineWazevo_DWARF(t *testing.T) {
-	if runtime.GOARCH != "arm64" {
+	if !platform.CompilerSupported() {
 		t.Skip()
 	}
 	config := opt.NewRuntimeConfigOptimizingCompiler()

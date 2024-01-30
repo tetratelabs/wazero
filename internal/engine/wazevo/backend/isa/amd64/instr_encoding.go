@@ -11,7 +11,7 @@ import (
 
 func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 	switch i.kind {
-	case nop0:
+	case nop0, sourceOffsetInfo:
 	case ret:
 		encodeRet(c)
 	case imm:

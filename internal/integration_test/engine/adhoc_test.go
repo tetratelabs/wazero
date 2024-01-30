@@ -66,13 +66,13 @@ var tests = map[string]testCase{
 	"many params many results / doubler":                               {f: testManyParamsResultsDoubler},
 	"many params many results / doubler / listener":                    {f: testManyParamsResultsDoublerListener},
 	"many params many results / call_many_consts":                      {f: testManyParamsResultsCallManyConsts},
-	"many params many results / call_many_consts / listener":           {f: testManyParamsResultsCallManyConstsListener},
+	"many params many results / call_many_consts / listener":           {f: testManyParamsResultsCallManyConstsListener, wazevoSkip: runtime.GOARCH == "amd64"},
 	"many params many results / swapper":                               {f: testManyParamsResultsSwapper},
 	"many params many results / swapper / listener":                    {f: testManyParamsResultsSwapperListener},
 	"many params many results / main":                                  {f: testManyParamsResultsMain},
-	"many params many results / main / listener":                       {f: testManyParamsResultsMainListener},
+	"many params many results / main / listener":                       {f: testManyParamsResultsMainListener, wazevoSkip: runtime.GOARCH == "amd64"},
 	"many params many results / call_many_consts_and_pick_last_vector": {f: testManyParamsResultsCallManyConstsAndPickLastVector},
-	"many params many results / call_many_consts_and_pick_last_vector / listener": {f: testManyParamsResultsCallManyConstsAndPickLastVectorListener},
+	"many params many results / call_many_consts_and_pick_last_vector / listener": {f: testManyParamsResultsCallManyConstsAndPickLastVectorListener, wazevoSkip: runtime.GOARCH == "amd64"},
 }
 
 func TestEngineCompiler(t *testing.T) {
@@ -94,7 +94,7 @@ const i32, i64, f32, f64, v128 = wasm.ValueTypeI32, wasm.ValueTypeI64, wasm.Valu
 var memoryCapacityPages = uint32(2)
 
 func TestEngineWazevo(t *testing.T) {
-	if runtime.GOARCH != "arm64" {
+	if !platform.CompilerSupported() {
 		t.Skip()
 	}
 	config := opt.NewRuntimeConfigOptimizingCompiler()

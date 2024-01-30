@@ -270,6 +270,11 @@ func (m *machine) LowerConditionalBranch(b *ssa.Instruction) {
 
 // LowerInstr implements backend.Machine.
 func (m *machine) LowerInstr(instr *ssa.Instruction) {
+	if l := instr.SourceOffset(); l.Valid() {
+		info := m.allocateInstr().asEmitSourceOffsetInfo(l)
+		m.insert(info)
+	}
+
 	switch op := instr.Opcode(); op {
 	case ssa.OpcodeBrz, ssa.OpcodeBrnz, ssa.OpcodeJump, ssa.OpcodeBrTable:
 		panic("BUG: branching instructions are handled by LowerBranches")
@@ -1212,11 +1217,15 @@ func (m *machine) Encode(context.Context) {
 		pos.BinaryOffset = offset
 		for cur := pos.Begin; cur != pos.End.next; cur = cur.next {
 			offset := int64(len(*bufPtr))
-			if cur.kind == nop0 {
+
+			switch cur.kind {
+			case nop0:
 				l := cur.nop0Label()
 				if pos, ok := ectx.LabelPositions[l]; ok {
 					pos.BinaryOffset = offset
 				}
+			case sourceOffsetInfo:
+				m.c.AddSourceOffsetInfo(offset, cur.sourceOffsetInfo())
 			}
 
 			needLabelResolution := cur.encode(m.c)
