@@ -55,7 +55,7 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 	cur = m.saveRegistersInExecutionContext(cur, execCtrPtr, calleeSavedVRegs)
 
 	if needModuleContextPtr {
-		moduleCtrPtr := rcxVReg // Module context is always the second argument.
+		moduleCtrPtr := rbxVReg // Module context is always the second argument.
 		mem := newAmodeImmReg(
 			wazevoapi.ExecutionContextOffsetGoFunctionCallCalleeModuleContextOpaque.U32(),
 			execCtrPtr)
