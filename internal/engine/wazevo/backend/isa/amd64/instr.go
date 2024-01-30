@@ -329,7 +329,6 @@ func (i *instruction) Uses(regs *[]regalloc.VReg) []regalloc.VReg {
 			panic(fmt.Sprintf("BUG: invalid operand: %s", i))
 		}
 		*regs = append(*regs, raxVReg)
-
 	default:
 		panic(fmt.Sprintf("BUG: invalid useKind %s for %s", uk, i))
 	}
@@ -671,6 +670,10 @@ const (
 	// the destination register and takes no inputs.
 	zeros
 
+	// sourceOffsetInfo is a dummy instruction to emit source offset info.
+	// The existence of this instruction does not affect the execution.
+	sourceOffsetInfo
+
 	instrMax
 )
 
@@ -906,6 +909,16 @@ func (i *instruction) asGprToXmm(op sseOpcode, rm operand, rd regalloc.VReg, _64
 	i.u1 = uint64(op)
 	i.b1 = _64
 	return i
+}
+
+func (i *instruction) asEmitSourceOffsetInfo(l ssa.SourceOffset) *instruction {
+	i.kind = sourceOffsetInfo
+	i.u1 = uint64(l)
+	return i
+}
+
+func (i *instruction) sourceOffsetInfo() ssa.SourceOffset {
+	return ssa.SourceOffset(i.u1)
 }
 
 func (i *instruction) asMovRM(rm regalloc.VReg, rd operand, size byte) *instruction {
@@ -1745,38 +1758,39 @@ const (
 )
 
 var defKinds = [instrMax]defKind{
-	nop0:            defKindNone,
-	div:             defKindRaxRdx,
-	signExtendData:  defKindRdx,
-	ret:             defKindNone,
-	movRR:           defKindOp2,
-	movRM:           defKindNone,
-	xmmMovRM:        defKindNone,
-	aluRmiR:         defKindNone,
-	shiftR:          defKindNone,
-	imm:             defKindOp2,
-	unaryRmR:        defKindOp2,
-	xmmUnaryRmR:     defKindOp2,
-	xmmUnaryRmRImm:  defKindOp2,
-	xmmCmpRmR:       defKindOp2,
-	xmmRmR:          defKindNone,
-	mov64MR:         defKindOp2,
-	movsxRmR:        defKindOp2,
-	movzxRmR:        defKindOp2,
-	gprToXmm:        defKindOp2,
-	cmove:           defKindNone,
-	call:            defKindCall,
-	callIndirect:    defKindCall,
-	ud2:             defKindNone,
-	jmp:             defKindNone,
-	jmpIf:           defKindNone,
-	jmpTableIsland:  defKindNone,
-	cmpRmiR:         defKindNone,
-	exitSequence:    defKindNone,
-	lea:             defKindOp2,
-	v128ConstIsland: defKindNone,
-	setcc:           defKindOp2,
-	zeros:           defKindOp2,
+	nop0:             defKindNone,
+	div:              defKindRaxRdx,
+	signExtendData:   defKindRdx,
+	ret:              defKindNone,
+	movRR:            defKindOp2,
+	movRM:            defKindNone,
+	xmmMovRM:         defKindNone,
+	aluRmiR:          defKindNone,
+	shiftR:           defKindNone,
+	imm:              defKindOp2,
+	unaryRmR:         defKindOp2,
+	xmmUnaryRmR:      defKindOp2,
+	xmmUnaryRmRImm:   defKindOp2,
+	xmmCmpRmR:        defKindOp2,
+	xmmRmR:           defKindNone,
+	mov64MR:          defKindOp2,
+	movsxRmR:         defKindOp2,
+	movzxRmR:         defKindOp2,
+	gprToXmm:         defKindOp2,
+	cmove:            defKindNone,
+	call:             defKindCall,
+	callIndirect:     defKindCall,
+	ud2:              defKindNone,
+	jmp:              defKindNone,
+	jmpIf:            defKindNone,
+	jmpTableIsland:   defKindNone,
+	cmpRmiR:          defKindNone,
+	exitSequence:     defKindNone,
+	lea:              defKindOp2,
+	v128ConstIsland:  defKindNone,
+	setcc:            defKindOp2,
+	zeros:            defKindOp2,
+	sourceOffsetInfo: defKindNone,
 }
 
 // String implements fmt.Stringer.
@@ -1815,38 +1829,39 @@ const (
 )
 
 var useKinds = [instrMax]useKind{
-	nop0:            useKindNone,
-	div:             useKindOp1Rax,
-	signExtendData:  useKindRax,
-	ret:             useKindNone,
-	movRR:           useKindOp1,
-	movRM:           useKindOp1RegOp2,
-	xmmMovRM:        useKindOp1RegOp2,
-	cmove:           useKindOp1Op2Reg,
-	aluRmiR:         useKindOp1Op2Reg,
-	shiftR:          useKindOp1Op2Reg,
-	imm:             useKindNone,
-	unaryRmR:        useKindOp1,
-	xmmUnaryRmR:     useKindOp1,
-	xmmUnaryRmRImm:  useKindOp1,
-	xmmCmpRmR:       useKindOp1Op2Reg,
-	xmmRmR:          useKindOp1Op2Reg,
-	mov64MR:         useKindOp1,
-	movzxRmR:        useKindOp1,
-	movsxRmR:        useKindOp1,
-	gprToXmm:        useKindOp1,
-	call:            useKindCall,
-	callIndirect:    useKindCallInd,
-	ud2:             useKindNone,
-	jmpIf:           useKindOp1,
-	jmp:             useKindOp1,
-	cmpRmiR:         useKindOp1Op2Reg,
-	exitSequence:    useKindOp1,
-	lea:             useKindOp1,
-	v128ConstIsland: useKindNone,
-	jmpTableIsland:  useKindNone,
-	setcc:           useKindNone,
-	zeros:           useKindNone,
+	nop0:             useKindNone,
+	div:              useKindOp1Rax,
+	signExtendData:   useKindRax,
+	ret:              useKindNone,
+	movRR:            useKindOp1,
+	movRM:            useKindOp1RegOp2,
+	xmmMovRM:         useKindOp1RegOp2,
+	cmove:            useKindOp1Op2Reg,
+	aluRmiR:          useKindOp1Op2Reg,
+	shiftR:           useKindOp1Op2Reg,
+	imm:              useKindNone,
+	unaryRmR:         useKindOp1,
+	xmmUnaryRmR:      useKindOp1,
+	xmmUnaryRmRImm:   useKindOp1,
+	xmmCmpRmR:        useKindOp1Op2Reg,
+	xmmRmR:           useKindOp1Op2Reg,
+	mov64MR:          useKindOp1,
+	movzxRmR:         useKindOp1,
+	movsxRmR:         useKindOp1,
+	gprToXmm:         useKindOp1,
+	call:             useKindCall,
+	callIndirect:     useKindCallInd,
+	ud2:              useKindNone,
+	jmpIf:            useKindOp1,
+	jmp:              useKindOp1,
+	cmpRmiR:          useKindOp1Op2Reg,
+	exitSequence:     useKindOp1,
+	lea:              useKindOp1,
+	v128ConstIsland:  useKindNone,
+	jmpTableIsland:   useKindNone,
+	setcc:            useKindNone,
+	zeros:            useKindNone,
+	sourceOffsetInfo: useKindNone,
 }
 
 func (u useKind) String() string {

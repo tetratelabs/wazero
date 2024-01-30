@@ -27,10 +27,6 @@ func TestMemoryLeak(t *testing.T) {
 	} {
 		tc := tc
 
-		if tc.isWazevo && runtime.GOARCH != "arm64" {
-			t.Skip("skipping wazevo memory leak test on non-arm64.")
-		}
-
 		t.Run(tc.name, func(t *testing.T) {
 			duration := 5 * time.Second
 			t.Logf("running memory leak test for %s", duration)
