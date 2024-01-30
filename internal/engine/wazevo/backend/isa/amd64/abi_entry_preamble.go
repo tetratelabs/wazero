@@ -62,7 +62,7 @@ func (m *machine) compileEntryPreamble(sig *ssa.Signature) *instruction {
 	var offset uint32
 	for i := range abi.Args {
 		if i < 2 {
-			// module context ptr and execution context ptr are passed in x0 and x1 by the Go assembly function.
+			// module context ptr and execution context ptr are passed in rax and rbx by the Go assembly function.
 			continue
 		}
 		arg := &abi.Args[i]

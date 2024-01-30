@@ -81,7 +81,7 @@ var (
 		}, nil),
 	}
 	ArithmReturn = TestCase{
-		Name: "add_sub_params_return",
+		Name: "arithm return",
 		Module: SingleFunctionModule(
 			wasm.FunctionType{
 				Params: []wasm.ValueType{i32, i32, i32, i64, i64, i64},
@@ -159,6 +159,102 @@ var (
 				wasm.OpcodeI64Const, 10,
 				wasm.OpcodeLocalGet, 3,
 				wasm.OpcodeI64Rotl,
+
+				wasm.OpcodeEnd,
+			}, nil),
+	}
+	DivUReturn32 = TestCase{
+		Name: "div return unsigned 32",
+		Module: SingleFunctionModule(
+			wasm.FunctionType{
+				Params:  []wasm.ValueType{i32, i32, i32, i32},
+				Results: []wasm.ValueType{i32, i32},
+			},
+			[]byte{
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeI32DivU,
+
+				wasm.OpcodeLocalGet, 2,
+				wasm.OpcodeLocalGet, 3,
+				wasm.OpcodeI32RemU,
+
+				wasm.OpcodeEnd,
+			}, nil),
+	}
+	DivUReturn64 = TestCase{
+		Name: "div return unsigned 64",
+		Module: SingleFunctionModule(
+			wasm.FunctionType{
+				Params:  []wasm.ValueType{i64, i64, i64, i64},
+				Results: []wasm.ValueType{i64, i64},
+			},
+			[]byte{
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeI64DivU,
+
+				wasm.OpcodeLocalGet, 2,
+				wasm.OpcodeLocalGet, 3,
+				wasm.OpcodeI64RemU,
+
+				wasm.OpcodeEnd,
+			}, nil),
+	}
+	DivSReturn32 = TestCase{
+		Name: "div return signed 32",
+		Module: SingleFunctionModule(
+			wasm.FunctionType{
+				Params:  []wasm.ValueType{i32, i32, i32, i32},
+				Results: []wasm.ValueType{i32, i32},
+			},
+			[]byte{
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeI32DivS,
+
+				wasm.OpcodeLocalGet, 2,
+				wasm.OpcodeLocalGet, 3,
+				wasm.OpcodeI32RemS,
+
+				wasm.OpcodeEnd,
+			}, nil),
+	}
+	DivSReturn32_weird = TestCase{
+		Name: "div return signed 32",
+		Module: SingleFunctionModule(
+			wasm.FunctionType{
+				Params:  []wasm.ValueType{i32, i32, i32, i32},
+				Results: []wasm.ValueType{i32, i32},
+			},
+			[]byte{
+				wasm.OpcodeLocalGet, 2,
+				wasm.OpcodeLocalGet, 3,
+				wasm.OpcodeI32RemS,
+
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeI32DivS,
+
+				wasm.OpcodeEnd,
+			}, nil),
+	}
+
+	DivSReturn64 = TestCase{
+		Name: "div return signed 64",
+		Module: SingleFunctionModule(
+			wasm.FunctionType{
+				Params:  []wasm.ValueType{i64, i64, i64, i64},
+				Results: []wasm.ValueType{i64, i64},
+			},
+			[]byte{
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeI64DivS,
+
+				wasm.OpcodeLocalGet, 2,
+				wasm.OpcodeLocalGet, 3,
+				wasm.OpcodeI64RemS,
 
 				wasm.OpcodeEnd,
 			}, nil),
@@ -985,6 +1081,162 @@ var (
 			wasm.OpcodeLocalGet, 2,
 			wasm.OpcodeLocalGet, 3,
 			wasm.OpcodeF64Ge,
+
+			wasm.OpcodeEnd,
+		}, []wasm.ValueType{}),
+	}
+	FloatArithm = TestCase{
+		Name: "float_arithm",
+		Module: SingleFunctionModule(wasm.FunctionType{
+			Params: []wasm.ValueType{f64, f64, f64, f32, f32, f32},
+			Results: []wasm.ValueType{
+				f64, f64, f64, f64, f64, f64, f64, f64, f64, f64, f64, f64,
+				f32, f32, f32, f32, f32, f32, f32, f32, f32, f32, f32, f32,
+			},
+		}, []byte{
+			wasm.OpcodeLocalGet, 0,
+			wasm.OpcodeF64Neg,
+
+			wasm.OpcodeLocalGet, 0,
+			wasm.OpcodeF64Neg,
+			wasm.OpcodeF64Abs,
+
+			wasm.OpcodeLocalGet, 0,
+			wasm.OpcodeF64Sqrt,
+
+			wasm.OpcodeLocalGet, 0,
+			wasm.OpcodeLocalGet, 1,
+			wasm.OpcodeF64Add,
+
+			wasm.OpcodeLocalGet, 0,
+			wasm.OpcodeLocalGet, 1,
+			wasm.OpcodeF64Sub,
+
+			wasm.OpcodeLocalGet, 0,
+			wasm.OpcodeLocalGet, 1,
+			wasm.OpcodeF64Mul,
+
+			wasm.OpcodeLocalGet, 0,
+			wasm.OpcodeLocalGet, 1,
+			wasm.OpcodeF64Div,
+
+			wasm.OpcodeLocalGet, 2,
+			wasm.OpcodeF64Nearest,
+
+			wasm.OpcodeLocalGet, 2,
+			wasm.OpcodeF64Floor,
+
+			wasm.OpcodeLocalGet, 2,
+			wasm.OpcodeF64Ceil,
+
+			wasm.OpcodeLocalGet, 2,
+			wasm.OpcodeF64Trunc,
+
+			wasm.OpcodeLocalGet, 0,
+			wasm.OpcodeLocalGet, 1,
+			wasm.OpcodeF64Neg,
+			wasm.OpcodeF64Copysign,
+
+			// 32-bit floats.
+			wasm.OpcodeLocalGet, 3,
+			wasm.OpcodeF32Neg,
+
+			wasm.OpcodeLocalGet, 3,
+			wasm.OpcodeF32Neg,
+			wasm.OpcodeF32Abs,
+
+			wasm.OpcodeLocalGet, 3,
+			wasm.OpcodeF32Sqrt,
+
+			wasm.OpcodeLocalGet, 3,
+			wasm.OpcodeLocalGet, 4,
+			wasm.OpcodeF32Add,
+
+			wasm.OpcodeLocalGet, 3,
+			wasm.OpcodeLocalGet, 4,
+			wasm.OpcodeF32Sub,
+
+			wasm.OpcodeLocalGet, 3,
+			wasm.OpcodeLocalGet, 4,
+			wasm.OpcodeF32Mul,
+
+			wasm.OpcodeLocalGet, 3,
+			wasm.OpcodeLocalGet, 4,
+			wasm.OpcodeF32Div,
+
+			wasm.OpcodeLocalGet, 5,
+			wasm.OpcodeF32Nearest,
+
+			wasm.OpcodeLocalGet, 5,
+			wasm.OpcodeF32Floor,
+
+			wasm.OpcodeLocalGet, 5,
+			wasm.OpcodeF32Ceil,
+
+			wasm.OpcodeLocalGet, 5,
+			wasm.OpcodeF32Trunc,
+
+			wasm.OpcodeLocalGet, 3,
+			wasm.OpcodeLocalGet, 4,
+			wasm.OpcodeF32Neg,
+			wasm.OpcodeF32Copysign,
+
+			wasm.OpcodeEnd,
+		}, []wasm.ValueType{}),
+	}
+	FloatLe = TestCase{
+		Name: "float_le",
+		Module: SingleFunctionModule(wasm.FunctionType{
+			Params:  []wasm.ValueType{f64},
+			Results: []wasm.ValueType{i64, i64},
+		}, []byte{
+			wasm.OpcodeLocalGet, 0,
+			wasm.OpcodeF64Const, 0, 0, 0, 0, 0, 0, 240, 63, // 1.0
+			wasm.OpcodeF64Le,
+			wasm.OpcodeIf, blockSignature_vv,
+			wasm.OpcodeI64Const, 1,
+			wasm.OpcodeLocalGet, 0,
+			wasm.OpcodeF64Const, 0, 0, 0, 0, 0, 0, 240, 63, // 1.0
+			wasm.OpcodeF64Le,
+			wasm.OpcodeI64ExtendI32U,
+			wasm.OpcodeReturn,
+			wasm.OpcodeElse,
+			wasm.OpcodeI64Const, 0,
+			wasm.OpcodeLocalGet, 0,
+			wasm.OpcodeF64Const, 0, 0, 0, 0, 0, 0, 240, 63, // 1.0
+			wasm.OpcodeF64Le,
+			wasm.OpcodeI64ExtendI32U,
+			wasm.OpcodeReturn,
+			wasm.OpcodeEnd,
+			wasm.OpcodeUnreachable,
+			wasm.OpcodeEnd,
+		}, []wasm.ValueType{}),
+	}
+	MinMaxFloat = TestCase{
+		Name: "min_max_float",
+		Module: SingleFunctionModule(wasm.FunctionType{
+			Params: []wasm.ValueType{f64, f64, f32, f32},
+			Results: []wasm.ValueType{
+				f64, f64,
+				f32, f32,
+			},
+		}, []byte{
+			wasm.OpcodeLocalGet, 0,
+			wasm.OpcodeLocalGet, 1,
+			wasm.OpcodeF64Min,
+
+			wasm.OpcodeLocalGet, 0,
+			wasm.OpcodeLocalGet, 1,
+			wasm.OpcodeF64Max,
+
+			// 32-bit floats.
+			wasm.OpcodeLocalGet, 2,
+			wasm.OpcodeLocalGet, 3,
+			wasm.OpcodeF32Min,
+
+			wasm.OpcodeLocalGet, 2,
+			wasm.OpcodeLocalGet, 3,
+			wasm.OpcodeF32Max,
 
 			wasm.OpcodeEnd,
 		}, []wasm.ValueType{}),

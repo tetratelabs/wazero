@@ -11,7 +11,7 @@ import (
 
 func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 	switch i.kind {
-	case nop0:
+	case nop0, sourceOffsetInfo:
 	case ret:
 		encodeRet(c)
 	case imm:
@@ -457,6 +457,36 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 			panic("BUG: invalid operand kind")
 		}
 
+	case xmmUnaryRmRImm:
+		var prefix legacyPrefixes
+		var opcode uint32
+		var opcodeNum uint32
+		op := sseOpcode(i.u1)
+		switch op {
+		case sseOpcodeRoundps:
+			prefix, opcode, opcodeNum = legacyPrefixes0x66, 0x0f3a08, 3
+		case sseOpcodeRoundss:
+			prefix, opcode, opcodeNum = legacyPrefixes0x66, 0x0f3a0a, 3
+		case sseOpcodeRoundpd:
+			prefix, opcode, opcodeNum = legacyPrefixes0x66, 0x0f3a09, 3
+		case sseOpcodeRoundsd:
+			prefix, opcode, opcodeNum = legacyPrefixes0x66, 0x0f3a0b, 3
+		}
+		rex := rexInfo(0).clearW()
+		dst := regEncodings[i.op2.r.RealReg()]
+		op1 := i.op1
+		if op1.kind == operandKindReg {
+			src := regEncodings[op1.r.RealReg()]
+			encodeRegReg(c, prefix, opcode, opcodeNum, dst, src, rex)
+		} else if i.op1.kind == operandKindMem {
+			m := i.op1.amode
+			encodeRegMem(c, prefix, opcode, opcodeNum, dst, m, rex)
+		} else {
+			panic("BUG: invalid operand kind")
+		}
+
+		c.EmitByte(byte(i.u2))
+
 	case unaryRmR:
 		var prefix legacyPrefixes
 		var opcode uint32
@@ -522,7 +552,30 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 		encodeEncEnc(c, prefix, 0xf7, 1, subopcode, uint8(src), rex)
 
 	case div:
-		panic("TODO")
+		rex := rexInfo(0)
+		if i.b1 { // 64 bit.
+			rex = rexInfo(0).setW()
+		} else {
+			rex = rexInfo(0).clearW()
+		}
+		var subopcode uint8
+		if i.u1 != 0 { // Signed.
+			subopcode = 7
+		} else {
+			subopcode = 6
+		}
+
+		divisor := i.op1
+		if divisor.kind == operandKindReg {
+			src := regEncodings[divisor.r.RealReg()]
+			encodeEncEnc(c, legacyPrefixesNone, 0xf7, 1, subopcode, uint8(src), rex)
+		} else if divisor.kind == operandKindMem {
+			m := divisor.amode
+			encodeEncMem(c, legacyPrefixesNone, 0xf7, 1, subopcode, m, rex)
+		} else {
+			panic("BUG: invalid operand kind")
+		}
+
 	case mulHi:
 		var prefix legacyPrefixes
 		rex := rexInfo(0)
@@ -557,7 +610,12 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 	case checkedDivOrRemSeq:
 		panic("TODO")
 	case signExtendData:
-		panic("TODO")
+		if i.b1 { // 64 bit.
+			c.EmitByte(0x48)
+			c.EmitByte(0x99)
+		} else {
+			c.EmitByte(0x99)
+		}
 	case movzxRmR, movsxRmR:
 		signed := i.kind == movsxRmR
 
@@ -805,7 +863,7 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 		}
 	case setcc:
 		cc := cond(i.u1)
-		dst := regEncodings[i.op1.r.RealReg()]
+		dst := regEncodings[i.op2.r.RealReg()]
 		rex := rexInfo(0).clearW().always()
 		opcode := uint32(0x0f90) + uint32(cc)
 		encodeEncEnc(c, legacyPrefixesNone, opcode, 2, 0, uint8(dst), rex)
@@ -898,10 +956,44 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 		panic("TODO")
 	case xmmMinMaxSeq:
 		panic("TODO")
-	case xmmCmove:
-		panic("TODO")
 	case xmmCmpRmR:
-		panic("TODO")
+		var prefix legacyPrefixes
+		var opcode uint32
+		var opcodeNum uint32
+		rex := rexInfo(0)
+		_64 := i.b1
+		if _64 { // 64 bit.
+			rex = rex.setW()
+		} else {
+			rex = rex.clearW()
+		}
+
+		op := sseOpcode(i.u1)
+		switch op {
+		case sseOpcodePtest:
+			prefix, opcode, opcodeNum = legacyPrefixes0x66, 0x0f3817, 3
+		case sseOpcodeUcomisd:
+			prefix, opcode, opcodeNum = legacyPrefixes0x66, 0x0f2e, 2
+		case sseOpcodeUcomiss:
+			prefix, opcode, opcodeNum = legacyPrefixesNone, 0x0f2e, 2
+		default:
+			panic(fmt.Sprintf("Unsupported sseOpcode: %s", op))
+		}
+
+		dst := regEncodings[i.op2.r.RealReg()]
+		op1 := i.op1
+		switch op1.kind {
+		case operandKindReg:
+			reg := regEncodings[op1.r.RealReg()]
+			encodeRegReg(c, prefix, opcode, opcodeNum, dst, reg, rex)
+
+		case operandKindMem:
+			m := op1.amode
+			encodeRegMem(c, prefix, opcode, opcodeNum, dst, m, rex)
+
+		default:
+			panic("BUG: invalid operand kind")
+		}
 	case xmmRmRImm:
 		panic("TODO")
 	case jmp:
@@ -952,8 +1044,11 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 			panic("BUG: invalid operand kind")
 		}
 
-	case jmpTableSequence:
-		panic("TODO")
+	case jmpTableIsland:
+		needsLabelResolution = true
+		for range i.targets {
+			c.Emit8Bytes(0)
+		}
 
 	case exitSequence:
 		execCtx := i.op1.r
@@ -1006,10 +1101,23 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 
 	case v128ConstIsland:
 		lo, hi := i.u1, i.u2
-		c.Emit4Bytes(uint32(lo))
-		c.Emit4Bytes(uint32(lo >> 32))
-		c.Emit4Bytes(uint32(hi))
-		c.Emit4Bytes(uint32(hi >> 32))
+		c.Emit8Bytes(lo)
+		c.Emit8Bytes(hi)
+
+	case xchg:
+		r1, r2 := i.op1.r.RealReg(), i.op2.r.RealReg()
+
+		enc1, enc2 := regEncodings[r1], regEncodings[r2]
+		encodeRegReg(c, legacyPrefixesNone, 0x87, 1, enc2, enc1, rexInfo(0).setW())
+
+	case zeros:
+		r := i.op2.r
+		if r.RegType() == regalloc.RegTypeInt {
+			i.asAluRmiR(aluRmiROpcodeXor, newOperandReg(r), r, true)
+		} else {
+			i.asXmmRmR(sseOpcodePxor, newOperandReg(r), r)
+		}
+		i.encode(c)
 
 	default:
 		panic(fmt.Sprintf("TODO: %v", i.kind))

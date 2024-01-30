@@ -55,7 +55,7 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 	cur = m.saveRegistersInExecutionContext(cur, execCtrPtr, calleeSavedVRegs)
 
 	if needModuleContextPtr {
-		moduleCtrPtr := rcxVReg // Module context is always the second argument.
+		moduleCtrPtr := rbxVReg // Module context is always the second argument.
 		mem := newAmodeImmReg(
 			wazevoapi.ExecutionContextOffsetGoFunctionCallCalleeModuleContextOpaque.U32(),
 			execCtrPtr)
@@ -98,7 +98,29 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 		if arg.Kind == backend.ABIArgKindReg {
 			v = arg.Reg
 		} else {
-			panic("TODO: stack arguments")
+			// We have saved callee saved registers, so we can use them.
+			if arg.Type.IsInt() {
+				v = r15VReg
+			} else {
+				v = xmm15VReg
+			}
+			mem := newOperandMem(newAmodeImmReg(uint32(arg.Offset+16 /* to skip caller_rbp and ret_addr */), rbpVReg))
+			load := m.allocateInstr()
+			switch arg.Type {
+			case ssa.TypeI32:
+				load.asMovzxRmR(extModeLQ, mem, v)
+			case ssa.TypeI64:
+				load.asMov64MR(mem, v)
+			case ssa.TypeF32:
+				load.asXmmUnaryRmR(sseOpcodeMovss, mem, v)
+			case ssa.TypeF64:
+				load.asXmmUnaryRmR(sseOpcodeMovsd, mem, v)
+			case ssa.TypeV128:
+				load.asXmmUnaryRmR(sseOpcodeMovdqu, mem, v)
+			default:
+				panic("BUG")
+			}
+			cur = linkInstr(cur, load)
 		}
 
 		store := m.allocateInstr()
@@ -163,43 +185,87 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 	// Ready to exit the execution.
 	cur = m.storeReturnAddressAndExit(cur, execCtrPtr)
 
-	// After the call, we need to restore the callee saved registers.
-	cur = m.restoreRegistersInExecutionContext(cur, execCtrPtr, calleeSavedVRegs)
-
 	// We don't need the slice size anymore, so pop it.
 	cur = m.addRSP(8, cur)
 
 	// Ready to set up the results.
 	offsetInGoSlice = 0
+	// To avoid overwriting with the execution context pointer by the result, we need to track the offset,
+	// and defer the restoration of the result to the end of this function.
+	var argOverlapWithExecCtxOffset int32 = -1
 	for i := range abi.Rets {
 		r := &abi.Rets[i]
-		if r.Kind == backend.ABIArgKindReg {
-			v := r.Reg
-			load := m.allocateInstr()
-			mem := newOperandMem(newAmodeImmReg(uint32(offsetInGoSlice), rspVReg))
+		var v regalloc.VReg
+		isRegResult := r.Kind == backend.ABIArgKindReg
+		if isRegResult {
+			v = r.Reg
+			if v.RealReg() == execCtrPtr.RealReg() {
+				argOverlapWithExecCtxOffset = offsetInGoSlice
+				offsetInGoSlice += 8 // always uint64 rep.
+				continue
+			}
+		} else {
+			if r.Type.IsInt() {
+				v = r15VReg
+			} else {
+				v = xmm15VReg
+			}
+		}
+
+		load := m.allocateInstr()
+		mem := newOperandMem(newAmodeImmReg(uint32(offsetInGoSlice), rspVReg))
+		switch r.Type {
+		case ssa.TypeI32:
+			load.asMovzxRmR(extModeLQ, mem, v)
+			offsetInGoSlice += 8 // always uint64 rep.
+		case ssa.TypeI64:
+			load.asMov64MR(mem, v)
+			offsetInGoSlice += 8
+		case ssa.TypeF32:
+			load.asXmmUnaryRmR(sseOpcodeMovss, mem, v)
+			offsetInGoSlice += 8 // always uint64 rep.
+		case ssa.TypeF64:
+			load.asXmmUnaryRmR(sseOpcodeMovsd, mem, v)
+			offsetInGoSlice += 8
+		case ssa.TypeV128:
+			load.asXmmUnaryRmR(sseOpcodeMovdqu, mem, v)
+			offsetInGoSlice += 16
+		default:
+			panic("BUG")
+		}
+		cur = linkInstr(cur, load)
+
+		if !isRegResult {
+			// We need to store it back to the result slot above rbp.
+			store := m.allocateInstr()
+			mem := newOperandMem(newAmodeImmReg(uint32(abi.ArgStackSize+r.Offset+16 /* to skip caller_rbp and ret_addr */), rbpVReg))
 			switch r.Type {
 			case ssa.TypeI32:
-				load.asMovzxRmR(extModeLQ, mem, v)
-				offsetInGoSlice += 8 // always uint64 rep.
+				store.asMovRM(v, mem, 4)
 			case ssa.TypeI64:
-				load.asMov64MR(mem, v)
-				offsetInGoSlice += 8
+				store.asMovRM(v, mem, 8)
 			case ssa.TypeF32:
-				load.asXmmUnaryRmR(sseOpcodeMovss, mem, v)
-				offsetInGoSlice += 8 // always uint64 rep.
+				store.asXmmMovRM(sseOpcodeMovss, v, mem)
 			case ssa.TypeF64:
-				load.asXmmUnaryRmR(sseOpcodeMovsd, mem, v)
-				offsetInGoSlice += 8
+				store.asXmmMovRM(sseOpcodeMovsd, v, mem)
 			case ssa.TypeV128:
-				load.asXmmUnaryRmR(sseOpcodeMovdqu, mem, v)
-				offsetInGoSlice += 16
+				store.asXmmMovRM(sseOpcodeMovdqu, v, mem)
 			default:
 				panic("BUG")
 			}
-			cur = linkInstr(cur, load)
-		} else {
-			panic("TODO: stack results")
+			cur = linkInstr(cur, store)
 		}
+	}
+
+	// Before return, we need to restore the callee saved registers.
+	cur = m.restoreRegistersInExecutionContext(cur, execCtrPtr, calleeSavedVRegs)
+
+	if argOverlapWithExecCtxOffset >= 0 {
+		// At this point execCtt is not used anymore, so we can finally store the
+		// result to the register which overlaps with the execution context pointer.
+		mem := newOperandMem(newAmodeImmReg(uint32(argOverlapWithExecCtxOffset), rspVReg))
+		load := m.allocateInstr().asMov64MR(mem, execCtrPtr)
+		cur = linkInstr(cur, load)
 	}
 
 	// Finally ready to return.

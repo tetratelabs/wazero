@@ -53,7 +53,8 @@ type (
 	}
 
 	labelResolutionPend struct {
-		instr *instruction
+		instr       *instruction
+		instrOffset int64
 		// imm32Offset is the offset of the last 4 bytes of the instruction.
 		imm32Offset int64
 	}
@@ -135,13 +136,58 @@ func (m *machine) LowerSingleBranch(b *ssa.Instruction) {
 		}
 		m.insert(jmp)
 	case ssa.OpcodeBrTable:
-		panic("TODO: implement me")
+		index, target := b.BrTableData()
+		m.lowerBrTable(index, target)
 	default:
 		panic("BUG: unexpected branch opcode" + b.Opcode().String())
 	}
 }
 
 var condBranchMatches = [...]ssa.Opcode{ssa.OpcodeIcmp, ssa.OpcodeFcmp}
+
+func (m *machine) lowerBrTable(index ssa.Value, targets []ssa.BasicBlock) {
+	_v := m.getOperand_Reg(m.c.ValueDefinition(index))
+	v := m.copyToTmp(_v.r)
+
+	// First, we need to do the bounds check.
+	maxIndex := m.c.AllocateVReg(ssa.TypeI32)
+	m.lowerIconst(maxIndex, uint64(len(targets)-1), false)
+	cmp := m.allocateInstr().asCmpRmiR(true, newOperandReg(maxIndex), v, false)
+	m.insert(cmp)
+
+	// Then do the conditional move maxIndex to v if v > maxIndex.
+	cmov := m.allocateInstr().asCmove(condNB, newOperandReg(maxIndex), v, false)
+	m.insert(cmov)
+
+	// Now that v has the correct index. Load the address of the jump table into the addr.
+	addr := m.c.AllocateVReg(ssa.TypeI64)
+	leaJmpTableAddr := m.allocateInstr()
+	m.insert(leaJmpTableAddr)
+
+	// Then add the target's offset into jmpTableAddr.
+	loadTargetOffsetFromJmpTable := m.allocateInstr().asAluRmiR(aluRmiROpcodeAdd,
+		// Shift by 3 because each entry is 8 bytes.
+		newOperandMem(newAmodeRegRegShift(0, addr, v, 3)), addr, true)
+	m.insert(loadTargetOffsetFromJmpTable)
+
+	// Now ready to jump.
+	jmp := m.allocateInstr().asJmp(newOperandReg(addr))
+	m.insert(jmp)
+
+	jmpTableBegin, jmpTableBeginLabel := m.allocateBrTarget()
+	m.insert(jmpTableBegin)
+	leaJmpTableAddr.asLEA(newAmodeRipRelative(jmpTableBeginLabel), addr)
+
+	jmpTable := m.allocateInstr()
+	// TODO: reuse the slice!
+	labels := make([]uint32, len(targets))
+	for j, target := range targets {
+		labels[j] = uint32(m.ectx.GetOrAllocateSSABlockLabel(target))
+	}
+
+	jmpTable.asJmpTableSequence(labels)
+	m.insert(jmpTable)
+}
 
 // LowerConditionalBranch implements backend.Machine.
 func (m *machine) LowerConditionalBranch(b *ssa.Instruction) {
@@ -176,7 +222,35 @@ func (m *machine) LowerConditionalBranch(b *ssa.Instruction) {
 		m.insert(m.allocateInstr().asJmpIf(cc, newOperandLabel(target)))
 		cvalDef.Instr.MarkLowered()
 	case ssa.OpcodeFcmp:
-		panic("TODO")
+		cvalInstr := cvalDef.Instr
+
+		f1, f2, and := m.lowerFcmpToFlags(cvalInstr)
+		isBrz := b.Opcode() == ssa.OpcodeBrz
+		if isBrz {
+			f1 = f1.invert()
+		}
+		if f2 == condInvalid {
+			m.insert(m.allocateInstr().asJmpIf(f1, newOperandLabel(target)))
+		} else {
+			if isBrz {
+				f2 = f2.invert()
+				and = !and
+			}
+			jmp1, jmp2 := m.allocateInstr(), m.allocateInstr()
+			m.insert(jmp1)
+			m.insert(jmp2)
+			notTaken, notTakenLabel := m.allocateBrTarget()
+			m.insert(notTaken)
+			if and {
+				jmp1.asJmpIf(f1.invert(), newOperandLabel(notTakenLabel))
+				jmp2.asJmpIf(f2, newOperandLabel(target))
+			} else {
+				jmp1.asJmpIf(f1, newOperandLabel(target))
+				jmp2.asJmpIf(f2, newOperandLabel(target))
+			}
+		}
+
+		cvalDef.Instr.MarkLowered()
 	default:
 		v := m.getOperand_Reg(cvalDef)
 
@@ -196,6 +270,11 @@ func (m *machine) LowerConditionalBranch(b *ssa.Instruction) {
 
 // LowerInstr implements backend.Machine.
 func (m *machine) LowerInstr(instr *ssa.Instruction) {
+	if l := instr.SourceOffset(); l.Valid() {
+		info := m.allocateInstr().asEmitSourceOffsetInfo(l)
+		m.insert(info)
+	}
+
 	switch op := instr.Opcode(); op {
 	case ssa.OpcodeBrz, ssa.OpcodeBrnz, ssa.OpcodeJump, ssa.OpcodeBrTable:
 		panic("BUG: branching instructions are handled by LowerBranches")
@@ -212,6 +291,10 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		m.lowerAluRmiROp(instr, aluRmiROpcodeSub)
 	case ssa.OpcodeImul:
 		m.lowerAluRmiROp(instr, aluRmiROpcodeMul)
+	case ssa.OpcodeSdiv, ssa.OpcodeUdiv, ssa.OpcodeSrem, ssa.OpcodeUrem:
+		isDiv := op == ssa.OpcodeSdiv || op == ssa.OpcodeUdiv
+		isSigned := op == ssa.OpcodeSdiv || op == ssa.OpcodeSrem
+		m.lowerIDivRem(instr, isDiv, isSigned)
 	case ssa.OpcodeBand:
 		m.lowerAluRmiROp(instr, aluRmiROpcodeAnd)
 	case ssa.OpcodeBor:
@@ -234,6 +317,26 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		m.lowerCtz(instr)
 	case ssa.OpcodePopcnt:
 		m.lowerUnaryRmR(instr, unaryRmROpcodePopcnt)
+	case ssa.OpcodeFadd, ssa.OpcodeFsub, ssa.OpcodeFmul, ssa.OpcodeFdiv:
+		m.lowerXmmRmR(instr)
+	case ssa.OpcodeFabs:
+		m.lowerFabsFneg(instr)
+	case ssa.OpcodeFneg:
+		m.lowerFabsFneg(instr)
+	case ssa.OpcodeCeil:
+		m.lowerRound(instr, roundingModeUp)
+	case ssa.OpcodeFloor:
+		m.lowerRound(instr, roundingModeDown)
+	case ssa.OpcodeTrunc:
+		m.lowerRound(instr, roundingModeZero)
+	case ssa.OpcodeNearest:
+		m.lowerRound(instr, roundingModeNearest)
+	case ssa.OpcodeFmin, ssa.OpcodeFmax:
+		m.lowerFminFmax(instr)
+	case ssa.OpcodeFcopysign:
+		m.lowerFcopysign(instr)
+	case ssa.OpcodeSqrt:
+		m.lowerSqrt(instr)
 	case ssa.OpcodeUndefined:
 		m.insert(m.allocateInstr().asUD2())
 	case ssa.OpcodeExitWithCode:
@@ -257,8 +360,139 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 	case ssa.OpcodeSExtend, ssa.OpcodeUExtend:
 		from, to, signed := instr.ExtendData()
 		m.lowerExtend(instr.Arg(), instr.Return(), from, to, signed)
+	case ssa.OpcodeIcmp:
+		m.lowerIcmp(instr)
+	case ssa.OpcodeFcmp:
+		m.lowerFcmp(instr)
+	case ssa.OpcodeSelect:
+		cval, x, y := instr.SelectData()
+		m.lowerSelect(x, y, cval, instr.Return())
+	case ssa.OpcodeIreduce:
+		rn := m.getOperand_Mem_Reg(m.c.ValueDefinition(instr.Arg()))
+		retVal := instr.Return()
+		rd := m.c.VRegOf(retVal)
+
+		if retVal.Type() != ssa.TypeI32 {
+			panic("TODO?: Ireduce to non-i32")
+		}
+		m.insert(m.allocateInstr().asMovzxRmR(extModeLQ, rn, rd))
+
 	default:
 		panic("TODO: lowering " + op.String())
+	}
+}
+
+func (m *machine) lowerFcmp(instr *ssa.Instruction) {
+	f1, f2, and := m.lowerFcmpToFlags(instr)
+	rd := m.c.VRegOf(instr.Return())
+	if f2 == condInvalid {
+		tmp := m.c.AllocateVReg(ssa.TypeI32)
+		m.insert(m.allocateInstr().asSetcc(f1, tmp))
+		// On amd64, setcc only sets the first byte of the register, so we need to zero extend it to match
+		// the semantics of Icmp that sets either 0 or 1.
+		m.insert(m.allocateInstr().asMovzxRmR(extModeBQ, newOperandReg(tmp), rd))
+	} else {
+		tmp1, tmp2 := m.c.AllocateVReg(ssa.TypeI32), m.c.AllocateVReg(ssa.TypeI32)
+		m.insert(m.allocateInstr().asSetcc(f1, tmp1))
+		m.insert(m.allocateInstr().asSetcc(f2, tmp2))
+		var op aluRmiROpcode
+		if and {
+			op = aluRmiROpcodeAnd
+		} else {
+			op = aluRmiROpcodeOr
+		}
+		m.insert(m.allocateInstr().asAluRmiR(op, newOperandReg(tmp1), tmp2, false))
+		m.insert(m.allocateInstr().asMovzxRmR(extModeBQ, newOperandReg(tmp2), rd))
+	}
+}
+
+func (m *machine) lowerIcmp(instr *ssa.Instruction) {
+	x, y, c := instr.IcmpData()
+	m.lowerIcmpToFlag(m.c.ValueDefinition(x), m.c.ValueDefinition(y), x.Type() == ssa.TypeI64)
+	rd := m.c.VRegOf(instr.Return())
+	tmp := m.c.AllocateVReg(ssa.TypeI32)
+	m.insert(m.allocateInstr().asSetcc(condFromSSAIntCmpCond(c), tmp))
+	// On amd64, setcc only sets the first byte of the register, so we need to zero extend it to match
+	// the semantics of Icmp that sets either 0 or 1.
+	m.insert(m.allocateInstr().asMovzxRmR(extModeBQ, newOperandReg(tmp), rd))
+}
+
+func (m *machine) lowerSelect(x, y, cval, ret ssa.Value) {
+	xo, yo := m.getOperand_Mem_Reg(m.c.ValueDefinition(x)), m.getOperand_Reg(m.c.ValueDefinition(y))
+	rd := m.c.VRegOf(ret)
+
+	var cond cond
+	cvalDef := m.c.ValueDefinition(cval)
+	switch m.c.MatchInstrOneOf(cvalDef, condBranchMatches[:]) {
+	case ssa.OpcodeIcmp:
+		icmp := cvalDef.Instr
+		xc, yc, cc := icmp.IcmpData()
+		m.lowerIcmpToFlag(m.c.ValueDefinition(xc), m.c.ValueDefinition(yc), xc.Type() == ssa.TypeI64)
+		cond = condFromSSAIntCmpCond(cc)
+		icmp.Lowered()
+	default: // TODO: match ssa.OpcodeFcmp for optimization, but seems a bit complex.
+		cv := m.getOperand_Reg(cvalDef).r
+		test := m.allocateInstr().asCmpRmiR(false, newOperandReg(cv), cv, false)
+		m.insert(test)
+		cond = condNZ
+	}
+
+	if typ := x.Type(); typ.IsInt() {
+		_64 := typ.Bits() == 64
+		mov := m.allocateInstr()
+		tmp := m.c.AllocateVReg(typ)
+		switch yo.kind {
+		case operandKindReg:
+			mov.asMovRR(yo.r, tmp, _64)
+		case operandKindMem:
+			if _64 {
+				mov.asMov64MR(yo, tmp)
+			} else {
+				mov.asMovzxRmR(extModeLQ, yo, tmp)
+			}
+		default:
+			panic("BUG")
+		}
+		m.insert(mov)
+		cmov := m.allocateInstr().asCmove(cond, xo, tmp, _64)
+		m.insert(cmov)
+		m.insert(m.allocateInstr().asMovRR(tmp, rd, _64))
+	} else {
+		mov := m.allocateInstr()
+		tmp := m.c.AllocateVReg(typ)
+		switch typ {
+		case ssa.TypeF32:
+			mov.asXmmUnaryRmR(sseOpcodeMovss, yo, tmp)
+		case ssa.TypeF64:
+			mov.asXmmUnaryRmR(sseOpcodeMovsd, yo, tmp)
+		case ssa.TypeV128:
+			mov.asXmmUnaryRmR(sseOpcodeMovdqu, yo, tmp)
+		default:
+			panic("BUG")
+		}
+		m.insert(mov)
+
+		jcc := m.allocateInstr()
+		m.insert(jcc)
+
+		cmov := m.allocateInstr()
+		m.insert(cmov)
+		switch typ {
+		case ssa.TypeF32:
+			cmov.asXmmUnaryRmR(sseOpcodeMovss, xo, tmp)
+		case ssa.TypeF64:
+			cmov.asXmmUnaryRmR(sseOpcodeMovsd, xo, tmp)
+		case ssa.TypeV128:
+			cmov.asXmmUnaryRmR(sseOpcodeMovdqu, xo, tmp)
+		default:
+			panic("BUG")
+		}
+
+		nop, end := m.allocateBrTarget()
+		m.insert(nop)
+
+		jcc.asJmpIf(cond.invert(), newOperandLabel(end))
+		m.insert(m.allocateInstr().asXmmUnaryRmR(sseOpcodeMovdqu, newOperandReg(tmp), rd))
 	}
 }
 
@@ -448,7 +682,7 @@ func (m *machine) lowerUnaryRmR(si *ssa.Instruction, op unaryRmROpcode) {
 	_64 := x.Type().Bits() == 64
 
 	xDef := m.c.ValueDefinition(x)
-	rm := m.getOperand_Imm32_Reg(xDef)
+	rm := m.getOperand_Mem_Reg(xDef)
 	rd := m.c.VRegOf(si.Return())
 
 	instr := m.allocateInstr()
@@ -636,6 +870,116 @@ func (m *machine) lowerShiftR(si *ssa.Instruction, op shiftROp) {
 	m.copyTo(tmpDst, rd)
 }
 
+func (m *machine) lowerXmmRmR(instr *ssa.Instruction) {
+	x, y := instr.Arg2()
+	if !x.Type().IsFloat() {
+		panic("BUG?")
+	}
+	_64 := x.Type().Bits() == 64
+
+	var op sseOpcode
+	if _64 {
+		switch instr.Opcode() {
+		case ssa.OpcodeFadd:
+			op = sseOpcodeAddsd
+		case ssa.OpcodeFsub:
+			op = sseOpcodeSubsd
+		case ssa.OpcodeFmul:
+			op = sseOpcodeMulsd
+		case ssa.OpcodeFdiv:
+			op = sseOpcodeDivsd
+		default:
+			panic("BUG")
+		}
+	} else {
+		switch instr.Opcode() {
+		case ssa.OpcodeFadd:
+			op = sseOpcodeAddss
+		case ssa.OpcodeFsub:
+			op = sseOpcodeSubss
+		case ssa.OpcodeFmul:
+			op = sseOpcodeMulss
+		case ssa.OpcodeFdiv:
+			op = sseOpcodeDivss
+		default:
+			panic("BUG")
+		}
+	}
+
+	xDef, yDef := m.c.ValueDefinition(x), m.c.ValueDefinition(y)
+	rn := m.getOperand_Mem_Reg(yDef)
+	rm := m.getOperand_Reg(xDef)
+	rd := m.c.VRegOf(instr.Return())
+
+	// rm is being overwritten, so we first copy its value to a temp register,
+	// in case it is referenced again later.
+	tmp := m.copyToTmp(rm.r)
+
+	xmm := m.allocateInstr().asXmmRmR(op, rn, tmp)
+	m.insert(xmm)
+
+	m.copyTo(tmp, rd)
+}
+
+func (m *machine) lowerSqrt(instr *ssa.Instruction) {
+	x := instr.Arg()
+	if !x.Type().IsFloat() {
+		panic("BUG")
+	}
+	_64 := x.Type().Bits() == 64
+	var op sseOpcode
+	if _64 {
+		op = sseOpcodeSqrtsd
+	} else {
+		op = sseOpcodeSqrtss
+	}
+
+	xDef := m.c.ValueDefinition(x)
+	rm := m.getOperand_Mem_Reg(xDef)
+	rd := m.c.VRegOf(instr.Return())
+
+	xmm := m.allocateInstr().asXmmUnaryRmR(op, rm, rd)
+	m.insert(xmm)
+}
+
+func (m *machine) lowerFabsFneg(instr *ssa.Instruction) {
+	x := instr.Arg()
+	if !x.Type().IsFloat() {
+		panic("BUG")
+	}
+	_64 := x.Type().Bits() == 64
+	var op sseOpcode
+	var mask uint64
+	if _64 {
+		switch instr.Opcode() {
+		case ssa.OpcodeFabs:
+			mask, op = 0x7fffffffffffffff, sseOpcodeAndpd
+		case ssa.OpcodeFneg:
+			mask, op = 0x8000000000000000, sseOpcodeXorpd
+		}
+	} else {
+		switch instr.Opcode() {
+		case ssa.OpcodeFabs:
+			mask, op = 0x7fffffff, sseOpcodeAndps
+		case ssa.OpcodeFneg:
+			mask, op = 0x80000000, sseOpcodeXorps
+		}
+	}
+
+	tmp := m.c.AllocateVReg(x.Type())
+
+	xDef := m.c.ValueDefinition(x)
+	rm := m.getOperand_Reg(xDef)
+	rd := m.c.VRegOf(instr.Return())
+
+	m.lowerFconst(tmp, mask, _64)
+
+	xmm := m.allocateInstr().asXmmRmR(op, rm, tmp)
+	m.insert(xmm)
+
+	m.copyTo(tmp, rd)
+}
+
 func (m *machine) lowerStore(si *ssa.Instruction) {
 	value, ptr, offset, storeSizeInBits := si.StoreData()
 	rm := m.getOperand_Reg(m.c.ValueDefinition(value))
@@ -677,6 +1021,9 @@ func (m *machine) lowerCall(si *ssa.Instruction) {
 		m.maxRequiredStackSizeForCalls = stackSlotSize + 16 // 16 == return address + RBP.
 	}
 
+	// Note: See machine.SetupPrologue for the stack layout.
+	// The stack pointer decrease/increase will be inserted later in the compilation.
+
 	for i, arg := range args {
 		reg := m.c.VRegOf(arg)
 		def := m.c.ValueDefinition(arg)
@@ -707,7 +1054,7 @@ func (m *machine) lowerCall(si *ssa.Instruction) {
 
 // callerGenVRegToFunctionArg is the opposite of GenFunctionArgToVReg, which is used to generate the
 // caller side of the function call.
-func (m *machine) callerGenVRegToFunctionArg(a *backend.FunctionABI, argIndex int, reg regalloc.VReg, def *backend.SSAValueDefinition, slotBegin int64) {
+func (m *machine) callerGenVRegToFunctionArg(a *backend.FunctionABI, argIndex int, reg regalloc.VReg, def *backend.SSAValueDefinition, stackSlotSize int64) {
 	arg := &a.Args[argIndex]
 	if def != nil && def.IsFromInstr() {
 		// Constant instructions are inlined.
@@ -718,16 +1065,52 @@ func (m *machine) callerGenVRegToFunctionArg(a *backend.FunctionABI, argIndex in
 	if arg.Kind == backend.ABIArgKindReg {
 		m.InsertMove(arg.Reg, reg, arg.Type)
 	} else {
-		panic("TODO")
+		store := m.allocateInstr()
+		mem := newOperandMem(newAmodeImmReg(
+			// -stackSlotSize because the stack pointer is not yet decreased.
+			uint32(arg.Offset-stackSlotSize), rspVReg))
+		switch arg.Type {
+		case ssa.TypeI32:
+			store.asMovRM(reg, mem, 4)
+		case ssa.TypeI64:
+			store.asMovRM(reg, mem, 8)
+		case ssa.TypeF32:
+			store.asXmmMovRM(sseOpcodeMovss, reg, mem)
+		case ssa.TypeF64:
+			store.asXmmMovRM(sseOpcodeMovsd, reg, mem)
+		case ssa.TypeV128:
+			store.asXmmMovRM(sseOpcodeMovdqu, reg, mem)
+		default:
+			panic("BUG")
+		}
+		m.insert(store)
 	}
 }
 
-func (m *machine) callerGenFunctionReturnVReg(a *backend.FunctionABI, retIndex int, reg regalloc.VReg, slotBegin int64) {
+func (m *machine) callerGenFunctionReturnVReg(a *backend.FunctionABI, retIndex int, reg regalloc.VReg, stackSlotSize int64) {
 	r := &a.Rets[retIndex]
 	if r.Kind == backend.ABIArgKindReg {
 		m.InsertMove(reg, r.Reg, r.Type)
 	} else {
-		panic("TODO")
+		load := m.allocateInstr()
+		mem := newOperandMem(newAmodeImmReg(
+			// -stackSlotSize because the stack pointer is not yet decreased.
+			uint32(a.ArgStackSize+r.Offset-stackSlotSize), rspVReg))
+		switch r.Type {
+		case ssa.TypeI32:
+			load.asMovzxRmR(extModeLQ, mem, reg)
+		case ssa.TypeI64:
+			load.asMov64MR(mem, reg)
+		case ssa.TypeF32:
+			load.asXmmUnaryRmR(sseOpcodeMovss, mem, reg)
+		case ssa.TypeF64:
+			load.asXmmUnaryRmR(sseOpcodeMovsd, mem, reg)
+		case ssa.TypeV128:
+			load.asXmmUnaryRmR(sseOpcodeMovdqu, mem, reg)
+		default:
+			panic("BUG")
+		}
+		m.insert(load)
 	}
 }
 
@@ -834,22 +1217,27 @@ func (m *machine) Encode(context.Context) {
 		pos.BinaryOffset = offset
 		for cur := pos.Begin; cur != pos.End.next; cur = cur.next {
 			offset := int64(len(*bufPtr))
-			if cur.kind == nop0 {
+
+			switch cur.kind {
+			case nop0:
 				l := cur.nop0Label()
 				if pos, ok := ectx.LabelPositions[l]; ok {
 					pos.BinaryOffset = offset
 				}
+			case sourceOffsetInfo:
+				m.c.AddSourceOffsetInfo(offset, cur.sourceOffsetInfo())
 			}
 
 			needLabelResolution := cur.encode(m.c)
 			if needLabelResolution {
 				m.labelResolutionPends = append(m.labelResolutionPends,
-					labelResolutionPend{instr: cur, imm32Offset: int64(len(*bufPtr)) - 4},
+					labelResolutionPend{instr: cur, instrOffset: offset, imm32Offset: int64(len(*bufPtr)) - 4},
 				)
 			}
 		}
 	}
 
+	buf := *bufPtr
 	for i := range m.labelResolutionPends {
 		p := &m.labelResolutionPends[i]
 		switch p.instr.kind {
@@ -858,7 +1246,15 @@ func (m *machine) Encode(context.Context) {
 			targetOffset := ectx.LabelPositions[target].BinaryOffset
 			imm32Offset := p.imm32Offset
 			jmpOffset := int32(targetOffset - (p.imm32Offset + 4)) // +4 because RIP points to the next instruction.
-			binary.LittleEndian.PutUint32((*bufPtr)[imm32Offset:], uint32(jmpOffset))
+			binary.LittleEndian.PutUint32(buf[imm32Offset:], uint32(jmpOffset))
+		case jmpTableIsland:
+			tableBegin := p.instrOffset
+			// Each entry is the offset from the beginning of the jmpTableIsland instruction in 8 bytes.
+			for i, l := range p.instr.targets {
+				targetOffset := ectx.LabelPositions[backend.Label(l)].BinaryOffset
+				jmpOffset := targetOffset - tableBegin
+				binary.LittleEndian.PutUint64(buf[tableBegin+int64(i)*8:], uint64(jmpOffset))
+			}
 		default:
 			panic("BUG")
 		}
@@ -885,6 +1281,40 @@ func (m *machine) lowerIcmpToFlag(xd, yd *backend.SSAValueDefinition, _64 bool) 
 	y := m.getOperand_Mem_Imm32_Reg(yd)
 	cmp := m.allocateInstr().asCmpRmiR(true, y, x.r, _64)
 	m.insert(cmp)
+}
+
+func (m *machine) lowerFcmpToFlags(instr *ssa.Instruction) (f1, f2 cond, and bool) {
+	x, y, c := instr.FcmpData()
+	switch c {
+	case ssa.FloatCmpCondEqual:
+		f1, f2 = condNP, condZ
+		and = true
+	case ssa.FloatCmpCondNotEqual:
+		f1, f2 = condP, condNZ
+	case ssa.FloatCmpCondLessThan:
+		f1 = condFromSSAFloatCmpCond(ssa.FloatCmpCondGreaterThan)
+		f2 = condInvalid
+		x, y = y, x
+	case ssa.FloatCmpCondLessThanOrEqual:
+		f1 = condFromSSAFloatCmpCond(ssa.FloatCmpCondGreaterThanOrEqual)
+		f2 = condInvalid
+		x, y = y, x
+	default:
+		f1 = condFromSSAFloatCmpCond(c)
+		f2 = condInvalid
+	}
+
+	var opc sseOpcode
+	if x.Type() == ssa.TypeF32 {
+		opc = sseOpcodeUcomiss
+	} else {
+		opc = sseOpcodeUcomisd
+	}
+
+	xr := m.getOperand_Reg(m.c.ValueDefinition(x))
+	yr := m.getOperand_Mem_Reg(m.c.ValueDefinition(y))
+	m.insert(m.allocateInstr().asXmmCmpRmR(opc, yr, xr.r))
+	return
 }
 
 // allocateInstr allocates an instruction.
@@ -963,4 +1393,305 @@ func (m *machine) frameSize() int64 {
 
 func (m *machine) clobberedRegSlotSize() int64 {
 	return int64(len(m.clobberedRegs) * 16)
+}
+
+func (m *machine) lowerIDivRem(si *ssa.Instruction, isDiv bool, signed bool) {
+	x, y, execCtx := si.Arg3()
+	if !x.Type().IsInt() {
+		panic("BUG?")
+	}
+	_64 := x.Type().Bits() == 64
+
+	xDef, yDef := m.c.ValueDefinition(x), m.c.ValueDefinition(y)
+	xr := m.getOperand_Reg(xDef)
+	yr := m.getOperand_Reg(yDef)
+	ctxVReg := m.c.VRegOf(execCtx)
+	rd := m.c.VRegOf(si.Return())
+
+	// Ensure yr is not zero.
+	test := m.allocateInstr()
+	test.asCmpRmiR(false, yr, yr.r, _64)
+	m.insert(test)
+
+	// We need to copy the execution context to a temp register *BEFORE BRANCHING*, because if it's spilled,
+	// it might end up being reloaded inside the exiting branch.
+	execCtxTmp := m.copyToTmp(ctxVReg)
+
+	jnz := m.allocateInstr()
+	m.insert(jnz)
+
+	nz := m.lowerExitWithCode(execCtxTmp, wazevoapi.ExitCodeIntegerDivisionByZero)
+
+	// If not zero, we can proceed with the division.
+	jnz.asJmpIf(condNZ, newOperandLabel(nz))
+
+	m.copyTo(xr.r, raxVReg)
+
+	var ifRemNeg1 *instruction
+	if signed {
+		var neg1 uint64
+		if _64 {
+			neg1 = 0xffffffffffffffff
+		} else {
+			neg1 = 0xffffffff
+		}
+		tmp1 := m.c.AllocateVReg(si.Return().Type())
+		m.lowerIconst(tmp1, neg1, _64)
+
+		if isDiv {
+			// For signed division, we have to have branches for "math.MinInt{32,64} / -1"
+			// case which results in the floating point exception via division error as
+			// the resulting value exceeds the maximum of signed int.
+
+			// First, we check if the divisor is -1.
+			cmp := m.allocateInstr()
+			cmp.asCmpRmiR(true, newOperandReg(tmp1), yr.r, _64)
+			m.insert(cmp)
+
+			// Again, we need to copy the execution context to a temp register *BEFORE BRANCHING*, because if it's spilled,
+			// it might end up being reloaded inside the exiting branch.
+			execCtxTmp2 := m.copyToTmp(execCtxTmp)
+			ifNotNeg1 := m.allocateInstr()
+			m.insert(ifNotNeg1)
+
+			var minInt uint64
+			if _64 {
+				minInt = 0x8000000000000000
+			} else {
+				minInt = 0x80000000
+			}
+			tmp := m.c.AllocateVReg(si.Return().Type())
+			m.lowerIconst(tmp, minInt, _64)
+
+			// Next we check if the quotient is the most negative value for the signed integer, i.e.
+			// if we are trying to do (math.MinInt32 / -1) or (math.MinInt64 / -1) respectively.
+			cmp2 := m.allocateInstr()
+			cmp2.asCmpRmiR(true, newOperandReg(tmp), xr.r, _64)
+			m.insert(cmp2)
+
+			ifNotMinInt := m.allocateInstr()
+			m.insert(ifNotMinInt)
+
+			// Trap if we are trying to do (math.MinInt32 / -1) or (math.MinInt64 / -1),
+			// as that is the overflow in division as the result becomes 2^31 which is larger than
+			// the maximum of signed 32-bit int (2^31-1).
+			end := m.lowerExitWithCode(execCtxTmp2, wazevoapi.ExitCodeIntegerOverflow)
+			ifNotNeg1.asJmpIf(condNZ, newOperandLabel(end))
+			ifNotMinInt.asJmpIf(condNZ, newOperandLabel(end))
+		} else {
+			// If it is remainder, zeros DX register and compare the divisor to -1.
+			xor := m.allocateInstr().asZeros(rdxVReg)
+			m.insert(xor)
+
+			// We check if the divisor is -1.
+			cmp := m.allocateInstr()
+			cmp.asCmpRmiR(true, newOperandReg(tmp1), yr.r, _64)
+			m.insert(cmp)
+
+			ifRemNeg1 = m.allocateInstr()
+			m.insert(ifRemNeg1)
+		}
+
+		// Sign-extend DX register to have 2*x.Type().Bits() dividend over DX and AX registers.
+		sed := m.allocateInstr()
+		sed.asSignExtendData(_64)
+		m.insert(sed)
+	} else {
+		// Zeros DX register to have 2*x.Type().Bits() dividend over DX and AX registers.
+		zeros := m.allocateInstr().asZeros(rdxVReg)
+		m.insert(zeros)
+	}
+
+	div := m.allocateInstr()
+	div.asDiv(yr, signed, _64)
+	m.insert(div)
+
+	nop, end := m.allocateBrTarget()
+	m.insert(nop)
+	// If we are compiling a Rem instruction, when the divisor is -1 we land at the end of the function.
+	if ifRemNeg1 != nil {
+		ifRemNeg1.asJmpIf(condZ, newOperandLabel(end))
+	}
+
+	if isDiv {
+		m.copyTo(raxVReg, rd)
+	} else {
+		m.copyTo(rdxVReg, rd)
+	}
+}
+
+func (m *machine) lowerRound(instr *ssa.Instruction, imm roundingMode) {
+	x := instr.Arg()
+	if !x.Type().IsFloat() {
+		panic("BUG?")
+	}
+	var op sseOpcode
+	if x.Type().Bits() == 64 {
+		op = sseOpcodeRoundsd
+	} else {
+		op = sseOpcodeRoundss
+	}
+
+	xDef := m.c.ValueDefinition(x)
+	rm := m.getOperand_Mem_Reg(xDef)
+	rd := m.c.VRegOf(instr.Return())
+
+	xmm := m.allocateInstr().asXmmUnaryRmRImm(op, uint8(imm), rm, rd)
+	m.insert(xmm)
+}
+
+func (m *machine) lowerFminFmax(instr *ssa.Instruction) {
+	x, y := instr.Arg2()
+	if !x.Type().IsFloat() {
+		panic("BUG?")
+	}
+
+	_64 := x.Type().Bits() == 64
+	isMin := instr.Opcode() == ssa.OpcodeFmin
+	var minMaxOp sseOpcode
+
+	switch {
+	case _64 && isMin:
+		minMaxOp = sseOpcodeMinpd
+	case _64 && !isMin:
+		minMaxOp = sseOpcodeMaxpd
+	case !_64 && isMin:
+		minMaxOp = sseOpcodeMinps
+	case !_64 && !isMin:
+		minMaxOp = sseOpcodeMaxps
+	}
+
+	xDef, yDef := m.c.ValueDefinition(x), m.c.ValueDefinition(y)
+	rm := m.getOperand_Reg(xDef)
+	rn := m.getOperand_Mem_Reg(yDef)
+	rd := m.c.VRegOf(instr.Return())
+
+	tmp := m.copyToTmp(rm.r)
+
+	// Check if this is (either x1 or x2 is NaN) or (x1 equals x2) case.
+	cmp := m.allocateInstr()
+	if _64 {
+		cmp.asXmmCmpRmR(sseOpcodeUcomisd, rn, tmp)
+	} else {
+		cmp.asXmmCmpRmR(sseOpcodeUcomiss, rn, tmp)
+	}
+	m.insert(cmp)
+
+	// At this point, we have the three cases of conditional flags below
+	// (See https://www.felixcloutier.com/x86/ucomiss#operation for detail.)
+	//
+	// 1) Two values are NaN-free and different: All flags are cleared.
+	// 2) Two values are NaN-free and equal: Only ZF flags is set.
+	// 3) One of Two values is NaN: ZF, PF and CF flags are set.
+
+	// Jump instruction to handle 1) case by checking the ZF flag
+	// as ZF is only set for 2) and 3) cases.
+	nanFreeOrDiffJump := m.allocateInstr()
+	m.insert(nanFreeOrDiffJump)
+
+	// Start handling 2) and 3).
+
+	// Jump if one of two values is NaN by checking the parity flag (PF).
+	ifIsNan := m.allocateInstr()
+	m.insert(ifIsNan)
+
+	// Start handling 2) NaN-free and equal.
+
+	// Before we exit this case, we have to ensure that positive zero (or negative zero for min instruction) is
+	// returned if two values are positive and negative zeros.
+	var op sseOpcode
+	switch {
+	case !_64 && isMin:
+		op = sseOpcodeOrps
+	case _64 && isMin:
+		op = sseOpcodeOrpd
+	case !_64 && !isMin:
+		op = sseOpcodeAndps
+	case _64 && !isMin:
+		op = sseOpcodeAndpd
+	}
+	orAnd := m.allocateInstr()
+	orAnd.asXmmRmR(op, rn, tmp)
+	m.insert(orAnd)
+
+	// Done, jump to end.
+	sameExitJump := m.allocateInstr()
+	m.insert(sameExitJump)
+
+	// Start handling 3) either is NaN.
+	isNanTarget, isNan := m.allocateBrTarget()
+	m.insert(isNanTarget)
+	ifIsNan.asJmpIf(condP, newOperandLabel(isNan))
+
+	// We emit the ADD instruction to produce the NaN in tmp.
+	add := m.allocateInstr()
+	if _64 {
+		add.asXmmRmR(sseOpcodeAddsd, rn, tmp)
+	} else {
+		add.asXmmRmR(sseOpcodeAddss, rn, tmp)
+	}
+	m.insert(add)
+
+	// Exit from the NaN case branch.
+	nanExitJmp := m.allocateInstr()
+	m.insert(nanExitJmp)
+
+	// Start handling 1).
+	doMinMaxTarget, doMinMax := m.allocateBrTarget()
+	m.insert(doMinMaxTarget)
+	nanFreeOrDiffJump.asJmpIf(condNZ, newOperandLabel(doMinMax))
+
+	// Now handle the NaN-free and different values case.
+	minMax := m.allocateInstr()
+	minMax.asXmmRmR(minMaxOp, rn, tmp)
+	m.insert(minMax)
+
+	endNop, end := m.allocateBrTarget()
+	m.insert(endNop)
+	nanExitJmp.asJmp(newOperandLabel(end))
+	sameExitJump.asJmp(newOperandLabel(end))
+
+	m.copyTo(tmp, rd)
+}
+
+func (m *machine) lowerFcopysign(instr *ssa.Instruction) {
+	x, y := instr.Arg2()
+	if !x.Type().IsFloat() {
+		panic("BUG")
+	}
+
+	_64 := x.Type().Bits() == 64
+
+	xDef, yDef := m.c.ValueDefinition(x), m.c.ValueDefinition(y)
+	rm := m.getOperand_Reg(xDef)
+	rn := m.getOperand_Reg(yDef)
+	rd := m.c.VRegOf(instr.Return())
+
+	// Clear the non-sign bits of src via AND with the mask.
+	var opAnd, opOr sseOpcode
+	var signMask uint64
+	if _64 {
+		signMask, opAnd, opOr = 0x8000000000000000, sseOpcodeAndpd, sseOpcodeOrpd
+	} else {
+		signMask, opAnd, opOr = 0x80000000, sseOpcodeAndps, sseOpcodeOrps
+	}
+
+	signBitReg := m.c.AllocateVReg(x.Type())
+	m.lowerFconst(signBitReg, signMask, _64)
+	nonSignBitReg := m.c.AllocateVReg(x.Type())
+	m.lowerFconst(nonSignBitReg, ^signMask, _64)
+
+	// Extract the sign bits of rn.
+	and := m.allocateInstr().asXmmRmR(opAnd, rn, signBitReg)
+	m.insert(and)
+
+	// Clear the sign bit of dst via AND with the non-sign bit mask.
+	xor := m.allocateInstr().asXmmRmR(opAnd, rm, nonSignBitReg)
+	m.insert(xor)
+
+	// Copy the sign bits of src to dst via OR.
+	or := m.allocateInstr().asXmmRmR(opOr, newOperandReg(signBitReg), nonSignBitReg)
+	m.insert(or)
+
+	m.copyTo(nonSignBitReg, rd)
 }

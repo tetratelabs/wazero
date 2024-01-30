@@ -3494,6 +3494,9 @@ func (c *Compiler) memAlignmentCheck(addr ssa.Value, operationSizeInBytes uint64
 
 func (c *Compiler) callMemmove(dst, src, size ssa.Value) {
 	args := []ssa.Value{dst, src, size} // TODO: reuse the slice.
+	if size.Type() != ssa.TypeI64 {
+		panic("TODO: memmove size must be i64")
+	}
 
 	builder := c.ssaBuilder
 	memmovePtr := builder.AllocateInstruction().

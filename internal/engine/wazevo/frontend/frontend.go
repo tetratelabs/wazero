@@ -141,8 +141,9 @@ func (c *Compiler) declareSignatures(listenerOn bool) {
 	c.memmoveSig = ssa.Signature{
 		ID: c.refFuncSig.ID + 1,
 		// dst, src, and the byte count.
-		Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI32},
+		Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI64},
 	}
+
 	c.ssaBuilder.DeclareSignature(&c.memmoveSig)
 
 	c.memoryWait32Sig = ssa.Signature{

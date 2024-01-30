@@ -196,18 +196,3 @@ func GetCurrentFunctionIndex(ctx context.Context) int {
 	ret, _ := ctx.Value(currentFunctionIndexKey{}).(int)
 	return ret
 }
-
-// ----- High Register Pressure -----
-
-type highRegisterPressureContextKey struct{}
-
-// EnableHighRegisterPressure enables the high register pressure mode.
-func EnableHighRegisterPressure(ctx context.Context) context.Context {
-	ctx = context.WithValue(ctx, highRegisterPressureContextKey{}, true)
-	return ctx
-}
-
-// IsHighRegisterPressure returns true if the current compilation is under high register pressure.
-func IsHighRegisterPressure(ctx context.Context) bool {
-	return ctx.Value(highRegisterPressureContextKey{}) != nil
-}

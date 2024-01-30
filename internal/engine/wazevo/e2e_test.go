@@ -13,7 +13,11 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/experimental/logging"
+	"github.com/tetratelabs/wazero/experimental/opt"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/testcases"
+	"github.com/tetratelabs/wazero/internal/integration_test/spectest"
+	v1 "github.com/tetratelabs/wazero/internal/integration_test/spectest/v1"
+	v2 "github.com/tetratelabs/wazero/internal/integration_test/spectest/v2"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
 	"github.com/tetratelabs/wazero/internal/testing/dwarftestdata"
@@ -124,6 +128,128 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
+			name: "divrem_unsigned_return", m: testcases.DivUReturn32.Module,
+			calls: []callCase{
+				{
+					params:     []uint64{21, 10, 21, 10},
+					expResults: []uint64{21 / 10, 21 % 10},
+				},
+				{
+					params: []uint64{21, 0, 1, 1},
+					expErr: "wasm error: integer divide by zero",
+				},
+				{
+					params: []uint64{1, 1, 21, 0},
+					expErr: "wasm error: integer divide by zero",
+				},
+				{
+					params: []uint64{
+						0x80000000, 0xffffffff, 1, 1,
+					},
+					expResults: []uint64{0, 0},
+				},
+				{
+					params: []uint64{
+						1, 1, 0x80000000, 0xffffffff,
+					},
+					expResults: []uint64{1, 0x80000000},
+				},
+			},
+		},
+		{
+			name: "divrem_unsigned_return", m: testcases.DivUReturn64.Module,
+			calls: []callCase{
+				{
+					params:     []uint64{21, 10, 21, 10},
+					expResults: []uint64{21 / 10, 21 % 10},
+				},
+				{
+					params: []uint64{21, 0, 1, 1},
+					expErr: "wasm error: integer divide by zero",
+				},
+				{
+					params: []uint64{1, 1, 21, 0},
+					expErr: "wasm error: integer divide by zero",
+				},
+				{
+					params:     []uint64{0x80000000, 0xffffffff, 1, 1},
+					expResults: []uint64{0, 0},
+				},
+				{
+					params:     []uint64{1, 1, 0x80000000, 0xffffffff},
+					expResults: []uint64{1, 0x80000000},
+				},
+			},
+		},
+		{
+			name: "divrem_signed_return32", m: testcases.DivSReturn32.Module,
+			calls: []callCase{
+				{
+					params:     []uint64{21, 10, 21, 10},
+					expResults: []uint64{21 / 10, 21 % 10},
+				},
+				{
+					params: []uint64{21, 0, 1, 1},
+					expErr: "wasm error: integer divide by zero",
+				},
+				{
+					params: []uint64{1, 1, 21, 0},
+					expErr: "wasm error: integer divide by zero",
+				},
+				{
+					params: []uint64{0x80000000, 0xffffffff, 1, 1},
+					expErr: "wasm error: integer overflow",
+				},
+				{
+					params:     []uint64{1, 1, 0x80000000, 0xffffffff},
+					expResults: []uint64{1, 0},
+				},
+			},
+		},
+
+		{
+			name: "divrem_signed_return32 inverted rem div order", m: testcases.DivSReturn32_weird.Module,
+			calls: []callCase{
+				{
+					params: []uint64{21, 0, 1, 1},
+					expErr: "wasm error: integer divide by zero",
+				},
+				{
+					params: []uint64{1, 1, 21, 0},
+					expErr: "wasm error: integer divide by zero",
+				},
+				{
+					params: []uint64{0x80000000, 0xffffffff, 1, 1},
+					expErr: "wasm error: integer overflow",
+				},
+				{
+					params:     []uint64{1, 1, 0x80000000, 0xffffffff},
+					expResults: []uint64{0, 1},
+				},
+			},
+		},
+		{
+			name: "divrem_signed_return64", m: testcases.DivSReturn64.Module,
+			calls: []callCase{
+				{
+					params:     []uint64{21, 10, 21, 10},
+					expResults: []uint64{21 / 10, 21 % 10},
+				},
+				{
+					params: []uint64{21, 0, 1, 1},
+					expErr: "wasm error: integer divide by zero",
+				},
+				{
+					params: []uint64{1, 1, 21, 0},
+					expErr: "wasm error: integer divide by zero",
+				},
+				{
+					params: []uint64{0x8000000000000000, 0xffffffffffffffff, 1, 1},
+					expErr: "wasm error: integer overflow",
+				},
+			},
+		},
+		{
 			name: "integer bit counts", m: testcases.IntegerBitCounts.Module,
 			calls: []callCase{{
 				params: []uint64{10, 100},
@@ -148,6 +274,109 @@ func TestE2E(t *testing.T) {
 						10, 9, 8, 7, 6, 5, 4, 3, 2, 1,
 						10, 9, 8, 7, 6, 5, 4, 3, 2, 1,
 						10, 9, 8, 7, 6, 5, 4, 3, 2, 1,
+					},
+				},
+			},
+		},
+		{
+			name: "float_arithm", m: testcases.FloatArithm.Module,
+			calls: []callCase{
+				{
+					params: []uint64{
+						math.Float64bits(25), math.Float64bits(5), math.Float64bits(1.4),
+						uint64(math.Float32bits(25)), uint64(math.Float32bits(5)), uint64(math.Float32bits(1.4)),
+					},
+					expResults: []uint64{
+						math.Float64bits(-25),
+						math.Float64bits(25),
+
+						math.Float64bits(5),
+						math.Float64bits(30),
+						math.Float64bits(20),
+						math.Float64bits(125),
+						math.Float64bits(5),
+
+						math.Float64bits(1),
+						math.Float64bits(1),
+						math.Float64bits(2),
+						math.Float64bits(1),
+
+						math.Float64bits(-25),
+
+						uint64(math.Float32bits(-25)),
+						uint64(math.Float32bits(25)),
+
+						uint64(math.Float32bits(5)),
+						uint64(math.Float32bits(30)),
+						uint64(math.Float32bits(20)),
+						uint64(math.Float32bits(125)),
+						uint64(math.Float32bits(5)),
+
+						uint64(math.Float32bits(1)),
+						uint64(math.Float32bits(1)),
+						uint64(math.Float32bits(2)),
+						uint64(math.Float32bits(1)),
+
+						uint64(math.Float32bits(-25)),
+					},
+				},
+			},
+		},
+		{
+			name: "min_max_float", m: testcases.MinMaxFloat.Module,
+			calls: []callCase{
+				{
+					params: []uint64{
+						math.Float64bits(25), math.Float64bits(5),
+						uint64(math.Float32bits(25)), uint64(math.Float32bits(5)),
+					},
+					expResults: []uint64{
+						math.Float64bits(5),
+						math.Float64bits(25),
+						uint64(math.Float32bits(5)),
+						uint64(math.Float32bits(25)),
+					},
+				},
+				{
+					// Left-hand side is NaN.
+					params: []uint64{
+						0x7ff8000000000001, math.Float64bits(5),
+						uint64(0x7ff80001), uint64(math.Float32bits(5)),
+					},
+					expResults: []uint64{
+						0x7ff8000000000001,
+						0x7ff8000000000001,
+
+						uint64(0x7ff80001),
+						uint64(0x7ff80001),
+					},
+				},
+				{
+					// Both NaN.
+					params: []uint64{
+						0x7ff8000000000001, 0x7ff8000000000001,
+						uint64(0x7ff80001), uint64(0x7ff80001),
+					},
+					expResults: []uint64{
+						0x7ff8000000000001,
+						0x7ff8000000000001,
+
+						uint64(0x7ff80001),
+						uint64(0x7ff80001),
+					},
+				},
+				{
+					// Negative zero and zero.
+					params: []uint64{
+						0x8000000000000000, 0,
+						uint64(0), uint64(0x80000000),
+					},
+					expResults: []uint64{
+						0x8000000000000000,
+						0,
+
+						uint64(0x80000000),
+						uint64(0),
 					},
 				},
 			},
@@ -281,9 +510,8 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
-			name:      "br_table",
-			m:         testcases.BrTable.Module,
-			skipAMD64: true,
+			name: "br_table",
+			m:    testcases.BrTable.Module,
 			calls: []callCase{
 				{params: []uint64{0}, expResults: []uint64{11}},
 				{params: []uint64{1}, expResults: []uint64{12}},
@@ -297,9 +525,8 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
-			name:      "br_table_with_args",
-			m:         testcases.BrTableWithArg.Module,
-			skipAMD64: true,
+			name: "br_table_with_args",
+			m:    testcases.BrTableWithArg.Module,
 			calls: []callCase{
 				{params: []uint64{0, 100}, expResults: []uint64{11 + 100}},
 				{params: []uint64{1, 100}, expResults: []uint64{12 + 100}},
@@ -396,6 +623,16 @@ func TestE2E(t *testing.T) {
 				{params: []uint64{0x0, 0xbeef, 0xffffffff}, expResults: []uint64{1}},
 			},
 		},
+		{
+			name: "float_le",
+			m:    testcases.FloatLe.Module,
+			calls: []callCase{
+				{params: []uint64{math.Float64bits(1.0)}, expResults: []uint64{1, 1}},
+				{params: []uint64{math.Float64bits(0.0)}, expResults: []uint64{1, 1}},
+				{params: []uint64{math.Float64bits(1.1)}, expResults: []uint64{0, 0}},
+				{params: []uint64{math.Float64bits(math.NaN())}, expResults: []uint64{0, 0}},
+			},
+		},
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
@@ -412,7 +649,7 @@ func TestE2E(t *testing.T) {
 				t.Run(name, func(t *testing.T) {
 					cache, err := wazero.NewCompilationCacheWithDir(tmp)
 					require.NoError(t, err)
-					config := newRuntimeConfigOptimizingCompiler().WithCompilationCache(cache)
+					config := opt.NewRuntimeConfigOptimizingCompiler().WithCompilationCache(cache)
 					if tc.features != 0 {
 						config = config.WithCoreFeatures(tc.features)
 					}
@@ -453,7 +690,7 @@ func TestE2E(t *testing.T) {
 								require.Equal(t, len(cc.expResults), len(result))
 								for i := range cc.expResults {
 									if cc.expResults[i] != result[i] {
-										t.Errorf("result[%d]: exp %d, got %d", i, cc.expResults[i], result[i])
+										t.Errorf("result[%d]: exp %x, got %x", i, cc.expResults[i], result[i])
 									}
 								}
 							}
@@ -480,7 +717,7 @@ func TestE2E_host_functions(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := tc.ctx
 
-			config := newRuntimeConfigOptimizingCompiler()
+			config := opt.NewRuntimeConfigOptimizingCompiler()
 
 			r := wazero.NewRuntimeWithConfig(ctx, config)
 			defer func() {
@@ -562,7 +799,7 @@ func TestE2E_host_functions(t *testing.T) {
 }
 
 func TestE2E_stores(t *testing.T) {
-	config := newRuntimeConfigOptimizingCompiler()
+	config := opt.NewRuntimeConfigOptimizingCompiler()
 
 	ctx := context.Background()
 	r := wazero.NewRuntimeWithConfig(ctx, config)
@@ -649,7 +886,7 @@ func TestE2E_reexported_memory(t *testing.T) {
 		CodeSection:       []wasm.Code{{Body: []byte{wasm.OpcodeI32Const, 10, wasm.OpcodeMemoryGrow, 0, wasm.OpcodeEnd}}},
 	}
 
-	config := newRuntimeConfigOptimizingCompiler()
+	config := opt.NewRuntimeConfigOptimizingCompiler()
 
 	ctx := context.Background()
 	r := wazero.NewRuntimeWithConfig(ctx, config)
@@ -698,7 +935,7 @@ func TestStackUnwind_panic_in_host(t *testing.T) {
 		},
 	}
 
-	config := newRuntimeConfigOptimizingCompiler()
+	config := opt.NewRuntimeConfigOptimizingCompiler()
 
 	ctx := context.Background()
 	r := wazero.NewRuntimeWithConfig(ctx, config)
@@ -748,7 +985,7 @@ func TestStackUnwind_unreachable(t *testing.T) {
 		},
 	}
 
-	config := newRuntimeConfigOptimizingCompiler()
+	config := opt.NewRuntimeConfigOptimizingCompiler()
 	ctx := context.Background()
 	r := wazero.NewRuntimeWithConfig(ctx, config)
 	defer func() {
@@ -770,7 +1007,7 @@ wasm stack trace:
 
 func TestListener_local(t *testing.T) {
 	var buf bytes.Buffer
-	config := newRuntimeConfigOptimizingCompiler()
+	config := opt.NewRuntimeConfigOptimizingCompiler()
 	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
 
 	r := wazero.NewRuntimeWithConfig(ctx, config)
@@ -798,7 +1035,7 @@ func TestListener_local(t *testing.T) {
 
 func TestListener_imported(t *testing.T) {
 	var buf bytes.Buffer
-	config := newRuntimeConfigOptimizingCompiler()
+	config := opt.NewRuntimeConfigOptimizingCompiler()
 	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
 
 	r := wazero.NewRuntimeWithConfig(ctx, config)
@@ -828,7 +1065,6 @@ func TestListener_imported(t *testing.T) {
 }
 
 func TestListener_long(t *testing.T) {
-	skipOnAmd64(t)
 	pickOneParam := binaryencoding.EncodeModule(&wasm.Module{
 		TypeSection: []wasm.FunctionType{{Results: []wasm.ValueType{i32}, Params: []wasm.ValueType{
 			i32, i32, f32, f64, i64, i32, i32, v128, f32,
@@ -850,7 +1086,7 @@ func TestListener_long(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
-	config := newRuntimeConfigOptimizingCompiler()
+	config := opt.NewRuntimeConfigOptimizingCompiler()
 	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
 
 	r := wazero.NewRuntimeWithConfig(ctx, config)
@@ -878,7 +1114,6 @@ func TestListener_long(t *testing.T) {
 }
 
 func TestListener_long_as_is(t *testing.T) {
-	skipOnAmd64(t)
 	params := []wasm.ValueType{
 		i32, i64, i32, i64, i32, i64, i32, i64, i32, i64,
 		i32, i64, i32, i64, i32, i64, i32, i64, i32, i64,
@@ -901,7 +1136,7 @@ func TestListener_long_as_is(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
-	config := newRuntimeConfigOptimizingCompiler()
+	config := opt.NewRuntimeConfigOptimizingCompiler()
 	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
 
 	r := wazero.NewRuntimeWithConfig(ctx, config)
@@ -929,7 +1164,6 @@ func TestListener_long_as_is(t *testing.T) {
 }
 
 func TestListener_long_many_consts(t *testing.T) {
-	skipOnAmd64(t)
 	const paramNum = 61
 
 	var exp []uint64
@@ -951,7 +1185,7 @@ func TestListener_long_many_consts(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
-	config := newRuntimeConfigOptimizingCompiler()
+	config := opt.NewRuntimeConfigOptimizingCompiler()
 	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
 
 	r := wazero.NewRuntimeWithConfig(ctx, config)
@@ -976,7 +1210,7 @@ func TestListener_long_many_consts(t *testing.T) {
 
 // TestDWARF verifies that the DWARF based stack traces work as expected before/after compilation cache.
 func TestDWARF(t *testing.T) {
-	config := newRuntimeConfigOptimizingCompiler()
+	config := opt.NewRuntimeConfigOptimizingCompiler()
 	ctx := context.Background()
 
 	bin := dwarftestdata.ZigWasm
@@ -1009,11 +1243,191 @@ func TestDWARF(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// newRuntimeConfigOptimizingCompiler is the same as opt.NewRuntimeConfigOptimizingCompiler
-// except that it doesn't check if it is on arm64 or not. Use this in tests until amd64 is completely supported.
-func newRuntimeConfigOptimizingCompiler() wazero.RuntimeConfig {
-	type enabler interface{ EnableOptimizingCompiler() }
-	c := wazero.NewRuntimeConfig()
-	c.(enabler).EnableOptimizingCompiler()
-	return c
+// TODO: delete this and rune them in internal/integration_test/spectest/v1/spec_test.go after amd64 is done.
+func TestSpectestV1(t *testing.T) {
+	if runtime.GOARCH != "amd64" {
+		return
+	}
+
+	config := opt.NewRuntimeConfigOptimizingCompiler().WithCoreFeatures(api.CoreFeaturesV1)
+
+	for _, tc := range []struct {
+		name string
+	}{
+		{name: "address"},
+		{name: "align"},
+		{name: "br"},
+		{name: "br_if"},
+		{name: "br_table"},
+		{name: "break-drop"},
+		{name: "block"},
+		{name: "binary"},
+		{name: "binary-leb128"},
+		{name: "call"},
+		{name: "call_indirect"},
+		{name: "comments"},
+		{name: "custom"},
+		//{name: "conversions"},
+		{name: "const"},
+		{name: "data"},
+		{name: "elem"},
+		//{name: "endianness"},
+		{name: "exports"},
+		{name: "f32"},
+		{name: "f32_bitwise"},
+		{name: "f32_cmp"},
+		{name: "f64"},
+		{name: "f64_bitwise"},
+		{name: "f64_cmp"},
+		{name: "fac"},
+		//{name: "float_exprs"},
+		//{name: "float_literals"},
+		{name: "float_memory"},
+		{name: "float_misc"},
+		{name: "func"},
+		{name: "func_ptrs"},
+		{name: "forward"},
+		{name: "globals"},
+		{name: "if"},
+		//{name: "imports"},
+		{name: "inline-module"},
+		{name: "i32"},
+		{name: "i64"},
+		{name: "int_exprs"},
+		{name: "int_literals"},
+		{name: "labels"},
+		{name: "left-to-right"},
+		{name: "linking"},
+		{name: "load"},
+		{name: "loop"},
+		//{name: "local_get"},
+		//{name: "local_set"},
+		//{name: "local_tee"},
+		//{name: "memory"},
+		{name: "memory_size"},
+		{name: "memory_grow"},
+		{name: "memory_redundancy"},
+		{name: "memory_trap"},
+		{name: "names"},
+		{name: "nop"},
+		{name: "return"},
+		{name: "select"},
+		{name: "start"},
+		{name: "stack"},
+		{name: "store"},
+		{name: "switch"},
+		{name: "skip-stack-guard-page"},
+		{name: "token"},
+		{name: "type"},
+		//{name: "traps"},
+		{name: "unreachable"},
+		{name: "unreached-invalid"},
+		{name: "unwind"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			spectest.RunCase(t, v1.Testcases, tc.name, context.Background(), config,
+				-1, 0, math.MaxInt)
+		})
+	}
+}
+
+// TODO: delete this and rune them in internal/integration_test/spectest/v2/spec_test.go after amd64 is done.
+func TestSpectestV2(t *testing.T) {
+	if runtime.GOARCH != "amd64" {
+		return
+	}
+
+	config := opt.NewRuntimeConfigOptimizingCompiler()
+
+	for _, tc := range []struct {
+		name string
+	}{
+		{"block"},
+		{"bulk"},
+		{"i32"},
+		{"i64"},
+		{"br"},
+		{"call"},
+		{"call_indirect"},
+		//{"conversions"},
+		{"global"},
+		{"if"},
+		{"linking"},
+		{"loop"},
+		{"memory_copy"},
+		{"memory_fill"},
+		{"memory_init"},
+		{"memory_trap"},
+		{"ref_null"},
+		{"ref_is_null"},
+		{"ref_func"},
+		{"table_copy"},
+		{"table_fill"},
+		{"table_get"},
+		{"table_init"},
+		{"table_set"},
+		{"table_size"},
+		{"select"},
+		//{"simd_boolean"},
+		//{"simd_bit_shift"},
+		//{"simd_bitwise"},
+		//{"simd_const"},
+		//{"simd_conversions"},
+		//{"simd_i8x16_arith"},
+		//{"simd_i8x16_arith2"},
+		//{"simd_i8x16_sat_arith"},
+		//{"simd_i16x8_arith"},
+		//{"simd_i16x8_arith2"},
+		//{"simd_i16x8_sat_arith"},
+		//{"simd_i32x4_arith"},
+		//{"simd_i32x4_arith2"},
+		//{"simd_i64x2_arith"},
+		//{"simd_i64x2_arith2"},
+		//{"simd_i8x16_cmp"},
+		//{"simd_i16x8_cmp"},
+		//{"simd_i32x4_cmp"},
+		//{"simd_i64x2_cmp"},
+		//{"simd_f32x4"},
+		//{"simd_f64x2"},
+		//{"simd_f32x4_arith"},
+		//{"simd_f64x2_arith"},
+		//{"simd_f32x4_cmp"},
+		//{"simd_f64x2_cmp"},
+		//{"simd_f32x4_rounding"},
+		//{"simd_f64x2_rounding"},
+		//{"simd_f32x4_pmin_pmax"},
+		//{"simd_f64x2_pmin_pmax"},
+		//{"simd_i32x4_trunc_sat_f32x4"},
+		//{"simd_i32x4_trunc_sat_f64x2"},
+		//{"simd_i32x4_dot_i16x8"},
+		//{"simd_i16x8_extmul_i8x16"},
+		//{"simd_i64x2_extmul_i32x4"},
+		//{"simd_i32x4_extmul_i16x8"},
+		//{"simd_i16x8_extadd_pairwise_i8x16"},
+		//{"simd_i32x4_extadd_pairwise_i16x8"},
+		//{"simd_i16x8_q15mulr_sat_s"},
+		//{"simd_int_to_int_extend"},
+		//{"simd_load"},
+		//{"simd_load_extend"},
+		//{"simd_load_splat"},
+		//{"simd_load_zero"},
+		//{"simd_load8_lane"},
+		//{"simd_load16_lane"},
+		//{"simd_load32_lane"},
+		//{"simd_load64_lane"},
+		//{"simd_lane"},
+		//{"simd_linking"},
+		//{"simd_splat"},
+		//{"simd_store"},
+		//{"simd_store8_lane"},
+		//{"simd_store16_lane"},
+		//{"simd_store32_lane"},
+		//{"simd_store64_lane"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			spectest.RunCase(t, v2.Testcases, tc.name, ctx, config,
+				-1, 0, math.MaxInt)
+		})
+	}
 }

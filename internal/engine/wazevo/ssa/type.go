@@ -48,6 +48,11 @@ func (t Type) IsInt() bool {
 	return t == TypeI32 || t == TypeI64
 }
 
+// IsFloat returns true if the type is a floating point type.
+func (t Type) IsFloat() bool {
+	return t == TypeF32 || t == TypeF64
+}
+
 // Bits returns the number of bits required to represent the type.
 func (t Type) Bits() byte {
 	switch t {

@@ -71,6 +71,56 @@ func TestInstruction_format_encode(t *testing.T) {
 			wantFormat: "movabsq $-126, %rcx",
 		},
 		{
+			setup:      func(i *instruction) { i.asSignExtendData(false) },
+			want:       "99",
+			wantFormat: "cdq",
+		},
+		{
+			setup:      func(i *instruction) { i.asSignExtendData(true) },
+			want:       "4899",
+			wantFormat: "cqo",
+		},
+		{
+			setup:      func(i *instruction) { i.asDiv(newOperandReg(raxVReg), true, true) },
+			want:       "48f7f8",
+			wantFormat: "idivq %rax",
+		},
+		{
+			setup:      func(i *instruction) { i.asDiv(newOperandReg(raxVReg), false, true) },
+			want:       "48f7f0",
+			wantFormat: "divq %rax",
+		},
+		{
+			setup:      func(i *instruction) { i.asDiv(newOperandReg(raxVReg), true, false) },
+			want:       "f7f8",
+			wantFormat: "idivl %eax",
+		},
+		{
+			setup:      func(i *instruction) { i.asDiv(newOperandReg(raxVReg), false, false) },
+			want:       "f7f0",
+			wantFormat: "divl %eax",
+		},
+		{
+			setup:      func(i *instruction) { i.asDiv(newOperandMem(newAmodeImmReg(123, raxVReg)), true, true) },
+			want:       "48f7787b",
+			wantFormat: "idivq 123(%rax)",
+		},
+		{
+			setup:      func(i *instruction) { i.asDiv(newOperandMem(newAmodeImmReg(123, raxVReg)), false, true) },
+			want:       "48f7707b",
+			wantFormat: "divq 123(%rax)",
+		},
+		{
+			setup:      func(i *instruction) { i.asDiv(newOperandMem(newAmodeImmReg(123, raxVReg)), true, false) },
+			want:       "f7787b",
+			wantFormat: "idivl 123(%rax)",
+		},
+		{
+			setup:      func(i *instruction) { i.asDiv(newOperandMem(newAmodeImmReg(123, raxVReg)), false, false) },
+			want:       "f7707b",
+			wantFormat: "divl 123(%rax)",
+		},
+		{
 			setup:      func(i *instruction) { i.asMovRR(raxVReg, rdiVReg, false) },
 			want:       "89c7",
 			wantFormat: "movl %eax, %edi",
@@ -1121,6 +1171,154 @@ func TestInstruction_format_encode(t *testing.T) {
 			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodeSqrtsd, newOperandReg(xmm11VReg), xmm15VReg) },
 			want:       "f2450f51fb",
 			wantFormat: "sqrtsd %xmm11, %xmm15",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmUnaryRmRImm(sseOpcodeRoundss, uint8(roundingModeNearest), newOperandReg(xmm11VReg), xmm15VReg)
+			},
+			want:       "66450f3a0afb00",
+			wantFormat: "roundss $0, %xmm11, %xmm15",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmUnaryRmRImm(sseOpcodeRoundss, uint8(roundingModeDown), newOperandReg(xmm11VReg), xmm15VReg)
+			},
+			want:       "66450f3a0afb01",
+			wantFormat: "roundss $1, %xmm11, %xmm15",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmUnaryRmRImm(sseOpcodeRoundss, uint8(roundingModeUp), newOperandReg(xmm11VReg), xmm15VReg)
+			},
+			want:       "66450f3a0afb02",
+			wantFormat: "roundss $2, %xmm11, %xmm15",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmUnaryRmRImm(sseOpcodeRoundss, uint8(roundingModeZero), newOperandReg(xmm11VReg), xmm15VReg)
+			},
+			want:       "66450f3a0afb03",
+			wantFormat: "roundss $3, %xmm11, %xmm15",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmUnaryRmRImm(sseOpcodeRoundss, uint8(roundingModeNearest), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm15VReg)
+			},
+			want:       "66440f3a0a787b00",
+			wantFormat: "roundss $0, 123(%rax), %xmm15",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmUnaryRmRImm(sseOpcodeRoundss, uint8(roundingModeDown), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm15VReg)
+			},
+			want:       "66440f3a0a787b01",
+			wantFormat: "roundss $1, 123(%rax), %xmm15",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmUnaryRmRImm(sseOpcodeRoundss, uint8(roundingModeUp), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm15VReg)
+			},
+			want:       "66440f3a0a787b02",
+			wantFormat: "roundss $2, 123(%rax), %xmm15",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmUnaryRmRImm(sseOpcodeRoundss, uint8(roundingModeZero), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm15VReg)
+			},
+			want:       "66440f3a0a787b03",
+			wantFormat: "roundss $3, 123(%rax), %xmm15",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmUnaryRmRImm(sseOpcodeRoundsd, uint8(roundingModeNearest), newOperandReg(xmm11VReg), xmm15VReg)
+			},
+			want:       "66450f3a0bfb00",
+			wantFormat: "roundsd $0, %xmm11, %xmm15",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmUnaryRmRImm(sseOpcodeRoundsd, uint8(roundingModeDown), newOperandReg(xmm11VReg), xmm15VReg)
+			},
+			want:       "66450f3a0bfb01",
+			wantFormat: "roundsd $1, %xmm11, %xmm15",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmUnaryRmRImm(sseOpcodeRoundsd, uint8(roundingModeUp), newOperandReg(xmm11VReg), xmm15VReg)
+			},
+			want:       "66450f3a0bfb02",
+			wantFormat: "roundsd $2, %xmm11, %xmm15",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmUnaryRmRImm(sseOpcodeRoundsd, uint8(roundingModeZero), newOperandReg(xmm11VReg), xmm15VReg)
+			},
+			want:       "66450f3a0bfb03",
+			wantFormat: "roundsd $3, %xmm11, %xmm15",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmUnaryRmRImm(sseOpcodeRoundsd, uint8(roundingModeNearest), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm15VReg)
+			},
+			want:       "66440f3a0b787b00",
+			wantFormat: "roundsd $0, 123(%rax), %xmm15",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmUnaryRmRImm(sseOpcodeRoundsd, uint8(roundingModeDown), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm15VReg)
+			},
+			want:       "66440f3a0b787b01",
+			wantFormat: "roundsd $1, 123(%rax), %xmm15",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmUnaryRmRImm(sseOpcodeRoundsd, uint8(roundingModeUp), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm15VReg)
+			},
+			want:       "66440f3a0b787b02",
+			wantFormat: "roundsd $2, 123(%rax), %xmm15",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmUnaryRmRImm(sseOpcodeRoundsd, uint8(roundingModeZero), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm15VReg)
+			},
+			want:       "66440f3a0b787b03",
+			wantFormat: "roundsd $3, 123(%rax), %xmm15",
+		},
+		{
+			setup:      func(i *instruction) { i.asXmmCmpRmR(sseOpcodePtest, newOperandReg(xmm1VReg), xmm0VReg) },
+			want:       "660f3817c1",
+			wantFormat: "ptest %xmm1, %xmm0",
+		},
+		{
+			setup:      func(i *instruction) { i.asXmmCmpRmR(sseOpcodeUcomisd, newOperandReg(xmm1VReg), xmm0VReg) },
+			want:       "660f2ec1",
+			wantFormat: "ucomisd %xmm1, %xmm0",
+		},
+		{
+			setup:      func(i *instruction) { i.asXmmCmpRmR(sseOpcodeUcomiss, newOperandReg(xmm1VReg), xmm0VReg) },
+			want:       "0f2ec1",
+			wantFormat: "ucomiss %xmm1, %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmCmpRmR(sseOpcodePtest, newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "660f3817407b",
+			wantFormat: "ptest 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmCmpRmR(sseOpcodeUcomisd, newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "660f2e407b",
+			wantFormat: "ucomisd 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmCmpRmR(sseOpcodeUcomiss, newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "0f2e407b",
+			wantFormat: "ucomiss 123(%rax), %xmm0",
 		},
 		// movd
 		{
@@ -2825,6 +3023,41 @@ func TestInstruction_format_encode(t *testing.T) {
 			setup:      func(i *instruction) { i.asV128ConstIsland(0xffffffff_eeeeeeee, 0xaaaaaaaa_bbbbbbbb) },
 			want:       "eeeeeeeeffffffffbbbbbbbbaaaaaaaa",
 			wantFormat: "v128ConstIsland (0xffffffffeeeeeeee, 0xaaaaaaaabbbbbbbb)",
+		},
+		{
+			setup:      func(i *instruction) { i.asXCHG(r11VReg, r14VReg) },
+			want:       "4d87f3",
+			wantFormat: "xchg %r11, %r14",
+		},
+		{
+			setup:      func(i *instruction) { i.asXCHG(r15VReg, raxVReg) },
+			want:       "4987c7",
+			wantFormat: "xchg %r15, %rax",
+		},
+		{
+			setup:      func(i *instruction) { i.asXCHG(rbxVReg, rsiVReg) },
+			want:       "4887f3",
+			wantFormat: "xchg %rbx, %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asZeros(rbxVReg) },
+			want:       "4831db",
+			wantFormat: "xor %rbx, %rbx",
+		},
+		{
+			setup:      func(i *instruction) { i.asZeros(r14VReg) },
+			want:       "4d31f6",
+			wantFormat: "xor %r14, %r14",
+		},
+		{
+			setup:      func(i *instruction) { i.asZeros(xmm1VReg) },
+			want:       "660fefc9",
+			wantFormat: "xor %xmm1, %xmm1",
+		},
+		{
+			setup:      func(i *instruction) { i.asZeros(xmm12VReg) },
+			want:       "66450fefe4",
+			wantFormat: "xor %xmm12, %xmm12",
 		},
 	} {
 		tc := tc

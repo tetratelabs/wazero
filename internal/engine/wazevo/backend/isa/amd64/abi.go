@@ -10,7 +10,7 @@ import (
 // https://github.com/golang/go/blob/49d42128fd8594c172162961ead19ac95e247d24/src/cmd/compile/abi-internal.md#amd64-architecture
 
 var (
-	intArgResultRegs   = []regalloc.RealReg{rax, rcx, rbx, rsi, rdi, r8, r9, r10, r11}
+	intArgResultRegs   = []regalloc.RealReg{rax, rbx, rcx, rdi, rsi, r8, r9, r10, r11}
 	floatArgResultRegs = []regalloc.RealReg{xmm0, xmm1, xmm2, xmm3, xmm4, xmm5, xmm6, xmm7}
 )
 

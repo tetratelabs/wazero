@@ -2,6 +2,7 @@ package amd64
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
@@ -16,6 +17,7 @@ type instruction struct {
 	b1                  bool
 	addedBeforeRegAlloc bool
 	kind                instructionKind
+	targets             []uint32
 }
 
 // Next implements regalloc.Instr.
@@ -67,6 +69,8 @@ func (i *instruction) String() string {
 		return fmt.Sprintf("%s %s, %s", sseOpcode(i.u1), i.op1.format(i.b1), i.op2.format(i.b1))
 	case xmmUnaryRmR:
 		return fmt.Sprintf("%s %s, %s", sseOpcode(i.u1), i.op1.format(false), i.op2.format(false))
+	case xmmUnaryRmRImm:
+		return fmt.Sprintf("%s $%d, %s, %s", sseOpcode(i.u1), roundingMode(i.u2), i.op1.format(false), i.op2.format(false))
 	case unaryRmR:
 		var suffix string
 		if i.b1 {
@@ -92,7 +96,17 @@ func (i *instruction) String() string {
 		}
 		return fmt.Sprintf("%s %s", op, i.op1.format(i.b1))
 	case div:
-		panic("TODO")
+		var prefix string
+		var op string
+		if i.b1 {
+			op = "divq"
+		} else {
+			op = "divl"
+		}
+		if i.u1 != 0 {
+			prefix = "i"
+		}
+		return fmt.Sprintf("%s%s %s", prefix, op, i.op1.format(i.b1))
 	case mulHi:
 		signed, _64 := i.u1 != 0, i.b1
 		var op string
@@ -110,7 +124,13 @@ func (i *instruction) String() string {
 	case checkedDivOrRemSeq:
 		panic("TODO")
 	case signExtendData:
-		panic("TODO")
+		var op string
+		if i.b1 {
+			op = "cqo"
+		} else {
+			op = "cdq"
+		}
+		return op
 	case movzxRmR:
 		return fmt.Sprintf("movzx.%s %s, %s", extMode(i.u1), i.op1.format(true), i.op2.format(true))
 	case mov64MR:
@@ -160,7 +180,7 @@ func (i *instruction) String() string {
 		}
 		return fmt.Sprintf("%s%s %s, %s", op, suffix, i.op1.format(i.b1), i.op2.format(i.b1))
 	case setcc:
-		return fmt.Sprintf("set%s %s", cond(i.u1), i.op1.format(true))
+		return fmt.Sprintf("set%s %s", cond(i.u1), i.op2.format(true))
 	case cmove:
 		var suffix string
 		if i.b1 {
@@ -187,18 +207,20 @@ func (i *instruction) String() string {
 		panic("TODO")
 	case xmmMinMaxSeq:
 		panic("TODO")
-	case xmmCmove:
-		panic("TODO")
 	case xmmCmpRmR:
-		panic("TODO")
+		return fmt.Sprintf("%s %s, %s", sseOpcode(i.u1), i.op1.format(false), i.op2.format(false))
 	case xmmRmRImm:
 		panic("TODO")
 	case jmp:
 		return fmt.Sprintf("jmp %s", i.op1.format(true))
 	case jmpIf:
 		return fmt.Sprintf("j%s %s", cond(i.u1), i.op1.format(true))
-	case jmpTableSequence:
-		panic("TODO")
+	case jmpTableIsland:
+		labels := make([]string, len(i.targets))
+		for index, l := range i.targets {
+			labels[index] = backend.Label(l).String()
+		}
+		return fmt.Sprintf("jump_table_island [%s]", strings.Join(labels, ", "))
 	case exitSequence:
 		return fmt.Sprintf("exit_sequence %s", i.op1.format(true))
 	case ud2:
@@ -213,6 +235,10 @@ func (i *instruction) String() string {
 		return fmt.Sprintf("callq *%s", i.op1.format(true))
 	case v128ConstIsland:
 		return fmt.Sprintf("v128ConstIsland (%#x, %#x)", i.u1, i.u2)
+	case xchg:
+		return fmt.Sprintf("xchg %s, %s", i.op1.format(true), i.op2.format(true))
+	case zeros:
+		return fmt.Sprintf("xor %s, %s", i.op2.format(true), i.op2.format(true))
 	default:
 		panic(fmt.Sprintf("BUG: %d", int(i.kind)))
 	}
@@ -230,6 +256,10 @@ func (i *instruction) Defs(regs *[]regalloc.VReg) []regalloc.VReg {
 		*regs = append(*regs, i.op2.r)
 	case defKindCall:
 		*regs = append(*regs, i.abi.RetRealRegs...)
+	case defKindRdx:
+		*regs = append(*regs, rdxVReg)
+	case defKindRaxRdx:
+		*regs = append(*regs, raxVReg, rdxVReg)
 	default:
 		panic(fmt.Sprintf("BUG: invalid defKind \"%s\" for %s", dk, i))
 	}
@@ -285,6 +315,20 @@ func (i *instruction) Uses(regs *[]regalloc.VReg) []regalloc.VReg {
 		*regs = append(*regs, i.abi.ArgRealRegs...)
 	case useKindCall:
 		*regs = append(*regs, i.abi.ArgRealRegs...)
+	case useKindRax:
+		*regs = append(*regs, raxVReg)
+	case useKindOp1Rax:
+		op := i.op1
+		switch op.kind {
+		case operandKindReg:
+			*regs = append(*regs, op.r)
+		case operandKindMem:
+			op.amode.uses(regs)
+		case operandKindImm32, operandKindLabel:
+		default:
+			panic(fmt.Sprintf("BUG: invalid operand: %s", i))
+		}
+		*regs = append(*regs, raxVReg)
 	default:
 		panic(fmt.Sprintf("BUG: invalid useKind %s for %s", uk, i))
 	}
@@ -368,6 +412,32 @@ func (i *instruction) AssignUse(index int, v regalloc.VReg) {
 		default:
 			panic(fmt.Sprintf("BUG: invalid operand: %s", i))
 		}
+	case useKindOp1Rax:
+		if index == 0 {
+			op := &i.op1
+			switch op.kind {
+			case operandKindReg:
+				if index != 0 {
+					panic("BUG")
+				}
+				if op.r.IsRealReg() {
+					panic("BUG already assigned: " + i.String())
+				}
+				op.r = v
+			case operandKindMem:
+				op.amode.assignUses(index, v)
+			default:
+				panic(fmt.Sprintf("BUG: invalid operand: %s", i))
+			}
+		} else if index == 1 {
+			// Do nothing.
+		} else {
+			panic("BUG")
+		}
+	case useKindRax:
+		if index != 0 {
+			panic("BUG")
+		}
 	default:
 		panic(fmt.Sprintf("BUG: invalid useKind %s for %s", uk, i))
 	}
@@ -390,7 +460,16 @@ func (i *instruction) AssignDef(reg regalloc.VReg) {
 // IsCopy implements regalloc.Instr.
 func (i *instruction) IsCopy() bool {
 	k := i.kind
-	return k == movRR || (k == xmmUnaryRmR && i.op1.kind == operandKindReg)
+	if k == movRR {
+		return true
+	}
+	if k == xmmUnaryRmR {
+		if i.op1.kind == operandKindReg {
+			sse := sseOpcode(i.u1)
+			return sse == sseOpcodeMovss || sse == sseOpcodeMovsd || sse == sseOpcodeMovdqu
+		}
+	}
+	return false
 }
 
 func resetInstruction(i *instruction) {
@@ -515,6 +594,13 @@ const (
 	// value. This is characteristic of mov instructions.
 	xmmUnaryRmR
 
+	// XMM (scalar or vector) unary op with immediate: roundss, roundsd, etc.
+	//
+	// This differs from XMM_RM_R_IMM in that the dst register of
+	// XmmUnaryRmRImm is not used in the computation of the instruction dst
+	// value and so does not have to be a previously valid value.
+	xmmUnaryRmRImm
+
 	// XMM (scalar or vector) unary op (from xmm to mem): stores, movd, movq
 	xmmMovRM
 
@@ -539,10 +625,6 @@ const (
 	// A sequence to compute min/max with the proper NaN semantics for xmm registers.
 	xmmMinMaxSeq
 
-	// XMM (scalar) conditional move.
-	// Overwrites the destination register if cc is set.
-	xmmCmove
-
 	// Float comparisons/tests: cmp (b w l q) (reg addr imm) reg.
 	xmmCmpRmR
 
@@ -565,11 +647,8 @@ const (
 	// Jump conditionally: jcond cond label.
 	jmpIf
 
-	// Jump-table sequence, as one compound instruction (see note in lower.rs for rationale).
-	// The generated code sequence is described in the emit's function match arm for this
-	// instruction.
-	// See comment in lowering about the temporaries signedness.
-	jmpTableSequence
+	// jmpTableIsland is to emit the jump table.
+	jmpTableIsland
 
 	// exitSequence exits the execution and go back to the Go world.
 	exitSequence
@@ -577,8 +656,23 @@ const (
 	// An instruction that will always trigger the illegal instruction exception.
 	ud2
 
+	// xchg swaps the contents of two gp registers.
+	// The instruction doesn't make sense before register allocation, so it doensn't
+	// have useKinds and defKinds to avoid being used by the register allocator.
+	xchg
+
 	// v128ConstIsland is 16 bytes (128-bit) constant that will be loaded into an XMM.
 	v128ConstIsland
+
+	// zeros puts zeros into the destination register. This is implemented as xor reg, reg for
+	// either integer or XMM registers. The reason why we have this instruction instead of using aluRmiR
+	// is that it requires the already-defined registers. From reg alloc's perspective, this defines
+	// the destination register and takes no inputs.
+	zeros
+
+	// sourceOffsetInfo is a dummy instruction to emit source offset info.
+	// The existence of this instruction does not affect the execution.
+	sourceOffsetInfo
 
 	instrMax
 )
@@ -601,6 +695,8 @@ func (k instructionKind) String() string {
 		return "gprToXmm"
 	case xmmUnaryRmR:
 		return "xmmUnaryRmR"
+	case xmmUnaryRmRImm:
+		return "xmmUnaryRmRImm"
 	case unaryRmR:
 		return "unaryRmR"
 	case not:
@@ -653,8 +749,6 @@ func (k instructionKind) String() string {
 		return "cvtFloatToUintSeq"
 	case xmmMinMaxSeq:
 		return "xmmMinMaxSeq"
-	case xmmCmove:
-		return "xmmCmove"
 	case xmmCmpRmR:
 		return "xmmCmpRmR"
 	case xmmRmRImm:
@@ -663,14 +757,18 @@ func (k instructionKind) String() string {
 		return "jmpIf"
 	case jmp:
 		return "jmp"
-	case jmpTableSequence:
-		return "jmpTableSeq"
+	case jmpTableIsland:
+		return "jmpTableIsland"
 	case exitSequence:
 		return "exit_sequence"
 	case v128ConstIsland:
 		return "v128ConstIsland"
 	case ud2:
 		return "ud2"
+	case xchg:
+		return "xchg"
+	case zeros:
+		return "zeros"
 	default:
 		panic("BUG")
 	}
@@ -710,6 +808,12 @@ func (i *instruction) asJmpIf(cond cond, target operand) *instruction {
 	i.kind = jmpIf
 	i.u1 = uint64(cond)
 	i.op1 = target
+	return i
+}
+
+func (i *instruction) asJmpTableSequence(targets []uint32) *instruction {
+	i.kind = jmpTableIsland
+	i.targets = targets
 	return i
 }
 
@@ -778,6 +882,12 @@ func (i *instruction) asAluRmiR(op aluRmiROpcode, rm operand, rd regalloc.VReg, 
 	return i
 }
 
+func (i *instruction) asZeros(dst regalloc.VReg) *instruction {
+	i.kind = zeros
+	i.op2 = newOperandReg(dst)
+	return i
+}
+
 func (i *instruction) asXmmRmR(op sseOpcode, rm operand, rd regalloc.VReg) *instruction {
 	if rm.kind != operandKindReg && rm.kind != operandKindMem {
 		panic("BUG")
@@ -799,6 +909,16 @@ func (i *instruction) asGprToXmm(op sseOpcode, rm operand, rd regalloc.VReg, _64
 	i.u1 = uint64(op)
 	i.b1 = _64
 	return i
+}
+
+func (i *instruction) asEmitSourceOffsetInfo(l ssa.SourceOffset) *instruction {
+	i.kind = sourceOffsetInfo
+	i.u1 = uint64(l)
+	return i
+}
+
+func (i *instruction) sourceOffsetInfo() ssa.SourceOffset {
+	return ssa.SourceOffset(i.u1)
 }
 
 func (i *instruction) asMovRM(rm regalloc.VReg, rd operand, size byte) *instruction {
@@ -834,8 +954,24 @@ func (i *instruction) asMovzxRmR(ext extMode, src operand, rd regalloc.VReg) *in
 	return i
 }
 
+func (i *instruction) asSignExtendData(_64 bool) *instruction {
+	i.kind = signExtendData
+	i.b1 = _64
+	return i
+}
+
 func (i *instruction) asUD2() *instruction {
 	i.kind = ud2
+	return i
+}
+
+func (i *instruction) asDiv(rn operand, signed bool, _64 bool) *instruction {
+	i.kind = div
+	i.op1 = rn
+	i.b1 = _64
+	if signed {
+		i.u1 = 1
+	}
 	return i
 }
 
@@ -925,13 +1061,13 @@ func (i *instruction) asXmmRmiReg(op sseOpcode, rm operand, rd regalloc.VReg) *i
 	return i
 }
 
-func (i *instruction) asCmpRmiR(cmp bool, rm operand, rd regalloc.VReg, _64 bool) *instruction {
+func (i *instruction) asCmpRmiR(cmp bool, rm operand, rn regalloc.VReg, _64 bool) *instruction {
 	if rm.kind != operandKindReg && rm.kind != operandKindImm32 && rm.kind != operandKindMem {
 		panic("BUG")
 	}
 	i.kind = cmpRmiR
 	i.op1 = rm
-	i.op2 = newOperandReg(rd)
+	i.op2 = newOperandReg(rn)
 	if cmp {
 		i.u1 = 1
 	}
@@ -941,7 +1077,7 @@ func (i *instruction) asCmpRmiR(cmp bool, rm operand, rd regalloc.VReg, _64 bool
 
 func (i *instruction) asSetcc(c cond, rd regalloc.VReg) *instruction {
 	i.kind = setcc
-	i.op1 = newOperandReg(rd)
+	i.op2 = newOperandReg(rd)
 	i.u1 = uint64(c)
 	return i
 }
@@ -966,6 +1102,29 @@ func (i *instruction) asXmmUnaryRmR(op sseOpcode, rm operand, rd regalloc.VReg) 
 		panic("BUG")
 	}
 	i.kind = xmmUnaryRmR
+	i.op1 = rm
+	i.op2 = newOperandReg(rd)
+	i.u1 = uint64(op)
+	return i
+}
+
+func (i *instruction) asXmmUnaryRmRImm(op sseOpcode, imm uint8, rm operand, rd regalloc.VReg) *instruction {
+	if rm.kind != operandKindReg && rm.kind != operandKindMem {
+		panic("BUG")
+	}
+	i.kind = xmmUnaryRmRImm
+	i.op1 = rm
+	i.op2 = newOperandReg(rd)
+	i.u1 = uint64(op)
+	i.u2 = uint64(imm)
+	return i
+}
+
+func (i *instruction) asXmmCmpRmR(op sseOpcode, rm operand, rd regalloc.VReg) *instruction {
+	if rm.kind != operandKindReg && rm.kind != operandKindMem {
+		panic("BUG")
+	}
+	i.kind = xmmCmpRmR
 	i.op1 = rm
 	i.op2 = newOperandReg(rd)
 	i.u1 = uint64(op)
@@ -1002,6 +1161,13 @@ func (i *instruction) asPush64(op operand) *instruction {
 	}
 	i.kind = push64
 	i.op1 = op
+	return i
+}
+
+func (i *instruction) asXCHG(rm, rd regalloc.VReg) *instruction {
+	i.kind = xchg
+	i.op1 = newOperandReg(rm)
+	i.op2 = newOperandReg(rd)
 	return i
 }
 
@@ -1551,6 +1717,30 @@ func (s sseOpcode) String() string {
 	}
 }
 
+type roundingMode uint8
+
+const (
+	roundingModeNearest roundingMode = iota
+	roundingModeDown
+	roundingModeUp
+	roundingModeZero
+)
+
+func (r roundingMode) String() string {
+	switch r {
+	case roundingModeNearest:
+		return "nearest"
+	case roundingModeDown:
+		return "down"
+	case roundingModeUp:
+		return "up"
+	case roundingModeZero:
+		return "zero"
+	default:
+		panic("BUG")
+	}
+}
+
 func linkInstr(prev, next *instruction) *instruction {
 	prev.next = next
 	next.prev = prev
@@ -1563,32 +1753,44 @@ const (
 	defKindNone defKind = iota + 1
 	defKindOp2
 	defKindCall
+	defKindRdx
+	defKindRaxRdx
 )
 
 var defKinds = [instrMax]defKind{
-	nop0:            defKindNone,
-	ret:             defKindNone,
-	movRR:           defKindOp2,
-	movRM:           defKindNone,
-	xmmMovRM:        defKindNone,
-	aluRmiR:         defKindNone,
-	shiftR:          defKindNone,
-	imm:             defKindOp2,
-	unaryRmR:        defKindOp2,
-	xmmUnaryRmR:     defKindOp2,
-	mov64MR:         defKindOp2,
-	movsxRmR:        defKindOp2,
-	movzxRmR:        defKindOp2,
-	gprToXmm:        defKindOp2,
-	call:            defKindCall,
-	callIndirect:    defKindCall,
-	ud2:             defKindNone,
-	jmp:             defKindNone,
-	jmpIf:           defKindNone,
-	cmpRmiR:         defKindNone,
-	exitSequence:    defKindNone,
-	lea:             defKindOp2,
-	v128ConstIsland: defKindNone,
+	nop0:             defKindNone,
+	div:              defKindRaxRdx,
+	signExtendData:   defKindRdx,
+	ret:              defKindNone,
+	movRR:            defKindOp2,
+	movRM:            defKindNone,
+	xmmMovRM:         defKindNone,
+	aluRmiR:          defKindNone,
+	shiftR:           defKindNone,
+	imm:              defKindOp2,
+	unaryRmR:         defKindOp2,
+	xmmUnaryRmR:      defKindOp2,
+	xmmUnaryRmRImm:   defKindOp2,
+	xmmCmpRmR:        defKindOp2,
+	xmmRmR:           defKindNone,
+	mov64MR:          defKindOp2,
+	movsxRmR:         defKindOp2,
+	movzxRmR:         defKindOp2,
+	gprToXmm:         defKindOp2,
+	cmove:            defKindNone,
+	call:             defKindCall,
+	callIndirect:     defKindCall,
+	ud2:              defKindNone,
+	jmp:              defKindNone,
+	jmpIf:            defKindNone,
+	jmpTableIsland:   defKindNone,
+	cmpRmiR:          defKindNone,
+	exitSequence:     defKindNone,
+	lea:              defKindOp2,
+	v128ConstIsland:  defKindNone,
+	setcc:            defKindOp2,
+	zeros:            defKindOp2,
+	sourceOffsetInfo: defKindNone,
 }
 
 // String implements fmt.Stringer.
@@ -1600,6 +1802,10 @@ func (d defKind) String() string {
 		return "op2"
 	case defKindCall:
 		return "call"
+	case defKindRdx:
+		return "rdx"
+	case defKindRaxRdx:
+		return "raxrdx"
 	default:
 		return "invalid"
 	}
@@ -1614,34 +1820,48 @@ const (
 	useKindOp1Op2Reg
 	// useKindOp1RegOp2 is Op1 must be a register, Op2 can be any operand.
 	useKindOp1RegOp2
+	// useKindRax is %rax is used (for instance in signExtendData).
+	useKindRax
+	// useKindOp1Rax is Op1 must be a reg, mem operand; the other operand is implicitly %rax.
+	useKindOp1Rax
 	useKindCall
 	useKindCallInd
 )
 
 var useKinds = [instrMax]useKind{
-	nop0:            useKindNone,
-	ret:             useKindNone,
-	movRR:           useKindOp1,
-	movRM:           useKindOp1RegOp2,
-	xmmMovRM:        useKindOp1RegOp2,
-	aluRmiR:         useKindOp1Op2Reg,
-	shiftR:          useKindOp1Op2Reg,
-	imm:             useKindNone,
-	unaryRmR:        useKindOp1,
-	xmmUnaryRmR:     useKindOp1,
-	mov64MR:         useKindOp1,
-	movzxRmR:        useKindOp1,
-	movsxRmR:        useKindOp1,
-	gprToXmm:        useKindOp1,
-	call:            useKindCall,
-	callIndirect:    useKindCallInd,
-	ud2:             useKindNone,
-	jmpIf:           useKindOp1,
-	jmp:             useKindOp1,
-	cmpRmiR:         useKindOp1Op2Reg,
-	exitSequence:    useKindOp1,
-	lea:             useKindOp1,
-	v128ConstIsland: useKindNone,
+	nop0:             useKindNone,
+	div:              useKindOp1Rax,
+	signExtendData:   useKindRax,
+	ret:              useKindNone,
+	movRR:            useKindOp1,
+	movRM:            useKindOp1RegOp2,
+	xmmMovRM:         useKindOp1RegOp2,
+	cmove:            useKindOp1Op2Reg,
+	aluRmiR:          useKindOp1Op2Reg,
+	shiftR:           useKindOp1Op2Reg,
+	imm:              useKindNone,
+	unaryRmR:         useKindOp1,
+	xmmUnaryRmR:      useKindOp1,
+	xmmUnaryRmRImm:   useKindOp1,
+	xmmCmpRmR:        useKindOp1Op2Reg,
+	xmmRmR:           useKindOp1Op2Reg,
+	mov64MR:          useKindOp1,
+	movzxRmR:         useKindOp1,
+	movsxRmR:         useKindOp1,
+	gprToXmm:         useKindOp1,
+	call:             useKindCall,
+	callIndirect:     useKindCallInd,
+	ud2:              useKindNone,
+	jmpIf:            useKindOp1,
+	jmp:              useKindOp1,
+	cmpRmiR:          useKindOp1Op2Reg,
+	exitSequence:     useKindOp1,
+	lea:              useKindOp1,
+	v128ConstIsland:  useKindNone,
+	jmpTableIsland:   useKindNone,
+	setcc:            useKindNone,
+	zeros:            useKindNone,
+	sourceOffsetInfo: useKindNone,
 }
 
 func (u useKind) String() string {
@@ -1656,6 +1876,12 @@ func (u useKind) String() string {
 		return "op1RegOp2"
 	case useKindCall:
 		return "call"
+	case useKindCallInd:
+		return "callInd"
+	case useKindOp1Rax:
+		return "op1rax"
+	case useKindRax:
+		return "rax"
 	default:
 		return "invalid"
 	}
