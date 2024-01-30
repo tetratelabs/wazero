@@ -460,7 +460,16 @@ func (i *instruction) AssignDef(reg regalloc.VReg) {
 // IsCopy implements regalloc.Instr.
 func (i *instruction) IsCopy() bool {
 	k := i.kind
-	return k == movRR || (k == xmmUnaryRmR && i.op1.kind == operandKindReg)
+	if k == movRR {
+		return true
+	}
+	if k == xmmUnaryRmR {
+		if i.op1.kind == operandKindReg {
+			sse := sseOpcode(i.u1)
+			return sse == sseOpcodeMovss || sse == sseOpcodeMovsd || sse == sseOpcodeMovdqu
+		}
+	}
+	return false
 }
 
 func resetInstruction(i *instruction) {
