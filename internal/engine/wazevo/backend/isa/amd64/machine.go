@@ -1661,22 +1661,29 @@ func (m *machine) lowerFcopysign(instr *ssa.Instruction) {
 
 	// Clear the non-sign bits of src via AND with the mask.
 	var opAnd, opOr sseOpcode
-	var mask uint64
+	var signMask uint64
 	if _64 {
-		mask, opAnd, opOr = 0x8000000000000000, sseOpcodeAndpd, sseOpcodeOrpd
+		signMask, opAnd, opOr = 0x8000000000000000, sseOpcodeAndpd, sseOpcodeOrpd
 	} else {
-		mask, opAnd, opOr = 0x80000000, sseOpcodeAndps, sseOpcodeOrps
+		signMask, opAnd, opOr = 0x80000000, sseOpcodeAndps, sseOpcodeOrps
 	}
 
-	tmp := m.c.AllocateVReg(x.Type())
-	m.lowerFconst(tmp, mask, _64)
+	signBitReg := m.c.AllocateVReg(x.Type())
+	m.lowerFconst(signBitReg, signMask, _64)
+	nonSignBitReg := m.c.AllocateVReg(x.Type())
+	m.lowerFconst(nonSignBitReg, ^signMask, _64)
 
-	and := m.allocateInstr().asXmmRmR(opAnd, rn, tmp)
+	// Extract the sign bits of rn.
+	and := m.allocateInstr().asXmmRmR(opAnd, rn, signBitReg)
 	m.insert(and)
 
-	// Finally, copy the sign bit of src to dst.
-	or := m.allocateInstr().asXmmRmR(opOr, rm, tmp)
+	// Clear the non-sign bits of dst via AND with the non-sign bit mask.
+	xor := m.allocateInstr().asXmmRmR(opAnd, rm, nonSignBitReg)
+	m.insert(xor)
+
+	// Copy the sign bits of src to dst via OR.
+	or := m.allocateInstr().asXmmRmR(opOr, newOperandReg(signBitReg), nonSignBitReg)
 	m.insert(or)
 
-	m.copyTo(tmp, rd)
+	m.copyTo(nonSignBitReg, rd)
 }
