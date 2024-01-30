@@ -3039,6 +3039,26 @@ func TestInstruction_format_encode(t *testing.T) {
 			want:       "4887f3",
 			wantFormat: "xchg %rbx, %rsi",
 		},
+		{
+			setup:      func(i *instruction) { i.asZeros(rbxVReg) },
+			want:       "4831db",
+			wantFormat: "xor %rbx, %rbx",
+		},
+		{
+			setup:      func(i *instruction) { i.asZeros(r14VReg) },
+			want:       "4d31f6",
+			wantFormat: "xor %r14, %r14",
+		},
+		{
+			setup:      func(i *instruction) { i.asZeros(xmm1VReg) },
+			want:       "660fefc9",
+			wantFormat: "xor %xmm1, %xmm1",
+		},
+		{
+			setup:      func(i *instruction) { i.asZeros(xmm12VReg) },
+			want:       "66450fefe4",
+			wantFormat: "xor %xmm12, %xmm12",
+		},
 	} {
 		tc := tc
 		t.Run(tc.wantFormat, func(t *testing.T) {

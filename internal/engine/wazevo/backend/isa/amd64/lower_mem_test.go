@@ -95,7 +95,7 @@ func TestMachine_lowerToAddressMode(t *testing.T) {
 				return ishl.Return(), 1 << 30
 			},
 			insts: []string{
-				"movabsq $0, %r100?",
+				"xor %r100?, %r100?",
 			},
 			am: newAmodeRegRegShift(1<<30, nextVReg, raxVReg, 2),
 		},
@@ -313,7 +313,7 @@ func TestMachine_lowerAddendsToAmode(t *testing.T) {
 			x:    addend{r: x1, shift: 3}, y: addend{r: regalloc.VRegInvalid},
 			offset: 1 << 30,
 			insts: []string{
-				"movabsq $0, %r100?",
+				"xor %r100?, %r100?",
 			},
 			exp: newAmodeRegRegShift(1<<30, nextVReg, x1, 3),
 		},
@@ -322,7 +322,7 @@ func TestMachine_lowerAddendsToAmode(t *testing.T) {
 			x:    addend{r: regalloc.VRegInvalid}, y: addend{r: x1, shift: 3},
 			offset: 1 << 30,
 			insts: []string{
-				"movabsq $0, %r100?",
+				"xor %r100?, %r100?",
 			},
 			exp: newAmodeRegRegShift(1<<30, nextVReg, x1, 3),
 		},

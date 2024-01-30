@@ -237,6 +237,8 @@ func (i *instruction) String() string {
 		return fmt.Sprintf("v128ConstIsland (%#x, %#x)", i.u1, i.u2)
 	case xchg:
 		return fmt.Sprintf("xchg %s, %s", i.op1.format(true), i.op2.format(true))
+	case zeros:
+		return fmt.Sprintf("xor %s, %s", i.op2.format(true), i.op2.format(true))
 	default:
 		panic(fmt.Sprintf("BUG: %d", int(i.kind)))
 	}
@@ -258,7 +260,6 @@ func (i *instruction) Defs(regs *[]regalloc.VReg) []regalloc.VReg {
 		*regs = append(*regs, rdxVReg)
 	case defKindRaxRdx:
 		*regs = append(*regs, raxVReg, rdxVReg)
-
 	default:
 		panic(fmt.Sprintf("BUG: invalid defKind \"%s\" for %s", dk, i))
 	}
@@ -664,6 +665,12 @@ const (
 	// v128ConstIsland is 16 bytes (128-bit) constant that will be loaded into an XMM.
 	v128ConstIsland
 
+	// zeros puts zeros into the destination register. This is implemented as xor reg, reg for
+	// either integer or XMM registers. The reason why we have this instruction instead of using aluRmiR
+	// is that it requires the already-defined registers. From reg alloc's perspective, this defines
+	// the destination register and takes no inputs.
+	zeros
+
 	instrMax
 )
 
@@ -757,6 +764,8 @@ func (k instructionKind) String() string {
 		return "ud2"
 	case xchg:
 		return "xchg"
+	case zeros:
+		return "zeros"
 	default:
 		panic("BUG")
 	}
@@ -867,6 +876,12 @@ func (i *instruction) asAluRmiR(op aluRmiROpcode, rm operand, rd regalloc.VReg, 
 	i.op2 = newOperandReg(rd)
 	i.u1 = uint64(op)
 	i.b1 = _64
+	return i
+}
+
+func (i *instruction) asZeros(dst regalloc.VReg) *instruction {
+	i.kind = zeros
+	i.op2 = newOperandReg(dst)
 	return i
 }
 
@@ -1761,6 +1776,7 @@ var defKinds = [instrMax]defKind{
 	lea:             defKindOp2,
 	v128ConstIsland: defKindNone,
 	setcc:           defKindOp2,
+	zeros:           defKindOp2,
 }
 
 // String implements fmt.Stringer.
@@ -1830,6 +1846,7 @@ var useKinds = [instrMax]useKind{
 	v128ConstIsland: useKindNone,
 	jmpTableIsland:  useKindNone,
 	setcc:           useKindNone,
+	zeros:           useKindNone,
 }
 
 func (u useKind) String() string {

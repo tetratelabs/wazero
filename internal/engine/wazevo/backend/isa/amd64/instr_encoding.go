@@ -1110,6 +1110,15 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 		enc1, enc2 := regEncodings[r1], regEncodings[r2]
 		encodeRegReg(c, legacyPrefixesNone, 0x87, 1, enc2, enc1, rexInfo(0).setW())
 
+	case zeros:
+		r := i.op2.r
+		if r.RegType() == regalloc.RegTypeInt {
+			i.asAluRmiR(aluRmiROpcodeXor, newOperandReg(r), r, true)
+		} else {
+			i.asXmmRmR(sseOpcodePxor, newOperandReg(r), r)
+		}
+		i.encode(c)
+
 	default:
 		panic(fmt.Sprintf("TODO: %v", i.kind))
 	}
