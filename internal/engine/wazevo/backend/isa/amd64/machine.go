@@ -1677,7 +1677,7 @@ func (m *machine) lowerFcopysign(instr *ssa.Instruction) {
 	and := m.allocateInstr().asXmmRmR(opAnd, rn, signBitReg)
 	m.insert(and)
 
-	// Clear the non-sign bits of dst via AND with the non-sign bit mask.
+	// Clear the sign bit of dst via AND with the non-sign bit mask.
 	xor := m.allocateInstr().asXmmRmR(opAnd, rm, nonSignBitReg)
 	m.insert(xor)
 
