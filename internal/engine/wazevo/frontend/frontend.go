@@ -23,6 +23,7 @@ type Compiler struct {
 	memoryGrowSig          ssa.Signature
 	memoryWait32Sig        ssa.Signature
 	memoryWait64Sig        ssa.Signature
+	memoryNotifySig        ssa.Signature
 	checkModuleExitCodeSig ssa.Signature
 	tableGrowSig           ssa.Signature
 	refFuncSig             ssa.Signature
@@ -163,6 +164,15 @@ func (c *Compiler) declareSignatures(listenerOn bool) {
 		Results: []ssa.Type{ssa.TypeI32},
 	}
 	c.ssaBuilder.DeclareSignature(&c.memoryWait64Sig)
+
+	c.memoryNotifySig = ssa.Signature{
+		ID: c.memoryWait64Sig.ID + 1,
+		// exec context, count, addr
+		Params: []ssa.Type{ssa.TypeI64, ssa.TypeI32, ssa.TypeI64},
+		// Returns the number notified.
+		Results: []ssa.Type{ssa.TypeI32},
+	}
+	c.ssaBuilder.DeclareSignature(&c.memoryNotifySig)
 }
 
 // SignatureForWasmFunctionType returns the ssa.Signature for the given wasm.FunctionType.

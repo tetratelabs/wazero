@@ -612,7 +612,11 @@ func TestE2E(t *testing.T) {
 			m:        testcases.MemoryWait32.Module,
 			features: api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
 			calls: []callCase{
-				{params: []uint64{0x0, 0xbeef, 0xffffffff}, expResults: []uint64{1}},
+				{params: []uint64{0x0, 0xbeef, 0xffffffff}, expResults: []uint64{1}}, // exp not equal, returns 1
+				{params: []uint64{0x1, 0xbeef, 0xffffffff}, expErr: "unaligned atomic"},
+				{params: []uint64{0x2, 0xbeef, 0xffffffff}, expErr: "unaligned atomic"},
+				{params: []uint64{0x3, 0xbeef, 0xffffffff}, expErr: "unaligned atomic"},
+				{params: []uint64{0x4, 0xbeef, 0xffffffff}, expResults: []uint64{1}}, // exp not equal, returns 1
 			},
 		},
 		{
@@ -620,7 +624,27 @@ func TestE2E(t *testing.T) {
 			m:        testcases.MemoryWait64.Module,
 			features: api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
 			calls: []callCase{
-				{params: []uint64{0x0, 0xbeef, 0xffffffff}, expResults: []uint64{1}},
+				{params: []uint64{0x0, 0xbeef, 0xffffffff}, expResults: []uint64{1}}, // exp not equal, returns 1
+				{params: []uint64{0x1, 0xbeef, 0xffffffff}, expErr: "unaligned atomic"},
+				{params: []uint64{0x2, 0xbeef, 0xffffffff}, expErr: "unaligned atomic"},
+				{params: []uint64{0x3, 0xbeef, 0xffffffff}, expErr: "unaligned atomic"},
+				{params: []uint64{0x4, 0xbeef, 0xffffffff}, expErr: "unaligned atomic"},
+				{params: []uint64{0x5, 0xbeef, 0xffffffff}, expErr: "unaligned atomic"},
+				{params: []uint64{0x6, 0xbeef, 0xffffffff}, expErr: "unaligned atomic"},
+				{params: []uint64{0x7, 0xbeef, 0xffffffff}, expErr: "unaligned atomic"},
+				{params: []uint64{0x8, 0xbeef, 0xffffffff}, expResults: []uint64{1}}, // exp not equal, returns 1
+			},
+		},
+		{
+			name:     "memory_notify",
+			m:        testcases.MemoryNotify.Module,
+			features: api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
+			calls: []callCase{
+				{params: []uint64{0x0, 0x1}, expResults: []uint64{0}}, // no waiters, returns 0
+				{params: []uint64{0x1, 0x1}, expErr: "unaligned atomic"},
+				{params: []uint64{0x2, 0x1}, expErr: "unaligned atomic"},
+				{params: []uint64{0x3, 0x1}, expErr: "unaligned atomic"},
+				{params: []uint64{0x4, 0x1}, expResults: []uint64{0}}, // no waiters, returns 0
 			},
 		},
 		{

@@ -87,6 +87,8 @@ type (
 		memoryWait32TrampolineAddress *byte
 		// memoryWait32TrampolineAddress holds the address of memory_wait64 trampoline function.
 		memoryWait64TrampolineAddress *byte
+		// memoryNotifyTrampolineAddress holds the address of the memory_notify trampoline function.
+		memoryNotifyTrampolineAddress *byte
 	}
 )
 
@@ -422,6 +424,18 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 				addr := unsafe.Add(unsafe.Pointer(&mem.Buffer[0]), offset)
 				return atomic.LoadUint64((*uint64)(addr))
 			})
+			s[0] = uint64(res)
+			c.execCtx.exitCode = wazevoapi.ExitCodeOK
+			afterGoFunctionCallEntrypoint(c.execCtx.goCallReturnAddress, c.execCtxPtr,
+				uintptr(unsafe.Pointer(c.execCtx.stackPointerBeforeGoCall)), c.execCtx.framePointerBeforeGoCall)
+		case wazevoapi.ExitCodeMemoryNotify:
+			mod := c.callerModuleInstance()
+			mem := mod.MemoryInstance
+
+			s := goCallStackView(c.execCtx.stackPointerBeforeGoCall)
+			count, addr := uint32(s[0]), s[1]
+			offset := uint32(uintptr(addr) - uintptr(unsafe.Pointer(&mem.Buffer[0])))
+			res := mem.Notify(offset, count)
 			s[0] = uint64(res)
 			c.execCtx.exitCode = wazevoapi.ExitCodeOK
 			afterGoFunctionCallEntrypoint(c.execCtx.goCallReturnAddress, c.execCtxPtr,

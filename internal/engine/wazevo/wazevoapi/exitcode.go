@@ -28,6 +28,7 @@ const (
 	ExitCodeRefFunc
 	ExitCodeMemoryWait32
 	ExitCodeMemoryWait64
+	ExitCodeMemoryNotify
 	ExitCodeUnalignedAtomic
 	exitCodeMax
 )
@@ -83,6 +84,8 @@ func (e ExitCode) String() string {
 		return "memory_wait32"
 	case ExitCodeMemoryWait64:
 		return "memory_wait64"
+	case ExitCodeMemoryNotify:
+		return "memory_notify"
 	}
 	panic("TODO")
 }

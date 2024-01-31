@@ -185,6 +185,7 @@ func (m *moduleEngine) NewFunction(index wasm.Index) api.Function {
 	ce.execCtx.refFuncTrampolineAddress = &m.parent.sharedFunctions.refFuncExecutable[0]
 	ce.execCtx.memoryWait32TrampolineAddress = &m.parent.sharedFunctions.memoryWait32Executable[0]
 	ce.execCtx.memoryWait64TrampolineAddress = &m.parent.sharedFunctions.memoryWait64Executable[0]
+	ce.execCtx.memoryNotifyTrampolineAddress = &m.parent.sharedFunctions.memoryNotifyExecutable[0]
 	ce.execCtx.memmoveAddress = memmovPtr
 	ce.init()
 	return ce

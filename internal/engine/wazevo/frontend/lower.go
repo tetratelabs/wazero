@@ -3194,6 +3194,28 @@ func (c *Compiler) lowerCurrentOpcode() {
 				AsCallIndirect(memoryWaitPtr, sig, args).
 				Insert(builder).Return()
 			state.push(memoryWaitRet)
+		case wasm.OpcodeAtomicMemoryNotify:
+			_, offset := c.readMemArg()
+			if state.unreachable {
+				break
+			}
+
+			c.storeCallerModuleContext()
+			count := state.pop()
+			baseAddr := state.pop()
+			addr := c.memOpSetup(baseAddr, uint64(offset), 4)
+			c.memAlignmentCheck(addr, 4)
+
+			memoryNotifyPtr := builder.AllocateInstruction().
+				AsLoad(c.execCtxPtrValue,
+					wazevoapi.ExecutionContextOffsetMemoryNotifyTrampolineAddress.U32(),
+					ssa.TypeI64,
+				).Insert(builder).Return()
+			args := []ssa.Value{c.execCtxPtrValue, count, addr}
+			memoryNotifyRet := builder.AllocateInstruction().
+				AsCallIndirect(memoryNotifyPtr, &c.memoryNotifySig, args).
+				Insert(builder).Return()
+			state.push(memoryNotifyRet)
 		default:
 			panic("TODO: unsupported atomic instruction: " + wasm.AtomicInstructionName(atomicOp))
 		}
