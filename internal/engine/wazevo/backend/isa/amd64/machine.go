@@ -1211,7 +1211,7 @@ func (m *machine) Format() string {
 		if cur.kind == nop0 {
 			continue
 		}
-		clines = append(lines, "\t"+cur.String())
+		lines = append(lines, "\t"+cur.String())
 	}
 	return "\n" + strings.Join(lines, "\n") + "\n"
 }
