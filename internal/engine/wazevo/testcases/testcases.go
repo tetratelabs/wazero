@@ -1969,6 +1969,22 @@ var (
 			}}},
 		},
 	}
+
+	MemoryNotify = TestCase{
+		Name: "memory_notify",
+		Module: &wasm.Module{
+			TypeSection:     []wasm.FunctionType{{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}}},
+			ExportSection:   []wasm.Export{{Name: ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 0}},
+			MemorySection:   &wasm.Memory{Min: 1, Max: 1, IsMaxEncoded: true, IsShared: true},
+			FunctionSection: []wasm.Index{0},
+			CodeSection: []wasm.Code{{Body: []byte{
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeAtomicPrefix, wasm.OpcodeAtomicMemoryNotify, 0x1, 0,
+				wasm.OpcodeEnd,
+			}}},
+		},
+	}
 )
 
 // VecShuffleWithLane returns a VecShuffle test with a custom 16-bytes immediate (lane indexes).

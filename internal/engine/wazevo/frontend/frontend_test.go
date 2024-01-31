@@ -1673,6 +1673,34 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i64, v4:i64)
 	Jump blk_ret, v17
 `,
 		},
+		{
+			name:     "MemoryNotify",
+			m:        testcases.MemoryNotify.Module,
+			features: api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
+			exp: `
+signatures:
+	sig8: i64i32i64_i32
+
+blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i32)
+	Store module_ctx, exec_ctx, 0x8
+	v4:i64 = Iconst_64 0x4
+	v5:i64 = UExtend v2, 32->64
+	v6:i64 = Uload32 module_ctx, 0x10
+	v7:i64 = Iadd v5, v4
+	v8:i32 = Icmp lt_u, v6, v7
+	ExitIfTrue v8, exec_ctx, memory_out_of_bounds
+	v9:i64 = Load module_ctx, 0x8
+	v10:i64 = Iadd v9, v5
+	v11:i64 = Iconst_64 0x3
+	v12:i64 = Band v10, v11
+	v13:i64 = Iconst_64 0x0
+	v14:i32 = Icmp neq, v12, v13
+	ExitIfTrue v14, exec_ctx, unaligned_atomic
+	v15:i64 = Load exec_ctx, 0x498
+	v16:i32 = CallIndirect v15:sig8, exec_ctx, v3, v10
+	Jump blk_ret, v16
+`,
+		},
 	} {
 
 		tc := tc
@@ -1781,6 +1809,7 @@ func TestCompiler_declareSignatures(t *testing.T) {
 			{ID: 8, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI64}},
 			{ID: 9, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI32, ssa.TypeI64}, Results: []ssa.Type{ssa.TypeI32}},
 			{ID: 10, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI64, ssa.TypeI64}, Results: []ssa.Type{ssa.TypeI32}},
+			{ID: 11, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI32, ssa.TypeI64}, Results: []ssa.Type{ssa.TypeI32}},
 		}
 
 		require.Equal(t, len(expected), len(declaredSigs))
@@ -1819,6 +1848,7 @@ func TestCompiler_declareSignatures(t *testing.T) {
 			{ID: 16, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI64}},
 			{ID: 17, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI32, ssa.TypeI64}, Results: []ssa.Type{ssa.TypeI32}},
 			{ID: 18, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI64, ssa.TypeI64}, Results: []ssa.Type{ssa.TypeI32}},
+			{ID: 19, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI32, ssa.TypeI64}, Results: []ssa.Type{ssa.TypeI32}},
 		}
 		require.Equal(t, len(expected), len(declaredSigs))
 		for i := 0; i < len(declaredSigs); i++ {
