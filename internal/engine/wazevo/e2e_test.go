@@ -1284,7 +1284,7 @@ func TestSpectestV2(t *testing.T) {
 		{"br"},
 		{"call"},
 		{"call_indirect"},
-		//{"conversions"},
+		{"conversions"},
 		{"global"},
 		{"if"},
 		{"linking"},
