@@ -47,6 +47,8 @@ func (i *instruction) String() string {
 	switch i.kind {
 	case nop0:
 		return "nop"
+	case sourceOffsetInfo:
+		return fmt.Sprintf("source_offset_info %d", i.u1)
 	case ret:
 		return "ret"
 	case imm:
