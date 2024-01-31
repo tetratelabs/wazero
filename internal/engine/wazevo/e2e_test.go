@@ -1305,7 +1305,7 @@ func TestSpectestV1(t *testing.T) {
 		{name: "f64_cmp"},
 		{name: "fac"},
 		//{name: "float_exprs"},
-		//{name: "float_literals"},
+		{name: "float_literals"},
 		{name: "float_memory"},
 		{name: "float_misc"},
 		{name: "func"},
@@ -1353,6 +1353,12 @@ func TestSpectestV1(t *testing.T) {
 				-1, 0, math.MaxInt)
 		})
 	}
+
+	t.Run("conversions 000-309", func(t *testing.T) {
+		spectest.RunCase(t, v1.Testcases, "conversions", context.Background(), config,
+			-1, 0, 309)
+	})
+
 }
 
 // TODO: delete this and rune them in internal/integration_test/spectest/v2/spec_test.go after amd64 is done.
