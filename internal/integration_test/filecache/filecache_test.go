@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -32,7 +31,7 @@ func TestFileCacheSpecTest_compiler(t *testing.T) {
 }
 
 func TestFileCacheSpecTest_wazevo(t *testing.T) {
-	if runtime.GOARCH != "arm64" {
+	if !platform.CompilerSupported() {
 		return
 	}
 	config := opt.NewRuntimeConfigOptimizingCompiler()
