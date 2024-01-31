@@ -200,7 +200,7 @@ func (i *instruction) String() string {
 	case xmmLoadConst:
 		panic("TODO")
 	case xmmToGpr:
-		panic("TODO")
+		return fmt.Sprintf("%s %s, %s", sseOpcode(i.u1), i.op1.format(i.b1), i.op2.format(i.b1))
 	case cvtUint64ToFloatSeq:
 		panic("TODO")
 	case cvtFloatToSintSeq:
@@ -253,7 +253,7 @@ func (i *instruction) Defs(regs *[]regalloc.VReg) []regalloc.VReg {
 	case defKindNone:
 	case defKindOp2:
 		if !i.op2.r.Valid() {
-			panic("BUG" + i.String())
+			panic("BUG " + i.op2.format(true) + " invalid in " + i.String())
 		}
 		*regs = append(*regs, i.op2.r)
 	case defKindCall:
@@ -921,6 +921,15 @@ func (i *instruction) asEmitSourceOffsetInfo(l ssa.SourceOffset) *instruction {
 
 func (i *instruction) sourceOffsetInfo() ssa.SourceOffset {
 	return ssa.SourceOffset(i.u1)
+}
+
+func (i *instruction) asXmmToGpr(op sseOpcode, rm, rd regalloc.VReg, _64 bool) *instruction {
+	i.kind = xmmToGpr
+	i.op1 = newOperandReg(rm)
+	i.op2 = newOperandReg(rd)
+	i.u1 = uint64(op)
+	i.b1 = _64
+	return i
 }
 
 func (i *instruction) asMovRM(rm regalloc.VReg, rd operand, size byte) *instruction {
@@ -1779,6 +1788,7 @@ var defKinds = [instrMax]defKind{
 	movsxRmR:         defKindOp2,
 	movzxRmR:         defKindOp2,
 	gprToXmm:         defKindOp2,
+	xmmToGpr:         defKindOp2,
 	cmove:            defKindNone,
 	call:             defKindCall,
 	callIndirect:     defKindCall,
@@ -1851,6 +1861,7 @@ var useKinds = [instrMax]useKind{
 	movzxRmR:         useKindOp1,
 	movsxRmR:         useKindOp1,
 	gprToXmm:         useKindOp1,
+	xmmToGpr:         useKindOp1,
 	call:             useKindCall,
 	callIndirect:     useKindCallInd,
 	ud2:              useKindNone,

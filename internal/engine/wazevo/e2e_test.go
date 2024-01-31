@@ -1327,7 +1327,7 @@ func TestSpectestV1(t *testing.T) {
 		//{name: "local_get"},
 		//{name: "local_set"},
 		//{name: "local_tee"},
-		//{name: "memory"},
+		{name: "memory"},
 		{name: "memory_size"},
 		{name: "memory_grow"},
 		{name: "memory_redundancy"},

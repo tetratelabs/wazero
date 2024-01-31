@@ -335,8 +335,24 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		m.lowerFminFmax(instr)
 	case ssa.OpcodeFcopysign:
 		m.lowerFcopysign(instr)
+	case ssa.OpcodeBitcast:
+		m.lowerBitcast(instr)
 	case ssa.OpcodeSqrt:
 		m.lowerSqrt(instr)
+	case ssa.OpcodeFpromote:
+		v := instr.Arg()
+		rn := m.getOperand_Reg(m.c.ValueDefinition(v))
+		rd := m.c.VRegOf(instr.Return())
+		cnt := m.allocateInstr()
+		cnt.asXmmUnaryRmR(sseOpcodeCvtss2sd, rn, rd)
+		m.insert(cnt)
+	case ssa.OpcodeFdemote:
+		v := instr.Arg()
+		rn := m.getOperand_Reg(m.c.ValueDefinition(v))
+		rd := m.c.VRegOf(instr.Return())
+		cnt := m.allocateInstr()
+		cnt.asXmmUnaryRmR(sseOpcodeCvtsd2ss, rn, rd)
+		m.insert(cnt)
 	case ssa.OpcodeUndefined:
 		m.insert(m.allocateInstr().asUD2())
 	case ssa.OpcodeExitWithCode:
@@ -1694,4 +1710,27 @@ func (m *machine) lowerFcopysign(instr *ssa.Instruction) {
 	m.insert(or)
 
 	m.copyTo(nonSignBitReg, rd)
+}
+
+func (m *machine) lowerBitcast(instr *ssa.Instruction) {
+	x, dstTyp := instr.BitcastData()
+	srcTyp := x.Type()
+	rn := m.getOperand_Reg(m.c.ValueDefinition(x))
+	rd := m.c.VRegOf(instr.Return())
+	switch {
+	case srcTyp == ssa.TypeF32 && dstTyp == ssa.TypeI32:
+		cvt := m.allocateInstr().asXmmToGpr(sseOpcodeMovd, rn.r, rd, false)
+		m.insert(cvt)
+	case srcTyp == ssa.TypeI32 && dstTyp == ssa.TypeF32:
+		cvt := m.allocateInstr().asGprToXmm(sseOpcodeMovd, rn, rd, false)
+		m.insert(cvt)
+	case srcTyp == ssa.TypeF64 && dstTyp == ssa.TypeI64:
+		cvt := m.allocateInstr().asXmmToGpr(sseOpcodeMovq, rn.r, rd, true)
+		m.insert(cvt)
+	case srcTyp == ssa.TypeI64 && dstTyp == ssa.TypeF64:
+		cvt := m.allocateInstr().asGprToXmm(sseOpcodeMovq, rn, rd, true)
+		m.insert(cvt)
+	default:
+		panic(fmt.Sprintf("invalid bitcast from %s to %s", srcTyp, dstTyp))
+	}
 }

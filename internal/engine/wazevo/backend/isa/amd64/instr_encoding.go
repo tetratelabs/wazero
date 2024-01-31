@@ -947,7 +947,34 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 	case xmmLoadConst:
 		panic("TODO")
 	case xmmToGpr:
-		panic("TODO")
+		var legPrefix legacyPrefixes
+		var opcode uint32
+		var argSwap bool
+		const opcodeNum = 2
+		switch sseOpcode(i.u1) {
+		case sseOpcodeMovd, sseOpcodeMovq:
+			legPrefix, opcode, argSwap = legacyPrefixes0x66, 0x0f7e, false
+		case sseOpcodeCvttss2si:
+			legPrefix, opcode, argSwap = legacyPrefixes0xF3, 0x0f2c, true
+		case sseOpcodeCvttsd2si:
+			legPrefix, opcode, argSwap = legacyPrefixes0xF2, 0x0f2c, true
+		default:
+			panic(fmt.Sprintf("Unsupported sseOpcode: %s", sseOpcode(i.u1)))
+		}
+
+		var rex rexInfo
+		if i.b1 {
+			rex = rex.setW()
+		} else {
+			rex = rex.clearW()
+		}
+		src := regEncodings[i.op1.r.RealReg()]
+		dst := regEncodings[i.op2.r.RealReg()]
+		if argSwap {
+			src, dst = dst, src
+		}
+		encodeRegReg(c, legPrefix, opcode, opcodeNum, src, dst, rex)
+
 	case cvtUint64ToFloatSeq:
 		panic("TODO")
 	case cvtFloatToSintSeq:
