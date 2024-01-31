@@ -228,7 +228,7 @@ jobs:
       - name: Run test binaries
         run: |
           cd ${{ env.STDLIB_TESTS }}
-          go test -bench='BenchmarkTinyGo/' -benchtime=1x
+          go test -bench='BenchmarkTinyGo/${{ matrix.compiler }}' -benchtime=1x
 
   wasi-testsuite:
     name: wasi-testsuite

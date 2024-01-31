@@ -2,16 +2,16 @@ package opt_test
 
 import (
 	"context"
-	"runtime"
 	"testing"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/experimental/opt"
+	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
 func TestUseOptimizingCompiler(t *testing.T) {
-	if runtime.GOARCH != "arm64" {
+	if !platform.CompilerSupported() {
 		return
 	}
 	c := opt.NewRuntimeConfigOptimizingCompiler()

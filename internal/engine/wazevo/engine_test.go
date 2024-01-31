@@ -73,7 +73,6 @@ func (f fakeFinalizer) setFinalizer(obj interface{}, finalizer interface{}) {
 }
 
 func TestEngine_CompileModule(t *testing.T) {
-	skipOnAmd64(t)
 	ctx := context.Background()
 	e := NewEngine(ctx, 0, nil).(*engine)
 	ff := fakeFinalizer{}
