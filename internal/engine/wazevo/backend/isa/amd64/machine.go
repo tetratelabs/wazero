@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"math"
 	"strings"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
@@ -353,14 +354,14 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		cnt := m.allocateInstr()
 		cnt.asXmmUnaryRmR(sseOpcodeCvtsd2ss, rn, rd)
 		m.insert(cnt)
-	case ssa.OpcodeFcvtToSint:
+	case ssa.OpcodeFcvtToSint, ssa.OpcodeFcvtToSintSat:
 		x, ctx := instr.Arg2()
 		rn := m.getOperand_Reg(m.c.ValueDefinition(x))
 		rd := newOperandReg(m.c.VRegOf(instr.Return()))
 		ctxVReg := m.c.VRegOf(ctx)
-		m.lowerFcvtToSint(ctxVReg, rn, rd, true, x.Type() == ssa.TypeF64,
+		m.lowerFcvtToSint(ctxVReg, rn, rd, x.Type() == ssa.TypeF64,
 			instr.Return().Type().Bits() == 64, op == ssa.OpcodeFcvtToSintSat)
-	case ssa.OpcodeFcvtToUint:
+	case ssa.OpcodeFcvtToUint, ssa.OpcodeFcvtToUintSat:
 		x, ctx := instr.Arg2()
 		rn := m.getOperand_Reg(m.c.ValueDefinition(x))
 		rd := newOperandReg(m.c.VRegOf(instr.Return()))
@@ -1765,7 +1766,7 @@ func (m *machine) lowerBitcast(instr *ssa.Instruction) {
 	}
 }
 
-func (m *machine) lowerFcvtToSint(ctxVReg regalloc.VReg, rn, rd operand, signed, src64, dst64, sat bool) {
+func (m *machine) lowerFcvtToSint(ctxVReg regalloc.VReg, rn, rd operand, src64, dst64, sat bool) {
 	var tmp regalloc.VReg
 	if dst64 {
 		tmp = m.c.AllocateVReg(ssa.TypeF64)
@@ -1832,14 +1833,14 @@ func (m *machine) lowerFcvtToSint(ctxVReg regalloc.VReg, rn, rd operand, signed,
 
 		// if >= jump to end.
 		jmpEnd2 := m.allocateInstr()
-		jmpEnd.asJmp(newOperandLabel(done))
+		jmpEnd2.asJmpIf(condB, newOperandLabel(done))
 		m.insert(jmpEnd2)
 
 		// Otherwise, saturate to INT_MAX.
-		if src64 {
-			m.lowerIconst(tmpDst, 0x7fffffffffffffff, dst64)
+		if dst64 {
+			m.lowerIconst(tmpDst, math.MaxInt64, dst64)
 		} else {
-			m.lowerIconst(tmpDst, 0x7fffffff, dst64)
+			m.lowerIconst(tmpDst, math.MaxInt32, dst64)
 		}
 
 	} else {
@@ -2029,9 +2030,9 @@ func (m *machine) lowerFcvtToUint(ctxVReg regalloc.VReg, rn, rd operand, src64, 
 		// overflow is because the input was too large: saturate to the max value.
 		var maxInt uint64
 		if dst64 {
-			maxInt = 0x7fffffffffffffff
+			maxInt = math.MaxUint64
 		} else {
-			maxInt = 0x7fffffff
+			maxInt = math.MaxUint32
 		}
 		m.lowerIconst(tmpDst, maxInt, dst64)
 

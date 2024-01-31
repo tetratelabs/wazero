@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -24,15 +23,15 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
-func TestFileCacheSpecTest_compiler(t *testing.T) {
+func TestFileCache_compiler(t *testing.T) {
 	if !platform.CompilerSupported() {
 		return
 	}
 	runAllFileCacheTests(t, wazero.NewRuntimeConfigCompiler())
 }
 
-func TestFileCacheSpecTest_wazevo(t *testing.T) {
-	if runtime.GOARCH != "arm64" {
+func TestFileCache_wazevo(t *testing.T) {
+	if !platform.CompilerSupported() {
 		return
 	}
 	config := opt.NewRuntimeConfigOptimizingCompiler()
