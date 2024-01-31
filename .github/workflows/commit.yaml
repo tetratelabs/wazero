@@ -57,13 +57,21 @@ jobs:
 
       - run: make check
 
-  test_amd64:
-    name: amd64, ${{ matrix.os }}, Go-${{ matrix.go-version }}
-    runs-on: ${{ matrix.os }}
+  test:
+    name: ${{ matrix.platform.arch }}, ${{ matrix.platform.os }}, Go-${{ matrix.go-version }}
+    runs-on: ${{ matrix.platform.os }}
     strategy:
       fail-fast: false  # don't fail fast as sometimes failures are arch/OS specific
       matrix:  # Use versions consistent with wazero's Go support policy.
-        os: [ubuntu-22.04, macos-12, windows-2022]
+        platform:
+        - os: ubuntu-22.04
+          arch: amd64
+        - os: macos-12
+          arch: amd64
+        - os: windows-2022
+          arch: amd64
+        - os: macos-14
+          arch: arm64
         go-version:
           - "1.21"  # Current Go version
           - "1.19"  # Floor Go version of wazero (current - 2)
@@ -172,8 +180,16 @@ jobs:
   # This ensures that internal/integration_test/fuzz is runnable, and is not intended to
   # run full-length fuzzing while trying to find low-hanging frontend bugs.
   fuzz:
-    name: Minimal Fuzzing
-    runs-on: ubuntu-22.04
+    name: Minimal Fuzzing (${{ matrix.platform.os }}, ${{ matrix.platform.arch }} )
+    runs-on: ${{ matrix.platform.os }}
+    strategy:
+      fail-fast: false  # don't fail fast as sometimes failures are arch/OS specific
+      matrix:  # Use versions consistent with wazero's Go support policy.
+        platform:
+          - os: ubuntu-22.04
+            arch: amd64
+          - os: macos-14
+            arch: arm64
 
     steps:
       - uses: actions/checkout@v3
@@ -194,7 +210,7 @@ jobs:
             internal/integration_test/fuzz/target
             internal/integration_test/fuzz/fuzz/artifacts
             internal/integration_test/fuzz/fuzz/corpus
-          key: build-fuzz-${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum', 'Makefile', '**/Cargo.lock', '**/Cargo.toml', '**/*.rs') }}
+          key: build-fuzz-${{ matrix.platform.os }}-${{ matrix.platform.arch }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum', 'Makefile', '**/Cargo.lock', '**/Cargo.toml', '**/*.rs') }}
 
       - run: cargo install cargo-fuzz
         if: steps.cache.outputs.cache-hit != 'true'
