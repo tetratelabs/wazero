@@ -55,7 +55,7 @@ on supported platforms:
 
 ## Support Policy
 
-The below support policy focuses on compatability concerns of those embedding
+The below support policy focuses on compatibility concerns of those embedding
 wazero into their Go applications.
 
 ### wazero
