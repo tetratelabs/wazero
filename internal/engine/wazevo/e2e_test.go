@@ -1358,7 +1358,6 @@ func TestSpectestV1(t *testing.T) {
 		spectest.RunCase(t, v1.Testcases, "conversions", context.Background(), config,
 			-1, 0, 309)
 	})
-
 }
 
 // TODO: delete this and rune them in internal/integration_test/spectest/v2/spec_test.go after amd64 is done.
