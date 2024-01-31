@@ -3151,6 +3151,52 @@ func (c *Compiler) lowerCurrentOpcode() {
 		default:
 			panic("TODO: unsupported vector instruction: " + wasm.VectorInstructionName(vecOp))
 		}
+	case wasm.OpcodeAtomicPrefix:
+		state.pc++
+		atomicOp := c.wasmFunctionBody[state.pc]
+		switch atomicOp {
+		case wasm.OpcodeAtomicMemoryWait32, wasm.OpcodeAtomicMemoryWait64:
+			_, offset := c.readMemArg()
+			if state.unreachable {
+				break
+			}
+
+			c.storeCallerModuleContext()
+
+			var opSize uint64
+			var trampoline wazevoapi.Offset
+			var sig *ssa.Signature
+			switch atomicOp {
+			case wasm.OpcodeAtomicMemoryWait32:
+				opSize = 4
+				trampoline = wazevoapi.ExecutionContextOffsetMemoryWait32TrampolineAddress
+				sig = &c.memoryWait32Sig
+			case wasm.OpcodeAtomicMemoryWait64:
+				opSize = 8
+				trampoline = wazevoapi.ExecutionContextOffsetMemoryWait64TrampolineAddress
+				sig = &c.memoryWait64Sig
+			}
+
+			timeout := state.pop()
+			exp := state.pop()
+			baseAddr := state.pop()
+			addr := c.memOpSetup(baseAddr, uint64(offset), opSize)
+			c.memAlignmentCheck(addr, opSize)
+
+			memoryWaitPtr := builder.AllocateInstruction().
+				AsLoad(c.execCtxPtrValue,
+					trampoline.U32(),
+					ssa.TypeI64,
+				).Insert(builder).Return()
+
+			args := []ssa.Value{c.execCtxPtrValue, timeout, exp, addr}
+			memoryWaitRet := builder.AllocateInstruction().
+				AsCallIndirect(memoryWaitPtr, sig, args).
+				Insert(builder).Return()
+			state.push(memoryWaitRet)
+		default:
+			panic("TODO: unsupported atomic instruction: " + wasm.AtomicInstructionName(atomicOp))
+		}
 	case wasm.OpcodeRefFunc:
 		funcIndex := c.readI32u()
 		if state.unreachable {
@@ -3421,6 +3467,29 @@ func (c *Compiler) memOpSetup(baseAddr ssa.Value, constOffset, operationSizeInBy
 	// Record the bound ceil for this baseAddr is known to be safe for the subsequent memory access in the same block.
 	c.recordKnownSafeBound(baseAddrID, ceil, address)
 	return
+}
+
+func (c *Compiler) memAlignmentCheck(addr ssa.Value, operationSizeInBytes uint64) {
+	if operationSizeInBytes == 1 {
+		return // No alignment restrictions when accessing a byte
+	}
+	var checkBits uint64
+	switch operationSizeInBytes {
+	case 2:
+		checkBits = 0b1
+	case 4:
+		checkBits = 0b11
+	case 8:
+		checkBits = 0b111
+	}
+
+	builder := c.ssaBuilder
+
+	mask := builder.AllocateInstruction().AsIconst64(checkBits).Insert(builder).Return()
+	masked := builder.AllocateInstruction().AsBand(addr, mask).Insert(builder).Return()
+	zero := builder.AllocateInstruction().AsIconst64(0).Insert(builder).Return()
+	cmp := builder.AllocateInstruction().AsIcmp(masked, zero, ssa.IntegerCmpCondNotEqual).Insert(builder).Return()
+	builder.AllocateInstruction().AsExitIfTrueWithCode(c.execCtxPtrValue, cmp, wazevoapi.ExitCodeUnalignedAtomic).Insert(builder)
 }
 
 func (c *Compiler) callMemmove(dst, src, size ssa.Value) {

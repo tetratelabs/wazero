@@ -51,6 +51,7 @@ func TestE2E(t *testing.T) {
 		name        string
 		imported, m *wasm.Module
 		calls       []callCase
+		features    api.CoreFeatures
 		skipAMD64   bool
 	}{
 		{
@@ -607,6 +608,22 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
+			name:     "memory_wait32",
+			m:        testcases.MemoryWait32.Module,
+			features: api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
+			calls: []callCase{
+				{params: []uint64{0x0, 0xbeef, 0xffffffff}, expResults: []uint64{1}},
+			},
+		},
+		{
+			name:     "memory_wait64",
+			m:        testcases.MemoryWait64.Module,
+			features: api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
+			calls: []callCase{
+				{params: []uint64{0x0, 0xbeef, 0xffffffff}, expResults: []uint64{1}},
+			},
+		},
+		{
 			name: "float_le",
 			m:    testcases.FloatLe.Module,
 			calls: []callCase{
@@ -633,6 +650,9 @@ func TestE2E(t *testing.T) {
 					cache, err := wazero.NewCompilationCacheWithDir(tmp)
 					require.NoError(t, err)
 					config := opt.NewRuntimeConfigOptimizingCompiler().WithCompilationCache(cache)
+					if tc.features != 0 {
+						config = config.WithCoreFeatures(tc.features)
+					}
 
 					ctx := context.Background()
 					r := wazero.NewRuntimeWithConfig(ctx, config)

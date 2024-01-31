@@ -56,7 +56,11 @@ type (
 		// tableGrowExecutable is a compiled trampoline executable for table.grow builtin function.
 		tableGrowExecutable []byte
 		// refFuncExecutable is a compiled trampoline executable for ref.func builtin function.
-		refFuncExecutable         []byte
+		refFuncExecutable []byte
+		// memoryWait32Executable is a compiled trampoline executable for memory.wait32 builtin function
+		memoryWait32Executable []byte
+		// memoryWait64Executable is a compiled trampoline executable for memory.wait64 builtin function
+		memoryWait64Executable    []byte
 		listenerBeforeTrampolines map[*wasm.FunctionType][]byte
 		listenerAfterTrampolines  map[*wasm.FunctionType][]byte
 	}
@@ -639,6 +643,36 @@ func (e *engine) compileSharedFunctions() {
 		}
 	}
 
+	e.be.Init()
+	{
+		src := e.machine.CompileGoFunctionTrampoline(wazevoapi.ExitCodeMemoryWait32, &ssa.Signature{
+			// exec context, timeout, expected, addr
+			Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI32, ssa.TypeI64},
+			// Returns the status.
+			Results: []ssa.Type{ssa.TypeI32},
+		}, false)
+		e.sharedFunctions.memoryWait32Executable = mmapExecutable(src)
+		if wazevoapi.PerfMapEnabled {
+			exe := e.sharedFunctions.memoryWait32Executable
+			wazevoapi.PerfMap.AddEntry(uintptr(unsafe.Pointer(&exe[0])), uint64(len(exe)), "memory_wait32_trampoline")
+		}
+	}
+
+	e.be.Init()
+	{
+		src := e.machine.CompileGoFunctionTrampoline(wazevoapi.ExitCodeMemoryWait64, &ssa.Signature{
+			// exec context, timeout, expected, addr
+			Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI64, ssa.TypeI64},
+			// Returns the status.
+			Results: []ssa.Type{ssa.TypeI32},
+		}, false)
+		e.sharedFunctions.memoryWait64Executable = mmapExecutable(src)
+		if wazevoapi.PerfMapEnabled {
+			exe := e.sharedFunctions.memoryWait64Executable
+			wazevoapi.PerfMap.AddEntry(uintptr(unsafe.Pointer(&exe[0])), uint64(len(exe)), "memory_wait64_trampoline")
+		}
+	}
+
 	e.setFinalizer(e.sharedFunctions, sharedFunctionsFinalizer)
 }
 
@@ -658,6 +692,12 @@ func sharedFunctionsFinalizer(sf *sharedFunctions) {
 	if err := platform.MunmapCodeSegment(sf.refFuncExecutable); err != nil {
 		panic(err)
 	}
+	if err := platform.MunmapCodeSegment(sf.memoryWait32Executable); err != nil {
+		panic(err)
+	}
+	if err := platform.MunmapCodeSegment(sf.memoryWait64Executable); err != nil {
+		panic(err)
+	}
 	for _, f := range sf.listenerBeforeTrampolines {
 		if err := platform.MunmapCodeSegment(f); err != nil {
 			panic(err)
@@ -674,6 +714,8 @@ func sharedFunctionsFinalizer(sf *sharedFunctions) {
 	sf.stackGrowExecutable = nil
 	sf.tableGrowExecutable = nil
 	sf.refFuncExecutable = nil
+	sf.memoryWait32Executable = nil
+	sf.memoryWait64Executable = nil
 	sf.listenerBeforeTrampolines = nil
 	sf.listenerAfterTrampolines = nil
 }

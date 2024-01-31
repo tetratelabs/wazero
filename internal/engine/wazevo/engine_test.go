@@ -25,12 +25,18 @@ func Test_sharedFunctionsFinalizer(t *testing.T) {
 	require.NoError(t, err)
 	b7, err := platform.MmapCodeSegment(100)
 	require.NoError(t, err)
+	b8, err := platform.MmapCodeSegment(100)
+	require.NoError(t, err)
+	b9, err := platform.MmapCodeSegment(100)
+	require.NoError(t, err)
 
 	sf.memoryGrowExecutable = b1
 	sf.stackGrowExecutable = b2
 	sf.checkModuleExitCode = b3
 	sf.tableGrowExecutable = b6
 	sf.refFuncExecutable = b7
+	sf.memoryWait32Executable = b8
+	sf.memoryWait64Executable = b9
 
 	sharedFunctionsFinalizer(sf)
 	require.Nil(t, sf.memoryGrowExecutable)
@@ -38,6 +44,8 @@ func Test_sharedFunctionsFinalizer(t *testing.T) {
 	require.Nil(t, sf.checkModuleExitCode)
 	require.Nil(t, sf.tableGrowExecutable)
 	require.Nil(t, sf.refFuncExecutable)
+	require.Nil(t, sf.memoryWait32Executable)
+	require.Nil(t, sf.memoryWait64Executable)
 }
 
 func Test_executablesFinalizer(t *testing.T) {

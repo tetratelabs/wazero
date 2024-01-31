@@ -1935,6 +1935,40 @@ var (
 		Name:   "shuffle",
 		Module: VecShuffleWithLane(0, 1, 2, 3, 4, 5, 6, 7, 24, 25, 26, 27, 28, 29, 30, 31),
 	}
+
+	MemoryWait32 = TestCase{
+		Name: "memory_wait32",
+		Module: &wasm.Module{
+			TypeSection:     []wasm.FunctionType{{Params: []wasm.ValueType{i32, i32, i64}, Results: []wasm.ValueType{i32}}},
+			ExportSection:   []wasm.Export{{Name: ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 0}},
+			MemorySection:   &wasm.Memory{Min: 1, Max: 1, IsMaxEncoded: true, IsShared: true},
+			FunctionSection: []wasm.Index{0},
+			CodeSection: []wasm.Code{{Body: []byte{
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeLocalGet, 2,
+				wasm.OpcodeAtomicPrefix, wasm.OpcodeAtomicMemoryWait32, 0x1, 0,
+				wasm.OpcodeEnd,
+			}}},
+		},
+	}
+
+	MemoryWait64 = TestCase{
+		Name: "memory_wait64",
+		Module: &wasm.Module{
+			TypeSection:     []wasm.FunctionType{{Params: []wasm.ValueType{i32, i64, i64}, Results: []wasm.ValueType{i32}}},
+			ExportSection:   []wasm.Export{{Name: ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 0}},
+			MemorySection:   &wasm.Memory{Min: 1, Max: 1, IsMaxEncoded: true, IsShared: true},
+			FunctionSection: []wasm.Index{0},
+			CodeSection: []wasm.Code{{Body: []byte{
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeLocalGet, 2,
+				wasm.OpcodeAtomicPrefix, wasm.OpcodeAtomicMemoryWait64, 0x2, 0,
+				wasm.OpcodeEnd,
+			}}},
+		},
+	}
 )
 
 // VecShuffleWithLane returns a VecShuffle test with a custom 16-bytes immediate (lane indexes).
