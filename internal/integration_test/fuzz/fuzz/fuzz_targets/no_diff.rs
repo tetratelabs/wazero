@@ -43,6 +43,9 @@ fn run(data: &[u8]) -> Result<()> {
     config.min_funcs = 1;
     config.max_funcs = config.max_funcs.max(1);
 
+    // TODO: remove after SIMD impl in wazevo on amd64.
+    config.simd_enabled = false;
+
     // Enables threading. TODO: remove after threads support in wazevo.
     config.threads_enabled = std::env::var("WAZERO_FUZZ_WAZEVO")
         .ok()
