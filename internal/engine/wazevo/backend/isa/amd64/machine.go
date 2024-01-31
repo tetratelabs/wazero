@@ -365,7 +365,7 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		rn := m.getOperand_Reg(m.c.ValueDefinition(x))
 		rd := newOperandReg(m.c.VRegOf(instr.Return()))
 		ctxVReg := m.c.VRegOf(ctx)
-		m.lowerFcvtToUint(ctxVReg, rn, rd, false, x.Type() == ssa.TypeF64,
+		m.lowerFcvtToUint(ctxVReg, rn, rd, x.Type() == ssa.TypeF64,
 			instr.Return().Type().Bits() == 64, op == ssa.OpcodeFcvtToUintSat)
 	case ssa.OpcodeFcvtFromSint:
 		x := instr.Arg()
@@ -1904,7 +1904,7 @@ func (m *machine) lowerFcvtToSint(ctxVReg regalloc.VReg, rn, rd operand, signed,
 	m.copyTo(tmpDst, rd.r)
 }
 
-func (m *machine) lowerFcvtToUint(ctxVReg regalloc.VReg, rn, rd operand, signed, src64, dst64, sat bool) {
+func (m *machine) lowerFcvtToUint(ctxVReg regalloc.VReg, rn, rd operand, src64, dst64, sat bool) {
 	var tmpF, tmpDst regalloc.VReg
 	if dst64 {
 		tmpDst = m.c.AllocateVReg(ssa.TypeI64)
@@ -2125,7 +2125,7 @@ func (m *machine) lowerFcvtFromUint(rn, rd operand, src64, dst64 bool) {
 	// If the sign bit is not set, we could fit the unsigned int into float32/float64.
 	// So, we convert it to float and emit jump instruction to exit from this branch.
 	cvt := m.allocateInstr()
-	cvt.asGprToXmm(op, rn, tmpXmm, dst64)
+	cvt.asGprToXmm(op, rn, tmpXmm, src64)
 	m.insert(cvt)
 
 	// We are done, jump to end.
@@ -2159,7 +2159,7 @@ func (m *machine) lowerFcvtFromUint(rn, rd operand, src64, dst64 bool) {
 	m.insert(or)
 
 	cvt2 := m.allocateInstr()
-	cvt2.asGprToXmm(op, newOperandReg(tmp), tmpXmm, dst64)
+	cvt2.asGprToXmm(op, newOperandReg(tmp), tmpXmm, src64)
 	m.insert(cvt2)
 
 	addsd := m.allocateInstr()

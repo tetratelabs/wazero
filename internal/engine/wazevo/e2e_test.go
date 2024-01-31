@@ -16,7 +16,6 @@ import (
 	"github.com/tetratelabs/wazero/experimental/opt"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/testcases"
 	"github.com/tetratelabs/wazero/internal/integration_test/spectest"
-	v1 "github.com/tetratelabs/wazero/internal/integration_test/spectest/v1"
 	v2 "github.com/tetratelabs/wazero/internal/integration_test/spectest/v2"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
@@ -1265,99 +1264,6 @@ func TestDWARF(t *testing.T) {
 
 	err = r.Close(ctx)
 	require.NoError(t, err)
-}
-
-// TODO: delete this and rune them in internal/integration_test/spectest/v1/spec_test.go after amd64 is done.
-func TestSpectestV1(t *testing.T) {
-	if runtime.GOARCH != "amd64" {
-		return
-	}
-
-	config := opt.NewRuntimeConfigOptimizingCompiler().WithCoreFeatures(api.CoreFeaturesV1)
-
-	for _, tc := range []struct {
-		name string
-	}{
-		{name: "address"},
-		{name: "align"},
-		{name: "br"},
-		{name: "br_if"},
-		{name: "br_table"},
-		{name: "break-drop"},
-		{name: "block"},
-		{name: "binary"},
-		{name: "binary-leb128"},
-		{name: "call"},
-		{name: "call_indirect"},
-		{name: "comments"},
-		{name: "custom"},
-		//{name: "conversions"},
-		{name: "const"},
-		{name: "data"},
-		{name: "elem"},
-		//{name: "endianness"},
-		{name: "exports"},
-		{name: "f32"},
-		{name: "f32_bitwise"},
-		{name: "f32_cmp"},
-		{name: "f64"},
-		{name: "f64_bitwise"},
-		{name: "f64_cmp"},
-		{name: "fac"},
-		//{name: "float_exprs"},
-		{name: "float_literals"},
-		{name: "float_memory"},
-		{name: "float_misc"},
-		{name: "func"},
-		{name: "func_ptrs"},
-		{name: "forward"},
-		{name: "globals"},
-		{name: "if"},
-		//{name: "imports"},
-		{name: "inline-module"},
-		{name: "i32"},
-		{name: "i64"},
-		{name: "int_exprs"},
-		{name: "int_literals"},
-		{name: "labels"},
-		{name: "left-to-right"},
-		{name: "linking"},
-		{name: "load"},
-		{name: "loop"},
-		//{name: "local_get"},
-		//{name: "local_set"},
-		//{name: "local_tee"},
-		{name: "memory"},
-		{name: "memory_size"},
-		{name: "memory_grow"},
-		{name: "memory_redundancy"},
-		{name: "memory_trap"},
-		{name: "names"},
-		{name: "nop"},
-		{name: "return"},
-		{name: "select"},
-		{name: "start"},
-		{name: "stack"},
-		{name: "store"},
-		{name: "switch"},
-		{name: "skip-stack-guard-page"},
-		{name: "token"},
-		{name: "type"},
-		//{name: "traps"},
-		{name: "unreachable"},
-		{name: "unreached-invalid"},
-		{name: "unwind"},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			spectest.RunCase(t, v1.Testcases, tc.name, context.Background(), config,
-				-1, 0, math.MaxInt)
-		})
-	}
-
-	t.Run("conversions 000-309", func(t *testing.T) {
-		spectest.RunCase(t, v1.Testcases, "conversions", context.Background(), config,
-			-1, 0, 309)
-	})
 }
 
 // TODO: delete this and rune them in internal/integration_test/spectest/v2/spec_test.go after amd64 is done.
