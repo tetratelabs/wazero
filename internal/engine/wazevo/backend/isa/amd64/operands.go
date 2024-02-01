@@ -229,8 +229,9 @@ func (a *amode) String() string {
 		} else {
 			return fmt.Sprintf("%d(%%rip)", int32(a.imm32))
 		}
+	default:
+		panic("BUG: invalid amode kind")
 	}
-	panic("BUG: invalid amode kind")
 }
 
 func (m *machine) getOperand_Mem_Reg(def *backend.SSAValueDefinition) (op operand) {
@@ -269,7 +270,10 @@ func (m *machine) getOperand_Imm32_Reg(def *backend.SSAValueDefinition) (op oper
 
 	instr := def.Instr
 	if instr.Constant() {
-		if op, ok := asImm32Operand(instr.ConstantVal()); ok {
+		// If the operation is 64-bit, x64 sign-extends the 32-bit immediate value.
+		// Therefore, we need to check if the immediate value is within the 32-bit range and if the sign bit is set,
+		// we should not use the immediate value.
+		if op, ok := asImm32Operand(instr.ConstantVal(), instr.Return().Type() == ssa.TypeI32); ok {
 			instr.MarkLowered()
 			return op
 		}
@@ -277,19 +281,22 @@ func (m *machine) getOperand_Imm32_Reg(def *backend.SSAValueDefinition) (op oper
 	return m.getOperand_Reg(def)
 }
 
-func asImm32(val uint64) (uint32, bool) {
+func asImm32Operand(val uint64, allowSignExt bool) (operand, bool) {
+	if imm32, ok := asImm32(val, allowSignExt); ok {
+		return newOperandImm32(imm32), true
+	}
+	return operand{}, false
+}
+
+func asImm32(val uint64, allowSignExt bool) (uint32, bool) {
 	u32val := uint32(val)
 	if uint64(u32val) != val {
 		return 0, false
 	}
-	return u32val, true
-}
-
-func asImm32Operand(val uint64) (operand, bool) {
-	if u32val, ok := asImm32(val); ok {
-		return newOperandImm32(u32val), true
+	if !allowSignExt && u32val&0x80000000 != 0 {
+		return 0, false
 	}
-	return operand{}, false
+	return u32val, true
 }
 
 func (m *machine) getOperand_Reg(def *backend.SSAValueDefinition) (op operand) {
