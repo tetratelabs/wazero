@@ -2372,7 +2372,7 @@ func (i *Instruction) Format(b Builder) string {
 			instSuffix = fmt.Sprintf(" %s:%s, %s", FuncRef(i.u1), SignatureID(i.u2), strings.Join(vs, ", "))
 		}
 	case OpcodeStore, OpcodeIstore8, OpcodeIstore16, OpcodeIstore32:
-		instSuffix = fmt.Sprintf(" %s, %s, %#x", i.v.Format(b), i.v2.Format(b), int32(i.u1))
+		instSuffix = fmt.Sprintf(" %s, %s, %#x", i.v.Format(b), i.v2.Format(b), uint32(i.u1))
 	case OpcodeLoad, OpcodeVZeroExtLoad:
 		instSuffix = fmt.Sprintf(" %s, %#x", i.v.Format(b), int32(i.u1))
 	case OpcodeLoadSplat:

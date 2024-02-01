@@ -1792,6 +1792,8 @@ func (m *machine) lowerFcvtToSint(ctxVReg regalloc.VReg, rn, rd operand, src64, 
 	cmp1.asCmpRmiR(true, newOperandImm32(1), tmpDst, dst64)
 	m.insert(cmp1)
 
+	execCtxCopy := m.copyToTmp(ctxVReg)
+
 	// If no overflow, then we are done.
 	doneTarget, done := m.allocateBrTarget()
 	ifNoOverflow := m.allocateInstr()
@@ -1847,7 +1849,7 @@ func (m *machine) lowerFcvtToSint(ctxVReg regalloc.VReg, rn, rd operand, src64, 
 
 		// If non-sat, NaN, trap.
 		checkPositiveTarget, checkPositive := m.allocateBrTarget()
-		m.lowerExitWithCode(ctxVReg, wazevoapi.ExitCodeInvalidConversionToInteger)
+		m.lowerExitWithCode(execCtxCopy, wazevoapi.ExitCodeInvalidConversionToInteger)
 
 		// Otherwise, we will jump here.
 		m.insert(notNanTarget)
@@ -1879,7 +1881,7 @@ func (m *machine) lowerFcvtToSint(ctxVReg regalloc.VReg, rn, rd operand, src64, 
 		jmpIfLarger.asJmpIf(condAboveThreshold, newOperandLabel(checkPositive))
 		m.insert(jmpIfLarger)
 
-		m.lowerExitWithCode(ctxVReg, wazevoapi.ExitCodeIntegerOverflow)
+		m.lowerExitWithCode(execCtxCopy, wazevoapi.ExitCodeIntegerOverflow)
 
 		// If positive, it was a real overflow.
 		m.insert(checkPositiveTarget)
@@ -1898,7 +1900,7 @@ func (m *machine) lowerFcvtToSint(ctxVReg regalloc.VReg, rn, rd operand, src64, 
 		jmp.asJmpIf(condNB, newOperandLabel(done))
 		m.insert(jmp)
 
-		m.lowerExitWithCode(ctxVReg, wazevoapi.ExitCodeIntegerOverflow)
+		m.lowerExitWithCode(execCtxCopy, wazevoapi.ExitCodeIntegerOverflow)
 
 	}
 	m.insert(doneTarget)
@@ -1938,6 +1940,8 @@ func (m *machine) lowerFcvtToUint(ctxVReg regalloc.VReg, rn, rd operand, src64, 
 		m.lowerFconst(tmpF, 0x4f000000, false)
 	}
 
+	execCtxCopy := m.copyToTmp(ctxVReg)
+
 	cmp := m.allocateInstr()
 	cmp.asXmmCmpRmR(cmpOp, newOperandReg(tmpF), rn.r)
 	m.insert(cmp)
@@ -1965,7 +1969,7 @@ func (m *machine) lowerFcvtToUint(ctxVReg regalloc.VReg, rn, rd operand, src64, 
 		m.insert(jmpEnd)
 	} else {
 		// On NaN, non-saturating, we trap.
-		m.lowerExitWithCode(ctxVReg, wazevoapi.ExitCodeInvalidConversionToInteger)
+		m.lowerExitWithCode(execCtxCopy, wazevoapi.ExitCodeInvalidConversionToInteger)
 	}
 
 	// If not NaN, land here.
@@ -1998,7 +2002,7 @@ func (m *machine) lowerFcvtToUint(ctxVReg regalloc.VReg, rn, rd operand, src64, 
 		m.insert(jmpEnd)
 	} else {
 		// If not saturating, trap.
-		m.lowerExitWithCode(ctxVReg, wazevoapi.ExitCodeIntegerOverflow)
+		m.lowerExitWithCode(execCtxCopy, wazevoapi.ExitCodeIntegerOverflow)
 	}
 
 	// If above the threshold, land here.
@@ -2041,7 +2045,7 @@ func (m *machine) lowerFcvtToUint(ctxVReg regalloc.VReg, rn, rd operand, src64, 
 		m.insert(jmpToEnd)
 	} else {
 		// If not saturating, trap.
-		m.lowerExitWithCode(ctxVReg, wazevoapi.ExitCodeIntegerOverflow)
+		m.lowerExitWithCode(execCtxCopy, wazevoapi.ExitCodeIntegerOverflow)
 	}
 
 	m.insert(ifNextLargeTarget)
