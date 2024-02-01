@@ -1790,8 +1790,6 @@ func (m *machine) lowerFcvtToSint(ctxVReg, rn, rd regalloc.VReg, src64, dst64, s
 
 func (m *machine) lowerFcvtToSintSequenceAfterRegalloc(i *instruction) {
 	cmpOp, truncOp, execCtx, src, dst, tmpGp, tmpGp2, tmpXmm, src64, dst64, sat := i.fcvtToSintSequenceData()
-	m.ectx.PendingInstructions = m.ectx.PendingInstructions[:0]
-
 	trunc := m.allocateInstr()
 	trunc.asXmmToGpr(truncOp, src, tmpGp, dst64)
 	m.insert(trunc)

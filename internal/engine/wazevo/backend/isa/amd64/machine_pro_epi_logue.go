@@ -1,6 +1,8 @@
 package amd64
 
-import "github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
+import (
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
+)
 
 // SetupPrologue implements backend.Machine.
 func (m *machine) SetupPrologue() {
@@ -130,6 +132,7 @@ func (m *machine) SetupEpilogue() {
 			m.setupEpilogueAfter(cur.prev)
 			continue
 		case fcvtToSintSequence, fcvtToUintSequence:
+			m.ectx.PendingInstructions = m.ectx.PendingInstructions[:0]
 			if k == fcvtToSintSequence {
 				m.lowerFcvtToSintSequenceAfterRegalloc(cur)
 			} else {
