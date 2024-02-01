@@ -144,7 +144,7 @@ func (m *machine) SetupEpilogue() {
 			for _, instr := range m.ectx.PendingInstructions {
 				cur = linkInstr(cur, instr)
 			}
-			cur = linkInstr(cur, next)
+			linkInstr(cur, next)
 			continue
 		}
 
