@@ -866,3 +866,15 @@ func Test2000b(t *testing.T) {
 		require.Error(t, err)
 	})
 }
+
+func Test2001(t *testing.T) {
+	if !platform.CompilerSupported() {
+		return
+	}
+	run(t, func(t *testing.T, r wazero.Runtime) {
+		mod, err := r.Instantiate(ctx, getWasmBinary(t, "2001"))
+		require.NoError(t, err)
+		_, err = mod.ExportedFunction("").Call(ctx)
+		require.NoError(t, err)
+	})
+}

@@ -139,8 +139,8 @@ func (m *machine) SetupEpilogue() {
 				m.lowerFcvtToUintSequenceAfterRegalloc(cur)
 			}
 			prev := cur.prev
-			prev.next = m.ectx.PendingInstructions[0]
 			next := cur.next
+			cur := prev
 			for _, instr := range m.ectx.PendingInstructions {
 				cur = linkInstr(cur, instr)
 			}
