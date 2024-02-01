@@ -843,12 +843,24 @@ func Test1999(t *testing.T) {
 	})
 }
 
-func Test2000(t *testing.T) {
+func Test2000a(t *testing.T) {
 	if !platform.CompilerSupported() {
 		return
 	}
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		mod, err := r.Instantiate(ctx, getWasmBinary(t, "2000"))
+		mod, err := r.Instantiate(ctx, getWasmBinary(t, "2000a"))
+		require.NoError(t, err)
+		_, err = mod.ExportedFunction("").Call(ctx)
+		require.Error(t, err)
+	})
+}
+
+func Test2000b(t *testing.T) {
+	if !platform.CompilerSupported() {
+		return
+	}
+	run(t, func(t *testing.T, r wazero.Runtime) {
+		mod, err := r.Instantiate(ctx, getWasmBinary(t, "2000b"))
 		require.NoError(t, err)
 		_, err = mod.ExportedFunction("").Call(ctx)
 		require.Error(t, err)
