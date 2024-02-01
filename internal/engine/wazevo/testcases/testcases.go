@@ -1985,6 +1985,43 @@ var (
 			}}},
 		},
 	}
+
+	AtomicRmwAnd = TestCase{
+		Name: "atomic_rmw_and",
+		Module: &wasm.Module{
+			TypeSection: []wasm.FunctionType{{
+				Params:  []wasm.ValueType{i32, i32, i32, i64, i64, i64, i64},
+				Results: []wasm.ValueType{i32, i32, i32, i64, i64, i64, i64},
+			}},
+			ExportSection:   []wasm.Export{{Name: ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 0}},
+			MemorySection:   &wasm.Memory{Min: 1, Max: 1, IsMaxEncoded: true, IsShared: true},
+			FunctionSection: []wasm.Index{0},
+			CodeSection: []wasm.Code{{Body: []byte{
+				wasm.OpcodeI32Const, 0,
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeAtomicPrefix, wasm.OpcodeAtomicI32Rmw8AndU, 0x0, 0,
+				wasm.OpcodeI32Const, 8,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeAtomicPrefix, wasm.OpcodeAtomicI32Rmw16AndU, 0x1, 0,
+				wasm.OpcodeI32Const, 16,
+				wasm.OpcodeLocalGet, 2,
+				wasm.OpcodeAtomicPrefix, wasm.OpcodeAtomicI32RmwAnd, 0x2, 0,
+				wasm.OpcodeI32Const, 24,
+				wasm.OpcodeLocalGet, 3,
+				wasm.OpcodeAtomicPrefix, wasm.OpcodeAtomicI64Rmw8AndU, 0x0, 0,
+				wasm.OpcodeI32Const, 32,
+				wasm.OpcodeLocalGet, 4,
+				wasm.OpcodeAtomicPrefix, wasm.OpcodeAtomicI64Rmw16AndU, 0x1, 0,
+				wasm.OpcodeI32Const, 40,
+				wasm.OpcodeLocalGet, 5,
+				wasm.OpcodeAtomicPrefix, wasm.OpcodeAtomicI64Rmw32AndU, 0x2, 0,
+				wasm.OpcodeI32Const, 48,
+				wasm.OpcodeLocalGet, 6,
+				wasm.OpcodeAtomicPrefix, wasm.OpcodeAtomicI64RmwAnd, 0x3, 0,
+				wasm.OpcodeEnd,
+			}}},
+		},
+	}
 )
 
 // VecShuffleWithLane returns a VecShuffle test with a custom 16-bytes immediate (lane indexes).

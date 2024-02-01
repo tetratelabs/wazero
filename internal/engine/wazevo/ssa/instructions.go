@@ -651,6 +651,41 @@ const (
 	opcodeEnd
 )
 
+type AtomicRmwOp byte
+
+const (
+	// Add
+	AtomicRmwOpAdd AtomicRmwOp = iota
+	// Sub
+	AtomicRmwOpSub
+	// And
+	AtomicRmwOpAnd
+	// Or
+	AtomicRmwOpOr
+	// Xor
+	AtomicRmwOpXor
+	// Exchange
+	AtomicRmwOpXchg
+)
+
+func (op AtomicRmwOp) String() string {
+	switch op {
+	case AtomicRmwOpAdd:
+		return "add"
+	case AtomicRmwOpSub:
+		return "sub"
+	case AtomicRmwOpAnd:
+		return "and"
+	case AtomicRmwOpOr:
+		return "or"
+	case AtomicRmwOpXor:
+		return "xor"
+	case AtomicRmwOpXchg:
+		return "xchg"
+	}
+	panic(fmt.Sprintf("unknown AtomicRmwOp: %d", op))
+}
+
 // returnTypesFn provides the info to determine the type of instruction.
 // t1 is the type of the first result, ts are the types of the remaining results.
 type returnTypesFn func(b *builder, instr *Instruction) (t1 Type, ts []Type)
@@ -818,6 +853,7 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeVFcvtToUintSat:     sideEffectNone,
 	OpcodeVFcvtToSintSat:     sideEffectNone,
 	OpcodeVZeroExtLoad:       sideEffectNone,
+	OpcodeAtomicRmw:          sideEffectStrict,
 }
 
 // sideEffect returns true if this instruction has side effects.
@@ -998,6 +1034,7 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeVMinPseudo:         returnTypesFnV128,
 	OpcodeVFcvtToUintSat:     returnTypesFnV128,
 	OpcodeVFcvtToSintSat:     returnTypesFnV128,
+	OpcodeAtomicRmw:          returnTypesFnSingle,
 }
 
 // AsLoad initializes this instruction as a store instruction with OpcodeLoad.
@@ -1922,6 +1959,18 @@ func (i *Instruction) AsWiden(v Value, lane VecLane, signed, low bool) *Instruct
 	return i
 }
 
+// AsAtomicRmw initializes this instruction as an atomic read-modify-write.
+// The size is in bytes and must be 1, 2, 4, or 8.
+func (i *Instruction) AsAtomicRmw(op AtomicRmwOp, addr, val Value, size uint64) *Instruction {
+	i.opcode = OpcodeAtomicRmw
+	i.u1 = uint64(op)
+	i.u2 = size
+	i.v = addr
+	i.v2 = val
+	i.typ = val.Type()
+	return i
+}
+
 // ReturnVals returns the return values of OpcodeReturn.
 func (i *Instruction) ReturnVals() []Value {
 	return i.vs
@@ -2478,6 +2527,8 @@ func (i *Instruction) Format(b Builder) string {
 		}
 		// Prints Shuffle.[0 1 2 3 4 5 6 7 ...] v2, v3
 		instSuffix = fmt.Sprintf(".%v %s, %s", lanes, i.v.Format(b), i.v2.Format(b))
+	case OpcodeAtomicRmw:
+		instSuffix = fmt.Sprintf(" %s_%d, %s, %s", AtomicRmwOp(i.u1), 8*i.u2, i.v.Format(b), i.v2.Format(b))
 	default:
 		panic(fmt.Sprintf("TODO: format for %s", i.opcode))
 	}
