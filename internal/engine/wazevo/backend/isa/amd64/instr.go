@@ -14,7 +14,7 @@ type instruction struct {
 	abi                 *backend.FunctionABI
 	op1, op2            operand
 	u1, u2              uint64
-	b1                  bool
+	b1, b2, b3          bool
 	addedBeforeRegAlloc bool
 	kind                instructionKind
 	targets             []uint32
@@ -241,6 +241,27 @@ func (i *instruction) String() string {
 		return fmt.Sprintf("xchg %s, %s", i.op1.format(true), i.op2.format(true))
 	case zeros:
 		return fmt.Sprintf("xor %s, %s", i.op2.format(true), i.op2.format(true))
+	case fcvtToSintSequence:
+		cmpOp, truncOp, execCtx, src, dst, tmpGp, tmpGp2, tmpXmm, _, dst64, sat := i.fcvtToSintSequenceData()
+		return fmt.Sprintf(
+			"fcvtToSintSequence %s, %s, execCtx=%s, src=%s, dst=%s, tmpGp=%s, tmpGp2=%s, tmpXmm=%s, sat=%v",
+			cmpOp, truncOp, formatVRegSized(execCtx, true),
+			formatVRegSized(src, true), formatVRegSized(dst, dst64),
+			formatVRegSized(tmpGp, true),
+			formatVRegSized(tmpGp2, true),
+			formatVRegSized(tmpXmm, true), sat)
+	case fcvtToUintSequence:
+		subOp, cmpOp, truncOp, execCtx, src, dst, tmpGp, tmpXmm, tmpXmm2, _, dst64, sat := i.fcvtToUintSequenceData()
+		return fmt.Sprintf(
+			"fcvtToUintSequence %s, %s, %s, execCtx=%s, src=%s, dst=%s, tmpGp=%s, tmpXmm=%s, tmpXmm2=%s, sat=%v",
+			subOp, cmpOp, truncOp, formatVRegSized(execCtx, true),
+			formatVRegSized(src, true), formatVRegSized(dst, dst64),
+			formatVRegSized(tmpGp, true),
+			formatVRegSized(tmpXmm, true),
+			formatVRegSized(tmpXmm2, true), sat)
+
+	case defineUninitializedReg:
+		return fmt.Sprintf("defineUninitializedReg %s", i.op2.format(true))
 	default:
 		panic(fmt.Sprintf("BUG: %d", int(i.kind)))
 	}
@@ -262,6 +283,12 @@ func (i *instruction) Defs(regs *[]regalloc.VReg) []regalloc.VReg {
 		*regs = append(*regs, rdxVReg)
 	case defKindRaxRdx:
 		*regs = append(*regs, raxVReg, rdxVReg)
+	case defKindFcvtToSintSequence:
+		_, _, _, _, dst, _, _, _, _, _, _ := i.fcvtToSintSequenceData()
+		*regs = append(*regs, dst)
+	case defKindFcvtToUintSequence:
+		_, _, _, _, _, dst, _, _, _, _, _, _ := i.fcvtToUintSequenceData()
+		*regs = append(*regs, dst)
 	default:
 		panic(fmt.Sprintf("BUG: invalid defKind \"%s\" for %s", dk, i))
 	}
@@ -331,6 +358,12 @@ func (i *instruction) Uses(regs *[]regalloc.VReg) []regalloc.VReg {
 			panic(fmt.Sprintf("BUG: invalid operand: %s", i))
 		}
 		*regs = append(*regs, raxVReg)
+	case useKindFcvtToSintSequence:
+		_, _, execCtx, src, _, tmpGp, tmpGp2, tmpXmm, _, _, _ := i.fcvtToSintSequenceData()
+		*regs = append(*regs, execCtx, src, tmpGp, tmpGp2, tmpXmm)
+	case useKindFcvtToUintSequence:
+		_, _, _, execCtx, src, _, tmpGp, tmpXmm, tmpXmm2, _, _, _ := i.fcvtToUintSequenceData()
+		*regs = append(*regs, execCtx, src, tmpGp, tmpXmm, tmpXmm2)
 	default:
 		panic(fmt.Sprintf("BUG: invalid useKind %s for %s", uk, i))
 	}
@@ -440,6 +473,21 @@ func (i *instruction) AssignUse(index int, v regalloc.VReg) {
 		if index != 0 {
 			panic("BUG")
 		}
+	case useKindFcvtToSintSequence, useKindFcvtToUintSequence:
+		switch index {
+		case 0:
+			i.op1.amode.base = v
+		case 1:
+			i.op1.amode.index = v
+		case 2:
+			i.op2.amode.base = v
+		case 3:
+			i.op2.amode.index = v
+		case 4:
+			i.op2.r = v
+		default:
+			panic("BUG")
+		}
 	default:
 		panic(fmt.Sprintf("BUG: invalid useKind %s for %s", uk, i))
 	}
@@ -454,6 +502,8 @@ func (i *instruction) AssignDef(reg regalloc.VReg) {
 			panic("BUG already assigned" + i.String())
 		}
 		i.op2.r = reg
+	case defKindFcvtToSintSequence, defKindFcvtToUintSequence:
+		i.op1.r = reg
 	default:
 		panic(fmt.Sprintf("BUG: invalid defKind \"%s\" for %s", dk, i))
 	}
@@ -676,8 +726,82 @@ const (
 	// The existence of this instruction does not affect the execution.
 	sourceOffsetInfo
 
+	// defineUninitializedReg is a no-op instruction that defines a register without a defining instruction.
+	defineUninitializedReg
+
+	// fcvtToSintSequence is a sequence of instructions to convert a float to a signed integer.
+	fcvtToSintSequence
+
+	// fcvtToUintSequence is a sequence of instructions to convert a float to an unsigned integer.
+	fcvtToUintSequence
+
 	instrMax
 )
+
+func (i *instruction) asDefineUninitializedReg(r regalloc.VReg) *instruction {
+	i.kind = defineUninitializedReg
+	i.op2 = newOperandReg(r)
+	return i
+}
+
+func (i *instruction) asFcvtToUintSequence(
+	subOp, cmpOp, truncOp sseOpcode,
+	execCtx, src, dst, tmpGp, tmpXmm, tmpXmm2 regalloc.VReg,
+	src64, dst64, sat bool,
+) *instruction {
+	i.u1 = uint64(subOp) | uint64(cmpOp)<<8 | uint64(truncOp)<<16
+	i.kind = fcvtToUintSequence
+	i.op1.amode.base = execCtx
+	i.op1.amode.index = src
+	i.op1.r = dst
+	i.op2.amode.base = tmpGp
+	i.op2.amode.index = tmpXmm
+	i.op2.r = tmpXmm2
+	i.b1 = src64
+	i.b2 = dst64
+	i.b3 = sat
+	return i
+}
+
+func (i *instruction) fcvtToUintSequenceData() (
+	subOp, cmpOp, truncOp sseOpcode, execCtx, src, dst, tmpGp, tmpXmm, tmpXmm2 regalloc.VReg, src64, dst64, sat bool,
+) {
+	if i.kind != fcvtToUintSequence {
+		panic("BUG")
+	}
+	return sseOpcode(i.u1), sseOpcode(i.u1 >> 8), sseOpcode(i.u1 >> 16), i.op1.amode.base, i.op1.amode.index,
+		i.op1.r, i.op2.amode.base, i.op2.amode.index, i.op2.r, i.b1, i.b2, i.b3
+}
+
+func (i *instruction) asFcvtToSintSequence(
+	cmpOp, truncOp sseOpcode,
+	execCtx, src, dst, tmpGp, tmpGp2, tmpXmm regalloc.VReg,
+	src64, dst64, sat bool,
+) *instruction {
+	i.u1 = uint64(cmpOp)
+	i.u2 = uint64(truncOp)
+	i.kind = fcvtToSintSequence
+	i.op1.amode.base = execCtx
+	i.op1.amode.index = src
+	i.op1.r = dst
+	i.op2.amode.base = tmpGp
+	i.op2.amode.index = tmpGp2
+	i.op2.r = tmpXmm
+	i.b1 = src64
+	i.b2 = dst64
+	i.b3 = sat
+	return i
+}
+
+func (i *instruction) fcvtToSintSequenceData() (
+	cmpOp, truncOp sseOpcode, execCtx, src, dst, tmpGp, tmpGp2, tmpXmm regalloc.VReg, src64, dst64, sat bool,
+) {
+	if i.kind != fcvtToSintSequence {
+		panic("BUG")
+	}
+	return sseOpcode(i.u1), sseOpcode(i.u2), i.op1.amode.base, i.op1.amode.index,
+		i.op1.r, i.op2.amode.base, i.op2.amode.index, i.op2.r, i.b1, i.b2, i.b3
+}
 
 func (k instructionKind) String() string {
 	switch k {
@@ -771,6 +895,10 @@ func (k instructionKind) String() string {
 		return "xchg"
 	case zeros:
 		return "zeros"
+	case fcvtToSintSequence:
+		return "fcvtToSintSequence"
+	case fcvtToUintSequence:
+		return "fcvtToUintSequence"
 	default:
 		panic("BUG")
 	}
@@ -1766,43 +1894,48 @@ const (
 	defKindCall
 	defKindRdx
 	defKindRaxRdx
+	defKindFcvtToSintSequence
+	defKindFcvtToUintSequence
 )
 
 var defKinds = [instrMax]defKind{
-	nop0:             defKindNone,
-	div:              defKindRaxRdx,
-	signExtendData:   defKindRdx,
-	ret:              defKindNone,
-	movRR:            defKindOp2,
-	movRM:            defKindNone,
-	xmmMovRM:         defKindNone,
-	aluRmiR:          defKindNone,
-	shiftR:           defKindNone,
-	imm:              defKindOp2,
-	unaryRmR:         defKindOp2,
-	xmmUnaryRmR:      defKindOp2,
-	xmmUnaryRmRImm:   defKindOp2,
-	xmmCmpRmR:        defKindOp2,
-	xmmRmR:           defKindNone,
-	mov64MR:          defKindOp2,
-	movsxRmR:         defKindOp2,
-	movzxRmR:         defKindOp2,
-	gprToXmm:         defKindOp2,
-	xmmToGpr:         defKindOp2,
-	cmove:            defKindNone,
-	call:             defKindCall,
-	callIndirect:     defKindCall,
-	ud2:              defKindNone,
-	jmp:              defKindNone,
-	jmpIf:            defKindNone,
-	jmpTableIsland:   defKindNone,
-	cmpRmiR:          defKindNone,
-	exitSequence:     defKindNone,
-	lea:              defKindOp2,
-	v128ConstIsland:  defKindNone,
-	setcc:            defKindOp2,
-	zeros:            defKindOp2,
-	sourceOffsetInfo: defKindNone,
+	nop0:                   defKindNone,
+	div:                    defKindRaxRdx,
+	signExtendData:         defKindRdx,
+	ret:                    defKindNone,
+	movRR:                  defKindOp2,
+	movRM:                  defKindNone,
+	xmmMovRM:               defKindNone,
+	aluRmiR:                defKindNone,
+	shiftR:                 defKindNone,
+	imm:                    defKindOp2,
+	unaryRmR:               defKindOp2,
+	xmmUnaryRmR:            defKindOp2,
+	xmmUnaryRmRImm:         defKindOp2,
+	xmmCmpRmR:              defKindOp2,
+	xmmRmR:                 defKindNone,
+	mov64MR:                defKindOp2,
+	movsxRmR:               defKindOp2,
+	movzxRmR:               defKindOp2,
+	gprToXmm:               defKindOp2,
+	xmmToGpr:               defKindOp2,
+	cmove:                  defKindNone,
+	call:                   defKindCall,
+	callIndirect:           defKindCall,
+	ud2:                    defKindNone,
+	jmp:                    defKindNone,
+	jmpIf:                  defKindNone,
+	jmpTableIsland:         defKindNone,
+	cmpRmiR:                defKindNone,
+	exitSequence:           defKindNone,
+	lea:                    defKindOp2,
+	v128ConstIsland:        defKindNone,
+	setcc:                  defKindOp2,
+	zeros:                  defKindOp2,
+	sourceOffsetInfo:       defKindNone,
+	fcvtToSintSequence:     defKindFcvtToSintSequence,
+	defineUninitializedReg: defKindOp2,
+	fcvtToUintSequence:     defKindFcvtToUintSequence,
 }
 
 // String implements fmt.Stringer.
@@ -1838,43 +1971,48 @@ const (
 	useKindOp1Rax
 	useKindCall
 	useKindCallInd
+	useKindFcvtToSintSequence
+	useKindFcvtToUintSequence
 )
 
 var useKinds = [instrMax]useKind{
-	nop0:             useKindNone,
-	div:              useKindOp1Rax,
-	signExtendData:   useKindRax,
-	ret:              useKindNone,
-	movRR:            useKindOp1,
-	movRM:            useKindOp1RegOp2,
-	xmmMovRM:         useKindOp1RegOp2,
-	cmove:            useKindOp1Op2Reg,
-	aluRmiR:          useKindOp1Op2Reg,
-	shiftR:           useKindOp1Op2Reg,
-	imm:              useKindNone,
-	unaryRmR:         useKindOp1,
-	xmmUnaryRmR:      useKindOp1,
-	xmmUnaryRmRImm:   useKindOp1,
-	xmmCmpRmR:        useKindOp1Op2Reg,
-	xmmRmR:           useKindOp1Op2Reg,
-	mov64MR:          useKindOp1,
-	movzxRmR:         useKindOp1,
-	movsxRmR:         useKindOp1,
-	gprToXmm:         useKindOp1,
-	xmmToGpr:         useKindOp1,
-	call:             useKindCall,
-	callIndirect:     useKindCallInd,
-	ud2:              useKindNone,
-	jmpIf:            useKindOp1,
-	jmp:              useKindOp1,
-	cmpRmiR:          useKindOp1Op2Reg,
-	exitSequence:     useKindOp1,
-	lea:              useKindOp1,
-	v128ConstIsland:  useKindNone,
-	jmpTableIsland:   useKindNone,
-	setcc:            useKindNone,
-	zeros:            useKindNone,
-	sourceOffsetInfo: useKindNone,
+	nop0:                   useKindNone,
+	div:                    useKindOp1Rax,
+	signExtendData:         useKindRax,
+	ret:                    useKindNone,
+	movRR:                  useKindOp1,
+	movRM:                  useKindOp1RegOp2,
+	xmmMovRM:               useKindOp1RegOp2,
+	cmove:                  useKindOp1Op2Reg,
+	aluRmiR:                useKindOp1Op2Reg,
+	shiftR:                 useKindOp1Op2Reg,
+	imm:                    useKindNone,
+	unaryRmR:               useKindOp1,
+	xmmUnaryRmR:            useKindOp1,
+	xmmUnaryRmRImm:         useKindOp1,
+	xmmCmpRmR:              useKindOp1Op2Reg,
+	xmmRmR:                 useKindOp1Op2Reg,
+	mov64MR:                useKindOp1,
+	movzxRmR:               useKindOp1,
+	movsxRmR:               useKindOp1,
+	gprToXmm:               useKindOp1,
+	xmmToGpr:               useKindOp1,
+	call:                   useKindCall,
+	callIndirect:           useKindCallInd,
+	ud2:                    useKindNone,
+	jmpIf:                  useKindOp1,
+	jmp:                    useKindOp1,
+	cmpRmiR:                useKindOp1Op2Reg,
+	exitSequence:           useKindOp1,
+	lea:                    useKindOp1,
+	v128ConstIsland:        useKindNone,
+	jmpTableIsland:         useKindNone,
+	setcc:                  useKindNone,
+	zeros:                  useKindNone,
+	sourceOffsetInfo:       useKindNone,
+	fcvtToSintSequence:     useKindFcvtToSintSequence,
+	defineUninitializedReg: useKindNone,
+	fcvtToUintSequence:     useKindFcvtToUintSequence,
 }
 
 func (u useKind) String() string {

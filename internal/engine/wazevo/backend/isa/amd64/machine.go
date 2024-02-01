@@ -357,16 +357,16 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 	case ssa.OpcodeFcvtToSint, ssa.OpcodeFcvtToSintSat:
 		x, ctx := instr.Arg2()
 		rn := m.getOperand_Reg(m.c.ValueDefinition(x))
-		rd := newOperandReg(m.c.VRegOf(instr.Return()))
+		rd := m.c.VRegOf(instr.Return())
 		ctxVReg := m.c.VRegOf(ctx)
-		m.lowerFcvtToSint(ctxVReg, rn, rd, x.Type() == ssa.TypeF64,
+		m.lowerFcvtToSint(ctxVReg, rn.r, rd, x.Type() == ssa.TypeF64,
 			instr.Return().Type().Bits() == 64, op == ssa.OpcodeFcvtToSintSat)
 	case ssa.OpcodeFcvtToUint, ssa.OpcodeFcvtToUintSat:
 		x, ctx := instr.Arg2()
 		rn := m.getOperand_Reg(m.c.ValueDefinition(x))
-		rd := newOperandReg(m.c.VRegOf(instr.Return()))
+		rd := m.c.VRegOf(instr.Return())
 		ctxVReg := m.c.VRegOf(ctx)
-		m.lowerFcvtToUint(ctxVReg, rn, rd, x.Type() == ssa.TypeF64,
+		m.lowerFcvtToUint(ctxVReg, rn.r, rd, x.Type() == ssa.TypeF64,
 			instr.Return().Type().Bits() == 64, op == ssa.OpcodeFcvtToUintSat)
 	case ssa.OpcodeFcvtFromSint:
 		x := instr.Arg()
@@ -800,12 +800,7 @@ func (m *machine) lowerExitIfTrueWithCode(execCtx regalloc.VReg, cond ssa.Value,
 	jmpIf.asJmpIf(condFromSSAIntCmpCond(c).invert(), newOperandLabel(l))
 }
 
-func (m *machine) allocateExitInstructions(execCtx, exitCodeReg regalloc.VReg) (setExitCode, saveRsp, saveRbp *instruction) {
-	setExitCode = m.allocateInstr().asMovRM(
-		exitCodeReg,
-		newOperandMem(newAmodeImmReg(wazevoapi.ExecutionContextOffsetExitCodeOffset.U32(), execCtx)),
-		4,
-	)
+func (m *machine) allocateExitInstructions(execCtx, exitCodeReg regalloc.VReg) (saveRsp, saveRbp, setExitCode *instruction) {
 	saveRsp = m.allocateInstr().asMovRM(
 		rspVReg,
 		newOperandMem(newAmodeImmReg(wazevoapi.ExecutionContextOffsetStackPointerBeforeGoCall.U32(), execCtx)),
@@ -817,25 +812,28 @@ func (m *machine) allocateExitInstructions(execCtx, exitCodeReg regalloc.VReg) (
 		newOperandMem(newAmodeImmReg(wazevoapi.ExecutionContextOffsetFramePointerBeforeGoCall.U32(), execCtx)),
 		8,
 	)
+	setExitCode = m.allocateInstr().asMovRM(
+		exitCodeReg,
+		newOperandMem(newAmodeImmReg(wazevoapi.ExecutionContextOffsetExitCodeOffset.U32(), execCtx)),
+		4,
+	)
 	return
 }
 
 func (m *machine) lowerExitWithCode(execCtx regalloc.VReg, code wazevoapi.ExitCode) (afterLabel backend.Label) {
-	// First we set the exit code in the execution context.
-	exitCodeReg := m.c.AllocateVReg(ssa.TypeI32)
-	m.lowerIconst(exitCodeReg, uint64(code), false)
+	exitCodeReg := rbpVReg
+	saveRsp, saveRbp, setExitCode := m.allocateExitInstructions(execCtx, exitCodeReg)
 
-	setExitCode, saveRsp, saveRbp := m.allocateExitInstructions(execCtx, exitCodeReg)
-
-	// Set exit code, save RSP and RBP.
-	m.insert(setExitCode)
+	// Set save RSP, RBP, and write exit code.
 	m.insert(saveRsp)
 	m.insert(saveRbp)
+	m.lowerIconst(exitCodeReg, uint64(code), false)
+	m.insert(setExitCode)
 
 	// Next is to save the return address.
 	readRip := m.allocateInstr()
 	m.insert(readRip)
-	ripReg := m.c.AllocateVReg(ssa.TypeI64)
+	ripReg := rbpVReg
 	saveRip := m.allocateInstr().asMovRM(
 		ripReg,
 		newOperandMem(newAmodeImmReg(wazevoapi.ExecutionContextOffsetGoCallReturnAddress.U32(), execCtx)),
@@ -1766,15 +1764,18 @@ func (m *machine) lowerBitcast(instr *ssa.Instruction) {
 	}
 }
 
-func (m *machine) lowerFcvtToSint(ctxVReg regalloc.VReg, rn, rd operand, src64, dst64, sat bool) {
-	var tmp regalloc.VReg
+func (m *machine) lowerFcvtToSint(ctxVReg, rn, rd regalloc.VReg, src64, dst64, sat bool) {
+	var tmpXmm regalloc.VReg
 	if dst64 {
-		tmp = m.c.AllocateVReg(ssa.TypeF64)
+		tmpXmm = m.c.AllocateVReg(ssa.TypeF64)
 	} else {
-		tmp = m.c.AllocateVReg(ssa.TypeF32)
+		tmpXmm = m.c.AllocateVReg(ssa.TypeF32)
 	}
 
-	tmpDst := m.copyToTmp(rd.r)
+	m.insert(m.allocateInstr().asDefineUninitializedReg(tmpXmm))
+	tmpGp, tmpGp2 := m.c.AllocateVReg(ssa.TypeI64), m.c.AllocateVReg(ssa.TypeI64)
+	m.insert(m.allocateInstr().asDefineUninitializedReg(tmpGp))
+	m.insert(m.allocateInstr().asDefineUninitializedReg(tmpGp2))
 
 	var cmpOp, truncOp sseOpcode
 	if src64 {
@@ -1783,16 +1784,20 @@ func (m *machine) lowerFcvtToSint(ctxVReg regalloc.VReg, rn, rd operand, src64, 
 		cmpOp, truncOp = sseOpcodeUcomiss, sseOpcodeCvttss2si
 	}
 
+	seq := m.allocateInstr().asFcvtToSintSequence(cmpOp, truncOp, ctxVReg, rn, rd, tmpGp, tmpGp2, tmpXmm, src64, dst64, sat)
+	m.insert(seq)
+}
+
+func (m *machine) lowerFcvtToSintSequenceAfterRegalloc(i *instruction) {
+	cmpOp, truncOp, execCtx, src, dst, tmpGp, tmpGp2, tmpXmm, src64, dst64, sat := i.fcvtToSintSequenceData()
 	trunc := m.allocateInstr()
-	trunc.asXmmToGpr(truncOp, rn.r, tmpDst, dst64)
+	trunc.asXmmToGpr(truncOp, src, tmpGp, dst64)
 	m.insert(trunc)
 
 	// Check if the dst operand was INT_MIN, by checking it against 1.
 	cmp1 := m.allocateInstr()
-	cmp1.asCmpRmiR(true, newOperandImm32(1), tmpDst, dst64)
+	cmp1.asCmpRmiR(true, newOperandImm32(1), tmpGp, dst64)
 	m.insert(cmp1)
-
-	execCtxCopy := m.copyToTmp(ctxVReg)
 
 	// If no overflow, then we are done.
 	doneTarget, done := m.allocateBrTarget()
@@ -1802,7 +1807,7 @@ func (m *machine) lowerFcvtToSint(ctxVReg regalloc.VReg, rn, rd operand, src64, 
 
 	// Now, check for NaN.
 	cmpNan := m.allocateInstr()
-	cmpNan.asXmmCmpRmR(cmpOp, newOperandReg(rn.r), rn.r)
+	cmpNan.asXmmCmpRmR(cmpOp, newOperandReg(src), src)
 	m.insert(cmpNan)
 
 	// We allocate the "non-nan target" here, but we will insert it later.
@@ -1813,8 +1818,7 @@ func (m *machine) lowerFcvtToSint(ctxVReg regalloc.VReg, rn, rd operand, src64, 
 
 	if sat {
 		// If NaN and saturating, return 0.
-		zeroDst := m.allocateInstr()
-		zeroDst.asZeros(tmpDst)
+		zeroDst := m.allocateInstr().asZeros(tmpGp)
 		m.insert(zeroDst)
 
 		jmpEnd := m.allocateInstr()
@@ -1825,12 +1829,10 @@ func (m *machine) lowerFcvtToSint(ctxVReg regalloc.VReg, rn, rd operand, src64, 
 		m.insert(notNanTarget)
 
 		// Zero-out the tmp register.
-		zero := m.allocateInstr()
-		zero.asZeros(tmp)
+		zero := m.allocateInstr().asZeros(tmpXmm)
 		m.insert(zero)
 
-		cmpXmm := m.allocateInstr()
-		cmpXmm.asXmmCmpRmR(cmpOp, newOperandReg(tmp), rn.r)
+		cmpXmm := m.allocateInstr().asXmmCmpRmR(cmpOp, newOperandReg(tmpXmm), src)
 		m.insert(cmpXmm)
 
 		// if >= jump to end.
@@ -1840,16 +1842,15 @@ func (m *machine) lowerFcvtToSint(ctxVReg regalloc.VReg, rn, rd operand, src64, 
 
 		// Otherwise, saturate to INT_MAX.
 		if dst64 {
-			m.lowerIconst(tmpDst, math.MaxInt64, dst64)
+			m.lowerIconst(tmpGp, math.MaxInt64, dst64)
 		} else {
-			m.lowerIconst(tmpDst, math.MaxInt32, dst64)
+			m.lowerIconst(tmpGp, math.MaxInt32, dst64)
 		}
 
 	} else {
 
 		// If non-sat, NaN, trap.
-		checkPositiveTarget, checkPositive := m.allocateBrTarget()
-		m.lowerExitWithCode(execCtxCopy, wazevoapi.ExitCodeInvalidConversionToInteger)
+		m.lowerExitWithCode(execCtx, wazevoapi.ExitCodeInvalidConversionToInteger)
 
 		// Otherwise, we will jump here.
 		m.insert(notNanTarget)
@@ -1871,55 +1872,45 @@ func (m *machine) lowerFcvtToSint(ctxVReg regalloc.VReg, rn, rd operand, src64, 
 			minInt = 0xCF00_0000
 		}
 
-		m.lowerFconst(tmp, minInt, src64)
+		loadToGP := m.allocateInstr().asImm(tmpGp2, minInt, src64)
+		m.insert(loadToGP)
 
-		cmpXmm := m.allocateInstr()
-		cmpXmm.asXmmCmpRmR(cmpOp, newOperandReg(tmp), rn.r)
+		movToXmm := m.allocateInstr().asGprToXmm(sseOpcodeMovq, newOperandReg(tmpGp2), tmpXmm, src64)
+		m.insert(movToXmm)
+
+		cmpXmm := m.allocateInstr().asXmmCmpRmR(cmpOp, newOperandReg(tmpXmm), src)
 		m.insert(cmpXmm)
 
 		jmpIfLarger := m.allocateInstr()
+		checkPositiveTarget, checkPositive := m.allocateBrTarget()
 		jmpIfLarger.asJmpIf(condAboveThreshold, newOperandLabel(checkPositive))
 		m.insert(jmpIfLarger)
 
-		m.lowerExitWithCode(execCtxCopy, wazevoapi.ExitCodeIntegerOverflow)
+		m.lowerExitWithCode(execCtx, wazevoapi.ExitCodeIntegerOverflow)
 
 		// If positive, it was a real overflow.
 		m.insert(checkPositiveTarget)
 
 		// Zero out the temp register.
 		xorpd := m.allocateInstr()
-		xorpd.asXmmRmR(sseOpcodeXorpd, newOperandReg(tmp), tmp)
+		xorpd.asXmmRmR(sseOpcodeXorpd, newOperandReg(tmpXmm), tmpXmm)
 		m.insert(xorpd)
 
 		pos := m.allocateInstr()
-		pos.asXmmCmpRmR(cmpOp, rn, tmp)
+		pos.asXmmCmpRmR(cmpOp, newOperandReg(src), tmpXmm)
 		m.insert(pos)
 
 		// If >= jump to end.
-		jmp := m.allocateInstr()
-		jmp.asJmpIf(condNB, newOperandLabel(done))
+		jmp := m.allocateInstr().asJmpIf(condNB, newOperandLabel(done))
 		m.insert(jmp)
-
-		m.lowerExitWithCode(execCtxCopy, wazevoapi.ExitCodeIntegerOverflow)
-
+		m.lowerExitWithCode(execCtx, wazevoapi.ExitCodeIntegerOverflow)
 	}
+
 	m.insert(doneTarget)
-	m.copyTo(tmpDst, rd.r)
+	m.copyTo(tmpGp, dst)
 }
 
-func (m *machine) lowerFcvtToUint(ctxVReg regalloc.VReg, rn, rd operand, src64, dst64, sat bool) {
-	var tmpF, tmpDst regalloc.VReg
-	if dst64 {
-		tmpDst = m.c.AllocateVReg(ssa.TypeI64)
-	} else {
-		tmpDst = m.c.AllocateVReg(ssa.TypeI32)
-	}
-	if src64 {
-		tmpF = m.c.AllocateVReg(ssa.TypeF64)
-	} else {
-		tmpF = m.c.AllocateVReg(ssa.TypeF32)
-	}
-
+func (m *machine) lowerFcvtToUint(ctxVReg, rn, rd regalloc.VReg, src64, dst64, sat bool) {
 	var subOp, cmpOp, truncOp sseOpcode
 	if src64 {
 		subOp, cmpOp, truncOp = sseOpcodeSubsd, sseOpcodeUcomisd, sseOpcodeCvttsd2si
@@ -1927,23 +1918,47 @@ func (m *machine) lowerFcvtToUint(ctxVReg regalloc.VReg, rn, rd operand, src64, 
 		subOp, cmpOp, truncOp = sseOpcodeSubss, sseOpcodeUcomiss, sseOpcodeCvttss2si
 	}
 
+	tmpXmm, tmpXmm2 := m.c.AllocateVReg(ssa.TypeF64), m.c.AllocateVReg(ssa.TypeF64)
+	m.insert(m.allocateInstr().asDefineUninitializedReg(tmpXmm))
+	m.insert(m.allocateInstr().asDefineUninitializedReg(tmpXmm2))
+	tmpGp := m.c.AllocateVReg(ssa.TypeI64)
+	m.insert(m.allocateInstr().asDefineUninitializedReg(tmpGp))
+
+	m.insert(m.allocateInstr().asFcvtToUintSequence(
+		subOp, cmpOp, truncOp, ctxVReg, rn, rd, tmpGp, tmpXmm, tmpXmm2, src64, dst64, sat,
+	))
+}
+
+func (m *machine) lowerFcvtToUintSequenceAfterRegalloc(i *instruction) {
+	subOp, cmpOp, truncOp, execCtx, src, dst, tmpGp, tmpXmm, tmpXmm2, src64, dst64, sat := i.fcvtToUintSequenceData()
+
 	doneTarget, done := m.allocateBrTarget()
 
 	switch {
 	case src64 && dst64:
-		m.lowerFconst(tmpF, 0x43e0000000000000, true)
+		loadToGP := m.allocateInstr().asImm(tmpGp, 0x43e0000000000000, true)
+		m.insert(loadToGP)
+		movToXmm := m.allocateInstr().asGprToXmm(sseOpcodeMovq, newOperandReg(tmpGp), tmpXmm, true)
+		m.insert(movToXmm)
 	case src64 && !dst64:
-		m.lowerFconst(tmpF, 0x41e0000000000000, true)
+		loadToGP := m.allocateInstr().asImm(tmpGp, 0x41e0000000000000, true)
+		m.insert(loadToGP)
+		movToXmm := m.allocateInstr().asGprToXmm(sseOpcodeMovq, newOperandReg(tmpGp), tmpXmm, true)
+		m.insert(movToXmm)
 	case !src64 && dst64:
-		m.lowerFconst(tmpF, 0x5f000000, false)
+		loadToGP := m.allocateInstr().asImm(tmpGp, 0x5f000000, false)
+		m.insert(loadToGP)
+		movToXmm := m.allocateInstr().asGprToXmm(sseOpcodeMovq, newOperandReg(tmpGp), tmpXmm, false)
+		m.insert(movToXmm)
 	case !src64 && !dst64:
-		m.lowerFconst(tmpF, 0x4f000000, false)
+		loadToGP := m.allocateInstr().asImm(tmpGp, 0x4f000000, false)
+		m.insert(loadToGP)
+		movToXmm := m.allocateInstr().asGprToXmm(sseOpcodeMovq, newOperandReg(tmpGp), tmpXmm, false)
+		m.insert(movToXmm)
 	}
 
-	execCtxCopy := m.copyToTmp(ctxVReg)
-
 	cmp := m.allocateInstr()
-	cmp.asXmmCmpRmR(cmpOp, newOperandReg(tmpF), rn.r)
+	cmp.asXmmCmpRmR(cmpOp, newOperandReg(tmpXmm), src)
 	m.insert(cmp)
 
 	// If above `tmp` ("large threshold"), jump to `ifAboveThreshold`
@@ -1960,8 +1975,7 @@ func (m *machine) lowerFcvtToUint(ctxVReg regalloc.VReg, rn, rd operand, src64, 
 	// If NaN, handle the error condition.
 	if sat {
 		// On NaN, saturating, we just return 0.
-		zeros := m.allocateInstr()
-		zeros.asZeros(tmpDst)
+		zeros := m.allocateInstr().asZeros(tmpGp)
 		m.insert(zeros)
 
 		jmpEnd := m.allocateInstr()
@@ -1969,20 +1983,21 @@ func (m *machine) lowerFcvtToUint(ctxVReg regalloc.VReg, rn, rd operand, src64, 
 		m.insert(jmpEnd)
 	} else {
 		// On NaN, non-saturating, we trap.
-		m.lowerExitWithCode(execCtxCopy, wazevoapi.ExitCodeInvalidConversionToInteger)
+		m.lowerExitWithCode(execCtx, wazevoapi.ExitCodeInvalidConversionToInteger)
 	}
 
 	// If not NaN, land here.
 	m.insert(ifNotNaNTarget)
 
 	// Truncation happens here.
+
 	trunc := m.allocateInstr()
-	trunc.asXmmToGpr(truncOp, rn.r, tmpDst, dst64)
+	trunc.asXmmToGpr(truncOp, src, tmpGp, dst64)
 	m.insert(trunc)
 
 	// Check if the result is negative.
 	cmpNeg := m.allocateInstr()
-	cmpNeg.asCmpRmiR(true, newOperandImm32(0), tmpDst, dst64)
+	cmpNeg.asCmpRmiR(true, newOperandImm32(0), tmpGp, dst64)
 	m.insert(cmpNeg)
 
 	// If non-neg, jump to end.
@@ -1993,8 +2008,7 @@ func (m *machine) lowerFcvtToUint(ctxVReg regalloc.VReg, rn, rd operand, src64, 
 	if sat {
 		// If the input was "small" (< 2**(width -1)), the only way to get an integer
 		// overflow is because the input was too small: saturate to the min value, i.e. 0.
-		zeros := m.allocateInstr()
-		zeros.asZeros(tmpDst)
+		zeros := m.allocateInstr().asZeros(tmpGp)
 		m.insert(zeros)
 
 		jmpEnd := m.allocateInstr()
@@ -2002,26 +2016,26 @@ func (m *machine) lowerFcvtToUint(ctxVReg regalloc.VReg, rn, rd operand, src64, 
 		m.insert(jmpEnd)
 	} else {
 		// If not saturating, trap.
-		m.lowerExitWithCode(execCtxCopy, wazevoapi.ExitCodeIntegerOverflow)
+		m.lowerExitWithCode(execCtx, wazevoapi.ExitCodeIntegerOverflow)
 	}
 
 	// If above the threshold, land here.
 	m.insert(ifAboveThresholdTarget)
 
 	// tmpDiff := threshold - rn.
-	tmpDiff := m.copyToTmp(rn.r)
+	copySrc := m.allocateInstr().asXmmUnaryRmR(sseOpcodeMovdqu, newOperandReg(src), tmpXmm2)
+	m.insert(copySrc)
+
 	sub := m.allocateInstr()
-	sub.asXmmRmR(subOp, newOperandReg(tmpF), tmpDiff) // must be -0x8000000000000000
+	sub.asXmmRmR(subOp, newOperandReg(tmpXmm), tmpXmm2) // must be -0x8000000000000000
 	m.insert(sub)
 
-	// tmpI := truncate( tmpDiff )
 	trunc2 := m.allocateInstr()
-	trunc2.asXmmToGpr(truncOp, tmpDiff, tmpDst, dst64)
+	trunc2.asXmmToGpr(truncOp, tmpXmm2, tmpGp, dst64)
 	m.insert(trunc2)
 
 	// Check if the result is negative.
-	cmpNeg2 := m.allocateInstr()
-	cmpNeg2.asCmpRmiR(true, newOperandImm32(0), tmpDst, dst64)
+	cmpNeg2 := m.allocateInstr().asCmpRmiR(true, newOperandImm32(0), tmpGp, dst64)
 	m.insert(cmpNeg2)
 
 	ifNextLargeTarget, ifNextLarge := m.allocateBrTarget()
@@ -2038,33 +2052,32 @@ func (m *machine) lowerFcvtToUint(ctxVReg regalloc.VReg, rn, rd operand, src64, 
 		} else {
 			maxInt = math.MaxUint32
 		}
-		m.lowerIconst(tmpDst, maxInt, dst64)
+		m.lowerIconst(tmpGp, maxInt, dst64)
 
 		jmpToEnd := m.allocateInstr()
 		jmpToEnd.asJmp(newOperandLabel(done))
 		m.insert(jmpToEnd)
 	} else {
 		// If not saturating, trap.
-		m.lowerExitWithCode(execCtxCopy, wazevoapi.ExitCodeIntegerOverflow)
+		m.lowerExitWithCode(execCtx, wazevoapi.ExitCodeIntegerOverflow)
 	}
 
 	m.insert(ifNextLargeTarget)
 
 	var op operand
 	if dst64 {
-		t := m.c.AllocateVReg(ssa.TypeI64)
-		m.lowerIconst(t, 0x8000000000000000, true)
-		op = newOperandReg(t)
+		m.lowerIconst(dst, 0x8000000000000000, true)
+		op = newOperandReg(dst)
 	} else {
 		op = newOperandImm32(0x80000000)
 	}
 
 	add := m.allocateInstr()
-	add.asAluRmiR(aluRmiROpcodeAdd, op, tmpDst, dst64)
+	add.asAluRmiR(aluRmiROpcodeAdd, op, tmpGp, dst64)
 	m.insert(add)
 
 	m.insert(doneTarget)
-	m.copyTo(tmpDst, rd.r)
+	m.copyTo(tmpGp, dst)
 }
 
 func (m *machine) lowerFcvtFromSint(rn, rd operand, src64, dst64 bool) {
