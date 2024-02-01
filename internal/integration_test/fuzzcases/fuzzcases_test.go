@@ -5,6 +5,7 @@ import (
 	"embed"
 	"fmt"
 	"math"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -51,6 +52,9 @@ func runWithInterpreter(t *testing.T, runner func(t *testing.T, r wazero.Runtime
 }
 
 func runWithWazevo(t *testing.T, runner func(t *testing.T, r wazero.Runtime)) {
+	if !platform.CompilerSupported() {
+		return
+	}
 	t.Run("wazevo", func(t *testing.T) {
 		config := opt.NewRuntimeConfigOptimizingCompiler()
 		r := wazero.NewRuntimeWithConfig(ctx, config)
@@ -66,7 +70,7 @@ func run(t *testing.T, runner func(t *testing.T, r wazero.Runtime)) {
 }
 
 func skipWazevo(t *testing.T) {
-	if strings.Contains(t.Name(), "wazevo") {
+	if runtime.GOARCH == "amd64" && strings.Contains(t.Name(), "wazevo") {
 		t.Skip("skipping wazevo")
 	}
 }
