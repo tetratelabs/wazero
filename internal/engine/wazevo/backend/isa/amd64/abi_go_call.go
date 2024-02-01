@@ -177,7 +177,7 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 	exitCodeReg := r12VReg // Callee saved which is already saved.
 	cur = linkInstr(cur, m.allocateInstr().asImm(exitCodeReg, uint64(exitCode), false))
 
-	setExitCode, saveRsp, saveRbp := m.allocateExitInstructions(execCtrPtr, exitCodeReg)
+	saveRsp, saveRbp, setExitCode := m.allocateExitInstructions(execCtrPtr, exitCodeReg)
 	cur = linkInstr(cur, setExitCode)
 	cur = linkInstr(cur, saveRsp)
 	cur = linkInstr(cur, saveRbp)
@@ -364,7 +364,7 @@ func (m *machine) CompileStackGrowCallSequence() []byte {
 	exitCodeReg := r12VReg // Already saved.
 	cur = linkInstr(cur, m.allocateInstr().asImm(exitCodeReg, uint64(wazevoapi.ExitCodeGrowStack), false))
 
-	setExitCode, saveRsp, saveRbp := m.allocateExitInstructions(execCtrPtr, exitCodeReg)
+	saveRsp, saveRbp, setExitCode := m.allocateExitInstructions(execCtrPtr, exitCodeReg)
 	cur = linkInstr(cur, setExitCode)
 	cur = linkInstr(cur, saveRsp)
 	cur = linkInstr(cur, saveRbp)
