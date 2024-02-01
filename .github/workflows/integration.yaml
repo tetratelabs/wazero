@@ -100,8 +100,8 @@ jobs:
         arch:     [amd64]
         include:
           - os:
-              version: ubuntu-22.04
-              name: Ubuntu
+              version: macos-14
+              name: macOS
             compiler: optimizing
             arch:     "arm64"
 
@@ -124,44 +124,16 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - if: ${{ matrix.compiler == 'optimizing' }}
-        name: Build wazero
-        run: go build -o ./wazerocli ./cmd/wazero
-        env:
-          GOARCH: ${{ matrix.arch }}
-
-      - name: Set up QEMU
-        if: ${{ matrix.compiler == 'optimizing' && matrix.arch == 'arm64' }}
-        uses: docker/setup-qemu-action@v2
-        with: # Avoid docker.io rate-limits; built with internal-images.yml
-          image: ghcr.io/tetratelabs/wazero/internal-binfmt
-          platforms: ${{ matrix.arch }}
-
-      - name: Build scratch container
-        if: ${{ matrix.compiler == 'optimizing' }}
-        run: |
-          echo 'FROM scratch' >> Dockerfile
-          echo 'CMD ["/test"]' >> Dockerfile
-          docker buildx build -t wazero:test --platform linux/${{ matrix.arch }} .
-
-
       # The following two steps run the previously compiled Zig tests with wazero.
       # If you need to troubleshoot any of the test, you can add "-hostlogging=filesystem" after
       # adding filter argument either to step "Run built test binaries" or
       # "Run built test binaries (container)".
       # e.g. --test-filter "Dir.Iterator but dir is deleted during iteration"
 
-      - name: Run built test binaries (container)
-        if: ${{ matrix.compiler == 'optimizing' }}
-        run: |
-          docker run --platform linux/${{ matrix.arch }} -v $(pwd)/${{ env.STDLIB_TESTS }}/testdata/zig:/test -v $(pwd)/wazerocli:/wazero -e WAZEROCLI=/wazero --tmpfs /tmp --rm -t wazero:test \
-            /wazero run -optimizing-compiler -mount=:/ ./test/test.wasm
-
       - name: Run built test binaries
-        if: ${{ matrix.compiler != 'optimizing' }}
         run: |
           cd ${{ env.STDLIB_TESTS }}
-          go test -bench='BenchmarkZig' -benchtime=1x
+          go test -bench='BenchmarkZig/${{ matrix.compiler }}' -benchtime=1x
 
   build_tinygo_test_binary:
     name: Build TinyGo test binary
@@ -224,8 +196,8 @@ jobs:
         arch:     [amd64]
         include:
           - os:
-              version: ubuntu-22.04
-              name: Ubuntu
+              version: macos-14
+              name: macOS
             compiler: optimizing
             arch:     "arm64"
 
@@ -248,47 +220,15 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - if: ${{ matrix.compiler == 'optimizing' }}
-        name: Build wazero
-        run: go build -o ~/wazerocli ./cmd/wazero
-        env:
-          GOARCH: ${{ matrix.arch }}
-
-      - name: Set up QEMU
-        if: ${{ matrix.compiler == 'optimizing' && matrix.arch == 'arm64' }}
-        uses: docker/setup-qemu-action@v2
-        with: # Avoid docker.io rate-limits; built with internal-images.yml
-          image: ghcr.io/tetratelabs/wazero/internal-binfmt
-          platforms: ${{ matrix.arch }}
-
-      - name: Build scratch container
-        if: ${{ matrix.compiler == 'optimizing' }}
-        run: |
-          echo 'FROM scratch' >> Dockerfile
-          echo 'CMD ["/test"]' >> Dockerfile
-          docker buildx build -t wazero:test --platform linux/${{ matrix.arch }} .
-
       # The following steps run the previously compiled TinyGo tests with wazero. If you need
       # to troubleshoot one, you can add "-hostlogging=filesystem" and also a
       # trailing argument narrowing which test to execute.
       # e.g. "-test.run '^TestStatBadDir$'"
 
-      - name: Run test binaries (container)
-        if: ${{ matrix.compiler == 'optimizing' }}
-        # This runs all tests compiled above in sequence. Note: This mounts /tmp to allow t.TempDir() in tests.
-        run: |
-          cd ${{ env.STDLIB_TESTS }}/testdata/tinygo
-          for bin in *.test; do
-            echo $bin
-            docker run --platform linux/${{ matrix.arch }} -v $(pwd):/test -v ~/wazerocli:/wazero -e WAZEROCLI=/wazero --tmpfs /tmp --rm -t wazero:test \
-              /wazero run -optimizing-compiler -mount=:/  /test/$bin -- -test.v
-          done
-
       - name: Run test binaries
-        if: ${{ matrix.compiler != 'optimizing' }}
         run: |
           cd ${{ env.STDLIB_TESTS }}
-          go test -bench='BenchmarkTinyGo' -benchtime=1x
+          go test -bench='BenchmarkTinyGo/${{ matrix.compiler }}' -benchtime=1x
 
   wasi-testsuite:
     name: wasi-testsuite
@@ -400,8 +340,8 @@ jobs:
           - "1.21"  # Current Go version && The only version that supports wasip1.
         include:
           - os:
-              version: ubuntu-22.04
-              name: Ubuntu
+              version: macos-14
+              name: macOS
             compiler:   optimizing
             arch:       "arm64"
             go-version: "1.21"
@@ -423,51 +363,13 @@ jobs:
           # Use precise Go version from setup-go as patch version differences can effect tests.
           key: go-wasip1-binaries-${{ matrix.os.version }}-${{ steps.setup-go.outputs.go-version }}-${{ matrix.arch }}
 
-      - if: ${{ matrix.compiler == 'optimizing' }}
-        name: Build wazero
-        run: go build -o ~/wazerocli ./cmd/wazero
-        env:
-          GOARCH: ${{ matrix.arch }}
-
       - if: ${{ steps.cache-go-test-binaries.outputs.cache-hit != 'true' }}
         name: Build Test Binaries
         run: |
           cd ${{ env.STDLIB_TESTS }}
           make build.gowasip1
 
-      - name: Set up QEMU
-        if: ${{ matrix.compiler == 'optimizing' && matrix.arch == 'arm64' }}
-        uses: docker/setup-qemu-action@v2
-        with: # Avoid docker.io rate-limits; built with internal-images.yml
-          image: ghcr.io/tetratelabs/wazero/internal-binfmt
-          platforms: ${{ matrix.arch }}
-
-      - name: Build scratch container
-        if: ${{ matrix.compiler == 'optimizing' }}
-        run: |
-          echo 'FROM scratch' >> Dockerfile
-          echo 'CMD ["/test"]' >> Dockerfile
-          docker buildx build -t wazero:test --platform linux/${{ matrix.arch }} .
-
-      - if: ${{ matrix.compiler == 'optimizing' }}
-        name: Run test binaries (container)
-        run: |
-          echo "Running $(find ${{ env.STDLIB_TESTS }}/testdata/go -name '*.test' | wc -l) test binaries"
-
-          # Skip tests that are hideously slow (mostly compilation time) for running inside QEMU.
-          skip_targets="src_encoding_json|src_runtime|src_os_exec|src_math_big|src_encoding_gob|src_time|src_archive_tar|src_math_rand|src_expvar|src_testing|src_os"
-          # Go tests often look for files relative to the source. Change to the corresponding directory.
-          for bin in $(find $PWD/${{ env.STDLIB_TESTS }}/testdata/go -name '*.test' | grep -vE "$skip_targets"); do
-            dir=$(basename $bin); dir=${dir%.test}; dir=${dir//_/\/}
-            pushd $(go env GOROOT)/$dir
-            # Mount / as /ROOT in docker and then remount /ROOT as / in wazero; $bin is now in /ROOT/$bin.
-            docker run --platform linux/arm64 -v /:/ROOT -v ~/wazerocli:/wazero -e WAZEROCLI=/wazero --tmpfs /tmp --rm -t wazero:test \
-              /wazero run -optimizing-compiler -mount=/ROOT:/ -mount=/tmp:/tmp -env PWD=$PWD /ROOT/$bin -- -test.short -test.v
-            popd
-          done
-
       - name: Run built test binaries
-        if: ${{ matrix.compiler != 'optimizing' }}
         run: |
           cd ${{ env.STDLIB_TESTS }}
-          go test -bench='BenchmarkWasip1' -benchtime=1x
+          go test -bench='BenchmarkWasip1/${{ matrix.compiler }}' -benchtime=1x

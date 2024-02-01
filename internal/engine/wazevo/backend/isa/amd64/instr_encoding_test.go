@@ -1392,6 +1392,48 @@ func TestInstruction_format_encode(t *testing.T) {
 			wantFormat: "cvtsi2sd %edi, %xmm0",
 		},
 		{
+			// This is actually equivalent to movq, because of _64=true.
+			setup:      func(i *instruction) { i.asXmmToGpr(sseOpcodeMovd, xmm0VReg, rdiVReg, true) },
+			want:       "66480f7ec7",
+			wantFormat: "movd %xmm0, %rdi",
+		},
+		{
+			setup:      func(i *instruction) { i.asXmmToGpr(sseOpcodeMovd, xmm0VReg, rdiVReg, false) },
+			want:       "660f7ec7",
+			wantFormat: "movd %xmm0, %edi",
+		},
+		{
+			setup:      func(i *instruction) { i.asXmmToGpr(sseOpcodeMovq, xmm0VReg, rdiVReg, true) },
+			want:       "66480f7ec7",
+			wantFormat: "movq %xmm0, %rdi",
+		},
+		// This is actually equivalent to movq, because of _64=false.
+		{
+			setup:      func(i *instruction) { i.asXmmToGpr(sseOpcodeMovq, xmm0VReg, rdiVReg, false) },
+			want:       "660f7ec7",
+			wantFormat: "movq %xmm0, %edi",
+		},
+		{
+			setup:      func(i *instruction) { i.asXmmToGpr(sseOpcodeCvttss2si, xmm0VReg, rdiVReg, true) },
+			want:       "f3480f2cf8",
+			wantFormat: "cvttss2si %xmm0, %rdi",
+		},
+		{
+			setup:      func(i *instruction) { i.asXmmToGpr(sseOpcodeCvttss2si, xmm0VReg, rdiVReg, false) },
+			want:       "f30f2cf8",
+			wantFormat: "cvttss2si %xmm0, %edi",
+		},
+		{
+			setup:      func(i *instruction) { i.asXmmToGpr(sseOpcodeCvttsd2si, xmm0VReg, rdiVReg, true) },
+			want:       "f2480f2cf8",
+			wantFormat: "cvttsd2si %xmm0, %rdi",
+		},
+		{
+			setup:      func(i *instruction) { i.asXmmToGpr(sseOpcodeCvttsd2si, xmm0VReg, rdiVReg, false) },
+			want:       "f20f2cf8",
+			wantFormat: "cvttsd2si %xmm0, %edi",
+		},
+		{
 			setup:      func(i *instruction) { i.asPop64(raxVReg) },
 			want:       "58",
 			wantFormat: "popq %rax",

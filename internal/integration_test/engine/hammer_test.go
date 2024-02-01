@@ -2,7 +2,6 @@ package adhoc
 
 import (
 	"context"
-	"runtime"
 	"sync"
 	"testing"
 
@@ -33,7 +32,7 @@ func TestEngineInterpreter_hammer(t *testing.T) {
 }
 
 func TestEngineWazevo_hammer(t *testing.T) {
-	if runtime.GOARCH != "arm64" {
+	if !platform.CompilerSupported() {
 		t.Skip()
 	}
 	c := opt.NewRuntimeConfigOptimizingCompiler()

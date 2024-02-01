@@ -14,12 +14,25 @@ import (
 )
 
 func Test_asImm32(t *testing.T) {
-	v, ok := asImm32(0xffffffff)
+	v, ok := asImm32(0xffffffff, true)
 	require.True(t, ok)
 	require.Equal(t, uint32(0xffffffff), v)
 
-	_, ok = asImm32(0xffffffff << 1)
+	v, ok = asImm32(0xffffffff, false)
 	require.False(t, ok)
+	require.Equal(t, uint32(0), v)
+
+	v, ok = asImm32(0x80000000, true)
+	require.True(t, ok)
+	require.Equal(t, uint32(0x80000000), v)
+
+	v, ok = asImm32(0x80000000, false)
+	require.False(t, ok)
+	require.Equal(t, uint32(0), v)
+
+	v, ok = asImm32(0xffffffff<<1, true)
+	require.False(t, ok)
+	require.Equal(t, uint32(0), v)
 }
 
 func TestMachine_getOperand_Reg(t *testing.T) {

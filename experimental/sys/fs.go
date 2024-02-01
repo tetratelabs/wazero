@@ -9,7 +9,7 @@ import (
 // FS is a writeable fs.FS bridge backed by syscall functions needed for ABI
 // including WASI and runtime.GOOS=js.
 //
-// Implementations should embed UnimplementedFS for forward compatability. Any
+// Implementations should embed UnimplementedFS for forward compatibility. Any
 // unsupported method or parameter should return ENO
 //
 // # Errors

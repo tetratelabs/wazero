@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/testcases"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
@@ -27,6 +28,7 @@ func TestCompiler_LowerToSSA(t *testing.T) {
 		exp string
 		// expAfterOpt is not empty when we want to check the result after optimization passes.
 		expAfterOpt string
+		features    api.CoreFeatures
 	}{
 		{
 			name: "empty", m: testcases.Empty.Module,
@@ -1615,12 +1617,100 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:v128, v3:v128)
 	Jump blk_ret, v4
 `,
 		},
+		{
+			name:     "MemoryWait32",
+			m:        testcases.MemoryWait32.Module,
+			features: api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
+			exp: `
+signatures:
+	sig6: i64i64i32i64_i32
+
+blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i32, v4:i64)
+	Store module_ctx, exec_ctx, 0x8
+	v5:i64 = Iconst_64 0x4
+	v6:i64 = UExtend v2, 32->64
+	v7:i64 = Uload32 module_ctx, 0x10
+	v8:i64 = Iadd v6, v5
+	v9:i32 = Icmp lt_u, v7, v8
+	ExitIfTrue v9, exec_ctx, memory_out_of_bounds
+	v10:i64 = Load module_ctx, 0x8
+	v11:i64 = Iadd v10, v6
+	v12:i64 = Iconst_64 0x3
+	v13:i64 = Band v11, v12
+	v14:i64 = Iconst_64 0x0
+	v15:i32 = Icmp neq, v13, v14
+	ExitIfTrue v15, exec_ctx, unaligned_atomic
+	v16:i64 = Load exec_ctx, 0x488
+	v17:i32 = CallIndirect v16:sig6, exec_ctx, v4, v3, v11
+	Jump blk_ret, v17
+`,
+		},
+		{
+			name:     "MemoryWait64",
+			m:        testcases.MemoryWait64.Module,
+			features: api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
+			exp: `
+signatures:
+	sig7: i64i64i64i64_i32
+
+blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i64, v4:i64)
+	Store module_ctx, exec_ctx, 0x8
+	v5:i64 = Iconst_64 0x8
+	v6:i64 = UExtend v2, 32->64
+	v7:i64 = Uload32 module_ctx, 0x10
+	v8:i64 = Iadd v6, v5
+	v9:i32 = Icmp lt_u, v7, v8
+	ExitIfTrue v9, exec_ctx, memory_out_of_bounds
+	v10:i64 = Load module_ctx, 0x8
+	v11:i64 = Iadd v10, v6
+	v12:i64 = Iconst_64 0x7
+	v13:i64 = Band v11, v12
+	v14:i64 = Iconst_64 0x0
+	v15:i32 = Icmp neq, v13, v14
+	ExitIfTrue v15, exec_ctx, unaligned_atomic
+	v16:i64 = Load exec_ctx, 0x490
+	v17:i32 = CallIndirect v16:sig7, exec_ctx, v4, v3, v11
+	Jump blk_ret, v17
+`,
+		},
+		{
+			name:     "MemoryNotify",
+			m:        testcases.MemoryNotify.Module,
+			features: api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
+			exp: `
+signatures:
+	sig8: i64i32i64_i32
+
+blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i32)
+	Store module_ctx, exec_ctx, 0x8
+	v4:i64 = Iconst_64 0x4
+	v5:i64 = UExtend v2, 32->64
+	v6:i64 = Uload32 module_ctx, 0x10
+	v7:i64 = Iadd v5, v4
+	v8:i32 = Icmp lt_u, v6, v7
+	ExitIfTrue v8, exec_ctx, memory_out_of_bounds
+	v9:i64 = Load module_ctx, 0x8
+	v10:i64 = Iadd v9, v5
+	v11:i64 = Iconst_64 0x3
+	v12:i64 = Band v10, v11
+	v13:i64 = Iconst_64 0x0
+	v14:i32 = Icmp neq, v12, v13
+	ExitIfTrue v14, exec_ctx, unaligned_atomic
+	v15:i64 = Load exec_ctx, 0x498
+	v16:i32 = CallIndirect v15:sig8, exec_ctx, v3, v10
+	Jump blk_ret, v16
+`,
+		},
 	} {
 
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			// Just in case let's check the test module is valid.
-			err := tc.m.Validate(api.CoreFeaturesV2)
+			features := tc.features
+			if features == 0 {
+				features = api.CoreFeaturesV2
+			}
+			err := tc.m.Validate(features)
 			require.NoError(t, err, "invalid test case module!")
 
 			b := ssa.NewBuilder()
@@ -1717,6 +1807,9 @@ func TestCompiler_declareSignatures(t *testing.T) {
 			{ID: 6, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI32, ssa.TypeI32, ssa.TypeI64}, Results: []ssa.Type{ssa.TypeI32}},
 			{ID: 7, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI32}, Results: []ssa.Type{ssa.TypeI64}},
 			{ID: 8, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI64}},
+			{ID: 9, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI32, ssa.TypeI64}, Results: []ssa.Type{ssa.TypeI32}},
+			{ID: 10, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI64, ssa.TypeI64}, Results: []ssa.Type{ssa.TypeI32}},
+			{ID: 11, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI32, ssa.TypeI64}, Results: []ssa.Type{ssa.TypeI32}},
 		}
 
 		require.Equal(t, len(expected), len(declaredSigs))
@@ -1753,6 +1846,9 @@ func TestCompiler_declareSignatures(t *testing.T) {
 			{ID: 14, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI32, ssa.TypeI32, ssa.TypeI64}, Results: []ssa.Type{ssa.TypeI32}},
 			{ID: 15, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI32}, Results: []ssa.Type{ssa.TypeI64}},
 			{ID: 16, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI64}},
+			{ID: 17, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI32, ssa.TypeI64}, Results: []ssa.Type{ssa.TypeI32}},
+			{ID: 18, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI64, ssa.TypeI64}, Results: []ssa.Type{ssa.TypeI32}},
+			{ID: 19, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI32, ssa.TypeI64}, Results: []ssa.Type{ssa.TypeI32}},
 		}
 		require.Equal(t, len(expected), len(declaredSigs))
 		for i := 0; i < len(declaredSigs); i++ {

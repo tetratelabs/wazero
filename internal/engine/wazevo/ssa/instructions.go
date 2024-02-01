@@ -1530,11 +1530,12 @@ func (i *Instruction) AsURem(x, y, ctx Value) *Instruction {
 }
 
 // AsBand initializes this instruction as an integer bitwise and instruction with OpcodeBand.
-func (i *Instruction) AsBand(x, amount Value) {
+func (i *Instruction) AsBand(x, amount Value) *Instruction {
 	i.opcode = OpcodeBand
 	i.v = x
 	i.v2 = amount
 	i.typ = x.Type()
+	return i
 }
 
 // AsBor initializes this instruction as an integer bitwise or instruction with OpcodeBor.
@@ -2371,7 +2372,7 @@ func (i *Instruction) Format(b Builder) string {
 			instSuffix = fmt.Sprintf(" %s:%s, %s", FuncRef(i.u1), SignatureID(i.u2), strings.Join(vs, ", "))
 		}
 	case OpcodeStore, OpcodeIstore8, OpcodeIstore16, OpcodeIstore32:
-		instSuffix = fmt.Sprintf(" %s, %s, %#x", i.v.Format(b), i.v2.Format(b), int32(i.u1))
+		instSuffix = fmt.Sprintf(" %s, %s, %#x", i.v.Format(b), i.v2.Format(b), uint32(i.u1))
 	case OpcodeLoad, OpcodeVZeroExtLoad:
 		instSuffix = fmt.Sprintf(" %s, %#x", i.v.Format(b), int32(i.u1))
 	case OpcodeLoadSplat:
@@ -2477,7 +2478,6 @@ func (i *Instruction) Format(b Builder) string {
 		}
 		// Prints Shuffle.[0 1 2 3 4 5 6 7 ...] v2, v3
 		instSuffix = fmt.Sprintf(".%v %s, %s", lanes, i.v.Format(b), i.v2.Format(b))
-
 	default:
 		panic(fmt.Sprintf("TODO: format for %s", i.opcode))
 	}

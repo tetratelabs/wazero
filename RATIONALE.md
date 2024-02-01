@@ -67,7 +67,7 @@ dependency.
 
 ## Project structure
 
-wazero uses internal packages extensively to balance API compatability desires for end users with the need to safely
+wazero uses internal packages extensively to balance API compatibility desires for end users with the need to safely
 share internals between compilers.
 
 End-user packages include `wazero`, with `Config` structs, `api`, with shared types, and the built-in `wasi` library.

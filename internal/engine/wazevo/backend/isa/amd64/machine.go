@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"math"
 	"strings"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
@@ -270,6 +271,11 @@ func (m *machine) LowerConditionalBranch(b *ssa.Instruction) {
 
 // LowerInstr implements backend.Machine.
 func (m *machine) LowerInstr(instr *ssa.Instruction) {
+	if l := instr.SourceOffset(); l.Valid() {
+		info := m.allocateInstr().asEmitSourceOffsetInfo(l)
+		m.insert(info)
+	}
+
 	switch op := instr.Opcode(); op {
 	case ssa.OpcodeBrz, ssa.OpcodeBrnz, ssa.OpcodeJump, ssa.OpcodeBrTable:
 		panic("BUG: branching instructions are handled by LowerBranches")
@@ -330,8 +336,50 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		m.lowerFminFmax(instr)
 	case ssa.OpcodeFcopysign:
 		m.lowerFcopysign(instr)
+	case ssa.OpcodeBitcast:
+		m.lowerBitcast(instr)
 	case ssa.OpcodeSqrt:
 		m.lowerSqrt(instr)
+	case ssa.OpcodeFpromote:
+		v := instr.Arg()
+		rn := m.getOperand_Reg(m.c.ValueDefinition(v))
+		rd := m.c.VRegOf(instr.Return())
+		cnt := m.allocateInstr()
+		cnt.asXmmUnaryRmR(sseOpcodeCvtss2sd, rn, rd)
+		m.insert(cnt)
+	case ssa.OpcodeFdemote:
+		v := instr.Arg()
+		rn := m.getOperand_Reg(m.c.ValueDefinition(v))
+		rd := m.c.VRegOf(instr.Return())
+		cnt := m.allocateInstr()
+		cnt.asXmmUnaryRmR(sseOpcodeCvtsd2ss, rn, rd)
+		m.insert(cnt)
+	case ssa.OpcodeFcvtToSint, ssa.OpcodeFcvtToSintSat:
+		x, ctx := instr.Arg2()
+		rn := m.getOperand_Reg(m.c.ValueDefinition(x))
+		rd := newOperandReg(m.c.VRegOf(instr.Return()))
+		ctxVReg := m.c.VRegOf(ctx)
+		m.lowerFcvtToSint(ctxVReg, rn, rd, x.Type() == ssa.TypeF64,
+			instr.Return().Type().Bits() == 64, op == ssa.OpcodeFcvtToSintSat)
+	case ssa.OpcodeFcvtToUint, ssa.OpcodeFcvtToUintSat:
+		x, ctx := instr.Arg2()
+		rn := m.getOperand_Reg(m.c.ValueDefinition(x))
+		rd := newOperandReg(m.c.VRegOf(instr.Return()))
+		ctxVReg := m.c.VRegOf(ctx)
+		m.lowerFcvtToUint(ctxVReg, rn, rd, x.Type() == ssa.TypeF64,
+			instr.Return().Type().Bits() == 64, op == ssa.OpcodeFcvtToUintSat)
+	case ssa.OpcodeFcvtFromSint:
+		x := instr.Arg()
+		rn := m.getOperand_Reg(m.c.ValueDefinition(x))
+		rd := newOperandReg(m.c.VRegOf(instr.Return()))
+		m.lowerFcvtFromSint(rn, rd,
+			x.Type() == ssa.TypeI64, instr.Return().Type().Bits() == 64)
+	case ssa.OpcodeFcvtFromUint:
+		x := instr.Arg()
+		rn := m.getOperand_Reg(m.c.ValueDefinition(x))
+		rd := newOperandReg(m.c.VRegOf(instr.Return()))
+		m.lowerFcvtFromUint(rn, rd, x.Type() == ssa.TypeI64,
+			instr.Return().Type().Bits() == 64)
 	case ssa.OpcodeUndefined:
 		m.insert(m.allocateInstr().asUD2())
 	case ssa.OpcodeExitWithCode:
@@ -492,8 +540,10 @@ func (m *machine) lowerSelect(x, y, cval, ret ssa.Value) {
 }
 
 func (m *machine) lowerExtend(_arg, ret ssa.Value, from, to byte, signed bool) {
-	rd := m.c.VRegOf(ret)
+	rd0 := m.c.VRegOf(ret)
 	arg := m.getOperand_Mem_Reg(m.c.ValueDefinition(_arg))
+
+	rd := m.c.AllocateVReg(ret.Type())
 
 	ext := m.allocateInstr()
 	switch {
@@ -525,6 +575,8 @@ func (m *machine) lowerExtend(_arg, ret ssa.Value, from, to byte, signed bool) {
 		panic(fmt.Sprintf("BUG: unhandled extend: from=%d, to=%d, signed=%t", from, to, signed))
 	}
 	m.insert(ext)
+
+	m.copyTo(rd, rd0)
 }
 
 func (m *machine) lowerVconst(res ssa.Value, lo, hi uint64) {
@@ -1212,11 +1264,15 @@ func (m *machine) Encode(context.Context) {
 		pos.BinaryOffset = offset
 		for cur := pos.Begin; cur != pos.End.next; cur = cur.next {
 			offset := int64(len(*bufPtr))
-			if cur.kind == nop0 {
+
+			switch cur.kind {
+			case nop0:
 				l := cur.nop0Label()
 				if pos, ok := ectx.LabelPositions[l]; ok {
 					pos.BinaryOffset = offset
 				}
+			case sourceOffsetInfo:
+				m.c.AddSourceOffsetInfo(offset, cur.sourceOffsetInfo())
 			}
 
 			needLabelResolution := cur.encode(m.c)
@@ -1685,4 +1741,440 @@ func (m *machine) lowerFcopysign(instr *ssa.Instruction) {
 	m.insert(or)
 
 	m.copyTo(nonSignBitReg, rd)
+}
+
+func (m *machine) lowerBitcast(instr *ssa.Instruction) {
+	x, dstTyp := instr.BitcastData()
+	srcTyp := x.Type()
+	rn := m.getOperand_Reg(m.c.ValueDefinition(x))
+	rd := m.c.VRegOf(instr.Return())
+	switch {
+	case srcTyp == ssa.TypeF32 && dstTyp == ssa.TypeI32:
+		cvt := m.allocateInstr().asXmmToGpr(sseOpcodeMovd, rn.r, rd, false)
+		m.insert(cvt)
+	case srcTyp == ssa.TypeI32 && dstTyp == ssa.TypeF32:
+		cvt := m.allocateInstr().asGprToXmm(sseOpcodeMovd, rn, rd, false)
+		m.insert(cvt)
+	case srcTyp == ssa.TypeF64 && dstTyp == ssa.TypeI64:
+		cvt := m.allocateInstr().asXmmToGpr(sseOpcodeMovq, rn.r, rd, true)
+		m.insert(cvt)
+	case srcTyp == ssa.TypeI64 && dstTyp == ssa.TypeF64:
+		cvt := m.allocateInstr().asGprToXmm(sseOpcodeMovq, rn, rd, true)
+		m.insert(cvt)
+	default:
+		panic(fmt.Sprintf("invalid bitcast from %s to %s", srcTyp, dstTyp))
+	}
+}
+
+func (m *machine) lowerFcvtToSint(ctxVReg regalloc.VReg, rn, rd operand, src64, dst64, sat bool) {
+	var tmp regalloc.VReg
+	if dst64 {
+		tmp = m.c.AllocateVReg(ssa.TypeF64)
+	} else {
+		tmp = m.c.AllocateVReg(ssa.TypeF32)
+	}
+
+	tmpDst := m.copyToTmp(rd.r)
+
+	var cmpOp, truncOp sseOpcode
+	if src64 {
+		cmpOp, truncOp = sseOpcodeUcomisd, sseOpcodeCvttsd2si
+	} else {
+		cmpOp, truncOp = sseOpcodeUcomiss, sseOpcodeCvttss2si
+	}
+
+	trunc := m.allocateInstr()
+	trunc.asXmmToGpr(truncOp, rn.r, tmpDst, dst64)
+	m.insert(trunc)
+
+	// Check if the dst operand was INT_MIN, by checking it against 1.
+	cmp1 := m.allocateInstr()
+	cmp1.asCmpRmiR(true, newOperandImm32(1), tmpDst, dst64)
+	m.insert(cmp1)
+
+	execCtxCopy := m.copyToTmp(ctxVReg)
+
+	// If no overflow, then we are done.
+	doneTarget, done := m.allocateBrTarget()
+	ifNoOverflow := m.allocateInstr()
+	ifNoOverflow.asJmpIf(condNO, newOperandLabel(done))
+	m.insert(ifNoOverflow)
+
+	// Now, check for NaN.
+	cmpNan := m.allocateInstr()
+	cmpNan.asXmmCmpRmR(cmpOp, newOperandReg(rn.r), rn.r)
+	m.insert(cmpNan)
+
+	// We allocate the "non-nan target" here, but we will insert it later.
+	notNanTarget, notNaN := m.allocateBrTarget()
+	ifNotNan := m.allocateInstr()
+	ifNotNan.asJmpIf(condNP, newOperandLabel(notNaN))
+	m.insert(ifNotNan)
+
+	if sat {
+		// If NaN and saturating, return 0.
+		zeroDst := m.allocateInstr()
+		zeroDst.asZeros(tmpDst)
+		m.insert(zeroDst)
+
+		jmpEnd := m.allocateInstr()
+		jmpEnd.asJmp(newOperandLabel(done))
+		m.insert(jmpEnd)
+
+		// Otherwise:
+		m.insert(notNanTarget)
+
+		// Zero-out the tmp register.
+		zero := m.allocateInstr()
+		zero.asZeros(tmp)
+		m.insert(zero)
+
+		cmpXmm := m.allocateInstr()
+		cmpXmm.asXmmCmpRmR(cmpOp, newOperandReg(tmp), rn.r)
+		m.insert(cmpXmm)
+
+		// if >= jump to end.
+		jmpEnd2 := m.allocateInstr()
+		jmpEnd2.asJmpIf(condB, newOperandLabel(done))
+		m.insert(jmpEnd2)
+
+		// Otherwise, saturate to INT_MAX.
+		if dst64 {
+			m.lowerIconst(tmpDst, math.MaxInt64, dst64)
+		} else {
+			m.lowerIconst(tmpDst, math.MaxInt32, dst64)
+		}
+
+	} else {
+
+		// If non-sat, NaN, trap.
+		checkPositiveTarget, checkPositive := m.allocateBrTarget()
+		m.lowerExitWithCode(execCtxCopy, wazevoapi.ExitCodeInvalidConversionToInteger)
+
+		// Otherwise, we will jump here.
+		m.insert(notNanTarget)
+
+		// jump over trap if src larger than threshold
+		condAboveThreshold := condNB
+
+		// The magic constants are various combination of minInt for int[32|64] represented as float[32|64].
+		var minInt uint64
+		switch {
+		case src64 && dst64:
+			minInt = 0xc3e0000000000000
+		case src64 && !dst64:
+			condAboveThreshold = condNBE
+			minInt = 0xC1E0_0000_0020_0000
+		case !src64 && dst64:
+			minInt = 0xDF00_0000
+		case !src64 && !dst64:
+			minInt = 0xCF00_0000
+		}
+
+		m.lowerFconst(tmp, minInt, src64)
+
+		cmpXmm := m.allocateInstr()
+		cmpXmm.asXmmCmpRmR(cmpOp, newOperandReg(tmp), rn.r)
+		m.insert(cmpXmm)
+
+		jmpIfLarger := m.allocateInstr()
+		jmpIfLarger.asJmpIf(condAboveThreshold, newOperandLabel(checkPositive))
+		m.insert(jmpIfLarger)
+
+		m.lowerExitWithCode(execCtxCopy, wazevoapi.ExitCodeIntegerOverflow)
+
+		// If positive, it was a real overflow.
+		m.insert(checkPositiveTarget)
+
+		// Zero out the temp register.
+		xorpd := m.allocateInstr()
+		xorpd.asXmmRmR(sseOpcodeXorpd, newOperandReg(tmp), tmp)
+		m.insert(xorpd)
+
+		pos := m.allocateInstr()
+		pos.asXmmCmpRmR(cmpOp, rn, tmp)
+		m.insert(pos)
+
+		// If >= jump to end.
+		jmp := m.allocateInstr()
+		jmp.asJmpIf(condNB, newOperandLabel(done))
+		m.insert(jmp)
+
+		m.lowerExitWithCode(execCtxCopy, wazevoapi.ExitCodeIntegerOverflow)
+
+	}
+	m.insert(doneTarget)
+	m.copyTo(tmpDst, rd.r)
+}
+
+func (m *machine) lowerFcvtToUint(ctxVReg regalloc.VReg, rn, rd operand, src64, dst64, sat bool) {
+	var tmpF, tmpDst regalloc.VReg
+	if dst64 {
+		tmpDst = m.c.AllocateVReg(ssa.TypeI64)
+	} else {
+		tmpDst = m.c.AllocateVReg(ssa.TypeI32)
+	}
+	if src64 {
+		tmpF = m.c.AllocateVReg(ssa.TypeF64)
+	} else {
+		tmpF = m.c.AllocateVReg(ssa.TypeF32)
+	}
+
+	var subOp, cmpOp, truncOp sseOpcode
+	if src64 {
+		subOp, cmpOp, truncOp = sseOpcodeSubsd, sseOpcodeUcomisd, sseOpcodeCvttsd2si
+	} else {
+		subOp, cmpOp, truncOp = sseOpcodeSubss, sseOpcodeUcomiss, sseOpcodeCvttss2si
+	}
+
+	doneTarget, done := m.allocateBrTarget()
+
+	switch {
+	case src64 && dst64:
+		m.lowerFconst(tmpF, 0x43e0000000000000, true)
+	case src64 && !dst64:
+		m.lowerFconst(tmpF, 0x41e0000000000000, true)
+	case !src64 && dst64:
+		m.lowerFconst(tmpF, 0x5f000000, false)
+	case !src64 && !dst64:
+		m.lowerFconst(tmpF, 0x4f000000, false)
+	}
+
+	execCtxCopy := m.copyToTmp(ctxVReg)
+
+	cmp := m.allocateInstr()
+	cmp.asXmmCmpRmR(cmpOp, newOperandReg(tmpF), rn.r)
+	m.insert(cmp)
+
+	// If above `tmp` ("large threshold"), jump to `ifAboveThreshold`
+	ifAboveThresholdTarget, ifAboveThreshold := m.allocateBrTarget()
+	jmpIfAboveThreshold := m.allocateInstr()
+	jmpIfAboveThreshold.asJmpIf(condNB, newOperandLabel(ifAboveThreshold))
+	m.insert(jmpIfAboveThreshold)
+
+	ifNotNaNTarget, ifNotNaN := m.allocateBrTarget()
+	jmpIfNotNaN := m.allocateInstr()
+	jmpIfNotNaN.asJmpIf(condNP, newOperandLabel(ifNotNaN))
+	m.insert(jmpIfNotNaN)
+
+	// If NaN, handle the error condition.
+	if sat {
+		// On NaN, saturating, we just return 0.
+		zeros := m.allocateInstr()
+		zeros.asZeros(tmpDst)
+		m.insert(zeros)
+
+		jmpEnd := m.allocateInstr()
+		jmpEnd.asJmp(newOperandLabel(done))
+		m.insert(jmpEnd)
+	} else {
+		// On NaN, non-saturating, we trap.
+		m.lowerExitWithCode(execCtxCopy, wazevoapi.ExitCodeInvalidConversionToInteger)
+	}
+
+	// If not NaN, land here.
+	m.insert(ifNotNaNTarget)
+
+	// Truncation happens here.
+	trunc := m.allocateInstr()
+	trunc.asXmmToGpr(truncOp, rn.r, tmpDst, dst64)
+	m.insert(trunc)
+
+	// Check if the result is negative.
+	cmpNeg := m.allocateInstr()
+	cmpNeg.asCmpRmiR(true, newOperandImm32(0), tmpDst, dst64)
+	m.insert(cmpNeg)
+
+	// If non-neg, jump to end.
+	jmpIfNonNeg := m.allocateInstr()
+	jmpIfNonNeg.asJmpIf(condNL, newOperandLabel(done))
+	m.insert(jmpIfNonNeg)
+
+	if sat {
+		// If the input was "small" (< 2**(width -1)), the only way to get an integer
+		// overflow is because the input was too small: saturate to the min value, i.e. 0.
+		zeros := m.allocateInstr()
+		zeros.asZeros(tmpDst)
+		m.insert(zeros)
+
+		jmpEnd := m.allocateInstr()
+		jmpEnd.asJmp(newOperandLabel(done))
+		m.insert(jmpEnd)
+	} else {
+		// If not saturating, trap.
+		m.lowerExitWithCode(execCtxCopy, wazevoapi.ExitCodeIntegerOverflow)
+	}
+
+	// If above the threshold, land here.
+	m.insert(ifAboveThresholdTarget)
+
+	// tmpDiff := threshold - rn.
+	tmpDiff := m.copyToTmp(rn.r)
+	sub := m.allocateInstr()
+	sub.asXmmRmR(subOp, newOperandReg(tmpF), tmpDiff) // must be -0x8000000000000000
+	m.insert(sub)
+
+	// tmpI := truncate( tmpDiff )
+	trunc2 := m.allocateInstr()
+	trunc2.asXmmToGpr(truncOp, tmpDiff, tmpDst, dst64)
+	m.insert(trunc2)
+
+	// Check if the result is negative.
+	cmpNeg2 := m.allocateInstr()
+	cmpNeg2.asCmpRmiR(true, newOperandImm32(0), tmpDst, dst64)
+	m.insert(cmpNeg2)
+
+	ifNextLargeTarget, ifNextLarge := m.allocateBrTarget()
+	jmpIfNextLarge := m.allocateInstr()
+	jmpIfNextLarge.asJmpIf(condNL, newOperandLabel(ifNextLarge))
+	m.insert(jmpIfNextLarge)
+
+	if sat {
+		// The input was "large" (>= maxInt), so the only way to get an integer
+		// overflow is because the input was too large: saturate to the max value.
+		var maxInt uint64
+		if dst64 {
+			maxInt = math.MaxUint64
+		} else {
+			maxInt = math.MaxUint32
+		}
+		m.lowerIconst(tmpDst, maxInt, dst64)
+
+		jmpToEnd := m.allocateInstr()
+		jmpToEnd.asJmp(newOperandLabel(done))
+		m.insert(jmpToEnd)
+	} else {
+		// If not saturating, trap.
+		m.lowerExitWithCode(execCtxCopy, wazevoapi.ExitCodeIntegerOverflow)
+	}
+
+	m.insert(ifNextLargeTarget)
+
+	var op operand
+	if dst64 {
+		t := m.c.AllocateVReg(ssa.TypeI64)
+		m.lowerIconst(t, 0x8000000000000000, true)
+		op = newOperandReg(t)
+	} else {
+		op = newOperandImm32(0x80000000)
+	}
+
+	add := m.allocateInstr()
+	add.asAluRmiR(aluRmiROpcodeAdd, op, tmpDst, dst64)
+	m.insert(add)
+
+	m.insert(doneTarget)
+	m.copyTo(tmpDst, rd.r)
+}
+
+func (m *machine) lowerFcvtFromSint(rn, rd operand, src64, dst64 bool) {
+	var op sseOpcode
+	if dst64 {
+		op = sseOpcodeCvtsi2sd
+	} else {
+		op = sseOpcodeCvtsi2ss
+	}
+
+	trunc := m.allocateInstr()
+	trunc.asGprToXmm(op, rn, rd.r, src64)
+	m.insert(trunc)
+}
+
+func (m *machine) lowerFcvtFromUint(rn, rd operand, src64, dst64 bool) {
+	var op sseOpcode
+	if dst64 {
+		op = sseOpcodeCvtsi2sd
+	} else {
+		op = sseOpcodeCvtsi2ss
+	}
+
+	// Src is 32 bit, then we just perform the conversion with 64 bit width.
+	//
+	// See the following link for why we use 64bit conversion for unsigned 32bit integer sources:
+	// https://stackoverflow.com/questions/41495498/fpu-operations-generated-by-gcc-during-casting-integer-to-float.
+	//
+	// Here's the summary:
+	// >> CVTSI2SS is indeed designed for converting a signed integer to a scalar single-precision float,
+	// >> not an unsigned integer like you have here. So what gives? Well, a 64-bit processor has 64-bit wide
+	// >> registers available, so the unsigned 32-bit input values can be stored as signed 64-bit intermediate values,
+	// >> which allows CVTSI2SS to be used after all.
+	//
+	if !src64 {
+		cvt := m.allocateInstr()
+		cvt.asGprToXmm(op, rn, rd.r, true)
+		m.insert(cvt)
+		return
+	}
+
+	// If uint64, we have to do a bit more work.
+	endTarget, end := m.allocateBrTarget()
+
+	var tmpXmm regalloc.VReg
+	if dst64 {
+		tmpXmm = m.c.AllocateVReg(ssa.TypeF64)
+	} else {
+		tmpXmm = m.c.AllocateVReg(ssa.TypeF32)
+	}
+
+	// Check if the most significant bit (sign bit) is set.
+	test := m.allocateInstr()
+	test.asCmpRmiR(false, rn, rn.r, src64)
+	m.insert(test)
+
+	// Jump if the sign bit is set.
+	ifSignTarget, ifSign := m.allocateBrTarget()
+	jmpIfNeg := m.allocateInstr()
+	jmpIfNeg.asJmpIf(condS, newOperandLabel(ifSign))
+	m.insert(jmpIfNeg)
+
+	// If the sign bit is not set, we could fit the unsigned int into float32/float64.
+	// So, we convert it to float and emit jump instruction to exit from this branch.
+	cvt := m.allocateInstr()
+	cvt.asGprToXmm(op, rn, tmpXmm, src64)
+	m.insert(cvt)
+
+	// We are done, jump to end.
+	jmpEnd := m.allocateInstr()
+	jmpEnd.asJmp(newOperandLabel(end))
+	m.insert(jmpEnd)
+
+	// Now handling the case where sign-bit is set.
+	// We emit the following sequences:
+	// 	   mov      %rn, %tmp
+	// 	   shr      1, %tmp
+	// 	   mov      %rn, %tmp2
+	// 	   and      1, %tmp2
+	// 	   or       %tmp2, %tmp
+	// 	   cvtsi2ss %tmp, %xmm0
+	// 	   addsd    %xmm0, %xmm0
+	m.insert(ifSignTarget)
+
+	tmp := m.copyToTmp(rn.r)
+	shr := m.allocateInstr()
+	shr.asShiftR(shiftROpShiftRightLogical, newOperandImm32(1), tmp, src64)
+	m.insert(shr)
+
+	tmp2 := m.copyToTmp(rn.r)
+	and := m.allocateInstr()
+	and.asAluRmiR(aluRmiROpcodeAnd, newOperandImm32(1), tmp2, src64)
+	m.insert(and)
+
+	or := m.allocateInstr()
+	or.asAluRmiR(aluRmiROpcodeOr, newOperandReg(tmp2), tmp, src64)
+	m.insert(or)
+
+	cvt2 := m.allocateInstr()
+	cvt2.asGprToXmm(op, newOperandReg(tmp), tmpXmm, src64)
+	m.insert(cvt2)
+
+	addsd := m.allocateInstr()
+	if dst64 {
+		addsd.asXmmRmR(sseOpcodeAddsd, newOperandReg(tmpXmm), tmpXmm)
+	} else {
+		addsd.asXmmRmR(sseOpcodeAddss, newOperandReg(tmpXmm), tmpXmm)
+	}
+	m.insert(addsd)
+
+	m.insert(endTarget)
+	m.copyTo(tmpXmm, rd.r)
 }

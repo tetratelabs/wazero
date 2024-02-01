@@ -11,8 +11,7 @@ import (
 )
 
 func TestMachine_lowerToAddressMode(t *testing.T) {
-	nextVReg, nextNextVReg := regalloc.VReg(100).SetRegType(regalloc.RegTypeInt), regalloc.VReg(101).SetRegType(regalloc.RegTypeInt)
-	_, _ = nextVReg, nextNextVReg
+	nextVReg := regalloc.VReg(100).SetRegType(regalloc.RegTypeInt)
 	for _, tc := range []struct {
 		name  string
 		in    func(*mockCompiler, ssa.Builder, *machine) (ptr ssa.Value, offset uint32)
@@ -66,6 +65,19 @@ func TestMachine_lowerToAddressMode(t *testing.T) {
 				return
 			},
 			am: newAmodeRegRegShift(3, raxVReg, rcxVReg, 0),
+		},
+		{
+			name: "huge offset",
+			in: func(ctx *mockCompiler, b ssa.Builder, m *machine) (ptr ssa.Value, offset uint32) {
+				ptr = b.CurrentBlock().AddParam(b, ssa.TypeI64)
+				offset = 1 << 31
+				ctx.definitions[ptr] = &backend.SSAValueDefinition{BlockParamValue: ptr, BlkParamVReg: raxVReg}
+				return
+			},
+			insts: []string{
+				"movabsq $2147483648, %r100?",
+			},
+			am: newAmodeRegRegShift(0, nextVReg, raxVReg, 0),
 		},
 
 		// The other iadd cases are covered by TestMachine_lowerAddendsToAmode.
@@ -212,15 +224,14 @@ func TestMachine_lowerAddendFromInstr(t *testing.T) {
 }
 
 func TestMachine_lowerAddendsToAmode(t *testing.T) {
-	x1, x2, x3 := raxVReg, rcxVReg, rdxVReg
-	_, _, _ = x1, x2, x3
+	x1, x2 := raxVReg, rcxVReg
 
 	nextVReg, nextNextVReg := regalloc.VReg(100).SetRegType(regalloc.RegTypeInt), regalloc.VReg(101).SetRegType(regalloc.RegTypeInt)
 	_ = nextNextVReg
 	for _, tc := range []struct {
 		name   string
 		x, y   addend
-		offset int32
+		offset uint32
 		exp    amode
 		insts  []string
 	}{
@@ -325,6 +336,24 @@ func TestMachine_lowerAddendsToAmode(t *testing.T) {
 				"xor %r100?, %r100?",
 			},
 			exp: newAmodeRegRegShift(1<<30, nextVReg, x1, 3),
+		},
+		{
+			name: "huge offset",
+			x:    addend{r: regalloc.VRegInvalid}, y: addend{r: x1, shift: 3},
+			offset: 1 << 31,
+			insts: []string{
+				"movabsq $2147483648, %r100?",
+			},
+			exp: newAmodeRegRegShift(0, nextVReg, x1, 3),
+		},
+		{
+			name: "huge offset",
+			x:    addend{r: regalloc.VRegInvalid, off: 1 << 31}, y: addend{r: x1, shift: 3},
+			offset: 0,
+			insts: []string{
+				"movabsq $2147483648, %r100?",
+			},
+			exp: newAmodeRegRegShift(0, nextVReg, x1, 3),
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

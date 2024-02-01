@@ -26,6 +26,10 @@ const (
 	ExitCodeCallGoFunctionWithListener
 	ExitCodeTableGrow
 	ExitCodeRefFunc
+	ExitCodeMemoryWait32
+	ExitCodeMemoryWait64
+	ExitCodeMemoryNotify
+	ExitCodeUnalignedAtomic
 	exitCodeMax
 )
 
@@ -46,6 +50,8 @@ func (e ExitCode) String() string {
 		return "unreachable"
 	case ExitCodeMemoryOutOfBounds:
 		return "memory_out_of_bounds"
+	case ExitCodeUnalignedAtomic:
+		return "unaligned_atomic"
 	case ExitCodeTableOutOfBounds:
 		return "table_out_of_bounds"
 	case ExitCodeIndirectCallNullPointer:
@@ -74,6 +80,12 @@ func (e ExitCode) String() string {
 		return "table_grow"
 	case ExitCodeRefFunc:
 		return "ref_func"
+	case ExitCodeMemoryWait32:
+		return "memory_wait32"
+	case ExitCodeMemoryWait64:
+		return "memory_wait64"
+	case ExitCodeMemoryNotify:
+		return "memory_notify"
 	}
 	panic("TODO")
 }

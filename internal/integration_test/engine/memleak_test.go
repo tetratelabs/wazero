@@ -11,11 +11,16 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/experimental/opt"
+	"github.com/tetratelabs/wazero/internal/platform"
 )
 
 func TestMemoryLeak(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping memory leak test in short mode.")
+	}
+
+	if !platform.CompilerSupported() {
+		t.Skip()
 	}
 
 	for _, tc := range []struct {
@@ -26,10 +31,6 @@ func TestMemoryLeak(t *testing.T) {
 		{"wazevo", true},
 	} {
 		tc := tc
-
-		if tc.isWazevo && runtime.GOARCH != "arm64" {
-			t.Skip("skipping wazevo memory leak test on non-arm64.")
-		}
 
 		t.Run(tc.name, func(t *testing.T) {
 			duration := 5 * time.Second

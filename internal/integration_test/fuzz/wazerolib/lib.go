@@ -10,7 +10,6 @@ import (
 	"math"
 	"os"
 	"path"
-	"runtime"
 	"strings"
 
 	"github.com/tetratelabs/wazero"
@@ -92,9 +91,6 @@ func newCompilerConfig() wazero.RuntimeConfig {
 
 //export test_signal_stack
 func test_signal_stack() {
-	if runtime.GOARCH != "arm64" { // TODO: amd64.
-		return
-	}
 	// (module
 	//  (func (export "long_loop")
 	//    (loop

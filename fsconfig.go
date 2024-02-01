@@ -84,7 +84,7 @@ type FSConfig interface {
 	//
 	// # os.DirFS
 	//
-	// This configuration optimizes for WASI compatability which is sometimes
+	// This configuration optimizes for WASI compatibility which is sometimes
 	// at odds with the behavior of os.DirFS. Hence, this will not behave
 	// exactly the same as os.DirFS. See /RATIONALE.md for more.
 	WithDirMount(dir, guestPath string) FSConfig

@@ -16,7 +16,6 @@ import (
 	"github.com/tetratelabs/wazero/experimental/opt"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/testcases"
 	"github.com/tetratelabs/wazero/internal/integration_test/spectest"
-	v1 "github.com/tetratelabs/wazero/internal/integration_test/spectest/v1"
 	v2 "github.com/tetratelabs/wazero/internal/integration_test/spectest/v2"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
@@ -51,6 +50,7 @@ func TestE2E(t *testing.T) {
 		name        string
 		imported, m *wasm.Module
 		calls       []callCase
+		features    api.CoreFeatures
 		skipAMD64   bool
 	}{
 		{
@@ -607,6 +607,46 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
+			name:     "memory_wait32",
+			m:        testcases.MemoryWait32.Module,
+			features: api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
+			calls: []callCase{
+				{params: []uint64{0x0, 0xbeef, 0xffffffff}, expResults: []uint64{1}}, // exp not equal, returns 1
+				{params: []uint64{0x1, 0xbeef, 0xffffffff}, expErr: "unaligned atomic"},
+				{params: []uint64{0x2, 0xbeef, 0xffffffff}, expErr: "unaligned atomic"},
+				{params: []uint64{0x3, 0xbeef, 0xffffffff}, expErr: "unaligned atomic"},
+				{params: []uint64{0x4, 0xbeef, 0xffffffff}, expResults: []uint64{1}}, // exp not equal, returns 1
+			},
+		},
+		{
+			name:     "memory_wait64",
+			m:        testcases.MemoryWait64.Module,
+			features: api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
+			calls: []callCase{
+				{params: []uint64{0x0, 0xbeef, 0xffffffff}, expResults: []uint64{1}}, // exp not equal, returns 1
+				{params: []uint64{0x1, 0xbeef, 0xffffffff}, expErr: "unaligned atomic"},
+				{params: []uint64{0x2, 0xbeef, 0xffffffff}, expErr: "unaligned atomic"},
+				{params: []uint64{0x3, 0xbeef, 0xffffffff}, expErr: "unaligned atomic"},
+				{params: []uint64{0x4, 0xbeef, 0xffffffff}, expErr: "unaligned atomic"},
+				{params: []uint64{0x5, 0xbeef, 0xffffffff}, expErr: "unaligned atomic"},
+				{params: []uint64{0x6, 0xbeef, 0xffffffff}, expErr: "unaligned atomic"},
+				{params: []uint64{0x7, 0xbeef, 0xffffffff}, expErr: "unaligned atomic"},
+				{params: []uint64{0x8, 0xbeef, 0xffffffff}, expResults: []uint64{1}}, // exp not equal, returns 1
+			},
+		},
+		{
+			name:     "memory_notify",
+			m:        testcases.MemoryNotify.Module,
+			features: api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
+			calls: []callCase{
+				{params: []uint64{0x0, 0x1}, expResults: []uint64{0}}, // no waiters, returns 0
+				{params: []uint64{0x1, 0x1}, expErr: "unaligned atomic"},
+				{params: []uint64{0x2, 0x1}, expErr: "unaligned atomic"},
+				{params: []uint64{0x3, 0x1}, expErr: "unaligned atomic"},
+				{params: []uint64{0x4, 0x1}, expResults: []uint64{0}}, // no waiters, returns 0
+			},
+		},
+		{
 			name: "float_le",
 			m:    testcases.FloatLe.Module,
 			calls: []callCase{
@@ -633,6 +673,9 @@ func TestE2E(t *testing.T) {
 					cache, err := wazero.NewCompilationCacheWithDir(tmp)
 					require.NoError(t, err)
 					config := opt.NewRuntimeConfigOptimizingCompiler().WithCompilationCache(cache)
+					if tc.features != 0 {
+						config = config.WithCoreFeatures(tc.features)
+					}
 
 					ctx := context.Background()
 					r := wazero.NewRuntimeWithConfig(ctx, config)
@@ -1088,7 +1131,7 @@ func TestListener_long(t *testing.T) {
 	require.Equal(t, []uint64{0xb}, res)
 
 	require.Equal(t, `
---> .$0(0,1,3e-45,1.5e-323,4,5,6,00000000000000070000000000000008,1.1e-44,9,10,1.5e-44,6e-323,13,14,15,00000000000000100000000000000011,2.4e-44,18,19,2.8e-44,1.04e-322,22,23,24,0000000000000019000000000000001a,3.6e-44,27,28,4e-44,1.5e-322,31,32,33,00000000000000220000000000000023,4.9e-44,36,37,5.3e-44,1.93e-322,40,41,42,000000000000002b000000000000002c,6.2e-44,45,46,6.6e-44,2.37e-322,49,50,51,00000000000000340000000000000035,7.4e-44,54,55,7.8e-44,2.8e-322,58,59,60,000000000000003d000000000000003e,8.7e-44,63,64,9.1e-44,3.26e-322,67,68,69,00000000000000460000000000000047,1e-43,72,73,1.04e-43,3.7e-322,76,77,78,000000000000004f0000000000000050,1.12e-43,81,82,1.16e-43,4.15e-322,85,86,87,00000000000000580000000000000059,1.25e-43)
+--> .$0(0,1,3e-45,1.5e-323,4,5,6,00000000000000070000000000000008,1.3e-44,10,11,1.7e-44,6.4e-323,14,15,16,00000000000000110000000000000012,2.7e-44,20,21,3.1e-44,1.14e-322,24,25,26,000000000000001b000000000000001c,4e-44,30,31,4.5e-44,1.63e-322,34,35,36,00000000000000250000000000000026,5.5e-44,40,41,5.9e-44,2.1e-322,44,45,46,000000000000002f0000000000000030,6.9e-44,50,51,7.3e-44,2.6e-322,54,55,56,0000000000000039000000000000003a,8.3e-44,60,61,8.7e-44,3.1e-322,64,65,66,00000000000000430000000000000044,9.7e-44,70,71,1.01e-43,3.6e-322,74,75,76,000000000000004d000000000000004e,1.11e-43,80,81,1.15e-43,4.1e-322,84,85,86,00000000000000570000000000000058,1.25e-43,90,91,1.29e-43,4.6e-322,94,95,96,00000000000000610000000000000062,1.39e-43)
 <-- 11
 `, "\n"+buf.String())
 }
@@ -1223,94 +1266,6 @@ func TestDWARF(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TODO: delete this and rune them in internal/integration_test/spectest/v1/spec_test.go after amd64 is done.
-func TestSpectestV1(t *testing.T) {
-	if runtime.GOARCH != "amd64" {
-		return
-	}
-
-	config := opt.NewRuntimeConfigOptimizingCompiler().WithCoreFeatures(api.CoreFeaturesV1)
-
-	for _, tc := range []struct {
-		name string
-	}{
-		{name: "address"},
-		{name: "align"},
-		{name: "br"},
-		{name: "br_if"},
-		{name: "br_table"},
-		{name: "break-drop"},
-		{name: "block"},
-		{name: "binary"},
-		{name: "binary-leb128"},
-		{name: "call"},
-		{name: "call_indirect"},
-		{name: "comments"},
-		{name: "custom"},
-		//{name: "conversions"},
-		{name: "const"},
-		{name: "data"},
-		{name: "elem"},
-		//{name: "endianness"},
-		{name: "exports"},
-		{name: "f32"},
-		{name: "f32_bitwise"},
-		{name: "f32_cmp"},
-		{name: "f64"},
-		{name: "f64_bitwise"},
-		{name: "f64_cmp"},
-		{name: "fac"},
-		//{name: "float_exprs"},
-		//{name: "float_literals"},
-		{name: "float_memory"},
-		{name: "float_misc"},
-		{name: "func"},
-		{name: "func_ptrs"},
-		{name: "forward"},
-		{name: "globals"},
-		{name: "if"},
-		//{name: "imports"},
-		{name: "inline-module"},
-		{name: "i32"},
-		{name: "i64"},
-		{name: "int_exprs"},
-		{name: "int_literals"},
-		{name: "labels"},
-		{name: "left-to-right"},
-		{name: "linking"},
-		{name: "load"},
-		{name: "loop"},
-		//{name: "local_get"},
-		//{name: "local_set"},
-		//{name: "local_tee"},
-		//{name: "memory"},
-		{name: "memory_size"},
-		{name: "memory_grow"},
-		{name: "memory_redundancy"},
-		{name: "memory_trap"},
-		{name: "names"},
-		{name: "nop"},
-		{name: "return"},
-		{name: "select"},
-		{name: "start"},
-		{name: "stack"},
-		{name: "store"},
-		{name: "switch"},
-		{name: "skip-stack-guard-page"},
-		{name: "token"},
-		{name: "type"},
-		//{name: "traps"},
-		{name: "unreachable"},
-		{name: "unreached-invalid"},
-		{name: "unwind"},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			spectest.RunCase(t, v1.Testcases, tc.name, context.Background(), config,
-				-1, 0, math.MaxInt)
-		})
-	}
-}
-
 // TODO: delete this and rune them in internal/integration_test/spectest/v2/spec_test.go after amd64 is done.
 func TestSpectestV2(t *testing.T) {
 	if runtime.GOARCH != "amd64" {
@@ -1329,7 +1284,7 @@ func TestSpectestV2(t *testing.T) {
 		{"br"},
 		{"call"},
 		{"call_indirect"},
-		//{"conversions"},
+		{"conversions"},
 		{"global"},
 		{"if"},
 		{"linking"},
