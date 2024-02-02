@@ -854,6 +854,8 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeVFcvtToSintSat:     sideEffectNone,
 	OpcodeVZeroExtLoad:       sideEffectNone,
 	OpcodeAtomicRmw:          sideEffectStrict,
+	OpcodeAtomicLoad:         sideEffectStrict,
+	OpcodeAtomicStore:        sideEffectStrict,
 }
 
 // sideEffect returns true if this instruction has side effects.
@@ -1035,6 +1037,8 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeVFcvtToUintSat:     returnTypesFnV128,
 	OpcodeVFcvtToSintSat:     returnTypesFnV128,
 	OpcodeAtomicRmw:          returnTypesFnSingle,
+	OpcodeAtomicLoad:         returnTypesFnSingle,
+	OpcodeAtomicStore:        returnTypesFnNoReturns,
 }
 
 // AsLoad initializes this instruction as a store instruction with OpcodeLoad.
@@ -1959,6 +1963,27 @@ func (i *Instruction) AsWiden(v Value, lane VecLane, signed, low bool) *Instruct
 	return i
 }
 
+// AsAtomicLoad initializes this instruction as an atomic load.
+// The size is in bytes and must be 1, 2, 4, or 8.
+func (i *Instruction) AsAtomicLoad(addr Value, size uint64, typ Type) *Instruction {
+	i.opcode = OpcodeAtomicLoad
+	i.u1 = size
+	i.v = addr
+	i.typ = typ
+	return i
+}
+
+// AsAtomicLoad initializes this instruction as an atomic store.
+// The size is in bytes and must be 1, 2, 4, or 8.
+func (i *Instruction) AsAtomicStore(addr, val Value, size uint64) *Instruction {
+	i.opcode = OpcodeAtomicStore
+	i.u1 = size
+	i.v = addr
+	i.v2 = val
+	i.typ = val.Type()
+	return i
+}
+
 // AsAtomicRmw initializes this instruction as an atomic read-modify-write.
 // The size is in bytes and must be 1, 2, 4, or 8.
 func (i *Instruction) AsAtomicRmw(op AtomicRmwOp, addr, val Value, size uint64) *Instruction {
@@ -2529,6 +2554,10 @@ func (i *Instruction) Format(b Builder) string {
 		instSuffix = fmt.Sprintf(".%v %s, %s", lanes, i.v.Format(b), i.v2.Format(b))
 	case OpcodeAtomicRmw:
 		instSuffix = fmt.Sprintf(" %s_%d, %s, %s", AtomicRmwOp(i.u1), 8*i.u2, i.v.Format(b), i.v2.Format(b))
+	case OpcodeAtomicLoad:
+		instSuffix = fmt.Sprintf("_%d, %s", 8*i.u1, i.v.Format(b))
+	case OpcodeAtomicStore:
+		instSuffix = fmt.Sprintf("_%d, %s, %s", 8*i.u1, i.v.Format(b), i.v2.Format(b))
 	default:
 		panic(fmt.Sprintf("TODO: format for %s", i.opcode))
 	}
