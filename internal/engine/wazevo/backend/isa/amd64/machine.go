@@ -2215,18 +2215,22 @@ func (m *machine) lowerVanyTrue(instr *ssa.Instruction) {
 	rm := m.getOperand_Reg(m.c.ValueDefinition(x))
 	rd := m.c.VRegOf(instr.Return())
 
+	tmp := m.c.AllocateVReg(ssa.TypeI32)
+
 	cmp := m.allocateInstr()
 	cmp.asXmmCmpRmR(sseOpcodePtest, rm, rm.r)
 	m.insert(cmp)
 
 	setcc := m.allocateInstr()
-	setcc.asSetcc(condNZ, rd)
+	setcc.asSetcc(condNZ, tmp)
 	m.insert(setcc)
 
 	// Clear the irrelevant bits.
 	and := m.allocateInstr()
-	and.asAluRmiR(aluRmiROpcodeAnd, newOperandImm32(1), rd, false)
+	and.asAluRmiR(aluRmiROpcodeAnd, newOperandImm32(1), tmp, false)
 	m.insert(and)
+
+	m.copyTo(tmp, rd)
 }
 
 func (m *machine) lowerVallTrue(instr *ssa.Instruction) {
@@ -2259,14 +2263,18 @@ func (m *machine) lowerVallTrue(instr *ssa.Instruction) {
 	test.asXmmCmpRmR(sseOpcodePtest, newOperandReg(tmp), tmp)
 	m.insert(test)
 
+	tmp2 := m.c.AllocateVReg(ssa.TypeI32)
+
 	setcc := m.allocateInstr()
-	setcc.asSetcc(condZ, rd)
+	setcc.asSetcc(condZ, tmp2)
 	m.insert(setcc)
 
 	// Clear the irrelevant bits.
 	and := m.allocateInstr()
-	and.asAluRmiR(aluRmiROpcodeAnd, newOperandImm32(1), rd, false)
+	and.asAluRmiR(aluRmiROpcodeAnd, newOperandImm32(1), tmp2, false)
 	m.insert(and)
+
+	m.copyTo(tmp2, rd)
 }
 
 func (m *machine) lowerVhighBits(instr *ssa.Instruction) {
@@ -2337,15 +2345,19 @@ func (m *machine) lowerVbnot(instr *ssa.Instruction) {
 	rd := m.c.VRegOf(instr.Return())
 
 	tmp := m.copyToTmp(rm.r)
+	tmp2 := m.c.AllocateVReg(ssa.TypeV128)
+
+	// Ensure tmp2 is considered defined by regalloc.
+	m.insert(m.allocateInstr().asDefineUninitializedReg(tmp2))
 
 	// Set all bits on tmp register.
 	pak := m.allocateInstr()
-	pak.asXmmRmR(sseOpcodePcmpeqd, newOperandReg(rd), rd)
+	pak.asXmmRmR(sseOpcodePcmpeqd, newOperandReg(tmp2), tmp2)
 	m.insert(pak)
 
 	// Then XOR with tmp to reverse all bits on v.register.
 	xor := m.allocateInstr()
-	xor.asXmmRmR(sseOpcodePxor, newOperandReg(rd), tmp)
+	xor.asXmmRmR(sseOpcodePxor, newOperandReg(tmp2), tmp)
 	m.insert(xor)
 
 	m.copyTo(tmp, rd)
@@ -2358,12 +2370,14 @@ func (m *machine) lowerVbBinOp(instr *ssa.Instruction, op sseOpcode) {
 	rm, rn := m.getOperand_Reg(xDef), m.getOperand_Reg(yDef)
 	rd := m.c.VRegOf(instr.Return())
 
-	m.copyTo(rm.r, rd)
+	tmp := m.copyToTmp(rm.r)
 
 	// op between rn, rm.
 	binOp := m.allocateInstr()
-	binOp.asXmmRmR(op, rn, rd)
+	binOp.asXmmRmR(op, rn, tmp)
 	m.insert(binOp)
+
+	m.copyTo(tmp, rd)
 }
 
 func (m *machine) lowerVbandnot(instr *ssa.Instruction, op sseOpcode) {
@@ -2373,12 +2387,14 @@ func (m *machine) lowerVbandnot(instr *ssa.Instruction, op sseOpcode) {
 	rm, rn := m.getOperand_Reg(xDef), m.getOperand_Reg(yDef)
 	rd := m.c.VRegOf(instr.Return())
 
-	m.copyTo(rn.r, rd)
+	tmp := m.copyToTmp(rn.r)
 
 	// pandn between rn, rm.
 	pand := m.allocateInstr()
-	pand.asXmmRmR(sseOpcodePandn, rm, rd)
+	pand.asXmmRmR(sseOpcodePandn, rm, tmp)
 	m.insert(pand)
+
+	m.copyTo(tmp, rd)
 }
 
 func (m *machine) lowerVbitselect(instr *ssa.Instruction) {
