@@ -290,13 +290,13 @@ func Test_machine_lowerClz(t *testing.T) {
 		name     string
 		setup    func(*mockCompiler, ssa.Builder, *machine) *backend.SSAValueDefinition
 		cpuFlags platform.CpuFeatureFlags
-		tpe      ssa.Type
+		typ      ssa.Type
 		exp      string
 	}{
 		{
 			name:     "no extra flags (64)",
 			cpuFlags: &mockCpuFlags{},
-			tpe:      ssa.TypeI64,
+			typ:      ssa.TypeI64,
 			exp: `
 	testq %rax, %rax
 	jnz L1
@@ -312,7 +312,7 @@ L2:
 		{
 			name:     "ABM (64)",
 			cpuFlags: &mockCpuFlags{extraFlags: platform.CpuExtraFeatureAmd64ABM},
-			tpe:      ssa.TypeI64,
+			typ:      ssa.TypeI64,
 			exp: `
 	lzcntq %rax, %rcx
 `,
@@ -320,7 +320,7 @@ L2:
 		{
 			name:     "no extra flags (32)",
 			cpuFlags: &mockCpuFlags{},
-			tpe:      ssa.TypeI32,
+			typ:      ssa.TypeI32,
 			exp: `
 	testl %eax, %eax
 	jnz L1
@@ -336,7 +336,7 @@ L2:
 		{
 			name:     "ABM (32)",
 			cpuFlags: &mockCpuFlags{extraFlags: platform.CpuExtraFeatureAmd64ABM},
-			tpe:      ssa.TypeI32,
+			typ:      ssa.TypeI32,
 			exp: `
 	lzcntl %eax, %ecx
 `,
@@ -344,7 +344,7 @@ L2:
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx, b, m := newSetupWithMockContext()
-			p := b.CurrentBlock().AddParam(b, tc.tpe)
+			p := b.CurrentBlock().AddParam(b, tc.typ)
 			m.cpuFeatures = tc.cpuFlags
 
 			ctx.definitions[p] = &backend.SSAValueDefinition{BlockParamValue: p, BlkParamVReg: raxVReg}
