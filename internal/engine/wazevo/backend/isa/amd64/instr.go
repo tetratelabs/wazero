@@ -208,7 +208,7 @@ func (i *instruction) String() string {
 	case xmmCmpRmR:
 		return fmt.Sprintf("%s %s, %s", sseOpcode(i.u1), i.op1.format(false), i.op2.format(false))
 	case xmmRmRImm:
-		panic("TODO")
+		return fmt.Sprintf("%s $%d, %s, %s", sseOpcode(i.u1), cmpPredicate(i.u2), i.op1.format(false), i.op2.format(false))
 	case jmp:
 		return fmt.Sprintf("jmp %s", i.op1.format(true))
 	case jmpIf:
@@ -1056,6 +1056,18 @@ func (i *instruction) asXmmRmR(op sseOpcode, rm operand, rd regalloc.VReg) *inst
 	i.op1 = rm
 	i.op2 = newOperandReg(rd)
 	i.u1 = uint64(op)
+	return i
+}
+
+func (i *instruction) asXmmRmRImm(op sseOpcode, imm uint8, rm operand, rd regalloc.VReg) *instruction {
+	if rm.kind != operandKindReg && rm.kind != operandKindMem {
+		panic("BUG")
+	}
+	i.kind = xmmRmRImm
+	i.op1 = rm
+	i.op2 = newOperandReg(rd)
+	i.u1 = uint64(op)
+	i.u2 = uint64(imm)
 	return i
 }
 
@@ -1913,6 +1925,21 @@ func (r roundingMode) String() string {
 	}
 }
 
+type cmpPredicate uint8
+
+const (
+	cmpPredicateEqualUnordered cmpPredicate = 8
+)
+
+func (r cmpPredicate) String() string {
+	switch r {
+	case cmpPredicateEqualUnordered:
+		return "equalUnordered"
+	default:
+		panic("unsupported")
+	}
+}
+
 func linkInstr(prev, next *instruction) *instruction {
 	prev.next = next
 	next.prev = prev
@@ -1938,10 +1965,12 @@ var defKinds = [instrMax]defKind{
 	shiftR:                 defKindNone,
 	imm:                    defKindOp2,
 	unaryRmR:               defKindOp2,
+	xmmRmiReg:              defKindOp2,
 	xmmUnaryRmR:            defKindOp2,
 	xmmUnaryRmRImm:         defKindOp2,
 	xmmCmpRmR:              defKindNone,
 	xmmRmR:                 defKindNone,
+	xmmRmRImm:              defKindNone,
 	mov64MR:                defKindOp2,
 	movsxRmR:               defKindOp2,
 	movzxRmR:               defKindOp2,
@@ -2011,10 +2040,12 @@ var useKinds = [instrMax]useKind{
 	shiftR:                 useKindOp1Op2Reg,
 	imm:                    useKindNone,
 	unaryRmR:               useKindOp1,
+	xmmRmiReg:              useKindOp1Op2Reg,
 	xmmUnaryRmR:            useKindOp1,
 	xmmUnaryRmRImm:         useKindOp1,
 	xmmCmpRmR:              useKindOp1Op2Reg,
 	xmmRmR:                 useKindOp1Op2Reg,
+	xmmRmRImm:              useKindOp1Op2Reg,
 	mov64MR:                useKindOp1,
 	movzxRmR:               useKindOp1,
 	movsxRmR:               useKindOp1,

@@ -1484,6 +1484,20 @@ func TestInstruction_format_encode(t *testing.T) {
 			wantFormat: "pmovmskb %xmm1, %xmm0",
 		},
 		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmppd, uint8(cmpPredicateEqualUnordered), newOperandReg(xmm1VReg), xmm0VReg)
+			},
+			want:       "660fc2c108",
+			wantFormat: "cmppd $8, %xmm1, %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmppd, uint8(cmpPredicateEqualUnordered), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "660fc2407b08",
+			wantFormat: "cmppd $8, 123(%rax), %xmm0",
+		},
+		{
 			setup:      func(i *instruction) { i.asPop64(raxVReg) },
 			want:       "58",
 			wantFormat: "popq %rax",
