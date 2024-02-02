@@ -1702,6 +1702,190 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i32)
 `,
 		},
 		{
+			name:     "AtomicRMWAdd",
+			m:        testcases.AtomicRmwAdd.Module,
+			features: api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
+			exp: `
+blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i32, v4:i32, v5:i64, v6:i64, v7:i64, v8:i64)
+	v9:i32 = Iconst_32 0x0
+	v10:i64 = Iconst_64 0x1
+	v11:i64 = UExtend v9, 32->64
+	v12:i64 = Uload32 module_ctx, 0x10
+	v13:i64 = Iadd v11, v10
+	v14:i32 = Icmp lt_u, v12, v13
+	ExitIfTrue v14, exec_ctx, memory_out_of_bounds
+	v15:i64 = Load module_ctx, 0x8
+	v16:i64 = Iadd v15, v11
+	v17:i32 = AtomicRmw add_8, v16, v2
+	v18:i32 = Iconst_32 0x8
+	v19:i64 = Iconst_64 0x2
+	v20:i64 = UExtend v18, 32->64
+	v21:i64 = Iadd v20, v19
+	v22:i32 = Icmp lt_u, v12, v21
+	ExitIfTrue v22, exec_ctx, memory_out_of_bounds
+	v23:i64 = Iadd v15, v20
+	v24:i64 = Iconst_64 0x1
+	v25:i64 = Band v23, v24
+	v26:i64 = Iconst_64 0x0
+	v27:i32 = Icmp neq, v25, v26
+	ExitIfTrue v27, exec_ctx, unaligned_atomic
+	v28:i32 = AtomicRmw add_16, v23, v3
+	v29:i32 = Iconst_32 0x10
+	v30:i64 = Iconst_64 0x4
+	v31:i64 = UExtend v29, 32->64
+	v32:i64 = Iadd v31, v30
+	v33:i32 = Icmp lt_u, v12, v32
+	ExitIfTrue v33, exec_ctx, memory_out_of_bounds
+	v34:i64 = Iadd v15, v31
+	v35:i64 = Iconst_64 0x3
+	v36:i64 = Band v34, v35
+	v37:i64 = Iconst_64 0x0
+	v38:i32 = Icmp neq, v36, v37
+	ExitIfTrue v38, exec_ctx, unaligned_atomic
+	v39:i32 = AtomicRmw add_32, v34, v4
+	v40:i32 = Iconst_32 0x18
+	v41:i64 = Iconst_64 0x1
+	v42:i64 = UExtend v40, 32->64
+	v43:i64 = Iadd v42, v41
+	v44:i32 = Icmp lt_u, v12, v43
+	ExitIfTrue v44, exec_ctx, memory_out_of_bounds
+	v45:i64 = Iadd v15, v42
+	v46:i64 = AtomicRmw add_8, v45, v5
+	v47:i32 = Iconst_32 0x20
+	v48:i64 = Iconst_64 0x2
+	v49:i64 = UExtend v47, 32->64
+	v50:i64 = Iadd v49, v48
+	v51:i32 = Icmp lt_u, v12, v50
+	ExitIfTrue v51, exec_ctx, memory_out_of_bounds
+	v52:i64 = Iadd v15, v49
+	v53:i64 = Iconst_64 0x1
+	v54:i64 = Band v52, v53
+	v55:i64 = Iconst_64 0x0
+	v56:i32 = Icmp neq, v54, v55
+	ExitIfTrue v56, exec_ctx, unaligned_atomic
+	v57:i64 = AtomicRmw add_16, v52, v6
+	v58:i32 = Iconst_32 0x28
+	v59:i64 = Iconst_64 0x4
+	v60:i64 = UExtend v58, 32->64
+	v61:i64 = Iadd v60, v59
+	v62:i32 = Icmp lt_u, v12, v61
+	ExitIfTrue v62, exec_ctx, memory_out_of_bounds
+	v63:i64 = Iadd v15, v60
+	v64:i64 = Iconst_64 0x3
+	v65:i64 = Band v63, v64
+	v66:i64 = Iconst_64 0x0
+	v67:i32 = Icmp neq, v65, v66
+	ExitIfTrue v67, exec_ctx, unaligned_atomic
+	v68:i64 = AtomicRmw add_32, v63, v7
+	v69:i32 = Iconst_32 0x30
+	v70:i64 = Iconst_64 0x8
+	v71:i64 = UExtend v69, 32->64
+	v72:i64 = Iadd v71, v70
+	v73:i32 = Icmp lt_u, v12, v72
+	ExitIfTrue v73, exec_ctx, memory_out_of_bounds
+	v74:i64 = Iadd v15, v71
+	v75:i64 = Iconst_64 0x7
+	v76:i64 = Band v74, v75
+	v77:i64 = Iconst_64 0x0
+	v78:i32 = Icmp neq, v76, v77
+	ExitIfTrue v78, exec_ctx, unaligned_atomic
+	v79:i64 = AtomicRmw add_64, v74, v8
+	Jump blk_ret, v17, v28, v39, v46, v57, v68, v79
+`,
+		},
+		{
+			name:     "AtomicRMWSub",
+			m:        testcases.AtomicRmwSub.Module,
+			features: api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
+			exp: `
+blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i32, v4:i32, v5:i64, v6:i64, v7:i64, v8:i64)
+	v9:i32 = Iconst_32 0x0
+	v10:i64 = Iconst_64 0x1
+	v11:i64 = UExtend v9, 32->64
+	v12:i64 = Uload32 module_ctx, 0x10
+	v13:i64 = Iadd v11, v10
+	v14:i32 = Icmp lt_u, v12, v13
+	ExitIfTrue v14, exec_ctx, memory_out_of_bounds
+	v15:i64 = Load module_ctx, 0x8
+	v16:i64 = Iadd v15, v11
+	v17:i32 = AtomicRmw sub_8, v16, v2
+	v18:i32 = Iconst_32 0x8
+	v19:i64 = Iconst_64 0x2
+	v20:i64 = UExtend v18, 32->64
+	v21:i64 = Iadd v20, v19
+	v22:i32 = Icmp lt_u, v12, v21
+	ExitIfTrue v22, exec_ctx, memory_out_of_bounds
+	v23:i64 = Iadd v15, v20
+	v24:i64 = Iconst_64 0x1
+	v25:i64 = Band v23, v24
+	v26:i64 = Iconst_64 0x0
+	v27:i32 = Icmp neq, v25, v26
+	ExitIfTrue v27, exec_ctx, unaligned_atomic
+	v28:i32 = AtomicRmw sub_16, v23, v3
+	v29:i32 = Iconst_32 0x10
+	v30:i64 = Iconst_64 0x4
+	v31:i64 = UExtend v29, 32->64
+	v32:i64 = Iadd v31, v30
+	v33:i32 = Icmp lt_u, v12, v32
+	ExitIfTrue v33, exec_ctx, memory_out_of_bounds
+	v34:i64 = Iadd v15, v31
+	v35:i64 = Iconst_64 0x3
+	v36:i64 = Band v34, v35
+	v37:i64 = Iconst_64 0x0
+	v38:i32 = Icmp neq, v36, v37
+	ExitIfTrue v38, exec_ctx, unaligned_atomic
+	v39:i32 = AtomicRmw sub_32, v34, v4
+	v40:i32 = Iconst_32 0x18
+	v41:i64 = Iconst_64 0x1
+	v42:i64 = UExtend v40, 32->64
+	v43:i64 = Iadd v42, v41
+	v44:i32 = Icmp lt_u, v12, v43
+	ExitIfTrue v44, exec_ctx, memory_out_of_bounds
+	v45:i64 = Iadd v15, v42
+	v46:i64 = AtomicRmw sub_8, v45, v5
+	v47:i32 = Iconst_32 0x20
+	v48:i64 = Iconst_64 0x2
+	v49:i64 = UExtend v47, 32->64
+	v50:i64 = Iadd v49, v48
+	v51:i32 = Icmp lt_u, v12, v50
+	ExitIfTrue v51, exec_ctx, memory_out_of_bounds
+	v52:i64 = Iadd v15, v49
+	v53:i64 = Iconst_64 0x1
+	v54:i64 = Band v52, v53
+	v55:i64 = Iconst_64 0x0
+	v56:i32 = Icmp neq, v54, v55
+	ExitIfTrue v56, exec_ctx, unaligned_atomic
+	v57:i64 = AtomicRmw sub_16, v52, v6
+	v58:i32 = Iconst_32 0x28
+	v59:i64 = Iconst_64 0x4
+	v60:i64 = UExtend v58, 32->64
+	v61:i64 = Iadd v60, v59
+	v62:i32 = Icmp lt_u, v12, v61
+	ExitIfTrue v62, exec_ctx, memory_out_of_bounds
+	v63:i64 = Iadd v15, v60
+	v64:i64 = Iconst_64 0x3
+	v65:i64 = Band v63, v64
+	v66:i64 = Iconst_64 0x0
+	v67:i32 = Icmp neq, v65, v66
+	ExitIfTrue v67, exec_ctx, unaligned_atomic
+	v68:i64 = AtomicRmw sub_32, v63, v7
+	v69:i32 = Iconst_32 0x30
+	v70:i64 = Iconst_64 0x8
+	v71:i64 = UExtend v69, 32->64
+	v72:i64 = Iadd v71, v70
+	v73:i32 = Icmp lt_u, v12, v72
+	ExitIfTrue v73, exec_ctx, memory_out_of_bounds
+	v74:i64 = Iadd v15, v71
+	v75:i64 = Iconst_64 0x7
+	v76:i64 = Band v74, v75
+	v77:i64 = Iconst_64 0x0
+	v78:i32 = Icmp neq, v76, v77
+	ExitIfTrue v78, exec_ctx, unaligned_atomic
+	v79:i64 = AtomicRmw sub_64, v74, v8
+	Jump blk_ret, v17, v28, v39, v46, v57, v68, v79
+`,
+		},
+		{
 			name:     "AtomicRMWAnd",
 			m:        testcases.AtomicRmwAnd.Module,
 			features: api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
@@ -1790,6 +1974,282 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i32, v4:i32, v5:i64, v6:i64, v7:
 	v78:i32 = Icmp neq, v76, v77
 	ExitIfTrue v78, exec_ctx, unaligned_atomic
 	v79:i64 = AtomicRmw and_64, v74, v8
+	Jump blk_ret, v17, v28, v39, v46, v57, v68, v79
+`,
+		},
+		{
+			name:     "AtomicRMWOr",
+			m:        testcases.AtomicRmwOr.Module,
+			features: api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
+			exp: `
+blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i32, v4:i32, v5:i64, v6:i64, v7:i64, v8:i64)
+	v9:i32 = Iconst_32 0x0
+	v10:i64 = Iconst_64 0x1
+	v11:i64 = UExtend v9, 32->64
+	v12:i64 = Uload32 module_ctx, 0x10
+	v13:i64 = Iadd v11, v10
+	v14:i32 = Icmp lt_u, v12, v13
+	ExitIfTrue v14, exec_ctx, memory_out_of_bounds
+	v15:i64 = Load module_ctx, 0x8
+	v16:i64 = Iadd v15, v11
+	v17:i32 = AtomicRmw or_8, v16, v2
+	v18:i32 = Iconst_32 0x8
+	v19:i64 = Iconst_64 0x2
+	v20:i64 = UExtend v18, 32->64
+	v21:i64 = Iadd v20, v19
+	v22:i32 = Icmp lt_u, v12, v21
+	ExitIfTrue v22, exec_ctx, memory_out_of_bounds
+	v23:i64 = Iadd v15, v20
+	v24:i64 = Iconst_64 0x1
+	v25:i64 = Band v23, v24
+	v26:i64 = Iconst_64 0x0
+	v27:i32 = Icmp neq, v25, v26
+	ExitIfTrue v27, exec_ctx, unaligned_atomic
+	v28:i32 = AtomicRmw or_16, v23, v3
+	v29:i32 = Iconst_32 0x10
+	v30:i64 = Iconst_64 0x4
+	v31:i64 = UExtend v29, 32->64
+	v32:i64 = Iadd v31, v30
+	v33:i32 = Icmp lt_u, v12, v32
+	ExitIfTrue v33, exec_ctx, memory_out_of_bounds
+	v34:i64 = Iadd v15, v31
+	v35:i64 = Iconst_64 0x3
+	v36:i64 = Band v34, v35
+	v37:i64 = Iconst_64 0x0
+	v38:i32 = Icmp neq, v36, v37
+	ExitIfTrue v38, exec_ctx, unaligned_atomic
+	v39:i32 = AtomicRmw or_32, v34, v4
+	v40:i32 = Iconst_32 0x18
+	v41:i64 = Iconst_64 0x1
+	v42:i64 = UExtend v40, 32->64
+	v43:i64 = Iadd v42, v41
+	v44:i32 = Icmp lt_u, v12, v43
+	ExitIfTrue v44, exec_ctx, memory_out_of_bounds
+	v45:i64 = Iadd v15, v42
+	v46:i64 = AtomicRmw or_8, v45, v5
+	v47:i32 = Iconst_32 0x20
+	v48:i64 = Iconst_64 0x2
+	v49:i64 = UExtend v47, 32->64
+	v50:i64 = Iadd v49, v48
+	v51:i32 = Icmp lt_u, v12, v50
+	ExitIfTrue v51, exec_ctx, memory_out_of_bounds
+	v52:i64 = Iadd v15, v49
+	v53:i64 = Iconst_64 0x1
+	v54:i64 = Band v52, v53
+	v55:i64 = Iconst_64 0x0
+	v56:i32 = Icmp neq, v54, v55
+	ExitIfTrue v56, exec_ctx, unaligned_atomic
+	v57:i64 = AtomicRmw or_16, v52, v6
+	v58:i32 = Iconst_32 0x28
+	v59:i64 = Iconst_64 0x4
+	v60:i64 = UExtend v58, 32->64
+	v61:i64 = Iadd v60, v59
+	v62:i32 = Icmp lt_u, v12, v61
+	ExitIfTrue v62, exec_ctx, memory_out_of_bounds
+	v63:i64 = Iadd v15, v60
+	v64:i64 = Iconst_64 0x3
+	v65:i64 = Band v63, v64
+	v66:i64 = Iconst_64 0x0
+	v67:i32 = Icmp neq, v65, v66
+	ExitIfTrue v67, exec_ctx, unaligned_atomic
+	v68:i64 = AtomicRmw or_32, v63, v7
+	v69:i32 = Iconst_32 0x30
+	v70:i64 = Iconst_64 0x8
+	v71:i64 = UExtend v69, 32->64
+	v72:i64 = Iadd v71, v70
+	v73:i32 = Icmp lt_u, v12, v72
+	ExitIfTrue v73, exec_ctx, memory_out_of_bounds
+	v74:i64 = Iadd v15, v71
+	v75:i64 = Iconst_64 0x7
+	v76:i64 = Band v74, v75
+	v77:i64 = Iconst_64 0x0
+	v78:i32 = Icmp neq, v76, v77
+	ExitIfTrue v78, exec_ctx, unaligned_atomic
+	v79:i64 = AtomicRmw or_64, v74, v8
+	Jump blk_ret, v17, v28, v39, v46, v57, v68, v79
+`,
+		},
+		{
+			name:     "AtomicRMWXor",
+			m:        testcases.AtomicRmwXor.Module,
+			features: api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
+			exp: `
+blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i32, v4:i32, v5:i64, v6:i64, v7:i64, v8:i64)
+	v9:i32 = Iconst_32 0x0
+	v10:i64 = Iconst_64 0x1
+	v11:i64 = UExtend v9, 32->64
+	v12:i64 = Uload32 module_ctx, 0x10
+	v13:i64 = Iadd v11, v10
+	v14:i32 = Icmp lt_u, v12, v13
+	ExitIfTrue v14, exec_ctx, memory_out_of_bounds
+	v15:i64 = Load module_ctx, 0x8
+	v16:i64 = Iadd v15, v11
+	v17:i32 = AtomicRmw xor_8, v16, v2
+	v18:i32 = Iconst_32 0x8
+	v19:i64 = Iconst_64 0x2
+	v20:i64 = UExtend v18, 32->64
+	v21:i64 = Iadd v20, v19
+	v22:i32 = Icmp lt_u, v12, v21
+	ExitIfTrue v22, exec_ctx, memory_out_of_bounds
+	v23:i64 = Iadd v15, v20
+	v24:i64 = Iconst_64 0x1
+	v25:i64 = Band v23, v24
+	v26:i64 = Iconst_64 0x0
+	v27:i32 = Icmp neq, v25, v26
+	ExitIfTrue v27, exec_ctx, unaligned_atomic
+	v28:i32 = AtomicRmw xor_16, v23, v3
+	v29:i32 = Iconst_32 0x10
+	v30:i64 = Iconst_64 0x4
+	v31:i64 = UExtend v29, 32->64
+	v32:i64 = Iadd v31, v30
+	v33:i32 = Icmp lt_u, v12, v32
+	ExitIfTrue v33, exec_ctx, memory_out_of_bounds
+	v34:i64 = Iadd v15, v31
+	v35:i64 = Iconst_64 0x3
+	v36:i64 = Band v34, v35
+	v37:i64 = Iconst_64 0x0
+	v38:i32 = Icmp neq, v36, v37
+	ExitIfTrue v38, exec_ctx, unaligned_atomic
+	v39:i32 = AtomicRmw xor_32, v34, v4
+	v40:i32 = Iconst_32 0x18
+	v41:i64 = Iconst_64 0x1
+	v42:i64 = UExtend v40, 32->64
+	v43:i64 = Iadd v42, v41
+	v44:i32 = Icmp lt_u, v12, v43
+	ExitIfTrue v44, exec_ctx, memory_out_of_bounds
+	v45:i64 = Iadd v15, v42
+	v46:i64 = AtomicRmw xor_8, v45, v5
+	v47:i32 = Iconst_32 0x20
+	v48:i64 = Iconst_64 0x2
+	v49:i64 = UExtend v47, 32->64
+	v50:i64 = Iadd v49, v48
+	v51:i32 = Icmp lt_u, v12, v50
+	ExitIfTrue v51, exec_ctx, memory_out_of_bounds
+	v52:i64 = Iadd v15, v49
+	v53:i64 = Iconst_64 0x1
+	v54:i64 = Band v52, v53
+	v55:i64 = Iconst_64 0x0
+	v56:i32 = Icmp neq, v54, v55
+	ExitIfTrue v56, exec_ctx, unaligned_atomic
+	v57:i64 = AtomicRmw xor_16, v52, v6
+	v58:i32 = Iconst_32 0x28
+	v59:i64 = Iconst_64 0x4
+	v60:i64 = UExtend v58, 32->64
+	v61:i64 = Iadd v60, v59
+	v62:i32 = Icmp lt_u, v12, v61
+	ExitIfTrue v62, exec_ctx, memory_out_of_bounds
+	v63:i64 = Iadd v15, v60
+	v64:i64 = Iconst_64 0x3
+	v65:i64 = Band v63, v64
+	v66:i64 = Iconst_64 0x0
+	v67:i32 = Icmp neq, v65, v66
+	ExitIfTrue v67, exec_ctx, unaligned_atomic
+	v68:i64 = AtomicRmw xor_32, v63, v7
+	v69:i32 = Iconst_32 0x30
+	v70:i64 = Iconst_64 0x8
+	v71:i64 = UExtend v69, 32->64
+	v72:i64 = Iadd v71, v70
+	v73:i32 = Icmp lt_u, v12, v72
+	ExitIfTrue v73, exec_ctx, memory_out_of_bounds
+	v74:i64 = Iadd v15, v71
+	v75:i64 = Iconst_64 0x7
+	v76:i64 = Band v74, v75
+	v77:i64 = Iconst_64 0x0
+	v78:i32 = Icmp neq, v76, v77
+	ExitIfTrue v78, exec_ctx, unaligned_atomic
+	v79:i64 = AtomicRmw xor_64, v74, v8
+	Jump blk_ret, v17, v28, v39, v46, v57, v68, v79
+`,
+		},
+		{
+			name:     "AtomicRMWXchg",
+			m:        testcases.AtomicRmwXchg.Module,
+			features: api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
+			exp: `
+blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i32, v4:i32, v5:i64, v6:i64, v7:i64, v8:i64)
+	v9:i32 = Iconst_32 0x0
+	v10:i64 = Iconst_64 0x1
+	v11:i64 = UExtend v9, 32->64
+	v12:i64 = Uload32 module_ctx, 0x10
+	v13:i64 = Iadd v11, v10
+	v14:i32 = Icmp lt_u, v12, v13
+	ExitIfTrue v14, exec_ctx, memory_out_of_bounds
+	v15:i64 = Load module_ctx, 0x8
+	v16:i64 = Iadd v15, v11
+	v17:i32 = AtomicRmw xchg_8, v16, v2
+	v18:i32 = Iconst_32 0x8
+	v19:i64 = Iconst_64 0x2
+	v20:i64 = UExtend v18, 32->64
+	v21:i64 = Iadd v20, v19
+	v22:i32 = Icmp lt_u, v12, v21
+	ExitIfTrue v22, exec_ctx, memory_out_of_bounds
+	v23:i64 = Iadd v15, v20
+	v24:i64 = Iconst_64 0x1
+	v25:i64 = Band v23, v24
+	v26:i64 = Iconst_64 0x0
+	v27:i32 = Icmp neq, v25, v26
+	ExitIfTrue v27, exec_ctx, unaligned_atomic
+	v28:i32 = AtomicRmw xchg_16, v23, v3
+	v29:i32 = Iconst_32 0x10
+	v30:i64 = Iconst_64 0x4
+	v31:i64 = UExtend v29, 32->64
+	v32:i64 = Iadd v31, v30
+	v33:i32 = Icmp lt_u, v12, v32
+	ExitIfTrue v33, exec_ctx, memory_out_of_bounds
+	v34:i64 = Iadd v15, v31
+	v35:i64 = Iconst_64 0x3
+	v36:i64 = Band v34, v35
+	v37:i64 = Iconst_64 0x0
+	v38:i32 = Icmp neq, v36, v37
+	ExitIfTrue v38, exec_ctx, unaligned_atomic
+	v39:i32 = AtomicRmw xchg_32, v34, v4
+	v40:i32 = Iconst_32 0x18
+	v41:i64 = Iconst_64 0x1
+	v42:i64 = UExtend v40, 32->64
+	v43:i64 = Iadd v42, v41
+	v44:i32 = Icmp lt_u, v12, v43
+	ExitIfTrue v44, exec_ctx, memory_out_of_bounds
+	v45:i64 = Iadd v15, v42
+	v46:i64 = AtomicRmw xchg_8, v45, v5
+	v47:i32 = Iconst_32 0x20
+	v48:i64 = Iconst_64 0x2
+	v49:i64 = UExtend v47, 32->64
+	v50:i64 = Iadd v49, v48
+	v51:i32 = Icmp lt_u, v12, v50
+	ExitIfTrue v51, exec_ctx, memory_out_of_bounds
+	v52:i64 = Iadd v15, v49
+	v53:i64 = Iconst_64 0x1
+	v54:i64 = Band v52, v53
+	v55:i64 = Iconst_64 0x0
+	v56:i32 = Icmp neq, v54, v55
+	ExitIfTrue v56, exec_ctx, unaligned_atomic
+	v57:i64 = AtomicRmw xchg_16, v52, v6
+	v58:i32 = Iconst_32 0x28
+	v59:i64 = Iconst_64 0x4
+	v60:i64 = UExtend v58, 32->64
+	v61:i64 = Iadd v60, v59
+	v62:i32 = Icmp lt_u, v12, v61
+	ExitIfTrue v62, exec_ctx, memory_out_of_bounds
+	v63:i64 = Iadd v15, v60
+	v64:i64 = Iconst_64 0x3
+	v65:i64 = Band v63, v64
+	v66:i64 = Iconst_64 0x0
+	v67:i32 = Icmp neq, v65, v66
+	ExitIfTrue v67, exec_ctx, unaligned_atomic
+	v68:i64 = AtomicRmw xchg_32, v63, v7
+	v69:i32 = Iconst_32 0x30
+	v70:i64 = Iconst_64 0x8
+	v71:i64 = UExtend v69, 32->64
+	v72:i64 = Iadd v71, v70
+	v73:i32 = Icmp lt_u, v12, v72
+	ExitIfTrue v73, exec_ctx, memory_out_of_bounds
+	v74:i64 = Iadd v15, v71
+	v75:i64 = Iconst_64 0x7
+	v76:i64 = Band v74, v75
+	v77:i64 = Iconst_64 0x0
+	v78:i32 = Icmp neq, v76, v77
+	ExitIfTrue v78, exec_ctx, unaligned_atomic
+	v79:i64 = AtomicRmw xchg_64, v74, v8
 	Jump blk_ret, v17, v28, v39, v46, v57, v68, v79
 `,
 		},
