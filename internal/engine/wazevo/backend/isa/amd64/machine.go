@@ -380,6 +380,24 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		rd := newOperandReg(m.c.VRegOf(instr.Return()))
 		m.lowerFcvtFromUint(rn, rd, x.Type() == ssa.TypeI64,
 			instr.Return().Type().Bits() == 64)
+	case ssa.OpcodeVanyTrue:
+		m.lowerVanyTrue(instr)
+	case ssa.OpcodeVallTrue:
+		m.lowerVallTrue(instr)
+	case ssa.OpcodeVhighBits:
+		m.lowerVhighBits(instr)
+	case ssa.OpcodeVbnot:
+		m.lowerVbnot(instr)
+	case ssa.OpcodeVband:
+		m.lowerVbBinOp(instr, sseOpcodePand)
+	case ssa.OpcodeVbor:
+		m.lowerVbBinOp(instr, sseOpcodePor)
+	case ssa.OpcodeVbxor:
+		m.lowerVbBinOp(instr, sseOpcodePxor)
+	case ssa.OpcodeVbandnot:
+		m.lowerVbandnot(instr, sseOpcodePandn)
+	case ssa.OpcodeVbitselect:
+		m.lowerVbitselect(instr)
 	case ssa.OpcodeUndefined:
 		m.insert(m.allocateInstr().asUD2())
 	case ssa.OpcodeExitWithCode:
@@ -2190,4 +2208,219 @@ func (m *machine) lowerFcvtFromUint(rn, rd operand, src64, dst64 bool) {
 
 	m.insert(endTarget)
 	m.copyTo(tmpXmm, rd.r)
+}
+
+func (m *machine) lowerVanyTrue(instr *ssa.Instruction) {
+	x := instr.Arg()
+	rm := m.getOperand_Reg(m.c.ValueDefinition(x))
+	rd := m.c.VRegOf(instr.Return())
+
+	tmp := m.c.AllocateVReg(ssa.TypeI32)
+
+	cmp := m.allocateInstr()
+	cmp.asXmmCmpRmR(sseOpcodePtest, rm, rm.r)
+	m.insert(cmp)
+
+	setcc := m.allocateInstr()
+	setcc.asSetcc(condNZ, tmp)
+	m.insert(setcc)
+
+	// Clear the irrelevant bits.
+	and := m.allocateInstr()
+	and.asAluRmiR(aluRmiROpcodeAnd, newOperandImm32(1), tmp, false)
+	m.insert(and)
+
+	m.copyTo(tmp, rd)
+}
+
+func (m *machine) lowerVallTrue(instr *ssa.Instruction) {
+	x, lane := instr.ArgWithLane()
+	var op sseOpcode
+	switch lane {
+	case ssa.VecLaneI8x16:
+		op = sseOpcodePcmpeqb
+	case ssa.VecLaneI16x8:
+		op = sseOpcodePcmpeqw
+	case ssa.VecLaneI32x4:
+		op = sseOpcodePcmpeqd
+	case ssa.VecLaneI64x2:
+		op = sseOpcodePcmpeqq
+	}
+	rm := m.getOperand_Reg(m.c.ValueDefinition(x))
+	rd := m.c.VRegOf(instr.Return())
+
+	tmp := m.c.AllocateVReg(ssa.TypeV128)
+
+	zeros := m.allocateInstr()
+	zeros.asZeros(tmp)
+	m.insert(zeros)
+
+	pcmp := m.allocateInstr()
+	pcmp.asXmmRmR(op, rm, tmp)
+	m.insert(pcmp)
+
+	test := m.allocateInstr()
+	test.asXmmCmpRmR(sseOpcodePtest, newOperandReg(tmp), tmp)
+	m.insert(test)
+
+	tmp2 := m.c.AllocateVReg(ssa.TypeI32)
+
+	setcc := m.allocateInstr()
+	setcc.asSetcc(condZ, tmp2)
+	m.insert(setcc)
+
+	// Clear the irrelevant bits.
+	and := m.allocateInstr()
+	and.asAluRmiR(aluRmiROpcodeAnd, newOperandImm32(1), tmp2, false)
+	m.insert(and)
+
+	m.copyTo(tmp2, rd)
+}
+
+func (m *machine) lowerVhighBits(instr *ssa.Instruction) {
+	x, lane := instr.ArgWithLane()
+	rm := m.getOperand_Reg(m.c.ValueDefinition(x))
+	rd := m.c.VRegOf(instr.Return())
+	switch lane {
+	case ssa.VecLaneI8x16:
+		mov := m.allocateInstr()
+		mov.asXmmToGpr(sseOpcodePmovmskb, rm.r, rd, false)
+		m.insert(mov)
+
+	case ssa.VecLaneI16x8:
+		// When we have:
+		// 	R1 = [R1(w1), R1(w2), R1(w3), R1(w4), R1(w5), R1(w6), R1(w7), R1(v8)]
+		// 	R2 = [R2(w1), R2(w2), R2(w3), R2(v4), R2(w5), R2(w6), R2(w7), R2(v8)]
+		//	where RX(wn) is n-th signed word (16-bit) of RX register,
+		//
+		// "PACKSSWB R1, R2" produces
+		//  R1 = [
+		// 		byte_sat(R1(w1)), byte_sat(R1(w2)), byte_sat(R1(w3)), byte_sat(R1(w4)),
+		// 		byte_sat(R1(w5)), byte_sat(R1(w6)), byte_sat(R1(w7)), byte_sat(R1(w8)),
+		// 		byte_sat(R2(w1)), byte_sat(R2(w2)), byte_sat(R2(w3)), byte_sat(R2(w4)),
+		// 		byte_sat(R2(w5)), byte_sat(R2(w6)), byte_sat(R2(w7)), byte_sat(R2(w8)),
+		//  ]
+		//  where R1 is the destination register, and
+		// 	byte_sat(w) = int8(w) if w fits as signed 8-bit,
+		//                0x80 if w is less than 0x80
+		//                0x7F if w is greater than 0x7f
+		//
+		// See https://www.felixcloutier.com/x86/packsswb:packssdw for detail.
+		//
+		// Therefore, v.register ends up having i-th and (i+8)-th bit set if i-th lane is negative (for i in 0..8).
+		tmp := m.copyToTmp(rm.r)
+		res := m.c.AllocateVReg(ssa.TypeI32)
+
+		pak := m.allocateInstr()
+		pak.asXmmRmR(sseOpcodePacksswb, rm, tmp)
+		m.insert(pak)
+
+		mov := m.allocateInstr()
+		mov.asXmmToGpr(sseOpcodePmovmskb, tmp, res, false)
+		m.insert(mov)
+
+		// Clear the higher bits than 8.
+		shr := m.allocateInstr()
+		shr.asShiftR(shiftROpShiftRightLogical, newOperandImm32(8), res, false)
+		m.insert(shr)
+
+		m.copyTo(res, rd)
+
+	case ssa.VecLaneI32x4:
+		mov := m.allocateInstr()
+		mov.asXmmToGpr(sseOpcodeMovmskps, rm.r, rd, true)
+		m.insert(mov)
+
+	case ssa.VecLaneI64x2:
+		mov := m.allocateInstr()
+		mov.asXmmToGpr(sseOpcodeMovmskpd, rm.r, rd, true)
+		m.insert(mov)
+	}
+}
+
+func (m *machine) lowerVbnot(instr *ssa.Instruction) {
+	x := instr.Arg()
+	xDef := m.c.ValueDefinition(x)
+	rm := m.getOperand_Reg(xDef)
+	rd := m.c.VRegOf(instr.Return())
+
+	tmp := m.copyToTmp(rm.r)
+	tmp2 := m.c.AllocateVReg(ssa.TypeV128)
+
+	// Ensure tmp2 is considered defined by regalloc.
+	m.insert(m.allocateInstr().asDefineUninitializedReg(tmp2))
+
+	// Set all bits on tmp register.
+	pak := m.allocateInstr()
+	pak.asXmmRmR(sseOpcodePcmpeqd, newOperandReg(tmp2), tmp2)
+	m.insert(pak)
+
+	// Then XOR with tmp to reverse all bits on v.register.
+	xor := m.allocateInstr()
+	xor.asXmmRmR(sseOpcodePxor, newOperandReg(tmp2), tmp)
+	m.insert(xor)
+
+	m.copyTo(tmp, rd)
+}
+
+func (m *machine) lowerVbBinOp(instr *ssa.Instruction, op sseOpcode) {
+	x, y := instr.Arg2()
+	xDef := m.c.ValueDefinition(x)
+	yDef := m.c.ValueDefinition(y)
+	rm, rn := m.getOperand_Reg(xDef), m.getOperand_Reg(yDef)
+	rd := m.c.VRegOf(instr.Return())
+
+	tmp := m.copyToTmp(rm.r)
+
+	// op between rn, rm.
+	binOp := m.allocateInstr()
+	binOp.asXmmRmR(op, rn, tmp)
+	m.insert(binOp)
+
+	m.copyTo(tmp, rd)
+}
+
+func (m *machine) lowerVbandnot(instr *ssa.Instruction, op sseOpcode) {
+	x, y := instr.Arg2()
+	xDef := m.c.ValueDefinition(x)
+	yDef := m.c.ValueDefinition(y)
+	rm, rn := m.getOperand_Reg(xDef), m.getOperand_Reg(yDef)
+	rd := m.c.VRegOf(instr.Return())
+
+	tmp := m.copyToTmp(rn.r)
+
+	// pandn between rn, rm.
+	pand := m.allocateInstr()
+	pand.asXmmRmR(sseOpcodePandn, rm, tmp)
+	m.insert(pand)
+
+	m.copyTo(tmp, rd)
+}
+
+func (m *machine) lowerVbitselect(instr *ssa.Instruction) {
+	c, x, y := instr.SelectData()
+	xDef := m.c.ValueDefinition(x)
+	yDef := m.c.ValueDefinition(y)
+	rm, rn := m.getOperand_Reg(xDef), m.getOperand_Reg(yDef)
+	creg := m.getOperand_Reg(m.c.ValueDefinition(c))
+	rd := m.c.VRegOf(instr.Return())
+
+	tmpC := m.copyToTmp(creg.r)
+	tmpX := m.copyToTmp(rm.r)
+
+	// And between c, x (overwrites x).
+	pand := m.allocateInstr()
+	pand.asXmmRmR(sseOpcodePand, creg, tmpX)
+	m.insert(pand)
+
+	// Andn between y, c (overwrites c).
+	pandn := m.allocateInstr()
+	pandn.asXmmRmR(sseOpcodePandn, rn, tmpC)
+	m.insert(pandn)
+
+	por := m.allocateInstr()
+	por.asXmmRmR(sseOpcodePor, newOperandReg(tmpC), tmpX)
+	m.insert(por)
+
+	m.copyTo(tmpX, rd)
 }
