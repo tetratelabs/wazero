@@ -162,6 +162,7 @@ var defKinds = [numInstructionKinds]defKind{
 	movToFPSR:            defKindNone,
 	movFromFPSR:          defKindRD,
 	emitSourceOffsetInfo: defKindNone,
+	atomicRmw:            defKindRD,
 }
 
 // Defs returns the list of regalloc.VReg that are defined by the instruction.
@@ -285,6 +286,7 @@ var useKinds = [numInstructionKinds]useKind{
 	movFromFPSR:          useKindNone,
 	adr:                  useKindNone,
 	emitSourceOffsetInfo: useKindNone,
+	atomicRmw:            useKindRNRM,
 }
 
 // Uses returns the list of regalloc.VReg that are used by the instruction.
@@ -1460,6 +1462,18 @@ func (i *instruction) String() (str string) {
 		}
 	case exitSequence:
 		str = fmt.Sprintf("exit_sequence %s", formatVRegSized(i.rn.nr(), 64))
+	case atomicRmw:
+		m := atomicRmwOp(i.u1).String()
+		size := byte(32)
+		switch i.u2 {
+		case 8:
+			size = 64
+		case 2:
+			m = m + "h"
+		case 1:
+			m = m + "b"
+		}
+		str = fmt.Sprintf("%s %s, %s, %s", m, formatVRegSized(i.rm.nr(), size), formatVRegSized(i.rd.nr(), size), formatVRegSized(i.rn.nr(), 64))
 	case udf:
 		str = "udf"
 	case emitSourceOffsetInfo:
@@ -1476,6 +1490,13 @@ func (i *instruction) asAdr(rd regalloc.VReg, offset int64) {
 	i.kind = adr
 	i.rd = operandNR(rd)
 	i.u1 = uint64(offset)
+}
+
+func (i *instruction) asAtomicRmw(op atomicRmwOp, rn, rs, rt operand, size uint64) {
+	i.kind = atomicRmw
+	i.rd, i.rn, i.rm = rt, rn, rs
+	i.u1 = uint64(op)
+	i.u2 = size
 }
 
 // TODO: delete unnecessary things.
@@ -1644,6 +1665,8 @@ const (
 	// exitSequence consists of multiple instructions, and exits the execution immediately.
 	// See encodeExitSequence.
 	exitSequence
+	// atomicRmw represents an atomic read-modify-write operation with two register sources and a register destination.
+	atomicRmw
 	// UDF is the undefined instruction. For debugging only.
 	udf
 
@@ -1719,6 +1742,8 @@ func (a aluOp) String() string {
 		return "sub"
 	case aluOpOrr:
 		return "orr"
+	case aluOpOrn:
+		return "orn"
 	case aluOpAnd:
 		return "and"
 	case aluOpBic:
@@ -1760,6 +1785,8 @@ const (
 	aluOpSub
 	// 32/64-bit Bitwise OR.
 	aluOpOrr
+	// 32/64-bit Bitwise OR NOT.
+	aluOpOrn
 	// 32/64-bit Bitwise AND.
 	aluOpAnd
 	// 32/64-bit Bitwise AND NOT.
@@ -2387,4 +2414,37 @@ func ssaLaneToArrangement(lane ssa.VecLane) vecArrangement {
 	default:
 		panic(lane)
 	}
+}
+
+// atomicRmwOp is the type of atomic read-modify-write operation.
+type atomicRmwOp byte
+
+const (
+	// atomicRmwOpAdd is an atomic add operation.
+	atomicRmwOpAdd atomicRmwOp = iota
+	// atomicRmwOpClr is an atomic clear operation, i.e. AND NOT.
+	atomicRmwOpClr
+	// atomicRmwOpSet is an atomic set operation, i.e. OR.
+	atomicRmwOpSet
+	// atomicRmwOpEor is an atomic exclusive OR operation.
+	atomicRmwOpEor
+	// atomicRmwOpSwp is an atomic swap operation.
+	atomicRmwOpSwp
+)
+
+// String implements fmt.Stringer
+func (a atomicRmwOp) String() string {
+	switch a {
+	case atomicRmwOpAdd:
+		return "ldaddal"
+	case atomicRmwOpClr:
+		return "ldclral"
+	case atomicRmwOpSet:
+		return "ldsetal"
+	case atomicRmwOpEor:
+		return "ldeoral"
+	case atomicRmwOpSwp:
+		return "swpal"
+	}
+	panic(fmt.Sprintf("unknown atomicRmwOp: %d", a))
 }

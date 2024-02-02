@@ -52,6 +52,7 @@ func TestE2E(t *testing.T) {
 		calls       []callCase
 		features    api.CoreFeatures
 		skipAMD64   bool
+		setupMemory func(mem api.Memory)
 	}{
 		{
 			name: "empty", m: testcases.Empty.Module,
@@ -647,6 +648,143 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
+			name:      "atomic_rmw_add",
+			m:         testcases.AtomicRmwAdd.Module,
+			features:  api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
+			skipAMD64: true,
+			calls: []callCase{
+				{params: []uint64{1, 2, 3, 4, 5, 6, 7}, expResults: []uint64{0, 0, 0, 0, 0, 0, 0}},
+				{params: []uint64{1, 2, 3, 4, 5, 6, 7}, expResults: []uint64{1, 2, 3, 4, 5, 6, 7}},
+				{params: []uint64{1, 2, 3, 4, 5, 6, 7}, expResults: []uint64{2, 4, 6, 8, 10, 12, 14}},
+			},
+		},
+		{
+			name:      "atomic_rmw_sub",
+			m:         testcases.AtomicRmwSub.Module,
+			features:  api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
+			skipAMD64: true,
+			calls: []callCase{
+				{params: []uint64{1, 2, 3, 4, 5, 6, 7}, expResults: []uint64{0, 0, 0, 0, 0, 0, 0}},
+				{
+					params: []uint64{1, 2, 3, 4, 5, 6, 7},
+					expResults: []uint64{
+						api.EncodeI32(-1) & 0xff,
+						api.EncodeI32(-2) & 0xffff,
+						api.EncodeI32(-3),
+						api.EncodeI64(-4) & 0xff,
+						api.EncodeI64(-5) & 0xffff,
+						api.EncodeI64(-6) & 0xffffffff,
+						api.EncodeI64(-7),
+					},
+				},
+				{
+					params: []uint64{1, 2, 3, 4, 5, 6, 7},
+					expResults: []uint64{
+						api.EncodeI32(-2) & 0xff,
+						api.EncodeI32(-4) & 0xffff,
+						api.EncodeI32(-6),
+						api.EncodeI64(-8) & 0xff,
+						api.EncodeI64(-10) & 0xffff,
+						api.EncodeI64(-12) & 0xffffffff,
+						api.EncodeI64(-14),
+					},
+				},
+			},
+		},
+		{
+			name:      "atomic_rmw_and",
+			m:         testcases.AtomicRmwAnd.Module,
+			features:  api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
+			skipAMD64: true,
+			setupMemory: func(mem api.Memory) {
+				mem.WriteUint32Le(0, 0xffffffff)
+				mem.WriteUint32Le(8, 0xffffffff)
+				mem.WriteUint32Le(16, 0xffffffff)
+				mem.WriteUint64Le(24, 0xffffffffffffffff)
+				mem.WriteUint64Le(32, 0xffffffffffffffff)
+				mem.WriteUint64Le(40, 0xffffffffffffffff)
+				mem.WriteUint64Le(48, 0xffffffffffffffff)
+			},
+			calls: []callCase{
+				{
+					params:     []uint64{0xfffffffe, 0xfffffffe, 0xfffffffe, 0xfffffffffffffffe, 0xfffffffffffffffe, 0xfffffffffffffffe, 0xfffffffffffffffe},
+					expResults: []uint64{0xff, 0xffff, 0xffffffff, 0xff, 0xffff, 0xffffffff, 0xffffffffffffffff},
+				},
+				{
+					params:     []uint64{0xffffffee, 0xffffffee, 0xffffffee, 0xffffffffffffffee, 0xffffffffffffffee, 0xffffffffffffffee, 0xffffffffffffffee},
+					expResults: []uint64{0xfe, 0xfffe, 0xfffffffe, 0xfe, 0xfffe, 0xfffffffe, 0xfffffffffffffffe},
+				},
+				{
+					params:     []uint64{0xffffffee, 0xffffffee, 0xffffffee, 0xffffffffffffffee, 0xffffffffffffffee, 0xffffffffffffffee, 0xffffffffffffffee},
+					expResults: []uint64{0xee, 0xffee, 0xffffffee, 0xee, 0xffee, 0xffffffee, 0xffffffffffffffee},
+				},
+			},
+		},
+		{
+			name:      "atomic_rmw_or",
+			m:         testcases.AtomicRmwOr.Module,
+			features:  api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
+			skipAMD64: true,
+			calls: []callCase{
+				{
+					params:     []uint64{0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f},
+					expResults: []uint64{0, 0, 0, 0, 0, 0, 0},
+				},
+				{
+					params:     []uint64{0xaf, 0xaf, 0xaf, 0xaf, 0xaf, 0xaf, 0xaf},
+					expResults: []uint64{0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f},
+				},
+				{
+					params:     []uint64{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
+					expResults: []uint64{0xaf, 0xaf, 0xaf, 0xaf, 0xaf, 0xaf, 0xaf},
+				},
+			},
+		},
+		{
+			name:      "atomic_rmw_xor",
+			m:         testcases.AtomicRmwXor.Module,
+			features:  api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
+			skipAMD64: true,
+			calls: []callCase{
+				{
+					params:     []uint64{0, 0, 0, 0, 0, 0, 0},
+					expResults: []uint64{0, 0, 0, 0, 0, 0, 0},
+				},
+				{
+					params:     []uint64{0xffffffff, 0xffffffff, 0xffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff},
+					expResults: []uint64{0, 0, 0, 0, 0, 0, 0},
+				},
+				{
+					params:     []uint64{0xffffffff, 0xffffffff, 0xffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff},
+					expResults: []uint64{0xff, 0xffff, 0xffffffff, 0xff, 0xffff, 0xffffffff, 0xffffffffffffffff},
+				},
+				{
+					params:     []uint64{0xffffffff, 0xffffffff, 0xffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff},
+					expResults: []uint64{0, 0, 0, 0, 0, 0, 0},
+				},
+			},
+		},
+		{
+			name:      "atomic_rmw_xchg",
+			m:         testcases.AtomicRmwXchg.Module,
+			features:  api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
+			skipAMD64: true,
+			calls: []callCase{
+				{
+					params:     []uint64{1, 2, 3, 4, 5, 6, 7},
+					expResults: []uint64{0, 0, 0, 0, 0, 0, 0},
+				},
+				{
+					params:     []uint64{2, 3, 4, 5, 6, 7, 8},
+					expResults: []uint64{1, 2, 3, 4, 5, 6, 7},
+				},
+				{
+					params:     []uint64{2, 3, 4, 5, 6, 7, 8},
+					expResults: []uint64{2, 3, 4, 5, 6, 7, 8},
+				},
+			},
+		},
+		{
 			name: "float_le",
 			m:    testcases.FloatLe.Module,
 			calls: []callCase{
@@ -696,6 +834,10 @@ func TestE2E(t *testing.T) {
 
 					inst, err := r.InstantiateModule(ctx, compiled, wazero.NewModuleConfig())
 					require.NoError(t, err)
+
+					if tc.setupMemory != nil {
+						tc.setupMemory(inst.Memory())
+					}
 
 					for _, cc := range tc.calls {
 						name := cc.funcName

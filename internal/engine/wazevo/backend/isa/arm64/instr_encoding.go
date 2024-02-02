@@ -386,6 +386,14 @@ func (i *instruction) encode(c backend.Compiler) {
 	case movToFPSR:
 		rt := regNumberInEncoding[i.rn.realReg()]
 		c.Emit4Bytes(encodeSystemRegisterMove(rt, false))
+	case atomicRmw:
+		c.Emit4Bytes(encodeAtomicRmw(
+			atomicRmwOp(i.u1),
+			regNumberInEncoding[i.rm.realReg()],
+			regNumberInEncoding[i.rd.realReg()],
+			regNumberInEncoding[i.rn.realReg()],
+			uint32(i.u2),
+		))
 	default:
 		panic(i.String())
 	}
@@ -1608,7 +1616,7 @@ func encodeAluRRR(op aluOp, rd, rn, rm uint32, _64bit, isRnSp bool) uint32 {
 		}
 		// "Shifted register" with shift = 0
 		_31to21 = 0b01101011_000
-	case aluOpAnd, aluOpOrr, aluOpEor:
+	case aluOpAnd, aluOpOrr, aluOpOrn, aluOpEor:
 		// "Logical (shifted register)".
 		var opc, n uint32
 		switch op {
@@ -1616,6 +1624,9 @@ func encodeAluRRR(op aluOp, rd, rn, rm uint32, _64bit, isRnSp bool) uint32 {
 			// all zeros
 		case aluOpOrr:
 			opc = 0b01
+		case aluOpOrn:
+			opc = 0b01
+			n = 1
 		case aluOpEor:
 			opc = 0b10
 		}
@@ -2217,4 +2228,36 @@ func encodeExitSequence(c backend.Compiler, ctxReg regalloc.VReg) {
 func encodeRet() uint32 {
 	// https://developer.arm.com/documentation/ddi0596/2020-12/Base-Instructions/RET--Return-from-subroutine-?lang=en
 	return 0b1101011001011111<<16 | regNumberInEncoding[lr]<<5
+}
+
+func encodeAtomicRmw(op atomicRmwOp, rs, rt, rn uint32, size uint32) uint32 {
+	var _31to21, _15to10, sz uint32
+
+	switch size {
+	case 8:
+		sz = 0b11
+	case 4:
+		sz = 0b10
+	case 2:
+		sz = 0b01
+	case 1:
+		sz = 0b00
+	}
+
+	_31to21 = 0b00111000_111 | sz<<9
+
+	switch op {
+	case atomicRmwOpAdd:
+		_15to10 = 0b000000
+	case atomicRmwOpClr:
+		_15to10 = 0b000100
+	case atomicRmwOpSet:
+		_15to10 = 0b001100
+	case atomicRmwOpEor:
+		_15to10 = 0b001000
+	case atomicRmwOpSwp:
+		_15to10 = 0b100000
+	}
+
+	return _31to21<<21 | rs<<16 | _15to10<<10 | rn<<5 | rt
 }

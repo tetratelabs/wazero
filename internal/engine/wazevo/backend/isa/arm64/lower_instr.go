@@ -709,6 +709,10 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 	case ssa.OpcodeLoadSplat:
 		ptr, offset, lane := instr.LoadSplatData()
 		m.lowerLoadSplat(ptr, offset, lane, instr.Return())
+
+	case ssa.OpcodeAtomicRmw:
+		m.lowerAtomicRmw(instr)
+
 	default:
 		panic("TODO: lowering " + op.String())
 	}
@@ -1981,6 +1985,66 @@ func (m *machine) lowerSelectVec(rc, rn, rm, rd operand) {
 	mov2 := m.allocateInstr()
 	mov2.asFpuMov128(rd.nr(), tmp2.nr())
 	m.insert(mov2)
+}
+
+func (m *machine) lowerAtomicRmw(si *ssa.Instruction) {
+	ssaOp, size := si.AtomicRmwData()
+
+	var op atomicRmwOp
+	var negateArg bool
+	var flipArg bool
+	switch ssaOp {
+	case ssa.AtomicRmwOpAdd:
+		op = atomicRmwOpAdd
+	case ssa.AtomicRmwOpSub:
+		op = atomicRmwOpAdd
+		negateArg = true
+	case ssa.AtomicRmwOpAnd:
+		op = atomicRmwOpClr
+		flipArg = true
+	case ssa.AtomicRmwOpOr:
+		op = atomicRmwOpSet
+	case ssa.AtomicRmwOpXor:
+		op = atomicRmwOpEor
+	case ssa.AtomicRmwOpXchg:
+		op = atomicRmwOpSwp
+	default:
+		panic(fmt.Sprintf("unknown ssa atomic rmw op: %s", ssaOp))
+	}
+
+	addr, val := si.Arg2()
+	addrDef, valDef := m.compiler.ValueDefinition(addr), m.compiler.ValueDefinition(val)
+	rn := m.getOperand_NR(addrDef, extModeNone)
+	rt := operandNR(m.compiler.VRegOf(si.Return()))
+	rs := m.getOperand_NR(valDef, extModeNone)
+
+	_64 := si.Return().Type().Bits() == 64
+	var tmp operand
+	if _64 {
+		tmp = operandNR(m.compiler.AllocateVReg(ssa.TypeI64))
+	} else {
+		tmp = operandNR(m.compiler.AllocateVReg(ssa.TypeI32))
+	}
+	m.lowerAtomicRmwImpl(op, rn, rs, rt, tmp, size, negateArg, flipArg, _64)
+}
+
+func (m *machine) lowerAtomicRmwImpl(op atomicRmwOp, rn, rs, rt, tmp operand, size uint64, negateArg, flipArg, dst64bit bool) {
+	switch {
+	case negateArg:
+		neg := m.allocateInstr()
+		neg.asALU(aluOpSub, tmp, operandNR(xzrVReg), rs, dst64bit)
+		m.insert(neg)
+	case flipArg:
+		flip := m.allocateInstr()
+		flip.asALU(aluOpOrn, tmp, operandNR(xzrVReg), rs, dst64bit)
+		m.insert(flip)
+	default:
+		tmp = rs
+	}
+
+	rmw := m.allocateInstr()
+	rmw.asAtomicRmw(op, rn, tmp, rt, size)
+	m.insert(rmw)
 }
 
 // copyToTmp copies the given regalloc.VReg to a temporary register. This is called before cbr to avoid the regalloc issue

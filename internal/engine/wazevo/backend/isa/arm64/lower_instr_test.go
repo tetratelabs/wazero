@@ -959,3 +959,429 @@ ror x4?, x2?, x1?
 		})
 	}
 }
+
+func TestMachine_lowerAtomicRmw(t *testing.T) {
+	tests := []struct {
+		name      string
+		op        atomicRmwOp
+		negateArg bool
+		flipArg   bool
+		_64bit    bool
+		size      uint64
+		exp       string
+	}{
+		{
+			name: "add 32",
+			op:   atomicRmwOpAdd,
+			size: 4,
+			exp: `
+ldaddal w3?, w4?, x2?
+`,
+		},
+		{
+			name: "add 32_16u",
+			op:   atomicRmwOpAdd,
+			size: 2,
+			exp: `
+ldaddalh w3?, w4?, x2?
+`,
+		},
+		{
+			name: "add 32_8u",
+			op:   atomicRmwOpAdd,
+			size: 1,
+			exp: `
+ldaddalb w3?, w4?, x2?
+`,
+		},
+		{
+			name:   "add 64",
+			op:     atomicRmwOpAdd,
+			size:   8,
+			_64bit: true,
+			exp: `
+ldaddal x3?, x4?, x2?
+`,
+		},
+		{
+			name:   "add 64_32u",
+			op:     atomicRmwOpAdd,
+			size:   4,
+			_64bit: true,
+			exp: `
+ldaddal w3?, w4?, x2?
+`,
+		},
+		{
+			name:   "add 64_16u",
+			op:     atomicRmwOpAdd,
+			size:   2,
+			_64bit: true,
+			exp: `
+ldaddalh w3?, w4?, x2?
+`,
+		},
+		{
+			name:   "add 64_8u",
+			op:     atomicRmwOpAdd,
+			size:   1,
+			_64bit: true,
+			exp: `
+ldaddalb w3?, w4?, x2?
+`,
+		},
+		{
+			name:      "sub 32",
+			op:        atomicRmwOpAdd,
+			negateArg: true,
+			size:      4,
+			exp: `
+sub w1?, wzr, w3?
+ldaddal w1?, w4?, x2?
+`,
+		},
+		{
+			name:      "sub 32_16u",
+			op:        atomicRmwOpAdd,
+			negateArg: true,
+			size:      2,
+			exp: `
+sub w1?, wzr, w3?
+ldaddalh w1?, w4?, x2?
+`,
+		},
+		{
+			name:      "sub 32_8u",
+			op:        atomicRmwOpAdd,
+			negateArg: true,
+			size:      1,
+			exp: `
+sub w1?, wzr, w3?
+ldaddalb w1?, w4?, x2?
+`,
+		},
+		{
+			name:      "sub 64",
+			op:        atomicRmwOpAdd,
+			negateArg: true,
+			size:      8,
+			_64bit:    true,
+			exp: `
+sub x1?, xzr, x3?
+ldaddal x1?, x4?, x2?
+`,
+		},
+		{
+			name:      "sub 64_32u",
+			op:        atomicRmwOpAdd,
+			negateArg: true,
+			size:      4,
+			_64bit:    true,
+			exp: `
+sub x1?, xzr, x3?
+ldaddal w1?, w4?, x2?
+`,
+		},
+		{
+			name:      "sub 64_16u",
+			op:        atomicRmwOpAdd,
+			negateArg: true,
+			size:      2,
+			_64bit:    true,
+			exp: `
+sub x1?, xzr, x3?
+ldaddalh w1?, w4?, x2?
+`,
+		},
+		{
+			name:      "sub 64_8u",
+			op:        atomicRmwOpAdd,
+			negateArg: true,
+			size:      1,
+			_64bit:    true,
+			exp: `
+sub x1?, xzr, x3?
+ldaddalb w1?, w4?, x2?
+`,
+		},
+		{
+			name:    "and 32",
+			op:      atomicRmwOpClr,
+			flipArg: true,
+			size:    4,
+			exp: `
+orn w1?, wzr, w3?
+ldclral w1?, w4?, x2?
+`,
+		},
+		{
+			name:    "and 32_16u",
+			op:      atomicRmwOpClr,
+			flipArg: true,
+			size:    2,
+			exp: `
+orn w1?, wzr, w3?
+ldclralh w1?, w4?, x2?
+`,
+		},
+		{
+			name:    "and 32_8u",
+			op:      atomicRmwOpClr,
+			flipArg: true,
+			size:    1,
+			exp: `
+orn w1?, wzr, w3?
+ldclralb w1?, w4?, x2?
+`,
+		},
+		{
+			name:    "and 64",
+			op:      atomicRmwOpClr,
+			flipArg: true,
+			size:    8,
+			_64bit:  true,
+			exp: `
+orn x1?, xzr, x3?
+ldclral x1?, x4?, x2?
+`,
+		},
+		{
+			name:    "and 64_32u",
+			op:      atomicRmwOpClr,
+			flipArg: true,
+			size:    4,
+			_64bit:  true,
+			exp: `
+orn x1?, xzr, x3?
+ldclral w1?, w4?, x2?
+`,
+		},
+		{
+			name:    "and 64_16u",
+			op:      atomicRmwOpClr,
+			flipArg: true,
+			size:    2,
+			_64bit:  true,
+			exp: `
+orn x1?, xzr, x3?
+ldclralh w1?, w4?, x2?
+`,
+		},
+		{
+			name:    "and 64_8u",
+			op:      atomicRmwOpClr,
+			flipArg: true,
+			size:    1,
+			_64bit:  true,
+			exp: `
+orn x1?, xzr, x3?
+ldclralb w1?, w4?, x2?
+`,
+		},
+		{
+			name: "or 32",
+			op:   atomicRmwOpSet,
+			size: 4,
+			exp: `
+ldsetal w3?, w4?, x2?
+`,
+		},
+		{
+			name: "or 32_16u",
+			op:   atomicRmwOpSet,
+			size: 2,
+			exp: `
+ldsetalh w3?, w4?, x2?
+`,
+		},
+		{
+			name: "or 32_8u",
+			op:   atomicRmwOpSet,
+			size: 1,
+			exp: `
+ldsetalb w3?, w4?, x2?
+`,
+		},
+		{
+			name:   "or 64",
+			op:     atomicRmwOpSet,
+			size:   8,
+			_64bit: true,
+			exp: `
+ldsetal x3?, x4?, x2?
+`,
+		},
+		{
+			name:   "or 64_32u",
+			op:     atomicRmwOpSet,
+			size:   4,
+			_64bit: true,
+			exp: `
+ldsetal w3?, w4?, x2?
+`,
+		},
+		{
+			name:   "or 64_16u",
+			op:     atomicRmwOpSet,
+			size:   2,
+			_64bit: true,
+			exp: `
+ldsetalh w3?, w4?, x2?
+`,
+		},
+		{
+			name:   "or 64_8u",
+			op:     atomicRmwOpSet,
+			size:   1,
+			_64bit: true,
+			exp: `
+ldsetalb w3?, w4?, x2?
+`,
+		},
+		{
+			name: "xor 32",
+			op:   atomicRmwOpEor,
+			size: 4,
+			exp: `
+ldeoral w3?, w4?, x2?
+`,
+		},
+		{
+			name: "xor 32_16u",
+			op:   atomicRmwOpEor,
+			size: 2,
+			exp: `
+ldeoralh w3?, w4?, x2?
+`,
+		},
+		{
+			name: "xor 32_8u",
+			op:   atomicRmwOpEor,
+			size: 1,
+			exp: `
+ldeoralb w3?, w4?, x2?
+`,
+		},
+		{
+			name:   "xor 64",
+			op:     atomicRmwOpEor,
+			size:   8,
+			_64bit: true,
+			exp: `
+ldeoral x3?, x4?, x2?
+`,
+		},
+		{
+			name:   "xor 64_32u",
+			op:     atomicRmwOpEor,
+			size:   4,
+			_64bit: true,
+			exp: `
+ldeoral w3?, w4?, x2?
+`,
+		},
+		{
+			name:   "xor 64_16u",
+			op:     atomicRmwOpEor,
+			size:   2,
+			_64bit: true,
+			exp: `
+ldeoralh w3?, w4?, x2?
+`,
+		},
+		{
+			name:   "xor 64_8u",
+			op:     atomicRmwOpEor,
+			size:   1,
+			_64bit: true,
+			exp: `
+ldeoralb w3?, w4?, x2?
+`,
+		},
+		{
+			name: "xchg 32",
+			op:   atomicRmwOpSwp,
+			size: 4,
+			exp: `
+swpal w3?, w4?, x2?
+`,
+		},
+		{
+			name: "xchg 32_16u",
+			op:   atomicRmwOpSwp,
+			size: 2,
+			exp: `
+swpalh w3?, w4?, x2?
+`,
+		},
+		{
+			name: "xchg 32_8u",
+			op:   atomicRmwOpSwp,
+			size: 1,
+			exp: `
+swpalb w3?, w4?, x2?
+`,
+		},
+		{
+			name:   "xchg 64",
+			op:     atomicRmwOpSwp,
+			size:   8,
+			_64bit: true,
+			exp: `
+swpal x3?, x4?, x2?
+`,
+		},
+		{
+			name:   "xchg 64_32u",
+			op:     atomicRmwOpSwp,
+			size:   4,
+			_64bit: true,
+			exp: `
+swpal w3?, w4?, x2?
+`,
+		},
+		{
+			name:   "xchg 64_16u",
+			op:     atomicRmwOpSwp,
+			size:   2,
+			_64bit: true,
+			exp: `
+swpalh w3?, w4?, x2?
+`,
+		},
+		{
+			name:   "xchg 64_8u",
+			op:     atomicRmwOpSwp,
+			size:   1,
+			_64bit: true,
+			exp: `
+swpalb w3?, w4?, x2?
+`,
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			_, _, m := newSetupWithMockContext()
+			var typ ssa.Type
+			if tc._64bit {
+				typ = ssa.TypeI64
+			} else {
+				typ = ssa.TypeI32
+			}
+			tmp := operandNR(m.compiler.AllocateVReg(typ))
+			rn := operandNR(m.compiler.AllocateVReg(ssa.TypeI64))
+			rs := operandNR(m.compiler.AllocateVReg(typ))
+			rt := operandNR(m.compiler.AllocateVReg(typ))
+
+			require.Equal(t, 1, int(tmp.reg().ID()))
+			require.Equal(t, 2, int(rn.reg().ID()))
+			require.Equal(t, 3, int(rs.reg().ID()))
+			require.Equal(t, 4, int(rt.reg().ID()))
+
+			m.lowerAtomicRmwImpl(tc.op, rn, rs, rt, tmp, tc.size, tc.negateArg, tc.flipArg, tc._64bit)
+			require.Equal(t, tc.exp, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
+		})
+	}
+}

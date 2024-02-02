@@ -1971,6 +1971,11 @@ func (i *Instruction) AsAtomicRmw(op AtomicRmwOp, addr, val Value, size uint64) 
 	return i
 }
 
+// AtomicRmwData returns the data for this atomic read-modify-write instruction.
+func (i *Instruction) AtomicRmwData() (op AtomicRmwOp, size uint64) {
+	return AtomicRmwOp(i.u1), i.u2
+}
+
 // ReturnVals returns the return values of OpcodeReturn.
 func (i *Instruction) ReturnVals() []Value {
 	return i.vs
