@@ -654,17 +654,17 @@ const (
 type AtomicRmwOp byte
 
 const (
-	// Add
+	// AtomicRmwOpAdd is an atomic add operation.
 	AtomicRmwOpAdd AtomicRmwOp = iota
-	// Sub
+	// AtomicRmwOpSub is an atomic sub operation.
 	AtomicRmwOpSub
-	// And
+	// AtomicRmwOpAnd is an atomic and operation.
 	AtomicRmwOpAnd
-	// Or
+	// AtomicRmwOpOr is an atomic or operation.
 	AtomicRmwOpOr
-	// Xor
+	// AtomicRmwOpXor is an atomic xor operation.
 	AtomicRmwOpXor
-	// Exchange
+	// AtomicRmwOpXchg is an atomic swap operation.
 	AtomicRmwOpXchg
 )
 
