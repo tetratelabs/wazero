@@ -44,6 +44,7 @@ func require_no_diff(binaryPtr uintptr, binarySize int, watPtr uintptr, watSize 
 		}
 	}()
 
+	saveFailedBinary(wasmBin, wat, "TestReRunFailedRequireNoDiffCase")
 	requireNoDiff(wasmBin, checkMemory, func(err error) {
 		if err != nil {
 			panic(err)
