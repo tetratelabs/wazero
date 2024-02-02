@@ -954,6 +954,12 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 		switch sseOpcode(i.u1) {
 		case sseOpcodeMovd, sseOpcodeMovq:
 			legPrefix, opcode, argSwap = legacyPrefixes0x66, 0x0f7e, false
+		case sseOpcodeMovmskps:
+			legPrefix, opcode, argSwap = legacyPrefixesNone, 0x0f50, true
+		case sseOpcodeMovmskpd:
+			legPrefix, opcode, argSwap = legacyPrefixes0x66, 0x0f50, true
+		case sseOpcodePmovmskb:
+			legPrefix, opcode, argSwap = legacyPrefixes0x66, 0x0fd7, true
 		case sseOpcodeCvttss2si:
 			legPrefix, opcode, argSwap = legacyPrefixes0xF3, 0x0f2c, true
 		case sseOpcodeCvttsd2si:

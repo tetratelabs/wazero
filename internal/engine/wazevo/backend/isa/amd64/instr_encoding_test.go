@@ -1434,6 +1434,36 @@ func TestInstruction_format_encode(t *testing.T) {
 			wantFormat: "cvttsd2si %xmm0, %edi",
 		},
 		{
+			setup:      func(i *instruction) { i.asXmmToGpr(sseOpcodeMovmskps, xmm1VReg, xmm0VReg, true) },
+			want:       "480f50c1",
+			wantFormat: "movmskps %xmm1, %xmm0",
+		},
+		{
+			setup:      func(i *instruction) { i.asXmmToGpr(sseOpcodeMovmskpd, xmm1VReg, xmm0VReg, true) },
+			want:       "66480f50c1",
+			wantFormat: "movmskpd %xmm1, %xmm0",
+		},
+		{
+			setup:      func(i *instruction) { i.asXmmToGpr(sseOpcodePmovmskb, xmm1VReg, xmm0VReg, true) },
+			want:       "66480fd7c1",
+			wantFormat: "pmovmskb %xmm1, %xmm0",
+		},
+		{
+			setup:      func(i *instruction) { i.asXmmToGpr(sseOpcodeMovmskps, xmm1VReg, xmm0VReg, false) },
+			want:       "0f50c1",
+			wantFormat: "movmskps %xmm1, %xmm0",
+		},
+		{
+			setup:      func(i *instruction) { i.asXmmToGpr(sseOpcodeMovmskpd, xmm1VReg, xmm0VReg, false) },
+			want:       "660f50c1",
+			wantFormat: "movmskpd %xmm1, %xmm0",
+		},
+		{
+			setup:      func(i *instruction) { i.asXmmToGpr(sseOpcodePmovmskb, xmm1VReg, xmm0VReg, false) },
+			want:       "660fd7c1",
+			wantFormat: "pmovmskb %xmm1, %xmm0",
+		},
+		{
 			setup:      func(i *instruction) { i.asPop64(raxVReg) },
 			want:       "58",
 			wantFormat: "popq %rax",
