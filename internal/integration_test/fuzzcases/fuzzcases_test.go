@@ -905,3 +905,16 @@ func Test2007(t *testing.T) {
 		require.Contains(t, err.Error(), "integer overflow")
 	})
 }
+
+func Test2008(t *testing.T) {
+	if !platform.CompilerSupported() {
+		return
+	}
+	run(t, func(t *testing.T, r wazero.Runtime) {
+		mod, err := r.Instantiate(ctx, getWasmBinary(t, "2008"))
+		require.NoError(t, err)
+		_, err = mod.ExportedFunction("").Call(ctx)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "unreachable")
+	})
+}

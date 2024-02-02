@@ -646,22 +646,22 @@ func (m *machine) lowerCtz(instr *ssa.Instruction) {
 		_64 := x.Type().Bits() == 64
 
 		xDef := m.c.ValueDefinition(x)
+		tmp := m.c.AllocateVReg(x.Type())
 		rm := m.getOperand_Reg(xDef)
-		rd := m.c.VRegOf(instr.Return())
 
 		// First, we have to check if the target is non-zero.
 		test := m.allocateInstr()
 		test.asCmpRmiR(false, rm, rm.r, _64)
 		m.insert(test)
 
-		jmpNz := m.allocateInstr() // Will backpatch the operands later.
+		jmpNz := m.allocateInstr()
 		m.insert(jmpNz)
 
 		// If the value is zero, we just push the const value.
-		m.lowerIconst(rd, uint64(x.Type().Bits()), _64)
+		m.lowerIconst(tmp, uint64(x.Type().Bits()), _64)
 
 		// Now jump right after the non-zero case.
-		jmpAtEnd := m.allocateInstr() // Will backpatch later.
+		jmpAtEnd := m.allocateInstr()
 		m.insert(jmpAtEnd)
 
 		// jmpNz target label is set here.
@@ -671,13 +671,15 @@ func (m *machine) lowerCtz(instr *ssa.Instruction) {
 
 		// Emit the non-zero case.
 		bsr := m.allocateInstr()
-		bsr.asUnaryRmR(unaryRmROpcodeBsf, rm, rd, _64)
+		bsr.asUnaryRmR(unaryRmROpcodeBsf, rm, tmp, _64)
 		m.insert(bsr)
 
 		// jmpAtEnd target label is set here.
 		nopEnd, end := m.allocateBrTarget()
 		jmpAtEnd.asJmp(newOperandLabel(end))
 		m.insert(nopEnd)
+
+		m.copyTo(tmp, m.c.VRegOf(instr.Return()))
 	}
 }
 
@@ -698,7 +700,7 @@ func (m *machine) lowerClz(instr *ssa.Instruction) {
 
 		xDef := m.c.ValueDefinition(x)
 		rm := m.getOperand_Reg(xDef)
-		rd := m.c.VRegOf(instr.Return())
+		tmp := m.c.AllocateVReg(x.Type())
 
 		// First, we have to check if the rm is non-zero as BSR is undefined
 		// on zero. See https://www.felixcloutier.com/x86/bsr.
@@ -706,14 +708,14 @@ func (m *machine) lowerClz(instr *ssa.Instruction) {
 		test.asCmpRmiR(false, rm, rm.r, _64)
 		m.insert(test)
 
-		jmpNz := m.allocateInstr() // Will backpatch later.
+		jmpNz := m.allocateInstr()
 		m.insert(jmpNz)
 
 		// If the value is zero, we just push the const value.
-		m.lowerIconst(rd, uint64(x.Type().Bits()), _64)
+		m.lowerIconst(tmp, uint64(x.Type().Bits()), _64)
 
 		// Now jump right after the non-zero case.
-		jmpAtEnd := m.allocateInstr() // Will backpatch later.
+		jmpAtEnd := m.allocateInstr()
 		m.insert(jmpAtEnd)
 
 		// jmpNz target label is set here.
@@ -722,7 +724,6 @@ func (m *machine) lowerClz(instr *ssa.Instruction) {
 		m.insert(nop)
 
 		// Emit the non-zero case.
-		tmp := m.c.VRegOf(instr.Return())
 		bsr := m.allocateInstr()
 		bsr.asUnaryRmR(unaryRmROpcodeBsr, rm, tmp, _64)
 		m.insert(bsr)
@@ -736,6 +737,8 @@ func (m *machine) lowerClz(instr *ssa.Instruction) {
 		nopEnd, end := m.allocateBrTarget()
 		jmpAtEnd.asJmp(newOperandLabel(end))
 		m.insert(nopEnd)
+
+		m.copyTo(tmp, m.c.VRegOf(instr.Return()))
 	}
 }
 
