@@ -1360,6 +1360,11 @@ func TestInstruction_format_encode(t *testing.T) {
 			wantFormat: "cvtsi2ss %rdi, %xmm0",
 		},
 		{
+			setup:      func(i *instruction) { i.asGprToXmm(sseOpcodeCvtsi2ss, newOperandReg(rdiVReg), xmm0VReg, false) },
+			want:       "f30f2ac7",
+			wantFormat: "cvtsi2ss %edi, %xmm0",
+		},
+		{
 			setup: func(i *instruction) {
 				i.asGprToXmm(sseOpcodeCvtsi2ss, newOperandMem(newAmodeImmReg(0, rspVReg)), xmm0VReg, true)
 			},
@@ -1372,6 +1377,13 @@ func TestInstruction_format_encode(t *testing.T) {
 			},
 			want:       "f3480f2a44247b",
 			wantFormat: "cvtsi2ss 123(%rsp), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asGprToXmm(sseOpcodeCvtsi2ss, newOperandMem(newAmodeImmReg(123, rspVReg)), xmm15VReg, false)
+			},
+			want:       "f3440f2a7c247b",
+			wantFormat: "cvtsi2ss 123(%rsp), %xmm15",
 		},
 		{
 			setup: func(i *instruction) {
