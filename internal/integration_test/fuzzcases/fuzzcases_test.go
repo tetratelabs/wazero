@@ -838,8 +838,9 @@ func Test1999(t *testing.T) {
 	run(t, func(t *testing.T, r wazero.Runtime) {
 		mod, err := r.Instantiate(ctx, getWasmBinary(t, "1999"))
 		require.NoError(t, err)
-		_, err = mod.ExportedFunction("").Call(ctx)
+		_, err = mod.ExportedFunction("").Call(ctx, 0)
 		require.Error(t, err)
+		require.Contains(t, err.Error(), "unreachable")
 	})
 }
 
@@ -850,8 +851,8 @@ func Test2000a(t *testing.T) {
 	run(t, func(t *testing.T, r wazero.Runtime) {
 		mod, err := r.Instantiate(ctx, getWasmBinary(t, "2000a"))
 		require.NoError(t, err)
-		_, err = mod.ExportedFunction("").Call(ctx)
-		require.Error(t, err)
+		_, err = mod.ExportedFunction("").Call(ctx, 0)
+		require.NoError(t, err)
 	})
 }
 
@@ -864,6 +865,7 @@ func Test2000b(t *testing.T) {
 		require.NoError(t, err)
 		_, err = mod.ExportedFunction("").Call(ctx)
 		require.Error(t, err)
+		require.Contains(t, err.Error(), "integer overflow")
 	})
 }
 
@@ -888,5 +890,18 @@ func Test2006(t *testing.T) {
 		require.NoError(t, err)
 		_, err = mod.ExportedFunction("").Call(ctx, 0)
 		require.NoError(t, err)
+	})
+}
+
+func Test2007(t *testing.T) {
+	if !platform.CompilerSupported() {
+		return
+	}
+	run(t, func(t *testing.T, r wazero.Runtime) {
+		mod, err := r.Instantiate(ctx, getWasmBinary(t, "2007"))
+		require.NoError(t, err)
+		_, err = mod.ExportedFunction("").Call(ctx)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "integer overflow")
 	})
 }

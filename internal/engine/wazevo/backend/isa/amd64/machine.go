@@ -568,9 +568,9 @@ func (m *machine) lowerExtend(_arg, ret ssa.Value, from, to byte, signed bool) {
 	case from == 8 && to == 16 && signed:
 		ext.asMovsxRmR(extModeBQ, arg, rd)
 	case from == 8 && to == 16 && !signed:
-		ext.asMovzxRmR(extModeBQ, arg, rd)
+		ext.asMovzxRmR(extModeBL, arg, rd)
 	case from == 8 && to == 32 && signed:
-		ext.asMovsxRmR(extModeBQ, arg, rd)
+		ext.asMovsxRmR(extModeBL, arg, rd)
 	case from == 8 && to == 32 && !signed:
 		ext.asMovzxRmR(extModeBQ, arg, rd)
 	case from == 8 && to == 64 && signed:
@@ -578,9 +578,9 @@ func (m *machine) lowerExtend(_arg, ret ssa.Value, from, to byte, signed bool) {
 	case from == 8 && to == 64 && !signed:
 		ext.asMovzxRmR(extModeBQ, arg, rd)
 	case from == 16 && to == 32 && signed:
-		ext.asMovsxRmR(extModeWQ, arg, rd)
+		ext.asMovsxRmR(extModeWL, arg, rd)
 	case from == 16 && to == 32 && !signed:
-		ext.asMovzxRmR(extModeWQ, arg, rd)
+		ext.asMovzxRmR(extModeWL, arg, rd)
 	case from == 16 && to == 64 && signed:
 		ext.asMovsxRmR(extModeWQ, arg, rd)
 	case from == 16 && to == 64 && !signed:
