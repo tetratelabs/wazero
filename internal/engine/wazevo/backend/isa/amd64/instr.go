@@ -251,12 +251,13 @@ func (i *instruction) String() string {
 			formatVRegSized(tmpGp2, true),
 			formatVRegSized(tmpXmm, true), sat)
 	case fcvtToUintSequence:
-		subOp, cmpOp, truncOp, execCtx, src, dst, tmpGp, tmpXmm, tmpXmm2, _, dst64, sat := i.fcvtToUintSequenceData()
+		subOp, cmpOp, truncOp, execCtx, src, dst, tmpGp, tmpGp2, tmpXmm, tmpXmm2, _, dst64, sat := i.fcvtToUintSequenceData()
 		return fmt.Sprintf(
-			"fcvtToUintSequence %s, %s, %s, execCtx=%s, src=%s, dst=%s, tmpGp=%s, tmpXmm=%s, tmpXmm2=%s, sat=%v",
+			"fcvtToUintSequence %s, %s, %s, execCtx=%s, src=%s, dst=%s, tmpGp=%s, tmpGp2=%s, tmpXmm=%s, tmpXmm2=%s, sat=%v",
 			subOp, cmpOp, truncOp, formatVRegSized(execCtx, true),
 			formatVRegSized(src, true), formatVRegSized(dst, dst64),
 			formatVRegSized(tmpGp, true),
+			formatVRegSized(tmpGp2, true),
 			formatVRegSized(tmpXmm, true),
 			formatVRegSized(tmpXmm2, true), sat)
 
@@ -287,7 +288,7 @@ func (i *instruction) Defs(regs *[]regalloc.VReg) []regalloc.VReg {
 		_, _, _, _, dst, _, _, _, _, _, _ := i.fcvtToSintSequenceData()
 		*regs = append(*regs, dst)
 	case defKindFcvtToUintSequence:
-		_, _, _, _, _, dst, _, _, _, _, _, _ := i.fcvtToUintSequenceData()
+		_, _, _, _, _, dst, _, _, _, _, _, _, _ := i.fcvtToUintSequenceData()
 		*regs = append(*regs, dst)
 	default:
 		panic(fmt.Sprintf("BUG: invalid defKind \"%s\" for %s", dk, i))
@@ -362,8 +363,8 @@ func (i *instruction) Uses(regs *[]regalloc.VReg) []regalloc.VReg {
 		_, _, execCtx, src, _, tmpGp, tmpGp2, tmpXmm, _, _, _ := i.fcvtToSintSequenceData()
 		*regs = append(*regs, execCtx, src, tmpGp, tmpGp2, tmpXmm)
 	case useKindFcvtToUintSequence:
-		_, _, _, execCtx, src, _, tmpGp, tmpXmm, tmpXmm2, _, _, _ := i.fcvtToUintSequenceData()
-		*regs = append(*regs, execCtx, src, tmpGp, tmpXmm, tmpXmm2)
+		_, _, _, execCtx, src, _, tmpGp, tmpGp2, tmpXmm, tmpXmm2, _, _, _ := i.fcvtToUintSequenceData()
+		*regs = append(*regs, execCtx, src, tmpGp, tmpGp2, tmpXmm, tmpXmm2)
 	default:
 		panic(fmt.Sprintf("BUG: invalid useKind %s for %s", uk, i))
 	}
@@ -473,7 +474,7 @@ func (i *instruction) AssignUse(index int, v regalloc.VReg) {
 		if index != 0 {
 			panic("BUG")
 		}
-	case useKindFcvtToSintSequence, useKindFcvtToUintSequence:
+	case useKindFcvtToSintSequence:
 		switch index {
 		case 0:
 			i.op1.amode.base = v
@@ -484,6 +485,23 @@ func (i *instruction) AssignUse(index int, v regalloc.VReg) {
 		case 3:
 			i.op2.amode.index = v
 		case 4:
+			i.op2.r = v
+		default:
+			panic("BUG")
+		}
+	case useKindFcvtToUintSequence:
+		switch index {
+		case 0:
+			i.op1.amode.base = v
+		case 1:
+			i.op1.amode.index = v
+		case 2:
+			i.op2.amode.base = v
+		case 3:
+			i.u2 = uint64(v)
+		case 4:
+			i.op2.amode.index = v
+		case 5:
 			i.op2.r = v
 		default:
 			panic("BUG")
@@ -746,7 +764,7 @@ func (i *instruction) asDefineUninitializedReg(r regalloc.VReg) *instruction {
 
 func (i *instruction) asFcvtToUintSequence(
 	subOp, cmpOp, truncOp sseOpcode,
-	execCtx, src, dst, tmpGp, tmpXmm, tmpXmm2 regalloc.VReg,
+	execCtx, src, dst, tmpGp, tmpGp2, tmpXmm, tmpXmm2 regalloc.VReg,
 	src64, dst64, sat bool,
 ) *instruction {
 	i.u1 = uint64(subOp) | uint64(cmpOp)<<8 | uint64(truncOp)<<16
@@ -757,6 +775,7 @@ func (i *instruction) asFcvtToUintSequence(
 	i.op2.amode.base = tmpGp
 	i.op2.amode.index = tmpXmm
 	i.op2.r = tmpXmm2
+	i.u2 = uint64(tmpGp2)
 	i.b1 = src64
 	i.b2 = dst64
 	i.b3 = sat
@@ -764,13 +783,13 @@ func (i *instruction) asFcvtToUintSequence(
 }
 
 func (i *instruction) fcvtToUintSequenceData() (
-	subOp, cmpOp, truncOp sseOpcode, execCtx, src, dst, tmpGp, tmpXmm, tmpXmm2 regalloc.VReg, src64, dst64, sat bool,
+	subOp, cmpOp, truncOp sseOpcode, execCtx, src, dst, tmpGp, tmpGp2, tmpXmm, tmpXmm2 regalloc.VReg, src64, dst64, sat bool,
 ) {
 	if i.kind != fcvtToUintSequence {
 		panic("BUG")
 	}
 	return sseOpcode(i.u1), sseOpcode(i.u1 >> 8), sseOpcode(i.u1 >> 16), i.op1.amode.base, i.op1.amode.index,
-		i.op1.r, i.op2.amode.base, i.op2.amode.index, i.op2.r, i.b1, i.b2, i.b3
+		i.op1.r, i.op2.amode.base, regalloc.VReg(i.u2), i.op2.amode.index, i.op2.r, i.b1, i.b2, i.b3
 }
 
 func (i *instruction) asFcvtToSintSequence(

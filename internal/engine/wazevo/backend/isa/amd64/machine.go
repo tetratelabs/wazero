@@ -1939,16 +1939,17 @@ func (m *machine) lowerFcvtToUint(ctxVReg, rn, rd regalloc.VReg, src64, dst64, s
 	tmpXmm, tmpXmm2 := m.c.AllocateVReg(ssa.TypeF64), m.c.AllocateVReg(ssa.TypeF64)
 	m.insert(m.allocateInstr().asDefineUninitializedReg(tmpXmm))
 	m.insert(m.allocateInstr().asDefineUninitializedReg(tmpXmm2))
-	tmpGp := m.c.AllocateVReg(ssa.TypeI64)
+	tmpGp, tmpGp2 := m.c.AllocateVReg(ssa.TypeI64), m.c.AllocateVReg(ssa.TypeI64)
 	m.insert(m.allocateInstr().asDefineUninitializedReg(tmpGp))
+	m.insert(m.allocateInstr().asDefineUninitializedReg(tmpGp2))
 
 	m.insert(m.allocateInstr().asFcvtToUintSequence(
-		subOp, cmpOp, truncOp, ctxVReg, rn, rd, tmpGp, tmpXmm, tmpXmm2, src64, dst64, sat,
+		subOp, cmpOp, truncOp, ctxVReg, rn, rd, tmpGp, tmpGp2, tmpXmm, tmpXmm2, src64, dst64, sat,
 	))
 }
 
 func (m *machine) lowerFcvtToUintSequenceAfterRegalloc(i *instruction) {
-	subOp, cmpOp, truncOp, execCtx, src, dst, tmpGp, tmpXmm, tmpXmm2, src64, dst64, sat := i.fcvtToUintSequenceData()
+	subOp, cmpOp, truncOp, execCtx, src, dst, tmpGp, tmpGp2, tmpXmm, tmpXmm2, src64, dst64, sat := i.fcvtToUintSequenceData()
 
 	doneTarget, done := m.allocateBrTarget()
 
@@ -2084,8 +2085,8 @@ func (m *machine) lowerFcvtToUintSequenceAfterRegalloc(i *instruction) {
 
 	var op operand
 	if dst64 {
-		m.lowerIconst(dst, 0x8000000000000000, true)
-		op = newOperandReg(dst)
+		m.lowerIconst(tmpGp2, 0x8000000000000000, true)
+		op = newOperandReg(tmpGp2)
 	} else {
 		op = newOperandImm32(0x80000000)
 	}
