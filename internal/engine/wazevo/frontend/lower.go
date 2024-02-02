@@ -3216,6 +3216,63 @@ func (c *Compiler) lowerCurrentOpcode() {
 				AsCallIndirect(memoryNotifyPtr, &c.memoryNotifySig, args).
 				Insert(builder).Return()
 			state.push(memoryNotifyRet)
+		case wasm.OpcodeAtomicI32Load, wasm.OpcodeAtomicI64Load, wasm.OpcodeAtomicI32Load8U, wasm.OpcodeAtomicI32Load16U, wasm.OpcodeAtomicI64Load8U, wasm.OpcodeAtomicI64Load16U, wasm.OpcodeAtomicI64Load32U:
+			_, offset := c.readMemArg()
+			if state.unreachable {
+				break
+			}
+
+			baseAddr := state.pop()
+
+			var size uint64
+			switch atomicOp {
+			case wasm.OpcodeAtomicI64Load:
+				size = 8
+			case wasm.OpcodeAtomicI32Load, wasm.OpcodeAtomicI64Load32U:
+				size = 4
+			case wasm.OpcodeAtomicI32Load16U, wasm.OpcodeAtomicI64Load16U:
+				size = 2
+			case wasm.OpcodeAtomicI32Load8U, wasm.OpcodeAtomicI64Load8U:
+				size = 1
+			}
+
+			var typ ssa.Type
+			switch atomicOp {
+			case wasm.OpcodeAtomicI64Load, wasm.OpcodeAtomicI64Load32U, wasm.OpcodeAtomicI64Load16U, wasm.OpcodeAtomicI64Load8U:
+				typ = ssa.TypeI64
+			case wasm.OpcodeAtomicI32Load, wasm.OpcodeAtomicI32Load16U, wasm.OpcodeAtomicI32Load8U:
+				typ = ssa.TypeI32
+			}
+
+			addr := c.memOpSetup(baseAddr, uint64(offset), size)
+			c.memAlignmentCheck(addr, size)
+			res := builder.AllocateInstruction().AsAtomicLoad(addr, size, typ).Insert(builder).Return()
+			state.push(res)
+		case wasm.OpcodeAtomicI32Store, wasm.OpcodeAtomicI64Store, wasm.OpcodeAtomicI32Store8, wasm.OpcodeAtomicI32Store16, wasm.OpcodeAtomicI64Store8, wasm.OpcodeAtomicI64Store16, wasm.OpcodeAtomicI64Store32:
+			_, offset := c.readMemArg()
+			if state.unreachable {
+				break
+			}
+
+			val := state.pop()
+			baseAddr := state.pop()
+
+			var size uint64
+			switch atomicOp {
+			case wasm.OpcodeAtomicI64Store:
+				size = 8
+			case wasm.OpcodeAtomicI32Store, wasm.OpcodeAtomicI64Store32:
+				size = 4
+			case wasm.OpcodeAtomicI32Store16, wasm.OpcodeAtomicI64Store16:
+				size = 2
+			case wasm.OpcodeAtomicI32Store8, wasm.OpcodeAtomicI64Store8:
+				size = 1
+			}
+
+			addr := c.memOpSetup(baseAddr, uint64(offset), size)
+			c.memAlignmentCheck(addr, size)
+			res := builder.AllocateInstruction().AsAtomicStore(addr, val, size).Insert(builder).Return()
+			state.push(res)
 		case wasm.OpcodeAtomicI32RmwAdd, wasm.OpcodeAtomicI64RmwAdd, wasm.OpcodeAtomicI32Rmw8AddU, wasm.OpcodeAtomicI32Rmw16AddU, wasm.OpcodeAtomicI64Rmw8AddU, wasm.OpcodeAtomicI64Rmw16AddU, wasm.OpcodeAtomicI64Rmw32AddU,
 			wasm.OpcodeAtomicI32RmwSub, wasm.OpcodeAtomicI64RmwSub, wasm.OpcodeAtomicI32Rmw8SubU, wasm.OpcodeAtomicI32Rmw16SubU, wasm.OpcodeAtomicI64Rmw8SubU, wasm.OpcodeAtomicI64Rmw16SubU, wasm.OpcodeAtomicI64Rmw32SubU,
 			wasm.OpcodeAtomicI32RmwAnd, wasm.OpcodeAtomicI64RmwAnd, wasm.OpcodeAtomicI32Rmw8AndU, wasm.OpcodeAtomicI32Rmw16AndU, wasm.OpcodeAtomicI64Rmw8AndU, wasm.OpcodeAtomicI64Rmw16AndU, wasm.OpcodeAtomicI64Rmw32AndU,
