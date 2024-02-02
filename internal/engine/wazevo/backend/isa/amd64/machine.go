@@ -447,11 +447,13 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		case ssa.VecLaneI16x8:
 			vecOp = sseOpcodePaddsw
 		}
+		tmp := m.copyToTmp(rn.r)
 
-		m.copyTo(rn.r, rd)
 		i := m.allocateInstr()
-		i.asXmmRmR(vecOp, rm, rd)
+		i.asXmmRmR(vecOp, rm, tmp)
 		m.insert(i)
+
+		m.copyTo(tmp, rd)
 	case ssa.OpcodeVUaddSat:
 		x, y, lane := instr.Arg2WithLane()
 		rm := m.getOperand_Reg(m.c.ValueDefinition(x))
@@ -465,11 +467,13 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		case ssa.VecLaneI16x8:
 			vecOp = sseOpcodePaddusw
 		}
+		tmp := m.copyToTmp(rn.r)
 
-		m.copyTo(rn.r, rd)
 		i := m.allocateInstr()
-		i.asXmmRmR(vecOp, rm, rd)
+		i.asXmmRmR(vecOp, rm, tmp)
 		m.insert(i)
+
+		m.copyTo(tmp, rd)
 	case ssa.OpcodeVIsub:
 		x, y, lane := instr.Arg2WithLane()
 		rm := m.getOperand_Reg(m.c.ValueDefinition(x))
@@ -487,10 +491,13 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		case ssa.VecLaneI64x2:
 			vecOp = sseOpcodePsubq
 		}
-		m.copyTo(rm.r, rd)
+		tmp := m.copyToTmp(rm.r)
+
 		i := m.allocateInstr()
-		i.asXmmRmR(vecOp, rn, rd)
+		i.asXmmRmR(vecOp, rn, tmp)
 		m.insert(i)
+
+		m.copyTo(tmp, rd)
 	case ssa.OpcodeVSsubSat:
 		x, y, lane := instr.Arg2WithLane()
 		rm := m.getOperand_Reg(m.c.ValueDefinition(x))
@@ -504,11 +511,13 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		case ssa.VecLaneI16x8:
 			vecOp = sseOpcodePsubsw
 		}
+		tmp := m.copyToTmp(rm.r)
 
-		m.copyTo(rm.r, rd)
 		i := m.allocateInstr()
-		i.asXmmRmR(vecOp, rn, rd)
+		i.asXmmRmR(vecOp, rn, tmp)
 		m.insert(i)
+
+		m.copyTo(tmp, rd)
 	case ssa.OpcodeVUsubSat:
 		x, y, lane := instr.Arg2WithLane()
 		rm := m.getOperand_Reg(m.c.ValueDefinition(x))
@@ -522,11 +531,13 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		case ssa.VecLaneI16x8:
 			vecOp = sseOpcodePsubusw
 		}
+		tmp := m.copyToTmp(rm.r)
 
-		m.copyTo(rm.r, rd)
 		i := m.allocateInstr()
-		i.asXmmRmR(vecOp, rn, rd)
+		i.asXmmRmR(vecOp, rn, tmp)
 		m.insert(i)
+
+		m.copyTo(tmp, rd)
 	case ssa.OpcodeVImul:
 		m.lowerVImul(instr)
 	case ssa.OpcodeVIneg:
@@ -544,13 +555,17 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		case ssa.VecLaneI64x2:
 			vecOp = sseOpcodePsubq
 		}
+		tmp := m.c.AllocateVReg(ssa.TypeV128)
+
 		zero := m.allocateInstr()
-		zero.asZeros(rd)
+		zero.asZeros(tmp)
 		m.insert(zero)
 
 		i := m.allocateInstr()
-		i.asXmmRmR(vecOp, rm, rd)
+		i.asXmmRmR(vecOp, rm, tmp)
 		m.insert(i)
+
+		m.copyTo(tmp, rd)
 	case ssa.OpcodeVFadd:
 		x, y, lane := instr.Arg2WithLane()
 		rm := m.getOperand_Reg(m.c.ValueDefinition(x))
@@ -564,10 +579,12 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		case ssa.VecLaneF64x2:
 			vecOp = sseOpcodeAddpd
 		}
-		m.copyTo(rn.r, rd)
+		tmp := m.copyToTmp(rn.r)
 		i := m.allocateInstr()
-		i.asXmmRmR(vecOp, rm, rd)
+		i.asXmmRmR(vecOp, rm, tmp)
 		m.insert(i)
+
+		m.copyTo(tmp, rd)
 	case ssa.OpcodeVFsub:
 		x, y, lane := instr.Arg2WithLane()
 		rm := m.getOperand_Reg(m.c.ValueDefinition(x))
@@ -581,10 +598,12 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		case ssa.VecLaneF64x2:
 			vecOp = sseOpcodeSubpd
 		}
-		m.copyTo(rm.r, rd)
+		tmp := m.copyToTmp(rm.r)
 		i := m.allocateInstr()
-		i.asXmmRmR(vecOp, rn, rd)
+		i.asXmmRmR(vecOp, rn, tmp)
 		m.insert(i)
+
+		m.copyTo(tmp, rd)
 	case ssa.OpcodeVFdiv:
 		x, y, lane := instr.Arg2WithLane()
 		rm := m.getOperand_Reg(m.c.ValueDefinition(x))
@@ -615,10 +634,13 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		case ssa.VecLaneF64x2:
 			vecOp = sseOpcodeMulpd
 		}
-		m.copyTo(rn.r, rd)
+		tmp := m.copyToTmp(rn.r)
+
 		i := m.allocateInstr()
-		i.asXmmRmR(vecOp, rm, rd)
+		i.asXmmRmR(vecOp, rm, tmp)
 		m.insert(i)
+
+		m.copyTo(tmp, rd)
 	case ssa.OpcodeVFneg:
 		x, lane := instr.ArgWithLane()
 		rm := m.getOperand_Reg(m.c.ValueDefinition(x))
@@ -792,11 +814,13 @@ func (m *machine) lowerVImul(instr *ssa.Instruction) {
 		default:
 			panic("unsupported: " + lane.String())
 		}
+		tmp := m.copyToTmp(rn.r)
 
-		m.copyTo(rn.r, rd)
 		i := m.allocateInstr()
-		i.asXmmRmR(vecOp, rm, rd)
+		i.asXmmRmR(vecOp, rm, tmp)
 		m.insert(i)
+
+		m.copyTo(tmp, rd)
 	}
 }
 
