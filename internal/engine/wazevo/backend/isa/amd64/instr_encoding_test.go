@@ -460,6 +460,18 @@ func TestInstruction_format_encode(t *testing.T) {
 			want:       "660f55c1",
 			wantFormat: "andnpd %xmm1, %xmm0",
 		},
+		// blendvpd
+		{
+			setup:      func(i *instruction) { i.asXmmRmR(sseOpcodeBlendvpd, newOperandReg(xmm1VReg), xmm0VReg) },
+			want:       "660f3815c1",
+			wantFormat: "blendvpd %xmm1, %xmm0",
+		},
+		// blendvps
+		{
+			setup:      func(i *instruction) { i.asXmmRmR(sseOpcodeBlendvps, newOperandReg(xmm1VReg), xmm0VReg) },
+			want:       "660f3814c1",
+			wantFormat: "blendvps %xmm1, %xmm0",
+		},
 		// cvttps2dq
 		{
 			setup:      func(i *instruction) { i.asXmmRmR(sseOpcodeCvttps2dq, newOperandReg(xmm1VReg), xmm0VReg) },
