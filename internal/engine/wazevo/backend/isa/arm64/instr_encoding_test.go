@@ -1062,6 +1062,12 @@ func TestInstruction_encode(t *testing.T) {
 		{want: "202cc29a", setup: func(i *instruction) {
 			i.asALU(aluOpRotR, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), true)
 		}},
+		{want: "2000222a", setup: func(i *instruction) {
+			i.asALU(aluOpOrn, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), false)
+		}},
+		{want: "200022aa", setup: func(i *instruction) {
+			i.asALU(aluOpOrn, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), true)
+		}},
 		{want: "30000010", setup: func(i *instruction) { i.asAdr(v16VReg, 4) }},
 		{want: "50050030", setup: func(i *instruction) { i.asAdr(v16VReg, 169) }},
 		{want: "101e302e", setup: func(i *instruction) { i.asLoadFpuConst32(v16VReg, uint64(math.Float32bits(0))) }},
@@ -1607,6 +1613,111 @@ func TestInstruction_encode(t *testing.T) {
 		{want: "41c4404d", setup: func(i *instruction) { i.asVecLoad1R(operandNR(v1VReg), operandNR(x2VReg), vecArrangement8H) }},
 		{want: "41c8404d", setup: func(i *instruction) { i.asVecLoad1R(operandNR(v1VReg), operandNR(x2VReg), vecArrangement4S) }},
 		{want: "41cc404d", setup: func(i *instruction) { i.asVecLoad1R(operandNR(v1VReg), operandNR(x2VReg), vecArrangement2D) }},
+		{want: "0200e1b8", setup: func(i *instruction) {
+			i.asAtomicRmw(atomicRmwOpAdd, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 4)
+		}},
+		{want: "0200e178", setup: func(i *instruction) {
+			i.asAtomicRmw(atomicRmwOpAdd, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 2)
+		}},
+		{want: "0200e138", setup: func(i *instruction) {
+			i.asAtomicRmw(atomicRmwOpAdd, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 1)
+		}},
+		{want: "0200e1f8", setup: func(i *instruction) {
+			i.asAtomicRmw(atomicRmwOpAdd, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 8)
+		}},
+		{want: "0200e1b8", setup: func(i *instruction) {
+			i.asAtomicRmw(atomicRmwOpAdd, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 4)
+		}},
+		{want: "0200e178", setup: func(i *instruction) {
+			i.asAtomicRmw(atomicRmwOpAdd, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 2)
+		}},
+		{want: "0200e138", setup: func(i *instruction) {
+			i.asAtomicRmw(atomicRmwOpAdd, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 1)
+		}},
+		{want: "0210e1b8", setup: func(i *instruction) {
+			i.asAtomicRmw(atomicRmwOpClr, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 4)
+		}},
+		{want: "0210e178", setup: func(i *instruction) {
+			i.asAtomicRmw(atomicRmwOpClr, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 2)
+		}},
+		{want: "0210e138", setup: func(i *instruction) {
+			i.asAtomicRmw(atomicRmwOpClr, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 1)
+		}},
+		{want: "0210e1f8", setup: func(i *instruction) {
+			i.asAtomicRmw(atomicRmwOpClr, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 8)
+		}},
+		{want: "0210e1b8", setup: func(i *instruction) {
+			i.asAtomicRmw(atomicRmwOpClr, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 4)
+		}},
+		{want: "0210e178", setup: func(i *instruction) {
+			i.asAtomicRmw(atomicRmwOpClr, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 2)
+		}},
+		{want: "0210e138", setup: func(i *instruction) {
+			i.asAtomicRmw(atomicRmwOpClr, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 1)
+		}},
+		{want: "0230e1b8", setup: func(i *instruction) {
+			i.asAtomicRmw(atomicRmwOpSet, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 4)
+		}},
+		{want: "0230e178", setup: func(i *instruction) {
+			i.asAtomicRmw(atomicRmwOpSet, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 2)
+		}},
+		{want: "0230e138", setup: func(i *instruction) {
+			i.asAtomicRmw(atomicRmwOpSet, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 1)
+		}},
+		{want: "0230e1f8", setup: func(i *instruction) {
+			i.asAtomicRmw(atomicRmwOpSet, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 8)
+		}},
+		{want: "0230e1b8", setup: func(i *instruction) {
+			i.asAtomicRmw(atomicRmwOpSet, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 4)
+		}},
+		{want: "0230e178", setup: func(i *instruction) {
+			i.asAtomicRmw(atomicRmwOpSet, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 2)
+		}},
+		{want: "0230e138", setup: func(i *instruction) {
+			i.asAtomicRmw(atomicRmwOpSet, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 1)
+		}},
+		{want: "0220e1b8", setup: func(i *instruction) {
+			i.asAtomicRmw(atomicRmwOpEor, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 4)
+		}},
+		{want: "0220e178", setup: func(i *instruction) {
+			i.asAtomicRmw(atomicRmwOpEor, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 2)
+		}},
+		{want: "0220e138", setup: func(i *instruction) {
+			i.asAtomicRmw(atomicRmwOpEor, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 1)
+		}},
+		{want: "0220e1f8", setup: func(i *instruction) {
+			i.asAtomicRmw(atomicRmwOpEor, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 8)
+		}},
+		{want: "0220e1b8", setup: func(i *instruction) {
+			i.asAtomicRmw(atomicRmwOpEor, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 4)
+		}},
+		{want: "0220e178", setup: func(i *instruction) {
+			i.asAtomicRmw(atomicRmwOpEor, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 2)
+		}},
+		{want: "0220e138", setup: func(i *instruction) {
+			i.asAtomicRmw(atomicRmwOpEor, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 1)
+		}},
+		{want: "0280e1b8", setup: func(i *instruction) {
+			i.asAtomicRmw(atomicRmwOpSwp, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 4)
+		}},
+		{want: "0280e178", setup: func(i *instruction) {
+			i.asAtomicRmw(atomicRmwOpSwp, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 2)
+		}},
+		{want: "0280e138", setup: func(i *instruction) {
+			i.asAtomicRmw(atomicRmwOpSwp, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 1)
+		}},
+		{want: "0280e1f8", setup: func(i *instruction) {
+			i.asAtomicRmw(atomicRmwOpSwp, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 8)
+		}},
+		{want: "0280e1b8", setup: func(i *instruction) {
+			i.asAtomicRmw(atomicRmwOpSwp, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 4)
+		}},
+		{want: "0280e178", setup: func(i *instruction) {
+			i.asAtomicRmw(atomicRmwOpSwp, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 2)
+		}},
+		{want: "0280e138", setup: func(i *instruction) {
+			i.asAtomicRmw(atomicRmwOpSwp, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 1)
+		}},
 		{want: "4201231e4201631e4201239e4201639e4201221e4201621e4201229e4201629e", setup: func(i *instruction) {
 			i.asNop0()
 			cur := i
