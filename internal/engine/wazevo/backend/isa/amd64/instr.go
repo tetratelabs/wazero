@@ -260,13 +260,10 @@ func (i *instruction) String() string {
 			formatVRegSized(tmpGp2, true),
 			formatVRegSized(tmpXmm, true),
 			formatVRegSized(tmpXmm2, true), sat)
-
 	case defineUninitializedReg:
 		return fmt.Sprintf("defineUninitializedReg %s", i.op2.format(true))
-
 	case xmmCMov:
-		return fmt.Sprintf("xmmcmov%s %s, %s",
-			cond(i.u1), i.op1.format(true), i.op2.format(true))
+		return fmt.Sprintf("xmmcmov%s %s, %s", cond(i.u1), i.op1.format(true), i.op2.format(true))
 	default:
 		panic(fmt.Sprintf("BUG: %d", int(i.kind)))
 	}
@@ -757,6 +754,7 @@ const (
 	// fcvtToUintSequence is a sequence of instructions to convert a float to an unsigned integer.
 	fcvtToUintSequence
 
+	// xmmCMov is a conditional move instruction for XMM registers. Lowered after register allocation.
 	xmmCMov
 
 	instrMax
