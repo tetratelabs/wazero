@@ -122,11 +122,6 @@ func (m *machine) SetupPrologue() {
 func (m *machine) SetupEpilogue() {
 	ectx := m.ectx
 	for cur := ectx.RootInstr; cur != nil; cur = cur.next {
-		k := cur.kind
-		if k == ret {
-			m.setupEpilogueAfter(cur.prev)
-			continue
-		}
 		switch k := cur.kind; k {
 		case ret:
 			m.setupEpilogueAfter(cur.prev)
@@ -138,6 +133,17 @@ func (m *machine) SetupEpilogue() {
 			} else {
 				m.lowerFcvtToUintSequenceAfterRegalloc(cur)
 			}
+			prev := cur.prev
+			next := cur.next
+			cur := prev
+			for _, instr := range m.ectx.PendingInstructions {
+				cur = linkInstr(cur, instr)
+			}
+			linkInstr(cur, next)
+			continue
+		case xmmCMov:
+			m.ectx.PendingInstructions = m.ectx.PendingInstructions[:0]
+			m.lowerXmmCmovAfterRegAlloc(cur)
 			prev := cur.prev
 			next := cur.next
 			cur := prev

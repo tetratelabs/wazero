@@ -260,9 +260,10 @@ func (i *instruction) String() string {
 			formatVRegSized(tmpGp2, true),
 			formatVRegSized(tmpXmm, true),
 			formatVRegSized(tmpXmm2, true), sat)
-
 	case defineUninitializedReg:
 		return fmt.Sprintf("defineUninitializedReg %s", i.op2.format(true))
+	case xmmCMov:
+		return fmt.Sprintf("xmmcmov%s %s, %s", cond(i.u1), i.op1.format(true), i.op2.format(true))
 	default:
 		panic(fmt.Sprintf("BUG: %d", int(i.kind)))
 	}
@@ -753,8 +754,20 @@ const (
 	// fcvtToUintSequence is a sequence of instructions to convert a float to an unsigned integer.
 	fcvtToUintSequence
 
+	// xmmCMov is a conditional move instruction for XMM registers. Lowered after register allocation.
+	xmmCMov
+
 	instrMax
 )
+
+func (i *instruction) asXmmCMov(cc cond, x operand, rd regalloc.VReg, size byte) *instruction {
+	i.kind = xmmCMov
+	i.op1 = x
+	i.op2 = newOperandReg(rd)
+	i.u1 = uint64(cc)
+	i.u2 = uint64(size)
+	return i
+}
 
 func (i *instruction) asDefineUninitializedReg(r regalloc.VReg) *instruction {
 	i.kind = defineUninitializedReg
@@ -918,6 +931,8 @@ func (k instructionKind) String() string {
 		return "fcvtToSintSequence"
 	case fcvtToUintSequence:
 		return "fcvtToUintSequence"
+	case xmmCMov:
+		return "xmmCMov"
 	default:
 		panic("BUG")
 	}
@@ -1931,7 +1946,7 @@ var defKinds = [instrMax]defKind{
 	unaryRmR:               defKindOp2,
 	xmmUnaryRmR:            defKindOp2,
 	xmmUnaryRmRImm:         defKindOp2,
-	xmmCmpRmR:              defKindOp2,
+	xmmCmpRmR:              defKindNone,
 	xmmRmR:                 defKindNone,
 	mov64MR:                defKindOp2,
 	movsxRmR:               defKindOp2,
@@ -1955,6 +1970,7 @@ var defKinds = [instrMax]defKind{
 	fcvtToSintSequence:     defKindFcvtToSintSequence,
 	defineUninitializedReg: defKindOp2,
 	fcvtToUintSequence:     defKindFcvtToUintSequence,
+	xmmCMov:                defKindOp2,
 }
 
 // String implements fmt.Stringer.
@@ -2032,6 +2048,7 @@ var useKinds = [instrMax]useKind{
 	fcvtToSintSequence:     useKindFcvtToSintSequence,
 	defineUninitializedReg: useKindNone,
 	fcvtToUintSequence:     useKindFcvtToUintSequence,
+	xmmCMov:                useKindOp1,
 }
 
 func (u useKind) String() string {

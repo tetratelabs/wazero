@@ -918,3 +918,16 @@ func Test2008(t *testing.T) {
 		require.Contains(t, err.Error(), "unreachable")
 	})
 }
+
+func Test2009(t *testing.T) {
+	if !platform.CompilerSupported() {
+		return
+	}
+	run(t, func(t *testing.T, r wazero.Runtime) {
+		mod, err := r.Instantiate(ctx, getWasmBinary(t, "2009"))
+		require.NoError(t, err)
+		res, err := mod.ExportedFunction("").Call(ctx)
+		require.NoError(t, err)
+		require.Equal(t, res, []uint64{0})
+	})
+}
