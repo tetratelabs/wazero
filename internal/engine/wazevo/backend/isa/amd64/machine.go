@@ -414,8 +414,8 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		m.lowerVbitselect(instr)
 	case ssa.OpcodeVIadd:
 		x, y, lane := instr.Arg2WithLane()
-		rm := m.getOperand_Reg(m.c.ValueDefinition(x))
-		rn := m.getOperand_Reg(m.c.ValueDefinition(y))
+		rn := m.getOperand_Mem_Reg(m.c.ValueDefinition(x))
+		rm := m.getOperand_Reg(m.c.ValueDefinition(y))
 		rd := m.c.VRegOf(instr.Return())
 
 		var vecOp sseOpcode
@@ -430,14 +430,16 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 			vecOp = sseOpcodePaddq
 		}
 
-		m.copyTo(rn.r, rd)
+		tmp := m.copyToTmp(rm.r)
 		i := m.allocateInstr()
-		i.asXmmRmR(vecOp, rm, rd)
+		i.asXmmRmR(vecOp, rn, tmp)
 		m.insert(i)
+
+		m.copyTo(tmp, rd)
 	case ssa.OpcodeVSaddSat:
 		x, y, lane := instr.Arg2WithLane()
-		rm := m.getOperand_Reg(m.c.ValueDefinition(x))
-		rn := m.getOperand_Reg(m.c.ValueDefinition(y))
+		rn := m.getOperand_Mem_Reg(m.c.ValueDefinition(x))
+		rm := m.getOperand_Reg(m.c.ValueDefinition(y))
 		rd := m.c.VRegOf(instr.Return())
 
 		var vecOp sseOpcode
@@ -447,17 +449,17 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		case ssa.VecLaneI16x8:
 			vecOp = sseOpcodePaddsw
 		}
-		tmp := m.copyToTmp(rn.r)
+		tmp := m.copyToTmp(rm.r)
 
 		i := m.allocateInstr()
-		i.asXmmRmR(vecOp, rm, tmp)
+		i.asXmmRmR(vecOp, rn, tmp)
 		m.insert(i)
 
 		m.copyTo(tmp, rd)
 	case ssa.OpcodeVUaddSat:
 		x, y, lane := instr.Arg2WithLane()
-		rm := m.getOperand_Reg(m.c.ValueDefinition(x))
-		rn := m.getOperand_Reg(m.c.ValueDefinition(y))
+		rn := m.getOperand_Mem_Reg(m.c.ValueDefinition(x))
+		rm := m.getOperand_Reg(m.c.ValueDefinition(y))
 		rd := m.c.VRegOf(instr.Return())
 
 		var vecOp sseOpcode
@@ -476,8 +478,8 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		m.copyTo(tmp, rd)
 	case ssa.OpcodeVIsub:
 		x, y, lane := instr.Arg2WithLane()
-		rm := m.getOperand_Reg(m.c.ValueDefinition(x))
-		rn := m.getOperand_Reg(m.c.ValueDefinition(y))
+		rn := m.getOperand_Mem_Reg(m.c.ValueDefinition(x))
+		rm := m.getOperand_Reg(m.c.ValueDefinition(y))
 		rd := m.c.VRegOf(instr.Return())
 
 		var vecOp sseOpcode
@@ -491,17 +493,17 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		case ssa.VecLaneI64x2:
 			vecOp = sseOpcodePsubq
 		}
-		tmp := m.copyToTmp(rm.r)
+		tmp := m.copyToTmp(rn.r)
 
 		i := m.allocateInstr()
-		i.asXmmRmR(vecOp, rn, tmp)
+		i.asXmmRmR(vecOp, rm, tmp)
 		m.insert(i)
 
 		m.copyTo(tmp, rd)
 	case ssa.OpcodeVSsubSat:
 		x, y, lane := instr.Arg2WithLane()
-		rm := m.getOperand_Reg(m.c.ValueDefinition(x))
-		rn := m.getOperand_Reg(m.c.ValueDefinition(y))
+		rn := m.getOperand_Reg(m.c.ValueDefinition(x))
+		rm := m.getOperand_Reg(m.c.ValueDefinition(y))
 		rd := m.c.VRegOf(instr.Return())
 
 		var vecOp sseOpcode
@@ -511,17 +513,17 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		case ssa.VecLaneI16x8:
 			vecOp = sseOpcodePsubsw
 		}
-		tmp := m.copyToTmp(rm.r)
+		tmp := m.copyToTmp(rn.r)
 
 		i := m.allocateInstr()
-		i.asXmmRmR(vecOp, rn, tmp)
+		i.asXmmRmR(vecOp, rm, tmp)
 		m.insert(i)
 
 		m.copyTo(tmp, rd)
 	case ssa.OpcodeVUsubSat:
 		x, y, lane := instr.Arg2WithLane()
-		rm := m.getOperand_Reg(m.c.ValueDefinition(x))
-		rn := m.getOperand_Reg(m.c.ValueDefinition(y))
+		rn := m.getOperand_Mem_Reg(m.c.ValueDefinition(x))
+		rm := m.getOperand_Reg(m.c.ValueDefinition(y))
 		rd := m.c.VRegOf(instr.Return())
 
 		var vecOp sseOpcode
@@ -531,10 +533,10 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		case ssa.VecLaneI16x8:
 			vecOp = sseOpcodePsubusw
 		}
-		tmp := m.copyToTmp(rm.r)
+		tmp := m.copyToTmp(rn.r)
 
 		i := m.allocateInstr()
-		i.asXmmRmR(vecOp, rn, tmp)
+		i.asXmmRmR(vecOp, rm, tmp)
 		m.insert(i)
 
 		m.copyTo(tmp, rd)
@@ -542,7 +544,7 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		m.lowerVImul(instr)
 	case ssa.OpcodeVIneg:
 		x, lane := instr.ArgWithLane()
-		rm := m.getOperand_Reg(m.c.ValueDefinition(x))
+		rn := m.getOperand_Mem_Reg(m.c.ValueDefinition(x))
 		rd := m.c.VRegOf(instr.Return())
 		var vecOp sseOpcode
 		switch lane {
@@ -562,14 +564,14 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		m.insert(zero)
 
 		i := m.allocateInstr()
-		i.asXmmRmR(vecOp, rm, tmp)
+		i.asXmmRmR(vecOp, rn, tmp)
 		m.insert(i)
 
 		m.copyTo(tmp, rd)
 	case ssa.OpcodeVFadd:
 		x, y, lane := instr.Arg2WithLane()
-		rm := m.getOperand_Reg(m.c.ValueDefinition(x))
-		rn := m.getOperand_Reg(m.c.ValueDefinition(y))
+		rn := m.getOperand_Mem_Reg(m.c.ValueDefinition(x))
+		rm := m.getOperand_Reg(m.c.ValueDefinition(y))
 		rd := m.c.VRegOf(instr.Return())
 
 		var vecOp sseOpcode
@@ -587,8 +589,8 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		m.copyTo(tmp, rd)
 	case ssa.OpcodeVFsub:
 		x, y, lane := instr.Arg2WithLane()
-		rm := m.getOperand_Reg(m.c.ValueDefinition(x))
-		rn := m.getOperand_Reg(m.c.ValueDefinition(y))
+		rn := m.getOperand_Mem_Reg(m.c.ValueDefinition(x))
+		rm := m.getOperand_Reg(m.c.ValueDefinition(y))
 		rd := m.c.VRegOf(instr.Return())
 
 		var vecOp sseOpcode
@@ -598,16 +600,16 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		case ssa.VecLaneF64x2:
 			vecOp = sseOpcodeSubpd
 		}
-		tmp := m.copyToTmp(rm.r)
+		tmp := m.copyToTmp(rn.r)
 		i := m.allocateInstr()
-		i.asXmmRmR(vecOp, rn, tmp)
+		i.asXmmRmR(vecOp, rm, tmp)
 		m.insert(i)
 
 		m.copyTo(tmp, rd)
 	case ssa.OpcodeVFdiv:
 		x, y, lane := instr.Arg2WithLane()
-		rm := m.getOperand_Reg(m.c.ValueDefinition(x))
-		rn := m.getOperand_Reg(m.c.ValueDefinition(y))
+		rn := m.getOperand_Mem_Reg(m.c.ValueDefinition(x))
+		rm := m.getOperand_Reg(m.c.ValueDefinition(y))
 		rd := m.c.VRegOf(instr.Return())
 
 		var vecOp sseOpcode
@@ -617,14 +619,16 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		case ssa.VecLaneF64x2:
 			vecOp = sseOpcodeDivpd
 		}
-		m.copyTo(rm.r, rd)
+		tmp := m.copyToTmp(rn.r)
 		i := m.allocateInstr()
-		i.asXmmRmR(vecOp, rn, rd)
+		i.asXmmRmR(vecOp, rm, tmp)
 		m.insert(i)
+
+		m.copyTo(tmp, rd)
 	case ssa.OpcodeVFmul:
 		x, y, lane := instr.Arg2WithLane()
-		rm := m.getOperand_Reg(m.c.ValueDefinition(x))
-		rn := m.getOperand_Reg(m.c.ValueDefinition(y))
+		rn := m.getOperand_Mem_Reg(m.c.ValueDefinition(x))
+		rm := m.getOperand_Reg(m.c.ValueDefinition(y))
 		rd := m.c.VRegOf(instr.Return())
 
 		var vecOp sseOpcode
@@ -745,8 +749,8 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 
 func (m *machine) lowerVImul(instr *ssa.Instruction) {
 	x, y, lane := instr.Arg2WithLane()
-	rm := m.getOperand_Reg(m.c.ValueDefinition(x))
-	rn := m.getOperand_Reg(m.c.ValueDefinition(y))
+	rn := m.getOperand_Mem_Reg(m.c.ValueDefinition(x))
+	rm := m.getOperand_Reg(m.c.ValueDefinition(y))
 	rd := m.c.VRegOf(instr.Return())
 	if lane == ssa.VecLaneI64x2 {
 		// Assuming that we have
