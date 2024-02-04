@@ -758,21 +758,21 @@ func (m *machine) lowerVImul(instr *ssa.Instruction) {
 		//  rn = [q1, q2] = [q1_lo, q1_hi, q2_lo, q2_high]
 		// where pN and qN are 64-bit (quad word) lane, and pN_lo, pN_hi, qN_lo and qN_hi are 32-bit (double word) lane.
 
-		// Copy rm into tmp1.
-		tmp1 := m.copyToTmp(rm.r)
+		// Copy rn into tmp1.
+		tmp1 := m.copyToTmp(rn.r)
 
 		// And do the logical right shift by 32-bit on tmp1, which makes tmp1 = [0, p1_high, 0, p2_high]
 		shift := m.allocateInstr()
 		shift.asXmmRmiReg(sseOpcodePsrlq, newOperandImm32(32), tmp1)
 		m.insert(shift)
 
-		// Execute "pmuludq rn,tmp1", which makes tmp1 = [p1_high*q1_lo, p2_high*q2_lo] where each lane is 64-bit.
+		// Execute "pmuludq rm,tmp1", which makes tmp1 = [p1_high*q1_lo, p2_high*q2_lo] where each lane is 64-bit.
 		mul := m.allocateInstr()
-		mul.asXmmRmR(sseOpcodePmuludq, rn, tmp1)
+		mul.asXmmRmR(sseOpcodePmuludq, rm, tmp1)
 		m.insert(mul)
 
-		// Copy rn value into tmp2.
-		tmp2 := m.copyToTmp(rn.r)
+		// Copy rm value into tmp2.
+		tmp2 := m.copyToTmp(rm.r)
 
 		// And do the logical right shift by 32-bit on tmp2, which makes tmp2 = [0, q1_high, 0, q2_high]
 		shift2 := m.allocateInstr()
@@ -781,7 +781,7 @@ func (m *machine) lowerVImul(instr *ssa.Instruction) {
 
 		// Execute "pmuludq rm,tmp2", which makes tmp2 = [p1_lo*q1_high, p2_lo*q2_high] where each lane is 64-bit.
 		mul2 := m.allocateInstr()
-		mul2.asXmmRmR(sseOpcodePmuludq, rm, tmp2)
+		mul2.asXmmRmR(sseOpcodePmuludq, rn, tmp2)
 		m.insert(mul2)
 
 		// Adds tmp1 and tmp2 and do the logical left shift by 32-bit,
@@ -794,10 +794,10 @@ func (m *machine) lowerVImul(instr *ssa.Instruction) {
 		shift3.asXmmRmiReg(sseOpcodePsllq, newOperandImm32(32), tmp1)
 		m.insert(shift3)
 
-		// Copy rn to tmp3; then "pmuludq rm,tmp3", which makes tmp3 = [p1_lo*q1_lo, p2_lo*q2_lo] where each lane is 64-bit.
-		tmp3 := m.copyToTmp(rn.r)
+		// Copy rm to tmp3; then "pmuludq rm,tmp3", which makes tmp3 = [p1_lo*q1_lo, p2_lo*q2_lo] where each lane is 64-bit.
+		tmp3 := m.copyToTmp(rm.r)
 		mul3 := m.allocateInstr()
-		mul3.asXmmRmR(sseOpcodePmuludq, rm, tmp3)
+		mul3.asXmmRmR(sseOpcodePmuludq, rn, tmp3)
 		m.insert(mul3)
 
 		// Finally, we get the result by computing tmp1 + tmp3,
