@@ -403,11 +403,11 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 	case ssa.OpcodeVbnot:
 		m.lowerVbnot(instr)
 	case ssa.OpcodeVband:
-		m.lowerVbBinOp(instr, sseOpcodePand)
+		m.lowerVbBinOpForInstr(instr, sseOpcodePand)
 	case ssa.OpcodeVbor:
-		m.lowerVbBinOp(instr, sseOpcodePor)
+		m.lowerVbBinOpForInstr(instr, sseOpcodePor)
 	case ssa.OpcodeVbxor:
-		m.lowerVbBinOp(instr, sseOpcodePxor)
+		m.lowerVbBinOpForInstr(instr, sseOpcodePxor)
 	case ssa.OpcodeVbandnot:
 		m.lowerVbandnot(instr, sseOpcodePandn)
 	case ssa.OpcodeVbitselect:
@@ -429,13 +429,8 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		case ssa.VecLaneI64x2:
 			vecOp = sseOpcodePaddq
 		}
+		m.lowerVbBinOp(vecOp, rn.reg(), rm, rd)
 
-		tmp := m.copyToTmp(rn.r)
-		i := m.allocateInstr()
-		i.asXmmRmR(vecOp, rm, tmp)
-		m.insert(i)
-
-		m.copyTo(tmp, rd)
 	case ssa.OpcodeVSaddSat:
 		x, y, lane := instr.Arg2WithLane()
 		rn := m.getOperand_Reg(m.c.ValueDefinition(x))
@@ -449,13 +444,8 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		case ssa.VecLaneI16x8:
 			vecOp = sseOpcodePaddsw
 		}
-		tmp := m.copyToTmp(rm.r)
+		m.lowerVbBinOp(vecOp, rn.reg(), rm, rd)
 
-		i := m.allocateInstr()
-		i.asXmmRmR(vecOp, rn, tmp)
-		m.insert(i)
-
-		m.copyTo(tmp, rd)
 	case ssa.OpcodeVUaddSat:
 		x, y, lane := instr.Arg2WithLane()
 		rn := m.getOperand_Reg(m.c.ValueDefinition(x))
@@ -469,13 +459,8 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		case ssa.VecLaneI16x8:
 			vecOp = sseOpcodePaddusw
 		}
-		tmp := m.copyToTmp(rm.r)
+		m.lowerVbBinOp(vecOp, rn.reg(), rm, rd)
 
-		i := m.allocateInstr()
-		i.asXmmRmR(vecOp, rn, tmp)
-		m.insert(i)
-
-		m.copyTo(tmp, rd)
 	case ssa.OpcodeVIsub:
 		x, y, lane := instr.Arg2WithLane()
 		rn := m.getOperand_Reg(m.c.ValueDefinition(x))
@@ -493,12 +478,8 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		case ssa.VecLaneI64x2:
 			vecOp = sseOpcodePsubq
 		}
-		tmp := m.copyToTmp(rn.r)
-		i := m.allocateInstr()
-		i.asXmmRmR(vecOp, rm, tmp)
-		m.insert(i)
+		m.lowerVbBinOp(vecOp, rn.reg(), rm, rd)
 
-		m.copyTo(tmp, rd)
 	case ssa.OpcodeVSsubSat:
 		x, y, lane := instr.Arg2WithLane()
 		rn := m.getOperand_Reg(m.c.ValueDefinition(x))
@@ -512,12 +493,8 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		case ssa.VecLaneI16x8:
 			vecOp = sseOpcodePsubsw
 		}
-		tmp := m.copyToTmp(rn.r)
-		i := m.allocateInstr()
-		i.asXmmRmR(vecOp, rm, tmp)
-		m.insert(i)
+		m.lowerVbBinOp(vecOp, rn.reg(), rm, rd)
 
-		m.copyTo(tmp, rd)
 	case ssa.OpcodeVUsubSat:
 		x, y, lane := instr.Arg2WithLane()
 		rn := m.getOperand_Reg(m.c.ValueDefinition(x))
@@ -531,13 +508,8 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		case ssa.VecLaneI16x8:
 			vecOp = sseOpcodePsubusw
 		}
-		tmp := m.copyToTmp(rn.r)
+		m.lowerVbBinOp(vecOp, rn.reg(), rm, rd)
 
-		i := m.allocateInstr()
-		i.asXmmRmR(vecOp, rm, tmp)
-		m.insert(i)
-
-		m.copyTo(tmp, rd)
 	case ssa.OpcodeVImul:
 		m.lowerVImul(instr)
 	case ssa.OpcodeVIneg:
@@ -579,13 +551,8 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		case ssa.VecLaneF64x2:
 			vecOp = sseOpcodeAddpd
 		}
-		tmp := m.copyToTmp(rn.r)
+		m.lowerVbBinOp(vecOp, rn.reg(), rm, rd)
 
-		i := m.allocateInstr()
-		i.asXmmRmR(vecOp, rm, tmp)
-		m.insert(i)
-
-		m.copyTo(tmp, rd)
 	case ssa.OpcodeVFsub:
 		x, y, lane := instr.Arg2WithLane()
 		rn := m.getOperand_Reg(m.c.ValueDefinition(x))
@@ -599,13 +566,8 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		case ssa.VecLaneF64x2:
 			vecOp = sseOpcodeSubpd
 		}
-		tmp := m.copyToTmp(rn.r)
+		m.lowerVbBinOp(vecOp, rn.reg(), rm, rd)
 
-		i := m.allocateInstr()
-		i.asXmmRmR(vecOp, rm, tmp)
-		m.insert(i)
-
-		m.copyTo(tmp, rd)
 	case ssa.OpcodeVFdiv:
 		x, y, lane := instr.Arg2WithLane()
 		rn := m.getOperand_Reg(m.c.ValueDefinition(x))
@@ -619,13 +581,8 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		case ssa.VecLaneF64x2:
 			vecOp = sseOpcodeDivpd
 		}
-		tmp := m.copyToTmp(rn.r)
+		m.lowerVbBinOp(vecOp, rn.reg(), rm, rd)
 
-		i := m.allocateInstr()
-		i.asXmmRmR(vecOp, rm, tmp)
-		m.insert(i)
-
-		m.copyTo(tmp, rd)
 	case ssa.OpcodeVFmul:
 		x, y, lane := instr.Arg2WithLane()
 		rn := m.getOperand_Reg(m.c.ValueDefinition(x))
@@ -639,13 +596,8 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		case ssa.VecLaneF64x2:
 			vecOp = sseOpcodeMulpd
 		}
-		tmp := m.copyToTmp(rn.r)
+		m.lowerVbBinOp(vecOp, rn.reg(), rm, rd)
 
-		i := m.allocateInstr()
-		i.asXmmRmR(vecOp, rm, tmp)
-		m.insert(i)
-
-		m.copyTo(tmp, rd)
 	case ssa.OpcodeVFneg:
 		x, lane := instr.ArgWithLane()
 		rn := m.getOperand_Mem_Reg(m.c.ValueDefinition(x))
@@ -751,7 +703,7 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 func (m *machine) lowerVImul(instr *ssa.Instruction) {
 	x, y, lane := instr.Arg2WithLane()
 	rn := m.getOperand_Reg(m.c.ValueDefinition(x))
-	rm := m.getOperand_Mem_Reg(m.c.ValueDefinition(y))
+	rm := m.getOperand_Reg(m.c.ValueDefinition(y))
 	rd := m.c.VRegOf(instr.Return())
 	if lane == ssa.VecLaneI64x2 {
 		// Assuming that we have
@@ -760,7 +712,7 @@ func (m *machine) lowerVImul(instr *ssa.Instruction) {
 		// where pN and qN are 64-bit (quad word) lane, and pN_lo, pN_hi, qN_lo and qN_hi are 32-bit (double word) lane.
 
 		// Copy rn into tmp1.
-		tmp1 := m.copyToTmp(rn.r)
+		tmp1 := m.copyToTmp(rn.reg())
 
 		// And do the logical right shift by 32-bit on tmp1, which makes tmp1 = [0, p1_high, 0, p2_high]
 		shift := m.allocateInstr()
@@ -773,7 +725,7 @@ func (m *machine) lowerVImul(instr *ssa.Instruction) {
 		m.insert(mul)
 
 		// Copy rm value into tmp2.
-		tmp2 := m.copyToTmp(rm.r)
+		tmp2 := m.copyToTmp(rm.reg())
 
 		// And do the logical right shift by 32-bit on tmp2, which makes tmp2 = [0, q1_high, 0, q2_high]
 		shift2 := m.allocateInstr()
@@ -795,8 +747,10 @@ func (m *machine) lowerVImul(instr *ssa.Instruction) {
 		shift3.asXmmRmiReg(sseOpcodePsllq, newOperandImm32(32), tmp1)
 		m.insert(shift3)
 
-		// Copy rm to tmp3; then "pmuludq rm,tmp3", which makes tmp3 = [p1_lo*q1_lo, p2_lo*q2_lo] where each lane is 64-bit.
-		tmp3 := m.copyToTmp(rm.r)
+		// Copy rm value into tmp3.
+		tmp3 := m.copyToTmp(rm.reg())
+
+		// "pmuludq rm,tmp3" makes tmp3 = [p1_lo*q1_lo, p2_lo*q2_lo] where each lane is 64-bit.
 		mul3 := m.allocateInstr()
 		mul3.asXmmRmR(sseOpcodePmuludq, rn, tmp3)
 		m.insert(mul3)
@@ -819,7 +773,7 @@ func (m *machine) lowerVImul(instr *ssa.Instruction) {
 		default:
 			panic("unsupported: " + lane.String())
 		}
-		tmp := m.copyToTmp(rn.r)
+		tmp := m.copyToTmp(rn.reg())
 
 		i := m.allocateInstr()
 		i.asXmmRmR(vecOp, rm, tmp)
@@ -2758,18 +2712,22 @@ func (m *machine) lowerVbnot(instr *ssa.Instruction) {
 	m.copyTo(tmp, rd)
 }
 
-func (m *machine) lowerVbBinOp(instr *ssa.Instruction, op sseOpcode) {
+func (m *machine) lowerVbBinOpForInstr(instr *ssa.Instruction, op sseOpcode) {
 	x, y := instr.Arg2()
 	xDef := m.c.ValueDefinition(x)
 	yDef := m.c.ValueDefinition(y)
-	rm, rn := m.getOperand_Reg(xDef), m.getOperand_Reg(yDef)
+	rn, rm := m.getOperand_Reg(xDef), m.getOperand_Mem_Reg(yDef)
 	rd := m.c.VRegOf(instr.Return())
 
-	tmp := m.copyToTmp(rm.reg())
+	m.lowerVbBinOp(op, rn.reg(), rm, rd)
+}
+
+func (m *machine) lowerVbBinOp(op sseOpcode, rn regalloc.VReg, rm operand, rd regalloc.VReg) {
+	tmp := m.copyToTmp(rn)
 
 	// op between rn, rm.
 	binOp := m.allocateInstr()
-	binOp.asXmmRmR(op, rn, tmp)
+	binOp.asXmmRmR(op, rm, tmp)
 	m.insert(binOp)
 
 	m.copyTo(tmp, rd)
