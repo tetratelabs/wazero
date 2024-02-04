@@ -2091,7 +2091,7 @@ var defKinds = [instrMax]defKind{
 	shiftR:                 defKindNone,
 	imm:                    defKindOp2,
 	unaryRmR:               defKindOp2,
-	xmmRmiReg:              defKindOp2,
+	xmmRmiReg:              defKindNone,
 	xmmUnaryRmR:            defKindOp2,
 	xmmUnaryRmRImm:         defKindOp2,
 	xmmCmpRmR:              defKindNone,
