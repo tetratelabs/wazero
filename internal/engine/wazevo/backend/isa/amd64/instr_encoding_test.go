@@ -1709,10 +1709,227 @@ func TestInstruction_format_encode(t *testing.T) {
 		},
 		{
 			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmppd, uint8(cmpPredEQ_OQ), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "660fc2407b00",
+			wantFormat: "cmppd $0, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmppd, uint8(cmpPredLT_OS), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "660fc2407b01",
+			wantFormat: "cmppd $1, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmppd, uint8(cmpPredLE_OS), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "660fc2407b02",
+			wantFormat: "cmppd $2, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmppd, uint8(cmpPredUNORD_Q), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "660fc2407b03",
+			wantFormat: "cmppd $3, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmppd, uint8(cmpPredNEQ_UQ), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "660fc2407b04",
+			wantFormat: "cmppd $4, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmppd, uint8(cmpPredNLT_US), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "660fc2407b05",
+			wantFormat: "cmppd $5, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmppd, uint8(cmpPredNLE_US), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "660fc2407b06",
+			wantFormat: "cmppd $6, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmppd, uint8(cmpPredORD_Q), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "660fc2407b07",
+			wantFormat: "cmppd $7, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
 				i.asXmmRmRImm(sseOpcodeCmppd, uint8(cmpPredEQ_UQ), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
 			},
 			want:       "660fc2407b08",
 			wantFormat: "cmppd $8, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmppd, uint8(cmpPredNGE_US), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "660fc2407b09",
+			wantFormat: "cmppd $9, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmppd, uint8(cmpPredNGT_US), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "660fc2407b0a",
+			wantFormat: "cmppd $10, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmppd, uint8(cmpPredFALSE_OQ), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "660fc2407b0b",
+			wantFormat: "cmppd $11, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmppd, uint8(cmpPredNEQ_OQ), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "660fc2407b0c",
+			wantFormat: "cmppd $12, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmppd, uint8(cmpPredGE_OS), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "660fc2407b0d",
+			wantFormat: "cmppd $13, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmppd, uint8(cmpPredGT_OS), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "660fc2407b0e",
+			wantFormat: "cmppd $14, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmppd, uint8(cmpPredTRUE_UQ), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "660fc2407b0f",
+			wantFormat: "cmppd $15, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmppd, uint8(cmpPredEQ_OS), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "660fc2407b10",
+			wantFormat: "cmppd $16, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmppd, uint8(cmpPredLT_OQ), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "660fc2407b11",
+			wantFormat: "cmppd $17, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmppd, uint8(cmpPredLE_OQ), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "660fc2407b12",
+			wantFormat: "cmppd $18, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmppd, uint8(cmpPredUNORD_S), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "660fc2407b13",
+			wantFormat: "cmppd $19, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmppd, uint8(cmpPredNEQ_US), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "660fc2407b14",
+			wantFormat: "cmppd $20, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmppd, uint8(cmpPredNLT_UQ), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "660fc2407b15",
+			wantFormat: "cmppd $21, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmppd, uint8(cmpPredNLE_UQ), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "660fc2407b16",
+			wantFormat: "cmppd $22, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmppd, uint8(cmpPredORD_S), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "660fc2407b17",
+			wantFormat: "cmppd $23, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmppd, uint8(cmpPredEQ_US), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "660fc2407b18",
+			wantFormat: "cmppd $24, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmppd, uint8(cmpPredNGE_UQ), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "660fc2407b19",
+			wantFormat: "cmppd $25, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmppd, uint8(cmpPredNGT_UQ), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "660fc2407b1a",
+			wantFormat: "cmppd $26, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmppd, uint8(cmpPredFALSE_OS), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "660fc2407b1b",
+			wantFormat: "cmppd $27, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmppd, uint8(cmpPredNEQ_OS), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "660fc2407b1c",
+			wantFormat: "cmppd $28, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmppd, uint8(cmpPredGE_OQ), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "660fc2407b1d",
+			wantFormat: "cmppd $29, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmppd, uint8(cmpPredGT_OQ), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "660fc2407b1e",
+			wantFormat: "cmppd $30, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmppd, uint8(cmpPredTRUE_US), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "660fc2407b1f",
+			wantFormat: "cmppd $31, 123(%rax), %xmm0",
 		},
 		{
 			setup:      func(i *instruction) { i.asPop64(raxVReg) },
