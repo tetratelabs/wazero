@@ -671,7 +671,7 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		// Note: if we do not clear all the bits ^ with XORPS, this might end up not setting ones on some lane
 		// if the lane is NaN.
 		cmp := m.allocateInstr()
-		cmp.asXmmRmRImm(sseOpcodeCmppd, 0x8, newOperandReg(tmp), tmp)
+		cmp.asXmmRmRImm(sseOpcodeCmppd, uint8(cmpPredEQ_UQ), newOperandReg(tmp), tmp)
 		m.insert(cmp)
 
 		// Do the left shift on each lane to set only the most significant bit in each.
