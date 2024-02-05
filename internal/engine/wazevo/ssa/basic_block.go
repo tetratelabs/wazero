@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 )
 
 // BasicBlock represents the Basic Block of an SSA function.
@@ -293,7 +295,7 @@ func resetBasicBlock(bb *basicBlock) {
 	bb.invalid, bb.sealed = false, false
 	bb.singlePred = nil
 	bb.unknownValues = bb.unknownValues[:0]
-	bb.lastDefinitions = make(map[Variable]Value)
+	bb.lastDefinitions = wazevoapi.ResetMap(bb.lastDefinitions)
 	bb.reversePostOrder = -1
 	bb.loopNestingForestChildren = bb.loopNestingForestChildren[:0]
 	bb.loopHeader = false

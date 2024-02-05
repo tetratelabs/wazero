@@ -312,7 +312,6 @@ func (b *builder) allocateBasicBlock() *basicBlock {
 	id := BasicBlockID(b.basicBlocksPool.Allocated())
 	blk := b.basicBlocksPool.Allocate()
 	blk.id = id
-	blk.lastDefinitions = make(map[Variable]Value)
 	return blk
 }
 
