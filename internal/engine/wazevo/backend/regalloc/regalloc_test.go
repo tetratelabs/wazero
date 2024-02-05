@@ -355,9 +355,12 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 				},
 			})
 			a.livenessAnalysis(f)
-			for blockID := range a.blockLivenessData {
+			for blockID := 0; blockID <= a.blockLivenessData.MaxIDEncountered(); blockID++ {
+				actual := a.blockLivenessData.Get(blockID)
+				if actual == nil {
+					continue
+				}
 				t.Run(fmt.Sprintf("block_id=%d", blockID), func(t *testing.T) {
-					actual := a.blockLivenessData[blockID]
 					exp := tc.exp[blockID]
 					initMapInInfo(exp)
 					require.Equal(t, exp.liveOuts, actual.liveOuts, "live outs")
