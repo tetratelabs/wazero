@@ -4,8 +4,13 @@ import (
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 )
 
-// SetupPrologue implements backend.Machine.
-func (m *machine) SetupPrologue() {
+// PostRegAlloc implements backend.Machine.
+func (m *machine) PostRegAlloc() {
+	m.setupPrologue()
+	m.postRegAlloc()
+}
+
+func (m *machine) setupPrologue() {
 	cur := m.ectx.RootInstr
 	prevInitInst := cur.next
 
@@ -118,8 +123,12 @@ func (m *machine) SetupPrologue() {
 	linkInstr(cur, prevInitInst)
 }
 
-// SetupEpilogue implements backend.Machine.
-func (m *machine) SetupEpilogue() {
+// postRegAlloc does multiple things while walking through the instructions:
+// 1. Inserts the epilogue code.
+// 2. Removes the redundant copy instruction.
+// 3. Inserts the dec/inc RSP instruction right before/after the call instruction.
+// 4. Lowering that is supposed to be done after regalloc.
+func (m *machine) postRegAlloc() {
 	ectx := m.ectx
 	for cur := ectx.RootInstr; cur != nil; cur = cur.next {
 		switch k := cur.kind; k {
@@ -168,7 +177,6 @@ func (m *machine) SetupEpilogue() {
 			// At this point, reg alloc is done, therefore we can safely insert dec/inc RPS instruction
 			// right before/after the call instruction. If this is done before reg alloc, the stack slot
 			// can point to the wrong location and therefore results in a wrong value.
-			// TODO: doing this in `SetupEpilogue` seems weird. Find a better home.
 			call := cur
 			next := call.next
 			if size := uint32(abi.AlignedArgResultStackSlotSize()); size > 0 {
@@ -183,7 +191,6 @@ func (m *machine) SetupEpilogue() {
 		}
 
 		// Removes the redundant copy instruction.
-		// TODO: doing this in `SetupEpilogue` seems weird. Find a better home.
 		if cur.IsCopy() && cur.op1.r.RealReg() == cur.op2.r.RealReg() {
 			prev, next := cur.prev, cur.next
 			// Remove the copy instruction.

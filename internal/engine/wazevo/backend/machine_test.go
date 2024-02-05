@@ -57,11 +57,8 @@ func (m mockMachine) Encode(ctx context.Context) {}
 // ResolveRelocations implements Machine.ResolveRelocations.
 func (m mockMachine) ResolveRelocations(map[ssa.FuncRef]int, []byte, []RelocationInfo) {}
 
-// SetupPrologue implements Machine.SetupPrologue.
-func (m mockMachine) SetupPrologue() {}
-
-// SetupEpilogue implements Machine.SetupEpilogue.
-func (m mockMachine) SetupEpilogue() {}
+// PostRegAlloc implements Machine.SetupPrologue.
+func (m mockMachine) PostRegAlloc() {}
 
 // Function implements Machine.Function.
 func (m mockMachine) Function() (f regalloc.Function) { return }
