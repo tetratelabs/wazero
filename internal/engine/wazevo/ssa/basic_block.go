@@ -92,7 +92,7 @@ type (
 		// lastDefinitions maps Variable to its last definition in this block.
 		lastDefinitions map[Variable]Value
 		// unknownsValues are used in builder.findValue. The usage is well-described in the paper.
-		unknownValues map[Variable]Value
+		unknownValues []unknownValue
 		// invalid is true if this block is made invalid during optimizations.
 		invalid bool
 		// sealed is true if this is sealed (all the predecessors are known).
@@ -130,6 +130,13 @@ type (
 		value Value
 		// typ is the type of the parameter.
 		typ Type
+	}
+
+	unknownValue struct {
+		// variable is the variable that this unknownValue represents.
+		variable Variable
+		// value is the value that this unknownValue represents.
+		value Value
 	}
 )
 
@@ -285,7 +292,7 @@ func resetBasicBlock(bb *basicBlock) {
 	bb.success = bb.success[:0]
 	bb.invalid, bb.sealed = false, false
 	bb.singlePred = nil
-	bb.unknownValues = make(map[Variable]Value)
+	bb.unknownValues = bb.unknownValues[:0]
 	bb.lastDefinitions = make(map[Variable]Value)
 	bb.reversePostOrder = -1
 	bb.loopNestingForestChildren = bb.loopNestingForestChildren[:0]

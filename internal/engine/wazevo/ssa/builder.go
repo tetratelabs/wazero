@@ -188,7 +188,6 @@ type builder struct {
 	blkStack2                      []*basicBlock
 	ints                           []int
 	redundantParameterIndexToValue map[int]Value
-	vars                           []Variable
 
 	// blockIterCur is used to implement blockIteratorBegin and blockIteratorNext.
 	blockIterCur int
@@ -314,7 +313,6 @@ func (b *builder) allocateBasicBlock() *basicBlock {
 	blk := b.basicBlocksPool.Allocate()
 	blk.id = id
 	blk.lastDefinitions = make(map[Variable]Value)
-	blk.unknownValues = make(map[Variable]Value)
 	return blk
 }
 
@@ -467,7 +465,10 @@ func (b *builder) findValue(typ Type, variable Variable, blk *basicBlock) Value 
 			fmt.Printf("adding unknown value placeholder for %s at %d\n", variable, blk.id)
 		}
 		blk.lastDefinitions[variable] = value
-		blk.unknownValues[variable] = value
+		blk.unknownValues = append(blk.unknownValues, unknownValue{
+			variable: variable,
+			value:    value,
+		})
 		return value
 	}
 
@@ -507,18 +508,8 @@ func (b *builder) Seal(raw BasicBlock) {
 	}
 	blk.sealed = true
 
-	// To get the deterministic compilation,
-	// we need to sort the parameters in the order of the variable index.
-	b.vars = b.vars[:0]
-	for v := range blk.unknownValues {
-		b.vars = append(b.vars, v)
-	}
-	sort.Slice(b.vars, func(i, j int) bool {
-		return b.vars[i] < b.vars[j]
-	})
-
-	for _, variable := range b.vars {
-		phiValue := blk.unknownValues[variable]
+	for _, v := range blk.unknownValues {
+		variable, phiValue := v.variable, v.value
 		typ := b.definedVariableType(variable)
 		blk.addParamOn(typ, phiValue)
 		for i := range blk.preds {
