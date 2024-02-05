@@ -1478,11 +1478,9 @@ func (m *machine) lowerIDivRem(si *ssa.Instruction, isDiv bool, signed bool) {
 	ctxVReg := m.c.VRegOf(execCtx)
 	tmpGp := m.c.AllocateVReg(si.Return().Type())
 
-	m.insert(m.allocateInstr().asDefineUninitializedReg(raxVReg))
+	m.copyTo(dividend.r, raxVReg)
 	m.insert(m.allocateInstr().asDefineUninitializedReg(rdxVReg))
 	m.insert(m.allocateInstr().asDefineUninitializedReg(tmpGp))
-
-	m.copyTo(dividend.r, raxVReg)
 	seq := m.allocateInstr().asIdivRemSequence(ctxVReg, divisor.r, tmpGp, isDiv, signed, x.Type().Bits() == 64)
 	m.insert(seq)
 	rd := m.c.VRegOf(si.Return())

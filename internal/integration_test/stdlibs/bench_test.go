@@ -29,12 +29,10 @@ func BenchmarkZig(b *testing.B) {
 }
 
 func BenchmarkTinyGo(b *testing.B) {
-	if runtime.GOARCH == "arm64" {
-		b.Run("optimizing", func(b *testing.B) {
-			c := opt.NewRuntimeConfigOptimizingCompiler()
-			runtBenches(b, context.Background(), c, tinyGoTestCase)
-		})
-	}
+	b.Run("optimizing", func(b *testing.B) {
+		c := opt.NewRuntimeConfigOptimizingCompiler()
+		runtBenches(b, context.Background(), c, tinyGoTestCase)
+	})
 	b.Run("baseline", func(b *testing.B) {
 		c := wazero.NewRuntimeConfigCompiler()
 		runtBenches(b, context.Background(), c, tinyGoTestCase)
