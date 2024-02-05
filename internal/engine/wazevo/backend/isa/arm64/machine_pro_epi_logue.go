@@ -7,8 +7,14 @@ import (
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 )
 
-// SetupPrologue implements backend.Machine.
-func (m *machine) SetupPrologue() {
+// PostRegAlloc implements backend.Machine.
+func (m *machine) PostRegAlloc() {
+	m.setupPrologue()
+	m.postRegAlloc()
+}
+
+// setupPrologue initializes the prologue of the function.
+func (m *machine) setupPrologue() {
 	ectx := m.executableContext
 
 	cur := ectx.RootInstr
@@ -186,8 +192,10 @@ func (m *machine) createFrameSizeSlot(cur *instruction, s int64) *instruction {
 	return cur
 }
 
-// SetupEpilogue implements backend.Machine.
-func (m *machine) SetupEpilogue() {
+// postRegAlloc does multiple things while walking through the instructions:
+// 1. Removes the redundant copy instruction.
+// 2. Inserts the epilogue.
+func (m *machine) postRegAlloc() {
 	ectx := m.executableContext
 	for cur := ectx.RootInstr; cur != nil; cur = cur.next {
 		if cur.kind == ret {
@@ -196,7 +204,6 @@ func (m *machine) SetupEpilogue() {
 		}
 
 		// Removes the redundant copy instruction.
-		// TODO: doing this in `SetupEpilogue` seems weird. Find a better home.
 		if cur.IsCopy() && cur.rn.realReg() == cur.rd.realReg() {
 			prev, next := cur.prev, cur.next
 			// Remove the copy instruction.

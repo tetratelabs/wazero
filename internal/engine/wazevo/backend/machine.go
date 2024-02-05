@@ -55,12 +55,8 @@ type (
 		// RegAlloc does the register allocation after lowering.
 		RegAlloc()
 
-		// SetupPrologue inserts the prologue after register allocations.
-		SetupPrologue()
-
-		// SetupEpilogue inserts the epilogue after register allocations.
-		// This sets up the instructions for the inverse of SetupPrologue right before
-		SetupEpilogue()
+		// PostRegAlloc does the post register allocation, e.g. setting up prologue/epilogue, redundant move elimination, etc.
+		PostRegAlloc()
 
 		// ResolveRelocations resolves the relocations after emitting machine code.
 		ResolveRelocations(refToBinaryOffset map[ssa.FuncRef]int, binary []byte, relocations []RelocationInfo)

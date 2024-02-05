@@ -192,8 +192,7 @@ func (c *compiler) RegAlloc() {
 
 // Finalize implements Compiler.Finalize.
 func (c *compiler) Finalize(ctx context.Context) {
-	c.mach.SetupPrologue()
-	c.mach.SetupEpilogue()
+	c.mach.PostRegAlloc()
 	c.mach.Encode(ctx)
 }
 

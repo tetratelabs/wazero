@@ -9,7 +9,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
-func TestMachine_SetupPrologue(t *testing.T) {
+func TestMachine_setupPrologue(t *testing.T) {
 	for _, tc := range []struct {
 		spillSlotSize int64
 		clobberedRegs []regalloc.VReg
@@ -75,7 +75,7 @@ func TestMachine_SetupPrologue(t *testing.T) {
 			root.next = udf
 			udf.prev = root
 
-			m.SetupPrologue()
+			m.setupPrologue()
 			require.Equal(t, root, m.ectx.RootInstr)
 			m.Encode(context.Background())
 			require.Equal(t, tc.exp, m.Format())
@@ -83,7 +83,7 @@ func TestMachine_SetupPrologue(t *testing.T) {
 	}
 }
 
-func TestMachine_SetupEpilogue(t *testing.T) {
+func TestMachine_postRegAlloc(t *testing.T) {
 	for _, tc := range []struct {
 		exp           string
 		abi           backend.FunctionABI
@@ -148,7 +148,7 @@ func TestMachine_SetupEpilogue(t *testing.T) {
 			ret.asRet(nil)
 			root.next = ret
 			ret.prev = root
-			m.SetupEpilogue()
+			m.postRegAlloc()
 
 			require.Equal(t, root, m.ectx.RootInstr)
 			m.Encode(context.Background())
