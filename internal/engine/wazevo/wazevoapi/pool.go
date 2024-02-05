@@ -57,3 +57,51 @@ func (p *Pool[T]) Reset() {
 	p.index = poolPageSize
 	p.allocated = 0
 }
+
+// IDedPool is a pool of T that can be allocated and reset, with a way to get T by an ID.
+type IDedPool[T any] struct {
+	pool             Pool[T]
+	idToItems        []*T
+	maxIDEncountered int
+}
+
+// NewIDedPool returns a new IDedPool.
+func NewIDedPool[T any](resetFn func(*T)) IDedPool[T] {
+	return IDedPool[T]{pool: NewPool[T](resetFn)}
+}
+
+// GetOrAllocate returns the T with the given id.
+func (p *IDedPool[T]) GetOrAllocate(id int) *T {
+	if p.maxIDEncountered < id {
+		p.maxIDEncountered = id
+	}
+	if id >= len(p.idToItems) {
+		p.idToItems = append(p.idToItems, make([]*T, id-len(p.idToItems)+1)...)
+	}
+	if p.idToItems[id] == nil {
+		p.idToItems[id] = p.pool.Allocate()
+	}
+	return p.idToItems[id]
+}
+
+// Get returns the T with the given id, or nil if it's not allocated.
+func (p *IDedPool[T]) Get(id int) *T {
+	if id >= len(p.idToItems) {
+		return nil
+	}
+	return p.idToItems[id]
+}
+
+// Reset resets the pool.
+func (p *IDedPool[T]) Reset() {
+	p.pool.Reset()
+	for i := range p.idToItems {
+		p.idToItems[i] = nil
+	}
+	p.maxIDEncountered = -1
+}
+
+// MaxIDEncountered returns the maximum id encountered so far.
+func (p *IDedPool[T]) MaxIDEncountered() int {
+	return p.maxIDEncountered
+}

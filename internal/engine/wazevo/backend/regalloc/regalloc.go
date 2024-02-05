@@ -19,11 +19,12 @@ import (
 // NewAllocator returns a new Allocator.
 func NewAllocator(allocatableRegs *RegisterInfo) Allocator {
 	a := Allocator{
-		regInfo:               allocatableRegs,
-		blockLivenessDataPool: wazevoapi.NewPool[blockLivenessData](resetBlockLivenessData),
-		phiDefInstListPool:    wazevoapi.NewPool[phiDefInstList](resetPhiDefInstList),
-		blockStatePool:        wazevoapi.NewPool[blockState](resetBlockState),
+		regInfo:            allocatableRegs,
+		blockLivenessData:  wazevoapi.NewIDedPool[blockLivenessData](resetBlockLivenessData),
+		phiDefInstListPool: wazevoapi.NewPool[phiDefInstList](resetPhiDefInstList),
+		blockStates:        wazevoapi.NewIDedPool[blockState](resetBlockState),
 	}
+	a.state.vrStates = wazevoapi.NewIDedPool[vrState](resetVrState)
 	a.state.reset()
 	for _, regs := range allocatableRegs.AllocatableRegisters {
 		for _, r := range regs {
@@ -54,10 +55,8 @@ type (
 		// allocatableSet is a set of allocatable RealReg derived from regInfo. Static per ABI/ISA.
 		allocatableSet           RegSet
 		allocatedCalleeSavedRegs []VReg
-		blockLivenessDataPool    wazevoapi.Pool[blockLivenessData]
-		blockLivenessData        [] /* blockID to */ *blockLivenessData
+		blockLivenessData        wazevoapi.IDedPool[blockLivenessData]
 		vs                       []VReg
-		maxBlockID               int
 		phiDefInstListPool       wazevoapi.Pool[phiDefInstList]
 
 		// Followings are re-used during various places e.g. coloring.
@@ -66,9 +65,8 @@ type (
 		currentOccupants regInUseSet
 
 		// Following two fields are updated while iterating the blocks in the reverse postorder.
-		state               state
-		blockStatePool      wazevoapi.Pool[blockState]
-		blockIDToBlockState []*blockState
+		state       state
+		blockStates wazevoapi.IDedPool[blockState]
 	}
 
 	// blockLivenessData is a per-block information used during the register allocation.
@@ -82,10 +80,9 @@ type (
 	programCounter int32
 
 	state struct {
-		argRealRegs          []VReg
-		regsInUse            regInUseSet
-		vrStates             []vrState
-		maxVRegIDEncountered int
+		argRealRegs []VReg
+		regsInUse   regInUseSet
+		vrStates    wazevoapi.IDedPool[vrState]
 
 		// allocatedRegSet is a set of RealReg that are allocated during the allocation phase. This is reset per function.
 		allocatedRegSet RegSet
@@ -140,11 +137,14 @@ func (s *state) dump(info *RegisterInfo) { //nolint:unused
 	fmt.Println("\t\t\tregsInUse", s.regsInUse.format(info))
 	fmt.Println("\t\t\tallocatedRegSet:", s.allocatedRegSet.format(info))
 	fmt.Println("\t\t\tused:", s.regsInUse.format(info))
-	fmt.Println("\t\t\tmaxVRegIDEncountered:", s.maxVRegIDEncountered)
 	var strs []string
-	for i, v := range s.vrStates {
-		if v.r != RealRegInvalid {
-			strs = append(strs, fmt.Sprintf("(v%d: %s)", i, info.RealRegName(v.r)))
+	for i := 0; i <= s.vrStates.MaxIDEncountered(); i++ {
+		vs := s.vrStates.Get(i)
+		if vs == nil {
+			continue
+		}
+		if vs.r != RealRegInvalid {
+			strs = append(strs, fmt.Sprintf("(v%d: %s)", vs.v.ID(), info.RealRegName(vs.r)))
 		}
 	}
 	fmt.Println("\t\t\tvrStates:", strings.Join(strs, ", "))
@@ -152,44 +152,25 @@ func (s *state) dump(info *RegisterInfo) { //nolint:unused
 
 func (s *state) reset() {
 	s.argRealRegs = s.argRealRegs[:0]
-	for i, l := 0, len(s.vrStates); i <= s.maxVRegIDEncountered && i < l; i++ {
-		s.vrStates[i].reset()
-	}
-	s.maxVRegIDEncountered = -1
+	s.vrStates.Reset()
 	s.allocatedRegSet = RegSet(0)
 	s.regsInUse.reset()
 }
 
-func (a *Allocator) getBlockState(bID int) *blockState {
-	if bID >= len(a.blockIDToBlockState) {
-		a.blockIDToBlockState = append(a.blockIDToBlockState, make([]*blockState, bID+1)...)
-	}
-
-	st := a.blockIDToBlockState[bID]
-	if st == nil {
-		st = a.blockStatePool.Allocate()
-		a.blockIDToBlockState[bID] = st
-	}
-	return st
-}
-
 func (s *state) setVRegState(v VReg, r RealReg) {
 	id := int(v.ID())
-	if id >= len(s.vrStates) {
-		s.vrStates = append(s.vrStates, make([]vrState, id+1-len(s.vrStates))...)
-		s.vrStates = s.vrStates[:cap(s.vrStates)]
-	}
-
-	st := &s.vrStates[id]
+	st := s.vrStates.GetOrAllocate(id)
 	st.r = r
 	st.v = v
 }
 
-func (vs *vrState) reset() {
+func resetVrState(vs *vrState) {
+	vs.v = VRegInvalid
 	vs.r = RealRegInvalid
 	vs.defInstr = nil
 	vs.defBlk = nil
 	vs.spilled = false
+	vs.lastUse = -1
 	vs.lca = nil
 	vs.isPhi = false
 	vs.phiDefInstList = nil
@@ -197,13 +178,7 @@ func (vs *vrState) reset() {
 
 func (s *state) getVRegState(v VReg) *vrState {
 	id := int(v.ID())
-	if id >= len(s.vrStates) {
-		s.setVRegState(v, RealRegInvalid)
-	}
-	if s.maxVRegIDEncountered < id {
-		s.maxVRegIDEncountered = id
-	}
-	return &s.vrStates[id]
+	return s.vrStates.GetOrAllocate(id)
 }
 
 func (s *state) useRealReg(r RealReg, v VReg) {
@@ -342,10 +317,8 @@ func (s *state) phiBlk(v VReg) Block {
 // liveAnalysis constructs Allocator.blockLivenessData.
 // The algorithm here is described in https://pfalcon.github.io/ssabook/latest/book-full.pdf Chapter 9.2.
 func (a *Allocator) livenessAnalysis(f Function) {
-	// First, we need to allocate blockLivenessData.
 	s := &a.state
 	for blk := f.PostOrderBlockIteratorBegin(); blk != nil; blk = f.PostOrderBlockIteratorNext() { // Order doesn't matter.
-		a.allocateBlockLivenessData(blk.ID())
 
 		// We should gather phi value data.
 		for _, p := range blk.BlockParams(&a.vs) {
@@ -353,15 +326,12 @@ func (a *Allocator) livenessAnalysis(f Function) {
 			vs.isPhi = true
 			vs.defBlk = blk
 		}
-		if blk.ID() > a.maxBlockID {
-			a.maxBlockID = blk.ID()
-		}
 	}
 
 	// Run the Algorithm 9.2 in the bool.
 	for blk := f.PostOrderBlockIteratorBegin(); blk != nil; blk = f.PostOrderBlockIteratorNext() {
 		blkID := blk.ID()
-		info := a.livenessDataAt(blkID)
+		info := a.blockLivenessData.GetOrAllocate(blkID)
 
 		ns := blk.Succs()
 		for i := 0; i < ns; i++ {
@@ -371,7 +341,7 @@ func (a *Allocator) livenessAnalysis(f Function) {
 			}
 
 			succID := succ.ID()
-			succInfo := a.livenessDataAt(succID)
+			succInfo := a.blockLivenessData.GetOrAllocate(succID)
 			if !succInfo.seen { // This means the back edge.
 				continue
 			}
@@ -432,7 +402,7 @@ func (a *Allocator) loopTreeDFS(entry Block) {
 		a.blks = a.blks[:tail]
 		a.vs = a.vs[:0]
 
-		info := a.livenessDataAt(loop.ID())
+		info := a.blockLivenessData.GetOrAllocate(loop.ID())
 		for v := range info.liveIns {
 			if s.phiBlk(v) != loop {
 				a.vs = append(a.vs, v)
@@ -444,7 +414,7 @@ func (a *Allocator) loopTreeDFS(entry Block) {
 		for i := 0; i < cn; i++ {
 			child := loop.LoopNestingForestChild(i)
 			childID := child.ID()
-			childInfo := a.livenessDataAt(childID)
+			childInfo := a.blockLivenessData.GetOrAllocate(childID)
 			for _, v := range a.vs {
 				childInfo.liveIns[v] = struct{}{}
 				childInfo.liveOuts[v] = struct{}{}
@@ -484,9 +454,9 @@ func (a *Allocator) alloc(f Function) {
 
 func (a *Allocator) allocBlock(f Function, blk Block) {
 	bID := blk.ID()
-	liveness := a.livenessDataAt(bID)
+	liveness := a.blockLivenessData.GetOrAllocate(bID)
 	s := &a.state
-	currentBlkState := a.getBlockState(bID)
+	currentBlkState := a.blockStates.GetOrAllocate(bID)
 
 	preds := blk.Preds()
 	var predState *blockState
@@ -494,13 +464,13 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 	case 0: // This is the entry block.
 	case 1:
 		predID := blk.Pred(0).ID()
-		predState = a.getBlockState(predID)
+		predState = a.blockStates.GetOrAllocate(predID)
 		currentBlkState.startFromPredIndex = 0
 	default:
 		// TODO: there should be some better heuristic to choose the predecessor.
 		for i := 0; i < preds; i++ {
 			predID := blk.Pred(i).ID()
-			if _predState := a.getBlockState(predID); _predState.visited {
+			if _predState := a.blockStates.GetOrAllocate(predID); _predState.visited {
 				predState = _predState
 				currentBlkState.startFromPredIndex = i
 				break
@@ -716,7 +686,7 @@ func (a *Allocator) fixMergeState(f Function, blk Block) {
 
 	// Restores the state at the beginning of the block.
 	bID := blk.ID()
-	blkSt := a.getBlockState(bID)
+	blkSt := a.blockStates.GetOrAllocate(bID)
 	desiredOccupants := &blkSt.startRegs
 	aliveOnRegVRegs := make(map[VReg]RealReg)
 	for i := 0; i < 64; i++ {
@@ -739,7 +709,7 @@ func (a *Allocator) fixMergeState(f Function, blk Block) {
 
 		currentOccupantsRev := make(map[VReg]RealReg)
 		pred := blk.Pred(i)
-		predSt := a.getBlockState(pred.ID())
+		predSt := a.blockStates.GetOrAllocate(pred.ID())
 		for ii := 0; ii < 64; ii++ {
 			r := RealReg(ii)
 			if v := predSt.endRegs.get(r); v.Valid() {
@@ -751,7 +721,7 @@ func (a *Allocator) fixMergeState(f Function, blk Block) {
 			}
 		}
 
-		s.resetAt(predSt, a.livenessDataAt(bID).liveIns)
+		s.resetAt(predSt, a.blockLivenessData.GetOrAllocate(bID).liveIns)
 
 		// Finds the free registers if any.
 		intTmp, floatTmp := VRegInvalid, VRegInvalid
@@ -873,9 +843,12 @@ func (a *Allocator) reconcileEdge(f Function,
 }
 
 func (a *Allocator) scheduleSpills(f Function) {
-	vrStates := a.state.vrStates
-	for i := 0; i <= a.state.maxVRegIDEncountered; i++ {
-		vs := &vrStates[i]
+	states := a.state.vrStates
+	for i := 0; i <= states.MaxIDEncountered(); i++ {
+		vs := states.Get(i)
+		if vs == nil {
+			continue
+		}
 		if vs.spilled {
 			a.scheduleSpill(f, vs)
 		}
@@ -904,7 +877,7 @@ func (a *Allocator) scheduleSpill(f Function, vs *vrState) {
 		fmt.Printf("v%d is spilled in blk%d, lca=blk%d\n", v.ID(), definingBlk.ID(), pos.ID())
 	}
 	for pos != definingBlk {
-		st := a.getBlockState(pos.ID())
+		st := a.blockStates.GetOrAllocate(pos.ID())
 		for ii := 0; ii < 64; ii++ {
 			rr := RealReg(ii)
 			if st.startRegs.get(rr) == v {
@@ -942,33 +915,10 @@ func (a *Allocator) scheduleSpill(f Function, vs *vrState) {
 // Reset resets the allocator's internal state so that it can be reused.
 func (a *Allocator) Reset() {
 	a.state.reset()
-	for i := 0; i <= a.maxBlockID && i < len(a.blockIDToBlockState); i++ {
-		a.blockLivenessData[i] = nil
-		a.blockIDToBlockState[i] = nil
-	}
-	a.blockStatePool.Reset()
-	a.blockLivenessDataPool.Reset()
+	a.blockLivenessData.Reset()
+	a.blockStates.Reset()
 	a.phiDefInstListPool.Reset()
-
 	a.vs = a.vs[:0]
-	a.maxBlockID = -1
-}
-
-func (a *Allocator) allocateBlockLivenessData(blockID int) *blockLivenessData {
-	if blockID >= len(a.blockLivenessData) {
-		a.blockLivenessData = append(a.blockLivenessData, make([]*blockLivenessData, (blockID+1)-len(a.blockLivenessData))...)
-	}
-	info := a.blockLivenessData[blockID]
-	if info == nil {
-		info = a.blockLivenessDataPool.Allocate()
-		a.blockLivenessData[blockID] = info
-	}
-	return info
-}
-
-func (a *Allocator) livenessDataAt(blockID int) (info *blockLivenessData) {
-	info = a.blockLivenessData[blockID]
-	return
 }
 
 func resetBlockLivenessData(i *blockLivenessData) {
