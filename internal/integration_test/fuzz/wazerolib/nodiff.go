@@ -22,7 +22,7 @@ import (
 // And if there's diff, this also saves the problematic binary and wat into testdata directory.
 //
 //export require_no_diff
-func require_no_diff(binaryPtr uintptr, binarySize int, watPtr uintptr, watSize int, checkMemory bool) {
+func require_no_diff(binaryPtr uintptr, binarySize int, checkMemory bool) {
 	// TODO: use unsafe.Slice after flooring Go 1.20.
 	var wasmBin []byte
 	wasmHdr := (*reflect.SliceHeader)(unsafe.Pointer(&wasmBin))
@@ -30,17 +30,11 @@ func require_no_diff(binaryPtr uintptr, binarySize int, watPtr uintptr, watSize 
 	wasmHdr.Len = binarySize
 	wasmHdr.Cap = binarySize
 
-	// TODO: use unsafe.String after flooring Go 1.20.
-	var wat string
-	watHdr := (*reflect.StringHeader)(unsafe.Pointer(&wat))
-	watHdr.Data = watPtr
-	watHdr.Len = watSize
-
 	failed := true
 	defer func() {
 		if failed {
 			// If the test fails, we save the binary and wat into testdata directory.
-			saveFailedBinary(wasmBin, wat, "TestReRunFailedRequireNoDiffCase")
+			saveFailedBinary(wasmBin, "TestReRunFailedRequireNoDiffCase")
 		}
 	}()
 
