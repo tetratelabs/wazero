@@ -248,7 +248,7 @@ func (c *Compiler) LowerToSSA() {
 		variable := builder.DeclareVariable(st)
 		value := entryBlock.AddParam(builder, st)
 		builder.DefineVariable(variable, value, entryBlock)
-		c.wasmLocalToVariable[wasm.Index(i)] = variable
+		c.setWasmLocalVariable(wasm.Index(i), variable)
 	}
 	c.declareWasmLocals(entryBlock)
 	c.declareNecessaryVariables()
@@ -261,17 +261,21 @@ func (c *Compiler) localVariable(index wasm.Index) ssa.Variable {
 	return c.wasmLocalToVariable[index]
 }
 
+func (c *Compiler) setWasmLocalVariable(index wasm.Index, variable ssa.Variable) {
+	idx := int(index)
+	if idx >= len(c.wasmLocalToVariable) {
+		c.wasmLocalToVariable = append(c.wasmLocalToVariable, make([]ssa.Variable, idx+1-len(c.wasmLocalToVariable))...)
+	}
+	c.wasmLocalToVariable[idx] = variable
+}
+
 // declareWasmLocals declares the SSA variables for the Wasm locals.
 func (c *Compiler) declareWasmLocals(entry ssa.BasicBlock) {
 	localCount := wasm.Index(len(c.wasmFunctionTyp.Params))
 	for i, typ := range c.wasmFunctionLocalTypes {
 		st := WasmTypeToSSAType(typ)
 		variable := c.ssaBuilder.DeclareVariable(st)
-		idx := int(wasm.Index(i) + localCount)
-		if idx >= len(c.wasmLocalToVariable) {
-			c.wasmLocalToVariable = append(c.wasmLocalToVariable, make([]ssa.Variable, idx+1-len(c.wasmLocalToVariable))...)
-		}
-		c.wasmLocalToVariable[idx] = variable
+		c.setWasmLocalVariable(wasm.Index(i)+localCount, variable)
 
 		zeroInst := c.ssaBuilder.AllocateInstruction()
 		switch st {
