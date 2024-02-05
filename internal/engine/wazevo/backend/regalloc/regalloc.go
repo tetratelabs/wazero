@@ -923,19 +923,8 @@ func (a *Allocator) Reset() {
 
 func resetBlockLivenessData(i *blockLivenessData) {
 	i.seen = false
-	i.liveOuts = resetMap(i.liveOuts)
-	i.liveIns = resetMap(i.liveIns)
-}
-
-func resetMap[K comparable, V any](m map[K]V) map[K]V {
-	if m == nil {
-		m = make(map[K]V)
-	} else {
-		for v := range m {
-			delete(m, v)
-		}
-	}
-	return m
+	i.liveOuts = wazevoapi.ResetMap(i.liveOuts)
+	i.liveIns = wazevoapi.ResetMap(i.liveIns)
 }
 
 // Format is for debugging.
