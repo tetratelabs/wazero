@@ -1472,35 +1472,42 @@ func (m *machine) clobberedRegSlotSize() int64 {
 
 func (m *machine) lowerIDivRem(si *ssa.Instruction, isDiv bool, signed bool) {
 	x, y, execCtx := si.Arg3()
-	if !x.Type().IsInt() {
-		panic("BUG?")
-	}
-	_64 := x.Type().Bits() == 64
 
-	xDef, yDef := m.c.ValueDefinition(x), m.c.ValueDefinition(y)
-	xr := m.getOperand_Reg(xDef)
-	yr := m.getOperand_Reg(yDef)
+	dividend := m.getOperand_Reg(m.c.ValueDefinition(x))
+	divisor := m.getOperand_Reg(m.c.ValueDefinition(y))
 	ctxVReg := m.c.VRegOf(execCtx)
+	tmpGp := m.c.AllocateVReg(si.Return().Type())
+
+	m.copyTo(dividend.r, raxVReg)
+	m.insert(m.allocateInstr().asDefineUninitializedReg(rdxVReg))
+	m.insert(m.allocateInstr().asDefineUninitializedReg(tmpGp))
+	seq := m.allocateInstr().asIdivRemSequence(ctxVReg, divisor.r, tmpGp, isDiv, signed, x.Type().Bits() == 64)
+	m.insert(seq)
 	rd := m.c.VRegOf(si.Return())
+	if isDiv {
+		m.copyTo(raxVReg, rd)
+	} else {
+		m.copyTo(rdxVReg, rd)
+	}
+}
+
+func (m *machine) lowerIDivRemSequenceAfterRegAlloc(i *instruction) {
+	execCtx, divisor, tmpGp, isDiv, signed, _64 := i.idivRemSequenceData()
+
+	dividend := raxVReg
 
 	// Ensure yr is not zero.
 	test := m.allocateInstr()
-	test.asCmpRmiR(false, yr, yr.r, _64)
+	test.asCmpRmiR(false, newOperandReg(divisor), divisor, _64)
 	m.insert(test)
-
-	// We need to copy the execution context to a temp register *BEFORE BRANCHING*, because if it's spilled,
-	// it might end up being reloaded inside the exiting branch.
-	execCtxTmp := m.copyToTmp(ctxVReg)
 
 	jnz := m.allocateInstr()
 	m.insert(jnz)
 
-	nz := m.lowerExitWithCode(execCtxTmp, wazevoapi.ExitCodeIntegerDivisionByZero)
+	nz := m.lowerExitWithCode(execCtx, wazevoapi.ExitCodeIntegerDivisionByZero)
 
 	// If not zero, we can proceed with the division.
 	jnz.asJmpIf(condNZ, newOperandLabel(nz))
-
-	m.copyTo(xr.r, raxVReg)
 
 	var ifRemNeg1 *instruction
 	if signed {
@@ -1510,8 +1517,7 @@ func (m *machine) lowerIDivRem(si *ssa.Instruction, isDiv bool, signed bool) {
 		} else {
 			neg1 = 0xffffffff
 		}
-		tmp1 := m.c.AllocateVReg(si.Return().Type())
-		m.lowerIconst(tmp1, neg1, _64)
+		m.lowerIconst(tmpGp, neg1, _64)
 
 		if isDiv {
 			// For signed division, we have to have branches for "math.MinInt{32,64} / -1"
@@ -1520,12 +1526,9 @@ func (m *machine) lowerIDivRem(si *ssa.Instruction, isDiv bool, signed bool) {
 
 			// First, we check if the divisor is -1.
 			cmp := m.allocateInstr()
-			cmp.asCmpRmiR(true, newOperandReg(tmp1), yr.r, _64)
+			cmp.asCmpRmiR(true, newOperandReg(tmpGp), divisor, _64)
 			m.insert(cmp)
 
-			// Again, we need to copy the execution context to a temp register *BEFORE BRANCHING*, because if it's spilled,
-			// it might end up being reloaded inside the exiting branch.
-			execCtxTmp2 := m.copyToTmp(execCtxTmp)
 			ifNotNeg1 := m.allocateInstr()
 			m.insert(ifNotNeg1)
 
@@ -1535,13 +1538,12 @@ func (m *machine) lowerIDivRem(si *ssa.Instruction, isDiv bool, signed bool) {
 			} else {
 				minInt = 0x80000000
 			}
-			tmp := m.c.AllocateVReg(si.Return().Type())
-			m.lowerIconst(tmp, minInt, _64)
+			m.lowerIconst(tmpGp, minInt, _64)
 
 			// Next we check if the quotient is the most negative value for the signed integer, i.e.
 			// if we are trying to do (math.MinInt32 / -1) or (math.MinInt64 / -1) respectively.
 			cmp2 := m.allocateInstr()
-			cmp2.asCmpRmiR(true, newOperandReg(tmp), xr.r, _64)
+			cmp2.asCmpRmiR(true, newOperandReg(tmpGp), dividend, _64)
 			m.insert(cmp2)
 
 			ifNotMinInt := m.allocateInstr()
@@ -1550,7 +1552,7 @@ func (m *machine) lowerIDivRem(si *ssa.Instruction, isDiv bool, signed bool) {
 			// Trap if we are trying to do (math.MinInt32 / -1) or (math.MinInt64 / -1),
 			// as that is the overflow in division as the result becomes 2^31 which is larger than
 			// the maximum of signed 32-bit int (2^31-1).
-			end := m.lowerExitWithCode(execCtxTmp2, wazevoapi.ExitCodeIntegerOverflow)
+			end := m.lowerExitWithCode(execCtx, wazevoapi.ExitCodeIntegerOverflow)
 			ifNotNeg1.asJmpIf(condNZ, newOperandLabel(end))
 			ifNotMinInt.asJmpIf(condNZ, newOperandLabel(end))
 		} else {
@@ -1560,7 +1562,7 @@ func (m *machine) lowerIDivRem(si *ssa.Instruction, isDiv bool, signed bool) {
 
 			// We check if the divisor is -1.
 			cmp := m.allocateInstr()
-			cmp.asCmpRmiR(true, newOperandReg(tmp1), yr.r, _64)
+			cmp.asCmpRmiR(true, newOperandReg(tmpGp), divisor, _64)
 			m.insert(cmp)
 
 			ifRemNeg1 = m.allocateInstr()
@@ -1578,7 +1580,7 @@ func (m *machine) lowerIDivRem(si *ssa.Instruction, isDiv bool, signed bool) {
 	}
 
 	div := m.allocateInstr()
-	div.asDiv(yr, signed, _64)
+	div.asDiv(newOperandReg(divisor), signed, _64)
 	m.insert(div)
 
 	nop, end := m.allocateBrTarget()
@@ -1586,12 +1588,6 @@ func (m *machine) lowerIDivRem(si *ssa.Instruction, isDiv bool, signed bool) {
 	// If we are compiling a Rem instruction, when the divisor is -1 we land at the end of the function.
 	if ifRemNeg1 != nil {
 		ifRemNeg1.asJmpIf(condZ, newOperandLabel(end))
-	}
-
-	if isDiv {
-		m.copyTo(raxVReg, rd)
-	} else {
-		m.copyTo(rdxVReg, rd)
 	}
 }
 

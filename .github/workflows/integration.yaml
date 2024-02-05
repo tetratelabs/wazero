@@ -206,6 +206,12 @@ jobs:
               name: macOS
             compiler: optimizing
             arch:     "arm64"
+          - os:
+              version: ubuntu-22.04
+              name: Ubuntu
+            compiler:   optimizing
+            arch:       "amd64"
+            go-version: "1.21"
 
     steps:
       - name: Checkout wazero

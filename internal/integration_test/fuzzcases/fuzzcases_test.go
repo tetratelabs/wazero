@@ -931,3 +931,16 @@ func Test2009(t *testing.T) {
 		require.Equal(t, res, []uint64{0})
 	})
 }
+
+func Test2017(t *testing.T) {
+	if !platform.CompilerSupported() {
+		return
+	}
+	run(t, func(t *testing.T, r wazero.Runtime) {
+		mod, err := r.Instantiate(ctx, getWasmBinary(t, "2017"))
+		require.NoError(t, err)
+		_, err = mod.ExportedFunction("").Call(ctx)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "integer divide by zero")
+	})
+}
