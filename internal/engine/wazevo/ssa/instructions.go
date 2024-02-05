@@ -856,6 +856,7 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeAtomicRmw:          sideEffectStrict,
 	OpcodeAtomicLoad:         sideEffectStrict,
 	OpcodeAtomicStore:        sideEffectStrict,
+	OpcodeAtomicCas:          sideEffectStrict,
 }
 
 // sideEffect returns true if this instruction has side effects.
@@ -1039,6 +1040,7 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeAtomicRmw:          returnTypesFnSingle,
 	OpcodeAtomicLoad:         returnTypesFnSingle,
 	OpcodeAtomicStore:        returnTypesFnNoReturns,
+	OpcodeAtomicCas:          returnTypesFnSingle,
 }
 
 // AsLoad initializes this instruction as a store instruction with OpcodeLoad.
@@ -1996,6 +1998,18 @@ func (i *Instruction) AsAtomicRmw(op AtomicRmwOp, addr, val Value, size uint64) 
 	return i
 }
 
+// AsAtomicCas initializes this instruction as an atomic compare-and-swap.
+// The size is in bytes and must be 1, 2, 4, or 8.
+func (i *Instruction) AsAtomicCas(addr, exp, repl Value, size uint64) *Instruction {
+	i.opcode = OpcodeAtomicCas
+	i.u1 = size
+	i.v = addr
+	i.v2 = exp
+	i.v3 = repl
+	i.typ = repl.Type()
+	return i
+}
+
 // AtomicRmwData returns the data for this atomic read-modify-write instruction.
 func (i *Instruction) AtomicRmwData() (op AtomicRmwOp, size uint64) {
 	return AtomicRmwOp(i.u1), i.u2
@@ -2563,6 +2577,8 @@ func (i *Instruction) Format(b Builder) string {
 		instSuffix = fmt.Sprintf("_%d, %s", 8*i.u1, i.v.Format(b))
 	case OpcodeAtomicStore:
 		instSuffix = fmt.Sprintf("_%d, %s, %s", 8*i.u1, i.v.Format(b), i.v2.Format(b))
+	case OpcodeAtomicCas:
+		instSuffix = fmt.Sprintf("_%d, %s, %s, %s", 8*i.u1, i.v.Format(b), i.v2.Format(b), i.v3.Format(b))
 	default:
 		panic(fmt.Sprintf("TODO: format for %s", i.opcode))
 	}
