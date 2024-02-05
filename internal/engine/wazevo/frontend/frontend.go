@@ -35,7 +35,7 @@ type Compiler struct {
 
 	// wasmLocalToVariable maps the index (considered as wasm.Index of locals)
 	// to the corresponding ssa.Variable.
-	wasmLocalToVariable                   map[wasm.Index]ssa.Variable
+	wasmLocalToVariable                   [] /* local index to */ ssa.Variable
 	wasmLocalFunctionIndex                wasm.Index
 	wasmFunctionTypeIndex                 wasm.Index
 	wasmFunctionTyp                       *wasm.FunctionType
@@ -71,7 +71,6 @@ func NewFrontendCompiler(m *wasm.Module, ssaBuilder ssa.Builder, offset *wazevoa
 		m:                    m,
 		ssaBuilder:           ssaBuilder,
 		br:                   bytes.NewReader(nil),
-		wasmLocalToVariable:  make(map[wasm.Index]ssa.Variable),
 		offset:               offset,
 		ensureTermination:    ensureTermination,
 		needSourceOffsetInfo: sourceInfo,
@@ -268,7 +267,11 @@ func (c *Compiler) declareWasmLocals(entry ssa.BasicBlock) {
 	for i, typ := range c.wasmFunctionLocalTypes {
 		st := WasmTypeToSSAType(typ)
 		variable := c.ssaBuilder.DeclareVariable(st)
-		c.wasmLocalToVariable[wasm.Index(i)+localCount] = variable
+		idx := int(wasm.Index(i) + localCount)
+		if idx >= len(c.wasmLocalToVariable) {
+			c.wasmLocalToVariable = append(c.wasmLocalToVariable, make([]ssa.Variable, idx+1-len(c.wasmLocalToVariable))...)
+		}
+		c.wasmLocalToVariable[idx] = variable
 
 		zeroInst := c.ssaBuilder.AllocateInstruction()
 		switch st {
