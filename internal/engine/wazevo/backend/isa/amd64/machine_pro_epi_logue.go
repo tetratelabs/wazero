@@ -152,6 +152,16 @@ func (m *machine) SetupEpilogue() {
 			}
 			linkInstr(cur, next)
 			continue
+		case idivRemSequence:
+			m.ectx.PendingInstructions = m.ectx.PendingInstructions[:0]
+			m.lowerIDivRemSequenceAfterRegAlloc(cur)
+			prev := cur.prev
+			next := cur.next
+			cur := prev
+			for _, instr := range m.ectx.PendingInstructions {
+				cur = linkInstr(cur, instr)
+			}
+			linkInstr(cur, next)
 		}
 
 		if abi := cur.abi; abi != nil {

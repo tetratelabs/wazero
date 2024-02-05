@@ -607,8 +607,6 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 			panic("BUG: invalid operand kind")
 		}
 
-	case checkedDivOrRemSeq:
-		panic("TODO")
 	case signExtendData:
 		if i.b1 { // 64 bit.
 			c.EmitByte(0x48)

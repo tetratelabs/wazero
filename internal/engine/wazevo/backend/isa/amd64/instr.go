@@ -123,8 +123,6 @@ func (i *instruction) String() string {
 			op = "mull"
 		}
 		return fmt.Sprintf("%s %s", op, i.op1.format(i.b1))
-	case checkedDivOrRemSeq:
-		panic("TODO")
 	case signExtendData:
 		var op string
 		if i.b1 {
@@ -260,6 +258,10 @@ func (i *instruction) String() string {
 			formatVRegSized(tmpGp2, true),
 			formatVRegSized(tmpXmm, true),
 			formatVRegSized(tmpXmm2, true), sat)
+	case idivRemSequence:
+		execCtx, divisor, tmpGp, isDiv, signed, _64 := i.idivRemSequenceData()
+		return fmt.Sprintf("idivRemSequence execCtx=%s, divisor=%s, tmpGp=%s, isDiv=%v, signed=%v, _64=%v",
+			formatVRegSized(execCtx, true), formatVRegSized(divisor, _64), formatVRegSized(tmpGp, _64), isDiv, signed, _64)
 	case defineUninitializedReg:
 		return fmt.Sprintf("defineUninitializedReg %s", i.op2.format(true))
 	case xmmCMov:
@@ -281,16 +283,19 @@ func (i *instruction) Defs(regs *[]regalloc.VReg) []regalloc.VReg {
 		*regs = append(*regs, i.op2.r)
 	case defKindCall:
 		*regs = append(*regs, i.abi.RetRealRegs...)
-	case defKindRdx:
-		*regs = append(*regs, rdxVReg)
-	case defKindRaxRdx:
-		*regs = append(*regs, raxVReg, rdxVReg)
 	case defKindFcvtToSintSequence:
 		_, _, _, _, dst, _, _, _, _, _, _ := i.fcvtToSintSequenceData()
 		*regs = append(*regs, dst)
 	case defKindFcvtToUintSequence:
 		_, _, _, _, _, dst, _, _, _, _, _, _, _ := i.fcvtToUintSequenceData()
 		*regs = append(*regs, dst)
+	case defKindDivRem:
+		_, _, _, isDiv, _, _ := i.idivRemSequenceData()
+		if isDiv {
+			*regs = append(*regs, raxVReg)
+		} else {
+			*regs = append(*regs, rdxVReg)
+		}
 	default:
 		panic(fmt.Sprintf("BUG: invalid defKind \"%s\" for %s", dk, i))
 	}
@@ -346,26 +351,16 @@ func (i *instruction) Uses(regs *[]regalloc.VReg) []regalloc.VReg {
 		*regs = append(*regs, i.abi.ArgRealRegs...)
 	case useKindCall:
 		*regs = append(*regs, i.abi.ArgRealRegs...)
-	case useKindRax:
-		*regs = append(*regs, raxVReg)
-	case useKindOp1Rax:
-		op := i.op1
-		switch op.kind {
-		case operandKindReg:
-			*regs = append(*regs, op.r)
-		case operandKindMem:
-			op.amode.uses(regs)
-		case operandKindImm32, operandKindLabel:
-		default:
-			panic(fmt.Sprintf("BUG: invalid operand: %s", i))
-		}
-		*regs = append(*regs, raxVReg)
 	case useKindFcvtToSintSequence:
 		_, _, execCtx, src, _, tmpGp, tmpGp2, tmpXmm, _, _, _ := i.fcvtToSintSequenceData()
 		*regs = append(*regs, execCtx, src, tmpGp, tmpGp2, tmpXmm)
 	case useKindFcvtToUintSequence:
 		_, _, _, execCtx, src, _, tmpGp, tmpGp2, tmpXmm, tmpXmm2, _, _, _ := i.fcvtToUintSequenceData()
 		*regs = append(*regs, execCtx, src, tmpGp, tmpGp2, tmpXmm, tmpXmm2)
+	case useKindDivRem:
+		execCtx, divisor, tmpGp, _, _, _ := i.idivRemSequenceData()
+		// idiv uses rax and rdx as implicit operands.
+		*regs = append(*regs, raxVReg, rdxVReg, execCtx, divisor, tmpGp)
 	default:
 		panic(fmt.Sprintf("BUG: invalid useKind %s for %s", uk, i))
 	}
@@ -449,32 +444,6 @@ func (i *instruction) AssignUse(index int, v regalloc.VReg) {
 		default:
 			panic(fmt.Sprintf("BUG: invalid operand: %s", i))
 		}
-	case useKindOp1Rax:
-		if index == 0 {
-			op := &i.op1
-			switch op.kind {
-			case operandKindReg:
-				if index != 0 {
-					panic("BUG")
-				}
-				if op.r.IsRealReg() {
-					panic("BUG already assigned: " + i.String())
-				}
-				op.r = v
-			case operandKindMem:
-				op.amode.assignUses(index, v)
-			default:
-				panic(fmt.Sprintf("BUG: invalid operand: %s", i))
-			}
-		} else if index == 1 {
-			// Do nothing.
-		} else {
-			panic("BUG")
-		}
-	case useKindRax:
-		if index != 0 {
-			panic("BUG")
-		}
 	case useKindFcvtToSintSequence:
 		switch index {
 		case 0:
@@ -504,6 +473,25 @@ func (i *instruction) AssignUse(index int, v regalloc.VReg) {
 			i.op2.amode.index = v
 		case 5:
 			i.op2.r = v
+		default:
+			panic("BUG")
+		}
+	case useKindDivRem:
+		switch index {
+		case 0:
+			if v != raxVReg {
+				panic("BUG")
+			}
+		case 1:
+			if v != rdxVReg {
+				panic("BUG")
+			}
+		case 2:
+			i.op1.amode.base = v
+		case 3:
+			i.op1.amode.index = v
+		case 4:
+			i.op2.amode.base = v
 		default:
 			panic("BUG")
 		}
@@ -591,19 +579,6 @@ const (
 
 	// The high bits (RDX) of a (un)signed multiply: RDX:RAX := RAX * rhs.
 	mulHi
-
-	// A synthetic sequence to implement the right inline checks for remainder and division,
-	// assuming the dividend is in %rax.
-	// Puts the result back into %rax if is_div, %rdx if !is_div, to mimic what the div
-	// instruction does.
-	// The generated code sequence is described in the emit's function match arm for this
-	// instruction.
-	///
-	// Note: %rdx is marked as modified by this instruction, to avoid an early clobber problem
-	// with the temporary and divisor registers. Make sure to zero %rdx right before this
-	// instruction, or you might run into regalloc failures where %rdx is live before its first
-	// def!
-	checkedDivOrRemSeq
 
 	// Do a sign-extend based on the sign of the value in rax into rdx: (cwd cdq cqo)
 	// or al into ah: (cbw)
@@ -757,8 +732,34 @@ const (
 	// xmmCMov is a conditional move instruction for XMM registers. Lowered after register allocation.
 	xmmCMov
 
+	// idivRemSequence is a sequence of instructions to compute both the quotient and remainder of a division.
+	idivRemSequence
+
 	instrMax
 )
+
+func (i *instruction) asIdivRemSequence(
+	execCtx, divisor, tmpGp regalloc.VReg,
+	isDiv, signed, _64 bool,
+) *instruction {
+	i.kind = idivRemSequence
+	i.op1.amode.base = execCtx
+	i.op1.amode.index = divisor
+	i.op2.amode.base = tmpGp
+	i.b1 = isDiv
+	i.b2 = signed
+	i.b3 = _64
+	return i
+}
+
+func (i *instruction) idivRemSequenceData() (
+	execCtx, divisor, tmpGp regalloc.VReg, isDiv, signed, _64 bool,
+) {
+	if i.kind != idivRemSequence {
+		panic("BUG")
+	}
+	return i.op1.amode.base, i.op1.amode.index, i.op2.amode.base, i.b1, i.b2, i.b3
+}
 
 func (i *instruction) asXmmCMov(cc cond, x operand, rd regalloc.VReg, size byte) *instruction {
 	i.kind = xmmCMov
@@ -865,8 +866,6 @@ func (k instructionKind) String() string {
 		return "div"
 	case mulHi:
 		return "mulHi"
-	case checkedDivOrRemSeq:
-		return "checkedDivOrRemSeq"
 	case signExtendData:
 		return "signExtendData"
 	case movzxRmR:
@@ -933,6 +932,8 @@ func (k instructionKind) String() string {
 		return "fcvtToUintSequence"
 	case xmmCMov:
 		return "xmmCMov"
+	case idivRemSequence:
+		return "idivRemSequence"
 	default:
 		panic("BUG")
 	}
@@ -1926,16 +1927,13 @@ const (
 	defKindNone defKind = iota + 1
 	defKindOp2
 	defKindCall
-	defKindRdx
-	defKindRaxRdx
+	defKindDivRem
 	defKindFcvtToSintSequence
 	defKindFcvtToUintSequence
 )
 
 var defKinds = [instrMax]defKind{
 	nop0:                   defKindNone,
-	div:                    defKindRaxRdx,
-	signExtendData:         defKindRdx,
 	ret:                    defKindNone,
 	movRR:                  defKindOp2,
 	movRM:                  defKindNone,
@@ -1971,6 +1969,7 @@ var defKinds = [instrMax]defKind{
 	defineUninitializedReg: defKindOp2,
 	fcvtToUintSequence:     defKindFcvtToUintSequence,
 	xmmCMov:                defKindOp2,
+	idivRemSequence:        defKindDivRem,
 }
 
 // String implements fmt.Stringer.
@@ -1982,10 +1981,8 @@ func (d defKind) String() string {
 		return "op2"
 	case defKindCall:
 		return "call"
-	case defKindRdx:
-		return "rdx"
-	case defKindRaxRdx:
-		return "raxrdx"
+	case defKindDivRem:
+		return "divrem"
 	default:
 		return "invalid"
 	}
@@ -2000,10 +1997,7 @@ const (
 	useKindOp1Op2Reg
 	// useKindOp1RegOp2 is Op1 must be a register, Op2 can be any operand.
 	useKindOp1RegOp2
-	// useKindRax is %rax is used (for instance in signExtendData).
-	useKindRax
-	// useKindOp1Rax is Op1 must be a reg, mem operand; the other operand is implicitly %rax.
-	useKindOp1Rax
+	useKindDivRem
 	useKindCall
 	useKindCallInd
 	useKindFcvtToSintSequence
@@ -2012,8 +2006,6 @@ const (
 
 var useKinds = [instrMax]useKind{
 	nop0:                   useKindNone,
-	div:                    useKindOp1Rax,
-	signExtendData:         useKindRax,
 	ret:                    useKindNone,
 	movRR:                  useKindOp1,
 	movRM:                  useKindOp1RegOp2,
@@ -2049,6 +2041,7 @@ var useKinds = [instrMax]useKind{
 	defineUninitializedReg: useKindNone,
 	fcvtToUintSequence:     useKindFcvtToUintSequence,
 	xmmCMov:                useKindOp1,
+	idivRemSequence:        useKindDivRem,
 }
 
 func (u useKind) String() string {
@@ -2065,10 +2058,6 @@ func (u useKind) String() string {
 		return "call"
 	case useKindCallInd:
 		return "callInd"
-	case useKindOp1Rax:
-		return "op1rax"
-	case useKindRax:
-		return "rax"
 	default:
 		return "invalid"
 	}
