@@ -56,17 +56,9 @@ fn run(data: &[u8]) -> Result<()> {
     module.ensure_termination(1000);
     let module_bytes = module.to_bytes();
 
-    let wat_bytes = wasmprinter::print_bytes(&module_bytes).unwrap();
-
     // Pass the randomly generated module to the wazero library.
     unsafe {
-        wazero_abi::require_no_diff(
-            module_bytes.as_ptr(),
-            module_bytes.len(),
-            wat_bytes.as_ptr(),
-            wat_bytes.len(),
-            false,
-        );
+        wazero_abi::require_no_diff(module_bytes.as_ptr(), module_bytes.len(), false);
     }
 
     // We always return Ok as inside require_no_diff, we cause panic if the binary is interesting.

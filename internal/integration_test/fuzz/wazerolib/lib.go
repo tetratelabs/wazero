@@ -24,7 +24,7 @@ func main() {}
 const failedCasesDir = "wazerolib/testdata"
 
 // saveFailedBinary writes binary and wat into failedCasesDir so that it is easy to reproduce the error.
-func saveFailedBinary(bin []byte, wat string, reproduceTestName string) {
+func saveFailedBinary(bin []byte, reproduceTestName string) {
 	checksum := sha256.Sum256(bin)
 	checkSumStr := hex.EncodeToString(checksum[:])
 
@@ -47,37 +47,11 @@ func saveFailedBinary(bin []byte, wat string, reproduceTestName string) {
 		panic(err)
 	}
 
-	var watPath string
-	if len(wat) != 0 {
-		watPath = path.Join(testDataDir, fmt.Sprintf("%s.wat", checkSumStr))
-		watF, err := os.Create(watPath)
-		if err != nil {
-			panic(err)
-		}
-
-		defer watF.Close()
-
-		_, err = watF.Write([]byte(wat))
-		if err != nil {
-			panic(err)
-		}
-		fmt.Printf(`
-Failed WebAssembly Text:
-%s
-
-Failed Wasm binary has been written to %s
-Failed Wasm Text has been written to %s
-To reproduce the failure, execute: WASM_BINARY_PATH=%s go test -run=%s ./wazerolib/...
-
-
-`, wat, binaryPath, watPath, binaryPath, reproduceTestName)
-	} else {
-		fmt.Printf(`
+	fmt.Printf(`
 Failed WebAssembly Binary in hex: %s
 Failed Wasm binary has been written to %s
 To reproduce the failure, execute: WASM_BINARY_PATH=%s go test -run=%s ./wazerolib/...
 `, hex.EncodeToString(bin), binaryPath, binaryPath, reproduceTestName)
-	}
 }
 
 // This returns a wazevo.RuntimeConfigure whose compiler is either wazevo or the default.
