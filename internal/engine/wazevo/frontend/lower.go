@@ -3368,6 +3368,31 @@ func (c *Compiler) lowerCurrentOpcode() {
 			c.memAlignmentCheck(addr, size)
 			res := builder.AllocateInstruction().AsAtomicRmw(rmwOp, addr, val, size).Insert(builder).Return()
 			state.push(res)
+		case wasm.OpcodeAtomicI32RmwCmpxchg, wasm.OpcodeAtomicI64RmwCmpxchg, wasm.OpcodeAtomicI32Rmw8CmpxchgU, wasm.OpcodeAtomicI32Rmw16CmpxchgU, wasm.OpcodeAtomicI64Rmw8CmpxchgU, wasm.OpcodeAtomicI64Rmw16CmpxchgU, wasm.OpcodeAtomicI64Rmw32CmpxchgU:
+			_, offset := c.readMemArg()
+			if state.unreachable {
+				break
+			}
+
+			repl := state.pop()
+			exp := state.pop()
+			baseAddr := state.pop()
+
+			var size uint64
+			switch atomicOp {
+			case wasm.OpcodeAtomicI64RmwCmpxchg:
+				size = 8
+			case wasm.OpcodeAtomicI32RmwCmpxchg, wasm.OpcodeAtomicI64Rmw32CmpxchgU:
+				size = 4
+			case wasm.OpcodeAtomicI32Rmw16CmpxchgU, wasm.OpcodeAtomicI64Rmw16CmpxchgU:
+				size = 2
+			case wasm.OpcodeAtomicI32Rmw8CmpxchgU, wasm.OpcodeAtomicI64Rmw8CmpxchgU:
+				size = 1
+			}
+			addr := c.memOpSetup(baseAddr, uint64(offset), size)
+			c.memAlignmentCheck(addr, size)
+			res := builder.AllocateInstruction().AsAtomicCas(addr, exp, repl, size).Insert(builder).Return()
+			state.push(res)
 		default:
 			panic("TODO: unsupported atomic instruction: " + wasm.AtomicInstructionName(atomicOp))
 		}
