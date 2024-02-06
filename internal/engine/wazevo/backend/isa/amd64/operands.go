@@ -2,6 +2,7 @@ package amd64
 
 import (
 	"fmt"
+	"unsafe"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
@@ -9,10 +10,8 @@ import (
 )
 
 type operand struct {
-	kind  operandKind
-	r     regalloc.VReg
-	imm32 uint32
-	amode amode
+	kind operandKind
+	data uint64
 }
 
 type operandKind byte
@@ -53,44 +52,65 @@ func (o operandKind) String() string {
 func (o *operand) format(_64 bool) string {
 	switch o.kind {
 	case operandKindReg:
-		return formatVRegSized(o.r, _64)
+		return formatVRegSized(o.reg(), _64)
 	case operandKindMem:
-		return o.amode.String()
+		return o.addressMode().String()
 	case operandKindImm32:
-		return fmt.Sprintf("$%d", int32(o.imm32))
+		return fmt.Sprintf("$%d", int32(o.imm32()))
 	case operandKindLabel:
-		return backend.Label(o.imm32).String()
+		return backend.Label(o.imm32()).String()
 	default:
 		panic(fmt.Sprintf("BUG: invalid operand: %s", o.kind))
 	}
 }
 
+//go:inline
+func (o *operand) reg() regalloc.VReg {
+	return regalloc.VReg(o.data)
+}
+
+//go:inline
+func (o *operand) setReg(r regalloc.VReg) {
+	o.data = uint64(r)
+}
+
+//go:inline
+func (o *operand) addressMode() *amode {
+	return (*amode)(unsafe.Pointer(uintptr(o.data)))
+}
+
+//go:inline
+func (o *operand) imm32() uint32 {
+	return uint32(o.data)
+}
+
 func (o *operand) label() backend.Label {
 	switch o.kind {
 	case operandKindLabel:
-		return backend.Label(o.imm32)
+		return backend.Label(o.data)
 	case operandKindMem:
-		if o.amode.kind == amodeRipRelative {
-			return o.amode.label
+		mem := o.addressMode()
+		if mem.kind == amodeRipRelative {
+			return mem.label
 		}
 	}
 	panic("BUG: invalid operand kind")
 }
 
 func newOperandLabel(label backend.Label) operand {
-	return operand{kind: operandKindLabel, imm32: uint32(label), r: regalloc.VRegInvalid}
+	return operand{kind: operandKindLabel, data: uint64(label)}
 }
 
 func newOperandReg(r regalloc.VReg) operand {
-	return operand{kind: operandKindReg, r: r}
+	return operand{kind: operandKindReg, data: uint64(r)}
 }
 
 func newOperandImm32(imm32 uint32) operand {
-	return operand{kind: operandKindImm32, imm32: imm32, r: regalloc.VRegInvalid}
+	return operand{kind: operandKindImm32, data: uint64(imm32)}
 }
 
-func newOperandMem(amode amode) operand {
-	return operand{kind: operandKindMem, amode: amode, r: regalloc.VRegInvalid}
+func newOperandMem(amode *amode) operand {
+	return operand{kind: operandKindMem, data: uint64(uintptr(unsafe.Pointer(amode)))}
 }
 
 // amode is a memory operand (addressing mode).
@@ -108,6 +128,8 @@ type amode struct {
 	// then imm32 should represent the resolved address.
 	label backend.Label
 }
+
+func resetAmode(am *amode) {}
 
 type amodeKind byte
 
@@ -176,19 +198,25 @@ func (a *amode) assignUses(i int, reg regalloc.VReg) {
 	}
 }
 
-func newAmodeImmReg(imm32 uint32, base regalloc.VReg) amode {
-	return amode{kind: amodeImmReg, imm32: imm32, base: base}
+func (m *machine) newAmodeImmReg(imm32 uint32, base regalloc.VReg) *amode {
+	ret := m.amodePool.Allocate()
+	*ret = amode{kind: amodeImmReg, imm32: imm32, base: base}
+	return ret
 }
 
-func newAmodeImmRBPReg(imm32 uint32) amode {
-	return amode{kind: amodeImmRBP, imm32: imm32, base: rbpVReg}
+func (m *machine) newAmodeImmRBPReg(imm32 uint32) *amode {
+	ret := m.amodePool.Allocate()
+	*ret = amode{kind: amodeImmRBP, imm32: imm32, base: rbpVReg}
+	return ret
 }
 
-func newAmodeRegRegShift(imm32 uint32, base, index regalloc.VReg, shift byte) amode {
+func (m *machine) newAmodeRegRegShift(imm32 uint32, base, index regalloc.VReg, shift byte) *amode {
 	if shift > 3 {
 		panic(fmt.Sprintf("BUG: invalid shift (must be 3>=): %d", shift))
 	}
-	return amode{kind: amodeRegRegShift, imm32: imm32, base: base, index: index, shift: shift}
+	ret := m.amodePool.Allocate()
+	*ret = amode{kind: amodeRegRegShift, imm32: imm32, base: base, index: index, shift: shift}
+	return ret
 }
 
 func (a *amode) resolveRipRelative(imm32 uint32) {
@@ -199,11 +227,13 @@ func (a *amode) resolveRipRelative(imm32 uint32) {
 	a.label = backend.LabelInvalid
 }
 
-func newAmodeRipRelative(label backend.Label) amode {
+func (m *machine) newAmodeRipRelative(label backend.Label) *amode {
 	if label == backend.LabelInvalid {
 		panic("BUG: invalid label")
 	}
-	return amode{kind: amodeRipRelative, label: label}
+	ret := m.amodePool.Allocate()
+	*ret = amode{kind: amodeRipRelative, label: label}
+	return ret
 }
 
 // String implements fmt.Stringer.

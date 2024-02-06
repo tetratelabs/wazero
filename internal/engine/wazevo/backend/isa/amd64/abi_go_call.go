@@ -56,7 +56,7 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 
 	if needModuleContextPtr {
 		moduleCtrPtr := rbxVReg // Module context is always the second argument.
-		mem := newAmodeImmReg(
+		mem := m.newAmodeImmReg(
 			wazevoapi.ExecutionContextOffsetGoFunctionCallCalleeModuleContextOpaque.U32(),
 			execCtrPtr)
 		store := m.allocateInstr().asMovRM(moduleCtrPtr, newOperandMem(mem), 8)
@@ -104,7 +104,7 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 			} else {
 				v = xmm15VReg
 			}
-			mem := newOperandMem(newAmodeImmReg(uint32(arg.Offset+16 /* to skip caller_rbp and ret_addr */), rbpVReg))
+			mem := newOperandMem(m.newAmodeImmReg(uint32(arg.Offset+16 /* to skip caller_rbp and ret_addr */), rbpVReg))
 			load := m.allocateInstr()
 			switch arg.Type {
 			case ssa.TypeI32:
@@ -124,7 +124,7 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 		}
 
 		store := m.allocateInstr()
-		mem := newOperandMem(newAmodeImmReg(uint32(offsetInGoSlice), rspVReg))
+		mem := newOperandMem(m.newAmodeImmReg(uint32(offsetInGoSlice), rspVReg))
 		switch arg.Type {
 		case ssa.TypeI32:
 			store.asMovRM(v, mem, 4)
@@ -213,7 +213,7 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 		}
 
 		load := m.allocateInstr()
-		mem := newOperandMem(newAmodeImmReg(uint32(offsetInGoSlice), rspVReg))
+		mem := newOperandMem(m.newAmodeImmReg(uint32(offsetInGoSlice), rspVReg))
 		switch r.Type {
 		case ssa.TypeI32:
 			load.asMovzxRmR(extModeLQ, mem, v)
@@ -238,7 +238,7 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 		if !isRegResult {
 			// We need to store it back to the result slot above rbp.
 			store := m.allocateInstr()
-			mem := newOperandMem(newAmodeImmReg(uint32(abi.ArgStackSize+r.Offset+16 /* to skip caller_rbp and ret_addr */), rbpVReg))
+			mem := newOperandMem(m.newAmodeImmReg(uint32(abi.ArgStackSize+r.Offset+16 /* to skip caller_rbp and ret_addr */), rbpVReg))
 			switch r.Type {
 			case ssa.TypeI32:
 				store.asMovRM(v, mem, 4)
@@ -263,7 +263,7 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 	if argOverlapWithExecCtxOffset >= 0 {
 		// At this point execCtt is not used anymore, so we can finally store the
 		// result to the register which overlaps with the execution context pointer.
-		mem := newOperandMem(newAmodeImmReg(uint32(argOverlapWithExecCtxOffset), rspVReg))
+		mem := newOperandMem(m.newAmodeImmReg(uint32(argOverlapWithExecCtxOffset), rspVReg))
 		load := m.allocateInstr().asMov64MR(mem, execCtrPtr)
 		cur = linkInstr(cur, load)
 	}
@@ -280,7 +280,7 @@ func (m *machine) saveRegistersInExecutionContext(cur *instruction, execCtx rega
 	offset := wazevoapi.ExecutionContextOffsetSavedRegistersBegin.I64()
 	for _, v := range regs {
 		store := m.allocateInstr()
-		mem := newOperandMem(newAmodeImmReg(uint32(offset), execCtx))
+		mem := newOperandMem(m.newAmodeImmReg(uint32(offset), execCtx))
 		switch v.RegType() {
 		case regalloc.RegTypeInt:
 			store.asMovRM(v, mem, 8)
@@ -299,7 +299,7 @@ func (m *machine) restoreRegistersInExecutionContext(cur *instruction, execCtx r
 	offset := wazevoapi.ExecutionContextOffsetSavedRegistersBegin.I64()
 	for _, v := range regs {
 		load := m.allocateInstr()
-		mem := newOperandMem(newAmodeImmReg(uint32(offset), execCtx))
+		mem := newOperandMem(m.newAmodeImmReg(uint32(offset), execCtx))
 		switch v.RegType() {
 		case regalloc.RegTypeInt:
 			load.asMov64MR(mem, v)
@@ -321,17 +321,17 @@ func (m *machine) storeReturnAddressAndExit(cur *instruction, execCtx regalloc.V
 	ripReg := r12VReg // Callee saved which is already saved.
 	saveRip := m.allocateInstr().asMovRM(
 		ripReg,
-		newOperandMem(newAmodeImmReg(wazevoapi.ExecutionContextOffsetGoCallReturnAddress.U32(), execCtx)),
+		newOperandMem(m.newAmodeImmReg(wazevoapi.ExecutionContextOffsetGoCallReturnAddress.U32(), execCtx)),
 		8,
 	)
 	cur = linkInstr(cur, saveRip)
 
-	exit := m.allocateInstr().asExitSeq(execCtx)
+	exit := m.allocateExitSeq(execCtx)
 	cur = linkInstr(cur, exit)
 
 	nop, l := m.allocateBrTarget()
 	cur = linkInstr(cur, nop)
-	readRip.asLEA(newAmodeRipRelative(l), ripReg)
+	readRip.asLEA(m.newAmodeRipRelative(l), ripReg)
 	return cur
 }
 
@@ -402,7 +402,7 @@ func (m *machine) insertStackBoundsCheck(requiredStackSize int64, cur *instructi
 	// .cont:
 	cur = m.addRSP(-int32(requiredStackSize), cur)
 	cur = linkInstr(cur, m.allocateInstr().asCmpRmiR(true,
-		newOperandMem(newAmodeImmReg(wazevoapi.ExecutionContextOffsetStackBottomPtr.U32(), raxVReg)),
+		newOperandMem(m.newAmodeImmReg(wazevoapi.ExecutionContextOffsetStackBottomPtr.U32(), raxVReg)),
 		rspVReg, true))
 
 	ja := m.allocateInstr()
@@ -417,11 +417,11 @@ func (m *machine) insertStackBoundsCheck(requiredStackSize int64, cur *instructi
 	cur = linkInstr(cur, m.allocateInstr().asImm(r15VReg, uint64(requiredStackSize), true))
 	// Set the required size in the execution context.
 	cur = linkInstr(cur, m.allocateInstr().asMovRM(r15VReg,
-		newOperandMem(newAmodeImmReg(wazevoapi.ExecutionContextOffsetStackGrowRequiredSize.U32(), raxVReg)), 8))
+		newOperandMem(m.newAmodeImmReg(wazevoapi.ExecutionContextOffsetStackGrowRequiredSize.U32(), raxVReg)), 8))
 	// Restore the temporary.
 	cur = linkInstr(cur, m.allocateInstr().asPop64(r15VReg))
 	// Call the Go function to grow the stack.
-	cur = linkInstr(cur, m.allocateInstr().asCallIndirect(newOperandMem(newAmodeImmReg(
+	cur = linkInstr(cur, m.allocateInstr().asCallIndirect(newOperandMem(m.newAmodeImmReg(
 		wazevoapi.ExecutionContextOffsetStackGrowCallTrampolineAddress.U32(), raxVReg)), nil))
 	// Jump to the continuation.
 	jmpToCont := m.allocateInstr()

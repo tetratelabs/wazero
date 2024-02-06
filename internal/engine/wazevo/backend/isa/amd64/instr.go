@@ -2,7 +2,6 @@ package amd64
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
@@ -14,10 +13,9 @@ type instruction struct {
 	abi                 *backend.FunctionABI
 	op1, op2            operand
 	u1, u2              uint64
-	b1, b2, b3          bool
+	b1                  bool
 	addedBeforeRegAlloc bool
 	kind                instructionKind
-	targets             []uint32
 }
 
 // Next implements regalloc.Instr.
@@ -216,11 +214,7 @@ func (i *instruction) String() string {
 	case jmpIf:
 		return fmt.Sprintf("j%s %s", cond(i.u1), i.op1.format(true))
 	case jmpTableIsland:
-		labels := make([]string, len(i.targets))
-		for index, l := range i.targets {
-			labels[index] = backend.Label(l).String()
-		}
-		return fmt.Sprintf("jump_table_island [%s]", strings.Join(labels, ", "))
+		return fmt.Sprintf("jump_table_island: jmp_table_index=%d", i.u1)
 	case exitSequence:
 		return fmt.Sprintf("exit_sequence %s", i.op1.format(true))
 	case ud2:
@@ -240,24 +234,24 @@ func (i *instruction) String() string {
 	case zeros:
 		return fmt.Sprintf("xor %s, %s", i.op2.format(true), i.op2.format(true))
 	case fcvtToSintSequence:
-		cmpOp, truncOp, execCtx, src, dst, tmpGp, tmpGp2, tmpXmm, _, dst64, sat := i.fcvtToSintSequenceData()
+		execCtx, src, tmpGp, tmpGp2, tmpXmm, src64, dst64, sat := i.fcvtToSintSequenceData()
 		return fmt.Sprintf(
-			"fcvtToSintSequence %s, %s, execCtx=%s, src=%s, dst=%s, tmpGp=%s, tmpGp2=%s, tmpXmm=%s, sat=%v",
-			cmpOp, truncOp, formatVRegSized(execCtx, true),
-			formatVRegSized(src, true), formatVRegSized(dst, dst64),
+			"fcvtToSintSequence execCtx=%s, src=%s, tmpGp=%s, tmpGp2=%s, tmpXmm=%s, src64=%v, dst64=%v, sat=%v",
+			formatVRegSized(execCtx, true),
+			formatVRegSized(src, true),
 			formatVRegSized(tmpGp, true),
 			formatVRegSized(tmpGp2, true),
-			formatVRegSized(tmpXmm, true), sat)
+			formatVRegSized(tmpXmm, true), src64, dst64, sat)
 	case fcvtToUintSequence:
-		subOp, cmpOp, truncOp, execCtx, src, dst, tmpGp, tmpGp2, tmpXmm, tmpXmm2, _, dst64, sat := i.fcvtToUintSequenceData()
+		execCtx, src, tmpGp, tmpGp2, tmpXmm, tmpXmm2, src64, dst64, sat := i.fcvtToUintSequenceData()
 		return fmt.Sprintf(
-			"fcvtToUintSequence %s, %s, %s, execCtx=%s, src=%s, dst=%s, tmpGp=%s, tmpGp2=%s, tmpXmm=%s, tmpXmm2=%s, sat=%v",
-			subOp, cmpOp, truncOp, formatVRegSized(execCtx, true),
-			formatVRegSized(src, true), formatVRegSized(dst, dst64),
+			"fcvtToUintSequence execCtx=%s, src=%s, tmpGp=%s, tmpGp2=%s, tmpXmm=%s, tmpXmm2=%s, src64=%v, dst64=%v, sat=%v",
+			formatVRegSized(execCtx, true),
+			formatVRegSized(src, true),
 			formatVRegSized(tmpGp, true),
 			formatVRegSized(tmpGp2, true),
 			formatVRegSized(tmpXmm, true),
-			formatVRegSized(tmpXmm2, true), sat)
+			formatVRegSized(tmpXmm2, true), src64, dst64, sat)
 	case idivRemSequence:
 		execCtx, divisor, tmpGp, isDiv, signed, _64 := i.idivRemSequenceData()
 		return fmt.Sprintf("idivRemSequence execCtx=%s, divisor=%s, tmpGp=%s, isDiv=%v, signed=%v, _64=%v",
@@ -277,18 +271,9 @@ func (i *instruction) Defs(regs *[]regalloc.VReg) []regalloc.VReg {
 	switch dk := defKinds[i.kind]; dk {
 	case defKindNone:
 	case defKindOp2:
-		if !i.op2.r.Valid() {
-			panic("BUG " + i.op2.format(true) + " invalid in " + i.String())
-		}
-		*regs = append(*regs, i.op2.r)
+		*regs = append(*regs, i.op2.reg())
 	case defKindCall:
 		*regs = append(*regs, i.abi.RetRealRegs...)
-	case defKindFcvtToSintSequence:
-		_, _, _, _, dst, _, _, _, _, _, _ := i.fcvtToSintSequenceData()
-		*regs = append(*regs, dst)
-	case defKindFcvtToUintSequence:
-		_, _, _, _, _, dst, _, _, _, _, _, _, _ := i.fcvtToUintSequenceData()
-		*regs = append(*regs, dst)
 	case defKindDivRem:
 		_, _, _, isDiv, _, _ := i.idivRemSequenceData()
 		if isDiv {
@@ -316,9 +301,9 @@ func (i *instruction) Uses(regs *[]regalloc.VReg) []regalloc.VReg {
 		// the source operand (op1) can be imm32, reg or mem.
 		switch opAny.kind {
 		case operandKindReg:
-			*regs = append(*regs, opAny.r)
+			*regs = append(*regs, opAny.reg())
 		case operandKindMem:
-			opAny.amode.uses(regs)
+			opAny.addressMode().uses(regs)
 		case operandKindImm32:
 		default:
 			panic(fmt.Sprintf("BUG: invalid operand: %s", i))
@@ -326,14 +311,14 @@ func (i *instruction) Uses(regs *[]regalloc.VReg) []regalloc.VReg {
 		if opReg.kind != operandKindReg {
 			panic(fmt.Sprintf("BUG: invalid operand: %s", i))
 		}
-		*regs = append(*regs, opReg.r)
+		*regs = append(*regs, opReg.reg())
 	case useKindOp1:
 		op := i.op1
 		switch op.kind {
 		case operandKindReg:
-			*regs = append(*regs, op.r)
+			*regs = append(*regs, op.reg())
 		case operandKindMem:
-			op.amode.uses(regs)
+			op.addressMode().uses(regs)
 		case operandKindImm32, operandKindLabel:
 		default:
 			panic(fmt.Sprintf("BUG: invalid operand: %s", i))
@@ -342,9 +327,9 @@ func (i *instruction) Uses(regs *[]regalloc.VReg) []regalloc.VReg {
 		op := i.op1
 		switch op.kind {
 		case operandKindReg:
-			*regs = append(*regs, op.r)
+			*regs = append(*regs, op.reg())
 		case operandKindMem:
-			op.amode.uses(regs)
+			op.addressMode().uses(regs)
 		default:
 			panic(fmt.Sprintf("BUG: invalid operand: %s", i))
 		}
@@ -352,10 +337,10 @@ func (i *instruction) Uses(regs *[]regalloc.VReg) []regalloc.VReg {
 	case useKindCall:
 		*regs = append(*regs, i.abi.ArgRealRegs...)
 	case useKindFcvtToSintSequence:
-		_, _, execCtx, src, _, tmpGp, tmpGp2, tmpXmm, _, _, _ := i.fcvtToSintSequenceData()
+		execCtx, src, tmpGp, tmpGp2, tmpXmm, _, _, _ := i.fcvtToSintSequenceData()
 		*regs = append(*regs, execCtx, src, tmpGp, tmpGp2, tmpXmm)
 	case useKindFcvtToUintSequence:
-		_, _, _, execCtx, src, _, tmpGp, tmpGp2, tmpXmm, tmpXmm2, _, _, _ := i.fcvtToUintSequenceData()
+		execCtx, src, tmpGp, tmpGp2, tmpXmm, tmpXmm2, _, _, _ := i.fcvtToUintSequenceData()
 		*regs = append(*regs, execCtx, src, tmpGp, tmpGp2, tmpXmm, tmpXmm2)
 	case useKindDivRem:
 		execCtx, divisor, tmpGp, _, _, _ := i.idivRemSequenceData()
@@ -378,9 +363,9 @@ func (i *instruction) AssignUse(index int, v regalloc.VReg) {
 		op := &i.op1
 		switch op.kind {
 		case operandKindReg:
-			op.r = v
+			op.setReg(v)
 		case operandKindMem:
-			op.amode.assignUses(index, v)
+			op.addressMode().assignUses(index, v)
 		default:
 			panic("BUG")
 		}
@@ -392,36 +377,24 @@ func (i *instruction) AssignUse(index int, v regalloc.VReg) {
 		switch op.kind {
 		case operandKindReg:
 			if index == 0 {
-				if op.r.IsRealReg() {
-					panic("BUG already assigned: " + i.String())
-				}
-				op.r = v
+				op.setReg(v)
 			} else if index == 1 {
-				if opMustBeReg.r.IsRealReg() {
-					panic("BUG already assigned: " + i.String())
-				}
-				opMustBeReg.r = v
+				opMustBeReg.setReg(v)
 			} else {
 				panic("BUG")
 			}
 		case operandKindMem:
-			nregs := op.amode.nregs()
+			nregs := op.addressMode().nregs()
 			if index < nregs {
-				op.amode.assignUses(index, v)
+				op.addressMode().assignUses(index, v)
 			} else if index == nregs {
-				if opMustBeReg.r.IsRealReg() {
-					panic("BUG already assigned: " + i.String())
-				}
-				opMustBeReg.r = v
+				opMustBeReg.setReg(v)
 			} else {
 				panic("BUG")
 			}
 		case operandKindImm32:
 			if index == 0 {
-				if opMustBeReg.r.IsRealReg() {
-					panic("BUG already assigned: " + i.String())
-				}
-				opMustBeReg.r = v
+				opMustBeReg.setReg(v)
 			} else {
 				panic("BUG")
 			}
@@ -435,44 +408,41 @@ func (i *instruction) AssignUse(index int, v regalloc.VReg) {
 			if index != 0 {
 				panic("BUG")
 			}
-			if op.r.IsRealReg() {
-				panic("BUG already assigned: " + i.String())
-			}
-			op.r = v
+			op.setReg(v)
 		case operandKindMem:
-			op.amode.assignUses(index, v)
+			op.addressMode().assignUses(index, v)
 		default:
 			panic(fmt.Sprintf("BUG: invalid operand: %s", i))
 		}
 	case useKindFcvtToSintSequence:
 		switch index {
 		case 0:
-			i.op1.amode.base = v
+			i.op1.addressMode().base = v
 		case 1:
-			i.op1.amode.index = v
+			i.op1.addressMode().index = v
 		case 2:
-			i.op2.amode.base = v
+			i.op2.addressMode().base = v
 		case 3:
-			i.op2.amode.index = v
+			i.op2.addressMode().index = v
 		case 4:
-			i.op2.r = v
+			i.u1 = uint64(v)
 		default:
 			panic("BUG")
 		}
 	case useKindFcvtToUintSequence:
 		switch index {
 		case 0:
-			i.op1.amode.base = v
+			i.op1.addressMode().base = v
 		case 1:
-			i.op1.amode.index = v
+			i.op1.addressMode().index = v
 		case 2:
-			i.op2.amode.base = v
+			i.op2.addressMode().base = v
 		case 3:
-			i.u2 = uint64(v)
+			i.op2.addressMode().index = v
 		case 4:
-			i.op2.amode.index = v
+			i.u1 = uint64(v)
 		case 5:
-			i.op2.r = v
+			i.u2 = uint64(v)
 		default:
 			panic("BUG")
 		}
@@ -487,11 +457,11 @@ func (i *instruction) AssignUse(index int, v regalloc.VReg) {
 				panic("BUG")
 			}
 		case 2:
-			i.op1.amode.base = v
+			i.op1.setReg(v)
 		case 3:
-			i.op1.amode.index = v
+			i.op2.setReg(v)
 		case 4:
-			i.op2.amode.base = v
+			i.u1 = uint64(v)
 		default:
 			panic("BUG")
 		}
@@ -505,12 +475,7 @@ func (i *instruction) AssignDef(reg regalloc.VReg) {
 	switch dk := defKinds[i.kind]; dk {
 	case defKindNone:
 	case defKindOp2:
-		if !i.op2.r.Valid() {
-			panic("BUG already assigned" + i.String())
-		}
-		i.op2.r = reg
-	case defKindFcvtToSintSequence, defKindFcvtToUintSequence:
-		i.op1.r = reg
+		i.op2.setReg(reg)
 	default:
 		panic(fmt.Sprintf("BUG: invalid defKind \"%s\" for %s", dk, i))
 	}
@@ -738,17 +703,20 @@ const (
 	instrMax
 )
 
-func (i *instruction) asIdivRemSequence(
-	execCtx, divisor, tmpGp regalloc.VReg,
-	isDiv, signed, _64 bool,
-) *instruction {
+func (i *instruction) asIdivRemSequence(execCtx, divisor, tmpGp regalloc.VReg, isDiv, signed, _64 bool) *instruction {
 	i.kind = idivRemSequence
-	i.op1.amode.base = execCtx
-	i.op1.amode.index = divisor
-	i.op2.amode.base = tmpGp
-	i.b1 = isDiv
-	i.b2 = signed
-	i.b3 = _64
+	i.op1 = newOperandReg(execCtx)
+	i.op2 = newOperandReg(divisor)
+	i.u1 = uint64(tmpGp)
+	if isDiv {
+		i.u2 |= 1
+	}
+	if signed {
+		i.u2 |= 2
+	}
+	if _64 {
+		i.u2 |= 4
+	}
 	return i
 }
 
@@ -758,7 +726,7 @@ func (i *instruction) idivRemSequenceData() (
 	if i.kind != idivRemSequence {
 		panic("BUG")
 	}
-	return i.op1.amode.base, i.op1.amode.index, i.op2.amode.base, i.b1, i.b2, i.b3
+	return i.op1.reg(), i.op2.reg(), regalloc.VReg(i.u1), i.u2&1 != 0, i.u2&2 != 0, i.u2&4 != 0
 }
 
 func (i *instruction) asXmmCMov(cc cond, x operand, rd regalloc.VReg, size byte) *instruction {
@@ -776,64 +744,88 @@ func (i *instruction) asDefineUninitializedReg(r regalloc.VReg) *instruction {
 	return i
 }
 
-func (i *instruction) asFcvtToUintSequence(
-	subOp, cmpOp, truncOp sseOpcode,
-	execCtx, src, dst, tmpGp, tmpGp2, tmpXmm, tmpXmm2 regalloc.VReg,
+func (m *machine) allocateFcvtToUintSequence(
+	execCtx, src, tmpGp, tmpGp2, tmpXmm, tmpXmm2 regalloc.VReg,
 	src64, dst64, sat bool,
 ) *instruction {
-	i.u1 = uint64(subOp) | uint64(cmpOp)<<8 | uint64(truncOp)<<16
+	i := m.allocateInstr()
 	i.kind = fcvtToUintSequence
-	i.op1.amode.base = execCtx
-	i.op1.amode.index = src
-	i.op1.r = dst
-	i.op2.amode.base = tmpGp
-	i.op2.amode.index = tmpXmm
-	i.op2.r = tmpXmm2
-	i.u2 = uint64(tmpGp2)
-	i.b1 = src64
-	i.b2 = dst64
-	i.b3 = sat
+	op1a := m.amodePool.Allocate()
+	op2a := m.amodePool.Allocate()
+	i.op1 = newOperandMem(op1a)
+	i.op2 = newOperandMem(op2a)
+	if src64 {
+		op1a.imm32 = 1
+	} else {
+		op1a.imm32 = 0
+	}
+	if dst64 {
+		op1a.imm32 |= 2
+	}
+	if sat {
+		op1a.imm32 |= 4
+	}
+
+	op1a.base = execCtx
+	op1a.index = src
+	op2a.base = tmpGp
+	op2a.index = tmpGp2
+	i.u1 = uint64(tmpXmm)
+	i.u2 = uint64(tmpXmm2)
 	return i
 }
 
 func (i *instruction) fcvtToUintSequenceData() (
-	subOp, cmpOp, truncOp sseOpcode, execCtx, src, dst, tmpGp, tmpGp2, tmpXmm, tmpXmm2 regalloc.VReg, src64, dst64, sat bool,
+	execCtx, src, tmpGp, tmpGp2, tmpXmm, tmpXmm2 regalloc.VReg, src64, dst64, sat bool,
 ) {
 	if i.kind != fcvtToUintSequence {
 		panic("BUG")
 	}
-	return sseOpcode(i.u1), sseOpcode(i.u1 >> 8), sseOpcode(i.u1 >> 16), i.op1.amode.base, i.op1.amode.index,
-		i.op1.r, i.op2.amode.base, regalloc.VReg(i.u2), i.op2.amode.index, i.op2.r, i.b1, i.b2, i.b3
+	op1a := i.op1.addressMode()
+	op2a := i.op2.addressMode()
+	return op1a.base, op1a.index, op2a.base, op2a.index, regalloc.VReg(i.u1), regalloc.VReg(i.u2),
+		op1a.imm32&1 != 0, op1a.imm32&2 != 0, op1a.imm32&4 != 0
 }
 
-func (i *instruction) asFcvtToSintSequence(
-	cmpOp, truncOp sseOpcode,
-	execCtx, src, dst, tmpGp, tmpGp2, tmpXmm regalloc.VReg,
+func (m *machine) allocateFcvtToSintSequence(
+	execCtx, src, tmpGp, tmpGp2, tmpXmm regalloc.VReg,
 	src64, dst64, sat bool,
 ) *instruction {
-	i.u1 = uint64(cmpOp)
-	i.u2 = uint64(truncOp)
+	i := m.allocateInstr()
 	i.kind = fcvtToSintSequence
-	i.op1.amode.base = execCtx
-	i.op1.amode.index = src
-	i.op1.r = dst
-	i.op2.amode.base = tmpGp
-	i.op2.amode.index = tmpGp2
-	i.op2.r = tmpXmm
-	i.b1 = src64
-	i.b2 = dst64
-	i.b3 = sat
+	op1a := m.amodePool.Allocate()
+	op2a := m.amodePool.Allocate()
+	i.op1 = newOperandMem(op1a)
+	i.op2 = newOperandMem(op2a)
+	op1a.base = execCtx
+	op1a.index = src
+	op2a.base = tmpGp
+	op2a.index = tmpGp2
+	i.u1 = uint64(tmpXmm)
+	if src64 {
+		i.u2 = 1
+	} else {
+		i.u2 = 0
+	}
+	if dst64 {
+		i.u2 |= 2
+	}
+	if sat {
+		i.u2 |= 4
+	}
 	return i
 }
 
 func (i *instruction) fcvtToSintSequenceData() (
-	cmpOp, truncOp sseOpcode, execCtx, src, dst, tmpGp, tmpGp2, tmpXmm regalloc.VReg, src64, dst64, sat bool,
+	execCtx, src, tmpGp, tmpGp2, tmpXmm regalloc.VReg, src64, dst64, sat bool,
 ) {
 	if i.kind != fcvtToSintSequence {
 		panic("BUG")
 	}
-	return sseOpcode(i.u1), sseOpcode(i.u2), i.op1.amode.base, i.op1.amode.index,
-		i.op1.r, i.op2.amode.base, i.op2.amode.index, i.op2.r, i.b1, i.b2, i.b3
+	op1a := i.op1.addressMode()
+	op2a := i.op2.addressMode()
+	return op1a.base, op1a.index, op2a.base, op2a.index, regalloc.VReg(i.u1),
+		i.u2&1 != 0, i.u2&2 != 0, i.u2&4 != 0
 }
 
 func (k instructionKind) String() string {
@@ -976,9 +968,12 @@ func (i *instruction) asJmpIf(cond cond, target operand) *instruction {
 	return i
 }
 
-func (i *instruction) asJmpTableSequence(targets []uint32) *instruction {
+// asJmpTableSequence is used to emit the jump table.
+// targetSliceIndex is the index of the target slice in machine.jmpTableTargets.
+func (i *instruction) asJmpTableSequence(targetSliceIndex int, targetCount int) *instruction {
 	i.kind = jmpTableIsland
-	i.targets = targets
+	i.u1 = uint64(targetSliceIndex)
+	i.u2 = uint64(targetCount)
 	return i
 }
 
@@ -997,7 +992,7 @@ func (i *instruction) jmpLabel() backend.Label {
 	}
 }
 
-func (i *instruction) asLEA(a amode, rd regalloc.VReg) *instruction {
+func (i *instruction) asLEA(a *amode, rd regalloc.VReg) *instruction {
 	i.kind = lea
 	i.op1 = newOperandMem(a)
 	i.op2 = newOperandReg(rd)
@@ -1265,9 +1260,12 @@ func (i *instruction) asCmove(c cond, rm operand, rd regalloc.VReg, _64 bool) *i
 	return i
 }
 
-func (i *instruction) asExitSeq(execCtx regalloc.VReg) *instruction {
+func (m *machine) allocateExitSeq(execCtx regalloc.VReg) *instruction {
+	i := m.allocateInstr()
 	i.kind = exitSequence
 	i.op1 = newOperandReg(execCtx)
+	// Allocate the address mode that will be used in encoding the exit sequence.
+	i.op2 = newOperandMem(m.amodePool.Allocate())
 	return i
 }
 
@@ -1928,8 +1926,6 @@ const (
 	defKindOp2
 	defKindCall
 	defKindDivRem
-	defKindFcvtToSintSequence
-	defKindFcvtToUintSequence
 )
 
 var defKinds = [instrMax]defKind{
@@ -1965,9 +1961,9 @@ var defKinds = [instrMax]defKind{
 	setcc:                  defKindOp2,
 	zeros:                  defKindOp2,
 	sourceOffsetInfo:       defKindNone,
-	fcvtToSintSequence:     defKindFcvtToSintSequence,
+	fcvtToSintSequence:     defKindNone,
 	defineUninitializedReg: defKindOp2,
-	fcvtToUintSequence:     defKindFcvtToUintSequence,
+	fcvtToUintSequence:     defKindNone,
 	xmmCMov:                defKindOp2,
 	idivRemSequence:        defKindDivRem,
 }

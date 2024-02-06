@@ -82,7 +82,7 @@ func (m *machine) setupPrologue() {
 				// Push the XMM register is not supported by the PUSH instruction.
 				cur = m.addRSP(-16, cur)
 				push := m.allocateInstr().asXmmMovRM(
-					sseOpcodeMovdqu, r, newOperandMem(newAmodeImmReg(0, rspVReg)),
+					sseOpcodeMovdqu, r, newOperandMem(m.newAmodeImmReg(0, rspVReg)),
 				)
 				cur = linkInstr(cur, push)
 			}
@@ -191,7 +191,7 @@ func (m *machine) postRegAlloc() {
 		}
 
 		// Removes the redundant copy instruction.
-		if cur.IsCopy() && cur.op1.r.RealReg() == cur.op2.r.RealReg() {
+		if cur.IsCopy() && cur.op1.reg().RealReg() == cur.op2.reg().RealReg() {
 			prev, next := cur.prev, cur.next
 			// Remove the copy instruction.
 			prev.next = next
@@ -264,7 +264,7 @@ func (m *machine) setupEpilogueAfter(cur *instruction) {
 			} else {
 				// Pop the XMM register is not supported by the POP instruction.
 				pop := m.allocateInstr().asXmmUnaryRmR(
-					sseOpcodeMovdqu, newOperandMem(newAmodeImmReg(0, rspVReg)), r,
+					sseOpcodeMovdqu, newOperandMem(m.newAmodeImmReg(0, rspVReg)), r,
 				)
 				cur = linkInstr(cur, pop)
 				cur = m.addRSP(16, cur)

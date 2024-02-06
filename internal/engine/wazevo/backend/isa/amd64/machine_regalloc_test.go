@@ -217,7 +217,7 @@ func TestMachineSwap(t *testing.T) {
 				r15VReg.ID(): ssa.TypeI64, raxVReg.ID(): ssa.TypeI64,
 				xmm1VReg.ID(): ssa.TypeF64, xmm12VReg.ID(): ssa.TypeF64,
 			}
-			cur, i2 := m.allocateInstr().asUD2(), m.allocateInstr().asExitSeq(rsiVReg)
+			cur, i2 := m.allocateInstr().asUD2(), m.allocateExitSeq(rsiVReg)
 			cur.next = i2
 			i2.prev = cur
 
