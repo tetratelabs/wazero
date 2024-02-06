@@ -1,6 +1,7 @@
 package amd64
 
 import (
+	"runtime"
 	"strings"
 	"testing"
 
@@ -11,12 +12,19 @@ import (
 )
 
 func TestMachine_lowerToAddressMode(t *testing.T) {
+	_, _, m := newSetupWithMockContext()
+	defer func() {
+		runtime.KeepAlive(m)
+	}()
+	newAmodeImmReg := m.newAmodeImmReg
+	newAmodeRegRegShift := m.newAmodeRegRegShift
+
 	nextVReg := regalloc.VReg(100).SetRegType(regalloc.RegTypeInt)
 	for _, tc := range []struct {
 		name  string
 		in    func(*mockCompiler, ssa.Builder, *machine) (ptr ssa.Value, offset uint32)
 		insts []string
-		am    amode
+		am    *amode
 	}{
 		{
 			name: "iadd const, const; offset != 0",
@@ -224,6 +232,13 @@ func TestMachine_lowerAddendFromInstr(t *testing.T) {
 }
 
 func TestMachine_lowerAddendsToAmode(t *testing.T) {
+	_, _, m := newSetupWithMockContext()
+	defer func() {
+		runtime.KeepAlive(m)
+	}()
+	newAmodeImmReg := m.newAmodeImmReg
+	newAmodeRegRegShift := m.newAmodeRegRegShift
+
 	x1, x2 := raxVReg, rcxVReg
 
 	nextVReg, nextNextVReg := regalloc.VReg(100).SetRegType(regalloc.RegTypeInt), regalloc.VReg(101).SetRegType(regalloc.RegTypeInt)
@@ -232,7 +247,7 @@ func TestMachine_lowerAddendsToAmode(t *testing.T) {
 		name   string
 		x, y   addend
 		offset uint32
-		exp    amode
+		exp    *amode
 		insts  []string
 	}{
 		{

@@ -21,7 +21,7 @@ func (a addend) String() string {
 }
 
 // lowerToAddressMode converts a pointer to an addressMode that can be used as an operand for load/store instructions.
-func (m *machine) lowerToAddressMode(ptr ssa.Value, offsetBase uint32) (am amode) {
+func (m *machine) lowerToAddressMode(ptr ssa.Value, offsetBase uint32) (am *amode) {
 	def := m.c.ValueDefinition(ptr)
 
 	if offsetBase&0x80000000 != 0 {
@@ -35,9 +35,9 @@ func (m *machine) lowerToAddressMode(ptr ssa.Value, offsetBase uint32) (am amode
 		offsetBaseReg := m.c.AllocateVReg(ssa.TypeI64)
 		m.lowerIconst(offsetBaseReg, uint64(off64), true)
 		if a.r != regalloc.VRegInvalid {
-			return newAmodeRegRegShift(0, offsetBaseReg, a.r, a.shift)
+			return m.newAmodeRegRegShift(0, offsetBaseReg, a.r, a.shift)
 		} else {
-			return newAmodeImmReg(0, offsetBaseReg)
+			return m.newAmodeImmReg(0, offsetBaseReg)
 		}
 	}
 
@@ -57,19 +57,19 @@ func (m *machine) lowerToAddressMode(ptr ssa.Value, offsetBase uint32) (am amode
 			if a.shift != 0 {
 				tmpReg := m.c.AllocateVReg(ssa.TypeI64)
 				m.lowerIconst(tmpReg, 0, true)
-				return newAmodeRegRegShift(offsetBase, tmpReg, a.r, a.shift)
+				return m.newAmodeRegRegShift(offsetBase, tmpReg, a.r, a.shift)
 			}
-			return newAmodeImmReg(offsetBase, a.r)
+			return m.newAmodeImmReg(offsetBase, a.r)
 		} else {
 			off64 := a.off + int64(offsetBase)
 			tmpReg := m.c.AllocateVReg(ssa.TypeI64)
 			m.lowerIconst(tmpReg, uint64(off64), true)
-			return newAmodeImmReg(0, tmpReg)
+			return m.newAmodeImmReg(0, tmpReg)
 		}
 	}
 }
 
-func (m *machine) lowerAddendsToAmode(x, y addend, offBase uint32) amode {
+func (m *machine) lowerAddendsToAmode(x, y addend, offBase uint32) *amode {
 	if x.r != regalloc.VRegInvalid && x.off != 0 || y.r != regalloc.VRegInvalid && y.off != 0 {
 		panic("invalid input")
 	}
@@ -105,13 +105,13 @@ func (m *machine) lowerAddendsToAmode(x, y addend, offBase uint32) amode {
 			shifted.asShiftR(shiftROpShiftLeft, newOperandImm32(uint32(x.shift)), x.r, true)
 			m.insert(shifted)
 
-			return newAmodeRegRegShift(u32, x.r, y.r, y.shift)
+			return m.newAmodeRegRegShift(u32, x.r, y.r, y.shift)
 		case x.shift != 0 && y.shift == 0:
 			// Swap base and index.
 			x, y = y, x
 			fallthrough
 		default:
-			return newAmodeRegRegShift(u32, x.r, y.r, y.shift)
+			return m.newAmodeRegRegShift(u32, x.r, y.r, y.shift)
 		}
 	case x.r == regalloc.VRegInvalid && y.r != regalloc.VRegInvalid:
 		x, y = y, x
@@ -120,13 +120,13 @@ func (m *machine) lowerAddendsToAmode(x, y addend, offBase uint32) amode {
 		if x.shift != 0 {
 			zero := m.c.AllocateVReg(ssa.TypeI64)
 			m.lowerIconst(zero, 0, true)
-			return newAmodeRegRegShift(u32, zero, x.r, x.shift)
+			return m.newAmodeRegRegShift(u32, zero, x.r, x.shift)
 		}
-		return newAmodeImmReg(u32, x.r)
+		return m.newAmodeImmReg(u32, x.r)
 	default: // Both are invalid: use the offset.
 		tmpReg := m.c.AllocateVReg(ssa.TypeI64)
 		m.lowerIconst(tmpReg, u64, true)
-		return newAmodeImmReg(0, tmpReg)
+		return m.newAmodeImmReg(0, tmpReg)
 	}
 }
 
@@ -139,7 +139,8 @@ func (m *machine) lowerAddend(x *backend.SSAValueDefinition) addend {
 	if op != ssa.OpcodeInvalid && op != ssa.OpcodeIadd {
 		return m.lowerAddendFromInstr(x.Instr)
 	}
-	return addend{m.getOperand_Reg(x).r, 0, 0}
+	p := m.getOperand_Reg(x)
+	return addend{p.reg(), 0, 0}
 }
 
 // lowerAddendFromInstr takes an instruction returns a Vreg and an offset that can be used in an address mode.
@@ -168,16 +169,19 @@ func (m *machine) lowerAddendFromInstr(instr *ssa.Instruction) addend {
 		case constInst && op == ssa.OpcodeUExtend:
 			return addend{regalloc.VRegInvalid, int64(int32(inputDef.Instr.ConstantVal())), 0} // sign-extend!
 		default:
-			return addend{m.getOperand_Reg(inputDef).r, 0, 0}
+			r := m.getOperand_Reg(inputDef)
+			return addend{r.reg(), 0, 0}
 		}
 	case ssa.OpcodeIshl:
 		// If the addend is a shift, we can only handle it if the shift amount is a constant.
 		x, amount := instr.Arg2()
 		amountDef := m.c.ValueDefinition(amount)
 		if amountDef.IsFromInstr() && amountDef.Instr.Constant() && amountDef.Instr.ConstantVal() <= 3 {
-			return addend{m.getOperand_Reg(m.c.ValueDefinition(x)).r, 0, uint8(amountDef.Instr.ConstantVal())}
+			r := m.getOperand_Reg(m.c.ValueDefinition(x))
+			return addend{r.reg(), 0, uint8(amountDef.Instr.ConstantVal())}
 		}
-		return addend{m.getOperand_Reg(m.c.ValueDefinition(x)).r, 0, 0}
+		r := m.getOperand_Reg(m.c.ValueDefinition(x))
+		return addend{r.reg(), 0, 0}
 	}
 	panic("BUG: invalid opcode")
 }

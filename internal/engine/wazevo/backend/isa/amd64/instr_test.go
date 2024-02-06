@@ -23,7 +23,8 @@ func TestMachine_lowerAluRmiROp_Uses_AssignUse(t *testing.T) {
 		{
 			name: "mem_reg",
 			instr: func(i *instruction) {
-				i.asAluRmiR(aluRmiROpcodeAdd, newOperandMem(newAmodeImmReg(123, vr0)), vr1, false)
+				_, _, m := newSetupWithMockContext()
+				i.asAluRmiR(aluRmiROpcodeAdd, newOperandMem(m.newAmodeImmReg(123, vr0)), vr1, false)
 			},
 			expected: "add 123(%rax), %ecx",
 		},

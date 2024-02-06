@@ -125,7 +125,7 @@ func (m *machine) move64(src, dst regalloc.VReg, prev *instruction) *instruction
 }
 
 func (m *machine) loadOrStore64AtExecutionCtx(execCtx regalloc.VReg, offset wazevoapi.Offset, r regalloc.VReg, store bool, prev *instruction) *instruction {
-	mem := newOperandMem(newAmodeImmReg(offset.U32(), execCtx))
+	mem := newOperandMem(m.newAmodeImmReg(offset.U32(), execCtx))
 	instr := m.allocateInstr()
 	if store {
 		instr.asMovRM(r, mem, 8)
@@ -158,7 +158,7 @@ func (m *machine) goEntryPreamblePassArg(cur *instruction, paramSlicePtr regallo
 	}
 
 	load := m.allocateInstr()
-	a := newOperandMem(newAmodeImmReg(offsetInParamSlice, paramSlicePtr))
+	a := newOperandMem(m.newAmodeImmReg(offsetInParamSlice, paramSlicePtr))
 	switch arg.Type {
 	case ssa.TypeI32:
 		load.asMovzxRmR(extModeLQ, a, dst)
@@ -176,7 +176,7 @@ func (m *machine) goEntryPreamblePassArg(cur *instruction, paramSlicePtr regallo
 	if arg.Kind == backend.ABIArgKindStack {
 		// Store back to the stack.
 		store := m.allocateInstr()
-		a := newOperandMem(newAmodeImmReg(uint32(arg.Offset), rspVReg))
+		a := newOperandMem(m.newAmodeImmReg(uint32(arg.Offset), rspVReg))
 		switch arg.Type {
 		case ssa.TypeI32:
 			store.asMovRM(dst, a, 4)
@@ -200,7 +200,7 @@ func (m *machine) goEntryPreamblePassResult(cur *instruction, resultSlicePtr reg
 		// Load the value to the temporary.
 		load := m.allocateInstr()
 		offset := resultStackSlotBeginOffset + uint32(result.Offset)
-		a := newOperandMem(newAmodeImmReg(offset, rspVReg))
+		a := newOperandMem(m.newAmodeImmReg(offset, rspVReg))
 		switch result.Type {
 		case ssa.TypeI32:
 			r = tmpIntReg
@@ -226,7 +226,7 @@ func (m *machine) goEntryPreamblePassResult(cur *instruction, resultSlicePtr reg
 	}
 
 	store := m.allocateInstr()
-	a := newOperandMem(newAmodeImmReg(offsetInResultSlice, resultSlicePtr))
+	a := newOperandMem(m.newAmodeImmReg(offsetInResultSlice, resultSlicePtr))
 	switch result.Type {
 	case ssa.TypeI32:
 		store.asMovRM(r, a, 4)

@@ -43,7 +43,7 @@ func (m *machine) InsertStoreRegisterAt(v regalloc.VReg, instr *instruction, aft
 
 	offsetFromSP := m.getVRegSpillSlotOffsetFromSP(v.ID(), typ.Size())
 	store := m.allocateInstr()
-	mem := newOperandMem(newAmodeImmReg(uint32(offsetFromSP), rspVReg))
+	mem := newOperandMem(m.newAmodeImmReg(uint32(offsetFromSP), rspVReg))
 	switch typ {
 	case ssa.TypeI32:
 		store.asMovRM(v, mem, 4)
@@ -78,7 +78,7 @@ func (m *machine) InsertReloadRegisterAt(v regalloc.VReg, instr *instruction, af
 	// Load the value to the temporary.
 	load := m.allocateInstr()
 	offsetFromSP := m.getVRegSpillSlotOffsetFromSP(v.ID(), typ.Size())
-	a := newOperandMem(newAmodeImmReg(uint32(offsetFromSP), rspVReg))
+	a := newOperandMem(m.newAmodeImmReg(uint32(offsetFromSP), rspVReg))
 	switch typ {
 	case ssa.TypeI32:
 		load.asMovzxRmR(extModeLQ, a, v)

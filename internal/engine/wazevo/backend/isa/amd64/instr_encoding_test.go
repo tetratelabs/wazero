@@ -2,12 +2,20 @@ package amd64
 
 import (
 	"encoding/hex"
+	"runtime"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
 func TestInstruction_format_encode(t *testing.T) {
+	_, _, m := newSetupWithMockContext()
+	defer func() { runtime.KeepAlive(m) }()
+	newAmodeImmReg := m.newAmodeImmReg
+	newAmodeRegRegShift := m.newAmodeRegRegShift
+	newAmodeRipRelative := m.newAmodeRipRelative
+	allocateExitSeq := m.allocateExitSeq
+
 	for _, tc := range []struct {
 		setup      func(*instruction)
 		want       string
@@ -3096,7 +3104,7 @@ func TestInstruction_format_encode(t *testing.T) {
 			wantFormat: "cmovnlel 123(%rax), %esi",
 		},
 		{
-			setup: func(i *instruction) { i.asExitSeq(r15VReg) },
+			setup: func(i *instruction) { *i = *allocateExitSeq(r15VReg) },
 			// movq 0x10(%r15), %rbp
 			// movq 0x18(%r15), %rsp
 			// retq

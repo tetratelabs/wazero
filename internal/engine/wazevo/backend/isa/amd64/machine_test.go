@@ -2,6 +2,7 @@ package amd64
 
 import (
 	"fmt"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -139,6 +140,12 @@ func TestMachine_getOperand_Imm32_Reg(t *testing.T) {
 }
 
 func Test_machine_getOperand_Mem_Imm32_Reg(t *testing.T) {
+	_, _, m := newSetupWithMockContext()
+	defer func() {
+		runtime.KeepAlive(m)
+	}()
+	newAmodeImmReg := m.newAmodeImmReg
+
 	for _, tc := range []struct {
 		name         string
 		setup        func(*mockCompiler, ssa.Builder, *machine) *backend.SSAValueDefinition
@@ -260,7 +267,11 @@ func Test_machine_getOperand_Mem_Imm32_Reg(t *testing.T) {
 			ctx, b, m := newSetupWithMockContext()
 			def := tc.setup(ctx, b, m)
 			actual := m.getOperand_Mem_Imm32_Reg(def)
-			require.Equal(t, tc.exp, actual)
+			if tc.exp.kind == operandKindMem {
+				require.Equal(t, tc.exp.addressMode(), actual.addressMode())
+			} else {
+				require.Equal(t, tc.exp, actual)
+			}
 			require.Equal(t, strings.Join(tc.instructions, "\n"), formatEmittedInstructionsInCurrentBlock(m))
 		})
 	}
