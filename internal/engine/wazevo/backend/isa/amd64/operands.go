@@ -89,13 +89,9 @@ func (o *operand) label() backend.Label {
 	switch o.kind {
 	case operandKindLabel:
 		return backend.Label(o.data)
-	case operandKindMem:
-		mem := o.addressMode()
-		if mem.kind == amodeRipRelative {
-			return mem.label
-		}
+	default:
+		panic("BUG: invalid operand kind")
 	}
-	panic("BUG: invalid operand kind")
 }
 
 func newOperandLabel(label backend.Label) operand {
@@ -116,21 +112,13 @@ func newOperandMem(amode *amode) operand {
 
 // amode is a memory operand (addressing mode).
 type amode struct {
-	kind  amodeKind
-	imm32 uint32
-	base  regalloc.VReg
+	kindWithShift uint32
+	imm32         uint32
+	base          regalloc.VReg
 
 	// For amodeRegRegShift:
 	index regalloc.VReg
-	shift byte // 0, 1, 2, 3
-
-	// For amodeRipRelative.
-	// If kind == amodeRipRelative, and label is invalid,
-	// then imm32 should represent the resolved address.
-	label backend.Label
 }
-
-func resetAmode(am *amode) {}
 
 type amodeKind byte
 
@@ -146,31 +134,36 @@ const (
 	// amodeRegRegShift calculates sign-extend-32-to-64(Immediate) + base + (Register2 << Shift)
 	amodeRegRegShift
 
-	// amodeRipRelative is a memory operand with RIP-relative addressing mode.
-	amodeRipRelative
-
 	// TODO: there are other addressing modes such as the one without base register.
 )
 
+func (a *amode) kind() amodeKind {
+	return amodeKind(a.kindWithShift & 0xff)
+}
+
+func (a *amode) shift() byte {
+	return byte(a.kindWithShift >> 8)
+}
+
 func (a *amode) uses(rs *[]regalloc.VReg) {
-	switch a.kind {
+	switch a.kind() {
 	case amodeImmReg:
 		*rs = append(*rs, a.base)
 	case amodeRegRegShift:
 		*rs = append(*rs, a.base, a.index)
-	case amodeRipRelative, amodeImmRBP:
+	case amodeImmRBP:
 	default:
 		panic("BUG: invalid amode kind")
 	}
 }
 
 func (a *amode) nregs() int {
-	switch a.kind {
+	switch a.kind() {
 	case amodeImmReg:
 		return 1
 	case amodeRegRegShift:
 		return 2
-	case amodeRipRelative, amodeImmRBP:
+	case amodeImmRBP:
 		return 0
 	default:
 		panic("BUG: invalid amode kind")
@@ -178,7 +171,7 @@ func (a *amode) nregs() int {
 }
 
 func (a *amode) assignUses(i int, reg regalloc.VReg) {
-	switch a.kind {
+	switch a.kind() {
 	case amodeImmReg:
 		if i == 0 {
 			a.base = reg
@@ -193,7 +186,6 @@ func (a *amode) assignUses(i int, reg regalloc.VReg) {
 		} else {
 			panic("BUG: invalid amode assignment")
 		}
-	case amodeRipRelative:
 	default:
 		panic("BUG: invalid amode assignment")
 	}
@@ -201,13 +193,13 @@ func (a *amode) assignUses(i int, reg regalloc.VReg) {
 
 func (m *machine) newAmodeImmReg(imm32 uint32, base regalloc.VReg) *amode {
 	ret := m.amodePool.Allocate()
-	*ret = amode{kind: amodeImmReg, imm32: imm32, base: base}
+	*ret = amode{kindWithShift: uint32(amodeImmReg), imm32: imm32, base: base}
 	return ret
 }
 
 func (m *machine) newAmodeImmRBPReg(imm32 uint32) *amode {
 	ret := m.amodePool.Allocate()
-	*ret = amode{kind: amodeImmRBP, imm32: imm32, base: rbpVReg}
+	*ret = amode{kindWithShift: uint32(amodeImmRBP), imm32: imm32, base: rbpVReg}
 	return ret
 }
 
@@ -216,47 +208,28 @@ func (m *machine) newAmodeRegRegShift(imm32 uint32, base, index regalloc.VReg, s
 		panic(fmt.Sprintf("BUG: invalid shift (must be 3>=): %d", shift))
 	}
 	ret := m.amodePool.Allocate()
-	*ret = amode{kind: amodeRegRegShift, imm32: imm32, base: base, index: index, shift: shift}
-	return ret
-}
-
-func (a *amode) resolveRipRelative(imm32 uint32) {
-	if a.kind != amodeRipRelative {
-		panic("BUG: invalid amode kind")
-	}
-	a.imm32 = imm32
-	a.label = backend.LabelInvalid
-}
-
-func (m *machine) newAmodeRipRelative(label backend.Label) *amode {
-	ret := m.amodePool.Allocate()
-	*ret = amode{kind: amodeRipRelative, label: label}
+	*ret = amode{kindWithShift: uint32(amodeRegRegShift) | uint32(shift)<<8, imm32: imm32, base: base, index: index}
 	return ret
 }
 
 // String implements fmt.Stringer.
 func (a *amode) String() string {
-	switch a.kind {
+	switch a.kind() {
 	case amodeImmReg, amodeImmRBP:
 		if a.imm32 == 0 {
 			return fmt.Sprintf("(%s)", formatVRegSized(a.base, true))
 		}
 		return fmt.Sprintf("%d(%s)", int32(a.imm32), formatVRegSized(a.base, true))
 	case amodeRegRegShift:
+		shift := 1 << a.shift()
 		if a.imm32 == 0 {
 			return fmt.Sprintf(
 				"(%s,%s,%d)",
-				formatVRegSized(a.base, true), formatVRegSized(a.index, true), 1<<a.shift)
+				formatVRegSized(a.base, true), formatVRegSized(a.index, true), shift)
 		}
 		return fmt.Sprintf(
 			"%d(%s,%s,%d)",
-			int32(a.imm32), formatVRegSized(a.base, true), formatVRegSized(a.index, true), 1<<a.shift)
-	case amodeRipRelative:
-		if a.label != backend.LabelInvalid {
-			return fmt.Sprintf("%s(%%rip)", a.label)
-		} else {
-			return fmt.Sprintf("%d(%%rip)", int32(a.imm32))
-		}
+			int32(a.imm32), formatVRegSized(a.base, true), formatVRegSized(a.index, true), shift)
 	default:
 		panic("BUG: invalid amode kind")
 	}

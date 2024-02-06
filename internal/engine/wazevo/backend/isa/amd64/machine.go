@@ -27,7 +27,7 @@ func NewBackend() backend.Machine {
 		cpuFeatures: platform.CpuFeatures,
 		regAlloc:    regalloc.NewAllocator(regInfo),
 		spillSlots:  map[regalloc.VRegID]int64{},
-		amodePool:   wazevoapi.NewPool[amode](resetAmode),
+		amodePool:   wazevoapi.NewPool[amode](nil),
 	}
 }
 
@@ -196,7 +196,7 @@ func (m *machine) lowerBrTable(index ssa.Value, targets []ssa.BasicBlock) {
 
 	jmpTableBegin, jmpTableBeginLabel := m.allocateBrTarget()
 	m.insert(jmpTableBegin)
-	leaJmpTableAddr.asLEA(m.newAmodeRipRelative(jmpTableBeginLabel), addr)
+	leaJmpTableAddr.asLEA(newOperandLabel(jmpTableBeginLabel), addr)
 
 	jmpTable := m.allocateInstr()
 	targetSliceIndex := m.addJmpTableTarget(targets)
@@ -648,7 +648,7 @@ func (m *machine) lowerVconst(res ssa.Value, lo, hi uint64) {
 	m.insert(constIsland)
 	m.insert(afterLoadNop)
 
-	lea.asLEA(m.newAmodeRipRelative(constLabel), islandAddr)
+	lea.asLEA(newOperandLabel(constLabel), islandAddr)
 	jmp.asJmp(newOperandLabel(afterLoadLabel))
 }
 
@@ -891,7 +891,7 @@ func (m *machine) lowerExitWithCode(execCtx regalloc.VReg, code wazevoapi.ExitCo
 
 	// Insert the label for the return address.
 	nop, l := m.allocateBrTarget()
-	readRip.asLEA(m.newAmodeRipRelative(l), ripReg)
+	readRip.asLEA(newOperandLabel(l), ripReg)
 	m.insert(nop)
 	return l
 }

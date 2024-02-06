@@ -288,7 +288,7 @@ func TestMachine_lowerExitWithCode(t *testing.T) {
 	mov.q %rbp, 1152(%r15)
 	movl $6, %ebp
 	mov.l %rbp, (%r15)
-	lea L1(%rip), %rbp
+	lea L1, %rbp
 	mov.q %rbp, 48(%r15)
 	exit_sequence %r15
 L1:

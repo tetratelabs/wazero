@@ -992,9 +992,9 @@ func (i *instruction) jmpLabel() backend.Label {
 	}
 }
 
-func (i *instruction) asLEA(a *amode, rd regalloc.VReg) *instruction {
+func (i *instruction) asLEA(target operand, rd regalloc.VReg) *instruction {
 	i.kind = lea
-	i.op1 = newOperandMem(a)
+	i.op1 = target
 	i.op2 = newOperandReg(rd)
 	return i
 }
