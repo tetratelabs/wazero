@@ -1054,15 +1054,15 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 			panic(fmt.Sprintf("Unsupported sseOpcode: %s", op))
 		}
 
-		dst := regEncodings[i.op2.r.RealReg()]
+		dst := regEncodings[i.op2.reg().RealReg()]
 
 		rex := rexInfo(0).clearW()
 		op1 := i.op1
 		if op1.kind == operandKindReg {
-			src := regEncodings[op1.r.RealReg()]
+			src := regEncodings[op1.reg().RealReg()]
 			encodeRegReg(c, legPrex, opcode, opcodeNum, dst, src, rex)
 		} else if i.op1.kind == operandKindMem {
-			m := i.op1.amode
+			m := i.op1.addressMode()
 			encodeRegMem(c, legPrex, opcode, opcodeNum, dst, m, rex)
 		} else {
 			panic("BUG: invalid operand kind")
