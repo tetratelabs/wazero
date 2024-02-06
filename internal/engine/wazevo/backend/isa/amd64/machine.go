@@ -632,7 +632,7 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		case ssa.VecLaneI32x4:
 			vecOp = sseOpcodePminsd
 		}
-		m.lowerVbBinOp(vecOp, rn.r, rm, rd)
+		m.lowerVbBinOp(vecOp, rn.reg(), rm, rd)
 
 	case ssa.OpcodeVUmin:
 		x, y, lane := instr.Arg2WithLane()
@@ -648,7 +648,7 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		case ssa.VecLaneI32x4:
 			vecOp = sseOpcodePminud
 		}
-		m.lowerVbBinOp(vecOp, rn.r, rm, rd)
+		m.lowerVbBinOp(vecOp, rn.reg(), rm, rd)
 
 	case ssa.OpcodeVImax:
 		x, y, lane := instr.Arg2WithLane()
@@ -664,7 +664,7 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		case ssa.VecLaneI32x4:
 			vecOp = sseOpcodePmaxsd
 		}
-		m.lowerVbBinOp(vecOp, rn.r, rm, rd)
+		m.lowerVbBinOp(vecOp, rn.reg(), rm, rd)
 
 	case ssa.OpcodeVUmax:
 		x, y, lane := instr.Arg2WithLane()
@@ -680,7 +680,7 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		case ssa.VecLaneI32x4:
 			vecOp = sseOpcodePmaxud
 		}
-		m.lowerVbBinOp(vecOp, rn.r, rm, rd)
+		m.lowerVbBinOp(vecOp, rn.reg(), rm, rd)
 
 	case ssa.OpcodeVAvgRound:
 		x, y, lane := instr.Arg2WithLane()
@@ -694,7 +694,7 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		case ssa.VecLaneI16x8:
 			vecOp = sseOpcodePavgw
 		}
-		m.lowerVbBinOp(vecOp, rn.r, rm, rd)
+		m.lowerVbBinOp(vecOp, rn.reg(), rm, rd)
 
 	case ssa.OpcodeVIabs:
 		m.lowerVIabs(instr)
@@ -751,7 +751,7 @@ func (m *machine) lowerVIabs(instr *ssa.Instruction) {
 
 	if lane == ssa.VecLaneI64x2 {
 		rn := m.getOperand_Reg(m.c.ValueDefinition(x))
-		tmp := m.copyToTmp(rn.r)
+		tmp := m.copyToTmp(rn.reg())
 
 		// Clear all bits on mask.
 		mask := m.c.AllocateVReg(ssa.TypeV128)
@@ -796,7 +796,7 @@ func (m *machine) lowerVIpopcnt(instr *ssa.Instruction) {
 	m.lowerVconst(tmp1, 0x0f0f0f0f0f0f0f0f, 0x0f0f0f0f0f0f0f0f)
 
 	// Copy input into tmp2.
-	tmp2 := m.copyToTmp(rn.r)
+	tmp2 := m.copyToTmp(rn.reg())
 
 	// Given that we have:
 	//  rm = [b1, ..., b16] where bn = hn:ln and hn and ln are higher and lower 4-bits of bn.
@@ -809,7 +809,7 @@ func (m *machine) lowerVIpopcnt(instr *ssa.Instruction) {
 
 	// Do logical (packed word) right shift by 4 on rm and PAND against the mask (tmp1); meaning that we have
 	//  tmp3 = [h1, ...., h16].
-	tmp3 := m.copyToTmp(rn.r)
+	tmp3 := m.copyToTmp(rn.reg())
 	psrlw := m.allocateInstr()
 	psrlw.asXmmRmiReg(sseOpcodePsrlw, newOperandImm32(4), tmp3)
 	m.insert(psrlw)
