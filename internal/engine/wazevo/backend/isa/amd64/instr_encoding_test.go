@@ -2,10 +2,10 @@ package amd64
 
 import (
 	"encoding/hex"
-	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"runtime"
 	"testing"
 
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
