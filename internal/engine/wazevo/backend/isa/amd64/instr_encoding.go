@@ -681,9 +681,26 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 
 	case lea:
 		needsLabelResolution = true
-		a := i.op1.addressMode()
 		dst := regEncodings[i.op2.reg().RealReg()]
-		encodeRegMem(c, legacyPrefixesNone, 0x8d, 1, dst, a, rexInfo(0).setW())
+		rex := rexInfo(0).setW()
+		const opcode, opcodeNum = 0x8d, 1
+		switch i.op1.kind {
+		case operandKindMem:
+			a := i.op1.addressMode()
+			encodeRegMem(c, legacyPrefixesNone, opcode, opcodeNum, dst, a, rex)
+		case operandKindLabel:
+			rex.encode(c, regRexBit(byte(dst)), 0)
+			c.EmitByte(byte((opcode) & 0xff))
+
+			// Indicate "LEAQ [RIP + 32bit displacement].
+			// https://wiki.osdev.org/X86-64_Instruction_Encoding#32.2F64-bit_addressing
+			c.EmitByte(encodeModRM(0b00, dst.encoding(), 0b101))
+
+			// This will be resolved later, so we just emit a placeholder (0xffffffff for testing).
+			c.Emit4Bytes(0xffffffff)
+		default:
+			panic("BUG: invalid operand kind")
+		}
 
 	case movRM:
 		m := i.op2.addressMode()
@@ -1087,7 +1104,7 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 
 		// Restore the RBP, RSP, and return to the Go code:
 		*allocatedAmode = amode{
-			kind: amodeImmReg, base: execCtx,
+			kindWithShift: uint32(amodeImmReg), base: execCtx,
 			imm32: wazevoapi.ExecutionContextOffsetOriginalFramePointer.U32(),
 		}
 		encodeLoad64(c, allocatedAmode, rbp)
@@ -1229,7 +1246,7 @@ func encodeEncMem(
 		useSBI = 4 // the encoding of rsp or r12 register.
 	)
 
-	switch m.kind {
+	switch m.kind() {
 	case amodeImmReg, amodeImmRBP:
 		base := m.base.RealReg()
 		baseEnc := regEncodings[base]
@@ -1287,30 +1304,17 @@ func encodeEncMem(
 		immZero, baseRbp, baseR13 := m.imm32 == 0, base == rbp, base == r13
 		if immZero && !baseRbp && !baseR13 { // rbp or r13 can't be used as base for without displacement encoding. (curious why? because it's interpreted as RIP relative addressing).
 			c.EmitByte(encodeModRM(modNoDisplacement, regEncoding(r), useSBI))
-			c.EmitByte(encodeSIB(m.shift, indexEnc.encoding(), baseEnc.encoding()))
+			c.EmitByte(encodeSIB(m.shift(), indexEnc.encoding(), baseEnc.encoding()))
 		} else if lower8willSignExtendTo32(m.imm32) {
 			c.EmitByte(encodeModRM(modShortDisplacement, regEncoding(r), useSBI))
-			c.EmitByte(encodeSIB(m.shift, indexEnc.encoding(), baseEnc.encoding()))
+			c.EmitByte(encodeSIB(m.shift(), indexEnc.encoding(), baseEnc.encoding()))
 			c.EmitByte(byte(m.imm32))
 		} else {
 			c.EmitByte(encodeModRM(modLongDisplacement, regEncoding(r), useSBI))
-			c.EmitByte(encodeSIB(m.shift, indexEnc.encoding(), baseEnc.encoding()))
+			c.EmitByte(encodeSIB(m.shift(), indexEnc.encoding(), baseEnc.encoding()))
 			c.Emit4Bytes(m.imm32)
 		}
 
-	case amodeRipRelative:
-		rex.encode(c, regRexBit(r), 0)
-		for opcodeNum > 0 {
-			opcodeNum--
-			c.EmitByte(byte((opcodes >> (opcodeNum << 3)) & 0xff))
-		}
-
-		// Indicate "LEAQ [RIP + 32bit displacement].
-		// https://wiki.osdev.org/X86-64_Instruction_Encoding#32.2F64-bit_addressing
-		c.EmitByte(encodeModRM(0b00, regEncoding(r), 0b101))
-
-		// This will be resolved later, so we just emit a placeholder. (m.imm32 for testing).
-		c.Emit4Bytes(m.imm32)
 	default:
 		panic("BUG: invalid addressing mode")
 	}

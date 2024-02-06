@@ -5,6 +5,7 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
@@ -13,7 +14,6 @@ func TestInstruction_format_encode(t *testing.T) {
 	defer func() { runtime.KeepAlive(m) }()
 	newAmodeImmReg := m.newAmodeImmReg
 	newAmodeRegRegShift := m.newAmodeRegRegShift
-	newAmodeRipRelative := m.newAmodeRipRelative
 	allocateExitSeq := m.allocateExitSeq
 
 	for _, tc := range []struct {
@@ -1842,37 +1842,28 @@ func TestInstruction_format_encode(t *testing.T) {
 			wantFormat: "xor %r11d, %r15d",
 		},
 		{
-			setup:      func(i *instruction) { i.asLEA(newAmodeImmReg(0, rdiVReg), rdxVReg) },
+			setup:      func(i *instruction) { i.asLEA(newOperandMem(newAmodeImmReg(0, rdiVReg)), rdxVReg) },
 			want:       "488d17",
 			wantFormat: "lea (%rdi), %rdx",
 		},
 		{
-			setup:      func(i *instruction) { i.asLEA(newAmodeImmReg(0xffff, rdiVReg), rdxVReg) },
+			setup:      func(i *instruction) { i.asLEA(newOperandMem(newAmodeImmReg(0xffff, rdiVReg)), rdxVReg) },
 			want:       "488d97ffff0000",
 			wantFormat: "lea 65535(%rdi), %rdx",
 		},
 		{
-			setup:      func(i *instruction) { i.asLEA(newAmodeRegRegShift(0xffff, rspVReg, r13VReg, 3), rdxVReg) },
+			setup: func(i *instruction) {
+				i.asLEA(newOperandMem(newAmodeRegRegShift(0xffff, rspVReg, r13VReg, 3)), rdxVReg)
+			},
 			want:       "4a8d94ecffff0000",
 			wantFormat: "lea 65535(%rsp,%r13,8), %rdx",
 		},
 		{
 			setup: func(i *instruction) {
-				a := newAmodeRipRelative(1)
-				a.resolveRipRelative(1234)
-				i.asLEA(a, r11VReg)
+				i.asLEA(newOperandLabel(backend.Label(1234)), r11VReg)
 			},
-			want:       "4c8d1dd2040000",
-			wantFormat: "lea 1234(%rip), %r11",
-		},
-		{
-			setup: func(i *instruction) {
-				a := newAmodeRipRelative(1)
-				a.resolveRipRelative(8)
-				i.asLEA(a, r11VReg)
-			},
-			want:       "4c8d1d08000000",
-			wantFormat: "lea 8(%rip), %r11",
+			want:       "4c8d1dffffffff",
+			wantFormat: "lea L1234, %r11",
 		},
 		{
 			setup:      func(i *instruction) { i.kind = ud2 },

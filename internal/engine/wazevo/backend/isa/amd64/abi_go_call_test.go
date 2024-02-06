@@ -72,7 +72,7 @@ L2:
 	mov.l %r12, (%rax)
 	mov.q %rsp, 56(%rax)
 	mov.q %rbp, 1152(%rax)
-	lea L3(%rip), %r12
+	lea L3, %r12
 	mov.q %r12, 48(%rax)
 	exit_sequence %rax
 L3:
@@ -147,7 +147,7 @@ L2:
 	mov.l %r12, (%rax)
 	mov.q %rsp, 56(%rax)
 	mov.q %rbp, 1152(%rax)
-	lea L3(%rip), %r12
+	lea L3, %r12
 	mov.q %r12, 48(%rax)
 	exit_sequence %rax
 L3:
@@ -213,7 +213,7 @@ L2:
 	mov.l %r12, (%rax)
 	mov.q %rsp, 56(%rax)
 	mov.q %rbp, 1152(%rax)
-	lea L3(%rip), %r12
+	lea L3, %r12
 	mov.q %r12, 48(%rax)
 	exit_sequence %rax
 L3:
@@ -309,7 +309,7 @@ L2:
 	mov.l %r12, (%rax)
 	mov.q %rsp, 56(%rax)
 	mov.q %rbp, 1152(%rax)
-	lea L3(%rip), %r12
+	lea L3, %r12
 	mov.q %r12, 48(%rax)
 	exit_sequence %rax
 L3:
@@ -435,7 +435,7 @@ func TestMachine_CompileStackGrowCallSequence(t *testing.T) {
 	mov.l %r12, (%rax)
 	mov.q %rsp, 56(%rax)
 	mov.q %rbp, 1152(%rax)
-	lea L1(%rip), %r12
+	lea L1, %r12
 	mov.q %r12, 48(%rax)
 	exit_sequence %rax
 L1:

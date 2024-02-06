@@ -39,7 +39,9 @@ func (p *Pool[T]) Allocate() *T {
 		p.index = 0
 	}
 	ret := &p.pages[len(p.pages)-1][p.index]
-	p.resetFn(ret)
+	if p.resetFn != nil {
+		p.resetFn(ret)
+	}
 	p.index++
 	p.allocated++
 	return ret
