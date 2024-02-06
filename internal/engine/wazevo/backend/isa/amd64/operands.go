@@ -7,6 +7,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 )
 
 type operand struct {
@@ -76,7 +77,7 @@ func (o *operand) setReg(r regalloc.VReg) {
 
 //go:inline
 func (o *operand) addressMode() *amode {
-	return (*amode)(unsafe.Pointer(uintptr(o.data)))
+	return wazevoapi.PtrFromUintptr[amode](uintptr(o.data))
 }
 
 //go:inline
@@ -228,9 +229,6 @@ func (a *amode) resolveRipRelative(imm32 uint32) {
 }
 
 func (m *machine) newAmodeRipRelative(label backend.Label) *amode {
-	if label == backend.LabelInvalid {
-		panic("BUG: invalid label")
-	}
 	ret := m.amodePool.Allocate()
 	*ret = amode{kind: amodeRipRelative, label: label}
 	return ret

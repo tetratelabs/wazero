@@ -2,6 +2,7 @@ package amd64
 
 import (
 	"encoding/hex"
+	"runtime"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -9,6 +10,7 @@ import (
 
 func TestInstruction_format_encode(t *testing.T) {
 	_, _, m := newSetupWithMockContext()
+	defer func() { runtime.KeepAlive(m) }()
 	newAmodeImmReg := m.newAmodeImmReg
 	newAmodeRegRegShift := m.newAmodeRegRegShift
 	newAmodeRipRelative := m.newAmodeRipRelative

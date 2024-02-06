@@ -1,6 +1,7 @@
 package amd64
 
 import (
+	"runtime"
 	"strings"
 	"testing"
 
@@ -12,6 +13,9 @@ import (
 
 func TestMachine_lowerToAddressMode(t *testing.T) {
 	_, _, m := newSetupWithMockContext()
+	defer func() {
+		runtime.KeepAlive(m)
+	}()
 	newAmodeImmReg := m.newAmodeImmReg
 	newAmodeRegRegShift := m.newAmodeRegRegShift
 
@@ -229,6 +233,9 @@ func TestMachine_lowerAddendFromInstr(t *testing.T) {
 
 func TestMachine_lowerAddendsToAmode(t *testing.T) {
 	_, _, m := newSetupWithMockContext()
+	defer func() {
+		runtime.KeepAlive(m)
+	}()
 	newAmodeImmReg := m.newAmodeImmReg
 	newAmodeRegRegShift := m.newAmodeRegRegShift
 

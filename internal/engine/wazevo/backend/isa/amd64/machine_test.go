@@ -2,6 +2,7 @@ package amd64
 
 import (
 	"fmt"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -140,6 +141,9 @@ func TestMachine_getOperand_Imm32_Reg(t *testing.T) {
 
 func Test_machine_getOperand_Mem_Imm32_Reg(t *testing.T) {
 	_, _, m := newSetupWithMockContext()
+	defer func() {
+		runtime.KeepAlive(m)
+	}()
 	newAmodeImmReg := m.newAmodeImmReg
 
 	for _, tc := range []struct {
