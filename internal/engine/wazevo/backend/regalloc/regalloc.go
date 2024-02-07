@@ -1,12 +1,13 @@
 // Package regalloc performs register allocation. The algorithm can work on any ISA by implementing the interfaces in
 // api.go.
-package regalloc
-
+//
 // References:
-// * https://web.stanford.edu/class/archive/cs/cs143/cs143.1128/lectures/17/Slides17.pdf
-// * https://en.wikipedia.org/wiki/Chaitin%27s_algorithm
-// * https://llvm.org/ProjectsWithLLVM/2004-Fall-CS426-LS.pdf
-// * https://pfalcon.github.io/ssabook/latest/book-full.pdf: Chapter 9. for liveness analysis.
+//   - https://web.stanford.edu/class/archive/cs/cs143/cs143.1128/lectures/17/Slides17.pdf
+//   - https://en.wikipedia.org/wiki/Chaitin%27s_algorithm
+//   - https://llvm.org/ProjectsWithLLVM/2004-Fall-CS426-LS.pdf
+//   - https://pfalcon.github.io/ssabook/latest/book-full.pdf: Chapter 9. for liveness analysis.
+//   - https://github.com/golang/go/blob/release-branch.go1.21/src/cmd/compile/internal/ssa/regalloc.go
+package regalloc
 
 import (
 	"fmt"
@@ -20,7 +21,6 @@ import (
 func NewAllocator(allocatableRegs *RegisterInfo) Allocator {
 	a := Allocator{
 		regInfo:            allocatableRegs,
-		blockLivenessData:  wazevoapi.NewIDedPool[blockLivenessData](resetBlockLivenessData),
 		phiDefInstListPool: wazevoapi.NewPool[phiDefInstList](resetPhiDefInstList),
 		blockStates:        wazevoapi.NewIDedPool[blockState](resetBlockState),
 	}
@@ -55,11 +55,11 @@ type (
 		// allocatableSet is a set of allocatable RealReg derived from regInfo. Static per ABI/ISA.
 		allocatableSet           RegSet
 		allocatedCalleeSavedRegs []VReg
-		blockLivenessData        wazevoapi.IDedPool[blockLivenessData]
 		vs                       []VReg
+		vs2                      []VRegID
 		phiDefInstListPool       wazevoapi.Pool[phiDefInstList]
 
-		// Followings are re-used during various places e.g. coloring.
+		// Followings are re-used during various places.
 		blks             []Block
 		reals            []RealReg
 		currentOccupants regInUseSet
@@ -67,13 +67,6 @@ type (
 		// Following two fields are updated while iterating the blocks in the reverse postorder.
 		state       state
 		blockStates wazevoapi.IDedPool[blockState]
-	}
-
-	// blockLivenessData is a per-block information used during the register allocation.
-	blockLivenessData struct {
-		seen     bool
-		liveOuts map[VReg]struct{}
-		liveIns  map[VReg]struct{}
 	}
 
 	// programCounter represents an opaque index into the program which is used to represents a LiveInterval of a VReg.
@@ -84,11 +77,18 @@ type (
 		regsInUse   regInUseSet
 		vrStates    wazevoapi.IDedPool[vrState]
 
+		currentBlockID int32
+
 		// allocatedRegSet is a set of RealReg that are allocated during the allocation phase. This is reset per function.
 		allocatedRegSet RegSet
 	}
 
 	blockState struct {
+		// liveIns is a list of VReg that are live at the beginning of the block.
+		liveIns []VRegID
+		// seen is true if the block is visited during the liveness analysis.
+		seen bool
+		// visited is true if the block is visited during the allocation phase.
 		visited            bool
 		startFromPredIndex int
 		// startRegs is a list of RealReg that are used at the beginning of the block. This is used to fix the merge edges.
@@ -104,14 +104,18 @@ type (
 		defInstr Instr
 		// defBlk is the block that defines this value. If this is the phi value, this is the block whose arguments contain this value.
 		defBlk Block
-		// spilled is true if this value is spilled i.e. the value is reload from the stack somewhere in the program.
-		spilled bool
 		// lca = lowest common ancestor. This is the block that is the lowest common ancestor of all the blocks that
 		// reloads this value. This is used to determine the spill location. Only valid if spilled=true.
 		lca Block
 		// lastUse is the program counter of the last use of this value. This changes while iterating the block, and
-		// should not be used across the blocks as it becomes invalid.
-		lastUse programCounter
+		// should not be used across the blocks as it becomes invalid. To check the validity, use lastUseUpdatedAtBlockID.
+		lastUse                 programCounter
+		lastUseUpdatedAtBlockID int32
+		// spilled is true if this value is spilled i.e. the value is reload from the stack somewhere in the program.
+		//
+		// Note that this field is used during liveness analysis for different purpose. This is used to determine the
+		// value is live-in or not.
+		spilled bool
 		// isPhi is true if this is a phi value.
 		isPhi bool
 		// phiDefInstList is a list of instructions that defines this phi value.
@@ -155,6 +159,7 @@ func (s *state) reset() {
 	s.vrStates.Reset()
 	s.allocatedRegSet = RegSet(0)
 	s.regsInUse.reset()
+	s.currentBlockID = -1
 }
 
 func (s *state) setVRegState(v VReg, r RealReg) {
@@ -171,14 +176,14 @@ func resetVrState(vs *vrState) {
 	vs.defBlk = nil
 	vs.spilled = false
 	vs.lastUse = -1
+	vs.lastUseUpdatedAtBlockID = -1
 	vs.lca = nil
 	vs.isPhi = false
 	vs.phiDefInstList = nil
 }
 
-func (s *state) getVRegState(v VReg) *vrState {
-	id := int(v.ID())
-	return s.vrStates.GetOrAllocate(id)
+func (s *state) getVRegState(v VRegID) *vrState {
+	return s.vrStates.GetOrAllocate(int(v))
 }
 
 func (s *state) useRealReg(r RealReg, v VReg) {
@@ -220,7 +225,7 @@ func (vs *vrState) recordReload(f Function, blk Block) {
 
 func (s *state) findOrSpillAllocatable(a *Allocator, allocatable []RealReg, forbiddenMask RegSet) (r RealReg) {
 	r = RealRegInvalid
-	var lastUseAt programCounter = math.MinInt32
+	var lastUseAt programCounter
 	var spillVReg VReg
 	for _, candidateReal := range allocatable {
 		if forbiddenMask.has(candidateReal) {
@@ -233,7 +238,7 @@ func (s *state) findOrSpillAllocatable(a *Allocator, allocatable []RealReg, forb
 			return candidateReal
 		}
 
-		if last := s.getVRegState(using).lastUse; last > lastUseAt {
+		if last := s.getVRegState(using.ID()).lastUse; r == RealRegInvalid || last > lastUseAt {
 			lastUseAt = last
 			r = candidateReal
 			spillVReg = using
@@ -260,13 +265,15 @@ func (s *state) findAllocatable(allocatable []RealReg, forbiddenMask RegSet) Rea
 	return RealRegInvalid
 }
 
-func (s *state) resetAt(bs *blockState, liveIns map[VReg]struct{}) {
+func (s *state) resetAt(bs *blockState) {
 	s.regsInUse.range_(func(_ RealReg, vr VReg) {
 		s.setVRegState(vr, RealRegInvalid)
 	})
 	s.regsInUse.reset()
 	bs.endRegs.range_(func(r RealReg, v VReg) {
-		if _, ok := liveIns[v]; ok {
+		id := int(v.ID())
+		st := s.vrStates.GetOrAllocate(id)
+		if st.lastUseUpdatedAtBlockID == s.currentBlockID && st.lastUse == programCounterLiveIn {
 			s.regsInUse.add(r, v)
 			s.setVRegState(v, r)
 		}
@@ -274,10 +281,12 @@ func (s *state) resetAt(bs *blockState, liveIns map[VReg]struct{}) {
 }
 
 func resetBlockState(b *blockState) {
+	b.seen = false
 	b.visited = false
 	b.endRegs.reset()
 	b.startRegs.reset()
 	b.startFromPredIndex = -1
+	b.liveIns = b.liveIns[:0]
 }
 
 func (b *blockState) dump(a *RegisterInfo) {
@@ -305,14 +314,23 @@ func (a *Allocator) determineCalleeSavedRealRegs(f Function) {
 	f.ClobberedRegisters(a.allocatedCalleeSavedRegs)
 }
 
+func (a *Allocator) getOrAllocateBlockState(blockID int32) *blockState {
+	return a.blockStates.GetOrAllocate(int(blockID))
+}
+
 // phiBlk returns the block that defines the given phi value, nil otherwise.
-func (s *state) phiBlk(v VReg) Block {
+func (s *state) phiBlk(v VRegID) Block {
 	vs := s.getVRegState(v)
 	if vs.isPhi {
 		return vs.defBlk
 	}
 	return nil
 }
+
+const (
+	programCounterLiveIn  = math.MinInt32
+	programCounterLiveOut = math.MaxInt32
+)
 
 // liveAnalysis constructs Allocator.blockLivenessData.
 // The algorithm here is described in https://pfalcon.github.io/ssabook/latest/book-full.pdf Chapter 9.2.
@@ -322,17 +340,21 @@ func (a *Allocator) livenessAnalysis(f Function) {
 
 		// We should gather phi value data.
 		for _, p := range blk.BlockParams(&a.vs) {
-			vs := s.getVRegState(p)
+			vs := s.getVRegState(p.ID())
 			vs.isPhi = true
 			vs.defBlk = blk
 		}
 	}
 
-	// Run the Algorithm 9.2 in the bool.
 	for blk := f.PostOrderBlockIteratorBegin(); blk != nil; blk = f.PostOrderBlockIteratorNext() {
 		blkID := blk.ID()
-		info := a.blockLivenessData.GetOrAllocate(blkID)
+		info := a.getOrAllocateBlockState(blkID)
 
+		a.vs2 = a.vs2[:0]
+		const (
+			flagDeleted = false
+			flagLive    = true
+		)
 		ns := blk.Succs()
 		for i := 0; i < ns; i++ {
 			succ := blk.Succ(i)
@@ -341,15 +363,17 @@ func (a *Allocator) livenessAnalysis(f Function) {
 			}
 
 			succID := succ.ID()
-			succInfo := a.blockLivenessData.GetOrAllocate(succID)
+			succInfo := a.getOrAllocateBlockState(succID)
 			if !succInfo.seen { // This means the back edge.
 				continue
 			}
 
-			for v := range succInfo.liveIns {
+			for _, v := range succInfo.liveIns {
 				if s.phiBlk(v) != succ {
-					info.liveOuts[v] = struct{}{}
-					info.liveIns[v] = struct{}{}
+					st := s.getVRegState(v)
+					// We use .spilled field to store the flag.
+					st.spilled = flagLive
+					a.vs2 = append(a.vs2, v)
 				}
 			}
 		}
@@ -359,27 +383,40 @@ func (a *Allocator) livenessAnalysis(f Function) {
 			var use, def VReg
 			for _, def = range instr.Defs(&a.vs) {
 				if !def.IsRealReg() {
-					delete(info.liveIns, def)
+					id := def.ID()
+					st := s.getVRegState(id)
+					// We use .spilled field to store the flag.
+					st.spilled = flagDeleted
+					a.vs2 = append(a.vs2, id)
 				}
 			}
 			for _, use = range instr.Uses(&a.vs) {
 				if !use.IsRealReg() {
-					info.liveIns[use] = struct{}{}
+					id := use.ID()
+					st := s.getVRegState(id)
+					// We use .spilled field to store the flag.
+					st.spilled = flagLive
+					a.vs2 = append(a.vs2, id)
 				}
 			}
 
-			// If the destination is a phi value, and ...
-			if def.Valid() && s.phiBlk(def) != nil {
+			if def.Valid() && s.phiBlk(def.ID()) != nil {
 				if use.Valid() && use.IsRealReg() {
-					// If the source is a real register, this is the beginning of the function.
+					// If the destination is a phi value, and the source is a real register, this is the beginning of the function.
 					a.state.argRealRegs = append(a.state.argRealRegs, use)
-				} else {
-					// Otherwise, this is the definition of the phi value for the successor block.
-					// So we need to make it outlive the block.
-					info.liveOuts[def] = struct{}{}
 				}
 			}
 		}
+
+		for _, v := range a.vs2 {
+			st := s.getVRegState(v)
+			// We use .spilled field to store the flag.
+			if st.spilled == flagLive { //nolint:gosimple
+				info.liveIns = append(info.liveIns, v)
+				st.spilled = false
+			}
+		}
+
 		info.seen = true
 	}
 
@@ -400,25 +437,47 @@ func (a *Allocator) loopTreeDFS(entry Block) {
 		tail := len(a.blks) - 1
 		loop := a.blks[tail]
 		a.blks = a.blks[:tail]
-		a.vs = a.vs[:0]
+		a.vs2 = a.vs2[:0]
 
-		info := a.blockLivenessData.GetOrAllocate(loop.ID())
-		for v := range info.liveIns {
+		a.vs2 = a.vs2[:0]
+		const (
+			flagDone    = false
+			flagPending = true
+		)
+		info := a.getOrAllocateBlockState(loop.ID())
+		for _, v := range info.liveIns {
 			if s.phiBlk(v) != loop {
-				a.vs = append(a.vs, v)
-				info.liveOuts[v] = struct{}{}
+				a.vs2 = append(a.vs2, v)
+				st := s.getVRegState(v)
+				// We use .spilled field to store the flag.
+				st.spilled = flagPending
 			}
 		}
 
+		var siblingAddedView []VRegID
 		cn := loop.LoopNestingForestChildren()
 		for i := 0; i < cn; i++ {
 			child := loop.LoopNestingForestChild(i)
 			childID := child.ID()
-			childInfo := a.blockLivenessData.GetOrAllocate(childID)
-			for _, v := range a.vs {
-				childInfo.liveIns[v] = struct{}{}
-				childInfo.liveOuts[v] = struct{}{}
+			childInfo := a.getOrAllocateBlockState(childID)
+
+			if i == 0 {
+				begin := len(childInfo.liveIns)
+				for _, v := range a.vs2 {
+					st := s.getVRegState(v)
+					// We use .spilled field to store the flag.
+					if st.spilled == flagPending { //nolint:gosimple
+						st.spilled = flagDone
+						// TODO: deduplicate, though I don't think it has much impact.
+						childInfo.liveIns = append(childInfo.liveIns, v)
+					}
+				}
+				siblingAddedView = childInfo.liveIns[begin:]
+			} else {
+				// TODO: deduplicate, though I don't think it has much impact.
+				childInfo.liveIns = append(childInfo.liveIns, siblingAddedView...)
 			}
+
 			if child.LoopHeader() {
 				a.blks = append(a.blks, child)
 			}
@@ -452,11 +511,23 @@ func (a *Allocator) alloc(f Function) {
 	a.scheduleSpills(f)
 }
 
+func (a *Allocator) updateLiveInVRState(liveness *blockState) {
+	currentBlockID := a.state.currentBlockID
+	for _, v := range liveness.liveIns {
+		vs := a.state.getVRegState(v)
+		vs.lastUse = programCounterLiveIn
+		vs.lastUseUpdatedAtBlockID = currentBlockID
+	}
+}
+
 func (a *Allocator) allocBlock(f Function, blk Block) {
 	bID := blk.ID()
-	liveness := a.blockLivenessData.GetOrAllocate(bID)
+	liveness := a.getOrAllocateBlockState(bID)
 	s := &a.state
-	currentBlkState := a.blockStates.GetOrAllocate(bID)
+	currentBlkState := a.getOrAllocateBlockState(bID)
+
+	s.currentBlockID = bID
+	a.updateLiveInVRState(liveness)
 
 	preds := blk.Preds()
 	var predState *blockState
@@ -464,13 +535,13 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 	case 0: // This is the entry block.
 	case 1:
 		predID := blk.Pred(0).ID()
-		predState = a.blockStates.GetOrAllocate(predID)
+		predState = a.getOrAllocateBlockState(predID)
 		currentBlkState.startFromPredIndex = 0
 	default:
 		// TODO: there should be some better heuristic to choose the predecessor.
 		for i := 0; i < preds; i++ {
 			predID := blk.Pred(i).ID()
-			if _predState := a.blockStates.GetOrAllocate(predID); _predState.visited {
+			if _predState := a.getOrAllocateBlockState(predID); _predState.visited {
 				predState = _predState
 				currentBlkState.startFromPredIndex = i
 				break
@@ -489,7 +560,7 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 			fmt.Printf("allocating blk%d starting from blk%d (on index=%d) \n",
 				bID, blk.Pred(currentBlkState.startFromPredIndex).ID(), currentBlkState.startFromPredIndex)
 		}
-		s.resetAt(predState, liveness.liveIns)
+		s.resetAt(predState)
 	}
 
 	s.regsInUse.range_(func(allocated RealReg, v VReg) {
@@ -501,14 +572,26 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 	for instr := blk.InstrIteratorBegin(); instr != nil; instr = blk.InstrIteratorNext() {
 		for _, use := range instr.Uses(&a.vs) {
 			if !use.IsRealReg() {
-				s.getVRegState(use).lastUse = pc
+				s.getVRegState(use.ID()).lastUse = pc
 			}
 		}
 		pc++
 	}
-	// Reset the last use of the liveOuts.
-	for outlive := range liveness.liveOuts {
-		s.getVRegState(outlive).lastUse = math.MaxInt32
+	// Mark all live-out values by checking live-in of the successors.
+	for i, ns := 0, blk.Succs(); i < ns; i++ {
+		succ := blk.Succ(i)
+		if succ == nil {
+			continue
+		}
+
+		succID := succ.ID()
+		succInfo := a.getOrAllocateBlockState(succID)
+		for _, v := range succInfo.liveIns {
+			if s.phiBlk(v) != succ {
+				st := s.getVRegState(v)
+				st.lastUse = programCounterLiveOut
+			}
+		}
 	}
 
 	pc = 0
@@ -529,7 +612,7 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 					killSet = append(killSet, r)
 				}
 			} else {
-				vs := s.getVRegState(use)
+				vs := s.getVRegState(use.ID())
 				if r := vs.r; r != RealRegInvalid {
 					currentUsedSet = currentUsedSet.add(r)
 				}
@@ -538,8 +621,8 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 
 		for i, use := range instr.Uses(&a.vs) {
 			if !use.IsRealReg() {
-				vs := s.getVRegState(use)
-				killed := liveness.isKilledAt(vs, pc)
+				vs := s.getVRegState(use.ID())
+				killed := vs.lastUse == pc
 				r := vs.r
 
 				if r == RealRegInvalid {
@@ -607,7 +690,7 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 					s.useRealReg(r, def)
 				}
 			} else {
-				vState := s.getVRegState(def)
+				vState := s.getVRegState(def.ID())
 				r := vState.r
 				// Allocate a new real register if `def` is not currently assigned one.
 				// It can happen when multiple instructions define the same VReg (e.g. const loads).
@@ -686,7 +769,7 @@ func (a *Allocator) fixMergeState(f Function, blk Block) {
 
 	// Restores the state at the beginning of the block.
 	bID := blk.ID()
-	blkSt := a.blockStates.GetOrAllocate(bID)
+	blkSt := a.getOrAllocateBlockState(bID)
 	desiredOccupants := &blkSt.startRegs
 	aliveOnRegVRegs := make(map[VReg]RealReg)
 	for i := 0; i < 64; i++ {
@@ -700,6 +783,9 @@ func (a *Allocator) fixMergeState(f Function, blk Block) {
 		fmt.Println("fixMergeState", blk.ID(), ":", desiredOccupants.format(a.regInfo))
 	}
 
+	s.currentBlockID = bID
+	a.updateLiveInVRState(a.getOrAllocateBlockState(bID))
+
 	currentOccupants := &a.currentOccupants
 	for i := 0; i < preds; i++ {
 		currentOccupants.reset()
@@ -709,7 +795,7 @@ func (a *Allocator) fixMergeState(f Function, blk Block) {
 
 		currentOccupantsRev := make(map[VReg]RealReg)
 		pred := blk.Pred(i)
-		predSt := a.blockStates.GetOrAllocate(pred.ID())
+		predSt := a.getOrAllocateBlockState(pred.ID())
 		for ii := 0; ii < 64; ii++ {
 			r := RealReg(ii)
 			if v := predSt.endRegs.get(r); v.Valid() {
@@ -721,7 +807,7 @@ func (a *Allocator) fixMergeState(f Function, blk Block) {
 			}
 		}
 
-		s.resetAt(predSt, a.blockLivenessData.GetOrAllocate(bID).liveIns)
+		s.resetAt(predSt)
 
 		// Finds the free registers if any.
 		intTmp, floatTmp := VRegInvalid, VRegInvalid
@@ -789,7 +875,7 @@ func (a *Allocator) reconcileEdge(f Function,
 			f.StoreRegisterBefore(currentVReg.SetRealReg(r), pred.LastInstrForInsertion())
 			delete(currentOccupantsRev, currentVReg)
 
-			s.getVRegState(desiredVReg).recordReload(f, pred)
+			s.getVRegState(desiredVReg.ID()).recordReload(f, pred)
 			f.ReloadRegisterBefore(desiredVReg.SetRealReg(r), pred.LastInstrForInsertion())
 			currentOccupants.add(r, desiredVReg)
 			currentOccupantsRev[desiredVReg] = r
@@ -830,7 +916,7 @@ func (a *Allocator) reconcileEdge(f Function,
 			)
 			currentOccupants.remove(currentReg)
 		} else {
-			s.getVRegState(desiredVReg).recordReload(f, pred)
+			s.getVRegState(desiredVReg.ID()).recordReload(f, pred)
 			f.ReloadRegisterBefore(desiredVReg.SetRealReg(r), pred.LastInstrForInsertion())
 		}
 		currentOccupantsRev[desiredVReg] = r
@@ -877,7 +963,7 @@ func (a *Allocator) scheduleSpill(f Function, vs *vrState) {
 		fmt.Printf("v%d is spilled in blk%d, lca=blk%d\n", v.ID(), definingBlk.ID(), pos.ID())
 	}
 	for pos != definingBlk {
-		st := a.blockStates.GetOrAllocate(pos.ID())
+		st := a.getOrAllocateBlockState(pos.ID())
 		for ii := 0; ii < 64; ii++ {
 			rr := RealReg(ii)
 			if st.startRegs.get(rr) == v {
@@ -915,48 +1001,7 @@ func (a *Allocator) scheduleSpill(f Function, vs *vrState) {
 // Reset resets the allocator's internal state so that it can be reused.
 func (a *Allocator) Reset() {
 	a.state.reset()
-	a.blockLivenessData.Reset()
 	a.blockStates.Reset()
 	a.phiDefInstListPool.Reset()
 	a.vs = a.vs[:0]
-}
-
-func resetBlockLivenessData(i *blockLivenessData) {
-	i.seen = false
-	i.liveOuts = wazevoapi.ResetMap(i.liveOuts)
-	i.liveIns = wazevoapi.ResetMap(i.liveIns)
-}
-
-// Format is for debugging.
-func (i *blockLivenessData) Format(ri *RegisterInfo) string {
-	var buf strings.Builder
-	buf.WriteString("\t\tblockLivenessData:")
-	buf.WriteString("\n\t\t\tliveOuts: ")
-	for v := range i.liveOuts {
-		if v.IsRealReg() {
-			buf.WriteString(fmt.Sprintf("%s ", ri.RealRegName(v.RealReg())))
-		} else {
-			buf.WriteString(fmt.Sprintf("%v ", v))
-		}
-	}
-	buf.WriteString("\n\t\t\tliveIns: ")
-	for v := range i.liveIns {
-		if v.IsRealReg() {
-			buf.WriteString(fmt.Sprintf("%s ", ri.RealRegName(v.RealReg())))
-		} else {
-			buf.WriteString(fmt.Sprintf("%v ", v))
-		}
-	}
-	buf.WriteString(fmt.Sprintf("\n\t\t\tseen: %v", i.seen))
-	return buf.String()
-}
-
-func (i *blockLivenessData) isKilledAt(vs *vrState, pos programCounter) bool {
-	v := vs.v
-	if vs.lastUse == pos {
-		if _, ok := i.liveOuts[v]; !ok {
-			return true
-		}
-	}
-	return false
 }
