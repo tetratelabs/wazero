@@ -17,6 +17,9 @@ func (s *vrSet) contains(id VRegID) bool {
 }
 
 func (s *vrSet) insert(id VRegID) {
+	if id < s.min {
+		panic("inserting a register with a lower id than the minimum")
+	}
 	s.set.set(uint(id - s.min))
 }
 

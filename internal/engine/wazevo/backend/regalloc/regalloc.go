@@ -695,10 +695,6 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 					vState.defInstr = instr
 					vState.defBlk = blk
 				}
-
-				if s.phiBlk(def) != nil {
-					liveOutSet.insert(def.ID())
-				}
 			}
 		}
 		if wazevoapi.RegAllocLoggingEnabled {
