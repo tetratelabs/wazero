@@ -1,12 +1,13 @@
 // Package regalloc performs register allocation. The algorithm can work on any ISA by implementing the interfaces in
 // api.go.
-package regalloc
-
+//
 // References:
-// * https://web.stanford.edu/class/archive/cs/cs143/cs143.1128/lectures/17/Slides17.pdf
-// * https://en.wikipedia.org/wiki/Chaitin%27s_algorithm
-// * https://llvm.org/ProjectsWithLLVM/2004-Fall-CS426-LS.pdf
-// * https://pfalcon.github.io/ssabook/latest/book-full.pdf: Chapter 9. for liveness analysis.
+//   - https://web.stanford.edu/class/archive/cs/cs143/cs143.1128/lectures/17/Slides17.pdf
+//   - https://en.wikipedia.org/wiki/Chaitin%27s_algorithm
+//   - https://llvm.org/ProjectsWithLLVM/2004-Fall-CS426-LS.pdf
+//   - https://pfalcon.github.io/ssabook/latest/book-full.pdf: Chapter 9. for liveness analysis.
+//   - https://github.com/golang/go/blob/release-branch.go1.21/src/cmd/compile/internal/ssa/regalloc.go
+package regalloc
 
 import (
 	"fmt"
@@ -481,7 +482,7 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 	bID := blk.ID()
 	liveness := a.getOrAllocateBlockState(bID)
 	s := &a.state
-	currentBlkState := a.blockStates.GetOrAllocate(bID)
+	currentBlkState := a.getOrAllocateBlockState(bID)
 
 	s.currentBlockID = bID
 	a.updateLiveInVRState(liveness)
@@ -492,13 +493,13 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 	case 0: // This is the entry block.
 	case 1:
 		predID := blk.Pred(0).ID()
-		predState = a.blockStates.GetOrAllocate(predID)
+		predState = a.getOrAllocateBlockState(predID)
 		currentBlkState.startFromPredIndex = 0
 	default:
 		// TODO: there should be some better heuristic to choose the predecessor.
 		for i := 0; i < preds; i++ {
 			predID := blk.Pred(i).ID()
-			if _predState := a.blockStates.GetOrAllocate(predID); _predState.visited {
+			if _predState := a.getOrAllocateBlockState(predID); _predState.visited {
 				predState = _predState
 				currentBlkState.startFromPredIndex = i
 				break
@@ -726,7 +727,7 @@ func (a *Allocator) fixMergeState(f Function, blk Block) {
 
 	// Restores the state at the beginning of the block.
 	bID := blk.ID()
-	blkSt := a.blockStates.GetOrAllocate(bID)
+	blkSt := a.getOrAllocateBlockState(bID)
 	desiredOccupants := &blkSt.startRegs
 	aliveOnRegVRegs := make(map[VReg]RealReg)
 	for i := 0; i < 64; i++ {
@@ -752,7 +753,7 @@ func (a *Allocator) fixMergeState(f Function, blk Block) {
 
 		currentOccupantsRev := make(map[VReg]RealReg)
 		pred := blk.Pred(i)
-		predSt := a.blockStates.GetOrAllocate(pred.ID())
+		predSt := a.getOrAllocateBlockState(pred.ID())
 		for ii := 0; ii < 64; ii++ {
 			r := RealReg(ii)
 			if v := predSt.endRegs.get(r); v.Valid() {
@@ -920,7 +921,7 @@ func (a *Allocator) scheduleSpill(f Function, vs *vrState) {
 		fmt.Printf("v%d is spilled in blk%d, lca=blk%d\n", v.ID(), definingBlk.ID(), pos.ID())
 	}
 	for pos != definingBlk {
-		st := a.blockStates.GetOrAllocate(pos.ID())
+		st := a.getOrAllocateBlockState(pos.ID())
 		for ii := 0; ii < 64; ii++ {
 			rr := RealReg(ii)
 			if st.startRegs.get(rr) == v {
