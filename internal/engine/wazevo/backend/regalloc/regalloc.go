@@ -23,7 +23,6 @@ func NewAllocator(allocatableRegs *RegisterInfo) Allocator {
 		regInfo:            allocatableRegs,
 		phiDefInstListPool: wazevoapi.NewPool[phiDefInstList](resetPhiDefInstList),
 		blockStates:        wazevoapi.NewIDedPool[blockState](resetBlockState),
-		vrSet:              make(map[VRegID]struct{}),
 	}
 	a.state.vrStates = wazevoapi.NewIDedPool[vrState](resetVrState)
 	a.state.reset()
@@ -59,8 +58,6 @@ type (
 		vs                       []VReg
 		vs2                      []VRegID
 		phiDefInstListPool       wazevoapi.Pool[phiDefInstList]
-		// TODO: use sparse set?
-		vrSet map[VRegID]struct{}
 
 		// Followings are re-used during various places.
 		blks             []Block
@@ -111,10 +108,13 @@ type (
 		// reloads this value. This is used to determine the spill location. Only valid if spilled=true.
 		lca Block
 		// lastUse is the program counter of the last use of this value. This changes while iterating the block, and
-		// should not be used across the blocks as it becomes invalid.
+		// should not be used across the blocks as it becomes invalid. To check the validity, use lastUseUpdatedAtBlockID.
 		lastUse                 programCounter
 		lastUseUpdatedAtBlockID int32
 		// spilled is true if this value is spilled i.e. the value is reload from the stack somewhere in the program.
+		//
+		// Note that this field is used during liveness analysis for different purpose. This is used to determine the
+		// value is live-in or not.
 		spilled bool
 		// isPhi is true if this is a phi value.
 		isPhi bool
@@ -273,7 +273,7 @@ func (s *state) resetAt(bs *blockState) {
 	bs.endRegs.range_(func(r RealReg, v VReg) {
 		id := int(v.ID())
 		st := s.vrStates.GetOrAllocate(id)
-		if st.lastUseUpdatedAtBlockID == s.currentBlockID && st.lastUse == liveInPC {
+		if st.lastUseUpdatedAtBlockID == s.currentBlockID && st.lastUse == programCounterLiveIn {
 			s.regsInUse.add(r, v)
 			s.setVRegState(v, r)
 		}
@@ -327,6 +327,11 @@ func (s *state) phiBlk(v VRegID) Block {
 	return nil
 }
 
+const (
+	programCounterLiveIn  = math.MinInt32
+	programCounterLiveOut = math.MaxInt32
+)
+
 // liveAnalysis constructs Allocator.blockLivenessData.
 // The algorithm here is described in https://pfalcon.github.io/ssabook/latest/book-full.pdf Chapter 9.2.
 func (a *Allocator) livenessAnalysis(f Function) {
@@ -341,11 +346,16 @@ func (a *Allocator) livenessAnalysis(f Function) {
 		}
 	}
 
-	set := a.vrSet
 	for blk := f.PostOrderBlockIteratorBegin(); blk != nil; blk = f.PostOrderBlockIteratorNext() {
 		blkID := blk.ID()
 		info := a.getOrAllocateBlockState(blkID)
 
+		a.vs2 = a.vs2[:0]
+
+		const (
+			flagDeleted = false
+			flagLive    = true
+		)
 		ns := blk.Succs()
 		for i := 0; i < ns; i++ {
 			succ := blk.Succ(i)
@@ -361,7 +371,10 @@ func (a *Allocator) livenessAnalysis(f Function) {
 
 			for _, v := range succInfo.liveIns {
 				if s.phiBlk(v) != succ {
-					set[v] = struct{}{}
+					st := s.getVRegState(v)
+					// We use .spilled field to store the flag.
+					st.spilled = flagLive
+					a.vs2 = append(a.vs2, v)
 				}
 			}
 		}
@@ -371,12 +384,20 @@ func (a *Allocator) livenessAnalysis(f Function) {
 			var use, def VReg
 			for _, def = range instr.Defs(&a.vs) {
 				if !def.IsRealReg() {
-					delete(set, def.ID())
+					id := def.ID()
+					st := s.getVRegState(id)
+					// We use .spilled field to store the flag.
+					st.spilled = flagDeleted
+					a.vs2 = append(a.vs2, id)
 				}
 			}
 			for _, use = range instr.Uses(&a.vs) {
 				if !use.IsRealReg() {
-					set[use.ID()] = struct{}{}
+					id := use.ID()
+					st := s.getVRegState(id)
+					// We use .spilled field to store the flag.
+					st.spilled = flagLive
+					a.vs2 = append(a.vs2, id)
 				}
 			}
 
@@ -388,12 +409,13 @@ func (a *Allocator) livenessAnalysis(f Function) {
 			}
 		}
 
-		for v := range set {
-			info.liveIns = append(info.liveIns, v)
-		}
-
-		for key := range set {
-			delete(set, key)
+		for _, v := range a.vs2 {
+			st := s.getVRegState(v)
+			// We use .spilled field to store the flag.
+			if st.spilled == flagLive { //nolint:gosimple
+				info.liveIns = append(info.liveIns, v)
+				st.spilled = false
+			}
 		}
 
 		info.seen = true
@@ -464,16 +486,11 @@ func (a *Allocator) alloc(f Function) {
 	a.scheduleSpills(f)
 }
 
-const (
-	liveInPC  = math.MinInt32
-	liveOutPC = math.MaxInt32
-)
-
 func (a *Allocator) updateLiveInVRState(liveness *blockState) {
 	currentBlockID := a.state.currentBlockID
 	for _, v := range liveness.liveIns {
 		vs := a.state.getVRegState(v)
-		vs.lastUse = liveInPC
+		vs.lastUse = programCounterLiveIn
 		vs.lastUseUpdatedAtBlockID = currentBlockID
 	}
 }
@@ -547,7 +564,7 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 		for _, v := range succInfo.liveIns {
 			if s.phiBlk(v) != succ {
 				st := s.getVRegState(v)
-				st.lastUse = liveOutPC
+				st.lastUse = programCounterLiveOut
 			}
 		}
 	}
@@ -962,5 +979,4 @@ func (a *Allocator) Reset() {
 	a.blockStates.Reset()
 	a.phiDefInstListPool.Reset()
 	a.vs = a.vs[:0]
-	a.vrSet = wazevoapi.ResetMap(a.vrSet)
 }
