@@ -402,7 +402,7 @@ func (a *Allocator) livenessAnalysis(f Function) {
 
 			if def.Valid() && s.phiBlk(def.ID()) != nil {
 				if use.Valid() && use.IsRealReg() {
-					// // If the destination is a phi value, and the source is a real register, this is the beginning of the function.
+					// If the destination is a phi value, and the source is a real register, this is the beginning of the function.
 					a.state.argRealRegs = append(a.state.argRealRegs, use)
 				}
 			}
@@ -449,22 +449,37 @@ func (a *Allocator) loopTreeDFS(entry Block) {
 			if s.phiBlk(v) != loop {
 				a.vs2 = append(a.vs2, v)
 				st := s.getVRegState(v)
+				// We use .spilled field to store the flag.
 				st.spilled = flagPending
 			}
 		}
 
+		var siblingAddedView []VRegID
 		cn := loop.LoopNestingForestChildren()
 		for i := 0; i < cn; i++ {
 			child := loop.LoopNestingForestChild(i)
 			childID := child.ID()
 			childInfo := a.getOrAllocateBlockState(childID)
-			for _, v := range a.vs2 {
-				st := s.getVRegState(v)
-				if st.spilled == flagPending { //nolint:gosimple
-					st.spilled = flagDone
+
+			if i == 0 {
+				begin := len(childInfo.liveIns)
+				for _, v := range a.vs2 {
+					st := s.getVRegState(v)
+					// We use .spilled field to store the flag.
+					if st.spilled == flagPending { //nolint:gosimple
+						st.spilled = flagDone
+						// TODO: deduplicate.
+						childInfo.liveIns = append(childInfo.liveIns, v)
+					}
+				}
+				siblingAddedView = childInfo.liveIns[begin:]
+			} else {
+				for _, v := range siblingAddedView {
+					// TODO: deduplicate.
 					childInfo.liveIns = append(childInfo.liveIns, v)
 				}
 			}
+
 			if child.LoopHeader() {
 				a.blks = append(a.blks, child)
 			}
