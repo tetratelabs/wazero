@@ -2,6 +2,7 @@ package regalloc
 
 import (
 	"fmt"
+	"sort"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -70,12 +71,11 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 				return newMockFunction(b0, b1, b2)
 			},
 			exp: map[int]*blockLivenessData{
-				0: {liveOuts: map[VReg]struct{}{3: {}}},
+				0: {},
 				1: {
-					liveIns:  map[VReg]struct{}{3: {}},
-					liveOuts: map[VReg]struct{}{3: {}, 4: {}, 5: {}},
+					liveIns: []VReg{3},
 				},
-				2: {liveIns: map[VReg]struct{}{3: {}, 4: {}, 5: {}}},
+				2: {liveIns: []VReg{3, 4, 5}},
 			},
 		},
 		{
@@ -112,19 +112,13 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 				return newMockFunction(b0, b1, b2, b3)
 			},
 			exp: map[int]*blockLivenessData{
-				0: {
-					liveOuts: map[VReg]struct{}{1000: {}, 1: {}, 2: {}},
-				},
-				1: {
-					liveIns:  map[VReg]struct{}{1000: {}, 1: {}},
-					liveOuts: map[VReg]struct{}{1000: {}},
-				},
+				0: {},
+				1: {liveIns: []VReg{1000, 1}},
 				2: {
-					liveIns:  map[VReg]struct{}{1000: {}, 2: {}},
-					liveOuts: map[VReg]struct{}{1000: {}},
+					liveIns: []VReg{1000, 2},
 				},
 				3: {
-					liveIns: map[VReg]struct{}{1000: {}},
+					liveIns: []VReg{1000},
 				},
 			},
 		},
@@ -160,23 +154,18 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 				return newMockFunction(b0, b1, b2, b3, b4)
 			},
 			exp: map[int]*blockLivenessData{
-				0: {
-					liveOuts: map[VReg]struct{}{1000: {}, 2000: {}, 3000: {}},
-				},
+				0: {},
 				1: {
-					liveIns:  map[VReg]struct{}{2000: {}, 3000: {}},
-					liveOuts: map[VReg]struct{}{phiVReg: {}, 3000: {}},
+					liveIns: []VReg{2000, 3000},
 				},
 				2: {
-					liveIns:  map[VReg]struct{}{phiVReg: {}, 3000: {}},
-					liveOuts: map[VReg]struct{}{phiVReg: {}, 3000: {}},
+					liveIns: []VReg{phiVReg, 3000},
 				},
 				3: {
-					liveIns:  map[VReg]struct{}{1000: {}, 3000: {}},
-					liveOuts: map[VReg]struct{}{phiVReg: {}, 3000: {}},
+					liveIns: []VReg{1000, 3000},
 				},
 				4: {
-					liveIns: map[VReg]struct{}{phiVReg: {}, 3000: {}},
+					liveIns: []VReg{phiVReg, 3000},
 				},
 			},
 		},
@@ -209,7 +198,7 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 						asCopy(),
 				)
 				b5 := newMockBlock(
-					4, newMockInstr().use(54321),
+					5, newMockInstr().use(54321),
 				)
 				b1.addPred(b0)
 				b1.addPred(b4)
@@ -224,27 +213,21 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 			},
 			exp: map[int]*blockLivenessData{
 				0: {
-					liveIns: map[VReg]struct{}{},
-					liveOuts: map[VReg]struct{}{
-						phiVReg: {},
-					},
+					liveIns: []VReg{},
 				},
 				1: {
-					liveIns:  map[VReg]struct{}{phiVReg: {}},
-					liveOuts: map[VReg]struct{}{phiVReg: {}, 9999: {}},
+					liveIns: []VReg{phiVReg},
 				},
 				2: {
-					liveIns:  map[VReg]struct{}{phiVReg: {}, 9999: {}},
-					liveOuts: map[VReg]struct{}{100: {}},
+					liveIns: []VReg{phiVReg, 9999},
 				},
 				3: {
-					liveIns:  map[VReg]struct{}{100: {}},
-					liveOuts: map[VReg]struct{}{54321: {}},
+					liveIns: []VReg{100},
 				},
 				4: {
-					liveIns:  map[VReg]struct{}{54321: {}},
-					liveOuts: map[VReg]struct{}{phiVReg: {}},
+					liveIns: []VReg{54321},
 				},
+				5: {liveIns: []VReg{54321}},
 			},
 		},
 		{
@@ -270,28 +253,22 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 				return f
 			},
 			exp: map[int]*blockLivenessData{
-				0: {
-					liveOuts: map[VReg]struct{}{9999: {}},
-				},
+				0: {},
 				1: {
-					liveIns:  map[VReg]struct{}{9999: {}},
-					liveOuts: map[VReg]struct{}{9999: {}},
+					liveIns: []VReg{9999},
 				},
 				2: {
-					liveIns:  map[VReg]struct{}{9999: {}},
-					liveOuts: map[VReg]struct{}{9999: {}},
+					liveIns: []VReg{9999},
 				},
 				3: {
-					liveIns: map[VReg]struct{}{9999: {}},
+					liveIns: []VReg{9999},
 				},
 				4: {
-					liveIns:  map[VReg]struct{}{9999: {}},
-					liveOuts: map[VReg]struct{}{9999: {}},
+					liveIns: []VReg{9999},
 				},
 				5: {},
 				6: {
-					liveIns:  map[VReg]struct{}{9999: {}},
-					liveOuts: map[VReg]struct{}{9999: {}},
+					liveIns: []VReg{9999},
 				},
 			},
 		},
@@ -327,20 +304,16 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 			},
 			exp: map[int]*blockLivenessData{
 				0: {
-					liveOuts: map[VReg]struct{}{99999: {}, phiVReg: {}},
-					liveIns:  map[VReg]struct{}{111: {}},
+					liveIns: []VReg{111},
 				},
 				1: {
-					liveIns:  map[VReg]struct{}{99999: {}, phiVReg: {}},
-					liveOuts: map[VReg]struct{}{99999: {}, phiVReg: {}},
+					liveIns: []VReg{99999, phiVReg},
 				},
 				2: {
-					liveIns:  map[VReg]struct{}{99999: {}, phiVReg: {}},
-					liveOuts: map[VReg]struct{}{99999: {}, 88888: {}, phiVReg: {}},
+					liveIns: []VReg{99999, phiVReg},
 				},
 				3: {
-					liveIns:  map[VReg]struct{}{99999: {}, phiVReg: {}, 88888: {}},
-					liveOuts: map[VReg]struct{}{99999: {}, phiVReg: {}},
+					liveIns: []VReg{99999, phiVReg, 88888},
 				},
 				4: {},
 			},
@@ -362,9 +335,17 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 				}
 				t.Run(fmt.Sprintf("block_id=%d", blockID), func(t *testing.T) {
 					exp := tc.exp[blockID]
-					initMapInInfo(exp)
-					require.Equal(t, exp.liveOuts, actual.liveOuts, "live outs")
-					require.Equal(t, exp.liveIns, actual.liveIns, "live ins")
+					if len(exp.liveIns) == 0 {
+						require.Nil(t, actual.liveIns, "live ins")
+					} else {
+						sort.Slice(actual.liveIns, func(i, j int) bool {
+							return actual.liveIns[i] < actual.liveIns[j]
+						})
+						sort.Slice(exp.liveIns, func(i, j int) bool {
+							return exp.liveIns[i] < exp.liveIns[j]
+						})
+						require.Equal(t, exp.liveIns, actual.liveIns, "live ins")
+					}
 				})
 			}
 		})
@@ -380,13 +361,4 @@ func TestAllocator_livenessAnalysis_copy(t *testing.T) {
 	)
 	a := NewAllocator(&RegisterInfo{})
 	a.livenessAnalysis(f)
-}
-
-func initMapInInfo(info *blockLivenessData) {
-	if info.liveIns == nil {
-		info.liveIns = make(map[VReg]struct{})
-	}
-	if info.liveOuts == nil {
-		info.liveOuts = make(map[VReg]struct{})
-	}
 }
