@@ -252,7 +252,7 @@ func (m *machine) resolveRelativeAddresses(ctx context.Context) {
 	}
 
 	// Reuse the slice to gather the unresolved conditional branches.
-	cbrs := m.condBrRelocs[:0]
+	m.condBrRelocs = m.condBrRelocs[:0]
 	ectx := m.executableContext
 
 	var fn string
@@ -287,7 +287,7 @@ func (m *machine) resolveRelativeAddresses(ctx context.Context) {
 						// therefore can be safely assumed that the next block exists when it's needed.
 						nextLabel = ectx.OrderedBlockLabels[i+1].L
 					}
-					cbrs = append(cbrs, condBrReloc{
+					m.condBrRelocs = append(m.condBrRelocs, condBrReloc{
 						cbr: cur, currentLabelPos: pos, offset: offset + size,
 						nextLabel: nextLabel,
 					})
@@ -316,8 +316,8 @@ func (m *machine) resolveRelativeAddresses(ctx context.Context) {
 
 	// Before resolving any offsets, we need to check if all the conditional branches can be resolved.
 	var needRerun bool
-	for i := range cbrs {
-		reloc := &cbrs[i]
+	for i := range m.condBrRelocs {
+		reloc := &m.condBrRelocs[i]
 		cbr := reloc.cbr
 		offset := reloc.offset
 
