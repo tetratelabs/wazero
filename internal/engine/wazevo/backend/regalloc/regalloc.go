@@ -20,7 +20,6 @@ import (
 func NewAllocator(allocatableRegs *RegisterInfo) Allocator {
 	a := Allocator{
 		regInfo:            allocatableRegs,
-		blockLivenessData:  wazevoapi.NewIDedPool[blockLivenessData](resetBlockLivenessData),
 		phiDefInstListPool: wazevoapi.NewPool[phiDefInstList](resetPhiDefInstList),
 		blockStates:        wazevoapi.NewIDedPool[blockState](resetBlockState),
 		vrSet:              make(map[VRegID]struct{}),
@@ -56,7 +55,6 @@ type (
 		// allocatableSet is a set of allocatable RealReg derived from regInfo. Static per ABI/ISA.
 		allocatableSet           RegSet
 		allocatedCalleeSavedRegs []VReg
-		blockLivenessData        wazevoapi.IDedPool[blockLivenessData]
 		vs                       []VReg
 		vs2                      []VRegID
 		phiDefInstListPool       wazevoapi.Pool[phiDefInstList]
@@ -71,12 +69,6 @@ type (
 		// Following two fields are updated while iterating the blocks in the reverse postorder.
 		state       state
 		blockStates wazevoapi.IDedPool[blockState]
-	}
-
-	// blockLivenessData is a per-block information used during the register allocation.
-	blockLivenessData struct {
-		seen    bool
-		liveIns []VRegID
 	}
 
 	// programCounter represents an opaque index into the program which is used to represents a LiveInterval of a VReg.
@@ -94,6 +86,11 @@ type (
 	}
 
 	blockState struct {
+		// liveIns is a list of VReg that are live at the beginning of the block.
+		liveIns []VRegID
+		// seen is true if the block is visited during the liveness analysis.
+		seen bool
+		// visited is true if the block is visited during the allocation phase.
 		visited            bool
 		startFromPredIndex int
 		// startRegs is a list of RealReg that are used at the beginning of the block. This is used to fix the merge edges.
@@ -283,10 +280,12 @@ func (s *state) resetAt(bs *blockState) {
 }
 
 func resetBlockState(b *blockState) {
+	b.seen = false
 	b.visited = false
 	b.endRegs.reset()
 	b.startRegs.reset()
 	b.startFromPredIndex = -1
+	b.liveIns = b.liveIns[:0]
 }
 
 func (b *blockState) dump(a *RegisterInfo) {
@@ -312,6 +311,10 @@ func (a *Allocator) determineCalleeSavedRealRegs(f Function) {
 		}
 	})
 	f.ClobberedRegisters(a.allocatedCalleeSavedRegs)
+}
+
+func (a *Allocator) getOrAllocateBlockState(blockID int) *blockState {
+	return a.blockStates.GetOrAllocate(blockID)
 }
 
 // phiBlk returns the block that defines the given phi value, nil otherwise.
@@ -340,7 +343,7 @@ func (a *Allocator) livenessAnalysis(f Function) {
 	set := a.vrSet
 	for blk := f.PostOrderBlockIteratorBegin(); blk != nil; blk = f.PostOrderBlockIteratorNext() {
 		blkID := blk.ID()
-		info := a.blockLivenessData.GetOrAllocate(blkID)
+		info := a.getOrAllocateBlockState(blkID)
 
 		ns := blk.Succs()
 		for i := 0; i < ns; i++ {
@@ -350,7 +353,7 @@ func (a *Allocator) livenessAnalysis(f Function) {
 			}
 
 			succID := succ.ID()
-			succInfo := a.blockLivenessData.GetOrAllocate(succID)
+			succInfo := a.getOrAllocateBlockState(succID)
 			if !succInfo.seen { // This means the back edge.
 				continue
 			}
@@ -414,7 +417,7 @@ func (a *Allocator) loopTreeDFS(entry Block) {
 		a.blks = a.blks[:tail]
 		a.vs2 = a.vs2[:0]
 
-		info := a.blockLivenessData.GetOrAllocate(loop.ID())
+		info := a.getOrAllocateBlockState(loop.ID())
 		for _, v := range info.liveIns {
 			if s.phiBlk(v) != loop {
 				a.vs2 = append(a.vs2, v)
@@ -425,7 +428,7 @@ func (a *Allocator) loopTreeDFS(entry Block) {
 		for i := 0; i < cn; i++ {
 			child := loop.LoopNestingForestChild(i)
 			childID := child.ID()
-			childInfo := a.blockLivenessData.GetOrAllocate(childID)
+			childInfo := a.getOrAllocateBlockState(childID)
 			childInfo.liveIns = append(childInfo.liveIns, a.vs2...)
 			if child.LoopHeader() {
 				a.blks = append(a.blks, child)
@@ -465,7 +468,7 @@ const (
 	liveOutPC = math.MaxInt32
 )
 
-func (a *Allocator) updateLiveInVRState(liveness *blockLivenessData) {
+func (a *Allocator) updateLiveInVRState(liveness *blockState) {
 	currentBlockID := a.state.currentBlockID
 	for _, v := range liveness.liveIns {
 		vs := a.state.getVRegState(v)
@@ -476,7 +479,7 @@ func (a *Allocator) updateLiveInVRState(liveness *blockLivenessData) {
 
 func (a *Allocator) allocBlock(f Function, blk Block) {
 	bID := blk.ID()
-	liveness := a.blockLivenessData.GetOrAllocate(bID)
+	liveness := a.getOrAllocateBlockState(bID)
 	s := &a.state
 	currentBlkState := a.blockStates.GetOrAllocate(bID)
 
@@ -539,7 +542,7 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 		}
 
 		succID := succ.ID()
-		succInfo := a.blockLivenessData.GetOrAllocate(succID)
+		succInfo := a.getOrAllocateBlockState(succID)
 		for _, v := range succInfo.liveIns {
 			if s.phiBlk(v) != succ {
 				st := s.getVRegState(v)
@@ -738,7 +741,7 @@ func (a *Allocator) fixMergeState(f Function, blk Block) {
 	}
 
 	s.currentBlockID = bID
-	a.updateLiveInVRState(a.blockLivenessData.GetOrAllocate(bID))
+	a.updateLiveInVRState(a.getOrAllocateBlockState(bID))
 
 	currentOccupants := &a.currentOccupants
 	for i := 0; i < preds; i++ {
@@ -955,14 +958,8 @@ func (a *Allocator) scheduleSpill(f Function, vs *vrState) {
 // Reset resets the allocator's internal state so that it can be reused.
 func (a *Allocator) Reset() {
 	a.state.reset()
-	a.blockLivenessData.Reset()
 	a.blockStates.Reset()
 	a.phiDefInstListPool.Reset()
 	a.vs = a.vs[:0]
 	a.vrSet = wazevoapi.ResetMap(a.vrSet)
-}
-
-func resetBlockLivenessData(i *blockLivenessData) {
-	i.seen = false
-	i.liveIns = i.liveIns[:0]
 }

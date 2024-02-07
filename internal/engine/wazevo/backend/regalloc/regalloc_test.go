@@ -15,7 +15,7 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
 		setup func() Function
-		exp   map[int]*blockLivenessData
+		exp   map[int]*blockState
 	}{
 		{
 			name: "single block",
@@ -27,7 +27,7 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 					).entry(),
 				)
 			},
-			exp: map[int]*blockLivenessData{
+			exp: map[int]*blockState{
 				0: {},
 			},
 		},
@@ -45,7 +45,7 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 				blk.blockParam(param)
 				return newMockFunction(blk)
 			},
-			exp: map[int]*blockLivenessData{
+			exp: map[int]*blockState{
 				0: {},
 			},
 		},
@@ -70,7 +70,7 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 				b1.addPred(b0)
 				return newMockFunction(b0, b1, b2)
 			},
-			exp: map[int]*blockLivenessData{
+			exp: map[int]*blockState{
 				0: {},
 				1: {
 					liveIns: []VRegID{3},
@@ -111,7 +111,7 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 				b2.addPred(b0)
 				return newMockFunction(b0, b1, b2, b3)
 			},
-			exp: map[int]*blockLivenessData{
+			exp: map[int]*blockState{
 				0: {},
 				1: {liveIns: []VRegID{1000, 1}},
 				2: {
@@ -153,7 +153,7 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 				b1.addPred(b0)
 				return newMockFunction(b0, b1, b2, b3, b4)
 			},
-			exp: map[int]*blockLivenessData{
+			exp: map[int]*blockState{
 				0: {},
 				1: {
 					liveIns: []VRegID{2000, 3000},
@@ -211,7 +211,7 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 				f.loopNestingForestRoots(b1)
 				return f
 			},
-			exp: map[int]*blockLivenessData{
+			exp: map[int]*blockState{
 				0: {
 					liveIns: []VRegID{},
 				},
@@ -252,7 +252,7 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 				f.loopNestingForestRoots(b2)
 				return f
 			},
-			exp: map[int]*blockLivenessData{
+			exp: map[int]*blockState{
 				0: {},
 				1: {
 					liveIns: []VRegID{9999},
@@ -302,7 +302,7 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 				f.loopNestingForestRoots(b1)
 				return f
 			},
-			exp: map[int]*blockLivenessData{
+			exp: map[int]*blockState{
 				0: {
 					liveIns: []VRegID{111},
 				},
@@ -328,8 +328,8 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 				},
 			})
 			a.livenessAnalysis(f)
-			for blockID := 0; blockID <= a.blockLivenessData.MaxIDEncountered(); blockID++ {
-				actual := a.blockLivenessData.Get(blockID)
+			for blockID := 0; blockID <= a.blockStates.MaxIDEncountered(); blockID++ {
+				actual := a.blockStates.Get(blockID)
 				if actual == nil {
 					continue
 				}
