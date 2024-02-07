@@ -575,7 +575,7 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 		for i, use := range instr.Uses(&a.vs) {
 			if !use.IsRealReg() {
 				vs := s.getVRegState(use)
-				killed := liveness.isKilledAt(vs, pc)
+				killed := vs.lastUse == pc
 				r := vs.r
 
 				if r == RealRegInvalid {
@@ -979,8 +979,4 @@ func (i *blockLivenessData) Format(ri *RegisterInfo) string {
 	}
 	buf.WriteString(fmt.Sprintf("\n\t\t\tseen: %v", i.seen))
 	return buf.String()
-}
-
-func (i *blockLivenessData) isKilledAt(vs *vrState, pos programCounter) bool {
-	return vs.lastUse == pos
 }
