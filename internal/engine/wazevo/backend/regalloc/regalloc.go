@@ -62,7 +62,7 @@ type (
 		// TODO: use sparse set?
 		vrSet map[VRegID]struct{}
 
-		// Followings are re-used during various places e.g. coloring.
+		// Followings are re-used during various places.
 		blks             []Block
 		reals            []RealReg
 		currentOccupants regInUseSet
@@ -107,8 +107,6 @@ type (
 		defInstr Instr
 		// defBlk is the block that defines this value. If this is the phi value, this is the block whose arguments contain this value.
 		defBlk Block
-		// spilled is true if this value is spilled i.e. the value is reload from the stack somewhere in the program.
-		spilled bool
 		// lca = lowest common ancestor. This is the block that is the lowest common ancestor of all the blocks that
 		// reloads this value. This is used to determine the spill location. Only valid if spilled=true.
 		lca Block
@@ -116,6 +114,8 @@ type (
 		// should not be used across the blocks as it becomes invalid.
 		lastUse                 programCounter
 		lastUseUpdatedAtBlockID int
+		// spilled is true if this value is spilled i.e. the value is reload from the stack somewhere in the program.
+		spilled bool
 		// isPhi is true if this is a phi value.
 		isPhi bool
 		// phiDefInstList is a list of instructions that defines this phi value.
