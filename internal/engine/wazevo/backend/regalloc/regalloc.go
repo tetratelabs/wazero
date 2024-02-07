@@ -468,16 +468,14 @@ func (a *Allocator) loopTreeDFS(entry Block) {
 					// We use .spilled field to store the flag.
 					if st.spilled == flagPending { //nolint:gosimple
 						st.spilled = flagDone
-						// TODO: deduplicate.
+						// TODO: deduplicate, though I don't think it has much impact.
 						childInfo.liveIns = append(childInfo.liveIns, v)
 					}
 				}
 				siblingAddedView = childInfo.liveIns[begin:]
 			} else {
-				for _, v := range siblingAddedView {
-					// TODO: deduplicate.
-					childInfo.liveIns = append(childInfo.liveIns, v)
-				}
+				// TODO: deduplicate, though I don't think it has much impact.
+				childInfo.liveIns = append(childInfo.liveIns, siblingAddedView...)
 			}
 
 			if child.LoopHeader() {
