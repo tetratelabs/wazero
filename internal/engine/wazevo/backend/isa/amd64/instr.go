@@ -529,7 +529,7 @@ func (i *instruction) nop0Label() backend.Label {
 	return backend.Label(i.u1)
 }
 
-type instructionKind int
+type instructionKind byte
 
 const (
 	nop0 instructionKind = iota + 1

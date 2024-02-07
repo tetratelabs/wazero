@@ -3,6 +3,7 @@ package backend_test
 import (
 	"context"
 	"fmt"
+	"os"
 	"runtime"
 	"testing"
 
@@ -13,9 +14,17 @@ import (
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/testcases"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
+	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
+
+func TestMain(m *testing.M) {
+	if !platform.CompilerSupported() {
+		os.Exit(0)
+	}
+	os.Exit(m.Run())
+}
 
 func newMachine() backend.Machine {
 	switch runtime.GOARCH {

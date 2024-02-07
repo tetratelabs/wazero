@@ -22,18 +22,18 @@ type (
 	//
 	// TODO: optimize the layout later once the impl settles.
 	instruction struct {
-		kind                instructionKind
 		prev, next          *instruction
 		u1, u2, u3          uint64
 		rd, rm, rn, ra      operand
 		amode               addressMode
 		targets             []uint32
+		kind                instructionKind
 		addedBeforeRegAlloc bool
 	}
 
 	// instructionKind represents the kind of instruction.
 	// This controls how the instruction struct is interpreted.
-	instructionKind int
+	instructionKind byte
 )
 
 func asNop0(i *instruction) {
