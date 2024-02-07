@@ -3,11 +3,11 @@ package backend_test
 import (
 	"context"
 	"fmt"
-	"os"
 	"runtime"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/isa/amd64"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/isa/arm64"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/frontend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
@@ -17,17 +17,12 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
-func TestMain(m *testing.M) {
-	if runtime.GOARCH != "arm64" {
-		os.Exit(0)
-	}
-	os.Exit(m.Run())
-}
-
 func newMachine() backend.Machine {
 	switch runtime.GOARCH {
 	case "arm64":
 		return arm64.NewBackend()
+	case "amd64":
+		return amd64.NewBackend()
 	default:
 		panic("unsupported architecture")
 	}
@@ -2155,6 +2150,16 @@ L1 (SSA Block: blk0):
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			var exp string
+			switch runtime.GOARCH {
+			case "arm64":
+				exp = tc.afterFinalizeARM64
+			case "amd64":
+				t.Skip()
+			default:
+				t.Fail()
+			}
+
 			ssab := ssa.NewBuilder()
 			offset := wazevoapi.NewModuleContextOffsetData(tc.m, false)
 			fc := frontend.NewFrontendCompiler(tc.m, ssab, &offset, false, false, false)
@@ -2213,12 +2218,7 @@ L1 (SSA Block: blk0):
 				fmt.Println(be.Format())
 			}
 
-			switch runtime.GOARCH {
-			case "arm64":
-				require.Equal(t, tc.afterFinalizeARM64, be.Format())
-			default:
-				t.Fail()
-			}
+			require.Equal(t, exp, be.Format())
 		})
 	}
 }

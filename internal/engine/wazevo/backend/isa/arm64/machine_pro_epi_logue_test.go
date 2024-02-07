@@ -217,7 +217,7 @@ func TestMachine_postRegAlloc(t *testing.T) {
 			root := m.allocateNop()
 			m.executableContext.RootInstr = root
 			ret := m.allocateInstr()
-			ret.asRet(nil)
+			ret.asRet()
 			root.next = ret
 			ret.prev = root
 			m.postRegAlloc()

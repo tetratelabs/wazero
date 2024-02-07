@@ -168,7 +168,7 @@ func (m *machine) constructEntryPreamble(sig *ssa.Signature) (root *instruction)
 		prReg = paramResultSliceCopied
 	}
 
-	stackSlotSize := abi.AlignedArgResultStackSlotSize()
+	stackSlotSize := int64(abi.AlignedArgResultStackSlotSize())
 	for i := range abi.Args {
 		if i < 2 {
 			// module context ptr and execution context ptr are passed in x0 and x1 by the Go assembly function.
@@ -201,7 +201,7 @@ func (m *machine) constructEntryPreamble(sig *ssa.Signature) (root *instruction)
 	cur = m.move64(spVReg, tmpRegVReg, cur)
 	cur = m.loadOrStoreAtExecutionContext(lrVReg, wazevoapi.ExecutionContextOffsetGoReturnAddress, false, cur)
 	retInst := m.allocateInstr()
-	retInst.asRet(nil)
+	retInst.asRet()
 	linkInstr(cur, retInst)
 	return
 }

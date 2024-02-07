@@ -96,7 +96,7 @@ func (m *machine) compileEntryPreamble(sig *ssa.Signature) *instruction {
 	// Finally, restore the original RBP and RSP.
 	cur = m.restoreOriginalRSPRBP(cur)
 
-	ret := m.allocateInstr().asRet(&abi)
+	ret := m.allocateInstr().asRet()
 	linkInstr(cur, ret)
 	return root
 }

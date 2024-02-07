@@ -10,7 +10,6 @@ import (
 
 type instruction struct {
 	prev, next          *instruction
-	abi                 *backend.FunctionABI
 	op1, op2            operand
 	u1, u2              uint64
 	b1                  bool
@@ -220,11 +219,7 @@ func (i *instruction) String() string {
 	case ud2:
 		return "ud2"
 	case call:
-		if i.u2 > 0 {
-			return fmt.Sprintf("call $%d", int32(i.u2))
-		} else {
-			return fmt.Sprintf("call %s", ssa.FuncRef(i.u1))
-		}
+		return fmt.Sprintf("call %s", ssa.FuncRef(i.u1))
 	case callIndirect:
 		return fmt.Sprintf("callq *%s", i.op1.format(true))
 	case v128ConstIsland:
@@ -273,7 +268,13 @@ func (i *instruction) Defs(regs *[]regalloc.VReg) []regalloc.VReg {
 	case defKindOp2:
 		*regs = append(*regs, i.op2.reg())
 	case defKindCall:
-		*regs = append(*regs, i.abi.RetRealRegs...)
+		_, _, retIntRealRegs, retFloatRealRegs, _ := backend.ABIInfoFromUint64(i.u2)
+		for i := byte(0); i < retIntRealRegs; i++ {
+			*regs = append(*regs, regInfo.RealRegToVReg[intArgResultRegs[i]])
+		}
+		for i := byte(0); i < retFloatRealRegs; i++ {
+			*regs = append(*regs, regInfo.RealRegToVReg[floatArgResultRegs[i]])
+		}
 	case defKindDivRem:
 		_, _, _, isDiv, _, _ := i.idivRemSequenceData()
 		if isDiv {
@@ -333,9 +334,15 @@ func (i *instruction) Uses(regs *[]regalloc.VReg) []regalloc.VReg {
 		default:
 			panic(fmt.Sprintf("BUG: invalid operand: %s", i))
 		}
-		*regs = append(*regs, i.abi.ArgRealRegs...)
+		fallthrough
 	case useKindCall:
-		*regs = append(*regs, i.abi.ArgRealRegs...)
+		argIntRealRegs, argFloatRealRegs, _, _, _ := backend.ABIInfoFromUint64(i.u2)
+		for i := byte(0); i < argIntRealRegs; i++ {
+			*regs = append(*regs, regInfo.RealRegToVReg[intArgResultRegs[i]])
+		}
+		for i := byte(0); i < argFloatRealRegs; i++ {
+			*regs = append(*regs, regInfo.RealRegToVReg[floatArgResultRegs[i]])
+		}
 	case useKindFcvtToSintSequence:
 		execCtx, src, tmpGp, tmpGp2, tmpXmm, _, _, _ := i.fcvtToSintSequenceData()
 		*regs = append(*regs, execCtx, src, tmpGp, tmpGp2, tmpXmm)
@@ -1001,8 +1008,10 @@ func (i *instruction) asLEA(target operand, rd regalloc.VReg) *instruction {
 
 func (i *instruction) asCall(ref ssa.FuncRef, abi *backend.FunctionABI) *instruction {
 	i.kind = call
-	i.abi = abi
 	i.u1 = uint64(ref)
+	if abi != nil {
+		i.u2 = abi.ABIInfoAsUint64()
+	}
 	return i
 }
 
@@ -1011,14 +1020,15 @@ func (i *instruction) asCallIndirect(ptr operand, abi *backend.FunctionABI) *ins
 		panic("BUG")
 	}
 	i.kind = callIndirect
-	i.abi = abi
 	i.op1 = ptr
+	if abi != nil {
+		i.u2 = abi.ABIInfoAsUint64()
+	}
 	return i
 }
 
-func (i *instruction) asRet(abi *backend.FunctionABI) *instruction {
+func (i *instruction) asRet() *instruction {
 	i.kind = ret
-	i.abi = abi
 	return i
 }
 

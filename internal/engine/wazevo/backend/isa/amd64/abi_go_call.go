@@ -270,7 +270,7 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 
 	// Finally ready to return.
 	cur = m.revertRBPRSP(cur)
-	linkInstr(cur, m.allocateInstr().asRet(nil))
+	linkInstr(cur, m.allocateInstr().asRet())
 
 	m.encodeWithoutSSA(ectx.RootInstr)
 	return m.c.Buf()
@@ -377,7 +377,7 @@ func (m *machine) CompileStackGrowCallSequence() []byte {
 
 	// Finally ready to return.
 	cur = m.revertRBPRSP(cur)
-	linkInstr(cur, m.allocateInstr().asRet(nil))
+	linkInstr(cur, m.allocateInstr().asRet())
 
 	m.encodeWithoutSSA(ectx.RootInstr)
 	return m.c.Buf()

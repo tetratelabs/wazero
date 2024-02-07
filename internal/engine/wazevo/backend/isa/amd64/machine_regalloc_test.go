@@ -47,7 +47,7 @@ func TestMachine_InsertStoreRegisterAt(t *testing.T) {
 					ctx.typeOf = map[regalloc.VRegID]ssa.Type{
 						raxVReg.ID(): ssa.TypeI64, xmm1VReg.ID(): ssa.TypeF64,
 					}
-					i1, i2 := m.allocateInstr().asUD2(), m.allocateInstr().asRet(nil)
+					i1, i2 := m.allocateInstr().asUD2(), m.allocateInstr().asRet()
 					i1.next = i2
 					i2.prev = i1
 
@@ -105,7 +105,7 @@ func TestMachine_InsertReloadRegisterAt(t *testing.T) {
 					ctx.typeOf = map[regalloc.VRegID]ssa.Type{
 						raxVReg.ID(): ssa.TypeI64, xmm1VReg.ID(): ssa.TypeV128,
 					}
-					i1, i2 := m.allocateInstr().asUD2(), m.allocateInstr().asRet(nil)
+					i1, i2 := m.allocateInstr().asUD2(), m.allocateInstr().asRet()
 					i1.next = i2
 					i2.prev = i1
 
@@ -150,7 +150,7 @@ func TestMachine_InsertMoveBefore(t *testing.T) {
 	} {
 		t.Run(tc.expected, func(t *testing.T) {
 			_, _, m := newSetupWithMockContext()
-			i1, i2 := m.allocateInstr().asUD2(), m.allocateInstr().asRet(nil)
+			i1, i2 := m.allocateInstr().asUD2(), m.allocateInstr().asRet()
 			i1.next = i2
 			i2.prev = i1
 

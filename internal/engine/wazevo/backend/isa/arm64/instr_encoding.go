@@ -33,15 +33,9 @@ func (i *instruction) encode(c backend.Compiler) {
 		imm := i.brOffset()
 		c.Emit4Bytes(encodeUnconditionalBranch(false, imm))
 	case call:
-		if i.u2 > 0 {
-			// This is a special case for EmitGoEntryPreamble which doesn't need reloc info,
-			// but instead the imm is already resolved.
-			c.Emit4Bytes(encodeUnconditionalBranch(true, int64(i.u2)))
-		} else {
-			// We still don't know the exact address of the function to call, so we emit a placeholder.
-			c.AddRelocationInfo(i.callFuncRef())
-			c.Emit4Bytes(encodeUnconditionalBranch(true, 0)) // 0 = placeholder
-		}
+		// We still don't know the exact address of the function to call, so we emit a placeholder.
+		c.AddRelocationInfo(i.callFuncRef())
+		c.Emit4Bytes(encodeUnconditionalBranch(true, 0)) // 0 = placeholder
 	case callInd:
 		c.Emit4Bytes(encodeUnconditionalBranchReg(regNumberInEncoding[i.rn.realReg()], true))
 	case store8, store16, store32, store64, fpuStore32, fpuStore64, fpuStore128:

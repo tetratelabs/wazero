@@ -15,8 +15,10 @@ type (
 		Args, Rets                 []ABIArg
 		ArgStackSize, RetStackSize int64
 
-		ArgRealRegs []regalloc.VReg
-		RetRealRegs []regalloc.VReg
+		ArgIntRealRegs   byte
+		ArgFloatRealRegs byte
+		RetIntRealRegs   byte
+		RetFloatRealRegs byte
 	}
 
 	// ABIArg represents either argument or return value's location.
@@ -77,19 +79,26 @@ func (a *FunctionABI) Init(sig *ssa.Signature, argResultInts, argResultFloats []
 	a.ArgStackSize = a.setABIArgs(a.Args, sig.Params, argResultInts, argResultFloats)
 
 	// Gather the real registers usages in arg/return.
-	a.RetRealRegs = a.RetRealRegs[:0]
+	a.ArgIntRealRegs, a.ArgFloatRealRegs = 0, 0
+	a.RetIntRealRegs, a.RetFloatRealRegs = 0, 0
 	for i := range a.Rets {
 		r := &a.Rets[i]
 		if r.Kind == ABIArgKindReg {
-			a.RetRealRegs = append(a.RetRealRegs, r.Reg)
+			if r.Type.IsInt() {
+				a.RetIntRealRegs++
+			} else {
+				a.RetFloatRealRegs++
+			}
 		}
 	}
-	a.ArgRealRegs = a.ArgRealRegs[:0]
 	for i := range a.Args {
 		arg := &a.Args[i]
 		if arg.Kind == ABIArgKindReg {
-			reg := arg.Reg
-			a.ArgRealRegs = append(a.ArgRealRegs, reg)
+			if arg.Type.IsInt() {
+				a.ArgIntRealRegs++
+			} else {
+				a.ArgFloatRealRegs++
+			}
 		}
 	}
 
@@ -137,9 +146,25 @@ func (a *FunctionABI) setABIArgs(s []ABIArg, types []ssa.Type, ints, floats []re
 	return stackOffset
 }
 
-func (a *FunctionABI) AlignedArgResultStackSlotSize() int64 {
+func (a *FunctionABI) AlignedArgResultStackSlotSize() uint32 {
 	stackSlotSize := a.RetStackSize + a.ArgStackSize
 	// Align stackSlotSize to 16 bytes.
 	stackSlotSize = (stackSlotSize + 15) &^ 15
-	return stackSlotSize
+	// Check overflow 32-bit.
+	if stackSlotSize > 0xFFFFFFFF {
+		panic("ABI stack slot size overflow")
+	}
+	return uint32(stackSlotSize)
+}
+
+func (a *FunctionABI) ABIInfoAsUint64() uint64 {
+	return uint64(a.ArgIntRealRegs)<<56 |
+		uint64(a.ArgFloatRealRegs)<<48 |
+		uint64(a.RetIntRealRegs)<<40 |
+		uint64(a.RetFloatRealRegs)<<32 |
+		uint64(a.AlignedArgResultStackSlotSize())
+}
+
+func ABIInfoFromUint64(info uint64) (argIntRealRegs, argFloatRealRegs, retIntRealRegs, retFloatRealRegs byte, stackSlotSize uint32) {
+	return byte(info >> 56), byte(info >> 48), byte(info >> 40), byte(info >> 32), uint32(info)
 }

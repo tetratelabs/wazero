@@ -22,7 +22,7 @@ func TestInstruction_format_encode(t *testing.T) {
 		wantFormat string
 	}{
 		{
-			setup:      func(i *instruction) { i.asRet(nil) },
+			setup:      func(i *instruction) { i.asRet() },
 			wantFormat: "ret",
 			want:       "c3",
 		},
@@ -1876,7 +1876,7 @@ func TestInstruction_format_encode(t *testing.T) {
 				i.u2 = 0xff
 			},
 			want:       "e8ff000000",
-			wantFormat: "call $255",
+			wantFormat: "call f0",
 		},
 		{
 			setup: func(i *instruction) {
