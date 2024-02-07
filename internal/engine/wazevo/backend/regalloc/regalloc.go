@@ -60,8 +60,8 @@ type (
 		vs                       []VReg
 		phiDefInstListPool       wazevoapi.Pool[phiDefInstList]
 		// TODO: use sparse set?
-		vrSet                 map[VReg]struct{}
-		liveInSet, liveOutSet vrSet
+		vrSet     map[VReg]struct{}
+		liveInSet vrSet
 
 		// Followings are re-used during various places e.g. coloring.
 		blks             []Block
@@ -114,7 +114,8 @@ type (
 		lca Block
 		// lastUse is the program counter of the last use of this value. This changes while iterating the block, and
 		// should not be used across the blocks as it becomes invalid.
-		lastUse programCounter
+		lastUse                 programCounter
+		lastUseUpdatedAtBlockID int
 		// isPhi is true if this is a phi value.
 		isPhi bool
 		// phiDefInstList is a list of instructions that defines this phi value.
@@ -174,6 +175,7 @@ func resetVrState(vs *vrState) {
 	vs.defBlk = nil
 	vs.spilled = false
 	vs.lastUse = -1
+	vs.lastUseUpdatedAtBlockID = -1
 	vs.lca = nil
 	vs.isPhi = false
 	vs.phiDefInstList = nil
@@ -182,10 +184,6 @@ func resetVrState(vs *vrState) {
 func (s *state) getVRegState(v VReg) *vrState {
 	id := int(v.ID())
 	return s.vrStates.GetOrAllocate(id)
-}
-
-func (s *state) getVRegIDState(id VRegID) *vrState {
-	return s.vrStates.GetOrAllocate(int(id))
 }
 
 func (s *state) useRealReg(r RealReg, v VReg) {
@@ -458,6 +456,8 @@ func (a *Allocator) alloc(f Function) {
 	a.scheduleSpills(f)
 }
 
+const outLivePC = math.MaxInt32
+
 func (a *Allocator) calcLiveInSet(liveness *blockLivenessData) *vrSet {
 	liveInSet := &a.liveInSet
 	var minVID VRegID = math.MaxInt32
@@ -481,40 +481,6 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 
 	// First calculate the live-in in sparse set.
 	liveInSet := a.calcLiveInSet(liveness)
-
-	// Next is to calculate the live-out in sparse set.
-	// First, we collect the live-ins of the successors in the slice.
-	liveOuts := a.vs[:0]
-	for i, ns := 0, blk.Succs(); i < ns; i++ {
-		succ := blk.Succ(i)
-		if succ == nil {
-			continue
-		}
-
-		succID := succ.ID()
-		succInfo := a.blockLivenessData.GetOrAllocate(succID)
-		if !succInfo.seen { // This means the back edge.
-			continue
-		}
-
-		for _, v := range succInfo.liveIns {
-			if s.phiBlk(v) != succ {
-				liveOuts = append(liveOuts, v)
-			}
-		}
-	}
-	// Then, we calculate the live-out in sparse set.
-	liveOutSet := &a.liveOutSet
-	var minVID VRegID = math.MaxInt32
-	for _, v := range liveOuts {
-		if v.ID() < minVID {
-			minVID = v.ID()
-		}
-	}
-	liveOutSet.reset(minVID)
-	for _, v := range liveOuts {
-		liveOutSet.insert(v.ID())
-	}
 
 	preds := blk.Preds()
 	var predState *blockState
@@ -564,10 +530,22 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 		}
 		pc++
 	}
-	// Reset the last use of the liveOuts.
-	liveOutSet.Range(func(id VRegID) {
-		s.getVRegIDState(id).lastUse = math.MaxInt32
-	})
+	// Mark all live-out values by checking live-in of the successors.
+	for i, ns := 0, blk.Succs(); i < ns; i++ {
+		succ := blk.Succ(i)
+		if succ == nil {
+			continue
+		}
+
+		succID := succ.ID()
+		succInfo := a.blockLivenessData.GetOrAllocate(succID)
+		for _, v := range succInfo.liveIns {
+			if s.phiBlk(v) != succ {
+				st := s.getVRegState(v)
+				st.lastUse = outLivePC
+			}
+		}
+	}
 
 	pc = 0
 	for instr := blk.InstrIteratorBegin(); instr != nil; instr = blk.InstrIteratorNext() {
