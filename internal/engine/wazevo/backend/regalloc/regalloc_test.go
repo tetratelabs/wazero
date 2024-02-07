@@ -73,9 +73,9 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 			exp: map[int]*blockLivenessData{
 				0: {},
 				1: {
-					liveIns: []VReg{3},
+					liveIns: []VRegID{3},
 				},
-				2: {liveIns: []VReg{3, 4, 5}},
+				2: {liveIns: []VRegID{3, 4, 5}},
 			},
 		},
 		{
@@ -113,12 +113,12 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 			},
 			exp: map[int]*blockLivenessData{
 				0: {},
-				1: {liveIns: []VReg{1000, 1}},
+				1: {liveIns: []VRegID{1000, 1}},
 				2: {
-					liveIns: []VReg{1000, 2},
+					liveIns: []VRegID{1000, 2},
 				},
 				3: {
-					liveIns: []VReg{1000},
+					liveIns: []VRegID{1000},
 				},
 			},
 		},
@@ -156,16 +156,16 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 			exp: map[int]*blockLivenessData{
 				0: {},
 				1: {
-					liveIns: []VReg{2000, 3000},
+					liveIns: []VRegID{2000, 3000},
 				},
 				2: {
-					liveIns: []VReg{phiVReg, 3000},
+					liveIns: []VRegID{phiVReg.ID(), 3000},
 				},
 				3: {
-					liveIns: []VReg{1000, 3000},
+					liveIns: []VRegID{1000, 3000},
 				},
 				4: {
-					liveIns: []VReg{phiVReg, 3000},
+					liveIns: []VRegID{phiVReg.ID(), 3000},
 				},
 			},
 		},
@@ -213,21 +213,21 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 			},
 			exp: map[int]*blockLivenessData{
 				0: {
-					liveIns: []VReg{},
+					liveIns: []VRegID{},
 				},
 				1: {
-					liveIns: []VReg{phiVReg},
+					liveIns: []VRegID{phiVReg.ID()},
 				},
 				2: {
-					liveIns: []VReg{phiVReg, 9999},
+					liveIns: []VRegID{phiVReg.ID(), 9999},
 				},
 				3: {
-					liveIns: []VReg{100},
+					liveIns: []VRegID{100},
 				},
 				4: {
-					liveIns: []VReg{54321},
+					liveIns: []VRegID{54321},
 				},
-				5: {liveIns: []VReg{54321}},
+				5: {liveIns: []VRegID{54321}},
 			},
 		},
 		{
@@ -255,20 +255,20 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 			exp: map[int]*blockLivenessData{
 				0: {},
 				1: {
-					liveIns: []VReg{9999},
+					liveIns: []VRegID{9999},
 				},
 				2: {
-					liveIns: []VReg{9999},
+					liveIns: []VRegID{9999},
 				},
 				3: {
-					liveIns: []VReg{9999},
+					liveIns: []VRegID{9999},
 				},
 				4: {
-					liveIns: []VReg{9999},
+					liveIns: []VRegID{9999},
 				},
 				5: {},
 				6: {
-					liveIns: []VReg{9999},
+					liveIns: []VRegID{9999},
 				},
 			},
 		},
@@ -304,16 +304,16 @@ func TestAllocator_livenessAnalysis(t *testing.T) {
 			},
 			exp: map[int]*blockLivenessData{
 				0: {
-					liveIns: []VReg{111},
+					liveIns: []VRegID{111},
 				},
 				1: {
-					liveIns: []VReg{99999, phiVReg},
+					liveIns: []VRegID{99999, phiVReg.ID()},
 				},
 				2: {
-					liveIns: []VReg{99999, phiVReg},
+					liveIns: []VRegID{99999, phiVReg.ID()},
 				},
 				3: {
-					liveIns: []VReg{99999, phiVReg, 88888},
+					liveIns: []VRegID{99999, phiVReg.ID(), 88888},
 				},
 				4: {},
 			},

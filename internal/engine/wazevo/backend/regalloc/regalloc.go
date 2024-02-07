@@ -23,7 +23,7 @@ func NewAllocator(allocatableRegs *RegisterInfo) Allocator {
 		blockLivenessData:  wazevoapi.NewIDedPool[blockLivenessData](resetBlockLivenessData),
 		phiDefInstListPool: wazevoapi.NewPool[phiDefInstList](resetPhiDefInstList),
 		blockStates:        wazevoapi.NewIDedPool[blockState](resetBlockState),
-		vrSet:              make(map[VReg]struct{}),
+		vrSet:              make(map[VRegID]struct{}),
 	}
 	a.state.vrStates = wazevoapi.NewIDedPool[vrState](resetVrState)
 	a.state.reset()
@@ -58,9 +58,10 @@ type (
 		allocatedCalleeSavedRegs []VReg
 		blockLivenessData        wazevoapi.IDedPool[blockLivenessData]
 		vs                       []VReg
+		vs2                      []VRegID
 		phiDefInstListPool       wazevoapi.Pool[phiDefInstList]
 		// TODO: use sparse set?
-		vrSet map[VReg]struct{}
+		vrSet map[VRegID]struct{}
 
 		// Followings are re-used during various places e.g. coloring.
 		blks             []Block
@@ -75,7 +76,7 @@ type (
 	// blockLivenessData is a per-block information used during the register allocation.
 	blockLivenessData struct {
 		seen    bool
-		liveIns []VReg
+		liveIns []VRegID
 	}
 
 	// programCounter represents an opaque index into the program which is used to represents a LiveInterval of a VReg.
@@ -183,9 +184,8 @@ func resetVrState(vs *vrState) {
 	vs.phiDefInstList = nil
 }
 
-func (s *state) getVRegState(v VReg) *vrState {
-	id := int(v.ID())
-	return s.vrStates.GetOrAllocate(id)
+func (s *state) getVRegState(v VRegID) *vrState {
+	return s.vrStates.GetOrAllocate(int(v))
 }
 
 func (s *state) useRealReg(r RealReg, v VReg) {
@@ -240,7 +240,7 @@ func (s *state) findOrSpillAllocatable(a *Allocator, allocatable []RealReg, forb
 			return candidateReal
 		}
 
-		if last := s.getVRegState(using).lastUse; r == RealRegInvalid || last > lastUseAt {
+		if last := s.getVRegState(using.ID()).lastUse; r == RealRegInvalid || last > lastUseAt {
 			lastUseAt = last
 			r = candidateReal
 			spillVReg = using
@@ -315,7 +315,7 @@ func (a *Allocator) determineCalleeSavedRealRegs(f Function) {
 }
 
 // phiBlk returns the block that defines the given phi value, nil otherwise.
-func (s *state) phiBlk(v VReg) Block {
+func (s *state) phiBlk(v VRegID) Block {
 	vs := s.getVRegState(v)
 	if vs.isPhi {
 		return vs.defBlk
@@ -331,7 +331,7 @@ func (a *Allocator) livenessAnalysis(f Function) {
 
 		// We should gather phi value data.
 		for _, p := range blk.BlockParams(&a.vs) {
-			vs := s.getVRegState(p)
+			vs := s.getVRegState(p.ID())
 			vs.isPhi = true
 			vs.defBlk = blk
 		}
@@ -367,16 +367,16 @@ func (a *Allocator) livenessAnalysis(f Function) {
 			var use, def VReg
 			for _, def = range instr.Defs(&a.vs) {
 				if !def.IsRealReg() {
-					delete(set, def)
+					delete(set, def.ID())
 				}
 			}
 			for _, use = range instr.Uses(&a.vs) {
 				if !use.IsRealReg() {
-					set[use] = struct{}{}
+					set[use.ID()] = struct{}{}
 				}
 			}
 
-			if def.Valid() && s.phiBlk(def) != nil {
+			if def.Valid() && s.phiBlk(def.ID()) != nil {
 				if use.Valid() && use.IsRealReg() {
 					// // If the destination is a phi value, and the source is a real register, this is the beginning of the function.
 					a.state.argRealRegs = append(a.state.argRealRegs, use)
@@ -412,12 +412,12 @@ func (a *Allocator) loopTreeDFS(entry Block) {
 		tail := len(a.blks) - 1
 		loop := a.blks[tail]
 		a.blks = a.blks[:tail]
-		a.vs = a.vs[:0]
+		a.vs2 = a.vs2[:0]
 
 		info := a.blockLivenessData.GetOrAllocate(loop.ID())
 		for _, v := range info.liveIns {
 			if s.phiBlk(v) != loop {
-				a.vs = append(a.vs, v)
+				a.vs2 = append(a.vs2, v)
 			}
 		}
 
@@ -426,7 +426,7 @@ func (a *Allocator) loopTreeDFS(entry Block) {
 			child := loop.LoopNestingForestChild(i)
 			childID := child.ID()
 			childInfo := a.blockLivenessData.GetOrAllocate(childID)
-			childInfo.liveIns = append(childInfo.liveIns, a.vs...)
+			childInfo.liveIns = append(childInfo.liveIns, a.vs2...)
 			if child.LoopHeader() {
 				a.blks = append(a.blks, child)
 			}
@@ -526,7 +526,7 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 	for instr := blk.InstrIteratorBegin(); instr != nil; instr = blk.InstrIteratorNext() {
 		for _, use := range instr.Uses(&a.vs) {
 			if !use.IsRealReg() {
-				s.getVRegState(use).lastUse = pc
+				s.getVRegState(use.ID()).lastUse = pc
 			}
 		}
 		pc++
@@ -566,7 +566,7 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 					killSet = append(killSet, r)
 				}
 			} else {
-				vs := s.getVRegState(use)
+				vs := s.getVRegState(use.ID())
 				if r := vs.r; r != RealRegInvalid {
 					currentUsedSet = currentUsedSet.add(r)
 				}
@@ -575,7 +575,7 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 
 		for i, use := range instr.Uses(&a.vs) {
 			if !use.IsRealReg() {
-				vs := s.getVRegState(use)
+				vs := s.getVRegState(use.ID())
 				killed := vs.lastUse == pc
 				r := vs.r
 
@@ -644,7 +644,7 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 					s.useRealReg(r, def)
 				}
 			} else {
-				vState := s.getVRegState(def)
+				vState := s.getVRegState(def.ID())
 				r := vState.r
 				// Allocate a new real register if `def` is not currently assigned one.
 				// It can happen when multiple instructions define the same VReg (e.g. const loads).
@@ -829,7 +829,7 @@ func (a *Allocator) reconcileEdge(f Function,
 			f.StoreRegisterBefore(currentVReg.SetRealReg(r), pred.LastInstrForInsertion())
 			delete(currentOccupantsRev, currentVReg)
 
-			s.getVRegState(desiredVReg).recordReload(f, pred)
+			s.getVRegState(desiredVReg.ID()).recordReload(f, pred)
 			f.ReloadRegisterBefore(desiredVReg.SetRealReg(r), pred.LastInstrForInsertion())
 			currentOccupants.add(r, desiredVReg)
 			currentOccupantsRev[desiredVReg] = r
@@ -870,7 +870,7 @@ func (a *Allocator) reconcileEdge(f Function,
 			)
 			currentOccupants.remove(currentReg)
 		} else {
-			s.getVRegState(desiredVReg).recordReload(f, pred)
+			s.getVRegState(desiredVReg.ID()).recordReload(f, pred)
 			f.ReloadRegisterBefore(desiredVReg.SetRealReg(r), pred.LastInstrForInsertion())
 		}
 		currentOccupantsRev[desiredVReg] = r
@@ -965,21 +965,4 @@ func (a *Allocator) Reset() {
 func resetBlockLivenessData(i *blockLivenessData) {
 	i.seen = false
 	i.liveIns = i.liveIns[:0]
-}
-
-// Format is for debugging.
-func (i *blockLivenessData) Format(ri *RegisterInfo) string {
-	var buf strings.Builder
-	buf.WriteString("\t\tblockLivenessData:")
-	buf.WriteString("\n\t\t\tliveOuts: ")
-	buf.WriteString("\n\t\t\tliveIns: ")
-	for _, v := range i.liveIns {
-		if v.IsRealReg() {
-			buf.WriteString(fmt.Sprintf("%s ", ri.RealRegName(v.RealReg())))
-		} else {
-			buf.WriteString(fmt.Sprintf("%v ", v))
-		}
-	}
-	buf.WriteString(fmt.Sprintf("\n\t\t\tseen: %v", i.seen))
-	return buf.String()
 }
