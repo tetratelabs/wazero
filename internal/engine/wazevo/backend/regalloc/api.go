@@ -53,7 +53,7 @@ type (
 	// Block is a basic block in the CFG of a function, and it consists of multiple instructions, and predecessor Block(s).
 	Block interface {
 		// ID returns the unique identifier of this block which is ordered in the reverse post-order traversal of the CFG.
-		ID() int
+		ID() int32
 		// BlockParams returns the virtual registers used as the parameters of this block.
 		BlockParams(*[]VReg) []VReg
 		// InstrIteratorBegin returns the first instruction in this block. Instructions added after lowering must be skipped.

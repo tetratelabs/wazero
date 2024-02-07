@@ -80,7 +80,7 @@ type (
 		regsInUse   regInUseSet
 		vrStates    wazevoapi.IDedPool[vrState]
 
-		currentBlockID int
+		currentBlockID int32
 
 		// allocatedRegSet is a set of RealReg that are allocated during the allocation phase. This is reset per function.
 		allocatedRegSet RegSet
@@ -113,7 +113,7 @@ type (
 		// lastUse is the program counter of the last use of this value. This changes while iterating the block, and
 		// should not be used across the blocks as it becomes invalid.
 		lastUse                 programCounter
-		lastUseUpdatedAtBlockID int
+		lastUseUpdatedAtBlockID int32
 		// spilled is true if this value is spilled i.e. the value is reload from the stack somewhere in the program.
 		spilled bool
 		// isPhi is true if this is a phi value.
@@ -314,8 +314,8 @@ func (a *Allocator) determineCalleeSavedRealRegs(f Function) {
 	f.ClobberedRegisters(a.allocatedCalleeSavedRegs)
 }
 
-func (a *Allocator) getOrAllocateBlockState(blockID int) *blockState {
-	return a.blockStates.GetOrAllocate(blockID)
+func (a *Allocator) getOrAllocateBlockState(blockID int32) *blockState {
+	return a.blockStates.GetOrAllocate(int(blockID))
 }
 
 // phiBlk returns the block that defines the given phi value, nil otherwise.

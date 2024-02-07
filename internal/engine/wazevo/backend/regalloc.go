@@ -190,7 +190,7 @@ func (f *RegAllocFunction[I, M]) Idom(blk regalloc.Block) regalloc.Block {
 }
 
 // ID implements regalloc.Block.
-func (r *RegAllocBlock[I, m]) ID() int { return r.id }
+func (r *RegAllocBlock[I, m]) ID() int32 { return int32(r.id) }
 
 // BlockParams implements regalloc.Block.
 func (r *RegAllocBlock[I, m]) BlockParams(regs *[]regalloc.VReg) []regalloc.VReg {

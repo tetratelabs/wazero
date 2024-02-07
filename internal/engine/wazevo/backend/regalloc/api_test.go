@@ -23,7 +23,7 @@ type (
 
 	// mockBlock implements Block.
 	mockBlock struct {
-		id             int
+		id             int32
 		instructions   []*mockInstr
 		preds, succs   []*mockBlock
 		_preds, _succs []Block
@@ -58,7 +58,7 @@ func (m *mockFunction) loopNestingForestRoots(blocks ...*mockBlock) {
 	m.lnfRoots = blocks
 }
 
-func newMockBlock(id int, instructions ...*mockInstr) *mockBlock {
+func newMockBlock(id int32, instructions ...*mockInstr) *mockBlock {
 	if len(instructions) > 0 {
 		instructions[0].prev = nil
 		for i := 1; i < len(instructions); i++ {
@@ -90,7 +90,7 @@ func (m *mockInstr) String() string {
 
 // String implements fmt.Stringer for debugging.
 func (m *mockBlock) String() string {
-	var preds []int
+	var preds []int32
 	for _, p := range m.preds {
 		preds = append(preds, p.id)
 	}
@@ -204,7 +204,7 @@ func (m *mockFunction) ReversePostOrderBlockIteratorNext() Block {
 }
 
 // ID implements Block.
-func (m *mockBlock) ID() int {
+func (m *mockBlock) ID() int32 {
 	return m.id
 }
 
