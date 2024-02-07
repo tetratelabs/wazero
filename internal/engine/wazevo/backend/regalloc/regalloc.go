@@ -351,7 +351,6 @@ func (a *Allocator) livenessAnalysis(f Function) {
 		info := a.getOrAllocateBlockState(blkID)
 
 		a.vs2 = a.vs2[:0]
-
 		const (
 			flagDeleted = false
 			flagLive    = true
@@ -440,10 +439,17 @@ func (a *Allocator) loopTreeDFS(entry Block) {
 		a.blks = a.blks[:tail]
 		a.vs2 = a.vs2[:0]
 
+		a.vs2 = a.vs2[:0]
+		const (
+			flagDone    = false
+			flagPending = true
+		)
 		info := a.getOrAllocateBlockState(loop.ID())
 		for _, v := range info.liveIns {
 			if s.phiBlk(v) != loop {
 				a.vs2 = append(a.vs2, v)
+				st := s.getVRegState(v)
+				st.spilled = flagPending
 			}
 		}
 
@@ -452,7 +458,13 @@ func (a *Allocator) loopTreeDFS(entry Block) {
 			child := loop.LoopNestingForestChild(i)
 			childID := child.ID()
 			childInfo := a.getOrAllocateBlockState(childID)
-			childInfo.liveIns = append(childInfo.liveIns, a.vs2...)
+			for _, v := range a.vs2 {
+				st := s.getVRegState(v)
+				if st.spilled == flagPending {
+					st.spilled = flagDone
+					childInfo.liveIns = append(childInfo.liveIns, v)
+				}
+			}
 			if child.LoopHeader() {
 				a.blks = append(a.blks, child)
 			}
