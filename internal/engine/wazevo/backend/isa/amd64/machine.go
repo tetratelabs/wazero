@@ -123,7 +123,7 @@ func (m *machine) RegAlloc() {
 
 // InsertReturn implements backend.Machine.
 func (m *machine) InsertReturn() {
-	i := m.allocateInstr().asRet(m.currentABI)
+	i := m.allocateInstr().asRet()
 	m.insert(i)
 }
 
@@ -139,7 +139,7 @@ func (m *machine) LowerSingleBranch(b *ssa.Instruction) {
 		jmp := m.allocateInstr()
 		target := ectx.GetOrAllocateSSABlockLabel(targetBlk)
 		if target == backend.LabelReturn {
-			jmp.asRet(m.currentABI)
+			jmp.asRet()
 		} else {
 			jmp.asJmp(newOperandLabel(target))
 		}
@@ -1105,7 +1105,7 @@ func (m *machine) lowerCall(si *ssa.Instruction) {
 	}
 	calleeABI := m.c.GetFunctionABI(m.c.SSABuilder().ResolveSignature(sigID))
 
-	stackSlotSize := calleeABI.AlignedArgResultStackSlotSize()
+	stackSlotSize := int64(calleeABI.AlignedArgResultStackSlotSize())
 	if m.maxRequiredStackSizeForCalls < stackSlotSize+16 {
 		m.maxRequiredStackSizeForCalls = stackSlotSize + 16 // 16 == return address + RBP.
 	}

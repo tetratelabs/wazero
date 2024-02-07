@@ -1,6 +1,7 @@
 package amd64
 
 import (
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 )
 
@@ -171,15 +172,15 @@ func (m *machine) postRegAlloc() {
 				cur = linkInstr(cur, instr)
 			}
 			linkInstr(cur, next)
-		}
-
-		if abi := cur.abi; abi != nil {
+			continue
+		case call, callIndirect:
 			// At this point, reg alloc is done, therefore we can safely insert dec/inc RPS instruction
 			// right before/after the call instruction. If this is done before reg alloc, the stack slot
 			// can point to the wrong location and therefore results in a wrong value.
 			call := cur
 			next := call.next
-			if size := uint32(abi.AlignedArgResultStackSlotSize()); size > 0 {
+			_, _, _, _, size := backend.ABIInfoFromUint64(call.u2)
+			if size > 0 {
 				dec := m.allocateInstr().asAluRmiR(aluRmiROpcodeSub, newOperandImm32(size), rspVReg, true)
 				linkInstr(call.prev, dec)
 				linkInstr(dec, call)

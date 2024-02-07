@@ -451,7 +451,7 @@ func (m *machine) Format() string {
 // InsertReturn implements backend.Machine.
 func (m *machine) InsertReturn() {
 	i := m.allocateInstr()
-	i.asRet(m.currentABI)
+	i.asRet()
 	m.insert(i)
 }
 

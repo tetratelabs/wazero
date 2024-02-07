@@ -27,7 +27,7 @@ func (m *machine) LowerSingleBranch(br *ssa.Instruction) {
 		b := m.allocateInstr()
 		target := ectx.GetOrAllocateSSABlockLabel(targetBlk)
 		if target == labelReturn {
-			b.asRet(m.currentABI)
+			b.asRet()
 		} else {
 			b.asBr(target)
 		}

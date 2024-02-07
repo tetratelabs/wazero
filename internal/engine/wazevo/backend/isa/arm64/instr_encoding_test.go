@@ -1259,7 +1259,7 @@ func TestInstruction_encode(t *testing.T) {
 		{want: "40001feb", setup: func(i *instruction) {
 			i.asALU(aluOpSubS, operandNR(x0VReg), operandNR(x2VReg), operandNR(xzrVReg), true)
 		}},
-		{want: "c0035fd6", setup: func(i *instruction) { i.asRet(nil) }},
+		{want: "c0035fd6", setup: func(i *instruction) { i.asRet() }},
 		{want: "e303042a", setup: func(i *instruction) { i.asMove32(x3VReg, x4VReg) }},
 		{want: "fe03002a", setup: func(i *instruction) { i.asMove32(x30VReg, x0VReg) }},
 		{want: "e30304aa", setup: func(i *instruction) { i.asMove64(x3VReg, x4VReg) }},

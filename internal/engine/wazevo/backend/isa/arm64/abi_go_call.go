@@ -175,7 +175,7 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 	}
 
 	// Make the SP point to the original address (above the result slot).
-	if s := m.currentABI.AlignedArgResultStackSlotSize(); s > 0 {
+	if s := int64(m.currentABI.AlignedArgResultStackSlotSize()); s > 0 {
 		cur = m.addsAddOrSubStackPointer(cur, spVReg, s, true)
 	}
 
@@ -240,7 +240,7 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 	}
 
 	ret := m.allocateInstr()
-	ret.asRet(nil)
+	ret.asRet()
 	linkInstr(cur, ret)
 
 	m.encode(m.executableContext.RootInstr)

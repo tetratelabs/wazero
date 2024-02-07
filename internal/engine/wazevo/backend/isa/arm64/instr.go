@@ -22,19 +22,18 @@ type (
 	//
 	// TODO: optimize the layout later once the impl settles.
 	instruction struct {
-		kind                instructionKind
 		prev, next          *instruction
 		u1, u2, u3          uint64
 		rd, rm, rn, ra      operand
 		amode               addressMode
-		abi                 *backend.FunctionABI
 		targets             []uint32
+		kind                instructionKind
 		addedBeforeRegAlloc bool
 	}
 
 	// instructionKind represents the kind of instruction.
 	// This controls how the instruction struct is interpreted.
-	instructionKind int
+	instructionKind byte
 )
 
 func asNop0(i *instruction) {
@@ -174,7 +173,13 @@ func (i *instruction) Defs(regs *[]regalloc.VReg) []regalloc.VReg {
 	case defKindRD:
 		*regs = append(*regs, i.rd.nr())
 	case defKindCall:
-		*regs = append(*regs, i.abi.RetRealRegs...)
+		_, _, retIntRealRegs, retFloatRealRegs, _ := backend.ABIInfoFromUint64(i.u2)
+		for i := byte(0); i < retIntRealRegs; i++ {
+			*regs = append(*regs, regInfo.RealRegToVReg[intParamResultRegs[i]])
+		}
+		for i := byte(0); i < retFloatRealRegs; i++ {
+			*regs = append(*regs, regInfo.RealRegToVReg[floatParamResultRegs[i]])
+		}
 	default:
 		panic(fmt.Sprintf("defKind for %v not defined", i))
 	}
@@ -202,7 +207,6 @@ const (
 	useKindRNRM
 	useKindRNRMRA
 	useKindRNRN1RM
-	useKindRet
 	useKindCall
 	useKindCallInd
 	useKindAMode
@@ -233,7 +237,7 @@ var useKinds = [numInstructionKinds]useKind{
 	nop0:                 useKindNone,
 	call:                 useKindCall,
 	callInd:              useKindCallInd,
-	ret:                  useKindRet,
+	ret:                  useKindNone,
 	store8:               useKindRNAMode,
 	store16:              useKindRNAMode,
 	store32:              useKindRNAMode,
@@ -324,8 +328,6 @@ func (i *instruction) Uses(regs *[]regalloc.VReg) []regalloc.VReg {
 		if rm := i.rm.reg(); rm.Valid() {
 			*regs = append(*regs, rm)
 		}
-	case useKindRet:
-		*regs = append(*regs, i.abi.RetRealRegs...)
 	case useKindAMode:
 		if amodeRN := i.amode.rn; amodeRN.Valid() {
 			*regs = append(*regs, amodeRN)
@@ -346,11 +348,17 @@ func (i *instruction) Uses(regs *[]regalloc.VReg) []regalloc.VReg {
 		if cnd.kind() != condKindCondFlagSet {
 			*regs = append(*regs, cnd.register())
 		}
-	case useKindCall:
-		*regs = append(*regs, i.abi.ArgRealRegs...)
 	case useKindCallInd:
 		*regs = append(*regs, i.rn.nr())
-		*regs = append(*regs, i.abi.ArgRealRegs...)
+		fallthrough
+	case useKindCall:
+		argIntRealRegs, argFloatRealRegs, _, _, _ := backend.ABIInfoFromUint64(i.u2)
+		for i := byte(0); i < argIntRealRegs; i++ {
+			*regs = append(*regs, regInfo.RealRegToVReg[intParamResultRegs[i]])
+		}
+		for i := byte(0); i < argFloatRealRegs; i++ {
+			*regs = append(*regs, regInfo.RealRegToVReg[floatParamResultRegs[i]])
+		}
 	case useKindVecRRRRewrite:
 		*regs = append(*regs, i.rn.reg())
 		*regs = append(*regs, i.rm.reg())
@@ -419,8 +427,6 @@ func (i *instruction) AssignUse(index int, reg regalloc.VReg) {
 				i.ra = i.ra.assignReg(reg)
 			}
 		}
-	case useKindRet:
-		panic("BUG: ret instructions shouldn't be assigned")
 	case useKindAMode:
 		if index == 0 {
 			if amodeRN := i.amode.rn; amodeRN.Valid() {
@@ -467,13 +473,17 @@ func (i *instruction) AssignUse(index int, reg regalloc.VReg) {
 func (i *instruction) asCall(ref ssa.FuncRef, abi *backend.FunctionABI) {
 	i.kind = call
 	i.u1 = uint64(ref)
-	i.abi = abi
+	if abi != nil {
+		i.u2 = abi.ABIInfoAsUint64()
+	}
 }
 
 func (i *instruction) asCallIndirect(ptr regalloc.VReg, abi *backend.FunctionABI) {
 	i.kind = callInd
 	i.rn = operandNR(ptr)
-	i.abi = abi
+	if abi != nil {
+		i.u2 = abi.ABIInfoAsUint64()
+	}
 }
 
 func (i *instruction) callFuncRef() ssa.FuncRef {
@@ -527,9 +537,8 @@ func (i *instruction) nop0Label() label {
 	return label(i.u1)
 }
 
-func (i *instruction) asRet(abi *backend.FunctionABI) {
+func (i *instruction) asRet() {
 	i.kind = ret
-	i.abi = abi
 }
 
 func (i *instruction) asStorePair64(src1, src2 regalloc.VReg, amode addressMode) {
@@ -1391,11 +1400,7 @@ func (i *instruction) String() (str string) {
 	case movFromFPSR:
 		str = fmt.Sprintf("mrs %s fpsr", formatVRegSized(i.rd.nr(), 64))
 	case call:
-		if i.u2 > 0 {
-			str = fmt.Sprintf("bl #%#x", i.u2)
-		} else {
-			str = fmt.Sprintf("bl %s", ssa.FuncRef(i.u1))
-		}
+		str = fmt.Sprintf("bl %s", ssa.FuncRef(i.u1))
 	case callInd:
 		str = fmt.Sprintf("bl %s", formatVRegSized(i.rn.nr(), 64))
 	case ret:
