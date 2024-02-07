@@ -460,7 +460,7 @@ func (a *Allocator) loopTreeDFS(entry Block) {
 			childInfo := a.getOrAllocateBlockState(childID)
 			for _, v := range a.vs2 {
 				st := s.getVRegState(v)
-				if st.spilled == flagPending {
+				if st.spilled == flagPending { //nolint:gosimple
 					st.spilled = flagDone
 					childInfo.liveIns = append(childInfo.liveIns, v)
 				}
