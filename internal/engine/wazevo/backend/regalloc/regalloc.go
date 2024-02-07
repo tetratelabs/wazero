@@ -60,8 +60,7 @@ type (
 		vs                       []VReg
 		phiDefInstListPool       wazevoapi.Pool[phiDefInstList]
 		// TODO: use sparse set?
-		vrSet     map[VReg]struct{}
-		liveInSet vrSet
+		vrSet map[VReg]struct{}
 
 		// Followings are re-used during various places e.g. coloring.
 		blks             []Block
@@ -86,6 +85,8 @@ type (
 		argRealRegs []VReg
 		regsInUse   regInUseSet
 		vrStates    wazevoapi.IDedPool[vrState]
+
+		currentBlockID int
 
 		// allocatedRegSet is a set of RealReg that are allocated during the allocation phase. This is reset per function.
 		allocatedRegSet RegSet
@@ -159,6 +160,7 @@ func (s *state) reset() {
 	s.vrStates.Reset()
 	s.allocatedRegSet = RegSet(0)
 	s.regsInUse.reset()
+	s.currentBlockID = -1
 }
 
 func (s *state) setVRegState(v VReg, r RealReg) {
@@ -225,7 +227,7 @@ func (vs *vrState) recordReload(f Function, blk Block) {
 
 func (s *state) findOrSpillAllocatable(a *Allocator, allocatable []RealReg, forbiddenMask RegSet) (r RealReg) {
 	r = RealRegInvalid
-	var lastUseAt programCounter = math.MinInt32
+	var lastUseAt programCounter
 	var spillVReg VReg
 	for _, candidateReal := range allocatable {
 		if forbiddenMask.has(candidateReal) {
@@ -238,7 +240,7 @@ func (s *state) findOrSpillAllocatable(a *Allocator, allocatable []RealReg, forb
 			return candidateReal
 		}
 
-		if last := s.getVRegState(using).lastUse; last > lastUseAt {
+		if last := s.getVRegState(using).lastUse; r == RealRegInvalid || last > lastUseAt {
 			lastUseAt = last
 			r = candidateReal
 			spillVReg = using
@@ -265,13 +267,15 @@ func (s *state) findAllocatable(allocatable []RealReg, forbiddenMask RegSet) Rea
 	return RealRegInvalid
 }
 
-func (s *state) resetAt(bs *blockState, liveIns *vrSet) {
+func (s *state) resetAt(bs *blockState) {
 	s.regsInUse.range_(func(_ RealReg, vr VReg) {
 		s.setVRegState(vr, RealRegInvalid)
 	})
 	s.regsInUse.reset()
 	bs.endRegs.range_(func(r RealReg, v VReg) {
-		if liveIns.contains(v.ID()) {
+		id := int(v.ID())
+		st := s.vrStates.GetOrAllocate(id)
+		if st.lastUseUpdatedAtBlockID == s.currentBlockID && st.lastUse == liveInPC {
 			s.regsInUse.add(r, v)
 			s.setVRegState(v, r)
 		}
@@ -456,21 +460,18 @@ func (a *Allocator) alloc(f Function) {
 	a.scheduleSpills(f)
 }
 
-const outLivePC = math.MaxInt32
+const (
+	liveInPC  = math.MinInt32
+	liveOutPC = math.MaxInt32
+)
 
-func (a *Allocator) calcLiveInSet(liveness *blockLivenessData) *vrSet {
-	liveInSet := &a.liveInSet
-	var minVID VRegID = math.MaxInt32
+func (a *Allocator) updateLiveInVRState(liveness *blockLivenessData) {
+	currentBlockID := a.state.currentBlockID
 	for _, v := range liveness.liveIns {
-		if v.ID() < minVID {
-			minVID = v.ID()
-		}
+		vs := a.state.getVRegState(v)
+		vs.lastUse = liveInPC
+		vs.lastUseUpdatedAtBlockID = currentBlockID
 	}
-	liveInSet.reset(minVID)
-	for _, v := range liveness.liveIns {
-		liveInSet.insert(v.ID())
-	}
-	return liveInSet
 }
 
 func (a *Allocator) allocBlock(f Function, blk Block) {
@@ -479,8 +480,8 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 	s := &a.state
 	currentBlkState := a.blockStates.GetOrAllocate(bID)
 
-	// First calculate the live-in in sparse set.
-	liveInSet := a.calcLiveInSet(liveness)
+	s.currentBlockID = bID
+	a.updateLiveInVRState(liveness)
 
 	preds := blk.Preds()
 	var predState *blockState
@@ -513,7 +514,7 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 			fmt.Printf("allocating blk%d starting from blk%d (on index=%d) \n",
 				bID, blk.Pred(currentBlkState.startFromPredIndex).ID(), currentBlkState.startFromPredIndex)
 		}
-		s.resetAt(predState, liveInSet)
+		s.resetAt(predState)
 	}
 
 	s.regsInUse.range_(func(allocated RealReg, v VReg) {
@@ -542,7 +543,7 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 		for _, v := range succInfo.liveIns {
 			if s.phiBlk(v) != succ {
 				st := s.getVRegState(v)
-				st.lastUse = outLivePC
+				st.lastUse = liveOutPC
 			}
 		}
 	}
@@ -736,6 +737,9 @@ func (a *Allocator) fixMergeState(f Function, blk Block) {
 		fmt.Println("fixMergeState", blk.ID(), ":", desiredOccupants.format(a.regInfo))
 	}
 
+	s.currentBlockID = bID
+	a.updateLiveInVRState(a.blockLivenessData.GetOrAllocate(bID))
+
 	currentOccupants := &a.currentOccupants
 	for i := 0; i < preds; i++ {
 		currentOccupants.reset()
@@ -757,8 +761,7 @@ func (a *Allocator) fixMergeState(f Function, blk Block) {
 			}
 		}
 
-		liveInSet := a.calcLiveInSet(a.blockLivenessData.GetOrAllocate(bID))
-		s.resetAt(predSt, liveInSet)
+		s.resetAt(predSt)
 
 		// Finds the free registers if any.
 		intTmp, floatTmp := VRegInvalid, VRegInvalid
