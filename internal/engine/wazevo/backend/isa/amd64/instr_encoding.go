@@ -1043,7 +1043,33 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 			panic("BUG: invalid operand kind")
 		}
 	case xmmRmRImm:
-		panic("TODO")
+		op := sseOpcode(i.u1)
+		var legPrex legacyPrefixes
+		var opcode uint32
+		var opcodeNum uint32
+		switch op {
+		case sseOpcodeCmppd:
+			legPrex, opcode, opcodeNum = legacyPrefixes0x66, 0x0FC2, 2
+		default:
+			panic(fmt.Sprintf("Unsupported sseOpcode: %s", op))
+		}
+
+		dst := regEncodings[i.op2.reg().RealReg()]
+
+		rex := rexInfo(0).clearW()
+		op1 := i.op1
+		if op1.kind == operandKindReg {
+			src := regEncodings[op1.reg().RealReg()]
+			encodeRegReg(c, legPrex, opcode, opcodeNum, dst, src, rex)
+		} else if i.op1.kind == operandKindMem {
+			m := i.op1.addressMode()
+			encodeRegMem(c, legPrex, opcode, opcodeNum, dst, m, rex)
+		} else {
+			panic("BUG: invalid operand kind")
+		}
+
+		c.EmitByte(byte(i.u2))
+
 	case jmp:
 		const (
 			regMemOpcode    = 0xff
