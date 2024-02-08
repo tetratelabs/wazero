@@ -130,6 +130,7 @@ func ensureMutableGlobalsMatch(compilerMod, interpreterMod api.Module, requireNo
 	if len(ci.Globals) == 0 {
 		return
 	}
+	var es []string
 	for i := range ci.Globals[:len(ci.Globals)-1] { // The last global is the fuel, so we can ignore it.
 		cg := ci.Globals[i]
 		ig := ii.Globals[i]
@@ -154,11 +155,14 @@ func ensureMutableGlobalsMatch(compilerMod, interpreterMod api.Module, requireNo
 
 		if !ok {
 			if ig.Type.ValType == wasm.ValueTypeV128 {
-				requireNoError(fmt.Errorf("mutable global[%d] value mismatch: (%v,%v) != (%v,%v)", i, cVal, cValHi, iVal, iValHi))
+				es = append(es, fmt.Sprintf("mutable global[%d] value mismatch: (%v,%v) != (%v,%v)", i, cVal, cValHi, iVal, iValHi))
 			} else {
-				requireNoError(fmt.Errorf("mutable global[%d] value mismatch: %v != %v", i, cVal, iVal))
+				es = append(es, fmt.Sprintf("mutable global[%d] value mismatch: %v != %v", i, cVal, iVal))
 			}
 		}
+	}
+	if len(es) > 0 {
+		requireNoError(fmt.Errorf("mutable globals mismatch:\n%s", strings.Join(es, "\n")))
 	}
 }
 
