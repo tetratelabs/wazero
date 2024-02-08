@@ -873,6 +873,7 @@ func (ce *callEngine) deferredOnCall(ctx context.Context, m *wasm.ModuleInstance
 		stackBasePointer := int(ce.stackBasePointerInBytes >> 3)
 		functionListeners := make([]functionListenerInvocation, 0, 16)
 
+		left := wasmdebug.MaxFrames
 		for {
 			def := fn.definition()
 
@@ -886,6 +887,7 @@ func (ce *callEngine) deferredOnCall(ctx context.Context, m *wasm.ModuleInstance
 				}
 			}
 			builder.AddFrame(def.DebugName(), def.ParamTypes(), def.ResultTypes(), sources)
+			left--
 
 			if fn.parent.listener != nil {
 				functionListeners = append(functionListeners, functionListenerInvocation{
@@ -895,7 +897,7 @@ func (ce *callEngine) deferredOnCall(ctx context.Context, m *wasm.ModuleInstance
 			}
 
 			callFrameOffset := callFrameOffset(fn.funcType)
-			if stackBasePointer != 0 {
+			if left > 0 && stackBasePointer != 0 {
 				frame := *(*callFrame)(unsafe.Pointer(&ce.stack[stackBasePointer+callFrameOffset]))
 				fn = frame.function
 				pc = uint64(frame.returnAddress)

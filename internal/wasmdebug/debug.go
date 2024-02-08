@@ -147,6 +147,9 @@ func (s *stackTrace) FromRecovered(recovered interface{}) error {
 	}
 }
 
+// MaxFrames is the maximum number of frames to include in the stack trace.
+const MaxFrames = 20
+
 // AddFrame implements ErrorBuilder.AddFrame
 func (s *stackTrace) AddFrame(funcName string, paramTypes, resultTypes []api.ValueType, sources []string) {
 	sig := signature(funcName, paramTypes, resultTypes)

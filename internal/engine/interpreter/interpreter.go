@@ -624,6 +624,9 @@ func (ce *callEngine) recoverOnCall(ctx context.Context, m *wasm.ModuleInstance,
 	frameCount := len(ce.frames)
 	functionListeners := make([]functionListenerInvocation, 0, 16)
 
+	if frameCount > wasmdebug.MaxFrames {
+		frameCount = wasmdebug.MaxFrames
+	}
 	for i := 0; i < frameCount; i++ {
 		frame := ce.popFrame()
 		f := frame.f
