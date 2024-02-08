@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -38,9 +38,6 @@ var wasmWasiFd []byte
 //go:embed testdata/wasi_random_get.wasm
 var wasmWasiRandomGet []byte
 
-// wasmCatGo is compiled on demand with `GOOS=js GOARCH=wasm`
-var wasmCatGo []byte
-
 //go:embed testdata/cat/cat-tinygo.wasm
 var wasmCatTinygo []byte
 
@@ -48,9 +45,9 @@ var wasmCatTinygo []byte
 var wasmWasiUnstable []byte
 
 func TestMain(m *testing.M) {
-	// For some reason, riscv64 fails to see directory listings.
-	if a := runtime.GOARCH; a == "riscv64" {
-		log.Println("main: skipping due to not yet supported GOARCH:", a)
+	cmd := exec.Command("go", "version")
+	if _, err := cmd.CombinedOutput(); err != nil {
+		log.Println("main: cli test is only supported on a machine with Go installed")
 		os.Exit(0)
 	}
 	os.Exit(m.Run())
