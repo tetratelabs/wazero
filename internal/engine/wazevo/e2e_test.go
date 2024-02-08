@@ -785,6 +785,34 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
+			name:      "atomic_cas",
+			m:         testcases.AtomicCas.Module,
+			features:  api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
+			skipAMD64: true,
+			calls: []callCase{
+				// no store
+				{
+					params:     []uint64{1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2},
+					expResults: []uint64{0, 0, 0, 0, 0, 0, 0},
+				},
+				// store
+				{
+					params:     []uint64{0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2},
+					expResults: []uint64{0, 0, 0, 0, 0, 0, 0},
+				},
+				// store
+				{
+					params:     []uint64{2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3},
+					expResults: []uint64{2, 2, 2, 2, 2, 2, 2},
+				},
+				// no store
+				{
+					params:     []uint64{2, 4, 2, 4, 2, 4, 2, 4, 2, 4, 2, 4, 2, 4},
+					expResults: []uint64{3, 3, 3, 3, 3, 3, 3},
+				},
+			},
+		},
+		{
 			name: "float_le",
 			m:    testcases.FloatLe.Module,
 			calls: []callCase{

@@ -1718,6 +1718,27 @@ func TestInstruction_encode(t *testing.T) {
 		{want: "0280e138", setup: func(i *instruction) {
 			i.asAtomicRmw(atomicRmwOpSwp, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 1)
 		}},
+		{want: "02fce188", setup: func(i *instruction) {
+			i.asAtomicCas(operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 4)
+		}},
+		{want: "02fce148", setup: func(i *instruction) {
+			i.asAtomicCas(operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 2)
+		}},
+		{want: "02fce108", setup: func(i *instruction) {
+			i.asAtomicCas(operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 1)
+		}},
+		{want: "02fce1c8", setup: func(i *instruction) {
+			i.asAtomicCas(operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 8)
+		}},
+		{want: "02fce188", setup: func(i *instruction) {
+			i.asAtomicCas(operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 4)
+		}},
+		{want: "02fce148", setup: func(i *instruction) {
+			i.asAtomicCas(operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 2)
+		}},
+		{want: "02fce108", setup: func(i *instruction) {
+			i.asAtomicCas(operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 1)
+		}},
 		{want: "4201231e4201631e4201239e4201639e4201221e4201621e4201229e4201629e", setup: func(i *instruction) {
 			i.asNop0()
 			cur := i
