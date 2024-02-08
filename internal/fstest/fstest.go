@@ -12,7 +12,7 @@
 //	}
 //
 // Failures found here should result in new tests in the appropriate package,
-// for example, gojs, sysfs or wasi_snapshot_preview1.
+// for example, sysfs or wasi_snapshot_preview1.
 //
 // This package must have no dependencies. Otherwise, compiling this with
 // TinyGo or `GOOS=js GOARCH=wasm` can become bloated or complicated.

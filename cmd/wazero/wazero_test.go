@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
 	"path"
 	"path/filepath"
 	"runtime"
@@ -52,12 +51,6 @@ func TestMain(m *testing.M) {
 	// For some reason, riscv64 fails to see directory listings.
 	if a := runtime.GOARCH; a == "riscv64" {
 		log.Println("main: skipping due to not yet supported GOARCH:", a)
-		os.Exit(0)
-	}
-
-	// Notably our scratch containers don't have go, so don't fail tests.
-	if err := compileGoJS(); err != nil {
-		log.Println("main: Skipping GOOS=js GOARCH=wasm tests due to:", err)
 		os.Exit(0)
 	}
 	os.Exit(m.Run())
@@ -231,12 +224,7 @@ func TestRun(t *testing.T) {
 	bearPath := filepath.Join(bearDir, "bear.txt")
 	bearStat, err := os.Stat(bearPath)
 	require.NoError(t, err)
-	bearMtime := bearStat.ModTime().UnixMilli()
 	bearMtimeNano := bearStat.ModTime().UnixNano()
-	// The file is world read, but windows cannot see that and reports world
-	// write. Hence, we save off the current interpretation of mode for
-	// comparison.
-	bearMode := bearStat.Mode()
 
 	existingDir1 := filepath.Join(tmpDir, "existing1")
 	require.NoError(t, os.Mkdir(existingDir1, 0o700))
@@ -370,71 +358,6 @@ func TestRun(t *testing.T) {
 `,
 		},
 		{
-			name:           "GOOS=js GOARCH=wasm",
-			wasm:           wasmCatGo,
-			wazeroOpts:     []string{fmt.Sprintf("--mount=%s:/", bearDir)},
-			wasmArgs:       []string{"/bear.txt"},
-			expectedStdout: "pooh\n",
-		},
-		{
-			name: "GOOS=js GOARCH=wasm workdir",
-			wasm: wasmCatGo,
-			wazeroOpts: []string{
-				// --mount=X:\:/ on Windows, --mount=/:/ everywhere else
-				"--mount=" + filepath.VolumeName(bearDir) + string(os.PathSeparator) + ":/",
-			},
-			workdir:        bearDir,
-			wasmArgs:       []string{"bear.txt"},
-			expectedStdout: "pooh\n",
-		},
-		{
-			name:           "GOOS=js GOARCH=wasm readonly",
-			wasm:           wasmCatGo,
-			wazeroOpts:     []string{fmt.Sprintf("--mount=%s:/:ro", bearDir)},
-			wasmArgs:       []string{"/bear.txt"},
-			expectedStdout: "pooh\n",
-		},
-		{
-			name:       "GOOS=js GOARCH=wasm hostlogging=proc",
-			wasm:       wasmCatGo,
-			wazeroOpts: []string{"--hostlogging=proc", fmt.Sprintf("--mount=%s:/:ro", bearDir)},
-			wasmArgs:   []string{"/not-bear.txt"},
-			expectedStderr: `==> go.runtime.wasmExit(code=1)
-<==
-`,
-			expectedExitCode: 1,
-		},
-		{
-			name:           "GOOS=js GOARCH=wasm hostlogging=filesystem",
-			wasm:           wasmCatGo,
-			wazeroOpts:     []string{"--hostlogging=filesystem", fmt.Sprintf("--mount=%s:/", bearDir)},
-			wasmArgs:       []string{"/bear.txt"},
-			expectedStdout: "pooh\n",
-			expectedStderr: fmt.Sprintf(`==> go.syscall/js.valueCall(fs.open(path=/bear.txt,flags=,perm=----------))
-<== (err=<nil>,fd=4)
-==> go.syscall/js.valueCall(fs.fstat(fd=4))
-<== (err=<nil>,stat={isDir=false,mode=%[1]s,size=5,mtimeMs=%[2]d})
-==> go.syscall/js.valueCall(fs.fstat(fd=4))
-<== (err=<nil>,stat={isDir=false,mode=%[1]s,size=5,mtimeMs=%[2]d})
-==> go.syscall/js.valueCall(fs.read(fd=4,offset=0,byteCount=512,fOffset=<nil>))
-<== (err=<nil>,n=5)
-==> go.syscall/js.valueCall(fs.read(fd=4,offset=0,byteCount=507,fOffset=<nil>))
-<== (err=<nil>,n=0)
-==> go.syscall/js.valueCall(fs.close(fd=4))
-<== (err=<nil>,ok=true)
-`, bearMode, bearMtime),
-		},
-		{
-			name:       "GOOS=js GOARCH=wasm not root mount",
-			wasm:       wasmCatGo,
-			wazeroOpts: []string{"--hostlogging=proc", fmt.Sprintf("--mount=%s:/animals:ro", bearDir)},
-			wasmArgs:   []string{"/not-bear.txt"},
-			expectedStderr: fmt.Sprintf(`invalid mount: only root mounts supported in GOOS=js: [%s:/animals:ro]
-Consider switching to GOOS=wasip1.
-`, bearDir),
-			expectedExitCode: 1,
-		},
-		{
 			name:       "cachedir existing absolute",
 			wazeroOpts: []string{"--cachedir=" + existingDir1},
 			wasm:       wasmWasiArg,
@@ -530,22 +453,7 @@ Consider switching to GOOS=wasip1.
 		},
 	}
 
-	cryptoTest := test{
-		name:       "GOOS=js GOARCH=wasm hostlogging=filesystem,random",
-		wasm:       wasmCatGo,
-		wazeroOpts: []string{"--hostlogging=filesystem,random"},
-		wasmArgs:   []string{"/bear.txt"},
-		expectedStderr: `==> go.runtime.getRandomData(r_len=32)
-<==
-==> go.runtime.getRandomData(r_len=8)
-<==
-==> go.syscall/js.valueCall(fs.open(path=/bear.txt,flags=,perm=----------))
-<== (err=functionality not supported,fd=0)
-`, // Test only shows logging happens in two scopes; it is ok to fail.
-		expectedExitCode: 1,
-	}
-
-	for _, tt := range append(tests, cryptoTest) {
+	for _, tt := range tests {
 		tc := tt
 
 		if tc.wasm == nil {
@@ -681,13 +589,6 @@ func Test_detectImports(t *testing.T) {
 			},
 			mode: modeWasiUnstable,
 		},
-		{
-			message: "GOOS=js GOARCH=wasm",
-			imports: []api.FunctionDefinition{
-				importer{internalapi.WazeroOnlyType{}, "go", "syscall/js.valueCall"},
-			},
-			mode: modeGo,
-		},
 	}
 
 	for _, tc := range tests {
@@ -814,32 +715,7 @@ func runMain(t *testing.T, workdir string, args []string) (int, string, string) 
 	stderr := new(bytes.Buffer)
 	exitCode := doMain(stdout, stderr)
 
-	// Handle "go" -> "gojs" module rename in Go 1.21
-	stderrString := strings.ReplaceAll(stderr.String(), "==> gojs", "==> go")
-	return exitCode, stdout.String(), stderrString
-}
-
-// compileGoJS compiles "testdata/cat/cat.go" on demand as the binary generated
-// is too big (1.6MB) to check into the source tree.
-func compileGoJS() (err error) {
-	dir, err := os.Getwd()
-	if err != nil {
-		return err
-	}
-
-	srcDir := path.Join(dir, "testdata", "cat")
-	outPath := path.Join(srcDir, "cat-go.wasm")
-
-	// This doesn't add "-ldflags=-s -w", as the binary size only changes 28KB.
-	cmd := exec.Command("go", "build", "-o", outPath, ".")
-	cmd.Dir = srcDir
-	cmd.Env = append(os.Environ(), "GOARCH=wasm", "GOOS=js", "GOWASM=satconv,signext")
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("go build: %v\n%s", err, out)
-	}
-
-	wasmCatGo, err = os.ReadFile(outPath)
-	return
+	return exitCode, stdout.String(), stderr.String()
 }
 
 func exist(path string) error {
