@@ -1430,6 +1430,8 @@ const (
 	sseOpcodeAndpd
 	sseOpcodeAndnps
 	sseOpcodeAndnpd
+	sseOpcodeBlendvps
+	sseOpcodeBlendvpd
 	sseOpcodeComiss
 	sseOpcodeComisd
 	sseOpcodeCmpps
@@ -1602,6 +1604,10 @@ func (s sseOpcode) String() string {
 		return "andnps"
 	case sseOpcodeAndnpd:
 		return "andnpd"
+	case sseOpcodeBlendvps:
+		return "blendvps"
+	case sseOpcodeBlendvpd:
+		return "blendvpd"
 	case sseOpcodeComiss:
 		return "comiss"
 	case sseOpcodeComisd:

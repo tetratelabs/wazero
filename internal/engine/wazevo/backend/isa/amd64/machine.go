@@ -618,6 +618,73 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		i.asXmmUnaryRmR(vecOp, rn, rd)
 		m.insert(i)
 
+	case ssa.OpcodeVImin:
+		x, y, lane := instr.Arg2WithLane()
+		var vecOp sseOpcode
+		switch lane {
+		case ssa.VecLaneI8x16:
+			vecOp = sseOpcodePminsb
+		case ssa.VecLaneI16x8:
+			vecOp = sseOpcodePminsw
+		case ssa.VecLaneI32x4:
+			vecOp = sseOpcodePminsd
+		}
+		m.lowerVbBinOp(vecOp, x, y, instr.Return())
+
+	case ssa.OpcodeVUmin:
+		x, y, lane := instr.Arg2WithLane()
+		var vecOp sseOpcode
+		switch lane {
+		case ssa.VecLaneI8x16:
+			vecOp = sseOpcodePminub
+		case ssa.VecLaneI16x8:
+			vecOp = sseOpcodePminuw
+		case ssa.VecLaneI32x4:
+			vecOp = sseOpcodePminud
+		}
+		m.lowerVbBinOp(vecOp, x, y, instr.Return())
+
+	case ssa.OpcodeVImax:
+		x, y, lane := instr.Arg2WithLane()
+		var vecOp sseOpcode
+		switch lane {
+		case ssa.VecLaneI8x16:
+			vecOp = sseOpcodePmaxsb
+		case ssa.VecLaneI16x8:
+			vecOp = sseOpcodePmaxsw
+		case ssa.VecLaneI32x4:
+			vecOp = sseOpcodePmaxsd
+		}
+		m.lowerVbBinOp(vecOp, x, y, instr.Return())
+
+	case ssa.OpcodeVUmax:
+		x, y, lane := instr.Arg2WithLane()
+		var vecOp sseOpcode
+		switch lane {
+		case ssa.VecLaneI8x16:
+			vecOp = sseOpcodePmaxub
+		case ssa.VecLaneI16x8:
+			vecOp = sseOpcodePmaxuw
+		case ssa.VecLaneI32x4:
+			vecOp = sseOpcodePmaxud
+		}
+		m.lowerVbBinOp(vecOp, x, y, instr.Return())
+
+	case ssa.OpcodeVAvgRound:
+		x, y, lane := instr.Arg2WithLane()
+		var vecOp sseOpcode
+		switch lane {
+		case ssa.VecLaneI8x16:
+			vecOp = sseOpcodePavgb
+		case ssa.VecLaneI16x8:
+			vecOp = sseOpcodePavgw
+		}
+		m.lowerVbBinOp(vecOp, x, y, instr.Return())
+
+	case ssa.OpcodeVIabs:
+		m.lowerVIabs(instr)
+	case ssa.OpcodeVIpopcnt:
+		m.lowerVIpopcnt(instr)
 	case ssa.OpcodeUndefined:
 		m.insert(m.allocateInstr().asUD2())
 	case ssa.OpcodeExitWithCode:
@@ -635,7 +702,7 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		ret := m.c.VRegOf(instr.Return())
 		m.lowerExtLoad(op, ptr, offset, ret)
 	case ssa.OpcodeVconst:
-		result := instr.Return()
+		result := m.c.VRegOf(instr.Return())
 		lo, hi := instr.VconstData()
 		m.lowerVconst(result, lo, hi)
 	case ssa.OpcodeSExtend, ssa.OpcodeUExtend:
@@ -661,6 +728,104 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 	default:
 		panic("TODO: lowering " + op.String())
 	}
+}
+
+func (m *machine) lowerVIabs(instr *ssa.Instruction) {
+	x, lane := instr.ArgWithLane()
+	rd := m.c.VRegOf(instr.Return())
+
+	if lane == ssa.VecLaneI64x2 {
+		rn := m.getOperand_Reg(m.c.ValueDefinition(x))
+		tmp := m.copyToTmp(rn.reg())
+
+		// Clear all bits on mask.
+		mask := m.c.AllocateVReg(ssa.TypeV128)
+		zero := m.allocateInstr()
+		zero.asZeros(mask)
+		m.insert(zero)
+
+		// Subtract rn from mask.
+		sub := m.allocateInstr()
+		sub.asXmmRmR(sseOpcodePsubq, newOperandReg(tmp), mask)
+		m.insert(sub)
+
+		blend := m.allocateInstr()
+		blend.asXmmRmR(sseOpcodeBlendvpd, newOperandReg(mask), tmp)
+		m.insert(blend)
+
+		m.copyTo(tmp, rd)
+	} else {
+		var vecOp sseOpcode
+		switch lane {
+		case ssa.VecLaneI8x16:
+			vecOp = sseOpcodePabsb
+		case ssa.VecLaneI16x8:
+			vecOp = sseOpcodePabsw
+		case ssa.VecLaneI32x4:
+			vecOp = sseOpcodePabsd
+		}
+		rn := m.getOperand_Mem_Reg(m.c.ValueDefinition(x))
+
+		i := m.allocateInstr()
+		i.asXmmUnaryRmR(vecOp, rn, rd)
+		m.insert(i)
+	}
+}
+
+func (m *machine) lowerVIpopcnt(instr *ssa.Instruction) {
+	x := instr.Arg()
+	rn := m.getOperand_Reg(m.c.ValueDefinition(x))
+	rd := m.c.VRegOf(instr.Return())
+
+	tmp1 := m.c.AllocateVReg(ssa.TypeV128)
+	m.lowerVconst(tmp1, 0x0f0f0f0f0f0f0f0f, 0x0f0f0f0f0f0f0f0f)
+
+	// Copy input into tmp2.
+	tmp2 := m.copyToTmp(rn.reg())
+
+	// Given that we have:
+	//  rm = [b1, ..., b16] where bn = hn:ln and hn and ln are higher and lower 4-bits of bn.
+	//
+	// Take PAND on tmp1 and tmp2, so that we mask out all the higher bits.
+	//  tmp2 = [l1, ..., l16].
+	pand := m.allocateInstr()
+	pand.asXmmRmR(sseOpcodePand, newOperandReg(tmp1), tmp2)
+	m.insert(pand)
+
+	// Do logical (packed word) right shift by 4 on rm and PAND against the mask (tmp1); meaning that we have
+	//  tmp3 = [h1, ...., h16].
+	tmp3 := m.copyToTmp(rn.reg())
+	psrlw := m.allocateInstr()
+	psrlw.asXmmRmiReg(sseOpcodePsrlw, newOperandImm32(4), tmp3)
+	m.insert(psrlw)
+
+	pand2 := m.allocateInstr()
+	pand2.asXmmRmR(sseOpcodePand, newOperandReg(tmp1), tmp3)
+	m.insert(pand2)
+
+	// Read the popcntTable into tmp4, and we have
+	//  tmp4 = [0x00, 0x01, 0x01, 0x02, 0x01, 0x02, 0x02, 0x03, 0x01, 0x02, 0x02, 0x03, 0x02, 0x03, 0x03, 0x04]
+	tmp4 := m.c.AllocateVReg(ssa.TypeV128)
+	m.lowerVconst(tmp4, 0x03_02_02_01_02_01_01_00, 0x04_03_03_02_03_02_02_01)
+
+	// Make a copy for later.
+	tmp5 := m.copyToTmp(tmp4)
+
+	//  tmp4 = [popcnt(l1), ..., popcnt(l16)].
+	pshufb := m.allocateInstr()
+	pshufb.asXmmRmR(sseOpcodePshufb, newOperandReg(tmp2), tmp4)
+	m.insert(pshufb)
+
+	pshufb2 := m.allocateInstr()
+	pshufb2.asXmmRmR(sseOpcodePshufb, newOperandReg(tmp3), tmp5)
+	m.insert(pshufb2)
+
+	// tmp4 + tmp5 is the result.
+	paddb := m.allocateInstr()
+	paddb.asXmmRmR(sseOpcodePaddb, newOperandReg(tmp4), tmp5)
+	m.insert(paddb)
+
+	m.copyTo(tmp5, rd)
 }
 
 func (m *machine) lowerVImul(instr *ssa.Instruction) {
@@ -903,10 +1068,8 @@ func (m *machine) lowerExtend(_arg, ret ssa.Value, from, to byte, signed bool) {
 	m.copyTo(rd, rd0)
 }
 
-func (m *machine) lowerVconst(res ssa.Value, lo, hi uint64) {
+func (m *machine) lowerVconst(dst regalloc.VReg, lo, hi uint64) {
 	// TODO: use xor when lo == hi == 0.
-
-	dst := m.c.VRegOf(res)
 
 	islandAddr := m.c.AllocateVReg(ssa.TypeI64)
 	lea := m.allocateInstr()
