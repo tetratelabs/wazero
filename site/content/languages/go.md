@@ -26,10 +26,6 @@ Moreover, Go defines js "EXPERIMENTAL... exempt from the Go compatibility
 promise." While WebAssembly signatures haven't broken between 1.18 and 1.19,
 then have in the past and can in the future.
 
-For this reason implementations such as wazero's [gojs][14], cannot guarantee
-portability from release to release, or that the code will work well in
-production.
-
 Due to lack of adoption, support and relatively high implementation overhead,
 most choose [TinyGo]({{< relref "/tinygo.md" >}}) to compile source code, even if it supports less
 features.
@@ -361,7 +357,6 @@ the host operating system's underlying controls permit.
 [11]: https://github.com/WebAssembly/proposals
 [12]: https://github.com/golang/go/blob/go1.20/src/cmd/link/internal/ld/data.go#L2457
 [13]: https://github.com/golang/go/blob/go1.20/src/syscall/tables_js.go#L371-L494
-[14]: https://github.com/tetratelabs/wazero/tree/main/experimental/gojs/example
 [15]: https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/
 [16]: https://github.com/golang/go/blob/go1.20/src/internal/buildcfg/cfg.go#L136-L150
 [17]: https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/nontrapping-float-to-int-conversion/Overview.md

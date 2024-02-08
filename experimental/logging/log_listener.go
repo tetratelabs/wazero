@@ -8,7 +8,6 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
 	aslogging "github.com/tetratelabs/wazero/internal/assemblyscript/logging"
-	gologging "github.com/tetratelabs/wazero/internal/gojs/logging"
 	"github.com/tetratelabs/wazero/internal/logging"
 	"github.com/tetratelabs/wazero/internal/wasip1"
 	wasilogging "github.com/tetratelabs/wazero/internal/wasip1/logging"
@@ -115,11 +114,6 @@ func (f *loggingListenerFactory) NewFunctionListener(fnd api.FunctionDefinition)
 			return nil
 		}
 		pSampler, pLoggers, rLoggers = wasilogging.Config(fnd)
-	case "go", "gojs":
-		if !gologging.IsInLogScope(fnd, f.scopes) {
-			return nil
-		}
-		pSampler, pLoggers, rLoggers = gologging.Config(fnd, f.scopes)
 	case "env":
 		// env is difficult because the same module name is used for different
 		// ABI.

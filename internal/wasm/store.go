@@ -95,8 +95,7 @@ type (
 		// or external objects (unimplemented).
 		ElementInstances []ElementInstance
 
-		// Sys is exposed for use in special imports such as WASI, assemblyscript
-		// and gojs.
+		// Sys is exposed for use in special imports such as WASI, assemblyscript.
 		//
 		// # Notes
 		//

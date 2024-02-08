@@ -18,13 +18,11 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
-	"github.com/tetratelabs/wazero/experimental/gojs"
 	"github.com/tetratelabs/wazero/experimental/logging"
 	"github.com/tetratelabs/wazero/experimental/opt"
 	"github.com/tetratelabs/wazero/experimental/sock"
 	"github.com/tetratelabs/wazero/experimental/sysfs"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
-	"github.com/tetratelabs/wazero/internal/platform"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/version"
 	"github.com/tetratelabs/wazero/sys"
@@ -258,7 +256,7 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer) int {
 		env = append(env, fields[0], fields[1])
 	}
 
-	rc, rootPath, fsConfig := validateMounts(mounts, stdErr)
+	rc, _, fsConfig := validateMounts(mounts, stdErr)
 	if rc != 0 {
 		return rc
 	}
@@ -347,30 +345,6 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer) int {
 			// Instantiate our binary, but using the old import names.
 			_, err = rt.InstantiateModule(ctx, guest, conf)
 		}
-	case modeGo:
-		// Fail fast on multiple mounts with the deprecated GOOS=js.
-		// GOOS=js will be removed in favor of GOOS=wasip1 once v1.22 is out.
-		if count := len(mounts); count > 1 || (count == 1 && rootPath == "") {
-			fmt.Fprintf(stdErr, "invalid mount: only root mounts supported in GOOS=js: %v\n"+
-				"Consider switching to GOOS=wasip1.\n", mounts)
-			return 1
-		}
-
-		gojs.MustInstantiate(ctx, rt, guest)
-
-		config := gojs.NewConfig(conf)
-
-		// Strip the volume of the path, for example C:\
-		rootDir := rootPath[len(filepath.VolumeName(rootPath)):]
-
-		// If the user mounted the entire filesystem, try to inherit the CWD.
-		// This is better than introducing a flag just for GOOS=js, especially
-		// as removing flags breaks syntax compat.
-		if platform.ToPosixPath(rootDir) == "/" {
-			config = config.WithOSWorkdir()
-		}
-
-		err = gojs.Run(ctx, rt, guest, config)
 	case modeDefault:
 		_, err = rt.InstantiateModule(ctx, guest, conf)
 	}
@@ -468,7 +442,6 @@ const (
 	modeDefault importMode = iota
 	modeWasi
 	modeWasiUnstable
-	modeGo
 )
 
 type importMode uint
@@ -481,8 +454,6 @@ func detectImports(imports []api.FunctionDefinition) importMode {
 			return modeWasi
 		case "wasi_unstable":
 			return modeWasiUnstable
-		case "go", "gojs":
-			return modeGo
 		}
 	}
 	return modeDefault
