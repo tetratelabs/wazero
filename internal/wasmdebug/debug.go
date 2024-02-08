@@ -148,7 +148,7 @@ func (s *stackTrace) FromRecovered(recovered interface{}) error {
 }
 
 // MaxFrames is the maximum number of frames to include in the stack trace.
-const MaxFrames = 20
+const MaxFrames = 30
 
 // AddFrame implements ErrorBuilder.AddFrame
 func (s *stackTrace) AddFrame(funcName string, paramTypes, resultTypes []api.ValueType, sources []string) {
@@ -156,5 +156,8 @@ func (s *stackTrace) AddFrame(funcName string, paramTypes, resultTypes []api.Val
 	s.frames = append(s.frames, sig)
 	for _, source := range sources {
 		s.frames = append(s.frames, "\t"+source)
+	}
+	if len(s.frames) == MaxFrames {
+		s.frames = append(s.frames, fmt.Sprintf("... maybe followed by omitted frames"))
 	}
 }
