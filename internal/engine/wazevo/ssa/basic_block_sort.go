@@ -18,6 +18,6 @@ func sortBlocks(blocks []*basicBlock) {
 		if iRoot == nil || jRoot == nil { // For testing.
 			return 1
 		}
-		return j.rootInstr.id - i.rootInstr.id
+		return i.rootInstr.id - j.rootInstr.id
 	})
 }
