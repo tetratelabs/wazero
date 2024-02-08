@@ -4,6 +4,8 @@ import (
 	"encoding/binary"
 	"reflect"
 	"unsafe"
+
+	"github.com/tetratelabs/wazero/internal/wasmdebug"
 )
 
 func stackView(rbp, top uintptr) []byte {
@@ -53,6 +55,9 @@ func UnwindStack(_, rbp, top uintptr, returnAddresses []uintptr) []uintptr {
 		retAddr := binary.LittleEndian.Uint64(stackBuf[i+8:])
 		returnAddresses = append(returnAddresses, uintptr(retAddr))
 		i = callerRBP - uint64(rbp)
+		if len(returnAddresses) == wasmdebug.MaxFrames {
+			break
+		}
 	}
 	return returnAddresses
 }
