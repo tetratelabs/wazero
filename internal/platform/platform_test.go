@@ -20,24 +20,3 @@ func Test_archRequirementsVerified(t *testing.T) {
 		require.False(t, archRequirementsVerified)
 	}
 }
-
-func Test_isAtLeastGo120(t *testing.T) {
-	tests := []struct {
-		input    string
-		expected bool
-	}{
-		{input: "go1.18.10", expected: false},
-		{input: "go1.19.10", expected: false},
-		{input: "go1.20.5", expected: true},
-		{input: "devel go1.21-39c50707 Thu Jul 6 23:23:41 2023 +0000", expected: true},
-		{input: "go1.21rc2", expected: true},
-		{input: "go1.90.10", expected: true},
-		{input: "go2.0.0", expected: false},
-	}
-
-	for _, tt := range tests {
-		tc := tt
-
-		require.Equal(t, tc.expected, isAtLeastGo120(tc.input), tc.input)
-	}
-}

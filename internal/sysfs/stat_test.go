@@ -300,10 +300,8 @@ func requireDir(t *testing.T, d experimentalsys.File, st sys.Stat_t) {
 
 func requireDevIno(t *testing.T, f experimentalsys.File, st sys.Stat_t) {
 	// Results are inconsistent, so don't validate the opposite.
-	if statSetsIno() {
-		require.NotEqual(t, uint64(0), st.Dev)
-		require.NotEqual(t, uint64(0), st.Ino)
-	}
+	require.NotEqual(t, uint64(0), st.Dev)
+	require.NotEqual(t, uint64(0), st.Ino)
 
 	// Verify the special-cased properties supporting wasip2 "is_same_object"
 	// See https://github.com/WebAssembly/wasi-filesystem/pull/81

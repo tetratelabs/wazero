@@ -8,7 +8,6 @@ import (
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/experimental/sys"
-	"github.com/tetratelabs/wazero/internal/platform"
 )
 
 func openFile(path string, oflag sys.Oflag, perm fs.FileMode) (*os.File, sys.Errno) {
@@ -150,13 +149,11 @@ func open(path string, mode int, perm uint32) (fd syscall.Handle, err error) {
 		}
 	}
 
-	if platform.IsAtLeastGo120 {
-		// This shouldn't be included before 1.20 to have consistent behavior.
-		// https://github.com/golang/go/commit/0f0aa5d8a6a0253627d58b3aa083b24a1091933f
-		if createmode == syscall.OPEN_EXISTING && access == syscall.GENERIC_READ {
-			// Necessary for opening directory handles.
-			attrs |= syscall.FILE_FLAG_BACKUP_SEMANTICS
-		}
+	// This shouldn't be included before 1.20 to have consistent behavior.
+	// https://github.com/golang/go/commit/0f0aa5d8a6a0253627d58b3aa083b24a1091933f
+	if createmode == syscall.OPEN_EXISTING && access == syscall.GENERIC_READ {
+		// Necessary for opening directory handles.
+		attrs |= syscall.FILE_FLAG_BACKUP_SEMANTICS
 	}
 
 	h, e := syscall.CreateFile(pathp, access, sharemode, sa, createmode, attrs, 0)

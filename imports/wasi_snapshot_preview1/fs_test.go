@@ -9,7 +9,6 @@ import (
 	"math"
 	"os"
 	"path"
-	"runtime"
 	"testing"
 	gofstest "testing/fstest"
 	"time"
@@ -3558,11 +3557,6 @@ func Test_pathFilestatSetTimes(t *testing.T) {
 		},
 	}
 
-	if runtime.GOOS == "windows" && !platform.IsAtLeastGo120 {
-		// Windows 1.19 returns ENOSYS on no_symlink_follow
-		tests = tests[:len(tests)-1]
-	}
-
 	for _, tt := range tests {
 		tc := tt
 
@@ -4951,10 +4945,6 @@ func requireOpenFile(t *testing.T, tmpDir string, pathName string, data []byte, 
 
 // Test_fdReaddir_dotEntryHasARealInode because wasi-testsuite requires it.
 func Test_fdReaddir_dotEntryHasARealInode(t *testing.T) {
-	if runtime.GOOS == "windows" && !platform.IsAtLeastGo120 {
-		t.Skip("windows before go 1.20 has trouble reading the inode information on directories.")
-	}
-
 	root := t.TempDir()
 	mod, r, _ := requireProxyModule(t, wazero.NewModuleConfig().
 		WithFSConfig(wazero.NewFSConfig().WithDirMount(root, "/")),
@@ -5008,10 +4998,6 @@ func Test_fdReaddir_dotEntryHasARealInode(t *testing.T) {
 // is visible. This is significant on Windows.
 // https://github.com/ziglang/zig/blob/2ccff5115454bab4898bae3de88f5619310bc5c1/lib/std/fs/test.zig#L156-L184
 func Test_fdReaddir_opened_file_written(t *testing.T) {
-	if runtime.GOOS == "windows" && !platform.IsAtLeastGo120 {
-		t.Skip("windows before go 1.20 has trouble reading the inode information on directories.")
-	}
-
 	tmpDir := t.TempDir()
 	mod, r, _ := requireProxyModule(t, wazero.NewModuleConfig().
 		WithFSConfig(wazero.NewFSConfig().WithDirMount(tmpDir, "/")),

@@ -12,7 +12,6 @@ import (
 
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/fsapi"
-	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/sys"
 )
@@ -195,9 +194,7 @@ func TestFileIno(t *testing.T) {
 			ino, errno := d.Ino()
 			require.EqualErrno(t, 0, errno)
 			// Results are inconsistent, so don't validate the opposite.
-			if statSetsIno() {
-				require.Equal(t, tc.expectedIno, ino)
-			}
+			require.Equal(t, tc.expectedIno, ino)
 		})
 	}
 
@@ -209,23 +206,8 @@ func TestFileIno(t *testing.T) {
 		ino, errno := d.Ino()
 		require.EqualErrno(t, 0, errno)
 		// Results are inconsistent, so don't validate the opposite.
-		if statSetsIno() {
-			require.Equal(t, st.Ino, ino)
-		}
+		require.Equal(t, st.Ino, ino)
 	})
-}
-
-// statSetsIno returns true if this will set sys.Stat_t Ino on stat. The
-// reverse doesn't mean it won't. Rather it is inconsistent. This is needed
-// because Windows on Go 1.19 sometimes, but not always returns non-zero inode.
-func statSetsIno() bool {
-	if runtime.GOOS != "windows" {
-		return true
-	} else {
-		// Go can read the inode via a Windows file handle, but it is
-		// inconsistent on Go 1.19.
-		return platform.IsAtLeastGo120
-	}
 }
 
 func TestFileIsDir(t *testing.T) {
@@ -978,9 +960,6 @@ func TestFileUtimens(t *testing.T) {
 	case "linux", "darwin": // supported
 	case "freebsd": // TODO: support freebsd w/o CGO
 	case "windows":
-		if !platform.IsAtLeastGo120 {
-			t.Skip("windows only works after Go 1.20") // TODO: possibly 1.19 ;)
-		}
 	default: // expect ENOSYS and callers need to fall back to Utimens
 		t.Skip("unsupported GOOS", runtime.GOOS)
 	}

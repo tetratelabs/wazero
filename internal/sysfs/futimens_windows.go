@@ -4,7 +4,6 @@ import (
 	"syscall"
 
 	"github.com/tetratelabs/wazero/experimental/sys"
-	"github.com/tetratelabs/wazero/internal/platform"
 )
 
 func utimens(path string, atim, mtim int64) sys.Errno {
@@ -12,12 +11,6 @@ func utimens(path string, atim, mtim int64) sys.Errno {
 }
 
 func futimens(fd uintptr, atim, mtim int64) error {
-	// Before Go 1.20, ERROR_INVALID_HANDLE was returned for too many reasons.
-	// Kick out so that callers can use path-based operations instead.
-	if !platform.IsAtLeastGo120 {
-		return sys.ENOSYS
-	}
-
 	// Per docs, zero isn't a valid timestamp as it cannot be differentiated
 	// from nil. In both cases, it is a marker like sys.UTIME_OMIT.
 	// See https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-setfiletime

@@ -640,7 +640,7 @@ func TestDirFS_OpenFile(t *testing.T) {
 
 	testFS := DirFS(tmpDir)
 
-	testOpen_Read(t, testFS, statSetsIno(), true)
+	testOpen_Read(t, testFS, true, true)
 
 	testOpen_O_RDWR(t, tmpDir, testFS)
 

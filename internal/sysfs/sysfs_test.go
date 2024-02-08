@@ -11,7 +11,6 @@ import (
 	"testing"
 
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
-	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/sys"
 )
@@ -322,11 +321,8 @@ func testStat(t *testing.T, testFS experimentalsys.FS) {
 	require.EqualErrno(t, 0, errno)
 
 	require.True(t, st.Mode.IsDir())
-	// windows before go 1.20 has trouble reading the inode information on directories.
-	if runtime.GOOS != "windows" || platform.IsAtLeastGo120 {
-		require.NotEqual(t, uint64(0), st.Dev)
-		require.NotEqual(t, uint64(0), st.Ino)
-	}
+	require.NotEqual(t, uint64(0), st.Dev)
+	require.NotEqual(t, uint64(0), st.Ino)
 }
 
 // requireReaddir ensures the input file is a directory, and returns its

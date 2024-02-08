@@ -144,7 +144,7 @@ func TestReadFS_Open_Read(t *testing.T) {
 			fs: func(tmpDir string) sys.FS {
 				return &AdaptFS{FS: os.DirFS(tmpDir)}
 			},
-			expectFileIno: statSetsIno(),
+			expectFileIno: true,
 			expectDirIno:  runtime.GOOS != "windows",
 		},
 		{
@@ -152,7 +152,7 @@ func TestReadFS_Open_Read(t *testing.T) {
 			fs: func(tmpDir string) sys.FS {
 				return &AdaptFS{FS: &MaskOsFS{Fs: os.DirFS(tmpDir)}}
 			},
-			expectFileIno: statSetsIno(),
+			expectFileIno: true,
 			expectDirIno:  runtime.GOOS != "windows",
 		},
 		{
