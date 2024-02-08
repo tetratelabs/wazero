@@ -1,11 +1,12 @@
 //go:build !go1.21
 
+// TODO: delete after the floor Go version is 1.21
+
 package ssa
 
 import "sort"
 
 func sortBlocks(blocks []*basicBlock) {
-	// This function is a no-op in Go 1.21 and later.
 	sort.SliceStable(blocks, func(i, j int) bool {
 		iBlk, jBlk := blocks[i], blocks[j]
 		if jBlk.ReturnBlock() {
