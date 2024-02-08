@@ -857,6 +857,7 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeAtomicLoad:         sideEffectStrict,
 	OpcodeAtomicStore:        sideEffectStrict,
 	OpcodeAtomicCas:          sideEffectStrict,
+	OpcodeFence:              sideEffectStrict,
 }
 
 // sideEffect returns true if this instruction has side effects.
@@ -1041,6 +1042,7 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeAtomicLoad:         returnTypesFnSingle,
 	OpcodeAtomicStore:        returnTypesFnNoReturns,
 	OpcodeAtomicCas:          returnTypesFnSingle,
+	OpcodeFence:              returnTypesFnNoReturns,
 }
 
 // AsLoad initializes this instruction as a store instruction with OpcodeLoad.
@@ -2010,6 +2012,15 @@ func (i *Instruction) AsAtomicCas(addr, exp, repl Value, size uint64) *Instructi
 	return i
 }
 
+// AsFence initializes this instruction as a memory fence.
+// A single byte immediate may be used to indicate fence ordering in the future
+// but is currently always 0 and ignored.
+func (i *Instruction) AsFence(order byte) *Instruction {
+	i.opcode = OpcodeFence
+	i.u1 = uint64(order)
+	return i
+}
+
 // AtomicRmwData returns the data for this atomic read-modify-write instruction.
 func (i *Instruction) AtomicRmwData() (op AtomicRmwOp, size uint64) {
 	return AtomicRmwOp(i.u1), i.u2
@@ -2579,6 +2590,8 @@ func (i *Instruction) Format(b Builder) string {
 		instSuffix = fmt.Sprintf("_%d, %s, %s", 8*i.u1, i.v.Format(b), i.v2.Format(b))
 	case OpcodeAtomicCas:
 		instSuffix = fmt.Sprintf("_%d, %s, %s, %s", 8*i.u1, i.v.Format(b), i.v2.Format(b), i.v3.Format(b))
+	case OpcodeFence:
+		instSuffix = fmt.Sprintf(" %d", i.u1)
 	default:
 		panic(fmt.Sprintf("TODO: format for %s", i.opcode))
 	}
