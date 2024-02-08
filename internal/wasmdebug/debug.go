@@ -158,6 +158,6 @@ func (s *stackTrace) AddFrame(funcName string, paramTypes, resultTypes []api.Val
 		s.frames = append(s.frames, "\t"+source)
 	}
 	if len(s.frames) == MaxFrames {
-		s.frames = append(s.frames, fmt.Sprintf("... maybe followed by omitted frames"))
+		s.frames = append(s.frames, "... maybe followed by omitted frames")
 	}
 }
