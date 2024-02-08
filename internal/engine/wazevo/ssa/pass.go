@@ -2,7 +2,6 @@ package ssa
 
 import (
 	"fmt"
-	"sort"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 )
@@ -357,19 +356,6 @@ func passNopInstElimination(b *builder) {
 func passSortSuccessors(b *builder) {
 	for i := 0; i < b.basicBlocksPool.Allocated(); i++ {
 		blk := b.basicBlocksPool.View(i)
-		sort.SliceStable(blk.success, func(i, j int) bool {
-			iBlk, jBlk := blk.success[i], blk.success[j]
-			if jBlk.ReturnBlock() {
-				return true
-			}
-			if iBlk.ReturnBlock() {
-				return false
-			}
-			iRoot, jRoot := iBlk.rootInstr, jBlk.rootInstr
-			if iRoot == nil || jRoot == nil { // For testing.
-				return true
-			}
-			return iBlk.rootInstr.id < jBlk.rootInstr.id
-		})
+		sortBlocks(blk.success)
 	}
 }
