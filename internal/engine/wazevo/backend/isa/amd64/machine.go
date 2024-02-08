@@ -620,9 +620,6 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 
 	case ssa.OpcodeVImin:
 		x, y, lane := instr.Arg2WithLane()
-		rn := m.getOperand_Reg(m.c.ValueDefinition(x))
-		rm := m.getOperand_Mem_Reg(m.c.ValueDefinition(y))
-		rd := m.c.VRegOf(instr.Return())
 		var vecOp sseOpcode
 		switch lane {
 		case ssa.VecLaneI8x16:
@@ -632,13 +629,10 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		case ssa.VecLaneI32x4:
 			vecOp = sseOpcodePminsd
 		}
-		m.lowerVbBinOp(vecOp, rn.reg(), rm, rd)
+		m.lowerVbBinOp(vecOp, x, y, instr.Return())
 
 	case ssa.OpcodeVUmin:
 		x, y, lane := instr.Arg2WithLane()
-		rn := m.getOperand_Reg(m.c.ValueDefinition(x))
-		rm := m.getOperand_Mem_Reg(m.c.ValueDefinition(y))
-		rd := m.c.VRegOf(instr.Return())
 		var vecOp sseOpcode
 		switch lane {
 		case ssa.VecLaneI8x16:
@@ -648,13 +642,10 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		case ssa.VecLaneI32x4:
 			vecOp = sseOpcodePminud
 		}
-		m.lowerVbBinOp(vecOp, rn.reg(), rm, rd)
+		m.lowerVbBinOp(vecOp, x, y, instr.Return())
 
 	case ssa.OpcodeVImax:
 		x, y, lane := instr.Arg2WithLane()
-		rn := m.getOperand_Reg(m.c.ValueDefinition(x))
-		rm := m.getOperand_Mem_Reg(m.c.ValueDefinition(y))
-		rd := m.c.VRegOf(instr.Return())
 		var vecOp sseOpcode
 		switch lane {
 		case ssa.VecLaneI8x16:
@@ -664,13 +655,10 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		case ssa.VecLaneI32x4:
 			vecOp = sseOpcodePmaxsd
 		}
-		m.lowerVbBinOp(vecOp, rn.reg(), rm, rd)
+		m.lowerVbBinOp(vecOp, x, y, instr.Return())
 
 	case ssa.OpcodeVUmax:
 		x, y, lane := instr.Arg2WithLane()
-		rm := m.getOperand_Reg(m.c.ValueDefinition(x))
-		rn := m.getOperand_Mem_Reg(m.c.ValueDefinition(y))
-		rd := m.c.VRegOf(instr.Return())
 		var vecOp sseOpcode
 		switch lane {
 		case ssa.VecLaneI8x16:
@@ -680,13 +668,10 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		case ssa.VecLaneI32x4:
 			vecOp = sseOpcodePmaxud
 		}
-		m.lowerVbBinOp(vecOp, rn.reg(), rm, rd)
+		m.lowerVbBinOp(vecOp, x, y, instr.Return())
 
 	case ssa.OpcodeVAvgRound:
 		x, y, lane := instr.Arg2WithLane()
-		rn := m.getOperand_Reg(m.c.ValueDefinition(x))
-		rm := m.getOperand_Mem_Reg(m.c.ValueDefinition(y))
-		rd := m.c.VRegOf(instr.Return())
 		var vecOp sseOpcode
 		switch lane {
 		case ssa.VecLaneI8x16:
@@ -694,7 +679,7 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		case ssa.VecLaneI16x8:
 			vecOp = sseOpcodePavgw
 		}
-		m.lowerVbBinOp(vecOp, rn.reg(), rm, rd)
+		m.lowerVbBinOp(vecOp, x, y, instr.Return())
 
 	case ssa.OpcodeVIabs:
 		m.lowerVIabs(instr)
