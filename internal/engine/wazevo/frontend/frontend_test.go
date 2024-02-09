@@ -2538,6 +2538,14 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 	Fence 0
 `,
 		},
+		{
+			name:     "AtomicFenceNoMemory",
+			m:        testcases.AtomicFenceNoMemory.Module,
+			features: api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
+			exp: `
+blk0: (exec_ctx:i64, module_ctx:i64)
+`,
+		},
 	} {
 
 		tc := tc

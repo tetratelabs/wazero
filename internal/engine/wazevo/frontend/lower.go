@@ -3399,7 +3399,9 @@ func (c *Compiler) lowerCurrentOpcode() {
 			if state.unreachable {
 				break
 			}
-			builder.AllocateInstruction().AsFence(order).Insert(builder)
+			if c.needMemory {
+				builder.AllocateInstruction().AsFence(order).Insert(builder)
+			}
 		default:
 			panic("TODO: unsupported atomic instruction: " + wasm.AtomicInstructionName(atomicOp))
 		}
