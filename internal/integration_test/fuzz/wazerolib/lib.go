@@ -1,6 +1,5 @@
 package main
 
-import "C"
 import (
 	"context"
 	"crypto/sha256"
@@ -18,8 +17,6 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
-
-func main() {}
 
 const failedCasesDir = "wazerolib/testdata"
 
