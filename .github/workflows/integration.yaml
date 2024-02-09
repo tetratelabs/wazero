@@ -30,8 +30,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # This builds a zig test binary only if the same version tag hasn't been build before.
-  # This saves time as we rarely update the zig version.
   build_zig_test_binary:
     name: Build Zig test binary
     runs-on: ubuntu-22.04
@@ -73,8 +71,6 @@ jobs:
 
       - name: Build Stdlib test binary
         if: steps.binary-cache.outputs.cache-hit != 'true'
-        # --test-no-exec allows building of the test Wasm binary without executing command.
-        # We use find because the test.wasm will be something like ./zig-cache/o/dd6df1361b2134adc5eee9d027495436/test.wasm
         run: |
           PATH=${{ env.ZIG_INSTALL }}:${{ env.BINARYEN_INSTALL }}/bin:$PATH
           cd ${{ env.STDLIB_TESTS }}
@@ -130,16 +126,10 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      # The following two steps run the previously compiled Zig tests with wazero.
-      # If you need to troubleshoot any of the test, you can add "-hostlogging=filesystem" after
-      # adding filter argument either to step "Run built test binaries" or
-      # "Run built test binaries (container)".
-      # e.g. --test-filter "Dir.Iterator but dir is deleted during iteration"
-
       - name: Run built test binaries
         run: |
           cd ${{ env.STDLIB_TESTS }}
-          go test -bench='BenchmarkZig/${{ matrix.compiler }}' -benchtime=1x
+          go test -bench='BenchmarkZig/${{ matrix.compiler }}'
 
   build_tinygo_test_binary:
     name: Build TinyGo test binary
@@ -159,7 +149,7 @@ jobs:
 
       - name: Install TinyGo
         if: steps.binary-cache.outputs.cache-hit != 'true'
-        run: |  # installing via curl so commands are similar on OS/x
+        run: | # installing via curl so commands are similar on OS/x
           tinygo_version=${{ env.TINYGO_VERSION }}
           curl -sSL https://github.com/tinygo-org/tinygo/releases/download/v${tinygo_version}/tinygo${tinygo_version}.linux-amd64.tar.gz | sudo tar -C /usr/local -xzf -
           echo "TINYGOROOT=/usr/local/tinygo" >> $GITHUB_ENV
@@ -172,12 +162,6 @@ jobs:
 
       - name: Build Test Binaries
         if: steps.binary-cache.outputs.cache-hit != 'true'
-        # The following list of packages is derived from:
-        # https://github.com/tinygo-org/tinygo/blob/v0.28.1/Makefile#L281-L322
-        # Note:
-        #  - index/suffixarray is extremely slow, so skip it.
-        #  - compress/zlib is skipped as it depends on the local files https://github.com/golang/go/blob/go1.20/src/compress/zlib/writer_test.go#L16-L30
-        #  - debug/macho is skipped as it depends on the local files https://github.com/golang/go/blob/go1.20/src/debug/macho/file_test.go#L25
         run: |
           cd ${{ env.STDLIB_TESTS }}
           make build.tinygo
@@ -232,15 +216,10 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      # The following steps run the previously compiled TinyGo tests with wazero. If you need
-      # to troubleshoot one, you can add "-hostlogging=filesystem" and also a
-      # trailing argument narrowing which test to execute.
-      # e.g. "-test.run '^TestStatBadDir$'"
-
       - name: Run test binaries
         run: |
           cd ${{ env.STDLIB_TESTS }}
-          go test -bench='BenchmarkTinyGo/${{ matrix.compiler }}' -benchtime=1x
+          go test -bench='BenchmarkTinyGo/${{ matrix.compiler }}'
 
   wasi-testsuite:
     name: wasi-testsuite
@@ -379,4 +358,4 @@ jobs:
       - name: Run built test binaries
         run: |
           cd ${{ env.STDLIB_TESTS }}
-          go test -bench='BenchmarkWasip1/${{ matrix.compiler }}' -benchtime=1x
+          go test -bench='BenchmarkWasip1/${{ matrix.compiler }}'
