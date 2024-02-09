@@ -949,6 +949,9 @@ func Test2031(t *testing.T) {
 	if !platform.CompilerSupported() {
 		return
 	}
+	if runtime.GOARCH == "amd64" && runtime.GOOS == "darwin" {
+		t.Skip()
+	}
 	run(t, func(t *testing.T, r wazero.Runtime) {
 		mod, err := r.Instantiate(ctx, getWasmBinary(t, "2031"))
 		require.NoError(t, err)

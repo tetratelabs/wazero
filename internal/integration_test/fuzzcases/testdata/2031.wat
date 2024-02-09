@@ -77,175 +77,173 @@
     global.get 0
     i64.xor
     global.set 0
-    global.get 2
-    global.set 2
-    global.get 2
-    global.set 2
-    global.get 2
-    global.set 2
-    i32.reinterpret_f32
-    global.get 2
-    i32.xor
-    global.set 2
-    i64.reinterpret_f64
-    global.get 0
-    i64.xor
-    global.set 0
-    i32.reinterpret_f32
-    global.get 2
-    i32.xor
-    global.set 2
-    i64.reinterpret_f64
-    global.get 0
-    i64.xor
-    global.set 0
-    i32.reinterpret_f32
-    global.get 2
-    i32.xor
-    global.set 2
-    i64.reinterpret_f64
-    global.get 0
-    i64.xor
-    global.set 0
-    i32.reinterpret_f32
-    global.get 2
-    i32.xor
-    global.set 2
-    i64.reinterpret_f64
-    global.get 0
-    i64.xor
-    global.set 0
-    i32.reinterpret_f32
-    global.get 2
-    i32.xor
-    global.set 2
-    i64.reinterpret_f64
-    global.get 0
-    i64.xor
-    global.set 0
-    i32.reinterpret_f32
-    global.get 2
-    i32.xor
-    global.set 2
-    i64.reinterpret_f64
-    global.get 0
-    i64.xor
-    global.set 0
-    i32.reinterpret_f32
-    global.get 2
-    i32.xor
-    global.set 2
-    i64.reinterpret_f64
-    global.get 0
-    i64.xor
-    global.set 0
-    i32.reinterpret_f32
-    global.get 2
-    i32.xor
-    global.set 2
-    i64.reinterpret_f64
-    global.get 0
-    i64.xor
-    global.set 0
-    i32.reinterpret_f32
-    global.get 2
-    i32.xor
-    global.set 2
-    global.get 3
-    i32.xor
-    global.set 3
     global.get 1
-    i64.xor
     global.set 1
     global.get 1
-    i64.xor
     global.set 1
     global.get 1
-    i64.xor
     global.set 1
+    i32.reinterpret_f32
     global.get 1
-    i64.xor
-    global.set 1
-    global.get 1
-    i64.xor
-    global.set 1
-    global.get 1
-    i64.xor
+    i32.xor
     global.set 1
     i64.reinterpret_f64
     global.get 0
     i64.xor
     global.set 0
+    i32.reinterpret_f32
+    global.get 1
+    i32.xor
+    global.set 1
     i64.reinterpret_f64
     global.get 0
     i64.xor
     global.set 0
     i32.reinterpret_f32
-    global.get 2
+    global.get 1
     i32.xor
-    global.set 2
+    global.set 1
     i64.reinterpret_f64
     global.get 0
     i64.xor
     global.set 0
     i32.reinterpret_f32
-    global.get 2
+    global.get 1
     i32.xor
-    global.set 2
+    global.set 1
     i64.reinterpret_f64
     global.get 0
     i64.xor
     global.set 0
     i32.reinterpret_f32
-    global.get 2
+    global.get 1
     i32.xor
-    global.set 2
+    global.set 1
     i64.reinterpret_f64
     global.get 0
     i64.xor
     global.set 0
     i32.reinterpret_f32
-    global.get 2
+    global.get 1
     i32.xor
-    global.set 2
+    global.set 1
     i64.reinterpret_f64
     global.get 0
     i64.xor
     global.set 0
     i32.reinterpret_f32
-    global.get 2
+    global.get 1
     i32.xor
-    global.set 2
+    global.set 1
     i64.reinterpret_f64
     global.get 0
     i64.xor
     global.set 0
     i32.reinterpret_f32
-    global.get 2
+    global.get 1
     i32.xor
-    global.set 2
+    global.set 1
     i64.reinterpret_f64
     global.get 0
     i64.xor
     global.set 0
     i32.reinterpret_f32
-    global.get 2
+    global.get 1
     i32.xor
-    global.set 2
+    global.set 1
+    global.get 1
+    i32.xor
+    global.set 1
+    global.get 0
+    i64.xor
+    global.set 0
+    global.get 0
+    i64.xor
+    global.set 0
+    global.get 0
+    i64.xor
+    global.set 0
+    global.get 0
+    i64.xor
+    global.set 0
+    global.get 0
+    i64.xor
+    global.set 0
+    global.get 0
+    i64.xor
+    global.set 0
+    i64.reinterpret_f64
+    global.get 0
+    i64.xor
+    global.set 0
     i64.reinterpret_f64
     global.get 0
     i64.xor
     global.set 0
     i32.reinterpret_f32
-    global.get 2
+    global.get 1
     i32.xor
-    global.set 2
+    global.set 1
+    i64.reinterpret_f64
+    global.get 0
+    i64.xor
+    global.set 0
+    i32.reinterpret_f32
+    global.get 1
+    i32.xor
+    global.set 1
+    i64.reinterpret_f64
+    global.get 0
+    i64.xor
+    global.set 0
+    i32.reinterpret_f32
+    global.get 1
+    i32.xor
+    global.set 1
+    i64.reinterpret_f64
+    global.get 0
+    i64.xor
+    global.set 0
+    i32.reinterpret_f32
+    global.get 1
+    i32.xor
+    global.set 1
+    i64.reinterpret_f64
+    global.get 0
+    i64.xor
+    global.set 0
+    i32.reinterpret_f32
+    global.get 1
+    i32.xor
+    global.set 1
+    i64.reinterpret_f64
+    global.get 0
+    i64.xor
+    global.set 0
+    i32.reinterpret_f32
+    global.get 1
+    i32.xor
+    global.set 1
+    i64.reinterpret_f64
+    global.get 0
+    i64.xor
+    global.set 0
+    i32.reinterpret_f32
+    global.get 1
+    i32.xor
+    global.set 1
+    i64.reinterpret_f64
+    global.get 0
+    i64.xor
+    global.set 0
+    i32.reinterpret_f32
+    global.get 1
+    i32.xor
+    global.set 1
     unreachable
   )
-  (global (;0;) (mut i64) i64.const 0) ;; 0
-  (global (;1;) (mut i64) i64.const 0) ;; 1
-  (global (;2;) (mut i32) i32.const 0) ;; 2
-  (global (;3;) (mut i32) i32.const 0) ;; 3
+  (global (;0;) (mut i64) i64.const 0)
+  (global (;2;) (mut i32) i32.const 0)
   (global $result1 (mut f32) f32.const 0)
   (global $result2 (mut f64) f64.const 0)
   (global (mut f64) f64.const 0) ;; dummy
