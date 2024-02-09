@@ -8,5 +8,5 @@ echo "Testing $WASM"
 export WASM_BINARY_PATH=$WASM
 
 # Run the test and reverse the exit code so that a non-zero exit code indicates interesting case.
-./nodiff.test
+./nodiff.test -test.run=TestReRunFailedRequireNoDiffCase
 exit $((! $?))

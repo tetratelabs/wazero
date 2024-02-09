@@ -154,10 +154,12 @@ func ensureMutableGlobalsMatch(compilerMod, interpreterMod api.Module, requireNo
 		}
 
 		if !ok {
-			if ig.Type.ValType == wasm.ValueTypeV128 {
-				es = append(es, fmt.Sprintf("mutable global[%d] value mismatch: (%v,%v) != (%v,%v)", i, cVal, cValHi, iVal, iValHi))
+			if typ := ig.Type.ValType; typ == wasm.ValueTypeV128 {
+				es = append(es, fmt.Sprintf("\t[%d] %s: (%v,%v) != (%v,%v)",
+					i, wasm.ValueTypeName(wasm.ValueTypeV128), cVal, cValHi, iVal, iValHi))
 			} else {
-				es = append(es, fmt.Sprintf("mutable global[%d] value mismatch: %v != %v", i, cVal, iVal))
+				es = append(es, fmt.Sprintf("\t[%d] %s: %v != %v",
+					i, wasm.ValueTypeName(typ), cVal, iVal))
 			}
 		}
 	}

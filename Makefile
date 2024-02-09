@@ -185,6 +185,7 @@ build.spectest.threads:
 test:
 	@go test $(go_test_options) $$(go list ./... | grep -vE '$(spectest_v1_dir)|$(spectest_v2_dir)')
 	@cd internal/version/testdata && go test $(go_test_options) ./...
+	@cd internal/integration_test/fuzz/wazerolib && WASM_BINARY_PATH=testdata/test.wasm go test $(go_test_options) ./...
 
 .PHONY: coverage
 # replace spaces with commas
