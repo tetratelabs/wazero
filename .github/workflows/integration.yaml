@@ -318,7 +318,8 @@ jobs:
         compiler: [baseline]
         arch:     [amd64]
         go-version:
-          - "1.21"  # Current Go version && The only version that supports wasip1.
+          - "1.21"
+          - "1.22"
         include:
           - os:
               version: macos-14
@@ -327,11 +328,23 @@ jobs:
             arch:       "arm64"
             go-version: "1.21"
           - os:
+              version: macos-14
+              name: macOS
+            compiler:   optimizing
+            arch:       "arm64"
+            go-version: "1.22"
+          - os:
               version: ubuntu-22.04
               name: Ubuntu
             compiler:   optimizing
             arch:       "amd64"
             go-version: "1.21"
+          - os:
+              version: ubuntu-22.04
+              name: Ubuntu
+            compiler:   optimizing
+            arch:       "amd64"
+            go-version: "1.22"
 
     steps:
       - id: setup-go
@@ -356,6 +369,12 @@ jobs:
         run: |
           cd ${{ env.STDLIB_TESTS }}
           make build.gowasip1
+
+      # The wasip1 stdlib tests are really path sensitive, so they expect a writeable /tmp directory to be available.
+      # We create it at the root of `C:`. This is normally only necessary on GHA Windows runners.
+      - if: ${{ matrix.os.name == 'Windows' }}
+        run: |
+          mkdir /c/tmp
 
       - name: Run built test binaries
         run: |

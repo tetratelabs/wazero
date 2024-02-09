@@ -109,8 +109,7 @@ var (
 			c, stdout, stderr = defaultModuleConfig()
 			c = c.WithFSConfig(
 				wazero.NewFSConfig().
-					WithDirMount(sysroot, "/").
-					WithDirMount(os.TempDir(), "/tmp")).
+					WithDirMount(sysroot, "/")).
 				WithEnv("PWD", normalizedTestdir)
 
 			args := []string{fname, "-test.short", "-test.v"}

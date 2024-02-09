@@ -1,6 +1,6 @@
 module github.com/tetratelabs/wazero/internal/integration_test/vs/wasmtime
 
-go 1.19
+go 1.20
 
 require (
 	github.com/bytecodealliance/wasmtime-go/v9 v9.0.0
