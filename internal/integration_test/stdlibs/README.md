@@ -19,8 +19,6 @@ Then you can run the test suite against the baseline compiler and the optimizing
 
     go test -bench=.
 
-If you want to run with the default settings, use `make run`.
-
 ## Caveats
 
 * The standard binary zig distribution does not ship some testdata.
