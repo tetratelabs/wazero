@@ -207,7 +207,7 @@ func (i *instruction) String() string {
 	case xmmCmpRmR:
 		return fmt.Sprintf("%s %s, %s", sseOpcode(i.u1), i.op1.format(false), i.op2.format(false))
 	case xmmRmRImm:
-		panic("TODO")
+		return fmt.Sprintf("%s $%d, %s, %s", sseOpcode(i.u1), i.u2, i.op1.format(false), i.op2.format(false))
 	case jmp:
 		return fmt.Sprintf("jmp %s", i.op1.format(true))
 	case jmpIf:
@@ -1069,6 +1069,18 @@ func (i *instruction) asXmmRmR(op sseOpcode, rm operand, rd regalloc.VReg) *inst
 	return i
 }
 
+func (i *instruction) asXmmRmRImm(op sseOpcode, imm uint8, rm operand, rd regalloc.VReg) *instruction {
+	if rm.kind != operandKindReg && rm.kind != operandKindMem {
+		panic("BUG")
+	}
+	i.kind = xmmRmRImm
+	i.op1 = rm
+	i.op2 = newOperandReg(rd)
+	i.u1 = uint64(op)
+	i.u2 = uint64(imm)
+	return i
+}
+
 func (i *instruction) asGprToXmm(op sseOpcode, rm operand, rd regalloc.VReg, _64 bool) *instruction {
 	if rm.kind != operandKindReg && rm.kind != operandKindMem {
 		panic("BUG")
@@ -1418,6 +1430,8 @@ const (
 	sseOpcodeAndpd
 	sseOpcodeAndnps
 	sseOpcodeAndnpd
+	sseOpcodeBlendvps
+	sseOpcodeBlendvpd
 	sseOpcodeComiss
 	sseOpcodeComisd
 	sseOpcodeCmpps
@@ -1590,6 +1604,10 @@ func (s sseOpcode) String() string {
 		return "andnps"
 	case sseOpcodeAndnpd:
 		return "andnpd"
+	case sseOpcodeBlendvps:
+		return "blendvps"
+	case sseOpcodeBlendvpd:
+		return "blendvpd"
 	case sseOpcodeComiss:
 		return "comiss"
 	case sseOpcodeComisd:
@@ -1923,6 +1941,147 @@ func (r roundingMode) String() string {
 	}
 }
 
+// cmpPred is the immediate value for a comparison operation in xmmRmRImm.
+type cmpPred uint8
+
+const (
+	// cmpPredEQ_OQ is Equal (ordered, non-signaling)
+	cmpPredEQ_OQ cmpPred = iota
+	// cmpPredLT_OS is Less-than (ordered, signaling)
+	cmpPredLT_OS
+	// cmpPredLE_OS is Less-than-or-equal (ordered, signaling)
+	cmpPredLE_OS
+	// cmpPredUNORD_Q is Unordered (non-signaling)
+	cmpPredUNORD_Q
+	// cmpPredNEQ_UQ is Not-equal (unordered, non-signaling)
+	cmpPredNEQ_UQ
+	// cmpPredNLT_US is Not-less-than (unordered, signaling)
+	cmpPredNLT_US
+	// cmpPredNLE_US is Not-less-than-or-equal (unordered, signaling)
+	cmpPredNLE_US
+	// cmpPredORD_Q is Ordered (non-signaling)
+	cmpPredORD_Q
+	// cmpPredEQ_UQ is Equal (unordered, non-signaling)
+	cmpPredEQ_UQ
+	// cmpPredNGE_US is Not-greater-than-or-equal (unordered, signaling)
+	cmpPredNGE_US
+	// cmpPredNGT_US is Not-greater-than (unordered, signaling)
+	cmpPredNGT_US
+	// cmpPredFALSE_OQ is False (ordered, non-signaling)
+	cmpPredFALSE_OQ
+	// cmpPredNEQ_OQ is Not-equal (ordered, non-signaling)
+	cmpPredNEQ_OQ
+	// cmpPredGE_OS is Greater-than-or-equal (ordered, signaling)
+	cmpPredGE_OS
+	// cmpPredGT_OS is Greater-than (ordered, signaling)
+	cmpPredGT_OS
+	// cmpPredTRUE_UQ is True (unordered, non-signaling)
+	cmpPredTRUE_UQ
+	// Equal (ordered, signaling)
+	cmpPredEQ_OS
+	// Less-than (ordered, nonsignaling)
+	cmpPredLT_OQ
+	// Less-than-or-equal (ordered, nonsignaling)
+	cmpPredLE_OQ
+	// Unordered (signaling)
+	cmpPredUNORD_S
+	// Not-equal (unordered, signaling)
+	cmpPredNEQ_US
+	// Not-less-than (unordered, nonsignaling)
+	cmpPredNLT_UQ
+	// Not-less-than-or-equal (unordered, nonsignaling)
+	cmpPredNLE_UQ
+	// Ordered (signaling)
+	cmpPredORD_S
+	// Equal (unordered, signaling)
+	cmpPredEQ_US
+	// Not-greater-than-or-equal (unordered, non-signaling)
+	cmpPredNGE_UQ
+	// Not-greater-than (unordered, nonsignaling)
+	cmpPredNGT_UQ
+	// False (ordered, signaling)
+	cmpPredFALSE_OS
+	// Not-equal (ordered, signaling)
+	cmpPredNEQ_OS
+	// Greater-than-or-equal (ordered, nonsignaling)
+	cmpPredGE_OQ
+	// Greater-than (ordered, nonsignaling)
+	cmpPredGT_OQ
+	// True (unordered, signaling)
+	cmpPredTRUE_US
+)
+
+func (r cmpPred) String() string {
+	switch r {
+	case cmpPredEQ_OQ:
+		return "eq_oq"
+	case cmpPredLT_OS:
+		return "lt_os"
+	case cmpPredLE_OS:
+		return "le_os"
+	case cmpPredUNORD_Q:
+		return "unord_q"
+	case cmpPredNEQ_UQ:
+		return "neq_uq"
+	case cmpPredNLT_US:
+		return "nlt_us"
+	case cmpPredNLE_US:
+		return "nle_us"
+	case cmpPredORD_Q:
+		return "ord_q"
+	case cmpPredEQ_UQ:
+		return "eq_uq"
+	case cmpPredNGE_US:
+		return "nge_us"
+	case cmpPredNGT_US:
+		return "ngt_us"
+	case cmpPredFALSE_OQ:
+		return "false_oq"
+	case cmpPredNEQ_OQ:
+		return "neq_oq"
+	case cmpPredGE_OS:
+		return "ge_os"
+	case cmpPredGT_OS:
+		return "gt_os"
+	case cmpPredTRUE_UQ:
+		return "true_uq"
+	case cmpPredEQ_OS:
+		return "eq_os"
+	case cmpPredLT_OQ:
+		return "lt_oq"
+	case cmpPredLE_OQ:
+		return "le_oq"
+	case cmpPredUNORD_S:
+		return "unord_s"
+	case cmpPredNEQ_US:
+		return "neq_us"
+	case cmpPredNLT_UQ:
+		return "nlt_uq"
+	case cmpPredNLE_UQ:
+		return "nle_uq"
+	case cmpPredORD_S:
+		return "ord_s"
+	case cmpPredEQ_US:
+		return "eq_us"
+	case cmpPredNGE_UQ:
+		return "nge_uq"
+	case cmpPredNGT_UQ:
+		return "ngt_uq"
+	case cmpPredFALSE_OS:
+		return "false_os"
+	case cmpPredNEQ_OS:
+		return "neq_os"
+	case cmpPredGE_OQ:
+		return "ge_oq"
+	case cmpPredGT_OQ:
+		return "gt_oq"
+	case cmpPredTRUE_US:
+		return "true_us"
+	default:
+		panic("BUG")
+	}
+}
+
 func linkInstr(prev, next *instruction) *instruction {
 	prev.next = next
 	next.prev = prev
@@ -1948,10 +2107,12 @@ var defKinds = [instrMax]defKind{
 	shiftR:                 defKindNone,
 	imm:                    defKindOp2,
 	unaryRmR:               defKindOp2,
+	xmmRmiReg:              defKindNone,
 	xmmUnaryRmR:            defKindOp2,
 	xmmUnaryRmRImm:         defKindOp2,
 	xmmCmpRmR:              defKindNone,
 	xmmRmR:                 defKindNone,
+	xmmRmRImm:              defKindNone,
 	mov64MR:                defKindOp2,
 	movsxRmR:               defKindOp2,
 	movzxRmR:               defKindOp2,
@@ -2021,10 +2182,12 @@ var useKinds = [instrMax]useKind{
 	shiftR:                 useKindOp1Op2Reg,
 	imm:                    useKindNone,
 	unaryRmR:               useKindOp1,
+	xmmRmiReg:              useKindOp1Op2Reg,
 	xmmUnaryRmR:            useKindOp1,
 	xmmUnaryRmRImm:         useKindOp1,
 	xmmCmpRmR:              useKindOp1Op2Reg,
 	xmmRmR:                 useKindOp1Op2Reg,
+	xmmRmRImm:              useKindOp1Op2Reg,
 	mov64MR:                useKindOp1,
 	movzxRmR:               useKindOp1,
 	movsxRmR:               useKindOp1,

@@ -36,6 +36,7 @@ type testCase struct {
 }
 
 var tests = map[string]testCase{
+	"huge call stack unwind":                                           {f: testHugeCallStackUnwind},
 	"imported mutable global":                                          {f: testImportedMutableGlobalUpdate},
 	"huge stack":                                                       {f: testHugeStack},
 	"unreachable":                                                      {f: testUnreachable},
@@ -129,6 +130,8 @@ var (
 	globalExtendWasm []byte
 	//go:embed testdata/infinite_loop.wasm
 	infiniteLoopWasm []byte
+	//go:embed testdata/huge_call_stack_unwind.wasm
+	hugeCallStackUnwind []byte
 )
 
 func testEnsureTerminationOnClose(t *testing.T, r wazero.Runtime) {
@@ -2126,4 +2129,43 @@ func testImportedMutableGlobalUpdate(t *testing.T, r wazero.Runtime) {
 	reExportedG := mainMod.ExportedGlobal("g")
 	v = reExportedG.Get()
 	require.Equal(t, uint64(2), v)
+}
+
+func testHugeCallStackUnwind(t *testing.T, r wazero.Runtime) {
+	ctx := context.Background()
+	_, err := r.Instantiate(ctx, hugeCallStackUnwind)
+	require.Error(t, err)
+	require.Equal(t, `start function[0] failed: wasm error: integer divide by zero
+wasm stack trace:
+	.$0()
+	.$0()
+	.$0()
+	.$0()
+	.$0()
+	.$0()
+	.$0()
+	.$0()
+	.$0()
+	.$0()
+	.$0()
+	.$0()
+	.$0()
+	.$0()
+	.$0()
+	.$0()
+	.$0()
+	.$0()
+	.$0()
+	.$0()
+	.$0()
+	.$0()
+	.$0()
+	.$0()
+	.$0()
+	.$0()
+	.$0()
+	.$0()
+	.$0()
+	.$0()
+	... maybe followed by omitted frames`, err.Error())
 }
