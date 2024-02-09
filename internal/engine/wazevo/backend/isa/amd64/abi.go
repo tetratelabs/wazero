@@ -113,63 +113,74 @@ func (m *machine) LowerParams(args []ssa.Value) {
 
 // LowerReturns implements backend.Machine.
 func (m *machine) LowerReturns(rets []ssa.Value) {
+	// Load the XMM registers first as it might need a temporary register to inline
+	// constant return.
 	a := m.currentABI
-
-	l := len(rets) - 1
-	for i := range rets {
-		// Reverse order in order to avoid overwriting the stack returns existing in the return registers.
-		ret := rets[l-i]
-		r := &a.Rets[l-i]
-		reg := m.c.VRegOf(ret)
-		if def := m.c.ValueDefinition(ret); def.IsFromInstr() {
-			// Constant instructions are inlined.
-			if inst := def.Instr; inst.Constant() {
-				m.InsertLoadConstant(inst, reg)
-			}
+	for i, ret := range rets {
+		r := &a.Rets[i]
+		if !r.Type.IsInt() {
+			m.LowerReturn(ret, r)
 		}
-		if r.Kind == backend.ABIArgKindReg {
-			m.InsertMove(r.Reg, reg, ret.Type())
-		} else {
-			//
-			//            (high address)
-			//          +-----------------+
-			//          |     .......     |
-			//          |      ret Y      |
-			//          |     .......     |
-			//          |      ret 0      |
-			//          |      arg X      |
-			//          |     .......     |
-			//          |      arg 1      |
-			//          |      arg 0      |
-			//          |   ReturnAddress |
-			//          |    Caller_RBP   |
-			//          +-----------------+ <-- RBP
-			//          |   ...........   |
-			//          |   clobbered  M  |
-			//          |   ............  |
-			//          |   clobbered  0  |
-			//          |   spill slot N  |
-			//          |   ...........   |
-			//          |   spill slot 0  |
-			//   RSP--> +-----------------+
-			//             (low address)
-
-			// Store the value to the return stack slot above the current RBP.
-			store := m.allocateInstr()
-			mem := newOperandMem(m.newAmodeImmRBPReg(uint32(a.ArgStackSize + 16 + r.Offset)))
-			switch r.Type {
-			case ssa.TypeI32:
-				store.asMovRM(reg, mem, 4)
-			case ssa.TypeI64:
-				store.asMovRM(reg, mem, 8)
-			case ssa.TypeF32:
-				store.asXmmMovRM(sseOpcodeMovss, reg, mem)
-			case ssa.TypeF64:
-				store.asXmmMovRM(sseOpcodeMovsd, reg, mem)
-			case ssa.TypeV128:
-				store.asXmmMovRM(sseOpcodeMovdqu, reg, mem)
-			}
-			m.insert(store)
+	}
+	// Then load the GPR registers.
+	for i, ret := range rets {
+		r := &a.Rets[i]
+		if r.Type.IsInt() {
+			m.LowerReturn(ret, r)
 		}
+	}
+}
+
+func (m *machine) LowerReturn(ret ssa.Value, r *backend.ABIArg) {
+	reg := m.c.VRegOf(ret)
+	if def := m.c.ValueDefinition(ret); def.IsFromInstr() {
+		// Constant instructions are inlined.
+		if inst := def.Instr; inst.Constant() {
+			m.InsertLoadConstant(inst, reg)
+		}
+	}
+	if r.Kind == backend.ABIArgKindReg {
+		m.InsertMove(r.Reg, reg, ret.Type())
+	} else {
+		//
+		//            (high address)
+		//          +-----------------+
+		//          |     .......     |
+		//          |      ret Y      |
+		//          |     .......     |
+		//          |      ret 0      |
+		//          |      arg X      |
+		//          |     .......     |
+		//          |      arg 1      |
+		//          |      arg 0      |
+		//          |   ReturnAddress |
+		//          |    Caller_RBP   |
+		//          +-----------------+ <-- RBP
+		//          |   ...........   |
+		//          |   clobbered  M  |
+		//          |   ............  |
+		//          |   clobbered  0  |
+		//          |   spill slot N  |
+		//          |   ...........   |
+		//          |   spill slot 0  |
+		//   RSP--> +-----------------+
+		//             (low address)
+
+		// Store the value to the return stack slot above the current RBP.
+		store := m.allocateInstr()
+		mem := newOperandMem(m.newAmodeImmRBPReg(uint32(m.currentABI.ArgStackSize + 16 + r.Offset)))
+		switch r.Type {
+		case ssa.TypeI32:
+			store.asMovRM(reg, mem, 4)
+		case ssa.TypeI64:
+			store.asMovRM(reg, mem, 8)
+		case ssa.TypeF32:
+			store.asXmmMovRM(sseOpcodeMovss, reg, mem)
+		case ssa.TypeF64:
+			store.asXmmMovRM(sseOpcodeMovsd, reg, mem)
+		case ssa.TypeV128:
+			store.asXmmMovRM(sseOpcodeMovdqu, reg, mem)
+		}
+		m.insert(store)
 	}
 }

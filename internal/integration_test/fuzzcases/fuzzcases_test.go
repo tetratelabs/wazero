@@ -960,3 +960,16 @@ func Test2031(t *testing.T) {
 		require.Equal(t, []uint64{2139095040, 9218868437227405312}, res)
 	})
 }
+
+func Test2034(t *testing.T) {
+	if !platform.CompilerSupported() {
+		return
+	}
+	run(t, func(t *testing.T, r wazero.Runtime) {
+		mod, err := r.Instantiate(ctx, getWasmBinary(t, "2034"))
+		require.NoError(t, err)
+		res, err := mod.ExportedFunction("").Call(ctx, make([]uint64, 20)...)
+		require.NoError(t, err)
+		require.Equal(t, []uint64{0xf0f0f280f0f280f, 0x0, 0x0, 0x0, 0x0}, res)
+	})
+}
