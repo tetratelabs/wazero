@@ -3393,6 +3393,15 @@ func (c *Compiler) lowerCurrentOpcode() {
 			c.memAlignmentCheck(addr, size)
 			res := builder.AllocateInstruction().AsAtomicCas(addr, exp, repl, size).Insert(builder).Return()
 			state.push(res)
+		case wasm.OpcodeAtomicFence:
+			order := c.readByte()
+			c.readI32u()
+			if state.unreachable {
+				break
+			}
+			if c.needMemory {
+				builder.AllocateInstruction().AsFence(order).Insert(builder)
+			}
 		default:
 			panic("TODO: unsupported atomic instruction: " + wasm.AtomicInstructionName(atomicOp))
 		}
@@ -3880,6 +3889,12 @@ func (c *Compiler) storeCallerModuleContext() {
 	store.AsStore(ssa.OpcodeStore,
 		c.moduleCtxPtrValue, execCtx, wazevoapi.ExecutionContextOffsetCallerModuleContextPtr.U32())
 	builder.InsertInstruction(store)
+}
+
+func (c *Compiler) readByte() byte {
+	v := c.wasmFunctionBody[c.loweringState.pc+1]
+	c.loweringState.pc++
+	return v
 }
 
 func (c *Compiler) readI32u() uint32 {

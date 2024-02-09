@@ -2318,6 +2318,39 @@ var (
 			}}},
 		},
 	}
+
+	AtomicFence = TestCase{
+		Name: "atomic_fence",
+		Module: &wasm.Module{
+			TypeSection: []wasm.FunctionType{{
+				Params:  []wasm.ValueType{},
+				Results: []wasm.ValueType{},
+			}},
+			ExportSection:   []wasm.Export{{Name: ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 0}},
+			MemorySection:   &wasm.Memory{Min: 1, Max: 1, IsMaxEncoded: true, IsShared: true},
+			FunctionSection: []wasm.Index{0},
+			CodeSection: []wasm.Code{{Body: []byte{
+				wasm.OpcodeAtomicPrefix, wasm.OpcodeAtomicFence, 0,
+				wasm.OpcodeEnd,
+			}}},
+		},
+	}
+
+	AtomicFenceNoMemory = TestCase{
+		Name: "atomic_fence",
+		Module: &wasm.Module{
+			TypeSection: []wasm.FunctionType{{
+				Params:  []wasm.ValueType{},
+				Results: []wasm.ValueType{},
+			}},
+			ExportSection:   []wasm.Export{{Name: ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 0}},
+			FunctionSection: []wasm.Index{0},
+			CodeSection: []wasm.Code{{Body: []byte{
+				wasm.OpcodeAtomicPrefix, wasm.OpcodeAtomicFence, 0,
+				wasm.OpcodeEnd,
+			}}},
+		},
+	}
 )
 
 // VecShuffleWithLane returns a VecShuffle test with a custom 16-bytes immediate (lane indexes).
