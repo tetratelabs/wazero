@@ -17,9 +17,7 @@ First, build the test suite (the Zig source root has to be set explicitly):
 
 Then you can run the test suite against the baseline compiler and the optimizing compiler; e.g.:
 
-    go test -bench=. --benchtime=1x
-
-If you want to run with the default settings, use `make run`.
+    go test -bench=.
 
 ## Caveats
 
