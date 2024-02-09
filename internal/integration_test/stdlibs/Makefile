@@ -116,9 +116,6 @@ gowasip1_tests=src/archive/tar \
 
 all: build.zig build.tinygo build.gowasip1
 
-run:
-	go test -bench=. -benchtime=1x
-
 
 .PHONY: build.zig
 build.zig:
