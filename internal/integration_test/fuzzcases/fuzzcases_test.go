@@ -944,3 +944,19 @@ func Test2017(t *testing.T) {
 		require.Contains(t, err.Error(), "integer divide by zero")
 	})
 }
+
+func Test2031(t *testing.T) {
+	if !platform.CompilerSupported() {
+		return
+	}
+	if runtime.GOARCH == "amd64" && runtime.GOOS == "darwin" {
+		t.Skip()
+	}
+	run(t, func(t *testing.T, r wazero.Runtime) {
+		mod, err := r.Instantiate(ctx, getWasmBinary(t, "2031"))
+		require.NoError(t, err)
+		res, err := mod.ExportedFunction("").Call(ctx, 0)
+		require.NoError(t, err)
+		require.Equal(t, []uint64{2139095040, 9218868437227405312}, res)
+	})
+}
