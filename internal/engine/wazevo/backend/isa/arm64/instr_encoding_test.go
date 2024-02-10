@@ -1774,15 +1774,17 @@ func TestInstruction_encode(t *testing.T) {
 }
 
 func TestInstruction_encode_call(t *testing.T) {
-	m := &mockCompiler{buf: make([]byte, 128)}
+	_, _, m := newSetupWithMockContext()
+	mock := m.compiler.(*mockCompiler)
+	mock.buf = make([]byte, 128)
 	i := &instruction{}
 	i.asCall(ssa.FuncRef(555), nil)
 	i.encode(m)
-	buf := m.buf[128:]
+	buf := mock.buf[128:]
 	require.Equal(t, "00000094", hex.EncodeToString(buf))
-	require.Equal(t, 1, len(m.relocs))
-	require.Equal(t, ssa.FuncRef(555), m.relocs[0].FuncRef)
-	require.Equal(t, int64(128), m.relocs[0].Offset)
+	require.Equal(t, 1, len(mock.relocs))
+	require.Equal(t, ssa.FuncRef(555), mock.relocs[0].FuncRef)
+	require.Equal(t, int64(128), mock.relocs[0].Offset)
 }
 
 func TestInstruction_encode_br_condflag(t *testing.T) {
@@ -1810,14 +1812,14 @@ func TestInstruction_encode_br_condflag(t *testing.T) {
 		i := &instruction{}
 		i.asCondBr(tc.c.asCond(), label(1), false)
 		i.condBrOffsetResolve(0xf0)
-		m := &mockCompiler{}
+		_, _, m := newSetupWithMockContext()
 		i.encode(m)
 		// Note: for quick iteration we can use golang.org/x/arch package to verify the encoding.
 		// 	but wazero doesn't add even a test dependency to it, so commented out.
 		// inst, err := arm64asm.Decode(m.buf)
 		// require.NoError(t, err)
 		// fmt.Println(inst.String())
-		require.Equal(t, tc.want, hex.EncodeToString(m.buf))
+		require.Equal(t, tc.want, hex.EncodeToString(m.compiler.Buf()))
 	}
 }
 
@@ -2140,14 +2142,14 @@ func TestInstruction_encoding_store_encoding(t *testing.T) {
 			default:
 				t.Fatalf("unknown kind: %v", tc.k)
 			}
-			m := &mockCompiler{}
+			_, _, m := newSetupWithMockContext()
 			i.encode(m)
 			// Note: for quick iteration we can use golang.org/x/arch package to verify the encoding.
 			// 	but wazero doesn't add even a test dependency to it, so commented out.
 			// inst, err := arm64asm.Decode(m.buf)
 			// require.NoError(t, err)
 			// fmt.Println(inst.String())
-			require.Equal(t, tc.want, hex.EncodeToString(m.buf))
+			require.Equal(t, tc.want, hex.EncodeToString(m.compiler.Buf()))
 		})
 	}
 }
@@ -2192,13 +2194,16 @@ func Test_encodeExitSequence(t *testing.T) {
 }
 
 func Test_encodeBrTableSequence(t *testing.T) {
-	m := &mockCompiler{}
-	i := &instruction{kind: brTableSequence, targets: []uint32{1, 2, 3, 4, 5}}
-	encodeBrTableSequence(m, x22VReg, i.targets)
-	encoded := m.Buf()
+	_, _, m := newSetupWithMockContext()
+	i := &instruction{}
+	const tableIndex, tableSize = 5, 10
+	i.asBrTableSequence(x22VReg, tableIndex, tableSize)
+	m.jmpTableTargets = [][]uint32{{}, {}, {}, {}, {}, {1, 2, 3, 4, 5, 6, 7, 8, 9, 10}}
+	i.encode(m)
+	encoded := m.compiler.Buf()
 	require.Equal(t, i.size(), int64(len(encoded)))
 	require.Equal(t, "9b000010765bb6b87b03168b60031fd6", hex.EncodeToString(encoded[:brTableSequenceOffsetTableBegin]))
-	require.Equal(t, "0100000002000000030000000400000005000000", hex.EncodeToString(encoded[brTableSequenceOffsetTableBegin:]))
+	require.Equal(t, "0100000002000000030000000400000005000000060000000700000008000000090000000a000000", hex.EncodeToString(encoded[brTableSequenceOffsetTableBegin:]))
 }
 
 func Test_encodeUnconditionalBranch(t *testing.T) {
