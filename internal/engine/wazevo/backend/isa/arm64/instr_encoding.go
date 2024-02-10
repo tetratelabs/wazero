@@ -17,11 +17,12 @@ func (m *machine) Encode(ctx context.Context) {
 
 func (m *machine) encode(root *instruction) {
 	for cur := root; cur != nil; cur = cur.next {
-		cur.encode(m.compiler)
+		cur.encode(m)
 	}
 }
 
-func (i *instruction) encode(c backend.Compiler) {
+func (i *instruction) encode(m *machine) {
+	c := m.compiler
 	switch kind := i.kind; kind {
 	case nop0, emitSourceOffsetInfo:
 	case exitSequence:
@@ -341,7 +342,8 @@ func (i *instruction) encode(c backend.Compiler) {
 			vecArrangement(i.u2)),
 		)
 	case brTableSequence:
-		encodeBrTableSequence(c, i.rn.reg(), i.targets)
+		targets := m.jmpTableTargets[i.u1]
+		encodeBrTableSequence(c, i.rn.reg(), targets)
 	case fpuToInt, intToFpu:
 		c.Emit4Bytes(encodeCnvBetweenFloatInt(i))
 	case fpuRR:

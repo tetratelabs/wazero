@@ -2047,7 +2047,7 @@ L1 (SSA Block: blk0):
 	orr w137?, wzr, #0x6
 	subs wzr, w130?, w137?
 	csel w138?, w137?, w130?, hs
-	br_table_sequence x138?, [L2, L3, L4, L5, L6, L7, L8]
+	br_table_sequence x138?, table_index=0
 L2 (SSA Block: blk7):
 	b L9
 L3 (SSA Block: blk8):
@@ -2088,7 +2088,7 @@ L1 (SSA Block: blk0):
 	orr w8, wzr, #0x6
 	subs wzr, w2, w8
 	csel w8, w8, w2, hs
-	adr x27, #16; ldrsw x8, [x27, x8, UXTW 2]; add x27, x27, x8; br x27; [0x1c 0x20 0x34 0x48 0x5c 0x70 0x84]
+	br_table_sequence x8, table_index=0
 L2 (SSA Block: blk7):
 	b #0x68 (L9)
 L3 (SSA Block: blk8):

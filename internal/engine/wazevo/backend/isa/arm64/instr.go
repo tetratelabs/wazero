@@ -3,7 +3,6 @@ package arm64
 import (
 	"fmt"
 	"math"
-	"strings"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
@@ -26,7 +25,6 @@ type (
 		u1, u2, u3          uint64
 		rd, rm, rn, ra      operand
 		amode               addressMode
-		targets             []uint32
 		kind                instructionKind
 		addedBeforeRegAlloc bool
 	}
@@ -671,10 +669,11 @@ func (i *instruction) asBr(target label) {
 	i.u1 = uint64(target)
 }
 
-func (i *instruction) asBrTableSequence(indexReg regalloc.VReg, targets []uint32) {
+func (i *instruction) asBrTableSequence(indexReg regalloc.VReg, targetIndex, targetCounts int) {
 	i.kind = brTableSequence
 	i.rn = operandNR(indexReg)
-	i.targets = targets
+	i.u1 = uint64(targetIndex)
+	i.u2 = uint64(targetCounts)
 }
 
 func (i *instruction) brTableSequenceOffsetsResolved() {
@@ -1443,28 +1442,8 @@ func (i *instruction) String() (str string) {
 	case adr:
 		str = fmt.Sprintf("adr %s, #%#x", formatVRegSized(i.rd.nr(), 64), int64(i.u1))
 	case brTableSequence:
-		if i.u3 == 0 { // The offsets haven't been resolved yet.
-			labels := make([]string, len(i.targets))
-			for index, l := range i.targets {
-				labels[index] = label(l).String()
-			}
-			str = fmt.Sprintf("br_table_sequence %s, [%s]",
-				formatVRegSized(i.rn.nr(), 64),
-				strings.Join(labels, ", "),
-			)
-		} else {
-			// See encodeBrTableSequence for the encoding.
-			offsets := make([]string, len(i.targets))
-			for index, offset := range i.targets {
-				offsets[index] = fmt.Sprintf("%#x", int32(offset))
-			}
-			str = fmt.Sprintf(
-				`adr %[2]s, #16; ldrsw %[1]s, [%[2]s, %[1]s, UXTW 2]; add %[2]s, %[2]s, %[1]s; br %[2]s; %s`,
-				formatVRegSized(i.rn.nr(), 64),
-				formatVRegSized(tmpRegVReg, 64),
-				offsets,
-			)
-		}
+		targetIndex := i.u1
+		str = fmt.Sprintf("br_table_sequence %s, table_index=%d", formatVRegSized(i.rn.nr(), 64), targetIndex)
 	case exitSequence:
 		str = fmt.Sprintf("exit_sequence %s", formatVRegSized(i.rn.nr(), 64))
 	case atomicRmw:
@@ -2313,7 +2292,7 @@ func (i *instruction) size() int64 {
 		}
 		return 4 + 4 + 16
 	case brTableSequence:
-		return 4*4 + int64(len(i.targets))*4
+		return 4*4 + int64(i.u2)*4
 	default:
 		return 4
 	}
