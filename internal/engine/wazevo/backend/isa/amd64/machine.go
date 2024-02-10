@@ -3045,7 +3045,7 @@ func (m *machine) lowerVFmax(instr *ssa.Instruction) {
 
 func (m *machine) lowerVFabs(instr *ssa.Instruction) {
 	x, lane := instr.ArgWithLane()
-	rm := m.getOperand_Reg(m.c.ValueDefinition(x))
+	rm := m.getOperand_Mem_Reg(m.c.ValueDefinition(x))
 	rd := m.c.VRegOf(instr.Return())
 
 	tmp := m.c.AllocateVReg(ssa.TypeV128)
