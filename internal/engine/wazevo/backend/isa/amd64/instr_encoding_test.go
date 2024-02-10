@@ -1944,6 +1944,454 @@ func TestInstruction_format_encode(t *testing.T) {
 			wantFormat: "cmppd $31, 123(%rax), %xmm0",
 		},
 		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredEQ_OQ), newOperandReg(xmm1VReg), xmm0VReg)
+			},
+			want:       "0fc2c100",
+			wantFormat: "cmpps $0, %xmm1, %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredLT_OS), newOperandReg(xmm1VReg), xmm0VReg)
+			},
+			want:       "0fc2c101",
+			wantFormat: "cmpps $1, %xmm1, %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredLE_OS), newOperandReg(xmm1VReg), xmm0VReg)
+			},
+			want:       "0fc2c102",
+			wantFormat: "cmpps $2, %xmm1, %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredUNORD_Q), newOperandReg(xmm1VReg), xmm0VReg)
+			},
+			want:       "0fc2c103",
+			wantFormat: "cmpps $3, %xmm1, %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredNEQ_UQ), newOperandReg(xmm1VReg), xmm0VReg)
+			},
+			want:       "0fc2c104",
+			wantFormat: "cmpps $4, %xmm1, %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredNLT_US), newOperandReg(xmm1VReg), xmm0VReg)
+			},
+			want:       "0fc2c105",
+			wantFormat: "cmpps $5, %xmm1, %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredNLE_US), newOperandReg(xmm1VReg), xmm0VReg)
+			},
+			want:       "0fc2c106",
+			wantFormat: "cmpps $6, %xmm1, %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredORD_Q), newOperandReg(xmm1VReg), xmm0VReg)
+			},
+			want:       "0fc2c107",
+			wantFormat: "cmpps $7, %xmm1, %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredEQ_UQ), newOperandReg(xmm1VReg), xmm0VReg)
+			},
+			want:       "0fc2c108",
+			wantFormat: "cmpps $8, %xmm1, %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredNGE_US), newOperandReg(xmm1VReg), xmm0VReg)
+			},
+			want:       "0fc2c109",
+			wantFormat: "cmpps $9, %xmm1, %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredNGT_US), newOperandReg(xmm1VReg), xmm0VReg)
+			},
+			want:       "0fc2c10a",
+			wantFormat: "cmpps $10, %xmm1, %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredFALSE_OQ), newOperandReg(xmm1VReg), xmm0VReg)
+			},
+			want:       "0fc2c10b",
+			wantFormat: "cmpps $11, %xmm1, %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredNEQ_OQ), newOperandReg(xmm1VReg), xmm0VReg)
+			},
+			want:       "0fc2c10c",
+			wantFormat: "cmpps $12, %xmm1, %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredGE_OS), newOperandReg(xmm1VReg), xmm0VReg)
+			},
+			want:       "0fc2c10d",
+			wantFormat: "cmpps $13, %xmm1, %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredGT_OS), newOperandReg(xmm1VReg), xmm0VReg)
+			},
+			want:       "0fc2c10e",
+			wantFormat: "cmpps $14, %xmm1, %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredTRUE_UQ), newOperandReg(xmm1VReg), xmm0VReg)
+			},
+			want:       "0fc2c10f",
+			wantFormat: "cmpps $15, %xmm1, %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredEQ_OS), newOperandReg(xmm1VReg), xmm0VReg)
+			},
+			want:       "0fc2c110",
+			wantFormat: "cmpps $16, %xmm1, %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredLT_OQ), newOperandReg(xmm1VReg), xmm0VReg)
+			},
+			want:       "0fc2c111",
+			wantFormat: "cmpps $17, %xmm1, %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredLE_OQ), newOperandReg(xmm1VReg), xmm0VReg)
+			},
+			want:       "0fc2c112",
+			wantFormat: "cmpps $18, %xmm1, %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredUNORD_S), newOperandReg(xmm1VReg), xmm0VReg)
+			},
+			want:       "0fc2c113",
+			wantFormat: "cmpps $19, %xmm1, %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredNEQ_US), newOperandReg(xmm1VReg), xmm0VReg)
+			},
+			want:       "0fc2c114",
+			wantFormat: "cmpps $20, %xmm1, %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredNLT_UQ), newOperandReg(xmm1VReg), xmm0VReg)
+			},
+			want:       "0fc2c115",
+			wantFormat: "cmpps $21, %xmm1, %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredNLE_UQ), newOperandReg(xmm1VReg), xmm0VReg)
+			},
+			want:       "0fc2c116",
+			wantFormat: "cmpps $22, %xmm1, %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredORD_S), newOperandReg(xmm1VReg), xmm0VReg)
+			},
+			want:       "0fc2c117",
+			wantFormat: "cmpps $23, %xmm1, %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredEQ_US), newOperandReg(xmm1VReg), xmm0VReg)
+			},
+			want:       "0fc2c118",
+			wantFormat: "cmpps $24, %xmm1, %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredNGE_UQ), newOperandReg(xmm1VReg), xmm0VReg)
+			},
+			want:       "0fc2c119",
+			wantFormat: "cmpps $25, %xmm1, %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredNGT_UQ), newOperandReg(xmm1VReg), xmm0VReg)
+			},
+			want:       "0fc2c11a",
+			wantFormat: "cmpps $26, %xmm1, %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredFALSE_OS), newOperandReg(xmm1VReg), xmm0VReg)
+			},
+			want:       "0fc2c11b",
+			wantFormat: "cmpps $27, %xmm1, %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredNEQ_OS), newOperandReg(xmm1VReg), xmm0VReg)
+			},
+			want:       "0fc2c11c",
+			wantFormat: "cmpps $28, %xmm1, %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredGE_OQ), newOperandReg(xmm1VReg), xmm0VReg)
+			},
+			want:       "0fc2c11d",
+			wantFormat: "cmpps $29, %xmm1, %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredGT_OQ), newOperandReg(xmm1VReg), xmm0VReg)
+			},
+			want:       "0fc2c11e",
+			wantFormat: "cmpps $30, %xmm1, %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredTRUE_US), newOperandReg(xmm1VReg), xmm0VReg)
+			},
+			want:       "0fc2c11f",
+			wantFormat: "cmpps $31, %xmm1, %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredEQ_OQ), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "0fc2407b00",
+			wantFormat: "cmpps $0, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredLT_OS), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "0fc2407b01",
+			wantFormat: "cmpps $1, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredLE_OS), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "0fc2407b02",
+			wantFormat: "cmpps $2, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredUNORD_Q), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "0fc2407b03",
+			wantFormat: "cmpps $3, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredNEQ_UQ), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "0fc2407b04",
+			wantFormat: "cmpps $4, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredNLT_US), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "0fc2407b05",
+			wantFormat: "cmpps $5, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredNLE_US), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "0fc2407b06",
+			wantFormat: "cmpps $6, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredORD_Q), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "0fc2407b07",
+			wantFormat: "cmpps $7, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredEQ_UQ), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "0fc2407b08",
+			wantFormat: "cmpps $8, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredNGE_US), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "0fc2407b09",
+			wantFormat: "cmpps $9, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredNGT_US), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "0fc2407b0a",
+			wantFormat: "cmpps $10, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredFALSE_OQ), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "0fc2407b0b",
+			wantFormat: "cmpps $11, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredNEQ_OQ), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "0fc2407b0c",
+			wantFormat: "cmpps $12, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredGE_OS), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "0fc2407b0d",
+			wantFormat: "cmpps $13, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredGT_OS), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "0fc2407b0e",
+			wantFormat: "cmpps $14, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredTRUE_UQ), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "0fc2407b0f",
+			wantFormat: "cmpps $15, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredEQ_OS), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "0fc2407b10",
+			wantFormat: "cmpps $16, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredLT_OQ), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "0fc2407b11",
+			wantFormat: "cmpps $17, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredLE_OQ), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "0fc2407b12",
+			wantFormat: "cmpps $18, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredUNORD_S), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "0fc2407b13",
+			wantFormat: "cmpps $19, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredNEQ_US), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "0fc2407b14",
+			wantFormat: "cmpps $20, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredNLT_UQ), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "0fc2407b15",
+			wantFormat: "cmpps $21, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredNLE_UQ), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "0fc2407b16",
+			wantFormat: "cmpps $22, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredORD_S), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "0fc2407b17",
+			wantFormat: "cmpps $23, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredEQ_US), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "0fc2407b18",
+			wantFormat: "cmpps $24, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredNGE_UQ), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "0fc2407b19",
+			wantFormat: "cmpps $25, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredNGT_UQ), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "0fc2407b1a",
+			wantFormat: "cmpps $26, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredFALSE_OS), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "0fc2407b1b",
+			wantFormat: "cmpps $27, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredNEQ_OS), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "0fc2407b1c",
+			wantFormat: "cmpps $28, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredGE_OQ), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "0fc2407b1d",
+			wantFormat: "cmpps $29, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredGT_OQ), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "0fc2407b1e",
+			wantFormat: "cmpps $30, 123(%rax), %xmm0",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredTRUE_US), newOperandMem(newAmodeImmReg(123, raxVReg)), xmm0VReg)
+			},
+			want:       "0fc2407b1f",
+			wantFormat: "cmpps $31, 123(%rax), %xmm0",
+		},
+		{
 			setup:      func(i *instruction) { i.asPop64(raxVReg) },
 			want:       "58",
 			wantFormat: "popq %rax",

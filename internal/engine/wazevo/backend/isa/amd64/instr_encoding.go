@@ -1052,6 +1052,8 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 		var opcode uint32
 		var opcodeNum uint32
 		switch op {
+		case sseOpcodeCmpps:
+			legPrex, opcode, opcodeNum = legacyPrefixesNone, 0x0FC2, 2
 		case sseOpcodeCmppd:
 			legPrex, opcode, opcodeNum = legacyPrefixes0x66, 0x0FC2, 2
 		default:

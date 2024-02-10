@@ -685,6 +685,12 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		m.lowerVIabs(instr)
 	case ssa.OpcodeVIpopcnt:
 		m.lowerVIpopcnt(instr)
+	case ssa.OpcodeVFmin:
+		m.lowerVFmin(instr)
+	case ssa.OpcodeVFmax:
+		m.lowerVFmax(instr)
+	case ssa.OpcodeVFabs:
+		m.lowerVFabs(instr)
 	case ssa.OpcodeUndefined:
 		m.insert(m.allocateInstr().asUD2())
 	case ssa.OpcodeExitWithCode:
@@ -2890,4 +2896,189 @@ func (m *machine) lowerVbitselect(instr *ssa.Instruction) {
 	m.insert(por)
 
 	m.copyTo(tmpX, rd)
+}
+
+func (m *machine) lowerVFmin(instr *ssa.Instruction) {
+	x, y, lane := instr.Arg2WithLane()
+	rn := m.getOperand_Reg(m.c.ValueDefinition(x))
+	rm := m.getOperand_Reg(m.c.ValueDefinition(y))
+	rd := m.c.VRegOf(instr.Return())
+
+	var min, cmp, andn, or, srl /* shift right logical */ sseOpcode
+	var shiftNumToInverseNaN uint32
+	if lane == ssa.VecLaneF32x4 {
+		min, cmp, andn, or, srl, shiftNumToInverseNaN = sseOpcodeMinps, sseOpcodeCmpps, sseOpcodeAndnps, sseOpcodeOrps, sseOpcodePsrld, 0xa
+	} else {
+		min, cmp, andn, or, srl, shiftNumToInverseNaN = sseOpcodeMinpd, sseOpcodeCmppd, sseOpcodeAndnpd, sseOpcodeOrpd, sseOpcodePsrlq, 0xd
+	}
+
+	tmp1 := m.copyToTmp(rn.reg())
+	tmp2 := m.copyToTmp(rm.reg())
+
+	// tmp1=min(rn, rm)
+	minIns1 := m.allocateInstr()
+	minIns1.asXmmRmR(min, rn, tmp2)
+	m.insert(minIns1)
+
+	// tmp2=min(rm, rn)
+	minIns2 := m.allocateInstr()
+	minIns2.asXmmRmR(min, rm, tmp1)
+	m.insert(minIns2)
+
+	// tmp3:=tmp1=min(rn, rm)
+	tmp3 := m.copyToTmp(tmp1)
+
+	// tmp1 = -0         if (rn == -0 || rm == -0) && rn != NaN && rm !=NaN
+	//       NaN         if rn == NaN || rm == NaN
+	//       min(rm, rm) otherwise
+	orIns := m.allocateInstr()
+	orIns.asXmmRmR(or, newOperandReg(tmp2), tmp1)
+	m.insert(orIns)
+
+	// tmp3 is originally min(rn,rm).
+	// tmp3 = 0^ (set all bits) if rn == NaN || rm == NaN
+	//        0 otherwise
+	cmpIns := m.allocateInstr()
+	cmpIns.asXmmRmRImm(cmp, uint8(cmpPredUNORD_Q), newOperandReg(tmp2), tmp3)
+	m.insert(cmpIns)
+
+	// tmp1 = -0          if (rn == -0 || rm == -0) && rn != NaN && rm !=NaN
+	//        ^0          if rn == NaN || rm == NaN
+	//        min(v1, v2) otherwise
+	orIns2 := m.allocateInstr()
+	orIns2.asXmmRmR(or, newOperandReg(tmp3), tmp1)
+	m.insert(orIns2)
+
+	// tmp3 = set all bits on the mantissa bits
+	//        0 otherwise
+	shift := m.allocateInstr()
+	shift.asXmmRmiReg(srl, newOperandImm32(shiftNumToInverseNaN), tmp3)
+	m.insert(shift)
+
+	// tmp3 = tmp1 and !tmp3
+	//     = -0                                                   if (rn == -0 || rm == -0) && rn != NaN && rm !=NaN
+	//       set all bits on exponential and sign bit (== NaN)    if rn == NaN || rm == NaN
+	//       min(rn, rm)                                          otherwise
+	andnIns := m.allocateInstr()
+	andnIns.asXmmRmR(andn, newOperandReg(tmp1), tmp3)
+	m.insert(andnIns)
+
+	m.copyTo(tmp3, rd)
+}
+
+func (m *machine) lowerVFmax(instr *ssa.Instruction) {
+	x, y, lane := instr.Arg2WithLane()
+	rn := m.getOperand_Reg(m.c.ValueDefinition(x))
+	rm := m.getOperand_Reg(m.c.ValueDefinition(y))
+	rd := m.c.VRegOf(instr.Return())
+
+	var max, cmp, andn, or, xor, sub, srl /* shift right logical */ sseOpcode
+	var shiftNumToInverseNaN uint32
+	if lane == ssa.VecLaneF32x4 {
+		max, cmp, andn, or, xor, sub, srl, shiftNumToInverseNaN = sseOpcodeMaxps, sseOpcodeCmpps, sseOpcodeAndnps, sseOpcodeOrps, sseOpcodeXorps, sseOpcodeSubps, sseOpcodePsrld, 0xa
+	} else {
+		max, cmp, andn, or, xor, sub, srl, shiftNumToInverseNaN = sseOpcodeMaxpd, sseOpcodeCmppd, sseOpcodeAndnpd, sseOpcodeOrpd, sseOpcodeXorpd, sseOpcodeSubpd, sseOpcodePsrlq, 0xd
+	}
+
+	tmp0 := m.copyToTmp(rm.reg())
+	tmp1 := m.copyToTmp(rn.reg())
+
+	// tmp0=max(rn, rm)
+	maxIns1 := m.allocateInstr()
+	maxIns1.asXmmRmR(max, rn, tmp0)
+	m.insert(maxIns1)
+
+	// tmp1=max(rm, rn)
+	maxIns2 := m.allocateInstr()
+	maxIns2.asXmmRmR(max, rm, tmp1)
+	m.insert(maxIns2)
+
+	// tmp2=max(rm, rn)
+	tmp2 := m.copyToTmp(tmp1)
+
+	// tmp2 = -0       if (rn == -0 && rm == 0) || (rn == 0 && rm == -0)
+	//         0       if (rn == 0 && rm ==  0)
+	//        -0       if (rn == -0 && rm == -0)
+	//       v1^v2     if rn == NaN || rm == NaN
+	//         0       otherwise
+	xorInstr := m.allocateInstr()
+	xorInstr.asXmmRmR(xor, newOperandReg(tmp0), tmp2)
+	m.insert(xorInstr)
+	// tmp1 = -0           if (rn == -0 && rm == 0) || (rn == 0 && rm == -0)
+	//         0           if (rn == 0 && rm ==  0)
+	//        -0           if (rn == -0 && rm == -0)
+	//        NaN          if rn == NaN || rm == NaN
+	//        max(v1, v2)  otherwise
+	orInstr := m.allocateInstr()
+	orInstr.asXmmRmR(or, newOperandReg(tmp2), tmp1)
+	m.insert(orInstr)
+
+	tmp3 := m.copyToTmp(tmp1)
+
+	// tmp3 = 0           if (rn == -0 && rm == 0) || (rn == 0 && rm == -0) || (rn == 0 && rm ==  0)
+	//       -0           if (rn == -0 && rm == -0)
+	//       NaN          if rn == NaN || rm == NaN
+	//       max(v1, v2)  otherwise
+	//
+	// Note: -0 - (-0) = 0 (!= -0) in floating point operation.
+	subIns := m.allocateInstr()
+	subIns.asXmmRmR(sub, newOperandReg(tmp2), tmp3)
+	m.insert(subIns)
+
+	// tmp1 = 0^ if rn == NaN || rm == NaN
+	cmpIns := m.allocateInstr()
+	cmpIns.asXmmRmRImm(cmp, uint8(cmpPredUNORD_Q), newOperandReg(tmp1), tmp1)
+	m.insert(cmpIns)
+
+	// tmp1 = set all bits on the mantissa bits
+	//        0 otherwise
+	shift := m.allocateInstr()
+	shift.asXmmRmiReg(srl, newOperandImm32(shiftNumToInverseNaN), tmp1)
+	m.insert(shift)
+
+	andnIns := m.allocateInstr()
+	andnIns.asXmmRmR(andn, newOperandReg(tmp3), tmp1)
+	m.insert(andnIns)
+
+	m.copyTo(tmp1, rd)
+}
+
+func (m *machine) lowerVFabs(instr *ssa.Instruction) {
+	x, lane := instr.ArgWithLane()
+	rm := m.getOperand_Mem_Reg(m.c.ValueDefinition(x))
+	rd := m.c.VRegOf(instr.Return())
+
+	tmp := m.c.AllocateVReg(ssa.TypeV128)
+
+	def := m.allocateInstr()
+	def.asDefineUninitializedReg(tmp)
+	m.insert(def)
+
+	// Set all bits on tmp.
+	pcmp := m.allocateInstr()
+	pcmp.asXmmRmR(sseOpcodePcmpeqd, newOperandReg(tmp), tmp)
+	m.insert(pcmp)
+
+	switch lane {
+	case ssa.VecLaneF32x4:
+		// Shift right packed single floats by 1 to clear the sign bits.
+		shift := m.allocateInstr()
+		shift.asXmmRmiReg(sseOpcodePsrld, newOperandImm32(1), tmp)
+		m.insert(shift)
+		// Clear the sign bit of rm.
+		andp := m.allocateInstr()
+		andp.asXmmRmR(sseOpcodeAndpd, rm, tmp)
+		m.insert(andp)
+	case ssa.VecLaneF64x2:
+		// Shift right packed single floats by 1 to clear the sign bits.
+		shift := m.allocateInstr()
+		shift.asXmmRmiReg(sseOpcodePsrlq, newOperandImm32(1), tmp)
+		m.insert(shift)
+		// Clear the sign bit of rm.
+		andp := m.allocateInstr()
+		andp.asXmmRmR(sseOpcodeAndps, rm, tmp)
+		m.insert(andp)
+	}
+
+	m.copyTo(tmp, rd)
 }
