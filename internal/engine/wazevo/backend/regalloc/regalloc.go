@@ -238,6 +238,14 @@ func (s *state) findOrSpillAllocatable(a *Allocator, allocatable []RealReg, forb
 			return candidateReal
 		}
 
+		// Real registers in use should not be spilled, so we skip them.
+		// For example, if the register is used as an argument register, and it might be
+		// spilled and not reloaded when it ends up being used as a temporary to pass
+		// stack based argument.
+		if using.IsRealReg() {
+			continue
+		}
+
 		if last := s.getVRegState(using.ID()).lastUse; r == RealRegInvalid || last > lastUseAt {
 			lastUseAt = last
 			r = candidateReal
