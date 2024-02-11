@@ -79,9 +79,10 @@ func newAlignedOpaque(size int) moduleContextOpaque {
 	if size%16 != 0 {
 		panic("size must be a multiple of 16")
 	}
-	buf := make([][2]uint64, size/16)
+	type _16 [16]byte
+	buf := make([]_16, size/16)
 	slice := unsafe.Slice(&buf[0][0], size)
-	return *(*moduleContextOpaque)(unsafe.Pointer(&slice))
+	return *(*moduleContextOpaque)(&slice)
 }
 
 func putLocalMemory(opaque []byte, offset wazevoapi.Offset, mem *wasm.MemoryInstance) {
