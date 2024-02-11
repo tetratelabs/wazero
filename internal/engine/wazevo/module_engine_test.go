@@ -331,3 +331,12 @@ func Test_getTypeIDOf(t *testing.T) {
 	require.Equal(t, wasm.FunctionTypeID(222), getTypeIDOf(2, m))
 	require.Equal(t, wasm.FunctionTypeID(111), getTypeIDOf(3, m))
 }
+
+func Test_newAlignedOpaque(t *testing.T) {
+	for i := 0; i < 100; i++ {
+		s := 16 * (i + 10)
+		buf := newAlignedOpaque(s)
+		require.Equal(t, s, len(buf))
+		require.Equal(t, 0, int(uintptr(unsafe.Pointer(&buf[0]))&15))
+	}
+}
