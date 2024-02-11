@@ -130,6 +130,8 @@ type Builder interface {
 
 	// Idom returns the immediate dominator of the given BasicBlock.
 	Idom(blk BasicBlock) BasicBlock
+
+	VarLengthPool() *wazevoapi.VarLengthPool[Value]
 }
 
 // NewBuilder returns a new Builder implementation.
@@ -137,6 +139,7 @@ func NewBuilder() Builder {
 	return &builder{
 		instructionsPool:               wazevoapi.NewPool[Instruction](resetInstruction),
 		basicBlocksPool:                wazevoapi.NewPool[basicBlock](resetBasicBlock),
+		varLengthPool:                  wazevoapi.NewVarLengthPool[Value](),
 		valueAnnotations:               make(map[ValueID]string),
 		signatures:                     make(map[SignatureID]*Signature),
 		blkVisited:                     make(map[*basicBlock]int),
@@ -150,6 +153,7 @@ func NewBuilder() Builder {
 type builder struct {
 	basicBlocksPool  wazevoapi.Pool[basicBlock]
 	instructionsPool wazevoapi.Pool[Instruction]
+	varLengthPool    wazevoapi.VarLengthPool[Value]
 	signatures       map[SignatureID]*Signature
 	currentSignature *Signature
 
@@ -200,6 +204,10 @@ type builder struct {
 	currentSourceOffset SourceOffset
 }
 
+func (b *builder) VarLengthPool() *wazevoapi.VarLengthPool[Value] {
+	return &b.varLengthPool
+}
+
 // ReturnBlock implements Builder.ReturnBlock.
 func (b *builder) ReturnBlock() BasicBlock {
 	return b.returnBlk
@@ -212,6 +220,7 @@ func (b *builder) Init(s *Signature) {
 	resetBasicBlock(b.returnBlk)
 	b.instructionsPool.Reset()
 	b.basicBlocksPool.Reset()
+	b.varLengthPool.Reset()
 	b.donePasses = false
 	for _, sig := range b.signatures {
 		sig.used = false
@@ -351,11 +360,11 @@ func (b *builder) InsertInstruction(instr *Instruction) {
 		return
 	}
 
-	// TODO: reuse slices, though this seems not to be common.
-	instr.rValues = make([]Value, tsl)
+	rValues := b.varLengthPool.Allocate(tsl)
 	for i := 0; i < tsl; i++ {
-		instr.rValues[i] = b.allocateValue(ts[i])
+		rValues = rValues.Append(&b.varLengthPool, b.allocateValue(ts[i]))
 	}
+	instr.rValues = rValues
 }
 
 // DefineVariable implements Builder.DefineVariable.
@@ -494,7 +503,7 @@ func (b *builder) findValue(typ Type, variable Variable, blk *basicBlock) Value 
 	for i := range blk.preds {
 		pred := &blk.preds[i]
 		value := b.findValue(typ, variable, pred.blk)
-		pred.branch.addArgumentBranchInst(value)
+		pred.branch.addArgumentBranchInst(b, value)
 	}
 	return paramValue
 }
@@ -517,7 +526,7 @@ func (b *builder) Seal(raw BasicBlock) {
 			if !predValue.Valid() {
 				panic("BUG: value is not defined anywhere in the predecessors in the CFG")
 			}
-			pred.branch.addArgumentBranchInst(predValue)
+			pred.branch.addArgumentBranchInst(b, predValue)
 		}
 	}
 }
@@ -657,8 +666,9 @@ func (b *builder) resolveArgumentAlias(instr *Instruction) {
 		instr.v3 = b.resolveAlias(instr.v3)
 	}
 
-	for i, v := range instr.vs {
-		instr.vs[i] = b.resolveAlias(v)
+	view := instr.vs.View()
+	for i, v := range view {
+		view[i] = b.resolveAlias(v)
 	}
 }
 
@@ -885,7 +895,7 @@ func maybeInvertBranches(now *basicBlock, nextInRPO *basicBlock) bool {
 		return false
 	}
 
-	if len(fallthroughBranch.vs) != 0 || len(condBranch.vs) != 0 {
+	if len(fallthroughBranch.vs.View()) != 0 || len(condBranch.vs.View()) != 0 {
 		// If either one of them has arguments, we don't invert the branches.
 		return false
 	}

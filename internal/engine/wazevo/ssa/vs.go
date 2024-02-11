@@ -79,3 +79,9 @@ func (v Value) ID() ValueID {
 func (v Value) setType(typ Type) Value {
 	return v | Value(typ)<<32
 }
+
+// Values is a slice of Value. Use this instead of []Value to reuse the underlying memory.
+type Values = wazevoapi.VarLength[Value]
+
+// ValuesNil is a nil Values.
+var ValuesNil = wazevoapi.NewNilVarLength[Value]()
