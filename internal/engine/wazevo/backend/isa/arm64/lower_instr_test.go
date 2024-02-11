@@ -1385,3 +1385,89 @@ swpalb w3?, w4?, x2?
 		})
 	}
 }
+
+func TestMachine_lowerAtomicCas(t *testing.T) {
+	tests := []struct {
+		name   string
+		_64bit bool
+		size   uint64
+		exp    string
+	}{
+		{
+			name: "cas 32",
+			size: 4,
+			exp: `
+casal w2?, w3?, x1?
+`,
+		},
+		{
+			name: "cas 32_16u",
+			size: 2,
+			exp: `
+casalh w2?, w3?, x1?
+`,
+		},
+		{
+			name: "cas 32_8u",
+			size: 1,
+			exp: `
+casalb w2?, w3?, x1?
+`,
+		},
+		{
+			name:   "cas 64",
+			size:   8,
+			_64bit: true,
+			exp: `
+casal x2?, x3?, x1?
+`,
+		},
+		{
+			name:   "cas 64_32u",
+			size:   4,
+			_64bit: true,
+			exp: `
+casal w2?, w3?, x1?
+`,
+		},
+		{
+			name:   "cas 64_16u",
+			size:   2,
+			_64bit: true,
+			exp: `
+casalh w2?, w3?, x1?
+`,
+		},
+		{
+			name:   "cas 64_8u",
+			size:   1,
+			_64bit: true,
+			exp: `
+casalb w2?, w3?, x1?
+`,
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			_, _, m := newSetupWithMockContext()
+			var typ ssa.Type
+			if tc._64bit {
+				typ = ssa.TypeI64
+			} else {
+				typ = ssa.TypeI32
+			}
+			rn := operandNR(m.compiler.AllocateVReg(ssa.TypeI64))
+			rs := operandNR(m.compiler.AllocateVReg(typ))
+			rt := operandNR(m.compiler.AllocateVReg(typ))
+
+			require.Equal(t, 1, int(rn.reg().ID()))
+			require.Equal(t, 2, int(rs.reg().ID()))
+			require.Equal(t, 3, int(rt.reg().ID()))
+
+			m.lowerAtomicCasImpl(rn, rs, rt, tc.size)
+			require.Equal(t, tc.exp, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
+		})
+	}
+}

@@ -160,6 +160,7 @@ var defKinds = [numInstructionKinds]defKind{
 	movFromFPSR:          defKindRD,
 	emitSourceOffsetInfo: defKindNone,
 	atomicRmw:            defKindRD,
+	atomicCas:            defKindNone,
 }
 
 // Defs returns the list of regalloc.VReg that are defined by the instruction.
@@ -210,7 +211,11 @@ const (
 	useKindAMode
 	useKindRNAMode
 	useKindCond
-	useKindVecRRRRewrite
+	// useKindRDRewrite indicates an instruction where RD is used both as a source and destination.
+	// A temporary register for RD must be allocated explicitly with the source copied to this
+	// register before the instruction and the value copied from this register to the instruction
+	// return register.
+	useKindRDRewrite
 )
 
 var useKinds = [numInstructionKinds]useKind{
@@ -280,7 +285,7 @@ var useKinds = [numInstructionKinds]useKind{
 	vecTbl:               useKindRNRM,
 	vecTbl2:              useKindRNRN1RM,
 	vecRRR:               useKindRNRM,
-	vecRRRRewrite:        useKindVecRRRRewrite,
+	vecRRRRewrite:        useKindRDRewrite,
 	vecPermute:           useKindRNRM,
 	fpuToInt:             useKindRN,
 	intToFpu:             useKindRN,
@@ -289,6 +294,7 @@ var useKinds = [numInstructionKinds]useKind{
 	adr:                  useKindNone,
 	emitSourceOffsetInfo: useKindNone,
 	atomicRmw:            useKindRNRM,
+	atomicCas:            useKindRDRewrite,
 }
 
 // Uses returns the list of regalloc.VReg that are used by the instruction.
@@ -357,7 +363,7 @@ func (i *instruction) Uses(regs *[]regalloc.VReg) []regalloc.VReg {
 		for i := byte(0); i < argFloatRealRegs; i++ {
 			*regs = append(*regs, regInfo.RealRegToVReg[floatParamResultRegs[i]])
 		}
-	case useKindVecRRRRewrite:
+	case useKindRDRewrite:
 		*regs = append(*regs, i.rn.reg())
 		*regs = append(*regs, i.rm.reg())
 		*regs = append(*regs, i.rd.reg())
@@ -384,7 +390,7 @@ func (i *instruction) AssignUse(index int, reg regalloc.VReg) {
 				i.rm = i.rm.assignReg(reg)
 			}
 		}
-	case useKindVecRRRRewrite:
+	case useKindRDRewrite:
 		if index == 0 {
 			if rn := i.rn.reg(); rn.Valid() {
 				i.rn = i.rn.assignReg(reg)
@@ -1458,6 +1464,18 @@ func (i *instruction) String() (str string) {
 			m = m + "b"
 		}
 		str = fmt.Sprintf("%s %s, %s, %s", m, formatVRegSized(i.rm.nr(), size), formatVRegSized(i.rd.nr(), size), formatVRegSized(i.rn.nr(), 64))
+	case atomicCas:
+		m := "casal"
+		size := byte(32)
+		switch i.u2 {
+		case 8:
+			size = 64
+		case 2:
+			m = m + "h"
+		case 1:
+			m = m + "b"
+		}
+		str = fmt.Sprintf("%s %s, %s, %s", m, formatVRegSized(i.rd.nr(), size), formatVRegSized(i.rm.nr(), size), formatVRegSized(i.rn.nr(), 64))
 	case udf:
 		str = "udf"
 	case emitSourceOffsetInfo:
@@ -1480,6 +1498,12 @@ func (i *instruction) asAtomicRmw(op atomicRmwOp, rn, rs, rt operand, size uint6
 	i.kind = atomicRmw
 	i.rd, i.rn, i.rm = rt, rn, rs
 	i.u1 = uint64(op)
+	i.u2 = size
+}
+
+func (i *instruction) asAtomicCas(rn, rs, rt operand, size uint64) {
+	i.kind = atomicCas
+	i.rm, i.rn, i.rd = rt, rn, rs
 	i.u2 = size
 }
 
@@ -1651,6 +1675,9 @@ const (
 	exitSequence
 	// atomicRmw represents an atomic read-modify-write operation with two register sources and a register destination.
 	atomicRmw
+	// atomicCas represents an atomic compare-and-swap operation with three register sources. The value is loaded to
+	// the source register containing the comparison value.
+	atomicCas
 	// UDF is the undefined instruction. For debugging only.
 	udf
 

@@ -708,6 +708,9 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 	case ssa.OpcodeAtomicRmw:
 		m.lowerAtomicRmw(instr)
 
+	case ssa.OpcodeAtomicCas:
+		m.lowerAtomicCas(instr)
+
 	default:
 		panic("TODO: lowering " + op.String())
 	}
@@ -2040,6 +2043,45 @@ func (m *machine) lowerAtomicRmwImpl(op atomicRmwOp, rn, rs, rt, tmp operand, si
 	rmw := m.allocateInstr()
 	rmw.asAtomicRmw(op, rn, tmp, rt, size)
 	m.insert(rmw)
+}
+
+func (m *machine) lowerAtomicCas(si *ssa.Instruction) {
+	addr, exp, repl := si.Arg3()
+	size := si.AtomicCasData()
+
+	addrDef, expDef, replDef := m.compiler.ValueDefinition(addr), m.compiler.ValueDefinition(exp), m.compiler.ValueDefinition(repl)
+	rn := m.getOperand_NR(addrDef, extModeNone)
+	rt := m.getOperand_NR(replDef, extModeNone)
+	rs := m.getOperand_NR(expDef, extModeNone)
+	tmp := operandNR(m.compiler.AllocateVReg(si.Return().Type()))
+
+	_64 := si.Return().Type().Bits() == 64
+	// rs is overwritten by CAS, so we need to move it to the result register before the instruction
+	// in case when it is used somewhere else.
+	mov := m.allocateInstr()
+	if _64 {
+		mov.asMove64(tmp.nr(), rs.nr())
+	} else {
+		mov.asMove32(tmp.nr(), rs.nr())
+	}
+	m.insert(mov)
+
+	m.lowerAtomicCasImpl(rn, tmp, rt, size)
+
+	mov2 := m.allocateInstr()
+	rd := m.compiler.VRegOf(si.Return())
+	if _64 {
+		mov2.asMove64(rd, tmp.nr())
+	} else {
+		mov2.asMove32(rd, tmp.nr())
+	}
+	m.insert(mov2)
+}
+
+func (m *machine) lowerAtomicCasImpl(rn, rs, rt operand, size uint64) {
+	cas := m.allocateInstr()
+	cas.asAtomicCas(rn, rs, rt, size)
+	m.insert(cas)
 }
 
 // copyToTmp copies the given regalloc.VReg to a temporary register. This is called before cbr to avoid the regalloc issue

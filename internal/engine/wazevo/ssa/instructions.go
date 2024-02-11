@@ -2026,6 +2026,11 @@ func (i *Instruction) AtomicRmwData() (op AtomicRmwOp, size uint64) {
 	return AtomicRmwOp(i.u1), i.u2
 }
 
+// AtomicCasData returns the data for this atomic compare-and-swap instruction.
+func (i *Instruction) AtomicCasData() (size uint64) {
+	return i.u1
+}
+
 // ReturnVals returns the return values of OpcodeReturn.
 func (i *Instruction) ReturnVals() []Value {
 	return i.vs

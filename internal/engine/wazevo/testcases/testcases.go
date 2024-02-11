@@ -2319,6 +2319,50 @@ var (
 		},
 	}
 
+	AtomicCasConst0 = TestCase{
+		Name: "atomic_cas_const0",
+		Module: &wasm.Module{
+			TypeSection: []wasm.FunctionType{{
+				Params:  []wasm.ValueType{i32, i32, i32, i64, i64, i64, i64},
+				Results: []wasm.ValueType{i32, i32, i32, i64, i64, i64, i64},
+			}},
+			ExportSection:   []wasm.Export{{Name: ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 0}},
+			MemorySection:   &wasm.Memory{Min: 1, Max: 1, IsMaxEncoded: true, IsShared: true},
+			FunctionSection: []wasm.Index{0},
+			CodeSection: []wasm.Code{{Body: []byte{
+				wasm.OpcodeI32Const, 0,
+				wasm.OpcodeI32Const, 0,
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeAtomicPrefix, wasm.OpcodeAtomicI32Rmw8CmpxchgU, 0x0, 0,
+				wasm.OpcodeI32Const, 8,
+				wasm.OpcodeI32Const, 0,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeAtomicPrefix, wasm.OpcodeAtomicI32Rmw16CmpxchgU, 0x1, 0,
+				wasm.OpcodeI32Const, 16,
+				wasm.OpcodeI32Const, 0,
+				wasm.OpcodeLocalGet, 2,
+				wasm.OpcodeAtomicPrefix, wasm.OpcodeAtomicI32RmwCmpxchg, 0x2, 0,
+				wasm.OpcodeI32Const, 24,
+				wasm.OpcodeI64Const, 0,
+				wasm.OpcodeLocalGet, 3,
+				wasm.OpcodeAtomicPrefix, wasm.OpcodeAtomicI64Rmw8CmpxchgU, 0x0, 0,
+				wasm.OpcodeI32Const, 32,
+				wasm.OpcodeI64Const, 0,
+				wasm.OpcodeLocalGet, 4,
+				wasm.OpcodeAtomicPrefix, wasm.OpcodeAtomicI64Rmw16CmpxchgU, 0x1, 0,
+				wasm.OpcodeI32Const, 40,
+				wasm.OpcodeI64Const, 0,
+				wasm.OpcodeLocalGet, 5,
+				wasm.OpcodeAtomicPrefix, wasm.OpcodeAtomicI64Rmw32CmpxchgU, 0x2, 0,
+				wasm.OpcodeI32Const, 48,
+				wasm.OpcodeI64Const, 0,
+				wasm.OpcodeLocalGet, 6,
+				wasm.OpcodeAtomicPrefix, wasm.OpcodeAtomicI64RmwCmpxchg, 0x3, 0,
+				wasm.OpcodeEnd,
+			}}},
+		},
+	}
+
 	AtomicFence = TestCase{
 		Name: "atomic_fence",
 		Module: &wasm.Module{

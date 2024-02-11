@@ -785,6 +785,57 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
+			name:      "atomic_cas",
+			m:         testcases.AtomicCas.Module,
+			features:  api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
+			skipAMD64: true,
+			calls: []callCase{
+				// no store
+				{
+					params:     []uint64{1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2},
+					expResults: []uint64{0, 0, 0, 0, 0, 0, 0},
+				},
+				// store
+				{
+					params:     []uint64{0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2},
+					expResults: []uint64{0, 0, 0, 0, 0, 0, 0},
+				},
+				// store
+				{
+					params:     []uint64{2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3},
+					expResults: []uint64{2, 2, 2, 2, 2, 2, 2},
+				},
+				// no store
+				{
+					params:     []uint64{2, 4, 2, 4, 2, 4, 2, 4, 2, 4, 2, 4, 2, 4},
+					expResults: []uint64{3, 3, 3, 3, 3, 3, 3},
+				},
+			},
+		},
+		{
+			// Checks if load works when comparison value is zero. It wouldn't if
+			// the zero register gets used.
+			name:      "atomic_cas_const0",
+			m:         testcases.AtomicCasConst0.Module,
+			features:  api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
+			skipAMD64: true,
+			setupMemory: func(mem api.Memory) {
+				mem.WriteUint32Le(0, 1)
+				mem.WriteUint32Le(8, 2)
+				mem.WriteUint32Le(16, 3)
+				mem.WriteUint64Le(24, 4)
+				mem.WriteUint64Le(32, 5)
+				mem.WriteUint64Le(40, 6)
+				mem.WriteUint64Le(48, 7)
+			},
+			calls: []callCase{
+				{
+					params:     []uint64{8, 9, 10, 11, 12, 13, 14},
+					expResults: []uint64{1, 2, 3, 4, 5, 6, 7},
+				},
+			},
+		},
+		{
 			name: "float_le",
 			m:    testcases.FloatLe.Module,
 			calls: []callCase{
