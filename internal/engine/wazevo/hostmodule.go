@@ -11,7 +11,7 @@ import (
 
 func buildHostModuleOpaque(m *wasm.Module, listeners []experimental.FunctionListener) moduleContextOpaque {
 	size := len(m.CodeSection)*16 + 32
-	ret := make(moduleContextOpaque, size)
+	ret := newAlignedOpaque(size)
 
 	binary.LittleEndian.PutUint64(ret[0:], uint64(uintptr(unsafe.Pointer(m))))
 

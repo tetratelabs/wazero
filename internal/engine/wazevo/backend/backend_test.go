@@ -1941,18 +1941,18 @@ L2:
 L1 (SSA Block: blk0):
 	mov x128?, x0
 	mov x129?, x1
-	ldr w130?, [x129?, #0x8]
-	ldr x131?, [x129?, #0x18]
-	ldr s132?, [x129?, #0x28]
-	ldr d133?, [x129?, #0x38]
+	ldr w130?, [x129?, #0x10]
+	ldr x131?, [x129?, #0x20]
+	ldr s132?, [x129?, #0x30]
+	ldr d133?, [x129?, #0x40]
 	str x129?, [x128?, #0x8]
 	mov x0, x128?
 	mov x1, x129?
 	bl f1
-	ldr w134?, [x129?, #0x8]
-	ldr x135?, [x129?, #0x18]
-	ldr s136?, [x129?, #0x28]
-	ldr d137?, [x129?, #0x38]
+	ldr w134?, [x129?, #0x10]
+	ldr x135?, [x129?, #0x20]
+	ldr s136?, [x129?, #0x30]
+	ldr d137?, [x129?, #0x40]
 	mov v3.8b, v137?.8b
 	mov v2.8b, v136?.8b
 	mov x3, x135?
@@ -1970,21 +1970,21 @@ L1 (SSA Block: blk0):
 	orr x27, xzr, #0x20
 	str x27, [sp, #-0x10]!
 	str x1, [sp, #0x10]
-	ldr w8, [x1, #0x8]
+	ldr w8, [x1, #0x10]
 	str w8, [sp, #0x2c]
-	ldr x9, [x1, #0x18]
+	ldr x9, [x1, #0x20]
 	str x9, [sp, #0x24]
-	ldr s8, [x1, #0x28]
+	ldr s8, [x1, #0x30]
 	str s8, [sp, #0x20]
-	ldr d9, [x1, #0x38]
+	ldr d9, [x1, #0x40]
 	str d9, [sp, #0x18]
 	str x1, [x0, #0x8]
 	bl f1
 	ldr x8, [sp, #0x10]
-	ldr w9, [x8, #0x8]
-	ldr x10, [x8, #0x18]
-	ldr s8, [x8, #0x28]
-	ldr d9, [x8, #0x38]
+	ldr w9, [x8, #0x10]
+	ldr x10, [x8, #0x20]
+	ldr s8, [x8, #0x30]
+	ldr d9, [x8, #0x40]
 	mov v3.8b, v9.8b
 	mov v2.8b, v8.8b
 	mov x3, x10
@@ -2011,13 +2011,13 @@ L1 (SSA Block: blk0):
 L1 (SSA Block: blk0):
 	mov x129?, x1
 	orr w137?, wzr, #0x1
-	str w137?, [x129?, #0x8]
+	str w137?, [x129?, #0x10]
 	orr x136?, xzr, #0x2
-	str x136?, [x129?, #0x18]
+	str x136?, [x129?, #0x20]
 	ldr s135?, #8; b 8; data.f32 3.000000
-	str s135?, [x129?, #0x28]
+	str s135?, [x129?, #0x30]
 	ldr d134?, #8; b 16; data.f64 4.000000
-	str d134?, [x129?, #0x38]
+	str d134?, [x129?, #0x40]
 	ret
 `,
 			afterFinalizeARM64: `
@@ -2025,13 +2025,13 @@ L1 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
 	orr w8, wzr, #0x1
-	str w8, [x1, #0x8]
+	str w8, [x1, #0x10]
 	orr x8, xzr, #0x2
-	str x8, [x1, #0x18]
+	str x8, [x1, #0x20]
 	ldr s8, #8; b 8; data.f32 3.000000
-	str s8, [x1, #0x28]
+	str s8, [x1, #0x30]
 	ldr d8, #8; b 16; data.f64 4.000000
-	str d8, [x1, #0x38]
+	str d8, [x1, #0x40]
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
 	ret

@@ -28,7 +28,6 @@ type Compiler struct {
 	tableGrowSig           ssa.Signature
 	refFuncSig             ssa.Signature
 	memmoveSig             ssa.Signature
-	checkModuleExitCodeArg [1]ssa.Value
 	ensureTermination      bool
 
 	// Followings are reset by per function.
@@ -449,4 +448,14 @@ func (c *Compiler) clearSafeBounds() {
 
 func (k *knownSafeBound) valid() bool {
 	return k != nil && k.bound > 0
+}
+
+func (c *Compiler) allocateVarLengthValues(vs ...ssa.Value) ssa.Values {
+	builder := c.ssaBuilder
+	pool := builder.VarLengthPool()
+	args := pool.Allocate(len(vs))
+	for _, v := range vs {
+		args = args.Append(builder.VarLengthPool(), v)
+	}
+	return args
 }

@@ -371,11 +371,11 @@ func (bb *basicBlock) validate(b *builder) {
 				exp = len(bb.params)
 			}
 
-			if len(pred.branch.vs) != exp {
+			if len(pred.branch.vs.View()) != exp {
 				panic(fmt.Sprintf(
 					"BUG: len(argument at %s) != len(params at %s): %d != %d: %s",
 					pred.blk.Name(), bb.Name(),
-					len(pred.branch.vs), len(bb.params), pred.branch.Format(b),
+					len(pred.branch.vs.View()), len(bb.params), pred.branch.Format(b),
 				))
 			}
 

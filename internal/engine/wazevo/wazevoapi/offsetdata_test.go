@@ -28,7 +28,7 @@ func TestNewModuleContextOffsetData(t *testing.T) {
 				AfterListenerTrampolines1stElement:  -1,
 				DataInstances1stElement:             8,
 				ElementInstances1stElement:          16,
-				TotalSize:                           24,
+				TotalSize:                           32, // 16 byte alignment.
 			},
 		},
 		{
@@ -45,7 +45,7 @@ func TestNewModuleContextOffsetData(t *testing.T) {
 				AfterListenerTrampolines1stElement:  -1,
 				DataInstances1stElement:             24,
 				ElementInstances1stElement:          32,
-				TotalSize:                           40,
+				TotalSize:                           48, // 16 byte alignment.
 			},
 		},
 		{
@@ -62,7 +62,7 @@ func TestNewModuleContextOffsetData(t *testing.T) {
 				AfterListenerTrampolines1stElement:  -1,
 				DataInstances1stElement:             24,
 				ElementInstances1stElement:          32,
-				TotalSize:                           40,
+				TotalSize:                           48, // 16 byte alignment.
 			},
 		},
 		{
@@ -79,7 +79,7 @@ func TestNewModuleContextOffsetData(t *testing.T) {
 				AfterListenerTrampolines1stElement:  -1,
 				DataInstances1stElement:             10*FunctionInstanceSize + 8,
 				ElementInstances1stElement:          10*FunctionInstanceSize + 16,
-				TotalSize:                           10*FunctionInstanceSize + 24,
+				TotalSize:                           int(align16(Offset(10*FunctionInstanceSize + 24))),
 			},
 		},
 		{
@@ -96,7 +96,7 @@ func TestNewModuleContextOffsetData(t *testing.T) {
 				AfterListenerTrampolines1stElement:  -1,
 				DataInstances1stElement:             10*FunctionInstanceSize + 24,
 				ElementInstances1stElement:          10*FunctionInstanceSize + 32,
-				TotalSize:                           10*FunctionInstanceSize + 40,
+				TotalSize:                           int(align16(Offset(10*FunctionInstanceSize + 40))),
 			},
 		},
 		{
@@ -110,17 +110,18 @@ func TestNewModuleContextOffsetData(t *testing.T) {
 				GlobalSection:       make([]wasm.Global, 20),
 			},
 			exp: ModuleContextOffsetData{
-				LocalMemoryBegin:                    8,
-				ImportedMemoryBegin:                 -1,
-				ImportedFunctionsBegin:              24,
-				GlobalsBegin:                        24 + 10*FunctionInstanceSize,
-				TypeIDs1stElement:                   24 + 10*FunctionInstanceSize + 16*30,
-				TablesBegin:                         24 + 10*FunctionInstanceSize + 16*30 + 8,
+				LocalMemoryBegin:       8,
+				ImportedMemoryBegin:    -1,
+				ImportedFunctionsBegin: 24,
+				// Align to 16 bytes for globals.
+				GlobalsBegin:                        32 + 10*FunctionInstanceSize,
+				TypeIDs1stElement:                   32 + 10*FunctionInstanceSize + 16*30,
+				TablesBegin:                         32 + 10*FunctionInstanceSize + 16*30 + 8,
 				BeforeListenerTrampolines1stElement: -1,
 				AfterListenerTrampolines1stElement:  -1,
-				DataInstances1stElement:             24 + 10*FunctionInstanceSize + 16*30 + 8 + 8*15,
-				ElementInstances1stElement:          24 + 10*FunctionInstanceSize + 16*30 + 8 + 8*15 + 8,
-				TotalSize:                           24 + 10*FunctionInstanceSize + 16*30 + 8 + 8*15 + 16,
+				DataInstances1stElement:             32 + 10*FunctionInstanceSize + 16*30 + 8 + 8*15,
+				ElementInstances1stElement:          32 + 10*FunctionInstanceSize + 16*30 + 8 + 8*15 + 8,
+				TotalSize:                           32 + 10*FunctionInstanceSize + 16*30 + 8 + 8*15 + 16,
 			},
 		},
 		{
@@ -135,17 +136,18 @@ func TestNewModuleContextOffsetData(t *testing.T) {
 			},
 			withListener: true,
 			exp: ModuleContextOffsetData{
-				LocalMemoryBegin:                    8,
-				ImportedMemoryBegin:                 -1,
-				ImportedFunctionsBegin:              24,
-				GlobalsBegin:                        24 + 10*FunctionInstanceSize,
-				TypeIDs1stElement:                   24 + 10*FunctionInstanceSize + 16*30,
-				TablesBegin:                         24 + 10*FunctionInstanceSize + 16*30 + 8,
-				BeforeListenerTrampolines1stElement: 24 + 10*FunctionInstanceSize + 16*30 + 8 + 8*15,
-				AfterListenerTrampolines1stElement:  24 + 10*FunctionInstanceSize + 16*30 + 8 + 8*15 + 8,
-				DataInstances1stElement:             24 + 10*FunctionInstanceSize + 16*30 + 8 + 8*15 + 16,
-				ElementInstances1stElement:          24 + 10*FunctionInstanceSize + 16*30 + 8 + 8*15 + 24,
-				TotalSize:                           24 + 10*FunctionInstanceSize + 16*30 + 8 + 8*15 + 32,
+				LocalMemoryBegin:       8,
+				ImportedMemoryBegin:    -1,
+				ImportedFunctionsBegin: 24,
+				// Align to 16 bytes for globals.
+				GlobalsBegin:                        32 + 10*FunctionInstanceSize,
+				TypeIDs1stElement:                   32 + 10*FunctionInstanceSize + 16*30,
+				TablesBegin:                         32 + 10*FunctionInstanceSize + 16*30 + 8,
+				BeforeListenerTrampolines1stElement: 32 + 10*FunctionInstanceSize + 16*30 + 8 + 8*15,
+				AfterListenerTrampolines1stElement:  32 + 10*FunctionInstanceSize + 16*30 + 8 + 8*15 + 8,
+				DataInstances1stElement:             32 + 10*FunctionInstanceSize + 16*30 + 8 + 8*15 + 16,
+				ElementInstances1stElement:          32 + 10*FunctionInstanceSize + 16*30 + 8 + 8*15 + 24,
+				TotalSize:                           32 + 10*FunctionInstanceSize + 16*30 + 8 + 8*15 + 32,
 			},
 		},
 	} {
