@@ -23,14 +23,14 @@ type Instruction struct {
 	v          Value
 	v2         Value
 	v3         Value
-	vs         []Value
+	vs         Values
 	typ        Type
 	blk        BasicBlock
 	targets    []BasicBlock
 	prev, next *Instruction
 
 	rValue         Value
-	rValues        []Value
+	rValues        Values
 	gid            InstructionGroupID
 	sourceOffset   SourceOffset
 	live           bool
@@ -84,7 +84,7 @@ func resetInstruction(i *Instruction) {
 	i.v3 = ValueInvalid
 	i.rValue = ValueInvalid
 	i.typ = typeInvalid
-	i.vs = nil
+	i.vs = ValuesNil
 	i.sourceOffset = sourceOffsetUnknown
 }
 
@@ -105,7 +105,7 @@ type InstructionGroupID uint32
 // Returns Value(s) produced by this instruction if any.
 // The `first` is the first return value, and `rest` is the rest of the values.
 func (i *Instruction) Returns() (first Value, rest []Value) {
-	return i.rValue, i.rValues
+	return i.rValue, i.rValues.View()
 }
 
 // Return returns a Value(s) produced by this instruction if any.
@@ -116,7 +116,7 @@ func (i *Instruction) Return() (first Value) {
 
 // Args returns the arguments to this instruction.
 func (i *Instruction) Args() (v1, v2, v3 Value, vs []Value) {
-	return i.v, i.v2, i.v3, i.vs
+	return i.v, i.v2, i.v3, i.vs.View()
 }
 
 // Arg returns the first argument to this instruction.
@@ -1935,7 +1935,7 @@ func (i *Instruction) VconstData() (lo, hi uint64) {
 }
 
 // AsReturn initializes this instruction as a return instruction with OpcodeReturn.
-func (i *Instruction) AsReturn(vs []Value) *Instruction {
+func (i *Instruction) AsReturn(vs wazevoapi.VarLength[Value]) *Instruction {
 	i.opcode = OpcodeReturn
 	i.vs = vs
 	return i
@@ -2033,7 +2033,7 @@ func (i *Instruction) AtomicCasData() (size uint64) {
 
 // ReturnVals returns the return values of OpcodeReturn.
 func (i *Instruction) ReturnVals() []Value {
-	return i.vs
+	return i.vs.View()
 }
 
 // AsExitWithCode initializes this instruction as a trap instruction with OpcodeExitWithCode.
@@ -2084,7 +2084,7 @@ func (i *Instruction) BranchData() (condVal Value, blockArgs []Value, target Bas
 	default:
 		panic("BUG")
 	}
-	blockArgs = i.vs
+	blockArgs = i.vs.View()
 	target = i.blk
 	return
 }
@@ -2100,7 +2100,7 @@ func (i *Instruction) BrTableData() (index Value, targets []BasicBlock) {
 }
 
 // AsJump initializes this instruction as a jump instruction with OpcodeJump.
-func (i *Instruction) AsJump(vs []Value, target BasicBlock) {
+func (i *Instruction) AsJump(vs Values, target BasicBlock) {
 	i.opcode = OpcodeJump
 	i.vs = vs
 	i.blk = target
@@ -2123,7 +2123,7 @@ func (i *Instruction) AsFallthroughJump() {
 }
 
 // AsBrz initializes this instruction as a branch-if-zero instruction with OpcodeBrz.
-func (i *Instruction) AsBrz(v Value, args []Value, target BasicBlock) {
+func (i *Instruction) AsBrz(v Value, args Values, target BasicBlock) {
 	i.opcode = OpcodeBrz
 	i.v = v
 	i.vs = args
@@ -2131,7 +2131,7 @@ func (i *Instruction) AsBrz(v Value, args []Value, target BasicBlock) {
 }
 
 // AsBrnz initializes this instruction as a branch-if-not-zero instruction with OpcodeBrnz.
-func (i *Instruction) AsBrnz(v Value, args []Value, target BasicBlock) *Instruction {
+func (i *Instruction) AsBrnz(v Value, args Values, target BasicBlock) *Instruction {
 	i.opcode = OpcodeBrnz
 	i.v = v
 	i.vs = args
@@ -2147,7 +2147,7 @@ func (i *Instruction) AsBrTable(index Value, targets []BasicBlock) {
 }
 
 // AsCall initializes this instruction as a call instruction with OpcodeCall.
-func (i *Instruction) AsCall(ref FuncRef, sig *Signature, args []Value) {
+func (i *Instruction) AsCall(ref FuncRef, sig *Signature, args Values) {
 	i.opcode = OpcodeCall
 	i.u1 = uint64(ref)
 	i.vs = args
@@ -2162,12 +2162,12 @@ func (i *Instruction) CallData() (ref FuncRef, sigID SignatureID, args []Value) 
 	}
 	ref = FuncRef(i.u1)
 	sigID = SignatureID(i.u2)
-	args = i.vs
+	args = i.vs.View()
 	return
 }
 
 // AsCallIndirect initializes this instruction as a call-indirect instruction with OpcodeCallIndirect.
-func (i *Instruction) AsCallIndirect(funcPtr Value, sig *Signature, args []Value) *Instruction {
+func (i *Instruction) AsCallIndirect(funcPtr Value, sig *Signature, args Values) *Instruction {
 	i.opcode = OpcodeCallIndirect
 	i.typ = TypeF64
 	i.vs = args
@@ -2184,7 +2184,7 @@ func (i *Instruction) CallIndirectData() (funcPtr Value, sigID SignatureID, args
 	}
 	funcPtr = i.v
 	sigID = SignatureID(i.u1)
-	args = i.vs
+	args = i.vs.View()
 	return
 }
 
@@ -2471,9 +2471,10 @@ func (i *Instruction) Format(b Builder) string {
 	case OpcodeSExtend, OpcodeUExtend:
 		instSuffix = fmt.Sprintf(" %s, %d->%d", i.v.Format(b), i.u1>>8, i.u1&0xff)
 	case OpcodeCall, OpcodeCallIndirect:
-		vs := make([]string, len(i.vs))
+		view := i.vs.View()
+		vs := make([]string, len(view))
 		for idx := range vs {
-			vs[idx] = i.vs[idx].Format(b)
+			vs[idx] = view[idx].Format(b)
 		}
 		if i.opcode == OpcodeCallIndirect {
 			instSuffix = fmt.Sprintf(" %s:%s, %s", i.v.Format(b), SignatureID(i.u1), strings.Join(vs, ", "))
@@ -2504,32 +2505,35 @@ func (i *Instruction) Format(b Builder) string {
 	case OpcodeF64const:
 		instSuffix = fmt.Sprintf(" %f", math.Float64frombits(i.u1))
 	case OpcodeReturn:
-		if len(i.vs) == 0 {
+		view := i.vs.View()
+		if len(view) == 0 {
 			break
 		}
-		vs := make([]string, len(i.vs))
+		vs := make([]string, len(view))
 		for idx := range vs {
-			vs[idx] = i.vs[idx].Format(b)
+			vs[idx] = view[idx].Format(b)
 		}
 		instSuffix = fmt.Sprintf(" %s", strings.Join(vs, ", "))
 	case OpcodeJump:
-		vs := make([]string, len(i.vs)+1)
+		view := i.vs.View()
+		vs := make([]string, len(view)+1)
 		if i.IsFallthroughJump() {
 			vs[0] = " fallthrough"
 		} else {
 			vs[0] = " " + i.blk.(*basicBlock).Name()
 		}
-		for idx := range i.vs {
-			vs[idx+1] = i.vs[idx].Format(b)
+		for idx := range view {
+			vs[idx+1] = view[idx].Format(b)
 		}
 
 		instSuffix = strings.Join(vs, ", ")
 	case OpcodeBrz, OpcodeBrnz:
-		vs := make([]string, len(i.vs)+2)
+		view := i.vs.View()
+		vs := make([]string, len(view)+2)
 		vs[0] = " " + i.v.Format(b)
 		vs[1] = i.blk.(*basicBlock).Name()
-		for idx := range i.vs {
-			vs[idx+2] = i.vs[idx].Format(b)
+		for idx := range view {
+			vs[idx+2] = view[idx].Format(b)
 		}
 		instSuffix = strings.Join(vs, ", ")
 	case OpcodeBrTable:
@@ -2608,7 +2612,7 @@ func (i *Instruction) Format(b Builder) string {
 		rvs = append(rvs, rv.formatWithType(b))
 	}
 
-	for _, v := range i.rValues {
+	for _, v := range i.rValues.View() {
 		rvs = append(rvs, v.formatWithType(b))
 	}
 
@@ -2620,10 +2624,10 @@ func (i *Instruction) Format(b Builder) string {
 }
 
 // addArgumentBranchInst adds an argument to this instruction.
-func (i *Instruction) addArgumentBranchInst(v Value) {
+func (i *Instruction) addArgumentBranchInst(b *builder, v Value) {
 	switch i.opcode {
 	case OpcodeJump, OpcodeBrz, OpcodeBrnz:
-		i.vs = append(i.vs, v)
+		i.vs = i.vs.Append(&b.varLengthPool, v)
 	default:
 		panic("BUG: " + i.opcode.String())
 	}

@@ -10,7 +10,7 @@ func Test_maybeInvertBranch(t *testing.T) {
 	insertJump := func(b *builder, src, dst *basicBlock) {
 		b.SetCurrentBlock(src)
 		jump := b.AllocateInstruction()
-		jump.AsJump(nil, dst)
+		jump.AsJump(ValuesNil, dst)
 		b.InsertInstruction(jump)
 	}
 
@@ -21,7 +21,7 @@ func Test_maybeInvertBranch(t *testing.T) {
 		b.InsertInstruction(vinst)
 		v := vinst.Return()
 		brz := b.AllocateInstruction()
-		brz.AsBrz(v, nil, dst)
+		brz.AsBrz(v, ValuesNil, dst)
 		b.InsertInstruction(brz)
 	}
 
@@ -183,10 +183,10 @@ func TestBuilder_splitCriticalEdge(t *testing.T) {
 	b.InsertInstruction(inst)
 	v := inst.Return()
 	originalBrz := b.AllocateInstruction() // This is the split edge.
-	originalBrz.AsBrz(v, nil, dummyBlk)
+	originalBrz.AsBrz(v, ValuesNil, dummyBlk)
 	b.InsertInstruction(originalBrz)
 	dummyJump := b.AllocateInstruction()
-	dummyJump.AsJump(nil, dummyBlk2)
+	dummyJump.AsJump(ValuesNil, dummyBlk2)
 	b.InsertInstruction(dummyJump)
 
 	predInfo := &basicBlockPredecessorInfo{blk: predBlk, branch: originalBrz}
@@ -276,7 +276,11 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 	insertJump := func(b *builder, src, dst *basicBlock, vs ...Value) {
 		b.SetCurrentBlock(src)
 		jump := b.AllocateInstruction()
-		jump.AsJump(vs, dst)
+		args := b.varLengthPool.Allocate(len(vs))
+		for _, v := range vs {
+			args = args.Append(&b.varLengthPool, v)
+		}
+		jump.AsJump(args, dst)
 		b.InsertInstruction(jump)
 	}
 
@@ -285,7 +289,11 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 		vinst := b.AllocateInstruction().AsIconst32(0)
 		b.InsertInstruction(vinst)
 		brz := b.AllocateInstruction()
-		brz.AsBrz(condVal, vs, dst)
+		args := b.varLengthPool.Allocate(len(vs))
+		for _, v := range vs {
+			args = args.Append(&b.varLengthPool, v)
+		}
+		brz.AsBrz(condVal, args, dst)
 		b.InsertInstruction(brz)
 	}
 
@@ -536,7 +544,9 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 				}
 				b.SetCurrentBlock(b1)
 				{
-					b.AllocateInstruction().AsReturn([]Value{retval}).Insert(b)
+					args := b.varLengthPool.Allocate(1)
+					args = args.Append(&b.varLengthPool, retval)
+					b.AllocateInstruction().AsReturn(args).Insert(b)
 				}
 				b.SetCurrentBlock(b2)
 				{

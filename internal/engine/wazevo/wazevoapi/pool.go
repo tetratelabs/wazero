@@ -107,3 +107,81 @@ func (p *IDedPool[T]) Reset() {
 func (p *IDedPool[T]) MaxIDEncountered() int {
 	return p.maxIDEncountered
 }
+
+const arraySize = 20
+
+// VarLengthPool is a pool of VarLength[T] that can be allocated and reset.
+type VarLengthPool[T any] struct {
+	arrayPool Pool[[arraySize]T]
+	slicePool Pool[[]T]
+}
+
+// VarLength is a variable length array that can be reused via a pool.
+type VarLength[T any] struct {
+	backing *[]T
+}
+
+// NewVarLengthPool returns a new VarLengthPool.
+func NewVarLengthPool[T any]() VarLengthPool[T] {
+	return VarLengthPool[T]{
+		arrayPool: NewPool[[arraySize]T](nil),
+		slicePool: NewPool[[]T](func(i *[]T) {
+			*i = (*i)[:0]
+		}),
+	}
+}
+
+// NewNilVarLength returns a new VarLength[T] with a nil backing.
+func NewNilVarLength[T any]() VarLength[T] {
+	var v *[]T = nil
+	return VarLength[T]{backing: v}
+}
+
+// Allocate allocates a new VarLength[T] from the pool.
+func (p *VarLengthPool[T]) Allocate(knownMin int) VarLength[T] {
+	if knownMin <= arraySize {
+		arr := p.arrayPool.Allocate()[:0]
+		return VarLength[T]{backing: &arr}
+	}
+	slc := p.slicePool.Allocate()
+	return VarLength[T]{backing: slc}
+}
+
+// Reset resets the pool.
+func (p *VarLengthPool[T]) Reset() {
+	p.arrayPool.Reset()
+	p.slicePool.Reset()
+}
+
+// Append appends an item to the backing slice.
+func (i VarLength[T]) Append(p *VarLengthPool[T], item T) VarLength[T] {
+	if i.backing == nil {
+		arr := p.arrayPool.Allocate()[:0]
+		i.backing = &arr
+	}
+
+	if len(*i.backing)+1 <= arraySize {
+		*i.backing = append(*i.backing, item)
+		return i
+	} else if len(*i.backing) == arraySize {
+		slc := p.slicePool.Allocate()
+		// Copy the array to the slice.
+		*slc = append(*slc, *i.backing...)
+	}
+	*i.backing = append(*i.backing, item)
+	return i
+}
+
+// View returns the backing slice.
+func (i VarLength[T]) View() []T {
+	if i.backing == nil {
+		return nil
+	}
+	return *i.backing
+}
+
+// Cut cuts the backing slice to the given length.
+// Precondition: n <= len(i.backing).
+func (i VarLength[T]) Cut(n int) {
+	*i.backing = (*i.backing)[:n]
+}

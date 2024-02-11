@@ -85,7 +85,7 @@ func passRedundantPhiEliminationOpt(b *builder) {
 
 			nonSelfReferencingValue := ValueInvalid
 			for predIndex := range blk.preds {
-				pred := blk.preds[predIndex].branch.vs[paramIndex]
+				pred := blk.preds[predIndex].branch.vs.View()[paramIndex]
 				if pred == phiValue {
 					// This is self-referencing: PHI from the same PHI.
 					continue
@@ -122,13 +122,14 @@ func passRedundantPhiEliminationOpt(b *builder) {
 			var cur int
 			predBlk := blk.preds[predIndex]
 			branchInst := predBlk.branch
-			for argIndex, value := range branchInst.vs {
+			view := branchInst.vs.View()
+			for argIndex, value := range view {
 				if _, ok := b.redundantParameterIndexToValue[argIndex]; !ok {
-					branchInst.vs[cur] = value
+					view[cur] = value
 					cur++
 				}
 			}
-			branchInst.vs = branchInst.vs[:cur]
+			branchInst.vs.Cut(cur)
 		}
 
 		// Still need to have the definition of the value of the PHI (previously as the parameter).
