@@ -142,6 +142,7 @@ func NewModuleContextOffsetData(m *wasm.Module, withListener bool) ModuleContext
 	}
 
 	if m.ImportMemoryCount > 0 {
+		offset = align8(offset)
 		// *wasm.MemoryInstance + imported memory's owner (moduleContextOpaque)
 		const importedMemorySizeInOpaqueModuleContext = 16
 		ret.ImportedMemoryBegin = offset
@@ -152,6 +153,7 @@ func NewModuleContextOffsetData(m *wasm.Module, withListener bool) ModuleContext
 	}
 
 	if m.ImportFunctionCount > 0 {
+		offset = align8(offset)
 		ret.ImportedFunctionsBegin = offset
 		// Each function is stored wazevo.functionInstance.
 		size := int(m.ImportFunctionCount) * FunctionInstanceSize
@@ -161,6 +163,8 @@ func NewModuleContextOffsetData(m *wasm.Module, withListener bool) ModuleContext
 	}
 
 	if globals := int(m.ImportGlobalCount) + len(m.GlobalSection); globals > 0 {
+		// Align to 16 bytes for globals, as f32/f64/v128 might be loaded via SIMD instructions.
+		offset = align16(offset)
 		ret.GlobalsBegin = offset
 		// Pointers to *wasm.GlobalInstance.
 		offset += Offset(globals) * 16
@@ -169,6 +173,7 @@ func NewModuleContextOffsetData(m *wasm.Module, withListener bool) ModuleContext
 	}
 
 	if tables := len(m.TableSection) + int(m.ImportTableCount); tables > 0 {
+		offset = align8(offset)
 		ret.TypeIDs1stElement = offset
 		offset += 8 // First element of TypeIDs.
 
@@ -181,6 +186,7 @@ func NewModuleContextOffsetData(m *wasm.Module, withListener bool) ModuleContext
 	}
 
 	if withListener {
+		offset = align8(offset)
 		ret.BeforeListenerTrampolines1stElement = offset
 		offset += 8 // First element of BeforeListenerTrampolines.
 
@@ -197,6 +203,14 @@ func NewModuleContextOffsetData(m *wasm.Module, withListener bool) ModuleContext
 	ret.ElementInstances1stElement = offset
 	offset += 8 // First element of ElementInstances.
 
-	ret.TotalSize = int(offset)
+	ret.TotalSize = int(align16(offset))
 	return ret
+}
+
+func align16(o Offset) Offset {
+	return (o + 15) &^ 15
+}
+
+func align8(o Offset) Offset {
+	return (o + 7) &^ 7
 }

@@ -569,7 +569,7 @@ func (e *engine) NewModuleEngine(m *wasm.Module, mi *wasm.ModuleInstance) (wasm.
 		me.opaquePtr = &me.opaque[0]
 	} else {
 		if size := compiled.offsets.TotalSize; size != 0 {
-			opaque := make([]byte, size)
+			opaque := newAlignedOpaque(size)
 			me.opaque = opaque
 			me.opaquePtr = &opaque[0]
 		}
