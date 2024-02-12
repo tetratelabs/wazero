@@ -456,7 +456,7 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 			encodeRegReg(c, prefix, opcode, opcodeNum, dst, src, rex)
 		} else if i.op1.kind == operandKindMem {
 			m := i.op1.addressMode()
-			encodeRegMem(c, prefix, opcode, opcodeNum, dst, m, rex)
+			needsLabelResolution = encodeRegMem(c, prefix, opcode, opcodeNum, dst, m, rex)
 		} else {
 			panic("BUG: invalid operand kind")
 		}
@@ -1224,11 +1224,6 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 			panic("BUG: invalid operand kind")
 		}
 
-	case v128ConstIsland:
-		lo, hi := i.u1, i.u2
-		c.Emit8Bytes(lo)
-		c.Emit8Bytes(hi)
-
 	case xchg:
 		r1, r2 := i.op1.reg().RealReg(), i.op2.reg().RealReg()
 
@@ -1300,13 +1295,14 @@ func encodeSIB(shift byte, encIndex byte, encBase byte) byte {
 
 func encodeRegMem(
 	c backend.Compiler, legPrefixes legacyPrefixes, opcodes uint32, opcodeNum uint32, r regEnc, m *amode, rex rexInfo,
-) {
-	encodeEncMem(c, legPrefixes, opcodes, opcodeNum, uint8(r), m, rex)
+) (needsLabelResolution bool) {
+	needsLabelResolution = encodeEncMem(c, legPrefixes, opcodes, opcodeNum, uint8(r), m, rex)
+	return
 }
 
 func encodeEncMem(
 	c backend.Compiler, legPrefixes legacyPrefixes, opcodes uint32, opcodeNum uint32, r uint8, m *amode, rex rexInfo,
-) {
+) (needsLabelResolution bool) {
 	legPrefixes.encode(c)
 
 	const (
@@ -1386,9 +1382,25 @@ func encodeEncMem(
 			c.Emit4Bytes(m.imm32)
 		}
 
+	case amodeRipRel:
+		rex.encode(c, regRexBit(r), 0)
+		for opcodeNum > 0 {
+			opcodeNum--
+			c.EmitByte(byte((opcodes >> (opcodeNum << 3)) & 0xff))
+		}
+
+		// Indicate "LEAQ [RIP + 32bit displacement].
+		// https://wiki.osdev.org/X86-64_Instruction_Encoding#32.2F64-bit_addressing
+		c.EmitByte(encodeModRM(0b00, regEncoding(r), 0b101))
+
+		// This will be resolved later, so we just emit a placeholder.
+		needsLabelResolution = true
+		c.Emit4Bytes(0)
+
 	default:
 		panic("BUG: invalid addressing mode")
 	}
+	return
 }
 
 const (
