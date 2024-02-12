@@ -57,10 +57,19 @@ The benefit of choosing an IR that is meant for transformation is that a lot of 
 
 The wazero optimizing compiler implements the following compilation passes:
 
+* Front-End:
+  - Translation to SSA
+  - Optimization
+
+* Back-End:
+  - Instruction Selection
+  - Registry Allocation
+  - Finalization and Encoding
+
 ```goat
 
                       +-------------------+      +-------------------+
-       Input          |                   |      |                   |           
+       Input          |                   |      |                   |
     Wasm Binary   --->|   DecodeModule    |----->|   CompileModule   |--+
                       |                   |      |                   |  |
                       +-------------------+      +-------------------+  |
@@ -90,3 +99,27 @@ The wazero optimizing compiler implements the following compilation passes:
                                                         Finalization/Encoding
 
 ```
+
+## Front-End: Translation to SSA
+
+We mentioned earlier that wazero uses an internal representation called an "SSA" form or "Static Single-Assignment" form,
+but we never explained what that is.
+
+In short terms, every program, or, in our case, every Wasm function, can be translated in a control-flow graph.
+The control-flow graph is a directed graph where each node is a sequence of statements that do not contain a control flow instruction,
+called a **basic block**. Instead, control-flow instructions are translated into edges.
+
+
+
+<!--
+We use the "block argument" variant of SSA: https://en.wikipedia.org/wiki/Static_single-assignment_form#Block_arguments
+which is equivalent to the traditional PHI function based one, but more convenient during optimizations.
+However, in this package's source code comment, we might use PHI whenever it seems necessary in order to be aligned with
+existing literatures, e.g. SSA level optimization algorithms are often described using PHI nodes.
+
+The rationale doc for the choice of "block argument" by MLIR of LLVM is worth a read:
+https://mlir.llvm.org/docs/Rationale/Rationale/#block-arguments-vs-phi-nodes
+
+The algorithm to resolve variable definitions used here is based on the paper
+"Simple and Efficient Construction of Static Single Assignment Form": https://link.springer.com/content/pdf/10.1007/978-3-642-37051-9_6.pdf.
+-->
