@@ -207,7 +207,10 @@ func (i *instruction) String() string {
 	case xmmCmpRmR:
 		return fmt.Sprintf("%s %s, %s", sseOpcode(i.u1), i.op1.format(false), i.op2.format(false))
 	case xmmRmRImm:
-		return fmt.Sprintf("%s $%d, %s, %s", sseOpcode(i.u1), i.u2, i.op1.format(false), i.op2.format(false))
+		op := sseOpcode(i.u1)
+		r1, r2 := i.op1.format(op == sseOpcodePextrq || op == sseOpcodePinsrq),
+			i.op2.format(op == sseOpcodePextrq || op == sseOpcodePinsrq)
+		return fmt.Sprintf("%s $%d, %s, %s", op, i.u2, r1, r2)
 	case jmp:
 		return fmt.Sprintf("jmp %s", i.op1.format(true))
 	case jmpIf:
@@ -1512,9 +1515,11 @@ const (
 	sseOpcodePextrb
 	sseOpcodePextrw
 	sseOpcodePextrd
+	sseOpcodePextrq
 	sseOpcodePinsrb
 	sseOpcodePinsrw
 	sseOpcodePinsrd
+	sseOpcodePinsrq
 	sseOpcodePmaddwd
 	sseOpcodePmaxsb
 	sseOpcodePmaxsw
@@ -1769,12 +1774,16 @@ func (s sseOpcode) String() string {
 		return "pextrw"
 	case sseOpcodePextrd:
 		return "pextrd"
+	case sseOpcodePextrq:
+		return "pextrq"
 	case sseOpcodePinsrb:
 		return "pinsrb"
 	case sseOpcodePinsrw:
 		return "pinsrw"
 	case sseOpcodePinsrd:
 		return "pinsrd"
+	case sseOpcodePinsrq:
+		return "pinsrq"
 	case sseOpcodePmaddwd:
 		return "pmaddwd"
 	case sseOpcodePmaxsb:

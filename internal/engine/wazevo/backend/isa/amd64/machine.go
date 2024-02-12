@@ -689,6 +689,14 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		x, y, c, lane := instr.VFcmpData()
 		m.lowerVFcmp(x, y, c, instr.Return(), lane)
 
+	case ssa.OpcodeExtractlane:
+		x, index, signed, lane := instr.ExtractlaneData()
+		m.lowerExtractLane(x, index, signed, instr.Return(), lane)
+
+	case ssa.OpcodeInsertlane:
+		x, y, index, lane := instr.InsertlaneData()
+		m.lowerInsertLane(x, y, index, instr.Return(), lane)
+
 	case ssa.OpcodeVIabs:
 		m.lowerVIabs(instr)
 	case ssa.OpcodeVIpopcnt:
@@ -2844,6 +2852,82 @@ func (m *machine) lowerVbnot(instr *ssa.Instruction) {
 	m.insert(xor)
 
 	m.copyTo(tmp, rd)
+}
+
+func (m *machine) lowerInsertLane(x, y ssa.Value, index byte, ret ssa.Value, lane ssa.VecLane) {
+	// Copy x to tmp.
+	tmpDst := m.c.AllocateVReg(ssa.TypeV128)
+	m.insert(m.allocateInstr().asXmmUnaryRmR(sseOpcodeMovdqu, m.getOperand_Mem_Reg(m.c.ValueDefinition(x)), tmpDst))
+
+	yy := m.getOperand_Reg(m.c.ValueDefinition(y))
+	switch lane {
+	case ssa.VecLaneI8x16:
+		m.insert(m.allocateInstr().asXmmRmRImm(sseOpcodePinsrb, index, yy, tmpDst))
+	case ssa.VecLaneI16x8:
+		m.insert(m.allocateInstr().asXmmRmRImm(sseOpcodePinsrw, index, yy, tmpDst))
+	case ssa.VecLaneI32x4:
+		m.insert(m.allocateInstr().asXmmRmRImm(sseOpcodePinsrd, index, yy, tmpDst))
+	case ssa.VecLaneI64x2:
+		m.insert(m.allocateInstr().asXmmRmRImm(sseOpcodePinsrq, index, yy, tmpDst))
+	case ssa.VecLaneF32x4:
+		// In INSERTPS instruction, the destination index is encoded at 4 and 5 bits of the argument.
+		// See https://www.felixcloutier.com/x86/insertps
+		m.insert(m.allocateInstr().asXmmRmRImm(sseOpcodeInsertps, index<<4, yy, tmpDst))
+	case ssa.VecLaneF64x2:
+		if index == 0 {
+			m.insert(m.allocateInstr().asXmmUnaryRmR(sseOpcodeMovsd, yy, tmpDst))
+		} else {
+			m.insert(m.allocateInstr().asXmmRmR(sseOpcodeMovlhps, yy, tmpDst))
+		}
+	default:
+		panic(fmt.Sprintf("invalid lane type: %s", lane))
+	}
+
+	m.copyTo(tmpDst, m.c.VRegOf(ret))
+}
+
+func (m *machine) lowerExtractLane(x ssa.Value, index byte, signed bool, ret ssa.Value, lane ssa.VecLane) {
+	// Pextr variants are used to extract a lane from a vector register.
+	xx := m.getOperand_Reg(m.c.ValueDefinition(x))
+
+	tmpDst := m.c.AllocateVReg(ret.Type())
+	m.insert(m.allocateInstr().asDefineUninitializedReg(tmpDst))
+	switch lane {
+	case ssa.VecLaneI8x16:
+		m.insert(m.allocateInstr().asXmmRmRImm(sseOpcodePextrb, index, xx, tmpDst))
+		if signed {
+			m.insert(m.allocateInstr().asMovsxRmR(extModeBL, newOperandReg(tmpDst), tmpDst))
+		} else {
+			m.insert(m.allocateInstr().asMovzxRmR(extModeBL, newOperandReg(tmpDst), tmpDst))
+		}
+	case ssa.VecLaneI16x8:
+		m.insert(m.allocateInstr().asXmmRmRImm(sseOpcodePextrw, index, xx, tmpDst))
+		if signed {
+			m.insert(m.allocateInstr().asMovsxRmR(extModeWL, newOperandReg(tmpDst), tmpDst))
+		} else {
+			m.insert(m.allocateInstr().asMovzxRmR(extModeWL, newOperandReg(tmpDst), tmpDst))
+		}
+	case ssa.VecLaneI32x4:
+		m.insert(m.allocateInstr().asXmmRmRImm(sseOpcodePextrd, index, xx, tmpDst))
+	case ssa.VecLaneI64x2:
+		m.insert(m.allocateInstr().asXmmRmRImm(sseOpcodePextrq, index, xx, tmpDst))
+	case ssa.VecLaneF32x4:
+		if index == 0 {
+			m.insert(m.allocateInstr().asXmmUnaryRmR(sseOpcodeMovss, xx, tmpDst))
+		} else {
+			m.insert(m.allocateInstr().asXmmRmRImm(sseOpcodePshufd, index, xx, tmpDst))
+		}
+	case ssa.VecLaneF64x2:
+		if index == 0 {
+			m.allocateInstr().asXmmUnaryRmR(sseOpcodeMovsd, xx, tmpDst)
+		} else {
+			m.insert(m.allocateInstr().asXmmRmRImm(sseOpcodePshufd, index, xx, tmpDst))
+		}
+	default:
+		panic(fmt.Sprintf("invalid lane type: %s", lane))
+	}
+
+	m.copyTo(tmpDst, m.c.VRegOf(ret))
 }
 
 func (m *machine) lowerVbBinOp(op sseOpcode, x, y, ret ssa.Value) {

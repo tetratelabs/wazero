@@ -4050,6 +4050,81 @@ func TestInstruction_format_encode(t *testing.T) {
 			want:       "66450fefe4",
 			wantFormat: "xor %xmm12, %xmm12",
 		},
+		{
+			setup:      func(i *instruction) { i.asXmmRmRImm(sseOpcodeCmpss, uint8(25), newOperandReg(xmm1VReg), xmm0VReg) },
+			want:       "f30fc2c119",
+			wantFormat: "cmpss $25, %xmm1, %xmm0",
+		},
+		{
+			setup:      func(i *instruction) { i.asXmmRmRImm(sseOpcodeCmpsd, uint8(25), newOperandReg(xmm1VReg), xmm0VReg) },
+			want:       "f20fc2c119",
+			wantFormat: "cmpsd $25, %xmm1, %xmm0",
+		},
+		{
+			setup:      func(i *instruction) { i.asXmmRmRImm(sseOpcodeInsertps, uint8(25), newOperandReg(xmm1VReg), xmm0VReg) },
+			want:       "660f3a21c119",
+			wantFormat: "insertps $25, %xmm1, %xmm0",
+		},
+		{
+			setup:      func(i *instruction) { i.asXmmRmRImm(sseOpcodePalignr, uint8(25), newOperandReg(xmm1VReg), xmm0VReg) },
+			want:       "660f3a0fc119",
+			wantFormat: "palignr $25, %xmm1, %xmm0",
+		},
+		{
+			setup:      func(i *instruction) { i.asXmmRmRImm(sseOpcodePinsrb, uint8(25), newOperandReg(r14VReg), xmm1VReg) },
+			want:       "66410f3a20ce19",
+			wantFormat: "pinsrb $25, %r14d, %xmm1",
+		},
+		{
+			setup:      func(i *instruction) { i.asXmmRmRImm(sseOpcodePinsrw, uint8(25), newOperandReg(r14VReg), xmm1VReg) },
+			want:       "66410fc4ce19",
+			wantFormat: "pinsrw $25, %r14d, %xmm1",
+		},
+		{
+			setup:      func(i *instruction) { i.asXmmRmRImm(sseOpcodePinsrd, uint8(25), newOperandReg(r14VReg), xmm1VReg) },
+			want:       "66410f3a22ce19",
+			wantFormat: "pinsrd $25, %r14d, %xmm1",
+		},
+		{
+			setup:      func(i *instruction) { i.asXmmRmRImm(sseOpcodePinsrq, uint8(25), newOperandReg(r14VReg), xmm1VReg) },
+			want:       "66490f3a22ce19",
+			wantFormat: "pinsrq $25, %r14, %xmm1",
+		},
+		{
+			setup:      func(i *instruction) { i.asXmmRmRImm(sseOpcodePextrb, uint8(25), newOperandReg(xmm1VReg), r14VReg) },
+			want:       "66410f3a14ce19",
+			wantFormat: "pextrb $25, %xmm1, %r14d",
+		},
+		{
+			setup:      func(i *instruction) { i.asXmmRmRImm(sseOpcodePextrw, uint8(25), newOperandReg(xmm1VReg), r14VReg) },
+			want:       "66440fc5f119",
+			wantFormat: "pextrw $25, %xmm1, %r14d",
+		},
+		{
+			setup:      func(i *instruction) { i.asXmmRmRImm(sseOpcodePextrd, uint8(25), newOperandReg(xmm1VReg), rbxVReg) },
+			want:       "660f3a16cb19",
+			wantFormat: "pextrd $25, %xmm1, %ebx",
+		},
+		{
+			setup:      func(i *instruction) { i.asXmmRmRImm(sseOpcodePextrq, uint8(25), newOperandReg(xmm1VReg), rdxVReg) },
+			want:       "66480f3a16ca19",
+			wantFormat: "pextrq $25, %xmm1, %rdx",
+		},
+		{
+			setup:      func(i *instruction) { i.asXmmRmRImm(sseOpcodePshufd, uint8(25), newOperandReg(xmm1VReg), xmm0VReg) },
+			want:       "660f70c119",
+			wantFormat: "pshufd $25, %xmm1, %xmm0",
+		},
+		{
+			setup:      func(i *instruction) { i.asXmmRmRImm(sseOpcodeRoundps, uint8(25), newOperandReg(xmm1VReg), xmm0VReg) },
+			want:       "660f3a08c119",
+			wantFormat: "roundps $25, %xmm1, %xmm0",
+		},
+		{
+			setup:      func(i *instruction) { i.asXmmRmRImm(sseOpcodeRoundpd, uint8(25), newOperandReg(xmm1VReg), xmm0VReg) },
+			want:       "660f3a09c119",
+			wantFormat: "roundpd $25, %xmm1, %xmm0",
+		},
 	} {
 		tc := tc
 		t.Run(tc.wantFormat, func(t *testing.T) {
@@ -4062,13 +4137,6 @@ func TestInstruction_format_encode(t *testing.T) {
 			m := &machine{c: mc}
 			i.encode(m.c)
 			require.Equal(t, tc.want, hex.EncodeToString(mc.buf))
-
-			// TODO: verify the size of the encoded instructions.
-			//var actualSize int
-			//for cur := i; cur != nil; cur = cur.next {
-			//	actualSize += int(cur.size())
-			//}
-			//require.Equal(t, len(tc.want)/2, actualSize)
 		})
 	}
 }
