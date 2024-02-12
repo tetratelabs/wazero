@@ -14,9 +14,9 @@ Wazero supports an _optimizing_ compiler in the style of other optimizing compil
 
 ```goat
 
-                   +-------------------+      +-------------------+
-     Input         |                   |      |                   |
-  Wasm Binary  --->|   DecodeModule    |----->|   CompileModule   |---->  wazero IR
-                   |                   |      |                   |
-                   +-------------------+      +-------------------+                  
+                    +-------------------+        +-------------------+ 
+     Input          |                   |        |                   | 
+  Wasm Binary  ---> |   DecodeModule    | -----> |   CompileModule   | ---->  wazero IR
+                    |                   |        |                   | 
+                    +-------------------+        +-------------------+ 
 ```
