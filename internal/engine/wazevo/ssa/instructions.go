@@ -218,12 +218,10 @@ const (
 	// OpcodeSwizzle performs a vector swizzle operation: `v = Swizzle.lane x, y`.
 	OpcodeSwizzle
 
-	// OpcodeInsertlane ...
-	// `v = insertlane x, y, Idx`. (TernaryImm8)
+	// OpcodeInsertlane inserts a lane value into a vector: `v = InsertLane x, y, Idx`.
 	OpcodeInsertlane
 
-	// OpcodeExtractlane ...
-	// `v = extractlane x, Idx`. (BinaryImm8)
+	// OpcodeExtractlane extracts a lane value from a vector: `v = ExtractLane x, Idx`.
 	OpcodeExtractlane
 
 	// OpcodeLoad loads a Type value from the [base + offset] address: `v = Load base, offset`.

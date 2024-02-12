@@ -1051,23 +1051,63 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 		var legPrex legacyPrefixes
 		var opcode uint32
 		var opcodeNum uint32
+		var swap bool
 		switch op {
 		case sseOpcodeCmpps:
 			legPrex, opcode, opcodeNum = legacyPrefixesNone, 0x0FC2, 2
 		case sseOpcodeCmppd:
 			legPrex, opcode, opcodeNum = legacyPrefixes0x66, 0x0FC2, 2
+		case sseOpcodeCmpss:
+			legPrex, opcode, opcodeNum = legacyPrefixes0xF3, 0x0FC2, 2
+		case sseOpcodeCmpsd:
+			legPrex, opcode, opcodeNum = legacyPrefixes0xF2, 0x0FC2, 2
+		case sseOpcodeInsertps:
+			legPrex, opcode, opcodeNum = legacyPrefixes0x66, 0x0F3A21, 3
+		case sseOpcodePalignr:
+			legPrex, opcode, opcodeNum = legacyPrefixes0x66, 0x0F3A0F, 3
+		case sseOpcodePinsrb:
+			legPrex, opcode, opcodeNum = legacyPrefixes0x66, 0x0F3A20, 3
+		case sseOpcodePinsrw:
+			legPrex, opcode, opcodeNum = legacyPrefixes0x66, 0x0FC4, 2
+		case sseOpcodePinsrd, sseOpcodePinsrq:
+			legPrex, opcode, opcodeNum = legacyPrefixes0x66, 0x0F3A22, 3
+		case sseOpcodePextrb:
+			swap = true
+			legPrex, opcode, opcodeNum = legacyPrefixes0x66, 0x0F3A14, 3
+		case sseOpcodePextrw:
+			legPrex, opcode, opcodeNum = legacyPrefixes0x66, 0x0FC5, 2
+		case sseOpcodePextrd, sseOpcodePextrq:
+			swap = true
+			legPrex, opcode, opcodeNum = legacyPrefixes0x66, 0x0F3A16, 3
+		case sseOpcodePshufd:
+			legPrex, opcode, opcodeNum = legacyPrefixes0x66, 0x0F70, 2
+		case sseOpcodeRoundps:
+			legPrex, opcode, opcodeNum = legacyPrefixes0x66, 0x0F3A08, 3
+		case sseOpcodeRoundpd:
+			legPrex, opcode, opcodeNum = legacyPrefixes0x66, 0x0F3A09, 3
 		default:
 			panic(fmt.Sprintf("Unsupported sseOpcode: %s", op))
 		}
 
 		dst := regEncodings[i.op2.reg().RealReg()]
 
-		rex := rexInfo(0).clearW()
+		var rex rexInfo
+		if op == sseOpcodePextrq || op == sseOpcodePinsrq {
+			rex = rexInfo(0).setW()
+		} else {
+			rex = rexInfo(0).clearW()
+		}
 		op1 := i.op1
 		if op1.kind == operandKindReg {
 			src := regEncodings[op1.reg().RealReg()]
+			if swap {
+				src, dst = dst, src
+			}
 			encodeRegReg(c, legPrex, opcode, opcodeNum, dst, src, rex)
 		} else if i.op1.kind == operandKindMem {
+			if swap {
+				panic("BUG: this is not possible to encode")
+			}
 			m := i.op1.addressMode()
 			encodeRegMem(c, legPrex, opcode, opcodeNum, dst, m, rex)
 		} else {
