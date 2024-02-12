@@ -2887,7 +2887,8 @@ func (m *machine) lowerInsertLane(x, y ssa.Value, index byte, ret ssa.Value, lan
 }
 
 func (m *machine) lowerExtractLane(x ssa.Value, index byte, signed bool, ret ssa.Value, lane ssa.VecLane) {
-	xx := m.getOperand_Mem_Reg(m.c.ValueDefinition(x))
+	// Pextr variants are used to extract a lane from a vector register.
+	xx := m.getOperand_Reg(m.c.ValueDefinition(x))
 
 	tmpDst := m.c.AllocateVReg(ret.Type())
 	m.insert(m.allocateInstr().asDefineUninitializedReg(tmpDst))
