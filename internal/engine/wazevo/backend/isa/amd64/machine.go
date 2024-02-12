@@ -681,6 +681,14 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		}
 		m.lowerVbBinOp(vecOp, x, y, instr.Return())
 
+	case ssa.OpcodeVIcmp:
+		x, y, c, lane := instr.VIcmpData()
+		m.lowerVIcmp(x, y, c, instr.Return(), lane)
+
+	case ssa.OpcodeVFcmp:
+		x, y, c, lane := instr.VFcmpData()
+		m.lowerVFcmp(x, y, c, instr.Return(), lane)
+
 	case ssa.OpcodeVIabs:
 		m.lowerVIabs(instr)
 	case ssa.OpcodeVIpopcnt:
@@ -2851,6 +2859,143 @@ func (m *machine) lowerVbBinOp(op sseOpcode, x, y, ret ssa.Value) {
 	m.insert(binOp)
 
 	m.copyTo(tmp, rd)
+}
+
+func (m *machine) lowerVFcmp(x, y ssa.Value, c ssa.FloatCmpCond, ret ssa.Value, lane ssa.VecLane) {
+	var cmpOp sseOpcode
+	switch lane {
+	case ssa.VecLaneF32x4:
+		cmpOp = sseOpcodeCmpps
+	case ssa.VecLaneF64x2:
+		cmpOp = sseOpcodeCmppd
+	default:
+		panic(fmt.Sprintf("invalid lane type: %s", lane))
+	}
+
+	xx, yy := m.c.ValueDefinition(x), m.c.ValueDefinition(y)
+	var cmpImm cmpPred
+	switch c {
+	case ssa.FloatCmpCondGreaterThan:
+		yy, xx = xx, yy
+		cmpImm = cmpPredLT_OS
+	case ssa.FloatCmpCondGreaterThanOrEqual:
+		yy, xx = xx, yy
+		cmpImm = cmpPredLE_OS
+	case ssa.FloatCmpCondEqual:
+		cmpImm = cmpPredEQ_OQ
+	case ssa.FloatCmpCondNotEqual:
+		cmpImm = cmpPredNEQ_UQ
+	case ssa.FloatCmpCondLessThan:
+		cmpImm = cmpPredLT_OS
+	case ssa.FloatCmpCondLessThanOrEqual:
+		cmpImm = cmpPredLE_OS
+	default:
+		panic(fmt.Sprintf("invalid float comparison condition: %s", c))
+	}
+
+	tmp := m.c.AllocateVReg(ssa.TypeV128)
+	xxx := m.getOperand_Mem_Reg(xx)
+	m.insert(m.allocateInstr().asXmmUnaryRmR(sseOpcodeMovdqu, xxx, tmp))
+
+	rm := m.getOperand_Mem_Reg(yy)
+	m.insert(m.allocateInstr().asXmmRmRImm(cmpOp, byte(cmpImm), rm, tmp))
+
+	m.copyTo(tmp, m.c.VRegOf(ret))
+}
+
+func (m *machine) lowerVIcmp(x, y ssa.Value, c ssa.IntegerCmpCond, ret ssa.Value, lane ssa.VecLane) {
+	var eq, gt, maxu, minu, mins sseOpcode
+	switch lane {
+	case ssa.VecLaneI8x16:
+		eq, gt, maxu, minu, mins = sseOpcodePcmpeqb, sseOpcodePcmpgtb, sseOpcodePmaxub, sseOpcodePminub, sseOpcodePminsb
+	case ssa.VecLaneI16x8:
+		eq, gt, maxu, minu, mins = sseOpcodePcmpeqw, sseOpcodePcmpgtw, sseOpcodePmaxuw, sseOpcodePminuw, sseOpcodePminsw
+	case ssa.VecLaneI32x4:
+		eq, gt, maxu, minu, mins = sseOpcodePcmpeqd, sseOpcodePcmpgtd, sseOpcodePmaxud, sseOpcodePminud, sseOpcodePminsd
+	case ssa.VecLaneI64x2:
+		eq, gt = sseOpcodePcmpeqq, sseOpcodePcmpgtq
+	default:
+		panic(fmt.Sprintf("invalid lane type: %s", lane))
+	}
+
+	tmp := m.c.AllocateVReg(ssa.TypeV128)
+	var op operand
+	switch c {
+	case ssa.IntegerCmpCondSignedLessThan, ssa.IntegerCmpCondSignedLessThanOrEqual,
+		ssa.IntegerCmpCondUnsignedLessThan, ssa.IntegerCmpCondUnsignedLessThanOrEqual:
+		if lane == ssa.VecLaneI64x2 {
+			x := m.getOperand_Mem_Reg(m.c.ValueDefinition(x))
+			// Copy x to tmp.
+			m.insert(m.allocateInstr().asXmmUnaryRmR(sseOpcodeMovdqu, x, tmp))
+			op = m.getOperand_Mem_Reg(m.c.ValueDefinition(y))
+		} else {
+			y := m.getOperand_Mem_Reg(m.c.ValueDefinition(y))
+			// Copy y to tmp.
+			m.insert(m.allocateInstr().asXmmUnaryRmR(sseOpcodeMovdqu, y, tmp))
+			op = m.getOperand_Mem_Reg(m.c.ValueDefinition(x))
+		}
+	default:
+		if lane == ssa.VecLaneI64x2 {
+			y := m.getOperand_Mem_Reg(m.c.ValueDefinition(y))
+			// Copy y to tmp.
+			m.insert(m.allocateInstr().asXmmUnaryRmR(sseOpcodeMovdqu, y, tmp))
+			op = m.getOperand_Mem_Reg(m.c.ValueDefinition(x))
+		} else {
+			x := m.getOperand_Mem_Reg(m.c.ValueDefinition(x))
+			// Copy x to tmp.
+			m.insert(m.allocateInstr().asXmmUnaryRmR(sseOpcodeMovdqu, x, tmp))
+			op = m.getOperand_Mem_Reg(m.c.ValueDefinition(y))
+		}
+	}
+
+	switch c {
+	case ssa.IntegerCmpCondEqual:
+		m.insert(m.allocateInstr().asXmmRmR(eq, op, tmp))
+	case ssa.IntegerCmpCondNotEqual:
+		// First we compare for equality.
+		m.insert(m.allocateInstr().asXmmRmR(eq, op, tmp))
+		// Then flip the bits. To do so, we set all bits on tmp2.
+		tmp2 := m.c.AllocateVReg(ssa.TypeV128)
+		m.insert(m.allocateInstr().asDefineUninitializedReg(tmp2))
+		m.insert(m.allocateInstr().asXmmRmR(eq, newOperandReg(tmp2), tmp2))
+		// And then xor with tmp.
+		m.insert(m.allocateInstr().asXmmRmR(sseOpcodePxor, newOperandReg(tmp2), tmp))
+	case ssa.IntegerCmpCondSignedGreaterThan, ssa.IntegerCmpCondSignedLessThan:
+		m.insert(m.allocateInstr().asXmmRmR(gt, op, tmp))
+	case ssa.IntegerCmpCondSignedGreaterThanOrEqual, ssa.IntegerCmpCondSignedLessThanOrEqual:
+		if lane == ssa.VecLaneI64x2 {
+			m.insert(m.allocateInstr().asXmmRmR(gt, op, tmp))
+			// Then flip the bits. To do so, we set all bits on tmp2.
+			tmp2 := m.c.AllocateVReg(ssa.TypeV128)
+			m.insert(m.allocateInstr().asDefineUninitializedReg(tmp2))
+			m.insert(m.allocateInstr().asXmmRmR(eq, newOperandReg(tmp2), tmp2))
+			// And then xor with tmp.
+			m.insert(m.allocateInstr().asXmmRmR(sseOpcodePxor, newOperandReg(tmp2), tmp))
+		} else {
+			// First take min of x and y.
+			m.insert(m.allocateInstr().asXmmRmR(mins, op, tmp))
+			// Then compare for equality.
+			m.insert(m.allocateInstr().asXmmRmR(eq, op, tmp))
+		}
+	case ssa.IntegerCmpCondUnsignedGreaterThan, ssa.IntegerCmpCondUnsignedLessThan:
+		// First maxu of x and y.
+		m.insert(m.allocateInstr().asXmmRmR(maxu, op, tmp))
+		// Then compare for equality.
+		m.insert(m.allocateInstr().asXmmRmR(eq, op, tmp))
+		// Then flip the bits. To do so, we set all bits on tmp2.
+		tmp2 := m.c.AllocateVReg(ssa.TypeV128)
+		m.insert(m.allocateInstr().asDefineUninitializedReg(tmp2))
+		m.insert(m.allocateInstr().asXmmRmR(eq, newOperandReg(tmp2), tmp2))
+		// And then xor with tmp.
+		m.insert(m.allocateInstr().asXmmRmR(sseOpcodePxor, newOperandReg(tmp2), tmp))
+	case ssa.IntegerCmpCondUnsignedGreaterThanOrEqual, ssa.IntegerCmpCondUnsignedLessThanOrEqual:
+		m.insert(m.allocateInstr().asXmmRmR(minu, op, tmp))
+		m.insert(m.allocateInstr().asXmmRmR(eq, op, tmp))
+	default:
+		panic("BUG")
+	}
+
+	m.copyTo(tmp, m.c.VRegOf(ret))
 }
 
 func (m *machine) lowerVbandnot(instr *ssa.Instruction, op sseOpcode) {
