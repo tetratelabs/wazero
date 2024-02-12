@@ -1422,7 +1422,8 @@ func (s shiftROp) String() string {
 type sseOpcode byte
 
 const (
-	sseOpcodeAddps sseOpcode = iota + 1
+	sseOpcodeInvalid sseOpcode = iota
+	sseOpcodeAddps
 	sseOpcodeAddpd
 	sseOpcodeAddss
 	sseOpcodeAddsd
@@ -1588,6 +1589,8 @@ const (
 
 func (s sseOpcode) String() string {
 	switch s {
+	case sseOpcodeInvalid:
+		return "invalid"
 	case sseOpcodeAddps:
 		return "addps"
 	case sseOpcodeAddpd:
