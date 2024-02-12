@@ -1543,7 +1543,7 @@ func TestSpectestV2(t *testing.T) {
 		{"simd_load16_lane"},
 		{"simd_load32_lane"},
 		{"simd_load64_lane"},
-		//{"simd_lane"},
+		{"simd_lane"},
 		{"simd_linking"},
 		//{"simd_splat"},
 		{"simd_store"},
