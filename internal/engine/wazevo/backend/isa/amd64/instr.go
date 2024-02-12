@@ -225,8 +225,6 @@ func (i *instruction) String() string {
 		return fmt.Sprintf("call %s", ssa.FuncRef(i.u1))
 	case callIndirect:
 		return fmt.Sprintf("callq *%s", i.op1.format(true))
-	case v128ConstIsland:
-		return fmt.Sprintf("v128ConstIsland (%#x, %#x)", i.u1, i.u2)
 	case xchg:
 		return fmt.Sprintf("xchg %s, %s", i.op1.format(true), i.op2.format(true))
 	case zeros:
@@ -682,9 +680,6 @@ const (
 	// have useKinds and defKinds to avoid being used by the register allocator.
 	xchg
 
-	// v128ConstIsland is 16 bytes (128-bit) constant that will be loaded into an XMM.
-	v128ConstIsland
-
 	// zeros puts zeros into the destination register. This is implemented as xor reg, reg for
 	// either integer or XMM registers. The reason why we have this instruction instead of using aluRmiR
 	// is that it requires the already-defined registers. From reg alloc's perspective, this defines
@@ -920,8 +915,6 @@ func (k instructionKind) String() string {
 		return "jmpTableIsland"
 	case exitSequence:
 		return "exit_sequence"
-	case v128ConstIsland:
-		return "v128ConstIsland"
 	case ud2:
 		return "ud2"
 	case xchg:
@@ -995,7 +988,7 @@ func (i *instruction) asJmp(target operand) *instruction {
 
 func (i *instruction) jmpLabel() backend.Label {
 	switch i.kind {
-	case jmp, jmpIf, lea:
+	case jmp, jmpIf, lea, xmmUnaryRmR:
 		return i.op1.label()
 	default:
 		panic("BUG")
@@ -1325,13 +1318,6 @@ func (i *instruction) asXmmCmpRmR(op sseOpcode, rm operand, rd regalloc.VReg) *i
 	i.op1 = rm
 	i.op2 = newOperandReg(rd)
 	i.u1 = uint64(op)
-	return i
-}
-
-func (i *instruction) asV128ConstIsland(lo, hi uint64) *instruction {
-	i.kind = v128ConstIsland
-	i.u1 = lo
-	i.u2 = hi
 	return i
 }
 
@@ -2140,7 +2126,6 @@ var defKinds = [instrMax]defKind{
 	cmpRmiR:                defKindNone,
 	exitSequence:           defKindNone,
 	lea:                    defKindOp2,
-	v128ConstIsland:        defKindNone,
 	setcc:                  defKindOp2,
 	zeros:                  defKindOp2,
 	sourceOffsetInfo:       defKindNone,
@@ -2213,7 +2198,6 @@ var useKinds = [instrMax]useKind{
 	cmpRmiR:                useKindOp1Op2Reg,
 	exitSequence:           useKindOp1,
 	lea:                    useKindOp1,
-	v128ConstIsland:        useKindNone,
 	jmpTableIsland:         useKindNone,
 	setcc:                  useKindNone,
 	zeros:                  useKindNone,

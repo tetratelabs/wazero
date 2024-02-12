@@ -56,6 +56,12 @@ type (
 		labelResolutionPends []labelResolutionPend
 
 		jmpTableTargets [][]uint32
+		vecConsts       []vecConst
+	}
+
+	vecConst struct {
+		lo, hi uint64
+		label  *backend.LabelPosition[instruction]
 	}
 
 	labelResolutionPend struct {
@@ -68,6 +74,7 @@ type (
 
 // Reset implements backend.Machine.
 func (m *machine) Reset() {
+	m.vecConsts = m.vecConsts[:0]
 	m.clobberedRegs = m.clobberedRegs[:0]
 	for key := range m.spillSlots {
 		m.clobberedRegs = append(m.clobberedRegs, regalloc.VReg(key))
@@ -1091,33 +1098,16 @@ func (m *machine) lowerExtend(_arg, ret ssa.Value, from, to byte, signed bool) {
 }
 
 func (m *machine) lowerVconst(dst regalloc.VReg, lo, hi uint64) {
-	// TODO: use xor when lo == hi == 0.
+	if lo == 0 && hi == 0 {
+		m.insert(m.allocateInstr().asZeros(dst))
+		return
+	}
 
-	islandAddr := m.c.AllocateVReg(ssa.TypeI64)
-	lea := m.allocateInstr()
-	load := m.allocateInstr().asXmmUnaryRmR(sseOpcodeMovdqu, newOperandMem(m.newAmodeImmReg(0, islandAddr)), dst)
-	jmp := m.allocateInstr()
-
-	constLabelNop, constLabel := m.allocateBrTarget()
-	constIsland := m.allocateInstr().asV128ConstIsland(lo, hi)
-	afterLoadNop, afterLoadLabel := m.allocateBrTarget()
-
-	// 		lea    constLabel(%rip), %islandAddr
-	// 		movdqu (%islandAddr), %dst
-	//		jmp    afterConst
-	// constLabel:
-	//		constIsland $lo, $hi
-	// afterConst:
-
-	m.insert(lea)
+	load := m.allocateInstr()
+	constLabel := m.allocateLabel()
+	m.vecConsts = append(m.vecConsts, vecConst{label: constLabel, lo: lo, hi: hi})
+	load.asXmmUnaryRmR(sseOpcodeMovdqu, newOperandMem(m.newAmodeRipRel(constLabel.L)), dst)
 	m.insert(load)
-	m.insert(jmp)
-	m.insert(constLabelNop)
-	m.insert(constIsland)
-	m.insert(afterLoadNop)
-
-	lea.asLEA(newOperandLabel(constLabel), islandAddr)
-	jmp.asJmp(newOperandLabel(afterLoadLabel))
 }
 
 func (m *machine) lowerCtz(instr *ssa.Instruction) {
@@ -1723,6 +1713,9 @@ func (m *machine) Format() string {
 		}
 		lines = append(lines, "\t"+cur.String())
 	}
+	for _, vc := range m.vecConsts {
+		lines = append(lines, fmt.Sprintf("%s: const_128 [%d %d]", vc.label.L, vc.lo, vc.hi))
+	}
 	return "\n" + strings.Join(lines, "\n") + "\n"
 }
 
@@ -1794,11 +1787,20 @@ func (m *machine) Encode(context.Context) {
 		}
 	}
 
+	for i := range m.vecConsts {
+		offset := int64(len(*bufPtr))
+		vc := &m.vecConsts[i]
+		vc.label.BinaryOffset = offset
+		lo, hi := vc.lo, vc.hi
+		m.c.Emit8Bytes(lo)
+		m.c.Emit8Bytes(hi)
+	}
+
 	buf := *bufPtr
 	for i := range m.labelResolutionPends {
 		p := &m.labelResolutionPends[i]
 		switch p.instr.kind {
-		case jmp, jmpIf, lea:
+		case jmp, jmpIf, lea, xmmUnaryRmR:
 			target := p.instr.jmpLabel()
 			targetOffset := ectx.LabelPositions[target].BinaryOffset
 			imm32Offset := p.imm32Offset
@@ -1896,14 +1898,20 @@ func (m *machine) insert(i *instruction) {
 }
 
 func (m *machine) allocateBrTarget() (nop *instruction, l backend.Label) { //nolint
-	ectx := m.ectx
-	l = ectx.AllocateLabel()
+	pos := m.allocateLabel()
+	l = pos.L
 	nop = m.allocateInstr()
 	nop.asNop0WithLabel(l)
-	pos := ectx.AllocateLabelPosition(l)
 	pos.Begin, pos.End = nop, nop
-	ectx.LabelPositions[l] = pos
 	return
+}
+
+func (m *machine) allocateLabel() *backend.LabelPosition[instruction] {
+	ectx := m.ectx
+	l := ectx.AllocateLabel()
+	pos := ectx.AllocateLabelPosition(l)
+	ectx.LabelPositions[l] = pos
+	return pos
 }
 
 func (m *machine) getVRegSpillSlotOffsetFromSP(id regalloc.VRegID, size byte) int64 {

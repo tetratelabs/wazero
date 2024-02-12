@@ -89,6 +89,12 @@ func (o *operand) label() backend.Label {
 	switch o.kind {
 	case operandKindLabel:
 		return backend.Label(o.data)
+	case operandKindMem:
+		mem := o.addressMode()
+		if mem.kind() != amodeRipRel {
+			panic("BUG: invalid label")
+		}
+		return backend.Label(mem.imm32)
 	default:
 		panic("BUG: invalid operand kind")
 	}
@@ -134,6 +140,9 @@ const (
 	// amodeRegRegShift calculates sign-extend-32-to-64(Immediate) + base + (Register2 << Shift)
 	amodeRegRegShift
 
+	// amodeRipRel is a RIP-relative addressing mode specified by the label.
+	amodeRipRel
+
 	// TODO: there are other addressing modes such as the one without base register.
 )
 
@@ -151,7 +160,7 @@ func (a *amode) uses(rs *[]regalloc.VReg) {
 		*rs = append(*rs, a.base)
 	case amodeRegRegShift:
 		*rs = append(*rs, a.base, a.index)
-	case amodeImmRBP:
+	case amodeImmRBP, amodeRipRel:
 	default:
 		panic("BUG: invalid amode kind")
 	}
@@ -163,7 +172,7 @@ func (a *amode) nregs() int {
 		return 1
 	case amodeRegRegShift:
 		return 2
-	case amodeImmRBP:
+	case amodeImmRBP, amodeRipRel:
 		return 0
 	default:
 		panic("BUG: invalid amode kind")
@@ -212,6 +221,12 @@ func (m *machine) newAmodeRegRegShift(imm32 uint32, base, index regalloc.VReg, s
 	return ret
 }
 
+func (m *machine) newAmodeRipRel(label backend.Label) *amode {
+	ret := m.amodePool.Allocate()
+	*ret = amode{kindWithShift: uint32(amodeRipRel), imm32: uint32(label)}
+	return ret
+}
+
 // String implements fmt.Stringer.
 func (a *amode) String() string {
 	switch a.kind() {
@@ -230,6 +245,8 @@ func (a *amode) String() string {
 		return fmt.Sprintf(
 			"%d(%s,%s,%d)",
 			int32(a.imm32), formatVRegSized(a.base, true), formatVRegSized(a.index, true), shift)
+	case amodeRipRel:
+		return fmt.Sprintf("%s(%%rip)", backend.Label(a.imm32))
 	default:
 		panic("BUG: invalid amode kind")
 	}
