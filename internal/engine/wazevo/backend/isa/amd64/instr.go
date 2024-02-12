@@ -1576,6 +1576,7 @@ const (
 	sseOpcodeUcomisd
 	sseOpcodeXorps
 	sseOpcodeXorpd
+	sseOpcodePmulhrsw
 )
 
 func (s sseOpcode) String() string {
@@ -1910,6 +1911,8 @@ func (s sseOpcode) String() string {
 		return "xorps"
 	case sseOpcodeXorpd:
 		return "xorpd"
+	case sseOpcodePmulhrsw:
+		return "pmulhrsw"
 	default:
 		panic("BUG")
 	}
