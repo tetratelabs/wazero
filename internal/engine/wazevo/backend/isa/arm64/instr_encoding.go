@@ -397,6 +397,20 @@ func (i *instruction) encode(m *machine) {
 			regNumberInEncoding[i.rn.realReg()],
 			uint32(i.u2),
 		))
+	case atomicLoad:
+		c.Emit4Bytes(encodeAtomicLoadStore(
+			regNumberInEncoding[i.rn.realReg()],
+			regNumberInEncoding[i.rd.realReg()],
+			uint32(i.u2),
+			1,
+		))
+	case atomicStore:
+		c.Emit4Bytes(encodeAtomicLoadStore(
+			regNumberInEncoding[i.rn.realReg()],
+			regNumberInEncoding[i.rm.realReg()],
+			uint32(i.u2),
+			0,
+		))
 	default:
 		panic(i.String())
 	}
@@ -2283,4 +2297,25 @@ func encodeAtomicCas(rs, rt, rn uint32, size uint32) uint32 {
 	_15to10 = 0b111111
 
 	return _31to21<<21 | rs<<16 | _15to10<<10 | rn<<5 | rt
+}
+
+func encodeAtomicLoadStore(rn, rt, size, l uint32) uint32 {
+	var _31to21, _20to16, _15to10, sz uint32
+
+	switch size {
+	case 8:
+		sz = 0b11
+	case 4:
+		sz = 0b10
+	case 2:
+		sz = 0b01
+	case 1:
+		sz = 0b00
+	}
+
+	_31to21 = 0b00001000_100 | sz<<9 | l<<1
+	_20to16 = 0b11111
+	_15to10 = 0b111111
+
+	return _31to21<<21 | _20to16<<16 | _15to10<<10 | rn<<5 | rt
 }

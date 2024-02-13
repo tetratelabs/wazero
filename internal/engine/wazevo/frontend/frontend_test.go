@@ -2254,100 +2254,8 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i32, v4:i32, v5:i64, v6:i64, v7:
 `,
 		},
 		{
-			name:     "AtomicLoad",
-			m:        testcases.AtomicLoad.Module,
-			features: api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
-			exp: `
-blk0: (exec_ctx:i64, module_ctx:i64)
-	v2:i32 = Iconst_32 0x0
-	v3:i64 = Iconst_64 0x1
-	v4:i64 = UExtend v2, 32->64
-	v5:i64 = Uload32 module_ctx, 0x10
-	v6:i64 = Iadd v4, v3
-	v7:i32 = Icmp lt_u, v5, v6
-	ExitIfTrue v7, exec_ctx, memory_out_of_bounds
-	v8:i64 = Load module_ctx, 0x8
-	v9:i64 = Iadd v8, v4
-	v10:i32 = AtomicLoad_8, v9
-	v11:i32 = Iconst_32 0x8
-	v12:i64 = Iconst_64 0x2
-	v13:i64 = UExtend v11, 32->64
-	v14:i64 = Iadd v13, v12
-	v15:i32 = Icmp lt_u, v5, v14
-	ExitIfTrue v15, exec_ctx, memory_out_of_bounds
-	v16:i64 = Iadd v8, v13
-	v17:i64 = Iconst_64 0x1
-	v18:i64 = Band v16, v17
-	v19:i64 = Iconst_64 0x0
-	v20:i32 = Icmp neq, v18, v19
-	ExitIfTrue v20, exec_ctx, unaligned_atomic
-	v21:i32 = AtomicLoad_16, v16
-	v22:i32 = Iconst_32 0x10
-	v23:i64 = Iconst_64 0x4
-	v24:i64 = UExtend v22, 32->64
-	v25:i64 = Iadd v24, v23
-	v26:i32 = Icmp lt_u, v5, v25
-	ExitIfTrue v26, exec_ctx, memory_out_of_bounds
-	v27:i64 = Iadd v8, v24
-	v28:i64 = Iconst_64 0x3
-	v29:i64 = Band v27, v28
-	v30:i64 = Iconst_64 0x0
-	v31:i32 = Icmp neq, v29, v30
-	ExitIfTrue v31, exec_ctx, unaligned_atomic
-	v32:i32 = AtomicLoad_32, v27
-	v33:i32 = Iconst_32 0x18
-	v34:i64 = Iconst_64 0x1
-	v35:i64 = UExtend v33, 32->64
-	v36:i64 = Iadd v35, v34
-	v37:i32 = Icmp lt_u, v5, v36
-	ExitIfTrue v37, exec_ctx, memory_out_of_bounds
-	v38:i64 = Iadd v8, v35
-	v39:i64 = AtomicLoad_8, v38
-	v40:i32 = Iconst_32 0x20
-	v41:i64 = Iconst_64 0x2
-	v42:i64 = UExtend v40, 32->64
-	v43:i64 = Iadd v42, v41
-	v44:i32 = Icmp lt_u, v5, v43
-	ExitIfTrue v44, exec_ctx, memory_out_of_bounds
-	v45:i64 = Iadd v8, v42
-	v46:i64 = Iconst_64 0x1
-	v47:i64 = Band v45, v46
-	v48:i64 = Iconst_64 0x0
-	v49:i32 = Icmp neq, v47, v48
-	ExitIfTrue v49, exec_ctx, unaligned_atomic
-	v50:i64 = AtomicLoad_16, v45
-	v51:i32 = Iconst_32 0x28
-	v52:i64 = Iconst_64 0x4
-	v53:i64 = UExtend v51, 32->64
-	v54:i64 = Iadd v53, v52
-	v55:i32 = Icmp lt_u, v5, v54
-	ExitIfTrue v55, exec_ctx, memory_out_of_bounds
-	v56:i64 = Iadd v8, v53
-	v57:i64 = Iconst_64 0x3
-	v58:i64 = Band v56, v57
-	v59:i64 = Iconst_64 0x0
-	v60:i32 = Icmp neq, v58, v59
-	ExitIfTrue v60, exec_ctx, unaligned_atomic
-	v61:i64 = AtomicLoad_32, v56
-	v62:i32 = Iconst_32 0x30
-	v63:i64 = Iconst_64 0x8
-	v64:i64 = UExtend v62, 32->64
-	v65:i64 = Iadd v64, v63
-	v66:i32 = Icmp lt_u, v5, v65
-	ExitIfTrue v66, exec_ctx, memory_out_of_bounds
-	v67:i64 = Iadd v8, v64
-	v68:i64 = Iconst_64 0x7
-	v69:i64 = Band v67, v68
-	v70:i64 = Iconst_64 0x0
-	v71:i32 = Icmp neq, v69, v70
-	ExitIfTrue v71, exec_ctx, unaligned_atomic
-	v72:i64 = AtomicLoad_64, v67
-	Jump blk_ret, v10, v21, v32, v39, v50, v61, v72
-`,
-		},
-		{
-			name:     "AtomicStore",
-			m:        testcases.AtomicStore.Module,
+			name:     "AtomicStoreLoad",
+			m:        testcases.AtomicStoreLoad.Module,
 			features: api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
 			exp: `
 blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i32, v4:i32, v5:i64, v6:i64, v7:i64, v8:i64)
@@ -2361,80 +2269,161 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i32, v4:i32, v5:i64, v6:i64, v7:
 	v15:i64 = Load module_ctx, 0x8
 	v16:i64 = Iadd v15, v11
 	AtomicStore_8, v16, v2
-	v17:i32 = Iconst_32 0x8
-	v18:i64 = Iconst_64 0x2
+	v17:i32 = Iconst_32 0x0
+	v18:i64 = Iconst_64 0x1
 	v19:i64 = UExtend v17, 32->64
 	v20:i64 = Iadd v19, v18
 	v21:i32 = Icmp lt_u, v12, v20
 	ExitIfTrue v21, exec_ctx, memory_out_of_bounds
 	v22:i64 = Iadd v15, v19
-	v23:i64 = Iconst_64 0x1
-	v24:i64 = Band v22, v23
-	v25:i64 = Iconst_64 0x0
-	v26:i32 = Icmp neq, v24, v25
-	ExitIfTrue v26, exec_ctx, unaligned_atomic
-	AtomicStore_16, v22, v3
-	v27:i32 = Iconst_32 0x10
-	v28:i64 = Iconst_64 0x4
-	v29:i64 = UExtend v27, 32->64
-	v30:i64 = Iadd v29, v28
-	v31:i32 = Icmp lt_u, v12, v30
-	ExitIfTrue v31, exec_ctx, memory_out_of_bounds
-	v32:i64 = Iadd v15, v29
-	v33:i64 = Iconst_64 0x3
-	v34:i64 = Band v32, v33
-	v35:i64 = Iconst_64 0x0
-	v36:i32 = Icmp neq, v34, v35
-	ExitIfTrue v36, exec_ctx, unaligned_atomic
-	AtomicStore_32, v32, v4
-	v37:i32 = Iconst_32 0x18
-	v38:i64 = Iconst_64 0x1
-	v39:i64 = UExtend v37, 32->64
-	v40:i64 = Iadd v39, v38
-	v41:i32 = Icmp lt_u, v12, v40
-	ExitIfTrue v41, exec_ctx, memory_out_of_bounds
-	v42:i64 = Iadd v15, v39
-	AtomicStore_8, v42, v5
-	v43:i32 = Iconst_32 0x20
-	v44:i64 = Iconst_64 0x2
-	v45:i64 = UExtend v43, 32->64
-	v46:i64 = Iadd v45, v44
-	v47:i32 = Icmp lt_u, v12, v46
-	ExitIfTrue v47, exec_ctx, memory_out_of_bounds
-	v48:i64 = Iadd v15, v45
-	v49:i64 = Iconst_64 0x1
-	v50:i64 = Band v48, v49
-	v51:i64 = Iconst_64 0x0
-	v52:i32 = Icmp neq, v50, v51
-	ExitIfTrue v52, exec_ctx, unaligned_atomic
-	AtomicStore_16, v48, v6
-	v53:i32 = Iconst_32 0x28
-	v54:i64 = Iconst_64 0x4
-	v55:i64 = UExtend v53, 32->64
-	v56:i64 = Iadd v55, v54
-	v57:i32 = Icmp lt_u, v12, v56
-	ExitIfTrue v57, exec_ctx, memory_out_of_bounds
-	v58:i64 = Iadd v15, v55
-	v59:i64 = Iconst_64 0x3
-	v60:i64 = Band v58, v59
-	v61:i64 = Iconst_64 0x0
-	v62:i32 = Icmp neq, v60, v61
-	ExitIfTrue v62, exec_ctx, unaligned_atomic
-	AtomicStore_32, v58, v7
-	v63:i32 = Iconst_32 0x30
-	v64:i64 = Iconst_64 0x8
-	v65:i64 = UExtend v63, 32->64
-	v66:i64 = Iadd v65, v64
-	v67:i32 = Icmp lt_u, v12, v66
-	ExitIfTrue v67, exec_ctx, memory_out_of_bounds
-	v68:i64 = Iadd v15, v65
-	v69:i64 = Iconst_64 0x7
-	v70:i64 = Band v68, v69
-	v71:i64 = Iconst_64 0x0
-	v72:i32 = Icmp neq, v70, v71
-	ExitIfTrue v72, exec_ctx, unaligned_atomic
-	AtomicStore_64, v68, v8
-	Jump blk_ret
+	v23:i32 = AtomicLoad_8, v22
+	v24:i32 = Iconst_32 0x8
+	v25:i64 = Iconst_64 0x2
+	v26:i64 = UExtend v24, 32->64
+	v27:i64 = Iadd v26, v25
+	v28:i32 = Icmp lt_u, v12, v27
+	ExitIfTrue v28, exec_ctx, memory_out_of_bounds
+	v29:i64 = Iadd v15, v26
+	v30:i64 = Iconst_64 0x1
+	v31:i64 = Band v29, v30
+	v32:i64 = Iconst_64 0x0
+	v33:i32 = Icmp neq, v31, v32
+	ExitIfTrue v33, exec_ctx, unaligned_atomic
+	AtomicStore_16, v29, v3
+	v34:i32 = Iconst_32 0x8
+	v35:i64 = Iconst_64 0x2
+	v36:i64 = UExtend v34, 32->64
+	v37:i64 = Iadd v36, v35
+	v38:i32 = Icmp lt_u, v12, v37
+	ExitIfTrue v38, exec_ctx, memory_out_of_bounds
+	v39:i64 = Iadd v15, v36
+	v40:i64 = Iconst_64 0x1
+	v41:i64 = Band v39, v40
+	v42:i64 = Iconst_64 0x0
+	v43:i32 = Icmp neq, v41, v42
+	ExitIfTrue v43, exec_ctx, unaligned_atomic
+	v44:i32 = AtomicLoad_16, v39
+	v45:i32 = Iconst_32 0x10
+	v46:i64 = Iconst_64 0x4
+	v47:i64 = UExtend v45, 32->64
+	v48:i64 = Iadd v47, v46
+	v49:i32 = Icmp lt_u, v12, v48
+	ExitIfTrue v49, exec_ctx, memory_out_of_bounds
+	v50:i64 = Iadd v15, v47
+	v51:i64 = Iconst_64 0x3
+	v52:i64 = Band v50, v51
+	v53:i64 = Iconst_64 0x0
+	v54:i32 = Icmp neq, v52, v53
+	ExitIfTrue v54, exec_ctx, unaligned_atomic
+	AtomicStore_32, v50, v4
+	v55:i32 = Iconst_32 0x10
+	v56:i64 = Iconst_64 0x4
+	v57:i64 = UExtend v55, 32->64
+	v58:i64 = Iadd v57, v56
+	v59:i32 = Icmp lt_u, v12, v58
+	ExitIfTrue v59, exec_ctx, memory_out_of_bounds
+	v60:i64 = Iadd v15, v57
+	v61:i64 = Iconst_64 0x3
+	v62:i64 = Band v60, v61
+	v63:i64 = Iconst_64 0x0
+	v64:i32 = Icmp neq, v62, v63
+	ExitIfTrue v64, exec_ctx, unaligned_atomic
+	v65:i32 = AtomicLoad_32, v60
+	v66:i32 = Iconst_32 0x18
+	v67:i64 = Iconst_64 0x1
+	v68:i64 = UExtend v66, 32->64
+	v69:i64 = Iadd v68, v67
+	v70:i32 = Icmp lt_u, v12, v69
+	ExitIfTrue v70, exec_ctx, memory_out_of_bounds
+	v71:i64 = Iadd v15, v68
+	AtomicStore_8, v71, v5
+	v72:i32 = Iconst_32 0x18
+	v73:i64 = Iconst_64 0x1
+	v74:i64 = UExtend v72, 32->64
+	v75:i64 = Iadd v74, v73
+	v76:i32 = Icmp lt_u, v12, v75
+	ExitIfTrue v76, exec_ctx, memory_out_of_bounds
+	v77:i64 = Iadd v15, v74
+	v78:i64 = AtomicLoad_8, v77
+	v79:i32 = Iconst_32 0x20
+	v80:i64 = Iconst_64 0x2
+	v81:i64 = UExtend v79, 32->64
+	v82:i64 = Iadd v81, v80
+	v83:i32 = Icmp lt_u, v12, v82
+	ExitIfTrue v83, exec_ctx, memory_out_of_bounds
+	v84:i64 = Iadd v15, v81
+	v85:i64 = Iconst_64 0x1
+	v86:i64 = Band v84, v85
+	v87:i64 = Iconst_64 0x0
+	v88:i32 = Icmp neq, v86, v87
+	ExitIfTrue v88, exec_ctx, unaligned_atomic
+	AtomicStore_16, v84, v6
+	v89:i32 = Iconst_32 0x20
+	v90:i64 = Iconst_64 0x2
+	v91:i64 = UExtend v89, 32->64
+	v92:i64 = Iadd v91, v90
+	v93:i32 = Icmp lt_u, v12, v92
+	ExitIfTrue v93, exec_ctx, memory_out_of_bounds
+	v94:i64 = Iadd v15, v91
+	v95:i64 = Iconst_64 0x1
+	v96:i64 = Band v94, v95
+	v97:i64 = Iconst_64 0x0
+	v98:i32 = Icmp neq, v96, v97
+	ExitIfTrue v98, exec_ctx, unaligned_atomic
+	v99:i64 = AtomicLoad_16, v94
+	v100:i32 = Iconst_32 0x28
+	v101:i64 = Iconst_64 0x4
+	v102:i64 = UExtend v100, 32->64
+	v103:i64 = Iadd v102, v101
+	v104:i32 = Icmp lt_u, v12, v103
+	ExitIfTrue v104, exec_ctx, memory_out_of_bounds
+	v105:i64 = Iadd v15, v102
+	v106:i64 = Iconst_64 0x3
+	v107:i64 = Band v105, v106
+	v108:i64 = Iconst_64 0x0
+	v109:i32 = Icmp neq, v107, v108
+	ExitIfTrue v109, exec_ctx, unaligned_atomic
+	AtomicStore_32, v105, v7
+	v110:i32 = Iconst_32 0x28
+	v111:i64 = Iconst_64 0x4
+	v112:i64 = UExtend v110, 32->64
+	v113:i64 = Iadd v112, v111
+	v114:i32 = Icmp lt_u, v12, v113
+	ExitIfTrue v114, exec_ctx, memory_out_of_bounds
+	v115:i64 = Iadd v15, v112
+	v116:i64 = Iconst_64 0x3
+	v117:i64 = Band v115, v116
+	v118:i64 = Iconst_64 0x0
+	v119:i32 = Icmp neq, v117, v118
+	ExitIfTrue v119, exec_ctx, unaligned_atomic
+	v120:i64 = AtomicLoad_32, v115
+	v121:i32 = Iconst_32 0x30
+	v122:i64 = Iconst_64 0x8
+	v123:i64 = UExtend v121, 32->64
+	v124:i64 = Iadd v123, v122
+	v125:i32 = Icmp lt_u, v12, v124
+	ExitIfTrue v125, exec_ctx, memory_out_of_bounds
+	v126:i64 = Iadd v15, v123
+	v127:i64 = Iconst_64 0x7
+	v128:i64 = Band v126, v127
+	v129:i64 = Iconst_64 0x0
+	v130:i32 = Icmp neq, v128, v129
+	ExitIfTrue v130, exec_ctx, unaligned_atomic
+	AtomicStore_64, v126, v8
+	v131:i32 = Iconst_32 0x30
+	v132:i64 = Iconst_64 0x8
+	v133:i64 = UExtend v131, 32->64
+	v134:i64 = Iadd v133, v132
+	v135:i32 = Icmp lt_u, v12, v134
+	ExitIfTrue v135, exec_ctx, memory_out_of_bounds
+	v136:i64 = Iadd v15, v133
+	v137:i64 = Iconst_64 0x7
+	v138:i64 = Band v136, v137
+	v139:i64 = Iconst_64 0x0
+	v140:i32 = Icmp neq, v138, v139
+	ExitIfTrue v140, exec_ctx, unaligned_atomic
+	v141:i64 = AtomicLoad_64, v136
+	Jump blk_ret, v23, v44, v65, v78, v99, v120, v141
 `,
 		},
 		{

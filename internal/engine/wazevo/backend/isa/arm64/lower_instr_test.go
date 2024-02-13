@@ -1471,3 +1471,171 @@ casalb w2?, w3?, x1?
 		})
 	}
 }
+
+func TestMachine_lowerAtomicLoad(t *testing.T) {
+	tests := []struct {
+		name   string
+		_64bit bool
+		size   uint64
+		exp    string
+	}{
+		{
+			name: "load 32",
+			size: 4,
+			exp: `
+ldar w2?, x1?
+`,
+		},
+		{
+			name: "load 32_16u",
+			size: 2,
+			exp: `
+ldarh w2?, x1?
+`,
+		},
+		{
+			name: "load 32_8u",
+			size: 1,
+			exp: `
+ldarb w2?, x1?
+`,
+		},
+		{
+			name:   "load 64",
+			size:   8,
+			_64bit: true,
+			exp: `
+ldar x2?, x1?
+`,
+		},
+		{
+			name:   "load 64_32u",
+			size:   4,
+			_64bit: true,
+			exp: `
+ldar w2?, x1?
+`,
+		},
+		{
+			name:   "load 64_16u",
+			size:   2,
+			_64bit: true,
+			exp: `
+ldarh w2?, x1?
+`,
+		},
+		{
+			name:   "load 64_8u",
+			size:   1,
+			_64bit: true,
+			exp: `
+ldarb w2?, x1?
+`,
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			_, _, m := newSetupWithMockContext()
+			var typ ssa.Type
+			if tc._64bit {
+				typ = ssa.TypeI64
+			} else {
+				typ = ssa.TypeI32
+			}
+			rn := operandNR(m.compiler.AllocateVReg(ssa.TypeI64))
+			rt := operandNR(m.compiler.AllocateVReg(typ))
+
+			require.Equal(t, 1, int(rn.reg().ID()))
+			require.Equal(t, 2, int(rt.reg().ID()))
+
+			m.lowerAtomicLoadImpl(rn, rt, tc.size)
+			require.Equal(t, tc.exp, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
+		})
+	}
+}
+
+func TestMachine_lowerAtomicStore(t *testing.T) {
+	tests := []struct {
+		name   string
+		_64bit bool
+		size   uint64
+		exp    string
+	}{
+		{
+			name: "store 32",
+			size: 4,
+			exp: `
+stlr w2?, x1?
+`,
+		},
+		{
+			name: "store 32_16u",
+			size: 2,
+			exp: `
+stlrh w2?, x1?
+`,
+		},
+		{
+			name: "store 32_8u",
+			size: 1,
+			exp: `
+stlrb w2?, x1?
+`,
+		},
+		{
+			name:   "store 64",
+			size:   8,
+			_64bit: true,
+			exp: `
+stlr x2?, x1?
+`,
+		},
+		{
+			name:   "store 64_32u",
+			size:   4,
+			_64bit: true,
+			exp: `
+stlr w2?, x1?
+`,
+		},
+		{
+			name:   "store 64_16u",
+			size:   2,
+			_64bit: true,
+			exp: `
+stlrh w2?, x1?
+`,
+		},
+		{
+			name:   "store 64_8u",
+			size:   1,
+			_64bit: true,
+			exp: `
+stlrb w2?, x1?
+`,
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			_, _, m := newSetupWithMockContext()
+			var typ ssa.Type
+			if tc._64bit {
+				typ = ssa.TypeI64
+			} else {
+				typ = ssa.TypeI32
+			}
+			rn := operandNR(m.compiler.AllocateVReg(ssa.TypeI64))
+			rt := operandNR(m.compiler.AllocateVReg(typ))
+
+			require.Equal(t, 1, int(rn.reg().ID()))
+			require.Equal(t, 2, int(rt.reg().ID()))
+
+			m.lowerAtomicStoreImpl(rn, rt, tc.size)
+			require.Equal(t, tc.exp, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
+		})
+	}
+}
