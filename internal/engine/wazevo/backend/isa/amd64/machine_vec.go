@@ -370,3 +370,35 @@ func (m *machine) lowerWidenHigh(x, ret ssa.Value, lane ssa.VecLane, signed bool
 
 	m.insert(m.allocateInstr().asXmmUnaryRmR(sseOp, newOperandReg(tmp), m.c.VRegOf(ret)))
 }
+
+func (m *machine) lowerLoadSplat(ptr ssa.Value, offset uint32, ret ssa.Value, lane ssa.VecLane) {
+	tmpDst, tmpGp := m.c.AllocateVReg(ssa.TypeV128), m.c.AllocateVReg(ssa.TypeI64)
+	am := newOperandMem(m.lowerToAddressMode(ptr, offset))
+
+	m.insert(m.allocateInstr().asDefineUninitializedReg(tmpDst))
+	switch lane {
+	case ssa.VecLaneI8x16:
+		m.insert(m.allocateInstr().asMovzxRmR(extModeBQ, am, tmpGp))
+		m.insert(m.allocateInstr().asXmmRmRImm(sseOpcodePinsrb, 0, newOperandReg(tmpGp), tmpDst))
+		tmpZeroVec := m.c.AllocateVReg(ssa.TypeV128)
+		m.insert(m.allocateInstr().asZeros(tmpZeroVec))
+		m.insert(m.allocateInstr().asXmmRmR(sseOpcodePshufb, newOperandReg(tmpZeroVec), tmpDst))
+	case ssa.VecLaneI16x8:
+		m.insert(m.allocateInstr().asMovzxRmR(extModeWQ, am, tmpGp))
+		m.insert(m.allocateInstr().asXmmRmRImm(sseOpcodePinsrw, 0, newOperandReg(tmpGp), tmpDst))
+		m.insert(m.allocateInstr().asXmmRmRImm(sseOpcodePinsrw, 1, newOperandReg(tmpGp), tmpDst))
+		m.insert(m.allocateInstr().asXmmRmRImm(sseOpcodePshufd, 0, newOperandReg(tmpDst), tmpDst))
+	case ssa.VecLaneI32x4:
+		m.insert(m.allocateInstr().asMovzxRmR(extModeLQ, am, tmpGp))
+		m.insert(m.allocateInstr().asXmmRmRImm(sseOpcodePinsrd, 0, newOperandReg(tmpGp), tmpDst))
+		m.insert(m.allocateInstr().asXmmRmRImm(sseOpcodePshufd, 0, newOperandReg(tmpDst), tmpDst))
+	case ssa.VecLaneI64x2:
+		m.insert(m.allocateInstr().asMov64MR(am, tmpGp))
+		m.insert(m.allocateInstr().asXmmRmRImm(sseOpcodePinsrq, 0, newOperandReg(tmpGp), tmpDst))
+		m.insert(m.allocateInstr().asXmmRmRImm(sseOpcodePinsrq, 1, newOperandReg(tmpGp), tmpDst))
+	default:
+		panic(fmt.Sprintf("invalid lane type: %s", lane))
+	}
+
+	m.copyTo(tmpDst, m.c.VRegOf(ret))
+}

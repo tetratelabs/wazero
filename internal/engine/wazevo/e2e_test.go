@@ -1537,7 +1537,7 @@ func TestSpectestV2(t *testing.T) {
 		{"simd_int_to_int_extend"},
 		//{"simd_load"},
 		{"simd_load_extend"},
-		//{"simd_load_splat"},
+		{"simd_load_splat"},
 		{"simd_load_zero"},
 		{"simd_load8_lane"},
 		{"simd_load16_lane"},

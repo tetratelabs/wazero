@@ -815,6 +815,10 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		x, lane := instr.ArgWithLane()
 		m.lowerWidenHigh(x, instr.Return(), lane, op == ssa.OpcodeSwidenHigh)
 
+	case ssa.OpcodeLoadSplat:
+		ptr, offset, lane := instr.LoadSplatData()
+		m.lowerLoadSplat(ptr, offset, instr.Return(), lane)
+
 	case ssa.OpcodeVIabs:
 		m.lowerVIabs(instr)
 	case ssa.OpcodeVIpopcnt:
