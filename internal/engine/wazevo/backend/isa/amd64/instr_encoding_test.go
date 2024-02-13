@@ -4122,7 +4122,7 @@ func TestInstruction_format_encode(t *testing.T) {
 		},
 		{
 			setup:      func(i *instruction) { i.asXmmRmR(sseOpcodePmulhrsw, newOperandReg(xmm1VReg), xmm0VReg) },
-			want:       "660f3a09c119",
+			want:       "660f380bc1",
 			wantFormat: "pmulhrsw %xmm1, %xmm0",
 		},
 	} {

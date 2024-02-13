@@ -744,6 +744,32 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		dst := m.c.VRegOf(instr.Return())
 		m.insert(m.allocateInstr().asXmmUnaryRmR(sseOp, newOperandMem(mem), dst))
 
+	case ssa.OpcodeVMinPseudo:
+		x, y, lane := instr.Arg2WithLane()
+		var vecOp sseOpcode
+		switch lane {
+		case ssa.VecLaneF32x4:
+			vecOp = sseOpcodeMinps
+		case ssa.VecLaneF64x2:
+			vecOp = sseOpcodeMinpd
+		default:
+			panic("BUG: unexpected lane type")
+		}
+		m.lowerVbBinOp(vecOp, y, x, instr.Return())
+
+	case ssa.OpcodeVMaxPseudo:
+		x, y, lane := instr.Arg2WithLane()
+		var vecOp sseOpcode
+		switch lane {
+		case ssa.VecLaneF32x4:
+			vecOp = sseOpcodeMaxps
+		case ssa.VecLaneF64x2:
+			vecOp = sseOpcodeMaxpd
+		default:
+			panic("BUG: unexpected lane type")
+		}
+		m.lowerVbBinOp(vecOp, y, x, instr.Return())
+
 	case ssa.OpcodeVIabs:
 		m.lowerVIabs(instr)
 	case ssa.OpcodeVIpopcnt:
