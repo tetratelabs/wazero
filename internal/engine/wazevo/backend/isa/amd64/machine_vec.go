@@ -3,6 +3,7 @@ package amd64
 import (
 	"fmt"
 
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 )
 
@@ -391,28 +392,71 @@ func (m *machine) lowerVRound(x, ret ssa.Value, imm byte, _64 bool) {
 	m.insert(m.allocateInstr().asXmmUnaryRmRImm(round, imm, xx, m.c.VRegOf(ret)))
 }
 
-func (m *machine) lowerIaddPairwise(x, y, ret ssa.Value, lane ssa.VecLane) {
-	xx := m.getOperand_Reg(m.c.ValueDefinition(x))
-	tmp := m.copyToTmp(xx.reg())
+var (
+	allOnesI8x16              = [16]byte{0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1}
+	allOnesI16x8              = [16]byte{0x1, 0x0, 0x1, 0x0, 0x1, 0x0, 0x1, 0x0, 0x1, 0x0, 0x1, 0x0, 0x1, 0x0, 0x1, 0x0}
+	extAddPairwiseI16x8uMask1 = [16]byte{0x00, 0x80, 0x00, 0x80, 0x00, 0x80, 0x00, 0x80, 0x00, 0x80, 0x00, 0x80, 0x00, 0x80, 0x00, 0x80}
+	extAddPairwiseI16x8uMask2 = [16]byte{0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00}
+)
 
-	var sseOp sseOpcode
-	switch lane {
+func (m *machine) lowerExtIaddPairwise(x, ret ssa.Value, srcLane ssa.VecLane, signed bool) {
+	_xx := m.getOperand_Reg(m.c.ValueDefinition(x))
+	xx := m.copyToTmp(_xx.reg())
+	switch srcLane {
 	case ssa.VecLaneI8x16:
-		sseOp = sseOpcodePaddb
+		allOneReg := m.c.AllocateVReg(ssa.TypeV128)
+		mask := m.getOrAllocateConstLabel(&m.constAllOnesI8x16Index, allOnesI8x16[:])
+		m.insert(m.allocateInstr().asXmmUnaryRmR(sseOpcodeMovdqu, newOperandMem(m.newAmodeRipRel(mask)), allOneReg))
+
+		var resultReg regalloc.VReg
+		if signed {
+			resultReg = allOneReg
+			m.insert(m.allocateInstr().asXmmRmR(sseOpcodePmaddubsw, newOperandReg(xx), resultReg))
+		} else {
+			// Interpreter tmp (all ones) as signed byte meaning that all the multiply-add is unsigned.
+			resultReg = xx
+			m.insert(m.allocateInstr().asXmmRmR(sseOpcodePmaddubsw, newOperandReg(allOneReg), resultReg))
+		}
+		m.copyTo(resultReg, m.c.VRegOf(ret))
+
 	case ssa.VecLaneI16x8:
-		sseOp = sseOpcodePaddw
-	case ssa.VecLaneI32x4:
-		sseOp = sseOpcodePaddd
-	case ssa.VecLaneI64x2:
-		sseOp = sseOpcodePaddq
+		if signed {
+			allOnesReg := m.c.AllocateVReg(ssa.TypeV128)
+			mask := m.getOrAllocateConstLabel(&m.constAllOnesI16x8Index, allOnesI16x8[:])
+			m.insert(m.allocateInstr().asXmmUnaryRmR(sseOpcodeMovdqu, newOperandMem(m.newAmodeRipRel(mask)), allOnesReg))
+			m.insert(m.allocateInstr().asXmmRmR(sseOpcodePmaddwd, newOperandReg(allOnesReg), xx))
+			m.copyTo(xx, m.c.VRegOf(ret))
+		} else {
+			maskReg := m.c.AllocateVReg(ssa.TypeV128)
+			mask := m.getOrAllocateConstLabel(&m.constExtAddPairwiseI16x8uMask1Index, extAddPairwiseI16x8uMask1[:])
+			m.insert(m.allocateInstr().asXmmUnaryRmR(sseOpcodeMovdqu, newOperandMem(m.newAmodeRipRel(mask)), maskReg))
+
+			// Flip the sign bits on xx.
+			//
+			// Assuming that xx = [w1, ..., w8], now we have,
+			// 	xx[i] = int8(-w1) for i = 0...8
+			m.insert(m.allocateInstr().asXmmRmR(sseOpcodePxor, newOperandReg(maskReg), xx))
+
+			mask = m.getOrAllocateConstLabel(&m.constAllOnesI16x8Index, allOnesI16x8[:])
+			m.insert(m.allocateInstr().asXmmUnaryRmR(sseOpcodeMovdqu, newOperandMem(m.newAmodeRipRel(mask)), maskReg))
+
+			// For i = 0,..4 (as this results in i32x4 lanes), now we have
+			// xx[i] = int32(-wn + -w(n+1)) = int32(-(wn + w(n+1)))
+			// c.assembler.CompileRegisterToRegister(amd64.PMADDWD, tmp, vr)
+			m.insert(m.allocateInstr().asXmmRmR(sseOpcodePmaddwd, newOperandReg(maskReg), xx))
+
+			mask = m.getOrAllocateConstLabel(&m.constExtAddPairwiseI16x8uMask2Index, extAddPairwiseI16x8uMask2[:])
+			m.insert(m.allocateInstr().asXmmUnaryRmR(sseOpcodeMovdqu, newOperandMem(m.newAmodeRipRel(mask)), maskReg))
+
+			// vr[i] = int32(-(wn + w(n+1))) + int32(math.MaxInt16+1) = int32((wn + w(n+1))) = uint32(wn + w(n+1)).
+			// c.assembler.CompileRegisterToRegister(amd64.PADDD, tmp, vr)
+			m.insert(m.allocateInstr().asXmmRmR(sseOpcodePaddd, newOperandReg(maskReg), xx))
+
+			m.copyTo(xx, m.c.VRegOf(ret))
+		}
 	default:
-		panic(fmt.Sprintf("invalid lane type: %s", lane))
+		panic(fmt.Sprintf("invalid lane type: %s", srcLane))
 	}
-
-	aaddw := m.allocateInstr().asXmmRmR(sseOp, m.getOperand_Mem_Reg(m.c.ValueDefinition(y)), tmp)
-	m.insert(aaddw)
-
-	m.copyTo(tmp, m.c.VRegOf(ret))
 }
 
 func (m *machine) lowerWidenLow(x, ret ssa.Value, lane ssa.VecLane, signed bool) {

@@ -390,10 +390,37 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		x, y, lane := instr.Arg2WithLane()
 		arr := ssaLaneToArrangement(lane)
 		m.lowerVecRRR(vecOpAdd, x, y, instr.Return(), arr)
-	case ssa.OpcodeIaddPairwise:
-		x, y, lane := instr.Arg2WithLane()
-		arr := ssaLaneToArrangement(lane)
-		m.lowerVecRRR(vecOpAddp, x, y, instr.Return(), arr)
+	case ssa.OpcodeExtIaddPairwise:
+		v, lane, signed := instr.ExtIaddPairwiseData()
+		vv := m.getOperand_NR(m.compiler.ValueDefinition(v), extModeNone)
+
+		tmpLo, tmpHi := operandNR(m.compiler.AllocateVReg(ssa.TypeV128)), operandNR(m.compiler.AllocateVReg(ssa.TypeV128))
+		var widen vecOp
+		if signed {
+			widen = vecOpSshll
+		} else {
+			widen = vecOpUshll
+		}
+
+		var loArr, hiArr, dstArr vecArrangement
+		switch lane {
+		case ssa.VecLaneI8x16:
+			loArr, hiArr, dstArr = vecArrangement8B, vecArrangement16B, vecArrangement8H
+		case ssa.VecLaneI16x8:
+			loArr, hiArr, dstArr = vecArrangement4H, vecArrangement8H, vecArrangement4S
+		case ssa.VecLaneI32x4:
+			loArr, hiArr, dstArr = vecArrangement2S, vecArrangement4S, vecArrangement2D
+		default:
+			panic("unsupported lane " + lane.String())
+		}
+
+		widenLo := m.allocateInstr().asVecShiftImm(widen, tmpLo, vv, operandShiftImm(0), loArr)
+		widenHi := m.allocateInstr().asVecShiftImm(widen, tmpHi, vv, operandShiftImm(0), hiArr)
+		addp := m.allocateInstr().asVecRRR(vecOpAddp, operandNR(m.compiler.VRegOf(instr.Return())), tmpLo, tmpHi, dstArr)
+		m.insert(widenLo)
+		m.insert(widenHi)
+		m.insert(addp)
+
 	case ssa.OpcodeVSaddSat:
 		x, y, lane := instr.Arg2WithLane()
 		arr := ssaLaneToArrangement(lane)

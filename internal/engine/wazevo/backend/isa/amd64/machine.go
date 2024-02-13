@@ -23,19 +23,23 @@ func NewBackend() backend.Machine {
 		asNop,
 	)
 	return &machine{
-		ectx:                               ectx,
-		cpuFeatures:                        platform.CpuFeatures,
-		regAlloc:                           regalloc.NewAllocator(regInfo),
-		spillSlots:                         map[regalloc.VRegID]int64{},
-		amodePool:                          wazevoapi.NewPool[amode](nil),
-		constSwizzleMaskConstIndex:         -1,
-		constSqmulRoundSatIndex:            -1,
-		constI8x16SHLMaskTableIndex:        -1,
-		constI8x16LogicalSHRMaskTableIndex: -1,
-		constF64x2CvtFromIMaskIndex:        -1,
-		constTwop52Index:                   -1,
-		constI32sMaxOnF64x2Index:           -1,
-		constI32uMaxOnF64x2Index:           -1,
+		ectx:                                ectx,
+		cpuFeatures:                         platform.CpuFeatures,
+		regAlloc:                            regalloc.NewAllocator(regInfo),
+		spillSlots:                          map[regalloc.VRegID]int64{},
+		amodePool:                           wazevoapi.NewPool[amode](nil),
+		constSwizzleMaskConstIndex:          -1,
+		constSqmulRoundSatIndex:             -1,
+		constI8x16SHLMaskTableIndex:         -1,
+		constI8x16LogicalSHRMaskTableIndex:  -1,
+		constF64x2CvtFromIMaskIndex:         -1,
+		constTwop52Index:                    -1,
+		constI32sMaxOnF64x2Index:            -1,
+		constI32uMaxOnF64x2Index:            -1,
+		constAllOnesI8x16Index:              -1,
+		constAllOnesI16x8Index:              -1,
+		constExtAddPairwiseI16x8uMask1Index: -1,
+		constExtAddPairwiseI16x8uMask2Index: -1,
 	}
 }
 
@@ -69,7 +73,9 @@ type (
 		constSwizzleMaskConstIndex, constSqmulRoundSatIndex,
 		constI8x16SHLMaskTableIndex, constI8x16LogicalSHRMaskTableIndex,
 		constF64x2CvtFromIMaskIndex, constTwop52Index,
-		constI32sMaxOnF64x2Index, constI32uMaxOnF64x2Index int
+		constI32sMaxOnF64x2Index, constI32uMaxOnF64x2Index,
+		constAllOnesI8x16Index, constAllOnesI16x8Index,
+		constExtAddPairwiseI16x8uMask1Index, constExtAddPairwiseI16x8uMask2Index int
 	}
 
 	_const struct {
@@ -134,6 +140,10 @@ func (m *machine) Reset() {
 	m.constTwop52Index = -1
 	m.constI32sMaxOnF64x2Index = -1
 	m.constI32uMaxOnF64x2Index = -1
+	m.constAllOnesI8x16Index = -1
+	m.constAllOnesI16x8Index = -1
+	m.constExtAddPairwiseI16x8uMask1Index = -1
+	m.constExtAddPairwiseI16x8uMask2Index = -1
 }
 
 // ExecutableContext implements backend.Machine.
@@ -827,9 +837,9 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		x, lane := instr.ArgWithLane()
 		m.lowerVRound(x, instr.Return(), 0x0, lane == ssa.VecLaneF64x2)
 
-	case ssa.OpcodeIaddPairwise:
-		x, y, lane := instr.Arg2WithLane()
-		m.lowerIaddPairwise(x, y, instr.Return(), lane)
+	case ssa.OpcodeExtIaddPairwise:
+		x, lane, signed := instr.ExtIaddPairwiseData()
+		m.lowerExtIaddPairwise(x, instr.Return(), lane, signed)
 
 	case ssa.OpcodeUwidenLow, ssa.OpcodeSwidenLow:
 		x, lane := instr.ArgWithLane()

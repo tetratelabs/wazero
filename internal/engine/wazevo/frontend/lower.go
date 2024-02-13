@@ -2549,24 +2549,18 @@ func (c *Compiler) lowerCurrentOpcode() {
 			if state.unreachable {
 				break
 			}
-			v1 := state.pop()
-			// TODO: The sequence `Widen; Widen; IaddPairwise` can be substituted for a single instruction on some ISAs.
+			v := state.pop()
 			signed := vecOp == wasm.OpcodeVecI16x8ExtaddPairwiseI8x16S
-			vlo := builder.AllocateInstruction().AsWiden(v1, ssa.VecLaneI8x16, signed, true).Insert(builder).Return()
-			vhi := builder.AllocateInstruction().AsWiden(v1, ssa.VecLaneI8x16, signed, false).Insert(builder).Return()
-			ret := builder.AllocateInstruction().AsIaddPairwise(vlo, vhi, ssa.VecLaneI16x8).Insert(builder).Return()
+			ret := builder.AllocateInstruction().AsExtIaddPairwise(v, ssa.VecLaneI8x16, signed).Insert(builder).Return()
 			state.push(ret)
 
 		case wasm.OpcodeVecI32x4ExtaddPairwiseI16x8S, wasm.OpcodeVecI32x4ExtaddPairwiseI16x8U:
 			if state.unreachable {
 				break
 			}
-			v1 := state.pop()
-			// TODO: The sequence `Widen; Widen; IaddPairwise` can be substituted for a single instruction on some ISAs.
+			v := state.pop()
 			signed := vecOp == wasm.OpcodeVecI32x4ExtaddPairwiseI16x8S
-			vlo := builder.AllocateInstruction().AsWiden(v1, ssa.VecLaneI16x8, signed, true).Insert(builder).Return()
-			vhi := builder.AllocateInstruction().AsWiden(v1, ssa.VecLaneI16x8, signed, false).Insert(builder).Return()
-			ret := builder.AllocateInstruction().AsIaddPairwise(vlo, vhi, ssa.VecLaneI32x4).Insert(builder).Return()
+			ret := builder.AllocateInstruction().AsExtIaddPairwise(v, ssa.VecLaneI16x8, signed).Insert(builder).Return()
 			state.push(ret)
 
 		case wasm.OpcodeVecI16x8ExtMulLowI8x16S, wasm.OpcodeVecI16x8ExtMulLowI8x16U:
