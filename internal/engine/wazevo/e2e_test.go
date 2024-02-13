@@ -15,8 +15,6 @@ import (
 	"github.com/tetratelabs/wazero/experimental/logging"
 	"github.com/tetratelabs/wazero/experimental/opt"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/testcases"
-	"github.com/tetratelabs/wazero/internal/integration_test/spectest"
-	v2 "github.com/tetratelabs/wazero/internal/integration_test/spectest/v2"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
 	"github.com/tetratelabs/wazero/internal/testing/dwarftestdata"
@@ -1467,105 +1465,4 @@ func TestDWARF(t *testing.T) {
 
 	err = r.Close(ctx)
 	require.NoError(t, err)
-}
-
-// TODO: delete this and rune them in internal/integration_test/spectest/v2/spec_test.go after amd64 is done.
-func TestSpectestV2(t *testing.T) {
-	if runtime.GOARCH != "amd64" {
-		return
-	}
-
-	config := opt.NewRuntimeConfigOptimizingCompiler()
-
-	for _, tc := range []struct {
-		name string
-	}{
-		{"block"},
-		{"bulk"},
-		{"i32"},
-		{"i64"},
-		{"br"},
-		{"call"},
-		{"call_indirect"},
-		{"conversions"},
-		{"global"},
-		{"if"},
-		{"linking"},
-		{"loop"},
-		{"memory_copy"},
-		{"memory_fill"},
-		{"memory_init"},
-		{"memory_trap"},
-		{"ref_null"},
-		{"ref_is_null"},
-		{"ref_func"},
-		{"table_copy"},
-		{"table_fill"},
-		{"table_get"},
-		{"table_init"},
-		{"table_set"},
-		{"table_size"},
-		{"select"},
-		{"simd_boolean"},
-		{"simd_bit_shift"},
-		{"simd_bitwise"},
-		{"simd_const"},
-		{"simd_conversions"},
-		{"simd_i8x16_arith"},
-		{"simd_i8x16_arith2"},
-		{"simd_i8x16_sat_arith"},
-		{"simd_i16x8_arith"},
-		{"simd_i16x8_arith2"},
-		{"simd_i16x8_sat_arith"},
-		{"simd_i32x4_arith"},
-		{"simd_i32x4_arith2"},
-		{"simd_i64x2_arith"},
-		{"simd_i64x2_arith2"},
-		{"simd_i8x16_cmp"},
-		{"simd_i16x8_cmp"},
-		{"simd_i32x4_cmp"},
-		{"simd_i64x2_cmp"},
-		{"simd_f32x4"},
-		{"simd_f64x2"},
-		{"simd_f32x4_arith"},
-		{"simd_f64x2_arith"},
-		{"simd_f32x4_cmp"},
-		{"simd_f64x2_cmp"},
-		{"simd_f32x4_rounding"},
-		{"simd_f64x2_rounding"},
-		{"simd_f32x4_pmin_pmax"},
-		{"simd_f64x2_pmin_pmax"},
-		//{"simd_i32x4_trunc_sat_f32x4"},
-		//{"simd_i32x4_trunc_sat_f64x2"},
-		{"simd_i32x4_dot_i16x8"},
-		{"simd_i16x8_extmul_i8x16"},
-		{"simd_i64x2_extmul_i32x4"},
-		{"simd_i32x4_extmul_i16x8"},
-		{"simd_i16x8_extadd_pairwise_i8x16"},
-		{"simd_i32x4_extadd_pairwise_i16x8"},
-		{"simd_i16x8_q15mulr_sat_s"},
-		{"simd_int_to_int_extend"},
-		//{"simd_load"},
-		{"simd_load_extend"},
-		{"simd_load_splat"},
-		{"simd_load_zero"},
-		{"simd_load8_lane"},
-		{"simd_load16_lane"},
-		{"simd_load32_lane"},
-		{"simd_load64_lane"},
-		{"simd_lane"},
-		{"simd_linking"},
-		//{"simd_splat"},
-		{"simd_store"},
-		{"simd_store8_lane"},
-		{"simd_store16_lane"},
-		{"simd_store32_lane"},
-		{"simd_store64_lane"},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			ctx := context.Background()
-			spectest.RunCase(t, v2.Testcases, tc.name, ctx, config,
-				-1, 0, math.MaxInt)
-		})
-	}
 }

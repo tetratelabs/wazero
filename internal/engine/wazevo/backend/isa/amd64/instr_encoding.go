@@ -161,8 +161,6 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 			legPrex, opcode, opcodeNum = legacyPrefixes0x66, 0x0F3814, 3
 		case sseOpcodeBlendvpd:
 			legPrex, opcode, opcodeNum = legacyPrefixes0x66, 0x0F3815, 3
-		case sseOpcodeCvttps2dq:
-			legPrex, opcode, opcodeNum = legacyPrefixes0xF3, 0x0F5B, 2
 		case sseOpcodeDivps:
 			legPrex, opcode, opcodeNum = legacyPrefixesNone, 0x0F5E, 2
 		case sseOpcodeDivpd:
@@ -453,6 +451,10 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 			prefix, opcode, opcodeNum = legacyPrefixesNone, 0x0F5A, 2
 		case sseOpcodeCvtpd2ps:
 			prefix, opcode, opcodeNum = legacyPrefixes0x66, 0x0F5A, 2
+		case sseOpcodeCvttps2dq:
+			prefix, opcode, opcodeNum = legacyPrefixes0xF3, 0x0F5B, 2
+		case sseOpcodeCvttpd2dq:
+			prefix, opcode, opcodeNum = legacyPrefixes0x66, 0x0FE6, 2
 		default:
 			panic(fmt.Sprintf("Unsupported sseOpcode: %s", op))
 		}
@@ -1095,6 +1097,8 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 			legPrex, opcode, opcodeNum = legacyPrefixes0x66, 0x0F3A08, 3
 		case sseOpcodeRoundpd:
 			legPrex, opcode, opcodeNum = legacyPrefixes0x66, 0x0F3A09, 3
+		case sseOpcodeShufps:
+			legPrex, opcode, opcodeNum = legacyPrefixesNone, 0x0FC6, 2
 		default:
 			panic(fmt.Sprintf("Unsupported sseOpcode: %s", op))
 		}
