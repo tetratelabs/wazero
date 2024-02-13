@@ -711,6 +711,12 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 	case ssa.OpcodeAtomicCas:
 		m.lowerAtomicCas(instr)
 
+	case ssa.OpcodeAtomicLoad:
+		m.lowerAtomicLoad(instr)
+
+	case ssa.OpcodeAtomicStore:
+		m.lowerAtomicStore(instr)
+
 	default:
 		panic("TODO: lowering " + op.String())
 	}
@@ -2047,7 +2053,7 @@ func (m *machine) lowerAtomicRmwImpl(op atomicRmwOp, rn, rs, rt, tmp operand, si
 
 func (m *machine) lowerAtomicCas(si *ssa.Instruction) {
 	addr, exp, repl := si.Arg3()
-	size := si.AtomicCasData()
+	size := si.AtomicTargetSize()
 
 	addrDef, expDef, replDef := m.compiler.ValueDefinition(addr), m.compiler.ValueDefinition(exp), m.compiler.ValueDefinition(repl)
 	rn := m.getOperand_NR(addrDef, extModeNone)
@@ -2082,6 +2088,41 @@ func (m *machine) lowerAtomicCasImpl(rn, rs, rt operand, size uint64) {
 	cas := m.allocateInstr()
 	cas.asAtomicCas(rn, rs, rt, size)
 	m.insert(cas)
+}
+
+func (m *machine) lowerAtomicLoad(si *ssa.Instruction) {
+	addr := si.Arg()
+	size := si.AtomicTargetSize()
+
+	addrDef := m.compiler.ValueDefinition(addr)
+	rn := m.getOperand_NR(addrDef, extModeNone)
+	rt := operandNR(m.compiler.VRegOf(si.Return()))
+
+	m.lowerAtomicLoadImpl(rn, rt, size)
+}
+
+func (m *machine) lowerAtomicLoadImpl(rn, rt operand, size uint64) {
+	ld := m.allocateInstr()
+	ld.asAtomicLoad(rn, rt, size)
+	m.insert(ld)
+}
+
+func (m *machine) lowerAtomicStore(si *ssa.Instruction) {
+	addr, val := si.Arg2()
+	size := si.AtomicTargetSize()
+
+	addrDef := m.compiler.ValueDefinition(addr)
+	valDef := m.compiler.ValueDefinition(val)
+	rn := m.getOperand_NR(addrDef, extModeNone)
+	rt := m.getOperand_NR(valDef, extModeNone)
+
+	m.lowerAtomicStoreImpl(rn, rt, size)
+}
+
+func (m *machine) lowerAtomicStoreImpl(rn, rt operand, size uint64) {
+	ld := m.allocateInstr()
+	ld.asAtomicStore(rn, rt, size)
+	m.insert(ld)
 }
 
 // copyToTmp copies the given regalloc.VReg to a temporary register. This is called before cbr to avoid the regalloc issue

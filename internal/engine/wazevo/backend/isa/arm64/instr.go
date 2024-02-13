@@ -161,6 +161,8 @@ var defKinds = [numInstructionKinds]defKind{
 	emitSourceOffsetInfo: defKindNone,
 	atomicRmw:            defKindRD,
 	atomicCas:            defKindNone,
+	atomicLoad:           defKindRD,
+	atomicStore:          defKindNone,
 }
 
 // Defs returns the list of regalloc.VReg that are defined by the instruction.
@@ -295,6 +297,8 @@ var useKinds = [numInstructionKinds]useKind{
 	emitSourceOffsetInfo: useKindNone,
 	atomicRmw:            useKindRNRM,
 	atomicCas:            useKindRDRewrite,
+	atomicLoad:           useKindRN,
+	atomicStore:          useKindRNRM,
 }
 
 // Uses returns the list of regalloc.VReg that are used by the instruction.
@@ -1476,6 +1480,30 @@ func (i *instruction) String() (str string) {
 			m = m + "b"
 		}
 		str = fmt.Sprintf("%s %s, %s, %s", m, formatVRegSized(i.rd.nr(), size), formatVRegSized(i.rm.nr(), size), formatVRegSized(i.rn.nr(), 64))
+	case atomicLoad:
+		m := "ldar"
+		size := byte(32)
+		switch i.u2 {
+		case 8:
+			size = 64
+		case 2:
+			m = m + "h"
+		case 1:
+			m = m + "b"
+		}
+		str = fmt.Sprintf("%s %s, %s", m, formatVRegSized(i.rd.nr(), size), formatVRegSized(i.rn.nr(), 64))
+	case atomicStore:
+		m := "stlr"
+		size := byte(32)
+		switch i.u2 {
+		case 8:
+			size = 64
+		case 2:
+			m = m + "h"
+		case 1:
+			m = m + "b"
+		}
+		str = fmt.Sprintf("%s %s, %s", m, formatVRegSized(i.rm.nr(), size), formatVRegSized(i.rn.nr(), 64))
 	case udf:
 		str = "udf"
 	case emitSourceOffsetInfo:
@@ -1504,6 +1532,18 @@ func (i *instruction) asAtomicRmw(op atomicRmwOp, rn, rs, rt operand, size uint6
 func (i *instruction) asAtomicCas(rn, rs, rt operand, size uint64) {
 	i.kind = atomicCas
 	i.rm, i.rn, i.rd = rt, rn, rs
+	i.u2 = size
+}
+
+func (i *instruction) asAtomicLoad(rn, rt operand, size uint64) {
+	i.kind = atomicLoad
+	i.rn, i.rd = rn, rt
+	i.u2 = size
+}
+
+func (i *instruction) asAtomicStore(rn, rt operand, size uint64) {
+	i.kind = atomicStore
+	i.rn, i.rm = rn, rt
 	i.u2 = size
 }
 
@@ -1678,6 +1718,10 @@ const (
 	// atomicCas represents an atomic compare-and-swap operation with three register sources. The value is loaded to
 	// the source register containing the comparison value.
 	atomicCas
+	// atomicLoad represents an atomic load with one source register and a register destination.
+	atomicLoad
+	// atomicStore represents an atomic store with two source registers and no destination.
+	atomicStore
 	// UDF is the undefined instruction. For debugging only.
 	udf
 
