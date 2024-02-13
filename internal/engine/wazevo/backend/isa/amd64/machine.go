@@ -23,13 +23,15 @@ func NewBackend() backend.Machine {
 		asNop,
 	)
 	return &machine{
-		ectx:                  ectx,
-		cpuFeatures:           platform.CpuFeatures,
-		regAlloc:              regalloc.NewAllocator(regInfo),
-		spillSlots:            map[regalloc.VRegID]int64{},
-		amodePool:             wazevoapi.NewPool[amode](nil),
-		swizzleMaskConstIndex: -1,
-		sqmulRoundSatIndex:    -1,
+		ectx:                          ectx,
+		cpuFeatures:                   platform.CpuFeatures,
+		regAlloc:                      regalloc.NewAllocator(regInfo),
+		spillSlots:                    map[regalloc.VRegID]int64{},
+		amodePool:                     wazevoapi.NewPool[amode](nil),
+		swizzleMaskConstIndex:         -1,
+		sqmulRoundSatIndex:            -1,
+		i8x16SHLMaskTableIndex:        -1,
+		i8x16LogicalSHRMaskTableIndex: -1,
 	}
 }
 
@@ -60,7 +62,8 @@ type (
 		jmpTableTargets [][]uint32
 		consts          []_const
 
-		swizzleMaskConstIndex, sqmulRoundSatIndex int
+		swizzleMaskConstIndex, sqmulRoundSatIndex,
+		i8x16SHLMaskTableIndex, i8x16LogicalSHRMaskTableIndex int
 	}
 
 	_const struct {
@@ -105,6 +108,8 @@ func (m *machine) Reset() {
 	m.jmpTableTargets = m.jmpTableTargets[:0]
 	m.swizzleMaskConstIndex = -1
 	m.sqmulRoundSatIndex = -1
+	m.i8x16SHLMaskTableIndex = -1
+	m.i8x16LogicalSHRMaskTableIndex = -1
 }
 
 // ExecutableContext implements backend.Machine.
@@ -769,6 +774,18 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 			panic("BUG: unexpected lane type")
 		}
 		m.lowerVbBinOp(vecOp, y, x, instr.Return())
+
+	case ssa.OpcodeVIshl:
+		x, y, lane := instr.Arg2WithLane()
+		m.lowerVIshl(x, y, instr.Return(), lane)
+
+	case ssa.OpcodeVSshr:
+		x, y, lane := instr.Arg2WithLane()
+		m.lowerVSshr(x, y, instr.Return(), lane)
+
+	case ssa.OpcodeVUshr:
+		x, y, lane := instr.Arg2WithLane()
+		m.lowerVUshr(x, y, instr.Return(), lane)
 
 	case ssa.OpcodeVIabs:
 		m.lowerVIabs(instr)
