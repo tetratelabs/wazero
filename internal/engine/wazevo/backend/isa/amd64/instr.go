@@ -1581,6 +1581,8 @@ const (
 	sseOpcodeUnpcklps
 	sseOpcodeCvtps2pd
 	sseOpcodeCvtpd2ps
+	sseOpcodeCvttpd2dq
+	sseOpcodeShufps
 )
 
 func (s sseOpcode) String() string {
@@ -1925,6 +1927,10 @@ func (s sseOpcode) String() string {
 		return "cvtps2pd"
 	case sseOpcodeCvtpd2ps:
 		return "cvtpd2ps"
+	case sseOpcodeCvttpd2dq:
+		return "cvttpd2dq"
+	case sseOpcodeShufps:
+		return "shufps"
 	default:
 		panic("BUG")
 	}

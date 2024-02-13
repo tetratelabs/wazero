@@ -529,20 +529,20 @@ func (m *machine) lowerVFcvtFromInt(x, ret ssa.Value, lane ssa.VecLane, signed b
 			m.insert(m.allocateInstr().asXmmRmiReg(sseOpcodePslld, newOperandImm32(0xa), tmp))
 			m.insert(m.allocateInstr().asXmmRmiReg(sseOpcodePsrld, newOperandImm32(0xa), tmp))
 
-			// Subtract the higher 16-bits from vr == clear the lower 16-bits of vr.
+			// Subtract the higher 16-bits from tmp2: clear the lower 16-bits of tmp2.
 			m.insert(m.allocateInstr().asXmmRmR(sseOpcodePsubd, newOperandReg(tmp), tmp2))
 
 			// Convert the lower 16-bits in tmp.
 			m.insert(m.allocateInstr().asXmmUnaryRmR(sseOpcodeCvtdq2ps, newOperandReg(tmp), tmp))
 
-			// Left shift by one and convert vr, meaning that halved conversion result of higher 16-bits in vr.
+			// Left shift by one and convert tmp2, meaning that halved conversion result of higher 16-bits in tmp2.
 			m.insert(m.allocateInstr().asXmmRmiReg(sseOpcodePsrld, newOperandImm32(1), tmp2))
 			m.insert(m.allocateInstr().asXmmUnaryRmR(sseOpcodeCvtdq2ps, newOperandReg(tmp2), tmp2))
 
 			// Double the converted halved higher 16bits.
 			m.insert(m.allocateInstr().asXmmRmR(sseOpcodeAddps, newOperandReg(tmp2), tmp2))
 
-			// Get the conversion result by add tmp (holding lower 16-bit conversion) into vr.
+			// Get the conversion result by add tmp (holding lower 16-bit conversion) into tmp2.
 			m.insert(m.allocateInstr().asXmmRmR(sseOpcodeAddps, newOperandReg(tmp), tmp2))
 
 			m.copyTo(tmp2, m.c.VRegOf(ret))
@@ -585,13 +585,13 @@ func (m *machine) lowerVFcvtFromInt(x, ret ssa.Value, lane ssa.VecLane, signed b
 
 var (
 	// i32sMaxOnF64x2 holds math.MaxInt32(=2147483647.0) on two f64 lanes.
-	i32sMaxOnF64x2 = [16]byte{ //nolint:unused
+	i32sMaxOnF64x2 = [16]byte{
 		0x00, 0x00, 0xc0, 0xff, 0xff, 0xff, 0xdf, 0x41, // float64(2147483647.0)
 		0x00, 0x00, 0xc0, 0xff, 0xff, 0xff, 0xdf, 0x41, // float64(2147483647.0)
 	}
 
 	// i32sMaxOnF64x2 holds math.MaxUint32(=4294967295.0) on two f64 lanes.
-	i32uMaxOnF64x2 = [16]byte{ //nolint:unused
+	i32uMaxOnF64x2 = [16]byte{
 		0x00, 0x00, 0xe0, 0xff, 0xff, 0xff, 0xef, 0x41, // float64(4294967295.0)
 		0x00, 0x00, 0xe0, 0xff, 0xff, 0xff, 0xef, 0x41, // float64(4294967295.0)
 	}
@@ -611,7 +611,132 @@ var (
 )
 
 func (m *machine) lowerVFcvtToIntSat(x, ret ssa.Value, lane ssa.VecLane, signed bool) {
-	panic("TODO")
+	_xx := m.getOperand_Reg(m.c.ValueDefinition(x))
+	xx := m.copyToTmp(_xx.reg())
+
+	switch lane {
+	case ssa.VecLaneF32x4:
+		if signed {
+			tmp := m.copyToTmp(xx)
+
+			// Assuming we have xx = [v1, v2, v3, v4].
+			//
+			// Set all bits if lane is not NaN on tmp.
+			// tmp[i] = 0xffffffff  if vi != NaN
+			//        = 0           if vi == NaN
+			m.insert(m.allocateInstr().asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredEQ_OQ), newOperandReg(tmp), tmp))
+
+			// Clear NaN lanes on xx, meaning that
+			// 	xx[i] = vi  if vi != NaN
+			//	        0   if vi == NaN
+			m.insert(m.allocateInstr().asXmmRmR(sseOpcodeAndps, newOperandReg(tmp), xx))
+
+			// tmp[i] = ^vi         if vi != NaN
+			//        = 0xffffffff  if vi == NaN
+			// which means that tmp[i] & 0x80000000 != 0 if and only if vi is negative.
+			m.insert(m.allocateInstr().asXmmRmR(sseOpcodeXorps, newOperandReg(xx), tmp))
+
+			// xx[i] = int32(vi)   if vi != NaN and xx is not overflowing.
+			//       = 0x80000000  if vi != NaN and xx is overflowing (See https://www.felixcloutier.com/x86/cvttps2dq)
+			//       = 0           if vi == NaN
+			m.insert(m.allocateInstr().asXmmUnaryRmR(sseOpcodeCvttps2dq, newOperandReg(xx), xx))
+
+			// Below, we have to convert 0x80000000 into 0x7FFFFFFF for positive overflowing lane.
+			//
+			// tmp[i] = 0x80000000                         if vi is positive
+			//        = any satisfying any&0x80000000 = 0  if vi is negative or zero.
+			m.insert(m.allocateInstr().asXmmRmR(sseOpcodeAndps, newOperandReg(xx), tmp))
+
+			// Arithmetic right shifting tmp by 31, meaning that we have
+			// tmp[i] = 0xffffffff if vi is positive, 0 otherwise.
+			m.insert(m.allocateInstr().asXmmRmiReg(sseOpcodePsrad, newOperandImm32(0x1f), tmp))
+
+			// Flipping 0x80000000 if vi is positive, otherwise keep intact.
+			m.insert(m.allocateInstr().asXmmRmR(sseOpcodePxor, newOperandReg(tmp), xx))
+		} else {
+			tmp := m.c.AllocateVReg(ssa.TypeV128)
+			m.insert(m.allocateInstr().asZeros(tmp))
+			m.insert(m.allocateInstr().asXmmRmR(sseOpcodeMaxps, newOperandReg(tmp), xx))
+			m.insert(m.allocateInstr().asXmmRmR(sseOpcodePcmpeqd, newOperandReg(tmp), tmp))
+			m.insert(m.allocateInstr().asXmmRmiReg(sseOpcodePsrld, newOperandImm32(0x1), tmp))
+			m.insert(m.allocateInstr().asXmmUnaryRmR(sseOpcodeCvtdq2ps, newOperandReg(tmp), tmp))
+			tmp2 := m.copyToTmp(xx)
+			m.insert(m.allocateInstr().asXmmUnaryRmR(sseOpcodeCvttps2dq, newOperandReg(xx), xx))
+			m.insert(m.allocateInstr().asXmmRmR(sseOpcodeSubps, newOperandReg(tmp), tmp2))
+			m.insert(m.allocateInstr().asXmmRmRImm(sseOpcodeCmpps, uint8(cmpPredLE_OS), newOperandReg(tmp2), tmp))
+			m.insert(m.allocateInstr().asXmmUnaryRmR(sseOpcodeCvttps2dq, newOperandReg(tmp2), tmp2))
+			m.insert(m.allocateInstr().asXmmRmR(sseOpcodePxor, newOperandReg(tmp), tmp2))
+			m.insert(m.allocateInstr().asXmmRmR(sseOpcodePxor, newOperandReg(tmp), tmp))
+			m.insert(m.allocateInstr().asXmmRmR(sseOpcodePmaxsd, newOperandReg(tmp), tmp2))
+			m.insert(m.allocateInstr().asXmmRmR(sseOpcodePaddd, newOperandReg(tmp2), xx))
+		}
+
+	case ssa.VecLaneF64x2:
+		tmp2 := m.c.AllocateVReg(ssa.TypeV128)
+		if signed {
+			tmp := m.copyToTmp(xx)
+
+			// Set all bits for non-NaN lanes, zeros otherwise.
+			// I.e. tmp[i] = 0xffffffff_ffffffff if vi != NaN, 0 otherwise.
+			m.insert(m.allocateInstr().asXmmRmRImm(sseOpcodeCmppd, uint8(cmpPredEQ_OQ), newOperandReg(tmp), tmp))
+
+			maskLabel := m.getOrAllocateConstLabel(&m.constI32sMaxOnF64x2Index, i32sMaxOnF64x2[:])
+			// Load the 2147483647 into tmp2's each lane.
+			m.insert(m.allocateInstr().asXmmUnaryRmR(sseOpcodeMovdqu, newOperandMem(m.newAmodeRipRel(maskLabel)), tmp2))
+
+			// tmp[i] = 2147483647 if vi != NaN, 0 otherwise.
+			m.insert(m.allocateInstr().asXmmRmR(sseOpcodeAndps, newOperandReg(tmp2), tmp))
+
+			// MINPD returns the source register's value as-is, so we have
+			//  xx[i] = vi   if vi != NaN
+			//        = 0    if vi == NaN
+			m.insert(m.allocateInstr().asXmmRmR(sseOpcodeMinpd, newOperandReg(tmp), xx))
+
+			m.insert(m.allocateInstr().asXmmUnaryRmR(sseOpcodeCvttpd2dq, newOperandReg(xx), xx))
+		} else {
+			tmp := m.c.AllocateVReg(ssa.TypeV128)
+			m.insert(m.allocateInstr().asZeros(tmp))
+
+			//  xx[i] = vi   if vi != NaN && vi > 0
+			//        = 0    if vi == NaN || vi <= 0
+			m.insert(m.allocateInstr().asXmmRmR(sseOpcodeMaxpd, newOperandReg(tmp), xx))
+
+			// tmp2[i] = float64(math.MaxUint32) = math.MaxUint32
+			maskIndex := m.getOrAllocateConstLabel(&m.constI32uMaxOnF64x2Index, i32uMaxOnF64x2[:])
+			m.insert(m.allocateInstr().asXmmUnaryRmR(sseOpcodeMovdqu, newOperandMem(m.newAmodeRipRel(maskIndex)), tmp2))
+
+			// xx[i] = vi   if vi != NaN && vi > 0 && vi <= math.MaxUint32
+			//       = 0    otherwise
+			m.insert(m.allocateInstr().asXmmRmR(sseOpcodeMinpd, newOperandReg(tmp2), xx))
+
+			// Round the floating points into integer.
+			m.insert(m.allocateInstr().asXmmRmRImm(sseOpcodeRoundpd, 0x3, newOperandReg(xx), xx))
+
+			// tmp2[i] = float64(0x1.0p52)
+			maskIndex = m.getOrAllocateConstLabel(&m.constTwop52Index, twop52[:])
+			m.insert(m.allocateInstr().asXmmUnaryRmR(sseOpcodeMovdqu, newOperandMem(m.newAmodeRipRel(maskIndex)), tmp2))
+
+			// xx[i] = float64(0x1.0p52) + float64(uint32(vi)) if vi != NaN && vi > 0 && vi <= math.MaxUint32
+			//       = 0                                       otherwise
+			//
+			// This means that xx[i] holds exactly the same bit of uint32(vi) in its lower 32-bits.
+			m.insert(m.allocateInstr().asXmmRmR(sseOpcodeAddpd, newOperandReg(tmp2), xx))
+
+			// At this point, we have
+			// 	xx  = [uint32(v0), float64(0x1.0p52), uint32(v1), float64(0x1.0p52)]
+			//  tmp = [0, 0, 0, 0]
+			// as 32x4 lanes. Therefore, SHUFPS with 0b00_00_10_00 results in
+			//	xx = [xx[00], xx[10], tmp[00], tmp[00]] = [xx[00], xx[10], 0, 0]
+			// meaning that for i = 0 and 1, we have
+			//  xx[i] = uint32(vi) if vi != NaN && vi > 0 && vi <= math.MaxUint32
+			//        = 0          otherwise.
+			m.insert(m.allocateInstr().asXmmRmRImm(sseOpcodeShufps, 0b00_00_10_00, newOperandReg(tmp), xx))
+		}
+	default:
+		panic(fmt.Sprintf("invalid lane type: %s", lane))
+	}
+
+	m.copyTo(xx, m.c.VRegOf(ret))
 }
 
 func (m *machine) lowerNarrow(x, y, ret ssa.Value, lane ssa.VecLane, signed bool) {

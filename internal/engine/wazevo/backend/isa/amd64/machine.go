@@ -34,6 +34,8 @@ func NewBackend() backend.Machine {
 		constI8x16LogicalSHRMaskTableIndex: -1,
 		constF64x2CvtFromIMaskIndex:        -1,
 		constTwop52Index:                   -1,
+		constI32sMaxOnF64x2Index:           -1,
+		constI32uMaxOnF64x2Index:           -1,
 	}
 }
 
@@ -66,7 +68,8 @@ type (
 
 		constSwizzleMaskConstIndex, constSqmulRoundSatIndex,
 		constI8x16SHLMaskTableIndex, constI8x16LogicalSHRMaskTableIndex,
-		constF64x2CvtFromIMaskIndex, constTwop52Index int
+		constF64x2CvtFromIMaskIndex, constTwop52Index,
+		constI32sMaxOnF64x2Index, constI32uMaxOnF64x2Index int
 	}
 
 	_const struct {
@@ -129,6 +132,8 @@ func (m *machine) Reset() {
 	m.constI8x16LogicalSHRMaskTableIndex = -1
 	m.constF64x2CvtFromIMaskIndex = -1
 	m.constTwop52Index = -1
+	m.constI32sMaxOnF64x2Index = -1
+	m.constI32uMaxOnF64x2Index = -1
 }
 
 // ExecutableContext implements backend.Machine.

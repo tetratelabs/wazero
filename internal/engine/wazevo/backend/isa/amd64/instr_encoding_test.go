@@ -462,7 +462,7 @@ func TestInstruction_format_encode(t *testing.T) {
 			wantFormat: "blendvps %xmm1, %xmm0",
 		},
 		{
-			setup:      func(i *instruction) { i.asXmmRmR(sseOpcodeCvttps2dq, newOperandReg(xmm1VReg), xmm0VReg) },
+			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodeCvttps2dq, newOperandReg(xmm1VReg), xmm0VReg) },
 			want:       "f30f5bc1",
 			wantFormat: "cvttps2dq %xmm1, %xmm0",
 		},
@@ -4023,6 +4023,18 @@ func TestInstruction_format_encode(t *testing.T) {
 			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodeCvtpd2ps, newOperandReg(xmm15VReg), xmm0VReg) },
 			want:       "66410f5ac7",
 			wantFormat: "cvtpd2ps %xmm15, %xmm0",
+		},
+		{
+			setup:      func(i *instruction) { i.asXmmUnaryRmR(sseOpcodeCvttpd2dq, newOperandReg(xmm15VReg), xmm11VReg) },
+			want:       "66450fe6df",
+			wantFormat: "cvttpd2dq %xmm15, %xmm11",
+		},
+		{
+			setup: func(i *instruction) {
+				i.asXmmRmRImm(sseOpcodeShufps, 0b00_00_10_00, newOperandReg(xmm15VReg), xmm11VReg)
+			},
+			want:       "450fc6df08",
+			wantFormat: "shufps $8, %xmm15, %xmm11",
 		},
 	} {
 		tc := tc

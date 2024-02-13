@@ -2,7 +2,6 @@ package v2
 
 import (
 	"context"
-	"runtime"
 	"testing"
 
 	"github.com/tetratelabs/wazero"
@@ -26,9 +25,5 @@ func TestInterpreter(t *testing.T) {
 }
 
 func TestWazevo(t *testing.T) {
-	if runtime.GOARCH != "arm64" {
-		t.Skip()
-	}
-	c := opt.NewRuntimeConfigOptimizingCompiler().WithCoreFeatures(enabledFeatures)
-	spectest.Run(t, Testcases, context.Background(), c)
+	spectest.Run(t, Testcases, context.Background(), opt.NewRuntimeConfigOptimizingCompiler().WithCoreFeatures(enabledFeatures))
 }
