@@ -29,6 +29,7 @@ func NewBackend() backend.Machine {
 		spillSlots:            map[regalloc.VRegID]int64{},
 		amodePool:             wazevoapi.NewPool[amode](nil),
 		swizzleMaskConstIndex: -1,
+		sqmulRoundSatIndex:    -1,
 	}
 }
 
@@ -59,7 +60,7 @@ type (
 		jmpTableTargets [][]uint32
 		consts          []_const
 
-		swizzleMaskConstIndex int
+		swizzleMaskConstIndex, sqmulRoundSatIndex int
 	}
 
 	_const struct {
@@ -103,6 +104,7 @@ func (m *machine) Reset() {
 	m.amodePool.Reset()
 	m.jmpTableTargets = m.jmpTableTargets[:0]
 	m.swizzleMaskConstIndex = -1
+	m.sqmulRoundSatIndex = -1
 }
 
 // ExecutableContext implements backend.Machine.
@@ -722,6 +724,51 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 	case ssa.OpcodeSplat:
 		x, lane := instr.ArgWithLane()
 		m.lowerSplat(x, instr.Return(), lane)
+
+	case ssa.OpcodeSqmulRoundSat:
+		x, y := instr.Arg2()
+		m.lowerSqmulRoundSat(x, y, instr.Return())
+
+	case ssa.OpcodeVZeroExtLoad:
+		ptr, offset, typ := instr.VZeroExtLoadData()
+		var sseOp sseOpcode
+		// Both movss and movsd clears the higher bits of the destination register upt 128 bits.
+		// https://www.felixcloutier.com/x86/movss
+		// https://www.felixcloutier.com/x86/movsd
+		if typ == ssa.TypeF32 {
+			sseOp = sseOpcodeMovss
+		} else {
+			sseOp = sseOpcodeMovsd
+		}
+		mem := m.lowerToAddressMode(ptr, offset)
+		dst := m.c.VRegOf(instr.Return())
+		m.insert(m.allocateInstr().asXmmUnaryRmR(sseOp, newOperandMem(mem), dst))
+
+	case ssa.OpcodeVMinPseudo:
+		x, y, lane := instr.Arg2WithLane()
+		var vecOp sseOpcode
+		switch lane {
+		case ssa.VecLaneF32x4:
+			vecOp = sseOpcodeMinps
+		case ssa.VecLaneF64x2:
+			vecOp = sseOpcodeMinpd
+		default:
+			panic("BUG: unexpected lane type")
+		}
+		m.lowerVbBinOp(vecOp, y, x, instr.Return())
+
+	case ssa.OpcodeVMaxPseudo:
+		x, y, lane := instr.Arg2WithLane()
+		var vecOp sseOpcode
+		switch lane {
+		case ssa.VecLaneF32x4:
+			vecOp = sseOpcodeMaxps
+		case ssa.VecLaneF64x2:
+			vecOp = sseOpcodeMaxpd
+		default:
+			panic("BUG: unexpected lane type")
+		}
+		m.lowerVbBinOp(vecOp, y, x, instr.Return())
 
 	case ssa.OpcodeVIabs:
 		m.lowerVIabs(instr)
@@ -2889,6 +2936,34 @@ func (m *machine) lowerVbnot(instr *ssa.Instruction) {
 	m.insert(xor)
 
 	m.copyTo(tmp, rd)
+}
+
+var sqmulRoundSat = [16]byte{
+	0x00, 0x80, 0x00, 0x80, 0x00, 0x80, 0x00, 0x80,
+	0x00, 0x80, 0x00, 0x80, 0x00, 0x80, 0x00, 0x80,
+}
+
+func (m *machine) lowerSqmulRoundSat(x, y, ret ssa.Value) {
+	// See https://github.com/WebAssembly/simd/pull/365 for the following logic.
+	maskIndex := m.sqmulRoundSatIndex
+	if maskIndex < 0 {
+		maskIndex = len(m.consts)
+		m.consts = append(m.consts, _const{_var: sqmulRoundSat[:], label: m.allocateLabel()})
+		m.sqmulRoundSatIndex = maskIndex
+	}
+
+	tmp := m.c.AllocateVReg(ssa.TypeV128)
+	loadMask := m.allocateInstr().asXmmUnaryRmR(sseOpcodeMovdqu, newOperandMem(m.newAmodeRipRel(m.consts[maskIndex].label.L)), tmp)
+	m.insert(loadMask)
+
+	xx, yy := m.getOperand_Reg(m.c.ValueDefinition(x)), m.getOperand_Mem_Reg(m.c.ValueDefinition(y))
+	tmpX := m.copyToTmp(xx.reg())
+
+	m.insert(m.allocateInstr().asXmmRmR(sseOpcodePmulhrsw, yy, tmpX))
+	m.insert(m.allocateInstr().asXmmRmR(sseOpcodePcmpeqd, newOperandReg(tmpX), tmp))
+	m.insert(m.allocateInstr().asXmmRmR(sseOpcodePxor, newOperandReg(tmp), tmpX))
+
+	m.copyTo(tmpX, m.c.VRegOf(ret))
 }
 
 func (m *machine) lowerSplat(x, ret ssa.Value, lane ssa.VecLane) {
