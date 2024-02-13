@@ -1006,8 +1006,24 @@ func Test2057(t *testing.T) {
 	run(t, func(t *testing.T, r wazero.Runtime) {
 		mod, err := r.Instantiate(ctx, getWasmBinary(t, "2057"))
 		require.NoError(t, err)
-		res, err := mod.ExportedFunction("").Call(ctx, 1)
+		res, err := mod.ExportedFunction("").Call(ctx, 0)
 		require.NoError(t, err)
 		require.Equal(t, []uint64{0xe2012900e20129, 0xe2012900e20129}, res)
+	})
+}
+
+func Test2058(t *testing.T) {
+	if !platform.CompilerSupported() {
+		return
+	}
+	run(t, func(t *testing.T, r wazero.Runtime) {
+		mod, err := r.Instantiate(ctx, getWasmBinary(t, "2058"))
+		require.NoError(t, err)
+		_, err = mod.ExportedFunction("").Call(ctx, 0, 0, 0)
+		require.NoError(t, err)
+		m := mod.(*wasm.ModuleInstance)
+		lo, hi := m.Globals[0].Value()
+		require.Equal(t, uint64(18446744073709551615), lo)
+		require.Equal(t, uint64(0), hi)
 	})
 }

@@ -3210,8 +3210,7 @@ func (m *machine) lowerVIcmp(x, y ssa.Value, c ssa.IntegerCmpCond, ret ssa.Value
 	tmp := m.c.AllocateVReg(ssa.TypeV128)
 	var op operand
 	switch c {
-	case ssa.IntegerCmpCondSignedLessThan, ssa.IntegerCmpCondSignedLessThanOrEqual,
-		ssa.IntegerCmpCondUnsignedLessThan, ssa.IntegerCmpCondUnsignedLessThanOrEqual:
+	case ssa.IntegerCmpCondSignedLessThanOrEqual:
 		if lane == ssa.VecLaneI64x2 {
 			x := m.getOperand_Mem_Reg(m.c.ValueDefinition(x))
 			// Copy x to tmp.
@@ -3223,18 +3222,28 @@ func (m *machine) lowerVIcmp(x, y ssa.Value, c ssa.IntegerCmpCond, ret ssa.Value
 			m.insert(m.allocateInstr().asXmmUnaryRmR(sseOpcodeMovdqu, y, tmp))
 			op = m.getOperand_Mem_Reg(m.c.ValueDefinition(x))
 		}
+	case ssa.IntegerCmpCondSignedGreaterThanOrEqual:
+		if lane == ssa.VecLaneI64x2 {
+			y := m.getOperand_Mem_Reg(m.c.ValueDefinition(y))
+			// Copy y to tmp.
+			m.insert(m.allocateInstr().asXmmUnaryRmR(sseOpcodeMovdqu, y, tmp))
+			op = m.getOperand_Mem_Reg(m.c.ValueDefinition(x))
+		} else {
+			x := m.getOperand_Mem_Reg(m.c.ValueDefinition(x))
+			// Copy x to tmp.
+			m.insert(m.allocateInstr().asXmmUnaryRmR(sseOpcodeMovdqu, x, tmp))
+			op = m.getOperand_Mem_Reg(m.c.ValueDefinition(y))
+		}
+	case ssa.IntegerCmpCondSignedLessThan, ssa.IntegerCmpCondUnsignedLessThan, ssa.IntegerCmpCondUnsignedLessThanOrEqual:
+		y := m.getOperand_Mem_Reg(m.c.ValueDefinition(y))
+		// Copy y to tmp.
+		m.insert(m.allocateInstr().asXmmUnaryRmR(sseOpcodeMovdqu, y, tmp))
+		op = m.getOperand_Mem_Reg(m.c.ValueDefinition(x))
 	default:
-		if lane == ssa.VecLaneI64x2 {
-			y := m.getOperand_Mem_Reg(m.c.ValueDefinition(y))
-			// Copy y to tmp.
-			m.insert(m.allocateInstr().asXmmUnaryRmR(sseOpcodeMovdqu, y, tmp))
-			op = m.getOperand_Mem_Reg(m.c.ValueDefinition(x))
-		} else {
-			x := m.getOperand_Mem_Reg(m.c.ValueDefinition(x))
-			// Copy x to tmp.
-			m.insert(m.allocateInstr().asXmmUnaryRmR(sseOpcodeMovdqu, x, tmp))
-			op = m.getOperand_Mem_Reg(m.c.ValueDefinition(y))
-		}
+		x := m.getOperand_Mem_Reg(m.c.ValueDefinition(x))
+		// Copy x to tmp.
+		m.insert(m.allocateInstr().asXmmUnaryRmR(sseOpcodeMovdqu, x, tmp))
+		op = m.getOperand_Mem_Reg(m.c.ValueDefinition(y))
 	}
 
 	switch c {
