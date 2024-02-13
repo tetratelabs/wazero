@@ -1494,6 +1494,24 @@ func TestInstruction_encode(t *testing.T) {
 		{want: "4138b06e", setup: func(i *instruction) {
 			i.asVecLanes(vecOpUaddlv, operandNR(v1VReg), operandNR(v2VReg), vecArrangement4S)
 		}},
+		{want: "41c0230e", setup: func(i *instruction) {
+			i.asVecRRR(vecOpSmull, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
+		}},
+		{want: "41c0630e", setup: func(i *instruction) {
+			i.asVecRRR(vecOpSmull, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
+		}},
+		{want: "41c0a30e", setup: func(i *instruction) {
+			i.asVecRRR(vecOpSmull, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
+		}},
+		{want: "41c0234e", setup: func(i *instruction) {
+			i.asVecRRR(vecOpSmull2, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
+		}},
+		{want: "41c0634e", setup: func(i *instruction) {
+			i.asVecRRR(vecOpSmull2, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
+		}},
+		{want: "41c0a34e", setup: func(i *instruction) {
+			i.asVecRRR(vecOpSmull2, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
+		}},
 		{want: "411c630e", setup: func(i *instruction) {
 			i.asVecRRR(vecOpBic, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
 		}},

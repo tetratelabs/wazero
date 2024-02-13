@@ -2647,16 +2647,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v2 := state.pop()
 			v1 := state.pop()
 
-			// TODO: The sequence `Widen; Widen; VIMul` can be substituted for a single instruction on some ISAs.
-			v1lo := builder.AllocateInstruction().AsWiden(v1, ssa.VecLaneI16x8, true, true).Insert(builder).Return()
-			v2lo := builder.AllocateInstruction().AsWiden(v2, ssa.VecLaneI16x8, true, true).Insert(builder).Return()
-			low := builder.AllocateInstruction().AsVImul(v1lo, v2lo, ssa.VecLaneI32x4).Insert(builder).Return()
-
-			v1hi := builder.AllocateInstruction().AsWiden(v1, ssa.VecLaneI16x8, true, false).Insert(builder).Return()
-			v2hi := builder.AllocateInstruction().AsWiden(v2, ssa.VecLaneI16x8, true, false).Insert(builder).Return()
-			high := builder.AllocateInstruction().AsVImul(v1hi, v2hi, ssa.VecLaneI32x4).Insert(builder).Return()
-
-			ret := builder.AllocateInstruction().AsIaddPairwise(low, high, ssa.VecLaneI32x4).Insert(builder).Return()
+			ret := builder.AllocateInstruction().AsWideningPairwiseDotProductS(v1, v2).Insert(builder).Return()
 			state.push(ret)
 
 		case wasm.OpcodeVecF32x4Eq, wasm.OpcodeVecF64x2Eq:

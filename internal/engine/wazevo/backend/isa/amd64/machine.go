@@ -867,6 +867,10 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		dst := m.c.VRegOf(instr.Return())
 		m.insert(m.allocateInstr().asXmmUnaryRmR(sseOpcodeCvtpd2ps, src, dst))
 
+	case ssa.OpcodeWideningPairwiseDotProductS:
+		x, y := instr.Arg2()
+		m.lowerWideningPairwiseDotProductS(x, y, instr.Return())
+
 	case ssa.OpcodeVIabs:
 		m.lowerVIabs(instr)
 	case ssa.OpcodeVIpopcnt:

@@ -1002,11 +1002,12 @@ func (i *instruction) asVecPermute(op vecOp, rd, rn, rm operand, arr vecArrangem
 	i.u2 = uint64(arr)
 }
 
-func (i *instruction) asVecRRR(op vecOp, rd, rn, rm operand, arr vecArrangement) {
+func (i *instruction) asVecRRR(op vecOp, rd, rn, rm operand, arr vecArrangement) *instruction {
 	i.kind = vecRRR
 	i.u1 = uint64(op)
 	i.rn, i.rd, i.rm = rn, rd, rm
 	i.u2 = uint64(arr)
+	return i
 }
 
 // asVecRRRRewrite encodes a vector instruction that rewrites the destination register.
@@ -2011,6 +2012,10 @@ func (b vecOp) String() string {
 		return "fmin"
 	case vecOpFmax:
 		return "fmax"
+	case vecOpSmull:
+		return "smull"
+	case vecOpSmull2:
+		return "smull2"
 	}
 	panic(int(b))
 }
@@ -2085,6 +2090,8 @@ const (
 	vecOpUshll
 	vecOpSshr
 	vecOpZip1
+	vecOpSmull
+	vecOpSmull2
 )
 
 // bitOp determines the type of bitwise operation. Instructions whose kind is one of

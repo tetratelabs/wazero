@@ -701,6 +701,18 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		}
 		m.insert(dup)
 
+	case ssa.OpcodeWideningPairwiseDotProductS:
+		x, y := instr.Arg2()
+		xx, yy := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone),
+			m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
+		tmp, tmp2 := operandNR(m.compiler.AllocateVReg(ssa.TypeV128)), operandNR(m.compiler.AllocateVReg(ssa.TypeV128))
+		m.insert(m.allocateInstr().asVecRRR(vecOpSmull, tmp, xx, yy, vecArrangement8H))
+		m.insert(m.allocateInstr().asVecRRR(vecOpSmull2, tmp2, xx, yy, vecArrangement8H))
+		m.insert(m.allocateInstr().asVecRRR(vecOpAddp, tmp, tmp, tmp2, vecArrangement4S))
+
+		rd := operandNR(m.compiler.VRegOf(instr.Return()))
+		m.insert(m.allocateInstr().asFpuMov128(rd.nr(), tmp.nr()))
+
 	case ssa.OpcodeLoadSplat:
 		ptr, offset, lane := instr.LoadSplatData()
 		m.lowerLoadSplat(ptr, offset, lane, instr.Return())
