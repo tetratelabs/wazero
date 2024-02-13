@@ -764,3 +764,11 @@ func (m *machine) lowerNarrow(x, y, ret ssa.Value, lane ssa.VecLane, signed bool
 	m.insert(m.allocateInstr().asXmmRmR(sseOp, yy, xx))
 	m.copyTo(xx, m.c.VRegOf(ret))
 }
+
+func (m *machine) lowerWideningPairwiseDotProductS(x, y, ret ssa.Value) {
+	_xx := m.getOperand_Reg(m.c.ValueDefinition(x))
+	xx := m.copyToTmp(_xx.reg())
+	yy := m.getOperand_Mem_Reg(m.c.ValueDefinition(y))
+	m.insert(m.allocateInstr().asXmmRmR(sseOpcodePmaddwd, yy, xx))
+	m.copyTo(xx, m.c.VRegOf(ret))
+}
