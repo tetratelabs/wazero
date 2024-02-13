@@ -803,6 +803,22 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		x, lane := instr.ArgWithLane()
 		m.lowerVRound(x, instr.Return(), 0x0, lane == ssa.VecLaneF64x2)
 
+	case ssa.OpcodeIaddPairwise:
+		x, y, lane := instr.Arg2WithLane()
+		m.lowerIaddPairwise(x, y, instr.Return(), lane)
+
+	case ssa.OpcodeUwidenLow, ssa.OpcodeSwidenLow:
+		x, lane := instr.ArgWithLane()
+		m.lowerWidenLow(x, instr.Return(), lane, op == ssa.OpcodeSwidenLow)
+
+	case ssa.OpcodeUwidenHigh, ssa.OpcodeSwidenHigh:
+		x, lane := instr.ArgWithLane()
+		m.lowerWidenHigh(x, instr.Return(), lane, op == ssa.OpcodeSwidenHigh)
+
+	case ssa.OpcodeLoadSplat:
+		ptr, offset, lane := instr.LoadSplatData()
+		m.lowerLoadSplat(ptr, offset, instr.Return(), lane)
+
 	case ssa.OpcodeVIabs:
 		m.lowerVIabs(instr)
 	case ssa.OpcodeVIpopcnt:
