@@ -436,9 +436,11 @@ const (
 	OpcodeVFcvtToSintSat
 
 	// OpcodeVFcvtFromUint converts a floating point value from an unsigned integer: `v = FcvtFromUint.lane x` on vector.
+	// x is always a 32-bit integer lane, and the result is either a 32-bit or 64-bit floating point-sized vector.
 	OpcodeVFcvtFromUint
 
 	// OpcodeVFcvtFromSint converts a floating point value from a signed integer: `v = VFcvtFromSint.lane x` on vector.
+	// x is always a 32-bit integer lane, and the result is either a 32-bit or 64-bit floating point-sized vector.
 	OpcodeVFcvtFromSint
 
 	// OpcodeImul performs an integer multiplication: `v = Imul x, y`.

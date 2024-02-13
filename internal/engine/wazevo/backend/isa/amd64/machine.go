@@ -23,15 +23,17 @@ func NewBackend() backend.Machine {
 		asNop,
 	)
 	return &machine{
-		ectx:                          ectx,
-		cpuFeatures:                   platform.CpuFeatures,
-		regAlloc:                      regalloc.NewAllocator(regInfo),
-		spillSlots:                    map[regalloc.VRegID]int64{},
-		amodePool:                     wazevoapi.NewPool[amode](nil),
-		swizzleMaskConstIndex:         -1,
-		sqmulRoundSatIndex:            -1,
-		i8x16SHLMaskTableIndex:        -1,
-		i8x16LogicalSHRMaskTableIndex: -1,
+		ectx:                               ectx,
+		cpuFeatures:                        platform.CpuFeatures,
+		regAlloc:                           regalloc.NewAllocator(regInfo),
+		spillSlots:                         map[regalloc.VRegID]int64{},
+		amodePool:                          wazevoapi.NewPool[amode](nil),
+		constSwizzleMaskConstIndex:         -1,
+		constSqmulRoundSatIndex:            -1,
+		constI8x16SHLMaskTableIndex:        -1,
+		constI8x16LogicalSHRMaskTableIndex: -1,
+		constF64x2CvtFromIMaskIndex:        -1,
+		constTwop52Index:                   -1,
 	}
 }
 
@@ -62,8 +64,9 @@ type (
 		jmpTableTargets [][]uint32
 		consts          []_const
 
-		swizzleMaskConstIndex, sqmulRoundSatIndex,
-		i8x16SHLMaskTableIndex, i8x16LogicalSHRMaskTableIndex int
+		constSwizzleMaskConstIndex, constSqmulRoundSatIndex,
+		constI8x16SHLMaskTableIndex, constI8x16LogicalSHRMaskTableIndex,
+		constF64x2CvtFromIMaskIndex, constTwop52Index int
 	}
 
 	_const struct {
@@ -81,6 +84,20 @@ type (
 
 	labelPosition = backend.LabelPosition[instruction]
 )
+
+func (m *machine) getOrAllocateConstLabel(i *int, _var []byte) backend.Label {
+	index := *i
+	if index == -1 {
+		label := m.allocateLabel()
+		index = len(m.consts)
+		m.consts = append(m.consts, _const{
+			_var:  _var,
+			label: label,
+		})
+		*i = index
+	}
+	return m.consts[index].label.L
+}
 
 // Reset implements backend.Machine.
 func (m *machine) Reset() {
@@ -106,10 +123,12 @@ func (m *machine) Reset() {
 
 	m.amodePool.Reset()
 	m.jmpTableTargets = m.jmpTableTargets[:0]
-	m.swizzleMaskConstIndex = -1
-	m.sqmulRoundSatIndex = -1
-	m.i8x16SHLMaskTableIndex = -1
-	m.i8x16LogicalSHRMaskTableIndex = -1
+	m.constSwizzleMaskConstIndex = -1
+	m.constSqmulRoundSatIndex = -1
+	m.constI8x16SHLMaskTableIndex = -1
+	m.constI8x16LogicalSHRMaskTableIndex = -1
+	m.constF64x2CvtFromIMaskIndex = -1
+	m.constTwop52Index = -1
 }
 
 // ExecutableContext implements backend.Machine.
@@ -818,6 +837,30 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 	case ssa.OpcodeLoadSplat:
 		ptr, offset, lane := instr.LoadSplatData()
 		m.lowerLoadSplat(ptr, offset, instr.Return(), lane)
+
+	case ssa.OpcodeVFcvtFromUint, ssa.OpcodeVFcvtFromSint:
+		x, lane := instr.ArgWithLane()
+		m.lowerVFcvtFromInt(x, instr.Return(), lane, op == ssa.OpcodeVFcvtFromSint)
+
+	case ssa.OpcodeVFcvtToSintSat, ssa.OpcodeVFcvtToUintSat:
+		x, lane := instr.ArgWithLane()
+		m.lowerVFcvtToIntSat(x, instr.Return(), lane, op == ssa.OpcodeVFcvtToSintSat)
+
+	case ssa.OpcodeSnarrow, ssa.OpcodeUnarrow:
+		x, y, lane := instr.Arg2WithLane()
+		m.lowerNarrow(x, y, instr.Return(), lane, op == ssa.OpcodeSnarrow)
+
+	case ssa.OpcodeFvpromoteLow:
+		x := instr.Arg()
+		src := m.getOperand_Mem_Reg(m.c.ValueDefinition(x))
+		dst := m.c.VRegOf(instr.Return())
+		m.insert(m.allocateInstr().asXmmUnaryRmR(sseOpcodeCvtps2pd, src, dst))
+
+	case ssa.OpcodeFvdemote:
+		x := instr.Arg()
+		src := m.getOperand_Mem_Reg(m.c.ValueDefinition(x))
+		dst := m.c.VRegOf(instr.Return())
+		m.insert(m.allocateInstr().asXmmUnaryRmR(sseOpcodeCvtpd2ps, src, dst))
 
 	case ssa.OpcodeVIabs:
 		m.lowerVIabs(instr)
@@ -2987,34 +3030,6 @@ func (m *machine) lowerVbnot(instr *ssa.Instruction) {
 	m.copyTo(tmp, rd)
 }
 
-var sqmulRoundSat = [16]byte{
-	0x00, 0x80, 0x00, 0x80, 0x00, 0x80, 0x00, 0x80,
-	0x00, 0x80, 0x00, 0x80, 0x00, 0x80, 0x00, 0x80,
-}
-
-func (m *machine) lowerSqmulRoundSat(x, y, ret ssa.Value) {
-	// See https://github.com/WebAssembly/simd/pull/365 for the following logic.
-	maskIndex := m.sqmulRoundSatIndex
-	if maskIndex < 0 {
-		maskIndex = len(m.consts)
-		m.consts = append(m.consts, _const{_var: sqmulRoundSat[:], label: m.allocateLabel()})
-		m.sqmulRoundSatIndex = maskIndex
-	}
-
-	tmp := m.c.AllocateVReg(ssa.TypeV128)
-	loadMask := m.allocateInstr().asXmmUnaryRmR(sseOpcodeMovdqu, newOperandMem(m.newAmodeRipRel(m.consts[maskIndex].label.L)), tmp)
-	m.insert(loadMask)
-
-	xx, yy := m.getOperand_Reg(m.c.ValueDefinition(x)), m.getOperand_Mem_Reg(m.c.ValueDefinition(y))
-	tmpX := m.copyToTmp(xx.reg())
-
-	m.insert(m.allocateInstr().asXmmRmR(sseOpcodePmulhrsw, yy, tmpX))
-	m.insert(m.allocateInstr().asXmmRmR(sseOpcodePcmpeqd, newOperandReg(tmpX), tmp))
-	m.insert(m.allocateInstr().asXmmRmR(sseOpcodePxor, newOperandReg(tmp), tmpX))
-
-	m.copyTo(tmpX, m.c.VRegOf(ret))
-}
-
 func (m *machine) lowerSplat(x, ret ssa.Value, lane ssa.VecLane) {
 	tmpDst := m.c.AllocateVReg(ssa.TypeV128)
 	m.insert(m.allocateInstr().asDefineUninitializedReg(tmpDst))
@@ -3099,118 +3114,6 @@ func (m *machine) lowerShuffle(x, y ssa.Value, lo, hi uint64, ret ssa.Value) {
 	m.insert(m.allocateInstr().asXmmRmR(sseOpcodeOrps, newOperandReg(tmpX), tmpY))
 
 	m.copyTo(tmpY, m.c.VRegOf(ret))
-}
-
-var swizzleMask = [16]byte{
-	0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70,
-	0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70,
-}
-
-func (m *machine) lowerSwizzle(x, y ssa.Value, ret ssa.Value) {
-	maskIndex := m.swizzleMaskConstIndex
-	if maskIndex < 0 {
-		label := m.allocateLabel()
-		maskIndex = len(m.consts)
-		m.consts = append(m.consts, _const{
-			_var:  swizzleMask[:],
-			label: label,
-		})
-	}
-	masklabel := m.consts[maskIndex].label
-
-	// Load mask to maskReg.
-	maskReg := m.c.AllocateVReg(ssa.TypeV128)
-	loadMask := m.allocateInstr().asXmmUnaryRmR(sseOpcodeMovdqu, newOperandMem(m.newAmodeRipRel(masklabel.L)), maskReg)
-	m.insert(loadMask)
-
-	// Copy x and y to tmp registers.
-	xx := m.getOperand_Reg(m.c.ValueDefinition(x))
-	tmpDst := m.copyToTmp(xx.reg())
-	yy := m.getOperand_Reg(m.c.ValueDefinition(y))
-	tmpX := m.copyToTmp(yy.reg())
-
-	m.insert(m.allocateInstr().asXmmRmR(sseOpcodePaddusb, newOperandReg(maskReg), tmpX))
-	m.insert(m.allocateInstr().asXmmRmR(sseOpcodePshufb, newOperandReg(tmpX), tmpDst))
-
-	// Copy the result to the destination register.
-	m.copyTo(tmpDst, m.c.VRegOf(ret))
-}
-
-func (m *machine) lowerInsertLane(x, y ssa.Value, index byte, ret ssa.Value, lane ssa.VecLane) {
-	// Copy x to tmp.
-	tmpDst := m.c.AllocateVReg(ssa.TypeV128)
-	m.insert(m.allocateInstr().asXmmUnaryRmR(sseOpcodeMovdqu, m.getOperand_Mem_Reg(m.c.ValueDefinition(x)), tmpDst))
-
-	yy := m.getOperand_Reg(m.c.ValueDefinition(y))
-	switch lane {
-	case ssa.VecLaneI8x16:
-		m.insert(m.allocateInstr().asXmmRmRImm(sseOpcodePinsrb, index, yy, tmpDst))
-	case ssa.VecLaneI16x8:
-		m.insert(m.allocateInstr().asXmmRmRImm(sseOpcodePinsrw, index, yy, tmpDst))
-	case ssa.VecLaneI32x4:
-		m.insert(m.allocateInstr().asXmmRmRImm(sseOpcodePinsrd, index, yy, tmpDst))
-	case ssa.VecLaneI64x2:
-		m.insert(m.allocateInstr().asXmmRmRImm(sseOpcodePinsrq, index, yy, tmpDst))
-	case ssa.VecLaneF32x4:
-		// In INSERTPS instruction, the destination index is encoded at 4 and 5 bits of the argument.
-		// See https://www.felixcloutier.com/x86/insertps
-		m.insert(m.allocateInstr().asXmmRmRImm(sseOpcodeInsertps, index<<4, yy, tmpDst))
-	case ssa.VecLaneF64x2:
-		if index == 0 {
-			m.insert(m.allocateInstr().asXmmUnaryRmR(sseOpcodeMovsd, yy, tmpDst))
-		} else {
-			m.insert(m.allocateInstr().asXmmRmR(sseOpcodeMovlhps, yy, tmpDst))
-		}
-	default:
-		panic(fmt.Sprintf("invalid lane type: %s", lane))
-	}
-
-	m.copyTo(tmpDst, m.c.VRegOf(ret))
-}
-
-func (m *machine) lowerExtractLane(x ssa.Value, index byte, signed bool, ret ssa.Value, lane ssa.VecLane) {
-	// Pextr variants are used to extract a lane from a vector register.
-	xx := m.getOperand_Reg(m.c.ValueDefinition(x))
-
-	tmpDst := m.c.AllocateVReg(ret.Type())
-	m.insert(m.allocateInstr().asDefineUninitializedReg(tmpDst))
-	switch lane {
-	case ssa.VecLaneI8x16:
-		m.insert(m.allocateInstr().asXmmRmRImm(sseOpcodePextrb, index, xx, tmpDst))
-		if signed {
-			m.insert(m.allocateInstr().asMovsxRmR(extModeBL, newOperandReg(tmpDst), tmpDst))
-		} else {
-			m.insert(m.allocateInstr().asMovzxRmR(extModeBL, newOperandReg(tmpDst), tmpDst))
-		}
-	case ssa.VecLaneI16x8:
-		m.insert(m.allocateInstr().asXmmRmRImm(sseOpcodePextrw, index, xx, tmpDst))
-		if signed {
-			m.insert(m.allocateInstr().asMovsxRmR(extModeWL, newOperandReg(tmpDst), tmpDst))
-		} else {
-			m.insert(m.allocateInstr().asMovzxRmR(extModeWL, newOperandReg(tmpDst), tmpDst))
-		}
-	case ssa.VecLaneI32x4:
-		m.insert(m.allocateInstr().asXmmRmRImm(sseOpcodePextrd, index, xx, tmpDst))
-	case ssa.VecLaneI64x2:
-		m.insert(m.allocateInstr().asXmmRmRImm(sseOpcodePextrq, index, xx, tmpDst))
-	case ssa.VecLaneF32x4:
-		if index == 0 {
-			m.insert(m.allocateInstr().asXmmUnaryRmR(sseOpcodeMovss, xx, tmpDst))
-		} else {
-			m.insert(m.allocateInstr().asXmmRmRImm(sseOpcodePshufd, index, xx, tmpDst))
-		}
-	case ssa.VecLaneF64x2:
-		if index == 0 {
-			m.insert(m.allocateInstr().asXmmUnaryRmR(sseOpcodeMovsd, xx, tmpDst))
-		} else {
-			m.copyTo(xx.reg(), tmpDst)
-			m.insert(m.allocateInstr().asXmmRmRImm(sseOpcodePshufd, 0b00_00_11_10, newOperandReg(tmpDst), tmpDst))
-		}
-	default:
-		panic(fmt.Sprintf("invalid lane type: %s", lane))
-	}
-
-	m.copyTo(tmpDst, m.c.VRegOf(ret))
 }
 
 func (m *machine) lowerVbBinOp(op sseOpcode, x, y, ret ssa.Value) {
