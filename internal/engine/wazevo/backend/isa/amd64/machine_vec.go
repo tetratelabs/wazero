@@ -530,25 +530,19 @@ func (m *machine) lowerVFcvtFromInt(x, ret ssa.Value, lane ssa.VecLane, signed b
 			m.insert(m.allocateInstr().asXmmRmiReg(sseOpcodePsrld, newOperandImm32(0xa), tmp))
 
 			// Subtract the higher 16-bits from vr == clear the lower 16-bits of vr.
-			// c.assembler.CompileRegisterToRegister(amd64.PSUBD, tmp, vr)
 			m.insert(m.allocateInstr().asXmmRmR(sseOpcodePsubd, newOperandReg(tmp), tmp2))
 
 			// Convert the lower 16-bits in tmp.
-			// c.assembler.CompileRegisterToRegister(amd64.CVTDQ2PS, tmp, tmp)
 			m.insert(m.allocateInstr().asXmmUnaryRmR(sseOpcodeCvtdq2ps, newOperandReg(tmp), tmp))
 
 			// Left shift by one and convert vr, meaning that halved conversion result of higher 16-bits in vr.
-			// c.assembler.CompileConstToRegister(amd64.PSRLD, 1, tmp2)
 			m.insert(m.allocateInstr().asXmmRmiReg(sseOpcodePsrld, newOperandImm32(1), tmp2))
-			// c.assembler.CompileRegisterToRegister(amd64.CVTDQ2PS, tmp2, tmp2)
 			m.insert(m.allocateInstr().asXmmUnaryRmR(sseOpcodeCvtdq2ps, newOperandReg(tmp2), tmp2))
 
 			// Double the converted halved higher 16bits.
-			// c.assembler.CompileRegisterToRegister(amd64.ADDPS, tmp2, tmp2)
 			m.insert(m.allocateInstr().asXmmRmR(sseOpcodeAddps, newOperandReg(tmp2), tmp2))
 
 			// Get the conversion result by add tmp (holding lower 16-bit conversion) into vr.
-			// c.assembler.CompileRegisterToRegister(amd64.ADDPS, tmp, tmp2)
 			m.insert(m.allocateInstr().asXmmRmR(sseOpcodeAddps, newOperandReg(tmp), tmp2))
 
 			m.copyTo(tmp2, m.c.VRegOf(ret))
@@ -566,7 +560,7 @@ func (m *machine) lowerVFcvtFromInt(x, ret ssa.Value, lane ssa.VecLane, signed b
 			_xx := m.getOperand_Reg(m.c.ValueDefinition(x))
 			xx := m.copyToTmp(_xx.reg())
 
-			// Given that we have vr = [d1, d2, d3, d4], this results in
+			// Given that we have xx = [d1, d2, d3, d4], this results in
 			//	xx = [d1, [0x00, 0x00, 0x30, 0x43], d2, [0x00, 0x00, 0x30, 0x43]]
 			//     = [float64(uint32(d1)) + 0x1.0p52, float64(uint32(d2)) + 0x1.0p52]
 			//     ^See https://stackoverflow.com/questions/13269523/can-all-32-bit-ints-be-exactly-represented-as-a-double
@@ -577,7 +571,7 @@ func (m *machine) lowerVFcvtFromInt(x, ret ssa.Value, lane ssa.VecLane, signed b
 			m.insert(m.allocateInstr().asXmmUnaryRmR(sseOpcodeMovdqu, newOperandMem(m.newAmodeRipRel(maskLabel)), maskReg))
 
 			// Now, we get the result as
-			// 	vr = [float64(uint32(d1)), float64(uint32(d2))]
+			// 	xx = [float64(uint32(d1)), float64(uint32(d2))]
 			// because the following equality always satisfies:
 			//  float64(0x1.0p52 + float64(uint32(x))) - float64(0x1.0p52 + float64(uint32(y))) = float64(uint32(x)) - float64(uint32(y))
 			m.insert(m.allocateInstr().asXmmRmR(sseOpcodeSubpd, newOperandReg(maskReg), xx))
