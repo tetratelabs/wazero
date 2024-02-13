@@ -273,3 +273,14 @@ var i8x16SHLMaskTable = [8 * 16]byte{ // (the number of possible shift amount 0,
 	0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, // for 6 shift
 	0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, // for 7 shift
 }
+
+func (m *machine) lowerVRound(x, ret ssa.Value, imm byte, _64 bool) {
+	xx := m.getOperand_Mem_Reg(m.c.ValueDefinition(x))
+	var round sseOpcode
+	if _64 {
+		round = sseOpcodeRoundpd
+	} else {
+		round = sseOpcodeRoundps
+	}
+	m.insert(m.allocateInstr().asXmmUnaryRmRImm(round, imm, xx, m.c.VRegOf(ret)))
+}

@@ -1298,7 +1298,7 @@ func (i *instruction) asXmmUnaryRmR(op sseOpcode, rm operand, rd regalloc.VReg) 
 	return i
 }
 
-func (i *instruction) asXmmUnaryRmRImm(op sseOpcode, imm uint8, rm operand, rd regalloc.VReg) *instruction {
+func (i *instruction) asXmmUnaryRmRImm(op sseOpcode, imm byte, rm operand, rd regalloc.VReg) *instruction {
 	if rm.kind != operandKindReg && rm.kind != operandKindMem {
 		panic("BUG")
 	}

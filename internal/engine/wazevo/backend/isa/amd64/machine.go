@@ -787,6 +787,22 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		x, y, lane := instr.Arg2WithLane()
 		m.lowerVUshr(x, y, instr.Return(), lane)
 
+	case ssa.OpcodeVCeil:
+		x, lane := instr.ArgWithLane()
+		m.lowerVRound(x, instr.Return(), 0x2, lane == ssa.VecLaneF64x2)
+
+	case ssa.OpcodeVFloor:
+		x, lane := instr.ArgWithLane()
+		m.lowerVRound(x, instr.Return(), 0x1, lane == ssa.VecLaneF64x2)
+
+	case ssa.OpcodeVTrunc:
+		x, lane := instr.ArgWithLane()
+		m.lowerVRound(x, instr.Return(), 0x3, lane == ssa.VecLaneF64x2)
+
+	case ssa.OpcodeVNearest:
+		x, lane := instr.ArgWithLane()
+		m.lowerVRound(x, instr.Return(), 0x0, lane == ssa.VecLaneF64x2)
+
 	case ssa.OpcodeVIabs:
 		m.lowerVIabs(instr)
 	case ssa.OpcodeVIpopcnt:
