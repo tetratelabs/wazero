@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
+	"runtime"
 	"strings"
 
 	"github.com/tetratelabs/wazero/api"
@@ -2869,10 +2870,13 @@ func (c *Compiler) lowerCurrentOpcode() {
 				break
 			}
 			v1 := state.pop()
-			v1w := builder.AllocateInstruction().
-				AsWiden(v1, ssa.VecLaneI32x4, vecOp == wasm.OpcodeVecF64x2ConvertLowI32x4S, true).Insert(builder).Return()
+			if runtime.GOARCH == "arm64" {
+				// TODO: this is weird. fix.
+				v1 = builder.AllocateInstruction().
+					AsWiden(v1, ssa.VecLaneI32x4, vecOp == wasm.OpcodeVecF64x2ConvertLowI32x4S, true).Insert(builder).Return()
+			}
 			ret := builder.AllocateInstruction().
-				AsVFcvtFromInt(v1w, ssa.VecLaneF64x2, vecOp == wasm.OpcodeVecF64x2ConvertLowI32x4S).
+				AsVFcvtFromInt(v1, ssa.VecLaneF64x2, vecOp == wasm.OpcodeVecF64x2ConvertLowI32x4S).
 				Insert(builder).Return()
 			state.push(ret)
 		case wasm.OpcodeVecI8x16NarrowI16x8S, wasm.OpcodeVecI8x16NarrowI16x8U:

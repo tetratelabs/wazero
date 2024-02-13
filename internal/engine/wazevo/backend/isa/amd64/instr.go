@@ -1429,6 +1429,7 @@ const (
 	sseOpcodeCmpss
 	sseOpcodeCmpsd
 	sseOpcodeCvtdq2ps
+	sseOpcodeCvtdq2pd
 	sseOpcodeCvtsd2ss
 	sseOpcodeCvtsd2si
 	sseOpcodeCvtsi2ss
@@ -1577,6 +1578,9 @@ const (
 	sseOpcodeXorps
 	sseOpcodeXorpd
 	sseOpcodePmulhrsw
+	sseOpcodeUnpcklps
+	sseOpcodeCvtps2pd
+	sseOpcodeCvtpd2ps
 )
 
 func (s sseOpcode) String() string {
@@ -1617,6 +1621,8 @@ func (s sseOpcode) String() string {
 		return "cmpsd"
 	case sseOpcodeCvtdq2ps:
 		return "cvtdq2ps"
+	case sseOpcodeCvtdq2pd:
+		return "cvtdq2pd"
 	case sseOpcodeCvtsd2ss:
 		return "cvtsd2ss"
 	case sseOpcodeCvtsd2si:
@@ -1913,6 +1919,12 @@ func (s sseOpcode) String() string {
 		return "xorpd"
 	case sseOpcodePmulhrsw:
 		return "pmulhrsw"
+	case sseOpcodeUnpcklps:
+		return "unpcklps"
+	case sseOpcodeCvtps2pd:
+		return "cvtps2pd"
+	case sseOpcodeCvtpd2ps:
+		return "cvtpd2ps"
 	default:
 		panic("BUG")
 	}

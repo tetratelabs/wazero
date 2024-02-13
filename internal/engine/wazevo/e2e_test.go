@@ -1510,7 +1510,7 @@ func TestSpectestV2(t *testing.T) {
 		{"simd_bit_shift"},
 		{"simd_bitwise"},
 		{"simd_const"},
-		//{"simd_conversions"},
+		{"simd_conversions"},
 		{"simd_i8x16_arith"},
 		{"simd_i8x16_arith2"},
 		{"simd_i8x16_sat_arith"},
