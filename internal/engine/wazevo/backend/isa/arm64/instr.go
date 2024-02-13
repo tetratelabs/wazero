@@ -969,11 +969,12 @@ func (i *instruction) asVecLanes(op vecOp, rd, rn operand, arr vecArrangement) {
 	i.u2 = uint64(arr)
 }
 
-func (i *instruction) asVecShiftImm(op vecOp, rd, rn, rm operand, arr vecArrangement) {
+func (i *instruction) asVecShiftImm(op vecOp, rd, rn, rm operand, arr vecArrangement) *instruction {
 	i.kind = vecShiftImm
 	i.u1 = uint64(op)
 	i.rn, i.rm, i.rd = rn, rm, rd
 	i.u2 = uint64(arr)
+	return i
 }
 
 func (i *instruction) asVecTbl(nregs byte, rd, rn, rm operand, arr vecArrangement) {

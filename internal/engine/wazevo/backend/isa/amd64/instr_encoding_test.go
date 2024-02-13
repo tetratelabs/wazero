@@ -4036,6 +4036,11 @@ func TestInstruction_format_encode(t *testing.T) {
 			want:       "450fc6df08",
 			wantFormat: "shufps $8, %xmm15, %xmm11",
 		},
+		{
+			setup:      func(i *instruction) { i.asXmmRmR(sseOpcodePmaddubsw, newOperandReg(xmm1VReg), xmm0VReg) },
+			want:       "660f3804c1",
+			wantFormat: "pmaddubsw %xmm1, %xmm0",
+		},
 	} {
 		tc := tc
 		t.Run(tc.wantFormat, func(t *testing.T) {

@@ -323,6 +323,8 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 			legPrex, opcode, opcodeNum = legacyPrefixes0x66, 0x0F380B, 3
 		case sseOpcodeUnpcklps:
 			legPrex, opcode, opcodeNum = legacyPrefixesNone, 0x0F14, 2
+		case sseOpcodePmaddubsw:
+			legPrex, opcode, opcodeNum = legacyPrefixes0x66, 0x0F3804, 3
 		default:
 			panic(fmt.Sprintf("Unsupported sseOpcode: %s", op))
 		}
