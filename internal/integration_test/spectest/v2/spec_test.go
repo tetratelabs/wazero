@@ -25,5 +25,8 @@ func TestInterpreter(t *testing.T) {
 }
 
 func TestWazevo(t *testing.T) {
+	if !platform.CompilerSupported() {
+		t.Skip()
+	}
 	spectest.Run(t, Testcases, context.Background(), opt.NewRuntimeConfigOptimizingCompiler().WithCoreFeatures(enabledFeatures))
 }
