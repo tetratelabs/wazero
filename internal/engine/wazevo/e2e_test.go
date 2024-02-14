@@ -851,6 +851,15 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
+			name:      "atomic_fence",
+			m:         testcases.AtomicFence.Module,
+			features:  api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
+			skipAMD64: true,
+			calls: []callCase{
+				{params: []uint64{}, expResults: []uint64{}},
+			},
+		},
+		{
 			name: "float_le",
 			m:    testcases.FloatLe.Module,
 			calls: []callCase{

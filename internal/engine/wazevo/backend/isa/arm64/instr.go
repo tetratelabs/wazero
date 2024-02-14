@@ -163,6 +163,7 @@ var defKinds = [numInstructionKinds]defKind{
 	atomicCas:            defKindNone,
 	atomicLoad:           defKindRD,
 	atomicStore:          defKindNone,
+	dmb:                  defKindNone,
 }
 
 // Defs returns the list of regalloc.VReg that are defined by the instruction.
@@ -299,6 +300,7 @@ var useKinds = [numInstructionKinds]useKind{
 	atomicCas:            useKindRDRewrite,
 	atomicLoad:           useKindRN,
 	atomicStore:          useKindRNRM,
+	dmb:                  useKindNone,
 }
 
 // Uses returns the list of regalloc.VReg that are used by the instruction.
@@ -1506,6 +1508,8 @@ func (i *instruction) String() (str string) {
 			m = m + "b"
 		}
 		str = fmt.Sprintf("%s %s, %s", m, formatVRegSized(i.rm.nr(), size), formatVRegSized(i.rn.nr(), 64))
+	case dmb:
+		str = "dmb"
 	case udf:
 		str = "udf"
 	case emitSourceOffsetInfo:
@@ -1547,6 +1551,10 @@ func (i *instruction) asAtomicStore(rn, rt operand, size uint64) {
 	i.kind = atomicStore
 	i.rn, i.rm = rn, rt
 	i.u2 = size
+}
+
+func (i *instruction) asDMB() {
+	i.kind = dmb
 }
 
 // TODO: delete unnecessary things.
@@ -1724,6 +1732,8 @@ const (
 	atomicLoad
 	// atomicStore represents an atomic store with two source registers and no destination.
 	atomicStore
+	// dmb represents the data memory barrier instruction in inner-shareable (ish) mode.
+	dmb
 	// UDF is the undefined instruction. For debugging only.
 	udf
 

@@ -3,11 +3,13 @@ package spectest
 import (
 	"context"
 	"embed"
+	"runtime"
 	"testing"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/experimental/opt"
 	"github.com/tetratelabs/wazero/internal/integration_test/spectest"
 	"github.com/tetratelabs/wazero/internal/platform"
 )
@@ -27,4 +29,11 @@ func TestCompiler(t *testing.T) {
 
 func TestInterpreter(t *testing.T) {
 	spectest.Run(t, testcases, context.Background(), wazero.NewRuntimeConfigInterpreter().WithCoreFeatures(enabledFeatures))
+}
+
+func TestWazevo(t *testing.T) {
+	if !platform.CompilerSupported() || runtime.GOARCH != "arm64" {
+		t.Skip()
+	}
+	spectest.Run(t, testcases, context.Background(), opt.NewRuntimeConfigOptimizingCompiler().WithCoreFeatures(enabledFeatures))
 }

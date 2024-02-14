@@ -2712,6 +2712,7 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i32, v4:i32, v5:i32, v6:i32, v7:
 			exp: `
 blk0: (exec_ctx:i64, module_ctx:i64)
 	Fence 0
+	Jump blk_ret
 `,
 		},
 		{
@@ -2720,6 +2721,7 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 			features: api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
 			exp: `
 blk0: (exec_ctx:i64, module_ctx:i64)
+	Jump blk_ret
 `,
 		},
 	} {

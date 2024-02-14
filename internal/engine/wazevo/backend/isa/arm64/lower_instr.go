@@ -756,6 +756,11 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 	case ssa.OpcodeAtomicStore:
 		m.lowerAtomicStore(instr)
 
+	case ssa.OpcodeFence:
+		instr := m.allocateInstr()
+		instr.asDMB()
+		m.insert(instr)
+
 	default:
 		panic("TODO: lowering " + op.String())
 	}
