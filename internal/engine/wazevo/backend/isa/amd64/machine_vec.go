@@ -822,13 +822,15 @@ func (m *machine) lowerVIabs(instr *ssa.Instruction) {
 
 	if lane == ssa.VecLaneI64x2 {
 		_xx := m.getOperand_Reg(m.c.ValueDefinition(x))
+
+		blendReg := xmm0VReg
+		m.insert(m.allocateInstr().asDefineUninitializedReg(blendReg))
+
 		tmp := m.copyToTmp(_xx.reg())
 		xx := m.copyToTmp(_xx.reg())
 
-		blendReg := xmm0VReg
-
 		// Clear all bits on blendReg.
-		m.insert(m.allocateInstr().asZeros(blendReg))
+		m.insert(m.allocateInstr().asXmmRmR(sseOpcodePxor, newOperandReg(blendReg), blendReg))
 		// Subtract xx from blendMaskReg.
 		m.insert(m.allocateInstr().asXmmRmR(sseOpcodePsubq, newOperandReg(xx), blendReg))
 		// Copy the subtracted value ^^ back into tmp.
