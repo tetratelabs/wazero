@@ -1799,6 +1799,9 @@ func TestInstruction_encode(t *testing.T) {
 		{want: "01fc9f08", setup: func(i *instruction) {
 			i.asAtomicStore(operandNR(x0VReg), operandNR(x1VReg), 1)
 		}},
+		{want: "bf3b03d5", setup: func(i *instruction) {
+			i.asDMB()
+		}},
 		{want: "4201231e4201631e4201239e4201639e4201221e4201621e4201229e4201629e", setup: func(i *instruction) {
 			i.asNop0()
 			cur := i

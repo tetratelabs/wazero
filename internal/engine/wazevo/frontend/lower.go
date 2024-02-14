@@ -3378,7 +3378,6 @@ func (c *Compiler) lowerCurrentOpcode() {
 			state.push(res)
 		case wasm.OpcodeAtomicFence:
 			order := c.readByte()
-			c.readI32u()
 			if state.unreachable {
 				break
 			}

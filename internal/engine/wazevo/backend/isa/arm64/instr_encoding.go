@@ -411,6 +411,8 @@ func (i *instruction) encode(m *machine) {
 			uint32(i.u2),
 			0,
 		))
+	case dmb:
+		c.Emit4Bytes(encodeDMB())
 	default:
 		panic(i.String())
 	}
@@ -2332,4 +2334,8 @@ func encodeAtomicLoadStore(rn, rt, size, l uint32) uint32 {
 	_15to10 = 0b111111
 
 	return _31to21<<21 | _20to16<<16 | _15to10<<10 | rn<<5 | rt
+}
+
+func encodeDMB() uint32 {
+	return 0b11010101000000110011101110111111
 }
