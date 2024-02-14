@@ -3,8 +3,12 @@
 package filecache
 
 import (
+	"errors"
+
 	"io"
 )
+
+var errNotYetSupported = errors.New("not yet supported")
 
 // New returns a new Cache implemented by an in-memory cache. Possibly Flash memory...
 func New(dir string) Cache {
@@ -20,13 +24,13 @@ type memoryCache struct {
 }
 
 func (mc *memoryCache) Get(key Key) (content io.ReadCloser, ok bool, err error) {
-	return nil, false, nil
+	return nil, false, errNotYetSupported
 }
 
 func (mc *memoryCache) Add(key Key, content io.Reader) (err error) {
-	return
+	return errNotYetSupported
 }
 
 func (mc *memoryCache) Delete(key Key) (err error) {
-	return
+	return errNotYetSupported
 }
