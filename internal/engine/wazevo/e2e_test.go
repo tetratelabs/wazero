@@ -615,6 +615,8 @@ func TestE2E(t *testing.T) {
 				{params: []uint64{0x2, 0xbeef, 0xffffffff}, expErr: "unaligned atomic"},
 				{params: []uint64{0x3, 0xbeef, 0xffffffff}, expErr: "unaligned atomic"},
 				{params: []uint64{0x4, 0xbeef, 0xffffffff}, expResults: []uint64{1}}, // exp not equal, returns 1
+
+				{params: []uint64{0xffffffff, 0xbeef, 0xffffffff}, expErr: "out of bounds memory access"},
 			},
 		},
 		{
@@ -631,6 +633,8 @@ func TestE2E(t *testing.T) {
 				{params: []uint64{0x6, 0xbeef, 0xffffffff}, expErr: "unaligned atomic"},
 				{params: []uint64{0x7, 0xbeef, 0xffffffff}, expErr: "unaligned atomic"},
 				{params: []uint64{0x8, 0xbeef, 0xffffffff}, expResults: []uint64{1}}, // exp not equal, returns 1
+
+				{params: []uint64{0xffffffff, 0xbeef, 0xffffffff}, expErr: "out of bounds memory access"},
 			},
 		},
 		{

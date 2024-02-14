@@ -3815,7 +3815,7 @@ func (c *Compiler) getMemoryBaseValue(forceReload bool) ssa.Value {
 func (c *Compiler) getMemoryLenValue(forceReload bool) ssa.Value {
 	variable := c.memoryLenVariable
 	builder := c.ssaBuilder
-	if !forceReload {
+	if !forceReload && !c.memoryShared {
 		if v := builder.FindValueInLinearPath(variable); v.Valid() {
 			return v
 		}
@@ -3829,13 +3829,25 @@ func (c *Compiler) getMemoryLenValue(forceReload bool) ssa.Value {
 		memInstPtr := loadMemInstPtr.Return()
 
 		loadBufSizePtr := builder.AllocateInstruction()
-		loadBufSizePtr.AsLoad(memInstPtr, memoryInstanceBufSizeOffset, ssa.TypeI64)
+		if c.memoryShared {
+			sizeOffset := builder.AllocateInstruction().AsIconst64(memoryInstanceBufSizeOffset).Insert(builder).Return()
+			addr := builder.AllocateInstruction().AsIadd(memInstPtr, sizeOffset).Insert(builder).Return()
+			loadBufSizePtr.AsAtomicLoad(addr, 8, ssa.TypeI64)
+		} else {
+			loadBufSizePtr.AsLoad(memInstPtr, memoryInstanceBufSizeOffset, ssa.TypeI64)
+		}
 		builder.InsertInstruction(loadBufSizePtr)
 
 		ret = loadBufSizePtr.Return()
 	} else {
 		load := builder.AllocateInstruction()
-		load.AsExtLoad(ssa.OpcodeUload32, c.moduleCtxPtrValue, c.offset.LocalMemoryLen().U32(), true)
+		if c.memoryShared {
+			lenOffset := builder.AllocateInstruction().AsIconst64(c.offset.LocalMemoryLen().U64()).Insert(builder).Return()
+			addr := builder.AllocateInstruction().AsIadd(c.moduleCtxPtrValue, lenOffset).Insert(builder).Return()
+			load.AsAtomicLoad(addr, 8, ssa.TypeI64)
+		} else {
+			load.AsExtLoad(ssa.OpcodeUload32, c.moduleCtxPtrValue, c.offset.LocalMemoryLen().U32(), true)
+		}
 		builder.InsertInstruction(load)
 		ret = load.Return()
 	}
