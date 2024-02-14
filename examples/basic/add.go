@@ -7,7 +7,10 @@ import (
 	"flag"
 	"fmt"
 	"log"
+
+	//"runtime"
 	"strconv"
+	"time"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
@@ -26,6 +29,9 @@ var addWasm []byte
 // Since addWasm was compiled with TinyGo's `wasi` target, we need to configure
 // WASI host imports.
 func main() {
+	time.Sleep(5 * time.Second)
+	log.Println("Starting wazero on tinygo...")
+
 	// Parse positional arguments.
 	flag.Parse()
 
@@ -39,6 +45,8 @@ func main() {
 	// Instantiate WASI, which implements host functions needed for TinyGo to
 	// implement `panic`.
 	wasi_snapshot_preview1.MustInstantiate(ctx, r)
+
+	//runtime.GC()
 
 	// Instantiate the guest Wasm into the same runtime. It exports the `add`
 	// function, implemented in WebAssembly.
