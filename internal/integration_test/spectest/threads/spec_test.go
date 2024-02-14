@@ -32,7 +32,7 @@ func TestInterpreter(t *testing.T) {
 }
 
 func TestWazevo(t *testing.T) {
-	if !platform.CompilerSupported() && runtime.GOARCH != "arm64" {
+	if !platform.CompilerSupported() || runtime.GOARCH != "arm64" {
 		t.Skip()
 	}
 	spectest.Run(t, testcases, context.Background(), opt.NewRuntimeConfigOptimizingCompiler().WithCoreFeatures(enabledFeatures))

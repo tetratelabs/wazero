@@ -67,7 +67,7 @@ func TestThreadsInterpreter_hammer(t *testing.T) {
 }
 
 func TestThreadsWazevo(t *testing.T) {
-	if !platform.CompilerSupported() && runtime.GOARCH != "arm64" {
+	if !platform.CompilerSupported() || runtime.GOARCH != "arm64" {
 		t.Skip()
 	}
 	runAllTests(t, threadTests, opt.NewRuntimeConfigOptimizingCompiler().WithCoreFeatures(api.CoreFeaturesV2|experimental.CoreFeaturesThreads), false)
