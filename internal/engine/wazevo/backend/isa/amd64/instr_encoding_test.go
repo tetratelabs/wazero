@@ -4041,6 +4041,11 @@ func TestInstruction_format_encode(t *testing.T) {
 			want:       "660f3804c1",
 			wantFormat: "pmaddubsw %xmm1, %xmm0",
 		},
+		{
+			setup:      func(i *instruction) { i.asBlendvpd(newOperandReg(xmm1VReg), xmm15VReg) },
+			want:       "66440f3815f9",
+			wantFormat: "blendvpd %xmm1, %xmm15, %xmm0",
+		},
 	} {
 		tc := tc
 		t.Run(tc.wantFormat, func(t *testing.T) {
