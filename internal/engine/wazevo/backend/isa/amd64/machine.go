@@ -560,12 +560,12 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 			vecOp = sseOpcodePsubd
 		case ssa.VecLaneI64x2:
 			vecOp = sseOpcodePsubq
+		default:
+			panic("BUG")
 		}
-		tmp := m.c.AllocateVReg(ssa.TypeV128)
 
-		zero := m.allocateInstr()
-		zero.asZeros(tmp)
-		m.insert(zero)
+		tmp := m.c.AllocateVReg(ssa.TypeV128)
+		m.insert(m.allocateInstr().asZeros(tmp))
 
 		i := m.allocateInstr()
 		i.asXmmRmR(vecOp, rn, tmp)
@@ -933,181 +933,6 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 
 	default:
 		panic("TODO: lowering " + op.String())
-	}
-}
-
-func (m *machine) lowerVIabs(instr *ssa.Instruction) {
-	x, lane := instr.ArgWithLane()
-	rd := m.c.VRegOf(instr.Return())
-
-	if lane == ssa.VecLaneI64x2 {
-		rn := m.getOperand_Reg(m.c.ValueDefinition(x))
-		tmp := m.copyToTmp(rn.reg())
-
-		// Clear all bits on mask.
-		mask := m.c.AllocateVReg(ssa.TypeV128)
-		zero := m.allocateInstr()
-		zero.asZeros(mask)
-		m.insert(zero)
-
-		// Subtract rn from mask.
-		sub := m.allocateInstr()
-		sub.asXmmRmR(sseOpcodePsubq, newOperandReg(tmp), mask)
-		m.insert(sub)
-
-		blend := m.allocateInstr()
-		blend.asXmmRmR(sseOpcodeBlendvpd, newOperandReg(mask), tmp)
-		m.insert(blend)
-
-		m.copyTo(tmp, rd)
-	} else {
-		var vecOp sseOpcode
-		switch lane {
-		case ssa.VecLaneI8x16:
-			vecOp = sseOpcodePabsb
-		case ssa.VecLaneI16x8:
-			vecOp = sseOpcodePabsw
-		case ssa.VecLaneI32x4:
-			vecOp = sseOpcodePabsd
-		}
-		rn := m.getOperand_Mem_Reg(m.c.ValueDefinition(x))
-
-		i := m.allocateInstr()
-		i.asXmmUnaryRmR(vecOp, rn, rd)
-		m.insert(i)
-	}
-}
-
-func (m *machine) lowerVIpopcnt(instr *ssa.Instruction) {
-	x := instr.Arg()
-	rn := m.getOperand_Reg(m.c.ValueDefinition(x))
-	rd := m.c.VRegOf(instr.Return())
-
-	tmp1 := m.c.AllocateVReg(ssa.TypeV128)
-	m.lowerVconst(tmp1, 0x0f0f0f0f0f0f0f0f, 0x0f0f0f0f0f0f0f0f)
-
-	// Copy input into tmp2.
-	tmp2 := m.copyToTmp(rn.reg())
-
-	// Given that we have:
-	//  rm = [b1, ..., b16] where bn = hn:ln and hn and ln are higher and lower 4-bits of bn.
-	//
-	// Take PAND on tmp1 and tmp2, so that we mask out all the higher bits.
-	//  tmp2 = [l1, ..., l16].
-	pand := m.allocateInstr()
-	pand.asXmmRmR(sseOpcodePand, newOperandReg(tmp1), tmp2)
-	m.insert(pand)
-
-	// Do logical (packed word) right shift by 4 on rm and PAND against the mask (tmp1); meaning that we have
-	//  tmp3 = [h1, ...., h16].
-	tmp3 := m.copyToTmp(rn.reg())
-	psrlw := m.allocateInstr()
-	psrlw.asXmmRmiReg(sseOpcodePsrlw, newOperandImm32(4), tmp3)
-	m.insert(psrlw)
-
-	pand2 := m.allocateInstr()
-	pand2.asXmmRmR(sseOpcodePand, newOperandReg(tmp1), tmp3)
-	m.insert(pand2)
-
-	// Read the popcntTable into tmp4, and we have
-	//  tmp4 = [0x00, 0x01, 0x01, 0x02, 0x01, 0x02, 0x02, 0x03, 0x01, 0x02, 0x02, 0x03, 0x02, 0x03, 0x03, 0x04]
-	tmp4 := m.c.AllocateVReg(ssa.TypeV128)
-	m.lowerVconst(tmp4, 0x03_02_02_01_02_01_01_00, 0x04_03_03_02_03_02_02_01)
-
-	// Make a copy for later.
-	tmp5 := m.copyToTmp(tmp4)
-
-	//  tmp4 = [popcnt(l1), ..., popcnt(l16)].
-	pshufb := m.allocateInstr()
-	pshufb.asXmmRmR(sseOpcodePshufb, newOperandReg(tmp2), tmp4)
-	m.insert(pshufb)
-
-	pshufb2 := m.allocateInstr()
-	pshufb2.asXmmRmR(sseOpcodePshufb, newOperandReg(tmp3), tmp5)
-	m.insert(pshufb2)
-
-	// tmp4 + tmp5 is the result.
-	paddb := m.allocateInstr()
-	paddb.asXmmRmR(sseOpcodePaddb, newOperandReg(tmp4), tmp5)
-	m.insert(paddb)
-
-	m.copyTo(tmp5, rd)
-}
-
-func (m *machine) lowerVImul(instr *ssa.Instruction) {
-	x, y, lane := instr.Arg2WithLane()
-	rd := m.c.VRegOf(instr.Return())
-	if lane == ssa.VecLaneI64x2 {
-		rn := m.getOperand_Reg(m.c.ValueDefinition(x))
-		rm := m.getOperand_Reg(m.c.ValueDefinition(y))
-		// Assuming that we have
-		//	rm = [p1, p2] = [p1_lo, p1_hi, p2_lo, p2_high]
-		//  rn = [q1, q2] = [q1_lo, q1_hi, q2_lo, q2_high]
-		// where pN and qN are 64-bit (quad word) lane, and pN_lo, pN_hi, qN_lo and qN_hi are 32-bit (double word) lane.
-
-		// Copy rn into tmp1.
-		tmp1 := m.copyToTmp(rn.reg())
-
-		// And do the logical right shift by 32-bit on tmp1, which makes tmp1 = [0, p1_high, 0, p2_high]
-		shift := m.allocateInstr()
-		shift.asXmmRmiReg(sseOpcodePsrlq, newOperandImm32(32), tmp1)
-		m.insert(shift)
-
-		// Execute "pmuludq rm,tmp1", which makes tmp1 = [p1_high*q1_lo, p2_high*q2_lo] where each lane is 64-bit.
-		mul := m.allocateInstr()
-		mul.asXmmRmR(sseOpcodePmuludq, rm, tmp1)
-		m.insert(mul)
-
-		// Copy rm value into tmp2.
-		tmp2 := m.copyToTmp(rm.reg())
-
-		// And do the logical right shift by 32-bit on tmp2, which makes tmp2 = [0, q1_high, 0, q2_high]
-		shift2 := m.allocateInstr()
-		shift2.asXmmRmiReg(sseOpcodePsrlq, newOperandImm32(32), tmp2)
-		m.insert(shift2)
-
-		// Execute "pmuludq rm,tmp2", which makes tmp2 = [p1_lo*q1_high, p2_lo*q2_high] where each lane is 64-bit.
-		mul2 := m.allocateInstr()
-		mul2.asXmmRmR(sseOpcodePmuludq, rn, tmp2)
-		m.insert(mul2)
-
-		// Adds tmp1 and tmp2 and do the logical left shift by 32-bit,
-		// which makes tmp1 = [(p1_lo*q1_high+p1_high*q1_lo)<<32, (p2_lo*q2_high+p2_high*q2_lo)<<32]
-		add := m.allocateInstr()
-		add.asXmmRmR(sseOpcodePaddq, newOperandReg(tmp2), tmp1)
-		m.insert(add)
-
-		shift3 := m.allocateInstr()
-		shift3.asXmmRmiReg(sseOpcodePsllq, newOperandImm32(32), tmp1)
-		m.insert(shift3)
-
-		// Copy rm value into tmp3.
-		tmp3 := m.copyToTmp(rm.reg())
-
-		// "pmuludq rm,tmp3" makes tmp3 = [p1_lo*q1_lo, p2_lo*q2_lo] where each lane is 64-bit.
-		mul3 := m.allocateInstr()
-		mul3.asXmmRmR(sseOpcodePmuludq, rn, tmp3)
-		m.insert(mul3)
-
-		// Finally, we get the result by computing tmp1 + tmp3,
-		// which makes tmp1 = [(p1_lo*q1_high+p1_high*q1_lo)<<32+p1_lo*q1_lo, (p2_lo*q2_high+p2_high*q2_lo)<<32+p2_lo*q2_lo]
-		add2 := m.allocateInstr()
-		add2.asXmmRmR(sseOpcodePaddq, newOperandReg(tmp3), tmp1)
-		m.insert(add2)
-
-		m.copyTo(tmp1, rd)
-
-	} else {
-		var vecOp sseOpcode
-		switch lane {
-		case ssa.VecLaneI16x8:
-			vecOp = sseOpcodePmullw
-		case ssa.VecLaneI32x4:
-			vecOp = sseOpcodePmulld
-		default:
-			panic("unsupported: " + lane.String())
-		}
-		m.lowerVbBinOp(vecOp, x, y, instr.Return())
 	}
 }
 

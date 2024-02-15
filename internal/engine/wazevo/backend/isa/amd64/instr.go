@@ -256,6 +256,8 @@ func (i *instruction) String() string {
 		return fmt.Sprintf("defineUninitializedReg %s", i.op2.format(true))
 	case xmmCMov:
 		return fmt.Sprintf("xmmcmov%s %s, %s", cond(i.u1), i.op1.format(true), i.op2.format(true))
+	case blendvpd:
+		return fmt.Sprintf("blendvpd %s, %s, %%xmm0", i.op1.format(false), i.op2.format(false))
 	default:
 		panic(fmt.Sprintf("BUG: %d", int(i.kind)))
 	}
@@ -354,6 +356,22 @@ func (i *instruction) Uses(regs *[]regalloc.VReg) []regalloc.VReg {
 		execCtx, divisor, tmpGp, _, _, _ := i.idivRemSequenceData()
 		// idiv uses rax and rdx as implicit operands.
 		*regs = append(*regs, raxVReg, rdxVReg, execCtx, divisor, tmpGp)
+	case useKindBlendvpd:
+		*regs = append(*regs, xmm0VReg)
+
+		opAny, opReg := &i.op1, &i.op2
+		switch opAny.kind {
+		case operandKindReg:
+			*regs = append(*regs, opAny.reg())
+		case operandKindMem:
+			opAny.addressMode().uses(regs)
+		default:
+			panic(fmt.Sprintf("BUG: invalid operand: %s", i))
+		}
+		if opReg.kind != operandKindReg {
+			panic(fmt.Sprintf("BUG: invalid operand: %s", i))
+		}
+		*regs = append(*regs, opReg.reg())
 	default:
 		panic(fmt.Sprintf("BUG: invalid useKind %s for %s", uk, i))
 	}
@@ -472,6 +490,34 @@ func (i *instruction) AssignUse(index int, v regalloc.VReg) {
 			i.u1 = uint64(v)
 		default:
 			panic("BUG")
+		}
+	case useKindBlendvpd:
+		op, opMustBeReg := &i.op1, &i.op2
+		switch op.kind {
+		case operandKindReg:
+			switch index {
+			case 0:
+				if v.RealReg() != xmm0 {
+					panic("BUG")
+				}
+			case 1:
+				op.setReg(v)
+			case 2:
+				opMustBeReg.setReg(v)
+			default:
+				panic("BUG")
+			}
+		case operandKindMem:
+			nregs := op.addressMode().nregs()
+			if index < nregs {
+				op.addressMode().assignUses(index, v)
+			} else if index == nregs {
+				opMustBeReg.setReg(v)
+			} else {
+				panic("BUG")
+			}
+		default:
+			panic(fmt.Sprintf("BUG: invalid operand pair: %s", i))
 		}
 	default:
 		panic(fmt.Sprintf("BUG: invalid useKind %s for %s", uk, i))
@@ -704,6 +750,9 @@ const (
 
 	// idivRemSequence is a sequence of instructions to compute both the quotient and remainder of a division.
 	idivRemSequence
+
+	// blendvpd is https://www.felixcloutier.com/x86/blendvpd.
+	blendvpd
 
 	instrMax
 )
@@ -1051,6 +1100,16 @@ func (i *instruction) asAluRmiR(op aluRmiROpcode, rm operand, rd regalloc.VReg, 
 func (i *instruction) asZeros(dst regalloc.VReg) *instruction {
 	i.kind = zeros
 	i.op2 = newOperandReg(dst)
+	return i
+}
+
+func (i *instruction) asBlendvpd(rm operand, rd regalloc.VReg) *instruction {
+	if rm.kind != operandKindReg && rm.kind != operandKindMem {
+		panic("BUG")
+	}
+	i.kind = blendvpd
+	i.op1 = rm
+	i.op2 = newOperandReg(rd)
 	return i
 }
 
@@ -2158,6 +2217,7 @@ var defKinds = [instrMax]defKind{
 	fcvtToUintSequence:     defKindNone,
 	xmmCMov:                defKindOp2,
 	idivRemSequence:        defKindDivRem,
+	blendvpd:               defKindNone,
 }
 
 // String implements fmt.Stringer.
@@ -2186,6 +2246,7 @@ const (
 	// useKindOp1RegOp2 is Op1 must be a register, Op2 can be any operand.
 	useKindOp1RegOp2
 	useKindDivRem
+	useKindBlendvpd
 	useKindCall
 	useKindCallInd
 	useKindFcvtToSintSequence
@@ -2231,6 +2292,7 @@ var useKinds = [instrMax]useKind{
 	fcvtToUintSequence:     useKindFcvtToUintSequence,
 	xmmCMov:                useKindOp1,
 	idivRemSequence:        useKindDivRem,
+	blendvpd:               useKindBlendvpd,
 }
 
 func (u useKind) String() string {

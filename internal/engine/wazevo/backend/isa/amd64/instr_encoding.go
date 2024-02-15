@@ -10,7 +10,7 @@ import (
 )
 
 func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
-	switch i.kind {
+	switch kind := i.kind; kind {
 	case nop0, sourceOffsetInfo, defineUninitializedReg, fcvtToSintSequence, fcvtToUintSequence:
 	case ret:
 		encodeRet(c)
@@ -135,7 +135,7 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 		}
 		encodeRegReg(c, legacyPrefixesNone, 0x89, 1, src, dst, rex)
 
-	case xmmRmR:
+	case xmmRmR, blendvpd:
 		op := sseOpcode(i.u1)
 		var legPrex legacyPrefixes
 		var opcode uint32
@@ -326,7 +326,11 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 		case sseOpcodePmaddubsw:
 			legPrex, opcode, opcodeNum = legacyPrefixes0x66, 0x0F3804, 3
 		default:
-			panic(fmt.Sprintf("Unsupported sseOpcode: %s", op))
+			if kind == blendvpd {
+				legPrex, opcode, opcodeNum = legacyPrefixes0x66, 0x0F3815, 3
+			} else {
+				panic(fmt.Sprintf("Unsupported sseOpcode: %s", op))
+			}
 		}
 
 		dst := regEncodings[i.op2.reg().RealReg()]
