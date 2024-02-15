@@ -1102,6 +1102,7 @@ func (i *instruction) asZeros(dst regalloc.VReg) *instruction {
 	i.op2 = newOperandReg(dst)
 	return i
 }
+
 func (i *instruction) asBlendvpd(rm operand, rd regalloc.VReg) *instruction {
 	if rm.kind != operandKindReg && rm.kind != operandKindMem {
 		panic("BUG")
