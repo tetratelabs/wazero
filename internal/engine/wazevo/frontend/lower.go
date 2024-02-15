@@ -3164,8 +3164,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			timeout := state.pop()
 			exp := state.pop()
 			baseAddr := state.pop()
-			addr := c.memOpSetup(baseAddr, uint64(offset), opSize)
-			c.memAlignmentCheck(addr, opSize)
+			addr := c.atomicMemOpSetup(baseAddr, uint64(offset), opSize)
 
 			memoryWaitPtr := builder.AllocateInstruction().
 				AsLoad(c.execCtxPtrValue,
@@ -3187,8 +3186,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			c.storeCallerModuleContext()
 			count := state.pop()
 			baseAddr := state.pop()
-			addr := c.memOpSetup(baseAddr, uint64(offset), 4)
-			c.memAlignmentCheck(addr, 4)
+			addr := c.atomicMemOpSetup(baseAddr, uint64(offset), 4)
 
 			memoryNotifyPtr := builder.AllocateInstruction().
 				AsLoad(c.execCtxPtrValue,
@@ -3228,8 +3226,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 				typ = ssa.TypeI32
 			}
 
-			addr := c.memOpSetup(baseAddr, uint64(offset), size)
-			c.memAlignmentCheck(addr, size)
+			addr := c.atomicMemOpSetup(baseAddr, uint64(offset), size)
 			res := builder.AllocateInstruction().AsAtomicLoad(addr, size, typ).Insert(builder).Return()
 			state.push(res)
 		case wasm.OpcodeAtomicI32Store, wasm.OpcodeAtomicI64Store, wasm.OpcodeAtomicI32Store8, wasm.OpcodeAtomicI32Store16, wasm.OpcodeAtomicI64Store8, wasm.OpcodeAtomicI64Store16, wasm.OpcodeAtomicI64Store32:
@@ -3253,8 +3250,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 				size = 1
 			}
 
-			addr := c.memOpSetup(baseAddr, uint64(offset), size)
-			c.memAlignmentCheck(addr, size)
+			addr := c.atomicMemOpSetup(baseAddr, uint64(offset), size)
 			builder.AllocateInstruction().AsAtomicStore(addr, val, size).Insert(builder)
 		case wasm.OpcodeAtomicI32RmwAdd, wasm.OpcodeAtomicI64RmwAdd, wasm.OpcodeAtomicI32Rmw8AddU, wasm.OpcodeAtomicI32Rmw16AddU, wasm.OpcodeAtomicI64Rmw8AddU, wasm.OpcodeAtomicI64Rmw16AddU, wasm.OpcodeAtomicI64Rmw32AddU,
 			wasm.OpcodeAtomicI32RmwSub, wasm.OpcodeAtomicI64RmwSub, wasm.OpcodeAtomicI32Rmw8SubU, wasm.OpcodeAtomicI32Rmw16SubU, wasm.OpcodeAtomicI64Rmw8SubU, wasm.OpcodeAtomicI64Rmw16SubU, wasm.OpcodeAtomicI64Rmw32SubU,
@@ -3347,8 +3343,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 				}
 			}
 
-			addr := c.memOpSetup(baseAddr, uint64(offset), size)
-			c.memAlignmentCheck(addr, size)
+			addr := c.atomicMemOpSetup(baseAddr, uint64(offset), size)
 			res := builder.AllocateInstruction().AsAtomicRmw(rmwOp, addr, val, size).Insert(builder).Return()
 			state.push(res)
 		case wasm.OpcodeAtomicI32RmwCmpxchg, wasm.OpcodeAtomicI64RmwCmpxchg, wasm.OpcodeAtomicI32Rmw8CmpxchgU, wasm.OpcodeAtomicI32Rmw16CmpxchgU, wasm.OpcodeAtomicI64Rmw8CmpxchgU, wasm.OpcodeAtomicI64Rmw16CmpxchgU, wasm.OpcodeAtomicI64Rmw32CmpxchgU:
@@ -3372,8 +3367,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			case wasm.OpcodeAtomicI32Rmw8CmpxchgU, wasm.OpcodeAtomicI64Rmw8CmpxchgU:
 				size = 1
 			}
-			addr := c.memOpSetup(baseAddr, uint64(offset), size)
-			c.memAlignmentCheck(addr, size)
+			addr := c.atomicMemOpSetup(baseAddr, uint64(offset), size)
 			res := builder.AllocateInstruction().AsAtomicCas(addr, exp, repl, size).Insert(builder).Return()
 			state.push(res)
 		case wasm.OpcodeAtomicFence:
@@ -3657,6 +3651,25 @@ func (c *Compiler) memOpSetup(baseAddr ssa.Value, constOffset, operationSizeInBy
 	// Record the bound ceil for this baseAddr is known to be safe for the subsequent memory access in the same block.
 	c.recordKnownSafeBound(baseAddrID, ceil, address)
 	return
+}
+
+// atomicMemOpSetup inserts the bounds check and calculates the address of the memory operation (loads/stores), including
+// the constant offset and performs an alignment check on the final address.
+func (c *Compiler) atomicMemOpSetup(baseAddr ssa.Value, constOffset, operationSizeInBytes uint64) (address ssa.Value) {
+	builder := c.ssaBuilder
+
+	addrWithoutOffset := c.memOpSetup(baseAddr, constOffset, operationSizeInBytes)
+	var addr ssa.Value
+	if constOffset == 0 {
+		addr = addrWithoutOffset
+	} else {
+		offset := builder.AllocateInstruction().AsIconst64(constOffset).Insert(builder).Return()
+		addr = builder.AllocateInstruction().AsIadd(addrWithoutOffset, offset).Insert(builder).Return()
+	}
+
+	c.memAlignmentCheck(addr, operationSizeInBytes)
+
+	return addr
 }
 
 func (c *Compiler) memAlignmentCheck(addr ssa.Value, operationSizeInBytes uint64) {
