@@ -63,8 +63,7 @@ before it.
 
 This is implemented in `machine.CompileEntryPreamble(*ssa.Signature)`.  The
 procedure first instantiates a `backend.FunctionABI` struct with metadata about
-the expected ABI for a function with a given signature, using the algorithm
-outlined in [Go's documentation][abi-cc].
+the expected ABI for a function with a given signature.
 
 The preamble sets the fields in the `wazevo.executionContext`.
 
@@ -131,7 +130,7 @@ invoked.
 A host function has the signature:
 
 ```
-go func(ctx context.Context, stack []uint64) 
+go func(ctx context.Context, stack []uint64)
 ```
 
 the function arguments in the `stack` parameter are copied over to the reserved
