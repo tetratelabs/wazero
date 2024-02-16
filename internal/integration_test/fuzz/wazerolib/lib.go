@@ -7,9 +7,6 @@ import (
 	"fmt"
 	"os"
 	"path"
-
-	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/experimental/opt"
 )
 
 const failedCasesDir = "wazerolib/testdata"
@@ -43,13 +40,4 @@ Failed WebAssembly Binary in hex: %s
 Failed Wasm binary has been written to %s
 To reproduce the failure, execute: WASM_BINARY_PATH=%s go test -run=%s ./wazerolib/...
 `, hex.EncodeToString(bin), binaryPath, binaryPath, reproduceTestName)
-}
-
-// This returns a wazevo.RuntimeConfigure whose compiler is either wazevo or the default.
-func newCompilerConfig() wazero.RuntimeConfig {
-	c := wazero.NewRuntimeConfigCompiler()
-	if os.Getenv("WAZERO_FUZZ_WAZEVO") != "" {
-		c = opt.NewRuntimeConfigOptimizingCompiler()
-	}
-	return c
 }
