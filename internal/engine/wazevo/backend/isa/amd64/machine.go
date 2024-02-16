@@ -548,7 +548,8 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		m.lowerVImul(instr)
 	case ssa.OpcodeVIneg:
 		x, lane := instr.ArgWithLane()
-		rn := m.getOperand_Mem_Reg(m.c.ValueDefinition(x))
+		// There's no way to ensure 128-bit alignment, so use getOperand_Reg.
+		rn := m.getOperand_Reg(m.c.ValueDefinition(x))
 		rd := m.c.VRegOf(instr.Return())
 		var vecOp sseOpcode
 		switch lane {
@@ -618,7 +619,8 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 
 	case ssa.OpcodeVFneg:
 		x, lane := instr.ArgWithLane()
-		rn := m.getOperand_Mem_Reg(m.c.ValueDefinition(x))
+		// There's no way to ensure 128-bit alignment, so use getOperand_Reg.
+		rn := m.getOperand_Reg(m.c.ValueDefinition(x))
 		rd := m.c.VRegOf(instr.Return())
 
 		tmp := m.c.AllocateVReg(ssa.TypeV128)
@@ -659,7 +661,8 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 
 	case ssa.OpcodeVSqrt:
 		x, lane := instr.ArgWithLane()
-		rn := m.getOperand_Mem_Reg(m.c.ValueDefinition(x))
+		// There's no way to ensure 128-bit alignment, so use getOperand_Reg.
+		rn := m.getOperand_Reg(m.c.ValueDefinition(x))
 		rd := m.c.VRegOf(instr.Return())
 
 		var vecOp sseOpcode
@@ -794,7 +797,8 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		default:
 			panic("BUG: unexpected lane type")
 		}
-		m.lowerVbBinOp(vecOp, y, x, instr.Return())
+		// There's no way to ensure 128-bit alignment, so use lowerVbBinOpUnaligned.
+		m.lowerVbBinOpUnaligned(vecOp, y, x, instr.Return())
 
 	case ssa.OpcodeVMaxPseudo:
 		x, y, lane := instr.Arg2WithLane()
@@ -807,7 +811,8 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		default:
 			panic("BUG: unexpected lane type")
 		}
-		m.lowerVbBinOp(vecOp, y, x, instr.Return())
+		// There's no way to ensure 128-bit alignment, so use lowerVbBinOpUnaligned.
+		m.lowerVbBinOpUnaligned(vecOp, y, x, instr.Return())
 
 	case ssa.OpcodeVIshl:
 		x, y, lane := instr.Arg2WithLane()
@@ -867,13 +872,15 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 
 	case ssa.OpcodeFvpromoteLow:
 		x := instr.Arg()
-		src := m.getOperand_Mem_Reg(m.c.ValueDefinition(x))
+		// There's no way to ensure 128-bit alignment, so use getOperand_Reg.
+		src := m.getOperand_Reg(m.c.ValueDefinition(x))
 		dst := m.c.VRegOf(instr.Return())
 		m.insert(m.allocateInstr().asXmmUnaryRmR(sseOpcodeCvtps2pd, src, dst))
 
 	case ssa.OpcodeFvdemote:
 		x := instr.Arg()
-		src := m.getOperand_Mem_Reg(m.c.ValueDefinition(x))
+		// There's no way to ensure 128-bit alignment, so use getOperand_Reg.
+		src := m.getOperand_Reg(m.c.ValueDefinition(x))
 		dst := m.c.VRegOf(instr.Return())
 		m.insert(m.allocateInstr().asXmmUnaryRmR(sseOpcodeCvtpd2ps, src, dst))
 
@@ -1456,7 +1463,8 @@ func (m *machine) lowerXmmRmR(instr *ssa.Instruction) {
 	}
 
 	xDef, yDef := m.c.ValueDefinition(x), m.c.ValueDefinition(y)
-	rn := m.getOperand_Mem_Reg(yDef)
+	// There's no way to ensure 128-bit alignment, so use getOperand_Reg.
+	rn := m.getOperand_Reg(yDef)
 	rm := m.getOperand_Reg(xDef)
 	rd := m.c.VRegOf(instr.Return())
 
@@ -2960,6 +2968,20 @@ func (m *machine) lowerShuffle(x, y ssa.Value, lo, hi uint64, ret ssa.Value) {
 	m.copyTo(tmpY, m.c.VRegOf(ret))
 }
 
+func (m *machine) lowerVbBinOpUnaligned(op sseOpcode, x, y, ret ssa.Value) {
+	rn := m.getOperand_Reg(m.c.ValueDefinition(x))
+	rm := m.getOperand_Reg(m.c.ValueDefinition(y))
+	rd := m.c.VRegOf(ret)
+
+	tmp := m.copyToTmp(rn.reg())
+
+	binOp := m.allocateInstr()
+	binOp.asXmmRmR(op, rm, tmp)
+	m.insert(binOp)
+
+	m.copyTo(tmp, rd)
+}
+
 func (m *machine) lowerVbBinOp(op sseOpcode, x, y, ret ssa.Value) {
 	rn := m.getOperand_Reg(m.c.ValueDefinition(x))
 	rm := m.getOperand_Mem_Reg(m.c.ValueDefinition(y))
@@ -2967,7 +2989,6 @@ func (m *machine) lowerVbBinOp(op sseOpcode, x, y, ret ssa.Value) {
 
 	tmp := m.copyToTmp(rn.reg())
 
-	// op between rn, rm.
 	binOp := m.allocateInstr()
 	binOp.asXmmRmR(op, rm, tmp)
 	m.insert(binOp)

@@ -561,7 +561,8 @@ func (m *machine) lowerVFcvtFromInt(x, ret ssa.Value, lane ssa.VecLane, signed b
 	switch lane {
 	case ssa.VecLaneF32x4:
 		if signed {
-			xx := m.getOperand_Mem_Reg(m.c.ValueDefinition(x))
+			// There's no way to ensure 128-bit alignment, so use getOperand_Reg.
+			xx := m.getOperand_Reg(m.c.ValueDefinition(x))
 			m.insert(m.allocateInstr().asXmmUnaryRmR(sseOpcodeCvtdq2ps, xx, m.c.VRegOf(ret)))
 		} else {
 			xx := m.getOperand_Reg(m.c.ValueDefinition(x))
@@ -850,7 +851,7 @@ func (m *machine) lowerVIabs(instr *ssa.Instruction) {
 		case ssa.VecLaneI32x4:
 			vecOp = sseOpcodePabsd
 		}
-		rn := m.getOperand_Mem_Reg(m.c.ValueDefinition(x))
+		rn := m.getOperand_Reg(m.c.ValueDefinition(x))
 
 		i := m.allocateInstr()
 		i.asXmmUnaryRmR(vecOp, rn, rd)
