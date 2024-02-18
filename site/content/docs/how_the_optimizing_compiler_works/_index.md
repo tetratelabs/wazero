@@ -3,11 +3,27 @@ title = "How the Optimizing Compiler Works"
 layout = "single"
 +++
 
+wazero supports two modes of execution: interpreter mode and compilation mode.
+The interpreter mode is a fallback mode for platforms where compilation is not
+supported. Compilation mode is otherwise the default mode of execution: it
+translates Wasm modules to native code to get the best run-time performance.
+
+Translating Wasm bytecode into machine code can take multiple forms.  wazero
+1.0 performs a straightforward translation from a given instruction to a native
+instruction. wazero 2.0 introduces an optimizing compiler that is able to
+perform nontrivial optimizing transformations, such as constant folding or
+dead-code elimination, and it makes better use of the underlying hardware, such
+as CPU registers. This document digs deeper into what we mean when we say
+"optimizing compiler", and explains how it is implemented in wazero.
+
+This document is intended for maintainers, researchers, developers and in
+general anyone interested in understanding the internals of wazero.
+
 What is an Optimizing Compiler?
 -------------------------------
 
 Wazero supports an _optimizing_ compiler in the style of other optimizing
-compilers out there, such as LLVM's or V8's. Traditionally an optimizing
+compilers such as LLVM's or V8's. Traditionally an optimizing
 compiler performs compilation in a number of steps.
 
 Compare this to the **old compiler**, where compilation happens in one step or
@@ -69,6 +85,7 @@ The wazero optimizing compiler implements the following compilation passes:
 * Front-End:
   - Translation to SSA
   - Optimization
+  - Block Layout
 
 * Back-End:
   - Instruction Selection
