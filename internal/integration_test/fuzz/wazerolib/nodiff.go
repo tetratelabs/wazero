@@ -12,6 +12,7 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/experimental/opt"
 	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
@@ -46,7 +47,7 @@ func requireNoDiff(wasmBin []byte, checkMemory bool, requireNoError func(err err
 	ctx := context.Background()
 
 	const features = api.CoreFeaturesV2 | experimental.CoreFeaturesThreads
-	compiler := wazero.NewRuntimeWithConfig(ctx, newCompilerConfig().WithCoreFeatures(features))
+	compiler := wazero.NewRuntimeWithConfig(ctx, opt.NewRuntimeConfigOptimizingCompiler().WithCoreFeatures(features))
 	interpreter := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigInterpreter().WithCoreFeatures(features))
 	defer compiler.Close(ctx)
 	defer interpreter.Close(ctx)

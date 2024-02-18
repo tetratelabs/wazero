@@ -88,17 +88,3 @@ go test -c ./wazerolib -o nodiff.test && wasm-tools shrink ./predicate.sh origin
 
 which uses `wasm-tools shrinken` command to minimize the input binary. Internally, the `predicate.sh` is invoked for each input binary
 where it executes the `nodiff.test` binary which runs `TestReRunFailedRequireNoDiffCase`.
-
-
-### Run fuzzing on wazevo
-
-Until we replace the existing compiler with the new optimizing compiler `wazevo`,
-we need to have the mechanism to allow us to run compiler fuzzing on both of these engines.
-
-To run the fuzzing on `wazevo`, you need to set the WAZERO_FUZZ_WAZEVO non-empty like:
-
-```
-export WAZERO_FUZZ_WAZEVO=1
-```
-
-and then run the fuzzing as usual as described above.
