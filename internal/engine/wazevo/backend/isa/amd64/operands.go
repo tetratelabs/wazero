@@ -256,6 +256,12 @@ func (m *machine) getOperand_Mem_Reg(def *backend.SSAValueDefinition) (op operan
 	if def.IsFromBlockParam() {
 		return newOperandReg(def.BlkParamVReg)
 	}
+
+	if def.SSAValue().Type() == ssa.TypeV128 {
+		// SIMD instructions require strict memory alignment, so we don't support the memory operand for V128 at the moment.
+		return m.getOperand_Reg(def)
+	}
+
 	if m.c.MatchInstr(def, ssa.OpcodeLoad) {
 		instr := def.Instr
 		ptr, offset, _ := instr.LoadData()
