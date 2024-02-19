@@ -161,7 +161,7 @@ func TestMemoryInstance_HasSize(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		offset      uint32
+		offset      uint64
 		sizeInBytes uint64
 		expected    bool
 	}{
@@ -207,7 +207,7 @@ func TestMemoryInstance_HasSize(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			require.Equal(t, tc.expected, memory.hasSize(tc.offset, tc.sizeInBytes))
+			require.Equal(t, tc.expected, memory.hasSize(uint32(tc.offset), tc.sizeInBytes))
 		})
 	}
 }
@@ -481,7 +481,7 @@ func TestMemoryInstance_WriteUint16Le(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		offset        uint32
+		offset        uint64
 		v             uint16
 		expectedOk    bool
 		expectedBytes []byte
@@ -519,7 +519,7 @@ func TestMemoryInstance_WriteUint16Le(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			require.Equal(t, tc.expectedOk, memory.WriteUint16Le(tc.offset, tc.v))
+			require.Equal(t, tc.expectedOk, memory.WriteUint16Le(uint32(tc.offset), tc.v))
 			if tc.expectedOk {
 				require.Equal(t, tc.expectedBytes, memory.Buffer[tc.offset:tc.offset+2]) // 2 is the size of uint16
 			}
@@ -532,7 +532,7 @@ func TestMemoryInstance_WriteUint32Le(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		offset        uint32
+		offset        uint64
 		v             uint32
 		expectedOk    bool
 		expectedBytes []byte
@@ -570,7 +570,7 @@ func TestMemoryInstance_WriteUint32Le(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			require.Equal(t, tc.expectedOk, memory.WriteUint32Le(tc.offset, tc.v))
+			require.Equal(t, tc.expectedOk, memory.WriteUint32Le(uint32(tc.offset), tc.v))
 			if tc.expectedOk {
 				require.Equal(t, tc.expectedBytes, memory.Buffer[tc.offset:tc.offset+4]) // 4 is the size of uint32
 			}
@@ -582,7 +582,7 @@ func TestMemoryInstance_WriteUint64Le(t *testing.T) {
 	memory := &MemoryInstance{Buffer: make([]byte, 100)}
 	tests := []struct {
 		name          string
-		offset        uint32
+		offset        uint64
 		v             uint64
 		expectedOk    bool
 		expectedBytes []byte
@@ -620,7 +620,7 @@ func TestMemoryInstance_WriteUint64Le(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			require.Equal(t, tc.expectedOk, memory.WriteUint64Le(tc.offset, tc.v))
+			require.Equal(t, tc.expectedOk, memory.WriteUint64Le(uint32(tc.offset), tc.v))
 			if tc.expectedOk {
 				require.Equal(t, tc.expectedBytes, memory.Buffer[tc.offset:tc.offset+8]) // 8 is the size of uint64
 			}
@@ -633,7 +633,7 @@ func TestMemoryInstance_WriteFloat32Le(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		offset        uint32
+		offset        uint64
 		v             float32
 		expectedOk    bool
 		expectedBytes []byte
@@ -671,7 +671,7 @@ func TestMemoryInstance_WriteFloat32Le(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			require.Equal(t, tc.expectedOk, memory.WriteFloat32Le(tc.offset, tc.v))
+			require.Equal(t, tc.expectedOk, memory.WriteFloat32Le(uint32(tc.offset), tc.v))
 			if tc.expectedOk {
 				require.Equal(t, tc.expectedBytes, memory.Buffer[tc.offset:tc.offset+4]) // 4 is the size of float32
 			}
@@ -683,7 +683,7 @@ func TestMemoryInstance_WriteFloat64Le(t *testing.T) {
 	memory := &MemoryInstance{Buffer: make([]byte, 100)}
 	tests := []struct {
 		name          string
-		offset        uint32
+		offset        uint64
 		v             float64
 		expectedOk    bool
 		expectedBytes []byte
@@ -721,7 +721,7 @@ func TestMemoryInstance_WriteFloat64Le(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			require.Equal(t, tc.expectedOk, memory.WriteFloat64Le(tc.offset, tc.v))
+			require.Equal(t, tc.expectedOk, memory.WriteFloat64Le(uint32(tc.offset), tc.v))
 			if tc.expectedOk {
 				require.Equal(t, tc.expectedBytes, memory.Buffer[tc.offset:tc.offset+8]) // 8 is the size of float64
 			}

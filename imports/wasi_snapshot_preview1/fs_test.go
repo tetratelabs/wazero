@@ -233,7 +233,7 @@ func Test_fdFdstatGet(t *testing.T) {
 	file, dir := "animals.txt", "sub"
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fstest.FS))
 	defer r.Close(testCtx)
-	memorySize := mod.Memory().Size()
+	memorySize := uint32(mod.Memory().Size())
 
 	// open both paths without using WASI
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
@@ -659,7 +659,7 @@ func Test_fdFilestatGet(t *testing.T) {
 	file, dir := "animals.txt", "sub"
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fstest.FS))
 	defer r.Close(testCtx)
-	memorySize := mod.Memory().Size()
+	memorySize := uint32(mod.Memory().Size())
 
 	// open both paths without using WASI
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
@@ -1397,7 +1397,7 @@ func Test_fdPrestatGet_Errors(t *testing.T) {
 	mod, dirFD, log, r := requireOpenFile(t, t.TempDir(), "tmp", nil, true)
 	defer r.Close(testCtx)
 
-	memorySize := mod.Memory().Size()
+	memorySize := uint32(mod.Memory().Size())
 	tests := []struct {
 		name          string
 		fd            int32
@@ -1477,7 +1477,7 @@ func Test_fdPrestatDirName_Errors(t *testing.T) {
 	mod, dirFD, log, r := requireOpenFile(t, t.TempDir(), "tmp", nil, true)
 	defer r.Close(testCtx)
 
-	memorySize := mod.Memory().Size()
+	memorySize := uint32(mod.Memory().Size())
 	maskMemory(t, mod, 10)
 
 	validAddress := uint32(0) // Arbitrary valid address as arguments to fd_prestat_dir_name. We chose 0 here.
@@ -2304,7 +2304,7 @@ func Test_fdReaddir_Rewind(t *testing.T) {
 func Test_fdReaddir_Errors(t *testing.T) {
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fstest.FS))
 	defer r.Close(testCtx)
-	memLen := mod.Memory().Size()
+	memLen := uint32(mod.Memory().Size())
 
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 	preopen := fsc.RootFS()
@@ -2640,7 +2640,7 @@ func Test_fdSeek_Errors(t *testing.T) {
 	require.Zero(t, fsc.RootFS().Mkdir("dir", 0o0777))
 	dirFD := requireOpenFD(t, mod, "dir")
 
-	memorySize := mod.Memory().Size()
+	memorySize := uint32(mod.Memory().Size())
 
 	tests := []struct {
 		name                    string
@@ -2791,7 +2791,7 @@ func Test_fdTell_Errors(t *testing.T) {
 	mod, fd, log, r := requireOpenFile(t, t.TempDir(), "test_path", []byte("wazero"), true)
 	defer r.Close(testCtx)
 
-	memorySize := mod.Memory().Size()
+	memorySize := uint32(mod.Memory().Size())
 
 	tests := []struct {
 		name            string
@@ -2888,7 +2888,7 @@ func Test_fdWrite_Errors(t *testing.T) {
 
 	// Setup valid test memory
 	iovsCount := uint32(1)
-	memSize := mod.Memory().Size()
+	memSize := uint32(mod.Memory().Size())
 
 	tests := []struct {
 		name                 string
@@ -3058,7 +3058,7 @@ func Test_pathCreateDirectory_Errors(t *testing.T) {
 		{
 			name:          "out-of-memory reading path",
 			fd:            sys.FdPreopen,
-			path:          mod.Memory().Size(),
+			path:          uint32(mod.Memory().Size()),
 			pathLen:       1,
 			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
@@ -3070,7 +3070,7 @@ func Test_pathCreateDirectory_Errors(t *testing.T) {
 			name:          "out-of-memory reading pathLen",
 			fd:            sys.FdPreopen,
 			path:          0,
-			pathLen:       mod.Memory().Size() + 1, // path is in the valid memory range, but pathLen is OOM for path
+			pathLen:       uint32(mod.Memory().Size()) + 1, // path is in the valid memory range, but pathLen is OOM for path
 			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_create_directory(fd=3,path=OOM(0,65537))
@@ -3126,7 +3126,7 @@ func Test_pathFilestatGet(t *testing.T) {
 
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fstest.FS))
 	defer r.Close(testCtx)
-	memorySize := mod.Memory().Size()
+	memorySize := uint32(mod.Memory().Size())
 
 	fileFD := requireOpenFD(t, mod, file)
 
@@ -4078,7 +4078,7 @@ func Test_pathOpen_Errors(t *testing.T) {
 		{
 			name:          "out-of-memory reading path",
 			fd:            sys.FdPreopen,
-			path:          mod.Memory().Size(),
+			path:          uint32(mod.Memory().Size()),
 			pathLen:       uint32(len(file)),
 			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
@@ -4090,7 +4090,7 @@ func Test_pathOpen_Errors(t *testing.T) {
 			name:          "out-of-memory reading pathLen",
 			fd:            sys.FdPreopen,
 			path:          0,
-			pathLen:       mod.Memory().Size() + 1, // path is in the valid memory range, but pathLen is OOM for path
+			pathLen:       uint32(mod.Memory().Size()) + 1, // path is in the valid memory range, but pathLen is OOM for path
 			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=OOM(0,65537),oflags=,fs_rights_base=,fs_rights_inheriting=,fdflags=)
@@ -4163,7 +4163,7 @@ func Test_pathOpen_Errors(t *testing.T) {
 			pathName:       dir,
 			path:           0,
 			pathLen:        uint32(len(dir)),
-			resultOpenedFd: mod.Memory().Size(), // path and pathLen correctly point to the right path, but where to write the opened FD is outside memory.
+			resultOpenedFd: uint32(mod.Memory().Size()), // path and pathLen correctly point to the right path, but where to write the opened FD is outside memory.
 			expectedErrno:  wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=dir,oflags=,fs_rights_base=,fs_rights_inheriting=,fdflags=)
@@ -4416,7 +4416,7 @@ func Test_pathRemoveDirectory_Errors(t *testing.T) {
 		{
 			name:          "out-of-memory reading path",
 			fd:            sys.FdPreopen,
-			path:          mod.Memory().Size(),
+			path:          uint32(mod.Memory().Size()),
 			pathLen:       1,
 			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
@@ -4428,7 +4428,7 @@ func Test_pathRemoveDirectory_Errors(t *testing.T) {
 			name:          "out-of-memory reading pathLen",
 			fd:            sys.FdPreopen,
 			path:          0,
-			pathLen:       mod.Memory().Size() + 1, // path is in the valid memory range, but pathLen is OOM for path
+			pathLen:       uint32(mod.Memory().Size()) + 1, // path is in the valid memory range, but pathLen is OOM for path
 			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_remove_directory(fd=3,path=OOM(0,65537))
@@ -4682,7 +4682,7 @@ func Test_pathRename_Errors(t *testing.T) {
 			name:          "out-of-memory reading old path",
 			oldFd:         sys.FdPreopen,
 			newFd:         sys.FdPreopen,
-			oldPath:       mod.Memory().Size(),
+			oldPath:       uint32(mod.Memory().Size()),
 			oldPathLen:    1,
 			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
@@ -4697,7 +4697,7 @@ func Test_pathRename_Errors(t *testing.T) {
 			oldPath:       0,
 			oldPathName:   "a",
 			oldPathLen:    1,
-			newPath:       mod.Memory().Size(),
+			newPath:       uint32(mod.Memory().Size()),
 			newPathLen:    1,
 			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
@@ -4710,7 +4710,7 @@ func Test_pathRename_Errors(t *testing.T) {
 			oldFd:         sys.FdPreopen,
 			newFd:         sys.FdPreopen,
 			oldPath:       0,
-			oldPathLen:    mod.Memory().Size() + 1, // path is in the valid memory range, but pathLen is OOM for path
+			oldPathLen:    uint32(mod.Memory().Size()) + 1, // path is in the valid memory range, but pathLen is OOM for path
 			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_rename(fd=3,old_path=OOM(0,65537),new_fd=3,new_path=)
@@ -4724,7 +4724,7 @@ func Test_pathRename_Errors(t *testing.T) {
 			oldPathName:   file,
 			oldPathLen:    uint32(len(file)),
 			newPath:       0,
-			newPathLen:    mod.Memory().Size() + 1, // path is in the valid memory range, but pathLen is OOM for path
+			newPathLen:    uint32(mod.Memory().Size()) + 1, // path is in the valid memory range, but pathLen is OOM for path
 			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_rename(fd=3,old_path=file,new_fd=3,new_path=OOM(0,65537))
@@ -4853,7 +4853,7 @@ func Test_pathUnlinkFile_Errors(t *testing.T) {
 		{
 			name:          "out-of-memory reading path",
 			fd:            sys.FdPreopen,
-			path:          mod.Memory().Size(),
+			path:          uint32(mod.Memory().Size()),
 			pathLen:       1,
 			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
@@ -4865,7 +4865,7 @@ func Test_pathUnlinkFile_Errors(t *testing.T) {
 			name:          "out-of-memory reading pathLen",
 			fd:            sys.FdPreopen,
 			path:          0,
-			pathLen:       mod.Memory().Size() + 1, // path is in the valid memory range, but pathLen is OOM for path
+			pathLen:       uint32(mod.Memory().Size()) + 1, // path is in the valid memory range, but pathLen is OOM for path
 			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_unlink_file(fd=3,path=OOM(0,65537))
