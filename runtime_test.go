@@ -192,7 +192,7 @@ func TestModule_Memory(t *testing.T) {
 		name        string
 		wasm        []byte
 		expected    bool
-		expectedLen uint32
+		expectedLen uint64
 	}{
 		{
 			name: "no memory",
@@ -226,7 +226,7 @@ func TestModule_Memory(t *testing.T) {
 				defs := module.ExportedMemoryDefinitions()
 				require.Equal(t, 1, len(defs))
 				def := defs["memory"]
-				require.Equal(t, tc.expectedLen>>16, def.Min())
+				require.Equal(t, tc.expectedLen>>16, uint64(def.Min()))
 			} else {
 				require.Nil(t, mem)
 				require.Zero(t, len(module.ExportedMemoryDefinitions()))

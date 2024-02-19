@@ -44,7 +44,7 @@ func Test_environGet_Errors(t *testing.T) {
 		WithEnv("a", "bc").WithEnv("b", "cd"))
 	defer r.Close(testCtx)
 
-	memorySize := mod.Memory().Size()
+	memorySize := uint32(mod.Memory().Size())
 	validAddress := uint32(0) // arbitrary valid address as arguments to environ_get. We chose 0 here.
 
 	tests := []struct {
@@ -138,7 +138,7 @@ func Test_environSizesGet_Errors(t *testing.T) {
 		WithEnv("a", "b").WithEnv("b", "cd"))
 	defer r.Close(testCtx)
 
-	memorySize := mod.Memory().Size()
+	memorySize := uint32(mod.Memory().Size())
 	validAddress := uint32(0) // arbitrary
 
 	tests := []struct {

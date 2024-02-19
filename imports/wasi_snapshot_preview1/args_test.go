@@ -41,7 +41,7 @@ func Test_argsGet_Errors(t *testing.T) {
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithArgs("a", "bc"))
 	defer r.Close(testCtx)
 
-	memorySize := mod.Memory().Size()
+	memorySize := uint32(mod.Memory().Size())
 	validAddress := uint32(0) // arbitrary
 
 	tests := []struct {
@@ -133,7 +133,7 @@ func Test_argsSizesGet_Errors(t *testing.T) {
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithArgs("a", "bc"))
 	defer r.Close(testCtx)
 
-	memorySize := mod.Memory().Size()
+	memorySize := uint32(mod.Memory().Size())
 	validAddress := uint32(0) // arbitrary valid address as arguments to args_sizes_get. We chose 0 here.
 
 	tests := []struct {

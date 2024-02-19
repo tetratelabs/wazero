@@ -1150,7 +1150,7 @@ func TestE2E_reexported_memory(t *testing.T) {
 	mem := m1Inst.Memory()
 	require.Equal(t, mem, m3Inst.Memory())
 	require.Equal(t, mem, m2Inst.Memory())
-	require.Equal(t, uint32(11), mem.Size()/65536)
+	require.Equal(t, uint64(11), mem.Size()/65536)
 }
 
 func TestStackUnwind_panic_in_host(t *testing.T) {
