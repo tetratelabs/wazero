@@ -3,11 +3,12 @@ package backend_test
 import (
 	"context"
 	"fmt"
-	"github.com/tetratelabs/wazero/api"
 	"os"
 	"runtime"
 	"testing"
 
+	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/isa/amd64"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/isa/arm64"
@@ -2412,12 +2413,16 @@ L2 (SSA Block: blk2):
 			case "arm64":
 				exp = tc.afterFinalizeARM64
 			case "amd64":
-				exp = tc.afterFinalizeAMD64
+				if tc.afterFinalizeAMD64 != "" {
+					exp = tc.afterFinalizeAMD64
+				} else {
+					t.Skip()
+				}
 			default:
 				t.Fail()
 			}
 
-			err := tc.m.Validate(api.CoreFeaturesV2)
+			err := tc.m.Validate(api.CoreFeaturesV2 | experimental.CoreFeaturesThreads)
 			require.NoError(t, err)
 
 			ssab := ssa.NewBuilder()
