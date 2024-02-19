@@ -2379,6 +2379,30 @@ var (
 			}}},
 		},
 	}
+
+	IcmpAndZero = TestCase{
+		Name: "icmp_and_zero",
+		Module: &wasm.Module{
+			TypeSection:     []wasm.FunctionType{{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}}},
+			ExportSection:   []wasm.Export{{Name: ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 0}},
+			FunctionSection: []wasm.Index{0},
+			CodeSection: []wasm.Code{{Body: []byte{
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeI32And,
+				wasm.OpcodeI32Eqz,
+				wasm.OpcodeIf, blockSignature_vv,
+				wasm.OpcodeI32Const, 1,
+				wasm.OpcodeReturn,
+				wasm.OpcodeElse,
+				wasm.OpcodeI32Const, 0,
+				wasm.OpcodeReturn,
+				wasm.OpcodeEnd,
+				wasm.OpcodeUnreachable,
+				wasm.OpcodeEnd,
+			}}},
+		},
+	}
 )
 
 // VecShuffleWithLane returns a VecShuffle test with a custom 16-bytes immediate (lane indexes).

@@ -286,7 +286,9 @@ func (m *machine) LowerConditionalBranch(b *ssa.Instruction) {
 
 		// First, perform the comparison and set the flag.
 		xd, yd := m.c.ValueDefinition(x), m.c.ValueDefinition(y)
-		m.lowerIcmpToFlag(xd, yd, x.Type() == ssa.TypeI64)
+		if !m.tryLowerBandToFlag(xd, yd) {
+			m.lowerIcmpToFlag(xd, yd, x.Type() == ssa.TypeI64)
+		}
 
 		// Then perform the conditional branch.
 		m.insert(m.allocateInstr().asJmpIf(cc, newOperandLabel(target)))
@@ -1296,12 +1298,44 @@ func (m *machine) lowerExitIfTrueWithCode(execCtx regalloc.VReg, cond ssa.Value,
 	execCtxTmp := m.copyToTmp(execCtx)
 
 	x, y, c := cvalInstr.IcmpData()
-	m.lowerIcmpToFlag(m.c.ValueDefinition(x), m.c.ValueDefinition(y), x.Type() == ssa.TypeI64)
+	xx, yy := m.c.ValueDefinition(x), m.c.ValueDefinition(y)
+	if !m.tryLowerBandToFlag(xx, yy) {
+		m.lowerIcmpToFlag(xx, yy, x.Type() == ssa.TypeI64)
+	}
 
 	jmpIf := m.allocateInstr()
 	m.insert(jmpIf)
 	l := m.lowerExitWithCode(execCtxTmp, code)
 	jmpIf.asJmpIf(condFromSSAIntCmpCond(c).invert(), newOperandLabel(l))
+}
+
+func (m *machine) tryLowerBandToFlag(x, y *backend.SSAValueDefinition) (ok bool) {
+	var target *backend.SSAValueDefinition
+	if x.IsFromInstr() && x.Instr.Constant() && x.Instr.ConstantVal() == 0 {
+		if m.c.MatchInstr(y, ssa.OpcodeBand) {
+			target = y
+		}
+	}
+
+	if y.IsFromInstr() && y.Instr.Constant() && y.Instr.ConstantVal() == 0 {
+		if m.c.MatchInstr(x, ssa.OpcodeBand) {
+			target = x
+		}
+	}
+
+	if target == nil {
+		return false
+	}
+
+	bandInstr := target.Instr
+	bandX, bandY := bandInstr.Arg2()
+
+	xx := m.getOperand_Reg(m.c.ValueDefinition(bandX))
+	yy := m.getOperand_Mem_Imm32_Reg(m.c.ValueDefinition(bandY))
+	test := m.allocateInstr().asCmpRmiR(false, yy, xx.reg(), bandX.Type() == ssa.TypeI64)
+	m.insert(test)
+	bandInstr.MarkLowered()
+	return true
 }
 
 func (m *machine) allocateExitInstructions(execCtx, exitCodeReg regalloc.VReg) (saveRsp, saveRbp, setExitCode *instruction) {
