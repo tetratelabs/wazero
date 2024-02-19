@@ -8,10 +8,11 @@ package arm64
 
 import (
 	"fmt"
+	"math"
+
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
-	"math"
 )
 
 // LowerSingleBranch implements backend.Machine.
