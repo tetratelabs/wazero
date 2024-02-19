@@ -3,6 +3,7 @@ package backend_test
 import (
 	"context"
 	"fmt"
+	"github.com/tetratelabs/wazero/api"
 	"os"
 	"runtime"
 	"testing"
@@ -45,7 +46,7 @@ func TestE2E(t *testing.T) {
 		m                                      *wasm.Module
 		targetIndex                            uint32
 		afterLoweringARM64, afterFinalizeARM64 string
-		// TODO: amd64.
+		afterLoweringAMD64, afterFinalizeAMD64 string
 	}
 
 	for _, tc := range []testCase{
@@ -2364,6 +2365,46 @@ L2:
 	ret
 `,
 		},
+		{
+			name: "icmp_and_zero",
+			m:    testcases.IcmpAndZero.Module,
+			afterFinalizeAMD64: `
+L1 (SSA Block: blk0):
+	pushq %rbp
+	movq %rsp, %rbp
+	testl %ecx, %edi
+	jnz L2
+L3 (SSA Block: blk1):
+	movl $1, %eax
+	movq %rbp, %rsp
+	popq %rbp
+	ret
+L2 (SSA Block: blk2):
+	xor %rax, %rax
+	movq %rbp, %rsp
+	popq %rbp
+	ret
+`,
+			afterFinalizeARM64: `
+L1 (SSA Block: blk0):
+	stp x30, xzr, [sp, #-0x10]!
+	str xzr, [sp, #-0x10]!
+	ands wzr, w2, w3
+	b.ne #0x18, (L2)
+L3 (SSA Block: blk1):
+	orr w8, wzr, #0x1
+	mov x0, x8
+	add sp, sp, #0x10
+	ldr x30, [sp], #0x10
+	ret
+L2 (SSA Block: blk2):
+	mov x8, xzr
+	mov x0, x8
+	add sp, sp, #0x10
+	ldr x30, [sp], #0x10
+	ret
+`,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var exp string
@@ -2371,10 +2412,13 @@ L2:
 			case "arm64":
 				exp = tc.afterFinalizeARM64
 			case "amd64":
-				t.Skip()
+				exp = tc.afterFinalizeAMD64
 			default:
 				t.Fail()
 			}
+
+			err := tc.m.Validate(api.CoreFeaturesV2)
+			require.NoError(t, err)
 
 			ssab := ssa.NewBuilder()
 			offset := wazevoapi.NewModuleContextOffsetData(tc.m, false)
@@ -2417,6 +2461,10 @@ L2:
 			case "arm64":
 				if tc.afterLoweringARM64 != "" {
 					require.Equal(t, tc.afterLoweringARM64, be.Format())
+				}
+			case "amd64":
+				if tc.afterLoweringAMD64 != "" {
+					require.Equal(t, tc.afterLoweringAMD64, be.Format())
 				}
 			default:
 				t.Fail()
