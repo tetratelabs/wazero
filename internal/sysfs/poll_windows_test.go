@@ -34,6 +34,8 @@ func TestPoll_Windows(t *testing.T) {
 	t.Run("peekNamedPipe should report the correct state of incoming data in the pipe", func(t *testing.T) {
 		r, w, err := os.Pipe()
 		require.NoError(t, err)
+		defer r.Close()
+		defer w.Close()
 		rh := syscall.Handle(r.Fd())
 
 		// Ensure the pipe has no data.
@@ -131,7 +133,10 @@ func TestPoll_Windows(t *testing.T) {
 	})
 
 	t.Run("poll should return immediately when duration is zero (no data)", func(t *testing.T) {
-		r, _, err := os.Pipe()
+		r, w, err := os.Pipe()
+		defer r.Close()
+		defer w.Close()
+
 		require.NoError(t, err)
 		fds := []pollFd{{fd: r.Fd(), events: _POLLIN}}
 		n, err := _poll(fds, 0)
@@ -142,6 +147,8 @@ func TestPoll_Windows(t *testing.T) {
 	t.Run("poll should return immediately when duration is zero (data)", func(t *testing.T) {
 		r, w, err := os.Pipe()
 		require.NoError(t, err)
+		defer r.Close()
+		defer w.Close()
 		fds := []pollFd{{fd: r.Fd(), events: _POLLIN}}
 
 		// Write to the channel immediately.
@@ -157,8 +164,10 @@ func TestPoll_Windows(t *testing.T) {
 	})
 
 	t.Run("poll should wait forever when duration is nil (no writes)", func(t *testing.T) {
-		r, _, err := os.Pipe()
+		r, w, err := os.Pipe()
 		require.NoError(t, err)
+		defer r.Close()
+		defer w.Close()
 
 		ch := make(chan result, 1)
 		go pollToChannel(r.Fd(), -1, ch)
@@ -171,6 +180,8 @@ func TestPoll_Windows(t *testing.T) {
 	t.Run("poll should wait forever when duration is nil", func(t *testing.T) {
 		r, w, err := os.Pipe()
 		require.NoError(t, err)
+		defer r.Close()
+		defer w.Close()
 
 		ch := make(chan result, 1)
 		go pollToChannel(r.Fd(), -1, ch)
@@ -198,6 +209,8 @@ func TestPoll_Windows(t *testing.T) {
 	t.Run("poll should wait for the given duration", func(t *testing.T) {
 		r, w, err := os.Pipe()
 		require.NoError(t, err)
+		defer r.Close()
+		defer w.Close()
 
 		ch := make(chan result, 1)
 		go pollToChannel(r.Fd(), 500, ch)
@@ -223,8 +236,10 @@ func TestPoll_Windows(t *testing.T) {
 	})
 
 	t.Run("poll should timeout after the given duration", func(t *testing.T) {
-		r, _, err := os.Pipe()
+		r, w, err := os.Pipe()
 		require.NoError(t, err)
+		defer r.Close()
+		defer w.Close()
 
 		ch := make(chan result, 1)
 		go pollToChannel(r.Fd(), 200, ch)
@@ -238,6 +253,8 @@ func TestPoll_Windows(t *testing.T) {
 	t.Run("poll should return when a write occurs before the given duration", func(t *testing.T) {
 		r, w, err := os.Pipe()
 		require.NoError(t, err)
+		defer r.Close()
+		defer w.Close()
 
 		ch := make(chan result, 1)
 		go pollToChannel(r.Fd(), 800, ch)
@@ -257,7 +274,9 @@ func TestPoll_Windows(t *testing.T) {
 
 	t.Run("poll should return when a regular file is given", func(t *testing.T) {
 		f, err := os.CreateTemp(t.TempDir(), "ex")
+		require.NoError(t, err)
 		defer f.Close()
+
 		require.NoError(t, err)
 		fds := []pollFd{{fd: f.Fd(), events: _POLLIN}}
 		n, errno := _poll(fds, 0)
