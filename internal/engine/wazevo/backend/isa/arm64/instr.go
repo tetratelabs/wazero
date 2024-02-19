@@ -1813,6 +1813,8 @@ func (a aluOp) String() string {
 		return "orn"
 	case aluOpAnd:
 		return "and"
+	case aluOpAnds:
+		return "ands"
 	case aluOpBic:
 		return "bic"
 	case aluOpEor:
@@ -1856,6 +1858,8 @@ const (
 	aluOpOrn
 	// 32/64-bit Bitwise AND.
 	aluOpAnd
+	// 32/64-bit Bitwise ANDS.
+	aluOpAnds
 	// 32/64-bit Bitwise AND NOT.
 	aluOpBic
 	// 32/64-bit Bitwise XOR (Exclusive OR).

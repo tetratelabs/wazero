@@ -1035,6 +1035,18 @@ func TestInstruction_encode(t *testing.T) {
 		{want: "2030428a", setup: func(i *instruction) {
 			i.asALU(aluOpAnd, operandNR(x0VReg), operandNR(x1VReg), operandSR(x2VReg, 12, shiftOpLSR), true)
 		}},
+		{want: "2000026a", setup: func(i *instruction) {
+			i.asALU(aluOpAnds, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), false)
+		}},
+		{want: "200002ea", setup: func(i *instruction) {
+			i.asALU(aluOpAnds, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), true)
+		}},
+		{want: "201002ea", setup: func(i *instruction) {
+			i.asALU(aluOpAnds, operandNR(x0VReg), operandNR(x1VReg), operandSR(x2VReg, 4, shiftOpLSL), true)
+		}},
+		{want: "203042ea", setup: func(i *instruction) {
+			i.asALU(aluOpAnds, operandNR(x0VReg), operandNR(x1VReg), operandSR(x2VReg, 12, shiftOpLSR), true)
+		}},
 		{want: "2000022a", setup: func(i *instruction) {
 			i.asALU(aluOpOrr, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), false)
 		}},

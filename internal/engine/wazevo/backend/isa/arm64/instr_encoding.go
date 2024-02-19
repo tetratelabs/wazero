@@ -1376,6 +1376,8 @@ func encodeAluBitmaskImmediate(op aluOp, rd, rn uint32, imm uint64, _64bit bool)
 		_31to23 = 0b01_100100
 	case aluOpEor:
 		_31to23 = 0b10_100100
+	case aluOpAnds:
+		_31to23 = 0b11_100100
 	default:
 		panic("BUG")
 	}
@@ -1539,7 +1541,7 @@ func encodeAluRRRShift(op aluOp, rd, rn, rm, amount uint32, shiftOp shiftOp, _64
 		_31to24 = 0b01001011
 	case aluOpSubS:
 		_31to24 = 0b01101011
-	case aluOpAnd, aluOpOrr, aluOpEor:
+	case aluOpAnd, aluOpOrr, aluOpEor, aluOpAnds:
 		// "Logical (shifted register)".
 		switch op {
 		case aluOpAnd:
@@ -1548,6 +1550,8 @@ func encodeAluRRRShift(op aluOp, rd, rn, rm, amount uint32, shiftOp shiftOp, _64
 			opc = 0b01
 		case aluOpEor:
 			opc = 0b10
+		case aluOpAnds:
+			opc = 0b11
 		}
 		_31to24 = 0b000_01010
 	default:
@@ -1649,7 +1653,7 @@ func encodeAluRRR(op aluOp, rd, rn, rm uint32, _64bit, isRnSp bool) uint32 {
 		}
 		// "Shifted register" with shift = 0
 		_31to21 = 0b01101011_000
-	case aluOpAnd, aluOpOrr, aluOpOrn, aluOpEor:
+	case aluOpAnd, aluOpOrr, aluOpOrn, aluOpEor, aluOpAnds:
 		// "Logical (shifted register)".
 		var opc, n uint32
 		switch op {
@@ -1662,6 +1666,8 @@ func encodeAluRRR(op aluOp, rd, rn, rm uint32, _64bit, isRnSp bool) uint32 {
 			n = 1
 		case aluOpEor:
 			opc = 0b10
+		case aluOpAnds:
+			opc = 0b11
 		}
 		_31to21 = 0b000_01010_000 | opc<<8 | n
 	case aluOpLsl, aluOpAsr, aluOpLsr, aluOpRotR:

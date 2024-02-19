@@ -2205,8 +2205,7 @@ L13:
 	exit_sequence x12
 L12:
 	add x11, x10, x11
-	and x12, x11, #0x1
-	subs xzr, x12, #0x0
+	ands xzr, x11, #0x1
 	mov x12, x0
 	b.eq #0x34, (L11)
 	movz x13, #0x17, lsl 0
@@ -2235,8 +2234,7 @@ L11:
 	exit_sequence x13
 L10:
 	add x12, x10, x12
-	and x13, x12, #0x3
-	subs xzr, x13, #0x0
+	ands xzr, x12, #0x3
 	mov x13, x0
 	b.eq #0x34, (L9)
 	movz x14, #0x17, lsl 0
@@ -2283,8 +2281,7 @@ L8:
 	exit_sequence x15
 L7:
 	add x14, x10, x14
-	and x15, x14, #0x1
-	subs xzr, x15, #0x0
+	ands xzr, x14, #0x1
 	mov x15, x0
 	b.eq #0x34, (L6)
 	movz x16, #0x17, lsl 0
@@ -2313,8 +2310,7 @@ L6:
 	exit_sequence x16
 L5:
 	add x15, x10, x15
-	and x16, x15, #0x3
-	subs xzr, x16, #0x0
+	ands xzr, x15, #0x3
 	mov x16, x0
 	b.eq #0x34, (L4)
 	movz x17, #0x17, lsl 0
@@ -2343,8 +2339,7 @@ L4:
 	exit_sequence x17
 L3:
 	add x10, x10, x16
-	and x16, x10, #0x7
-	subs xzr, x16, #0x0
+	ands xzr, x10, #0x7
 	b.eq #0x34, (L2)
 	movz x16, #0x17, lsl 0
 	str w16, [x0]
