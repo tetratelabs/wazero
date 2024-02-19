@@ -1330,8 +1330,8 @@ func (m *machine) tryLowerBandToFlag(x, y *backend.SSAValueDefinition) (ok bool)
 	bandInstr := target.Instr
 	bandX, bandY := bandInstr.Arg2()
 
-	xx := m.getOperand_Reg(m.c.ValueDefinition(bandY))
-	yy := m.getOperand_Mem_Imm32_Reg(m.c.ValueDefinition(bandX))
+	xx := m.getOperand_Reg(m.c.ValueDefinition(bandX))
+	yy := m.getOperand_Mem_Imm32_Reg(m.c.ValueDefinition(bandY))
 	test := m.allocateInstr().asCmpRmiR(false, yy, xx.reg(), bandX.Type() == ssa.TypeI64)
 	m.insert(test)
 	bandInstr.MarkLowered()

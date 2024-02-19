@@ -2373,7 +2373,7 @@ L2:
 L1 (SSA Block: blk0):
 	pushq %rbp
 	movq %rsp, %rbp
-	testl %ecx, %edi
+	testl %edi, %ecx
 	jnz L2
 L3 (SSA Block: blk1):
 	movl $1, %eax
