@@ -446,8 +446,6 @@ func (a *Allocator) loopTreeDFS(entry Block) {
 		loop := a.blks[tail]
 		a.blks = a.blks[:tail]
 		a.vs2 = a.vs2[:0]
-
-		a.vs2 = a.vs2[:0]
 		const (
 			flagDone    = false
 			flagPending = true
@@ -488,6 +486,14 @@ func (a *Allocator) loopTreeDFS(entry Block) {
 
 			if child.LoopHeader() {
 				a.blks = append(a.blks, child)
+			}
+		}
+
+		if cn == 0 {
+			// If there's no forest child, we haven't cleared the .spilled field at this point.
+			for _, v := range a.vs2 {
+				st := s.getVRegState(v)
+				st.spilled = false
 			}
 		}
 	}
@@ -965,6 +971,9 @@ func (a *Allocator) scheduleSpill(f Function, vs *vrState) {
 	r := RealRegInvalid
 	if definingBlk == nil {
 		panic(fmt.Sprintf("BUG: definingBlk should not be nil for %s. This is likley a bug in backend lowering logic", vs.v.String()))
+	}
+	if pos == nil {
+		panic(fmt.Sprintf("BUG: pos should not be nil for %s. This is likley a bug in backend lowering logic", vs.v.String()))
 	}
 
 	if wazevoapi.RegAllocLoggingEnabled {

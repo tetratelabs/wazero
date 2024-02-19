@@ -1028,7 +1028,7 @@ func Test2058(t *testing.T) {
 	})
 }
 
-func Test206(t *testing.T) {
+func Test2060(t *testing.T) {
 	if !platform.CompilerSupported() {
 		return
 	}
@@ -1044,5 +1044,12 @@ func Test206(t *testing.T) {
 		lo, hi = m.Globals[1].Value()
 		require.Equal(t, uint64(18446744073709551615), lo)
 		require.Equal(t, uint64(18446744073709551615), hi)
+	})
+}
+
+func Test2070(t *testing.T) {
+	run(t, func(t *testing.T, r wazero.Runtime) {
+		_, err := r.Instantiate(ctx, getWasmBinary(t, "2070"))
+		require.NoError(t, err)
 	})
 }
