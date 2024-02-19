@@ -273,9 +273,6 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer) int {
 	if useInterpreter {
 		rtc = wazero.NewRuntimeConfigInterpreter()
 	} else if useOptimizingCompiler {
-		if runtime.GOARCH != "arm64" {
-			panic("UseOptimizingCompiler is only supported on arm64")
-		}
 		rtc = opt.NewRuntimeConfigOptimizingCompiler()
 	} else {
 		rtc = wazero.NewRuntimeConfig()

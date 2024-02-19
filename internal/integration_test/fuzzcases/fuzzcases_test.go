@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math"
 	"runtime"
-	"strings"
 	"testing"
 
 	"github.com/tetratelabs/wazero"
@@ -69,17 +68,9 @@ func run(t *testing.T, runner func(t *testing.T, r wazero.Runtime)) {
 	runWithWazevo(t, runner)
 }
 
-func skipWazevo(t *testing.T) {
-	if runtime.GOARCH == "amd64" && strings.Contains(t.Name(), "wazevo") {
-		t.Skip("skipping wazevo")
-	}
-}
-
 // Test695 requires two functions to exit with "out of bounds memory access" consistently across the implementations.
 func Test695(t *testing.T) {
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		skipWazevo(t) // TODO after SIMD is supported.
-
 		module, err := r.Instantiate(ctx, getWasmBinary(t, "695"))
 		require.NoError(t, err)
 
@@ -146,7 +137,6 @@ func Test701(t *testing.T) {
 
 func Test704(t *testing.T) {
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		skipWazevo(t) // TODO after SIMD is supported.
 		_, err := r.Instantiate(ctx, getWasmBinary(t, "704"))
 		require.NoError(t, err)
 	})
@@ -162,8 +152,6 @@ func Test708(t *testing.T) {
 
 func Test709(t *testing.T) {
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		skipWazevo(t) // TODO after SIMD is supported.
-
 		mod, err := r.Instantiate(ctx, getWasmBinary(t, "709"))
 		require.NoError(t, err)
 
@@ -237,8 +225,6 @@ func Test718(t *testing.T) {
 
 func Test719(t *testing.T) {
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		skipWazevo(t) // TODO after SIMD is supported.
-
 		mod, err := r.Instantiate(ctx, getWasmBinary(t, "719"))
 		require.NoError(t, err)
 
@@ -325,8 +311,6 @@ func Test730(t *testing.T) {
 	}
 
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		skipWazevo(t) // TODO after SIMD is supported.
-
 		mod, err := r.Instantiate(ctx, getWasmBinary(t, "730"))
 		require.NoError(t, err)
 
@@ -480,8 +464,6 @@ func Test1792b(t *testing.T) {
 		return
 	}
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		skipWazevo(t) // TODO after SIMD is supported.
-
 		_, err := r.Instantiate(ctx, getWasmBinary(t, "1792b"))
 		require.NoError(t, err)
 	})
@@ -493,8 +475,6 @@ func Test1792c(t *testing.T) {
 		return
 	}
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		skipWazevo(t) // TODO after SIMD is supported.
-
 		mod, err := r.Instantiate(ctx, getWasmBinary(t, "1792c"))
 		require.NoError(t, err)
 		f := mod.ExportedFunction("")
@@ -515,8 +495,6 @@ func Test1793a(t *testing.T) {
 		return
 	}
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		skipWazevo(t) // TODO after SIMD is supported.
-
 		mod, err := r.Instantiate(ctx, getWasmBinary(t, "1793a"))
 		require.NoError(t, err)
 		m := mod.(*wasm.ModuleInstance)
@@ -534,8 +512,6 @@ func Test1793b(t *testing.T) {
 		return
 	}
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		skipWazevo(t) // TODO after SIMD is supported.
-
 		mod, err := r.Instantiate(ctx, getWasmBinary(t, "1793b"))
 		require.NoError(t, err)
 		m := mod.(*wasm.ModuleInstance)
@@ -553,8 +529,6 @@ func Test1793c(t *testing.T) {
 		return
 	}
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		skipWazevo(t) // TODO after SIMD is supported.
-
 		mod, err := r.Instantiate(ctx, getWasmBinary(t, "1793c"))
 		require.NoError(t, err)
 		m := mod.(*wasm.ModuleInstance)
@@ -572,8 +546,6 @@ func Test1793d(t *testing.T) {
 		return
 	}
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		skipWazevo(t) // TODO after SIMD is supported.
-
 		mod, err := r.Instantiate(ctx, getWasmBinary(t, "1793d"))
 		require.NoError(t, err)
 		m := mod.(*wasm.ModuleInstance)
@@ -589,8 +561,6 @@ func Test1797a(t *testing.T) {
 		return
 	}
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		skipWazevo(t) // TODO after SIMD is supported.
-
 		mod, err := r.Instantiate(ctx, getWasmBinary(t, "1797a"))
 		require.NoError(t, err)
 		m := mod.(*wasm.ModuleInstance)
@@ -606,8 +576,6 @@ func Test1797b(t *testing.T) {
 		return
 	}
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		skipWazevo(t) // TODO after SIMD is supported.
-
 		mod, err := r.Instantiate(ctx, getWasmBinary(t, "1797b"))
 		require.NoError(t, err)
 		m := mod.(*wasm.ModuleInstance)
@@ -626,8 +594,6 @@ func Test1797c(t *testing.T) {
 		return
 	}
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		skipWazevo(t) // TODO after SIMD is supported.
-
 		mod, err := r.Instantiate(ctx, getWasmBinary(t, "1797c"))
 		require.NoError(t, err)
 		m := mod.(*wasm.ModuleInstance)
@@ -643,8 +609,6 @@ func Test1797d(t *testing.T) {
 		return
 	}
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		skipWazevo(t) // TODO after SIMD is supported.
-
 		mod, err := r.Instantiate(ctx, getWasmBinary(t, "1797d"))
 		require.NoError(t, err)
 		m := mod.(*wasm.ModuleInstance)
@@ -664,8 +628,6 @@ func Test1802(t *testing.T) {
 		return
 	}
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		skipWazevo(t) // TODO after SIMD is supported.
-
 		mod, err := r.Instantiate(ctx, getWasmBinary(t, "1802"))
 		require.NoError(t, err, "wasm binary should build successfully")
 		m := mod.(*wasm.ModuleInstance)
@@ -701,8 +663,6 @@ func Test1817(t *testing.T) {
 		return
 	}
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		skipWazevo(t) // TODO after SIMD is supported.
-
 		mod, err := r.Instantiate(ctx, getWasmBinary(t, "1817"))
 		require.NoError(t, err)
 		m := mod.(*wasm.ModuleInstance)
@@ -723,8 +683,6 @@ func Test1820(t *testing.T) {
 		return
 	}
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		skipWazevo(t) // TODO after SIMD is supported.
-
 		mod, err := r.Instantiate(ctx, getWasmBinary(t, "1820"))
 		require.NoError(t, err)
 		m := mod.(*wasm.ModuleInstance)
@@ -743,8 +701,6 @@ func Test1823(t *testing.T) {
 		return
 	}
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		skipWazevo(t) // TODO after SIMD is supported.
-
 		mod, err := r.Instantiate(ctx, getWasmBinary(t, "1823"))
 		require.NoError(t, err)
 		m := mod.(*wasm.ModuleInstance)
@@ -762,8 +718,6 @@ func Test1825(t *testing.T) {
 		return
 	}
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		skipWazevo(t) // TODO after SIMD is supported.
-
 		mod, err := r.Instantiate(ctx, getWasmBinary(t, "1825"))
 		require.NoError(t, err)
 		m := mod.(*wasm.ModuleInstance)
@@ -781,8 +735,6 @@ func Test1826(t *testing.T) {
 		return
 	}
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		skipWazevo(t) // TODO after SIMD is supported.
-
 		mod, err := r.Instantiate(ctx, getWasmBinary(t, "1826"))
 		require.NoError(t, err)
 		m := mod.(*wasm.ModuleInstance)
@@ -818,8 +770,6 @@ func Test1949(t *testing.T) {
 	}
 	const offset = 65526
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		skipWazevo(t) // TODO after SIMD is supported.
-
 		mod, err := r.Instantiate(ctx, getWasmBinary(t, "1949"))
 		require.NoError(t, err)
 		_, err = mod.ExportedFunction("").Call(ctx)
