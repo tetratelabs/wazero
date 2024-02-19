@@ -131,7 +131,7 @@ func (m *machine) tryLowerBandToFlag(x, y ssa.Value) (ok bool) {
 			bandInstr := yy.Instr
 			m.lowerBitwiseAluOp(bandInstr, aluOpAnds, true)
 			ok = true
-			bandInstr.Lowered()
+			bandInstr.MarkLowered()
 			return
 		}
 	}
@@ -141,7 +141,7 @@ func (m *machine) tryLowerBandToFlag(x, y ssa.Value) (ok bool) {
 			bandInstr := xx.Instr
 			m.lowerBitwiseAluOp(bandInstr, aluOpAnds, true)
 			ok = true
-			bandInstr.Lowered()
+			bandInstr.MarkLowered()
 			return
 		}
 	}
