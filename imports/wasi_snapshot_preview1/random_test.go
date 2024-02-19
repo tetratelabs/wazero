@@ -43,7 +43,7 @@ func Test_randomGet_Errors(t *testing.T) {
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig())
 	defer r.Close(testCtx)
 
-	memorySize := mod.Memory().Size()
+	memorySize := uint32(mod.Memory().Size())
 
 	tests := []struct {
 		name           string

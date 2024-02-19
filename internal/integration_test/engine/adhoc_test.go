@@ -818,7 +818,7 @@ func testMemOps(t *testing.T, r wazero.Runtime) {
 	results, err = sizeFn.Call(testCtx)
 	require.NoError(t, err)
 	require.Equal(t, uint64(1), results[0])        // 1 page
-	require.Equal(t, uint32(65536), memory.Size()) // 64KB
+	require.Equal(t, uint64(65536), memory.Size()) // 64KB
 
 	// Grow again so that the memory size matches memory capacity.
 	results, err = growFn.Call(testCtx, 1)
