@@ -90,7 +90,9 @@ func (m *machine) LowerConditionalBranch(b *ssa.Instruction) {
 			cc = cc.invert()
 		}
 
-		m.lowerIcmpToFlag(x, y, signed)
+		if !m.tryLowerBandToFlag(x, y) {
+			m.lowerIcmpToFlag(x, y, signed)
+		}
 		cbr := m.allocateInstr()
 		cbr.asCondBr(cc.asCond(), target, false /* ignored */)
 		m.insert(cbr)
@@ -119,6 +121,31 @@ func (m *machine) LowerConditionalBranch(b *ssa.Instruction) {
 		cbr.asCondBr(c, target, false)
 		m.insert(cbr)
 	}
+}
+
+func (m *machine) tryLowerBandToFlag(x, y ssa.Value) (ok bool) {
+	xx := m.compiler.ValueDefinition(x)
+	yy := m.compiler.ValueDefinition(y)
+	if xx.IsFromInstr() && xx.Instr.Constant() && xx.Instr.ConstantVal() == 0 {
+		if m.compiler.MatchInstr(yy, ssa.OpcodeBand) {
+			bandInstr := yy.Instr
+			m.lowerBitwiseAluOp(bandInstr, aluOpAnds, true)
+			ok = true
+			bandInstr.MarkLowered()
+			return
+		}
+	}
+
+	if yy.IsFromInstr() && yy.Instr.Constant() && yy.Instr.ConstantVal() == 0 {
+		if m.compiler.MatchInstr(xx, ssa.OpcodeBand) {
+			bandInstr := xx.Instr
+			m.lowerBitwiseAluOp(bandInstr, aluOpAnds, true)
+			ok = true
+			bandInstr.MarkLowered()
+			return
+		}
+	}
+	return
 }
 
 // LowerInstr implements backend.Machine.
@@ -179,11 +206,11 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 	case ssa.OpcodeVMinPseudo:
 		m.lowerVMinMaxPseudo(instr, false)
 	case ssa.OpcodeBand:
-		m.lowerBitwiseAluOp(instr, aluOpAnd)
+		m.lowerBitwiseAluOp(instr, aluOpAnd, false)
 	case ssa.OpcodeBor:
-		m.lowerBitwiseAluOp(instr, aluOpOrr)
+		m.lowerBitwiseAluOp(instr, aluOpOrr, false)
 	case ssa.OpcodeBxor:
-		m.lowerBitwiseAluOp(instr, aluOpEor)
+		m.lowerBitwiseAluOp(instr, aluOpEor, false)
 	case ssa.OpcodeIshl:
 		m.lowerShifts(instr, extModeNone, aluOpLsl)
 	case ssa.OpcodeSshr:
@@ -1645,12 +1672,18 @@ func (m *machine) lowerShifts(si *ssa.Instruction, ext extMode, aluOp aluOp) {
 	m.insert(alu)
 }
 
-func (m *machine) lowerBitwiseAluOp(si *ssa.Instruction, op aluOp) {
+func (m *machine) lowerBitwiseAluOp(si *ssa.Instruction, op aluOp, ignoreResult bool) {
 	x, y := si.Arg2()
 
 	xDef, yDef := m.compiler.ValueDefinition(x), m.compiler.ValueDefinition(y)
 	rn := m.getOperand_NR(xDef, extModeNone)
-	rd := operandNR(m.compiler.VRegOf(si.Return()))
+
+	var rd operand
+	if ignoreResult {
+		rd = operandNR(xzrVReg)
+	} else {
+		rd = operandNR(m.compiler.VRegOf(si.Return()))
+	}
 
 	_64 := x.Type().Bits() == 64
 	alu := m.allocateInstr()
@@ -1934,7 +1967,10 @@ func (m *machine) lowerExitIfTrueWithCode(execCtxVReg regalloc.VReg, cond ssa.Va
 	cvalInstr := condDef.Instr
 	x, y, c := cvalInstr.IcmpData()
 	signed := c.Signed()
-	m.lowerIcmpToFlag(x, y, signed)
+
+	if !m.tryLowerBandToFlag(x, y) {
+		m.lowerIcmpToFlag(x, y, signed)
+	}
 
 	// We need to copy the execution context to a temp register, because if it's spilled,
 	// it might end up being reloaded inside the exiting branch.
