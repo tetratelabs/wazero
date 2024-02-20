@@ -14,6 +14,8 @@ Currently, we have the following fuzzing targets:
 - `no_diff`: compares the results from the compiler and interpreter engines, and see if there's a diff in them.
 - `memory_no_diff`: same as `no_diff` except that in addition to the results, it also compares the entire memory buffer between engines to ensure the consistency around memory access.
   Therefore, this takes much longer than `no_diff`.
+- `logging_no_diff`: same as `no_diff` except that in addition to the results, it also compares the entire logging filter result between engines to ensure the consistency around function calls.
+  Therefore, this takes much longer than `no_diff`.
 - `validation`: try compiling maybe-invalid Wasm module binaries. This is to ensure that our validation phase works correctly as well as the engines do not panic during compilation.
 
 
