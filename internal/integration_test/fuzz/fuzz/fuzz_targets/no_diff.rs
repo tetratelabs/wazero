@@ -53,7 +53,7 @@ fn run(data: &[u8]) -> Result<()> {
 
     // Pass the randomly generated module to the wazero library.
     unsafe {
-        wazero_abi::require_no_diff(module_bytes.as_ptr(), module_bytes.len(), false);
+        wazero_abi::require_no_diff(module_bytes.as_ptr(), module_bytes.len(), false, false);
     }
 
     // We always return Ok as inside require_no_diff, we cause panic if the binary is interesting.
