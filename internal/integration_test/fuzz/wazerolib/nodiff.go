@@ -297,7 +297,7 @@ outer:
 		}
 
 		if !matched {
-			err = fmt.Errorf("result mismatch on invoking '%s':\n\tinterpreter got: %v\n\tcompiler got: %v", name, intRes, cmpRes)
+			err = errors.Join(err, fmt.Errorf("result mismatch on invoking '%s':\n\tinterpreter got: %v\n\tcompiler got: %v", name, intRes, cmpRes))
 		}
 	}
 	return
