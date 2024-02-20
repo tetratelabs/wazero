@@ -52,12 +52,12 @@ func requireNoDiff(wasmBin []byte, checkMemory, loggingCheck bool, requireNoErro
 
 	interpreterCtx, compilerCtx := context.Background(), context.Background()
 	var interPreterLoggingBuf, compilerLoggingBuf bytes.Buffer
-	var doLoggingCheck bool
+	var errorDuringInvocation bool
 	if loggingCheck {
 		interpreterCtx = context.WithValue(interpreterCtx, experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&interPreterLoggingBuf))
 		compilerCtx = context.WithValue(compilerCtx, experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&compilerLoggingBuf))
 		defer func() {
-			if doLoggingCheck {
+			if !errorDuringInvocation {
 				if !bytes.Equal(compilerLoggingBuf.Bytes(), interPreterLoggingBuf.Bytes()) {
 					requireNoError(fmt.Errorf("logging mismatch\ncompiler: %s\ninterpreter: %s",
 						compilerLoggingBuf.String(), interPreterLoggingBuf.String()))
@@ -94,7 +94,7 @@ func requireNoDiff(wasmBin []byte, checkMemory, loggingCheck bool, requireNoErro
 	requireNoError(err)
 
 	if okToInvoke {
-		err = ensureInvocationResultMatch(
+		err, errorDuringInvocation = ensureInvocationResultMatch(
 			compilerCtx, interpreterCtx,
 			compilerMod, interpreterMod, interpreterCompiled.ExportedFunctions())
 		requireNoError(err)
@@ -109,8 +109,6 @@ func requireNoDiff(wasmBin []byte, checkMemory, loggingCheck bool, requireNoErro
 		}
 		ensureMutableGlobalsMatch(compilerMod, interpreterMod, requireNoError)
 	}
-
-	doLoggingCheck = true
 }
 
 func ensureMutableGlobalsMatch(compilerMod, interpreterMod api.Module, requireNoError func(err error)) {
@@ -269,7 +267,7 @@ const valueTypeVector = 0x7b
 func ensureInvocationResultMatch(
 	compilerCtx, interpreterCtx context.Context, compiledMod, interpreterMod api.Module,
 	exportedFunctions map[string]api.FunctionDefinition,
-) (err error) {
+) (err error, errorDuringInvocation bool) {
 	// In order to do the deterministic execution, we need to sort the exported functions.
 	var names []string
 	for f := range exportedFunctions {
@@ -296,6 +294,7 @@ outer:
 		params := getDummyValues(def.ParamTypes())
 		cmpRes, cmpErr := cmpF.Call(compilerCtx, params...)
 		intRes, intErr := intF.Call(interpreterCtx, params...)
+		errorDuringInvocation = errorDuringInvocation || cmpErr != nil || intErr != nil
 		if errMismatch := ensureInvocationError(cmpErr, intErr); errMismatch != nil {
 			panic(fmt.Sprintf("error mismatch on invoking %s: %v", name, errMismatch))
 		}
