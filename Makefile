@@ -276,6 +276,7 @@ fuzz_timeout_seconds ?= 10
 .PHONY: fuzz
 fuzz:
 	@cd internal/integration_test/fuzz && cargo test
+	@cd internal/integration_test/fuzz && cargo fuzz run logging_no_diff --sanitizer=none -- -rss_limit_mb=8192 -max_total_time=$(fuzz_timeout_seconds)
 	@cd internal/integration_test/fuzz && cargo fuzz run no_diff --sanitizer=none -- -rss_limit_mb=8192 -max_total_time=$(fuzz_timeout_seconds)
 	@cd internal/integration_test/fuzz && cargo fuzz run memory_no_diff --sanitizer=none -- -rss_limit_mb=8192 -max_total_time=$(fuzz_timeout_seconds)
 	@cd internal/integration_test/fuzz && cargo fuzz run validation --sanitizer=none -- -rss_limit_mb=8192 -max_total_time=$(fuzz_timeout_seconds)
