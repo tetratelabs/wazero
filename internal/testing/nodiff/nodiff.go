@@ -1,4 +1,4 @@
-package main
+package nodiff
 
 import (
 	"bytes"
@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"testing"
 	"unsafe"
 
 	"github.com/tetratelabs/wazero"
@@ -15,6 +16,7 @@ import (
 	"github.com/tetratelabs/wazero/experimental/logging"
 	"github.com/tetratelabs/wazero/experimental/opt"
 	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
+	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -42,8 +44,13 @@ func extractInternalWasmModuleFromCompiledModule(c wazero.CompiledModule) (*wasm
 	return cm.module, nil
 }
 
-// requireNoDiff ensures that the behavior is the same between the compiler and the interpreter for any given binary.
-func requireNoDiff(wasmBin []byte, checkMemory, loggingCheck bool, requireNoError func(err error)) {
+// RequireNoDiffT is a wrapper of RequireNoDiff for testing.T.
+func RequireNoDiffT(t *testing.T, wasmBin []byte, checkMemory, loggingCheck bool) {
+	RequireNoDiff(wasmBin, checkMemory, loggingCheck, func(err error) { require.NoError(t, err) })
+}
+
+// RequireNoDiff ensures that the behavior is the same between the compiler and the interpreter for any given binary.
+func RequireNoDiff(wasmBin []byte, checkMemory, loggingCheck bool, requireNoError func(err error)) {
 	const features = api.CoreFeaturesV2 | experimental.CoreFeaturesThreads
 	compiler := wazero.NewRuntimeWithConfig(context.Background(), opt.NewRuntimeConfigOptimizingCompiler().WithCoreFeatures(features))
 	interpreter := wazero.NewRuntimeWithConfig(context.Background(), wazero.NewRuntimeConfigInterpreter().WithCoreFeatures(features))

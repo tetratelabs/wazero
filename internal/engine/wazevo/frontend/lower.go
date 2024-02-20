@@ -1498,11 +1498,36 @@ func (c *Compiler) lowerCurrentOpcode() {
 
 		targetBlk, argNum := state.brTargetArgNumFor(labelIndex)
 		args := c.nPeekDup(argNum)
+		var sealTargetBlk bool
+		if c.needListener && targetBlk.ReturnBlock() { // In this case, we have to call the listener before returning.
+			// Save the currently active block.
+			current := builder.CurrentBlock()
+
+			// Allocate the trampoline block to the return where we call the listener.
+			targetBlk = builder.AllocateBasicBlock()
+			builder.SetCurrentBlock(targetBlk)
+			sealTargetBlk = true
+
+			c.callListenerAfter()
+
+			instr := builder.AllocateInstruction()
+			instr.AsReturn(args)
+			builder.InsertInstruction(instr)
+
+			args = ssa.ValuesNil
+
+			// Revert the current block.
+			builder.SetCurrentBlock(current)
+		}
 
 		// Insert the conditional jump to the target block.
 		brnz := builder.AllocateInstruction()
 		brnz.AsBrnz(v, args, targetBlk)
 		builder.InsertInstruction(brnz)
+
+		if sealTargetBlk {
+			builder.Seal(targetBlk)
+		}
 
 		// Insert the unconditional jump to the Else block which corresponds to after br_if.
 		elseBlk := builder.AllocateBasicBlock()
