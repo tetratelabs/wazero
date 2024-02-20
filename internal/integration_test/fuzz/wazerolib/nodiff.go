@@ -12,6 +12,7 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/experimental/logging"
 	"github.com/tetratelabs/wazero/experimental/opt"
 	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -42,24 +43,37 @@ func extractInternalWasmModuleFromCompiledModule(c wazero.CompiledModule) (*wasm
 }
 
 // requireNoDiff ensures that the behavior is the same between the compiler and the interpreter for any given binary.
-func requireNoDiff(wasmBin []byte, checkMemory bool, requireNoError func(err error)) {
-	// Choose the context to use for function calls.
-	ctx := context.Background()
-
+func requireNoDiff(wasmBin []byte, checkMemory, loggingCheck bool, requireNoError func(err error)) {
 	const features = api.CoreFeaturesV2 | experimental.CoreFeaturesThreads
-	compiler := wazero.NewRuntimeWithConfig(ctx, opt.NewRuntimeConfigOptimizingCompiler().WithCoreFeatures(features))
-	interpreter := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigInterpreter().WithCoreFeatures(features))
-	defer compiler.Close(ctx)
-	defer interpreter.Close(ctx)
+	compiler := wazero.NewRuntimeWithConfig(context.Background(), opt.NewRuntimeConfigOptimizingCompiler().WithCoreFeatures(features))
+	interpreter := wazero.NewRuntimeWithConfig(context.Background(), wazero.NewRuntimeConfigInterpreter().WithCoreFeatures(features))
+	defer compiler.Close(context.Background())
+	defer interpreter.Close(context.Background())
 
-	compilerCompiled, err := compiler.CompileModule(ctx, wasmBin)
+	interpreterCtx, compilerCtx := context.Background(), context.Background()
+	var interPreterLoggingBuf, compilerLoggingBuf bytes.Buffer
+	var errorDuringInvocation bool
+	if loggingCheck {
+		interpreterCtx = context.WithValue(interpreterCtx, experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&interPreterLoggingBuf))
+		compilerCtx = context.WithValue(compilerCtx, experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&compilerLoggingBuf))
+		defer func() {
+			if !errorDuringInvocation {
+				if !bytes.Equal(compilerLoggingBuf.Bytes(), interPreterLoggingBuf.Bytes()) {
+					requireNoError(fmt.Errorf("logging mismatch\ncompiler: %s\ninterpreter: %s",
+						compilerLoggingBuf.String(), interPreterLoggingBuf.String()))
+				}
+			}
+		}()
+	}
+
+	compilerCompiled, err := compiler.CompileModule(compilerCtx, wasmBin)
 	if err != nil && strings.Contains(err.Error(), "has an empty module name") {
 		// This is the limitation wazero imposes to allow special-casing of anonymous modules.
 		return
 	}
 	requireNoError(err)
 
-	interpreterCompiled, err := interpreter.CompileModule(ctx, wasmBin)
+	interpreterCompiled, err := interpreter.CompileModule(interpreterCtx, wasmBin)
 	requireNoError(err)
 
 	internalMod, err := extractInternalWasmModuleFromCompiledModule(compilerCompiled)
@@ -71,16 +85,18 @@ func requireNoDiff(wasmBin []byte, checkMemory bool, requireNoError func(err err
 	ensureDummyImports(interpreter, internalMod, requireNoError)
 
 	// Instantiate module.
-	compilerMod, compilerInstErr := compiler.InstantiateModule(ctx, compilerCompiled,
+	compilerMod, compilerInstErr := compiler.InstantiateModule(compilerCtx, compilerCompiled,
 		wazero.NewModuleConfig().WithName(string(internalMod.ID[:])))
-	interpreterMod, interpreterInstErr := interpreter.InstantiateModule(ctx, interpreterCompiled,
+	interpreterMod, interpreterInstErr := interpreter.InstantiateModule(interpreterCtx, interpreterCompiled,
 		wazero.NewModuleConfig().WithName(string(internalMod.ID[:])))
 
 	okToInvoke, err := ensureInstantiationError(compilerInstErr, interpreterInstErr)
 	requireNoError(err)
 
 	if okToInvoke {
-		err = ensureInvocationResultMatch(compilerMod, interpreterMod, interpreterCompiled.ExportedFunctions())
+		err, errorDuringInvocation = ensureInvocationResultMatch(
+			compilerCtx, interpreterCtx,
+			compilerMod, interpreterMod, interpreterCompiled.ExportedFunctions())
 		requireNoError(err)
 
 		compilerMem, _ := compilerMod.Memory().(*wasm.MemoryInstance)
@@ -248,9 +264,10 @@ func ensureDummyImports(r wazero.Runtime, origin *wasm.Module, requireNoError fu
 const valueTypeVector = 0x7b
 
 // ensureInvocationResultMatch invokes all the exported functions from the module, and compare all the results between compiler vs interpreter.
-func ensureInvocationResultMatch(compiledMod, interpreterMod api.Module, exportedFunctions map[string]api.FunctionDefinition) (err error) {
-	ctx := context.Background()
-
+func ensureInvocationResultMatch(
+	compilerCtx, interpreterCtx context.Context, compiledMod, interpreterMod api.Module,
+	exportedFunctions map[string]api.FunctionDefinition,
+) (err error, errorDuringInvocation bool) {
 	// In order to do the deterministic execution, we need to sort the exported functions.
 	var names []string
 	for f := range exportedFunctions {
@@ -275,8 +292,9 @@ outer:
 		intF := interpreterMod.ExportedFunction(name)
 
 		params := getDummyValues(def.ParamTypes())
-		cmpRes, cmpErr := cmpF.Call(ctx, params...)
-		intRes, intErr := intF.Call(ctx, params...)
+		cmpRes, cmpErr := cmpF.Call(compilerCtx, params...)
+		intRes, intErr := intF.Call(interpreterCtx, params...)
+		errorDuringInvocation = errorDuringInvocation || cmpErr != nil || intErr != nil
 		if errMismatch := ensureInvocationError(cmpErr, intErr); errMismatch != nil {
 			panic(fmt.Sprintf("error mismatch on invoking %s: %v", name, errMismatch))
 		}

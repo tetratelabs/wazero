@@ -21,7 +21,7 @@ func main() {}
 // And if there's diff, this also saves the problematic binary and wat into testdata directory.
 //
 //export require_no_diff
-func require_no_diff(binaryPtr uintptr, binarySize int, checkMemory bool) {
+func require_no_diff(binaryPtr uintptr, binarySize int, checkMemory bool, checkLogging bool) {
 	// TODO: use unsafe.Slice after flooring Go 1.20.
 	var wasmBin []byte
 	wasmHdr := (*reflect.SliceHeader)(unsafe.Pointer(&wasmBin))
@@ -37,7 +37,7 @@ func require_no_diff(binaryPtr uintptr, binarySize int, checkMemory bool) {
 		}
 	}()
 
-	requireNoDiff(wasmBin, checkMemory, func(err error) {
+	requireNoDiff(wasmBin, checkMemory, checkLogging, func(err error) {
 		if err != nil {
 			panic(err)
 		}

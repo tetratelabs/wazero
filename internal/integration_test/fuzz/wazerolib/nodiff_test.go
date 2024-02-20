@@ -17,7 +17,7 @@ func TestReRunFailedRequireNoDiffCase(t *testing.T) {
 		t.Skip(err)
 	}
 
-	requireNoDiff(wasmBin, true, func(err error) { require.NoError(t, err) })
+	requireNoDiff(wasmBin, true, true, func(err error) { require.NoError(t, err) })
 }
 
 func Test_ensureMutableGlobalsMatch(t *testing.T) {
