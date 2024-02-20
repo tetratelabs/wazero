@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"reflect"
+	"runtime"
 	"sync/atomic"
 	"unsafe"
 
@@ -252,6 +253,8 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 			return nil
 		case wazevoapi.ExitCodeGrowStack:
 			oldsp := uintptr(unsafe.Pointer(c.execCtx.stackPointerBeforeGoCall))
+			oldTop := c.stackTop
+			oldStack := c.stack
 			var newsp, newfp uintptr
 			if wazevoapi.StackGuardCheckEnabled {
 				newsp, newfp, err = c.growStackWithGuarded()
@@ -261,7 +264,9 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 			if err != nil {
 				return err
 			}
-			adjustStackAfterGrown(oldsp, newsp, newfp, c.stackTop)
+			adjustStackAfterGrown(oldsp, oldTop, newsp, newfp, c.stackTop)
+			// Old stack must be alive until the new stack is adjusted.
+			runtime.KeepAlive(oldStack)
 			c.execCtx.exitCode = wazevoapi.ExitCodeOK
 			afterGoFunctionCallEntrypoint(c.execCtx.goCallReturnAddress, c.execCtxPtr, newsp, newfp)
 		case wazevoapi.ExitCodeGrowMemory:

@@ -24,6 +24,7 @@ func TestMachineCompileEntryPreamble(t *testing.T) {
 	mov.q %rbp, 16(%rax)
 	mov.q %rsp, 24(%rax)
 	movq %r13, %rsp
+	xor %rbp, %rbp
 	callq *%r14
 	movq 16(%rdx), %rbp
 	movq 24(%rdx), %rsp
@@ -47,6 +48,7 @@ func TestMachineCompileEntryPreamble(t *testing.T) {
 	movsd 24(%r12), %xmm1
 	movdqu 32(%r12), %xmm2
 	movq 48(%r12), %rsi
+	xor %rbp, %rbp
 	callq *%r14
 	movq 16(%rdx), %rbp
 	movq 24(%rdx), %rsp
@@ -65,6 +67,7 @@ func TestMachineCompileEntryPreamble(t *testing.T) {
 	mov.q %rbp, 16(%rax)
 	mov.q %rsp, 24(%rax)
 	movq %r13, %rsp
+	xor %rbp, %rbp
 	callq *%r14
 	mov.l %rax, (%r12)
 	movdqu %xmm0, 8(%r12)
@@ -94,6 +97,7 @@ func TestMachineCompileEntryPreamble(t *testing.T) {
 	movsd 24(%r12), %xmm1
 	movdqu 32(%r12), %xmm2
 	movq 48(%r12), %rsi
+	xor %rbp, %rbp
 	callq *%r14
 	mov.l %rax, (%r12)
 	movdqu %xmm0, 8(%r12)
@@ -150,6 +154,7 @@ func TestMachineCompileEntryPreamble(t *testing.T) {
 	movdqu %xmm15, 40(%rsp)
 	movq 192(%r12), %r15
 	mov.q %r15, 56(%rsp)
+	xor %rbp, %rbp
 	callq *%r14
 	movq 16(%rdx), %rbp
 	movq 24(%rdx), %rsp
@@ -173,6 +178,7 @@ func TestMachineCompileEntryPreamble(t *testing.T) {
 	mov.q %rsp, 24(%rax)
 	movq %r13, %rsp
 	sub $64, %rsp
+	xor %rbp, %rbp
 	callq *%r14
 	mov.q %rax, (%r12)
 	mov.q %rbx, 8(%r12)
@@ -260,6 +266,7 @@ func TestMachineCompileEntryPreamble(t *testing.T) {
 	movdqu %xmm15, 40(%rsp)
 	movq 192(%r12), %r15
 	mov.q %r15, 56(%rsp)
+	xor %rbp, %rbp
 	callq *%r14
 	mov.q %rax, (%r12)
 	mov.q %rbx, 8(%r12)

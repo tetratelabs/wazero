@@ -74,6 +74,10 @@ func (m *machine) compileEntryPreamble(sig *ssa.Signature) *instruction {
 		}
 	}
 
+	// Zero out RBP so that the unwind/stack growth code can correctly detect the end of the stack.
+	zerosRbp := m.allocateInstr().asAluRmiR(aluRmiROpcodeXor, newOperandReg(rbpVReg), rbpVReg, true)
+	cur = linkInstr(cur, zerosRbp)
+
 	// Now ready to call the real function. Note that at this point stack pointer is already set to the Go-allocated,
 	// which is aligned to 16 bytes.
 	call := m.allocateInstr().asCallIndirect(newOperandReg(functionExecutable), &abi)
