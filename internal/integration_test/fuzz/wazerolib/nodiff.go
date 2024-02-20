@@ -50,7 +50,7 @@ func requireNoDiff(wasmBin []byte, checkMemory, loggingCheck bool, requireNoErro
 	defer compiler.Close(context.Background())
 	defer interpreter.Close(context.Background())
 
-	var interpreterCtx, compilerCtx = context.Background(), context.Background()
+	interpreterCtx, compilerCtx := context.Background(), context.Background()
 	var interPreterLoggingBuf, compilerLoggingBuf bytes.Buffer
 	var doLoggingCheck bool
 	if loggingCheck {
@@ -268,8 +268,8 @@ const valueTypeVector = 0x7b
 // ensureInvocationResultMatch invokes all the exported functions from the module, and compare all the results between compiler vs interpreter.
 func ensureInvocationResultMatch(
 	compilerCtx, interpreterCtx context.Context, compiledMod, interpreterMod api.Module,
-	exportedFunctions map[string]api.FunctionDefinition) (err error) {
-
+	exportedFunctions map[string]api.FunctionDefinition,
+) (err error) {
 	// In order to do the deterministic execution, we need to sort the exported functions.
 	var names []string
 	for f := range exportedFunctions {
