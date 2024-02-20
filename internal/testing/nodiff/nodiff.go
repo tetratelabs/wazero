@@ -70,7 +70,6 @@ func RequireNoDiff(wasmBin []byte, checkMemory, loggingCheck bool, requireNoErro
 						compilerLoggingBuf.String(), interPreterLoggingBuf.String()))
 				}
 			}
-			fmt.Printf("compiler: %s\ninterpreter: %s\n", compilerLoggingBuf.String(), interPreterLoggingBuf.String())
 		}()
 	}
 
