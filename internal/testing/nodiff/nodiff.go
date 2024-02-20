@@ -303,7 +303,8 @@ outer:
 		intRes, intErr := intF.Call(interpreterCtx, params...)
 		errorDuringInvocation = errorDuringInvocation || cmpErr != nil || intErr != nil
 		if errMismatch := ensureInvocationError(cmpErr, intErr); errMismatch != nil {
-			panic(fmt.Sprintf("error mismatch on invoking %s: %v", name, errMismatch))
+			err = errors.Join(err, fmt.Errorf("error mismatch on invoking %s: %v", name, errMismatch))
+			continue
 		}
 
 		matched := true

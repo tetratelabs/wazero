@@ -246,7 +246,8 @@ func (s *state) findOrSpillAllocatable(a *Allocator, allocatable []RealReg, forb
 			continue
 		}
 
-		if last := s.getVRegState(using.ID()).lastUse; r == RealRegInvalid || last > lastUseAt {
+		// last == -1 means the value won't be used anymore.
+		if last := s.getVRegState(using.ID()).lastUse; r == RealRegInvalid || last == -1 || (lastUseAt != -1 && last > lastUseAt) {
 			lastUseAt = last
 			r = candidateReal
 			spillVReg = using
@@ -258,7 +259,7 @@ func (s *state) findOrSpillAllocatable(a *Allocator, allocatable []RealReg, forb
 	}
 
 	if wazevoapi.RegAllocLoggingEnabled {
-		fmt.Printf("\tspilling v%d when: %s\n", spillVReg.ID(), forbiddenMask.format(a.regInfo))
+		fmt.Printf("\tspilling v%d when lastUseAt=%d and regsInUse=%s\n", spillVReg.ID(), lastUseAt, s.regsInUse.format(a.regInfo))
 	}
 	s.releaseRealReg(r)
 	return r
