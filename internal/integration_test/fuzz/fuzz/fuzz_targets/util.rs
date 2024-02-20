@@ -123,6 +123,10 @@ pub fn run_nodiff(
     // TODO: enable after threads support in wazevo.
     config.threads_enabled = false;
 
+    if check_logging {
+        config.reference_types_enabled = false;
+    }
+
     // Generate the random module via wasm-smith.
     let mut module = wasm_smith::Module::new(config.clone(), &mut u)?;
     module.ensure_termination(1000);
