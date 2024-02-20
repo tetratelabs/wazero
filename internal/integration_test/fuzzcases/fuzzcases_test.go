@@ -998,17 +998,3 @@ func Test2040(t *testing.T) {
 		require.NoError(t, err)
 	})
 }
-
-func TestX(t *testing.T) {
-	if !platform.CompilerSupported() {
-		return
-	}
-	run(t, func(t *testing.T, r wazero.Runtime) {
-		mod, err := r.Instantiate(ctx, getWasmBinary(t, "x"))
-		require.NoError(t, err)
-		x := int(-5)
-		res, err := mod.ExportedFunction("f").Call(ctx, uint64(uint32(x)))
-		require.NoError(t, err)
-		require.Equal(t, uint64(5), res[0])
-	})
-}
