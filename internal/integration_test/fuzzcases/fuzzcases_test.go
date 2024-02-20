@@ -13,6 +13,7 @@ import (
 	"github.com/tetratelabs/wazero/experimental/opt"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
+	"github.com/tetratelabs/wazero/internal/testing/nodiff"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
@@ -1002,4 +1003,11 @@ func Test2070(t *testing.T) {
 		_, err := r.Instantiate(ctx, getWasmBinary(t, "2070"))
 		require.NoError(t, err)
 	})
+}
+
+func Test2078(t *testing.T) {
+	if !platform.CompilerSupported() {
+		return
+	}
+	nodiff.RequireNoDiffT(t, getWasmBinary(t, "2078"), true, true)
 }

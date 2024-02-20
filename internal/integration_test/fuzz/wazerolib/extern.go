@@ -12,6 +12,7 @@ import (
 	"github.com/tetratelabs/wazero/experimental/opt"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
+	"github.com/tetratelabs/wazero/internal/testing/nodiff"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -37,7 +38,7 @@ func require_no_diff(binaryPtr uintptr, binarySize int, checkMemory bool, checkL
 		}
 	}()
 
-	requireNoDiff(wasmBin, checkMemory, checkLogging, func(err error) {
+	nodiff.RequireNoDiff(wasmBin, checkMemory, checkLogging, func(err error) {
 		if err != nil {
 			panic(err)
 		}
