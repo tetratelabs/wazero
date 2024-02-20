@@ -2171,7 +2171,8 @@ func (m *machine) lowerFminFmax(instr *ssa.Instruction) {
 
 	xDef, yDef := m.c.ValueDefinition(x), m.c.ValueDefinition(y)
 	rm := m.getOperand_Reg(xDef)
-	rn := m.getOperand_Mem_Reg(yDef)
+	// We cannot ensure that y is aligned to 16 bytes, so we have to use it on reg.
+	rn := m.getOperand_Reg(yDef)
 	rd := m.c.VRegOf(instr.Return())
 
 	tmp := m.copyToTmp(rm.reg())
