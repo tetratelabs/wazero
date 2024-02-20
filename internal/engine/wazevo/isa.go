@@ -47,14 +47,14 @@ func goCallStackView(stackPointerBeforeGoCall *uint64) []uint64 {
 
 // adjustStackAfterGrown is a function to adjust the stack after it is grown.
 // More precisely, absolute addresses (frame pointers) in the stack must be adjusted.
-func adjustStackAfterGrown(oldsp, sp, fp, top uintptr) {
+func adjustStackAfterGrown(oldsp, oldTop, sp, fp, top uintptr) {
 	switch runtime.GOARCH {
 	case "arm64":
 		// TODO: currently, the frame pointers are not used, and saved old sps are relative to the current stack pointer,
 		//  so no need to adjustment on arm64. However, when we make it absolute, which in my opinion is better perf-wise
 		//  at the expense of slightly costly stack growth, we need to adjust the pushed frame pointers.
 	case "amd64":
-		amd64.AdjustStackAfterGrown(oldsp, sp, fp, top)
+		amd64.AdjustStackAfterGrown(oldsp, oldTop, sp, fp, top)
 	default:
 		panic("unsupported architecture")
 	}

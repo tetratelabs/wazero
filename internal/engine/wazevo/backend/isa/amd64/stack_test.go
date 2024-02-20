@@ -51,6 +51,7 @@ func TestAdjustStackAfterGrown(t *testing.T) {
 
 	oldStack := allocSlice(512)
 	oldRsp := uintptr(unsafe.Pointer(&oldStack[0]))
+	oldTop := uintptr(unsafe.Pointer(&oldStack[len(oldStack)-1]))
 	rbpIndex := uintptr(32)
 	binary.LittleEndian.PutUint64(oldStack[rbpIndex:], addressOf(&oldStack[16+rbpIndex]))
 	binary.LittleEndian.PutUint64(oldStack[rbpIndex+16:], addressOf(&oldStack[32+rbpIndex]))
@@ -62,7 +63,7 @@ func TestAdjustStackAfterGrown(t *testing.T) {
 	// Coy old stack to new stack which contains the old pointers to the old stack elements.
 	copy(newStack, oldStack)
 
-	AdjustStackAfterGrown(oldRsp, rsp, rbp, uintptr(addressOf(&newStack[len(newStack)-1])))
+	AdjustStackAfterGrown(oldRsp, oldTop, rsp, rbp, uintptr(addressOf(&newStack[len(newStack)-1])))
 	require.Equal(t, addressOf(&newStack[rbpIndex+16]), binary.LittleEndian.Uint64(newStack[rbpIndex:]))
 	require.Equal(t, addressOf(&newStack[rbpIndex+32]), binary.LittleEndian.Uint64(newStack[rbpIndex+16:]))
 	require.Equal(t, addressOf(&newStack[rbpIndex+160]), binary.LittleEndian.Uint64(newStack[rbpIndex+32:]))

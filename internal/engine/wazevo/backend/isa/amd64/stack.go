@@ -85,7 +85,7 @@ func GoCallStackView(stackPointerBeforeGoCall *uint64) []uint64 {
 	return view
 }
 
-func AdjustStackAfterGrown(oldRsp, rsp, rbp, top uintptr) {
+func AdjustStackAfterGrown(oldRsp, oldTop, rsp, rbp, top uintptr) {
 	diff := uint64(rsp - oldRsp)
 
 	newBuf := stackView(rbp, top)
@@ -120,7 +120,16 @@ func AdjustStackAfterGrown(oldRsp, rsp, rbp, top uintptr) {
 			// End of stack.
 			break
 		}
+		if i64 := int64(callerRBP); i64 < int64(oldRsp) || i64 >= int64(oldTop) {
+			panic("BUG: callerRBP is out of range")
+		}
+		if int(callerRBP) < 0 {
+			panic("BUG: callerRBP is negative")
+		}
 		adjustedCallerRBP := callerRBP + diff
+		if int(adjustedCallerRBP) < 0 {
+			panic("BUG: adjustedCallerRBP is negative")
+		}
 		binary.LittleEndian.PutUint64(newBuf[i:], adjustedCallerRBP)
 		i = adjustedCallerRBP - uint64(rbp)
 	}
