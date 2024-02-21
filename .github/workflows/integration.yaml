@@ -359,3 +359,45 @@ jobs:
         run: |
           cd ${{ env.STDLIB_TESTS }}
           go test -bench='BenchmarkWasip1/${{ matrix.compiler }}'
+
+  libsodium:
+    name: libsodium (${{ matrix.os.name }}, ${{ matrix.arch }}, optimizing)
+    runs-on: ${{ matrix.os.version }}
+    strategy:
+      fail-fast: false # don't fail fast as sometimes failures are arch/OS specific
+      matrix:
+        # version is too verbose to be present in the name, so we use the name instead.
+        # Note that it'd be better to use runner.os in the name, but the runner context is not available in the name field.
+        os:
+          - version: ubuntu-22.04
+            name: Ubuntu
+            arch: amd64
+          - version: macos-14
+            name: macOS
+            arch: arm64
+
+    steps:
+      - name: Checkout wazero
+        uses: actions/checkout@v3
+
+      - uses: actions/cache@v3
+        id: binary-cache
+        with:
+          # Use share the cache containing archives across OSes.
+          enableCrossOsArchive: true
+          # We need this cache to run tests.
+          fail-on-cache-miss: true
+          key: tinygo-test-binaries-${{ env.TINYGO_VERSION }}
+          path:
+            ${{ env.STDLIB_TESTS }}/testdata/tinygo
+
+      - uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Download test binaries
+        run: make libsodium
+
+      - name: Run test binaries
+        #
+        run: go test ./internal/integration_test/libsodium -bench=. -benchtime=1x
