@@ -1797,9 +1797,21 @@ func (m *machine) encodeWithoutSSA(root *instruction) {
 }
 
 // Encode implements backend.Machine Encode.
-func (m *machine) Encode(context.Context) {
+func (m *machine) Encode(ctx context.Context) {
 	ectx := m.ectx
 	bufPtr := m.c.BufPtr()
+
+	var fn string
+	var fnIndex int
+	var labelToSSABlockID map[backend.Label]ssa.BasicBlockID
+	if wazevoapi.PerfMapEnabled {
+		fn = wazevoapi.GetCurrentFunctionName(ctx)
+		labelToSSABlockID = make(map[backend.Label]ssa.BasicBlockID)
+		for i, l := range ectx.SsaBlockIDToLabels {
+			labelToSSABlockID[l] = ssa.BasicBlockID(i)
+		}
+		fnIndex = wazevoapi.GetCurrentFunctionIndex(ctx)
+	}
 
 	m.labelResolutionPends = m.labelResolutionPends[:0]
 	for _, pos := range ectx.OrderedBlockLabels {
@@ -1824,6 +1836,18 @@ func (m *machine) Encode(context.Context) {
 					labelResolutionPend{instr: cur, instrOffset: offset, imm32Offset: int64(len(*bufPtr)) - 4},
 				)
 			}
+		}
+
+		if wazevoapi.PerfMapEnabled {
+			l := pos.L
+			var labelStr string
+			if blkID, ok := labelToSSABlockID[l]; ok {
+				labelStr = fmt.Sprintf("%s::SSA_Block[%s]", l, blkID)
+			} else {
+				labelStr = l.String()
+			}
+			size := int64(len(*bufPtr)) - offset
+			wazevoapi.PerfMap.AddModuleEntry(fnIndex, offset, uint64(size), fmt.Sprintf("%s:::::%s", fn, labelStr))
 		}
 	}
 
