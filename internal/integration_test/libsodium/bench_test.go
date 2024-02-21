@@ -14,7 +14,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
-//go:embed testdata
+//go:embed testdata/*
 var tests embed.FS
 
 func BenchmarkLibsodium(b *testing.B) {
