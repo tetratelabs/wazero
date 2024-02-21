@@ -29,10 +29,11 @@ func BenchmarkLibsodium(b *testing.B) {
 	defer r.Close(ctx)
 	wasi_snapshot_preview1.MustInstantiate(ctx, r)
 
+	// Some tests are skipped because they are taking too long to run, but sure it is possible to run them.
 	for _, c := range []struct {
 		name string
 	}{
-		// {name: "box7"},
+		//{name: "box7"},
 		{name: "box_easy2"},
 		{name: "kdf_hkdf"},
 		{name: "auth5"},
@@ -45,13 +46,13 @@ func BenchmarkLibsodium(b *testing.B) {
 		{name: "onetimeauth"},
 		{name: "aead_aegis256"},
 		{name: "scalarmult_ristretto255"},
-		// {name: "core_ristretto255"},
+		//{name: "core_ristretto255"},
 		{name: "stream3"},
-		// {name: "pwhash_scrypt"},
+		//{name: "pwhash_scrypt"},
 		{name: "shorthash"},
 		{name: "scalarmult"},
 		{name: "chacha20"},
-		// {name: "pwhash_argon2id"},
+		//{name: "pwhash_argon2id"},
 		{name: "onetimeauth7"},
 		{name: "scalarmult7"},
 		{name: "auth3"},
