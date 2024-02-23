@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"path/filepath"
 	"sync"
 )
 
@@ -71,7 +72,9 @@ func (fc *fileCache) Add(key Key, content io.Reader) (err error) {
 
 	// Use rename for an atomic write
 	path := fc.path(key)
-	file, err := os.Create(path + ".tmp")
+	dirPath, fileName := filepath.Split(path)
+
+	file, err := os.CreateTemp(dirPath, fileName+".*.tmp")
 	if err != nil {
 		return
 	}
