@@ -49,11 +49,11 @@ func (fc *fileCache) Add(key Key, content io.Reader) (err error) {
 		return
 	}
 	defer func() {
+		file.Close()
 		if err != nil {
 			_ = os.Remove(file.Name())
 		}
 	}()
-	defer file.Close()
 	if _, err = io.Copy(file, content); err != nil {
 		return
 	}
