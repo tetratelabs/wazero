@@ -6,7 +6,7 @@ import (
 	"io"
 	"os"
 	"path"
-	"sync"
+	"path/filepath"
 )
 
 // New returns a new Cache implemented by fileCache.
@@ -23,12 +23,6 @@ func newFileCache(dir string) *fileCache {
 // Note: this can be expanded to do binary signing/verification, set TTL on each entry, etc.
 type fileCache struct {
 	dirPath string
-	mux     sync.RWMutex
-}
-
-type fileReadCloser struct {
-	*os.File
-	fc *fileCache
 }
 
 func (fc *fileCache) path(key Key) string {
@@ -36,51 +30,30 @@ func (fc *fileCache) path(key Key) string {
 }
 
 func (fc *fileCache) Get(key Key) (content io.ReadCloser, ok bool, err error) {
-	// TODO: take lock per key for more efficiency vs the complexity of impl.
-	fc.mux.RLock()
-	unlock := fc.mux.RUnlock
-	defer func() {
-		if unlock != nil {
-			unlock()
-		}
-	}()
-
 	f, err := os.Open(fc.path(key))
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, false, nil
 	} else if err != nil {
 		return nil, false, err
 	} else {
-		// Unlock is done inside the content.Close() at the call site.
-		unlock = nil
-		return &fileReadCloser{File: f, fc: fc}, true, nil
+		return f, true, nil
 	}
 }
 
-// Close wraps the os.File Close to release the read lock on fileCache.
-func (f *fileReadCloser) Close() (err error) {
-	defer f.fc.mux.RUnlock()
-	err = f.File.Close()
-	return
-}
-
 func (fc *fileCache) Add(key Key, content io.Reader) (err error) {
-	// TODO: take lock per key for more efficiency vs the complexity of impl.
-	fc.mux.Lock()
-	defer fc.mux.Unlock()
-
-	// Use rename for an atomic write
 	path := fc.path(key)
-	file, err := os.Create(path + ".tmp")
+	dirPath, fileName := filepath.Split(path)
+
+	file, err := os.CreateTemp(dirPath, fileName+".*.tmp")
 	if err != nil {
 		return
 	}
 	defer func() {
+		file.Close()
 		if err != nil {
 			_ = os.Remove(file.Name())
 		}
 	}()
-	defer file.Close()
 	if _, err = io.Copy(file, content); err != nil {
 		return
 	}
@@ -95,10 +68,6 @@ func (fc *fileCache) Add(key Key, content io.Reader) (err error) {
 }
 
 func (fc *fileCache) Delete(key Key) (err error) {
-	// TODO: take lock per key for more efficiency vs the complexity of impl.
-	fc.mux.Lock()
-	defer fc.mux.Unlock()
-
 	err = os.Remove(fc.path(key))
 	if errors.Is(err, os.ErrNotExist) {
 		err = nil
