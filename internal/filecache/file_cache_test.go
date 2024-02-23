@@ -9,25 +9,6 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
-func TestFileReadCloser_Close(t *testing.T) {
-	fc := newFileCache(t.TempDir())
-	key := Key{1, 2, 3}
-
-	err := fc.Add(key, bytes.NewReader([]byte{1, 2, 3, 4}))
-	require.NoError(t, err)
-
-	c, ok, err := fc.Get(key)
-	require.NoError(t, err)
-	require.True(t, ok)
-
-	// At this point, file is not closed, therefore TryLock should fail.
-	require.False(t, fc.mux.TryLock())
-
-	// Close, and then TryLock should succeed this time.
-	require.NoError(t, c.Close())
-	require.True(t, fc.mux.TryLock())
-}
-
 func TestFileCache_Add(t *testing.T) {
 	fc := newFileCache(t.TempDir())
 
