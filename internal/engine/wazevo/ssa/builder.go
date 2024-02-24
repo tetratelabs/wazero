@@ -124,7 +124,11 @@ type Builder interface {
 	// Idom returns the immediate dominator of the given BasicBlock.
 	Idom(blk BasicBlock) BasicBlock
 
+	// VarLengthPool returns the VarLengthPool for Value.
 	VarLengthPool() *wazevoapi.VarLengthPool[Value]
+
+	// AllocateVarLengthValues allocates a new Values for the given Values.
+	AllocateVarLengthValues(vs ...Value) Values
 }
 
 // NewBuilder returns a new Builder implementation.
@@ -720,4 +724,14 @@ func (b *builder) LoopNestingForestRoots() []BasicBlock {
 // LowestCommonAncestor implements Builder.LowestCommonAncestor.
 func (b *builder) LowestCommonAncestor(blk1, blk2 BasicBlock) BasicBlock {
 	return b.sparseTree.findLCA(blk1.ID(), blk2.ID())
+}
+
+// AllocateVarLengthValues implements Builder.AllocateVarLengthValues.
+func (b *builder) AllocateVarLengthValues(vs ...Value) Values {
+	pool := &b.varLengthPool
+	args := pool.Allocate(len(vs))
+	for _, v := range vs {
+		args = args.Append(pool, v)
+	}
+	return args
 }

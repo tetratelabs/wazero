@@ -28,7 +28,6 @@ const (
 const (
 	PrintSSA                                 = false
 	PrintOptimizedSSA                        = false
-	PrintBlockLaidOutSSA                     = false
 	PrintSSAToBackendIRLowering              = false
 	PrintRegisterAllocated                   = false
 	PrintFinalizedMachineCode                = false
@@ -170,7 +169,6 @@ This is mostly due to (but might not be limited to):
 // nolint
 const NeedFunctionNameInContext = PrintSSA ||
 	PrintOptimizedSSA ||
-	PrintBlockLaidOutSSA ||
 	PrintSSAToBackendIRLowering ||
 	PrintRegisterAllocated ||
 	PrintFinalizedMachineCode ||

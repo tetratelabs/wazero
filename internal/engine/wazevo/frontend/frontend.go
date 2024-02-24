@@ -451,11 +451,5 @@ func (k *knownSafeBound) valid() bool {
 }
 
 func (c *Compiler) allocateVarLengthValues(vs ...ssa.Value) ssa.Values {
-	builder := c.ssaBuilder
-	pool := builder.VarLengthPool()
-	args := pool.Allocate(len(vs))
-	for _, v := range vs {
-		args = args.Append(builder.VarLengthPool(), v)
-	}
-	return args
+	return c.ssaBuilder.AllocateVarLengthValues(vs...)
 }

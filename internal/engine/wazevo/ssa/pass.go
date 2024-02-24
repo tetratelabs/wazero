@@ -58,7 +58,8 @@ func (b *builder) runPostBlockLayoutPasses() {
 	if !b.doneBlockLayout {
 		panic("runPostBlockLayoutPasses must be called after block layout pass is done")
 	}
-	// TODO: Do more. e.g. tail duplication, loop unrolling, etc.
+	// TODO: Do more.
+	passTailDuplication(b)
 
 	b.donePostBlockLayoutPasses = true
 }
@@ -397,4 +398,205 @@ func passSortSuccessors(b *builder) {
 		blk := b.basicBlocksPool.View(i)
 		sortBlocks(blk.success)
 	}
+}
+
+// passTailDuplication duplicates the block that has many predecessors while using many values if the block is simple enough.
+// This is similar to TailDuplication in LLVM:
+// https://opensource.apple.com/source/clang/clang-137/src/lib/Transforms/Scalar/TailDuplication.cpp.auto.html
+func passTailDuplication(b *builder) {
+	for i := 0; i < b.basicBlocksPool.Allocated(); i++ {
+		blk := b.basicBlocksPool.View(i)
+		if isTailDuplicationTarget(blk) {
+			doTailDuplication(b, blk)
+		}
+	}
+}
+
+func isTailDuplicationTarget(blk *basicBlock) (ok bool) {
+	if blk.ReturnBlock() || len(blk.preds) < 5 || len(blk.params) == 0 {
+		return
+	}
+
+	var usedValueCount int
+	for instrCount, cur := 0, blk.rootInstr; cur != nil; cur = cur.next {
+		if len(cur.rValues.View()) > 0 {
+			// If an instruction has many values, we don't duplicate the block to avoid the complexity.
+			return
+		}
+		if instrCount > 10 {
+			return
+		}
+		if cur.v.Valid() {
+			usedValueCount++
+		}
+		if cur.v2.Valid() {
+			usedValueCount++
+		}
+
+		if cur.v3.Valid() {
+			usedValueCount++
+		}
+		view := cur.vs.View()
+		for range view {
+			usedValueCount++
+		}
+		instrCount++
+	}
+
+	if usedValueCount < 10 {
+		return
+	}
+
+	// TODO: allow Return target.
+	if tail := blk.Tail(); tail.opcode != OpcodeJump || tail.blk.ReturnBlock() {
+		return
+	}
+
+	// TODO: it should be possible to duplicate the block if it contains conditional jump if the destinations are dominated by it.
+	// 	We should implement this later but not sure if it's worth it.
+	if len(blk.success) > 1 {
+		return
+	}
+
+	// At this point,
+	// * the jump is unconditional (we only have one successor).
+	// * the destination has at least 5 predecessors.
+	// * the destination has at most 10 instructions.
+	// * the destination has at most 10 used values.
+	//
+	// therefore, before making this jump, it is highly likely that register state reconciliation is necessary due to
+	// the high number of predecessors and the high number of used values.
+	// So, we duplicate the destination block at the end of the predecessor block so that we won't need to reconcile the register state.
+	ok = true
+	return
+}
+
+func doTailDuplication(b *builder, eliminationTarget *basicBlock) {
+	// Sanity check to ensure all origin jumps are unconditional.
+	for i := range eliminationTarget.preds {
+		if eliminationTarget.preds[i].branch.opcode != OpcodeJump {
+			panic("BUG: eliminationTarget has at least one param, and therefore all predecessors" +
+				" should be unconditional jumps since this is after critical edge splitting")
+		}
+	}
+	if len(eliminationTarget.success) != 1 {
+		panic("BUG: eliminationTarget has more than one successor")
+	}
+	dst := eliminationTarget.success[0]
+
+	for i := range dst.preds {
+		if dst.preds[i].blk == eliminationTarget {
+			// Remove the edge from the dst.preds.
+			dst.preds = append(dst.preds[:i], dst.preds[i+1:]...)
+			break
+		}
+	}
+
+	// First we need to expand the block params of the destination block by the values
+	// defined by the eliminationTarget block.
+	dstIsDominatedByEliminationTarget := b.isDominatedBy(dst, eliminationTarget)
+	if dstIsDominatedByEliminationTarget {
+		// If the dst is dominated by the eliminationTarget, the locally defined values in eliminationTarget
+		// might be used in the dst and the following blocks. Otherwise, the value must be already passed as a parameter.
+		//
+		// So, we gather the locally defined values in the eliminationTarget block.
+		for cur := eliminationTarget.rootInstr; cur != nil; cur = cur.next {
+			v := cur.rValue
+			if v.Valid() {
+				dst.params = append(dst.params, blockParam{value: v, typ: v.Type()})
+			}
+		}
+	}
+
+	// Then merge the instructions of the eliminationTarget block into the predecessors.
+	var valueMapping map[Value]Value
+	additionalParams := make([]Value, 0, 10) // I believe this doesn't cause an allocation since we won't have more than 10 additional params.
+	for i := range eliminationTarget.preds {
+		valueMapping = wazevoapi.ResetMap(valueMapping)
+		additionalParams = additionalParams[:0]
+
+		pred := &eliminationTarget.preds[i]
+		predJmp, predBlk := pred.branch, pred.blk
+
+		// First, we need to create mapping from the arguments to the elimination target block.
+		for i, arg := range predJmp.vs.View() {
+			phi := eliminationTarget.params[i]
+			valueMapping[phi.value] = arg
+		}
+
+		gid := predJmp.gid
+
+		// Then, walk through the instructions and duplicate them.
+		cur := predJmp.prev
+		for dupCur := eliminationTarget.rootInstr; dupCur != nil; dupCur = dupCur.next {
+			copied := b.AllocateInstruction()
+			id := copied.id
+			*copied = *dupCur
+			copied.id = id
+			copied.gid = gid
+			if copied.sideEffect() == sideEffectStrict {
+				gid++
+			}
+
+			originalResult := dupCur.Return()
+			if originalResult.Valid() {
+				newResult := b.allocateValue(originalResult.Type())
+				valueMapping[originalResult] = newResult
+				copied.rValue = newResult
+				additionalParams = append(additionalParams, newResult)
+			}
+
+			// Resolve the mapped values.
+			if copied.v.Valid() {
+				if mapped, ok := valueMapping[copied.v]; ok {
+					copied.v = mapped
+				}
+			}
+
+			if copied.v2.Valid() {
+				if mapped, ok := valueMapping[copied.v2]; ok {
+					copied.v2 = mapped
+				}
+			}
+
+			if copied.v3.Valid() {
+				if mapped, ok := valueMapping[copied.v3]; ok {
+					copied.v3 = mapped
+				}
+			}
+
+			newVs := b.AllocateVarLengthValues(copied.vs.View()...)
+			newVsView := newVs.View()
+			for i, v := range newVsView {
+				if mapped, ok := valueMapping[v]; ok {
+					newVsView[i] = mapped
+				}
+			}
+
+			copied.vs = newVs
+
+			// Insert the new instruction to insertionCur.
+			if cur == nil {
+				predBlk.rootInstr = copied
+			} else {
+				cur.next = copied
+				copied.prev = cur
+			}
+			cur = copied
+
+			// Finally, append the new instruction to the predJmp.
+			if copied.opcode == OpcodeJump {
+				// If the dest is dst, we need to append the params.
+				if dstIsDominatedByEliminationTarget {
+					for _, v := range additionalParams {
+						newVs = newVs.Append(&b.varLengthPool, v)
+					}
+				}
+				dst.preds = append(dst.preds, basicBlockPredecessorInfo{branch: predJmp, blk: predBlk})
+			}
+		}
+		predBlk.currentInstr = cur
+	}
+
+	eliminationTarget.invalid = true
 }
