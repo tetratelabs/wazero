@@ -210,7 +210,6 @@ type dominatorSparseTree struct {
 
 // passBuildDominatorTree builds the dominator tree for the function, and constructs builder.sparseTree.
 func passBuildDominatorTree(b *builder) {
-
 	// First we materialize the children of each node in the dominator tree.
 	idoms := b.dominators
 	for _, blk := range b.reversePostOrderedBasicBlocks {

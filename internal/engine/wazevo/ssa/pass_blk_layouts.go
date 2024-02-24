@@ -151,7 +151,6 @@ func passLayoutBlocks(b *builder) {
 
 	// Reuse the stack for the next iteration.
 	b.blkStack2 = uninsertedTrampolines[:0]
-
 }
 
 // markFallthroughJumps finds the fallthrough jumps and marks them as such.
