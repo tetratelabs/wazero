@@ -167,7 +167,7 @@ func subPassLoopDetection(b *builder) {
 
 // buildLoopNestingForest builds the loop nesting forest for the function.
 // This must be called after branch splitting since it relies on the CFG.
-func buildLoopNestingForest(b *builder) {
+func passBuildLoopNestingForest(b *builder) {
 	ent := b.entryBlk()
 	doms := b.dominators
 	for _, blk := range b.reversePostOrderedBasicBlocks {
@@ -208,8 +208,8 @@ type dominatorSparseTree struct {
 	table        [][]int
 }
 
-// buildDominatorTree builds the dominator tree for the function, and constructs builder.sparseTree.
-func buildDominatorTree(b *builder) {
+// passBuildDominatorTree builds the dominator tree for the function, and constructs builder.sparseTree.
+func passBuildDominatorTree(b *builder) {
 	// First we materialize the children of each node in the dominator tree.
 	idoms := b.dominators
 	for _, blk := range b.reversePostOrderedBasicBlocks {

@@ -2449,12 +2449,6 @@ L2 (SSA Block: blk2):
 				fmt.Println(ssab.Format())
 			}
 
-			ssab.LayoutBlocks()
-			if verbose {
-				fmt.Println("============ SSA after block layout ============")
-				fmt.Println(ssab.Format())
-			}
-
 			// Lowers the SSA to ISA specific code.
 			be.Lower()
 			if verbose {

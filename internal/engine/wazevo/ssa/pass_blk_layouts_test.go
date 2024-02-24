@@ -612,9 +612,8 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 			b := NewBuilder().(*builder)
 			tc.setup(b)
 
-			b.RunPasses() // LayoutBlocks() must be called after RunPasses().
-			b.LayoutBlocks()
-
+			b.runPreBlockLayoutPasses() // LayoutBlocks() must be called after RunPasses().
+			b.runBlockLayoutPass()
 			var actual []BasicBlockID
 			for blk := b.BlockIteratorReversePostOrderBegin(); blk != nil; blk = b.BlockIteratorReversePostOrderNext() {
 				actual = append(actual, blk.(*basicBlock).id)
