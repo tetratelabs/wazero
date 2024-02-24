@@ -52,7 +52,7 @@ func (v Value) formatWithType(b Builder) (ret string) {
 	}
 
 	if wazevoapi.SSALoggingEnabled { // This is useful to check live value analysis bugs.
-		if bd := b.(*builder); bd.donePasses {
+		if bd := b.(*builder); bd.donePostBlockLayoutPasses {
 			id := v.ID()
 			ret += fmt.Sprintf("(ref=%d)", bd.valueRefCounts[id])
 		}

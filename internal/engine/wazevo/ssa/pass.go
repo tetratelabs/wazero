@@ -13,6 +13,13 @@ import (
 // Note that passes suffixed with "Opt" are the optimization passes, meaning that they edit the instructions and blocks
 // while the other passes are not, like passEstimateBranchProbabilities does not edit them, but only calculates the additional information.
 func (b *builder) RunPasses() {
+	b.runPreBlockLayoutPasses()
+	b.runBlockLayoutPass()
+	b.runPostBlockLayoutPasses()
+	b.runFinalizingPasses()
+}
+
+func (b *builder) runPreBlockLayoutPasses() {
 	passSortSuccessors(b)
 	passDeadBlockEliminationOpt(b)
 	passRedundantPhiEliminationOpt(b)
@@ -34,7 +41,38 @@ func (b *builder) RunPasses() {
 
 	// passDeadCodeEliminationOpt could be more accurate if we do this after other optimizations.
 	passDeadCodeEliminationOpt(b)
-	b.donePasses = true
+	b.donePreBlockLayoutPasses = true
+}
+
+func (b *builder) runBlockLayoutPass() {
+	if !b.donePreBlockLayoutPasses {
+		panic("runBlockLayoutPass must be called after all pre passes are done")
+	}
+	passLayoutBlocks(b)
+	b.doneBlockLayout = true
+}
+
+// runPostBlockLayoutPasses runs the post block layout passes. After this point, CFG is somewhat stable,
+// but still can be modified before finalizing passes. At this point, critical edges are split by passLayoutBlocks.
+func (b *builder) runPostBlockLayoutPasses() {
+	if !b.doneBlockLayout {
+		panic("runPostBlockLayoutPasses must be called after block layout pass is done")
+	}
+	// TODO: Do more. e.g. tail duplication, loop unrolling, etc.
+
+	b.donePostBlockLayoutPasses = true
+}
+
+// runFinalizingPasses runs the finalizing passes. After this point, CFG should not be modified.
+func (b *builder) runFinalizingPasses() {
+	if !b.donePostBlockLayoutPasses {
+		panic("runFinalizingPasses must be called after post block layout passes are done")
+	}
+	// Critical edges are split, so we fix the loop nesting forest.
+	passBuildLoopNestingForest(b)
+	passBuildDominatorTree(b)
+	// Now that we know the final placement of the blocks, we can explicitly mark the fallthrough jumps.
+	b.markFallthroughJumps()
 }
 
 // passDeadBlockEliminationOpt searches the unreachable blocks, and sets the basicBlock.invalid flag true if so.

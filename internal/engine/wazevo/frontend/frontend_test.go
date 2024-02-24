@@ -26,9 +26,9 @@ func TestCompiler_LowerToSSA(t *testing.T) {
 		targetIndex wasm.Index
 		// exp is the *unoptimized* expected SSA IR for the function m.FunctionSection[targetIndex].
 		exp string
-		// expAfterOpt is not empty when we want to check the result after optimization passes.
-		expAfterOpt string
-		features    api.CoreFeatures
+		// expAfterPasses is not empty when we want to check the result after SSA passes.
+		expAfterPasses string
+		features       api.CoreFeatures
 	}{
 		{
 			name: "empty", m: testcases.Empty.Module,
@@ -101,7 +101,7 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 	v5:f64 = F64const 0.000000
 	Jump blk_ret
 `,
-			expAfterOpt: `
+			expAfterPasses: `
 blk0: (exec_ctx:i64, module_ctx:i64)
 	Jump blk_ret
 `,
@@ -127,7 +127,7 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
 	v3:i32 = Iconst_32 0x0
 	Jump blk_ret, v2, v2
 `,
-			expAfterOpt: `
+			expAfterPasses: `
 blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
 	Jump blk_ret, v2, v2
 `,
@@ -156,7 +156,7 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:i64, v3:f32, v4:f64)
 	v22:f64 = Fmin v21, v4
 	Jump blk_ret, v10, v16, v22
 `,
-			expAfterOpt: `
+			expAfterPasses: `
 blk0: (exec_ctx:i64, module_ctx:i64, v2:i64, v3:f32, v4:f64)
 	v9:i64 = Iadd v2, v2
 	v10:i64 = Isub v9, v2
@@ -240,9 +240,9 @@ blk1: () <-- (blk0,blk1)
 
 blk2: ()
 `,
-			expAfterOpt: `
+			expAfterPasses: `
 blk0: (exec_ctx:i64, module_ctx:i64)
-	Jump blk1
+	Jump fallthrough
 
 blk1: () <-- (blk0,blk1)
 	Jump blk1
@@ -265,12 +265,12 @@ blk1: () <-- (blk0,blk1)
 
 blk2: ()
 `,
-			expAfterOpt: `
+			expAfterPasses: `
 signatures:
 	sig2: i64_v
 
 blk0: (exec_ctx:i64, module_ctx:i64)
-	Jump blk1
+	Jump fallthrough
 
 blk1: () <-- (blk0,blk1)
 	v2:i64 = Load exec_ctx, 0x58
@@ -294,14 +294,17 @@ blk2: ()
 blk3: () <-- (blk1)
 	Return
 `,
-			expAfterOpt: `
+			expAfterPasses: `
 blk0: (exec_ctx:i64, module_ctx:i64)
-	Jump blk1
+	Jump fallthrough
 
-blk1: () <-- (blk0,blk1)
+blk1: () <-- (blk0,blk4)
 	v2:i32 = Iconst_32 0x1
-	Brnz v2, blk1
-	Jump blk3
+	Brz v2, blk3
+	Jump fallthrough
+
+blk4: () <-- (blk1)
+	Jump blk1
 
 blk3: () <-- (blk1)
 	Return
@@ -322,9 +325,9 @@ blk1: () <-- (blk0)
 
 blk2: ()
 `,
-			expAfterOpt: `
+			expAfterPasses: `
 blk0: (exec_ctx:i64, module_ctx:i64)
-	Jump blk1
+	Jump fallthrough
 
 blk1: () <-- (blk0)
 	Jump blk_ret
@@ -385,18 +388,18 @@ blk2: () <-- (blk0)
 blk3: () <-- (blk2)
 	Jump blk_ret, v2
 `,
-			expAfterOpt: `
+			expAfterPasses: `
 blk0: (exec_ctx:i64, module_ctx:i64)
 	v2:i32 = Iconst_32 0x0
 	v4:i32 = Iconst_32 0x0
 	Brz v2, blk2
-	Jump blk1
+	Jump fallthrough
 
 blk1: () <-- (blk0)
 	Return v4
 
 blk2: () <-- (blk0)
-	Jump blk3
+	Jump fallthrough
 
 blk3: () <-- (blk2)
 	Jump blk_ret, v2
@@ -420,16 +423,16 @@ blk2: () <-- (blk0)
 blk3: (v5:i32) <-- (blk1,blk2)
 	Jump blk_ret, v5
 `,
-			expAfterOpt: `
+			expAfterPasses: `
 blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i32)
 	Brz v2, blk2
-	Jump blk1
+	Jump fallthrough
 
 blk1: () <-- (blk0)
 	Jump blk3, v2
 
 blk2: () <-- (blk0)
-	Jump blk3, v3
+	Jump fallthrough, v3
 
 blk3: (v5:i32) <-- (blk1,blk2)
 	Jump blk_ret, v5
@@ -448,9 +451,9 @@ blk1: (v4:i32) <-- (blk0)
 
 blk2: ()
 `,
-			expAfterOpt: `
+			expAfterPasses: `
 blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
-	Jump blk1
+	Jump fallthrough
 
 blk1: () <-- (blk0)
 	Return v2
@@ -477,23 +480,26 @@ blk3: () <-- (blk4)
 blk4: () <-- (blk1)
 	Jump blk3
 `,
-			expAfterOpt: `
+			expAfterPasses: `
 blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
+	Jump fallthrough
+
+blk1: () <-- (blk0,blk5)
+	Brz v2, blk4
+	Jump fallthrough
+
+blk5: () <-- (blk1)
 	Jump blk1
 
-blk1: () <-- (blk0,blk1)
-	Brnz v2, blk1
-	Jump blk4
+blk4: () <-- (blk1)
+	Jump fallthrough
+
+blk3: () <-- (blk4)
+	Jump fallthrough
 
 blk2: () <-- (blk3)
 	v4:i32 = Iconst_32 0x0
 	Jump blk_ret, v4
-
-blk3: () <-- (blk4)
-	Jump blk2
-
-blk4: () <-- (blk1)
-	Jump blk3
 `,
 		},
 		{
@@ -516,20 +522,23 @@ blk3: () <-- (blk4)
 blk4: () <-- (blk1)
 	Jump blk3
 `,
-			expAfterOpt: `
+			expAfterPasses: `
 blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
-	Jump blk1, v2
+	Jump fallthrough, v2
 
 blk1: (v3:i32) <-- (blk0,blk3)
-	Brnz v3, blk_ret
+	Brnz v3, blk5
 	Jump blk4
+
+blk5: () <-- (blk1)
+	Jump blk_ret
+
+blk4: () <-- (blk1)
+	Jump fallthrough
 
 blk3: () <-- (blk4)
 	v4:i32 = Iconst_32 0x1
 	Jump blk1, v4
-
-blk4: () <-- (blk1)
-	Jump blk3
 `,
 		},
 		{
@@ -604,7 +613,7 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i32, v4:i64, v5:i64)
 	v25:i32 = Icmp ge_u, v4, v5
 	Jump blk_ret, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15, v16, v17, v18, v19, v20, v21, v22, v23, v24, v25
 `,
-			expAfterOpt: `
+			expAfterPasses: `
 blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i32, v4:i64, v5:i64)
 	v6:i32 = Icmp eq, v2, v3
 	v7:i32 = Icmp eq, v4, v5
@@ -768,20 +777,23 @@ blk2: (v6:i32) <-- (blk3)
 blk3: () <-- (blk1)
 	Jump blk2, v4
 `,
-			expAfterOpt: `
+			expAfterPasses: `
 blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i32)
+	Jump fallthrough
+
+blk1: () <-- (blk0,blk4)
+	v7:i32 = Iconst_32 0x1
+	Brz v7, blk3
+	Jump fallthrough
+
+blk4: () <-- (blk1)
 	Jump blk1
 
-blk1: () <-- (blk0,blk1)
-	v7:i32 = Iconst_32 0x1
-	Brnz v7, blk1
-	Jump blk3
+blk3: () <-- (blk1)
+	Jump fallthrough
 
 blk2: () <-- (blk3)
 	Jump blk_ret, v2
-
-blk3: () <-- (blk1)
-	Jump blk2
 `,
 		},
 		{
@@ -792,7 +804,7 @@ blk3: () <-- (blk1)
 blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i64, v4:f32, v5:f64, v6:i32, v7:i64, v8:f32, v9:f64, v10:i32, v11:i64, v12:f32, v13:f64, v14:i32, v15:i64, v16:f32, v17:f64, v18:i32, v19:i64, v20:f32, v21:f64, v22:i32, v23:i64, v24:f32, v25:f64, v26:i32, v27:i64, v28:f32, v29:f64, v30:i32, v31:i64, v32:f32, v33:f64, v34:i32, v35:i64, v36:f32, v37:f64, v38:i32, v39:i64, v40:f32, v41:f64)
 	Jump blk_ret, v2, v11, v20, v29
 `,
-			expAfterOpt: `
+			expAfterPasses: `
 blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i64, v4:f32, v5:f64, v6:i32, v7:i64, v8:f32, v9:f64, v10:i32, v11:i64, v12:f32, v13:f64, v14:i32, v15:i64, v16:f32, v17:f64, v18:i32, v19:i64, v20:f32, v21:f64, v22:i32, v23:i64, v24:f32, v25:f64, v26:i32, v27:i64, v28:f32, v29:f64, v30:i32, v31:i64, v32:f32, v33:f64, v34:i32, v35:i64, v36:f32, v37:f64, v38:i32, v39:i64, v40:f32, v41:f64)
 	Jump blk_ret, v2, v11, v20, v29
 `,
@@ -805,7 +817,7 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i64, v4:f32, v5:f64, v6:i32, v7:
 blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i64, v4:f32, v5:f64)
 	Jump blk_ret, v2, v3, v4, v5, v2, v3, v4, v5, v2, v3, v4, v5, v2, v3, v4, v5, v2, v3, v4, v5, v2, v3, v4, v5, v2, v3, v4, v5, v2, v3, v4, v5, v2, v3, v4, v5, v2, v3, v4, v5
 `,
-			expAfterOpt: `
+			expAfterPasses: `
 blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i64, v4:f32, v5:f64)
 	Jump blk_ret, v2, v3, v4, v5, v2, v3, v4, v5, v2, v3, v4, v5, v2, v3, v4, v5, v2, v3, v4, v5, v2, v3, v4, v5, v2, v3, v4, v5, v2, v3, v4, v5, v2, v3, v4, v5, v2, v3, v4, v5
 `,
@@ -818,7 +830,7 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i64, v4:f32, v5:f64)
 blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i64, v4:f32, v5:f64, v6:i32, v7:i64, v8:f32, v9:f64, v10:i32, v11:i64, v12:f32, v13:f64, v14:i32, v15:i64, v16:f32, v17:f64, v18:i32, v19:i64, v20:f32, v21:f64, v22:i32, v23:i64, v24:f32, v25:f64, v26:i32, v27:i64, v28:f32, v29:f64, v30:i32, v31:i64, v32:f32, v33:f64, v34:i32, v35:i64, v36:f32, v37:f64, v38:i32, v39:i64, v40:f32, v41:f64)
 	Jump blk_ret, v41, v40, v39, v38, v37, v36, v35, v34, v33, v32, v31, v30, v29, v28, v27, v26, v25, v24, v23, v22, v21, v20, v19, v18, v17, v16, v15, v14, v13, v12, v11, v10, v9, v8, v7, v6, v5, v4, v3, v2
 `,
-			expAfterOpt: `
+			expAfterPasses: `
 blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i64, v4:f32, v5:f64, v6:i32, v7:i64, v8:f32, v9:f64, v10:i32, v11:i64, v12:f32, v13:f64, v14:i32, v15:i64, v16:f32, v17:f64, v18:i32, v19:i64, v20:f32, v21:f64, v22:i32, v23:i64, v24:f32, v25:f64, v26:i32, v27:i64, v28:f32, v29:f64, v30:i32, v31:i64, v32:f32, v33:f64, v34:i32, v35:i64, v36:f32, v37:f64, v38:i32, v39:i64, v40:f32, v41:f64)
 	Jump blk_ret, v41, v40, v39, v38, v37, v36, v35, v34, v33, v32, v31, v30, v29, v28, v27, v26, v25, v24, v23, v22, v21, v20, v19, v18, v17, v16, v15, v14, v13, v12, v11, v10, v9, v8, v7, v6, v5, v4, v3, v2
 `,
@@ -979,7 +991,7 @@ blk3: () <-- (blk2)
 	v11:i32 = Iadd v7, v10
 	Jump blk_ret, v11
 `,
-			expAfterOpt: `
+			expAfterPasses: `
 signatures:
 	sig0: i64i64i32_i32
 
@@ -987,13 +999,13 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
 	v3:i32 = Iconst_32 0x2
 	v4:i32 = Icmp lt_s, v2, v3
 	Brz v4, blk2
-	Jump blk1
+	Jump fallthrough
 
 blk1: () <-- (blk0)
 	Return v2
 
 blk2: () <-- (blk0)
-	Jump blk3
+	Jump fallthrough
 
 blk3: () <-- (blk2)
 	v5:i32 = Iconst_32 0x1
@@ -1075,7 +1087,7 @@ blk3: (v7:i32) <-- (blk1,blk2)
 	v15:i32 = Load v14, 0x0
 	Jump blk_ret, v15
 `,
-			expAfterOpt: `
+			expAfterPasses: `
 signatures:
 	sig1: i64i64_v
 
@@ -1083,7 +1095,7 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
 	v3:i32 = Iconst_32 0x0
 	v4:i32 = Icmp eq, v2, v3
 	Brz v4, blk2
-	Jump blk1
+	Jump fallthrough
 
 blk1: () <-- (blk0)
 	Store module_ctx, exec_ctx, 0x8
@@ -1091,7 +1103,7 @@ blk1: () <-- (blk0)
 	Jump blk3
 
 blk2: () <-- (blk0)
-	Jump blk3
+	Jump fallthrough
 
 blk3: () <-- (blk1,blk2)
 	v8:i64 = Iconst_64 0x4
@@ -1229,7 +1241,7 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 	v9:f64 = Load module_ctx, 0x40
 	Jump blk_ret, v2, v3, v4, v5, v6, v7, v8, v9
 `,
-			expAfterOpt: `
+			expAfterPasses: `
 signatures:
 	sig1: i64i64_v
 
@@ -1290,7 +1302,7 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 	v30:i32 = Ushr v28, v29
 	Jump blk_ret, v4, v12, v22, v30
 `,
-			expAfterOpt: `
+			expAfterPasses: `
 signatures:
 	sig0: i64i64_i32
 	sig2: i64i32_i32
@@ -1344,7 +1356,7 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 	v14:i64 = Uload32 module_ctx, 0x10
 	Jump blk_ret, v4, v9, v12
 `,
-			expAfterOpt: `
+			expAfterPasses: `
 signatures:
 	sig1: i64i32_i32
 
@@ -1504,61 +1516,60 @@ blk13: () <-- (blk0)
 	Jump blk6, v3
 `,
 
-			// TODO: these trivial two hop jumps should be optimized away.
-			expAfterOpt: `
+			expAfterPasses: `
 blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i32)
 	BrTable v2, [blk7, blk8, blk9, blk10, blk11, blk12, blk13]
 
-blk1: () <-- (blk12)
-	v20:i32 = Iconst_32 0x10
-	v21:i32 = Iadd v3, v20
-	Return v21
+blk7: () <-- (blk0)
+	Jump blk6
 
-blk2: () <-- (blk11)
-	v18:i32 = Iconst_32 0xf
-	v19:i32 = Iadd v3, v18
-	Return v19
-
-blk3: () <-- (blk10)
-	v16:i32 = Iconst_32 0xe
-	v17:i32 = Iadd v3, v16
-	Return v17
-
-blk4: () <-- (blk9)
-	v14:i32 = Iconst_32 0xd
-	v15:i32 = Iadd v3, v14
-	Return v15
+blk8: () <-- (blk0)
+	Jump fallthrough
 
 blk5: () <-- (blk8)
 	v12:i32 = Iconst_32 0xc
 	v13:i32 = Iadd v3, v12
 	Return v13
 
+blk9: () <-- (blk0)
+	Jump fallthrough
+
+blk4: () <-- (blk9)
+	v14:i32 = Iconst_32 0xd
+	v15:i32 = Iadd v3, v14
+	Return v15
+
+blk10: () <-- (blk0)
+	Jump fallthrough
+
+blk3: () <-- (blk10)
+	v16:i32 = Iconst_32 0xe
+	v17:i32 = Iadd v3, v16
+	Return v17
+
+blk11: () <-- (blk0)
+	Jump fallthrough
+
+blk2: () <-- (blk11)
+	v18:i32 = Iconst_32 0xf
+	v19:i32 = Iadd v3, v18
+	Return v19
+
+blk12: () <-- (blk0)
+	Jump fallthrough
+
+blk1: () <-- (blk12)
+	v20:i32 = Iconst_32 0x10
+	v21:i32 = Iadd v3, v20
+	Return v21
+
+blk13: () <-- (blk0)
+	Jump fallthrough
+
 blk6: () <-- (blk7,blk13)
 	v10:i32 = Iconst_32 0xb
 	v11:i32 = Iadd v3, v10
 	Return v11
-
-blk7: () <-- (blk0)
-	Jump blk6
-
-blk8: () <-- (blk0)
-	Jump blk5
-
-blk9: () <-- (blk0)
-	Jump blk4
-
-blk10: () <-- (blk0)
-	Jump blk3
-
-blk11: () <-- (blk0)
-	Jump blk2
-
-blk12: () <-- (blk0)
-	Jump blk1
-
-blk13: () <-- (blk0)
-	Jump blk6
 `,
 		},
 		{
@@ -1587,25 +1598,25 @@ blk4: () <-- (blk2,blk3)
 	v12:i64 = Iconst_64 0x0
 	Jump blk1, v12
 `,
-			expAfterOpt: `
+			expAfterPasses: `
 blk0: (exec_ctx:i64, module_ctx:i64, v2:f64, v3:f64, v4:f64)
 	v6:i32 = Load module_ctx, 0x10
 	v7:i32 = Iconst_32 0x10
 	v8:i32 = Ushr v6, v7
 	Brz v8, blk3
-	Jump blk2
-
-blk1: () <-- (blk4)
-	Jump blk_ret
+	Jump fallthrough
 
 blk2: () <-- (blk0)
 	Jump blk4
 
 blk3: () <-- (blk0)
-	Jump blk4
+	Jump fallthrough
 
 blk4: () <-- (blk2,blk3)
-	Jump blk1
+	Jump fallthrough
+
+blk1: () <-- (blk4)
+	Jump blk_ret
 `,
 		},
 		{
@@ -2840,13 +2851,10 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 			require.Equal(t, tc.exp, actual)
 
 			b.RunPasses()
-			if expAfterOpt := tc.expAfterOpt; expAfterOpt != "" {
+			if expAfterOpt := tc.expAfterPasses; expAfterOpt != "" {
 				actualAfterOpt := fc.formatBuilder()
 				require.Equal(t, expAfterOpt, actualAfterOpt)
 			}
-
-			// Dry-run without checking the results of LayoutBlocks function.
-			b.LayoutBlocks()
 		})
 	}
 }

@@ -351,17 +351,6 @@ func (e *engine) compileLocalWasmFunction(
 		wazevoapi.VerifyOrSetDeterministicCompilationContextValue(ctx, "Optimized SSA", ssaBuilder.Format())
 	}
 
-	// Finalize the layout of SSA blocks which might use the optimization results.
-	ssaBuilder.LayoutBlocks()
-
-	if wazevoapi.PrintBlockLaidOutSSA && wazevoapi.PrintEnabledIndex(ctx) {
-		fmt.Printf("[[[Laidout SSA for %s]]]%s\n", wazevoapi.GetCurrentFunctionName(ctx), ssaBuilder.Format())
-	}
-
-	if wazevoapi.DeterministicCompilationVerifierEnabled {
-		wazevoapi.VerifyOrSetDeterministicCompilationContextValue(ctx, "Block laid out SSA", ssaBuilder.Format())
-	}
-
 	// Now our ssaBuilder contains the necessary information to further lower them to
 	// machine code.
 	original, rels, err := be.Compile(ctx)

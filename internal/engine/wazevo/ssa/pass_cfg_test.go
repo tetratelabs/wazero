@@ -649,7 +649,7 @@ func TestBuildLoopNestingForest(t *testing.T) {
 			b := constructGraphFromEdges(tc.edges)
 			// buildLoopNestingForest requires passCalculateImmediateDominators to be done.
 			passCalculateImmediateDominators(b)
-			buildLoopNestingForest(b)
+			passBuildLoopNestingForest(b)
 
 			blocks := map[BasicBlockID]*basicBlock{}
 			for blk := b.blockIteratorBegin(); blk != nil; blk = b.blockIteratorNext() {
@@ -833,7 +833,7 @@ func TestDominatorTree(t *testing.T) {
 			b := constructGraphFromEdges(tc.edges)
 			// buildDominatorTree requires passCalculateImmediateDominators to be done.
 			passCalculateImmediateDominators(b)
-			buildDominatorTree(b)
+			passBuildDominatorTree(b)
 
 			for _, c := range tc.cases {
 				exp := b.sparseTree.findLCA(c.a, c.b)
