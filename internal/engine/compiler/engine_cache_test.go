@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"errors"
+	"hash/crc32"
 	"io"
 	"math"
 	"testing"
@@ -19,6 +20,11 @@ import (
 )
 
 var testVersion = ""
+
+func crcf(b []byte) []byte {
+	c := crc32.Checksum(b, crc)
+	return u32.LeBytes(c)
+}
 
 func concat(ins ...[]byte) (ret []byte) {
 	for _, in := range ins {
@@ -49,12 +55,13 @@ func TestSerializeCompiledModule(t *testing.T) {
 				[]byte(wazeroMagic),
 				[]byte{byte(len(testVersion))},
 				[]byte(testVersion),
-				[]byte{0},             // ensure termination.
-				u32.LeBytes(1),        // number of functions.
-				u64.LeBytes(12345),    // stack pointer ceil.
-				u64.LeBytes(0),        // offset.
-				u64.LeBytes(5),        // length of code.
-				[]byte{1, 2, 3, 4, 5}, // code.
+				[]byte{0},                   // ensure termination.
+				u32.LeBytes(1),              // number of functions.
+				u64.LeBytes(12345),          // stack pointer ceil.
+				u64.LeBytes(0),              // offset.
+				u64.LeBytes(5),              // length of code.
+				[]byte{1, 2, 3, 4, 5},       // code.
+				crcf([]byte{1, 2, 3, 4, 5}), // crc of code.
 			),
 		},
 		{
@@ -71,12 +78,13 @@ func TestSerializeCompiledModule(t *testing.T) {
 				[]byte(wazeroMagic),
 				[]byte{byte(len(testVersion))},
 				[]byte(testVersion),
-				[]byte{1},             // ensure termination.
-				u32.LeBytes(1),        // number of functions.
-				u64.LeBytes(12345),    // stack pointer ceil.
-				u64.LeBytes(0),        // offset.
-				u64.LeBytes(5),        // length of code.
-				[]byte{1, 2, 3, 4, 5}, // code.
+				[]byte{1},                   // ensure termination.
+				u32.LeBytes(1),              // number of functions.
+				u64.LeBytes(12345),          // stack pointer ceil.
+				u64.LeBytes(0),              // offset.
+				u64.LeBytes(5),              // length of code.
+				[]byte{1, 2, 3, 4, 5},       // code.
+				crcf([]byte{1, 2, 3, 4, 5}), // crc of code.
 			),
 		},
 		{
@@ -103,8 +111,9 @@ func TestSerializeCompiledModule(t *testing.T) {
 				u64.LeBytes(0xffffffff), // stack pointer ceil.
 				u64.LeBytes(5),          // offset.
 				// Executable.
-				u64.LeBytes(8),                 // length of code.
-				[]byte{1, 2, 3, 4, 5, 1, 2, 3}, // code.
+				u64.LeBytes(8),                       // length of code.
+				[]byte{1, 2, 3, 4, 5, 1, 2, 3},       // code.
+				crcf([]byte{1, 2, 3, 4, 5, 1, 2, 3}), // crc of code.
 			),
 		},
 	}
@@ -151,7 +160,25 @@ func TestDeserializeCompiledModule(t *testing.T) {
 			expStaleCache: true,
 		},
 		{
-			name: "one function",
+			name: "invalid crc",
+			in: concat(
+				[]byte(wazeroMagic),
+				[]byte{byte(len(testVersion))},
+				[]byte(testVersion),
+				[]byte{0},          // ensure termination.
+				u32.LeBytes(1),     // number of functions.
+				u64.LeBytes(12345), // stack pointer ceil.
+				u64.LeBytes(0),     // offset.
+				// Executable.
+				u64.LeBytes(5),           // size.
+				[]byte{1, 2, 3, 4, 5},    // machine code.
+				crcf([]byte{1, 2, 3, 4}), // crc of code.
+			),
+			expStaleCache: false,
+			expErr:        "compilationcache: checksum mismatch (expected 1397854123, got 691047668)",
+		},
+		{
+			name: "missing crc",
 			in: concat(
 				[]byte(wazeroMagic),
 				[]byte{byte(len(testVersion))},
@@ -163,6 +190,24 @@ func TestDeserializeCompiledModule(t *testing.T) {
 				// Executable.
 				u64.LeBytes(5),        // size.
 				[]byte{1, 2, 3, 4, 5}, // machine code.
+			),
+			expStaleCache: false,
+			expErr:        "compilationcache: could not read checksum: EOF",
+		},
+		{
+			name: "one function",
+			in: concat(
+				[]byte(wazeroMagic),
+				[]byte{byte(len(testVersion))},
+				[]byte(testVersion),
+				[]byte{0},          // ensure termination.
+				u32.LeBytes(1),     // number of functions.
+				u64.LeBytes(12345), // stack pointer ceil.
+				u64.LeBytes(0),     // offset.
+				// Executable.
+				u64.LeBytes(5),              // size.
+				[]byte{1, 2, 3, 4, 5},       // machine code.
+				crcf([]byte{1, 2, 3, 4, 5}), // crc of code.
 			),
 			expCompiledModule: &compiledModule{
 				compiledCode: &compiledCode{
@@ -181,12 +226,13 @@ func TestDeserializeCompiledModule(t *testing.T) {
 				[]byte(wazeroMagic),
 				[]byte{byte(len(testVersion))},
 				[]byte(testVersion),
-				[]byte{1},             // ensure termination.
-				u32.LeBytes(1),        // number of functions.
-				u64.LeBytes(12345),    // stack pointer ceil.
-				u64.LeBytes(0),        // offset.
-				u64.LeBytes(5),        // length of code.
-				[]byte{1, 2, 3, 4, 5}, // code.
+				[]byte{1},                   // ensure termination.
+				u32.LeBytes(1),              // number of functions.
+				u64.LeBytes(12345),          // stack pointer ceil.
+				u64.LeBytes(0),              // offset.
+				u64.LeBytes(5),              // length of code.
+				[]byte{1, 2, 3, 4, 5},       // code.
+				crcf([]byte{1, 2, 3, 4, 5}), // crc of code.
 			),
 			expCompiledModule: &compiledModule{
 				compiledCode: &compiledCode{
@@ -213,8 +259,9 @@ func TestDeserializeCompiledModule(t *testing.T) {
 				u64.LeBytes(0xffffffff), // stack pointer ceil.
 				u64.LeBytes(7),          // offset.
 				// Executable.
-				u64.LeBytes(10),                       // size.
-				[]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, // machine code.
+				u64.LeBytes(10),                             // size.
+				[]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},       // machine code.
+				crcf([]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}), // crc of code.
 			),
 			importedFunctionCount: 1,
 			expCompiledModule: &compiledModule{
@@ -322,8 +369,9 @@ func TestEngine_getCompiledModuleFromCache(t *testing.T) {
 		u64.LeBytes(0xffffffff), // stack pointer ceil.
 		u64.LeBytes(5),          // offset.
 		// executables.
-		u64.LeBytes(10),                       // length of code.
-		[]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, // code.
+		u64.LeBytes(10),                             // length of code.
+		[]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},       // code.
+		crcf([]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}), // code.
 	)
 
 	tests := []struct {
@@ -475,6 +523,7 @@ func TestEngine_addCompiledModuleToCache(t *testing.T) {
 			u64.LeBytes(0),   // offset.
 			u64.LeBytes(3),   // size of executable.
 			[]byte{1, 2, 3},
+			crcf([]byte{1, 2, 3}), // code.
 		), actual)
 		require.NoError(t, content.Close())
 	})

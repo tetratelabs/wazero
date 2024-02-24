@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
+	"hash/crc32"
 	"io"
 	"runtime"
 	"unsafe"
@@ -20,6 +21,8 @@ import (
 	"github.com/tetratelabs/wazero/internal/u64"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
+
+var crc = crc32.MakeTable(crc32.Castagnoli)
 
 // fileCacheKey returns a key for the file cache.
 // In order to avoid collisions with the existing compiler, we do not use m.ID directly,
@@ -145,6 +148,9 @@ func serializeCompiledModule(wazeroVersion string, cm *compiledModule) io.Reader
 	buf.Write(u64.LeBytes(uint64(len(cm.executable))))
 	// Append the native code.
 	buf.Write(cm.executable)
+	// Append checksum.
+	checksum := crc32.Checksum(cm.executable, crc)
+	buf.Write(u32.LeBytes(checksum))
 	if sm := cm.sourceMap; len(sm.executableOffsets) > 0 {
 		buf.WriteByte(1) // indicates that source map is present.
 		l := len(sm.wasmBinaryOffsets)
@@ -224,6 +230,13 @@ func deserializeCompiledModule(wazeroVersion string, reader io.ReadCloser) (cm *
 		if err != nil {
 			err = fmt.Errorf("compilationcache: error reading executable (len=%d): %v", executableLen, err)
 			return nil, false, err
+		}
+
+		expected := crc32.Checksum(executable, crc)
+		if _, err = io.ReadFull(reader, eightBytes[:4]); err != nil {
+			return nil, false, fmt.Errorf("compilationcache: could not read checksum: %v", err)
+		} else if checksum := binary.LittleEndian.Uint32(eightBytes[:4]); expected != checksum {
+			return nil, false, fmt.Errorf("compilationcache: checksum mismatch (expected %d, got %d)", expected, checksum)
 		}
 
 		if runtime.GOARCH == "arm64" {

@@ -3,6 +3,7 @@ package wazevo
 import (
 	"bytes"
 	"crypto/sha256"
+	"hash/crc32"
 	"io"
 	"testing"
 
@@ -13,6 +14,11 @@ import (
 )
 
 var testVersion = "0.0.1"
+
+func crcf(b []byte) []byte {
+	c := crc32.Checksum(b, crc)
+	return u32.LeBytes(c)
+}
 
 func TestSerializeCompiledModule(t *testing.T) {
 	tests := []struct {
@@ -28,11 +34,12 @@ func TestSerializeCompiledModule(t *testing.T) {
 				magic,
 				[]byte{byte(len(testVersion))},
 				[]byte(testVersion),
-				u32.LeBytes(1),        // number of functions.
-				u64.LeBytes(0),        // offset.
-				u64.LeBytes(5),        // length of code.
-				[]byte{1, 2, 3, 4, 5}, // code.
-				[]byte{0},             // no source map.
+				u32.LeBytes(1),              // number of functions.
+				u64.LeBytes(0),              // offset.
+				u64.LeBytes(5),              // length of code.
+				[]byte{1, 2, 3, 4, 5},       // code.
+				crcf([]byte{1, 2, 3, 4, 5}), // crc for the code.
+				[]byte{0},                   // no source map.
 			),
 		},
 		{
@@ -44,11 +51,12 @@ func TestSerializeCompiledModule(t *testing.T) {
 				magic,
 				[]byte{byte(len(testVersion))},
 				[]byte(testVersion),
-				u32.LeBytes(1),        // number of functions.
-				u64.LeBytes(0),        // offset.
-				u64.LeBytes(5),        // length of code.
-				[]byte{1, 2, 3, 4, 5}, // code.
-				[]byte{0},             // no source map.
+				u32.LeBytes(1),              // number of functions.
+				u64.LeBytes(0),              // offset.
+				u64.LeBytes(5),              // length of code.
+				[]byte{1, 2, 3, 4, 5},       // code.
+				crcf([]byte{1, 2, 3, 4, 5}), // crc for the code.
+				[]byte{0},                   // no source map.
 			),
 		},
 		{
@@ -66,9 +74,10 @@ func TestSerializeCompiledModule(t *testing.T) {
 				// Function index = 1.
 				u64.LeBytes(5), // offset.
 				// Executable.
-				u64.LeBytes(8),                 // length of code.
-				[]byte{1, 2, 3, 4, 5, 1, 2, 3}, // code.
-				[]byte{0},                      // no source map.
+				u64.LeBytes(8),                       // length of code.
+				[]byte{1, 2, 3, 4, 5, 1, 2, 3},       // code.
+				crcf([]byte{1, 2, 3, 4, 5, 1, 2, 3}), // crc for the code.
+				[]byte{0},                            // no source map.
 			),
 		},
 	}
@@ -140,9 +149,10 @@ func TestDeserializeCompiledModule(t *testing.T) {
 				u32.LeBytes(1), // number of functions.
 				u64.LeBytes(0), // offset.
 				// Executable.
-				u64.LeBytes(5),        // size.
-				[]byte{1, 2, 3, 4, 5}, // machine code.
-				[]byte{0},             // no source map.
+				u64.LeBytes(5),              // size.
+				[]byte{1, 2, 3, 4, 5},       // machine code.
+				crcf([]byte{1, 2, 3, 4, 5}), // machine code.
+				[]byte{0},                   // no source map.
 			),
 			expCompiledModule: &compiledModule{
 				executables:     &executables{executable: []byte{1, 2, 3, 4, 5}},
@@ -163,9 +173,10 @@ func TestDeserializeCompiledModule(t *testing.T) {
 				// Function index = 1.
 				u64.LeBytes(7), // offset.
 				// Executable.
-				u64.LeBytes(10),                       // size.
-				[]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, // machine code.
-				[]byte{0},                             // no source map.
+				u64.LeBytes(10),                             // size.
+				[]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},       // machine code.
+				crcf([]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}), // crc for machine code.
+				[]byte{0}, // no source map.
 			),
 			importedFunctionCount: 1,
 			expCompiledModule: &compiledModule{
@@ -206,7 +217,7 @@ func TestDeserializeCompiledModule(t *testing.T) {
 			expErr: "compilationcache: error reading executable (len=5): EOF",
 		},
 		{
-			name: "no source map presence",
+			name: "bad crc",
 			in: concat(
 				magic,
 				[]byte{byte(len(testVersion))},
@@ -216,6 +227,46 @@ func TestDeserializeCompiledModule(t *testing.T) {
 				// Executable.
 				u64.LeBytes(5),        // size.
 				[]byte{1, 2, 3, 4, 5}, // machine code.
+				[]byte{1, 2, 3, 4},    // crc for machine code.
+			),
+			expCompiledModule: &compiledModule{
+				executables:     &executables{executable: []byte{1, 2, 3, 4, 5}},
+				functionOffsets: []int{0},
+			},
+			expStaleCache: false,
+			expErr:        "compilationcache: checksum mismatch (expected 1397854123, got 67305985)",
+		},
+		{
+			name: "missing crc",
+			in: concat(
+				magic,
+				[]byte{byte(len(testVersion))},
+				[]byte(testVersion),
+				u32.LeBytes(1), // number of functions.
+				u64.LeBytes(0), // offset.
+				// Executable.
+				u64.LeBytes(5),        // size.
+				[]byte{1, 2, 3, 4, 5}, // machine code.
+			),
+			expCompiledModule: &compiledModule{
+				executables:     &executables{executable: []byte{1, 2, 3, 4, 5}},
+				functionOffsets: []int{0},
+			},
+			expStaleCache: false,
+			expErr:        "compilationcache: could not read checksum: EOF",
+		},
+		{
+			name: "no source map presence",
+			in: concat(
+				magic,
+				[]byte{byte(len(testVersion))},
+				[]byte(testVersion),
+				u32.LeBytes(1), // number of functions.
+				u64.LeBytes(0), // offset.
+				// Executable.
+				u64.LeBytes(5),              // size.
+				[]byte{1, 2, 3, 4, 5},       // machine code.
+				crcf([]byte{1, 2, 3, 4, 5}), // crc for machine code.
 			),
 			expCompiledModule: &compiledModule{
 				executables:     &executables{executable: []byte{1, 2, 3, 4, 5}},
