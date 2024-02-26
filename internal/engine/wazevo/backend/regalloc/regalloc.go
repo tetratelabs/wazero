@@ -2,9 +2,6 @@
 // api.go.
 //
 // References:
-//   - https://web.stanford.edu/class/archive/cs/cs143/cs143.1128/lectures/17/Slides17.pdf
-//   - https://en.wikipedia.org/wiki/Chaitin%27s_algorithm
-//   - https://llvm.org/ProjectsWithLLVM/2004-Fall-CS426-LS.pdf
 //   - https://pfalcon.github.io/ssabook/latest/book-full.pdf: Chapter 9. for liveness analysis.
 //   - https://github.com/golang/go/blob/release-branch.go1.21/src/cmd/compile/internal/ssa/regalloc.go
 package regalloc
