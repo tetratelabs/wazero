@@ -112,10 +112,9 @@ func (f *RegAllocFunction[I, M]) ClobberedRegisters(regs []regalloc.VReg) {
 	f.m.ClobberedRegisters(regs)
 }
 
-// SwapAtEndOfBlock implements regalloc.Function SwapAtEndOfBlock.
-func (f *RegAllocFunction[I, M]) SwapAtEndOfBlock(x1, x2, tmp regalloc.VReg, blk regalloc.Block) {
-	cur := blk.LastInstrForInsertion()
-	f.m.Swap(cur.Prev().(I), x1, x2, tmp)
+// SwapBefore implements regalloc.Function SwapBefore.
+func (f *RegAllocFunction[I, M]) SwapBefore(x1, x2, tmp regalloc.VReg, instr regalloc.Instr) {
+	f.m.Swap(instr.Prev().(I), x1, x2, tmp)
 }
 
 // PostOrderBlockIteratorBegin implements regalloc.Function PostOrderBlockIteratorBegin.

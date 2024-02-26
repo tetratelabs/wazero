@@ -619,10 +619,9 @@ L4 (SSA Block: blk5):
 	ret
 L3 (SSA Block: blk4):
 L5 (SSA Block: blk3):
-	load_const_block_arg x8, 0x1
-	orr w8, wzr, #0x1
-	mov x2, x8
-	b #-0x1c (L2)
+	load_const_block_arg x2, 0x1
+	orr w2, wzr, #0x1
+	b #-0x18 (L2)
 `,
 		},
 		{

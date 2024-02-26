@@ -36,8 +36,8 @@ type (
 
 		// Followings are for rewriting the function.
 
-		// SwapAtEndOfBlock swaps the two virtual registers at the end of the given block.
-		SwapAtEndOfBlock(x1, x2, tmp VReg, block Block)
+		// SwapBefore swaps the two virtual registers at the end of the given block.
+		SwapBefore(x1, x2, tmp VReg, inst Instr)
 		// StoreRegisterBefore inserts store instruction(s) before the given instruction for the given virtual register.
 		StoreRegisterBefore(v VReg, instr Instr)
 		// StoreRegisterAfter inserts store instruction(s) after the given instruction for the given virtual register.
