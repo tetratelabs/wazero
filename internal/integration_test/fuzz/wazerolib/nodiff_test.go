@@ -17,5 +17,5 @@ func TestReRunFailedRequireNoDiffCase(t *testing.T) {
 		t.Skip(err)
 	}
 
-	nodiff.RequireNoDiff(wasmBin, true, false, func(err error) { require.NoError(t, err) })
+	nodiff.RequireNoDiff(wasmBin, true, true, func(err error) { require.NoError(t, err) })
 }
