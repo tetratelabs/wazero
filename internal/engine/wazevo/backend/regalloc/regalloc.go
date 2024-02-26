@@ -61,6 +61,7 @@ type (
 		blks             []Block
 		reals            []RealReg
 		currentOccupants regInUseSet
+		insts            []Instr
 
 		// Following two fields are updated while iterating the blocks in the reverse postorder.
 		state       state
@@ -637,11 +638,10 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 			if a.isPhiDef(instr) {
 				phiDefEnd := instr
 				for a.isPhiDef(phiDefEnd) {
-					phiDefEnd = phiDefEnd.Next()
+					phiDefEnd = blk.InstrIteratorNext()
 				}
 				a.handlePhiDefs(f, blk, succ, instr, phiDefEnd)
-				instr = phiDefEnd.Prev()
-				continue
+				instr = phiDefEnd
 			}
 		}
 
@@ -796,7 +796,7 @@ func (a *Allocator) handlePhiDefs(f Function, currentBlk, succBlk Block, phiDefB
 	}
 
 	// First, store the stack phi values.
-	var regInstrs []Instr // TODO: reuse the slice.
+	a.insts = a.insts[:0]
 	for instr := phiDefBegin; instr != phiDefEnd; instr = instr.Next() {
 		def := instr.Defs(&a.vs)[0]
 		var found bool
@@ -808,7 +808,7 @@ func (a *Allocator) handlePhiDefs(f Function, currentBlk, succBlk Block, phiDefB
 		}
 
 		if !found {
-			regInstrs = append(regInstrs, instr)
+			a.insts = append(a.insts, instr)
 			continue
 		}
 		if wazevoapi.RegAllocLoggingEnabled {
@@ -851,7 +851,7 @@ func (a *Allocator) handlePhiDefs(f Function, currentBlk, succBlk Block, phiDefB
 	}
 
 	// Next is the real register phi values. But first, we only handle the phi value where the source is already on a real register.
-	for _, instr := range regInstrs {
+	for _, instr := range a.insts {
 		def := instr.Defs(&a.vs)[0]
 		dstReg := RealRegInvalid
 		for _, regPhi := range succState.regPhis {
@@ -894,7 +894,7 @@ func (a *Allocator) handlePhiDefs(f Function, currentBlk, succBlk Block, phiDefB
 		}
 	}
 
-	for _, instr := range regInstrs {
+	for _, instr := range a.insts {
 		def := instr.Defs(&a.vs)[0]
 		var dstReg RealReg
 		for _, regPhi := range succState.regPhis {
