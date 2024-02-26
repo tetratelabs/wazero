@@ -20,8 +20,9 @@ import (
 // NewAllocator returns a new Allocator.
 func NewAllocator(allocatableRegs *RegisterInfo) Allocator {
 	a := Allocator{
-		regInfo:     allocatableRegs,
-		blockStates: wazevoapi.NewIDedPool[blockState](resetBlockState),
+		regInfo:            allocatableRegs,
+		phiDefInstListPool: wazevoapi.NewPool[phiDefInstList](resetPhiDefInstList),
+		blockStates:        wazevoapi.NewIDedPool[blockState](resetBlockState),
 	}
 	a.state.vrStates = wazevoapi.NewIDedPool[vrState](resetVrState)
 	a.state.reset()
@@ -56,6 +57,7 @@ type (
 		allocatedCalleeSavedRegs []VReg
 		vs                       []VReg
 		vs2                      []VRegID
+		phiDefInstListPool       wazevoapi.Pool[phiDefInstList]
 
 		// Followings are re-used during various places.
 		blks             []Block
@@ -118,8 +120,22 @@ type (
 		spilled bool
 		// isPhi is true if this is a phi value.
 		isPhi bool
+		// phiDefInstList is a list of instructions that defines this phi value.
+		// This is used to determine the spill location, and only valid if isPhi=true.
+		*phiDefInstList
+	}
+
+	// phiDefInstList is a linked list of instructions that defines a phi value.
+	phiDefInstList struct {
+		instr Instr
+		next  *phiDefInstList
 	}
 )
+
+func resetPhiDefInstList(l *phiDefInstList) {
+	l.instr = nil
+	l.next = nil
+}
 
 func (s *state) dump(info *RegisterInfo) { //nolint:unused
 	fmt.Println("\t\tstate:")
@@ -165,6 +181,7 @@ func resetVrState(vs *vrState) {
 	vs.lastUseUpdatedAtBlockID = -1
 	vs.lca = nil
 	vs.isPhi = false
+	vs.phiDefInstList = nil
 }
 
 func (s *state) getVRegState(v VRegID) *vrState {
@@ -756,8 +773,15 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 				if wazevoapi.RegAllocLoggingEnabled {
 					fmt.Printf("\tdefining v%d with %s\n", def.ID(), a.regInfo.RealRegName(r))
 				}
-				vState.defInstr = instr
-				vState.defBlk = blk
+				if vState.isPhi {
+					n := a.phiDefInstListPool.Allocate()
+					n.instr = instr
+					n.next = vState.phiDefInstList
+					vState.phiDefInstList = n
+				} else {
+					vState.defInstr = instr
+					vState.defBlk = blk
+				}
 			}
 		}
 		if wazevoapi.RegAllocLoggingEnabled {
@@ -892,6 +916,7 @@ func (a *Allocator) handlePhiDefs(f Function, currentBlk, succBlk Block, phiDefB
 			instr.AssignUse(0, use.SetRealReg(dstReg))
 			a.state.useRealReg(dstReg, def)
 		}
+		a.addNewPhiDef(def, instr)
 	}
 
 	for _, instr := range a.insts {
@@ -943,6 +968,7 @@ func (a *Allocator) handlePhiDefs(f Function, currentBlk, succBlk Block, phiDefB
 				a.state.useRealReg(dstReg, def)
 			}
 		}
+		a.addNewPhiDef(def, instr)
 	}
 }
 
@@ -1140,28 +1166,9 @@ func (a *Allocator) reconcileEdge(f Function,
 func (a *Allocator) scheduleSpills(f Function) {
 	states := a.state.vrStates
 
-	// Handle the phi values first in a different way.
-	for blk := f.PostOrderBlockIteratorBegin(); blk != nil; blk = f.PostOrderBlockIteratorNext() {
-		if blk.Entry() {
-			continue
-		}
-		bs := a.getOrAllocateBlockState(blk.ID())
-		begin := blk.FirstInstr()
-		for _, regPhi := range bs.regPhis {
-			vs := a.state.getVRegState(regPhi.ID())
-			if vs.spilled {
-				f.StoreRegisterAfter(regPhi, begin)
-			}
-		}
-	}
-
 	for i := 0; i <= states.MaxIDEncountered(); i++ {
 		vs := states.Get(i)
 		if vs == nil {
-			continue
-		}
-		if vs.isPhi && !vs.defBlk.Entry() {
-			// Phis are treated differently for non-entry blocks.
 			continue
 		}
 
@@ -1173,6 +1180,14 @@ func (a *Allocator) scheduleSpills(f Function) {
 
 func (a *Allocator) scheduleSpill(f Function, vs *vrState) {
 	v := vs.v
+	// If the value is the phi value, we need to insert a spill after each phi definition.
+	if vs.isPhi {
+		for defInstr := vs.phiDefInstList; defInstr != nil; defInstr = defInstr.next {
+			def := defInstr.instr.Defs(&a.vs)[0]
+			f.StoreRegisterAfter(def, defInstr.instr)
+		}
+		return
+	}
 
 	pos := vs.lca
 	definingBlk := vs.defBlk
@@ -1223,9 +1238,18 @@ func (a *Allocator) scheduleSpill(f Function, vs *vrState) {
 	}
 }
 
+func (a *Allocator) addNewPhiDef(phi VReg, instr Instr) {
+	defState := a.state.getVRegState(phi.ID())
+	n := a.phiDefInstListPool.Allocate()
+	n.instr = instr
+	n.next = defState.phiDefInstList
+	defState.phiDefInstList = n
+}
+
 // Reset resets the allocator's internal state so that it can be reused.
 func (a *Allocator) Reset() {
 	a.state.reset()
 	a.blockStates.Reset()
+	a.phiDefInstListPool.Reset()
 	a.vs = a.vs[:0]
 }
