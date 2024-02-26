@@ -198,18 +198,28 @@ func (m *machine) createFrameSizeSlot(cur *instruction, s int64) *instruction {
 func (m *machine) postRegAlloc() {
 	ectx := m.executableContext
 	for cur := ectx.RootInstr; cur != nil; cur = cur.next {
-		if cur.kind == ret {
+		switch cur.kind {
+		case ret:
 			m.setupEpilogueAfter(cur.prev)
-			continue
-		}
-
-		// Removes the redundant copy instruction.
-		if cur.IsCopy() && cur.rn.realReg() == cur.rd.realReg() {
-			prev, next := cur.prev, cur.next
-			// Remove the copy instruction.
-			prev.next = next
-			if next != nil {
-				next.prev = prev
+		case loadConstBlockArg:
+			lc := cur
+			next := lc.next
+			m.executableContext.PendingInstructions = m.executableContext.PendingInstructions[:0]
+			m.lowerLoadConstantBlockArgAfterRegAlloc(lc)
+			for _, instr := range m.executableContext.PendingInstructions {
+				cur = linkInstr(cur, instr)
+			}
+			linkInstr(cur, next)
+			m.executableContext.PendingInstructions = m.executableContext.PendingInstructions[:0]
+		default:
+			// Removes the redundant copy instruction.
+			if cur.IsCopy() && cur.rn.realReg() == cur.rd.realReg() {
+				prev, next := cur.prev, cur.next
+				// Remove the copy instruction.
+				prev.next = next
+				if next != nil {
+					next.prev = prev
+				}
 			}
 		}
 	}

@@ -45,8 +45,8 @@ type (
 		// InsertReturn inserts the return instruction to return from the current function.
 		InsertReturn()
 
-		// InsertLoadConstant inserts the instruction(s) to load the constant value into the given regalloc.VReg.
-		InsertLoadConstant(instr *ssa.Instruction, vr regalloc.VReg)
+		// InsertLoadConstantBlockArg inserts the instruction(s) to load the constant value into the given regalloc.VReg.
+		InsertLoadConstantBlockArg(instr *ssa.Instruction, vr regalloc.VReg)
 
 		// Format returns the string representation of the currently compiled machine code.
 		// This is only for testing purpose.

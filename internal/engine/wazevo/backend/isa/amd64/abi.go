@@ -136,7 +136,7 @@ func (m *machine) LowerReturn(ret ssa.Value, r *backend.ABIArg) {
 	if def := m.c.ValueDefinition(ret); def.IsFromInstr() {
 		// Constant instructions are inlined.
 		if inst := def.Instr; inst.Constant() {
-			m.InsertLoadConstant(inst, reg)
+			m.insertLoadConstant(inst, reg)
 		}
 	}
 	if r.Kind == backend.ABIArgKindReg {

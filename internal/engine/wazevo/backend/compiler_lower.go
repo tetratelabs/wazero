@@ -221,6 +221,6 @@ func (c *compiler) lowerBlockArguments(args []ssa.Value, succ ssa.BasicBlock) {
 	// Finally, move the constants.
 	for _, edge := range c.constEdges {
 		cInst, dst := edge.cInst, edge.dst
-		c.mach.InsertLoadConstant(cInst, dst)
+		c.mach.InsertLoadConstantBlockArg(cInst, dst)
 	}
 }

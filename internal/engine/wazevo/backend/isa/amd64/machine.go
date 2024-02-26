@@ -1642,7 +1642,7 @@ func (m *machine) callerGenVRegToFunctionArg(a *backend.FunctionABI, argIndex in
 	if def != nil && def.IsFromInstr() {
 		// Constant instructions are inlined.
 		if inst := def.Instr; inst.Constant() {
-			m.InsertLoadConstant(inst, reg)
+			m.insertLoadConstant(inst, reg)
 		}
 	}
 	if arg.Kind == backend.ABIArgKindReg {
