@@ -11,12 +11,16 @@ func (m *machine) lowerConstant(instr *ssa.Instruction) (vr regalloc.VReg) {
 	valType := val.Type()
 
 	vr = m.c.AllocateVReg(valType)
-	m.InsertLoadConstant(instr, vr)
+	m.insertLoadConstant(instr, vr)
 	return
 }
 
-// InsertLoadConstant implements backend.Machine.
-func (m *machine) InsertLoadConstant(instr *ssa.Instruction, vr regalloc.VReg) {
+// InsertLoadConstantBlockArg implements backend.Machine.
+func (m *machine) InsertLoadConstantBlockArg(instr *ssa.Instruction, vr regalloc.VReg) {
+	m.insertLoadConstant(instr, vr)
+}
+
+func (m *machine) insertLoadConstant(instr *ssa.Instruction, vr regalloc.VReg) {
 	val := instr.Return()
 	valType := val.Type()
 	v := instr.ConstantVal()

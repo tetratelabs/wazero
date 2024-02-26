@@ -11,16 +11,27 @@ func (m *machine) lowerConstant(instr *ssa.Instruction) (vr regalloc.VReg) {
 	valType := val.Type()
 
 	vr = m.compiler.AllocateVReg(valType)
-	m.InsertLoadConstant(instr, vr)
+	v := instr.ConstantVal()
+	m.insertLoadConstant(v, valType, vr)
 	return
 }
 
-// InsertLoadConstant implements backend.Machine.
-func (m *machine) InsertLoadConstant(instr *ssa.Instruction, vr regalloc.VReg) {
+// InsertLoadConstantBlockArg implements backend.Machine.
+func (m *machine) InsertLoadConstantBlockArg(instr *ssa.Instruction, vr regalloc.VReg) {
 	val := instr.Return()
 	valType := val.Type()
 	v := instr.ConstantVal()
+	load := m.allocateInstr()
+	load.asLoadConstBlockArg(v, valType, vr)
+	m.insert(load)
+}
 
+func (m *machine) lowerLoadConstantBlockArgAfterRegAlloc(i *instruction) {
+	v, typ, dst := i.loadConstBlockArgData()
+	m.insertLoadConstant(v, typ, dst)
+}
+
+func (m *machine) insertLoadConstant(v uint64, valType ssa.Type, vr regalloc.VReg) {
 	if valType.Bits() < 64 { // Clear the redundant bits just in case it's unexpectedly sign-extended, etc.
 		v = v & ((1 << valType.Bits()) - 1)
 	}

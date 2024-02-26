@@ -603,7 +603,7 @@ L4 (SSA Block: blk5):
 	ret
 L3 (SSA Block: blk4):
 L5 (SSA Block: blk3):
-	orr w131?, wzr, #0x1
+	load_const_block_arg x131?, 0x1
 	b L2
 `,
 			afterFinalizeARM64: `
@@ -619,6 +619,7 @@ L4 (SSA Block: blk5):
 	ret
 L3 (SSA Block: blk4):
 L5 (SSA Block: blk3):
+	load_const_block_arg x8, 0x1
 	orr w8, wzr, #0x1
 	mov x2, x8
 	b #-0x1c (L2)

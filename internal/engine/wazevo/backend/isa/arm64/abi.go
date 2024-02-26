@@ -130,7 +130,10 @@ func (m *machine) LowerReturns(rets []ssa.Value) {
 		if def := m.compiler.ValueDefinition(ret); def.IsFromInstr() {
 			// Constant instructions are inlined.
 			if inst := def.Instr; inst.Constant() {
-				m.InsertLoadConstant(inst, reg)
+				val := inst.Return()
+				valType := val.Type()
+				v := inst.ConstantVal()
+				m.insertLoadConstant(v, valType, reg)
 			}
 		}
 		if r.Kind == backend.ABIArgKindReg {
@@ -182,7 +185,10 @@ func (m *machine) callerGenVRegToFunctionArg(a *backend.FunctionABI, argIndex in
 	if def != nil && def.IsFromInstr() {
 		// Constant instructions are inlined.
 		if inst := def.Instr; inst.Constant() {
-			m.InsertLoadConstant(inst, reg)
+			val := inst.Return()
+			valType := val.Type()
+			v := inst.ConstantVal()
+			m.insertLoadConstant(v, valType, reg)
 		}
 	}
 	if arg.Kind == backend.ABIArgKindReg {

@@ -164,6 +164,7 @@ var defKinds = [numInstructionKinds]defKind{
 	atomicLoad:           defKindRD,
 	atomicStore:          defKindNone,
 	dmb:                  defKindNone,
+	loadConstBlockArg:    defKindRD,
 }
 
 // Defs returns the list of regalloc.VReg that are defined by the instruction.
@@ -300,6 +301,7 @@ var useKinds = [numInstructionKinds]useKind{
 	atomicCas:            useKindRDRewrite,
 	atomicLoad:           useKindRN,
 	atomicStore:          useKindRNRM,
+	loadConstBlockArg:    useKindNone,
 	dmb:                  useKindNone,
 }
 
@@ -1516,6 +1518,8 @@ func (i *instruction) String() (str string) {
 		str = fmt.Sprintf("source_offset_info %d", ssa.SourceOffset(i.u1))
 	case vecLoad1R:
 		str = fmt.Sprintf("ld1r {%s}, [%s]", formatVRegVec(i.rd.nr(), vecArrangement(i.u1), vecIndexNone), formatVRegSized(i.rn.nr(), 64))
+	case loadConstBlockArg:
+		str = fmt.Sprintf("load_const_block_arg %s, %#x", formatVRegSized(i.rd.nr(), 64), i.u1)
 	default:
 		panic(i.kind)
 	}
@@ -1736,6 +1740,8 @@ const (
 	dmb
 	// UDF is the undefined instruction. For debugging only.
 	udf
+	// loadConstBlockArg represents a load of a constant block argument.
+	loadConstBlockArg
 
 	// emitSourceOffsetInfo is a dummy instruction to emit source offset info.
 	// The existence of this instruction does not affect the execution.
@@ -1744,6 +1750,18 @@ const (
 	// ------------------- do not define below this line -------------------
 	numInstructionKinds
 )
+
+func (i *instruction) asLoadConstBlockArg(v uint64, typ ssa.Type, dst regalloc.VReg) *instruction {
+	i.kind = loadConstBlockArg
+	i.u1 = v
+	i.u2 = uint64(typ)
+	i.rd = operandNR(dst)
+	return i
+}
+
+func (i *instruction) loadConstBlockArgData() (v uint64, typ ssa.Type, dst regalloc.VReg) {
+	return i.u1, ssa.Type(i.u2), i.rd.nr()
+}
 
 func (i *instruction) asEmitSourceOffsetInfo(l ssa.SourceOffset) *instruction {
 	i.kind = emitSourceOffsetInfo
@@ -2365,7 +2383,7 @@ func (i *instruction) size() int64 {
 	switch i.kind {
 	case exitSequence:
 		return exitSequenceSize // 5 instructions as in encodeExitSequence.
-	case nop0:
+	case nop0, loadConstBlockArg:
 		return 0
 	case emitSourceOffsetInfo:
 		return 0

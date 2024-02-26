@@ -23,7 +23,6 @@ type mockMachine struct {
 	insertLoadConstant             func(instr *ssa.Instruction, vr regalloc.VReg)
 	format                         func() string
 	linkAdjacentBlocks             func(prev, next ssa.BasicBlock)
-	rinfo                          *regalloc.RegisterInfo
 }
 
 func (m mockMachine) ArgsResultsRegs() (argResultInts, argResultFloats []regalloc.RealReg) {
@@ -59,17 +58,6 @@ func (m mockMachine) ResolveRelocations(map[ssa.FuncRef]int, []byte, []Relocatio
 
 // PostRegAlloc implements Machine.SetupPrologue.
 func (m mockMachine) PostRegAlloc() {}
-
-// Function implements Machine.Function.
-func (m mockMachine) Function() (f regalloc.Function) { return }
-
-// RegisterInfo implements Machine.RegisterInfo.
-func (m mockMachine) RegisterInfo() *regalloc.RegisterInfo {
-	if m.rinfo != nil {
-		return m.rinfo
-	}
-	return &regalloc.RegisterInfo{}
-}
 
 // InsertReturn implements Machine.InsertReturn.
 func (m mockMachine) InsertReturn() { panic("TODO") }
@@ -131,8 +119,8 @@ func (m mockMachine) InsertMove(dst, src regalloc.VReg, typ ssa.Type) {
 	m.insertMove(dst, src)
 }
 
-// InsertLoadConstant implements Machine.InsertLoadConstant.
-func (m mockMachine) InsertLoadConstant(instr *ssa.Instruction, vr regalloc.VReg) {
+// InsertLoadConstantBlockArg implements Machine.InsertLoadConstantBlockArg.
+func (m mockMachine) InsertLoadConstantBlockArg(instr *ssa.Instruction, vr regalloc.VReg) {
 	m.insertLoadConstant(instr, vr)
 }
 
