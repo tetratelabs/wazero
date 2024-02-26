@@ -771,10 +771,7 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 					fmt.Printf("\tdefining v%d with %s\n", def.ID(), a.regInfo.RealRegName(r))
 				}
 				if vState.isPhi {
-					n := a.phiDefInstListPool.Allocate()
-					n.instr = instr
-					n.next = vState.phiDefInstList
-					vState.phiDefInstList = n
+					a.addNewPhiDef(def, instr)
 				} else {
 					vState.defInstr = instr
 					vState.defBlk = blk
@@ -937,6 +934,7 @@ func (a *Allocator) handlePhiDefs(f Function, currentBlk, succBlk Block, phiDefB
 
 		currentV := a.state.regsInUse.get(dstReg)
 		if currentV.ID() == def.ID() {
+			a.addNewPhiDef(def, instr)
 			continue
 		}
 		if currentV.Valid() {
