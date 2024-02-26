@@ -1042,7 +1042,6 @@ func (a *Allocator) fixMergeState(f Function, blk Block) {
 
 		// Finds the free registers if any.
 		intTmp, floatTmp := VRegInvalid, VRegInvalid
-
 		if intFree := s.findAllocatable(
 			a.regInfo.AllocatableRegisters[RegTypeInt], desiredOccupants.set,
 		); intFree != RealRegInvalid {
@@ -1162,13 +1161,11 @@ func (a *Allocator) reconcileEdge(f Function,
 
 func (a *Allocator) scheduleSpills(f Function) {
 	states := a.state.vrStates
-
 	for i := 0; i <= states.MaxIDEncountered(); i++ {
 		vs := states.Get(i)
 		if vs == nil {
 			continue
 		}
-
 		if vs.spilled {
 			a.scheduleSpill(f, vs)
 		}
@@ -1249,4 +1246,5 @@ func (a *Allocator) Reset() {
 	a.blockStates.Reset()
 	a.phiDefInstListPool.Reset()
 	a.vs = a.vs[:0]
+	a.insts = a.insts[:0]
 }
