@@ -19,7 +19,7 @@ type instruction struct {
 
 // AsNop implements regalloc.Instr.
 func (i *instruction) AsNop() {
-	i.kind = nop0
+	asNop(i)
 }
 
 // Next implements regalloc.Instr.
@@ -48,6 +48,9 @@ func (i *instruction) AddedBeforeRegAlloc() bool { return i.addedBeforeRegAlloc 
 func (i *instruction) String() string {
 	switch i.kind {
 	case nop0:
+		if l := i.nop0Label(); l != backend.LabelInvalid {
+			return fmt.Sprintf("nop (L=%s)", l)
+		}
 		return "nop"
 	case sourceOffsetInfo:
 		return fmt.Sprintf("source_offset_info %d", i.u1)
@@ -568,7 +571,7 @@ func setPrev(i *instruction, prev *instruction) {
 }
 
 func asNop(i *instruction) {
-	i.kind = nop0
+	i.asNop0WithLabel(backend.LabelInvalid)
 }
 
 func (i *instruction) asNop0WithLabel(label backend.Label) *instruction { //nolint

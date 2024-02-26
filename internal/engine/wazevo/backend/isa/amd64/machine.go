@@ -1823,8 +1823,10 @@ func (m *machine) Encode(ctx context.Context) {
 			switch cur.kind {
 			case nop0:
 				l := cur.nop0Label()
-				if pos, ok := ectx.LabelPositions[l]; ok {
-					pos.BinaryOffset = offset
+				if l != backend.LabelInvalid {
+					if pos, ok := ectx.LabelPositions[l]; ok {
+						pos.BinaryOffset = offset
+					}
 				}
 			case sourceOffsetInfo:
 				m.c.AddSourceOffsetInfo(offset, cur.sourceOffsetInfo())
@@ -1958,7 +1960,7 @@ func (m *machine) allocateInstr() *instruction {
 
 func (m *machine) allocateNop() *instruction {
 	instr := m.allocateInstr()
-	instr.kind = nop0
+	asNop(instr)
 	return instr
 }
 
