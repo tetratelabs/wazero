@@ -62,7 +62,6 @@ func TestE2E(t *testing.T) {
 		},
 		{
 			name: "selects", m: testcases.Selects.Module,
-			skipAMD64: true,
 			calls: []callCase{
 				{
 					params: []uint64{
@@ -547,17 +546,15 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
-			name:      "vector_bit_select",
-			m:         testcases.VecBitSelect.Module,
-			skipAMD64: true,
+			name: "vector_bit_select",
+			m:    testcases.VecBitSelect.Module,
 			calls: []callCase{
 				{params: []uint64{1, 2, 3, 4, 5, 6}, expResults: []uint64{0x3, 0x2, 0x5, 0x6}},
 			},
 		},
 		{
-			name:      "vector_shuffle",
-			m:         testcases.VecShuffle.Module,
-			skipAMD64: true,
+			name: "vector_shuffle",
+			m:    testcases.VecShuffle.Module,
 			calls: []callCase{
 				{params: []uint64{0x01010101, 0x02020202, 0x03030303, 0x04040404}, expResults: []uint64{0x01010101, 0x04040404}},
 				{params: []uint64{0x03030303, 0x04040404, 0x01010101, 0x02020202}, expResults: []uint64{0x03030303, 0x02020202}},
@@ -567,9 +564,8 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
-			name:      "vector_shuffle (1st only)",
-			m:         testcases.VecShuffleWithLane(1, 1, 1, 1, 0, 0, 0, 0, 10, 10, 10, 10, 0, 0, 0, 0),
-			skipAMD64: true,
+			name: "vector_shuffle (1st only)",
+			m:    testcases.VecShuffleWithLane(1, 1, 1, 1, 0, 0, 0, 0, 10, 10, 10, 10, 0, 0, 0, 0),
 			calls: []callCase{
 				{params: []uint64{0x0000000000000b0a, 0x0c0000, 0xffffffffffffffff, 0xffffffffffffffff}, expResults: []uint64{0x0a0a0a0a0b0b0b0b, 0x0a0a0a0a0c0c0c0c}},
 				{params: []uint64{0x01010101, 0x02020202, 0x03030303, 0x04040404}, expResults: []uint64{0x0101010101010101, 0x101010102020202}},
@@ -580,9 +576,8 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
-			name:      "vector_shuffle (2nd only)",
-			m:         testcases.VecShuffleWithLane(17, 17, 17, 17, 16, 16, 16, 16, 26, 26, 26, 26, 16, 16, 16, 16),
-			skipAMD64: true,
+			name: "vector_shuffle (2nd only)",
+			m:    testcases.VecShuffleWithLane(17, 17, 17, 17, 16, 16, 16, 16, 26, 26, 26, 26, 16, 16, 16, 16),
 			calls: []callCase{
 				{params: []uint64{0xffffffffffffffff, 0xffffffffffffffff, 0x0000000000000b0a, 0x0c0000}, expResults: []uint64{0x0a0a0a0a0b0b0b0b, 0x0a0a0a0a0c0c0c0c}},
 				{params: []uint64{0x01010101, 0x02020202, 0x03030303, 0x04040404}, expResults: []uint64{0x303030303030303, 0x303030304040404}},
@@ -593,9 +588,8 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
-			name:      "vector_shuffle (mixed)",
-			m:         testcases.VecShuffleWithLane(0, 17, 2, 19, 4, 21, 6, 23, 8, 25, 10, 27, 12, 29, 14, 31),
-			skipAMD64: true,
+			name: "vector_shuffle (mixed)",
+			m:    testcases.VecShuffleWithLane(0, 17, 2, 19, 4, 21, 6, 23, 8, 25, 10, 27, 12, 29, 14, 31),
 			calls: []callCase{
 				{params: []uint64{0xff08ff07ff06ff05, 0xff04ff03ff02ff01, 0x18ff17ff16ff15ff, 0x14ff13ff12ff11ff}, expResults: []uint64{0x1808170716061505, 0x1404130312021101}},
 				{params: []uint64{0x01010101, 0x02020202, 0x03030303, 0x04040404}, expResults: []uint64{0x3010301, 0x4020402}},
