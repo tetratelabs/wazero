@@ -46,6 +46,11 @@ func setPrev(i, prev *instruction) {
 	i.prev = prev
 }
 
+// AsNop implements regalloc.Instr.
+func (i *instruction) AsNop() {
+	i.asNop0()
+}
+
 // IsCall implements regalloc.Instr IsCall.
 func (i *instruction) IsCall() bool {
 	return i.kind == call

@@ -125,6 +125,7 @@ type (
 	// phiDefInstList is a linked list of instructions that defines a phi value.
 	phiDefInstList struct {
 		instr Instr
+		v     VReg
 		next  *phiDefInstList
 	}
 )
@@ -771,7 +772,7 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 					fmt.Printf("\tdefining v%d with %s\n", def.ID(), a.regInfo.RealRegName(r))
 				}
 				if vState.isPhi {
-					a.addNewPhiDef(def, instr)
+					a.addNewPhiDef(def.SetRealReg(r), instr)
 				} else {
 					vState.defInstr = instr
 					vState.defBlk = blk
@@ -909,8 +910,9 @@ func (a *Allocator) handlePhiDefs(f Function, currentBlk, succBlk Block, phiDefB
 			instr.AssignDef(def.SetRealReg(dstReg))
 			instr.AssignUse(0, use.SetRealReg(dstReg))
 			a.state.useRealReg(dstReg, def)
+
+			a.addNewPhiDef(def.SetRealReg(dstReg), instr)
 		}
-		a.addNewPhiDef(def, instr)
 	}
 
 	for _, instr := range a.insts {
@@ -934,14 +936,11 @@ func (a *Allocator) handlePhiDefs(f Function, currentBlk, succBlk Block, phiDefB
 
 		currentV := a.state.regsInUse.get(dstReg)
 		if currentV.ID() == def.ID() {
-			a.addNewPhiDef(def, instr)
+			a.addNewPhiDef(def.SetRealReg(dstReg), instr)
+			instr.AsNop() // This case, the instruction is redundant.
 			continue
 		}
 		if currentV.Valid() {
-			if a.state.phiBlk(currentV.ID()) == succBlk {
-				a.state.dump(a.regInfo)
-				panic(fmt.Sprintf("%s is occupied by v%d which is assigned to be v%d", a.regInfo.RealRegName(dstReg), currentV.ID(), def.ID()))
-			}
 			// Release.
 			a.state.releaseRealReg(dstReg)
 		}
@@ -963,7 +962,7 @@ func (a *Allocator) handlePhiDefs(f Function, currentBlk, succBlk Block, phiDefB
 				a.state.useRealReg(dstReg, def)
 			}
 		}
-		a.addNewPhiDef(def, instr)
+		a.addNewPhiDef(def.SetRealReg(dstReg), instr)
 	}
 }
 
@@ -1175,8 +1174,7 @@ func (a *Allocator) scheduleSpill(f Function, vs *vrState) {
 	// If the value is the phi value, we need to insert a spill after each phi definition.
 	if vs.isPhi {
 		for defInstr := vs.phiDefInstList; defInstr != nil; defInstr = defInstr.next {
-			def := defInstr.instr.Defs(&a.vs)[0]
-			f.StoreRegisterAfter(def, defInstr.instr)
+			f.StoreRegisterAfter(defInstr.v, defInstr.instr)
 		}
 		return
 	}
@@ -1234,6 +1232,7 @@ func (a *Allocator) addNewPhiDef(phi VReg, instr Instr) {
 	defState := a.state.getVRegState(phi.ID())
 	n := a.phiDefInstListPool.Allocate()
 	n.instr = instr
+	n.v = phi
 	n.next = defState.phiDefInstList
 	defState.phiDefInstList = n
 }

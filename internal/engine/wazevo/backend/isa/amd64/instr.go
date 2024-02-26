@@ -17,6 +17,11 @@ type instruction struct {
 	kind                instructionKind
 }
 
+// AsNop implements regalloc.Instr.
+func (i *instruction) AsNop() {
+	i.kind = nop0
+}
+
 // Next implements regalloc.Instr.
 func (i *instruction) Next() regalloc.Instr {
 	return i.next

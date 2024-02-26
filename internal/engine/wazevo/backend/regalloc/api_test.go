@@ -269,6 +269,9 @@ func (m *mockInstr) Defs(ret *[]VReg) []VReg {
 	return *ret
 }
 
+// Defs implements Instr.
+func (m *mockInstr) AsNop() {}
+
 // AddedBeforeRegAlloc implements Instr.
 func (m *mockInstr) AddedBeforeRegAlloc() bool { return true }
 
