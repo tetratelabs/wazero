@@ -23,7 +23,6 @@ type mockMachine struct {
 	insertLoadConstant             func(instr *ssa.Instruction, vr regalloc.VReg)
 	format                         func() string
 	linkAdjacentBlocks             func(prev, next ssa.BasicBlock)
-	rinfo                          *regalloc.RegisterInfo
 }
 
 func (m mockMachine) ArgsResultsRegs() (argResultInts, argResultFloats []regalloc.RealReg) {
