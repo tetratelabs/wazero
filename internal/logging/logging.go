@@ -282,8 +282,8 @@ func writeMemH64(_ context.Context, mod api.Module, w Writer, i uint32, vals []u
 }
 
 func writeString(_ context.Context, mod api.Module, w Writer, i uint32, vals []uint64) {
-	offset, byteCount := uint32(vals[i]), vals[i+1]
-	WriteStringOrOOM(mod.Memory(), w, offset, byteCount)
+	offset, byteCount := uint32(vals[i]), uint32(vals[i+1])
+	WriteStringOrOOM(mod.Memory(), w, offset, uint64(byteCount))
 }
 
 func WriteStringOrOOM(mem api.Memory, w Writer, offset uint32, byteCount uint64) {

@@ -80,9 +80,9 @@ func (m *wazeroModule) Memory() []byte {
 }
 
 func (r *wazeroRuntime) log(_ context.Context, mod api.Module, stack []uint64) {
-	offset, byteCount := uint32(stack[0]), stack[1]
+	offset, byteCount := uint32(stack[0]), uint32(stack[1])
 
-	buf, ok := mod.Memory().Read(offset, byteCount)
+	buf, ok := mod.Memory().Read(offset, uint64(byteCount))
 	if !ok {
 		panic("out of memory reading log buffer")
 	}

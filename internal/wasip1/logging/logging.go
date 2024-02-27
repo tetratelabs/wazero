@@ -292,8 +292,8 @@ func (i logFdstat) Log(_ context.Context, mod api.Module, w logging.Writer, para
 type logString uint32
 
 func (i logString) Log(_ context.Context, mod api.Module, w logging.Writer, params []uint64) {
-	offset, byteCount := uint32(params[i]), uint64(params[i+1])
-	if s, ok := mod.Memory().Read(offset, byteCount); ok {
+	offset, byteCount := uint32(params[i]), uint32(params[i+1])
+	if s, ok := mod.Memory().Read(offset, uint64(byteCount)); ok {
 		w.Write(s) //nolint
 	}
 }
