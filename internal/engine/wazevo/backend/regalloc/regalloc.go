@@ -92,8 +92,7 @@ type (
 		// startRegs is a list of RealReg that are used at the beginning of the block. This is used to fix the merge edges.
 		startRegs regInUseSet
 		// endRegs is a list of RealReg that are used at the end of the block. This is used to fix the merge edges.
-		endRegs            regInUseSet
-		regPhis, stackPhis []VReg
+		endRegs regInUseSet
 	}
 
 	vrState struct {
@@ -116,7 +115,8 @@ type (
 		// value is live-in or not.
 		spilled bool
 		// isPhi is true if this is a phi value.
-		isPhi bool
+		isPhi  bool
+		phiReg RealReg
 		// phiDefInstList is a list of instructions that defines this phi value.
 		// This is used to determine the spill location, and only valid if isPhi=true.
 		*phiDefInstList
@@ -180,6 +180,7 @@ func resetVrState(vs *vrState) {
 	vs.lca = nil
 	vs.isPhi = false
 	vs.phiDefInstList = nil
+	vs.phiReg = RealRegInvalid
 }
 
 func (s *state) getVRegState(v VRegID) *vrState {
@@ -296,8 +297,6 @@ func resetBlockState(b *blockState) {
 	b.startRegs.reset()
 	b.startFromPredIndex = -1
 	b.liveIns = b.liveIns[:0]
-	b.regPhis = b.regPhis[:0]
-	b.stackPhis = b.stackPhis[:0]
 }
 
 func (b *blockState) dump(a *RegisterInfo) {
@@ -306,16 +305,6 @@ func (b *blockState) dump(a *RegisterInfo) {
 	fmt.Println("\t\t\tendRegs:", b.endRegs.format(a))
 	fmt.Println("\t\t\tstartFromPredIndex:", b.startFromPredIndex)
 	fmt.Println("\t\t\tvisited:", b.visited)
-	var regPhis []string
-	for _, p := range b.regPhis {
-		regPhis = append(regPhis, fmt.Sprintf("v%d: %s", p.ID(), a.RealRegName(p.RealReg())))
-	}
-	var stackPhis []string
-	for _, p := range b.stackPhis {
-		stackPhis = append(stackPhis, fmt.Sprintf("v%d", p.ID()))
-	}
-	fmt.Println("\t\t\tregPhis:", strings.Join(regPhis, ", "))
-	fmt.Println("\t\t\tstackPhis:", strings.Join(stackPhis, ", "))
 }
 
 // DoAllocation performs register allocation on the given Function.
@@ -594,15 +583,11 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 		currentBlkState.startRegs.add(allocated, v)
 	})
 
-	// Records phi values.
+	// Records registers holding phis.
 	if !blk.Entry() {
 		for _, p := range blk.BlockParams(&a.vs) {
 			vs := s.getVRegState(p.ID())
-			if vs.r != RealRegInvalid {
-				currentBlkState.regPhis = append(currentBlkState.regPhis, p.SetRealReg(vs.r))
-			} else {
-				currentBlkState.stackPhis = append(currentBlkState.stackPhis, p)
-			}
+			vs.phiReg = vs.r
 		}
 	}
 
@@ -818,18 +803,12 @@ func (a *Allocator) handlePhiDefs(f Function, currentBlk, succBlk Block, phiDefB
 	a.insts = a.insts[:0]
 	for instr := phiDefBegin; instr != phiDefEnd; instr = instr.Next() {
 		def := instr.Defs(&a.vs)[0]
-		var found bool
-		for _, stackPhi := range succState.stackPhis {
-			if stackPhi.ID() == def.ID() {
-				found = true
-				break
-			}
-		}
-
-		if !found {
+		st := a.state.getVRegState(def.ID())
+		if st.phiReg != RealRegInvalid {
 			a.insts = append(a.insts, instr)
 			continue
 		}
+
 		if wazevoapi.RegAllocLoggingEnabled {
 			fmt.Println("\t\thandle stack phi: " + instr.String())
 		}
@@ -872,14 +851,11 @@ func (a *Allocator) handlePhiDefs(f Function, currentBlk, succBlk Block, phiDefB
 	// Next is the real register phi values. But first, we only handle the phi value where the source is already on a real register.
 	for _, instr := range a.insts {
 		def := instr.Defs(&a.vs)[0]
-		dstReg := RealRegInvalid
-		for _, regPhi := range succState.regPhis {
-			if regPhi.ID() == def.ID() {
-				dstReg = regPhi.RealReg()
-				break
-			}
+		st := a.state.getVRegState(def.ID())
+		if !st.isPhi {
+			panic("BUG")
 		}
-
+		dstReg := st.phiReg
 		if dstReg == RealRegInvalid {
 			continue
 		}
@@ -917,14 +893,12 @@ func (a *Allocator) handlePhiDefs(f Function, currentBlk, succBlk Block, phiDefB
 
 	for _, instr := range a.insts {
 		def := instr.Defs(&a.vs)[0]
-		var dstReg RealReg
-		for _, regPhi := range succState.regPhis {
-			if regPhi.ID() == def.ID() {
-				dstReg = regPhi.RealReg()
-				break
-			}
-		}
 
+		st := a.state.getVRegState(def.ID())
+		if !st.isPhi {
+			panic("BUG")
+		}
+		dstReg := st.phiReg
 		if dstReg == RealRegInvalid {
 			continue
 		}
