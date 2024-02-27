@@ -96,7 +96,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 		}
 
 		if len(controlBlockStack.stack) == 0 {
-			return fmt.Errorf("unexpected end of function at pc=%d", pc)
+			return fmt.Errorf("unexpected end of function at pc=%#x", pc)
 		}
 
 		if OpcodeI32Load <= op && op <= OpcodeI64Store32 {
@@ -1819,9 +1819,6 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			valueTypeStack.pushStackLimit(len(bt.Params))
 			pc += num
 		} else if op == OpcodeElse {
-			if len(controlBlockStack.stack) == 0 {
-				return fmt.Errorf("redundant Else instruction at %#x", pc)
-			}
 			bl := &controlBlockStack.stack[len(controlBlockStack.stack)-1]
 			bl.elseAt = pc
 			// Check the type soundness of the instructions *before* entering this else Op.
@@ -1835,9 +1832,6 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				valueTypeStack.push(p)
 			}
 		} else if op == OpcodeEnd {
-			if len(controlBlockStack.stack) == 0 {
-				return fmt.Errorf("redundant End instruction at %#x", pc)
-			}
 			bl := controlBlockStack.pop()
 			bl.endAt = pc
 
