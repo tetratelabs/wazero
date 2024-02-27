@@ -2083,6 +2083,9 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			offset := ce.popMemoryOffset(op)
 			// Write the upper bytes first to trigger an early error if the memory access is out of bounds.
 			// Otherwise, the lower bytes might be written to memory, but the upper bytes might not.
+			if uint64(offset)+8 > math.MaxUint32 {
+				panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+			}
 			if ok := memoryInst.WriteUint64Le(offset+8, hi); !ok {
 				panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 			}

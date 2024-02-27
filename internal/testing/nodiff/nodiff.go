@@ -110,8 +110,7 @@ func RequireNoDiff(wasmBin []byte, checkMemory, loggingCheck bool, requireNoErro
 		interpreterMem, _ := interpreterMod.Memory().(*wasm.MemoryInstance)
 		if checkMemory && compilerMem != nil && interpreterMem != nil {
 			if !bytes.Equal(compilerMem.Buffer, interpreterMem.Buffer) {
-				requireNoError(fmt.Errorf("memory state mimsmatch\ncompiler: %v\ninterpreter: %v",
-					compilerMem.Buffer, interpreterMem.Buffer))
+				requireNoError(errors.New("memory state mimsmatch"))
 			}
 		}
 		ensureMutableGlobalsMatch(compilerMod, interpreterMod, requireNoError)
