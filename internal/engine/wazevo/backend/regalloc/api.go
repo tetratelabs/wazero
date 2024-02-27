@@ -126,6 +126,8 @@ type (
 		IsReturn() bool
 		// AddedBeforeRegAlloc returns true if this instruction is added before register allocation.
 		AddedBeforeRegAlloc() bool
+		// AsNop modifies this instruction to be a nop instruction to be optimized out.
+		AsNop()
 	}
 
 	// InstrConstraint is an interface for arch-specific instruction constraints.

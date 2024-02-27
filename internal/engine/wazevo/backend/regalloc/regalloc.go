@@ -127,6 +127,7 @@ type (
 	// phiDefInstList is a linked list of instructions that defines a phi value.
 	phiDefInstList struct {
 		instr Instr
+		v     VReg
 		next  *phiDefInstList
 	}
 )
@@ -134,6 +135,7 @@ type (
 func resetPhiDefInstList(l *phiDefInstList) {
 	l.instr = nil
 	l.next = nil
+	l.v = VRegInvalid
 }
 
 func (s *state) dump(info *RegisterInfo) { //nolint:unused
@@ -770,6 +772,7 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 							f.InsertMoveBefore(def.SetRealReg(desired), def.SetRealReg(r), instr)
 							r = desired
 							s.useRealReg(r, def)
+							instr.AsNop()
 						} else {
 							r = desired
 							s.releaseRealReg(r)
@@ -810,6 +813,7 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 						n := a.phiDefInstListPool.Allocate()
 						n.instr = instr
 						n.next = vState.phiDefInstList
+						n.v = dr
 						vState.phiDefInstList = n
 					}
 				} else {
@@ -1058,8 +1062,7 @@ func (a *Allocator) scheduleSpill(f Function, vs *vrState) {
 	// If the value is the phi value, we need to insert a spill after each phi definition.
 	if vs.isPhi {
 		for defInstr := vs.phiDefInstList; defInstr != nil; defInstr = defInstr.next {
-			def := defInstr.instr.Defs(&a.vs)[0]
-			f.StoreRegisterAfter(def, defInstr.instr)
+			f.StoreRegisterAfter(defInstr.v, defInstr.instr)
 		}
 		return
 	}
