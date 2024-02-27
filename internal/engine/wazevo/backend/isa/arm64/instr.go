@@ -535,11 +535,6 @@ func (i *instruction) asMOVN(dst regalloc.VReg, imm uint64, shift uint64, dst64b
 	}
 }
 
-// AsNop implements regalloc.Instr AsNop.
-func (i *instruction) AsNop() {
-	i.asNop0WithLabel(labelInvalid)
-}
-
 func (i *instruction) asNop0() *instruction {
 	i.asNop0WithLabel(labelInvalid)
 	return i

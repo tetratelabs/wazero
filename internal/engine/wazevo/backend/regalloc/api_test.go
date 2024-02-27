@@ -312,9 +312,6 @@ func (m *mockInstr) AssignDef(reg VReg) {
 	m.defs = []VReg{reg}
 }
 
-// AsNop implements Instr.
-func (m *mockInstr) AsNop() {}
-
 var (
 	_ Function = (*mockFunction)(nil)
 	_ Block    = (*mockBlock)(nil)

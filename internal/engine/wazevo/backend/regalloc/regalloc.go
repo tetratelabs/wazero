@@ -765,21 +765,14 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 						if vState.isPhi {
 							// If the phi value is passed via a real register, we force the value to be in the desired register.
 							if wazevoapi.RegAllocLoggingEnabled {
-								fmt.Printf("\t\tv%d is phi and desiredEndLoc=%s\n", def.ID(), a.regInfo.RealRegName(desired))
+								fmt.Printf("\t\tv%d is phi and desiredReg=%s\n", def.ID(), a.regInfo.RealRegName(desired))
 							}
 							if r != RealRegInvalid {
-								// TODO: this is buggy.
-								//s.releaseRealReg(r)
-								//s.releaseRealReg(desired)
-								//f.InsertMoveBefore(def.SetRealReg(desired), def.SetRealReg(r), instr)
-								//r = desired
-								//s.useRealReg(r, def)
-								//instr.AsNop()
-							} else {
-								r = desired
 								s.releaseRealReg(r)
-								s.useRealReg(r, def)
 							}
+							r = desired
+							s.releaseRealReg(r)
+							s.useRealReg(r, def)
 						} else {
 							// TODO: otherwise, we should try to use the desired register if it's not used by other values.
 							//  one idea is to pass "preferred mask" into findOrSpillAllocatable.

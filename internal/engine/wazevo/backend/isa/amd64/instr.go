@@ -39,10 +39,6 @@ func (i *instruction) IsReturn() bool { return i.kind == ret }
 // AddedBeforeRegAlloc implements regalloc.Instr.
 func (i *instruction) AddedBeforeRegAlloc() bool { return i.addedBeforeRegAlloc }
 
-func (i *instruction) AsNop() {
-	i.asNop0WithLabel(backend.LabelInvalid)
-}
-
 // String implements regalloc.Instr.
 func (i *instruction) String() string {
 	switch i.kind {
