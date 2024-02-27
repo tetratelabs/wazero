@@ -802,6 +802,9 @@ func (a *Allocator) handlePhiDefs(f Function, currentBlk, succBlk Block, phiDefB
 	// First, store the stack phi values.
 	a.insts = a.insts[:0]
 	for instr := phiDefBegin; instr != phiDefEnd; instr = instr.Next() {
+		if !a.isPhiDef(instr) {
+			continue
+		}
 		def := instr.Defs(&a.vs)[0]
 		st := a.state.getVRegState(def.ID())
 		if !st.isPhi {
@@ -823,7 +826,7 @@ func (a *Allocator) handlePhiDefs(f Function, currentBlk, succBlk Block, phiDefB
 			dr := def.SetRealReg(r)
 			instr.AssignDef(dr)
 			// And then store.
-			f.StoreRegisterBefore(dr, instr)
+			f.StoreRegisterAfter(dr, instr)
 		case 1:
 			use := uses[0]
 			useState := a.state.getVRegState(use.ID())
@@ -848,7 +851,7 @@ func (a *Allocator) handlePhiDefs(f Function, currentBlk, succBlk Block, phiDefB
 			if dr.RealReg() == RealRegInvalid {
 				panic("BUG: the phi value should be on a real register")
 			}
-			f.StoreRegisterBefore(dr, instr)
+			f.StoreRegisterAfter(dr, instr)
 		default:
 			panic("BUG: multiple uses for phi value")
 		}
