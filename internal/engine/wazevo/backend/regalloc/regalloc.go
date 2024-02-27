@@ -640,7 +640,10 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 				for a.isPhiDef(phiDefEnd) {
 					phiDefEnd = blk.InstrIteratorNext()
 				}
-				a.handlePhiDefs(f, blk, succ, instr, phiDefEnd)
+				if wazevoapi.RegAllocLoggingEnabled {
+					fmt.Printf("handling phi defs from blk%d to blk%d\n", blk.ID(), succ.ID())
+				}
+				a.handlePhiDefs(f, blk, instr, phiDefEnd)
 				instr = phiDefEnd
 			}
 		}
@@ -792,15 +795,8 @@ func (a *Allocator) isPhiDef(i Instr) bool {
 	return false
 }
 
-func (a *Allocator) handlePhiDefs(f Function, currentBlk, succBlk Block, phiDefBegin, phiDefEnd Instr) {
-	succState := a.getOrAllocateBlockState(succBlk.ID())
-
-	if wazevoapi.RegAllocLoggingEnabled {
-		fmt.Printf("handling phi defs from blk%d to blk%d\n", succBlk.ID(), currentBlk.ID())
-	}
-
+func (a *Allocator) handlePhiDefs(f Function, currentBlk Block, phiDefBegin, phiDefEnd Instr) {
 	// First, store the stack phi values.
-	a.insts = a.insts[:0]
 	for instr := phiDefBegin; instr != phiDefEnd; instr = instr.Next() {
 		if !a.isPhiDef(instr) {
 			continue
@@ -810,152 +806,88 @@ func (a *Allocator) handlePhiDefs(f Function, currentBlk, succBlk Block, phiDefB
 		if !st.isPhi {
 			panic("BUG")
 		}
-		if st.phiReg != RealRegInvalid {
-			a.insts = append(a.insts, instr)
-			continue
-		}
 
-		if wazevoapi.RegAllocLoggingEnabled {
-			fmt.Println("\t\thandle stack phi: " + instr.String())
-		}
-
-		switch uses := instr.Uses(&a.vs); len(uses) {
-		case 0:
-			// Constant phi.
-			r := a.state.findOrSpillAllocatable(a, a.regInfo.AllocatableRegisters[def.RegType()], RegSet(0))
-			dr := def.SetRealReg(r)
-			instr.AssignDef(dr)
-			// And then store.
-			f.StoreRegisterAfter(dr, instr)
-		case 1:
-			use := uses[0]
-			useState := a.state.getVRegState(use.ID())
-			var dr VReg
-			if useState.r == RealRegInvalid {
-				r := a.state.findOrSpillAllocatable(a, a.regInfo.AllocatableRegisters[def.RegType()], RegSet(0))
-				// Reload.
-				ur := use.SetRealReg(r)
-				f.ReloadRegisterBefore(ur, instr)
-				useState.recordReload(f, currentBlk)
-				instr.AssignUse(0, ur)
-				dr = def.SetRealReg(r)
-				instr.AssignDef(dr)
-			} else {
-				r := useState.r
-				instr.AssignUse(0, use.SetRealReg(r))
-				a.state.releaseRealReg(r)
-				dr = def.SetRealReg(r)
-				instr.AssignDef(dr)
+		if phiDst := st.phiReg; phiDst != RealRegInvalid { // Reg phis.
+			if wazevoapi.RegAllocLoggingEnabled {
+				fmt.Println("\t\thandle reg phi: " + instr.String())
 			}
-			// And then store.
-			if dr.RealReg() == RealRegInvalid {
-				panic("BUG: the phi value should be on a real register")
-			}
-			f.StoreRegisterAfter(dr, instr)
-		default:
-			panic("BUG: multiple uses for phi value")
-		}
-	}
-
-	// Next is the real register phi values. But first, we only handle the phi value where the source is already on a real register.
-	for _, instr := range a.insts {
-		def := instr.Defs(&a.vs)[0]
-		st := a.state.getVRegState(def.ID())
-		if !st.isPhi {
-			panic("BUG")
-		}
-		dstReg := st.phiReg
-		if dstReg == RealRegInvalid {
-			continue
-		}
-
-		if uses := instr.Uses(&a.vs); len(uses) == 1 {
-			use := uses[0]
-			useState := a.state.getVRegState(use.ID())
-			useReg := useState.r
-			if useReg == RealRegInvalid {
+			currentOnPhiDst := a.state.regsInUse.get(phiDst)
+			if currentOnPhiDst.ID() == def.ID() {
+				a.addNewPhiDef(def.SetRealReg(phiDst), instr)
+				instr.AsNop() // This case, the instruction is redundant.
 				continue
 			}
 
-			if wazevoapi.RegAllocLoggingEnabled {
-				fmt.Printf("\t\thandle reg phi source already on real %s: %s\n", a.regInfo.RealRegName(useReg), instr.String())
-			}
-
-			a.state.releaseRealReg(useReg)
-			if dstReg != useReg {
-				currentOnDst := a.state.regsInUse.get(dstReg)
-				a.state.releaseRealReg(dstReg)
-
-				f.SwapBefore(use.SetRealReg(dstReg), use.SetRealReg(useReg), VRegInvalid, instr)
-				if currentOnDst.Valid() {
-					a.state.useRealReg(useReg, currentOnDst)
+			switch uses := instr.Uses(&a.vs); len(uses) {
+			case 0:
+				if currentOnPhiDst.Valid() {
+					a.state.releaseRealReg(phiDst)
 				}
+				instr.AssignDef(def.SetRealReg(phiDst))
+				a.state.useRealReg(phiDst, def)
+			case 1:
+				use := uses[0]
+				useState := a.state.getVRegState(use.ID())
+				srcReg := useState.r
+				if currentOnPhiDst.Valid() {
+					a.state.releaseRealReg(phiDst)
+				}
+				if srcReg == RealRegInvalid {
+					// Directly reload into the phiDst register.
+					ur := use.SetRealReg(phiDst)
+					f.ReloadRegisterBefore(ur, instr)
+					useState.recordReload(f, currentBlk)
+					instr.AsNop() // This case, the copy instruction is redundant.
+				} else {
+					ur := use.SetRealReg(srcReg)
+					instr.AssignUse(0, ur)
+					instr.AssignDef(def.SetRealReg(phiDst))
+				}
+				a.state.useRealReg(phiDst, def)
 			}
-
-			// This will be optimized out later.
-			instr.AssignDef(def.SetRealReg(dstReg))
-			instr.AssignUse(0, use.SetRealReg(dstReg))
-			a.state.useRealReg(dstReg, def)
-
-			a.addNewPhiDef(def.SetRealReg(dstReg), instr)
-		}
-	}
-
-	for _, instr := range a.insts {
-		def := instr.Defs(&a.vs)[0]
-
-		st := a.state.getVRegState(def.ID())
-		if !st.isPhi {
-			panic("BUG")
-		}
-		dstReg := st.phiReg
-		if dstReg == RealRegInvalid {
-			continue
-		}
-
-		if wazevoapi.RegAllocLoggingEnabled {
-			fmt.Println("\t\thandle reg phi source not on real " + instr.String())
-			succState.dump(a.regInfo)
-		}
-
-		currentOnDst := a.state.regsInUse.get(dstReg)
-		if currentOnDst.ID() == def.ID() {
-			a.addNewPhiDef(def.SetRealReg(dstReg), instr)
-			instr.AsNop() // This case, the instruction is redundant.
-			continue
-		}
-
-		switch uses := instr.Uses(&a.vs); len(uses) {
-		case 0:
-			if currentOnDst.Valid() {
-				// Release.
-				a.state.releaseRealReg(dstReg)
+			a.addNewPhiDef(def.SetRealReg(phiDst), instr)
+		} else {
+			// Stack phis.
+			if wazevoapi.RegAllocLoggingEnabled {
+				fmt.Println("\t\thandle stack phi: " + instr.String())
 			}
-			instr.AssignDef(def.SetRealReg(dstReg))
-			a.state.useRealReg(dstReg, def)
-		case 1:
-			use := uses[0]
-			useState := a.state.getVRegState(use.ID())
-			srcReg := useState.r
-			if currentOnDst.Valid() {
-				// Release.
-				a.state.releaseRealReg(dstReg)
-			}
-			if srcReg == RealRegInvalid {
-				// Reload.
-				ur := use.SetRealReg(dstReg)
-				f.ReloadRegisterBefore(ur, instr)
-				useState.recordReload(f, currentBlk)
-				instr.AsNop() // This case, the copy instruction is redundant.
-				a.state.useRealReg(dstReg, def)
-			} else {
-				ur := use.SetRealReg(srcReg)
-				instr.AssignUse(0, ur)
-				instr.AssignDef(def.SetRealReg(dstReg))
-				a.state.useRealReg(dstReg, def)
+			switch uses := instr.Uses(&a.vs); len(uses) {
+			case 0:
+				// Constant phi.
+				r := a.state.findOrSpillAllocatable(a, a.regInfo.AllocatableRegisters[def.RegType()], RegSet(0))
+				dr := def.SetRealReg(r)
+				instr.AssignDef(dr)
+				// And then store.
+				f.StoreRegisterAfter(dr, instr)
+			case 1:
+				use := uses[0]
+				useState := a.state.getVRegState(use.ID())
+				var dr VReg
+				if useState.r == RealRegInvalid {
+					r := a.state.findOrSpillAllocatable(a, a.regInfo.AllocatableRegisters[def.RegType()], RegSet(0))
+					// Reload.
+					ur := use.SetRealReg(r)
+					f.ReloadRegisterBefore(ur, instr)
+					useState.recordReload(f, currentBlk)
+					instr.AssignUse(0, ur)
+					dr = def.SetRealReg(r)
+					instr.AssignDef(dr)
+				} else {
+					r := useState.r
+					instr.AssignUse(0, use.SetRealReg(r))
+					a.state.releaseRealReg(r)
+					dr = def.SetRealReg(r)
+					instr.AssignDef(dr)
+				}
+				// And then store.
+				if dr.RealReg() == RealRegInvalid {
+					panic("BUG: the phi value should be on a real register")
+				}
+				f.StoreRegisterAfter(dr, instr)
+			default:
+				panic("BUG: multiple uses for phi value definition")
 			}
 		}
-		a.addNewPhiDef(def.SetRealReg(dstReg), instr)
 	}
 }
 
