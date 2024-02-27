@@ -39,9 +39,9 @@ var randomGet = newHostFunc(wasip1.RandomGetName, randomGetFn, []api.ValueType{i
 func randomGetFn(_ context.Context, mod api.Module, params []uint64) sys.Errno {
 	sysCtx := mod.(*wasm.ModuleInstance).Sys
 	randSource := sysCtx.RandSource()
-	buf, bufLen := uint32(params[0]), params[1]
+	buf, bufLen := uint32(params[0]), uint32(params[1])
 
-	randomBytes, ok := mod.Memory().Read(buf, bufLen)
+	randomBytes, ok := mod.Memory().Read(buf, uint64(bufLen))
 	if !ok { // out-of-range
 		return sys.EFAULT
 	}
