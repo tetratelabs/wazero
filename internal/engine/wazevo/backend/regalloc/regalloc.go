@@ -764,9 +764,18 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 						if wazevoapi.RegAllocLoggingEnabled {
 							fmt.Printf("\t\tv%d is phi and desiredEndLoc=%s\n", def.ID(), a.regInfo.RealRegName(desired))
 						}
-						r = desired
-						s.releaseRealReg(r)
-						s.useRealReg(r, def)
+						if r != RealRegInvalid {
+							s.releaseRealReg(r)
+							s.releaseRealReg(desired)
+							f.InsertMoveBefore(def.SetRealReg(desired), def.SetRealReg(r), instr)
+							r = desired
+							s.releaseRealReg(r)
+							s.useRealReg(r, def)
+						} else {
+							r = desired
+							s.releaseRealReg(r)
+							s.useRealReg(r, def)
+						}
 					} else {
 						// TODO: otherwise, we should try to use the desired register if it's not used by other values.
 						//  one idea is to pass "preferred mask" into findOrSpillAllocatable.
