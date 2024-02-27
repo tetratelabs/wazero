@@ -117,8 +117,8 @@ type (
 		// value is live-in or not.
 		spilled bool
 		// isPhi is true if this is a phi value.
-		isPhi         bool
-		desiredEndLoc RealReg
+		isPhi      bool
+		desiredReg RealReg
 		// phiDefInstList is a list of instructions that defines this phi value.
 		// This is used to determine the spill location, and only valid if isPhi=true.
 		*phiDefInstList
@@ -181,7 +181,7 @@ func resetVrState(vs *vrState) {
 	vs.lca = nil
 	vs.isPhi = false
 	vs.phiDefInstList = nil
-	vs.desiredEndLoc = RealRegInvalid
+	vs.desiredReg = RealRegInvalid
 }
 
 func (s *state) getVRegState(v VRegID) *vrState {
@@ -615,6 +615,8 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 		s.useRealReg(allocatedRealReg, vr)
 	})
 
+	desiredUpdated := a.vs2[:0]
+
 	// Update the last use of each VReg.
 	var pc programCounter
 	for instr := blk.InstrIteratorBegin(); instr != nil; instr = blk.InstrIteratorNext() {
@@ -623,11 +625,12 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 				s.getVRegState(use.ID()).lastUse = pc
 			}
 		}
+		// TODO: if a value moved to a register, record it to the desiredReg and apply it to desiredUpdated.
 		pc++
 	}
-	// Mark all live-out values by checking live-in of the successors.
 
-	var desiredOk bool
+	// Mark all live-out values by checking live-in of the successors.
+	// While doing so, we also update the desired register values.
 	for i, ns := 0, blk.Succs(); i < ns; i++ {
 		succ := blk.Succ(i)
 		if succ == nil {
@@ -644,18 +647,18 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 		}
 
 		if succState.startFromPredIndex > -1 {
-			desiredOk = true
 			if wazevoapi.RegAllocLoggingEnabled {
 				fmt.Printf("blk%d -> blk%d: start_regs: %s\n", bID, succID, succState.startRegs.format(a.regInfo))
 			}
 			succState.startRegs.range_(func(allocatedRealReg RealReg, vr VReg) {
 				vs := s.getVRegState(vr.ID())
-				vs.desiredEndLoc = allocatedRealReg
+				vs.desiredReg = allocatedRealReg
+				desiredUpdated = append(desiredUpdated, vr.ID())
 			})
 		}
 	}
 
-	entry := blk.Entry()
+	desiredSet := len(desiredUpdated) > 0
 	pc = 0
 	for instr := blk.InstrIteratorBegin(); instr != nil; instr = blk.InstrIteratorNext() {
 		if wazevoapi.RegAllocLoggingEnabled {
@@ -755,16 +758,18 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 				vState := s.getVRegState(def.ID())
 				r := vState.r
 
-				stackPhi := !entry && vState.isPhi && vState.desiredEndLoc == RealRegInvalid
-				if desiredOk && vState.isPhi {
-					desired := vState.desiredEndLoc
-					if desired != RealRegInvalid {
+				if desired := vState.desiredReg; desired != RealRegInvalid {
+					if vState.isPhi {
+						// If the phi value is passed via a real register, we force the value to be in the desired register.
 						if wazevoapi.RegAllocLoggingEnabled {
 							fmt.Printf("\t\tv%d is phi and desiredEndLoc=%s\n", def.ID(), a.regInfo.RealRegName(desired))
 						}
 						r = desired
 						s.releaseRealReg(r)
 						s.useRealReg(r, def)
+					} else {
+						// TODO: otherwise, we should try to use the desired register if it's not used by other values.
+						//  one idea is to pass "preferred mask" into findOrSpillAllocatable.
 					}
 				}
 
@@ -789,7 +794,7 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 					fmt.Printf("\tdefining v%d with %s\n", def.ID(), a.regInfo.RealRegName(r))
 				}
 				if vState.isPhi {
-					if desiredOk && stackPhi {
+					if desiredSet && vState.desiredReg == RealRegInvalid { // Stack based phi value.
 						f.StoreRegisterAfter(dr, instr)
 						// Release the real register as it's not used anymore.
 						s.releaseRealReg(r)
@@ -819,6 +824,13 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 	if wazevoapi.RegAllocLoggingEnabled {
 		currentBlkState.dump(a.regInfo)
 	}
+
+	// Reset the desired end location.
+	for _, v := range desiredUpdated {
+		vs := s.getVRegState(v)
+		vs.desiredReg = RealRegInvalid
+	}
+	a.vs2 = desiredUpdated[:0]
 
 	for i := 0; i < blk.Succs(); i++ {
 		succ := blk.Succ(i)
