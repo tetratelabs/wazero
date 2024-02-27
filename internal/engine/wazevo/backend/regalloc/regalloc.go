@@ -789,14 +789,15 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 					fmt.Printf("\tdefining v%d with %s\n", def.ID(), a.regInfo.RealRegName(r))
 				}
 				if vState.isPhi {
-					n := a.phiDefInstListPool.Allocate()
-					n.instr = instr
-					n.next = vState.phiDefInstList
-					vState.phiDefInstList = n
 					if desiredOk && stackPhi {
 						f.StoreRegisterAfter(dr, instr)
 						// Release the real register as it's not used anymore.
 						s.releaseRealReg(r)
+					} else {
+						n := a.phiDefInstListPool.Allocate()
+						n.instr = instr
+						n.next = vState.phiDefInstList
+						vState.phiDefInstList = n
 					}
 				} else {
 					vState.defInstr = instr
