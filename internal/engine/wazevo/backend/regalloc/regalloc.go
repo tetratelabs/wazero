@@ -914,19 +914,24 @@ func (a *Allocator) handlePhiDefs(f Function, currentBlk, succBlk Block, phiDefB
 			instr.AsNop() // This case, the instruction is redundant.
 			continue
 		}
-		if currentV.Valid() {
-			// Release.
-			a.state.releaseRealReg(dstReg)
-		}
 
 		switch uses := instr.Uses(&a.vs); len(uses) {
 		case 0:
+			if currentV.Valid() {
+				// Release.
+				a.state.releaseRealReg(dstReg)
+			}
 			instr.AssignDef(def.SetRealReg(dstReg))
 			a.state.useRealReg(dstReg, def)
 		case 1:
 			use := uses[0]
 			useState := a.state.getVRegState(use.ID())
-			if useState.r == RealRegInvalid {
+			srcReg := useState.r
+			if currentV.Valid() {
+				// Release.
+				a.state.releaseRealReg(dstReg)
+			}
+			if srcReg == RealRegInvalid {
 				// Reload.
 				ur := use.SetRealReg(dstReg)
 				f.ReloadRegisterBefore(ur, instr)
@@ -934,6 +939,10 @@ func (a *Allocator) handlePhiDefs(f Function, currentBlk, succBlk Block, phiDefB
 				instr.AssignUse(0, ur)
 				instr.AssignDef(def.SetRealReg(dstReg))
 				a.state.useRealReg(dstReg, def)
+			} else {
+				ur := use.SetRealReg(srcReg)
+				instr.AssignUse(0, ur)
+				instr.AssignDef(def.SetRealReg(dstReg))
 			}
 		}
 		a.addNewPhiDef(def.SetRealReg(dstReg), instr)
