@@ -769,7 +769,6 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 							s.releaseRealReg(desired)
 							f.InsertMoveBefore(def.SetRealReg(desired), def.SetRealReg(r), instr)
 							r = desired
-							s.releaseRealReg(r)
 							s.useRealReg(r, def)
 						} else {
 							r = desired
