@@ -14,7 +14,7 @@ on:
       - 'netlify.toml'
 
 env:  # Update this prior to requiring a higher minor version in go.mod
-  GO_VERSION: "1.21"  # 1.xx == latest patch of 1.xx
+  GO_VERSION: "1.22"
 
 defaults:
   run:  # use bash for all operating systems unless overridden

@@ -18,8 +18,8 @@ defaults:
     shell: bash
 
 env:  # Update this prior to requiring a higher minor version in go.mod
-  GO_VERSION: "1.21"  # 1.xx == latest patch of 1.xx
-  TINYGO_VERSION: "0.30.0"
+  GO_VERSION: "1.22"
+  TINYGO_VERSION: "0.31.0"
   ZIG_VERSION: "0.11.0"
   BINARYEN_VERSION: "116"
   STDLIB_TESTS: "internal/integration_test/stdlibs"
@@ -361,7 +361,7 @@ jobs:
           go test -bench='BenchmarkWasip1/${{ matrix.compiler }}'
 
   libsodium:
-    name: libsodium (${{ matrix.os.name }}, ${{ matrix.arch }}, optimizing)
+    name: libsodium (${{ matrix.os.name }}, ${{ matrix.os.arch }}, optimizing)
     runs-on: ${{ matrix.os.version }}
     strategy:
       fail-fast: false # don't fail fast as sometimes failures are arch/OS specific
