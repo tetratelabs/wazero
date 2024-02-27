@@ -804,6 +804,9 @@ func (a *Allocator) handlePhiDefs(f Function, currentBlk, succBlk Block, phiDefB
 	for instr := phiDefBegin; instr != phiDefEnd; instr = instr.Next() {
 		def := instr.Defs(&a.vs)[0]
 		st := a.state.getVRegState(def.ID())
+		if !st.isPhi {
+			panic("BUG")
+		}
 		if st.phiReg != RealRegInvalid {
 			a.insts = append(a.insts, instr)
 			continue
@@ -836,6 +839,7 @@ func (a *Allocator) handlePhiDefs(f Function, currentBlk, succBlk Block, phiDefB
 				instr.AssignDef(dr)
 			} else {
 				r := useState.r
+				instr.AssignUse(0, use.SetRealReg(r))
 				a.state.releaseRealReg(r)
 				dr = def.SetRealReg(r)
 				instr.AssignDef(dr)
@@ -845,6 +849,8 @@ func (a *Allocator) handlePhiDefs(f Function, currentBlk, succBlk Block, phiDefB
 				panic("BUG: the phi value should be on a real register")
 			}
 			f.StoreRegisterBefore(dr, instr)
+		default:
+			panic("BUG: multiple uses for phi value")
 		}
 	}
 
@@ -873,12 +879,13 @@ func (a *Allocator) handlePhiDefs(f Function, currentBlk, succBlk Block, phiDefB
 			}
 
 			a.state.releaseRealReg(useReg)
-			a.state.releaseRealReg(dstReg)
 			if dstReg != useReg {
-				currentV := a.state.regsInUse.get(dstReg)
+				currentOnDst := a.state.regsInUse.get(dstReg)
+				a.state.releaseRealReg(dstReg)
+
 				f.SwapBefore(use.SetRealReg(dstReg), use.SetRealReg(useReg), VRegInvalid, instr)
-				if currentV.Valid() {
-					a.state.useRealReg(useReg, currentV)
+				if currentOnDst.Valid() {
+					a.state.useRealReg(useReg, currentOnDst)
 				}
 			}
 
@@ -908,8 +915,8 @@ func (a *Allocator) handlePhiDefs(f Function, currentBlk, succBlk Block, phiDefB
 			succState.dump(a.regInfo)
 		}
 
-		currentV := a.state.regsInUse.get(dstReg)
-		if currentV.ID() == def.ID() {
+		currentOnDst := a.state.regsInUse.get(dstReg)
+		if currentOnDst.ID() == def.ID() {
 			a.addNewPhiDef(def.SetRealReg(dstReg), instr)
 			instr.AsNop() // This case, the instruction is redundant.
 			continue
@@ -917,7 +924,7 @@ func (a *Allocator) handlePhiDefs(f Function, currentBlk, succBlk Block, phiDefB
 
 		switch uses := instr.Uses(&a.vs); len(uses) {
 		case 0:
-			if currentV.Valid() {
+			if currentOnDst.Valid() {
 				// Release.
 				a.state.releaseRealReg(dstReg)
 			}
@@ -927,7 +934,7 @@ func (a *Allocator) handlePhiDefs(f Function, currentBlk, succBlk Block, phiDefB
 			use := uses[0]
 			useState := a.state.getVRegState(use.ID())
 			srcReg := useState.r
-			if currentV.Valid() {
+			if currentOnDst.Valid() {
 				// Release.
 				a.state.releaseRealReg(dstReg)
 			}
@@ -936,13 +943,13 @@ func (a *Allocator) handlePhiDefs(f Function, currentBlk, succBlk Block, phiDefB
 				ur := use.SetRealReg(dstReg)
 				f.ReloadRegisterBefore(ur, instr)
 				useState.recordReload(f, currentBlk)
-				instr.AssignUse(0, ur)
-				instr.AssignDef(def.SetRealReg(dstReg))
+				instr.AsNop() // This case, the copy instruction is redundant.
 				a.state.useRealReg(dstReg, def)
 			} else {
 				ur := use.SetRealReg(srcReg)
 				instr.AssignUse(0, ur)
 				instr.AssignDef(def.SetRealReg(dstReg))
+				a.state.useRealReg(dstReg, def)
 			}
 		}
 		a.addNewPhiDef(def.SetRealReg(dstReg), instr)
