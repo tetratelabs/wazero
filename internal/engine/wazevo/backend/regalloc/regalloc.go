@@ -627,7 +627,7 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 				s.getVRegState(use.ID()).lastUse = pc
 			}
 		}
-		// TODO: if a value moved to a register, record it to the desiredReg and apply it to desiredUpdated.
+		// TODO: if a value moved to a real register, record it to the desiredReg and apply it to desiredUpdated.
 		pc++
 	}
 
