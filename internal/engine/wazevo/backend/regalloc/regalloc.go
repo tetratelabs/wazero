@@ -516,6 +516,9 @@ func (a *Allocator) alloc(f Function) {
 		if wazevoapi.RegAllocLoggingEnabled {
 			fmt.Printf("========== allocating blk%d ========\n", blk.ID())
 		}
+		if blk.Entry() {
+			a.finalizeStartReg(blk)
+		}
 		a.allocBlock(f, blk)
 	}
 	// After the allocation, we all know the start and end state of each block. So we can fix the merge states.
@@ -535,11 +538,14 @@ func (a *Allocator) updateLiveInVRState(liveness *blockState) {
 	}
 }
 
-func (a *Allocator) allocBlock(f Function, blk Block) {
+func (a *Allocator) finalizeStartReg(blk Block) {
 	bID := blk.ID()
 	liveness := a.getOrAllocateBlockState(bID)
 	s := &a.state
 	currentBlkState := a.getOrAllocateBlockState(bID)
+	if currentBlkState.startFromPredIndex > -1 {
+		return
+	}
 
 	s.currentBlockID = bID
 	a.updateLiveInVRState(liveness)
@@ -570,6 +576,7 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 		for _, u := range s.argRealRegs {
 			s.useRealReg(u.RealReg(), u)
 		}
+		currentBlkState.startFromPredIndex = 0
 	} else if predState != nil {
 		if wazevoapi.RegAllocLoggingEnabled {
 			fmt.Printf("allocating blk%d starting from blk%d (on index=%d) \n",
@@ -580,6 +587,27 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 
 	s.regsInUse.range_(func(allocated RealReg, v VReg) {
 		currentBlkState.startRegs.add(allocated, v)
+	})
+}
+
+func (a *Allocator) allocBlock(f Function, blk Block) {
+	bID := blk.ID()
+	s := &a.state
+	currentBlkState := a.getOrAllocateBlockState(bID)
+	s.currentBlockID = bID
+
+	if currentBlkState.startFromPredIndex < 0 {
+		panic("BUG: startFromPredIndex should be set in finalizeStartReg prior to allocBlock")
+	}
+
+	// Clears the previous state.
+	s.regsInUse.range_(func(allocatedRealReg RealReg, vr VReg) {
+		s.setVRegState(vr, RealRegInvalid)
+	})
+	s.regsInUse.reset()
+	// Then set the start state.
+	currentBlkState.startRegs.range_(func(allocatedRealReg RealReg, vr VReg) {
+		s.useRealReg(allocatedRealReg, vr)
 	})
 
 	// Update the last use of each VReg.
@@ -750,6 +778,15 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 	currentBlkState.visited = true
 	if wazevoapi.RegAllocLoggingEnabled {
 		currentBlkState.dump(a.regInfo)
+	}
+
+	for i := 0; i < blk.Succs(); i++ {
+		succ := blk.Succ(i)
+		if succ == nil {
+			continue
+		}
+		// If the successor is not visited yet, finalize the start state.
+		a.finalizeStartReg(succ)
 	}
 }
 
