@@ -35,7 +35,7 @@ type (
 )
 
 func asNop0(i *instruction) {
-	i.asNop0()
+	i.kind = nop0
 }
 
 func setNext(i, next *instruction) {
@@ -536,7 +536,7 @@ func (i *instruction) asMOVN(dst regalloc.VReg, imm uint64, shift uint64, dst64b
 }
 
 func (i *instruction) asNop0() *instruction {
-	i.asNop0WithLabel(labelInvalid)
+	i.kind = nop0
 	return i
 }
 

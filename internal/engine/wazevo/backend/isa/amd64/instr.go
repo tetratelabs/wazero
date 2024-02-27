@@ -563,7 +563,7 @@ func setPrev(i *instruction, prev *instruction) {
 }
 
 func asNop(i *instruction) {
-	i.asNop0WithLabel(backend.LabelInvalid)
+	i.kind = nop0
 }
 
 func (i *instruction) asNop0WithLabel(label backend.Label) *instruction { //nolint

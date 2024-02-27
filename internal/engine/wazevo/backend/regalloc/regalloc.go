@@ -768,12 +768,15 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 								fmt.Printf("\t\tv%d is phi and desiredReg=%s\n", def.ID(), a.regInfo.RealRegName(desired))
 							}
 							if r != RealRegInvalid {
+								// If the value is already in a different real register, we release it to change the state.
+								// Otherwise, multiple registers might have the same values at the end, which results in
+								// messing up the merge state reconciliation.
 								s.releaseRealReg(r)
 							}
 							r = desired
 							s.releaseRealReg(r)
 							s.useRealReg(r, def)
-						} else {
+						} else { //nolint
 							// TODO: otherwise, we should try to use the desired register if it's not used by other values.
 							//  one idea is to pass "preferred mask" into findOrSpillAllocatable.
 						}
@@ -806,6 +809,8 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 						// Release the real register as it's not used anymore.
 						s.releaseRealReg(r)
 					} else {
+						// Only the register based phis are necessary to track the defining instructions
+						// since the stack-based phis are already having stores inserted ^.
 						n := a.phiDefInstListPool.Allocate()
 						n.instr = instr
 						n.next = vState.phiDefInstList
