@@ -3586,7 +3586,7 @@ func TestFunctionValidation_redundantEnd(t *testing.T) {
 	}
 	err := m.validateFunction(&stacks{}, api.CoreFeaturesV2,
 		0, nil, nil, nil, nil, nil, bytes.NewReader(nil))
-	require.EqualError(t, err, "redundant End instruction at 0x1")
+	require.EqualError(t, err, "unexpected end of function at pc=0x1")
 }
 
 // TestFunctionValidation_redundantEnd is found in th validation fuzzing.
@@ -3598,7 +3598,7 @@ func TestFunctionValidation_redundantElse(t *testing.T) {
 	}
 	err := m.validateFunction(&stacks{}, api.CoreFeaturesV2,
 		0, nil, nil, nil, nil, nil, bytes.NewReader(nil))
-	require.EqualError(t, err, "redundant Else instruction at 0x1")
+	require.EqualError(t, err, "unexpected end of function at pc=0x1")
 }
 
 func Test_SplitCallStack(t *testing.T) {
