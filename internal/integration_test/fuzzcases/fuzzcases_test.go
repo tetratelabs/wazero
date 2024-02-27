@@ -3,6 +3,7 @@ package fuzzcases
 import (
 	"context"
 	"embed"
+	"encoding/hex"
 	"fmt"
 	"math"
 	"runtime"
@@ -1031,4 +1032,14 @@ func Test2096(t *testing.T) {
 		return
 	}
 	nodiff.RequireNoDiffT(t, getWasmBinary(t, "2096"), true, true)
+}
+
+func Test2097(t *testing.T) {
+	bin, err := hex.DecodeString("0061736d010000000107016000037f7f7f02010003030200000a49022f0010010004001001027d00024002400240024002400240440000000000000000000b0b0b0b0b0b000b0005000b000b1703017c017c017e00000000000000000000000b43420b0b")
+	require.NoError(t, err)
+
+	r := wazero.NewRuntime(context.Background())
+	_, err = r.Instantiate(ctx, bin)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "unexpected end of function")
 }

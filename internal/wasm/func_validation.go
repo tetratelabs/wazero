@@ -95,6 +95,10 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			fmt.Printf("handling %s, stack=%s, blocks: %v\n", instName, valueTypeStack.stack, controlBlockStack)
 		}
 
+		if len(controlBlockStack.stack) == 0 {
+			return fmt.Errorf("unexpected end of function at pc=%d", pc)
+		}
+
 		if OpcodeI32Load <= op && op <= OpcodeI64Store32 {
 			if memory == nil {
 				return fmt.Errorf("memory must exist for %s", InstructionName(op))
