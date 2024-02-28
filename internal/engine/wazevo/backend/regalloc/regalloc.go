@@ -118,7 +118,7 @@ type (
 		spilled bool
 		// isPhi is true if this is a phi value.
 		isPhi      bool
-		desiredReg RealReg
+		desiredLoc desiredLoc
 		// phiDefInstList is a list of instructions that defines this phi value.
 		// This is used to determine the spill location, and only valid if isPhi=true.
 		*phiDefInstList
@@ -130,7 +130,32 @@ type (
 		v     VReg
 		next  *phiDefInstList
 	}
+
+	desiredLoc     uint32
+	desiredLocKind uint32
 )
+
+// desiredLoc values.
+
+const (
+	desiredLocKindUnspecified desiredLocKind = iota
+	desiredLocKindStack
+	desiredLocKindReg
+	desiredLocUnspecified = desiredLoc(desiredLocKindUnspecified)
+	desiredLocStack       = desiredLoc(desiredLocKindStack)
+)
+
+func newDesiredLocReg(r RealReg) desiredLoc {
+	return desiredLoc(desiredLocKindReg) | desiredLoc(r<<2)
+}
+
+func (d desiredLoc) realReg() RealReg {
+	return RealReg(d >> 2)
+}
+
+func (d desiredLoc) stack() bool {
+	return d&3 == desiredLoc(desiredLocKindStack)
+}
 
 func resetPhiDefInstList(l *phiDefInstList) {
 	l.instr = nil
@@ -183,7 +208,7 @@ func resetVrState(vs *vrState) {
 	vs.lca = nil
 	vs.isPhi = false
 	vs.phiDefInstList = nil
-	vs.desiredReg = RealRegInvalid
+	vs.desiredLoc = desiredLocUnspecified
 }
 
 func (s *state) getVRegState(v VRegID) *vrState {
@@ -654,13 +679,18 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 			}
 			succState.startRegs.range_(func(allocatedRealReg RealReg, vr VReg) {
 				vs := s.getVRegState(vr.ID())
-				vs.desiredReg = allocatedRealReg
+				vs.desiredLoc = newDesiredLocReg(allocatedRealReg)
 				desiredUpdated = append(desiredUpdated, vr.ID())
 			})
+			for _, p := range succ.BlockParams(&a.vs) {
+				vs := s.getVRegState(p.ID())
+				if vs.desiredLoc.realReg() == RealRegInvalid {
+					vs.desiredLoc = desiredLocStack
+				}
+			}
 		}
 	}
 
-	desiredSet := len(desiredUpdated) > 0
 	pc = 0
 	for instr := blk.InstrIteratorBegin(); instr != nil; instr = blk.InstrIteratorNext() {
 		if wazevoapi.RegAllocLoggingEnabled {
@@ -760,7 +790,7 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 				vState := s.getVRegState(def.ID())
 				r := vState.r
 
-				if desired := vState.desiredReg; desired != RealRegInvalid {
+				if desired := vState.desiredLoc.realReg(); desired != RealRegInvalid {
 					if r != desired {
 						if vState.isPhi {
 							// If the phi value is passed via a real register, we force the value to be in the desired register.
@@ -804,7 +834,7 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 					fmt.Printf("\tdefining v%d with %s\n", def.ID(), a.regInfo.RealRegName(r))
 				}
 				if vState.isPhi {
-					if desiredSet && vState.desiredReg == RealRegInvalid { // Stack based phi value.
+					if vState.desiredLoc.stack() { // Stack based phi value.
 						f.StoreRegisterAfter(dr, instr)
 						// Release the real register as it's not used anymore.
 						s.releaseRealReg(r)
@@ -841,7 +871,7 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 	// Reset the desired end location.
 	for _, v := range desiredUpdated {
 		vs := s.getVRegState(v)
-		vs.desiredReg = RealRegInvalid
+		vs.desiredLoc = desiredLocUnspecified
 	}
 	a.vs2 = desiredUpdated[:0]
 
@@ -1004,11 +1034,11 @@ func (a *Allocator) reconcileEdge(f Function,
 				desiredVReg.ID(), a.regInfo.RealRegName(r), a.regInfo.RealRegName(er),
 			)
 		}
-		f.SwapAtEndOfBlock(
+		f.SwapBefore(
 			currentVReg.SetRealReg(r),
 			desiredVReg.SetRealReg(er),
 			freeReg,
-			pred,
+			pred.LastInstrForInsertion(),
 		)
 		s.allocatedRegSet = s.allocatedRegSet.add(freeReg.RealReg())
 		currentOccupantsRev[desiredVReg] = r

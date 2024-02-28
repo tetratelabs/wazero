@@ -46,7 +46,7 @@ func (m *mockFunction) LowestCommonAncestor(blk1, blk2 Block) Block { panic("TOD
 
 func (m *mockFunction) Idom(blk Block) Block { panic("TODO") }
 
-func (m *mockFunction) SwapAtEndOfBlock(x1, x2, tmp VReg, block Block) { panic("TODO") }
+func (m *mockFunction) SwapBefore(x1, x2, tmp VReg, instr Instr) { panic("TODO") }
 
 func (m *mockFunction) InsertMoveBefore(dst, src VReg, instr Instr) { panic("TODO") }
 
