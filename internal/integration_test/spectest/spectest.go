@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -386,7 +385,6 @@ func RunCase(t *testing.T, testDataFS embed.FS, f string, ctx context.Context, c
 				continue
 			}
 			t.Run(fmt.Sprintf("%s/line:%d", c.CommandType, c.Line), func(t *testing.T) {
-				defer runtime.GC()
 				msg := fmt.Sprintf("%s:%d %s", wastName, c.Line, c.CommandType)
 				switch c.CommandType {
 				case "module":
