@@ -807,7 +807,7 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 
 				if desired := vState.desiredLoc.realReg(); desired != RealRegInvalid {
 					if r != desired {
-						if vState.isPhi {
+						if vState.isPhi || !s.regsInUse.has(desired) {
 							// If the phi value is passed via a real register, we force the value to be in the desired register.
 							if wazevoapi.RegAllocLoggingEnabled {
 								fmt.Printf("\t\tv%d is phi and desiredReg=%s\n", def.ID(), a.regInfo.RealRegName(desired))
@@ -821,39 +821,6 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 							r = desired
 							s.releaseRealReg(r)
 							s.useRealReg(r, def)
-						} else {
-							// Check if the desired register is available.
-							if exitingValueOnDesired := s.regsInUse.get(desired); exitingValueOnDesired.Valid() {
-								// TODO:
-								//// If the desired register is already used, try to find a free register and move the value to it.
-								//forbiddenMask := RegSet(0).add(desired)
-								//var tmp RealReg
-								//if r != RealRegInvalid {
-								//	tmp = r
-								//	s.releaseRealReg(tmp)
-								//} else {
-								//	tmp = a.state.findAllocatable(a.regInfo.AllocatableRegisters[def.RegType()], forbiddenMask)
-								//}
-								//if tmp != RealRegInvalid {
-								//	// Move the existing value to the new register.
-								//	f.InsertMoveBefore(exitingValueOnDesired.SetRealReg(tmp), exitingValueOnDesired.SetRealReg(desired), instr)
-								//	s.releaseRealReg(desired)
-								//	s.useRealReg(tmp, exitingValueOnDesired)
-								//	// Now it is safe to use the desired register.
-								//	r = desired
-								//	s.useRealReg(r, def)
-								//}
-							} else {
-								if r != RealRegInvalid {
-									// If the value is already in a different real register, we release it to change the state.
-									// Otherwise, multiple registers might have the same values at the end, which results in
-									// messing up the merge state reconciliation.
-									s.releaseRealReg(r)
-								}
-								r = desired
-								s.releaseRealReg(r)
-								s.useRealReg(r, def)
-							}
 						}
 					}
 				}
