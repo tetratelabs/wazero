@@ -500,7 +500,12 @@ func RunCase(t *testing.T, testDataFS embed.FS, f string, ctx context.Context, c
 				case "assert_uninstantiable":
 					buf, err := testDataFS.ReadFile(testdataPath(c.Filename))
 					require.NoError(t, err, msg)
-					_, err = r.InstantiateWithConfig(ctx, buf, wazero.NewModuleConfig())
+					// linking.wast references this module later, so while the instantiation
+					// should fail, we should not close it. InstantiateWithConfig() will auto-close
+					// on failure, so instead we compile then instantiate explicitly.
+					cm, err := r.CompileModule(ctx, buf)
+					require.NoError(t, err, msg)
+					_, err = r.InstantiateModule(ctx, cm, wazero.NewModuleConfig())
 					if c.Text == "out of bounds table access" {
 						// This is not actually an instantiation error, but assert_trap in the original wast, but wast2json translates it to assert_uninstantiable.
 						// Anyway, this spectest case expects the error due to active element offset ouf of bounds
