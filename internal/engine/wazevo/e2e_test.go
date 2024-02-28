@@ -1024,7 +1024,7 @@ func TestE2E_stores(t *testing.T) {
 
 	f := inst.ExportedFunction(testcases.ExportedFunctionName)
 
-	mem, ok := inst.Memory().Read(0, wasm.MemoryPageSize)
+	mem, ok := inst.Memory().Read(0, uint64(wasm.MemoryPageSize))
 	require.True(t, ok)
 	for _, tc := range []struct {
 		i32 uint32

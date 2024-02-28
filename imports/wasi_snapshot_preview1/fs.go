@@ -800,13 +800,13 @@ func fdReadOrPread(mod api.Module, params []uint64, isPread bool) experimentalsy
 
 func readv(mem api.Memory, iovs uint32, iovsCount uint32, reader func(buf []byte) (nread int, errno experimentalsys.Errno)) (uint32, experimentalsys.Errno) {
 	var nread uint32
-	iovsStop := iovsCount << 3 // iovsCount * 8
+	iovsStop := uint64(iovsCount) * 8
 	iovsBuf, ok := mem.Read(iovs, iovsStop)
 	if !ok {
 		return 0, experimentalsys.EFAULT
 	}
 
-	for iovsPos := uint32(0); iovsPos < iovsStop; iovsPos += 8 {
+	for iovsPos := uint64(0); iovsPos < iovsStop; iovsPos += 8 {
 		offset := le.Uint32(iovsBuf[iovsPos:])
 		l := le.Uint32(iovsBuf[iovsPos+4:])
 
@@ -814,7 +814,7 @@ func readv(mem api.Memory, iovs uint32, iovsCount uint32, reader func(buf []byte
 			continue
 		}
 
-		b, ok := mem.Read(offset, l)
+		b, ok := mem.Read(offset, uint64(l))
 		if !ok {
 			return 0, experimentalsys.EFAULT
 		}
@@ -917,7 +917,7 @@ func fdReaddirFn(_ context.Context, mod api.Module, params []uint64) experimenta
 		// ^^ yes this can overflow to negative, which means our implementation
 		// doesn't support writing greater than max int64 entries.
 
-		buf, ok := mem.Read(buf, bufToWrite)
+		buf, ok := mem.Read(buf, uint64(bufToWrite))
 		if !ok {
 			return experimentalsys.EFAULT
 		}
@@ -1284,17 +1284,17 @@ func fdWriteOrPwrite(mod api.Module, params []uint64, isPwrite bool) experimenta
 
 func writev(mem api.Memory, iovs uint32, iovsCount uint32, writer func(buf []byte) (n int, errno experimentalsys.Errno)) (uint32, experimentalsys.Errno) {
 	var nwritten uint32
-	iovsStop := iovsCount << 3 // iovsCount * 8
+	iovsStop := uint64(iovsCount) * 8
 	iovsBuf, ok := mem.Read(iovs, iovsStop)
 	if !ok {
 		return 0, experimentalsys.EFAULT
 	}
 
-	for iovsPos := uint32(0); iovsPos < iovsStop; iovsPos += 8 {
+	for iovsPos := uint64(0); iovsPos < iovsStop; iovsPos += 8 {
 		offset := le.Uint32(iovsBuf[iovsPos:])
 		l := le.Uint32(iovsBuf[iovsPos+4:])
 
-		b, ok := mem.Read(offset, l)
+		b, ok := mem.Read(offset, uint64(l))
 		if !ok {
 			return 0, experimentalsys.EFAULT
 		}
@@ -1645,7 +1645,7 @@ func pathOpenFn(_ context.Context, mod api.Module, params []uint64) experimental
 // See https://github.com/WebAssembly/wasi-libc/blob/659ff414560721b1660a19685110e484a081c3d4/libc-bottom-half/sources/at_fdcwd.c
 // See https://linux.die.net/man/2/openat
 func atPath(fsc *sys.FSContext, mem api.Memory, fd int32, p, pathLen uint32) (experimentalsys.FS, string, experimentalsys.Errno) {
-	b, ok := mem.Read(p, pathLen)
+	b, ok := mem.Read(p, uint64(pathLen))
 	if !ok {
 		return nil, "", experimentalsys.EFAULT
 	}
@@ -1946,12 +1946,12 @@ func pathSymlinkFn(_ context.Context, mod api.Module, params []uint64) experimen
 		return experimentalsys.EINVAL
 	}
 
-	oldPathBuf, ok := mem.Read(oldPath, oldPathLen)
+	oldPathBuf, ok := mem.Read(oldPath, uint64(oldPathLen))
 	if !ok {
 		return experimentalsys.EFAULT
 	}
 
-	newPathBuf, ok := mem.Read(newPath, newPathLen)
+	newPathBuf, ok := mem.Read(newPath, uint64(newPathLen))
 	if !ok {
 		return experimentalsys.EFAULT
 	}

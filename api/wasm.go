@@ -635,7 +635,7 @@ type Memory interface {
 	// shared. Those who need a stable view must set Wasm memory min=max, or
 	// use wazero.RuntimeConfig WithMemoryCapacityPages to ensure max is always
 	// allocated.
-	Read(offset, byteCount uint32) ([]byte, bool)
+	Read(offset uint32, byteCount uint64) ([]byte, bool)
 
 	// WriteByte writes a single byte to the underlying buffer at the offset in or returns false if out of range.
 	WriteByte(offset uint32, v byte) bool

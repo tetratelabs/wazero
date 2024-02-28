@@ -62,11 +62,11 @@ func pollOneoffFn(_ context.Context, mod api.Module, params []uint64) sys.Errno 
 	mem := mod.Memory()
 
 	// Ensure capacity prior to the read loop to reduce error handling.
-	inBuf, ok := mem.Read(in, nsubscriptions*48)
+	inBuf, ok := mem.Read(in, uint64(nsubscriptions)*48)
 	if !ok {
 		return sys.EFAULT
 	}
-	outBuf, ok := mem.Read(out, nsubscriptions*32)
+	outBuf, ok := mem.Read(out, uint64(nsubscriptions)*32)
 	// zero-out all buffer before writing
 	for i := range outBuf {
 		outBuf[i] = 0

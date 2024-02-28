@@ -380,7 +380,7 @@ func Test_fdFdstatGet(t *testing.T) {
 			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.FdFdstatGetName, uint64(tc.fd), uint64(tc.resultFdstat))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
-			actual, ok := mod.Memory().Read(0, uint32(len(tc.expectedMemory)))
+			actual, ok := mod.Memory().Read(0, uint64(len(tc.expectedMemory)))
 			require.True(t, ok)
 			require.Equal(t, tc.expectedMemory, actual)
 		})
@@ -472,7 +472,7 @@ func Test_fdFdstatGet_StdioNonblock(t *testing.T) {
 			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.FdFdstatGetName, uint64(tc.fd), uint64(tc.resultFdstat))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
-			actual, ok := mod.Memory().Read(0, uint32(len(tc.expectedMemory)))
+			actual, ok := mod.Memory().Read(0, uint64(len(tc.expectedMemory)))
 			require.True(t, ok)
 			require.Equal(t, tc.expectedMemory, actual)
 		})
@@ -822,7 +822,7 @@ func Test_fdFilestatGet(t *testing.T) {
 			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.FdFilestatGetName, uint64(tc.fd), uint64(tc.resultFilestat))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
-			actual, ok := mod.Memory().Read(0, uint32(len(tc.expectedMemory)))
+			actual, ok := mod.Memory().Read(0, uint64(len(tc.expectedMemory)))
 			require.True(t, ok)
 			require.Equal(t, tc.expectedMemory, actual)
 		})
@@ -1160,7 +1160,7 @@ func Test_fdPread(t *testing.T) {
 			requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdPreadName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(tc.offset), uint64(resultNread))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
-			actual, ok := mod.Memory().Read(0, uint32(len(tc.expectedMemory)))
+			actual, ok := mod.Memory().Read(0, uint64(len(tc.expectedMemory)))
 			require.True(t, ok)
 			require.Equal(t, tc.expectedMemory, actual)
 		})
@@ -1200,7 +1200,7 @@ func Test_fdPread_offset(t *testing.T) {
 	require.True(t, ok)
 
 	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdPreadName, uint64(fd), uint64(iovs), uint64(iovsCount), 2, uint64(resultNread))
-	actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
+	actual, ok := mod.Memory().Read(0, uint64(len(expectedMemory)))
 	require.True(t, ok)
 	require.Equal(t, expectedMemory, actual)
 
@@ -1217,7 +1217,7 @@ func Test_fdPread_offset(t *testing.T) {
 	)
 
 	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdReadName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultNread))
-	actual, ok = mod.Memory().Read(0, uint32(len(expectedMemory)))
+	actual, ok = mod.Memory().Read(0, uint64(len(expectedMemory)))
 	require.True(t, ok)
 	require.Equal(t, expectedMemory, actual)
 
@@ -1388,7 +1388,7 @@ func Test_fdPrestatGet(t *testing.T) {
 <== (prestat={pr_name_len=1},errno=ESUCCESS)
 `, "\n"+log.String())
 
-	actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
+	actual, ok := mod.Memory().Read(0, uint64(len(expectedMemory)))
 	require.True(t, ok)
 	require.Equal(t, expectedMemory, actual)
 }
@@ -1468,7 +1468,7 @@ func Test_fdPrestatDirName(t *testing.T) {
 <== (path=,errno=ESUCCESS)
 `, "\n"+log.String())
 
-	actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
+	actual, ok := mod.Memory().Read(0, uint64(len(expectedMemory)))
 	require.True(t, ok)
 	require.Equal(t, expectedMemory, actual)
 }
@@ -1634,7 +1634,7 @@ func Test_fdPwrite(t *testing.T) {
 			requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdPwriteName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(tc.offset), uint64(resultNwritten))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
-			actual, ok := mod.Memory().Read(0, uint32(len(tc.expectedMemory)))
+			actual, ok := mod.Memory().Read(0, uint64(len(tc.expectedMemory)))
 			require.True(t, ok)
 			require.Equal(t, tc.expectedMemory, actual)
 
@@ -1680,7 +1680,7 @@ func Test_fdPwrite_offset(t *testing.T) {
 
 	// Write the last half first, to offset 3
 	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdPwriteName, uint64(fd), uint64(iovs), uint64(iovsCount), 3, uint64(resultNwritten))
-	actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
+	actual, ok := mod.Memory().Read(0, uint64(len(expectedMemory)))
 	require.True(t, ok)
 	require.Equal(t, expectedMemory, actual)
 
@@ -1704,7 +1704,7 @@ func Test_fdPwrite_offset(t *testing.T) {
 	require.True(t, ok)
 
 	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdWriteName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultNwritten))
-	actual, ok = mod.Memory().Read(0, uint32(len(expectedMemory)))
+	actual, ok = mod.Memory().Read(0, uint64(len(expectedMemory)))
 	require.True(t, ok)
 	require.Equal(t, expectedMemory, actual)
 
@@ -1895,7 +1895,7 @@ func Test_fdRead(t *testing.T) {
 <== (nread=6,errno=ESUCCESS)
 `, "\n"+log.String())
 
-	actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
+	actual, ok := mod.Memory().Read(0, uint64(len(expectedMemory)))
 	require.True(t, ok)
 	require.Equal(t, expectedMemory, actual)
 }
@@ -2238,7 +2238,7 @@ func Test_fdReaddir(t *testing.T) {
 			require.True(t, ok)
 			require.Equal(t, tc.expectedBufused, bufused)
 
-			mem, ok := mod.Memory().Read(buf, bufused)
+			mem, ok := mod.Memory().Read(buf, uint64(bufused))
 			require.True(t, ok)
 
 			if tc.expectedMem != nil {
@@ -2621,7 +2621,7 @@ func Test_fdSeek(t *testing.T) {
 			requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdSeekName, uint64(fd), uint64(tc.offset), uint64(tc.whence), uint64(resultNewoffset))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
-			actual, ok := mod.Memory().Read(0, uint32(len(tc.expectedMemory)))
+			actual, ok := mod.Memory().Read(0, uint64(len(tc.expectedMemory)))
 			require.True(t, ok)
 			require.Equal(t, tc.expectedMemory, actual)
 
@@ -2778,7 +2778,7 @@ func Test_fdTell(t *testing.T) {
 	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdTellName, uint64(fd), uint64(resultNewoffset))
 	require.Equal(t, expectedLog, "\n"+log.String())
 
-	actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
+	actual, ok := mod.Memory().Read(0, uint64(len(expectedMemory)))
 	require.True(t, ok)
 	require.Equal(t, expectedMemory, actual)
 
@@ -2869,7 +2869,7 @@ func Test_fdWrite(t *testing.T) {
 <== (nwritten=6,errno=ESUCCESS)
 `, "\n"+log.String())
 
-	actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
+	actual, ok := mod.Memory().Read(0, uint64(len(expectedMemory)))
 	require.True(t, ok)
 	require.Equal(t, expectedMemory, actual)
 
@@ -3405,7 +3405,7 @@ func Test_pathFilestatGet(t *testing.T) {
 			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.PathFilestatGetName, uint64(tc.fd), uint64(tc.flags), uint64(1), uint64(tc.pathLen), uint64(tc.resultFilestat))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
-			actual, ok := mod.Memory().Read(0, uint32(len(tc.expectedMemory)))
+			actual, ok := mod.Memory().Read(0, uint64(len(tc.expectedMemory)))
 			require.True(t, ok)
 			require.Equal(t, tc.expectedMemory, actual)
 		})
@@ -4277,7 +4277,7 @@ func Test_pathReadlink(t *testing.T) {
 
 				size, ok := mem.ReadUint32Le(resultBufused)
 				require.True(t, ok)
-				actual, ok := mem.Read(buf, size)
+				actual, ok := mem.Read(buf, uint64(size))
 				require.True(t, ok)
 				require.Equal(t, tc.expectedBuf, string(actual))
 			})
@@ -4990,7 +4990,7 @@ func Test_fdReaddir_dotEntryHasARealInode(t *testing.T) {
 
 	used, _ := mem.ReadUint32Le(resultBufused)
 
-	results, _ := mem.Read(buf, used)
+	results, _ := mem.Read(buf, uint64(used))
 	require.Equal(t, dirents, results)
 }
 
@@ -5059,7 +5059,7 @@ func Test_fdReaddir_opened_file_written(t *testing.T) {
 
 	used, _ := mem.ReadUint32Le(resultBufused)
 
-	results, _ := mem.Read(buf, used)
+	results, _ := mem.Read(buf, uint64(used))
 	require.Equal(t, dirents, results)
 }
 
