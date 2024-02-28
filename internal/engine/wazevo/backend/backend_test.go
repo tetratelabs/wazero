@@ -1924,14 +1924,10 @@ L1 (SSA Block: blk0):
 	ldr x3, [x8, #0x20]
 	ldr s2, [x8, #0x30]
 	ldr d3, [x8, #0x40]
-	ldr d8, [sp, #0x18]
-	mov v1.8b, v8.8b
-	ldr s8, [sp, #0x20]
-	mov v0.8b, v8.8b
-	ldr x8, [sp, #0x24]
-	mov x1, x8
-	ldr w8, [sp, #0x2c]
-	mov x0, x8
+	ldr d1, [sp, #0x18]
+	ldr s0, [sp, #0x20]
+	ldr x1, [sp, #0x24]
+	ldr w0, [sp, #0x2c]
 	add sp, sp, #0x10
 	add sp, sp, #0x20
 	ldr x30, [sp], #0x10

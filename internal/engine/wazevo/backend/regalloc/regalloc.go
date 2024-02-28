@@ -252,8 +252,15 @@ func (vs *vrState) recordReload(f Function, blk Block) {
 	}
 }
 
-func (s *state) findOrSpillAllocatable(a *Allocator, allocatable []RealReg, forbiddenMask RegSet) (r RealReg) {
+func (s *state) findOrSpillAllocatable(a *Allocator, allocatable []RealReg, forbiddenMask, preferredMask RegSet) (r RealReg) {
 	r = RealRegInvalid
+	// First, check if the preferredMask has any allocatable register.
+	for _, candidateReal := range allocatable {
+		if !forbiddenMask.has(candidateReal) && !s.regsInUse.has(candidateReal) && preferredMask.has(candidateReal) {
+			return candidateReal
+		}
+	}
+
 	var lastUseAt programCounter
 	var spillVReg VReg
 	for _, candidateReal := range allocatable {
@@ -275,11 +282,16 @@ func (s *state) findOrSpillAllocatable(a *Allocator, allocatable []RealReg, forb
 			continue
 		}
 
+		preferred := preferredMask.has(candidateReal)
+
 		// last == -1 means the value won't be used anymore.
-		if last := s.getVRegState(using.ID()).lastUse; r == RealRegInvalid || last == -1 || (lastUseAt != -1 && last > lastUseAt) {
+		if last := s.getVRegState(using.ID()).lastUse; r == RealRegInvalid || preferred || last == -1 || (lastUseAt != -1 && last > lastUseAt) {
 			lastUseAt = last
 			r = candidateReal
 			spillVReg = using
+			if preferred {
+				break
+			}
 		}
 	}
 
@@ -737,8 +749,8 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 				r := vs.r
 
 				if r == RealRegInvalid {
-					// TODO: use the desired register if available.
-					r = s.findOrSpillAllocatable(a, a.regInfo.AllocatableRegisters[use.RegType()], currentUsedSet)
+					preferredMask := RegSet(0).add(vs.desiredLoc.realReg())
+					r = s.findOrSpillAllocatable(a, a.regInfo.AllocatableRegisters[use.RegType()], currentUsedSet, preferredMask)
 					vs.recordReload(f, blk)
 					f.ReloadRegisterBefore(use.SetRealReg(r), instr)
 					s.useRealReg(r, use)
@@ -836,7 +848,7 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 					}
 					if r == RealRegInvalid {
 						typ := def.RegType()
-						r = s.findOrSpillAllocatable(a, a.regInfo.AllocatableRegisters[typ], RegSet(0))
+						r = s.findOrSpillAllocatable(a, a.regInfo.AllocatableRegisters[typ], RegSet(0), RegSet(0))
 					}
 					s.useRealReg(r, def)
 				}
