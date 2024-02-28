@@ -91,7 +91,7 @@ func main() {
 	defer deallocate.Call(ctx, uint64(greetingPtr), uint64(greetingSize))
 
 	// The pointer is a linear memory offset, which is where we write the name.
-	if bytes, ok := mod.Memory().Read(greetingPtr, greetingSize); !ok {
+	if bytes, ok := mod.Memory().Read(greetingPtr, uint64(greetingSize)); !ok {
 		log.Panicf("Memory.Read(%d, %d) out of range of memory size %d",
 			greetingPtr, greetingSize, mod.Memory().Size())
 	} else {
@@ -100,7 +100,7 @@ func main() {
 }
 
 func logString(ctx context.Context, m api.Module, offset, byteCount uint32) {
-	buf, ok := m.Memory().Read(offset, byteCount)
+	buf, ok := m.Memory().Read(offset, uint64(byteCount))
 	if !ok {
 		log.Panicf("Memory.Read(%d, %d) out of range", offset, byteCount)
 	}

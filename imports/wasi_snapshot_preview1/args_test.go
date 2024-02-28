@@ -32,7 +32,7 @@ func Test_argsGet(t *testing.T) {
 <== errno=ESUCCESS
 `, "\n"+log.String())
 
-	actual, ok := mod.Memory().Read(argvBuf-1, uint32(len(expectedMemory)))
+	actual, ok := mod.Memory().Read(argvBuf-1, uint64(len(expectedMemory)))
 	require.True(t, ok)
 	require.Equal(t, expectedMemory, actual)
 }
@@ -124,7 +124,7 @@ func Test_argsSizesGet(t *testing.T) {
 <== errno=ESUCCESS
 `, "\n"+log.String())
 
-	actual, ok := mod.Memory().Read(resultArgc-1, uint32(len(expectedMemory)))
+	actual, ok := mod.Memory().Read(resultArgc-1, uint64(len(expectedMemory)))
 	require.True(t, ok)
 	require.Equal(t, expectedMemory, actual)
 }

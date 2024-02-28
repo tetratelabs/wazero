@@ -179,11 +179,11 @@ func (m *MemoryInstance) ReadFloat64Le(offset uint32) (float64, bool) {
 }
 
 // Read implements the same method as documented on api.Memory.
-func (m *MemoryInstance) Read(offset, byteCount uint32) ([]byte, bool) {
-	if !m.hasSize(offset, uint64(byteCount)) {
+func (m *MemoryInstance) Read(offset uint32, byteCount uint64) ([]byte, bool) {
+	if !m.hasSize(offset, byteCount) {
 		return nil, false
 	}
-	return m.Buffer[offset : offset+byteCount : offset+byteCount], true
+	return m.Buffer[offset : uint64(offset)+byteCount : uint64(offset)+byteCount], true
 }
 
 // WriteByte implements the same method as documented on api.Memory.

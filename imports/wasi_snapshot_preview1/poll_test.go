@@ -55,7 +55,7 @@ func Test_pollOneoff(t *testing.T) {
 <== (nevents=1,errno=ESUCCESS)
 `, "\n"+log.String())
 
-	outMem, ok := mod.Memory().Read(out, uint32(len(expectedMem)))
+	outMem, ok := mod.Memory().Read(out, uint64(len(expectedMem)))
 	require.True(t, ok)
 	require.Equal(t, expectedMem, outMem)
 
@@ -136,7 +136,7 @@ func Test_pollOneoff_Errors(t *testing.T) {
 				uint64(tc.nsubscriptions), uint64(tc.resultNevents))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
-			out, ok := mod.Memory().Read(tc.out, uint32(len(tc.expectedMem)))
+			out, ok := mod.Memory().Read(tc.out, uint64(len(tc.expectedMem)))
 			require.True(t, ok)
 			require.Equal(t, tc.expectedMem, out)
 
@@ -428,7 +428,7 @@ func Test_pollOneoff_Stdin(t *testing.T) {
 				uint64(tc.nsubscriptions), uint64(tc.resultNevents))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
-			out, ok := mod.Memory().Read(tc.out, uint32(len(tc.expectedMem)))
+			out, ok := mod.Memory().Read(tc.out, uint64(len(tc.expectedMem)))
 			require.True(t, ok)
 			require.Equal(t, tc.expectedMem, out)
 
@@ -492,7 +492,7 @@ func Test_pollOneoff_Zero(t *testing.T) {
 	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.PollOneoffName, uint64(0), uint64(out),
 		uint64(nsubscriptions), uint64(resultNevents))
 
-	outMem, ok := mod.Memory().Read(out, uint32(len(expectedMem)))
+	outMem, ok := mod.Memory().Read(out, uint64(len(expectedMem)))
 	require.True(t, ok)
 	require.Equal(t, expectedMem, outMem)
 
@@ -529,7 +529,7 @@ func Test_pollOneoff_Zero(t *testing.T) {
 	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.PollOneoffName, uint64(0), uint64(out),
 		uint64(nsubscriptions), uint64(resultNevents))
 
-	outMem, ok = mod.Memory().Read(out, uint32(len(expectedMem)))
+	outMem, ok = mod.Memory().Read(out, uint64(len(expectedMem)))
 	require.True(t, ok)
 	require.Equal(t, expectedMem, outMem)
 
