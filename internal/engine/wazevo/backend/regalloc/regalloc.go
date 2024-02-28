@@ -647,19 +647,33 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 	// Update the last use of each VReg.
 	var pc programCounter
 	for instr := blk.InstrIteratorBegin(); instr != nil; instr = blk.InstrIteratorNext() {
-		for _, use := range instr.Uses(&a.vs) {
+		var use, def VReg
+		for _, use = range instr.Uses(&a.vs) {
 			if !use.IsRealReg() {
 				s.getVRegState(use.ID()).lastUse = pc
 			}
 		}
-		// TODO: if a value moved to a real register, record it to the desiredReg and apply it to desiredUpdated.
+
+		if instr.IsCopy() {
+			def = instr.Defs(&a.vs)[0]
+			r := def.RealReg()
+			if r != RealRegInvalid {
+				useID := use.ID()
+				vs := s.getVRegState(useID)
+				if !vs.isPhi { // TODO: no idea why do we need this.
+					vs.desiredLoc = newDesiredLocReg(r)
+					desiredUpdated = append(desiredUpdated, useID)
+				}
+			}
+		}
 		pc++
 	}
 
 	// Mark all live-out values by checking live-in of the successors.
 	// While doing so, we also update the desired register values.
+	var succ Block
 	for i, ns := 0, blk.Succs(); i < ns; i++ {
-		succ := blk.Succ(i)
+		succ = blk.Succ(i)
 		if succ == nil {
 			continue
 		}
@@ -723,6 +737,7 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 				r := vs.r
 
 				if r == RealRegInvalid {
+					// TODO: use the desired register if available.
 					r = s.findOrSpillAllocatable(a, a.regInfo.AllocatableRegisters[use.RegType()], currentUsedSet)
 					vs.recordReload(f, blk)
 					f.ReloadRegisterBefore(use.SetRealReg(r), instr)
@@ -806,9 +821,39 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 							r = desired
 							s.releaseRealReg(r)
 							s.useRealReg(r, def)
-						} else { //nolint
-							// TODO: otherwise, we should try to use the desired register if it's not used by other values.
-							//  one idea is to pass "preferred mask" into findOrSpillAllocatable.
+						} else {
+							// Check if the desired register is available.
+							if exitingValueOnDesired := s.regsInUse.get(desired); exitingValueOnDesired.Valid() {
+								// TODO:
+								//// If the desired register is already used, try to find a free register and move the value to it.
+								//forbiddenMask := RegSet(0).add(desired)
+								//var tmp RealReg
+								//if r != RealRegInvalid {
+								//	tmp = r
+								//	s.releaseRealReg(tmp)
+								//} else {
+								//	tmp = a.state.findAllocatable(a.regInfo.AllocatableRegisters[def.RegType()], forbiddenMask)
+								//}
+								//if tmp != RealRegInvalid {
+								//	// Move the existing value to the new register.
+								//	f.InsertMoveBefore(exitingValueOnDesired.SetRealReg(tmp), exitingValueOnDesired.SetRealReg(desired), instr)
+								//	s.releaseRealReg(desired)
+								//	s.useRealReg(tmp, exitingValueOnDesired)
+								//	// Now it is safe to use the desired register.
+								//	r = desired
+								//	s.useRealReg(r, def)
+								//}
+							} else {
+								if r != RealRegInvalid {
+									// If the value is already in a different real register, we release it to change the state.
+									// Otherwise, multiple registers might have the same values at the end, which results in
+									// messing up the merge state reconciliation.
+									s.releaseRealReg(r)
+								}
+								r = desired
+								s.releaseRealReg(r)
+								s.useRealReg(r, def)
+							}
 						}
 					}
 				}

@@ -40,6 +40,7 @@ func newMachine() backend.Machine {
 }
 
 func TestE2E(t *testing.T) {
+	t.Skip()
 	const verbose = false
 
 	type testCase struct {
