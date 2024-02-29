@@ -2190,15 +2190,21 @@ func testLinking(t *testing.T, r wazero.Runtime) {
 		t.Skip()
 	}
 	ctx := context.Background()
+	// Instantiate the first module.
 	mod, err := r.InstantiateWithConfig(ctx, linking1, wazero.NewModuleConfig().WithName("Ms"))
 	require.NoError(t, err)
+	// The second module builds successfully.
 	m, err := r.CompileModule(ctx, linking2)
 	require.NoError(t, err)
+	// The second module instantiates and sets the table[0] field to point to its own $f function.
 	_, err = r.InstantiateModule(ctx, m, wazero.NewModuleConfig())
+	// However it traps upon instantiation.
 	require.Error(t, err)
 	m.Close(ctx)
 	// This should not be necessary to fail.
 	runtime.GC()
-	_, err = mod.ExportedFunction("get table[0]").Call(ctx) // This should not SIGSEGV.
+	// The result is expected to be 0xdead, i.e., the result of linking2.$f.
+	res, err := mod.ExportedFunction("get table[0]").Call(ctx) // This should not SIGSEGV.
 	require.NoError(t, err)
+	require.Equal(t, uint64(0xdead), res[0])
 }
