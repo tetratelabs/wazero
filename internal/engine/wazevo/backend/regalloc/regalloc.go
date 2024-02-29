@@ -839,7 +839,7 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 
 				if desired := vState.desiredLoc.realReg(); desired != RealRegInvalid {
 					if r != desired {
-						if vState.isPhi ||
+						if (vState.isPhi && vState.defBlk == succ) ||
 							// If this is not a phi and it's already assigned a real reg,
 							// this value has multiple definitions, hence we cannot assign the desired register.
 							(!s.regsInUse.has(desired) && r == RealRegInvalid) {
