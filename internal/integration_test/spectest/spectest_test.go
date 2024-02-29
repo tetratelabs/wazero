@@ -1,6 +1,7 @@
 package spectest
 
 import (
+	_ "embed"
 	"encoding/json"
 	"math"
 	"testing"
