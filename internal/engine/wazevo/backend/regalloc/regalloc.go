@@ -717,6 +717,26 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 		}
 	}
 
+	// Propagate the desired register values from the end of the block to the beginning.
+	for instr := blk.InstrRevIteratorBegin(); instr != nil; instr = blk.InstrRevIteratorNext() {
+		if instr.IsCopy() {
+			def := instr.Defs(&a.vs)[0]
+			defState := s.getVRegState(def.ID())
+			desired := defState.desiredLoc.realReg()
+			if desired == RealRegInvalid {
+				continue
+			}
+
+			use := instr.Uses(&a.vs)[0]
+			useID := use.ID()
+			useState := s.getVRegState(useID)
+			if !useState.isPhi && useState.desiredLoc == desiredLocUnspecified {
+				useState.desiredLoc = newDesiredLocReg(desired)
+				desiredUpdated = append(desiredUpdated, useID)
+			}
+		}
+	}
+
 	pc = 0
 	for instr := blk.InstrIteratorBegin(); instr != nil; instr = blk.InstrIteratorNext() {
 		if wazevoapi.RegAllocLoggingEnabled {
@@ -819,7 +839,10 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 
 				if desired := vState.desiredLoc.realReg(); desired != RealRegInvalid {
 					if r != desired {
-						if vState.isPhi || !s.regsInUse.has(desired) {
+						if vState.isPhi ||
+							// If this is not a phi and it's already assigned a real reg,
+							// this value has multiple definitions, hence we cannot assign the desired register.
+							(!s.regsInUse.has(desired) && r == RealRegInvalid) {
 							// If the phi value is passed via a real register, we force the value to be in the desired register.
 							if wazevoapi.RegAllocLoggingEnabled {
 								fmt.Printf("\t\tv%d is phi and desiredReg=%s\n", def.ID(), a.regInfo.RealRegName(desired))
