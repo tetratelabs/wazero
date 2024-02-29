@@ -1995,9 +1995,8 @@ func (m *machine) getVRegSpillSlotOffsetFromSP(id regalloc.VRegID, size byte) in
 }
 
 func (m *machine) copyTo(src regalloc.VReg, dst regalloc.VReg) {
-	typ := m.c.TypeOf(src)
 	mov := m.allocateInstr()
-	if typ.IsInt() {
+	if src.RegType() == regalloc.RegTypeInt {
 		mov.asMovRR(src, dst, true)
 	} else {
 		mov.asXmmUnaryRmR(sseOpcodeMovdqu, newOperandReg(src), dst)
