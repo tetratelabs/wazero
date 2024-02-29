@@ -51,7 +51,7 @@ func (e *engine) getCompiledModule(module *wasm.Module, listeners []experimental
 		}
 
 		// As this uses mmap, we need to munmap on the compiled machine code when it's GCed.
-		e.setFinalizer(cm, releaseCompiledModule)
+		e.setFinalizer(cm.compiledCode, releaseCompiledCode)
 	}
 	return
 }
