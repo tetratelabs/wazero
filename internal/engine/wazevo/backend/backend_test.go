@@ -650,15 +650,19 @@ L1 (SSA Block: blk0):
 	str x1, [x0, #0x8]
 	bl f1
 	mov x2, x0
-	ldr x1, [sp, #0x10]
-	ldr x0, [sp, #0x18]
-	str x1, [x0, #0x8]
+	ldr x8, [sp, #0x10]
+	ldr x9, [sp, #0x18]
+	str x8, [x9, #0x8]
+	mov x0, x9
+	mov x1, x8
 	movz w3, #0x5, lsl 0
 	bl f2
 	mov x2, x0
-	ldr x1, [sp, #0x10]
-	ldr x0, [sp, #0x18]
-	str x1, [x0, #0x8]
+	ldr x8, [sp, #0x10]
+	ldr x9, [sp, #0x18]
+	str x8, [x9, #0x8]
+	mov x0, x9
+	mov x1, x8
 	bl f3
 	add sp, sp, #0x10
 	add sp, sp, #0x10

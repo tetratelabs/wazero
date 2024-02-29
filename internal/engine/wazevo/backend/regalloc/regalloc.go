@@ -730,7 +730,7 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 			use := instr.Uses(&a.vs)[0]
 			useID := use.ID()
 			useState := s.getVRegState(useID)
-			if !useState.isPhi && useState.desiredLoc == desiredLocUnspecified {
+			if s.phiBlk(useID) != succ && useState.desiredLoc == desiredLocUnspecified {
 				useState.desiredLoc = newDesiredLocReg(desired)
 				desiredUpdated = append(desiredUpdated, useID)
 			}
