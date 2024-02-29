@@ -615,12 +615,10 @@ L5 (SSA Block: blk3):
 L1 (SSA Block: blk0):
 	mov x128?, x0
 	mov x129?, x1
-	str x129?, [x128?, #0x8]
 	mov x0, x128?
 	mov x1, x129?
 	bl f1
 	mov x130?, x0
-	str x129?, [x128?, #0x8]
 	mov x0, x128?
 	mov x1, x129?
 	mov x2, x130?
@@ -628,7 +626,6 @@ L1 (SSA Block: blk0):
 	mov x3, x131?
 	bl f2
 	mov x132?, x0
-	str x129?, [x128?, #0x8]
 	mov x0, x128?
 	mov x1, x129?
 	mov x2, x132?
@@ -645,23 +642,20 @@ L1 (SSA Block: blk0):
 	sub sp, sp, #0x10
 	orr x27, xzr, #0x10
 	str x27, [sp, #-0x10]!
-	str x0, [sp, #0x18]
-	str x1, [sp, #0x10]
-	str x1, [x0, #0x8]
+	str x0, [sp, #0x10]
+	str x1, [sp, #0x18]
 	bl f1
 	mov x2, x0
 	ldr x8, [sp, #0x10]
+	mov x0, x8
 	ldr x9, [sp, #0x18]
-	str x8, [x9, #0x8]
-	mov x0, x9
-	mov x1, x8
+	mov x1, x9
 	movz w3, #0x5, lsl 0
 	bl f2
 	mov x2, x0
 	ldr x8, [sp, #0x10]
-	ldr x9, [sp, #0x18]
-	str x8, [x9, #0x8]
-	mov x0, x9
+	mov x0, x8
+	ldr x8, [sp, #0x18]
 	mov x1, x8
 	bl f3
 	add sp, sp, #0x10
@@ -680,7 +674,6 @@ L1 (SSA Block: blk0):
 	mov x131?, x3
 	mov v132?.8b, v0.8b
 	mov v133?.8b, v1.8b
-	str x129?, [x128?, #0x8]
 	mov x0, x128?
 	mov x1, x129?
 	mov x2, x130?
@@ -736,7 +729,6 @@ L1 (SSA Block: blk0):
 	str x3, [sp, #0x14]
 	str s0, [sp, #0x1c]
 	str d1, [sp, #0x20]
-	str x1, [x0, #0x8]
 	ldr w8, [sp, #0x10]
 	mov x4, x8
 	ldr x9, [sp, #0x14]
@@ -794,7 +786,6 @@ L1 (SSA Block: blk0):
 	mov x131?, x3
 	mov v132?.8b, v0.8b
 	mov v133?.8b, v1.8b
-	str x129?, [x128?, #0x8]
 	mov x0, x128?
 	mov x1, x129?
 	mov x2, x130?
@@ -895,7 +886,6 @@ L1 (SSA Block: blk0):
 	str q19, [sp, #-0x10]!
 	orr x27, xzr, #0x40
 	str x27, [sp, #-0x10]!
-	str x1, [x0, #0x8]
 	bl f1
 	ldr w8, [sp, #-0xc0]
 	ldr x9, [sp, #-0xb8]
@@ -1884,7 +1874,6 @@ L1 (SSA Block: blk0):
 	ldr x131?, [x129?, #0x20]
 	ldr s132?, [x129?, #0x30]
 	ldr d133?, [x129?, #0x40]
-	str x129?, [x128?, #0x8]
 	mov x0, x128?
 	mov x1, x129?
 	bl f1
@@ -1917,7 +1906,6 @@ L1 (SSA Block: blk0):
 	str s0, [sp, #0x20]
 	ldr d1, [x1, #0x40]
 	str d1, [sp, #0x18]
-	str x1, [x0, #0x8]
 	bl f1
 	ldr x8, [sp, #0x10]
 	ldr w2, [x8, #0x10]
