@@ -1598,14 +1598,11 @@ func (c *Compiler) lowerCurrentOpcode() {
 			break
 		}
 
-		// Before transfer the control to the callee, we have to store the current module's moduleContextPtr
-		// into execContext.callerModuleContextPtr in case when the callee is a Go function.
-		//
-		// TODO: maybe this can be optimized out if this is in-module function calls. Investigate later.
-		c.storeCallerModuleContext()
-
 		var typIndex wasm.Index
 		if fnIndex < c.m.ImportFunctionCount {
+			// Before transfer the control to the callee, we have to store the current module's moduleContextPtr
+			// into execContext.callerModuleContextPtr in case when the callee is a Go function.
+			c.storeCallerModuleContext()
 			var fi int
 			for i := range c.m.ImportSection {
 				imp := &c.m.ImportSection[i]

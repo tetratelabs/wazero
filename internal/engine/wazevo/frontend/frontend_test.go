@@ -551,12 +551,9 @@ signatures:
 	sig3: i64i64i32_i32i32
 
 blk0: (exec_ctx:i64, module_ctx:i64)
-	Store module_ctx, exec_ctx, 0x8
 	v2:i32 = Call f1:sig1, exec_ctx, module_ctx
 	v3:i32 = Iconst_32 0x5
-	Store module_ctx, exec_ctx, 0x8
 	v4:i32 = Call f2:sig2, exec_ctx, module_ctx, v2, v3
-	Store module_ctx, exec_ctx, 0x8
 	v5:i32, v6:i32 = Call f3:sig3, exec_ctx, module_ctx, v4
 	Jump blk_ret, v5, v6
 `,
@@ -569,7 +566,6 @@ signatures:
 	sig1: i64i64i32i64f32f64i32i64f32f64i32i64f32f64i32i64f32f64i32i64f32f64i32i64f32f64i32i64f32f64i32i64f32f64i32i64f32f64i32i64f32f64_v
 
 blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i64, v4:f32, v5:f64)
-	Store module_ctx, exec_ctx, 0x8
 	Call f1:sig1, exec_ctx, module_ctx, v2, v3, v4, v5, v2, v3, v4, v5, v2, v3, v4, v5, v2, v3, v4, v5, v2, v3, v4, v5, v2, v3, v4, v5, v2, v3, v4, v5, v2, v3, v4, v5, v2, v3, v4, v5, v2, v3, v4, v5
 	Jump blk_ret
 `,
@@ -582,7 +578,6 @@ signatures:
 	sig0: i64i64i32i64f32f64_i32i64f32f64i32i64f32f64i32i64f32f64i32i64f32f64i32i64f32f64i32i64f32f64i32i64f32f64i32i64f32f64i32i64f32f64i32i64f32f64
 
 blk0: (exec_ctx:i64, module_ctx:i64, v2:i32, v3:i64, v4:f32, v5:f64)
-	Store module_ctx, exec_ctx, 0x8
 	v6:i32, v7:i64, v8:f32, v9:f64, v10:i32, v11:i64, v12:f32, v13:f64, v14:i32, v15:i64, v16:f32, v17:f64, v18:i32, v19:i64, v20:f32, v21:f64, v22:i32, v23:i64, v24:f32, v25:f64, v26:i32, v27:i64, v28:f32, v29:f64, v30:i32, v31:i64, v32:f32, v33:f64, v34:i32, v35:i64, v36:f32, v37:f64, v38:i32, v39:i64, v40:f32, v41:f64, v42:i32, v43:i64, v44:f32, v45:f64 = Call f1:sig0, exec_ctx, module_ctx, v2, v3, v4, v5
 	Jump blk_ret, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15, v16, v17, v18, v19, v20, v21, v22, v23, v24, v25, v26, v27, v28, v29, v30, v31, v32, v33, v34, v35, v36, v37, v38, v39, v40, v41, v42, v43, v44, v45
 `,
@@ -982,11 +977,9 @@ blk2: () <-- (blk0)
 blk3: () <-- (blk2)
 	v5:i32 = Iconst_32 0x1
 	v6:i32 = Isub v2, v5
-	Store module_ctx, exec_ctx, 0x8
 	v7:i32 = Call f0:sig0, exec_ctx, module_ctx, v6
 	v8:i32 = Iconst_32 0x2
 	v9:i32 = Isub v2, v8
-	Store module_ctx, exec_ctx, 0x8
 	v10:i32 = Call f0:sig0, exec_ctx, module_ctx, v9
 	v11:i32 = Iadd v7, v10
 	Jump blk_ret, v11
@@ -1010,11 +1003,9 @@ blk2: () <-- (blk0)
 blk3: () <-- (blk2)
 	v5:i32 = Iconst_32 0x1
 	v6:i32 = Isub v2, v5
-	Store module_ctx, exec_ctx, 0x8
 	v7:i32 = Call f0:sig0, exec_ctx, module_ctx, v6
 	v8:i32 = Iconst_32 0x2
 	v9:i32 = Isub v2, v8
-	Store module_ctx, exec_ctx, 0x8
 	v10:i32 = Call f0:sig0, exec_ctx, module_ctx, v9
 	v11:i32 = Iadd v7, v10
 	Jump blk_ret, v11
@@ -1066,7 +1057,6 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
 	Jump blk1
 
 blk1: () <-- (blk0)
-	Store module_ctx, exec_ctx, 0x8
 	Call f1:sig1, exec_ctx, module_ctx
 	v5:i64 = Load module_ctx, 0x8
 	v6:i64 = Uload32 module_ctx, 0x10
@@ -1098,7 +1088,6 @@ blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
 	Jump fallthrough
 
 blk1: () <-- (blk0)
-	Store module_ctx, exec_ctx, 0x8
 	Call f1:sig1, exec_ctx, module_ctx
 	Jump blk3
 
@@ -1233,7 +1222,6 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 	v3:i64 = Load module_ctx, 0x20
 	v4:f32 = Load module_ctx, 0x30
 	v5:f64 = Load module_ctx, 0x40
-	Store module_ctx, exec_ctx, 0x8
 	Call f1:sig1, exec_ctx, module_ctx
 	v6:i32 = Load module_ctx, 0x10
 	v7:i64 = Load module_ctx, 0x20
@@ -1250,7 +1238,6 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 	v3:i64 = Load module_ctx, 0x20
 	v4:f32 = Load module_ctx, 0x30
 	v5:f64 = Load module_ctx, 0x40
-	Store module_ctx, exec_ctx, 0x8
 	Call f1:sig1, exec_ctx, module_ctx
 	v6:i32 = Load module_ctx, 0x10
 	v7:i64 = Load module_ctx, 0x20
