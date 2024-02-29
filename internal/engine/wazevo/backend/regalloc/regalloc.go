@@ -131,15 +131,18 @@ type (
 		next  *phiDefInstList
 	}
 
-	desiredLoc     uint32
-	desiredLocKind uint32
+	// desiredLoc represents a desired location for a VReg.
+	desiredLoc uint16
+	// desiredLocKind is a kind of desired location for a VReg.
+	desiredLocKind uint16
 )
 
-// desiredLoc values.
-
 const (
+	// desiredLocKindUnspecified is a kind of desired location for a VReg that is not specified.
 	desiredLocKindUnspecified desiredLocKind = iota
+	// desiredLocKindStack is a kind of desired location for a VReg that is on the stack, only used for the phi values.
 	desiredLocKindStack
+	// desiredLocKindReg is a kind of desired location for a VReg that is in a register.
 	desiredLocKindReg
 	desiredLocUnspecified = desiredLoc(desiredLocKindUnspecified)
 	desiredLocStack       = desiredLoc(desiredLocKindStack)
@@ -252,11 +255,11 @@ func (vs *vrState) recordReload(f Function, blk Block) {
 	}
 }
 
-func (s *state) findOrSpillAllocatable(a *Allocator, allocatable []RealReg, forbiddenMask, preferredMask RegSet) (r RealReg) {
+func (s *state) findOrSpillAllocatable(a *Allocator, allocatable []RealReg, forbiddenMask RegSet, preferred RealReg) (r RealReg) {
 	r = RealRegInvalid
 	// First, check if the preferredMask has any allocatable register.
 	for _, candidateReal := range allocatable {
-		if !forbiddenMask.has(candidateReal) && !s.regsInUse.has(candidateReal) && preferredMask.has(candidateReal) {
+		if !forbiddenMask.has(candidateReal) && !s.regsInUse.has(candidateReal) && candidateReal == preferred {
 			return candidateReal
 		}
 	}
@@ -282,14 +285,14 @@ func (s *state) findOrSpillAllocatable(a *Allocator, allocatable []RealReg, forb
 			continue
 		}
 
-		preferred := preferredMask.has(candidateReal)
+		isPreferred := candidateReal == preferred
 
 		// last == -1 means the value won't be used anymore.
-		if last := s.getVRegState(using.ID()).lastUse; r == RealRegInvalid || preferred || last == -1 || (lastUseAt != -1 && last > lastUseAt) {
+		if last := s.getVRegState(using.ID()).lastUse; r == RealRegInvalid || isPreferred || last == -1 || (lastUseAt != -1 && last > lastUseAt) {
 			lastUseAt = last
 			r = candidateReal
 			spillVReg = using
-			if preferred {
+			if isPreferred {
 				break
 			}
 		}
@@ -769,8 +772,9 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 				r := vs.r
 
 				if r == RealRegInvalid {
-					preferredMask := RegSet(0).add(vs.desiredLoc.realReg())
-					r = s.findOrSpillAllocatable(a, a.regInfo.AllocatableRegisters[use.RegType()], currentUsedSet, preferredMask)
+					r = s.findOrSpillAllocatable(a, a.regInfo.AllocatableRegisters[use.RegType()], currentUsedSet,
+						// Prefer the desired register if it's available.
+						vs.desiredLoc.realReg())
 					vs.recordReload(f, blk)
 					f.ReloadRegisterBefore(use.SetRealReg(r), instr)
 					s.useRealReg(r, use)
@@ -871,7 +875,7 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 					}
 					if r == RealRegInvalid {
 						typ := def.RegType()
-						r = s.findOrSpillAllocatable(a, a.regInfo.AllocatableRegisters[typ], RegSet(0), RegSet(0))
+						r = s.findOrSpillAllocatable(a, a.regInfo.AllocatableRegisters[typ], RegSet(0), RealRegInvalid)
 					}
 					s.useRealReg(r, def)
 				}
