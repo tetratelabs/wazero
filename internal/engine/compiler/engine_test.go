@@ -26,14 +26,14 @@ func requireSupportedOSArch(t *testing.T) {
 	}
 }
 
-type fakeFinalizer map[*compiledModule]func(module *compiledModule)
+type fakeFinalizer map[*compiledCode]func(code *compiledCode)
 
 func (f fakeFinalizer) setFinalizer(obj interface{}, finalizer interface{}) {
-	cf := obj.(*compiledModule)
+	cf := obj.(*compiledCode)
 	if _, ok := f[cf]; ok { // easier than adding a field for testing.T
 		panic(fmt.Sprintf("BUG: %v already had its finalizer set", cf))
 	}
-	f[cf] = finalizer.(func(*compiledModule))
+	f[cf] = finalizer.(func(*compiledCode))
 }
 
 func TestCompiler_CompileModule(t *testing.T) {
