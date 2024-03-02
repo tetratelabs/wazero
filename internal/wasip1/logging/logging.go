@@ -260,7 +260,7 @@ func (i logMemI64) Log(_ context.Context, mod api.Module, w logging.Writer, para
 type logFilestat uint32
 
 func (i logFilestat) Log(_ context.Context, mod api.Module, w logging.Writer, params []uint64) {
-	offset, byteCount := uint32(params[i]), uint64(64)
+	offset, byteCount := uint32(params[i]), uint32(64)
 	if buf, ok := mod.Memory().Read(offset, byteCount); ok {
 		w.WriteString("{filetype=")          //nolint
 		w.WriteString(FiletypeName(buf[16])) //nolint
@@ -275,7 +275,7 @@ func (i logFilestat) Log(_ context.Context, mod api.Module, w logging.Writer, pa
 type logFdstat uint32
 
 func (i logFdstat) Log(_ context.Context, mod api.Module, w logging.Writer, params []uint64) {
-	offset, byteCount := uint32(params[i]), uint64(24)
+	offset, byteCount := uint32(params[i]), uint32(24)
 	if buf, ok := mod.Memory().Read(offset, byteCount); ok {
 		w.WriteString("{filetype=")                           //nolint
 		w.WriteString(FiletypeName(buf[0]))                   //nolint
@@ -293,7 +293,7 @@ type logString uint32
 
 func (i logString) Log(_ context.Context, mod api.Module, w logging.Writer, params []uint64) {
 	offset, byteCount := uint32(params[i]), uint32(params[i+1])
-	if s, ok := mod.Memory().Read(offset, uint64(byteCount)); ok {
+	if s, ok := mod.Memory().Read(offset, byteCount); ok {
 		w.Write(s) //nolint
 	}
 }

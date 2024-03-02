@@ -275,7 +275,7 @@ func Test_sockRecv(t *testing.T) {
 			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.SockRecvName, uint64(connFd), uint64(iovs), tc.iovsCount, uint64(tc.flags), uint64(resultRoDatalen), uint64(resultRoDatalen+4))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
-			actual, ok := mod.Memory().Read(0, uint64(len(expectedMemory)))
+			actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
 			require.True(t, ok)
 			require.Equal(t, expectedMemory, actual)
 		})
@@ -352,7 +352,7 @@ func Test_sockSend(t *testing.T) {
 			requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.SockSendName, uint64(connFd), uint64(iovs), uint64(iovsCount), 0, uint64(resultSoDatalen))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
-			actual, ok := mod.Memory().Read(0, uint64(len(expectedMemory)))
+			actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
 			require.True(t, ok)
 			require.Equal(t, expectedMemory, actual)
 

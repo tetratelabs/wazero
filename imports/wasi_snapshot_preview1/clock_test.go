@@ -63,7 +63,7 @@ func Test_clockResGet(t *testing.T) {
 			requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.ClockResGetName, uint64(tc.clockID), uint64(resultResolution))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
-			actual, ok := mod.Memory().Read(uint32(resultResolution-1), uint64(len(tc.expectedMemory)))
+			actual, ok := mod.Memory().Read(uint32(resultResolution-1), uint32(len(tc.expectedMemory)))
 			require.True(t, ok)
 			require.Equal(t, tc.expectedMemory, actual)
 		})
@@ -170,7 +170,7 @@ func Test_clockTimeGet(t *testing.T) {
 			requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.ClockTimeGetName, uint64(tc.clockID), 0 /* TODO: precision */, uint64(resultTimestamp))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
-			actual, ok := mod.Memory().Read(uint32(resultTimestamp-1), uint64(len(tc.expectedMemory)))
+			actual, ok := mod.Memory().Read(uint32(resultTimestamp-1), uint32(len(tc.expectedMemory)))
 			require.True(t, ok)
 			require.Equal(t, tc.expectedMemory, actual)
 		})

@@ -85,7 +85,7 @@ func sockRecvFn(_ context.Context, mod api.Module, params []uint64) sys.Errno {
 		if !ok {
 			return sys.EINVAL
 		}
-		firstIovecBuf, ok := mem.Read(firstIovecBufAddr, uint64(firstIovecBufLen))
+		firstIovecBuf, ok := mem.Read(firstIovecBufAddr, firstIovecBufLen)
 		if !ok {
 			return sys.EINVAL
 		}

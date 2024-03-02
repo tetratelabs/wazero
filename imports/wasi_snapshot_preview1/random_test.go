@@ -22,13 +22,13 @@ func Test_randomGet(t *testing.T) {
 		'?', // stopped after encoding
 	}
 
-	length := uint64(5) // arbitrary length,
-	offset := uint64(1) // offset,
+	length := uint32(5) // arbitrary length,
+	offset := uint32(1) // offset,
 
 	maskMemory(t, mod, len(expectedMemory))
 
 	// Invoke randomGet and check the memory side effects!
-	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.RandomGetName, offset, length)
+	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.RandomGetName, uint64(offset), uint64(length))
 	require.Equal(t, `
 ==> wasi_snapshot_preview1.random_get(buf=1,buf_len=5)
 <== errno=ESUCCESS
