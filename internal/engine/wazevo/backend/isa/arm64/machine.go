@@ -248,101 +248,103 @@ func (m *machine) resolveAddressingMode(arg0offset, ret0offset int64, i *instruc
 
 // resolveRelativeAddresses resolves the relative addresses before encoding.
 func (m *machine) resolveRelativeAddresses(ctx context.Context) {
-	if len(m.unresolvedAddressModes) > 0 {
-		arg0offset, ret0offset := m.arg0OffsetFromSP(), m.ret0OffsetFromSP()
-		for _, i := range m.unresolvedAddressModes {
-			m.resolveAddressingMode(arg0offset, ret0offset, i)
-		}
-	}
-
-	// Reuse the slice to gather the unresolved conditional branches.
-	m.condBrRelocs = m.condBrRelocs[:0]
 	ectx := m.executableContext
-
-	var fn string
-	var fnIndex int
-	var labelToSSABlockID map[label]ssa.BasicBlockID
-	if wazevoapi.PerfMapEnabled {
-		fn = wazevoapi.GetCurrentFunctionName(ctx)
-		labelToSSABlockID = make(map[label]ssa.BasicBlockID)
-		for i, l := range ectx.SsaBlockIDToLabels {
-			labelToSSABlockID[l] = ssa.BasicBlockID(i)
+	for {
+		if len(m.unresolvedAddressModes) > 0 {
+			arg0offset, ret0offset := m.arg0OffsetFromSP(), m.ret0OffsetFromSP()
+			for _, i := range m.unresolvedAddressModes {
+				m.resolveAddressingMode(arg0offset, ret0offset, i)
+			}
 		}
-		fnIndex = wazevoapi.GetCurrentFunctionIndex(ctx)
-	}
 
-	// Next, in order to determine the offsets of relative jumps, we have to calculate the size of each label.
-	var offset int64
-	for i, pos := range ectx.OrderedBlockLabels {
-		pos.BinaryOffset = offset
-		var size int64
-		for cur := pos.Begin; ; cur = cur.next {
-			switch cur.kind {
-			case nop0:
-				l := cur.nop0Label()
-				if pos, ok := ectx.LabelPositions[l]; ok {
-					pos.BinaryOffset = offset + size
-				}
-			case condBr:
-				if !cur.condBrOffsetResolved() {
-					var nextLabel label
-					if i < len(ectx.OrderedBlockLabels)-1 {
-						// Note: this is only used when the block ends with fallthrough,
-						// therefore can be safely assumed that the next block exists when it's needed.
-						nextLabel = ectx.OrderedBlockLabels[i+1].L
+		// Reuse the slice to gather the unresolved conditional branches.
+		m.condBrRelocs = m.condBrRelocs[:0]
+
+		var fn string
+		var fnIndex int
+		var labelToSSABlockID map[label]ssa.BasicBlockID
+		if wazevoapi.PerfMapEnabled {
+			fn = wazevoapi.GetCurrentFunctionName(ctx)
+			labelToSSABlockID = make(map[label]ssa.BasicBlockID)
+			for i, l := range ectx.SsaBlockIDToLabels {
+				labelToSSABlockID[l] = ssa.BasicBlockID(i)
+			}
+			fnIndex = wazevoapi.GetCurrentFunctionIndex(ctx)
+		}
+
+		// Next, in order to determine the offsets of relative jumps, we have to calculate the size of each label.
+		var offset int64
+		for i, pos := range ectx.OrderedBlockLabels {
+			pos.BinaryOffset = offset
+			var size int64
+			for cur := pos.Begin; ; cur = cur.next {
+				switch cur.kind {
+				case nop0:
+					l := cur.nop0Label()
+					if pos, ok := ectx.LabelPositions[l]; ok {
+						pos.BinaryOffset = offset + size
 					}
-					m.condBrRelocs = append(m.condBrRelocs, condBrReloc{
-						cbr: cur, currentLabelPos: pos, offset: offset + size,
-						nextLabel: nextLabel,
-					})
+				case condBr:
+					if !cur.condBrOffsetResolved() {
+						var nextLabel label
+						if i < len(ectx.OrderedBlockLabels)-1 {
+							// Note: this is only used when the block ends with fallthrough,
+							// therefore can be safely assumed that the next block exists when it's needed.
+							nextLabel = ectx.OrderedBlockLabels[i+1].L
+						}
+						m.condBrRelocs = append(m.condBrRelocs, condBrReloc{
+							cbr: cur, currentLabelPos: pos, offset: offset + size,
+							nextLabel: nextLabel,
+						})
+					}
+				}
+				size += cur.size()
+				if cur == pos.End {
+					break
 				}
 			}
-			size += cur.size()
-			if cur == pos.End {
-				break
-			}
-		}
 
-		if wazevoapi.PerfMapEnabled {
-			if size > 0 {
-				l := pos.L
-				var labelStr string
-				if blkID, ok := labelToSSABlockID[l]; ok {
-					labelStr = fmt.Sprintf("%s::SSA_Block[%s]", l, blkID)
-				} else {
-					labelStr = l.String()
+			if wazevoapi.PerfMapEnabled {
+				if size > 0 {
+					l := pos.L
+					var labelStr string
+					if blkID, ok := labelToSSABlockID[l]; ok {
+						labelStr = fmt.Sprintf("%s::SSA_Block[%s]", l, blkID)
+					} else {
+						labelStr = l.String()
+					}
+					wazevoapi.PerfMap.AddModuleEntry(fnIndex, offset, uint64(size), fmt.Sprintf("%s:::::%s", fn, labelStr))
 				}
-				wazevoapi.PerfMap.AddModuleEntry(fnIndex, offset, uint64(size), fmt.Sprintf("%s:::::%s", fn, labelStr))
+			}
+			offset += size
+		}
+
+		// Before resolving any offsets, we need to check if all the conditional branches can be resolved.
+		var needRerun bool
+		for i := range m.condBrRelocs {
+			reloc := &m.condBrRelocs[i]
+			cbr := reloc.cbr
+			offset := reloc.offset
+
+			target := cbr.condBrLabel()
+			offsetOfTarget := ectx.LabelPositions[target].BinaryOffset
+			diff := offsetOfTarget - offset
+			if divided := diff >> 2; divided < minSignedInt19 || divided > maxSignedInt19 {
+				// This case the conditional branch is too huge. We place the trampoline instructions at the end of the current block,
+				// and jump to it.
+				m.insertConditionalJumpTrampoline(cbr, reloc.currentLabelPos, reloc.nextLabel)
+				// Then, we need to recall this function to fix up the label offsets
+				// as they have changed after the trampoline is inserted.
+				needRerun = true
 			}
 		}
-		offset += size
-	}
-
-	// Before resolving any offsets, we need to check if all the conditional branches can be resolved.
-	var needRerun bool
-	for i := range m.condBrRelocs {
-		reloc := &m.condBrRelocs[i]
-		cbr := reloc.cbr
-		offset := reloc.offset
-
-		target := cbr.condBrLabel()
-		offsetOfTarget := ectx.LabelPositions[target].BinaryOffset
-		diff := offsetOfTarget - offset
-		if divided := diff >> 2; divided < minSignedInt19 || divided > maxSignedInt19 {
-			// This case the conditional branch is too huge. We place the trampoline instructions at the end of the current block,
-			// and jump to it.
-			m.insertConditionalJumpTrampoline(cbr, reloc.currentLabelPos, reloc.nextLabel)
-			// Then, we need to recall this function to fix up the label offsets
-			// as they have changed after the trampoline is inserted.
-			needRerun = true
+		if needRerun {
+			if wazevoapi.PerfMapEnabled {
+				wazevoapi.PerfMap.Clear()
+			}
+		} else {
+			break
 		}
-	}
-	if needRerun {
-		m.resolveRelativeAddresses(ctx)
-		if wazevoapi.PerfMapEnabled {
-			wazevoapi.PerfMap.Clear()
-		}
-		return
 	}
 
 	var currentOffset int64
