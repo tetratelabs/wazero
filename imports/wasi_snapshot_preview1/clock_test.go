@@ -259,7 +259,7 @@ func Test_clockTimeGet_Errors(t *testing.T) {
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig())
 	defer r.Close(testCtx)
 
-	memorySize := uint32(mod.Memory().Size())
+	memorySize := mod.Memory().Size()
 
 	tests := []struct {
 		name                     string
