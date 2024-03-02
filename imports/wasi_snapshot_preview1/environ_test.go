@@ -34,7 +34,7 @@ func Test_environGet(t *testing.T) {
 <== errno=ESUCCESS
 `, "\n"+log.String())
 
-	actual, ok := mod.Memory().Read(resultEnvironBuf-1, uint64(len(expectedMemory)))
+	actual, ok := mod.Memory().Read(resultEnvironBuf-1, uint32(len(expectedMemory)))
 	require.True(t, ok)
 	require.Equal(t, expectedMemory, actual)
 }
@@ -44,7 +44,7 @@ func Test_environGet_Errors(t *testing.T) {
 		WithEnv("a", "bc").WithEnv("b", "cd"))
 	defer r.Close(testCtx)
 
-	memorySize := uint32(mod.Memory().Size())
+	memorySize := mod.Memory().Size()
 	validAddress := uint32(0) // arbitrary valid address as arguments to environ_get. We chose 0 here.
 
 	tests := []struct {
@@ -128,7 +128,7 @@ func Test_environSizesGet(t *testing.T) {
 <== errno=ESUCCESS
 `, "\n"+log.String())
 
-	actual, ok := mod.Memory().Read(resultEnvironc-1, uint64(len(expectedMemory)))
+	actual, ok := mod.Memory().Read(resultEnvironc-1, uint32(len(expectedMemory)))
 	require.True(t, ok)
 	require.Equal(t, expectedMemory, actual)
 }
@@ -138,7 +138,7 @@ func Test_environSizesGet_Errors(t *testing.T) {
 		WithEnv("a", "b").WithEnv("b", "cd"))
 	defer r.Close(testCtx)
 
-	memorySize := uint32(mod.Memory().Size())
+	memorySize := mod.Memory().Size()
 	validAddress := uint32(0) // arbitrary
 
 	tests := []struct {

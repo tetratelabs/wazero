@@ -818,7 +818,7 @@ func testMemOps(t *testing.T, r wazero.Runtime) {
 	results, err = sizeFn.Call(testCtx)
 	require.NoError(t, err)
 	require.Equal(t, uint64(1), results[0])        // 1 page
-	require.Equal(t, uint64(65536), memory.Size()) // 64KB
+	require.Equal(t, uint32(65536), memory.Size()) // 64KB
 
 	// Grow again so that the memory size matches memory capacity.
 	results, err = growFn.Call(testCtx, 1)
@@ -1055,7 +1055,7 @@ func testCall(t *testing.T, r wazero.Runtime) {
 // * Wasm code calls wasm.OpcodeMemoryGrowName and this changes the capacity (by default, it will).
 func testModuleMemory(t *testing.T, r wazero.Runtime) {
 	wasmPhrase := "Well, that'll be the day when you say goodbye."
-	wasmPhraseSize := uint64(len(wasmPhrase))
+	wasmPhraseSize := uint32(len(wasmPhrase))
 
 	one := uint32(1)
 
@@ -1109,7 +1109,7 @@ func testModuleMemory(t *testing.T, r wazero.Runtime) {
 	require.Equal(t, wasmPhrase, string(buf))
 
 	hostPhrase := "Goodbye, cruel world. I'm off to join the circus." // Intentionally slightly longer.
-	hostPhraseSize := uint64(len(hostPhrase))
+	hostPhraseSize := uint32(len(hostPhrase))
 
 	// Copy over the buffer, which should stop at the current length.
 	copy(buf, hostPhrase)

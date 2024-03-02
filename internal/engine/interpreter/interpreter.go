@@ -4024,7 +4024,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 				panic(wasmruntime.ErrRuntimeUnalignedAtomic)
 			}
 			// Just a bounds check
-			if int(offset) >= len(memoryInst.Buffer) {
+			if offset >= memoryInst.Size() {
 				panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 			}
 			res := memoryInst.Notify(offset, uint32(count))

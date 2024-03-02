@@ -263,7 +263,7 @@ func writeRef(_ context.Context, _ api.Module, w Writer, i uint32, vals []uint64
 
 func writeMemI32(_ context.Context, mod api.Module, w Writer, i uint32, vals []uint64) {
 	offset := uint32(vals[i])
-	byteCount := uint64(4)
+	byteCount := uint32(4)
 	if v, ok := mod.Memory().ReadUint32Le(offset); ok {
 		w.WriteString(strconv.FormatInt(int64(int32(v)), 10)) //nolint
 	} else { // log the positions that were out of memory
@@ -273,7 +273,7 @@ func writeMemI32(_ context.Context, mod api.Module, w Writer, i uint32, vals []u
 
 func writeMemH64(_ context.Context, mod api.Module, w Writer, i uint32, vals []uint64) {
 	offset := uint32(vals[i])
-	byteCount := uint64(8)
+	byteCount := uint32(8)
 	if s, ok := mod.Memory().Read(offset, byteCount); ok {
 		hex.NewEncoder(w).Write(s) //nolint
 	} else { // log the positions that were out of memory
@@ -283,10 +283,10 @@ func writeMemH64(_ context.Context, mod api.Module, w Writer, i uint32, vals []u
 
 func writeString(_ context.Context, mod api.Module, w Writer, i uint32, vals []uint64) {
 	offset, byteCount := uint32(vals[i]), uint32(vals[i+1])
-	WriteStringOrOOM(mod.Memory(), w, offset, uint64(byteCount))
+	WriteStringOrOOM(mod.Memory(), w, offset, byteCount)
 }
 
-func WriteStringOrOOM(mem api.Memory, w Writer, offset uint32, byteCount uint64) {
+func WriteStringOrOOM(mem api.Memory, w Writer, offset, byteCount uint32) {
 	if s, ok := mem.Read(offset, byteCount); ok {
 		w.Write(s) //nolint
 	} else { // log the positions that were out of memory
@@ -294,7 +294,7 @@ func WriteStringOrOOM(mem api.Memory, w Writer, offset uint32, byteCount uint64)
 	}
 }
 
-func WriteOOM(w Writer, offset uint32, byteCount uint64) {
+func WriteOOM(w Writer, offset uint32, byteCount uint32) {
 	w.WriteString("OOM(")                       //nolint
 	w.WriteString(strconv.Itoa(int(offset)))    //nolint
 	w.WriteByte(',')                            //nolint

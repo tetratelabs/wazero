@@ -233,7 +233,7 @@ func Test_fdFdstatGet(t *testing.T) {
 	file, dir := "animals.txt", "sub"
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fstest.FS))
 	defer r.Close(testCtx)
-	memorySize := uint32(mod.Memory().Size())
+	memorySize := mod.Memory().Size()
 
 	// open both paths without using WASI
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
@@ -380,7 +380,7 @@ func Test_fdFdstatGet(t *testing.T) {
 			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.FdFdstatGetName, uint64(tc.fd), uint64(tc.resultFdstat))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
-			actual, ok := mod.Memory().Read(0, uint64(len(tc.expectedMemory)))
+			actual, ok := mod.Memory().Read(0, uint32(len(tc.expectedMemory)))
 			require.True(t, ok)
 			require.Equal(t, tc.expectedMemory, actual)
 		})
@@ -472,7 +472,7 @@ func Test_fdFdstatGet_StdioNonblock(t *testing.T) {
 			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.FdFdstatGetName, uint64(tc.fd), uint64(tc.resultFdstat))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
-			actual, ok := mod.Memory().Read(0, uint64(len(tc.expectedMemory)))
+			actual, ok := mod.Memory().Read(0, uint32(len(tc.expectedMemory)))
 			require.True(t, ok)
 			require.Equal(t, tc.expectedMemory, actual)
 		})
@@ -659,7 +659,7 @@ func Test_fdFilestatGet(t *testing.T) {
 	file, dir := "animals.txt", "sub"
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fstest.FS))
 	defer r.Close(testCtx)
-	memorySize := uint32(mod.Memory().Size())
+	memorySize := mod.Memory().Size()
 
 	// open both paths without using WASI
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
@@ -822,7 +822,7 @@ func Test_fdFilestatGet(t *testing.T) {
 			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.FdFilestatGetName, uint64(tc.fd), uint64(tc.resultFilestat))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
-			actual, ok := mod.Memory().Read(0, uint64(len(tc.expectedMemory)))
+			actual, ok := mod.Memory().Read(0, uint32(len(tc.expectedMemory)))
 			require.True(t, ok)
 			require.Equal(t, tc.expectedMemory, actual)
 		})
@@ -1160,7 +1160,7 @@ func Test_fdPread(t *testing.T) {
 			requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdPreadName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(tc.offset), uint64(resultNread))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
-			actual, ok := mod.Memory().Read(0, uint64(len(tc.expectedMemory)))
+			actual, ok := mod.Memory().Read(0, uint32(len(tc.expectedMemory)))
 			require.True(t, ok)
 			require.Equal(t, tc.expectedMemory, actual)
 		})
@@ -1200,7 +1200,7 @@ func Test_fdPread_offset(t *testing.T) {
 	require.True(t, ok)
 
 	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdPreadName, uint64(fd), uint64(iovs), uint64(iovsCount), 2, uint64(resultNread))
-	actual, ok := mod.Memory().Read(0, uint64(len(expectedMemory)))
+	actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
 	require.True(t, ok)
 	require.Equal(t, expectedMemory, actual)
 
@@ -1217,7 +1217,7 @@ func Test_fdPread_offset(t *testing.T) {
 	)
 
 	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdReadName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultNread))
-	actual, ok = mod.Memory().Read(0, uint64(len(expectedMemory)))
+	actual, ok = mod.Memory().Read(0, uint32(len(expectedMemory)))
 	require.True(t, ok)
 	require.Equal(t, expectedMemory, actual)
 
@@ -1388,7 +1388,7 @@ func Test_fdPrestatGet(t *testing.T) {
 <== (prestat={pr_name_len=1},errno=ESUCCESS)
 `, "\n"+log.String())
 
-	actual, ok := mod.Memory().Read(0, uint64(len(expectedMemory)))
+	actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
 	require.True(t, ok)
 	require.Equal(t, expectedMemory, actual)
 }
@@ -1397,7 +1397,7 @@ func Test_fdPrestatGet_Errors(t *testing.T) {
 	mod, dirFD, log, r := requireOpenFile(t, t.TempDir(), "tmp", nil, true)
 	defer r.Close(testCtx)
 
-	memorySize := uint32(mod.Memory().Size())
+	memorySize := mod.Memory().Size()
 	tests := []struct {
 		name          string
 		fd            int32
@@ -1468,7 +1468,7 @@ func Test_fdPrestatDirName(t *testing.T) {
 <== (path=,errno=ESUCCESS)
 `, "\n"+log.String())
 
-	actual, ok := mod.Memory().Read(0, uint64(len(expectedMemory)))
+	actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
 	require.True(t, ok)
 	require.Equal(t, expectedMemory, actual)
 }
@@ -1477,7 +1477,7 @@ func Test_fdPrestatDirName_Errors(t *testing.T) {
 	mod, dirFD, log, r := requireOpenFile(t, t.TempDir(), "tmp", nil, true)
 	defer r.Close(testCtx)
 
-	memorySize := uint32(mod.Memory().Size())
+	memorySize := mod.Memory().Size()
 	maskMemory(t, mod, 10)
 
 	validAddress := uint32(0) // Arbitrary valid address as arguments to fd_prestat_dir_name. We chose 0 here.
@@ -1634,7 +1634,7 @@ func Test_fdPwrite(t *testing.T) {
 			requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdPwriteName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(tc.offset), uint64(resultNwritten))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
-			actual, ok := mod.Memory().Read(0, uint64(len(tc.expectedMemory)))
+			actual, ok := mod.Memory().Read(0, uint32(len(tc.expectedMemory)))
 			require.True(t, ok)
 			require.Equal(t, tc.expectedMemory, actual)
 
@@ -1680,7 +1680,7 @@ func Test_fdPwrite_offset(t *testing.T) {
 
 	// Write the last half first, to offset 3
 	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdPwriteName, uint64(fd), uint64(iovs), uint64(iovsCount), 3, uint64(resultNwritten))
-	actual, ok := mod.Memory().Read(0, uint64(len(expectedMemory)))
+	actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
 	require.True(t, ok)
 	require.Equal(t, expectedMemory, actual)
 
@@ -1704,7 +1704,7 @@ func Test_fdPwrite_offset(t *testing.T) {
 	require.True(t, ok)
 
 	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdWriteName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultNwritten))
-	actual, ok = mod.Memory().Read(0, uint64(len(expectedMemory)))
+	actual, ok = mod.Memory().Read(0, uint32(len(expectedMemory)))
 	require.True(t, ok)
 	require.Equal(t, expectedMemory, actual)
 
@@ -1895,7 +1895,7 @@ func Test_fdRead(t *testing.T) {
 <== (nread=6,errno=ESUCCESS)
 `, "\n"+log.String())
 
-	actual, ok := mod.Memory().Read(0, uint64(len(expectedMemory)))
+	actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
 	require.True(t, ok)
 	require.Equal(t, expectedMemory, actual)
 }
@@ -2238,7 +2238,7 @@ func Test_fdReaddir(t *testing.T) {
 			require.True(t, ok)
 			require.Equal(t, tc.expectedBufused, bufused)
 
-			mem, ok := mod.Memory().Read(buf, uint64(bufused))
+			mem, ok := mod.Memory().Read(buf, bufused)
 			require.True(t, ok)
 
 			if tc.expectedMem != nil {
@@ -2304,7 +2304,7 @@ func Test_fdReaddir_Rewind(t *testing.T) {
 func Test_fdReaddir_Errors(t *testing.T) {
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fstest.FS))
 	defer r.Close(testCtx)
-	memLen := uint32(mod.Memory().Size())
+	memLen := mod.Memory().Size()
 
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
 	preopen := fsc.RootFS()
@@ -2621,7 +2621,7 @@ func Test_fdSeek(t *testing.T) {
 			requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdSeekName, uint64(fd), uint64(tc.offset), uint64(tc.whence), uint64(resultNewoffset))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
-			actual, ok := mod.Memory().Read(0, uint64(len(tc.expectedMemory)))
+			actual, ok := mod.Memory().Read(0, uint32(len(tc.expectedMemory)))
 			require.True(t, ok)
 			require.Equal(t, tc.expectedMemory, actual)
 
@@ -2640,7 +2640,7 @@ func Test_fdSeek_Errors(t *testing.T) {
 	require.Zero(t, fsc.RootFS().Mkdir("dir", 0o0777))
 	dirFD := requireOpenFD(t, mod, "dir")
 
-	memorySize := uint32(mod.Memory().Size())
+	memorySize := mod.Memory().Size()
 
 	tests := []struct {
 		name                    string
@@ -2778,7 +2778,7 @@ func Test_fdTell(t *testing.T) {
 	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.FdTellName, uint64(fd), uint64(resultNewoffset))
 	require.Equal(t, expectedLog, "\n"+log.String())
 
-	actual, ok := mod.Memory().Read(0, uint64(len(expectedMemory)))
+	actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
 	require.True(t, ok)
 	require.Equal(t, expectedMemory, actual)
 
@@ -2791,7 +2791,7 @@ func Test_fdTell_Errors(t *testing.T) {
 	mod, fd, log, r := requireOpenFile(t, t.TempDir(), "test_path", []byte("wazero"), true)
 	defer r.Close(testCtx)
 
-	memorySize := uint32(mod.Memory().Size())
+	memorySize := mod.Memory().Size()
 
 	tests := []struct {
 		name            string
@@ -2869,7 +2869,7 @@ func Test_fdWrite(t *testing.T) {
 <== (nwritten=6,errno=ESUCCESS)
 `, "\n"+log.String())
 
-	actual, ok := mod.Memory().Read(0, uint64(len(expectedMemory)))
+	actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
 	require.True(t, ok)
 	require.Equal(t, expectedMemory, actual)
 
@@ -2888,7 +2888,7 @@ func Test_fdWrite_Errors(t *testing.T) {
 
 	// Setup valid test memory
 	iovsCount := uint32(1)
-	memSize := uint32(mod.Memory().Size())
+	memSize := mod.Memory().Size()
 
 	tests := []struct {
 		name                 string
@@ -3058,7 +3058,7 @@ func Test_pathCreateDirectory_Errors(t *testing.T) {
 		{
 			name:          "out-of-memory reading path",
 			fd:            sys.FdPreopen,
-			path:          uint32(mod.Memory().Size()),
+			path:          mod.Memory().Size(),
 			pathLen:       1,
 			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
@@ -3070,7 +3070,7 @@ func Test_pathCreateDirectory_Errors(t *testing.T) {
 			name:          "out-of-memory reading pathLen",
 			fd:            sys.FdPreopen,
 			path:          0,
-			pathLen:       uint32(mod.Memory().Size()) + 1, // path is in the valid memory range, but pathLen is OOM for path
+			pathLen:       mod.Memory().Size() + 1, // path is in the valid memory range, but pathLen is OOM for path
 			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_create_directory(fd=3,path=OOM(0,65537))
@@ -3126,7 +3126,7 @@ func Test_pathFilestatGet(t *testing.T) {
 
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fstest.FS))
 	defer r.Close(testCtx)
-	memorySize := uint32(mod.Memory().Size())
+	memorySize := mod.Memory().Size()
 
 	fileFD := requireOpenFD(t, mod, file)
 
@@ -3405,7 +3405,7 @@ func Test_pathFilestatGet(t *testing.T) {
 			requireErrnoResult(t, tc.expectedErrno, mod, wasip1.PathFilestatGetName, uint64(tc.fd), uint64(tc.flags), uint64(1), uint64(tc.pathLen), uint64(tc.resultFilestat))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
-			actual, ok := mod.Memory().Read(0, uint64(len(tc.expectedMemory)))
+			actual, ok := mod.Memory().Read(0, uint32(len(tc.expectedMemory)))
 			require.True(t, ok)
 			require.Equal(t, tc.expectedMemory, actual)
 		})
@@ -4078,7 +4078,7 @@ func Test_pathOpen_Errors(t *testing.T) {
 		{
 			name:          "out-of-memory reading path",
 			fd:            sys.FdPreopen,
-			path:          uint32(mod.Memory().Size()),
+			path:          mod.Memory().Size(),
 			pathLen:       uint32(len(file)),
 			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
@@ -4090,7 +4090,7 @@ func Test_pathOpen_Errors(t *testing.T) {
 			name:          "out-of-memory reading pathLen",
 			fd:            sys.FdPreopen,
 			path:          0,
-			pathLen:       uint32(mod.Memory().Size()) + 1, // path is in the valid memory range, but pathLen is OOM for path
+			pathLen:       mod.Memory().Size() + 1, // path is in the valid memory range, but pathLen is OOM for path
 			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=OOM(0,65537),oflags=,fs_rights_base=,fs_rights_inheriting=,fdflags=)
@@ -4163,7 +4163,7 @@ func Test_pathOpen_Errors(t *testing.T) {
 			pathName:       dir,
 			path:           0,
 			pathLen:        uint32(len(dir)),
-			resultOpenedFd: uint32(mod.Memory().Size()), // path and pathLen correctly point to the right path, but where to write the opened FD is outside memory.
+			resultOpenedFd: mod.Memory().Size(), // path and pathLen correctly point to the right path, but where to write the opened FD is outside memory.
 			expectedErrno:  wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=dir,oflags=,fs_rights_base=,fs_rights_inheriting=,fdflags=)
@@ -4277,7 +4277,7 @@ func Test_pathReadlink(t *testing.T) {
 
 				size, ok := mem.ReadUint32Le(resultBufused)
 				require.True(t, ok)
-				actual, ok := mem.Read(buf, uint64(size))
+				actual, ok := mem.Read(buf, size)
 				require.True(t, ok)
 				require.Equal(t, tc.expectedBuf, string(actual))
 			})
@@ -4416,7 +4416,7 @@ func Test_pathRemoveDirectory_Errors(t *testing.T) {
 		{
 			name:          "out-of-memory reading path",
 			fd:            sys.FdPreopen,
-			path:          uint32(mod.Memory().Size()),
+			path:          mod.Memory().Size(),
 			pathLen:       1,
 			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
@@ -4428,7 +4428,7 @@ func Test_pathRemoveDirectory_Errors(t *testing.T) {
 			name:          "out-of-memory reading pathLen",
 			fd:            sys.FdPreopen,
 			path:          0,
-			pathLen:       uint32(mod.Memory().Size()) + 1, // path is in the valid memory range, but pathLen is OOM for path
+			pathLen:       mod.Memory().Size() + 1, // path is in the valid memory range, but pathLen is OOM for path
 			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_remove_directory(fd=3,path=OOM(0,65537))
@@ -4682,7 +4682,7 @@ func Test_pathRename_Errors(t *testing.T) {
 			name:          "out-of-memory reading old path",
 			oldFd:         sys.FdPreopen,
 			newFd:         sys.FdPreopen,
-			oldPath:       uint32(mod.Memory().Size()),
+			oldPath:       mod.Memory().Size(),
 			oldPathLen:    1,
 			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
@@ -4697,7 +4697,7 @@ func Test_pathRename_Errors(t *testing.T) {
 			oldPath:       0,
 			oldPathName:   "a",
 			oldPathLen:    1,
-			newPath:       uint32(mod.Memory().Size()),
+			newPath:       mod.Memory().Size(),
 			newPathLen:    1,
 			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
@@ -4710,7 +4710,7 @@ func Test_pathRename_Errors(t *testing.T) {
 			oldFd:         sys.FdPreopen,
 			newFd:         sys.FdPreopen,
 			oldPath:       0,
-			oldPathLen:    uint32(mod.Memory().Size()) + 1, // path is in the valid memory range, but pathLen is OOM for path
+			oldPathLen:    mod.Memory().Size() + 1, // path is in the valid memory range, but pathLen is OOM for path
 			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_rename(fd=3,old_path=OOM(0,65537),new_fd=3,new_path=)
@@ -4724,7 +4724,7 @@ func Test_pathRename_Errors(t *testing.T) {
 			oldPathName:   file,
 			oldPathLen:    uint32(len(file)),
 			newPath:       0,
-			newPathLen:    uint32(mod.Memory().Size()) + 1, // path is in the valid memory range, but pathLen is OOM for path
+			newPathLen:    mod.Memory().Size() + 1, // path is in the valid memory range, but pathLen is OOM for path
 			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_rename(fd=3,old_path=file,new_fd=3,new_path=OOM(0,65537))
@@ -4853,7 +4853,7 @@ func Test_pathUnlinkFile_Errors(t *testing.T) {
 		{
 			name:          "out-of-memory reading path",
 			fd:            sys.FdPreopen,
-			path:          uint32(mod.Memory().Size()),
+			path:          mod.Memory().Size(),
 			pathLen:       1,
 			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
@@ -4865,7 +4865,7 @@ func Test_pathUnlinkFile_Errors(t *testing.T) {
 			name:          "out-of-memory reading pathLen",
 			fd:            sys.FdPreopen,
 			path:          0,
-			pathLen:       uint32(mod.Memory().Size()) + 1, // path is in the valid memory range, but pathLen is OOM for path
+			pathLen:       mod.Memory().Size() + 1, // path is in the valid memory range, but pathLen is OOM for path
 			expectedErrno: wasip1.ErrnoFault,
 			expectedLog: `
 ==> wasi_snapshot_preview1.path_unlink_file(fd=3,path=OOM(0,65537))
@@ -4990,7 +4990,7 @@ func Test_fdReaddir_dotEntryHasARealInode(t *testing.T) {
 
 	used, _ := mem.ReadUint32Le(resultBufused)
 
-	results, _ := mem.Read(buf, uint64(used))
+	results, _ := mem.Read(buf, used)
 	require.Equal(t, dirents, results)
 }
 
@@ -5059,7 +5059,7 @@ func Test_fdReaddir_opened_file_written(t *testing.T) {
 
 	used, _ := mem.ReadUint32Le(resultBufused)
 
-	results, _ := mem.Read(buf, uint64(used))
+	results, _ := mem.Read(buf, used)
 	require.Equal(t, dirents, results)
 }
 

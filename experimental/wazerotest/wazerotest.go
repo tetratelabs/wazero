@@ -507,8 +507,8 @@ func (m *Memory) Definition() api.MemoryDefinition {
 	return memoryDefinition{memory: m}
 }
 
-func (m *Memory) Size() uint64 {
-	return uint64(len(m.Bytes))
+func (m *Memory) Size() uint32 {
+	return uint32(len(m.Bytes))
 }
 
 func (m *Memory) Grow(deltaPages uint32) (previousPages uint32, ok bool) {
@@ -561,11 +561,11 @@ func (m *Memory) ReadFloat64Le(offset uint32) (float64, bool) {
 	return math.Float64frombits(v), ok
 }
 
-func (m *Memory) Read(offset uint32, length uint64) ([]byte, bool) {
+func (m *Memory) Read(offset, length uint32) ([]byte, bool) {
 	if m.isOutOfRange(offset, length) {
 		return nil, false
 	}
-	return m.Bytes[offset : uint64(offset)+length : uint64(offset)+length], true
+	return m.Bytes[offset : offset+length : offset+length], true
 }
 
 func (m *Memory) WriteByte(offset uint32, value byte) bool {
@@ -609,7 +609,7 @@ func (m *Memory) WriteFloat64Le(offset uint32, value float64) bool {
 }
 
 func (m *Memory) Write(offset uint32, value []byte) bool {
-	if m.isOutOfRange(offset, uint64(len(value))) {
+	if m.isOutOfRange(offset, uint32(len(value))) {
 		return false
 	}
 	copy(m.Bytes[offset:], value)
@@ -617,16 +617,15 @@ func (m *Memory) Write(offset uint32, value []byte) bool {
 }
 
 func (m *Memory) WriteString(offset uint32, value string) bool {
-	if m.isOutOfRange(offset, uint64(len(value))) {
+	if m.isOutOfRange(offset, uint32(len(value))) {
 		return false
 	}
 	copy(m.Bytes[offset:], value)
 	return true
 }
 
-func (m *Memory) isOutOfRange(_offset uint32, length uint64) bool {
+func (m *Memory) isOutOfRange(offset, length uint32) bool {
 	size := m.Size()
-	offset := uint64(_offset)
 	return offset >= size || length > size || offset > (size-length)
 }
 

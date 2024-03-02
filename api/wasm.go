@@ -563,7 +563,7 @@ type Memory interface {
 	// has 1 page: 65536
 	//
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#-hrefsyntax-instr-memorymathsfmemorysize%E2%91%A0
-	Size() uint64
+	Size() uint32
 
 	// Grow increases memory by the delta in pages (65536 bytes per page).
 	// The return val is the previous memory size in pages, or false if the
@@ -635,7 +635,7 @@ type Memory interface {
 	// shared. Those who need a stable view must set Wasm memory min=max, or
 	// use wazero.RuntimeConfig WithMemoryCapacityPages to ensure max is always
 	// allocated.
-	Read(offset uint32, byteCount uint64) ([]byte, bool)
+	Read(offset, byteCount uint32) ([]byte, bool)
 
 	// WriteByte writes a single byte to the underlying buffer at the offset in or returns false if out of range.
 	WriteByte(offset uint32, v byte) bool

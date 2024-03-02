@@ -98,7 +98,7 @@ func run() error {
 	greetingPtr := uint32(ptrSize[0] >> 32)
 	greetingSize := uint32(ptrSize[0])
 	// The pointer is a linear memory offset, which is where we write the name.
-	if bytes, ok := mod.Memory().Read(greetingPtr, uint64(greetingSize)); !ok {
+	if bytes, ok := mod.Memory().Read(greetingPtr, greetingSize); !ok {
 		return fmt.Errorf("Memory.Read(%d, %d) out of range of memory size %d",
 			greetingPtr, greetingSize, mod.Memory().Size())
 	} else {
@@ -109,7 +109,7 @@ func run() error {
 }
 
 func logString(_ context.Context, m api.Module, offset, byteCount uint32) {
-	buf, ok := m.Memory().Read(offset, uint64(byteCount))
+	buf, ok := m.Memory().Read(offset, byteCount)
 	if !ok {
 		log.Panicf("Memory.Read(%d, %d) out of range", offset, byteCount)
 	}

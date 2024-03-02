@@ -23,7 +23,7 @@ func TestModuleInstance_Memory(t *testing.T) {
 		name        string
 		input       *Module
 		expected    bool
-		expectedLen uint64
+		expectedLen uint32
 	}{
 		{
 			name:  "no memory",

@@ -305,7 +305,7 @@ func readAssemblyScriptString(mem api.Memory, offset uint32) (string, bool) {
 	if !ok || byteCount%2 != 0 {
 		return "", false
 	}
-	buf, ok := mem.Read(offset, uint64(byteCount))
+	buf, ok := mem.Read(offset, byteCount)
 	if !ok {
 		return "", false
 	}

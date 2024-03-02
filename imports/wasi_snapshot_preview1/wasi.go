@@ -233,12 +233,12 @@ func writeOffsetsAndNullTerminatedValues(mem api.Memory, values [][]byte, offset
 	// The caller may not place bytes directly after offsets, so we have to
 	// read them independently.
 	valuesLen := len(values)
-	offsetsLen := uint64(valuesLen) * 4
+	offsetsLen := uint32(valuesLen * 4) // uint32Le
 	offsetsBuf, ok := mem.Read(offsets, offsetsLen)
 	if !ok {
 		return sys.EFAULT
 	}
-	bytesBuf, ok := mem.Read(bytes, uint64(bytesLen))
+	bytesBuf, ok := mem.Read(bytes, bytesLen)
 	if !ok {
 		return sys.EFAULT
 	}
