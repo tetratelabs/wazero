@@ -310,6 +310,7 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 	}
 	cm.sharedFunctions = e.sharedFunctions
 	e.setFinalizer(cm.executables, executablesFinalizer)
+	fmt.Printf("executable size: %d\n", totalSize)
 	return cm, nil
 }
 
