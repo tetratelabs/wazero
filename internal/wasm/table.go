@@ -3,6 +3,7 @@ package wasm
 import (
 	"fmt"
 	"math"
+	"unsafe"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/leb128"
@@ -133,7 +134,7 @@ type TableInstance struct {
 type ElementInstance = []Reference
 
 // Reference is the runtime representation of RefType which is either RefTypeFuncref or RefTypeExternref.
-type Reference = uintptr
+type Reference = unsafe.Pointer
 
 // validateTable ensures any ElementSegment is valid. This caches results via Module.validatedActiveElementSegments.
 // Note: limitsType are validated by decoders, so not re-validated here.
@@ -314,7 +315,7 @@ func (t *TableInstance) Grow(delta uint32, initialRef Reference) (currentLen uin
 	newLen >= math.MaxUint32 || (t.Max != nil && newLen > int64(*t.Max)) {
 		return 0xffffffff // = -1 in signed 32-bit integer.
 	}
-	t.References = append(t.References, make([]uintptr, delta)...)
+	t.References = append(t.References, make([]Reference, delta)...)
 
 	// Uses the copy trick for faster filling the new region with the initial value.
 	// https://gist.github.com/taylorza/df2f89d5f9ab3ffd06865062a4cf015d

@@ -836,7 +836,7 @@ func TestModule_buildTables(t *testing.T) {
 			},
 			importedGlobals: []*GlobalInstance{{Type: GlobalType{ValType: ValueTypeI32}, Val: 1}},
 			importedTables:  []*TableInstance{{References: make([]Reference, 2), Min: 2}},
-			expectedTables:  []*TableInstance{{Min: 2, References: []Reference{0, 0}}},
+			expectedTables:  []*TableInstance{{Min: 2, References: []Reference{nil, nil}}},
 		},
 		{
 			name: "imported global derived element offset - ignores min on imported table",
@@ -854,7 +854,7 @@ func TestModule_buildTables(t *testing.T) {
 			},
 			importedGlobals: []*GlobalInstance{{Type: GlobalType{ValType: ValueTypeI32}, Val: 1}},
 			importedTables:  []*TableInstance{{References: make([]Reference, 2), Min: 2}},
-			expectedTables:  []*TableInstance{{Min: 2, References: []Reference{0, 0}}},
+			expectedTables:  []*TableInstance{{Min: 2, References: []Reference{nil, nil}}},
 		},
 		{
 			name: "imported global derived element offset - two indices",
@@ -1066,8 +1066,8 @@ func TestTableInstance_Grow(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			table := &TableInstance{References: make([]uintptr, tc.currentLen), Max: tc.max}
-			actual := table.Grow(tc.delta, 0)
+			table := &TableInstance{References: make([]Reference, tc.currentLen), Max: tc.max}
+			actual := table.Grow(tc.delta, nil)
 			require.Equal(t, tc.exp, actual)
 		})
 	}

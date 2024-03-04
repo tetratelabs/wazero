@@ -222,7 +222,7 @@ func (m *ModuleInstance) applyElements(elems []ElementSegment) {
 
 		if table.Type == RefTypeExternref {
 			for i := 0; i < len(elem.Init); i++ {
-				references[offset+uint32(i)] = Reference(0)
+				references[offset+uint32(i)] = nil
 			}
 		} else {
 			for i, init := range elem.Init {
@@ -233,7 +233,7 @@ func (m *ModuleInstance) applyElements(elems []ElementSegment) {
 				var ref Reference
 				if index, ok := unwrapElementInitGlobalReference(init); ok {
 					global := m.Globals[index]
-					ref = Reference(global.Val)
+					ref = Reference(uintptr(global.Val))
 				} else {
 					ref = m.Engine.FunctionInstanceReference(index)
 				}
@@ -558,7 +558,7 @@ func (g *GlobalInstance) initialize(importedGlobals []*GlobalInstance, expr *Con
 		}
 	case OpcodeRefFunc:
 		v, _, _ := leb128.LoadUint32(expr.Data)
-		g.Val = uint64(funcRefResolver(v))
+		g.Val = uint64(uintptr(funcRefResolver(v)))
 	case OpcodeVecV128Const:
 		g.Val, g.ValHi = binary.LittleEndian.Uint64(expr.Data[0:8]), binary.LittleEndian.Uint64(expr.Data[8:16])
 	}

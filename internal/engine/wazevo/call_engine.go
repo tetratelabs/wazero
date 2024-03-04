@@ -315,7 +315,7 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 			s := goCallStackView(c.execCtx.stackPointerBeforeGoCall)
 			tableIndex, num, ref := uint32(s[0]), uint32(s[1]), uintptr(s[2])
 			table := mod.Tables[tableIndex]
-			s[0] = uint64(uint32(int32(table.Grow(num, ref))))
+			s[0] = uint64(uint32(int32(table.Grow(num, unsafe.Pointer(ref)))))
 			c.execCtx.exitCode = wazevoapi.ExitCodeOK
 			afterGoFunctionCallEntrypoint(c.execCtx.goCallReturnAddress, c.execCtxPtr,
 				uintptr(unsafe.Pointer(c.execCtx.stackPointerBeforeGoCall)), c.execCtx.framePointerBeforeGoCall)
@@ -409,7 +409,7 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 			s := goCallStackView(c.execCtx.stackPointerBeforeGoCall)
 			funcIndex := wasm.Index(s[0])
 			ref := mod.Engine.FunctionInstanceReference(funcIndex)
-			s[0] = uint64(ref)
+			s[0] = uint64(uintptr(ref))
 			c.execCtx.exitCode = wazevoapi.ExitCodeOK
 			afterGoFunctionCallEntrypoint(c.execCtx.goCallReturnAddress, c.execCtxPtr,
 				uintptr(unsafe.Pointer(c.execCtx.stackPointerBeforeGoCall)), c.execCtx.framePointerBeforeGoCall)
