@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math"
 	"testing"
-	"unsafe"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
@@ -819,7 +818,7 @@ func TestModule_buildGlobals(t *testing.T) {
 
 	mi.buildGlobals(m, func(funcIndex Index) Reference {
 		require.Equal(t, localFuncRefInstructionIndex, funcIndex)
-		return unsafe.Pointer(uintptr(0x99999))
+		return Reference(uintptr(0x99999))
 	})
 	expectedGlobals := []*GlobalInstance{
 		imported[0], imported[1],

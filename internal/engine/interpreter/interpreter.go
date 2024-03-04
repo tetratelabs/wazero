@@ -1779,7 +1779,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 				panic(wasmruntime.ErrRuntimeInvalidTableAccess)
 			}
 
-			table.References[offset] = unsafe.Pointer(uintptr(ref)) // externrefs are opaque uint64.
+			table.References[offset] = asReference(ref) // externrefs are opaque uint64.
 			frame.pc++
 		case wazeroir.OperationKindTableSize:
 			table := tables[op.U1]
@@ -1788,13 +1788,13 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 		case wazeroir.OperationKindTableGrow:
 			table := tables[op.U1]
 			num, ref := ce.popValue(), ce.popValue()
-			ret := table.Grow(uint32(num), unsafe.Pointer(uintptr(ref)))
+			ret := table.Grow(uint32(num), asReference(ref))
 			ce.pushValue(uint64(ret))
 			frame.pc++
 		case wazeroir.OperationKindTableFill:
 			table := tables[op.U1]
 			num := ce.popValue()
-			ref := unsafe.Pointer(uintptr(ce.popValue()))
+			ref := asReference(ce.popValue())
 			offset := ce.popValue()
 			if num+offset > uint64(len(table.References)) {
 				panic(wasmruntime.ErrRuntimeInvalidTableAccess)
@@ -4579,4 +4579,8 @@ func (ce *callEngine) callGoFuncWithStack(ctx context.Context, m *wasm.ModuleIns
 	if shrinkLen := paramLen - resultLen; shrinkLen > 0 {
 		ce.stack = ce.stack[0 : len(ce.stack)-shrinkLen]
 	}
+}
+
+func asReference(ptr uint64) wasm.Reference {
+	return unsafe.Pointer(uintptr(ptr))
 }
