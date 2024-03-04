@@ -1281,7 +1281,7 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 			encodeRegMem(c, lp, opcode, 1, src, m, rex)
 		case operandKindReg:
 			r := dst.reg().RealReg()
-			encodeRegReg(c, lp, opcode, 1, regEncodings[r], src, rex)
+			encodeRegReg(c, lp, opcode, 1, src, regEncodings[r], rex)
 		default:
 			panic("BUG: invalid operand kind")
 		}

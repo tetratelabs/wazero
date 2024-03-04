@@ -3896,7 +3896,7 @@ func TestInstruction_format_encode(t *testing.T) {
 		},
 		{
 			setup:      func(i *instruction) { i.asXCHG(r11VReg, newOperandReg(r14VReg), 8) },
-			want:       "4d87f3",
+			want:       "4d87de",
 			wantFormat: "xchg.q %r11, %r14",
 		},
 		{
@@ -3906,27 +3906,27 @@ func TestInstruction_format_encode(t *testing.T) {
 		},
 		{
 			setup:      func(i *instruction) { i.asXCHG(r15VReg, newOperandReg(raxVReg), 8) },
-			want:       "4987c7",
+			want:       "4c87f8",
 			wantFormat: "xchg.q %r15, %rax",
 		},
 		{
 			setup:      func(i *instruction) { i.asXCHG(rbxVReg, newOperandReg(rsiVReg), 8) },
-			want:       "4887f3",
+			want:       "4887de",
 			wantFormat: "xchg.q %rbx, %rsi",
 		},
 		{
 			setup:      func(i *instruction) { i.asXCHG(r11VReg, newOperandReg(r14VReg), 4) },
-			want:       "4587f3",
+			want:       "4587de",
 			wantFormat: "xchg.l %r11, %r14",
 		},
 		{
 			setup:      func(i *instruction) { i.asXCHG(r15VReg, newOperandReg(raxVReg), 4) },
-			want:       "4187c7",
+			want:       "4487f8",
 			wantFormat: "xchg.l %r15, %rax",
 		},
 		{
 			setup:      func(i *instruction) { i.asXCHG(rbxVReg, newOperandReg(rsiVReg), 4) },
-			want:       "87f3",
+			want:       "87de",
 			wantFormat: "xchg.l %rbx, %rsi",
 		},
 		{
@@ -3936,17 +3936,17 @@ func TestInstruction_format_encode(t *testing.T) {
 		},
 		{
 			setup:      func(i *instruction) { i.asXCHG(r11VReg, newOperandReg(r14VReg), 2) },
-			want:       "664587f3",
+			want:       "664587de",
 			wantFormat: "xchg.w %r11, %r14",
 		},
 		{
 			setup:      func(i *instruction) { i.asXCHG(r15VReg, newOperandReg(raxVReg), 2) },
-			want:       "664187c7",
+			want:       "664487f8",
 			wantFormat: "xchg.w %r15, %rax",
 		},
 		{
 			setup:      func(i *instruction) { i.asXCHG(rbxVReg, newOperandReg(rsiVReg), 2) },
-			want:       "6687f3",
+			want:       "6687de",
 			wantFormat: "xchg.w %rbx, %rsi",
 		},
 		{
