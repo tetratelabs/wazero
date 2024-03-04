@@ -112,88 +112,98 @@ func passDeadBlockEliminationOpt(b *builder) {
 func passRedundantPhiEliminationOpt(b *builder) {
 	redundantParameterIndexes := b.ints[:0] // reuse the slice from previous iterations.
 
-	_ = b.blockIteratorBegin() // skip entry block!
-	// Below, we intentionally use the named iteration variable name, as this comes with inevitable nested for loops!
-	for blk := b.blockIteratorNext(); blk != nil; blk = b.blockIteratorNext() {
-		paramNum := len(blk.params)
+	for {
+		changed := false
+		_ = b.blockIteratorBegin() // skip entry block!
+		// Below, we intentionally use the named iteration variable name, as this comes with inevitable nested for loops!
+		for blk := b.blockIteratorNext(); blk != nil; blk = b.blockIteratorNext() {
+			paramNum := len(blk.params)
 
-		for paramIndex := 0; paramIndex < paramNum; paramIndex++ {
-			phiValue := blk.params[paramIndex].value
-			redundant := true
+			for paramIndex := 0; paramIndex < paramNum; paramIndex++ {
+				phiValue := blk.params[paramIndex].value
+				redundant := true
 
-			nonSelfReferencingValue := ValueInvalid
-			for predIndex := range blk.preds {
-				pred := blk.preds[predIndex].branch.vs.View()[paramIndex]
-				if pred == phiValue {
-					// This is self-referencing: PHI from the same PHI.
-					continue
+				nonSelfReferencingValue := ValueInvalid
+				for predIndex := range blk.preds {
+					br := blk.preds[predIndex].branch
+					b.resolveArgumentAlias(br)
+					pred := br.vs.View()[paramIndex]
+					if pred == phiValue {
+						// This is self-referencing: PHI from the same PHI.
+						continue
+					}
+
+					if !nonSelfReferencingValue.Valid() {
+						nonSelfReferencingValue = pred
+						continue
+					}
+
+					if nonSelfReferencingValue != pred {
+						redundant = false
+						break
+					}
 				}
 
 				if !nonSelfReferencingValue.Valid() {
-					nonSelfReferencingValue = pred
-					continue
+					// This shouldn't happen, and must be a bug in builder.go.
+					panic("BUG: params added but only self-referencing")
 				}
 
-				if nonSelfReferencingValue != pred {
-					redundant = false
-					break
+				if redundant {
+					b.redundantParameterIndexToValue[paramIndex] = nonSelfReferencingValue
+					redundantParameterIndexes = append(redundantParameterIndexes, paramIndex)
 				}
 			}
 
-			if !nonSelfReferencingValue.Valid() {
-				// This shouldn't happen, and must be a bug in builder.go.
-				panic("BUG: params added but only self-referencing")
+			if len(b.redundantParameterIndexToValue) == 0 {
+				continue
+			}
+			changed = true
+
+			// Remove the redundant PHIs from the argument list of branching instructions.
+			for predIndex := range blk.preds {
+				var cur int
+				predBlk := blk.preds[predIndex]
+				branchInst := predBlk.branch
+				view := branchInst.vs.View()
+				for argIndex, value := range view {
+					if _, ok := b.redundantParameterIndexToValue[argIndex]; !ok {
+						view[cur] = value
+						cur++
+					}
+				}
+				branchInst.vs.Cut(cur)
 			}
 
-			if redundant {
-				b.redundantParameterIndexToValue[paramIndex] = nonSelfReferencingValue
-				redundantParameterIndexes = append(redundantParameterIndexes, paramIndex)
+			// Still need to have the definition of the value of the PHI (previously as the parameter).
+			for _, redundantParamIndex := range redundantParameterIndexes {
+				phiValue := blk.params[redundantParamIndex].value
+				onlyValue := b.redundantParameterIndexToValue[redundantParamIndex]
+				// Create an alias in this block from the only phi argument to the phi value.
+				b.alias(phiValue, onlyValue)
 			}
-		}
 
-		if len(b.redundantParameterIndexToValue) == 0 {
-			continue
-		}
-
-		// Remove the redundant PHIs from the argument list of branching instructions.
-		for predIndex := range blk.preds {
+			// Finally, Remove the param from the blk.
 			var cur int
-			predBlk := blk.preds[predIndex]
-			branchInst := predBlk.branch
-			view := branchInst.vs.View()
-			for argIndex, value := range view {
-				if _, ok := b.redundantParameterIndexToValue[argIndex]; !ok {
-					view[cur] = value
+			for paramIndex := 0; paramIndex < paramNum; paramIndex++ {
+				param := blk.params[paramIndex]
+				if _, ok := b.redundantParameterIndexToValue[paramIndex]; !ok {
+					blk.params[cur] = param
 					cur++
 				}
 			}
-			branchInst.vs.Cut(cur)
-		}
+			blk.params = blk.params[:cur]
 
-		// Still need to have the definition of the value of the PHI (previously as the parameter).
-		for _, redundantParamIndex := range redundantParameterIndexes {
-			phiValue := blk.params[redundantParamIndex].value
-			onlyValue := b.redundantParameterIndexToValue[redundantParamIndex]
-			// Create an alias in this block from the only phi argument to the phi value.
-			b.alias(phiValue, onlyValue)
-		}
-
-		// Finally, Remove the param from the blk.
-		var cur int
-		for paramIndex := 0; paramIndex < paramNum; paramIndex++ {
-			param := blk.params[paramIndex]
-			if _, ok := b.redundantParameterIndexToValue[paramIndex]; !ok {
-				blk.params[cur] = param
-				cur++
+			// Clears the map for the next iteration.
+			for _, paramIndex := range redundantParameterIndexes {
+				delete(b.redundantParameterIndexToValue, paramIndex)
 			}
+			redundantParameterIndexes = redundantParameterIndexes[:0]
 		}
-		blk.params = blk.params[:cur]
 
-		// Clears the map for the next iteration.
-		for _, paramIndex := range redundantParameterIndexes {
-			delete(b.redundantParameterIndexToValue, paramIndex)
+		if !changed {
+			break
 		}
-		redundantParameterIndexes = redundantParameterIndexes[:0]
 	}
 
 	// Reuse the slice for the future passes.
