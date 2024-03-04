@@ -1633,7 +1633,11 @@ func (m *machine) lowerCall(si *ssa.Instruction) {
 	// Note: See machine.SetupPrologue for the stack layout.
 	// The stack pointer decrease/increase will be inserted later in the compilation.
 
-	for i, arg := range args {
+	for i := range args {
+		// Lower in reverse order to avoid spilling the register-based arguments to load stack-based ones.
+		// This will emperically reduce the size of executable code highly likely due to the less-number of spills.
+		i := len(args) - 1 - i
+		arg := args[i]
 		reg := m.c.VRegOf(arg)
 		def := m.c.ValueDefinition(arg)
 		m.callerGenVRegToFunctionArg(calleeABI, i, reg, def, stackSlotSize)
