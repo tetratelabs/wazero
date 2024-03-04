@@ -1043,3 +1043,16 @@ func Test2097(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unexpected end of function")
 }
+
+func Test2112(t *testing.T) {
+	bin, err := hex.DecodeString("0061736d0100000001050160017e00020100030201000404017000000a06010400fc300b")
+	require.NoError(t, err)
+	if !platform.CompilerSupported() {
+		return
+	}
+
+	r := wazero.NewRuntimeWithConfig(context.Background(), opt.NewRuntimeConfigOptimizingCompiler())
+	_, err = r.Instantiate(ctx, bin)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "invalid function[0]: unknown misc opcode 0x30")
+}

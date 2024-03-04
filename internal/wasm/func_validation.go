@@ -1090,6 +1090,8 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				for _, r := range results {
 					valueTypeStack.push(r)
 				}
+			} else {
+				return fmt.Errorf("unknown misc opcode %#x", miscOpcode)
 			}
 		} else if op == OpcodeVecPrefix {
 			pc++
@@ -1393,7 +1395,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				}
 				valueTypeStack.push(ValueTypeV128)
 			default:
-				return fmt.Errorf("TODO: SIMD instruction %s will be implemented in #506", vectorInstructionName[vecOpcode])
+				return fmt.Errorf("unknown SIMD instruction %s", vectorInstructionName[vecOpcode])
 			}
 		} else if op == OpcodeBlock {
 			br.Reset(body[pc+1:])
