@@ -172,7 +172,7 @@ func TestMachineSwap(t *testing.T) {
 			tmp: rdiVReg,
 			expected: `
 	ud2
-	xchg %r15, %rax
+	xchg.q %r15, %rax
 	exit_sequence %rsi
 `,
 		},
@@ -181,7 +181,7 @@ func TestMachineSwap(t *testing.T) {
 			x2: raxVReg,
 			expected: `
 	ud2
-	xchg %r15, %rax
+	xchg.q %r15, %rax
 	exit_sequence %rsi
 `,
 		},

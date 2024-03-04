@@ -3895,19 +3895,89 @@ func TestInstruction_format_encode(t *testing.T) {
 			wantFormat: "exit_sequence %r15",
 		},
 		{
-			setup:      func(i *instruction) { i.asXCHG(r11VReg, r14VReg) },
-			want:       "4d87f3",
-			wantFormat: "xchg %r11, %r14",
+			setup:      func(i *instruction) { i.asXCHG(r11VReg, newOperandReg(r14VReg), 8) },
+			want:       "4d87de",
+			wantFormat: "xchg.q %r11, %r14",
 		},
 		{
-			setup:      func(i *instruction) { i.asXCHG(r15VReg, raxVReg) },
-			want:       "4987c7",
-			wantFormat: "xchg %r15, %rax",
+			setup:      func(i *instruction) { i.asXCHG(r11VReg, newOperandMem(newAmodeImmReg(123, raxVReg)), 8) },
+			want:       "4c87587b",
+			wantFormat: "xchg.q %r11, 123(%rax)",
 		},
 		{
-			setup:      func(i *instruction) { i.asXCHG(rbxVReg, rsiVReg) },
-			want:       "4887f3",
-			wantFormat: "xchg %rbx, %rsi",
+			setup:      func(i *instruction) { i.asXCHG(r15VReg, newOperandReg(raxVReg), 8) },
+			want:       "4c87f8",
+			wantFormat: "xchg.q %r15, %rax",
+		},
+		{
+			setup:      func(i *instruction) { i.asXCHG(rbxVReg, newOperandReg(rsiVReg), 8) },
+			want:       "4887de",
+			wantFormat: "xchg.q %rbx, %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asXCHG(r11VReg, newOperandReg(r14VReg), 4) },
+			want:       "4587de",
+			wantFormat: "xchg.l %r11, %r14",
+		},
+		{
+			setup:      func(i *instruction) { i.asXCHG(r15VReg, newOperandReg(raxVReg), 4) },
+			want:       "4487f8",
+			wantFormat: "xchg.l %r15, %rax",
+		},
+		{
+			setup:      func(i *instruction) { i.asXCHG(rbxVReg, newOperandReg(rsiVReg), 4) },
+			want:       "87de",
+			wantFormat: "xchg.l %rbx, %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asXCHG(r11VReg, newOperandMem(newAmodeImmReg(123, raxVReg)), 4) },
+			want:       "4487587b",
+			wantFormat: "xchg.l %r11, 123(%rax)",
+		},
+		{
+			setup:      func(i *instruction) { i.asXCHG(r11VReg, newOperandReg(r14VReg), 2) },
+			want:       "664587de",
+			wantFormat: "xchg.w %r11, %r14",
+		},
+		{
+			setup:      func(i *instruction) { i.asXCHG(r15VReg, newOperandReg(raxVReg), 2) },
+			want:       "664487f8",
+			wantFormat: "xchg.w %r15, %rax",
+		},
+		{
+			setup:      func(i *instruction) { i.asXCHG(rbxVReg, newOperandReg(rsiVReg), 2) },
+			want:       "6687de",
+			wantFormat: "xchg.w %rbx, %rsi",
+		},
+		{
+			setup:      func(i *instruction) { i.asXCHG(r11VReg, newOperandMem(newAmodeImmReg(123, raxVReg)), 2) },
+			want:       "664487587b",
+			wantFormat: "xchg.w %r11, 123(%rax)",
+		},
+		{
+			setup:      func(i *instruction) { i.asXCHG(r11VReg, newOperandMem(newAmodeImmReg(123, raxVReg)), 1) },
+			want:       "4486587b",
+			wantFormat: "xchg.b %r11, 123(%rax)",
+		},
+		{
+			setup:      func(i *instruction) { i.asXCHG(r11VReg, newOperandMem(newAmodeImmReg(123, rdiVReg)), 1) },
+			want:       "44865f7b",
+			wantFormat: "xchg.b %r11, 123(%rdi)",
+		},
+		{
+			setup:      func(i *instruction) { i.asXCHG(rsiVReg, newOperandMem(newAmodeImmReg(123, raxVReg)), 1) },
+			want:       "4086707b",
+			wantFormat: "xchg.b %rsi, 123(%rax)",
+		},
+		{
+			setup:      func(i *instruction) { i.asXCHG(rdiVReg, newOperandMem(newAmodeImmReg(123, raxVReg)), 1) },
+			want:       "4086787b",
+			wantFormat: "xchg.b %rdi, 123(%rax)",
+		},
+		{
+			setup:      func(i *instruction) { i.asXCHG(rdiVReg, newOperandMem(newAmodeImmReg(123, rsiVReg)), 1) },
+			want:       "40867e7b",
+			wantFormat: "xchg.b %rdi, 123(%rsi)",
 		},
 		{
 			setup:      func(i *instruction) { i.asZeros(rbxVReg) },

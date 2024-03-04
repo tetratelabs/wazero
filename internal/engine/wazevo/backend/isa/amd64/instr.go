@@ -226,7 +226,18 @@ func (i *instruction) String() string {
 	case callIndirect:
 		return fmt.Sprintf("callq *%s", i.op1.format(true))
 	case xchg:
-		return fmt.Sprintf("xchg %s, %s", i.op1.format(true), i.op2.format(true))
+		var suffix string
+		switch i.u1 {
+		case 1:
+			suffix = "b"
+		case 2:
+			suffix = "w"
+		case 4:
+			suffix = "l"
+		case 8:
+			suffix = "q"
+		}
+		return fmt.Sprintf("xchg.%s %s, %s", suffix, i.op1.format(true), i.op2.format(true))
 	case zeros:
 		return fmt.Sprintf("xor %s, %s", i.op2.format(true), i.op2.format(true))
 	case fcvtToSintSequence:
@@ -723,9 +734,9 @@ const (
 	// An instruction that will always trigger the illegal instruction exception.
 	ud2
 
-	// xchg swaps the contents of two gp registers.
-	// The instruction doesn't make sense before register allocation, so it doensn't
-	// have useKinds and defKinds to avoid being used by the register allocator.
+	// xchg is described in https://www.felixcloutier.com/x86/xchg.
+	// This instruction uses two operands, where one of them can be a memory address, and swaps their values.
+	// If the dst is a memory address, the execution is atomic.
 	xchg
 
 	// zeros puts zeros into the destination register. This is implemented as xor reg, reg for
@@ -1418,10 +1429,11 @@ func (i *instruction) asPush64(op operand) *instruction {
 	return i
 }
 
-func (i *instruction) asXCHG(rm, rd regalloc.VReg) *instruction {
+func (i *instruction) asXCHG(rm regalloc.VReg, rd operand, size byte) *instruction {
 	i.kind = xchg
 	i.op1 = newOperandReg(rm)
-	i.op2 = newOperandReg(rd)
+	i.op2 = rd
+	i.u1 = uint64(size)
 	return i
 }
 
@@ -2231,6 +2243,7 @@ var defKinds = [instrMax]defKind{
 	idivRemSequence:        defKindDivRem,
 	blendvpd:               defKindNone,
 	mfence:                 defKindNone,
+	xchg:                   defKindNone,
 }
 
 // String implements fmt.Stringer.
@@ -2307,6 +2320,7 @@ var useKinds = [instrMax]useKind{
 	idivRemSequence:        useKindDivRem,
 	blendvpd:               useKindBlendvpd,
 	mfence:                 useKindNone,
+	xchg:                   useKindOp1RegOp2,
 }
 
 func (u useKind) String() string {

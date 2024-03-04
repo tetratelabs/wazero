@@ -1245,10 +1245,46 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 		}
 
 	case xchg:
-		r1, r2 := i.op1.reg().RealReg(), i.op2.reg().RealReg()
+		src, dst := regEncodings[i.op1.reg().RealReg()], i.op2
+		size := i.u1
 
-		enc1, enc2 := regEncodings[r1], regEncodings[r2]
-		encodeRegReg(c, legacyPrefixesNone, 0x87, 1, enc2, enc1, rexInfo(0).setW())
+		var rex rexInfo
+		var opcode uint32
+		lp := legacyPrefixesNone
+		switch size {
+		case 8:
+			opcode = 0x87
+			rex = rexInfo(0).setW()
+		case 4:
+			opcode = 0x87
+			rex = rexInfo(0).clearW()
+		case 2:
+			lp = legacyPrefixes0x66
+			opcode = 0x87
+			rex = rexInfo(0).clearW()
+		case 1:
+			opcode = 0x86
+			if i.op2.kind == operandKindReg {
+				panic("TODO?: xchg on two 1-byte registers")
+			}
+			// Some destinations must be encoded with REX.R = 1.
+			if e := src.encoding(); e >= 4 && e <= 7 {
+				rex = rexInfo(0).always()
+			}
+		default:
+			panic(fmt.Sprintf("BUG: invalid size %d: %s", size, i.String()))
+		}
+
+		switch dst.kind {
+		case operandKindMem:
+			m := dst.addressMode()
+			encodeRegMem(c, lp, opcode, 1, src, m, rex)
+		case operandKindReg:
+			r := dst.reg().RealReg()
+			encodeRegReg(c, lp, opcode, 1, src, regEncodings[r], rex)
+		default:
+			panic("BUG: invalid operand kind")
+		}
 
 	case zeros:
 		r := i.op2.reg()
