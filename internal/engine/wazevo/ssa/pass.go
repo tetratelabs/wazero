@@ -112,6 +112,12 @@ func passDeadBlockEliminationOpt(b *builder) {
 func passRedundantPhiEliminationOpt(b *builder) {
 	redundantParameterIndexes := b.ints[:0] // reuse the slice from previous iterations.
 
+	// TODO: this might be costly for large programs, but at least, as far as I did the experiment, it's almost the
+	//  same as the single iteration version in terms of the overall compilation time. That *might be* mostly thanks to the fact
+	//  that removing many PHIs results in the reduction of the total instructions, not because of this indefinite iteration is
+	//  relatively small. For example, sqlite speedtest binary results in the large number of redundant PHIs,
+	//  the maximum number of iteration was 22, which seems to be acceptable but not that small either since the
+	//  complexity here is O(BlockNum * Iterations) at the worst case where BlockNum might be the order of thousands.
 	for {
 		changed := false
 		_ = b.blockIteratorBegin() // skip entry block!
@@ -126,6 +132,7 @@ func passRedundantPhiEliminationOpt(b *builder) {
 				nonSelfReferencingValue := ValueInvalid
 				for predIndex := range blk.preds {
 					br := blk.preds[predIndex].branch
+					// Resolve the alias in the arguments so that we could use the previous iteration's result.
 					b.resolveArgumentAlias(br)
 					pred := br.vs.View()[paramIndex]
 					if pred == phiValue {
