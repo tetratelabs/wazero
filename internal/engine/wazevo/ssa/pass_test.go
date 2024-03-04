@@ -189,7 +189,7 @@ blk0: ()
 
 blk1: (v0:i32) <-- (blk0,blk1)
 	v3:i32 = Iconst_32 0xff
-	Brz v2, blk1, v3
+	Brz v1, blk1, v3
 	Jump blk2
 
 blk2: () <-- (blk1)
