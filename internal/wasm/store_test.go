@@ -631,7 +631,7 @@ func TestGlobalInstance_initialize(t *testing.T) {
 			&ConstantExpression{Opcode: OpcodeRefFunc, Data: []byte{1}},
 			func(funcIndex Index) Reference {
 				require.Equal(t, Index(1), funcIndex)
-				return 0xdeadbeaf
+				return asReference(0xdeadbeaf)
 			},
 		)
 		require.Equal(t, uint64(0xdeadbeaf), g.Val)
@@ -970,7 +970,7 @@ func TestModuleInstance_applyElements(t *testing.T) {
 		m := &ModuleInstance{}
 		m.Tables = []*TableInstance{{Type: RefTypeExternref, References: make([]Reference, 10)}}
 		for i := range m.Tables[0].References {
-			m.Tables[0].References[i] = 0xffff // non-null ref.
+			m.Tables[0].References[i] = asReference(0xffff) // non-null ref.
 		}
 
 		// This shouldn't panic.
@@ -980,23 +980,23 @@ func TestModuleInstance_applyElements(t *testing.T) {
 			{Mode: ElementModeActive, OffsetExpr: ConstantExpression{Opcode: OpcodeI32Const, Data: leb128_100}, Init: make([]Index, 5)}, // Iteration stops at this point, so the offset:5 below shouldn't be applied.
 			{Mode: ElementModeActive, OffsetExpr: ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{5}}, Init: make([]Index, 5)},
 		})
-		require.Equal(t, []Reference{0, 0, 0, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff},
+		require.Equal(t, []Reference{nil, nil, nil, asReference(0xffff), asReference(0xffff), asReference(0xffff), asReference(0xffff), asReference(0xffff), asReference(0xffff), asReference(0xffff)},
 			m.Tables[0].References)
 		m.applyElements([]ElementSegment{
 			{Mode: ElementModeActive, OffsetExpr: ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{5}}, Init: make([]Index, 5)},
 		})
-		require.Equal(t, []Reference{0, 0, 0, 0xffff, 0xffff, 0, 0, 0, 0, 0}, m.Tables[0].References)
+		require.Equal(t, []Reference{nil, nil, nil, asReference(0xffff), asReference(0xffff), nil, nil, nil, nil, nil}, m.Tables[0].References)
 	})
 	t.Run("funcref", func(t *testing.T) {
 		e := &mockEngine{}
 		me, err := e.NewModuleEngine(nil, nil)
-		me.(*mockModuleEngine).functionRefs = map[Index]Reference{0: 0xa, 1: 0xaa, 2: 0xaaa, 3: 0xaaaa}
+		me.(*mockModuleEngine).functionRefs = map[Index]Reference{0: asReference(0xa), 1: asReference(0xaa), 2: asReference(0xaaa), 3: asReference(0xaaaa)}
 		require.NoError(t, err)
 		m := &ModuleInstance{Engine: me, Globals: []*GlobalInstance{{}, {Val: 0xabcde}}}
 
 		m.Tables = []*TableInstance{{Type: RefTypeFuncref, References: make([]Reference, 10)}}
 		for i := range m.Tables[0].References {
-			m.Tables[0].References[i] = 0xffff // non-null ref.
+			m.Tables[0].References[i] = asReference(0xffff) // non-null ref.
 		}
 
 		// This shouldn't panic.
@@ -1007,12 +1007,16 @@ func TestModuleInstance_applyElements(t *testing.T) {
 			{Mode: ElementModeActive, OffsetExpr: ConstantExpression{Opcode: OpcodeI32Const, Data: leb128_100}, Init: make([]Index, 5)}, // Iteration stops at this point, so the offset:5 below shouldn't be applied.
 			{Mode: ElementModeActive, OffsetExpr: ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{5}}, Init: make([]Index, 5)},
 		})
-		require.Equal(t, []Reference{0xa, 0xaa, 0xaaa, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xabcde},
+		require.Equal(t, []Reference{asReference(0xa), asReference(0xaa), asReference(0xaaa), asReference(0xffff), asReference(0xffff), asReference(0xffff), asReference((0xffff)), asReference(0xffff), asReference(0xffff), asReference(0xabcde)},
 			m.Tables[0].References)
 		m.applyElements([]ElementSegment{
 			{Mode: ElementModeActive, OffsetExpr: ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{5}}, Init: []Index{0, ElementInitNullReference, 2}},
 		})
-		require.Equal(t, []Reference{0xa, 0xaa, 0xaaa, 0xffff, 0xffff, 0xa, 0xffff, 0xaaa, 0xffff, 0xabcde},
+		require.Equal(t, []Reference{asReference(0xa), asReference(0xaa), asReference(0xaaa), asReference(0xffff), asReference(0xffff), asReference(0xa), asReference((0xffff)), asReference(0xaaa), asReference(0xffff), asReference(0xabcde)},
 			m.Tables[0].References)
 	})
+}
+
+func asReference(u uint) Reference {
+	return Reference(uintptr(u))
 }

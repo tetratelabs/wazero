@@ -219,14 +219,8 @@ type function struct {
 
 // functionFromUintptr resurrects the original *function from the given uintptr
 // which comes from either funcref table or OpcodeRefFunc instruction.
-func functionFromUintptr(ptr uintptr) *function {
-	// Wraps ptrs as the double pointer in order to avoid the unsafe access as detected by race detector.
-	//
-	// For example, if we have (*function)(unsafe.Pointer(ptr)) instead, then the race detector's "checkptr"
-	// subroutine wanrs as "checkptr: pointer arithmetic result points to invalid allocation"
-	// https://github.com/golang/go/blob/1ce7fcf139417d618c2730010ede2afb41664211/src/runtime/checkptr.go#L69
-	var wrapped *uintptr = &ptr
-	return *(**function)(unsafe.Pointer(wrapped))
+func functionFromUintptr(ptr wasm.Reference) *function {
+	return (*function)(ptr)
 }
 
 type snapshot struct {
@@ -502,7 +496,7 @@ func (e *moduleEngine) DoneInstantiation() {}
 
 // FunctionInstanceReference implements the same method as documented on wasm.ModuleEngine.
 func (e *moduleEngine) FunctionInstanceReference(funcIndex wasm.Index) wasm.Reference {
-	return uintptr(unsafe.Pointer(&e.functions[funcIndex]))
+	return unsafe.Pointer(&e.functions[funcIndex])
 }
 
 // NewFunction implements the same method as documented on wasm.ModuleEngine.
@@ -519,7 +513,7 @@ func (e *moduleEngine) LookupFunction(t *wasm.TableInstance, typeId wasm.Functio
 		panic(wasmruntime.ErrRuntimeInvalidTableAccess)
 	}
 	rawPtr := t.References[tableOffset]
-	if rawPtr == 0 {
+	if rawPtr == nil {
 		panic(wasmruntime.ErrRuntimeInvalidTableAccess)
 	}
 
@@ -767,11 +761,11 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 				panic(wasmruntime.ErrRuntimeInvalidTableAccess)
 			}
 			rawPtr := table.References[offset]
-			if rawPtr == 0 {
+			if rawPtr == nil {
 				panic(wasmruntime.ErrRuntimeInvalidTableAccess)
 			}
 
-			tf := functionFromUintptr(rawPtr)
+			tf := (*function)(rawPtr)
 			if tf.typeID != typeIDs[op.U1] {
 				panic(wasmruntime.ErrRuntimeIndirectCallTypeMismatch)
 			}
@@ -1774,7 +1768,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 				panic(wasmruntime.ErrRuntimeInvalidTableAccess)
 			}
 
-			ce.pushValue(uint64(table.References[offset]))
+			ce.pushValue(uint64(uintptr(table.References[offset])))
 			frame.pc++
 		case wazeroir.OperationKindTableSet:
 			table := tables[op.U1]
@@ -1785,7 +1779,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 				panic(wasmruntime.ErrRuntimeInvalidTableAccess)
 			}
 
-			table.References[offset] = uintptr(ref) // externrefs are opaque uint64.
+			table.References[offset] = asReference(ref) // externrefs are opaque uint64.
 			frame.pc++
 		case wazeroir.OperationKindTableSize:
 			table := tables[op.U1]
@@ -1794,13 +1788,13 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 		case wazeroir.OperationKindTableGrow:
 			table := tables[op.U1]
 			num, ref := ce.popValue(), ce.popValue()
-			ret := table.Grow(uint32(num), uintptr(ref))
+			ret := table.Grow(uint32(num), asReference(ref))
 			ce.pushValue(uint64(ret))
 			frame.pc++
 		case wazeroir.OperationKindTableFill:
 			table := tables[op.U1]
 			num := ce.popValue()
-			ref := uintptr(ce.popValue())
+			ref := asReference(ce.popValue())
 			offset := ce.popValue()
 			if num+offset > uint64(len(table.References)) {
 				panic(wasmruntime.ErrRuntimeInvalidTableAccess)
@@ -4585,4 +4579,8 @@ func (ce *callEngine) callGoFuncWithStack(ctx context.Context, m *wasm.ModuleIns
 	if shrinkLen := paramLen - resultLen; shrinkLen > 0 {
 		ce.stack = ce.stack[0 : len(ce.stack)-shrinkLen]
 	}
+}
+
+func asReference(ptr uint64) wasm.Reference {
+	return unsafe.Pointer(uintptr(ptr))
 }
