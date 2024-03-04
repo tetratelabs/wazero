@@ -600,10 +600,9 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
-			name:      "memory_wait32",
-			m:         testcases.MemoryWait32.Module,
-			features:  api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
-			skipAMD64: true,
+			name:     "memory_wait32",
+			m:        testcases.MemoryWait32.Module,
+			features: api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
 			calls: []callCase{
 				{params: []uint64{0x0, 0xbeef, 0xffffffff}, expResults: []uint64{1}}, // exp not equal, returns 1
 				{params: []uint64{0x1, 0xbeef, 0xffffffff}, expErr: "unaligned atomic"},
@@ -615,10 +614,9 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
-			name:      "memory_wait64",
-			m:         testcases.MemoryWait64.Module,
-			features:  api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
-			skipAMD64: true,
+			name:     "memory_wait64",
+			m:        testcases.MemoryWait64.Module,
+			features: api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
 			calls: []callCase{
 				{params: []uint64{0x0, 0xbeef, 0xffffffff}, expResults: []uint64{1}}, // exp not equal, returns 1
 				{params: []uint64{0x1, 0xbeef, 0xffffffff}, expErr: "unaligned atomic"},
@@ -634,10 +632,9 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
-			name:      "memory_notify",
-			m:         testcases.MemoryNotify.Module,
-			features:  api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
-			skipAMD64: true,
+			name:     "memory_notify",
+			m:        testcases.MemoryNotify.Module,
+			features: api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
 			calls: []callCase{
 				{params: []uint64{0x0, 0x1}, expResults: []uint64{0}}, // no waiters, returns 0
 				{params: []uint64{0x1, 0x1}, expErr: "unaligned atomic"},

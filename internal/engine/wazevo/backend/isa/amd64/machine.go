@@ -933,6 +933,29 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		}
 		m.insert(m.allocateInstr().asMovzxRmR(extModeLQ, rn, rd))
 
+	case ssa.OpcodeAtomicLoad:
+		ptr := instr.Arg()
+		size := instr.AtomicTargetSize()
+		dst := m.c.VRegOf(instr.Return())
+
+		// At this point, the ptr is ensured to be aligned, so using a normal load is atomic.
+		// https://github.com/golang/go/blob/adead1a93f472affa97c494ef19f2f492ee6f34a/src/runtime/internal/atomic/atomic_amd64.go#L30
+		mem := newOperandMem(m.lowerToAddressMode(ptr, 0))
+		load := m.allocateInstr()
+		switch size {
+		case 8:
+			load.asMov64MR(mem, dst)
+		case 4:
+			load.asMovzxRmR(extModeLQ, mem, dst)
+		case 2:
+			load.asMovzxRmR(extModeWQ, mem, dst)
+		case 1:
+			load.asMovzxRmR(extModeBQ, mem, dst)
+		default:
+			panic("BUG")
+		}
+		m.insert(load)
+
 	default:
 		panic("TODO: lowering " + op.String())
 	}
