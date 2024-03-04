@@ -956,6 +956,9 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		}
 		m.insert(load)
 
+	case ssa.OpcodeFence:
+		m.insert(m.allocateInstr().asMFence())
+
 	default:
 		panic("TODO: lowering " + op.String())
 	}
