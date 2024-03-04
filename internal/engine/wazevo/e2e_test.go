@@ -832,10 +832,9 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
-			name:      "atomic_store_load",
-			m:         testcases.AtomicStoreLoad.Module,
-			features:  api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
-			skipAMD64: true,
+			name:     "atomic_store_load",
+			m:        testcases.AtomicStoreLoad.Module,
+			features: api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
 			calls: []callCase{
 				{params: []uint64{1, 2, 3, 4, 5, 6, 7}, expResults: []uint64{1, 2, 3, 4, 5, 6, 7}},
 				{params: []uint64{10, 20, 30, 40, 50, 60, 70}, expResults: []uint64{10, 20, 30, 40, 50, 60, 70}},

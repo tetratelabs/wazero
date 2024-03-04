@@ -107,7 +107,7 @@ func (m *machine) ClobberedRegisters(regs []regalloc.VReg) {
 func (m *machine) Swap(cur *instruction, x1, x2, tmp regalloc.VReg) {
 	if x1.RegType() == regalloc.RegTypeInt {
 		prevNext := cur.next
-		xc := m.allocateInstr().asXCHG(x1, x2)
+		xc := m.allocateInstr().asXCHG(x1, newOperandReg(x2), 8)
 		cur = linkInstr(cur, xc)
 		linkInstr(cur, prevNext)
 	} else {

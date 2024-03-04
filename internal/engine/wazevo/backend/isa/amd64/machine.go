@@ -959,6 +959,18 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 	case ssa.OpcodeFence:
 		m.insert(m.allocateInstr().asMFence())
 
+	case ssa.OpcodeAtomicStore:
+		ptr, _val := instr.Arg2()
+		size := instr.AtomicTargetSize()
+
+		val := m.getOperand_Reg(m.c.ValueDefinition(_val))
+		// The content on the val register will be overwritten by xchg, so we need to copy it to a temporary register.
+		copied := m.copyToTmp(val.reg())
+
+		mem := newOperandMem(m.lowerToAddressMode(ptr, 0))
+		store := m.allocateInstr().asXCHG(copied, mem, byte(size))
+		m.insert(store)
+
 	default:
 		panic("TODO: lowering " + op.String())
 	}
