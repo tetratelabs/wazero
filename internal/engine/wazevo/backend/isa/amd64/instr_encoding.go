@@ -1259,6 +1259,12 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 		}
 		i.encode(c)
 
+	case mfence:
+		// https://www.felixcloutier.com/x86/mfence
+		c.EmitByte(0x0f)
+		c.EmitByte(0xae)
+		c.EmitByte(0xf0)
+
 	default:
 		panic(fmt.Sprintf("TODO: %v", i.kind))
 	}

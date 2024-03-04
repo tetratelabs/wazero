@@ -258,6 +258,8 @@ func (i *instruction) String() string {
 		return fmt.Sprintf("xmmcmov%s %s, %s", cond(i.u1), i.op1.format(true), i.op2.format(true))
 	case blendvpd:
 		return fmt.Sprintf("blendvpd %s, %s, %%xmm0", i.op1.format(false), i.op2.format(false))
+	case mfence:
+		return "mfence"
 	default:
 		panic(fmt.Sprintf("BUG: %d", int(i.kind)))
 	}
@@ -754,8 +756,16 @@ const (
 	// blendvpd is https://www.felixcloutier.com/x86/blendvpd.
 	blendvpd
 
+	// mfence is https://www.felixcloutier.com/x86/mfence
+	mfence
+
 	instrMax
 )
+
+func (i *instruction) asMFence() *instruction {
+	i.kind = mfence
+	return i
+}
 
 func (i *instruction) asIdivRemSequence(execCtx, divisor, tmpGp regalloc.VReg, isDiv, signed, _64 bool) *instruction {
 	i.kind = idivRemSequence
@@ -978,6 +988,8 @@ func (k instructionKind) String() string {
 		return "xmmCMov"
 	case idivRemSequence:
 		return "idivRemSequence"
+	case mfence:
+		return "mfence"
 	default:
 		panic("BUG")
 	}
@@ -2218,6 +2230,7 @@ var defKinds = [instrMax]defKind{
 	xmmCMov:                defKindOp2,
 	idivRemSequence:        defKindDivRem,
 	blendvpd:               defKindNone,
+	mfence:                 defKindNone,
 }
 
 // String implements fmt.Stringer.
@@ -2293,6 +2306,7 @@ var useKinds = [instrMax]useKind{
 	xmmCMov:                useKindOp1,
 	idivRemSequence:        useKindDivRem,
 	blendvpd:               useKindBlendvpd,
+	mfence:                 useKindNone,
 }
 
 func (u useKind) String() string {
