@@ -946,7 +946,7 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		case 8:
 			load.asMov64MR(mem, dst)
 		case 4:
-			load.asMovzxRmR(extModeWQ, mem, dst)
+			load.asMovzxRmR(extModeLQ, mem, dst)
 		case 2:
 			load.asMovzxRmR(extModeWQ, mem, dst)
 		case 1:
