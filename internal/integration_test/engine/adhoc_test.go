@@ -2201,10 +2201,12 @@ func testLinking(t *testing.T, r wazero.Runtime) {
 	// However it traps upon instantiation.
 	require.Error(t, err)
 	m.Close(ctx)
-	// This should not be necessary to fail.
+	// Force a GC cycle. This should not cause the memory segment to become invalid.
+	// If the segment is invalid, the next function call will SIGSEGV.
 	runtime.GC()
+	time.Sleep(200 * time.Millisecond)
 	// The result is expected to be 0xdead, i.e., the result of linking2.$f.
-	res, err := mod.ExportedFunction("get table[0]").Call(ctx) // This should not SIGSEGV.
+	res, err := mod.ExportedFunction("get table[0]").Call(ctx)
 	require.NoError(t, err)
 	require.Equal(t, uint64(0xdead), res[0])
 }
