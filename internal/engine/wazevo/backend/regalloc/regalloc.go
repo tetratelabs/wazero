@@ -715,6 +715,7 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 				vs := s.getVRegState(p.ID())
 				if vs.desiredLoc.realReg() == RealRegInvalid {
 					vs.desiredLoc = desiredLocStack
+					desiredUpdated = append(desiredUpdated, p.ID())
 				}
 			}
 		}
