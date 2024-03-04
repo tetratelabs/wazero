@@ -1250,7 +1250,7 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 
 		var rex rexInfo
 		var opcode uint32
-		var lp = legacyPrefixesNone
+		lp := legacyPrefixesNone
 		switch size {
 		case 8:
 			opcode = 0x87
