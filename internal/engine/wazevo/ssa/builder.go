@@ -54,6 +54,9 @@ type Builder interface {
 	// MustFindValue searches the latest definition of the given Variable and returns the result.
 	MustFindValue(variable Variable) Value
 
+	// MustFindValueInBlk is the same as MustFindValue except it searches the latest definition from the given BasicBlock.
+	MustFindValueInBlk(variable Variable, blk BasicBlock) Value
+
 	// FindValueInLinearPath tries to find the latest definition of the given Variable in the linear path to the current BasicBlock.
 	// If it cannot find the definition, or it's not sealed yet, it returns ValueInvalid.
 	FindValueInLinearPath(variable Variable) Value
@@ -443,6 +446,11 @@ func (b *builder) findValueInLinearPath(variable Variable, blk *basicBlock) Valu
 		panic("BUG")
 	}
 	return ValueInvalid
+}
+
+func (b *builder) MustFindValueInBlk(variable Variable, blk BasicBlock) Value {
+	typ := b.definedVariableType(variable)
+	return b.findValue(typ, variable, blk.(*basicBlock))
 }
 
 // MustFindValue implements Builder.MustFindValue.

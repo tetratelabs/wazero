@@ -67,6 +67,11 @@ func (m *Module) validateFunctionWithMaxStackValues(
 	declaredFunctionIndexes map[Index]struct{},
 	br *bytes.Reader,
 ) error {
+	nonStaticLocals := make(map[Index]struct{})
+	if len(m.NonStaticLocals) > 0 {
+		m.NonStaticLocals[idx] = nonStaticLocals
+	}
+
 	functionType := &m.TypeSection[m.FunctionSection[idx]]
 	code := &m.CodeSection[idx]
 	body := code.Body
@@ -352,6 +357,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 					return fmt.Errorf("invalid local index for %s %d >= %d(=len(locals)+len(parameters))",
 						OpcodeLocalSetName, index, l)
 				}
+				nonStaticLocals[index] = struct{}{}
 				var expType ValueType
 				if index < inputLen {
 					expType = functionType.Params[index]
@@ -367,6 +373,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 					return fmt.Errorf("invalid local index for %s %d >= %d(=len(locals)+len(parameters))",
 						OpcodeLocalTeeName, index, l)
 				}
+				nonStaticLocals[index] = struct{}{}
 				var expType ValueType
 				if index < inputLen {
 					expType = functionType.Params[index]
