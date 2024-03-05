@@ -206,7 +206,7 @@ func (c *Compiler) Init(idx, typIndex wasm.Index, typ *wasm.FunctionType, localT
 	c.wasmFunctionBody = body
 	c.wasmFunctionBodyOffsetInCodeSection = bodyOffsetInCodeSection
 	c.needListener = needListener
-	c.clearSafeBounds(true)
+	c.clearSafeBounds()
 }
 
 // Note: this assumes 64-bit platform (I believe we won't have 32-bit backend ;)).
@@ -440,22 +440,20 @@ func (c *Compiler) recordKnownSafeBound(v ssa.ValueID, safeBound uint64, absolut
 	}
 }
 
-// clearSafeBounds clears the known safe bounds. This must be called
-// after the compilation of each block.
-// If `hard` is true, it clears the bounds. Otherwise, it clears only the absolute addresses,
-// so that the constant bounds are still valid.
-func (c *Compiler) clearSafeBounds(hard bool) {
-	if hard {
-		for _, v := range c.knownSafeBoundsSet {
-			ptr := &c.knownSafeBounds[v]
-			ptr.bound = 0
-		}
-		c.knownSafeBoundsSet = c.knownSafeBoundsSet[:0]
-	} else {
-		for _, v := range c.knownSafeBoundsSet {
-			ptr := &c.knownSafeBounds[v]
-			ptr.absoluteAddr = ssa.ValueInvalid
-		}
+// clearSafeBounds clears the known safe bounds.
+func (c *Compiler) clearSafeBounds() {
+	for _, v := range c.knownSafeBoundsSet {
+		ptr := &c.knownSafeBounds[v]
+		ptr.bound = 0
+	}
+	c.knownSafeBoundsSet = c.knownSafeBoundsSet[:0]
+}
+
+// resetAbsoluteAddressInSafeBounds resets the absolute addresses recorded in the known safe bounds.
+func (c *Compiler) resetAbsoluteAddressInSafeBounds() {
+	for _, v := range c.knownSafeBoundsSet {
+		ptr := &c.knownSafeBounds[v]
+		ptr.absoluteAddr = ssa.ValueInvalid
 	}
 }
 

@@ -2996,36 +2996,35 @@ func TestCompiler_getKnownSafeBound(t *testing.T) {
 }
 
 func TestCompiler_clearSafeBounds(t *testing.T) {
-	t.Run("hard", func(t *testing.T) {
-		c := &Compiler{}
-		c.knownSafeBounds = []knownSafeBound{{bound: 1}, {}, {bound: 2}, {}, {}, {bound: 3}}
-		c.knownSafeBoundsSet = []ssa.ValueID{0, 2, 5}
-		c.clearSafeBounds(true)
-		require.Equal(t, 0, len(c.knownSafeBoundsSet))
-		require.Equal(t, []knownSafeBound{{}, {}, {}, {}, {}, {}}, c.knownSafeBounds)
-	})
-	t.Run("not hard", func(t *testing.T) {
-		c := &Compiler{}
-		c.knownSafeBounds = []knownSafeBound{
-			{bound: 1, absoluteAddr: ssa.Value(1)},
-			{},
-			{bound: 2, absoluteAddr: ssa.Value(2)},
-			{},
-			{},
-			{bound: 3, absoluteAddr: ssa.Value(3)},
-		}
-		c.knownSafeBoundsSet = []ssa.ValueID{0, 2, 5}
-		c.clearSafeBounds(false)
-		require.Equal(t, 3, len(c.knownSafeBoundsSet))
-		require.Equal(t, []knownSafeBound{
-			{bound: 1, absoluteAddr: ssa.ValueInvalid},
-			{},
-			{bound: 2, absoluteAddr: ssa.ValueInvalid},
-			{},
-			{},
-			{bound: 3, absoluteAddr: ssa.ValueInvalid},
-		}, c.knownSafeBounds)
-	})
+	c := &Compiler{}
+	c.knownSafeBounds = []knownSafeBound{{bound: 1}, {}, {bound: 2}, {}, {}, {bound: 3}}
+	c.knownSafeBoundsSet = []ssa.ValueID{0, 2, 5}
+	c.clearSafeBounds()
+	require.Equal(t, 0, len(c.knownSafeBoundsSet))
+	require.Equal(t, []knownSafeBound{{}, {}, {}, {}, {}, {}}, c.knownSafeBounds)
+}
+
+func TestCompiler_resetAbsoluteAddressInSafeBounds(t *testing.T) {
+	c := &Compiler{}
+	c.knownSafeBounds = []knownSafeBound{
+		{bound: 1, absoluteAddr: ssa.Value(1)},
+		{},
+		{bound: 2, absoluteAddr: ssa.Value(2)},
+		{},
+		{},
+		{bound: 3, absoluteAddr: ssa.Value(3)},
+	}
+	c.knownSafeBoundsSet = []ssa.ValueID{0, 2, 5}
+	c.resetAbsoluteAddressInSafeBounds()
+	require.Equal(t, 3, len(c.knownSafeBoundsSet))
+	require.Equal(t, []knownSafeBound{
+		{bound: 1, absoluteAddr: ssa.ValueInvalid},
+		{},
+		{bound: 2, absoluteAddr: ssa.ValueInvalid},
+		{},
+		{},
+		{bound: 3, absoluteAddr: ssa.ValueInvalid},
+	}, c.knownSafeBounds)
 }
 
 func TestKnownSafeBound_valid(t *testing.T) {

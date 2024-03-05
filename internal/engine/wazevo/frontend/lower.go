@@ -1418,7 +1418,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 		// Reset the safe bounds since we are entering the Else block.
 		// TODO: we should be able to inherit the safe bounds from the parent block. So, right now, this means that
 		//  else block is a little bit more slow than the then block.
-		c.clearSafeBounds(true)
+		c.clearSafeBounds()
 
 		ifctrl := state.ctrlPeekAt(0)
 		if unreachable := state.unreachable; unreachable && state.unreachableDepth > 0 {
@@ -1486,7 +1486,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			// If we can reach this block without being unreachable, and it has only one predecessor,
 			// this means that we get here from the unique block contiguously. Therefore, we can
 			// keep using the same safe bounds information. Otherwise, we need to reset it.
-			c.clearSafeBounds(true)
+			c.clearSafeBounds()
 		}
 
 		// Ready to start translating the following block.
@@ -3650,6 +3650,8 @@ func (c *Compiler) memOpSetup(baseAddr ssa.Value, constOffset, operationSizeInBy
 		address = known.absoluteAddr
 		if ceil <= known.bound {
 			if !address.Valid() {
+				// This means that, the bound is known to be safe, but the memory base might have changed.
+				// So, we re-calculate the address.
 				memBase := c.getMemoryBaseValue(false)
 				extBaseAddr := builder.AllocateInstruction().
 					AsUExtend(baseAddr, 32, 64).
@@ -3657,7 +3659,7 @@ func (c *Compiler) memOpSetup(baseAddr ssa.Value, constOffset, operationSizeInBy
 					Return()
 				address = builder.AllocateInstruction().
 					AsIadd(memBase, extBaseAddr).Insert(builder).Return()
-				known.absoluteAddr = address
+				known.absoluteAddr = address // Update the absolute address for the subsequent memory access.
 			}
 			return
 		}
@@ -3779,9 +3781,9 @@ func (c *Compiler) reloadMemoryBaseLen() {
 	_ = c.getMemoryLenValue(true)
 
 	// This function being called means that the memory base might have changed.
-	// Therefore, we need to clear the absolute addresses recorded in the known safe bounds (passing false to clearSafeBounds)
+	// Therefore, we need to clear the absolute addresses recorded in the known safe bounds
 	// because we cache the absolute address of the memory access per each base offset.
-	c.clearSafeBounds(false)
+	c.resetAbsoluteAddressInSafeBounds()
 }
 
 func (c *Compiler) setWasmGlobalValue(index wasm.Index, v ssa.Value) {
