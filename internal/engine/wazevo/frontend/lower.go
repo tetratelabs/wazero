@@ -1415,7 +1415,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 		builder.Seal(thenBlk)
 		builder.Seal(elseBlk)
 	case wasm.OpcodeElse:
-		c.clearSafeBounds() // Reset the safe bounds since we are entering the Else block.
+		c.clearSafeBounds(true) // Reset the safe bounds since we are entering the Else block.
 
 		ifctrl := state.ctrlPeekAt(0)
 		if unreachable := state.unreachable; unreachable && state.unreachableDepth > 0 {
@@ -1444,8 +1444,6 @@ func (c *Compiler) lowerCurrentOpcode() {
 		builder.SetCurrentBlock(elseBlk)
 
 	case wasm.OpcodeEnd:
-		c.clearSafeBounds() // Reset the safe bounds since we are exiting the block.
-
 		if state.unreachableDepth > 0 {
 			state.unreachableDepth--
 			break
@@ -1479,7 +1477,11 @@ func (c *Compiler) lowerCurrentOpcode() {
 			c.insertJumpToBlock(ctrl.clonedArgs, followingBlk)
 		}
 
-		builder.Seal(ctrl.followingBlock)
+		builder.Seal(followingBlk)
+
+		if unreachable || followingBlk.Preds() != 1 {
+			c.clearSafeBounds(true) // Reset the safe bounds since we are exiting the block.
+		}
 
 		// Ready to start translating the following block.
 		c.switchTo(ctrl.originalStackLenWithoutParam, followingBlk)
@@ -3641,6 +3643,16 @@ func (c *Compiler) memOpSetup(baseAddr ssa.Value, constOffset, operationSizeInBy
 		// We reuse the calculated absolute address even if the bound is not known to be safe.
 		address = known.absoluteAddr
 		if ceil <= known.bound {
+			if !address.Valid() {
+				memBase := c.getMemoryBaseValue(false)
+				extBaseAddr := builder.AllocateInstruction().
+					AsUExtend(baseAddr, 32, 64).
+					Insert(builder).
+					Return()
+				address = builder.AllocateInstruction().
+					AsIadd(memBase, extBaseAddr).Insert(builder).Return()
+				known.absoluteAddr = address
+			}
 			return
 		}
 	}
@@ -3762,7 +3774,7 @@ func (c *Compiler) reloadMemoryBaseLen() {
 
 	// This function being called means that the memory base might have changed.
 	// Therefore, we need to clear the known safe bounds because we cache the absolute address of the memory access per each base offset.
-	c.clearSafeBounds()
+	c.clearSafeBounds(false)
 }
 
 func (c *Compiler) setWasmGlobalValue(index wasm.Index, v ssa.Value) {

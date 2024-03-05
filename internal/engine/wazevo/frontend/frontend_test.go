@@ -2999,7 +2999,7 @@ func TestCompiler_clearSafeBounds(t *testing.T) {
 	c := &Compiler{}
 	c.knownSafeBounds = []knownSafeBound{{bound: 1}, {}, {bound: 2}, {}, {}, {bound: 3}}
 	c.knownSafeBoundsSet = []ssa.ValueID{0, 2, 5}
-	c.clearSafeBounds()
+	c.clearSafeBounds(true)
 	require.Equal(t, 0, len(c.knownSafeBoundsSet))
 	require.Equal(t, []knownSafeBound{{}, {}, {}, {}, {}, {}}, c.knownSafeBounds)
 }

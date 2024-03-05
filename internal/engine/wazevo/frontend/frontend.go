@@ -203,6 +203,7 @@ func (c *Compiler) Init(idx, typIndex wasm.Index, typ *wasm.FunctionType, localT
 	c.wasmFunctionBody = body
 	c.wasmFunctionBodyOffsetInCodeSection = bodyOffsetInCodeSection
 	c.needListener = needListener
+	c.clearSafeBounds(true)
 }
 
 // Note: this assumes 64-bit platform (I believe we won't have 32-bit backend ;)).
@@ -438,12 +439,19 @@ func (c *Compiler) recordKnownSafeBound(v ssa.ValueID, safeBound uint64, absolut
 
 // clearSafeBounds clears the known safe bounds. This must be called
 // after the compilation of each block.
-func (c *Compiler) clearSafeBounds() {
-	for _, v := range c.knownSafeBoundsSet {
-		ptr := &c.knownSafeBounds[v]
-		ptr.bound = 0
+func (c *Compiler) clearSafeBounds(hard bool) {
+	if hard {
+		for _, v := range c.knownSafeBoundsSet {
+			ptr := &c.knownSafeBounds[v]
+			ptr.bound = 0
+		}
+		c.knownSafeBoundsSet = c.knownSafeBoundsSet[:0]
+	} else {
+		for _, v := range c.knownSafeBoundsSet {
+			ptr := &c.knownSafeBounds[v]
+			ptr.absoluteAddr = ssa.ValueInvalid
+		}
 	}
-	c.knownSafeBoundsSet = c.knownSafeBoundsSet[:0]
 }
 
 func (k *knownSafeBound) valid() bool {
