@@ -444,10 +444,10 @@ blk3: (v5:i32) <-- (blk1,blk2)
 			exp: `
 blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
 	v3:i32 = Iconst_32 0x0
-	Jump blk1, v2
+	Jump blk1
 
-blk1: (v4:i32) <-- (blk0)
-	Return v4
+blk1: () <-- (blk0)
+	Return v2
 
 blk2: ()
 `,
@@ -464,15 +464,15 @@ blk1: () <-- (blk0)
 			m:    testcases.ReferenceValueFromUnsealedBlock2.Module,
 			exp: `
 blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
-	Jump blk1, v2
+	Jump blk1
 
-blk1: (v3:i32) <-- (blk0,blk1)
-	Brnz v3, blk1, v3
+blk1: () <-- (blk0,blk1)
+	Brnz v2, blk1
 	Jump blk4
 
 blk2: () <-- (blk3)
-	v4:i32 = Iconst_32 0x0
-	Jump blk_ret, v4
+	v3:i32 = Iconst_32 0x0
+	Jump blk_ret, v3
 
 blk3: () <-- (blk4)
 	Jump blk2
@@ -498,8 +498,8 @@ blk3: () <-- (blk4)
 	Jump fallthrough
 
 blk2: () <-- (blk3)
-	v4:i32 = Iconst_32 0x0
-	Jump blk_ret, v4
+	v3:i32 = Iconst_32 0x0
+	Jump blk_ret, v3
 `,
 		},
 		{
@@ -1060,22 +1060,22 @@ blk1: () <-- (blk0)
 	Call f1:sig1, exec_ctx, module_ctx
 	v5:i64 = Load module_ctx, 0x8
 	v6:i64 = Uload32 module_ctx, 0x10
-	Jump blk3, v2
+	Jump blk3
 
 blk2: () <-- (blk0)
-	Jump blk3, v2
+	Jump blk3
 
-blk3: (v7:i32) <-- (blk1,blk2)
-	v8:i64 = Iconst_64 0x4
-	v9:i64 = UExtend v7, 32->64
-	v10:i64 = Uload32 module_ctx, 0x10
-	v11:i64 = Iadd v9, v8
-	v12:i32 = Icmp lt_u, v10, v11
-	ExitIfTrue v12, exec_ctx, memory_out_of_bounds
-	v13:i64 = Load module_ctx, 0x8
-	v14:i64 = Iadd v13, v9
-	v15:i32 = Load v14, 0x0
-	Jump blk_ret, v15
+blk3: () <-- (blk1,blk2)
+	v7:i64 = Iconst_64 0x4
+	v8:i64 = UExtend v2, 32->64
+	v9:i64 = Uload32 module_ctx, 0x10
+	v10:i64 = Iadd v8, v7
+	v11:i32 = Icmp lt_u, v9, v10
+	ExitIfTrue v11, exec_ctx, memory_out_of_bounds
+	v12:i64 = Load module_ctx, 0x8
+	v13:i64 = Iadd v12, v8
+	v14:i32 = Load v13, 0x0
+	Jump blk_ret, v14
 `,
 			expAfterPasses: `
 signatures:
@@ -1095,16 +1095,16 @@ blk2: () <-- (blk0)
 	Jump fallthrough
 
 blk3: () <-- (blk1,blk2)
-	v8:i64 = Iconst_64 0x4
-	v9:i64 = UExtend v2, 32->64
-	v10:i64 = Uload32 module_ctx, 0x10
-	v11:i64 = Iadd v9, v8
-	v12:i32 = Icmp lt_u, v10, v11
-	ExitIfTrue v12, exec_ctx, memory_out_of_bounds
-	v13:i64 = Load module_ctx, 0x8
-	v14:i64 = Iadd v13, v9
-	v15:i32 = Load v14, 0x0
-	Jump blk_ret, v15
+	v7:i64 = Iconst_64 0x4
+	v8:i64 = UExtend v2, 32->64
+	v9:i64 = Uload32 module_ctx, 0x10
+	v10:i64 = Iadd v8, v7
+	v11:i32 = Icmp lt_u, v9, v10
+	ExitIfTrue v11, exec_ctx, memory_out_of_bounds
+	v12:i64 = Load module_ctx, 0x8
+	v13:i64 = Iadd v12, v8
+	v14:i32 = Load v13, 0x0
+	Jump blk_ret, v14
 `,
 		},
 		{

@@ -1078,8 +1078,16 @@ func (c *Compiler) lowerCurrentOpcode() {
 			break
 		}
 		variable := c.localVariable(index)
-		v := builder.MustFindValue(variable)
-		state.push(v)
+		if _, ok := c.m.NonStaticLocals[c.wasmLocalFunctionIndex][index]; ok {
+			state.push(builder.MustFindValue(variable))
+		} else {
+			// If a local is static, we can simply find it in the entry block which is either a function param
+			// or a zero value. This fast pass helps to avoid the overhead of searching the entire function plus
+			// avoid adding unnecessary block arguments.
+			// TODO: I think this optimization should be done in a SSA pass like passRedundantPhiEliminationOpt,
+			// 	but somehow there's some corner cases that it fails to optimize.
+			state.push(builder.MustFindValueInBlk(variable, c.ssaBuilder.EntryBlock()))
+		}
 	case wasm.OpcodeLocalSet:
 		index := c.readI32u()
 		if state.unreachable {
