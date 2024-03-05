@@ -59,8 +59,11 @@ type Compiler struct {
 	execCtxPtrValue, moduleCtxPtrValue ssa.Value
 }
 
+// knownSafeBound represents a known safe bound for a value.
 type knownSafeBound struct {
-	bound        uint64
+	// bound is a constant upper bound for the value.
+	bound uint64
+	// absoluteAddr is the absolute address of the value.
 	absoluteAddr ssa.Value
 }
 
@@ -439,6 +442,8 @@ func (c *Compiler) recordKnownSafeBound(v ssa.ValueID, safeBound uint64, absolut
 
 // clearSafeBounds clears the known safe bounds. This must be called
 // after the compilation of each block.
+// If `hard` is true, it clears the bounds. Otherwise, it clears only the absolute addresses,
+// so that the constant bounds are still valid.
 func (c *Compiler) clearSafeBounds(hard bool) {
 	if hard {
 		for _, v := range c.knownSafeBoundsSet {

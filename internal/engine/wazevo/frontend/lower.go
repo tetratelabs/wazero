@@ -1415,7 +1415,10 @@ func (c *Compiler) lowerCurrentOpcode() {
 		builder.Seal(thenBlk)
 		builder.Seal(elseBlk)
 	case wasm.OpcodeElse:
-		c.clearSafeBounds(true) // Reset the safe bounds since we are entering the Else block.
+		// Reset the safe bounds since we are entering the Else block.
+		// TODO: we should be able to inherit the safe bounds from the parent block. So, right now, this means that
+		//  else block is a little bit more slow than the then block.
+		c.clearSafeBounds(true)
 
 		ifctrl := state.ctrlPeekAt(0)
 		if unreachable := state.unreachable; unreachable && state.unreachableDepth > 0 {
@@ -1480,7 +1483,10 @@ func (c *Compiler) lowerCurrentOpcode() {
 		builder.Seal(followingBlk)
 
 		if unreachable || followingBlk.Preds() != 1 {
-			c.clearSafeBounds(true) // Reset the safe bounds since we are exiting the block.
+			// If we can reach this block without being unreachable, and it has only one predecessor,
+			// this means that we get here from the unique block contiguously. Therefore, we can
+			// keep using the same safe bounds information. Otherwise, we need to reset it.
+			c.clearSafeBounds(true)
 		}
 
 		// Ready to start translating the following block.
@@ -3773,7 +3779,8 @@ func (c *Compiler) reloadMemoryBaseLen() {
 	_ = c.getMemoryLenValue(true)
 
 	// This function being called means that the memory base might have changed.
-	// Therefore, we need to clear the known safe bounds because we cache the absolute address of the memory access per each base offset.
+	// Therefore, we need to clear the absolute addresses recorded in the known safe bounds (passing false to clearSafeBounds)
+	// because we cache the absolute address of the memory access per each base offset.
 	c.clearSafeBounds(false)
 }
 
