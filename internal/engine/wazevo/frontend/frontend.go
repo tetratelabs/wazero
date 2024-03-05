@@ -53,29 +53,43 @@ type Compiler struct {
 	br            *bytes.Reader
 	loweringState loweringState
 
-	knownSafeBounds    []knownSafeBound
+	knownSafeBounds    [] /* ssa.ValueID to */ knownSafeBound
 	knownSafeBoundsSet []ssa.ValueID
+
+	knownSafeBoundsAtTheEndOfBlocks   [] /* ssa.BlockID to */ knownSafeBoundsAtTheEndOfBlock
+	varLengthKnownSafeBoundWithIDPool wazevoapi.VarLengthPool[knownSafeBoundWithID]
 
 	execCtxPtrValue, moduleCtxPtrValue ssa.Value
 }
 
-// knownSafeBound represents a known safe bound for a value.
-type knownSafeBound struct {
-	// bound is a constant upper bound for the value.
-	bound uint64
-	// absoluteAddr is the absolute address of the value.
-	absoluteAddr ssa.Value
-}
+type (
+	// knownSafeBound represents a known safe bound for a value.
+	knownSafeBound struct {
+		// bound is a constant upper bound for the value.
+		bound uint64
+		// absoluteAddr is the absolute address of the value.
+		absoluteAddr ssa.Value
+	}
+	// knownSafeBoundWithID is a knownSafeBound with the ID of the value.
+	knownSafeBoundWithID struct {
+		knownSafeBound
+		id ssa.ValueID
+	}
+	knownSafeBoundsAtTheEndOfBlock = wazevoapi.VarLength[knownSafeBoundWithID]
+)
+
+var knownSafeBoundsAtTheEndOfBlockNil = wazevoapi.NewNilVarLength[knownSafeBoundWithID]()
 
 // NewFrontendCompiler returns a frontend Compiler.
 func NewFrontendCompiler(m *wasm.Module, ssaBuilder ssa.Builder, offset *wazevoapi.ModuleContextOffsetData, ensureTermination bool, listenerOn bool, sourceInfo bool) *Compiler {
 	c := &Compiler{
-		m:                    m,
-		ssaBuilder:           ssaBuilder,
-		br:                   bytes.NewReader(nil),
-		offset:               offset,
-		ensureTermination:    ensureTermination,
-		needSourceOffsetInfo: sourceInfo,
+		m:                                 m,
+		ssaBuilder:                        ssaBuilder,
+		br:                                bytes.NewReader(nil),
+		offset:                            offset,
+		ensureTermination:                 ensureTermination,
+		needSourceOffsetInfo:              sourceInfo,
+		varLengthKnownSafeBoundWithIDPool: wazevoapi.NewVarLengthPool[knownSafeBoundWithID](),
 	}
 	c.declareSignatures(listenerOn)
 	return c
@@ -207,6 +221,8 @@ func (c *Compiler) Init(idx, typIndex wasm.Index, typ *wasm.FunctionType, localT
 	c.wasmFunctionBodyOffsetInCodeSection = bodyOffsetInCodeSection
 	c.needListener = needListener
 	c.clearSafeBounds()
+	c.varLengthKnownSafeBoundWithIDPool.Reset()
+	c.knownSafeBoundsAtTheEndOfBlocks = c.knownSafeBoundsAtTheEndOfBlocks[:0]
 }
 
 // Note: this assumes 64-bit platform (I believe we won't have 32-bit backend ;)).
@@ -445,6 +461,7 @@ func (c *Compiler) clearSafeBounds() {
 	for _, v := range c.knownSafeBoundsSet {
 		ptr := &c.knownSafeBounds[v]
 		ptr.bound = 0
+		ptr.absoluteAddr = ssa.ValueInvalid
 	}
 	c.knownSafeBoundsSet = c.knownSafeBoundsSet[:0]
 }
@@ -469,4 +486,85 @@ func (c *Compiler) allocateVarLengthValues(vs ...ssa.Value) ssa.Values {
 		args = args.Append(builder.VarLengthPool(), v)
 	}
 	return args
+}
+
+func (c *Compiler) finalizeKnownSafeBoundsAtTheEndOfBlock(bID ssa.BasicBlockID) {
+	_bID := int(bID)
+	if l := len(c.knownSafeBoundsAtTheEndOfBlocks); _bID >= l {
+		c.knownSafeBoundsAtTheEndOfBlocks = append(c.knownSafeBoundsAtTheEndOfBlocks,
+			make([]knownSafeBoundsAtTheEndOfBlock, _bID+1-len(c.knownSafeBoundsAtTheEndOfBlocks))...)
+		for i := l; i < len(c.knownSafeBoundsAtTheEndOfBlocks); i++ {
+			c.knownSafeBoundsAtTheEndOfBlocks[i] = knownSafeBoundsAtTheEndOfBlockNil
+		}
+	}
+	p := &c.varLengthKnownSafeBoundWithIDPool
+	size := len(c.knownSafeBoundsSet)
+	allocated := c.varLengthKnownSafeBoundWithIDPool.Allocate(size)
+	for _, vID := range c.knownSafeBoundsSet {
+		kb := c.knownSafeBounds[vID]
+		allocated = allocated.Append(p, knownSafeBoundWithID{
+			knownSafeBound: kb,
+			id:             vID,
+		})
+	}
+	c.knownSafeBoundsAtTheEndOfBlocks[bID] = allocated
+	c.clearSafeBounds()
+}
+
+func (c *Compiler) initializeCurrentBlockKnownBounds() {
+	currentBlk := c.ssaBuilder.CurrentBlock()
+	switch preds := currentBlk.Preds(); preds {
+	case 0:
+	case 1:
+		pred := currentBlk.Pred(0).ID()
+		for _, kb := range c.getKnownSafeBoundsAtTheEndOfBlocks(pred).View() {
+			c.recordKnownSafeBound(kb.id, kb.bound, kb.absoluteAddr)
+		}
+	default:
+		primary := currentBlk.Pred(0).ID()
+		type mapVal struct {
+			kb    knownSafeBoundWithID
+			count int
+		}
+		set := map[ssa.ValueID]mapVal{}
+		for _, kb := range c.getKnownSafeBoundsAtTheEndOfBlocks(primary).View() {
+			if kb.valid() {
+				set[kb.id] = mapVal{kb, 1}
+			}
+		}
+
+		// If there are more than one predecessor, we need to find the intersection of the known safe bounds.
+		for i := 1; i < preds; i++ {
+			pred := currentBlk.Pred(i).ID()
+			for _, kb := range c.getKnownSafeBoundsAtTheEndOfBlocks(pred).View() {
+				if !kb.valid() {
+					continue
+				}
+				mv, ok := set[kb.id]
+				if !ok {
+					continue
+				}
+				mv.count++
+				// Choose the lower bound.
+				if kb.bound < mv.kb.bound {
+					mv.kb = kb
+				}
+				set[kb.id] = mv
+			}
+		}
+		for _, mv := range set {
+			if mv.count == preds {
+				kb := mv.kb
+				// Absolute address cannot be used in the intersection since the value might be only defined in one of the predecessors.
+				c.recordKnownSafeBound(kb.id, kb.bound, ssa.ValueInvalid)
+			}
+		}
+	}
+}
+
+func (c *Compiler) getKnownSafeBoundsAtTheEndOfBlocks(id ssa.BasicBlockID) knownSafeBoundsAtTheEndOfBlock {
+	if int(id) >= len(c.knownSafeBoundsAtTheEndOfBlocks) {
+		return knownSafeBoundsAtTheEndOfBlockNil
+	}
+	return c.knownSafeBoundsAtTheEndOfBlocks[id]
 }

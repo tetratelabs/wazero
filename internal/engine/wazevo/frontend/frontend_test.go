@@ -1,6 +1,7 @@
 package frontend
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
@@ -2812,6 +2813,86 @@ blk0: (exec_ctx:i64, module_ctx:i64)
 	Jump blk_ret
 `,
 		},
+		{
+			name: "bounds check in if-else",
+			m: &wasm.Module{
+				TypeSection:     []wasm.FunctionType{{Params: []wasm.ValueType{wasm.ValueTypeI32}}},
+				FunctionSection: []wasm.Index{0},
+				CodeSection: []wasm.Code{{
+					Body: []byte{
+						wasm.OpcodeLocalGet, 0,
+						wasm.OpcodeI32Load, 0x2, 0x20, // alignment=2 (natural alignment) staticOffset=0x20
+						wasm.OpcodeDrop,
+
+						wasm.OpcodeLocalGet, 0,
+						wasm.OpcodeIf, 0x40, // blockSignature:vv.
+						/* */ wasm.OpcodeLocalGet, 0,
+						/* */ // This bound check should be removed since it's known to be in bounds.
+						/* */ wasm.OpcodeI32Load, 0x2, 0x10, // alignment=2 (natural alignment) staticOffset=0x20
+						/* */ wasm.OpcodeDrop,
+						wasm.OpcodeElse,
+						/* */ wasm.OpcodeLocalGet, 0,
+						/* */ // This bound check should be removed since it's known to be in bounds.
+						/* */ wasm.OpcodeI32Load, 0x2, 0x10, // alignment=2 (natural alignment) staticOffset=0x20
+						/* */ wasm.OpcodeDrop,
+						/* */ // This shouldn't be removed since it's not known to be in bounds.
+						/* */ wasm.OpcodeLocalGet, 0,
+						/* */ wasm.OpcodeI32Load, 0x2, 0x30, // alignment=2 (natural alignment) staticOffset=0x20
+						/* */ wasm.OpcodeDrop,
+						/* */ // But this is known to be in bounds.
+						/* */ wasm.OpcodeLocalGet, 0,
+						/* */ wasm.OpcodeI32Load, 0x2, 0x25, // alignment=2 (natural alignment) staticOffset=0x20
+						/* */ wasm.OpcodeDrop,
+						wasm.OpcodeEnd,
+
+						// At this point, the known bound 0x20 should be retained.
+						wasm.OpcodeLocalGet, 0,
+						wasm.OpcodeI32Load, 0x2, 0x15, // alignment=2 (natural alignment) staticOffset=0x20
+						wasm.OpcodeDrop,
+
+						wasm.OpcodeEnd,
+					},
+				}},
+				MemorySection: &wasm.Memory{Min: 1},
+			},
+			features: api.CoreFeaturesV2,
+			exp: `
+blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
+	v3:i64 = Iconst_64 0x24
+	v4:i64 = UExtend v2, 32->64
+	v5:i64 = Uload32 module_ctx, 0x10
+	v6:i64 = Iadd v4, v3
+	v7:i32 = Icmp lt_u, v5, v6
+	ExitIfTrue v7, exec_ctx, memory_out_of_bounds
+	v8:i64 = Load module_ctx, 0x8
+	v9:i64 = Iadd v8, v4
+	v10:i32 = Load v9, 0x20
+	Brz v2, blk2
+	Jump blk1
+
+blk1: () <-- (blk0)
+	v11:i32 = Load v9, 0x10
+	Jump blk3
+
+blk2: () <-- (blk0)
+	v12:i32 = Load v9, 0x10
+	v13:i64 = Iconst_64 0x34
+	v14:i64 = UExtend v2, 32->64
+	v15:i64 = Iadd v14, v13
+	v16:i32 = Icmp lt_u, v5, v15
+	ExitIfTrue v16, exec_ctx, memory_out_of_bounds
+	v17:i32 = Load v9, 0x30
+	v18:i32 = Load v9, 0x25
+	Jump blk3
+
+blk3: () <-- (blk1,blk2)
+	v19:i64 = Load module_ctx, 0x8
+	v20:i64 = UExtend v2, 32->64
+	v21:i64 = Iadd v19, v20
+	v22:i32 = Load v21, 0x15
+	Jump blk_ret
+`,
+		},
 	} {
 
 		tc := tc
@@ -3001,7 +3082,7 @@ func TestCompiler_clearSafeBounds(t *testing.T) {
 	c.knownSafeBoundsSet = []ssa.ValueID{0, 2, 5}
 	c.clearSafeBounds()
 	require.Equal(t, 0, len(c.knownSafeBoundsSet))
-	require.Equal(t, []knownSafeBound{{}, {}, {}, {}, {}, {}}, c.knownSafeBounds)
+	require.Equal(t, []knownSafeBound{{absoluteAddr: ssa.ValueInvalid}, {}, {absoluteAddr: ssa.ValueInvalid}, {}, {}, {absoluteAddr: ssa.ValueInvalid}}, c.knownSafeBounds)
 }
 
 func TestCompiler_resetAbsoluteAddressInSafeBounds(t *testing.T) {
@@ -3032,4 +3113,121 @@ func TestKnownSafeBound_valid(t *testing.T) {
 	require.True(t, k.valid())
 	k.bound = 0
 	require.False(t, k.valid())
+}
+
+func TestCompiler_finalizeKnownSafeBoundsAtTheEndOoBlock(t *testing.T) {
+	c := NewFrontendCompiler(&wasm.Module{}, ssa.NewBuilder(), nil, false, false, false)
+	blk := c.ssaBuilder.AllocateBasicBlock()
+	require.True(t, len(c.getKnownSafeBoundsAtTheEndOfBlocks(blk.ID()).View()) == 0)
+	c.ssaBuilder.SetCurrentBlock(blk)
+	c.knownSafeBoundsSet = []ssa.ValueID{0, 2, 5}
+	c.knownSafeBounds = []knownSafeBound{
+		{bound: 1, absoluteAddr: ssa.Value(1)},
+		{},
+		{bound: 2, absoluteAddr: ssa.Value(2)},
+		{},
+		{},
+		{bound: 3, absoluteAddr: ssa.Value(3)},
+	}
+	c.finalizeKnownSafeBoundsAtTheEndOfBlock(blk.ID())
+	require.True(t, len(c.knownSafeBoundsSet) == 0)
+	finalized := c.getKnownSafeBoundsAtTheEndOfBlocks(blk.ID())
+	require.Equal(t, 3, len(finalized.View()))
+}
+
+func TestCompiler_initializeCurrentBlockKnownBounds(t *testing.T) {
+	t.Run("single", func(t *testing.T) {
+		c := NewFrontendCompiler(&wasm.Module{}, ssa.NewBuilder(), nil, false, false, false)
+		builder := c.ssaBuilder
+		child := builder.AllocateBasicBlock()
+		{
+			parent := builder.AllocateBasicBlock()
+			builder.SetCurrentBlock(parent)
+			c.recordKnownSafeBound(1, 99, 9999)
+			c.recordKnownSafeBound(2, 150, 9999)
+			c.recordKnownSafeBound(5, 666, 54321)
+			builder.AllocateInstruction().AsJump(ssa.ValuesNil, child).Insert(builder)
+			c.finalizeKnownSafeBoundsAtTheEndOfBlock(parent.ID())
+		}
+
+		builder.SetCurrentBlock(child)
+		c.initializeCurrentBlockKnownBounds()
+		kb := c.getKnownSafeBound(1)
+		require.True(t, kb.valid())
+		require.Equal(t, uint64(99), kb.bound)
+		require.Equal(t, ssa.Value(9999), kb.absoluteAddr)
+		kb = c.getKnownSafeBound(2)
+		require.True(t, kb.valid())
+		require.Equal(t, uint64(150), kb.bound)
+		require.Equal(t, ssa.Value(9999), kb.absoluteAddr)
+		kb = c.getKnownSafeBound(5)
+		require.True(t, kb.valid())
+		require.Equal(t, uint64(666), kb.bound)
+		require.Equal(t, ssa.Value(54321), kb.absoluteAddr)
+	})
+	t.Run("multiple predecessors", func(t *testing.T) {
+		c := NewFrontendCompiler(&wasm.Module{}, ssa.NewBuilder(), nil, false, false, false)
+		builder := c.ssaBuilder
+		child := builder.AllocateBasicBlock()
+		{
+			p1 := builder.AllocateBasicBlock()
+			builder.SetCurrentBlock(p1)
+			c.recordKnownSafeBound(1, 99, 9999)
+			c.recordKnownSafeBound(2, 150, 9999)
+			c.recordKnownSafeBound(5, 666, 54321)
+			c.recordKnownSafeBound(592131, 666, 54321)
+			builder.AllocateInstruction().AsJump(ssa.ValuesNil, child).Insert(builder)
+			c.finalizeKnownSafeBoundsAtTheEndOfBlock(p1.ID())
+		}
+		{
+			p2 := builder.AllocateBasicBlock()
+			builder.SetCurrentBlock(p2)
+			c.recordKnownSafeBound(1, 100, 999419)
+			c.recordKnownSafeBound(2, 4, 9991239)
+			c.recordKnownSafeBound(5, 555, 54341221)
+			c.recordKnownSafeBound(6, 666, 54321)
+			c.recordKnownSafeBound(7, 666, 54321)
+			builder.AllocateInstruction().AsJump(ssa.ValuesNil, child).Insert(builder)
+			c.finalizeKnownSafeBoundsAtTheEndOfBlock(p2.ID())
+		}
+		{
+			p3 := builder.AllocateBasicBlock()
+			builder.SetCurrentBlock(p3)
+			c.recordKnownSafeBound(1, 1, 999419)
+			c.recordKnownSafeBound(2, 11111, 9991239)
+			c.recordKnownSafeBound(5, 5551231, 54341221)
+			c.recordKnownSafeBound(7, 666, 54321)
+			c.recordKnownSafeBound(60, 666, 54321)
+			builder.AllocateInstruction().AsJump(ssa.ValuesNil, child).Insert(builder)
+			c.finalizeKnownSafeBoundsAtTheEndOfBlock(p3.ID())
+		}
+
+		builder.SetCurrentBlock(child)
+		c.initializeCurrentBlockKnownBounds()
+		for _, tc := range []struct {
+			id    ssa.ValueID
+			valid bool
+			bound uint64
+		}{
+			{id: 0, valid: false},
+			{id: 1, valid: true, bound: 1},
+			{id: 2, valid: true, bound: 4},
+			{id: 3, valid: false},
+			{id: 4, valid: false},
+			{id: 5, valid: true, bound: 555},
+			{id: 6, valid: false},
+			{id: 7, valid: false},
+			{id: 60, valid: false},
+			{id: 592131, valid: false},
+		} {
+			t.Run(fmt.Sprintf("id=%d", tc.id), func(t *testing.T) {
+				kb := c.getKnownSafeBound(tc.id)
+				require.Equal(t, tc.valid, kb.valid())
+				if kb.valid() {
+					require.Equal(t, tc.bound, kb.bound)
+					require.Equal(t, ssa.ValueInvalid, kb.absoluteAddr)
+				}
+			})
+		}
+	})
 }

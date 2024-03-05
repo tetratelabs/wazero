@@ -2119,10 +2119,11 @@ func (i *Instruction) BrTableData() (index Value, targets []BasicBlock) {
 }
 
 // AsJump initializes this instruction as a jump instruction with OpcodeJump.
-func (i *Instruction) AsJump(vs Values, target BasicBlock) {
+func (i *Instruction) AsJump(vs Values, target BasicBlock) *Instruction {
 	i.opcode = OpcodeJump
 	i.vs = vs
 	i.blk = target
+	return i
 }
 
 // IsFallthroughJump returns true if this instruction is a fallthrough jump.
