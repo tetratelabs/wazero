@@ -256,7 +256,7 @@ func (m *MemoryInstance) Grow(delta uint32) (result uint32, ok bool) {
 
 	// If exceeds the max of memory size, we push -1 according to the spec.
 	newPages := currentPages + delta
-	if newPages > m.Max {
+	if newPages > m.Max || int32(delta) < 0 {
 		return 0, false
 	} else if newPages > m.Cap { // grow the memory.
 		if m.Shared {

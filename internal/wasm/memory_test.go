@@ -91,6 +91,16 @@ func TestMemoryInstance_Grow_Size(t *testing.T) {
 	}
 }
 
+func TestMemoryInstance_NegativeDelta(t *testing.T) {
+	m := &MemoryInstance{Buffer: make([]byte, 2*MemoryPageSize)}
+	_negative := -1
+	negativeu32 := uint32(_negative)
+	_, ok := m.Grow(negativeu32)
+	// If the negative page size is given, current_page+delta might overflow, and it can result in accidentally shrinking the memory,
+	// which is obviously not spec compliant.
+	require.False(t, ok)
+}
+
 func TestMemoryInstance_ReadByte(t *testing.T) {
 	mem := &MemoryInstance{Buffer: []byte{0, 0, 0, 0, 0, 0, 0, 16}, Min: 1}
 	v, ok := mem.ReadByte(7)
