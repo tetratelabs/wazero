@@ -233,55 +233,16 @@ func (m *machine) lowerLoad(ptr ssa.Value, offset uint32, typ ssa.Type, ret ssa.
 }
 
 func (m *machine) lowerLoadSplat(ptr ssa.Value, offset uint32, lane ssa.VecLane, ret ssa.Value) {
-	var opSize byte
-	switch lane {
-	case ssa.VecLaneI8x16:
-		opSize = 8
-	case ssa.VecLaneI16x8:
-		opSize = 16
-	case ssa.VecLaneI32x4:
-		opSize = 32
-	case ssa.VecLaneI64x2:
-		opSize = 64
-	}
-	amode := m.lowerToAddressMode(ptr, offset, opSize)
+	// vecLoad1R has offset address mode (base+imm) only for post index, so we simply add the offset to the base.
+	base := m.getOperand_NR(m.compiler.ValueDefinition(ptr), extModeNone).nr()
+	offsetReg := m.compiler.AllocateVReg(ssa.TypeI64)
+	m.lowerConstantI64(offsetReg, int64(offset))
+	addedBase := m.addReg64ToReg64(base, offsetReg)
+
 	rd := operandNR(m.compiler.VRegOf(ret))
-	m.lowerLoadSplatFromAddressMode(rd, amode, lane)
-}
-
-// lowerLoadSplatFromAddressMode is extracted from lowerLoadSplat for testing.
-func (m *machine) lowerLoadSplatFromAddressMode(rd operand, amode addressMode, lane ssa.VecLane) {
-	tmpReg := operandNR(m.compiler.AllocateVReg(ssa.TypeI64))
-
-	// vecLoad1R has offset address mode (base+imm) only for post index, so the only addressing mode
-	// we can use here is "no-offset" register addressing mode, i.e. `addressModeKindRegReg`.
-	switch amode.kind {
-	case addressModeKindRegReg:
-		add := m.allocateInstr()
-		add.asALU(aluOpAdd, tmpReg, operandNR(amode.rn), operandNR(amode.rm), true)
-		m.insert(add)
-	case addressModeKindRegSignedImm9:
-		add := m.allocateInstr()
-		add.asALU(aluOpAdd, tmpReg, operandNR(amode.rn), operandImm12(uint16(amode.imm), 0), true)
-		m.insert(add)
-	case addressModeKindRegUnsignedImm12:
-		if amode.imm != 0 {
-			offsetReg := m.compiler.AllocateVReg(ssa.TypeI64)
-			m.load64bitConst(amode.imm, offsetReg)
-			add := m.allocateInstr()
-			m.insert(add)
-			add.asALU(aluOpAdd, tmpReg, operandNR(amode.rn), operandNR(offsetReg), true)
-		} else {
-			tmpReg = operandNR(amode.rn)
-		}
-	default:
-		panic("unsupported address mode for LoadSplat")
-	}
-
-	arr := ssaLaneToArrangement(lane)
 
 	ld1r := m.allocateInstr()
-	ld1r.asVecLoad1R(rd, tmpReg, arr)
+	ld1r.asVecLoad1R(rd, operandNR(addedBase), ssaLaneToArrangement(lane))
 	m.insert(ld1r)
 }
 

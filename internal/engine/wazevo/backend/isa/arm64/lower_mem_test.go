@@ -3,7 +3,6 @@ package arm64
 import (
 	"fmt"
 	"math"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -829,74 +828,5 @@ func Test_extLoadSizeSign(t *testing.T) {
 		size, signed := extLoadSignSize(tc.op)
 		require.Equal(t, tc.expSize, size)
 		require.Equal(t, tc.signed, signed)
-	}
-}
-
-func Test_lowerLoadSplatFromAddressMode(t *testing.T) {
-	positiveTests := make(map[addressModeKind]bool)
-	nextVReg := regalloc.VReg(100).SetRegType(regalloc.RegTypeInt)
-
-	for _, tc := range []struct {
-		amode       addressMode
-		expected    string
-		expectPanic bool
-	}{
-		{
-			amode: addressMode{kind: addressModeKindRegReg, rn: x0VReg, rm: x1VReg},
-			expected: `
-add x100?, x0, x1
-ld1r {x10.4s}, [x100?]
-`,
-		},
-		{
-			amode: addressMode{kind: addressModeKindRegUnsignedImm12, rn: x0VReg, imm: 15616},
-			expected: `
-movz x101?, #0x3d00, lsl 0
-add x100?, x0, x101?
-ld1r {x10.4s}, [x100?]
-`,
-		},
-		{
-			amode: addressMode{kind: addressModeKindRegUnsignedImm12, rn: x15VReg, imm: 0},
-			expected: `
-ld1r {x10.4s}, [x15]
-`,
-		},
-		{
-			amode: addressMode{kind: addressModeKindRegSignedImm9, rn: x0VReg, imm: 42},
-			expected: `
-add x100?, x0, #0x2a
-ld1r {x10.4s}, [x100?]
-`,
-		},
-	} {
-		tc := tc
-		t.Run("address mode "+strconv.Itoa(int(tc.amode.kind)), func(t *testing.T) {
-			ctx, _, m := newSetupWithMockContext()
-			ctx.vRegCounter = int(nextVReg.ID()) - 1
-			positiveTests[tc.amode.kind] = true
-
-			m.lowerLoadSplatFromAddressMode(operandNR(x10VReg), tc.amode, ssa.VecLaneI32x4)
-			require.Equal(t, tc.expected, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
-		})
-	}
-
-	// Must panic for all other addressModeKinds.
-	for k := 0; k <= int(addressModeKindResultStackSpace); k++ {
-		amk := addressModeKind(k)
-		if positiveTests[amk] {
-			continue
-		}
-
-		ctx, _, m := newSetupWithMockContext()
-		ctx.vRegCounter = int(nextVReg.ID()) - 1
-
-		t.Run("address mode "+strconv.Itoa(k), func(t *testing.T) {
-			err := require.CapturePanic(func() {
-				m.lowerLoadSplatFromAddressMode(operandNR(x10VReg), addressMode{kind: amk}, ssa.VecLaneI32x4)
-			})
-			require.Contains(t, err.Error(), "unsupported address mode for LoadSplat")
-		})
-
 	}
 }
