@@ -56,7 +56,7 @@ type Compiler struct {
 	knownSafeBounds    [] /* ssa.ValueID to */ knownSafeBound
 	knownSafeBoundsSet []ssa.ValueID
 
-	knownSafeBoundsAtTheEndOfBlocks   [] /* ssa.ValueID to */ knownSafeBoundsAtTheEndOfBlock
+	knownSafeBoundsAtTheEndOfBlocks   [] /* ssa.BlockID to */ knownSafeBoundsAtTheEndOfBlock
 	varLengthKnownSafeBoundWithIDPool wazevoapi.VarLengthPool[knownSafeBoundWithID]
 
 	execCtxPtrValue, moduleCtxPtrValue ssa.Value
