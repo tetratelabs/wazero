@@ -1056,3 +1056,10 @@ func Test2112(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "invalid function[0]: unknown misc opcode 0x30")
 }
+
+func Test2118(t *testing.T) {
+	if !platform.CompilerSupported() {
+		return
+	}
+	nodiff.RequireNoDiffT(t, getWasmBinary(t, "2118"), true, true)
+}
