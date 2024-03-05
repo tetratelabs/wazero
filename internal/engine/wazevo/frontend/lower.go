@@ -161,7 +161,13 @@ func (c *Compiler) lowerBody(entryBlk ssa.BasicBlock) {
 	})
 
 	for c.loweringState.pc < len(c.wasmFunctionBody) {
+		blkBeforeLowering := c.ssaBuilder.CurrentBlock()
 		c.lowerCurrentOpcode()
+		blkAfterLowering := c.ssaBuilder.CurrentBlock()
+		if blkBeforeLowering != blkAfterLowering {
+			c.finalizeKnownSafeBoundsAtTheEndOfBlock(blkBeforeLowering.ID())
+			c.initializeCurrentBlockKnownBounds()
+		}
 	}
 }
 
@@ -1415,11 +1421,6 @@ func (c *Compiler) lowerCurrentOpcode() {
 		builder.Seal(thenBlk)
 		builder.Seal(elseBlk)
 	case wasm.OpcodeElse:
-		// Reset the safe bounds since we are entering the Else block.
-		// TODO: we should be able to inherit the safe bounds from the parent block. So, right now, this means that
-		//  else block is a little bit more slow than the then block.
-		c.clearSafeBounds()
-
 		ifctrl := state.ctrlPeekAt(0)
 		if unreachable := state.unreachable; unreachable && state.unreachableDepth > 0 {
 			// If it is currently in unreachable and is a nested if,
@@ -1481,13 +1482,6 @@ func (c *Compiler) lowerCurrentOpcode() {
 		}
 
 		builder.Seal(followingBlk)
-
-		if unreachable || followingBlk.Preds() != 1 {
-			// If we can reach this block without being unreachable, and it has only one predecessor,
-			// this means that we get here from the unique block contiguously. Therefore, we can
-			// keep using the same safe bounds information. Otherwise, we need to reset it.
-			c.clearSafeBounds()
-		}
 
 		// Ready to start translating the following block.
 		c.switchTo(ctrl.originalStackLenWithoutParam, followingBlk)
