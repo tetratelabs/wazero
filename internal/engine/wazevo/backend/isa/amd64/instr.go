@@ -271,6 +271,19 @@ func (i *instruction) String() string {
 		return fmt.Sprintf("blendvpd %s, %s, %%xmm0", i.op1.format(false), i.op2.format(false))
 	case mfence:
 		return "mfence"
+	case lockcmpxchg:
+		var suffix string
+		switch i.u1 {
+		case 1:
+			suffix = "b"
+		case 2:
+			suffix = "w"
+		case 4:
+			suffix = "l"
+		case 8:
+			suffix = "q"
+		}
+		return fmt.Sprintf("lock cmpxchg.%s %s, %s", suffix, i.op1.format(true), i.op2.format(true))
 	default:
 		panic(fmt.Sprintf("BUG: %d", int(i.kind)))
 	}
@@ -739,6 +752,9 @@ const (
 	// If the dst is a memory address, the execution is atomic.
 	xchg
 
+	// lockcmpxchg is the cmpxchg instruction https://www.felixcloutier.com/x86/cmpxchg with a lock prefix.
+	lockcmpxchg
+
 	// zeros puts zeros into the destination register. This is implemented as xor reg, reg for
 	// either integer or XMM registers. The reason why we have this instruction instead of using aluRmiR
 	// is that it requires the already-defined registers. From reg alloc's perspective, this defines
@@ -1001,6 +1017,8 @@ func (k instructionKind) String() string {
 		return "idivRemSequence"
 	case mfence:
 		return "mfence"
+	case lockcmpxchg:
+		return "lockcmpxchg"
 	default:
 		panic("BUG")
 	}
@@ -1433,6 +1451,14 @@ func (i *instruction) asXCHG(rm regalloc.VReg, rd operand, size byte) *instructi
 	i.kind = xchg
 	i.op1 = newOperandReg(rm)
 	i.op2 = rd
+	i.u1 = uint64(size)
+	return i
+}
+
+func (i *instruction) asLockCmpXCHG(rm regalloc.VReg, rd *amode, size byte) *instruction {
+	i.kind = lockcmpxchg
+	i.op1 = newOperandReg(rm)
+	i.op2 = newOperandMem(rd)
 	i.u1 = uint64(size)
 	return i
 }
