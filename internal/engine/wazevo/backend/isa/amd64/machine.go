@@ -998,7 +998,7 @@ func (m *machine) lowerAtomicRmw(op ssa.AtomicRmwOp, addr, val ssa.Value, size u
 			m.insert(m.allocateInstr().asNeg(newOperandReg(valCopied), true))
 		}
 		m.insert(m.allocateInstr().asLockXAdd(valCopied, mem, byte(size)))
-		m.clearHigherBitsForAtomic(valCopied, size)
+		m.clearHigherBitsForAtomic(valCopied, size, ret.Type())
 		m.copyTo(valCopied, m.c.VRegOf(ret))
 
 	case ssa.AtomicRmwOpAnd, ssa.AtomicRmwOpOr, ssa.AtomicRmwOpXor:
@@ -1011,7 +1011,7 @@ func (m *machine) lowerAtomicRmw(op ssa.AtomicRmwOp, addr, val ssa.Value, size u
 
 		// Copy the value to a temporary register.
 		valCopied := m.copyToTmp(_val.reg())
-		m.clearHigherBitsForAtomic(valCopied, size)
+		m.clearHigherBitsForAtomic(valCopied, size, ret.Type())
 
 		memOp := newOperandMem(mem)
 		tmp := m.c.AllocateVReg(ssa.TypeI64)
@@ -1054,14 +1054,14 @@ func (m *machine) lowerAtomicRmw(op ssa.AtomicRmwOp, addr, val ssa.Value, size u
 		m.insert(m.allocateInstr().asKeepAlive(valCopied))
 
 		// At this point, accumulator contains the result.
-		m.clearHigherBitsForAtomic(accumulator, size)
+		m.clearHigherBitsForAtomic(accumulator, size, ret.Type())
 		m.copyTo(accumulator, m.c.VRegOf(ret))
 
 	case ssa.AtomicRmwOpXchg:
 		valCopied := m.copyToTmp(_val.reg())
 
 		m.insert(m.allocateInstr().asXCHG(valCopied, newOperandMem(mem), byte(size)))
-		m.clearHigherBitsForAtomic(valCopied, size)
+		m.clearHigherBitsForAtomic(valCopied, size, ret.Type())
 		m.copyTo(valCopied, m.c.VRegOf(ret))
 
 	default:
@@ -1077,13 +1077,15 @@ func (m *machine) lowerAtomicCas(addr, exp, repl ssa.Value, size uint64, ret ssa
 	accumulator := raxVReg
 	m.copyTo(expOp.reg(), accumulator)
 	m.insert(m.allocateInstr().asLockCmpXCHG(replOp.reg(), mem, byte(size)))
-	m.clearHigherBitsForAtomic(accumulator, size)
+	m.clearHigherBitsForAtomic(accumulator, size, ret.Type())
 	m.copyTo(accumulator, m.c.VRegOf(ret))
 }
 
-func (m *machine) clearHigherBitsForAtomic(r regalloc.VReg, size uint64) {
-	if size < 4 {
-		m.insert(m.allocateInstr().asAluRmiR(aluRmiROpcodeAnd, newOperandImm32(uint32((1<<(8*size))-1)), r, true))
+func (m *machine) clearHigherBitsForAtomic(r regalloc.VReg, valSize uint64, resultType ssa.Type) {
+	if resultType == ssa.TypeI32 && valSize < 4 {
+		m.insert(m.allocateInstr().asAluRmiR(aluRmiROpcodeAnd, newOperandImm32(uint32((1<<(8*valSize))-1)), r, true))
+	} else if resultType == ssa.TypeI64 && valSize < 8 {
+		m.insert(m.allocateInstr().asAluRmiR(aluRmiROpcodeAnd, newOperandImm32(uint32((1<<(8*valSize))-1)), r, true))
 	}
 }
 
