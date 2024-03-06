@@ -1082,8 +1082,23 @@ func (m *machine) lowerAtomicCas(addr, exp, repl ssa.Value, size uint64, ret ssa
 }
 
 func (m *machine) clearHigherBitsForAtomic(r regalloc.VReg, valSize uint64, resultType ssa.Type) {
-	if byte(valSize) < resultType.Size() {
-		m.insert(m.allocateInstr().asAluRmiR(aluRmiROpcodeAnd, newOperandImm32(uint32((1<<(8*valSize))-1)), r, false))
+	switch resultType {
+	case ssa.TypeI32:
+		switch valSize {
+		case 1:
+			m.insert(m.allocateInstr().asMovzxRmR(extModeBL, newOperandReg(r), r))
+		case 2:
+			m.insert(m.allocateInstr().asMovzxRmR(extModeWL, newOperandReg(r), r))
+		}
+	case ssa.TypeI64:
+		switch valSize {
+		case 1:
+			m.insert(m.allocateInstr().asMovzxRmR(extModeBQ, newOperandReg(r), r))
+		case 2:
+			m.insert(m.allocateInstr().asMovzxRmR(extModeWQ, newOperandReg(r), r))
+		case 4:
+			m.insert(m.allocateInstr().asMovzxRmR(extModeLQ, newOperandReg(r), r))
+		}
 	}
 }
 
