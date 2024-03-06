@@ -646,8 +646,8 @@ func TestE2E(t *testing.T) {
 		{
 			name:      "atomic_rmw_add",
 			m:         testcases.AtomicRmwAdd.Module,
-			features:  api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
 			skipAMD64: true,
+			features:  api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
 			calls: []callCase{
 				{params: []uint64{1, 2, 3, 4, 5, 6, 7}, expResults: []uint64{0, 0, 0, 0, 0, 0, 0}},
 				{params: []uint64{1, 2, 3, 4, 5, 6, 7}, expResults: []uint64{1, 2, 3, 4, 5, 6, 7}},
@@ -781,10 +781,9 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
-			name:      "atomic_cas",
-			m:         testcases.AtomicCas.Module,
-			features:  api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
-			skipAMD64: true,
+			name:     "atomic_cas",
+			m:        testcases.AtomicCas.Module,
+			features: api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
 			calls: []callCase{
 				// no store
 				{
@@ -811,10 +810,9 @@ func TestE2E(t *testing.T) {
 		{
 			// Checks if load works when comparison value is zero. It wouldn't if
 			// the zero register gets used.
-			name:      "atomic_cas_const0",
-			m:         testcases.AtomicCasConst0.Module,
-			features:  api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
-			skipAMD64: true,
+			name:     "atomic_cas_const0",
+			m:        testcases.AtomicCasConst0.Module,
+			features: api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
 			setupMemory: func(mem api.Memory) {
 				mem.WriteUint32Le(0, 1)
 				mem.WriteUint32Le(8, 2)

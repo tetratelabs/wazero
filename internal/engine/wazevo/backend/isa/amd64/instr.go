@@ -411,6 +411,22 @@ func (i *instruction) Uses(regs *[]regalloc.VReg) []regalloc.VReg {
 			panic(fmt.Sprintf("BUG: invalid operand: %s", i))
 		}
 		*regs = append(*regs, opReg.reg())
+
+	case useKindRaxOp1RegOp2:
+		opReg, opAny := &i.op1, &i.op2
+		*regs = append(*regs, raxVReg, opReg.reg())
+		switch opAny.kind {
+		case operandKindReg:
+			*regs = append(*regs, opAny.reg())
+		case operandKindMem:
+			opAny.addressMode().uses(regs)
+		default:
+			panic(fmt.Sprintf("BUG: invalid operand: %s", i))
+		}
+		if opReg.kind != operandKindReg {
+			panic(fmt.Sprintf("BUG: invalid operand: %s", i))
+		}
+
 	default:
 		panic(fmt.Sprintf("BUG: invalid useKind %s for %s", uk, i))
 	}
@@ -532,31 +548,69 @@ func (i *instruction) AssignUse(index int, v regalloc.VReg) {
 		}
 	case useKindBlendvpd:
 		op, opMustBeReg := &i.op1, &i.op2
-		switch op.kind {
-		case operandKindReg:
-			switch index {
-			case 0:
-				if v.RealReg() != xmm0 {
+		if index == 0 {
+			if v.RealReg() != xmm0 {
+				panic("BUG")
+			}
+		} else {
+			switch op.kind {
+			case operandKindReg:
+				switch index {
+				case 1:
+					op.setReg(v)
+				case 2:
+					opMustBeReg.setReg(v)
+				default:
 					panic("BUG")
 				}
-			case 1:
-				op.setReg(v)
-			case 2:
-				opMustBeReg.setReg(v)
+			case operandKindMem:
+				nregs := op.addressMode().nregs()
+				index--
+				if index < nregs {
+					op.addressMode().assignUses(index, v)
+				} else if index == nregs {
+					opMustBeReg.setReg(v)
+				} else {
+					panic("BUG")
+				}
 			default:
+				panic(fmt.Sprintf("BUG: invalid operand pair: %s", i))
+			}
+		}
+
+	case useKindRaxOp1RegOp2:
+		switch index {
+		case 0:
+			if v.RealReg() != rax {
 				panic("BUG")
 			}
-		case operandKindMem:
-			nregs := op.addressMode().nregs()
-			if index < nregs {
-				op.addressMode().assignUses(index, v)
-			} else if index == nregs {
-				opMustBeReg.setReg(v)
-			} else {
-				panic("BUG")
-			}
+		case 1:
+			i.op1.setReg(v)
 		default:
-			panic(fmt.Sprintf("BUG: invalid operand pair: %s", i))
+			op := &i.op2
+			switch op.kind {
+			case operandKindReg:
+				switch index {
+				case 1:
+					op.setReg(v)
+				case 2:
+					op.setReg(v)
+				default:
+					panic("BUG")
+				}
+			case operandKindMem:
+				nregs := op.addressMode().nregs()
+				index -= 2
+				if index < nregs {
+					op.addressMode().assignUses(index, v)
+				} else if index == nregs {
+					op.setReg(v)
+				} else {
+					panic("BUG")
+				}
+			default:
+				panic(fmt.Sprintf("BUG: invalid operand pair: %s", i))
+			}
 		}
 	default:
 		panic(fmt.Sprintf("BUG: invalid useKind %s for %s", uk, i))
@@ -2296,6 +2350,7 @@ var defKinds = [instrMax]defKind{
 	blendvpd:               defKindNone,
 	mfence:                 defKindNone,
 	xchg:                   defKindNone,
+	lockcmpxchg:            defKindNone,
 }
 
 // String implements fmt.Stringer.
@@ -2323,6 +2378,8 @@ const (
 	useKindOp1Op2Reg
 	// useKindOp1RegOp2 is Op1 must be a register, Op2 can be any operand.
 	useKindOp1RegOp2
+	// useKindRaxOp1RegOp2 is Op1 must be a register, Op2 can be any operand, and RAX is used.
+	useKindRaxOp1RegOp2
 	useKindDivRem
 	useKindBlendvpd
 	useKindCall
@@ -2373,6 +2430,7 @@ var useKinds = [instrMax]useKind{
 	blendvpd:               useKindBlendvpd,
 	mfence:                 useKindNone,
 	xchg:                   useKindOp1RegOp2,
+	lockcmpxchg:            useKindRaxOp1RegOp2,
 }
 
 func (u useKind) String() string {

@@ -971,9 +971,31 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		store := m.allocateInstr().asXCHG(copied, mem, byte(size))
 		m.insert(store)
 
+	case ssa.OpcodeAtomicCas:
+		addr, exp, repl := instr.Arg3()
+		size := instr.AtomicTargetSize()
+		m.lowerAtomicCas(addr, exp, repl, size, instr.Return())
+
 	default:
 		panic("TODO: lowering " + op.String())
 	}
+}
+
+func (m *machine) lowerAtomicCas(addr, exp, repl ssa.Value, size uint64, ret ssa.Value) {
+	mem := m.lowerToAddressMode(addr, 0)
+	expOp := m.getOperand_Reg(m.c.ValueDefinition(exp))
+	replOp := m.getOperand_Reg(m.c.ValueDefinition(repl))
+
+	accumulator := raxVReg
+	m.copyTo(expOp.reg(), accumulator)
+	m.insert(m.allocateInstr().asLockCmpXCHG(replOp.reg(), mem, byte(size)))
+
+	if size < 4 {
+		// Clear the unnecessary bits.
+		m.insert(m.allocateInstr().asAluRmiR(aluRmiROpcodeAnd, newOperandImm32(uint32((1<<(8*size))-1)), accumulator, true))
+	}
+
+	m.copyTo(accumulator, m.c.VRegOf(ret))
 }
 
 func (m *machine) lowerFcmp(instr *ssa.Instruction) {
