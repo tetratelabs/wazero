@@ -547,10 +547,6 @@ const (
 	// OpcodeBitcast is a bitcast operation: `v = bitcast x`.
 	OpcodeBitcast
 
-	// OpcodeBmask ...
-	// `v = bmask x`.
-	OpcodeBmask
-
 	// OpcodeIreduce narrow the given integer: `v = Ireduce x`.
 	OpcodeIreduce
 
@@ -599,18 +595,16 @@ const (
 	// to two lower single-precision lanes of the result `v = Fvdemote.lane x`.
 	OpcodeFvdemote
 
-	// OpcodeFcvtToUint ...
-	// `v = fcvt_to_uint x`.
+	// OpcodeFcvtToUint converts a floating point value to an unsigned integer: `v = FcvtToUint x`.
 	OpcodeFcvtToUint
 
 	// OpcodeFcvtToSint converts a floating point value to a signed integer: `v = FcvtToSint x`.
 	OpcodeFcvtToSint
 
-	// OpcodeFcvtToUintSat converts a floating point value to an unsigned integer: `v = FcvtToUintSat x`.
+	// OpcodeFcvtToUintSat converts a floating point value to an unsigned integer: `v = FcvtToUintSat x` which saturates on overflow.
 	OpcodeFcvtToUintSat
 
-	// OpcodeFcvtToSintSat ...
-	// `v = fcvt_to_sint_sat x`.
+	// OpcodeFcvtToSintSat converts a floating point value to a signed integer: `v = FcvtToSintSat x` which saturates on overflow.
 	OpcodeFcvtToSintSat
 
 	// OpcodeFcvtFromUint converts an unsigned integer to a floating point value: `v = FcvtFromUint x`.
@@ -619,38 +613,26 @@ const (
 	// OpcodeFcvtFromSint converts a signed integer to a floating point value: `v = FcvtFromSint x`.
 	OpcodeFcvtFromSint
 
-	// OpcodeIsplit ...
-	// `lo, hi = isplit x`.
-	OpcodeIsplit
-
-	// OpcodeIconcat ...
-	// `v = iconcat lo, hi`.
-	OpcodeIconcat
-
-	// OpcodeAtomicRmw ...
-	// `v = atomic_rmw MemFlags, AtomicRmwOp, p, x`.
+	// OpcodeAtomicRmw is atomic read-modify-write operation: `v = atomic_rmw op, p, offset, value`.
 	OpcodeAtomicRmw
 
-	// OpcodeAtomicCas ...
-	// `v = atomic_cas MemFlags, p, e, x`.
+	// OpcodeAtomicCas is atomic compare-and-swap operation.
 	OpcodeAtomicCas
 
-	// OpcodeAtomicLoad ...
-	// `v = atomic_load MemFlags, p`.
+	// OpcodeAtomicLoad is atomic load operation.
 	OpcodeAtomicLoad
 
-	// OpcodeAtomicStore ...
-	// `atomic_store MemFlags, x, p`.
+	// OpcodeAtomicStore is atomic store operation.
 	OpcodeAtomicStore
 
-	// OpcodeFence ...
-	// `fence`.
+	// OpcodeFence is a memory fence operation.
 	OpcodeFence
 
 	// opcodeEnd marks the end of the opcode list.
 	opcodeEnd
 )
 
+// AtomicRmwOp represents the atomic read-modify-write operation.
 type AtomicRmwOp byte
 
 const (
@@ -668,6 +650,7 @@ const (
 	AtomicRmwOpXchg
 )
 
+// String implements the fmt.Stringer.
 func (op AtomicRmwOp) String() string {
 	switch op {
 	case AtomicRmwOpAdd:
@@ -2829,8 +2812,6 @@ func (o Opcode) String() (ret string) {
 		return "Nearest"
 	case OpcodeBitcast:
 		return "Bitcast"
-	case OpcodeBmask:
-		return "Bmask"
 	case OpcodeIreduce:
 		return "Ireduce"
 	case OpcodeSnarrow:
@@ -2871,10 +2852,6 @@ func (o Opcode) String() (ret string) {
 		return "FcvtFromUint"
 	case OpcodeFcvtFromSint:
 		return "FcvtFromSint"
-	case OpcodeIsplit:
-		return "Isplit"
-	case OpcodeIconcat:
-		return "Iconcat"
 	case OpcodeAtomicRmw:
 		return "AtomicRmw"
 	case OpcodeAtomicCas:
