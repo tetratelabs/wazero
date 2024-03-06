@@ -359,7 +359,7 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 			index := wasm.Index(stack[0])
 			mod := c.callerModuleInstance()
 			listener := mod.Engine.(*moduleEngine).listeners[index]
-			def := mod.Source.FunctionDefinition(index)
+			def := mod.Source.FunctionDefinition(index + mod.Source.ImportFunctionCount)
 			listener.Before(ctx, mod, def, stack[1:], c.stackIterator(false))
 			c.execCtx.exitCode = wazevoapi.ExitCodeOK
 			afterGoFunctionCallEntrypoint(c.execCtx.goCallReturnAddress, c.execCtxPtr,
@@ -369,7 +369,7 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 			index := wasm.Index(stack[0])
 			mod := c.callerModuleInstance()
 			listener := mod.Engine.(*moduleEngine).listeners[index]
-			def := mod.Source.FunctionDefinition(index)
+			def := mod.Source.FunctionDefinition(index + mod.Source.ImportFunctionCount)
 			listener.After(ctx, mod, def, stack[1:])
 			c.execCtx.exitCode = wazevoapi.ExitCodeOK
 			afterGoFunctionCallEntrypoint(c.execCtx.goCallReturnAddress, c.execCtxPtr,
