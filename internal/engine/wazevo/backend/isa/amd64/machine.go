@@ -989,40 +989,79 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 func (m *machine) lowerAtomicRmw(op ssa.AtomicRmwOp, addr, val ssa.Value, size uint64, ret ssa.Value) {
 	mem := m.lowerToAddressMode(addr, 0)
 	_val := m.getOperand_Reg(m.c.ValueDefinition(val))
-	valCopied := m.copyToTmp(_val.reg())
 
 	switch op {
 	case ssa.AtomicRmwOpAdd, ssa.AtomicRmwOpSub:
+		valCopied := m.copyToTmp(_val.reg())
 		if op == ssa.AtomicRmwOpSub {
 			// Negate the value.
 			m.insert(m.allocateInstr().asNeg(newOperandReg(valCopied), true))
 		}
 		m.insert(m.allocateInstr().asLockXAdd(valCopied, mem, byte(size)))
-		if size < 4 {
-			// Clear the unnecessary bits.
-			m.insert(m.allocateInstr().asAluRmiR(aluRmiROpcodeAnd, newOperandImm32(uint32((1<<(8*size))-1)),
-				valCopied, true))
-		}
-
+		m.clearHigherBitsForAtomic(valCopied, size)
 		m.copyTo(valCopied, m.c.VRegOf(ret))
 
-	case ssa.AtomicRmwOpAnd:
-		panic("TODO")
+	case ssa.AtomicRmwOpAnd, ssa.AtomicRmwOpOr, ssa.AtomicRmwOpXor:
+		accumulator := raxVReg
+		// Reserve rax for the accumulator to make regalloc happy.
+		// Note: do this initialization before defining valCopied, because it might be the same register and
+		// if that happens, the unnecessary load/store will be performed inside the loop.
+		// This can be mitigated in any way once the register allocator is clever enough.
+		m.insert(m.allocateInstr().asDefineUninitializedReg(accumulator))
 
-	case ssa.AtomicRmwOpOr:
-		panic("TODO")
+		// Copy the value to a temporary register.
+		valCopied := m.copyToTmp(_val.reg())
+		m.clearHigherBitsForAtomic(valCopied, size)
 
-	case ssa.AtomicRmwOpXor:
-		panic("TODO")
-
-	case ssa.AtomicRmwOpXchg:
-		m.insert(m.allocateInstr().asXCHG(valCopied, newOperandMem(mem), byte(size)))
-		if size < 4 {
-			// Clear the unnecessary bits.
-			m.insert(m.allocateInstr().asAluRmiR(aluRmiROpcodeAnd, newOperandImm32(uint32((1<<(8*size))-1)),
-				valCopied, true))
+		memOp := newOperandMem(mem)
+		tmp := m.c.AllocateVReg(ssa.TypeI64)
+		beginLoop, beginLoopLabel := m.allocateBrTarget()
+		{
+			m.insert(beginLoop)
+			// Reset the value on tmp by the original value.
+			m.copyTo(valCopied, tmp)
+			// Load the current value at the memory location into accumulator.
+			switch size {
+			case 1:
+				m.insert(m.allocateInstr().asMovzxRmR(extModeBQ, memOp, accumulator))
+			case 2:
+				m.insert(m.allocateInstr().asMovzxRmR(extModeWQ, memOp, accumulator))
+			case 4:
+				m.insert(m.allocateInstr().asMovzxRmR(extModeLQ, memOp, accumulator))
+			case 8:
+				m.insert(m.allocateInstr().asMov64MR(memOp, accumulator))
+			default:
+				panic("BUG")
+			}
+			// Then perform the logical operation on the accumulator and the value on tmp.
+			switch op {
+			case ssa.AtomicRmwOpAnd:
+				m.insert(m.allocateInstr().asAluRmiR(aluRmiROpcodeAnd, newOperandReg(accumulator), tmp, true))
+			case ssa.AtomicRmwOpOr:
+				m.insert(m.allocateInstr().asAluRmiR(aluRmiROpcodeOr, newOperandReg(accumulator), tmp, true))
+			case ssa.AtomicRmwOpXor:
+				m.insert(m.allocateInstr().asAluRmiR(aluRmiROpcodeXor, newOperandReg(accumulator), tmp, true))
+			default:
+				panic("BUG")
+			}
+			// Finally, try compare-exchange the value at the memory location with the tmp.
+			m.insert(m.allocateInstr().asLockCmpXCHG(tmp, memOp.addressMode(), byte(size)))
+			// If it succeeds, ZF will be set, and we can break the loop.
+			m.insert(m.allocateInstr().asJmpIf(condNZ, newOperandLabel(beginLoopLabel)))
 		}
 
+		// valCopied must be alive at the end of the loop.
+		m.insert(m.allocateInstr().asKeepAlive(valCopied))
+
+		// At this point, accumulator contains the result.
+		m.clearHigherBitsForAtomic(accumulator, size)
+		m.copyTo(accumulator, m.c.VRegOf(ret))
+
+	case ssa.AtomicRmwOpXchg:
+		valCopied := m.copyToTmp(_val.reg())
+
+		m.insert(m.allocateInstr().asXCHG(valCopied, newOperandMem(mem), byte(size)))
+		m.clearHigherBitsForAtomic(valCopied, size)
 		m.copyTo(valCopied, m.c.VRegOf(ret))
 
 	default:
@@ -1038,13 +1077,14 @@ func (m *machine) lowerAtomicCas(addr, exp, repl ssa.Value, size uint64, ret ssa
 	accumulator := raxVReg
 	m.copyTo(expOp.reg(), accumulator)
 	m.insert(m.allocateInstr().asLockCmpXCHG(replOp.reg(), mem, byte(size)))
-
-	if size < 4 {
-		// Clear the unnecessary bits.
-		m.insert(m.allocateInstr().asAluRmiR(aluRmiROpcodeAnd, newOperandImm32(uint32((1<<(8*size))-1)), accumulator, true))
-	}
-
+	m.clearHigherBitsForAtomic(accumulator, size)
 	m.copyTo(accumulator, m.c.VRegOf(ret))
+}
+
+func (m *machine) clearHigherBitsForAtomic(r regalloc.VReg, size uint64) {
+	if size < 4 {
+		m.insert(m.allocateInstr().asAluRmiR(aluRmiROpcodeAnd, newOperandImm32(uint32((1<<(8*size))-1)), r, true))
+	}
 }
 
 func (m *machine) lowerFcmp(instr *ssa.Instruction) {

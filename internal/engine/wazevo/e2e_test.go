@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
-	"runtime"
 	"testing"
 
 	"github.com/tetratelabs/wazero"
@@ -30,13 +29,6 @@ const (
 	v128 = wasm.ValueTypeV128
 )
 
-// TODO: delete once we complete the implementation for amd64.
-func skipOnAmd64(t *testing.T) {
-	if runtime.GOARCH == "amd64" {
-		t.Skip("skip on amd64")
-	}
-}
-
 func TestE2E(t *testing.T) {
 	tmp := t.TempDir()
 	type callCase struct {
@@ -49,7 +41,6 @@ func TestE2E(t *testing.T) {
 		imported, m *wasm.Module
 		calls       []callCase
 		features    api.CoreFeatures
-		skipAMD64   bool
 		setupMemory func(mem api.Memory)
 	}{
 		{
@@ -686,10 +677,9 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
-			name:      "atomic_rmw_and",
-			m:         testcases.AtomicRmwAnd.Module,
-			features:  api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
-			skipAMD64: true,
+			name:     "atomic_rmw_and",
+			m:        testcases.AtomicRmwAnd.Module,
+			features: api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
 			setupMemory: func(mem api.Memory) {
 				mem.WriteUint32Le(0, 0xffffffff)
 				mem.WriteUint32Le(8, 0xffffffff)
@@ -715,10 +705,9 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
-			name:      "atomic_rmw_or",
-			m:         testcases.AtomicRmwOr.Module,
-			features:  api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
-			skipAMD64: true,
+			name:     "atomic_rmw_or",
+			m:        testcases.AtomicRmwOr.Module,
+			features: api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
 			calls: []callCase{
 				{
 					params:     []uint64{0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f},
@@ -735,10 +724,9 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
-			name:      "atomic_rmw_xor",
-			m:         testcases.AtomicRmwXor.Module,
-			features:  api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
-			skipAMD64: true,
+			name:     "atomic_rmw_xor",
+			m:        testcases.AtomicRmwXor.Module,
+			features: api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
 			calls: []callCase{
 				{
 					params:     []uint64{0, 0, 0, 0, 0, 0, 0},
@@ -856,9 +844,6 @@ func TestE2E(t *testing.T) {
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.skipAMD64 {
-				skipOnAmd64(t)
-			}
 			for i := 0; i < 2; i++ {
 				var name string
 				if i == 0 {
