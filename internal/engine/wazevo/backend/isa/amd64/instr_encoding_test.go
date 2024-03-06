@@ -4121,6 +4121,116 @@ func TestInstruction_format_encode(t *testing.T) {
 			want:       "0faef0",
 			wantFormat: "mfence",
 		},
+		{
+			setup:      func(i *instruction) { i.asLockCmpXCHG(rsiVReg, newAmodeImmReg(123, raxVReg), 8) },
+			want:       "f0480fb1707b",
+			wantFormat: "lock cmpxchg.q %rsi, 123(%rax)",
+		},
+		{
+			setup:      func(i *instruction) { i.asLockCmpXCHG(r11VReg, newAmodeImmReg(123, raxVReg), 8) },
+			want:       "f04c0fb1587b",
+			wantFormat: "lock cmpxchg.q %r11, 123(%rax)",
+		},
+		{
+			setup:      func(i *instruction) { i.asLockCmpXCHG(rsiVReg, newAmodeImmReg(123, raxVReg), 4) },
+			want:       "f00fb1707b",
+			wantFormat: "lock cmpxchg.l %rsi, 123(%rax)",
+		},
+		{
+			setup:      func(i *instruction) { i.asLockCmpXCHG(r11VReg, newAmodeImmReg(123, raxVReg), 4) },
+			want:       "f0440fb1587b",
+			wantFormat: "lock cmpxchg.l %r11, 123(%rax)",
+		},
+		{
+			setup:      func(i *instruction) { i.asLockCmpXCHG(r11VReg, newAmodeImmReg(123, raxVReg), 2) },
+			want:       "66f0440fb1587b",
+			wantFormat: "lock cmpxchg.w %r11, 123(%rax)",
+		},
+		{
+			setup:      func(i *instruction) { i.asLockCmpXCHG(rsiVReg, newAmodeImmReg(123, raxVReg), 2) },
+			want:       "66f00fb1707b",
+			wantFormat: "lock cmpxchg.w %rsi, 123(%rax)",
+		},
+		{
+			setup:      func(i *instruction) { i.asLockCmpXCHG(r11VReg, newAmodeImmReg(123, raxVReg), 1) },
+			want:       "f0440fb0587b",
+			wantFormat: "lock cmpxchg.b %r11, 123(%rax)",
+		},
+		{
+			setup:      func(i *instruction) { i.asLockCmpXCHG(r11VReg, newAmodeImmReg(123, rdiVReg), 1) },
+			want:       "f0440fb05f7b",
+			wantFormat: "lock cmpxchg.b %r11, 123(%rdi)",
+		},
+		{
+			setup:      func(i *instruction) { i.asLockCmpXCHG(rsiVReg, newAmodeImmReg(123, raxVReg), 1) },
+			want:       "f0400fb0707b",
+			wantFormat: "lock cmpxchg.b %rsi, 123(%rax)",
+		},
+		{
+			setup:      func(i *instruction) { i.asLockCmpXCHG(rdiVReg, newAmodeImmReg(123, raxVReg), 1) },
+			want:       "f0400fb0787b",
+			wantFormat: "lock cmpxchg.b %rdi, 123(%rax)",
+		},
+		{
+			setup:      func(i *instruction) { i.asLockCmpXCHG(rdiVReg, newAmodeImmReg(123, rsiVReg), 1) },
+			want:       "f0400fb07e7b",
+			wantFormat: "lock cmpxchg.b %rdi, 123(%rsi)",
+		},
+		{
+			setup:      func(i *instruction) { i.asLockXAdd(rsiVReg, newAmodeImmReg(123, raxVReg), 8) },
+			want:       "f0480fc1707b",
+			wantFormat: "lock xadd.q %rsi, 123(%rax)",
+		},
+		{
+			setup:      func(i *instruction) { i.asLockXAdd(r11VReg, newAmodeImmReg(123, raxVReg), 8) },
+			want:       "f04c0fc1587b",
+			wantFormat: "lock xadd.q %r11, 123(%rax)",
+		},
+		{
+			setup:      func(i *instruction) { i.asLockXAdd(rsiVReg, newAmodeImmReg(123, raxVReg), 4) },
+			want:       "f00fc1707b",
+			wantFormat: "lock xadd.l %rsi, 123(%rax)",
+		},
+		{
+			setup:      func(i *instruction) { i.asLockXAdd(r11VReg, newAmodeImmReg(123, raxVReg), 4) },
+			want:       "f0440fc1587b",
+			wantFormat: "lock xadd.l %r11, 123(%rax)",
+		},
+		{
+			setup:      func(i *instruction) { i.asLockXAdd(r11VReg, newAmodeImmReg(123, raxVReg), 2) },
+			want:       "66f0440fc1587b",
+			wantFormat: "lock xadd.w %r11, 123(%rax)",
+		},
+		{
+			setup:      func(i *instruction) { i.asLockXAdd(rsiVReg, newAmodeImmReg(123, raxVReg), 2) },
+			want:       "66f00fc1707b",
+			wantFormat: "lock xadd.w %rsi, 123(%rax)",
+		},
+		{
+			setup:      func(i *instruction) { i.asLockXAdd(r11VReg, newAmodeImmReg(123, raxVReg), 1) },
+			want:       "f0440fc0587b",
+			wantFormat: "lock xadd.b %r11, 123(%rax)",
+		},
+		{
+			setup:      func(i *instruction) { i.asLockXAdd(r11VReg, newAmodeImmReg(123, rdiVReg), 1) },
+			want:       "f0440fc05f7b",
+			wantFormat: "lock xadd.b %r11, 123(%rdi)",
+		},
+		{
+			setup:      func(i *instruction) { i.asLockXAdd(rsiVReg, newAmodeImmReg(123, raxVReg), 1) },
+			want:       "f0400fc0707b",
+			wantFormat: "lock xadd.b %rsi, 123(%rax)",
+		},
+		{
+			setup:      func(i *instruction) { i.asLockXAdd(rdiVReg, newAmodeImmReg(123, raxVReg), 1) },
+			want:       "f0400fc0787b",
+			wantFormat: "lock xadd.b %rdi, 123(%rax)",
+		},
+		{
+			setup:      func(i *instruction) { i.asLockXAdd(rdiVReg, newAmodeImmReg(123, rsiVReg), 1) },
+			want:       "f0400fc07e7b",
+			wantFormat: "lock xadd.b %rdi, 123(%rsi)",
+		},
 	} {
 		tc := tc
 		t.Run(tc.wantFormat, func(t *testing.T) {
