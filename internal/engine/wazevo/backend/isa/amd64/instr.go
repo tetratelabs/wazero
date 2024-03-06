@@ -297,6 +297,10 @@ func (i *instruction) String() string {
 			suffix = "q"
 		}
 		return fmt.Sprintf("lock xadd.%s %s, %s", suffix, i.op1.format(true), i.op2.format(true))
+
+	case keepAlive:
+		return fmt.Sprintf("keepAlive %s", i.op1.format(true))
+
 	default:
 		panic(fmt.Sprintf("BUG: %d", int(i.kind)))
 	}
@@ -856,11 +860,20 @@ const (
 	// lockxadd is xadd https://www.felixcloutier.com/x86/xadd with a lock prefix.
 	lockxadd
 
+	// keepAlive is a meta instruction that uses one register and does nothing.
+	keepAlive
+
 	instrMax
 )
 
 func (i *instruction) asMFence() *instruction {
 	i.kind = mfence
+	return i
+}
+
+func (i *instruction) asKeepAlive(r regalloc.VReg) *instruction {
+	i.kind = keepAlive
+	i.op1 = newOperandReg(r)
 	return i
 }
 
@@ -2353,6 +2366,7 @@ var defKinds = [instrMax]defKind{
 	lockcmpxchg:            defKindNone,
 	lockxadd:               defKindNone,
 	neg:                    defKindNone,
+	keepAlive:              defKindNone,
 }
 
 // String implements fmt.Stringer.
@@ -2435,6 +2449,7 @@ var useKinds = [instrMax]useKind{
 	lockcmpxchg:            useKindRaxOp1RegOp2,
 	lockxadd:               useKindOp1RegOp2,
 	neg:                    useKindOp1,
+	keepAlive:              useKindOp1,
 }
 
 func (u useKind) String() string {

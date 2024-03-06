@@ -3,12 +3,12 @@ package wazevo
 import (
 	"context"
 	"os"
-	"runtime"
 	"testing"
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
+	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
@@ -16,7 +16,7 @@ import (
 var ctx = context.Background()
 
 func TestMain(m *testing.M) {
-	if runtime.GOARCH != "arm64" && runtime.GOARCH != "amd64" {
+	if !platform.CompilerSupported() {
 		os.Exit(0)
 	}
 	os.Exit(m.Run())

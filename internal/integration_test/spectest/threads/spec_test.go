@@ -3,7 +3,6 @@ package spectest
 import (
 	"context"
 	"embed"
-	"runtime"
 	"testing"
 
 	"github.com/tetratelabs/wazero"
@@ -32,7 +31,7 @@ func TestInterpreter(t *testing.T) {
 }
 
 func TestWazevo(t *testing.T) {
-	if !platform.CompilerSupported() || runtime.GOARCH != "arm64" {
+	if !platform.CompilerSupported() {
 		t.Skip()
 	}
 	spectest.Run(t, testcases, context.Background(), opt.NewRuntimeConfigOptimizingCompiler().WithCoreFeatures(enabledFeatures))
