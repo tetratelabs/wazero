@@ -46,7 +46,7 @@ other Wasm runtimes.
   results of the function are passed.
 - `goAllocatedStackSlicePtr` is an aligned pointer to the Go-allocated stack
   for holding values and call frames. For further details refer to
-[/internal/engine/compiler/engine.go][wazero-engine-stack]
+  [Backend § Prologue and Epilogue](../backend/#prologue-and-epilogue)
 
 The trampoline can be found in`backend/isa/<arch>/abi_entry_<arch>.s`.
 
@@ -56,7 +56,7 @@ For each given architecture, the trampoline:
 
 The **preamble** that will be jumped from `entrypoint` function is generated per function signature.
 
-This is implemented in `machine.CompileEntryPreamble(*ssa.Signature)`. 
+This is implemented in `machine.CompileEntryPreamble(*ssa.Signature)`.
 
 The preamble sets the fields in the `wazevo.executionContext`.
 

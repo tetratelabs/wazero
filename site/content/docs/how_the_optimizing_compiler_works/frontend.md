@@ -175,6 +175,10 @@ such values have the `i32` type. The wazero SSA's type system (`ssa.Type`) allow
 - `f64`: 64-bit floating point
 - `v128`: 128-bit SIMD vector
 
+For simplicity, we don't have a dedicated type for pointers. Instead, we use the `i64`
+type to represent pointer values since we only support 64-bit architectures,
+unlike traditional compilers such as LLVM.
+
 Values and instructions are both allocated from pools to minimize memory allocations.
 
 ### Debug Flags

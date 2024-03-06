@@ -201,8 +201,10 @@ blocks:
 if it is live at the entry of a successor.
 
 Because the CFG is a connected graph, it is enough to keep track of either
-live-in or live-out sets, and then propagate the liveness information backwards
-or forwards, respectively. In our case, we keep track of live-ins.
+live-in or live-out sets, and then propagate the liveness information backward
+or forward, respectively. In our case, we keep track of live-in sets per block;
+live-outs are derived from live-ins of the successor blocks when a block is
+allocated.
 
 ### Allocation
 
@@ -232,25 +234,27 @@ this *fixing merge states*: for instance, consider the following:
 
 if the live-out set of a given block `BB0` is different from the live-out set
 of a given block `BB1` and both are predecessors of a block `BB2`, then we need
-to adjust `BB0` and `BB1` to ensure consistency with `BB2`. In practice, we
-ensure that the registers that `BB2` expects to be live-in are live-out in
-`BB0` and `BB1`.
+to adjust `BB0` and `BB1` to ensure consistency with `BB2`. In practice,
+abstract values in `BB0` and `BB1` might be passed to `BB2` either via registers
+or via stack; fixing merge states ensures that registers and stack are used
+consistently to pass values across the involved states.
 
 #### Spilling
 
 If the register allocator cannot find a free register for a given virtual
-(live) register, it will "spill" the value to memory, *i.e.,* stash it
-temporarily to stack.  When that virtual register is reused later, we will
-have to insert instructions to reload the value into a real register.
+(live) register, it needs to "spill" the value to the stack to get a free
+register, *i.e.,* stash it temporarily to stack.  When that virtual register is
+reused later, we will have to insert instructions to reload the value into a
+real register.
 
 While the procedure proceeds with allocation, the procedure also records all
 the virtual registers that transition to the "spilled" state, and inserts the
 reload instructions when those registers are reused later.
 
-The spill instructions are actually inserted at the end of the register allocation, after all the
-allocations and the merge states have been fixed. At this point, all the other
-potential sources of instability have been resolved, and we know where all the
-reloads happen.
+The spill instructions are actually inserted at the end of the register
+allocation, after all the allocations and the merge states have been fixed. At
+this point, all the other potential sources of instability have been resolved,
+and we know where all the reloads happen.
 
 We insert the spills in the block that is the lowest common ancestor of all the
 blocks that reload the value.
