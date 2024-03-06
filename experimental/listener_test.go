@@ -10,6 +10,7 @@ import (
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/experimental/opt"
 	"github.com/tetratelabs/wazero/experimental/wazerotest"
+	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -74,7 +75,12 @@ func TestFunctionListenerFactory(t *testing.T) {
 		},
 	})
 
-	r := wazero.NewRuntimeWithConfig(ctx, opt.NewRuntimeConfigOptimizingCompiler())
+	var r wazero.Runtime
+	if platform.CompilerSupported() {
+		r = wazero.NewRuntimeWithConfig(ctx, opt.NewRuntimeConfigOptimizingCompiler())
+	} else {
+		r = wazero.NewRuntime(ctx)
+	}
 	defer r.Close(ctx) // This closes everything this Runtime created.
 
 	_, err := r.NewHostModuleBuilder("host").NewFunctionBuilder().WithFunc(func() {}).Export("").Instantiate(ctx)
