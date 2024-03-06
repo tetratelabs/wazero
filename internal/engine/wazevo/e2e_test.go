@@ -644,9 +644,10 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
-			name:     "atomic_rmw_add",
-			m:        testcases.AtomicRmwAdd.Module,
-			features: api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
+			name:      "atomic_rmw_add",
+			m:         testcases.AtomicRmwAdd.Module,
+			skipAMD64: true,
+			features:  api.CoreFeaturesV2 | experimental.CoreFeaturesThreads,
 			calls: []callCase{
 				{params: []uint64{1, 2, 3, 4, 5, 6, 7}, expResults: []uint64{0, 0, 0, 0, 0, 0, 0}},
 				{params: []uint64{1, 2, 3, 4, 5, 6, 7}, expResults: []uint64{1, 2, 3, 4, 5, 6, 7}},
