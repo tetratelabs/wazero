@@ -284,6 +284,19 @@ func (i *instruction) String() string {
 			suffix = "q"
 		}
 		return fmt.Sprintf("lock cmpxchg.%s %s, %s", suffix, i.op1.format(true), i.op2.format(true))
+	case lockxadd:
+		var suffix string
+		switch i.u1 {
+		case 1:
+			suffix = "b"
+		case 2:
+			suffix = "w"
+		case 4:
+			suffix = "l"
+		case 8:
+			suffix = "q"
+		}
+		return fmt.Sprintf("lock xadd.%s %s, %s", suffix, i.op1.format(true), i.op2.format(true))
 	default:
 		panic(fmt.Sprintf("BUG: %d", int(i.kind)))
 	}
@@ -786,6 +799,9 @@ const (
 	// mfence is https://www.felixcloutier.com/x86/mfence
 	mfence
 
+	// lockxadd is xadd https://www.felixcloutier.com/x86/xadd with a lock prefix.
+	lockxadd
+
 	instrMax
 )
 
@@ -1019,6 +1035,8 @@ func (k instructionKind) String() string {
 		return "mfence"
 	case lockcmpxchg:
 		return "lockcmpxchg"
+	case lockxadd:
+		return "lockxadd"
 	default:
 		panic("BUG")
 	}
@@ -1457,6 +1475,14 @@ func (i *instruction) asXCHG(rm regalloc.VReg, rd operand, size byte) *instructi
 
 func (i *instruction) asLockCmpXCHG(rm regalloc.VReg, rd *amode, size byte) *instruction {
 	i.kind = lockcmpxchg
+	i.op1 = newOperandReg(rm)
+	i.op2 = newOperandMem(rd)
+	i.u1 = uint64(size)
+	return i
+}
+
+func (i *instruction) asLockXAdd(rm regalloc.VReg, rd *amode, size byte) *instruction {
+	i.kind = lockxadd
 	i.op1 = newOperandReg(rm)
 	i.op2 = newOperandMem(rd)
 	i.u1 = uint64(size)

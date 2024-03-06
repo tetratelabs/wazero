@@ -1322,6 +1322,42 @@ func (i *instruction) encode(c backend.Compiler) (needsLabelResolution bool) {
 			panic("BUG: invalid operand kind")
 		}
 
+	case lockxadd:
+		src, dst := regEncodings[i.op1.reg().RealReg()], i.op2
+		size := i.u1
+
+		var rex rexInfo
+		var opcode uint32
+		lp := legacyPrefixes0xF0 // Lock prefix.
+		switch size {
+		case 8:
+			opcode = 0x0FC1
+			rex = rexInfo(0).setW()
+		case 4:
+			opcode = 0x0FC1
+			rex = rexInfo(0).clearW()
+		case 2:
+			lp = legacyPrefixes0x660xF0 // Legacy prefix + Lock prefix.
+			opcode = 0x0FC1
+			rex = rexInfo(0).clearW()
+		case 1:
+			opcode = 0x0FC0
+			// Some destinations must be encoded with REX.R = 1.
+			if e := src.encoding(); e >= 4 && e <= 7 {
+				rex = rexInfo(0).always()
+			}
+		default:
+			panic(fmt.Sprintf("BUG: invalid size %d: %s", size, i.String()))
+		}
+
+		switch dst.kind {
+		case operandKindMem:
+			m := dst.addressMode()
+			encodeRegMem(c, lp, opcode, 2, src, m, rex)
+		default:
+			panic("BUG: invalid operand kind")
+		}
+
 	case zeros:
 		r := i.op2.reg()
 		if r.RegType() == regalloc.RegTypeInt {
