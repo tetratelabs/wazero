@@ -97,7 +97,7 @@ parameters (`exec_ctx` and `module_ctx`):
 1. `exec_ctx` is a pointer to `wazevo.executionContext`. This is used to exit the execution
    in the face of traps or for host function calls.
 2. `module_ctx`: pointer to `wazevo.moduleContextOpaque`. This is used, among other things,
-   to access memory. It is also used during host function calls.
+   to access memory.
 
 It then takes one parameter `v2`, corresponding to the function parameter, and
 it defines two variables `v3`, `v4`. `v3` is the constant 0, `v4` is the result of
@@ -139,7 +139,7 @@ The relevant APIs can be found under sub-package `ssa` and `frontend`.
 In the code, the terms *lower* or *lowering* are often used to indicate a mapping or a translation,
 because such transformations usually correspond to targeting a lower abstraction level.
 
-- Basic Blocks are represented by the type `ssa.Block` (`ssa/basic_block.go`).
+- Basic Blocks are represented by the type `ssa.Block`.
 - The SSA form is constructed using an `ssa.Builder`. The `ssa.Builder` is instantiated
   in the context of `wasm.Engine.CompileModule()`, more specifically in the method
   `frontend.Compiler.LowerToSSA()`.
@@ -350,7 +350,7 @@ blk3: (v5:i32) <-- (blk1,blk2)
 
 ### Code
 
-`ssa.Builder.LayoutBlocks()` implements the block layout phase.
+`passLayoutBlocks` implements the block layout phase.
 
 ### Debug Flags
 

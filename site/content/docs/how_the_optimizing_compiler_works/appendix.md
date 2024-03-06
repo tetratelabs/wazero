@@ -48,38 +48,31 @@ other Wasm runtimes.
   for holding values and call frames. For further details refer to
 [/internal/engine/compiler/engine.go][wazero-engine-stack]
 
-The ASM trampoline is guaranteed to follow the stable calling convention
-described in [Go's ASM documentation][abi-asm] (sometimes referred to as
-[ABI0][proposal-register-cc]) The trampoline can be found in
-`backend/isa/<arch>/abi_entry_<arch>.s`.
+The trampoline can be found in`backend/isa/<arch>/abi_entry_<arch>.s`.
 
 For each given architecture, the trampoline:
-- moves the arguments to some conventional registers that are documented to be
-  free at the time of the call,
+- moves the arguments to specific registers to match the behavior of the entry preamble or trampoline function, and
 - finally, it jumps into the execution of the generated code for the preamble
 
-The **preamble** is generated distinctly from the rest of the function, and
-before it.
+The **preamble** that will be jumped from `entrypoint` function is generated per function signature.
 
-This is implemented in `machine.CompileEntryPreamble(*ssa.Signature)`.  The
-procedure first instantiates a `backend.FunctionABI` struct with metadata about
-the expected ABI for a function with a given signature.
+This is implemented in `machine.CompileEntryPreamble(*ssa.Signature)`. 
 
 The preamble sets the fields in the `wazevo.executionContext`.
 
 At the beginning of the preamble:
 
-- We set a register to point to the `*wazevo.executionContext` struct.
-- we save the stack pointers, frame pointers, return addresses, etc. to that
+- Set a register to point to the `*wazevo.executionContext` struct.
+- Save the stack pointers, frame pointers, return addresses, etc. to that
   struct.
-- we update the stack pointer to point to `paramResultStackPtr`.
+- Update the stack pointer to point to `paramResultStackPtr`.
 
 The generated code works in concert with the assumption that the preamble has
 been entered through the aforementioned trampoline. Thus, it assumes that the
 arguments can be found in some specific registers.
 
 The preamble then assigns the arguments pointed at by `paramResultStackPtr` to
-the registers that the generated code expects.
+the registers and stack location that the generated code expects.
 
 Finally, it invokes the generated code for the function.
 
@@ -130,7 +123,7 @@ invoked.
 A host function has the signature:
 
 ```
-go func(ctx context.Context, stack []uint64)
+func(ctx context.Context, stack []uint64)
 ```
 
 the function arguments in the `stack` parameter are copied over to the reserved
@@ -181,16 +174,10 @@ under `backend/isa/<arch>/abi_entry_<arch>.s`.
 
 ## Further References
 
-- Go's [internal ABI documentation][abi-internal] complements Go's ASM
-  documentation with details on the internal, unstable ABI, known as
-*ABIInternal*. Notice that, however, the calling convention for ASM is
-different and described in the ASM documentation.
-- Go's [internal ASM documentation][abi-asm] describes the stable, stack-based
-  calling convention for ASM (_ABI0_).
+- Go's [internal ABI documentation][abi-internal] details the calling convention similar to the one we use in both arm64 and amd64 backend.
 - Raphael Poss's [The Go low-level calling convention on
   x86-64][go-call-conv-x86] is also an excellent reference for `amd64`.
 
-[abi-asm]: https://go.dev/doc/asm
 [abi-internal]: https://tip.golang.org/src/cmd/compile/abi-internal
 [go-call-conv-x86]: https://dr-knz.net/go-calling-convention-x86-64.html
 [proposal-register-cc]: https://go.googlesource.com/proposal/+/master/design/40724-register-calling.md#background

@@ -162,7 +162,7 @@ At the end of the allocation procedure, we also record the set of registers
 that are **clobbered** by the body of the function. A register is clobbered
 if its value is overwritten by the function, and it is not saved by the
 callee. This information is used in the finalization phase to determine which
-registers need to be spilled in the prologue. This is not strictly related
+registers need to be saved in the prologue and restored in the epilogue.
 to register allocation in a textbook meaning, but it is a necessary step
 for the finalization phase.
 
@@ -226,7 +226,7 @@ this *fixing merge states*: for instance, consider the following:
         |
         v
       .---.
-     | BB1 |
+     | BB2 |
       '---'
 ```
 
@@ -240,14 +240,14 @@ ensure that the registers that `BB2` expects to be live-in are live-out in
 
 If the register allocator cannot find a free register for a given virtual
 (live) register, it will "spill" the value to memory, *i.e.,* stash it
-temporarily to memory.  When that virtual register is recalled later, we will
+temporarily to stack.  When that virtual register is reused later, we will
 have to insert instructions to reload the value into a real register.
 
 While the procedure proceeds with allocation, the procedure also records all
 the virtual registers that transition to the "spilled" state, and inserts the
-reload instructions when those registers are recalled later.
+reload instructions when those registers are reused later.
 
-The spill instructions are actually inserted at the end, after all the
+The spill instructions are actually inserted at the end of the register allocation, after all the
 allocations and the merge states have been fixed. At this point, all the other
 potential sources of instability have been resolved, and we know where all the
 reloads happen.
@@ -294,7 +294,6 @@ L3 (SSA Block: blk1):
 	mov x8, x8
 	b L4
 L2 (SSA Block: blk2):
-	mov x2, x2
 	mov x8, x2
 L4 (SSA Block: blk3):
 	mov x0, x8
@@ -353,7 +352,7 @@ and epilogue of the function.
 ### Prologue and Epilogue
 
 As usual, the **prologue** is executed before the main body of the function,
-and the **epilogue** is executed at the end. The prologue is responsible for
+and the **epilogue** is executed at the return. The prologue is responsible for
 setting up the stack frame, and the epilogue is responsible for cleaning up the
 stack frame and returning control to the caller.
 
@@ -416,9 +415,9 @@ reloaded.
 - Clobbered registers are, similarly, determined by the register allocator, but
   they are stashed in the prologue and then restored in the epilogue.
 
-The procedure happens at the end of the register allocation phase because at
+The procedure happens after the register allocation phase because at
 this point we have collected enough information to know how much space we need
-to reserve.
+to reserve, and which registers are clobbered.
 
 Regardless of the architecture, after allocating this space, the stack will
 look as follows:

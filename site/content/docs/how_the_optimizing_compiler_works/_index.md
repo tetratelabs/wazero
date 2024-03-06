@@ -86,6 +86,7 @@ The wazero optimizing compiler implements the following compilation passes:
   - Translation to SSA
   - Optimization
   - Block Layout
+  - Control Flow Analysis
 
 * Back-End:
   - Instruction Selection
