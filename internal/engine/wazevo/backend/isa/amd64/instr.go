@@ -2351,6 +2351,8 @@ var defKinds = [instrMax]defKind{
 	mfence:                 defKindNone,
 	xchg:                   defKindNone,
 	lockcmpxchg:            defKindNone,
+	lockxadd:               defKindNone,
+	neg:                    defKindNone,
 }
 
 // String implements fmt.Stringer.
@@ -2431,6 +2433,8 @@ var useKinds = [instrMax]useKind{
 	mfence:                 useKindNone,
 	xchg:                   useKindOp1RegOp2,
 	lockcmpxchg:            useKindRaxOp1RegOp2,
+	lockxadd:               useKindOp1RegOp2,
+	neg:                    useKindOp1,
 }
 
 func (u useKind) String() string {

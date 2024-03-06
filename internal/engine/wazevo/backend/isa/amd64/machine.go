@@ -976,8 +976,57 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		size := instr.AtomicTargetSize()
 		m.lowerAtomicCas(addr, exp, repl, size, instr.Return())
 
+	case ssa.OpcodeAtomicRmw:
+		addr, val := instr.Arg2()
+		atomicOp, size := instr.AtomicRmwData()
+		m.lowerAtomicRmw(atomicOp, addr, val, size, instr.Return())
+
 	default:
 		panic("TODO: lowering " + op.String())
+	}
+}
+
+func (m *machine) lowerAtomicRmw(op ssa.AtomicRmwOp, addr, val ssa.Value, size uint64, ret ssa.Value) {
+	mem := m.lowerToAddressMode(addr, 0)
+	_val := m.getOperand_Reg(m.c.ValueDefinition(val))
+	valCopied := m.copyToTmp(_val.reg())
+
+	switch op {
+	case ssa.AtomicRmwOpAdd, ssa.AtomicRmwOpSub:
+		if op == ssa.AtomicRmwOpSub {
+			// Negate the value.
+			m.insert(m.allocateInstr().asNeg(newOperandReg(valCopied), true))
+		}
+		m.insert(m.allocateInstr().asLockXAdd(valCopied, mem, byte(size)))
+		if size < 4 {
+			// Clear the unnecessary bits.
+			m.insert(m.allocateInstr().asAluRmiR(aluRmiROpcodeAnd, newOperandImm32(uint32((1<<(8*size))-1)),
+				valCopied, true))
+		}
+
+		m.copyTo(valCopied, m.c.VRegOf(ret))
+
+	case ssa.AtomicRmwOpAnd:
+		panic("TODO")
+
+	case ssa.AtomicRmwOpOr:
+		panic("TODO")
+
+	case ssa.AtomicRmwOpXor:
+		panic("TODO")
+
+	case ssa.AtomicRmwOpXchg:
+		m.insert(m.allocateInstr().asXCHG(valCopied, newOperandMem(mem), byte(size)))
+		if size < 4 {
+			// Clear the unnecessary bits.
+			m.insert(m.allocateInstr().asAluRmiR(aluRmiROpcodeAnd, newOperandImm32(uint32((1<<(8*size))-1)),
+				valCopied, true))
+		}
+
+		m.copyTo(valCopied, m.c.VRegOf(ret))
+
+	default:
+		panic("BUG")
 	}
 }
 
