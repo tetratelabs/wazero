@@ -308,7 +308,9 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			b := tc.input(NewRuntime(testCtx)).(*hostModuleBuilder)
+			cfg := NewRuntimeConfig()
+			cfg.(*runtimeConfig).EnableOptimizingCompiler()
+			b := tc.input(NewRuntimeWithConfig(testCtx, cfg)).(*hostModuleBuilder)
 			compiled, err := b.Compile(testCtx)
 			require.NoError(t, err)
 			m := compiled.(*compiledModule)

@@ -437,6 +437,11 @@ func (e *engine) compileHostModule(ctx context.Context, module *wasm.Module, lis
 		totalSize += len(body)
 	}
 
+	if totalSize == 0 {
+		// Empty module.
+		return cm, nil
+	}
+
 	// Allocate executable memory and then copy the generated machine code.
 	executable, err := platform.MmapCodeSegment(totalSize)
 	if err != nil {
