@@ -34,9 +34,7 @@ func ExampleCoreFeaturesThreads() {
 	ctx := context.Background()
 
 	// Threads support must be enabled explicitly in addition to standard V2 features.
-
-	// TODO: currently, only the interpreter is supported for snapshotting.
-	cfg := wazero.NewRuntimeConfigInterpreter().WithCoreFeatures(api.CoreFeaturesV2 | experimental.CoreFeaturesThreads)
+	cfg := wazero.NewRuntimeConfig().WithCoreFeatures(api.CoreFeaturesV2 | experimental.CoreFeaturesThreads)
 
 	r := wazero.NewRuntimeWithConfig(ctx, cfg)
 	defer r.Close(ctx)
