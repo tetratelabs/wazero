@@ -585,6 +585,14 @@ func (g *GlobalInstance) Value() (uint64, uint64) {
 	return g.Val, g.ValHi
 }
 
+func (g *GlobalInstance) SetValue(lo, hi uint64) {
+	if g.Me != nil {
+		g.Me.SetGlobalValue(g.Index, lo, hi)
+	} else {
+		g.Val, g.ValHi = lo, hi
+	}
+}
+
 func (s *Store) GetFunctionTypeIDs(ts []FunctionType) ([]FunctionTypeID, error) {
 	ret := make([]FunctionTypeID, len(ts))
 	for i := range ts {

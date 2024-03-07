@@ -662,6 +662,11 @@ func (e *moduleEngine) ResolveImportedFunction(index, indexInImportedModule wasm
 	e.functions[index] = imported.functions[indexInImportedModule]
 }
 
+// SetGlobalValue implements the same method as documented on wasm.ModuleEngine.
+func (e *moduleEngine) SetGlobalValue(idx wasm.Index, lo, hi uint64) {
+	panic("BUG: SetGlobalValue should never be called on compiler mode")
+}
+
 // GetGlobalValue implements the same method as documented on wasm.ModuleEngine.
 func (e *moduleEngine) GetGlobalValue(wasm.Index) (lo, hi uint64) {
 	panic("BUG: GetGlobalValue should never be called on compiler mode")

@@ -92,6 +92,11 @@ func (e *moduleEngine) GetGlobalValue(wasm.Index) (lo, hi uint64) {
 	panic("BUG: GetGlobalValue should never be called on interpreter mode")
 }
 
+// SetGlobalValue implements the same method as documented on wasm.ModuleEngine.
+func (e *moduleEngine) SetGlobalValue(idx wasm.Index, lo, hi uint64) {
+	panic("BUG: SetGlobalValue should never be called on interpreter mode")
+}
+
 // OwnsGlobals implements the same method as documented on wasm.ModuleEngine.
 func (e *moduleEngine) OwnsGlobals() bool { return false }
 

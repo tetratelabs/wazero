@@ -548,7 +548,11 @@ func TestInstantiateForModule(t *testing.T) {
 
 			results, err := mod.ExportedFunction(tc.funcName).Call(testCtx, params...)
 			require.NoError(t, err)
-			require.Equal(t, tc.expectedResults, results)
+			l := len(tc.expectedResults)
+			require.Equal(t, l, len(results))
+			if l > 0 {
+				require.Equal(t, tc.expectedResults, results)
+			}
 
 			// We expect to see the dynamic function call target
 			require.Equal(t, tc.expectedLog, log.String())
