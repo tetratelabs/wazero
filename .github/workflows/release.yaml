@@ -48,9 +48,13 @@ jobs:
       # windows-2022 is missing osslsigncode (no issue, yet)
       - name: "Install osslsigncode, infozip; setup wix"
         run: |
+          # Find "C:\Program Files (x86)\WiX Toolset <version>\"
+          WIXDIR=`ls '/c/Program Files (x86)'|grep WiX`
+          WIXBIN="C:\\Program Files (x86)\\$WIXDIR\\bin"
+          echo WIXBIN=$WIXBIN
+          echo $WIXBIN >> $GITHUB_PATH
           choco install osslsigncode -y
           choco install zip -y
-          echo "C:\Program Files (x86)\WiX Toolset v3.11\bin" >> $GITHUB_PATH
 
       - name: Download Windows code signing certificate
         env:
