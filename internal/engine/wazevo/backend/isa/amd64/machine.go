@@ -2868,8 +2868,9 @@ func (m *machine) lowerFcvtFromUint(rn, rd operand, src64, dst64 bool) {
 	if !src64 {
 		// Before we convert, we have to clear the higher 32-bits of the 64-bit register
 		// to get the correct result.
-		m.insert(m.allocateInstr().asMovzxRmR(extModeLQ, rn, rd.reg()))
-		m.insert(m.allocateInstr().asGprToXmm(op, rn, rd.reg(), true))
+		tmp := m.copyToTmp(rn.reg())
+		m.insert(m.allocateInstr().asMovzxRmR(extModeLQ, newOperandReg(tmp), tmp))
+		m.insert(m.allocateInstr().asGprToXmm(op, newOperandReg(tmp), rd.reg(), true))
 		return
 	}
 
