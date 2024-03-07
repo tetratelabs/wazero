@@ -58,6 +58,10 @@ type ModuleEngine interface {
 	// Only called when OwnsGlobals() returns true, and must not be called for imported globals
 	GetGlobalValue(idx Index) (lo, hi uint64)
 
+	// SetGlobalValue sets the value of the global variable at the given Index.
+	// Only called when OwnsGlobals() returns true, and must not be called for imported globals
+	SetGlobalValue(idx Index, lo, hi uint64)
+
 	// OwnsGlobals returns true if this ModuleEngine owns the global variables. If true, wasm.GlobalInstance's Val,ValHi should
 	// not be accessed directly.
 	OwnsGlobals() bool

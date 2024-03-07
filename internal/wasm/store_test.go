@@ -466,6 +466,9 @@ func (e *mockEngine) NewModuleEngine(_ *Module, _ *ModuleInstance) (ModuleEngine
 // GetGlobalValue implements the same method as documented on wasm.ModuleEngine.
 func (e *mockModuleEngine) GetGlobalValue(idx Index) (lo, hi uint64) { panic("BUG") }
 
+// SetGlobalValue implements the same method as documented on wasm.ModuleEngine.
+func (e *mockModuleEngine) SetGlobalValue(idx Index, lo, hi uint64) { panic("BUG") }
+
 // OwnsGlobals implements the same method as documented on wasm.ModuleEngine.
 func (e *mockModuleEngine) OwnsGlobals() bool { return false }
 

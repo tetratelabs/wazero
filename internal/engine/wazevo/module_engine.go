@@ -213,6 +213,17 @@ func (m *moduleEngine) GetGlobalValue(i wasm.Index) (lo, hi uint64) {
 	return binary.LittleEndian.Uint64(buf), binary.LittleEndian.Uint64(buf[8:])
 }
 
+// SetGlobalValue implements the same method as documented on wasm.ModuleEngine.
+func (m *moduleEngine) SetGlobalValue(i wasm.Index, lo, hi uint64) {
+	offset := m.parent.offsets.GlobalInstanceOffset(i)
+	buf := m.opaque[offset:]
+	if i < m.module.Source.ImportGlobalCount {
+		panic("GetGlobalValue should not be called for imported globals")
+	}
+	binary.LittleEndian.PutUint64(buf, lo)
+	binary.LittleEndian.PutUint64(buf[8:], hi)
+}
+
 // OwnsGlobals implements the same method as documented on wasm.ModuleEngine.
 func (m *moduleEngine) OwnsGlobals() bool { return true }
 

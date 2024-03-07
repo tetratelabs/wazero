@@ -51,5 +51,5 @@ func (g mutableGlobal) String() string {
 
 // Set implements the same method as documented on api.MutableGlobal.
 func (g mutableGlobal) Set(v uint64) {
-	g.g.Val = v
+	g.g.SetValue(v, 0)
 }
