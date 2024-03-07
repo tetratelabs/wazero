@@ -2866,9 +2866,10 @@ func (m *machine) lowerFcvtFromUint(rn, rd operand, src64, dst64 bool) {
 	// >> which allows CVTSI2SS to be used after all.
 	//
 	if !src64 {
-		cvt := m.allocateInstr()
-		cvt.asGprToXmm(op, rn, rd.reg(), true)
-		m.insert(cvt)
+		// Before we convert, we have to clear the higher 32-bits of the 64-bit register
+		// to get the correct result.
+		m.insert(m.allocateInstr().asMovzxRmR(extModeLQ, rn, rd.reg()))
+		m.insert(m.allocateInstr().asGprToXmm(op, rn, rd.reg(), true))
 		return
 	}
 
