@@ -120,8 +120,8 @@ pub fn run_nodiff(
     config.min_funcs = 1;
     config.max_funcs = config.max_funcs.max(1);
 
-    // TODO: enable after threads support in wazevo.
-    config.threads_enabled = false;
+    // Enable threads, which is disabled by default.
+    config.threads_enabled = true;
 
     if check_logging {
         config.reference_types_enabled = false;
