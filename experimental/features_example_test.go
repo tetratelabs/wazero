@@ -145,8 +145,8 @@ func createChildModule(rt wazero.Runtime, root api.Module, wasmCompiled wazero.C
 	// This is relying on libc implementation details. The structure has been stable for a long time
 	// though it is possible it could change if compiling with a different version of wasi sdk.
 	tid := atomic.AddUint32(&prevTID, 1)
-	root.Memory().WriteUint32Le(ptr, ptr)
-	root.Memory().WriteUint32Le(ptr+20, tid)
+	child.Memory().WriteUint32Le(ptr, ptr)
+	child.Memory().WriteUint32Le(ptr+20, tid)
 	child.ExportedGlobal("__stack_pointer").(api.MutableGlobal).Set(uint64(ptr) + size)
 
 	ret := &childModule{
