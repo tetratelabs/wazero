@@ -15,8 +15,9 @@ import (
 
 var hammers = map[string]testCase{
 	// Tests here are similar to what's described in /RATIONALE.md, but deviate as they involve blocking functions.
-	"close importing module while in use": {f: closeImportingModuleWhileInUse},
-	"close imported module while in use":  {f: closeImportedModuleWhileInUse},
+	"close importing module while in use":         {f: closeImportingModuleWhileInUse},
+	"close imported module while in use":          {f: closeImportedModuleWhileInUse},
+	"linking a closed module should not segfault": {f: testLinkingHammer},
 }
 
 func TestEngineCompiler_hammer(t *testing.T) {
@@ -114,6 +115,19 @@ func closeModuleWhileInUse(t *testing.T, r wazero.Runtime, closeFn func(imported
 
 	// If unloading worked properly, a new function call should route to the newly instantiated module.
 	requireFunctionCall(t, importing.ExportedFunction("call_return_input"))
+}
+
+// testLinkingHammer links two modules where the first exports a table and the second module imports it,
+// overwriting one of the table entries with one of its functions.
+// The first module exposes a function that invokes the functionref in the table.
+// If the functionref belongs to failed or closed module, then the call should not fail.
+func testLinkingHammer(t *testing.T, r wazero.Runtime) {
+	if !platform.CompilerSupported() {
+		t.Skip()
+	}
+	hammer.NewHammer(t, 1, 10).Run(func(name string) {
+		testLinking(t, r)
+	}, func() {})
 }
 
 func requireFunctionCall(t *testing.T, fn api.Function) {
