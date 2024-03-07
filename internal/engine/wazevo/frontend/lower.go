@@ -1840,7 +1840,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			baseAddr := state.pop()
 			addr := c.memOpSetup(baseAddr, uint64(offset), 8)
 			load := builder.AllocateInstruction().
-				AsLoad(addr, offset, ssa.TypeV128).
+				AsLoad(addr, offset, ssa.TypeF64).
 				Insert(builder).Return()
 			ret := builder.AllocateInstruction().
 				AsWiden(load, lane, signed, true).
