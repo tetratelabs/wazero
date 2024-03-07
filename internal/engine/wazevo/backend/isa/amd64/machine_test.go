@@ -279,19 +279,20 @@ func Test_machine_getOperand_Mem_Imm32_Reg(t *testing.T) {
 
 func TestMachine_lowerExitWithCode(t *testing.T) {
 	_, _, m := newSetupWithMockContext()
-	m.lowerExitWithCode(r15VReg, wazevoapi.ExitCodeCallGoFunction)
+	m.lowerExitWithCode(r15VReg, wazevoapi.ExitCodeUnreachable)
 	m.insert(m.allocateInstr().asUD2())
 	m.ectx.FlushPendingInstructions()
 	m.ectx.RootInstr = m.ectx.PerBlockHead
 	require.Equal(t, `
 	mov.q %rsp, 56(%r15)
 	mov.q %rbp, 1152(%r15)
-	movl $6, %ebp
+	movl $3, %ebp
 	mov.l %rbp, (%r15)
+L1:
 	lea L1, %rbp
 	mov.q %rbp, 48(%r15)
 	exit_sequence %r15
-L1:
+L2:
 	ud2
 `, m.Format())
 }

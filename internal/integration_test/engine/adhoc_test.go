@@ -1151,8 +1151,14 @@ func testModuleMemory(t *testing.T, r wazero.Runtime) {
 func testTwoIndirection(t *testing.T, r wazero.Runtime) {
 	var buf bytes.Buffer
 	ctx := context.WithValue(testCtx, experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
-	_, err := r.NewHostModuleBuilder("host").NewFunctionBuilder().WithFunc(func(d uint32) uint32 {
+	_, err := r.NewHostModuleBuilder("host").NewFunctionBuilder().WithFunc(func(
+		_ context.Context, m api.Module, d uint32,
+	) uint32 {
 		if d == math.MaxUint32 {
+			panic(errors.New("host-function panic"))
+		} else if d == math.MaxUint32-1 {
+			err := m.CloseWithExitCode(context.Background(), 1)
+			require.NoError(t, err)
 			panic(errors.New("host-function panic"))
 		}
 		return 1 / d // panics if d ==0.
@@ -1221,6 +1227,11 @@ wasm stack trace:
 	host.div(i32) i32
 	host_importer.call_host_div(i32) i32
 	main.main(i32) i32`},
+			{name: "module closed and then go runtime panic", input: math.MaxUint32 - 1, expErr: `host-function panic (recovered by wazero)
+wasm stack trace:
+	host.div(i32) i32
+	host_importer.call_host_div(i32) i32
+	main.main(i32) i32`},
 		} {
 			tc := tc
 			t.Run(tc.name, func(t *testing.T) {
@@ -1259,6 +1270,9 @@ wasm stack trace:
 --> main.main(0)
 	--> host_importer.call_host_div(0)
 		==> host.div(0)
+--> main.main(-2)
+	--> host_importer.call_host_div(-2)
+		==> host.div(-2)
 `, "\n"+buf.String())
 }
 

@@ -147,6 +147,26 @@ func (c *callEngine) Call(ctx context.Context, params ...uint64) ([]uint64, erro
 func (c *callEngine) addFrame(builder wasmdebug.ErrorBuilder, addr uintptr) (def api.FunctionDefinition, listener experimental.FunctionListener) {
 	eng := c.parent.parent.parent
 	cm := eng.compiledModuleOfAddr(addr)
+	if cm == nil {
+		// This case, the module might have been closed and deleted from the engine.
+		// We fall back to searching the imported modules that can be referenced from this callEngine.
+
+		// First, we check itself.
+		if checkAddrInBytes(addr, c.parent.parent.executable) {
+			cm = c.parent.parent
+		} else {
+			// Otherwise, search all imported modules. TODO: maybe recursive, but not sure it's useful in practice.
+			p := c.parent
+			for i := range p.importedFunctions {
+				candidate := p.importedFunctions[i].me.parent
+				if checkAddrInBytes(addr, candidate.executable) {
+					cm = candidate
+					break
+				}
+			}
+		}
+	}
+
 	if cm != nil {
 		index := cm.functionIndexOf(addr)
 		def = cm.module.FunctionDefinition(cm.module.ImportFunctionCount + index)

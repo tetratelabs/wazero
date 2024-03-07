@@ -110,8 +110,8 @@ func TestEngine_sortedCompiledModules(t *testing.T) {
 			// TODO: use unsafe.Slice after floor version is set to Go 1.20.
 			hdr := (*reflect.SliceHeader)(unsafe.Pointer(&buf))
 			hdr.Data = addr
-			hdr.Len = 1
-			hdr.Cap = 1
+			hdr.Len = 4
+			hdr.Cap = 4
 		}
 		cm := &compiledModule{executables: &executables{executable: buf}}
 		return cm
@@ -166,14 +166,19 @@ func TestEngine_sortedCompiledModules(t *testing.T) {
 		require.Equal(t, unsafe.Pointer(m1), unsafe.Pointer(e.compiledModuleOfAddr(1)))
 		require.Equal(t, unsafe.Pointer(m1), unsafe.Pointer(e.compiledModuleOfAddr(4)))
 		require.Equal(t, unsafe.Pointer(m5), unsafe.Pointer(e.compiledModuleOfAddr(5)))
-		require.Equal(t, unsafe.Pointer(m5), unsafe.Pointer(e.compiledModuleOfAddr(9)))
+		require.Equal(t, unsafe.Pointer(m5), unsafe.Pointer(e.compiledModuleOfAddr(8)))
 		require.Equal(t, unsafe.Pointer(m10), unsafe.Pointer(e.compiledModuleOfAddr(10)))
 		require.Equal(t, unsafe.Pointer(m10), unsafe.Pointer(e.compiledModuleOfAddr(11)))
 		require.Equal(t, unsafe.Pointer(m10), unsafe.Pointer(e.compiledModuleOfAddr(12)))
-		require.Equal(t, unsafe.Pointer(m10), unsafe.Pointer(e.compiledModuleOfAddr(50)))
-		require.Equal(t, unsafe.Pointer(m10), unsafe.Pointer(e.compiledModuleOfAddr(99)))
 		require.Equal(t, unsafe.Pointer(m100), unsafe.Pointer(e.compiledModuleOfAddr(100)))
-		require.Equal(t, unsafe.Pointer(m100), unsafe.Pointer(e.compiledModuleOfAddr(10000)))
+		require.Equal(t, unsafe.Pointer(m100), unsafe.Pointer(e.compiledModuleOfAddr(103)))
+		e.deleteCompiledModuleFromSortedList(m1)
+		require.Equal(t, nil, e.compiledModuleOfAddr(1))
+		require.Equal(t, nil, e.compiledModuleOfAddr(2))
+		require.Equal(t, nil, e.compiledModuleOfAddr(4))
+		e.deleteCompiledModuleFromSortedList(m100)
+		require.Equal(t, nil, e.compiledModuleOfAddr(100))
+		require.Equal(t, nil, e.compiledModuleOfAddr(103))
 	})
 }
 
@@ -200,4 +205,15 @@ func TestCompiledModule_functionIndexOf(t *testing.T) {
 	require.Equal(t, wasm.Index(2), cm.functionIndexOf(executableAddr+1500))
 	require.Equal(t, wasm.Index(2), cm.functionIndexOf(executableAddr+1999))
 	require.Equal(t, wasm.Index(3), cm.functionIndexOf(executableAddr+2000))
+}
+
+func Test_checkAddrInBytes(t *testing.T) {
+	bytes := []byte{0, 1, 2, 3, 4, 5, 6, 7}
+	begin := uintptr(unsafe.Pointer(&bytes[0]))
+	end := uintptr(unsafe.Pointer(&bytes[len(bytes)-1]))
+
+	require.True(t, checkAddrInBytes(begin, bytes))
+	require.True(t, checkAddrInBytes(end, bytes))
+	require.False(t, checkAddrInBytes(begin-1, bytes))
+	require.False(t, checkAddrInBytes(end+1, bytes))
 }

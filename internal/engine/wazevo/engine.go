@@ -540,7 +540,16 @@ func (e *engine) compiledModuleOfAddr(addr uintptr) *compiledModule {
 	if index < 0 {
 		return nil
 	}
-	return e.sortedCompiledModules[index]
+	candidate := e.sortedCompiledModules[index]
+	if checkAddrInBytes(addr, candidate.executable) {
+		// If a module is already deleted, the found module may have been wrong.
+		return candidate
+	}
+	return nil
+}
+
+func checkAddrInBytes(addr uintptr, b []byte) bool {
+	return uintptr(unsafe.Pointer(&b[0])) <= addr && addr <= uintptr(unsafe.Pointer(&b[len(b)-1]))
 }
 
 // NewModuleEngine implements wasm.Engine.
