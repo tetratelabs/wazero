@@ -472,13 +472,6 @@ func (e *engine) compileHostModule(ctx context.Context, module *wasm.Module, lis
 func (e *engine) Close() (err error) {
 	e.mux.Lock()
 	defer e.mux.Unlock()
-
-	for _, cm := range e.compiledModules {
-		cm.functionOffsets = nil
-		cm.module = nil
-		cm.parent = nil
-		cm.executables = nil
-	}
 	e.sortedCompiledModules = nil
 	e.compiledModules = nil
 	e.sharedFunctions = nil
