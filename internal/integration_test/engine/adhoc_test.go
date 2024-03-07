@@ -2192,6 +2192,7 @@ func testLinking(t *testing.T, r wazero.Runtime) {
 	ctx := context.Background()
 	// Instantiate the first module.
 	mod, err := r.InstantiateWithConfig(ctx, linking1, wazero.NewModuleConfig().WithName("Ms"))
+	defer mod.Close(ctx) //nolint
 	require.NoError(t, err)
 	// The second module builds successfully.
 	m, err := r.CompileModule(ctx, linking2)

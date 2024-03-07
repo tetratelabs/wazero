@@ -217,9 +217,9 @@ type function struct {
 	parent         *compiledFunction
 }
 
-// functionFromUintptr resurrects the original *function from the given uintptr
+// functionFromReference resurrects the original *function from the given wasm.Reference
 // which comes from either funcref table or OpcodeRefFunc instruction.
-func functionFromUintptr(ptr wasm.Reference) *function {
+func functionFromReference(ptr wasm.Reference) *function {
 	return (*function)(ptr)
 }
 
@@ -517,7 +517,7 @@ func (e *moduleEngine) LookupFunction(t *wasm.TableInstance, typeId wasm.Functio
 		panic(wasmruntime.ErrRuntimeInvalidTableAccess)
 	}
 
-	tf := functionFromUintptr(rawPtr)
+	tf := functionFromReference(rawPtr)
 	if tf.typeID != typeId {
 		panic(wasmruntime.ErrRuntimeIndirectCallTypeMismatch)
 	}
