@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	_ "embed"
+	"github.com/tetratelabs/wazero/experimental/opt"
 	"testing"
 
 	"github.com/tetratelabs/wazero"
@@ -346,7 +347,7 @@ func TestInstantiateForModule(t *testing.T) {
 	// Set context to one that has an experimental listener
 	ctx := context.WithValue(testCtx, experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&log))
 
-	r := wazero.NewRuntime(ctx)
+	r := wazero.NewRuntimeWithConfig(ctx, opt.NewRuntimeConfigOptimizingCompiler())
 	defer r.Close(ctx)
 
 	compiled, err := r.CompileModule(ctx, invokeWasm)
