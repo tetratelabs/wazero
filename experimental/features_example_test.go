@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"runtime"
+	"sync"
 	"sync/atomic"
 
 	wazero "github.com/tetratelabs/wazero"
@@ -102,12 +103,17 @@ type childModule struct {
 
 var prevTID uint32
 
+var childModuleMu sync.Mutex
+
 // wasi sdk maintains a stack per thread within memory, so we must allocate one separately per child
 // module, corresponding to a host thread, or the stack accesses would collide. wasi sdk does not
 // currently plan to implement this so we must implement it ourselves. We allocate memory for a stack,
 // initialize a pthread struct at the beginning of the stack, and set globals to reference it.
 // https://github.com/WebAssembly/wasi-threads/issues/45
 func createChildModule(rt wazero.Runtime, root api.Module, wasmCompiled wazero.CompiledModule) *childModule {
+	childModuleMu.Lock()
+	defer childModuleMu.Unlock()
+
 	ctx := context.Background()
 
 	// Not executing function so the current stack pointer is end of stack
