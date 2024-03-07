@@ -2,21 +2,22 @@ package adhoc
 
 import (
 	"context"
-	"sync"
-	"testing"
-
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/hammer"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/sys"
+	"runtime"
+	"sync"
+	"testing"
 )
 
 var hammers = map[string]testCase{
 	// Tests here are similar to what's described in /RATIONALE.md, but deviate as they involve blocking functions.
-	"close importing module while in use": {f: closeImportingModuleWhileInUse},
-	"close imported module while in use":  {f: closeImportedModuleWhileInUse},
+	"close importing module while in use":         {f: closeImportingModuleWhileInUse},
+	"close imported module while in use":          {f: closeImportedModuleWhileInUse},
+	"linking a closed module should not segfault": {f: testLinkingHammer},
 }
 
 func TestEngineCompiler_hammer(t *testing.T) {
@@ -114,6 +115,37 @@ func closeModuleWhileInUse(t *testing.T, r wazero.Runtime, closeFn func(imported
 
 	// If unloading worked properly, a new function call should route to the newly instantiated module.
 	requireFunctionCall(t, importing.ExportedFunction("call_return_input"))
+}
+
+// testLinkingHammer links two modules where the first exports a table and the second module imports it,
+// overwriting one of the table entries with one of its functions.
+// The first module exposes a function that invokes the functionref in the table.
+// If the functionref belongs to failed or closed module, then the call should not fail.
+func testLinkingHammer(t *testing.T, r wazero.Runtime) {
+	if !platform.CompilerSupported() {
+		t.Skip()
+	}
+	hammer.NewHammer(t, 1, 10).Run(func(name string) {
+		ctx := context.Background()
+		// Instantiate the first module.
+		mod, err := r.InstantiateWithConfig(ctx, linking1, wazero.NewModuleConfig().WithName("Ms"))
+		defer mod.Close(ctx)
+		require.NoError(t, err)
+		// The second module builds successfully.
+		m, err := r.CompileModule(ctx, linking2)
+		require.NoError(t, err)
+		// The second module instantiates and sets the table[0] field to point to its own $f function.
+		_, err = r.InstantiateModule(ctx, m, wazero.NewModuleConfig())
+		// However it traps upon instantiation.
+		require.Error(t, err)
+		m.Close(ctx)
+		// This should not be necessary to fail.
+		runtime.GC()
+		// The result is expected to be 0xdead, i.e., the result of linking2.$f.
+		res, err := mod.ExportedFunction("get table[0]").Call(ctx) // This should not SIGSEGV.
+		require.NoError(t, err)
+		require.Equal(t, uint64(0xdead), res[0])
+	}, func() {})
 }
 
 func requireFunctionCall(t *testing.T, fn api.Function) {
