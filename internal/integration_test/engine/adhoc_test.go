@@ -17,7 +17,6 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/experimental/logging"
-	"github.com/tetratelabs/wazero/experimental/opt"
 	"github.com/tetratelabs/wazero/experimental/table"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/platform"
@@ -91,14 +90,6 @@ var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 const i32, i64, f32, f64, v128 = wasm.ValueTypeI32, wasm.ValueTypeI64, wasm.ValueTypeF32, wasm.ValueTypeF64, wasm.ValueTypeV128
 
 var memoryCapacityPages = uint32(2)
-
-func TestEngineWazevo(t *testing.T) {
-	if !platform.CompilerSupported() {
-		t.Skip()
-	}
-	config := opt.NewRuntimeConfigOptimizingCompiler()
-	runAllTests(t, tests, config.WithCloseOnContextDone(true), true)
-}
 
 func runAllTests(t *testing.T, tests map[string]testCase, config wazero.RuntimeConfig, isWazevo bool) {
 	for name, tc := range tests {

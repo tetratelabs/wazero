@@ -11,7 +11,6 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/experimental/opt"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
 	"github.com/tetratelabs/wazero/internal/testing/nodiff"
@@ -52,22 +51,9 @@ func runWithInterpreter(t *testing.T, runner func(t *testing.T, r wazero.Runtime
 	})
 }
 
-func runWithWazevo(t *testing.T, runner func(t *testing.T, r wazero.Runtime)) {
-	if !platform.CompilerSupported() {
-		return
-	}
-	t.Run("wazevo", func(t *testing.T) {
-		config := opt.NewRuntimeConfigOptimizingCompiler()
-		r := wazero.NewRuntimeWithConfig(ctx, config)
-		defer r.Close(ctx)
-		runner(t, r)
-	})
-}
-
 func run(t *testing.T, runner func(t *testing.T, r wazero.Runtime)) {
 	runWithInterpreter(t, runner)
 	runWithCompiler(t, runner)
-	runWithWazevo(t, runner)
 }
 
 // Test695 requires two functions to exit with "out of bounds memory access" consistently across the implementations.
@@ -1051,7 +1037,7 @@ func Test2112(t *testing.T) {
 		return
 	}
 
-	r := wazero.NewRuntimeWithConfig(context.Background(), opt.NewRuntimeConfigOptimizingCompiler())
+	r := wazero.NewRuntimeWithConfig(context.Background(), wazero.NewRuntimeConfigCompiler())
 	_, err = r.Instantiate(ctx, bin)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "invalid function[0]: unknown misc opcode 0x30")

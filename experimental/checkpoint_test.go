@@ -13,7 +13,8 @@ import (
 func TestSnapshotNestedWasmInvocation(t *testing.T) {
 	ctx := context.Background()
 
-	rt := wazero.NewRuntime(ctx)
+	// TODO: currently, only the interpreter is supported for snapshotting.
+	rt := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigInterpreter())
 	defer rt.Close(ctx)
 
 	sidechannel := 0
@@ -69,7 +70,8 @@ func TestSnapshotNestedWasmInvocation(t *testing.T) {
 func TestSnapshotMultipleWasmInvocations(t *testing.T) {
 	ctx := context.Background()
 
-	rt := wazero.NewRuntime(ctx)
+	// TODO: currently, only the interpreter is supported for snapshotting.
+	rt := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigInterpreter())
 	defer rt.Close(ctx)
 
 	_, err := rt.NewHostModuleBuilder("example").

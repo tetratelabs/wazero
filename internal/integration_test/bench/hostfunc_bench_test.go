@@ -7,9 +7,10 @@ import (
 	"math"
 	"testing"
 
+	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/internal/engine/compiler"
 	"github.com/tetratelabs/wazero/internal/platform"
+	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
@@ -130,67 +131,37 @@ func getCallEngine(m *wasm.ModuleInstance, name string) (ce api.Function) {
 }
 
 func setupHostCallBench(requireNoError func(error)) *wasm.ModuleInstance {
-	eng := compiler.NewEngine(context.Background(), api.CoreFeaturesV2, nil)
+	ctx := context.Background()
+	r := wazero.NewRuntime(ctx)
 
-	ft := wasm.FunctionType{
-		Params:           []wasm.ValueType{wasm.ValueTypeI32},
-		Results:          []wasm.ValueType{wasm.ValueTypeF32},
-		ParamNumInUint64: 1, ResultNumInUint64: 1,
-	}
-
-	// Build the host module.
-	hostModule := &wasm.Module{
-		TypeSection:     []wasm.FunctionType{ft},
-		FunctionSection: []wasm.Index{0, 0},
-		CodeSection: []wasm.Code{
-			{
-				GoFunc: api.GoModuleFunc(func(_ context.Context, mod api.Module, stack []uint64) {
-					ret, ok := mod.Memory().ReadUint32Le(uint32(stack[0]))
-					if !ok {
-						panic("couldn't read memory")
-					}
-					stack[0] = uint64(ret)
-				}),
-			},
-			wasm.MustParseGoReflectFuncCode(
-				func(_ context.Context, m api.Module, pos uint32) float32 {
-					ret, ok := m.Memory().ReadUint32Le(pos)
-					if !ok {
-						panic("couldn't read memory")
-					}
-					return math.Float32frombits(ret)
-				},
-			),
-		},
-		ExportSection: []wasm.Export{
-			{Name: "go", Type: wasm.ExternTypeFunc, Index: 0},
-			{Name: "go-reflect", Type: wasm.ExternTypeFunc, Index: 1},
-		},
-		Exports: map[string]*wasm.Export{
-			"go":         {Name: "go", Type: wasm.ExternTypeFunc, Index: 0},
-			"go-reflect": {Name: "go-reflect", Type: wasm.ExternTypeFunc, Index: 1},
-		},
-		ID: wasm.ModuleID{1, 2, 3, 4, 5},
-	}
-
-	host := &wasm.ModuleInstance{ModuleName: "host", TypeIDs: []wasm.FunctionTypeID{0}}
-	host.Exports = hostModule.Exports
-
-	err := eng.CompileModule(testCtx, hostModule, nil, false)
+	const i32, f32 = api.ValueTypeI32, api.ValueTypeF32
+	_, err := r.NewHostModuleBuilder("host").
+		NewFunctionBuilder().WithGoModuleFunction(api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
+		ret, ok := mod.Memory().ReadUint32Le(uint32(stack[0]))
+		if !ok {
+			panic("couldn't read memory")
+		}
+		stack[0] = uint64(ret)
+	}), []api.ValueType{i32}, []api.ValueType{f32}).Export("go").
+		NewFunctionBuilder().WithFunc(func(ctx context.Context, m api.Module, pos uint32) float32 {
+		ret, ok := m.Memory().ReadUint32Le(pos)
+		if !ok {
+			panic("couldn't read memory")
+		}
+		return math.Float32frombits(ret)
+	}).Export("go-reflect").Instantiate(ctx)
 	requireNoError(err)
-
-	hostMe, err := eng.NewModuleEngine(hostModule, host)
-	requireNoError(err)
-	linkModuleToEngine(host, hostMe)
 
 	// Build the importing module.
-	importingModule := &wasm.Module{
-		ImportFunctionCount: 2,
-		TypeSection:         []wasm.FunctionType{ft},
+	importingModuleBin := binaryencoding.EncodeModule(&wasm.Module{
+		TypeSection: []wasm.FunctionType{{
+			Params:  []wasm.ValueType{i32},
+			Results: []wasm.ValueType{f32},
+		}},
 		ImportSection: []wasm.Import{
 			// Placeholders for imports from hostModule.
-			{Type: wasm.ExternTypeFunc},
-			{Type: wasm.ExternTypeFunc},
+			{Type: wasm.ExternTypeFunc, Module: "host", Name: "go"},
+			{Type: wasm.ExternTypeFunc, Module: "host", Name: "go-reflect"},
 		},
 		FunctionSection: []wasm.Index{0, 0},
 		ExportSection: []wasm.Export{
@@ -205,27 +176,10 @@ func setupHostCallBench(requireNoError func(error)) *wasm.ModuleInstance {
 			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeCall, 0, wasm.OpcodeEnd}}, // Calling the index 0 = host.go.
 			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeCall, 1, wasm.OpcodeEnd}}, // Calling the index 1 = host.go-reflect.
 		},
-		// Indicates that this module has a memory so that compilers are able to assemble memory-related initialization.
 		MemorySection: &wasm.Memory{Min: 1},
-		ID:            wasm.ModuleID{1},
-	}
+	})
 
-	err = eng.CompileModule(testCtx, importingModule, nil, false)
+	importing, err := r.Instantiate(ctx, importingModuleBin)
 	requireNoError(err)
-
-	importing := &wasm.ModuleInstance{TypeIDs: []wasm.FunctionTypeID{0}}
-	importing.Exports = importingModule.Exports
-
-	importingMe, err := eng.NewModuleEngine(importingModule, importing)
-	requireNoError(err)
-	linkModuleToEngine(importing, importingMe)
-	importingMe.ResolveImportedFunction(0, 0, hostMe)
-	importingMe.ResolveImportedFunction(1, 1, hostMe)
-
-	importing.MemoryInstance = &wasm.MemoryInstance{Buffer: make([]byte, wasm.MemoryPageSize), Min: 1, Cap: 1, Max: 1}
-	return importing
-}
-
-func linkModuleToEngine(module *wasm.ModuleInstance, me wasm.ModuleEngine) {
-	module.Engine = me
+	return importing.(*wasm.ModuleInstance)
 }

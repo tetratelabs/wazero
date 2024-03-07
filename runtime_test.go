@@ -296,9 +296,7 @@ func TestModule_Global(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			cfg := NewRuntimeConfig().(*runtimeConfig)
-			cfg.EnableOptimizingCompiler()
-			r := NewRuntimeWithConfig(testCtx, cfg).(*runtime)
+			r := NewRuntime(testCtx).(*runtime)
 			defer r.Close(testCtx)
 
 			code := &compiledModule{module: tc.module}

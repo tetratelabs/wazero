@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/experimental/opt"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
+	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
@@ -18,6 +18,10 @@ import (
 var tests embed.FS
 
 func BenchmarkLibsodium(b *testing.B) {
+	if !platform.CompilerSupported() {
+		b.Skip()
+	}
+
 	cases, err := tests.ReadDir("testdata")
 	require.NoError(b, err)
 	if len(cases) < 10 {
@@ -25,7 +29,7 @@ func BenchmarkLibsodium(b *testing.B) {
 	}
 
 	ctx := context.Background()
-	r := wazero.NewRuntimeWithConfig(ctx, opt.NewRuntimeConfigOptimizingCompiler())
+	r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigCompiler())
 	defer r.Close(ctx)
 	wasi_snapshot_preview1.MustInstantiate(ctx, r)
 

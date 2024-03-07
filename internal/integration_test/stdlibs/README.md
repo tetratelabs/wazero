@@ -1,7 +1,7 @@
 # Stdlibs benchmarks
 
 This directory contains a Makefile to build (a subset of) the stdlibs for Zig, TinyGo and Go (wasip1)
-and test them against the baseline compiler and the optimizing compiler.
+and test them against the compiler.
 
 ## Requirements
 
@@ -15,7 +15,7 @@ First, build the test suite (the Zig source root has to be set explicitly):
 
     make all zigroot=/path/to/zig/source
 
-Then you can run the test suite against the baseline compiler and the optimizing compiler; e.g.:
+Then you can run the test suite against the compiler; e.g.:
 
     go test -bench=.
 

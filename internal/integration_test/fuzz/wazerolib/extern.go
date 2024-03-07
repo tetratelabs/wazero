@@ -9,7 +9,6 @@ import (
 	"unsafe"
 
 	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/experimental/opt"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
 	"github.com/tetratelabs/wazero/internal/testing/nodiff"
@@ -122,7 +121,7 @@ func test_signal_stack() {
 		},
 	})
 	ctx := context.Background()
-	config := opt.NewRuntimeConfigOptimizingCompiler()
+	config := wazero.NewRuntimeConfigCompiler()
 	r := wazero.NewRuntimeWithConfig(ctx, config)
 	module, err := r.Instantiate(ctx, bin)
 	if err != nil {

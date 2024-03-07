@@ -14,7 +14,6 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/experimental/logging"
-	"github.com/tetratelabs/wazero/experimental/opt"
 	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -52,7 +51,7 @@ func RequireNoDiffT(t *testing.T, wasmBin []byte, checkMemory, loggingCheck bool
 // RequireNoDiff ensures that the behavior is the same between the compiler and the interpreter for any given binary.
 func RequireNoDiff(wasmBin []byte, checkMemory, loggingCheck bool, requireNoError func(err error)) {
 	const features = api.CoreFeaturesV2 | experimental.CoreFeaturesThreads
-	compiler := wazero.NewRuntimeWithConfig(context.Background(), opt.NewRuntimeConfigOptimizingCompiler().WithCoreFeatures(features))
+	compiler := wazero.NewRuntimeWithConfig(context.Background(), wazero.NewRuntimeConfigCompiler().WithCoreFeatures(features))
 	interpreter := wazero.NewRuntimeWithConfig(context.Background(), wazero.NewRuntimeConfigInterpreter().WithCoreFeatures(features))
 	defer compiler.Close(context.Background())
 	defer interpreter.Close(context.Background())

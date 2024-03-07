@@ -1536,7 +1536,38 @@ If a module reaches this limit, an error is returned at the compilation phase.
 
 ## Compiler engine implementation
 
-See [compiler/RATIONALE.md](internal/engine/compiler/RATIONALE.md).
+### Why it's safe to execute runtime-generated machine codes against async Goroutine preemption
+
+Goroutine preemption is the mechanism of the Go runtime to switch goroutines contexts on an OS thread.
+There are two types of preemption: cooperative preemption and async preemption. The former happens, for example,
+when making a function call, and it is not an issue for our runtime-generated functions as they do not make
+direct function calls to Go-implemented functions. On the other hand, the latter, async preemption, can be problematic
+since it tries to interrupt the execution of Goroutine at any point of function, and manipulates CPU register states.
+
+Fortunately, our runtime-generated machine codes do not need to take the async preemption into account.
+All the assembly codes are entered via the trampoline implemented as Go Assembler Function (e.g. [arch_amd64.s](./arch_amd64.s)),
+and as of Go 1.20, these assembler functions are considered as _unsafe_ for async preemption:
+- https://github.com/golang/go/blob/go1.20rc1/src/runtime/preempt.go#L406-L407
+- https://github.com/golang/go/blob/9f0234214473dfb785a5ad84a8fc62a6a395cbc3/src/runtime/traceback.go#L227
+
+From the Go runtime point of view, the execution of runtime-generated machine codes is considered as a part of
+that trampoline function. Therefore, runtime-generated machine code is also correctly considered unsafe for async preemption.
+
+## Why context cancellation is handled in Go code rather than native code
+
+Since [wazero v1.0.0-pre.9](https://github.com/tetratelabs/wazero/releases/tag/v1.0.0-pre.9), the runtime
+supports integration with Go contexts to interrupt execution after a timeout, or in response to explicit cancellation.
+This support is internally implemented as a special opcode `builtinFunctionCheckExitCode` that triggers the execution of
+a Go function (`ModuleInstance.FailIfClosed`) that atomically checks a sentinel value at strategic points in the code
+(e.g. [within loops][checkexitcode_loop]).
+
+[It _is indeed_ possible to check the sentinel value directly, without leaving the native world][native_check], thus sparing some cycles;
+however, because native code never preempts (see section above), this may lead to a state where the other goroutines
+never get the chance to run, and thus never get the chance to set the sentinel value; effectively preventing
+cancellation from taking place.
+
+[checkexitcode_loop]: https://github.com/tetratelabs/wazero/blob/86444c67a37dbf9e693ae5b365901f64968d9025/internal/wazeroir/compiler.go#L467-L476
+[native_check]: https://github.com/tetratelabs/wazero/issues/1409
 
 ## Golang patterns
 

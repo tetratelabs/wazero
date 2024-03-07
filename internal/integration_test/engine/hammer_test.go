@@ -7,7 +7,6 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/experimental/opt"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/hammer"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -29,14 +28,6 @@ func TestEngineCompiler_hammer(t *testing.T) {
 
 func TestEngineInterpreter_hammer(t *testing.T) {
 	runAllTests(t, hammers, wazero.NewRuntimeConfigInterpreter(), false)
-}
-
-func TestEngineWazevo_hammer(t *testing.T) {
-	if !platform.CompilerSupported() {
-		t.Skip()
-	}
-	c := opt.NewRuntimeConfigOptimizingCompiler()
-	runAllTests(t, hammers, c, true)
 }
 
 func closeImportingModuleWhileInUse(t *testing.T, r wazero.Runtime) {
