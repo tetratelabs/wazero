@@ -1532,10 +1532,13 @@ func (m *machine) lowerExitWithCode(execCtx regalloc.VReg, code wazevoapi.ExitCo
 	m.lowerIconst(exitCodeReg, uint64(code), false)
 	m.insert(setExitCode)
 
-	// Next is to save the return address.
-	readRip := m.allocateInstr()
-	m.insert(readRip)
 	ripReg := rbpVReg
+
+	// Next is to save the current address for stack unwinding.
+	nop, currentAddrLabel := m.allocateBrTarget()
+	m.insert(nop)
+	readRip := m.allocateInstr().asLEA(newOperandLabel(currentAddrLabel), ripReg)
+	m.insert(readRip)
 	saveRip := m.allocateInstr().asMovRM(
 		ripReg,
 		newOperandMem(m.newAmodeImmReg(wazevoapi.ExecutionContextOffsetGoCallReturnAddress.U32(), execCtx)),
@@ -1547,11 +1550,10 @@ func (m *machine) lowerExitWithCode(execCtx regalloc.VReg, code wazevoapi.ExitCo
 	exitSq := m.allocateExitSeq(execCtx)
 	m.insert(exitSq)
 
-	// Insert the label for the return address.
-	nop, l := m.allocateBrTarget()
-	readRip.asLEA(newOperandLabel(l), ripReg)
-	m.insert(nop)
-	return l
+	// Return the label for continuation.
+	continuation, afterLabel := m.allocateBrTarget()
+	m.insert(continuation)
+	return afterLabel
 }
 
 func (m *machine) lowerAluRmiROp(si *ssa.Instruction, op aluRmiROpcode) {
