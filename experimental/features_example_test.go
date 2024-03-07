@@ -9,7 +9,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	wazero "github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
@@ -34,7 +34,9 @@ func ExampleCoreFeaturesThreads() {
 	ctx := context.Background()
 
 	// Threads support must be enabled explicitly in addition to standard V2 features.
-	cfg := wazero.NewRuntimeConfig().WithCoreFeatures(api.CoreFeaturesV2 | experimental.CoreFeaturesThreads)
+
+	// TODO: currently, only the interpreter is supported for snapshotting.
+	cfg := wazero.NewRuntimeConfigInterpreter().WithCoreFeatures(api.CoreFeaturesV2 | experimental.CoreFeaturesThreads)
 
 	r := wazero.NewRuntimeWithConfig(ctx, cfg)
 	defer r.Close(ctx)

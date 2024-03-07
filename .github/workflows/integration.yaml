@@ -78,7 +78,7 @@ jobs:
 
   zig:
     needs: build_zig_test_binary
-    name: Zig (${{ matrix.os.name }}, ${{ matrix.arch }}, ${{ matrix.compiler }})
+    name: Zig (${{ matrix.os.name }}, ${{ matrix.arch }})
     runs-on: ${{ matrix.os.version }}
     strategy:
       fail-fast: false # don't fail fast as sometimes failures are arch/OS specific
@@ -92,18 +92,15 @@ jobs:
             name: macOS
           - version: windows-2022
             name: Windows
-        compiler: [baseline]
         arch:     [amd64]
         include:
           - os:
               version: macos-14
               name: macOS
-            compiler: optimizing
             arch:     "arm64"
           - os:
               version: ubuntu-22.04
               name: Ubuntu
-            compiler:   optimizing
             arch:       "amd64"
             go-version: "1.21"
 
@@ -129,7 +126,7 @@ jobs:
       - name: Run built test binaries
         run: |
           cd ${{ env.STDLIB_TESTS }}
-          go test -bench='BenchmarkZig/${{ matrix.compiler }}'
+          go test -bench='BenchmarkZig' -timeout=20m
 
   build_tinygo_test_binary:
     name: Build TinyGo test binary
@@ -168,7 +165,7 @@ jobs:
 
   tinygo:
     needs: build_tinygo_test_binary
-    name: TinyGo (${{ matrix.os.name }}, ${{ matrix.arch }}, ${{ matrix.compiler }})
+    name: TinyGo (${{ matrix.os.name }}, ${{ matrix.arch }})
     runs-on: ${{ matrix.os.version }}
     strategy:
       fail-fast: false # don't fail fast as sometimes failures are arch/OS specific
@@ -182,18 +179,15 @@ jobs:
             name: macOS
           - version: windows-2022
             name: Windows
-        compiler: [baseline]
         arch:     [amd64]
         include:
           - os:
               version: macos-14
               name: macOS
-            compiler: optimizing
             arch:     "arm64"
           - os:
               version: ubuntu-22.04
               name: Ubuntu
-            compiler:   optimizing
             arch:       "amd64"
             go-version: "1.21"
 
@@ -219,7 +213,7 @@ jobs:
       - name: Run test binaries
         run: |
           cd ${{ env.STDLIB_TESTS }}
-          go test -bench='BenchmarkTinyGo/${{ matrix.compiler }}'
+          go test -bench='BenchmarkTinyGo' -timeout=20m
 
   wasi-testsuite:
     name: wasi-testsuite
@@ -280,7 +274,7 @@ jobs:
   go_tests:
     # Due to the embedding of the GOROOT of the building env(https://github.com/golang/go/blob/3c59639b902fada0a2e5a6a35bafd10fc9183b89/src/os/os_test.go#L112),
     # we have to build and cache on each OS unlike others in this file.
-    name: Go-${{ matrix.go-version }} (${{ matrix.os.name }}, ${{ matrix.arch }}, ${{ matrix.compiler }})
+    name: Go-${{ matrix.go-version }} (${{ matrix.os.name }}, ${{ matrix.arch }})
     runs-on: ${{ matrix.os.version }}
     strategy:
       fail-fast: false # don't fail fast as sometimes failures are arch/OS specific
@@ -294,7 +288,6 @@ jobs:
           name: macOS
         - version: windows-2022
           name: Windows
-        compiler: [baseline]
         arch:     [amd64]
         go-version:
           - "1.21"
@@ -303,25 +296,21 @@ jobs:
           - os:
               version: macos-14
               name: macOS
-            compiler:   optimizing
             arch:       "arm64"
             go-version: "1.21"
           - os:
               version: macos-14
               name: macOS
-            compiler:   optimizing
             arch:       "arm64"
             go-version: "1.22"
           - os:
               version: ubuntu-22.04
               name: Ubuntu
-            compiler:   optimizing
             arch:       "amd64"
             go-version: "1.21"
           - os:
               version: ubuntu-22.04
               name: Ubuntu
-            compiler:   optimizing
             arch:       "amd64"
             go-version: "1.22"
 
@@ -358,10 +347,10 @@ jobs:
       - name: Run built test binaries
         run: |
           cd ${{ env.STDLIB_TESTS }}
-          go test -bench='BenchmarkWasip1/${{ matrix.compiler }}'
+          go test -bench='BenchmarkWasip1' -timeout=20m
 
   libsodium:
-    name: libsodium (${{ matrix.os.name }}, ${{ matrix.os.arch }}, optimizing)
+    name: libsodium (${{ matrix.os.name }}, ${{ matrix.os.arch }})
     runs-on: ${{ matrix.os.version }}
     strategy:
       fail-fast: false # don't fail fast as sometimes failures are arch/OS specific

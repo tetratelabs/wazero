@@ -14,7 +14,6 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/experimental/logging"
-	"github.com/tetratelabs/wazero/experimental/opt"
 	"github.com/tetratelabs/wazero/internal/integration_test/spectest"
 	v1 "github.com/tetratelabs/wazero/internal/integration_test/spectest/v1"
 	"github.com/tetratelabs/wazero/internal/platform"
@@ -28,14 +27,6 @@ func TestFileCache_compiler(t *testing.T) {
 		return
 	}
 	runAllFileCacheTests(t, wazero.NewRuntimeConfigCompiler())
-}
-
-func TestFileCache_wazevo(t *testing.T) {
-	if !platform.CompilerSupported() {
-		return
-	}
-	config := opt.NewRuntimeConfigOptimizingCompiler()
-	runAllFileCacheTests(t, config)
 }
 
 func runAllFileCacheTests(t *testing.T, config wazero.RuntimeConfig) {

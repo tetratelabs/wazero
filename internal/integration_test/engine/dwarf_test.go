@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/experimental/opt"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/dwarftestdata"
@@ -30,14 +29,6 @@ func TestEngineCompiler_DWARF(t *testing.T) {
 
 func TestEngineInterpreter_DWARF(t *testing.T) {
 	runAllTests(t, dwarfTests, wazero.NewRuntimeConfigInterpreter(), false)
-}
-
-func TestEngineWazevo_DWARF(t *testing.T) {
-	if !platform.CompilerSupported() {
-		t.Skip()
-	}
-	config := opt.NewRuntimeConfigOptimizingCompiler()
-	runAllTests(t, dwarfTests, config, true)
 }
 
 func testTinyGoDWARF(t *testing.T, r wazero.Runtime) {

@@ -4,10 +4,9 @@ import (
 	_ "embed"
 	"testing"
 
-	wazero "github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
-	"github.com/tetratelabs/wazero/experimental/opt"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/hammer"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -63,13 +62,6 @@ func TestThreadsCompiler_hammer(t *testing.T) {
 
 func TestThreadsInterpreter_hammer(t *testing.T) {
 	runAllTests(t, threadTests, wazero.NewRuntimeConfigInterpreter().WithCoreFeatures(api.CoreFeaturesV2|experimental.CoreFeaturesThreads), false)
-}
-
-func TestThreadsWazevo(t *testing.T) {
-	if !platform.CompilerSupported() {
-		t.Skip()
-	}
-	runAllTests(t, threadTests, opt.NewRuntimeConfigOptimizingCompiler().WithCoreFeatures(api.CoreFeaturesV2|experimental.CoreFeaturesThreads), false)
 }
 
 func incrementGuardedByMutex(t *testing.T, r wazero.Runtime) {

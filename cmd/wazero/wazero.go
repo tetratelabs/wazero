@@ -19,7 +19,6 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/experimental/logging"
-	"github.com/tetratelabs/wazero/experimental/opt"
 	"github.com/tetratelabs/wazero/experimental/sock"
 	"github.com/tetratelabs/wazero/experimental/sysfs"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
@@ -160,10 +159,6 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer) int {
 	flags.BoolVar(&useInterpreter, "interpreter", false,
 		"Interprets WebAssembly modules instead of compiling them into native code.")
 
-	var useOptimizingCompiler bool
-	flags.BoolVar(&useOptimizingCompiler, "optimizing-compiler", false,
-		"[Experimental] Compiles WebAssembly modules using the optimizing compiler.")
-
 	var envs sliceFlag
 	flags.Var(&envs, "env", "key=value pair of environment variable to expose to the binary. "+
 		"Can be specified multiple times.")
@@ -272,8 +267,6 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer) int {
 	var rtc wazero.RuntimeConfig
 	if useInterpreter {
 		rtc = wazero.NewRuntimeConfigInterpreter()
-	} else if useOptimizingCompiler {
-		rtc = opt.NewRuntimeConfigOptimizingCompiler()
 	} else {
 		rtc = wazero.NewRuntimeConfig()
 	}

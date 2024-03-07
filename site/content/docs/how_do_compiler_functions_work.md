@@ -203,15 +203,12 @@ we call `panic` with a corresponding error. This jumping is why the strategy is
 called a trampoline, and only used between the guest wasm and the host running
 it.
 
-For more details, see [RATIONALE.md][compiler-rationale].
-
 [call-stack]: https://en.wikipedia.org/wiki/Call_stack
 [api-function]: https://pkg.go.dev/github.com/tetratelabs/wazero@v1.0.0-rc.1/api#Function
 [api-module]: https://pkg.go.dev/github.com/tetratelabs/wazero@v1.0.0-rc.1/api#Module
 [spec-function-instance]: https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#function-instances%E2%91%A0
 [spec-trap]: https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#trap
 [spec-unreachable]: https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-instr-control
-[compiler-rationale]: https://github.com/tetratelabs/wazero/blob/v1.0.0-rc.1/internal/engine/compiler/RATIONALE.md
 [signal-handler-discussion]: https://gophers.slack.com/archives/C1C1YSQBT/p1675992411241409
 [cgo-not-go]: https://www.youtube.com/watch?v=PAAkCSZUG1c&t=757s
 

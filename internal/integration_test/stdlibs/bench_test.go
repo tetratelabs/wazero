@@ -11,43 +11,24 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/experimental/opt"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/sys"
 )
 
 func BenchmarkZig(b *testing.B) {
-	b.Run("optimizing", func(b *testing.B) {
-		c := opt.NewRuntimeConfigOptimizingCompiler()
-		runtBenches(b, context.Background(), c, zigTestCase)
-	})
-	b.Run("baseline", func(b *testing.B) {
-		c := wazero.NewRuntimeConfigCompiler()
-		runtBenches(b, context.Background(), c, zigTestCase)
-	})
+	c := wazero.NewRuntimeConfigCompiler()
+	runtBenches(b, context.Background(), c, zigTestCase)
 }
 
 func BenchmarkTinyGo(b *testing.B) {
-	b.Run("optimizing", func(b *testing.B) {
-		c := opt.NewRuntimeConfigOptimizingCompiler()
-		runtBenches(b, context.Background(), c, tinyGoTestCase)
-	})
-	b.Run("baseline", func(b *testing.B) {
-		c := wazero.NewRuntimeConfigCompiler()
-		runtBenches(b, context.Background(), c, tinyGoTestCase)
-	})
+	c := wazero.NewRuntimeConfigCompiler()
+	runtBenches(b, context.Background(), c, tinyGoTestCase)
 }
 
 func BenchmarkWasip1(b *testing.B) {
-	b.Run("optimizing", func(b *testing.B) {
-		c := opt.NewRuntimeConfigOptimizingCompiler()
-		runtBenches(b, context.Background(), c, wasip1TestCase)
-	})
-	b.Run("baseline", func(b *testing.B) {
-		c := wazero.NewRuntimeConfigCompiler()
-		runtBenches(b, context.Background(), c, wasip1TestCase)
-	})
+	c := wazero.NewRuntimeConfigCompiler()
+	runtBenches(b, context.Background(), c, wasip1TestCase)
 }
 
 type testCase struct {

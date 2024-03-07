@@ -10,7 +10,6 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/experimental/logging"
-	"github.com/tetratelabs/wazero/experimental/opt"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	internal "github.com/tetratelabs/wazero/internal/emscripten"
 	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
@@ -347,7 +346,7 @@ func TestInstantiateForModule(t *testing.T) {
 	// Set context to one that has an experimental listener
 	ctx := context.WithValue(testCtx, experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&log))
 
-	r := wazero.NewRuntimeWithConfig(ctx, opt.NewRuntimeConfigOptimizingCompiler())
+	r := wazero.NewRuntime(ctx)
 	defer r.Close(ctx)
 
 	compiled, err := r.CompileModule(ctx, invokeWasm)

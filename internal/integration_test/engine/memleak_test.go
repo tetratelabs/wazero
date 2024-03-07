@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/experimental/opt"
 	"github.com/tetratelabs/wazero/internal/platform"
 )
 
@@ -23,50 +22,32 @@ func TestMemoryLeak(t *testing.T) {
 		t.Skip()
 	}
 
-	for _, tc := range []struct {
-		name     string
-		isWazevo bool
-	}{
-		{"compiler", false},
-		{"wazevo", true},
-	} {
-		tc := tc
+	duration := 5 * time.Second
+	t.Logf("running memory leak test for %s", duration)
 
-		t.Run(tc.name, func(t *testing.T) {
-			duration := 5 * time.Second
-			t.Logf("running memory leak test for %s", duration)
+	ctx, cancel := context.WithTimeout(context.Background(), duration)
+	defer cancel()
 
-			ctx, cancel := context.WithTimeout(context.Background(), duration)
-			defer cancel()
-
-			for ctx.Err() == nil {
-				if err := testMemoryLeakInstantiateRuntimeAndModule(tc.isWazevo); err != nil {
-					log.Panicln(err)
-				}
-			}
-
-			var stats runtime.MemStats
-			runtime.GC()
-			runtime.ReadMemStats(&stats)
-
-			if stats.Alloc > (100 * 1024 * 1024) {
-				t.Errorf("wazero used more than 100 MiB after running the test for %s (alloc=%d)", duration, stats.Alloc)
-			}
-			fmt.Println(stats.Alloc)
-		})
+	for ctx.Err() == nil {
+		if err := testMemoryLeakInstantiateRuntimeAndModule(); err != nil {
+			log.Panicln(err)
+		}
 	}
+
+	var stats runtime.MemStats
+	runtime.GC()
+	runtime.ReadMemStats(&stats)
+
+	if stats.Alloc > (100 * 1024 * 1024) {
+		t.Errorf("wazero used more than 100 MiB after running the test for %s (alloc=%d)", duration, stats.Alloc)
+	}
+	fmt.Println(stats.Alloc)
 }
 
-func testMemoryLeakInstantiateRuntimeAndModule(isWazevo bool) error {
+func testMemoryLeakInstantiateRuntimeAndModule() error {
 	ctx := context.Background()
 
-	var r wazero.Runtime
-	if isWazevo {
-		c := opt.NewRuntimeConfigOptimizingCompiler()
-		r = wazero.NewRuntimeWithConfig(ctx, c)
-	} else {
-		r = wazero.NewRuntime(ctx)
-	}
+	r := wazero.NewRuntime(ctx)
 	defer r.Close(ctx)
 
 	hostBuilder := r.NewHostModuleBuilder("test")
