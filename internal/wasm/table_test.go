@@ -288,6 +288,44 @@ func TestModule_validateTable(t *testing.T) {
 			},
 		},
 		{
+			name: "constant offset - two inits from globals - funcref",
+			input: &Module{
+				TypeSection: []FunctionType{{}},
+				ImportSection: []Import{
+					{Type: ExternTypeGlobal, DescGlobal: GlobalType{ValType: ValueTypeFuncref}},
+					{Type: ExternTypeGlobal, DescGlobal: GlobalType{ValType: ValueTypeFuncref}},
+				},
+				ImportGlobalCount: 2,
+				TableSection:      []Table{{Min: 10, Type: RefTypeFuncref}},
+				ElementSection: []ElementSegment{
+					{
+						OffsetExpr: ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0x5}},
+						Init:       []Index{WrapGlobalIndexAsElementInit(0), WrapGlobalIndexAsElementInit(1)},
+						Type:       RefTypeFuncref,
+					},
+				},
+			},
+		},
+		{
+			name: "constant offset - two inits from globals - externref",
+			input: &Module{
+				TypeSection: []FunctionType{{}},
+				ImportSection: []Import{
+					{Type: ExternTypeGlobal, DescGlobal: GlobalType{ValType: ValueTypeExternref}},
+					{Type: ExternTypeGlobal, DescGlobal: GlobalType{ValType: ValueTypeExternref}},
+				},
+				ImportGlobalCount: 2,
+				TableSection:      []Table{{Min: 10, Type: RefTypeExternref}},
+				ElementSection: []ElementSegment{
+					{
+						OffsetExpr: ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0x5}},
+						Init:       []Index{elementInitImportedGlobalReferenceType, elementInitImportedGlobalReferenceType | 1},
+						Type:       RefTypeExternref,
+					},
+				},
+			},
+		},
+		{
 			name: "mixed elementSegments - const before imported global",
 			input: &Module{
 				TypeSection: []FunctionType{{}},
@@ -393,7 +431,7 @@ func TestModule_validateTable_Errors(t *testing.T) {
 			expectedErr: "element type mismatch: table has funcref but element has externref",
 		},
 		{
-			name: "non-nil externref",
+			name: "non-nil non-global externref",
 			input: &Module{
 				TableSection: []Table{{Type: RefTypeFuncref}},
 				ElementSection: []ElementSegment{
@@ -513,7 +551,7 @@ func TestModule_validateTable_Errors(t *testing.T) {
 			expectedErr: "element[0].init exceeds min table size",
 		},
 		{
-			name: "constant derived element offset - funcidx out of range",
+			name: "constant derived element offset - func index out of range",
 			input: &Module{
 				TypeSection:     []FunctionType{{}},
 				TableSection:    []Table{{Min: 1}},
@@ -526,7 +564,7 @@ func TestModule_validateTable_Errors(t *testing.T) {
 					},
 				},
 			},
-			expectedErr: "element[0].init[1] funcidx 1 out of range",
+			expectedErr: "element[0].init[1] func index 1 out of range",
 		},
 		{
 			name: "constant derived element offset - global out of range",
@@ -539,14 +577,14 @@ func TestModule_validateTable_Errors(t *testing.T) {
 				ElementSection: []ElementSegment{
 					{
 						OffsetExpr: ConstantExpression{Opcode: OpcodeI32Const, Data: const1}, Init: []Index{
-							ElementInitImportedGlobalFunctionReference | 1,
-							ElementInitImportedGlobalFunctionReference | 100,
+							elementInitImportedGlobalReferenceType | 1,
+							elementInitImportedGlobalReferenceType | 100,
 						},
 						Type: RefTypeFuncref,
 					},
 				},
 			},
-			expectedErr: "element[0].init[1] globalidx 100 out of range",
+			expectedErr: "element[0].init[1] global index 100 out of range",
 		},
 		{
 			name: "imported global derived element offset - missing table",
@@ -567,7 +605,7 @@ func TestModule_validateTable_Errors(t *testing.T) {
 			expectedErr: "unknown table 0 as active element target",
 		},
 		{
-			name: "imported global derived element offset - funcidx out of range",
+			name: "imported global derived element offset - func index out of range",
 			input: &Module{
 				TypeSection: []FunctionType{{}},
 				ImportSection: []Import{
@@ -583,7 +621,7 @@ func TestModule_validateTable_Errors(t *testing.T) {
 					},
 				},
 			},
-			expectedErr: "element[0].init[1] funcidx 1 out of range",
+			expectedErr: "element[0].init[1] func index 1 out of range",
 		},
 		{
 			name: "imported global derived element offset - wrong ValType",
@@ -1074,7 +1112,7 @@ func TestTableInstance_Grow(t *testing.T) {
 }
 
 func Test_unwrapElementInitGlobalReference(t *testing.T) {
-	actual, ok := unwrapElementInitGlobalReference(12345 | ElementInitImportedGlobalFunctionReference)
+	actual, ok := unwrapElementInitGlobalReference(12345 | elementInitImportedGlobalReferenceType)
 	require.True(t, ok)
 	require.Equal(t, actual, uint32(12345))
 
@@ -1087,5 +1125,5 @@ func Test_unwrapElementInitGlobalReference(t *testing.T) {
 // they won't collide with the actual index.
 func Test_ElementInitSpecials(t *testing.T) {
 	require.True(t, ElementInitNullReference > MaximumFunctionIndex)
-	require.True(t, ElementInitImportedGlobalFunctionReference > MaximumFunctionIndex)
+	require.True(t, elementInitImportedGlobalReferenceType > MaximumFunctionIndex)
 }

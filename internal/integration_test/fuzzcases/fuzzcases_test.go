@@ -1063,3 +1063,10 @@ func Test2136(t *testing.T) {
 	}
 	nodiff.RequireNoDiffT(t, getWasmBinary(t, "2136"), true, true)
 }
+
+func Test2137(t *testing.T) {
+	r := wazero.NewRuntime(context.Background())
+	_, err := r.CompileModule(ctx, getWasmBinary(t, "2137"))
+	require.NoError(t, err)
+	require.NoError(t, r.Close(ctx))
+}
