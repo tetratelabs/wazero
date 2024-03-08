@@ -360,6 +360,12 @@ func (s *Store) instantiate(
 	m.buildGlobals(module, m.Engine.FunctionInstanceReference)
 	m.buildMemory(module)
 	m.Exports = module.Exports
+	for _, exp := range m.Exports {
+		if exp.Type == ExternTypeTable {
+			t := m.Tables[exp.Index]
+			t.involvingModuleInstances = map[*ModuleInstance]struct{}{m: {}}
+		}
+	}
 
 	// As of reference types proposal, data segment validation must happen after instantiation,
 	// and the side effect must persist even if there's out of bounds error after instantiation.
@@ -447,6 +453,9 @@ func (m *ModuleInstance) resolveImports(module *Module) (err error) {
 					}
 				}
 				m.Tables[i.IndexPerType] = importedTable
+				importedTable.involvingModuleInstancesMutex.Lock()
+				importedTable.involvingModuleInstances[m] = struct{}{}
+				importedTable.involvingModuleInstancesMutex.Unlock()
 			case ExternTypeMemory:
 				expected := i.DescMem
 				importedMemory := importedModule.MemoryInstance

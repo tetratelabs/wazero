@@ -3,6 +3,7 @@ package wasm
 import (
 	"fmt"
 	"math"
+	"sync"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/leb128"
@@ -131,6 +132,16 @@ type TableInstance struct {
 
 	// Type is either RefTypeFuncref or RefTypeExternRef.
 	Type RefType
+
+	// The following is only used when the table is exported.
+
+	// involvingModuleInstances is a set of module instances which are involved in the table instance.
+	// This is critical for safety purpose because once a table is imported, it can hold any reference to
+	// any function in the module instance. Therefore, these module instance, transitively the compiled code,
+	// must be alive as long as the table instance is alive.
+	involvingModuleInstances map[*ModuleInstance]struct{}
+	// involvingModuleInstancesMutex is a mutex to protect involvingModuleInstances.
+	involvingModuleInstancesMutex sync.RWMutex
 }
 
 // ElementInstance represents an element instance in a module.

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -2173,4 +2174,86 @@ wasm stack trace:
 	.$0()
 	.$0()
 	... maybe followed by omitted frames`, err.Error())
+}
+
+func TestAAA(t *testing.T) {
+	testCloseTableExportingModule(t, wazero.NewRuntime(context.TODO()))
+}
+
+func testCloseTableExportingModule(t *testing.T, r wazero.Runtime) {
+	exportingBin := binaryencoding.EncodeModule(&wasm.Module{
+		ExportSection: []wasm.Export{
+			{Name: "t", Type: wasm.ExternTypeTable, Index: 0},
+		},
+		TableSection: []wasm.Table{{Type: wasm.RefTypeFuncref, Min: 10}},
+		NameSection:  &wasm.NameSection{ModuleName: "exporting"},
+		// Initialize element at 5
+		ElementSection: []wasm.ElementSegment{
+			{
+				OffsetExpr: wasm.ConstantExpression{
+					Opcode: wasm.OpcodeI32Const,
+					Data:   leb128.EncodeInt32(5),
+				}, TableIndex: 0, Type: wasm.RefTypeFuncref, Mode: wasm.ElementModeActive,
+				// Set the function 0, 1 at table offset 5.
+				Init: []wasm.Index{0, 1},
+			},
+		},
+		TypeSection:     []wasm.FunctionType{{Results: []wasm.ValueType{i32}}},
+		FunctionSection: []wasm.Index{0, 0},
+		CodeSection: []wasm.Code{
+			{Body: []byte{wasm.OpcodeI32Const, 1, wasm.OpcodeEnd}},
+			{Body: []byte{wasm.OpcodeI32Const, 2, wasm.OpcodeEnd}},
+		},
+	})
+
+	mainBin := binaryencoding.EncodeModule(&wasm.Module{
+		ImportSection: []wasm.Import{{
+			Type:      wasm.ExternTypeTable,
+			Module:    "exporting",
+			Name:      "t",
+			DescTable: wasm.Table{Type: wasm.RefTypeFuncref, Min: 10},
+		}},
+		TypeSection: []wasm.FunctionType{
+			{Results: []wasm.ValueType{i32}},                                // Type for functions in the table.
+			{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32}}, // Type for the main function.
+		},
+		ExportSection: []wasm.Export{
+			{Name: "", Type: wasm.ExternTypeFunc, Index: 0},
+		},
+		FunctionSection: []wasm.Index{1},
+		CodeSection: []wasm.Code{
+			{Body: []byte{
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeCallIndirect, 0, 0,
+				wasm.OpcodeEnd,
+			}},
+		},
+	})
+
+	ctx := context.Background()
+	exportingMod, err := r.Instantiate(ctx, exportingBin)
+	require.NoError(t, err)
+
+	mainMod, err := r.Instantiate(ctx, mainBin)
+	require.NoError(t, err)
+
+	main := mainMod.ExportedFunction("")
+	require.NotNil(t, main)
+
+	err = exportingMod.Close(ctx)
+	require.NoError(t, err)
+
+	runtime.GC()
+
+	_, err = main.Call(ctx, 0)
+	// Null function call
+	require.Error(t, err)
+
+	res, err := main.Call(ctx, 5)
+	require.NoError(t, err)
+	require.Equal(t, uint64(1), res[0])
+
+	res, err = main.Call(ctx, 6)
+	require.NoError(t, err)
+	require.Equal(t, uint64(2), res[0])
 }
