@@ -337,9 +337,9 @@ func TestRun(t *testing.T) {
 <== (opened_fd=4,errno=ESUCCESS)
 ==> wasi_snapshot_preview1.fd_filestat_get(fd=4)
 <== (filestat={filetype=REGULAR_FILE,size=5,mtim=%d},errno=ESUCCESS)
-==> wasi_snapshot_preview1.fd_read(fd=4,iovs=64776,iovs_len=1)
+==> wasi_snapshot_preview1.fd_read(fd=4,iovs=64744,iovs_len=1)
 <== (nread=5,errno=ESUCCESS)
-==> wasi_snapshot_preview1.fd_read(fd=4,iovs=64776,iovs_len=1)
+==> wasi_snapshot_preview1.fd_read(fd=4,iovs=64744,iovs_len=1)
 <== (nread=0,errno=ESUCCESS)
 ==> wasi_snapshot_preview1.fd_close(fd=4)
 <== errno=ESUCCESS
