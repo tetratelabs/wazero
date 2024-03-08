@@ -1003,7 +1003,7 @@ func TestModuleInstance_applyElements(t *testing.T) {
 		m.applyElements([]ElementSegment{{Mode: ElementModeActive, OffsetExpr: ConstantExpression{Opcode: OpcodeI32Const, Data: leb128_100}, Init: []Index{1, 2, 3}}})
 		m.applyElements([]ElementSegment{
 			{Mode: ElementModeActive, OffsetExpr: ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0}}, Init: []Index{0, 1, 2}},
-			{Mode: ElementModeActive, OffsetExpr: ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{9}}, Init: []Index{1 | ElementInitImportedGlobalFunctionReference}},
+			{Mode: ElementModeActive, OffsetExpr: ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{9}}, Init: []Index{1 | elementInitImportedGlobalReferenceType}},
 			{Mode: ElementModeActive, OffsetExpr: ConstantExpression{Opcode: OpcodeI32Const, Data: leb128_100}, Init: make([]Index, 5)}, // Iteration stops at this point, so the offset:5 below shouldn't be applied.
 			{Mode: ElementModeActive, OffsetExpr: ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{5}}, Init: make([]Index, 5)},
 		})

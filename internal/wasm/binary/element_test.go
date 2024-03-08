@@ -77,7 +77,7 @@ func Test_decodeElementConstExprVector(t *testing.T) {
 		},
 		{
 			in: []byte{
-				4, // Three indexes.
+				4, // Four indexes.
 				wasm.OpcodeRefNull, wasm.RefTypeFuncref, wasm.OpcodeEnd,
 				wasm.OpcodeRefFunc,
 				0x80, 0x7f,
@@ -88,7 +88,7 @@ func Test_decodeElementConstExprVector(t *testing.T) {
 			exp: []wasm.Index{
 				wasm.ElementInitNullReference,
 				16256,
-				wasm.ElementInitImportedGlobalFunctionReference | 1,
+				wasm.WrapGlobalIndexAsElementInit(1),
 				wasm.ElementInitNullReference,
 			},
 			refType:  wasm.RefTypeFuncref,
@@ -96,11 +96,16 @@ func Test_decodeElementConstExprVector(t *testing.T) {
 		},
 		{
 			in: []byte{
-				2, // Two indexes.
+				3, // Three indexes.
 				wasm.OpcodeRefNull, wasm.RefTypeExternref, wasm.OpcodeEnd,
+				wasm.OpcodeGlobalGet, 1, wasm.OpcodeEnd,
 				wasm.OpcodeRefNull, wasm.RefTypeExternref, wasm.OpcodeEnd,
 			},
-			exp:      []wasm.Index{wasm.ElementInitNullReference, wasm.ElementInitNullReference},
+			exp: []wasm.Index{
+				wasm.ElementInitNullReference,
+				wasm.WrapGlobalIndexAsElementInit(1),
+				wasm.ElementInitNullReference,
+			},
 			refType:  wasm.RefTypeExternref,
 			features: api.CoreFeatureBulkMemoryOperations,
 		},
@@ -167,13 +172,6 @@ func Test_decodeElementConstExprVector_errors(t *testing.T) {
 			refType:  wasm.RefTypeFuncref,
 			features: api.CoreFeaturesV2,
 			expErr:   "too large function index in Element init: 4294967295",
-		},
-		{
-			name:     "type mismatch - global.get",
-			in:       []byte{1, wasm.OpcodeGlobalGet, 0, wasm.OpcodeEnd},
-			refType:  wasm.RefTypeExternref,
-			features: api.CoreFeaturesV2,
-			expErr:   "element type mismatch: want externref, but requires funcref",
 		},
 	}
 
