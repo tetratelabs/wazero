@@ -2178,11 +2178,6 @@ wasm stack trace:
 	... maybe followed by omitted frames`, err.Error())
 }
 
-func TestAAA(t *testing.T) {
-	//testCloseTableExportingModule(t, wazero.NewRuntime(context.TODO()))
-	testCloseTableImportingModule(t, wazero.NewRuntime(context.TODO()))
-}
-
 // testCloseTableExportingModule tests the situation where the module instance that
 // is the initial owner of the table is closed and then try to call call_indirect on the table.
 //
