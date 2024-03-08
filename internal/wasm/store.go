@@ -179,8 +179,13 @@ func (m *ModuleInstance) buildElementInstances(elements []ElementSegment) {
 			inst := make([]Reference, len(inits))
 			m.ElementInstances[i] = inst
 			for j, idx := range inits {
-				if idx != ElementInitNullReference {
-					inst[j] = m.Engine.FunctionInstanceReference(idx)
+				if index, ok := unwrapElementInitGlobalReference(idx); ok {
+					global := m.Globals[index]
+					inst[j] = Reference(global.Val)
+				} else {
+					if idx != ElementInitNullReference {
+						inst[j] = m.Engine.FunctionInstanceReference(idx)
+					}
 				}
 			}
 		}
