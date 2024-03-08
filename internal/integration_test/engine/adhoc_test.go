@@ -2353,6 +2353,7 @@ func testCloseTableImportingModule(t *testing.T, r wazero.Runtime) {
 
 func instantiateClose(t *testing.T, r wazero.Runtime, ctx context.Context, bin []byte) {
 	compiled, err := r.CompileModule(ctx, bin)
+	require.NoError(t, err)
 	m, err := r.InstantiateModule(ctx, compiled, wazero.NewModuleConfig())
 	require.NoError(t, err)
 	err = m.Close(ctx)
