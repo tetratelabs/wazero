@@ -1065,8 +1065,15 @@ func Test2136(t *testing.T) {
 }
 
 func Test2137(t *testing.T) {
-	r := wazero.NewRuntime(context.Background())
-	_, err := r.CompileModule(ctx, getWasmBinary(t, "2137"))
-	require.NoError(t, err)
-	require.NoError(t, r.Close(ctx))
+	if !platform.CompilerSupported() {
+		return
+	}
+	nodiff.RequireNoDiffT(t, getWasmBinary(t, "2137"), true, true)
+}
+
+func Test2140(t *testing.T) {
+	if !platform.CompilerSupported() {
+		return
+	}
+	nodiff.RequireNoDiffT(t, getWasmBinary(t, "2140"), true, true)
 }
