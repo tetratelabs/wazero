@@ -1,7 +1,9 @@
 #![no_main]
 
+use arbitrary::Arbitrary;
 use libfuzzer_sys::arbitrary::{Result, Unstructured};
 use libfuzzer_sys::fuzz_target;
+use wasm_smith::Config;
 
 mod util;
 
@@ -13,8 +15,11 @@ fn run(data: &[u8]) -> Result<()> {
     // Create the random source.
     let mut u = Unstructured::new(data);
 
-    // Generate the random module via wasm-smith, but MaybeInvalidModule.
-    let module: wasm_smith::MaybeInvalidModule = u.arbitrary()?;
+    // Generate the configuration with possibly invalid functions.
+    let mut config = Config::arbitrary(&mut u)?;
+    config.allow_invalid_funcs = true;
+
+    let module = wasm_smith::Module::new(config.clone(), &mut u)?;
     let module_bytes = module.to_bytes();
 
     unsafe {
