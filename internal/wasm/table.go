@@ -137,9 +137,9 @@ type TableInstance struct {
 
 	// involvingModuleInstances is a set of module instances which are involved in the table instance.
 	// This is critical for safety purpose because once a table is imported, it can hold any reference to
-	// any function in the module instance. Therefore, these module instance, transitively the compiled code,
-	// must be alive as long as the table instance is alive.
-	involvingModuleInstances map[*ModuleInstance]struct{}
+	// any function in the owner and importing module instances. Therefore, these module instance,
+	// transitively the compiled modules, must be alive as long as the table instance is alive.
+	involvingModuleInstances []*ModuleInstance
 	// involvingModuleInstancesMutex is a mutex to protect involvingModuleInstances.
 	involvingModuleInstancesMutex sync.RWMutex
 }

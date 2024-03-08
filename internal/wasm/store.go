@@ -363,7 +363,7 @@ func (s *Store) instantiate(
 	for _, exp := range m.Exports {
 		if exp.Type == ExternTypeTable {
 			t := m.Tables[exp.Index]
-			t.involvingModuleInstances = map[*ModuleInstance]struct{}{m: {}}
+			t.involvingModuleInstances = append(t.involvingModuleInstances, m)
 		}
 	}
 
@@ -454,7 +454,10 @@ func (m *ModuleInstance) resolveImports(module *Module) (err error) {
 				}
 				m.Tables[i.IndexPerType] = importedTable
 				importedTable.involvingModuleInstancesMutex.Lock()
-				importedTable.involvingModuleInstances[m] = struct{}{}
+				if len(importedTable.involvingModuleInstances) == 0 {
+					panic("BUG: involvingModuleInstances must not be nil when it's imported")
+				}
+				importedTable.involvingModuleInstances = append(importedTable.involvingModuleInstances, m)
 				importedTable.involvingModuleInstancesMutex.Unlock()
 			case ExternTypeMemory:
 				expected := i.DescMem

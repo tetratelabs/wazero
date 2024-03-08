@@ -72,6 +72,8 @@ var tests = map[string]testCase{
 	"many params many results / main / listener":                       {f: testManyParamsResultsMainListener},
 	"many params many results / call_many_consts_and_pick_last_vector": {f: testManyParamsResultsCallManyConstsAndPickLastVector},
 	"many params many results / call_many_consts_and_pick_last_vector / listener": {f: testManyParamsResultsCallManyConstsAndPickLastVectorListener},
+	"close table importing module": {f: testCloseTableImportingModule},
+	"close table exporting module": {f: testCloseTableExportingModule},
 }
 
 func TestEngineCompiler(t *testing.T) {
@@ -2177,9 +2179,14 @@ wasm stack trace:
 }
 
 func TestAAA(t *testing.T) {
-	testCloseTableExportingModule(t, wazero.NewRuntime(context.TODO()))
+	//testCloseTableExportingModule(t, wazero.NewRuntime(context.TODO()))
+	testCloseTableImportingModule(t, wazero.NewRuntime(context.TODO()))
 }
 
+// testCloseTableExportingModule tests the situation where the module instance that
+// is the initial owner of the table is closed and then try to call call_indirect on the table.
+//
+// This is in practice extremely edge case and shouldn't occur in real world, but in any way, seg fault should not occur.
 func testCloseTableExportingModule(t *testing.T, r wazero.Runtime) {
 	exportingBin := binaryencoding.EncodeModule(&wasm.Module{
 		ExportSection: []wasm.Export{
@@ -2187,7 +2194,6 @@ func testCloseTableExportingModule(t *testing.T, r wazero.Runtime) {
 		},
 		TableSection: []wasm.Table{{Type: wasm.RefTypeFuncref, Min: 10}},
 		NameSection:  &wasm.NameSection{ModuleName: "exporting"},
-		// Initialize element at 5
 		ElementSection: []wasm.ElementSegment{
 			{
 				OffsetExpr: wasm.ConstantExpression{
@@ -2243,17 +2249,119 @@ func testCloseTableExportingModule(t *testing.T, r wazero.Runtime) {
 	err = exportingMod.Close(ctx)
 	require.NoError(t, err)
 
+	// Trigger GC to make sure the module instance that is the initial owner of the table is collected.
 	runtime.GC()
 
-	_, err = main.Call(ctx, 0)
-	// Null function call
-	require.Error(t, err)
+	// Call call_indirect multiple times, should be safe.
+	for i := 0; i < 10; i++ {
+		_, err = main.Call(ctx, 0)
+		// Null function call
+		require.Error(t, err)
 
-	res, err := main.Call(ctx, 5)
-	require.NoError(t, err)
-	require.Equal(t, uint64(1), res[0])
+		res, err := main.Call(ctx, 5)
+		require.NoError(t, err)
+		require.Equal(t, uint64(1), res[0])
 
-	res, err = main.Call(ctx, 6)
+		res, err = main.Call(ctx, 6)
+		require.NoError(t, err)
+		require.Equal(t, uint64(2), res[0])
+		time.Sleep(time.Millisecond * 10)
+	}
+}
+
+// testCloseTableImportingModule is similar to testCloseTableExportingModule, but the module
+// importing the table sets the function reference in the table, and then the module instance
+// that is the initial owner of the table will call call_indirect on the table.
+//
+// This is in practice extremely edge case and shouldn't occur in real world, but in any way, seg fault should not occur.
+func testCloseTableImportingModule(t *testing.T, r wazero.Runtime) {
+	exportingBin := binaryencoding.EncodeModule(&wasm.Module{
+		ExportSection: []wasm.Export{
+			{Name: "t", Type: wasm.ExternTypeTable, Index: 0},
+			{Name: "main", Type: wasm.ExternTypeFunc, Index: 0},
+		},
+		TableSection: []wasm.Table{{Type: wasm.RefTypeFuncref, Min: 10}},
+		NameSection:  &wasm.NameSection{ModuleName: "exporting"},
+		TypeSection: []wasm.FunctionType{
+			{Results: []wasm.ValueType{i32}},                                // Type for functions in the table.
+			{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32}}, // Type for the main function.
+		},
+		FunctionSection: []wasm.Index{1},
+		CodeSection: []wasm.Code{
+			{Body: []byte{
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeCallIndirect, 0, 0,
+				wasm.OpcodeEnd,
+			}},
+		},
+	})
+
+	importingBin := binaryencoding.EncodeModule(&wasm.Module{
+		NameSection: &wasm.NameSection{ModuleName: "importing"},
+		ImportSection: []wasm.Import{{
+			Type:      wasm.ExternTypeTable,
+			Module:    "exporting",
+			Name:      "t",
+			DescTable: wasm.Table{Type: wasm.RefTypeFuncref, Min: 10},
+		}},
+		TypeSection: []wasm.FunctionType{
+			{Results: []wasm.ValueType{i32}}, // Type for functions in the table.
+		},
+		ElementSection: []wasm.ElementSegment{
+			{
+				OffsetExpr: wasm.ConstantExpression{
+					Opcode: wasm.OpcodeI32Const,
+					Data:   leb128.EncodeInt32(5),
+				}, TableIndex: 0, Type: wasm.RefTypeFuncref, Mode: wasm.ElementModeActive,
+				// Set the function 0, 1 at table offset 5.
+				Init: []wasm.Index{0, 1},
+			},
+		},
+		FunctionSection: []wasm.Index{0, 0},
+		CodeSection: []wasm.Code{
+			{Body: []byte{wasm.OpcodeI32Const, 1, wasm.OpcodeEnd}},
+			{Body: []byte{wasm.OpcodeI32Const, 2, wasm.OpcodeEnd}},
+		},
+	})
+
+	ctx := context.Background()
+	exportingMod, err := r.Instantiate(ctx, exportingBin)
 	require.NoError(t, err)
-	require.Equal(t, uint64(2), res[0])
+
+	instantiateClose(t, r, ctx, importingBin)
+
+	// Trigger GC to make sure the module instance that is the initial owner of the references in the table is collected.
+	time.Sleep(time.Millisecond * 10)
+	runtime.GC()
+	time.Sleep(time.Millisecond * 10)
+
+	main := exportingMod.ExportedFunction("main")
+	require.NotNil(t, main)
+
+	// Call call_indirect multiple times, should be safe.
+	for i := 0; i < 10; i++ {
+		_, err = main.Call(ctx, 0)
+		// Null function call
+		require.Error(t, err)
+
+		res, err := main.Call(ctx, 5)
+		require.NoError(t, err)
+		require.Equal(t, uint64(1), res[0])
+
+		res, err = main.Call(ctx, 6)
+		require.NoError(t, err)
+		require.Equal(t, uint64(2), res[0])
+		runtime.GC()
+		time.Sleep(time.Millisecond * 10)
+	}
+}
+
+func instantiateClose(t *testing.T, r wazero.Runtime, ctx context.Context, bin []byte) {
+	compiled, err := r.CompileModule(ctx, bin)
+	m, err := r.InstantiateModule(ctx, compiled, wazero.NewModuleConfig())
+	require.NoError(t, err)
+	err = m.Close(ctx)
+	require.NoError(t, err)
+	require.NoError(t, compiled.Close(ctx))
+	runtime.GC()
 }
