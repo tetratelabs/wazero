@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/testing/nodiff"
-	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
 // TestReRunFailedRequireNoDiffCase re-runs the failed case specified by WASM_BINARY_NAME in testdata directory.
@@ -17,5 +16,5 @@ func TestReRunFailedRequireNoDiffCase(t *testing.T) {
 		t.Skip(err)
 	}
 
-	nodiff.RequireNoDiff(wasmBin, true, true, func(err error) { require.NoError(t, err) })
+	nodiff.RequireNoDiffT(t, wasmBin, true, true)
 }

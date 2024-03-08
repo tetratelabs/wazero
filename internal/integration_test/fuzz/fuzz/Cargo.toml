@@ -10,10 +10,11 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4.7"
-wasm-smith = "0.12.20"
+wasm-smith = "0.201.0"
 libc = "0.2"
-nix = "0.23.0"
+nix = { version = "0.28.0" , features = ["signal"]}
 ctor = "0.2.6"
+arbitrary = "1.1.0"
 
 [[bin]]
 name = "memory_no_diff"
