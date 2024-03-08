@@ -14,13 +14,14 @@ extern "C" {
     pub fn validate(binary_ptr: *const u8, binary_size: usize);
 }
 
+use arbitrary::Arbitrary;
 use ctor::ctor;
 use libc::SIGSTKSZ;
 use libfuzzer_sys::arbitrary::Unstructured;
 use nix::libc::{sigaltstack, stack_t};
 use nix::sys::signal::{sigaction, SaFlags, SigAction, SigHandler, SigSet, Signal};
 use std::ptr::null_mut;
-use wasm_smith::SwarmConfig;
+use wasm_smith::Config;
 
 #[ctor]
 /// Sets up the separate stack for signal handlers, and sets the SA_ONSTACK flag for signals that are handled by libFuzzer
@@ -92,7 +93,7 @@ pub fn run_nodiff(
     let mut u = Unstructured::new(data);
 
     // Generate the configuration.
-    let mut config: SwarmConfig = u.arbitrary()?;
+    let mut config = Config::arbitrary(&mut u)?;
 
     // 64-bit memory won't be supported by wazero.
     config.memory64_enabled = false;
@@ -100,7 +101,7 @@ pub fn run_nodiff(
     config.max_memories = 1;
     config.min_memories = 1;
     // If we don't set the limit, we will soon reach the OOM and the fuzzing will be killed by OS.
-    config.max_memory_pages = 10;
+    config.max_memory32_pages = 10;
     config.memory_max_size_required = true;
     // Don't test too large tables.
     config.max_tables = 2;
@@ -129,7 +130,7 @@ pub fn run_nodiff(
 
     // Generate the random module via wasm-smith.
     let mut module = wasm_smith::Module::new(config.clone(), &mut u)?;
-    module.ensure_termination(1000);
+    module.ensure_termination(1000).unwrap();
     let module_bytes = module.to_bytes();
 
     // Pass the randomly generated module to the wazero library.
