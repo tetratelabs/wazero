@@ -21,7 +21,7 @@ func Test_resolveImports_table(t *testing.T) {
 
 	t.Run("ok", func(t *testing.T) {
 		max := uint32(10)
-		tableInst := &TableInstance{Max: &max}
+		tableInst := &TableInstance{Max: &max, involvingModuleInstances: []*ModuleInstance{{}}}
 		s := newStore()
 		s.nameToModule[moduleName] = &ModuleInstance{
 			Tables:     []*TableInstance{tableInst},
@@ -36,6 +36,7 @@ func Test_resolveImports_table(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.Equal(t, m.Tables[0], tableInst)
+		require.Equal(t, m.Tables[0].involvingModuleInstances[1], m)
 	})
 	t.Run("minimum size mismatch", func(t *testing.T) {
 		s := newStore()
