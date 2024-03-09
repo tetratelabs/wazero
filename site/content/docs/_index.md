@@ -143,7 +143,8 @@ Notably, the interpreter and compiler in wazero's [Runtime configuration][Runtim
 In wazero, a compiler is a runtime configured to compile modules to platform-specific machine code ahead of time (AOT)
 during the creation of [CompiledModule][CompiledModule]. This means your WebAssembly functions execute
 natively at runtime of the embedding Go program. Compiler is faster than Interpreter, often by order of
-magnitude (10x) or more, and therefore enabled by default whenever available.
+magnitude (10x) or more, and therefore enabled by default whenever available. You can read more about wazero's
+[optimizing compiler in the detailed documentation]({{< relref "/how_the_optimizing_compiler_works" >}}).
 
 #### Interpreter
 
