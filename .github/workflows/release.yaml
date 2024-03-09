@@ -82,9 +82,9 @@ jobs:
         if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
         env:
           WINDOWS_CODESIGN_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_PASSWORD }}
-        run: | # Note: MSI_VERSION requires . as a separator, so replace "-" in the tag with ".".
+        run: | # Note: MSI_VERSION requires . as a separator and admits only numbers, so replace "-[a-z]*" in the tag with ".".
           VERSION=${GITHUB_REF#refs/tags/v}
-          MSI_VERSION=${VERSION//-/.}
+          MSI_VERSION=${VERSION//-[a-z]*./.}
           make dist VERSION=$VERSION MSI_VERSION=$MSI_VERSION
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
         shell: bash
@@ -181,6 +181,12 @@ jobs:
           ls dist
           tag="${GITHUB_REF#refs/tags/}"
           ./.github/workflows/release_notes.sh ${tag} > release-notes.txt
-          gh release create ${tag} --draft --notes-file release-notes.txt --title ${GITHUB_REF#refs/tags/} ./dist/*
+          if [[ $VERSION =~ -[a-z]+\. ]]; then
+            # If it is a pre-release (e.g. it contains `-pre.`) create release notes without artifacts.
+            gh release create ${tag} --draft --notes-file release-notes.txt --title ${GITHUB_REF#refs/tags/}
+          else
+            # Otherwise upload artifacts.
+            gh release create ${tag} --draft --notes-file release-notes.txt --title ${GITHUB_REF#refs/tags/} ./dist/*
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
