@@ -558,13 +558,8 @@ func (c *callEngine) growStack() (newSP, newFP uintptr, err error) {
 	}
 
 	newLen := 2*currentLen + c.execCtx.stackGrowRequiredSize + 16 // Stack might be aligned to 16 bytes, so add 16 bytes just in case.
-	var newStack []byte
-	var newTop uintptr
-	newSP, newFP, newTop, newStack = c.cloneStack(newLen)
-
-	c.stack = newStack
-	c.stackTop = newTop
-	c.execCtx.stackBottomPtr = &newStack[0]
+	newSP, newFP, c.stackTop, c.stack = c.cloneStack(newLen)
+	c.execCtx.stackBottomPtr = &c.stack[0]
 	return
 }
 
@@ -698,7 +693,7 @@ func (s *snapshot) Restore(ret []uint64) {
 }
 
 func (s *snapshot) doRestore() {
-	spp := (*uint64)(unsafe.Pointer(s.sp))
+	spp := *(**uint64)(unsafe.Pointer(&s.sp))
 	view := goCallStackView(spp)
 	copy(view, s.ret)
 
