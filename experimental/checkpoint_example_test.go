@@ -23,8 +23,7 @@ type snapshotsKey struct{}
 func Example_enableSnapshotterKey() {
 	ctx := context.Background()
 
-	// TODO: currently, only the interpreter is supported for snapshotting.
-	rt := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigInterpreter())
+	rt := wazero.NewRuntime(ctx)
 	defer rt.Close(ctx) // This closes everything this Runtime created.
 
 	// Enable experimental snapshotting functionality by setting it to context. We use this

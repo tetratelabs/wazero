@@ -193,6 +193,11 @@ func (c *callEngine) CallWithStack(ctx context.Context, paramResultStack []uint6
 
 // CallWithStack implements api.Function.
 func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint64) (err error) {
+	snapshotEnabled := ctx.Value(experimental.EnableSnapshotterKey{}) != nil
+	if snapshotEnabled {
+		ctx = context.WithValue(ctx, experimental.SnapshotterKey{}, c)
+	}
+
 	if wazevoapi.StackGuardCheckEnabled {
 		defer func() {
 			wazevoapi.CheckStackGuardPage(c.stack)
@@ -217,7 +222,13 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 		paramResultPtr = &paramResultStack[0]
 	}
 	defer func() {
-		if r := recover(); r != nil {
+		r := recover()
+		if s, ok := r.(*snapshot); ok {
+			// A snapshot that wasn't handled was created by a different call engine possibly from a nested wasm invocation,
+			// let it propagate up to be handled by the caller.
+			panic(s)
+		}
+		if r != nil {
 			type listenerForAbort struct {
 				def api.FunctionDefinition
 				lsn experimental.FunctionListener
@@ -322,7 +333,12 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 		case wazevoapi.ExitCodeCallGoFunction:
 			index := wazevoapi.GoFunctionIndexFromExitCode(ec)
 			f := hostModuleGoFuncFromOpaque[api.GoFunction](index, c.execCtx.goFunctionCallCalleeModuleContextOpaque)
-			f.Call(ctx, goCallStackView(c.execCtx.stackPointerBeforeGoCall))
+			func() {
+				if snapshotEnabled {
+					defer snapshotRecoverFn(c)
+				}
+				f.Call(ctx, goCallStackView(c.execCtx.stackPointerBeforeGoCall))
+			}()
 			// Back to the native code.
 			c.execCtx.exitCode = wazevoapi.ExitCodeOK
 			afterGoFunctionCallEntrypoint(c.execCtx.goCallReturnAddress, c.execCtxPtr,
@@ -339,7 +355,12 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 			def := hostModule.FunctionDefinition(wasm.Index(index))
 			listener.Before(ctx, callerModule, def, s, c.stackIterator(true))
 			// Call into the Go function.
-			f.Call(ctx, s)
+			func() {
+				if snapshotEnabled {
+					defer snapshotRecoverFn(c)
+				}
+				f.Call(ctx, s)
+			}()
 			// Call Listener.After.
 			listener.After(ctx, callerModule, def, s)
 			// Back to the native code.
@@ -350,7 +371,12 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 			index := wazevoapi.GoFunctionIndexFromExitCode(ec)
 			f := hostModuleGoFuncFromOpaque[api.GoModuleFunction](index, c.execCtx.goFunctionCallCalleeModuleContextOpaque)
 			mod := c.callerModuleInstance()
-			f.Call(ctx, mod, goCallStackView(c.execCtx.stackPointerBeforeGoCall))
+			func() {
+				if snapshotEnabled {
+					defer snapshotRecoverFn(c)
+				}
+				f.Call(ctx, mod, goCallStackView(c.execCtx.stackPointerBeforeGoCall))
+			}()
 			// Back to the native code.
 			c.execCtx.exitCode = wazevoapi.ExitCodeOK
 			afterGoFunctionCallEntrypoint(c.execCtx.goCallReturnAddress, c.execCtxPtr,
@@ -367,7 +393,12 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 			def := hostModule.FunctionDefinition(wasm.Index(index))
 			listener.Before(ctx, callerModule, def, s, c.stackIterator(true))
 			// Call into the Go function.
-			f.Call(ctx, callerModule, s)
+			func() {
+				if snapshotEnabled {
+					defer snapshotRecoverFn(c)
+				}
+				f.Call(ctx, callerModule, s)
+			}()
 			// Call Listener.After.
 			listener.After(ctx, callerModule, def, s)
 			// Back to the native code.
@@ -429,7 +460,7 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 				addr := unsafe.Add(unsafe.Pointer(&mem.Buffer[0]), offset)
 				return atomic.LoadUint32((*uint32)(addr))
 			})
-			s[0] = uint64(res)
+			s[0] = res
 			c.execCtx.exitCode = wazevoapi.ExitCodeOK
 			afterGoFunctionCallEntrypoint(c.execCtx.goCallReturnAddress, c.execCtxPtr,
 				uintptr(unsafe.Pointer(c.execCtx.stackPointerBeforeGoCall)), c.execCtx.framePointerBeforeGoCall)
@@ -527,7 +558,18 @@ func (c *callEngine) growStack() (newSP, newFP uintptr, err error) {
 	}
 
 	newLen := 2*currentLen + c.execCtx.stackGrowRequiredSize + 16 // Stack might be aligned to 16 bytes, so add 16 bytes just in case.
-	newStack := make([]byte, newLen)
+	var newStack []byte
+	var newTop uintptr
+	newSP, newFP, newTop, newStack = c.cloneStack(newLen)
+
+	c.stack = newStack
+	c.stackTop = newTop
+	c.execCtx.stackBottomPtr = &newStack[0]
+	return
+}
+
+func (c *callEngine) cloneStack(l uintptr) (newSP, newFP, newTop uintptr, newStack []byte) {
+	newStack = make([]byte, l)
 
 	relSp := c.stackTop - uintptr(unsafe.Pointer(c.execCtx.stackPointerBeforeGoCall))
 	relFp := c.stackTop - c.execCtx.framePointerBeforeGoCall
@@ -540,7 +582,7 @@ func (c *callEngine) growStack() (newSP, newFP uintptr, err error) {
 		sh.Len = int(relSp)
 		sh.Cap = int(relSp)
 	}
-	newTop := alignedStackTop(newStack)
+	newTop = alignedStackTop(newStack)
 	{
 		newSP = newTop - relSp
 		newFP = newTop - relFp
@@ -550,10 +592,6 @@ func (c *callEngine) growStack() (newSP, newFP uintptr, err error) {
 		sh.Cap = int(relSp)
 	}
 	copy(newStackAligned, prevStackAligned)
-
-	c.stack = newStack
-	c.stackTop = newTop
-	c.execCtx.stackBottomPtr = &newStack[0]
 	return
 }
 
@@ -623,4 +661,69 @@ func (si *stackIterator) SourceOffsetForPC(pc experimental.ProgramCounter) uint6
 	upc := uintptr(pc)
 	cm := si.eng.compiledModuleOfAddr(upc)
 	return cm.getSourceOffset(upc)
+}
+
+// snapshot implements experimental.Snapshot
+type snapshot struct {
+	sp, fp, top   uintptr
+	returnAddress *byte
+	stack         []byte
+
+	ret []uint64
+
+	c *callEngine
+}
+
+// Snapshot implements the same method as documented on experimental.Snapshotter.
+func (c *callEngine) Snapshot() experimental.Snapshot {
+	returnAddress := c.execCtx.goCallReturnAddress
+	oldTop, oldSp := c.stackTop, uintptr(unsafe.Pointer(c.execCtx.stackPointerBeforeGoCall))
+	newSP, newFP, newTop, newStack := c.cloneStack(uintptr(len(c.stack)) + 16)
+	adjustStackAfterGrown(oldSp, oldTop, newSP, newFP, newTop)
+
+	return &snapshot{
+		sp:            newSP,
+		fp:            newFP,
+		top:           newTop,
+		returnAddress: returnAddress,
+		stack:         newStack,
+		c:             c,
+	}
+}
+
+// Restore implements the same method as documented on experimental.Snapshot.
+func (s *snapshot) Restore(ret []uint64) {
+	s.ret = ret
+	panic(s)
+}
+
+func (s *snapshot) doRestore() {
+	spp := (*uint64)(unsafe.Pointer(s.sp))
+	view := goCallStackView(spp)
+	copy(view, s.ret)
+
+	c := s.c
+	c.stack = s.stack
+	c.stackTop = s.top
+	ec := &c.execCtx
+	ec.stackBottomPtr = &c.stack[0]
+	ec.stackPointerBeforeGoCall = spp
+	ec.framePointerBeforeGoCall = s.fp
+	ec.goCallReturnAddress = s.returnAddress
+}
+
+// Error implements the same method on error.
+func (s *snapshot) Error() string {
+	return "unhandled snapshot restore, this generally indicates restore was called from a different " +
+		"exported function invocation than snapshot"
+}
+
+func snapshotRecoverFn(c *callEngine) {
+	if r := recover(); r != nil {
+		if s, ok := r.(*snapshot); ok && s.c == c {
+			s.doRestore()
+		} else {
+			panic(r)
+		}
+	}
 }
