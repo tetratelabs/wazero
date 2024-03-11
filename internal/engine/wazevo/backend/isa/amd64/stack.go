@@ -85,7 +85,7 @@ func GoCallStackView(stackPointerBeforeGoCall *uint64) []uint64 {
 	return view
 }
 
-func AdjustStackAfterGrown(oldRsp, oldTop, rsp, rbp, top uintptr) {
+func AdjustClonedStack(oldRsp, oldTop, rsp, rbp, top uintptr) {
 	diff := uint64(rsp - oldRsp)
 
 	newBuf := stackView(rbp, top)

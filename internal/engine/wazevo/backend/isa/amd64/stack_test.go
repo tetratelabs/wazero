@@ -43,7 +43,7 @@ func addressOf(v *byte) uint64 {
 	return uint64(uintptr(unsafe.Pointer(v)))
 }
 
-func TestAdjustStackAfterGrown(t *testing.T) {
+func TestAdjustClonedStack(t *testing.T) {
 	// In order to allocate slices on Go heap, we need to allocSlice function.
 	allocSlice := func(size int) []byte {
 		return make([]byte, size)
@@ -63,7 +63,7 @@ func TestAdjustStackAfterGrown(t *testing.T) {
 	// Coy old stack to new stack which contains the old pointers to the old stack elements.
 	copy(newStack, oldStack)
 
-	AdjustStackAfterGrown(oldRsp, oldTop, rsp, rbp, uintptr(addressOf(&newStack[len(newStack)-1])))
+	AdjustClonedStack(oldRsp, oldTop, rsp, rbp, uintptr(addressOf(&newStack[len(newStack)-1])))
 	require.Equal(t, addressOf(&newStack[rbpIndex+16]), binary.LittleEndian.Uint64(newStack[rbpIndex:]))
 	require.Equal(t, addressOf(&newStack[rbpIndex+32]), binary.LittleEndian.Uint64(newStack[rbpIndex+16:]))
 	require.Equal(t, addressOf(&newStack[rbpIndex+160]), binary.LittleEndian.Uint64(newStack[rbpIndex+32:]))
