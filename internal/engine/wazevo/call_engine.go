@@ -295,7 +295,7 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 			if err != nil {
 				return err
 			}
-			adjustStackAfterGrown(oldsp, oldTop, newsp, newfp, c.stackTop)
+			adjustClonedStack(oldsp, oldTop, newsp, newfp, c.stackTop)
 			// Old stack must be alive until the new stack is adjusted.
 			runtime.KeepAlive(oldStack)
 			c.execCtx.exitCode = wazevoapi.ExitCodeOK
@@ -660,13 +660,12 @@ func (si *stackIterator) SourceOffsetForPC(pc experimental.ProgramCounter) uint6
 
 // snapshot implements experimental.Snapshot
 type snapshot struct {
-	sp, fp, top   uintptr
-	returnAddress *byte
-	stack         []byte
-
-	ret []uint64
-
-	c *callEngine
+	sp, fp, top    uintptr
+	returnAddress  *byte
+	stack          []byte
+	savedRegisters [64][2]uint64
+	ret            []uint64
+	c              *callEngine
 }
 
 // Snapshot implements the same method as documented on experimental.Snapshotter.
@@ -674,15 +673,15 @@ func (c *callEngine) Snapshot() experimental.Snapshot {
 	returnAddress := c.execCtx.goCallReturnAddress
 	oldTop, oldSp := c.stackTop, uintptr(unsafe.Pointer(c.execCtx.stackPointerBeforeGoCall))
 	newSP, newFP, newTop, newStack := c.cloneStack(uintptr(len(c.stack)) + 16)
-	adjustStackAfterGrown(oldSp, oldTop, newSP, newFP, newTop)
-
+	adjustClonedStack(oldSp, oldTop, newSP, newFP, newTop)
 	return &snapshot{
-		sp:            newSP,
-		fp:            newFP,
-		top:           newTop,
-		returnAddress: returnAddress,
-		stack:         newStack,
-		c:             c,
+		sp:             newSP,
+		fp:             newFP,
+		top:            newTop,
+		savedRegisters: c.execCtx.savedRegisters,
+		returnAddress:  returnAddress,
+		stack:          newStack,
+		c:              c,
 	}
 }
 
@@ -705,6 +704,7 @@ func (s *snapshot) doRestore() {
 	ec.stackPointerBeforeGoCall = spp
 	ec.framePointerBeforeGoCall = s.fp
 	ec.goCallReturnAddress = s.returnAddress
+	ec.savedRegisters = s.savedRegisters
 }
 
 // Error implements the same method on error.
