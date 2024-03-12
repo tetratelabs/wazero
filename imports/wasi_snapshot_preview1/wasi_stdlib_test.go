@@ -555,15 +555,11 @@ func Test_LargeStdout(t *testing.T) {
 
 		tempDir := t.TempDir()
 		temp, err := os.Create(joinPath(tempDir, "out.go"))
-		defer func() {
-			require.NoError(t, temp.Close())
-		}()
-
 		require.NoError(t, err)
 
 		// Check if the output Go source code is valid.
 		_, _ = temp.Write(buf.Bytes())
-		_ = temp.Close()
+		require.NoError(t, temp.Close())
 		cmd := exec.CommandContext(testCtx, "go", "build", "-o",
 			joinPath(tempDir, "outbin"), temp.Name())
 		require.NoError(t, err)
