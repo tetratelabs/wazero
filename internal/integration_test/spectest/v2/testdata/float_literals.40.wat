@@ -1,1 +1,1 @@
-(global f64 (f64.const _100))
+(global f32 (f32.const nan:0x80_0000))

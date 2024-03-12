@@ -119,8 +119,8 @@ spectest_v1_testdata_dir := $(spectest_v1_dir)/testdata
 spec_version_v1 := wg-1.0
 spectest_v2_dir := $(spectest_base_dir)/v2
 spectest_v2_testdata_dir := $(spectest_v2_dir)/testdata
-# Latest draft state as of May 23, 2023.
-spec_version_v2 := 2e8912e88a3118a46b90e8ccb659e24b4e8f3c23
+# Latest draft state as of Mar 12, 2024.
+spec_version_v2 := 1c5e5d178bd75c79b7a12881c529098beaee2a05
 spectest_threads_dir := $(spectest_base_dir)/threads
 spectest_threads_testdata_dir := $(spectest_threads_dir)/testdata
 # From https://github.com/WebAssembly/threads/tree/upstream-rebuild which has not been merged to main yet.
@@ -167,8 +167,8 @@ build.spectest.v2: # Note: SIMD cases are placed in the "simd" subdirectory.
 	@cd $(spectest_v2_testdata_dir) \
 		&& curl -sSL 'https://api.github.com/repos/WebAssembly/spec/contents/test/core/simd?ref=$(spec_version_v2)' | jq -r '.[]| .download_url' | grep -E ".wast" | xargs -Iurl curl -sJL url -O
 	@cd $(spectest_v2_testdata_dir) && for f in `find . -name '*.wast'`; do \
-		wast2json --debug-names --no-check $$f; \
-	done
+		wast2json --debug-names --no-check $$f || true; \
+	done # Ignore the error here as some tests (e.g. comments.wast right now) are not supported by wast2json yet.
 
 # Note: We currently cannot build the "threads" subdirectory that spawns threads due to missing support in wast2json.
 # https://github.com/WebAssembly/wabt/issues/2348#issuecomment-1878003959

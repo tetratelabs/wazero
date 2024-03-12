@@ -1,0 +1,1 @@
+(memory 1)(func (drop (current_memory)))

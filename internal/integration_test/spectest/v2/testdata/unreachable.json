@@ -2,8 +2,8 @@
  "commands": [
   {"type": "module", "line": 3, "filename": "unreachable.0.wasm"}, 
   {"type": "assert_trap", "line": 221, "action": {"type": "invoke", "field": "type-i32", "args": []}, "text": "unreachable", "expected": [{"type": "i32"}]}, 
-  {"type": "assert_trap", "line": 222, "action": {"type": "invoke", "field": "type-i64", "args": []}, "text": "unreachable", "expected": [{"type": "i32"}]}, 
-  {"type": "assert_trap", "line": 223, "action": {"type": "invoke", "field": "type-f32", "args": []}, "text": "unreachable", "expected": [{"type": "f64"}]}, 
+  {"type": "assert_trap", "line": 222, "action": {"type": "invoke", "field": "type-i64", "args": []}, "text": "unreachable", "expected": [{"type": "i64"}]}, 
+  {"type": "assert_trap", "line": 223, "action": {"type": "invoke", "field": "type-f32", "args": []}, "text": "unreachable", "expected": [{"type": "f32"}]}, 
   {"type": "assert_trap", "line": 224, "action": {"type": "invoke", "field": "type-f64", "args": []}, "text": "unreachable", "expected": [{"type": "f64"}]}, 
   {"type": "assert_trap", "line": 226, "action": {"type": "invoke", "field": "as-func-first", "args": []}, "text": "unreachable", "expected": [{"type": "i32"}]}, 
   {"type": "assert_trap", "line": 227, "action": {"type": "invoke", "field": "as-func-mid", "args": []}, "text": "unreachable", "expected": [{"type": "i32"}]}, 

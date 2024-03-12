@@ -1,0 +1,1 @@
+(func (local $i i32) (drop (tee_local $i (i32.const 0))))

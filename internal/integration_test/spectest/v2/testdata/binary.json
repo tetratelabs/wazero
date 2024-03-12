@@ -110,5 +110,5 @@
   {"type": "assert_malformed", "line": 1055, "filename": "binary.107.wasm", "text": "section size mismatch", "module_type": "binary"}, 
   {"type": "module", "line": 1068, "filename": "binary.108.wasm"}, 
   {"type": "assert_malformed", "line": 1086, "filename": "binary.109.wasm", "text": "unexpected end", "module_type": "binary"}, 
-  {"type": "module", "line": 1107, "filename": "binary.110.wasm"}, 
-  {"type": "assert_malformed", "line": 1121, "filename": "binary.111.wasm", "text": "unexpected content after last section", "module_type": "binary"}]}
+  {"type": "module", "line": 1119, "filename": "binary.110.wasm"}, 
+  {"type": "assert_malformed", "line": 1133, "filename": "binary.111.wasm", "text": "unexpected content after last section", "module_type": "binary"}]}

@@ -238,12 +238,18 @@
   (func (export "get-1") (result i32) (global.get 1))
   (func (export "get-x") (result i32) (global.get $x))
   (func (export "get-y") (result i32) (global.get $y))
+  (func (export "get-4") (result i64) (global.get 4))
+  (func (export "get-5") (result f32) (global.get 5))
+  (func (export "get-6") (result f64) (global.get 6))
 )
 
 (assert_return (invoke "get-0") (i32.const 666))
 (assert_return (invoke "get-1") (i32.const 666))
 (assert_return (invoke "get-x") (i32.const 666))
 (assert_return (invoke "get-y") (i32.const 666))
+(assert_return (invoke "get-4") (i64.const 666))
+(assert_return (invoke "get-5") (f32.const 666.6))
+(assert_return (invoke "get-6") (f64.const 666.6))
 
 (module (import "test" "global-i32" (global i32)))
 (module (import "test" "global-f32" (global f32)))

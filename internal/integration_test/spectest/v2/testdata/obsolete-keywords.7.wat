@@ -1,0 +1,1 @@
+(global $g (mut i32) (i32.const 0))(func (set_global $g (i32.const 0)))
