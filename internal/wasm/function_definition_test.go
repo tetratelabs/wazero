@@ -269,7 +269,7 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 		testName := tc.name + " (concurrent)"
 		t.Run(testName, func(t *testing.T) {
 			hammer.NewHammer(t, nGoroutines, nIterations).
-				Run(func(name string) {
+				Run(func(p, n int) {
 					tc.m.buildFunctionDefinitions()
 				}, nil)
 

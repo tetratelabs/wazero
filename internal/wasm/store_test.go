@@ -220,8 +220,8 @@ func TestStore_hammer(t *testing.T) {
 		P = 4
 		N = 100
 	}
-	hammer.NewHammer(t, P, N).Run(func(name string) {
-		mod, instantiateErr := s.Instantiate(testCtx, importingModule, name, sys.DefaultContext(nil), []FunctionTypeID{0})
+	hammer.NewHammer(t, P, N).Run(func(p, n int) {
+		mod, instantiateErr := s.Instantiate(testCtx, importingModule, fmt.Sprintf("%d:%d", p, n), sys.DefaultContext(nil), []FunctionTypeID{0})
 		require.NoError(t, instantiateErr)
 		require.NoError(t, mod.Close(testCtx))
 	}, nil)
@@ -279,7 +279,7 @@ func TestStore_hammer_close(t *testing.T) {
 		instances[i] = mod
 	}
 
-	hammer.NewHammer(t, 100, 2).Run(func(name string) {
+	hammer.NewHammer(t, 100, 2).Run(func(p, n int) {
 		for i := 0; i < instCount; i++ {
 			if i == instCount/2 {
 				// Close store concurrently as well.

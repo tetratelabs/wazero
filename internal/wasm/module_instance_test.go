@@ -127,7 +127,7 @@ func TestModuleInstance_Close(t *testing.T) {
 		require.True(t, ok, "sysCtx.openedFiles was empty")
 
 		// Closing should not err even when concurrently closed.
-		hammer.NewHammer(t, 100, 10).Run(func(name string) {
+		hammer.NewHammer(t, 100, 10).Run(func(p, n int) {
 			require.NoError(t, m.Close(testCtx))
 			// closeWithExitCode is the one called during Store.CloseWithExitCode.
 			require.NoError(t, m.closeWithExitCode(testCtx, 0))

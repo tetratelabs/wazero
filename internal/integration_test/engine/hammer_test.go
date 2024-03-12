@@ -97,7 +97,7 @@ func closeModuleWhileInUse(t *testing.T, r wazero.Runtime, closeFn func(imported
 
 	// As this is a blocking function call, only run 1 per goroutine.
 	i := importing // pin the module used inside goroutines
-	hammer.NewHammer(t, P, 1).Run(func(name string) {
+	hammer.NewHammer(t, P, 1).Run(func(p, n int) {
 		// In all cases, the importing module is closed, so the error should have that as its module name.
 		requireFunctionCallExits(t, i.ExportedFunction("call_return_input"))
 	}, func() { // When all functions are in-flight, re-assign the modules.

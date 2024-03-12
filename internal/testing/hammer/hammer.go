@@ -1,7 +1,6 @@
 package hammer
 
 import (
-	"fmt"
 	"runtime"
 	"sync"
 	"testing"
@@ -38,7 +37,7 @@ type Hammer interface {
 	//	if t.Failed() {
 	//		return
 	//	}
-	Run(test func(name string), onRunning func())
+	Run(test func(p, n int), onRunning func())
 }
 
 // NewHammer returns a Hammer initialized to indicated count of goroutines (P) and iterations per goroutine (N).
@@ -58,7 +57,7 @@ type hammer struct {
 }
 
 // Run implements Hammer.Run
-func (h *hammer) Run(test func(name string), onRunning func()) {
+func (h *hammer) Run(test func(p, n int), onRunning func()) {
 	defer runtime.GOMAXPROCS(runtime.GOMAXPROCS(h.P / 2)) // Ensure goroutines have to switch cores.
 
 	// running track
@@ -84,7 +83,7 @@ func (h *hammer) Run(test func(name string), onRunning func()) {
 
 			unblocked.Wait()           // Wait to be unblocked
 			for n := 0; n < h.N; n++ { // Invoke one test
-				test(fmt.Sprintf("%s:%d-%d", h.t.Name(), p, n))
+				test(p, n)
 			}
 		}()
 	}
