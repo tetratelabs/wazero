@@ -119,13 +119,12 @@ func (c *Compiler) nPeekDup(n int) ssa.Values {
 	if n == 0 {
 		return ssa.ValuesNil
 	}
-	args := c.allocateVarLengthValues()
 
 	l := c.state()
 	tail := len(l.values)
-	for _, v := range l.values[tail-n : tail] {
-		args = args.Append(c.ssaBuilder.VarLengthPool(), v)
-	}
+
+	args := c.allocateVarLengthValues(n)
+	args = args.Append(c.ssaBuilder.VarLengthPool(), l.values[tail-n:tail]...)
 	return args
 }
 
@@ -581,7 +580,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 					ssa.TypeI64,
 				).Insert(builder).Return()
 
-			args := c.allocateVarLengthValues(c.execCtxPtrValue, tableIndexVal, num, r)
+			args := c.allocateVarLengthValues(4, c.execCtxPtrValue, tableIndexVal, num, r)
 			callGrowRet := builder.
 				AllocateInstruction().
 				AsCallIndirect(tableGrowPtr, &c.tableGrowSig, args).
@@ -690,7 +689,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			builder.SetCurrentBlock(beforeLoop)
 			builder.AllocateInstruction().AsStore(ssa.OpcodeStore, value, addr, 0).Insert(builder)
 			initValue := builder.AllocateInstruction().AsIconst64(8).Insert(builder).Return()
-			c.insertJumpToBlock(c.allocateVarLengthValues(initValue), loopBlk)
+			c.insertJumpToBlock(c.allocateVarLengthValues(1, initValue), loopBlk)
 
 			builder.SetCurrentBlock(loopBlk)
 			dstAddr := builder.AllocateInstruction().AsIadd(addr, loopVar).Insert(builder).Return()
@@ -714,7 +713,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 				AsIcmp(newLoopVar, fillSizeInBytes, ssa.IntegerCmpCondUnsignedLessThan).Insert(builder).Return()
 
 			builder.AllocateInstruction().
-				AsBrnz(loopVarLessThanFillSize, c.allocateVarLengthValues(newLoopVar), loopBlk).
+				AsBrnz(loopVarLessThanFillSize, c.allocateVarLengthValues(1, newLoopVar), loopBlk).
 				Insert(builder)
 
 			c.insertJumpToBlock(ssa.ValuesNil, followingBlk)
@@ -766,7 +765,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			builder.SetCurrentBlock(beforeLoop)
 			builder.AllocateInstruction().AsStore(ssa.OpcodeIstore8, value, addr, 0).Insert(builder)
 			initValue := builder.AllocateInstruction().AsIconst64(1).Insert(builder).Return()
-			c.insertJumpToBlock(c.allocateVarLengthValues(initValue), loopBlk)
+			c.insertJumpToBlock(c.allocateVarLengthValues(1, initValue), loopBlk)
 
 			builder.SetCurrentBlock(loopBlk)
 			dstAddr := builder.AllocateInstruction().AsIadd(addr, loopVar).Insert(builder).Return()
@@ -790,7 +789,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 				AsIcmp(newLoopVar, fillSize, ssa.IntegerCmpCondUnsignedLessThan).Insert(builder).Return()
 
 			builder.AllocateInstruction().
-				AsBrnz(loopVarLessThanFillSize, c.allocateVarLengthValues(newLoopVar), loopBlk).
+				AsBrnz(loopVarLessThanFillSize, c.allocateVarLengthValues(1, newLoopVar), loopBlk).
 				Insert(builder)
 
 			c.insertJumpToBlock(ssa.ValuesNil, followingBlk)
@@ -1182,7 +1181,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 				ssa.TypeI64,
 			).Insert(builder).Return()
 
-		args := c.allocateVarLengthValues(c.execCtxPtrValue, pages)
+		args := c.allocateVarLengthValues(1, c.execCtxPtrValue, pages)
 		callGrowRet := builder.
 			AllocateInstruction().
 			AsCallIndirect(memoryGrowPtr, &c.memoryGrowSig, args).
@@ -1352,10 +1351,8 @@ func (c *Compiler) lowerCurrentOpcode() {
 			blockType:                    bt,
 		})
 
-		args := c.allocateVarLengthValues()
-		for _, v := range state.values[originalLen:] {
-			args = args.Append(builder.VarLengthPool(), v)
-		}
+		args := c.allocateVarLengthValues(originalLen)
+		args = args.Append(builder.VarLengthPool(), state.values[originalLen:]...)
 
 		// Insert the jump to the header of loop.
 		br := builder.AllocateInstruction()
@@ -1371,7 +1368,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 					ssa.TypeI64,
 				).Insert(builder).Return()
 
-			args := c.allocateVarLengthValues(c.execCtxPtrValue)
+			args := c.allocateVarLengthValues(1, c.execCtxPtrValue)
 			builder.AllocateInstruction().
 				AsCallIndirect(checkModuleExitCodePtr, &c.checkModuleExitCodeSig, args).
 				Insert(builder)
@@ -1394,10 +1391,8 @@ func (c *Compiler) lowerCurrentOpcode() {
 		// multiple definitions (one in Then and another in Else blocks).
 		c.addBlockParamsFromWasmTypes(bt.Results, followingBlk)
 
-		args := c.allocateVarLengthValues()
-		for _, v := range state.values[len(state.values)-len(bt.Params):] {
-			args = args.Append(builder.VarLengthPool(), v)
-		}
+		args := c.allocateVarLengthValues(len(bt.Params))
+		args = args.Append(builder.VarLengthPool(), state.values[len(state.values)-len(bt.Params):]...)
 
 		// Insert the conditional jump to the Else block.
 		brz := builder.AllocateInstruction()
@@ -1636,15 +1631,13 @@ func (c *Compiler) lowerCurrentOpcode() {
 		tail := len(state.values) - argN
 		vs := state.values[tail:]
 		state.values = state.values[:tail]
-		args := c.allocateVarLengthValues(c.execCtxPtrValue)
+		args := c.allocateVarLengthValues(2+len(vs), c.execCtxPtrValue)
 
 		sig := c.signatures[typ]
 		call := builder.AllocateInstruction()
 		if fnIndex >= c.m.ImportFunctionCount {
 			args = args.Append(builder.VarLengthPool(), c.moduleCtxPtrValue) // This case the callee module is itself.
-			for _, v := range vs {
-				args = args.Append(builder.VarLengthPool(), v)
-			}
+			args = args.Append(builder.VarLengthPool(), vs...)
 			call.AsCall(FunctionIndexToFuncRef(fnIndex), sig, args)
 			builder.InsertInstruction(call)
 		} else {
@@ -1657,10 +1650,8 @@ func (c *Compiler) lowerCurrentOpcode() {
 			builder.InsertInstruction(loadFuncPtr)
 			builder.InsertInstruction(loadModuleCtxPtr)
 
-			args = args.Append(builder.VarLengthPool(), loadModuleCtxPtr.Return()) // This case the callee module is itself.
-			for _, v := range vs {
-				args = args.Append(builder.VarLengthPool(), v)
-			}
+			args = args.Append(builder.VarLengthPool(), loadModuleCtxPtr.Return())
+			args = args.Append(builder.VarLengthPool(), vs...)
 			call.AsCallIndirect(loadFuncPtr.Return(), sig, args)
 			builder.InsertInstruction(call)
 		}
@@ -3207,7 +3198,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 					ssa.TypeI64,
 				).Insert(builder).Return()
 
-			args := c.allocateVarLengthValues(c.execCtxPtrValue, timeout, exp, addr)
+			args := c.allocateVarLengthValues(3, c.execCtxPtrValue, timeout, exp, addr)
 			memoryWaitRet := builder.AllocateInstruction().
 				AsCallIndirect(memoryWaitPtr, sig, args).
 				Insert(builder).Return()
@@ -3228,7 +3219,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 					wazevoapi.ExecutionContextOffsetMemoryNotifyTrampolineAddress.U32(),
 					ssa.TypeI64,
 				).Insert(builder).Return()
-			args := c.allocateVarLengthValues(c.execCtxPtrValue, count, addr)
+			args := c.allocateVarLengthValues(2, c.execCtxPtrValue, count, addr)
 			memoryNotifyRet := builder.AllocateInstruction().
 				AsCallIndirect(memoryNotifyPtr, &c.memoryNotifySig, args).
 				Insert(builder).Return()
@@ -3432,7 +3423,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 				ssa.TypeI64,
 			).Insert(builder).Return()
 
-		args := c.allocateVarLengthValues(c.execCtxPtrValue, funcIndexVal)
+		args := c.allocateVarLengthValues(2, c.execCtxPtrValue, funcIndexVal)
 		refFuncRet := builder.
 			AllocateInstruction().
 			AsCallIndirect(refFuncPtr, &c.refFuncSig, args).
@@ -3611,10 +3602,8 @@ func (c *Compiler) lowerCallIndirect(typeIndex, tableIndex uint32) {
 	tail := len(state.values) - len(typ.Params)
 	vs := state.values[tail:]
 	state.values = state.values[:tail]
-	args := c.allocateVarLengthValues(c.execCtxPtrValue, moduleContextOpaquePtr)
-	for _, v := range vs {
-		args = args.Append(builder.VarLengthPool(), v)
-	}
+	args := c.allocateVarLengthValues(2+len(vs), c.execCtxPtrValue, moduleContextOpaquePtr)
+	args = args.Append(builder.VarLengthPool(), vs...)
 
 	// Before transfer the control to the callee, we have to store the current module's moduleContextPtr
 	// into execContext.callerModuleContextPtr in case when the callee is a Go function.
@@ -3743,7 +3732,7 @@ func (c *Compiler) memAlignmentCheck(addr ssa.Value, operationSizeInBytes uint64
 }
 
 func (c *Compiler) callMemmove(dst, src, size ssa.Value) {
-	args := c.allocateVarLengthValues(dst, src, size)
+	args := c.allocateVarLengthValues(3, dst, src, size)
 	if size.Type() != ssa.TypeI64 {
 		panic("TODO: memmove size must be i64")
 	}
@@ -4141,7 +4130,7 @@ func (c *Compiler) callListenerBefore() {
 	entry := builder.EntryBlock()
 	ps := entry.Params()
 
-	args := c.allocateVarLengthValues(c.execCtxPtrValue,
+	args := c.allocateVarLengthValues(ps, c.execCtxPtrValue,
 		builder.AllocateInstruction().AsIconst32(c.wasmLocalFunctionIndex).Insert(builder).Return())
 	for i := 2; i < ps; i++ {
 		args = args.Append(builder.VarLengthPool(), entry.Param(i))
@@ -4170,14 +4159,15 @@ func (c *Compiler) callListenerAfter() {
 		Return()
 
 	afterSig := c.listenerSignatures[c.wasmFunctionTyp][1]
-	args := c.allocateVarLengthValues(c.execCtxPtrValue,
-		builder.AllocateInstruction().AsIconst32(c.wasmLocalFunctionIndex).Insert(builder).Return())
+	args := c.allocateVarLengthValues(
+		c.results()+2,
+		c.execCtxPtrValue,
+		builder.AllocateInstruction().AsIconst32(c.wasmLocalFunctionIndex).Insert(builder).Return(),
+	)
 
 	l := c.state()
 	tail := len(l.values)
-	for _, v := range l.values[tail-c.results() : tail] {
-		args = args.Append(c.ssaBuilder.VarLengthPool(), v)
-	}
+	args = args.Append(c.ssaBuilder.VarLengthPool(), l.values[tail-c.results():tail]...)
 	builder.AllocateInstruction().
 		AsCallIndirect(afterListenerPtr, afterSig, args).
 		Insert(builder)

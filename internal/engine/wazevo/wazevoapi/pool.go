@@ -154,21 +154,21 @@ func (p *VarLengthPool[T]) Reset() {
 }
 
 // Append appends an item to the backing slice.
-func (i VarLength[T]) Append(p *VarLengthPool[T], item T) VarLength[T] {
+func (i VarLength[T]) Append(p *VarLengthPool[T], items ...T) VarLength[T] {
 	if i.backing == nil {
 		arr := p.arrayPool.Allocate()[:0]
 		i.backing = &arr
 	}
 
-	if len(*i.backing)+1 <= arraySize {
-		*i.backing = append(*i.backing, item)
+	if len(*i.backing)+len(items) <= arraySize {
+		*i.backing = append(*i.backing, items...)
 		return i
 	} else if len(*i.backing) == arraySize {
 		slc := p.slicePool.Allocate()
 		// Copy the array to the slice.
 		*slc = append(*slc, *i.backing...)
 	}
-	*i.backing = append(*i.backing, item)
+	*i.backing = append(*i.backing, items...)
 	return i
 }
 

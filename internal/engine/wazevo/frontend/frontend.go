@@ -478,13 +478,11 @@ func (k *knownSafeBound) valid() bool {
 	return k != nil && k.bound > 0
 }
 
-func (c *Compiler) allocateVarLengthValues(vs ...ssa.Value) ssa.Values {
+func (c *Compiler) allocateVarLengthValues(_cap int, vs ...ssa.Value) ssa.Values {
 	builder := c.ssaBuilder
 	pool := builder.VarLengthPool()
-	args := pool.Allocate(len(vs))
-	for _, v := range vs {
-		args = args.Append(builder.VarLengthPool(), v)
-	}
+	args := pool.Allocate(_cap)
+	args = args.Append(builder.VarLengthPool(), vs...)
 	return args
 }
 
