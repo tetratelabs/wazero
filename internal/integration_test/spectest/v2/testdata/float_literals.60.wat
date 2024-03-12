@@ -1,1 +1,1 @@
-(global f64 (f64.const 0_x100))
+(global f64 (f64.const _0x100))

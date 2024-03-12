@@ -1,0 +1,1 @@
+(global $g anyfunc (ref.null func))

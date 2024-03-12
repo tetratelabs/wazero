@@ -1,0 +1,1 @@
+(func (drop (f32x4.convert_s/i32x4 (v128.const i64x2 0 0))))

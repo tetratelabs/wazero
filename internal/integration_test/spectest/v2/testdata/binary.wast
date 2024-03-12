@@ -1085,8 +1085,19 @@
 (assert_malformed
   (module binary
     "\00asm" "\01\00\00\00"
-    "\01\04\01"                             ;; type section
+    "\01\25\0c"                             ;; type section
     "\60\00\00"                             ;; type 0
+    "\60\00\00"                             ;; type 1
+    "\60\00\00"                             ;; type 2
+    "\60\00\00"                             ;; type 3
+    "\60\00\00"                             ;; type 4
+    "\60\00\00"                             ;; type 5
+    "\60\00\00"                             ;; type 6
+    "\60\00\00"                             ;; type 7
+    "\60\00\00"                             ;; type 8
+    "\60\00\00"                             ;; type 9
+    "\60\00\00"                             ;; type 10
+    "\60\00\00"                             ;; type 11
     "\03\02\01\00"                          ;; func section
     "\0a\13\01"                             ;; code section
     "\11\00"                                ;; func 0
@@ -1097,8 +1108,9 @@
     "\0e\01"                                ;; br_table with inconsistent target count (1 declared, 2 given)
     "\00"                                   ;; break depth 0
     "\01"                                   ;; break depth 1
-    "\02"                                   ;; break depth for default
-    "\0b\0b\0b"                             ;; end
+    "\02"                                   ;; break depth for default, interpreted as a block
+    "\0b"                                   ;; end, interpreted as type 11 for the block
+    "\0b\0b"                                ;; end
   )
   "unexpected end"
 )

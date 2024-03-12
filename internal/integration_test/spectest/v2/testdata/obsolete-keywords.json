@@ -1,0 +1,13 @@
+{"source_filename": "./obsolete-keywords.wast",
+ "commands": [
+  {"type": "assert_malformed", "line": 3, "filename": "obsolete-keywords.0.wat", "text": "unknown operator current_memory", "module_type": "text"}, 
+  {"type": "assert_malformed", "line": 11, "filename": "obsolete-keywords.1.wat", "text": "unknown operator grow_memory", "module_type": "text"}, 
+  {"type": "assert_malformed", "line": 20, "filename": "obsolete-keywords.2.wat", "text": "unknown operator get_local", "module_type": "text"}, 
+  {"type": "assert_malformed", "line": 27, "filename": "obsolete-keywords.3.wat", "text": "unknown operator set_local", "module_type": "text"}, 
+  {"type": "assert_malformed", "line": 34, "filename": "obsolete-keywords.4.wat", "text": "unknown operator tee_local", "module_type": "text"}, 
+  {"type": "assert_malformed", "line": 41, "filename": "obsolete-keywords.5.wat", "text": "unknown operator anyfunc", "module_type": "text"}, 
+  {"type": "assert_malformed", "line": 48, "filename": "obsolete-keywords.6.wat", "text": "unknown operator get_global", "module_type": "text"}, 
+  {"type": "assert_malformed", "line": 56, "filename": "obsolete-keywords.7.wat", "text": "unknown operator set_global", "module_type": "text"}, 
+  {"type": "assert_malformed", "line": 64, "filename": "obsolete-keywords.8.wat", "text": "unknown operator i32.wrap/i64", "module_type": "text"}, 
+  {"type": "assert_malformed", "line": 71, "filename": "obsolete-keywords.9.wat", "text": "unknown operator i32.trunc_s:sat/f32", "module_type": "text"}, 
+  {"type": "assert_malformed", "line": 78, "filename": "obsolete-keywords.10.wat", "text": "unknown operator f32x4.convert_s/i32x4", "module_type": "text"}]}

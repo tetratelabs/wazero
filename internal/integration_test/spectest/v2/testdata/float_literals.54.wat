@@ -1,1 +1,1 @@
-(global f64 (f64.const 1.0e1_))
+(global f64 (f64.const _1.0e1))

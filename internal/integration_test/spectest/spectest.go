@@ -317,9 +317,9 @@ func (c command) expectedError() (err error) {
 //
 //	cd testdata; wat2wasm --debug-names spectest.wat
 //
-// This module is required by some test cases, and instantiated before running cases.
-// See https://github.com/WebAssembly/spec/blob/wg-1.0/test/core/imports.wast
-// See https://github.com/WebAssembly/spec/blob/wg-1.0/interpreter/script/js.ml#L13-L25
+// This module is required by some test cases, and must be instantiated before running cases.
+// See https://github.com/WebAssembly/spec/blob/1c5e5d178bd75c79b7a12881c529098beaee2a05/test/core/imports.wast
+// See https://github.com/WebAssembly/spec/blob/1c5e5d178bd75c79b7a12881c529098beaee2a05/interpreter/script/js.ml#L33-L50
 //
 //go:embed testdata/spectest.wasm
 var spectestWasm []byte

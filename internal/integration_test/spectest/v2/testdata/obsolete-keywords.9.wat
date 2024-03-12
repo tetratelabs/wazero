@@ -1,0 +1,1 @@
+(func (drop (i32.trunc_s:sat/f32 (f32.const 0))))
