@@ -242,13 +242,16 @@ func compileAndRunWithPreStart(t *testing.T, ctx context.Context, config wazero.
 	// same for console and stderr as sometimes the stack trace is in one or the other.
 	var consoleBuf bytes.Buffer
 
-	r := wazero.NewRuntime(ctx)
+	r := wazero.NewRuntimeWithConfig(ctx, runtimeCfg)
 	defer r.Close(ctx)
 
 	_, err := wasi_snapshot_preview1.Instantiate(ctx, r)
 	require.NoError(t, err)
 
-	mod, err := r.InstantiateWithConfig(ctx, bin, config.
+	compiled, err := r.CompileModule(ctx, bin)
+	require.NoError(t, err)
+
+	mod, err := r.InstantiateModule(ctx, compiled, config.
 		WithStdout(&consoleBuf).
 		WithStderr(&consoleBuf).
 		WithStartFunctions()) // clear
@@ -515,12 +518,18 @@ func testStdin(t *testing.T, bin []byte) {
 	ch := make(chan struct{}, 1)
 	go func() {
 		defer close(ch)
+		r := wazero.NewRuntimeWithConfig(testCtx, runtimeCfg)
+		defer func() {
+			require.NoError(t, r.Close(testCtx))
+		}()
 
-		r := wazero.NewRuntime(testCtx)
-		defer r.Close(testCtx)
 		_, err := wasi_snapshot_preview1.Instantiate(testCtx, r)
 		require.NoError(t, err)
-		_, err = r.InstantiateWithConfig(testCtx, bin, moduleConfig)
+
+		compiled, err := r.CompileModule(testCtx, wasmGo)
+		require.NoError(t, err)
+
+		_, err = r.InstantiateModule(testCtx, compiled, moduleConfig) // clear
 		require.NoError(t, err)
 	}()
 
@@ -539,7 +548,7 @@ func testStdin(t *testing.T, bin []byte) {
 func Test_LargeStdout(t *testing.T) {
 	if wasmGo != nil {
 		var buf bytes.Buffer
-		r := wazero.NewRuntime(testCtx)
+		r := wazero.NewRuntimeWithConfig(testCtx, runtimeCfg)
 		defer func() {
 			require.NoError(t, r.Close(testCtx))
 		}()
@@ -547,10 +556,12 @@ func Test_LargeStdout(t *testing.T) {
 		_, err := wasi_snapshot_preview1.Instantiate(testCtx, r)
 		require.NoError(t, err)
 
-		_, err = r.InstantiateWithConfig(testCtx, wasmGo,
-			wazero.NewModuleConfig().
-				WithArgs("wasi", "largestdout").
-				WithStdout(&buf))
+		compiled, err := r.CompileModule(testCtx, wasmGo)
+		require.NoError(t, err)
+
+		_, err = r.InstantiateModule(testCtx, compiled, wazero.NewModuleConfig().
+			WithArgs("wasi", "largestdout").
+			WithStdout(&buf)) // clear
 		require.NoError(t, err)
 
 		tempDir := t.TempDir()

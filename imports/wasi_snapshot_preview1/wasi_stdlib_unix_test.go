@@ -122,13 +122,18 @@ func Test_NonblockGo(t *testing.T) {
 
 			ch := make(chan string, 1)
 			go func() {
-				r := wazero.NewRuntime(testCtx)
-				defer r.Close(testCtx)
+				r := wazero.NewRuntimeWithConfig(testCtx, runtimeCfg)
+				defer func() {
+					require.NoError(t, r.Close(testCtx))
+				}()
 
 				_, err := wasi_snapshot_preview1.Instantiate(testCtx, r)
 				require.NoError(t, err)
 
-				mod, err := r.InstantiateWithConfig(testCtx, wasmGo, moduleConfig) // clear
+				compiled, err := r.CompileModule(testCtx, wasmGo)
+				require.NoError(t, err)
+
+				mod, err := r.InstantiateModule(testCtx, compiled, moduleConfig)
 				require.NoError(t, err)
 
 				_, err = mod.ExportedFunction("_start").Call(testCtx)
