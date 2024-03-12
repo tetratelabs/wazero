@@ -119,7 +119,7 @@ spectest_v1_testdata_dir := $(spectest_v1_dir)/testdata
 spec_version_v1 := wg-1.0
 spectest_v2_dir := $(spectest_base_dir)/v2
 spectest_v2_testdata_dir := $(spectest_v2_dir)/testdata
-# Latest draft state as of Mar 12, 2024.
+# Latest draft state as of March 12, 2024.
 spec_version_v2 := 1c5e5d178bd75c79b7a12881c529098beaee2a05
 spectest_threads_dir := $(spectest_base_dir)/threads
 spectest_threads_testdata_dir := $(spectest_threads_dir)/testdata
