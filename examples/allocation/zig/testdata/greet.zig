@@ -58,6 +58,6 @@ pub export fn greeting(message: [*]const u8, size: u32) u64 {
 // stringToPtr returns a pointer and size pair for the given string in a way
 // compatible with WebAssembly numeric types.
 pub fn stringToPtr(s: []const u8) u64 {
-    const p: u64 = @ptrToInt(s.ptr);
+    const p: u64 = @intFromPtr(s.ptr);
     return p << 32 | s.len;
 }
