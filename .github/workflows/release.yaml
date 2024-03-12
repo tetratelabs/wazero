@@ -181,12 +181,6 @@ jobs:
           ls dist
           tag="${GITHUB_REF#refs/tags/}"
           ./.github/workflows/release_notes.sh ${tag} > release-notes.txt
-          if [[ $VERSION =~ -[a-z]+\. ]]; then
-            # If it is a pre-release (e.g. it contains `-pre.`) create release notes without artifacts.
-            gh release create ${tag} --draft --notes-file release-notes.txt --title ${GITHUB_REF#refs/tags/}
-          else
-            # Otherwise upload artifacts.
-            gh release create ${tag} --draft --notes-file release-notes.txt --title ${GITHUB_REF#refs/tags/} ./dist/*
-          fi
+          gh release create ${tag} --draft --notes-file release-notes.txt --title ${GITHUB_REF#refs/tags/} ./dist/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
