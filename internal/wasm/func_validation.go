@@ -1829,6 +1829,10 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			pc += num
 		} else if op == OpcodeElse {
 			bl := &controlBlockStack.stack[len(controlBlockStack.stack)-1]
+			if bl.op != OpcodeIf {
+				return fmt.Errorf("else instruction must be used in if block: %#x", pc)
+			}
+			bl.op = OpcodeElse
 			bl.elseAt = pc
 			// Check the type soundness of the instructions *before* entering this else Op.
 			if err := valueTypeStack.popResults(OpcodeIf, bl.blockType.Results, true); err != nil {
