@@ -5,6 +5,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
@@ -361,4 +362,24 @@ func TestAllocator_livenessAnalysis_copy(t *testing.T) {
 	)
 	a := NewAllocator(&RegisterInfo{})
 	a.livenessAnalysis(f)
+}
+
+func Test_findOrSpillAllocatable_prefersSpill(t *testing.T) {
+	t.Run("ok", func(t *testing.T) {
+		s := &state{}
+		s.regsInUse.add(RealReg(1), VReg(2222222))
+		got := s.findOrSpillAllocatable(&Allocator{}, []RealReg{3}, 0, 3)
+		require.Equal(t, RealReg(3), got)
+	})
+	t.Run("preferred but in use", func(t *testing.T) {
+		s := &state{vrStates: wazevoapi.NewIDedPool[vrState](resetVrState)}
+		s.regsInUse.add(RealReg(3), VReg(1).SetRealReg(3))
+		got := s.findOrSpillAllocatable(&Allocator{}, []RealReg{3, 4}, 0, 3)
+		require.Equal(t, RealReg(4), got)
+	})
+	t.Run("preferred but forbidden", func(t *testing.T) {
+		s := &state{vrStates: wazevoapi.NewIDedPool[vrState](resetVrState)}
+		got := s.findOrSpillAllocatable(&Allocator{}, []RealReg{3, 4}, RegSet(0).add(3), 3)
+		require.Equal(t, RealReg(4), got)
+	})
 }
