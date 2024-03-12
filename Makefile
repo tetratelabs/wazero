@@ -272,14 +272,16 @@ clean: ## Ensure a clean build
 	@rm -rf dist build coverage.txt
 	@go clean -testcache
 
+fuzz_default_flags := --no-trace-compares --sanitizer=none -- -rss_limit_mb=8192
+
 fuzz_timeout_seconds ?= 10
 .PHONY: fuzz
 fuzz:
 	@cd internal/integration_test/fuzz && cargo test
-	@cd internal/integration_test/fuzz && cargo fuzz run logging_no_diff --sanitizer=none -- -rss_limit_mb=8192 -max_total_time=$(fuzz_timeout_seconds)
-	@cd internal/integration_test/fuzz && cargo fuzz run no_diff --sanitizer=none -- -rss_limit_mb=8192 -max_total_time=$(fuzz_timeout_seconds)
-	@cd internal/integration_test/fuzz && cargo fuzz run memory_no_diff --sanitizer=none -- -rss_limit_mb=8192 -max_total_time=$(fuzz_timeout_seconds)
-	@cd internal/integration_test/fuzz && cargo fuzz run validation --sanitizer=none -- -rss_limit_mb=8192 -max_total_time=$(fuzz_timeout_seconds)
+	@cd internal/integration_test/fuzz && cargo fuzz run logging_no_diff $(fuzz_default_flags) -max_total_time=$(fuzz_timeout_seconds)
+	@cd internal/integration_test/fuzz && cargo fuzz run no_diff $(fuzz_default_flags) -max_total_time=$(fuzz_timeout_seconds)
+	@cd internal/integration_test/fuzz && cargo fuzz run memory_no_diff $(fuzz_default_flags) -max_total_time=$(fuzz_timeout_seconds)
+	@cd internal/integration_test/fuzz && cargo fuzz run validation $(fuzz_default_flags) -max_total_time=$(fuzz_timeout_seconds)
 
 libsodium:
 	cd ./internal/integration_test/libsodium/testdata && \
