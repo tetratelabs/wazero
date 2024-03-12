@@ -129,35 +129,31 @@ func runtBenches(b *testing.B, ctx context.Context, rc wazero.RuntimeConfig, tc 
 			continue
 		}
 
-		for _, compile := range []bool{true} {
-			if compile {
-				b.Run("Compile/"+fname, func(b *testing.B) {
-					b.ResetTimer()
-					for i := 0; i < b.N; i++ {
-						r := wazero.NewRuntimeWithConfig(ctx, rc)
-						_, err := r.CompileModule(ctx, bin)
-						require.NoError(b, err)
-						require.NoError(b, r.Close(ctx))
-					}
-				})
-			} else {
+		b.Run("Compile/"+fname, func(b *testing.B) {
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
 				r := wazero.NewRuntimeWithConfig(ctx, rc)
-				wasi_snapshot_preview1.MustInstantiate(ctx, r)
-				b.Cleanup(func() { r.Close(ctx) })
-
-				cm, err := r.CompileModule(ctx, bin)
+				_, err := r.CompileModule(ctx, bin)
 				require.NoError(b, err)
-				b.Run("Run/"+fname, func(b *testing.B) {
-					b.ResetTimer()
-					for i := 0; i < b.N; i++ {
-						// Instantiate in the loop as _start cannot be called multiple times.
-						m, err := r.InstantiateModule(ctx, cm, modCfg)
-						requireZeroExitCode(b, err, stdout, stderr)
-						require.NoError(b, m.Close(ctx))
-					}
-				})
+				require.NoError(b, r.Close(ctx))
 			}
-		}
+		})
+		b.Run("Run/"+fname, func(b *testing.B) {
+			r := wazero.NewRuntimeWithConfig(ctx, rc)
+			wasi_snapshot_preview1.MustInstantiate(ctx, r)
+			b.Cleanup(func() { r.Close(ctx) })
+
+			cm, err := r.CompileModule(ctx, bin)
+			require.NoError(b, err)
+
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				// Instantiate in the loop as _start cannot be called multiple times.
+				m, err := r.InstantiateModule(ctx, cm, modCfg)
+				requireZeroExitCode(b, err, stdout, stderr)
+				require.NoError(b, m.Close(ctx))
+			}
+		})
 	}
 }
 
