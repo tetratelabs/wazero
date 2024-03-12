@@ -3610,7 +3610,8 @@ func TestFunctionValidation_redundantElse(t *testing.T) {
 		{
 			body: []byte{
 				OpcodeI32Const, 0,
-				OpcodeIf, 0, OpcodeElse, OpcodeElse, OpcodeEnd, OpcodeEnd},
+				OpcodeIf, 0, OpcodeElse, OpcodeElse, OpcodeEnd, OpcodeEnd,
+			},
 			expErr: "else instruction must be used in if block: 0x5",
 		},
 	} {
@@ -3621,7 +3622,6 @@ func TestFunctionValidation_redundantElse(t *testing.T) {
 			require.EqualError(t, err, tc.expErr)
 		})
 	}
-
 }
 
 func Test_SplitCallStack(t *testing.T) {
