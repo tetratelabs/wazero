@@ -540,7 +540,9 @@ func Test_LargeStdout(t *testing.T) {
 	if wasmGo != nil {
 		var buf bytes.Buffer
 		r := wazero.NewRuntime(testCtx)
-		defer r.Close(testCtx)
+		defer func() {
+			require.NoError(t, r.Close(testCtx))
+		}()
 
 		_, err := wasi_snapshot_preview1.Instantiate(testCtx, r)
 		require.NoError(t, err)
@@ -553,7 +555,9 @@ func Test_LargeStdout(t *testing.T) {
 
 		tempDir := t.TempDir()
 		temp, err := os.Create(joinPath(tempDir, "out.go"))
-		defer temp.Close()
+		defer func() {
+			require.NoError(t, temp.Close())
+		}()
 
 		require.NoError(t, err)
 
