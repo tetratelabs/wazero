@@ -100,8 +100,9 @@ func incrementGuardedByMutex(t *testing.T, r wazero.Runtime) {
 			mod, err := r.Instantiate(testCtx, mutexWasm)
 			require.NoError(t, err)
 
-			hammer.NewHammer(t, P, 30000).Run(func(name string) {
-				_, err := mod.ExportedFunction(tt.fn).Call(testCtx)
+			fns := make([]api.Function, P)
+			hammer.NewHammer(t, P, 30000).Run(func(p, n int) {
+				_, err := mustGetFn(mod, tt.fn, fns, p).Call(testCtx)
 				require.NoError(t, err)
 			}, func() {})
 
@@ -161,8 +162,9 @@ func atomicAdd(t *testing.T, r wazero.Runtime) {
 			mod, err := r.Instantiate(testCtx, addWasm)
 			require.NoError(t, err)
 
-			hammer.NewHammer(t, P, 30000).Run(func(name string) {
-				_, err := mod.ExportedFunction(tt.fn).Call(testCtx)
+			fns := make([]api.Function, P)
+			hammer.NewHammer(t, P, 30000).Run(func(p, n int) {
+				_, err := mustGetFn(mod, tt.fn, fns, p).Call(testCtx)
 				require.NoError(t, err)
 			}, func() {})
 
@@ -222,8 +224,9 @@ func atomicSub(t *testing.T, r wazero.Runtime) {
 			mod, err := r.Instantiate(testCtx, subWasm)
 			require.NoError(t, err)
 
-			hammer.NewHammer(t, P, 30000).Run(func(name string) {
-				_, err := mod.ExportedFunction(tt.fn).Call(testCtx)
+			fns := make([]api.Function, P)
+			hammer.NewHammer(t, P, 30000).Run(func(p, n int) {
+				_, err := mustGetFn(mod, tt.fn, fns, p).Call(testCtx)
 				require.NoError(t, err)
 			}, func() {})
 
@@ -273,8 +276,9 @@ func atomicXor(t *testing.T, r wazero.Runtime) {
 
 			mod.Memory().WriteUint32Le(0, 12345)
 
-			hammer.NewHammer(t, P, 30000).Run(func(name string) {
-				_, err := mod.ExportedFunction(tt.fn).Call(testCtx)
+			fns := make([]api.Function, P)
+			hammer.NewHammer(t, P, 30000).Run(func(p, n int) {
+				_, err := mustGetFn(mod, tt.fn, fns, p).Call(testCtx)
 				require.NoError(t, err)
 			}, func() {})
 
@@ -285,4 +289,15 @@ func atomicXor(t *testing.T, r wazero.Runtime) {
 			require.Equal(t, uint32(12345), res)
 		})
 	}
+}
+
+// mustGetFn is a helper to get a function from a module, caching the result to avoid repeated allocations.
+//
+// Creating ExportedFunction per invocation costs a lot here since each time the runtime allocates the execution stack,
+// so only do it once per goroutine of the hammer.
+func mustGetFn(m api.Module, name string, fns []api.Function, p int) api.Function {
+	if fns[p] == nil {
+		fns[p] = m.ExportedFunction(name)
+	}
+	return fns[p]
 }

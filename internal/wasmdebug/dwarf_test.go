@@ -61,7 +61,7 @@ func TestDWARFLines_Line_Zig(t *testing.T) {
 		tc := tc
 		t.Run(fmt.Sprintf("%#x/%s", tc.offset, tc.exp), func(t *testing.T) {
 			// Ensures that DWARFLines.Line is goroutine-safe.
-			hammer.NewHammer(t, 100, 5).Run(func(name string) {
+			hammer.NewHammer(t, 100, 5).Run(func(p, n int) {
 				actual := mod.DWARFLines.Line(tc.offset)
 				require.Equal(t, len(tc.exp), len(actual))
 				for i := range tc.exp {
