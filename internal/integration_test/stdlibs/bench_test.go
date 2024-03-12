@@ -129,7 +129,7 @@ func runtBenches(b *testing.B, ctx context.Context, rc wazero.RuntimeConfig, tc 
 			continue
 		}
 
-		for _, compile := range []bool{false, true} {
+		for _, compile := range []bool{true} {
 			if compile {
 				b.Run("Compile/"+fname, func(b *testing.B) {
 					b.ResetTimer()
