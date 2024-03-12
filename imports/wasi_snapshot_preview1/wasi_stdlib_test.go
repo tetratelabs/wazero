@@ -40,8 +40,8 @@ var sleepALittle = func() { time.Sleep(500 * time.Millisecond) }
 //go:embed testdata/cargo-wasi/wasi.wasm
 var wasmCargoWasi []byte
 
-// wasmGotip is conditionally compiled from testdata/gotip/wasi.go
-var wasmGotip []byte
+// wasmGo is conditionally compiled from testdata/go/wasi.go
+var wasmGo []byte
 
 // wasmTinyGo was compiled from testdata/tinygo/wasi.go
 //
@@ -65,8 +65,8 @@ func Test_fdReaddir_ls(t *testing.T) {
 		"zig-cc":     wasmZigCc,
 		"zig":        wasmZig,
 	}
-	if wasmGotip != nil {
-		toolchains["gotip"] = wasmGotip
+	if wasmGo != nil {
+		toolchains["go"] = wasmGo
 	}
 
 	tmpDir := t.TempDir()
@@ -178,8 +178,8 @@ func Test_fdReaddir_stat(t *testing.T) {
 		"zig-cc":     wasmZigCc,
 		"zig":        wasmZig,
 	}
-	if wasmGotip != nil {
-		toolchains["gotip"] = wasmGotip
+	if wasmGo != nil {
+		toolchains["go"] = wasmGo
 	}
 
 	for toolchain, bin := range toolchains {
@@ -267,59 +267,6 @@ func compileAndRunWithPreStart(t *testing.T, ctx context.Context, config wazero.
 
 	console = consoleBuf.String()
 	return
-}
-
-// compileAndRunForked executes the test case with the wazero runtime in a separate process, and waits for it to terminate.
-//
-// Stdout is captured to a buffer, and stderr is dumped to os.Stderr.
-// It returns the capture buffer and boolean; the boolean is true if we are running in the outer process.
-// If it is false, it means we are running in the subprocess; all the verification logic should be handled
-// when the boolean is true.
-//
-// A typical usage pattern will be:
-//
-//	if buf, hasRun := compileAndRunForked(...); hasRun {
-//		validateContents(buf)
-//	}
-func compileAndRunForked(t *testing.T, ctx context.Context, config wazero.ModuleConfig, tname string, bin []byte) ([]byte, bool) {
-	var buf bytes.Buffer
-	// We use the technique described in https://go.dev/talks/2014/testing.slide#23
-	// We check if we are running forked by ensuring that a "magic" environment variable is set.
-	if os.Getenv("_TEST_FORKED") != "1" {
-		// If said variable is not set, then we need to exec this same executable, specifying the name of test.
-		// We could use t.Name(), but because t may be arbitrarily nested, it is better to get the name of the test
-		// from a parameter.
-		cmd := exec.Command(os.Args[0], "-test.run", tname)
-		cmd.Stdout = &buf
-		cmd.Stderr = os.Stderr
-		cmd.Env = append(os.Environ(), "_TEST_FORKED=1")
-		err := cmd.Run()
-		if e, ok := err.(*exec.ExitError); ok && !e.Success() {
-			require.NoError(t, e, "The test quit with an error code: %v\n", e)
-		}
-		res := buf.Bytes()
-		// This is a test, so in case of success, it will include the "PASS\n" string:
-		// we remove that from the output, to return a clean stdout.
-		return res[0 : len(res)-len("PASS\n")], true
-	}
-
-	r := wazero.NewRuntime(ctx)
-	defer r.Close(ctx)
-
-	_, err := wasi_snapshot_preview1.Instantiate(ctx, r)
-	require.NoError(t, err)
-
-	mod, err := r.InstantiateWithConfig(ctx, bin, config.
-		WithStartFunctions()) // clear
-	require.NoError(t, err)
-
-	_, err = mod.ExportedFunction("_start").Call(ctx)
-	if exitErr, ok := err.(*sys.ExitError); ok {
-		require.Zero(t, exitErr.ExitCode())
-	} else {
-		require.NoError(t, err)
-	}
-	return nil, false
 }
 
 func Test_Poll(t *testing.T) {
@@ -439,8 +386,8 @@ func Test_Sock(t *testing.T) {
 		"cargo-wasi": wasmCargoWasi,
 		"zig-cc":     wasmZigCc,
 	}
-	if wasmGotip != nil {
-		toolchains["gotip"] = wasmGotip
+	if wasmGo != nil {
+		toolchains["go"] = wasmGo
 	}
 
 	for toolchain, bin := range toolchains {
@@ -483,8 +430,8 @@ func testSock(t *testing.T, bin []byte) {
 
 func Test_HTTP(t *testing.T) {
 	toolchains := map[string][]byte{}
-	if wasmGotip != nil {
-		toolchains["gotip"] = wasmGotip
+	if wasmGo != nil {
+		toolchains["go"] = wasmGo
 	}
 
 	for toolchain, bin := range toolchains {
@@ -535,8 +482,8 @@ func testHTTP(t *testing.T, bin []byte) {
 
 func Test_Stdin(t *testing.T) {
 	toolchains := map[string][]byte{}
-	if wasmGotip != nil {
-		toolchains["gotip"] = wasmGotip
+	if wasmGo != nil {
+		toolchains["go"] = wasmGo
 	}
 
 	for toolchain, bin := range toolchains {
@@ -590,44 +537,30 @@ func testStdin(t *testing.T, bin []byte) {
 }
 
 func Test_LargeStdout(t *testing.T) {
-	toolchains := map[string][]byte{}
-	if wasmGotip != nil {
-		toolchains["gotip"] = wasmGotip
-	}
+	if wasmGo != nil {
+		var buf bytes.Buffer
+		r := wazero.NewRuntime(testCtx)
+		defer func() {
+			require.NoError(t, r.Close(testCtx))
+		}()
 
-	for toolchain, bin := range toolchains {
-		toolchain := toolchain
-		bin := bin
-		name := t.Name()
-		t.Run(toolchain, func(t *testing.T) {
-			testLargeStdout(t, name, bin)
-		})
-	}
-}
+		_, err := wasi_snapshot_preview1.Instantiate(testCtx, r)
+		require.NoError(t, err)
 
-func testLargeStdout(t *testing.T, tname string, bin []byte) {
-	// This test dumps a large Go source file to stdout. The generated result
-	// should be valid code, otherwise it means that stdout is corrupted.
-	//
-	// The error conditions are more easily reproduced by executing in a subprocess
-	// and capturing its stdout.
-	if buf, hasRun := compileAndRunForked(t, testCtx, wazero.NewModuleConfig().
-		WithArgs("wasi", "largestdout").
-		WithStdout(os.Stdout), tname, bin); hasRun {
+		_, err = r.InstantiateWithConfig(testCtx, wasmGo,
+			wazero.NewModuleConfig().
+				WithArgs("wasi", "largestdout").
+				WithStdout(&buf))
+		require.NoError(t, err)
 
 		tempDir := t.TempDir()
 		temp, err := os.Create(joinPath(tempDir, "out.go"))
 		require.NoError(t, err)
-		defer temp.Close()
 
-		require.NoError(t, err)
-		_, _ = temp.Write(buf)
-		_ = temp.Close()
-
-		gotipBin, err := findGotipBin()
-		require.NoError(t, err)
-
-		cmd := exec.CommandContext(testCtx, gotipBin, "build", "-o",
+		// Check if the output Go source code is valid.
+		_, _ = temp.Write(buf.Bytes())
+		require.NoError(t, temp.Close())
+		cmd := exec.CommandContext(testCtx, "go", "build", "-o",
 			joinPath(tempDir, "outbin"), temp.Name())
 		require.NoError(t, err)
 		output, err := cmd.CombinedOutput()
