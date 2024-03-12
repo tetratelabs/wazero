@@ -67,9 +67,9 @@ type fifo struct {
 	path string
 }
 
-func Test_NonblockGotip(t *testing.T) {
+func Test_NonblockGo(t *testing.T) {
 	// - Create `numFifos` FIFOs.
-	// - Instantiate `wasmGotip` with the names of the FIFO in the order of creation
+	// - Instantiate `wasmGo` with the names of the FIFO in the order of creation
 	// - The test binary opens the FIFOs in the given order and spawns a goroutine for each
 	// - The unit test writes to the FIFO in reverse order.
 	// - Each goroutine reads from the given FIFO and writes the contents to stderr
@@ -81,8 +81,8 @@ func Test_NonblockGotip(t *testing.T) {
 	//
 	// Adapted from https://github.com/golang/go/blob/0fcc70ecd56e3b5c214ddaee4065ea1139ae16b5/src/runtime/internal/wasitest/nonblock_test.go
 
-	if wasmGotip == nil {
-		t.Skip("skipping because wasi.go was not compiled (gotip missing or compilation error)")
+	if wasmGo == nil {
+		t.Skip("skipping because wasi.go was not compiled (go missing or compilation error)")
 	}
 	const numFifos = 8
 
@@ -128,7 +128,7 @@ func Test_NonblockGotip(t *testing.T) {
 				_, err := wasi_snapshot_preview1.Instantiate(testCtx, r)
 				require.NoError(t, err)
 
-				mod, err := r.InstantiateWithConfig(testCtx, wasmGotip, moduleConfig) // clear
+				mod, err := r.InstantiateWithConfig(testCtx, wasmGo, moduleConfig) // clear
 				require.NoError(t, err)
 
 				_, err = mod.ExportedFunction("_start").Call(testCtx)

@@ -40,8 +40,8 @@ var sleepALittle = func() { time.Sleep(500 * time.Millisecond) }
 //go:embed testdata/cargo-wasi/wasi.wasm
 var wasmCargoWasi []byte
 
-// wasmGotip is conditionally compiled from testdata/gotip/wasi.go
-var wasmGotip []byte
+// wasmGo is conditionally compiled from testdata/go/wasi.go
+var wasmGo []byte
 
 // wasmTinyGo was compiled from testdata/tinygo/wasi.go
 //
@@ -65,8 +65,8 @@ func Test_fdReaddir_ls(t *testing.T) {
 		"zig-cc":     wasmZigCc,
 		"zig":        wasmZig,
 	}
-	if wasmGotip != nil {
-		toolchains["gotip"] = wasmGotip
+	if wasmGo != nil {
+		toolchains["go"] = wasmGo
 	}
 
 	tmpDir := t.TempDir()
@@ -178,8 +178,8 @@ func Test_fdReaddir_stat(t *testing.T) {
 		"zig-cc":     wasmZigCc,
 		"zig":        wasmZig,
 	}
-	if wasmGotip != nil {
-		toolchains["gotip"] = wasmGotip
+	if wasmGo != nil {
+		toolchains["go"] = wasmGo
 	}
 
 	for toolchain, bin := range toolchains {
@@ -439,8 +439,8 @@ func Test_Sock(t *testing.T) {
 		"cargo-wasi": wasmCargoWasi,
 		"zig-cc":     wasmZigCc,
 	}
-	if wasmGotip != nil {
-		toolchains["gotip"] = wasmGotip
+	if wasmGo != nil {
+		toolchains["go"] = wasmGo
 	}
 
 	for toolchain, bin := range toolchains {
@@ -483,8 +483,8 @@ func testSock(t *testing.T, bin []byte) {
 
 func Test_HTTP(t *testing.T) {
 	toolchains := map[string][]byte{}
-	if wasmGotip != nil {
-		toolchains["gotip"] = wasmGotip
+	if wasmGo != nil {
+		toolchains["go"] = wasmGo
 	}
 
 	for toolchain, bin := range toolchains {
@@ -535,8 +535,8 @@ func testHTTP(t *testing.T, bin []byte) {
 
 func Test_Stdin(t *testing.T) {
 	toolchains := map[string][]byte{}
-	if wasmGotip != nil {
-		toolchains["gotip"] = wasmGotip
+	if wasmGo != nil {
+		toolchains["go"] = wasmGo
 	}
 
 	for toolchain, bin := range toolchains {
@@ -591,8 +591,8 @@ func testStdin(t *testing.T, bin []byte) {
 
 func Test_LargeStdout(t *testing.T) {
 	toolchains := map[string][]byte{}
-	if wasmGotip != nil {
-		toolchains["gotip"] = wasmGotip
+	if wasmGo != nil {
+		toolchains["go"] = wasmGo
 	}
 
 	for toolchain, bin := range toolchains {
@@ -624,10 +624,7 @@ func testLargeStdout(t *testing.T, tname string, bin []byte) {
 		_, _ = temp.Write(buf)
 		_ = temp.Close()
 
-		gotipBin, err := findGotipBin()
-		require.NoError(t, err)
-
-		cmd := exec.CommandContext(testCtx, gotipBin, "build", "-o",
+		cmd := exec.CommandContext(testCtx, "go", "build", "-o",
 			joinPath(tempDir, "outbin"), temp.Name())
 		require.NoError(t, err)
 		output, err := cmd.CombinedOutput()
