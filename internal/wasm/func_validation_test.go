@@ -3591,14 +3591,37 @@ func TestFunctionValidation_redundantEnd(t *testing.T) {
 
 // TestFunctionValidation_redundantEnd is found in th validation fuzzing.
 func TestFunctionValidation_redundantElse(t *testing.T) {
-	m := &Module{
-		TypeSection:     []FunctionType{{}},
-		FunctionSection: []Index{0},
-		CodeSection:     []Code{{Body: []byte{OpcodeEnd, OpcodeElse}}},
+	for _, tc := range []struct {
+		body   []byte
+		expErr string
+	}{
+		{
+			body:   []byte{OpcodeEnd, OpcodeElse},
+			expErr: "unexpected end of function at pc=0x1",
+		},
+		{
+			body:   []byte{OpcodeElse, OpcodeEnd},
+			expErr: "else instruction must be used in if block: 0x0",
+		},
+		{
+			body:   []byte{OpcodeBlock, 0, OpcodeElse, OpcodeEnd},
+			expErr: "else instruction must be used in if block: 0x2",
+		},
+		{
+			body: []byte{
+				OpcodeI32Const, 0,
+				OpcodeIf, 0, OpcodeElse, OpcodeElse, OpcodeEnd, OpcodeEnd},
+			expErr: "else instruction must be used in if block: 0x5",
+		},
+	} {
+		t.Run(tc.expErr, func(t *testing.T) {
+			m := &Module{TypeSection: []FunctionType{{}}, FunctionSection: []Index{0}, CodeSection: []Code{{Body: tc.body}}}
+			err := m.validateFunction(&stacks{}, api.CoreFeaturesV2,
+				0, nil, nil, nil, nil, nil, bytes.NewReader(nil))
+			require.EqualError(t, err, tc.expErr)
+		})
 	}
-	err := m.validateFunction(&stacks{}, api.CoreFeaturesV2,
-		0, nil, nil, nil, nil, nil, bytes.NewReader(nil))
-	require.EqualError(t, err, "unexpected end of function at pc=0x1")
+
 }
 
 func Test_SplitCallStack(t *testing.T) {
