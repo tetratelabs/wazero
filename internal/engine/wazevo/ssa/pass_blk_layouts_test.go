@@ -277,9 +277,7 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 		b.SetCurrentBlock(src)
 		jump := b.AllocateInstruction()
 		args := b.varLengthPool.Allocate(len(vs))
-		for _, v := range vs {
-			args = args.Append(&b.varLengthPool, v)
-		}
+		args = args.Append(&b.varLengthPool, vs...)
 		jump.AsJump(args, dst)
 		b.InsertInstruction(jump)
 	}
@@ -290,9 +288,7 @@ func TestBuilder_LayoutBlocks(t *testing.T) {
 		b.InsertInstruction(vinst)
 		brz := b.AllocateInstruction()
 		args := b.varLengthPool.Allocate(len(vs))
-		for _, v := range vs {
-			args = args.Append(&b.varLengthPool, v)
-		}
+		args = args.Append(&b.varLengthPool, vs...)
 		brz.AsBrz(condVal, args, dst)
 		b.InsertInstruction(brz)
 	}

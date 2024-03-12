@@ -108,23 +108,35 @@ func (p *IDedPool[T]) MaxIDEncountered() int {
 	return p.maxIDEncountered
 }
 
-const arraySize = 20
+// arraySize is the size of the array used in VarLengthPool's arrayPool.
+// This is chosen to be 8, which is empirically a good number among 8, 12, 16 and 20.
+const arraySize = 8
 
 // VarLengthPool is a pool of VarLength[T] that can be allocated and reset.
-type VarLengthPool[T any] struct {
-	arrayPool Pool[[arraySize]T]
-	slicePool Pool[[]T]
-}
+type (
+	VarLengthPool[T any] struct {
+		arrayPool Pool[varLengthPoolArray[T]]
+		slicePool Pool[[]T]
+	}
+	// varLengthPoolArray wraps an array and keeps track of the next index to be used to avoid the heap allocation.
+	varLengthPoolArray[T any] struct {
+		arr  [arraySize]T
+		next int
+	}
+)
 
 // VarLength is a variable length array that can be reused via a pool.
 type VarLength[T any] struct {
-	backing *[]T
+	arr *varLengthPoolArray[T]
+	slc *[]T
 }
 
 // NewVarLengthPool returns a new VarLengthPool.
 func NewVarLengthPool[T any]() VarLengthPool[T] {
 	return VarLengthPool[T]{
-		arrayPool: NewPool[[arraySize]T](nil),
+		arrayPool: NewPool[varLengthPoolArray[T]](func(v *varLengthPoolArray[T]) {
+			v.next = 0
+		}),
 		slicePool: NewPool[[]T](func(i *[]T) {
 			*i = (*i)[:0]
 		}),
@@ -133,18 +145,17 @@ func NewVarLengthPool[T any]() VarLengthPool[T] {
 
 // NewNilVarLength returns a new VarLength[T] with a nil backing.
 func NewNilVarLength[T any]() VarLength[T] {
-	var v *[]T = nil
-	return VarLength[T]{backing: v}
+	return VarLength[T]{}
 }
 
 // Allocate allocates a new VarLength[T] from the pool.
 func (p *VarLengthPool[T]) Allocate(knownMin int) VarLength[T] {
 	if knownMin <= arraySize {
-		arr := p.arrayPool.Allocate()[:0]
-		return VarLength[T]{backing: &arr}
+		arr := p.arrayPool.Allocate()
+		return VarLength[T]{arr: arr}
 	}
 	slc := p.slicePool.Allocate()
-	return VarLength[T]{backing: slc}
+	return VarLength[T]{slc: slc}
 }
 
 // Reset resets the pool.
@@ -153,35 +164,52 @@ func (p *VarLengthPool[T]) Reset() {
 	p.slicePool.Reset()
 }
 
-// Append appends an item to the backing slice.
-func (i VarLength[T]) Append(p *VarLengthPool[T], item T) VarLength[T] {
-	if i.backing == nil {
-		arr := p.arrayPool.Allocate()[:0]
-		i.backing = &arr
+// Append appends items to the backing slice just like the `append` builtin function in Go.
+func (i VarLength[T]) Append(p *VarLengthPool[T], items ...T) VarLength[T] {
+	if i.slc != nil {
+		*i.slc = append(*i.slc, items...)
+		return i
 	}
 
-	if len(*i.backing)+1 <= arraySize {
-		*i.backing = append(*i.backing, item)
-		return i
-	} else if len(*i.backing) == arraySize {
+	if i.arr == nil {
+		i.arr = p.arrayPool.Allocate()
+	}
+
+	arr := i.arr
+	if arr.next+len(items) <= arraySize {
+		for _, item := range items {
+			arr.arr[arr.next] = item
+			arr.next++
+		}
+	} else {
 		slc := p.slicePool.Allocate()
 		// Copy the array to the slice.
-		*slc = append(*slc, *i.backing...)
+		for ptr := 0; ptr < arr.next; ptr++ {
+			*slc = append(*slc, arr.arr[ptr])
+		}
+		i.slc = slc
+		*i.slc = append(*i.slc, items...)
 	}
-	*i.backing = append(*i.backing, item)
 	return i
 }
 
 // View returns the backing slice.
 func (i VarLength[T]) View() []T {
-	if i.backing == nil {
-		return nil
+	if i.slc != nil {
+		return *i.slc
+	} else if i.arr != nil {
+		arr := i.arr
+		return arr.arr[:arr.next]
 	}
-	return *i.backing
+	return nil
 }
 
 // Cut cuts the backing slice to the given length.
 // Precondition: n <= len(i.backing).
 func (i VarLength[T]) Cut(n int) {
-	*i.backing = (*i.backing)[:n]
+	if i.slc != nil {
+		*i.slc = (*i.slc)[:n]
+	} else if i.arr != nil {
+		i.arr.next = n
+	}
 }

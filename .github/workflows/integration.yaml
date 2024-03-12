@@ -126,7 +126,7 @@ jobs:
       - name: Run built test binaries
         run: |
           cd ${{ env.STDLIB_TESTS }}
-          go test -bench='BenchmarkZig' -timeout=20m
+          go test -bench='BenchmarkZig' -timeout=20m -benchtime=1x
 
   build_tinygo_test_binary:
     name: Build TinyGo test binary
@@ -213,7 +213,7 @@ jobs:
       - name: Run test binaries
         run: |
           cd ${{ env.STDLIB_TESTS }}
-          go test -bench='BenchmarkTinyGo' -timeout=20m
+          go test -bench='BenchmarkTinyGo' -timeout=20m -benchtime=1x
 
   wasi-testsuite:
     name: wasi-testsuite
@@ -347,7 +347,7 @@ jobs:
       - name: Run built test binaries
         run: |
           cd ${{ env.STDLIB_TESTS }}
-          go test -bench='BenchmarkWasip1' -timeout=20m
+          go test -bench='BenchmarkWasip1' -timeout=20m -benchtime=1x
 
   libsodium:
     name: libsodium (${{ matrix.os.name }}, ${{ matrix.os.arch }})
@@ -388,5 +388,4 @@ jobs:
         run: make libsodium
 
       - name: Run test binaries
-        #
         run: go test ./internal/integration_test/libsodium -bench=. -benchtime=1x

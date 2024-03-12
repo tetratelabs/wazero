@@ -17,34 +17,34 @@ func TestNewNilVarLength(t *testing.T) {
 func TestAllocate(t *testing.T) {
 	pool := NewVarLengthPool[uint64]()
 	// Array:
-	v := pool.Allocate(10)
-	require.NotNil(t, v.backing)
-	require.Equal(t, 0, len(*v.backing))
-	require.Equal(t, arraySize, cap(*v.backing))
+	v := pool.Allocate(5)
+	require.NotNil(t, v.arr)
+	require.Equal(t, 0, v.arr.next)
+	require.Equal(t, arraySize, cap(v.arr.arr))
 
 	// Slice backed:
 	v = pool.Allocate(25)
-	require.NotNil(t, v.backing)
-	require.Equal(t, 0, len(*v.backing))
+	require.NotNil(t, v.slc)
+	require.Equal(t, 0, len(*v.slc))
 	v.Append(&pool, 1)
-	require.NotNil(t, v.backing)
-	require.Equal(t, 1, len(*v.backing))
+	require.NotNil(t, v.slc)
+	require.Equal(t, 1, len(*v.slc))
 	v.Append(&pool, 2)
-	require.NotNil(t, v.backing)
-	require.Equal(t, 2, len(*v.backing))
-	capacity := cap(*v.backing)
+	require.NotNil(t, v.slc)
+	require.Equal(t, 2, len(*v.slc))
+	capacity := cap(*v.slc)
 
 	// Reset the pool and ensure the backing slice is reused.
 	pool.Reset()
 
-	v = pool.Allocate(10)
-	require.NotNil(t, v.backing)
-	require.Equal(t, 0, len(*v.backing))
-	require.Equal(t, arraySize, cap(*v.backing))
+	v = pool.Allocate(5)
+	require.NotNil(t, v.arr)
+	require.Equal(t, 0, v.arr.next)
+	require.Equal(t, arraySize, cap(v.arr.arr))
 	v = pool.Allocate(25)
-	require.NotNil(t, v.backing)
-	require.Equal(t, 0, len(*v.backing))
-	require.Equal(t, capacity, cap(*v.backing))
+	require.NotNil(t, v.slc)
+	require.Equal(t, 0, len(*v.slc))
+	require.Equal(t, capacity, cap(*v.slc))
 }
 
 func TestAppendAndView(t *testing.T) {
