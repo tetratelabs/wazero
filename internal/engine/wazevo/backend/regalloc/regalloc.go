@@ -258,9 +258,13 @@ func (vs *vrState) recordReload(f Function, blk Block) {
 func (s *state) findOrSpillAllocatable(a *Allocator, allocatable []RealReg, forbiddenMask RegSet, preferred RealReg) (r RealReg) {
 	r = RealRegInvalid
 	// First, check if the preferredMask has any allocatable register.
-	for _, candidateReal := range allocatable {
-		if !forbiddenMask.has(candidateReal) && !s.regsInUse.has(candidateReal) && candidateReal == preferred {
-			return candidateReal
+	if preferred != RealRegInvalid && !forbiddenMask.has(preferred) && !s.regsInUse.has(preferred) {
+		for _, candidateReal := range allocatable {
+			// TODO: we should ensure the preferred register is in the allocatable set in the first place,
+			//  but right now, just in case, we check it here.
+			if candidateReal == preferred {
+				return preferred
+			}
 		}
 	}
 
