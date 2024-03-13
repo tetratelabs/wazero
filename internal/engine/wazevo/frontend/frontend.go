@@ -4,7 +4,6 @@ package frontend
 import (
 	"bytes"
 	"math"
-	"slices"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
@@ -507,9 +506,7 @@ func (c *Compiler) finalizeKnownSafeBoundsAtTheEndOfBlock(bID ssa.BasicBlockID) 
 	size := len(c.knownSafeBoundsSet)
 	allocated := c.varLengthKnownSafeBoundWithIDPool.Allocate(size)
 	// Sort the known safe bounds by the value ID so that we can use the intersection algorithm in initializeCurrentBlockKnownBounds.
-	slices.SortFunc(c.knownSafeBoundsSet, func(i, j ssa.ValueID) int {
-		return int(i) - int(j)
-	})
+	sortSSAValueIDs(c.knownSafeBoundsSet)
 	for _, vID := range c.knownSafeBoundsSet {
 		kb := c.knownSafeBounds[vID]
 		allocated = allocated.Append(p, knownSafeBoundWithID{
