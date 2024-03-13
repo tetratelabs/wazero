@@ -64,9 +64,8 @@ type Compiler struct {
 
 	// Following are reused for the known safe bounds analysis.
 
-	pointers      []int
-	bounds        [][]knownSafeBoundWithID
-	currentBounds []knownSafeBoundWithID
+	pointers []int
+	bounds   [][]knownSafeBoundWithID
 }
 
 type (
@@ -529,13 +528,13 @@ func (c *Compiler) initializeCurrentBlockKnownBounds() {
 		}
 	default:
 		c.pointers = c.pointers[:0]
-		c.currentBounds = c.currentBounds[:0]
 		c.bounds = c.bounds[:0]
 		for i := 0; i < preds; i++ {
 			c.bounds = append(c.bounds, c.getKnownSafeBoundsAtTheEndOfBlocks(currentBlk.Pred(i).ID()).View())
 			c.pointers = append(c.pointers, 0)
-			c.currentBounds = append(c.currentBounds, knownSafeBoundWithID{})
 		}
+
+		// If there are multiple predecessors, we need to find the intersection of the known safe bounds.
 
 	outer:
 		for {
@@ -544,8 +543,7 @@ func (c *Compiler) initializeCurrentBlockKnownBounds() {
 				if ptr >= len(c.bounds[i]) {
 					break outer
 				}
-				cb := c.bounds[i][ptr]
-				c.currentBounds[i] = cb
+				cb := &c.bounds[i][ptr]
 				if id := cb.id; id < smallestID {
 					smallestID = cb.id
 				}
@@ -554,7 +552,8 @@ func (c *Compiler) initializeCurrentBlockKnownBounds() {
 			// Check if current elements are the same across all lists.
 			same := true
 			minBound := uint64(math.MaxUint64)
-			for _, cb := range c.currentBounds {
+			for i := 0; i < preds; i++ {
+				cb := &c.bounds[i][c.pointers[i]]
 				if cb.id != smallestID {
 					same = false
 					break
@@ -568,16 +567,13 @@ func (c *Compiler) initializeCurrentBlockKnownBounds() {
 			if same { // All elements are the same.
 				// Absolute address cannot be used in the intersection since the value might be only defined in one of the predecessors.
 				c.recordKnownSafeBound(smallestID, minBound, ssa.ValueInvalid)
-				// Move all the pointers forward.
-				for i := range c.pointers {
+			}
+
+			// Move pointer(s) for the smallest ID forward (if same, move all).
+			for i := 0; i < preds; i++ {
+				cb := &c.bounds[i][c.pointers[i]]
+				if cb.id == smallestID {
 					c.pointers[i]++
-				}
-			} else {
-				// Move pointer(s) for the smallest ID forward.
-				for i, cb := range c.currentBounds {
-					if cb.id == smallestID {
-						c.pointers[i]++
-					}
 				}
 			}
 		}

@@ -1,5 +1,7 @@
 //go:build !go1.21
 
+// TODO: delete after the floor Go version is 1.21
+
 package frontend
 
 import (
