@@ -3,6 +3,8 @@ package frontend
 
 import (
 	"bytes"
+	"math"
+	"slices"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
@@ -60,6 +62,12 @@ type Compiler struct {
 	varLengthKnownSafeBoundWithIDPool wazevoapi.VarLengthPool[knownSafeBoundWithID]
 
 	execCtxPtrValue, moduleCtxPtrValue ssa.Value
+
+	// Following are reused for the known safe bounds analysis.
+
+	pointers      []int
+	bounds        [][]knownSafeBoundWithID
+	currentBounds []knownSafeBoundWithID
 }
 
 type (
@@ -498,6 +506,10 @@ func (c *Compiler) finalizeKnownSafeBoundsAtTheEndOfBlock(bID ssa.BasicBlockID) 
 	p := &c.varLengthKnownSafeBoundWithIDPool
 	size := len(c.knownSafeBoundsSet)
 	allocated := c.varLengthKnownSafeBoundWithIDPool.Allocate(size)
+	// Sort the known safe bounds by the value ID so that we can use the intersection algorithm in initializeCurrentBlockKnownBounds.
+	slices.SortFunc(c.knownSafeBoundsSet, func(i, j ssa.ValueID) int {
+		return int(i) - int(j)
+	})
 	for _, vID := range c.knownSafeBoundsSet {
 		kb := c.knownSafeBounds[vID]
 		allocated = allocated.Append(p, knownSafeBoundWithID{
@@ -519,42 +531,57 @@ func (c *Compiler) initializeCurrentBlockKnownBounds() {
 			c.recordKnownSafeBound(kb.id, kb.bound, kb.absoluteAddr)
 		}
 	default:
-		primary := currentBlk.Pred(0).ID()
-		type mapVal struct {
-			kb    knownSafeBoundWithID
-			count int
-		}
-		set := map[ssa.ValueID]mapVal{}
-		for _, kb := range c.getKnownSafeBoundsAtTheEndOfBlocks(primary).View() {
-			if kb.valid() {
-				set[kb.id] = mapVal{kb, 1}
-			}
+		c.pointers = c.pointers[:0]
+		c.currentBounds = c.currentBounds[:0]
+		c.bounds = c.bounds[:0]
+		for i := 0; i < preds; i++ {
+			c.bounds = append(c.bounds, c.getKnownSafeBoundsAtTheEndOfBlocks(currentBlk.Pred(i).ID()).View())
+			c.pointers = append(c.pointers, 0)
+			c.currentBounds = append(c.currentBounds, knownSafeBoundWithID{})
 		}
 
-		// If there are more than one predecessor, we need to find the intersection of the known safe bounds.
-		for i := 1; i < preds; i++ {
-			pred := currentBlk.Pred(i).ID()
-			for _, kb := range c.getKnownSafeBoundsAtTheEndOfBlocks(pred).View() {
-				if !kb.valid() {
-					continue
+	outer:
+		for {
+			smallestID := ssa.ValueID(math.MaxUint32)
+			for i, ptr := range c.pointers {
+				if ptr >= len(c.bounds[i]) {
+					break outer
 				}
-				mv, ok := set[kb.id]
-				if !ok {
-					continue
+				cb := c.bounds[i][ptr]
+				c.currentBounds[i] = cb
+				if id := cb.id; id < smallestID {
+					smallestID = cb.id
 				}
-				mv.count++
-				// Choose the lower bound.
-				if kb.bound < mv.kb.bound {
-					mv.kb = kb
-				}
-				set[kb.id] = mv
 			}
-		}
-		for _, mv := range set {
-			if mv.count == preds {
-				kb := mv.kb
+
+			// Check if current elements are the same across all lists.
+			same := true
+			minBound := uint64(math.MaxUint64)
+			for _, cb := range c.currentBounds {
+				if cb.id != smallestID {
+					same = false
+					break
+				} else {
+					if cb.bound < minBound {
+						minBound = cb.bound
+					}
+				}
+			}
+
+			if same { // All elements are the same.
 				// Absolute address cannot be used in the intersection since the value might be only defined in one of the predecessors.
-				c.recordKnownSafeBound(kb.id, kb.bound, ssa.ValueInvalid)
+				c.recordKnownSafeBound(smallestID, minBound, ssa.ValueInvalid)
+				// Move all the pointers forward.
+				for i := range c.pointers {
+					c.pointers[i]++
+				}
+			} else {
+				// Move pointer(s) for the smallest ID forward.
+				for i, cb := range c.currentBounds {
+					if cb.id == smallestID {
+						c.pointers[i]++
+					}
+				}
 			}
 		}
 	}
