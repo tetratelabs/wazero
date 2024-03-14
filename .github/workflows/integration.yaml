@@ -97,12 +97,7 @@ jobs:
           - os:
               version: macos-14
               name: macOS
-            arch:     "arm64"
-          - os:
-              version: ubuntu-22.04
-              name: Ubuntu
-            arch:       "amd64"
-            go-version: "1.21"
+            arch: arm64
 
     steps:
       - name: Checkout wazero
@@ -184,12 +179,7 @@ jobs:
           - os:
               version: macos-14
               name: macOS
-            arch:     "arm64"
-          - os:
-              version: ubuntu-22.04
-              name: Ubuntu
-            arch:       "amd64"
-            go-version: "1.21"
+            arch: arm64
 
     steps:
       - name: Checkout wazero
@@ -302,16 +292,6 @@ jobs:
               version: macos-14
               name: macOS
             arch:       "arm64"
-            go-version: "1.22"
-          - os:
-              version: ubuntu-22.04
-              name: Ubuntu
-            arch:       "amd64"
-            go-version: "1.21"
-          - os:
-              version: ubuntu-22.04
-              name: Ubuntu
-            arch:       "amd64"
             go-version: "1.22"
 
     steps:
