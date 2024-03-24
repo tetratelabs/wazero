@@ -66,6 +66,7 @@ type MemoryInstance struct {
 // NewMemoryInstance creates a new instance based on the parameters in the SectionIDMemory.
 func NewMemoryInstance(memSec *Memory) *MemoryInstance {
 	min := MemoryPagesToBytesNum(memSec.Min)
+	max := MemoryPagesToBytesNum(memSec.Max)
 	capacity := MemoryPagesToBytesNum(memSec.Cap)
 
 	var buffer []byte
@@ -76,25 +77,33 @@ func NewMemoryInstance(memSec *Memory) *MemoryInstance {
 		// we cannot have the memory base move during operation. mmap allows allocating memory virtually so
 		// we can grow without changing the base. The spec requires max for shared memory currently because
 		// all threads implementations are effectively expected to use mmap for shared memory.
-		max := MemoryPagesToBytesNum(memSec.Max)
-		var b []byte
 		if platform.MmapSupported && max > 0 {
-			var err error
-			b, err = platform.MmapMemory(int(max))
+			b, err := platform.MmapMemory(int(max))
 			if err != nil {
 				panic(fmt.Errorf("unable to mmap memory: %w", err))
 			}
 			mmappedBuffer = b
+			buffer = b[:min]
 		} else {
 			// mmap not supported so we just preallocate a normal buffer. This will often be large, i.e. ~4GB,
-			// and likely isn't practical, but interpreter usage should be rare and the Wasm binary can be
+			// and likely isn't practical, but interpreter usage should be rare and the WASM binary can be
 			// edited to reduce max memory size if support for non-mmap platforms is required.
-			b = make([]byte, max)
+			buffer = make([]byte, min, max)
 		}
-		buffer = b[:MemoryPagesToBytesNum(memSec.Min)]
 		cap = memSec.Max
 	} else {
-		buffer = make([]byte, min, capacity)
+		// If memory won't grow at runtime, because capacity is the same as max,
+		// we can at least try to use mmap to allocate memory virtually.
+		if platform.MmapSupported && max > 0 && capacity == max {
+			b, err := platform.MmapMemory(int(capacity))
+			if err != nil {
+				panic(fmt.Errorf("unable to mmap memory: %w", err))
+			}
+			mmappedBuffer = b
+			buffer = b[:min]
+		} else {
+			buffer = make([]byte, min, capacity)
+		}
 		cap = memSec.Cap
 	}
 
