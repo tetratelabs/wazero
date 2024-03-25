@@ -13,6 +13,7 @@ func stackView(rbp, top uintptr) []byte {
 	{
 		// TODO: use unsafe.Slice after floor version is set to Go 1.20.
 		hdr := (*reflect.SliceHeader)(unsafe.Pointer(&stackBuf))
+		hdr.Data = rbp
 		setSliceLimits(hdr, top-rbp)
 	}
 	return stackBuf
