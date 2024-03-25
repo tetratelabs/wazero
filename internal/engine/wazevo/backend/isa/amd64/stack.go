@@ -9,14 +9,11 @@ import (
 )
 
 func stackView(rbp, top uintptr) []byte {
-	l := int(top - rbp)
 	var stackBuf []byte
 	{
 		// TODO: use unsafe.Slice after floor version is set to Go 1.20.
 		hdr := (*reflect.SliceHeader)(unsafe.Pointer(&stackBuf))
-		hdr.Data = rbp
-		hdr.Len = l
-		hdr.Cap = l
+		setSliceLimits(hdr, top-rbp)
 	}
 	return stackBuf
 }
@@ -79,8 +76,7 @@ func GoCallStackView(stackPointerBeforeGoCall *uint64) []uint64 {
 	{
 		sh := (*reflect.SliceHeader)(unsafe.Pointer(&view))
 		sh.Data = uintptr(unsafe.Pointer(stackPointerBeforeGoCall)) + 8 // skips the(sliceSize.
-		sh.Len = int(size)
-		sh.Cap = int(size)
+		setSliceLimits(sh, uintptr(size))
 	}
 	return view
 }
