@@ -271,7 +271,7 @@ func (m *MemoryInstance) Grow(delta uint32) (result uint32, ok bool) {
 			// Use atomic write to ensure new length is visible across threads.
 			atomic.StoreUintptr((*uintptr)(unsafe.Pointer(&sp.Len)), uintptr(MemoryPagesToBytesNum(newPages)))
 		} else {
-			sp.Len = int(MemoryPagesToBytesNum(newPages))
+			sp.Len = lengthMemoryPages(newPages)
 		}
 		return currentPages, true
 	}
