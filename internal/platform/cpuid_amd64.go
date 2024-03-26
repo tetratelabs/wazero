@@ -1,3 +1,5 @@
+//go:build amd64 && !tinygo
+
 package platform
 
 // CpuFeatures exposes the capabilities for this CPU, queried via the Has, HasExtra methods
