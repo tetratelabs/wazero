@@ -2893,6 +2893,105 @@ blk3: () <-- (blk1,blk2)
 	Jump blk_ret
 `,
 		},
+		{
+			name: "bounds check in loop with if-else",
+			m: &wasm.Module{
+				TypeSection:     []wasm.FunctionType{{Params: []wasm.ValueType{wasm.ValueTypeI32}}},
+				FunctionSection: []wasm.Index{0},
+				CodeSection: []wasm.Code{{
+					Body: []byte{
+						wasm.OpcodeLocalGet, 0,
+						wasm.OpcodeI32Load, 0x2, 0x10, // staticOffset=0x20
+						wasm.OpcodeDrop,
+
+						wasm.OpcodeLoop, 0x40, // blockSignature:vv.
+
+						/* */ wasm.OpcodeLocalGet, 0,
+						// This address must be always recomputed:
+						// v9 in `Load v9, 0x20` won't propagate from blk0 to blk1,
+						/* */ wasm.OpcodeI32Load, 0x2, 0x20, // staticOffset=0x30
+
+						/* */ wasm.OpcodeIf, 0x40, // blockSignature:vv.
+						/* */ /* */ wasm.OpcodeLoop, 0x40, // blockSignature:vv.
+						/* */ /* */ /* */ wasm.OpcodeLocalGet, 0,
+						/* */ /* */ /* */ wasm.OpcodeI32Load, 0x2, 0x50, // staticOffset=0x50
+						/* */ /* */ /* */ wasm.OpcodeBrIf, 2, // quit to the inner loop
+						/* */ /* */ wasm.OpcodeEnd,
+						/* */ wasm.OpcodeElse,
+						/* */ /* */ wasm.OpcodeLocalGet, 0,
+						/* */ /* */ wasm.OpcodeBrIf, 2, // quit to the outer loop
+						/* */ wasm.OpcodeEnd,
+						/* */ wasm.OpcodeBr, 1, // quit to the loop
+
+						wasm.OpcodeEnd, // end loop
+
+						wasm.OpcodeEnd,
+					},
+				}},
+				MemorySection: &wasm.Memory{Min: 1},
+			},
+			features: api.CoreFeaturesV2,
+			exp: `
+blk0: (exec_ctx:i64, module_ctx:i64, v2:i32)
+	v3:i64 = Iconst_64 0x14
+	v4:i64 = UExtend v2, 32->64
+	v5:i64 = Uload32 module_ctx, 0x10
+	v6:i64 = Iadd v4, v3
+	v7:i32 = Icmp lt_u, v5, v6
+	ExitIfTrue v7, exec_ctx, memory_out_of_bounds
+	v8:i64 = Load module_ctx, 0x8
+	v9:i64 = Iadd v8, v4
+	v10:i32 = Load v9, 0x10
+	Jump blk1
+
+blk1: () <-- (blk0,blk6)
+	v11:i64 = Iconst_64 0x24
+	v12:i64 = UExtend v2, 32->64
+	v13:i64 = Uload32 module_ctx, 0x10
+	v14:i64 = Iadd v12, v11
+	v15:i32 = Icmp lt_u, v13, v14
+	ExitIfTrue v15, exec_ctx, memory_out_of_bounds
+	v16:i64 = Load module_ctx, 0x8
+	v17:i64 = Iadd v16, v12
+	v18:i32 = Load v17, 0x20
+	Brz v18, blk4
+	Jump blk3
+
+blk2: ()
+
+blk3: () <-- (blk1)
+	Jump blk6
+
+blk4: () <-- (blk1)
+	Brnz v2, blk_ret
+	Jump blk9
+
+blk5: () <-- (blk7,blk9)
+	Jump blk_ret
+
+blk6: () <-- (blk3)
+	v19:i64 = Iconst_64 0x54
+	v20:i64 = UExtend v2, 32->64
+	v21:i64 = Uload32 module_ctx, 0x10
+	v22:i64 = Iadd v20, v19
+	v23:i32 = Icmp lt_u, v21, v22
+	ExitIfTrue v23, exec_ctx, memory_out_of_bounds
+	v24:i64 = Load module_ctx, 0x8
+	v25:i64 = Iadd v24, v20
+	v26:i32 = Load v25, 0x50
+	Brnz v26, blk1
+	Jump blk8
+
+blk7: () <-- (blk8)
+	Jump blk5
+
+blk8: () <-- (blk6)
+	Jump blk7
+
+blk9: () <-- (blk4)
+	Jump blk5
+`,
+		},
 	} {
 
 		tc := tc
