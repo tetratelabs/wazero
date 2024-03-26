@@ -58,25 +58,6 @@ func newDefaultTCPListenerFile(tl *net.TCPListener) socketapi.TCPSock {
 	return &tcpListenerFile{tl: tl}
 }
 
-// Accept implements the same method as documented on socketapi.TCPSock
-func (f *tcpListenerFile) Accept() (socketapi.TCPConn, experimentalsys.Errno) {
-	// Ensure we have an incoming connection, otherwise return immediately.
-	if f.nonblock {
-		if ready, errno := _pollSock(f.tl, fsapi.POLLIN, 0); !ready || errno != 0 {
-			return nil, experimentalsys.EAGAIN
-		}
-	}
-
-	// Accept normally blocks goroutines, but we
-	// made sure that we have an incoming connection,
-	// so we should be safe.
-	if conn, err := f.tl.Accept(); err != nil {
-		return nil, experimentalsys.UnwrapOSError(err)
-	} else {
-		return newTcpConn(conn.(*net.TCPConn)), 0
-	}
-}
-
 // Close implements the same method as documented on experimentalsys.File
 func (f *tcpListenerFile) Close() experimentalsys.Errno {
 	if !f.closed {
@@ -88,15 +69,6 @@ func (f *tcpListenerFile) Close() experimentalsys.Errno {
 // Addr is exposed for testing.
 func (f *tcpListenerFile) Addr() *net.TCPAddr {
 	return f.tl.Addr().(*net.TCPAddr)
-}
-
-// SetNonblock implements the same method as documented on fsapi.File
-func (f *tcpListenerFile) SetNonblock(enabled bool) (errno experimentalsys.Errno) {
-	f.nonblock = enabled
-	_, errno = syscallConnControl(f.tl, func(fd uintptr) (int, experimentalsys.Errno) {
-		return 0, setNonblockSocket(fd, enabled)
-	})
-	return
 }
 
 // IsNonblock implements the same method as documented on fsapi.File
@@ -180,23 +152,6 @@ func (f *tcpConnFile) Recvfrom(p []byte, flags int) (n int, errno experimentalsy
 		errno = fileError(f, f.closed, errno)
 		return n, errno
 	})
-}
-
-// Shutdown implements the same method as documented on experimentalsys.Conn
-func (f *tcpConnFile) Shutdown(how int) experimentalsys.Errno {
-	// FIXME: can userland shutdown listeners?
-	var err error
-	switch how {
-	case socketapi.SHUT_RD:
-		err = f.tc.CloseRead()
-	case socketapi.SHUT_WR:
-		err = f.tc.CloseWrite()
-	case socketapi.SHUT_RDWR:
-		return f.close()
-	default:
-		return experimentalsys.EINVAL
-	}
-	return experimentalsys.UnwrapOSError(err)
 }
 
 // Close implements the same method as documented on experimentalsys.File
