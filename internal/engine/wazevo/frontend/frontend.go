@@ -524,7 +524,13 @@ func (c *Compiler) initializeCurrentBlockKnownBounds() {
 	case 1:
 		pred := currentBlk.Pred(0).ID()
 		for _, kb := range c.getKnownSafeBoundsAtTheEndOfBlocks(pred).View() {
-			c.recordKnownSafeBound(kb.id, kb.bound, kb.absoluteAddr)
+			// Unless the block is sealed, we cannot assume the absolute address is valid:
+			// later we might add another predecessor that has no visibility of that value.
+			addr := ssa.ValueInvalid
+			if currentBlk.Sealed() {
+				addr = kb.absoluteAddr
+			}
+			c.recordKnownSafeBound(kb.id, kb.bound, addr)
 		}
 	default:
 		c.pointers = c.pointers[:0]

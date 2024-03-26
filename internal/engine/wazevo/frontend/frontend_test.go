@@ -3136,7 +3136,7 @@ func TestCompiler_finalizeKnownSafeBoundsAtTheEndOoBlock(t *testing.T) {
 }
 
 func TestCompiler_initializeCurrentBlockKnownBounds(t *testing.T) {
-	t.Run("single", func(t *testing.T) {
+	t.Run("single (sealed)", func(t *testing.T) {
 		c := NewFrontendCompiler(&wasm.Module{}, ssa.NewBuilder(), nil, false, false, false)
 		builder := c.ssaBuilder
 		child := builder.AllocateBasicBlock()
@@ -3150,6 +3150,8 @@ func TestCompiler_initializeCurrentBlockKnownBounds(t *testing.T) {
 			c.finalizeKnownSafeBoundsAtTheEndOfBlock(parent.ID())
 		}
 
+		// Seal the child: the absolute addresses will be propagated.
+		builder.Seal(child)
 		builder.SetCurrentBlock(child)
 		c.initializeCurrentBlockKnownBounds()
 		kb := c.getKnownSafeBound(1)
@@ -3164,6 +3166,36 @@ func TestCompiler_initializeCurrentBlockKnownBounds(t *testing.T) {
 		require.True(t, kb.valid())
 		require.Equal(t, uint64(666), kb.bound)
 		require.Equal(t, ssa.Value(54321), kb.absoluteAddr)
+	})
+	t.Run("single (unsealed)", func(t *testing.T) {
+		c := NewFrontendCompiler(&wasm.Module{}, ssa.NewBuilder(), nil, false, false, false)
+		builder := c.ssaBuilder
+		child := builder.AllocateBasicBlock()
+		{
+			parent := builder.AllocateBasicBlock()
+			builder.SetCurrentBlock(parent)
+			c.recordKnownSafeBound(1, 99, 9999)
+			c.recordKnownSafeBound(2, 150, 9999)
+			c.recordKnownSafeBound(5, 666, 54321)
+			builder.AllocateInstruction().AsJump(ssa.ValuesNil, child).Insert(builder)
+			c.finalizeKnownSafeBoundsAtTheEndOfBlock(parent.ID())
+		}
+
+		// Do not seal the child: the absolute addresses will be recomputed.
+		builder.SetCurrentBlock(child)
+		c.initializeCurrentBlockKnownBounds()
+		kb := c.getKnownSafeBound(1)
+		require.True(t, kb.valid())
+		require.Equal(t, uint64(99), kb.bound)
+		require.NotEqual(t, ssa.Value(9999), kb.absoluteAddr)
+		kb = c.getKnownSafeBound(2)
+		require.True(t, kb.valid())
+		require.Equal(t, uint64(150), kb.bound)
+		require.NotEqual(t, ssa.Value(9999), kb.absoluteAddr)
+		kb = c.getKnownSafeBound(5)
+		require.True(t, kb.valid())
+		require.Equal(t, uint64(666), kb.bound)
+		require.NotEqual(t, ssa.Value(54321), kb.absoluteAddr)
 	})
 	t.Run("multiple predecessors", func(t *testing.T) {
 		c := NewFrontendCompiler(&wasm.Module{}, ssa.NewBuilder(), nil, false, false, false)
