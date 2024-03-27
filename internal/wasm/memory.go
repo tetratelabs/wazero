@@ -74,10 +74,9 @@ func NewMemoryInstance(memSec *Memory) *MemoryInstance {
 	var mmappedBuffer []byte
 	if memSec.IsShared || capacity == max {
 		// For a shared memory, accesses can happen at the same time that memory is resized,
-		// so we cannot have the memory base move during operation.
-		// The same is true if the user configured WithMemoryCapacityFromMax.
-		// In this situation, mmap allows allocating memory virtually so we can
-		// grow without changing the base.
+		// meaning we cannot have the memory base move during operation.
+		// Similarly, we don't want move the memory when WithMemoryCapacityFromMax is used.
+		// mmap allows allocating memory virtually so we can grow without changing the base.
 		if platform.MmapSupported && max > 0 {
 			b, err := platform.MmapMemory(int(max))
 			if err != nil {
@@ -87,8 +86,8 @@ func NewMemoryInstance(memSec *Memory) *MemoryInstance {
 			buffer = b[:min]
 		} else {
 			// mmap not supported so we just preallocate a normal buffer. This will often be large, i.e. ~4GB,
-			// and likely isn't practical, but interpreter usage should be rare and the Wasm binary can be
-			// edited to reduce max memory size if support for non-mmap platforms is required.
+			// and likely isn't practical, but WithMemoryLimitPages can be used to reduce max memory size
+			// if support for non-mmap platforms is required.
 			buffer = make([]byte, min, max)
 		}
 		cap = memSec.Max
