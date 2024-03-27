@@ -66,32 +66,30 @@ type MemoryInstance struct {
 // NewMemoryInstance creates a new instance based on the parameters in the SectionIDMemory.
 func NewMemoryInstance(memSec *Memory) *MemoryInstance {
 	min := MemoryPagesToBytesNum(memSec.Min)
+	max := MemoryPagesToBytesNum(memSec.Max)
 	capacity := MemoryPagesToBytesNum(memSec.Cap)
 
 	var buffer []byte
 	var cap uint32
 	var mmappedBuffer []byte
-	if memSec.IsShared {
-		// Memory accesses can happen at the same time that memory is resized, meaning
-		// we cannot have the memory base move during operation. mmap allows allocating memory virtually so
-		// we can grow without changing the base. The spec requires max for shared memory currently because
-		// all threads implementations are effectively expected to use mmap for shared memory.
-		max := MemoryPagesToBytesNum(memSec.Max)
-		var b []byte
+	if memSec.IsShared || capacity == max {
+		// For a shared memory, accesses can happen at the same time that memory is resized,
+		// meaning we cannot have the memory base move during operation.
+		// Similarly, we don't want move the memory when WithMemoryCapacityFromMax is used.
+		// mmap allows allocating memory virtually so we can grow without changing the base.
 		if platform.MmapSupported && max > 0 {
-			var err error
-			b, err = platform.MmapMemory(int(max))
+			b, err := platform.MmapMemory(int(max))
 			if err != nil {
 				panic(fmt.Errorf("unable to mmap memory: %w", err))
 			}
 			mmappedBuffer = b
+			buffer = b[:min]
 		} else {
 			// mmap not supported so we just preallocate a normal buffer. This will often be large, i.e. ~4GB,
-			// and likely isn't practical, but interpreter usage should be rare and the Wasm binary can be
-			// edited to reduce max memory size if support for non-mmap platforms is required.
-			b = make([]byte, max)
+			// and likely isn't practical, but WithMemoryLimitPages can be used to reduce max memory size
+			// if support for non-mmap platforms is required.
+			buffer = make([]byte, min, max)
 		}
-		buffer = b[:MemoryPagesToBytesNum(memSec.Min)]
 		cap = memSec.Max
 	} else {
 		buffer = make([]byte, min, capacity)
