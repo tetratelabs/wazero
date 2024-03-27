@@ -55,6 +55,9 @@ type BasicBlock interface {
 	// Valid is true if this block is still valid even after optimizations.
 	Valid() bool
 
+	// Sealed is true if this block has been sealed.
+	Sealed() bool
+
 	// BeginPredIterator returns the first predecessor of this block.
 	BeginPredIterator() BasicBlock
 
@@ -210,6 +213,11 @@ func (bb *basicBlock) Param(i int) Value {
 // Valid implements BasicBlock.Valid.
 func (bb *basicBlock) Valid() bool {
 	return !bb.invalid
+}
+
+// Sealed implements BasicBlock.Sealed.
+func (bb *basicBlock) Sealed() bool {
+	return bb.sealed
 }
 
 // InsertInstruction implements BasicBlock.InsertInstruction.
