@@ -1,4 +1,4 @@
-//go:build !linux && !darwin && !windows
+//go:build (!linux && !darwin && !windows) || tinygo
 
 package sysfs
 
@@ -56,4 +56,26 @@ func recvfrom(fd uintptr, buf []byte, flags int32) (n int, errno sys.Errno) {
 // within fn or returned by syscall.RawConn.Control itself.
 func syscallConnControl(conn syscall.Conn, fn func(fd uintptr) (int, experimentalsys.Errno)) (n int, errno sys.Errno) {
 	return -1, sys.ENOTSUP
+}
+
+// Accept implements the same method as documented on socketapi.TCPSock
+func (f *tcpListenerFile) Accept() (socketapi.TCPConn, experimentalsys.Errno) {
+	panic("TCPSock.Accept is not implemented for TinyGo")
+}
+
+// Shutdown implements the same method as documented on experimentalsys.Conn
+func (f *tcpConnFile) Shutdown(how int) experimentalsys.Errno {
+	// FIXME: can userland shutdown listeners?
+	var err error
+	switch how {
+	case socketapi.SHUT_RD:
+		err = f.tc.Close()
+	case socketapi.SHUT_WR:
+		err = f.tc.Close()
+	case socketapi.SHUT_RDWR:
+		return f.close()
+	default:
+		return experimentalsys.EINVAL
+	}
+	return experimentalsys.UnwrapOSError(err)
 }
