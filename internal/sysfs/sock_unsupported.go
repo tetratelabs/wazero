@@ -60,7 +60,7 @@ func syscallConnControl(conn syscall.Conn, fn func(fd uintptr) (int, experimenta
 
 // Accept implements the same method as documented on socketapi.TCPSock
 func (f *tcpListenerFile) Accept() (socketapi.TCPConn, experimentalsys.Errno) {
-	panic("TCPSock.Accept is not implemented for TinyGo")
+	return nil, experimentalsys.ENOSYS
 }
 
 // Shutdown implements the same method as documented on experimentalsys.Conn
