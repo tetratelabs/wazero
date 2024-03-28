@@ -266,12 +266,12 @@ func (m *MemoryInstance) Grow(delta uint32) (result uint32, ok bool) {
 		m.Cap = newPages
 		return currentPages, true
 	} else { // We already have the capacity we need.
-		sp := (*reflect.SliceHeader)(unsafe.Pointer(&m.Buffer))
 		if m.Shared {
+			sp := (*reflect.SliceHeader)(unsafe.Pointer(&m.Buffer))
 			// Use atomic write to ensure new length is visible across threads.
 			atomic.StoreUintptr((*uintptr)(unsafe.Pointer(&sp.Len)), uintptr(MemoryPagesToBytesNum(newPages)))
 		} else {
-			sp.Len = lengthMemoryPages(newPages)
+			m.Buffer = m.Buffer[:MemoryPagesToBytesNum(newPages)]
 		}
 		return currentPages, true
 	}

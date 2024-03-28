@@ -72,14 +72,9 @@ func GoCallStackView(stackPointerBeforeGoCall *uint64) []uint64 {
 	//              |   SizeInBytes   |
 	//              +-----------------+ <---- stackPointerBeforeGoCall
 	//                 (low address)
+	data := unsafe.Pointer(uintptr(unsafe.Pointer(stackPointerBeforeGoCall)) + 8)
 	size := *stackPointerBeforeGoCall / 8
-	var view []uint64
-	{
-		sh := (*reflect.SliceHeader)(unsafe.Pointer(&view))
-		sh.Data = uintptr(unsafe.Pointer(stackPointerBeforeGoCall)) + 8 // skips the(sliceSize.
-		setSliceLimits(sh, uintptr(size))
-	}
-	return view
+	return unsafe.Slice((*uint64)(data), int(size))
 }
 
 func AdjustClonedStack(oldRsp, oldTop, rsp, rbp, top uintptr) {
