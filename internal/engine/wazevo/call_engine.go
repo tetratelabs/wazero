@@ -528,8 +528,7 @@ func opaqueViewFromPtr(ptr uintptr) []byte {
 	var opaque []byte
 	sh := (*reflect.SliceHeader)(unsafe.Pointer(&opaque))
 	sh.Data = ptr
-	sh.Len = 24
-	sh.Cap = 24
+	setSliceLimits(sh, 24, 24)
 	return opaque
 }
 
@@ -574,8 +573,7 @@ func (c *callEngine) cloneStack(l uintptr) (newSP, newFP, newTop uintptr, newSta
 	{
 		sh := (*reflect.SliceHeader)(unsafe.Pointer(&prevStackAligned))
 		sh.Data = c.stackTop - relSp
-		sh.Len = int(relSp)
-		sh.Cap = int(relSp)
+		setSliceLimits(sh, relSp, relSp)
 	}
 	newTop = alignedStackTop(newStack)
 	{
@@ -583,8 +581,7 @@ func (c *callEngine) cloneStack(l uintptr) (newSP, newFP, newTop uintptr, newSta
 		newFP = newTop - relFp
 		sh := (*reflect.SliceHeader)(unsafe.Pointer(&newStackAligned))
 		sh.Data = newSP
-		sh.Len = int(relSp)
-		sh.Cap = int(relSp)
+		setSliceLimits(sh, relSp, relSp)
 	}
 	copy(newStackAligned, prevStackAligned)
 	return
