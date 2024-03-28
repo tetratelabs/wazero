@@ -86,12 +86,6 @@ func (d *dirFS) Readlink(path string) (string, experimentalsys.Errno) {
 	return platform.ToPosixPath(dst), 0
 }
 
-// Link implements the same method as documented on sys.FS
-func (d *dirFS) Link(oldName, newName string) experimentalsys.Errno {
-	err := os.Link(d.join(oldName), d.join(newName))
-	return experimentalsys.UnwrapOSError(err)
-}
-
 // Rmdir implements the same method as documented on sys.FS
 func (d *dirFS) Rmdir(path string) experimentalsys.Errno {
 	return rmdir(d.join(path))
