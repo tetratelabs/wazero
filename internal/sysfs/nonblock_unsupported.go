@@ -1,3 +1,5 @@
+//go:build plan9 || tinygo
+
 package sysfs
 
 import "github.com/tetratelabs/wazero/experimental/sys"

@@ -167,6 +167,7 @@ jobs:
         with:
           tinygo-version: "0.31.2"
       - run: tinygo build ./cmd/wazero
+      - run: tinygo build -size short -target pico -stack-size=8kb ./cmd/wazero
 
   bench:
     name: Benchmark
