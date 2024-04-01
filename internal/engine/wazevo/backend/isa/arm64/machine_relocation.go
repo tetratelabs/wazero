@@ -1,6 +1,8 @@
 package arm64
 
 import (
+	"fmt"
+
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 )
@@ -14,6 +16,10 @@ func (m *machine) ResolveRelocations(refToBinaryOffset map[ssa.FuncRef]int, bina
 		calleeFnOffset := refToBinaryOffset[r.FuncRef]
 		brInstr := binary[instrOffset : instrOffset+4]
 		diff := int64(calleeFnOffset) - (instrOffset)
+		// Check if the diff is within the range of the branch instruction.
+		if diff < -(1<<25)*4 || diff > ((1<<25)-1)*4 {
+			panic(fmt.Sprintf("TODO: too large binary where branch target is out of the supported range +/-128MB: %#x", diff))
+		}
 		// https://developer.arm.com/documentation/ddi0596/2020-12/Base-Instructions/BL--Branch-with-Link-
 		imm26 := diff / 4
 		brInstr[0] = byte(imm26)
