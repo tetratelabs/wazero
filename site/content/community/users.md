@@ -20,6 +20,11 @@ considering their efforts before starting your own!
 | [Wetware][28]    | Simple, secure & scalable clusters                                                                   |
 | [mjml-go][19]    | Compile [MJML][20] to HTML directly in Go                                                            |
 | [wzprof][32]     | CPU and Memory profiler for WebAssembly modules, based on Wazero                                     |
+| [avif][39]       | AVIF encoder/decoder based on libavif                                                                |
+| [heic][40]       | HEIC decoder based on libheif                                                                        |
+| [jpegxl][41]     | JPEG XL encoder/decoder based on libjxl                                                              |
+| [jpegli][42]     | JPEG encoder/decoder based on jpegli                                                                 |
+| [webp][43]       | WEBP encoder/decoder based on libwebp                                                                |
 
 ### General purpose plugins
 
@@ -145,3 +150,13 @@ experience.
 [37]: https://emscripten.org/docs/porting/connecting_cpp_and_javascript/embind.html
 
 [38]: https://github.com/extism/extism
+
+[39]: https://github.com/gen2brain/avif
+
+[40]: https://github.com/gen2brain/heic
+
+[41]: https://github.com/gen2brain/jpegxl
+
+[42]: https://github.com/gen2brain/jpegli
+
+[43]: https://github.com/gen2brain/webp
