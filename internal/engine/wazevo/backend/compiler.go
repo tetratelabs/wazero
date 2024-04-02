@@ -113,8 +113,10 @@ type Compiler interface {
 type RelocationInfo struct {
 	// Offset represents the offset from the beginning of the machine code of either a function or the entire module.
 	Offset int64
-	// Target is the target function of the call instruction.
+	// FuncRef is the target function of the call instruction.
 	FuncRef ssa.FuncRef
+	// TrampolineOffset is an optional offset to a trampoline if the call instruction is out of range.
+	TrampolineOffset int
 }
 
 // compiler implements Compiler.
