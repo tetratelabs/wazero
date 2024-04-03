@@ -21,12 +21,13 @@ func (m *machine) ResolveRelocations(refToBinaryOffset map[ssa.FuncRef]int, bina
 		if diff < -(1<<25)*4 || diff > ((1<<25)-1)*4 {
 			// If the diff is out of range, we need to use a trampoline.
 			diff = int64(r.TrampolineOffset) - instrOffset
-			// The trampoline invokes the function using the BLR instruction
+			// The trampoline invokes the function using the BR instruction
 			// using the absolute address of the callee function.
+			// The BR instruction will not pollute LR, leaving set to the
+			// PC at this location. Thus, upon return, the callee will
+			// transparently return to the actual caller, skipping the trampoline.
 			absoluteCalleeFnAddress := uint(base) + uint(calleeFnOffset)
-			// The trampoline should return to the next instruction after the branch instruction.
-			returnOffset := -diff + 8
-			encodeTrampoline(absoluteCalleeFnAddress, binary, r.TrampolineOffset, returnOffset)
+			encodeTrampoline(absoluteCalleeFnAddress, binary, r.TrampolineOffset)
 		}
 		// https://developer.arm.com/documentation/ddi0596/2020-12/Base-Instructions/BL--Branch-with-Link-
 		imm26 := diff / 4
@@ -46,11 +47,11 @@ func (m *machine) UpdateRelocationInfo(r backend.RelocationInfo, totalSize int, 
 	// But when we invoke this method the refToBinaryOffset is not set for all funcRefs.
 	r.Offset += int64(totalSize)
 	r.TrampolineOffset = totalSize + len(body)
-	body = append(body, make([]byte, 4*6)...)
+	body = append(body, make([]byte, 4*5)...) // 5 instructions for the trampoline.
 	return r, body
 }
 
-func encodeTrampoline(addr uint, binary []byte, instrOffset int, returnOffset int64) {
+func encodeTrampoline(addr uint, binary []byte, instrOffset int) {
 	// The tmpReg is safe to overwrite.
 	tmpReg := regNumberInEncoding[tmp]
 
@@ -63,8 +64,7 @@ func encodeTrampoline(addr uint, binary []byte, instrOffset int, returnOffset in
 		encodeMoveWideImmediate(movkOp, tmpReg, uint64(uint16(addr>>16)), 1, 1),
 		encodeMoveWideImmediate(movkOp, tmpReg, uint64(uint16(addr>>32)), 2, 1),
 		encodeMoveWideImmediate(movkOp, tmpReg, uint64(uint16(addr>>48)), 3, 1),
-		encodeUnconditionalBranchReg(tmpReg, true),
-		encodeUnconditionalBranch(false, returnOffset-6*4),
+		encodeUnconditionalBranchReg(tmpReg, false),
 	}
 
 	for i, inst := range instrs {
