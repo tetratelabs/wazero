@@ -63,7 +63,7 @@ type (
 
 		// UpdateRelocationInfo recomputes the relocation info after emitting machine code and pads the body
 		// to accommodate trampolines if necessary.
-		UpdateRelocationInfo(r *RelocationInfo, totalSize int, body []byte) []byte
+		UpdateRelocationInfo(r RelocationInfo, totalSize int, body []byte) (RelocationInfo, []byte)
 
 		// Encode encodes the machine instructions to the Compiler.
 		Encode(ctx context.Context)

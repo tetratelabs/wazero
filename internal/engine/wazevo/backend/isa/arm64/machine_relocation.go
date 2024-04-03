@@ -41,13 +41,13 @@ func (m *machine) ResolveRelocations(refToBinaryOffset map[ssa.FuncRef]int, bina
 	}
 }
 
-func (m *machine) UpdateRelocationInfo(r *backend.RelocationInfo, totalSize int, body []byte) []byte {
+func (m *machine) UpdateRelocationInfo(r backend.RelocationInfo, totalSize int, body []byte) (backend.RelocationInfo, []byte) {
 	// FIXME: this should add padding conditionally based on refToBinaryOffset[r.FuncRef].
 	// But when we invoke this method the refToBinaryOffset is not set for all funcRefs.
 	r.Offset += int64(totalSize)
 	r.TrampolineOffset = totalSize + len(body)
 	body = append(body, make([]byte, 4*6)...)
-	return body
+	return r, body
 }
 
 func encodeTrampoline(addr uint, binary []byte, instrOffset int, returnOffset int64) {

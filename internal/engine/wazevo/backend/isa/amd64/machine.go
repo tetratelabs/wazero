@@ -2072,9 +2072,9 @@ func (m *machine) ResolveRelocations(refToBinaryOffset map[ssa.FuncRef]int, bina
 	}
 }
 
-func (m *machine) UpdateRelocationInfo(r *backend.RelocationInfo, totalSize int, body []byte) []byte {
+func (m *machine) UpdateRelocationInfo(r backend.RelocationInfo, totalSize int, body []byte) (backend.RelocationInfo, []byte) {
 	r.Offset += int64(totalSize)
-	return body
+	return r, body
 }
 
 func (m *machine) lowerIcmpToFlag(xd, yd *backend.SSAValueDefinition, _64 bool) {

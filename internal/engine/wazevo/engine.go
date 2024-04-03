@@ -264,7 +264,7 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 		// At this point, relocation offsets are relative to the start of the function body,
 		// so we adjust it to the start of the executable.
 		for _, r := range rels {
-			body = e.machine.UpdateRelocationInfo(&r, totalSize, body)
+			r, body = e.machine.UpdateRelocationInfo(r, totalSize, body)
 			e.rels = append(e.rels, r)
 		}
 
