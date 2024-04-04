@@ -213,7 +213,7 @@ func MemoryPagesToBytesNum(pages uint32) (bytesNum uint64) {
 
 // Grow implements the same method as documented on api.Memory.
 func (m *MemoryInstance) Grow(delta uint32) (result uint32, ok bool) {
-	currentPages := memoryBytesNumToPages(uint64(len(m.Buffer)))
+	currentPages := m.PageSize()
 	if delta == 0 {
 		return currentPages, true
 	}
