@@ -565,16 +565,11 @@ type Memory interface {
 	// # Notes
 	//
 	//   - This overflows (returns zero) if the memory has the maximum 65536 pages.
-	//   - Use Pages() to handle this corner case.
+	// 	   As a workaround until wazero v2 to fix the return type, use Grow(0) to obtain the current pages and
+	//     multiply by 65536.
 	//
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#-hrefsyntax-instr-memorymathsfmemorysize%E2%91%A0
 	Size() uint32
-
-	// Pages returns the number of pages in the memory. 1 Page corresponds to 65536 bytes,
-	// which is called "Page Size" in WebAssembly.
-	//
-	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memory-instances%E2%91%A0
-	Pages() (pages uint32)
 
 	// Grow increases memory by the delta in pages (65536 bytes per page).
 	// The return val is the previous memory size in pages, or false if the
