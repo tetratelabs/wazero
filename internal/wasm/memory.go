@@ -95,12 +95,12 @@ func (m *MemoryInstance) Definition() api.MemoryDefinition {
 
 // Size implements the same method as documented on api.Memory.
 func (m *MemoryInstance) Size() uint32 {
-	return m.size()
+	return uint32(len(m.Buffer))
 }
 
 // ReadByte implements the same method as documented on api.Memory.
 func (m *MemoryInstance) ReadByte(offset uint32) (byte, bool) {
-	if offset >= m.size() {
+	if !m.hasSize(offset, 1) {
 		return 0, false
 	}
 	return m.Buffer[offset], true
@@ -152,7 +152,7 @@ func (m *MemoryInstance) Read(offset, byteCount uint32) ([]byte, bool) {
 
 // WriteByte implements the same method as documented on api.Memory.
 func (m *MemoryInstance) WriteByte(offset uint32, v byte) bool {
-	if offset >= m.size() {
+	if !m.hasSize(offset, 1) {
 		return false
 	}
 	m.Buffer[offset] = v
@@ -270,11 +270,6 @@ func PagesToUnitOfBytes(pages uint32) string {
 // memoryBytesNumToPages converts the given number of bytes into the number of pages.
 func memoryBytesNumToPages(bytesNum uint64) (pages uint32) {
 	return uint32(bytesNum >> MemoryPageSizeInBits)
-}
-
-// size returns the size in bytes of the buffer.
-func (m *MemoryInstance) size() uint32 {
-	return uint32(len(m.Buffer)) // We don't lock here because size can't become smaller.
 }
 
 // hasSize returns true if Len is sufficient for byteCount at the given offset.
