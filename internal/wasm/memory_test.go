@@ -813,17 +813,14 @@ func TestNewMemoryInstance_Shared(t *testing.T) {
 	tests := []struct {
 		name string
 		mem  *Memory
-		mmap bool
 	}{
 		{
 			name: "min 0, max 1",
 			mem:  &Memory{Min: 0, Max: 1, IsMaxEncoded: true, IsShared: true},
-			mmap: true,
 		},
 		{
 			name: "min 0, max 0",
 			mem:  &Memory{Min: 0, Max: 0, IsMaxEncoded: true, IsShared: true},
-			mmap: false, // Cannot mmap buffer of 0 size
 		},
 	}
 
@@ -831,15 +828,9 @@ func TestNewMemoryInstance_Shared(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			m := NewMemoryInstance(tc.mem)
-			defer m.Close()
 			require.Equal(t, tc.mem.Min, m.Min)
 			require.Equal(t, tc.mem.Max, m.Max)
 			require.True(t, m.Shared)
-			if tc.mmap {
-				require.NotNil(t, m.mmappedBuffer)
-			} else {
-				require.Nil(t, m.mmappedBuffer)
-			}
 		})
 	}
 }

@@ -123,11 +123,6 @@ func (m *ModuleInstance) closeWithExitCode(ctx context.Context, exitCode uint32)
 	if !m.setExitCode(exitCode, exitCodeFlagResourceClosed) {
 		return nil // not an error to have already closed
 	}
-	if mem := m.MemoryInstance; mem != nil {
-		if err = mem.Close(); err != nil {
-			return err
-		}
-	}
 	return m.ensureResourcesClosed(ctx)
 }
 
