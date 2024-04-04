@@ -57,9 +57,13 @@ func (m mockMachine) Encode(ctx context.Context) {}
 func (m mockMachine) ResolveRelocations(map[ssa.FuncRef]int, []byte, []RelocationInfo) {}
 
 // UpdateRelocationInfo implements Machine.UpdateRelocationInfo.
-func (m mockMachine) UpdateRelocationInfo(r RelocationInfo, totalSize int, body []byte) (RelocationInfo, []byte) {
-	r.Offset += int64(totalSize)
-	return r, body
+func (m mockMachine) UpdateRelocationInfo(refToBinaryOffset map[ssa.FuncRef]int, trampolineOffset int, r RelocationInfo) (RelocationInfo, int) {
+	return r, 0
+}
+
+// RelocationTrampolineSize implements Machine.RelocationTrampolineSize.
+func (m mockMachine) RelocationTrampolineSize(rels []RelocationInfo) int {
+	return 0
 }
 
 // PostRegAlloc implements Machine.SetupPrologue.

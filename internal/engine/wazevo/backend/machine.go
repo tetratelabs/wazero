@@ -61,9 +61,11 @@ type (
 		// ResolveRelocations resolves the relocations after emitting machine code.
 		ResolveRelocations(refToBinaryOffset map[ssa.FuncRef]int, binary []byte, relocations []RelocationInfo)
 
-		// UpdateRelocationInfo recomputes the relocation info after emitting machine code and pads the body
-		// to accommodate trampolines if necessary.
-		UpdateRelocationInfo(r RelocationInfo, totalSize int, body []byte) (RelocationInfo, []byte)
+		// UpdateRelocationInfo recomputes the RelocationInfo after emitting machine code and returns the updated
+		// RelocationInfo and the size of the trampoline if necessary.
+		UpdateRelocationInfo(refToBinaryOffset map[ssa.FuncRef]int, trampolineOffset int, r RelocationInfo) (res RelocationInfo, trampolineSize int)
+
+		RelocationTrampolineSize(relocations []RelocationInfo) int
 
 		// Encode encodes the machine instructions to the Compiler.
 		Encode(ctx context.Context)

@@ -220,6 +220,7 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 	totalSize := 0 // Total binary size of the executable.
 	cm.functionOffsets = make([]int, localFns)
 	bodies := make([][]byte, localFns)
+	sourceOffsets := make([][]backend.SourceOffsetInfo, localFns)
 	for i := range module.CodeSection {
 		if wazevoapi.DeterministicCompilationVerifierEnabled {
 			i = wazevoapi.DeterministicCompilationVerifierGetRandomizedLocalFunctionIndex(ctx, i)
@@ -247,15 +248,7 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 		cm.functionOffsets[i] = totalSize
 
 		if needSourceInfo {
-			// At the beginning of the function, we add the offset of the function body so that
-			// we can resolve the source location of the call site of before listener call.
-			cm.sourceMap.executableOffsets = append(cm.sourceMap.executableOffsets, uintptr(totalSize))
-			cm.sourceMap.wasmBinaryOffsets = append(cm.sourceMap.wasmBinaryOffsets, module.CodeSection[i].BodyOffsetInCodeSection)
-
-			for _, info := range be.SourceOffsetInfo() {
-				cm.sourceMap.executableOffsets = append(cm.sourceMap.executableOffsets, uintptr(totalSize)+uintptr(info.ExecutableOffset))
-				cm.sourceMap.wasmBinaryOffsets = append(cm.sourceMap.wasmBinaryOffsets, uint64(info.SourceOffset))
-			}
+			sourceOffsets[i] = append(sourceOffsets[i], be.SourceOffsetInfo()...)
 		}
 
 		fref := frontend.FunctionIndexToFuncRef(fidx)
@@ -264,14 +257,56 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 		// At this point, relocation offsets are relative to the start of the function body,
 		// so we adjust it to the start of the executable.
 		for _, r := range rels {
-			r, body = e.machine.UpdateRelocationInfo(r, totalSize, body)
+			r.Caller = fref
+			r.Offset += int64(totalSize)
 			e.rels = append(e.rels, r)
 		}
 
 		bodies[i] = body
-		totalSize += len(body)
+		totalSize += len(body) + e.machine.RelocationTrampolineSize(rels)
 		if wazevoapi.PrintMachineCodeHexPerFunction {
 			fmt.Printf("[[[machine code for %s]]]\n%s\n\n", wazevoapi.GetCurrentFunctionName(ctx), hex.EncodeToString(body))
+		}
+	}
+
+	// Now that we have collected all the relocations, we can recompute the offsets, accounting for trampolines (if any).
+	if len(e.rels) > 0 {
+		totalSize = 0
+		relIdx := 0
+		for i, body := range bodies {
+			// Align 16-bytes boundary.
+			totalSize = (totalSize + 15) &^ 15
+			// As we scan the bodies, the size of the previous functions may have changed, so we compute
+			// by how much to update the new instruction offset in the RelocationInfo.
+			// Note: because these are offsets, this value is negative when cm.functionOffsets[i] > totalSize,
+			//       i.e. when we are referencing a function that follows the current one.
+			offsetDelta := int64(totalSize - cm.functionOffsets[i])
+
+			// Update the function offsets to the new value.
+			cm.functionOffsets[i] = totalSize
+			fidx := wasm.Index(i + importedFns)
+			fref := frontend.FunctionIndexToFuncRef(fidx)
+			e.refToBinaryOffset[fref] = totalSize
+
+			bodySize := len(body)
+			trampolineSectionSize := 0
+			// Loop while there are RelocationInfos left and the given RelocationInfo relates to the current function.
+			for ; relIdx < len(e.rels) && fref == e.rels[relIdx].Caller; relIdx++ {
+				r := e.rels[relIdx]
+				// Update the offset and compute the offset to the trampoline at the end of the function.
+				r.Offset += offsetDelta
+				trampolineOffset := totalSize + bodySize + trampolineSectionSize
+				r, l := e.machine.UpdateRelocationInfo(e.refToBinaryOffset, trampolineOffset, r)
+				e.rels[relIdx] = r
+				trampolineSectionSize += l
+			}
+
+			if needSourceInfo {
+				// Update the source maps for the current offset.
+				updateSourceMap(cm, totalSize, module.CodeSection[i], sourceOffsets, i)
+			}
+
+			totalSize = totalSize + bodySize + trampolineSectionSize
 		}
 	}
 
@@ -311,6 +346,18 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 	cm.sharedFunctions = e.sharedFunctions
 	e.setFinalizer(cm.executables, executablesFinalizer)
 	return cm, nil
+}
+
+func updateSourceMap(cm *compiledModule, totalSize int, codeSection wasm.Code, sourceOffsets [][]backend.SourceOffsetInfo, i int) {
+	// At the beginning of the function, we add the offset of the function body so that
+	// we can resolve the source location of the call site of before listener call.
+	cm.sourceMap.executableOffsets = append(cm.sourceMap.executableOffsets, uintptr(totalSize))
+	cm.sourceMap.wasmBinaryOffsets = append(cm.sourceMap.wasmBinaryOffsets, codeSection.BodyOffsetInCodeSection)
+
+	for _, info := range sourceOffsets[i] {
+		cm.sourceMap.executableOffsets = append(cm.sourceMap.executableOffsets, uintptr(totalSize)+uintptr(info.ExecutableOffset))
+		cm.sourceMap.wasmBinaryOffsets = append(cm.sourceMap.wasmBinaryOffsets, uint64(info.SourceOffset))
+	}
 }
 
 func (e *engine) compileLocalWasmFunction(

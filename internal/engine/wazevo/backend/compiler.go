@@ -111,6 +111,7 @@ type Compiler interface {
 
 // RelocationInfo represents the relocation information for a call instruction.
 type RelocationInfo struct {
+	Caller ssa.FuncRef
 	// Offset represents the offset from the beginning of the machine code of either a function or the entire module.
 	Offset int64
 	// FuncRef is the target function of the call instruction.

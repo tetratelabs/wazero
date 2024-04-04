@@ -18,7 +18,7 @@ func (m *machine) ResolveRelocations(refToBinaryOffset map[ssa.FuncRef]int, bina
 		brInstr := binary[instrOffset : instrOffset+4]
 		diff := int64(calleeFnOffset) - (instrOffset)
 		// Check if the diff is within the range of the branch instruction.
-		if diff < -(1<<25)*4 || diff > ((1<<25)-1)*4 {
+		if r.TrampolineOffset > 0 {
 			// If the diff is out of range, we need to use a trampoline.
 			diff = int64(r.TrampolineOffset) - instrOffset
 			// The trampoline invokes the function using the BR instruction
@@ -42,13 +42,22 @@ func (m *machine) ResolveRelocations(refToBinaryOffset map[ssa.FuncRef]int, bina
 	}
 }
 
-func (m *machine) UpdateRelocationInfo(r backend.RelocationInfo, totalSize int, body []byte) (backend.RelocationInfo, []byte) {
-	// FIXME: this should add padding conditionally based on refToBinaryOffset[r.FuncRef].
-	// But when we invoke this method the refToBinaryOffset is not set for all funcRefs.
-	r.Offset += int64(totalSize)
-	r.TrampolineOffset = totalSize + len(body)
-	body = append(body, make([]byte, 4*5)...) // 5 instructions for the trampoline.
-	return r, body
+const relocationTrampolineSize = 5 * 4
+
+func (m *machine) RelocationTrampolineSize(rels []backend.RelocationInfo) int {
+	return relocationTrampolineSize * len(rels)
+}
+
+func (m *machine) UpdateRelocationInfo(refToBinaryOffset map[ssa.FuncRef]int, trampolineOffset int, r backend.RelocationInfo) (backend.RelocationInfo, int) {
+	instrOffset := r.Offset
+	calleeFnOffset := refToBinaryOffset[r.FuncRef]
+	diff := int64(calleeFnOffset) - (instrOffset)
+	trampolineSize := 0
+	if diff < -(1<<25)*4 || diff > ((1<<25)-1)*4 {
+		r.TrampolineOffset = trampolineOffset
+		trampolineSize = relocationTrampolineSize
+	}
+	return r, trampolineSize
 }
 
 func encodeTrampoline(addr uint, binary []byte, instrOffset int) {
