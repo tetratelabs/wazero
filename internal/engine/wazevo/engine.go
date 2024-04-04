@@ -273,7 +273,7 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 	if len(e.rels) > 0 {
 		totalSize = 0
 		relIdx := 0
-		for i, body := range bodies {
+		for i := range bodies {
 			// Align 16-bytes boundary.
 			totalSize = (totalSize + 15) &^ 15
 			// As we scan the bodies, the size of the previous functions may have changed, so we compute
@@ -284,29 +284,18 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 
 			// Update the function offsets to the new value.
 			cm.functionOffsets[i] = totalSize
-			fidx := wasm.Index(i + importedFns)
-			fref := frontend.FunctionIndexToFuncRef(fidx)
+			fref := frontend.FunctionIndexToFuncRef(wasm.Index(i + importedFns))
 			e.refToBinaryOffset[fref] = totalSize
 
-			bodySize := len(body)
-			trampolineSectionSize := 0
-			// Loop while there are RelocationInfos left and the given RelocationInfo relates to the current function.
-			for ; relIdx < len(e.rels) && fref == e.rels[relIdx].Caller; relIdx++ {
-				r := e.rels[relIdx]
-				// Update the offset and compute the offset to the trampoline at the end of the function.
-				r.Offset += offsetDelta
-				trampolineOffset := totalSize + bodySize + trampolineSectionSize
-				r, l := e.machine.UpdateRelocationInfo(e.refToBinaryOffset, trampolineOffset, r)
-				e.rels[relIdx] = r
-				trampolineSectionSize += l
-			}
+			nextRelIdx, currentOffset, updatedBodySize := e.updateRelocationInfos(
+				totalSize, offsetDelta, fref, len(bodies[i]), relIdx)
 
 			if needSourceInfo {
-				// Update the source maps for the current offset.
-				updateSourceMap(cm, totalSize, module.CodeSection[i], sourceOffsets, i)
+				updateSourceMap(cm, currentOffset, module.CodeSection[i], sourceOffsets, i)
 			}
 
-			totalSize = totalSize + bodySize + trampolineSectionSize
+			totalSize = currentOffset + updatedBodySize
+			relIdx = nextRelIdx
 		}
 	}
 
@@ -348,6 +337,23 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 	return cm, nil
 }
 
+// updateRelocationInfos is extracted for testing.
+func (e *engine) updateRelocationInfos(currentOffset int, offsetDelta int64, fref ssa.FuncRef, bodySize int, currentRelIdx int) (nextRelIdx int, nextOffset int, updatedBodySize int) {
+	trampolineSectionSize := 0
+	// Loop while there are RelocationInfos left and the given RelocationInfo relates to the current function.
+	for ; currentRelIdx < len(e.rels) && e.rels[currentRelIdx].Caller == fref; currentRelIdx++ {
+		r := e.rels[currentRelIdx]
+		// Update the offset and compute the offset to the trampoline at the end of the function.
+		r.Offset += offsetDelta
+		trampolineOffset := currentOffset + bodySize + trampolineSectionSize
+		r, l := e.machine.UpdateRelocationInfo(e.refToBinaryOffset, trampolineOffset, r)
+		e.rels[currentRelIdx] = r
+		trampolineSectionSize += l
+	}
+	return currentRelIdx, currentOffset, bodySize + trampolineSectionSize
+}
+
+// updateSourceMap Update the source maps for the current offset.
 func updateSourceMap(cm *compiledModule, totalSize int, codeSection wasm.Code, sourceOffsets [][]backend.SourceOffsetInfo, i int) {
 	// At the beginning of the function, we add the offset of the function body so that
 	// we can resolve the source location of the call site of before listener call.
