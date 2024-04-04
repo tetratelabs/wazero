@@ -57,8 +57,6 @@ type MemoryInstance struct {
 	// waiters implements atomic wait and notify. It is implemented similarly to golang.org/x/sync/semaphore,
 	// with a fixed weight of 1 and no spurious notifications.
 	waiters sync.Map
-
-	closed bool
 }
 
 // NewMemoryInstance creates a new instance based on the parameters in the SectionIDMemory.
