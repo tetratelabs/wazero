@@ -511,12 +511,12 @@ func (m *Memory) Size() uint32 {
 	return uint32(len(m.Bytes))
 }
 
-func (m *Memory) PageSize() uint32 {
+func (m *Memory) Pages() uint32 {
 	return uint32(len(m.Bytes) / PageSize)
 }
 
 func (m *Memory) Grow(deltaPages uint32) (previousPages uint32, ok bool) {
-	previousPages = m.PageSize()
+	previousPages = m.Pages()
 	numPages := previousPages + deltaPages
 	if m.Max != 0 && numPages > m.Max {
 		return previousPages, false

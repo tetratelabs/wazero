@@ -926,7 +926,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			}
 			frame.pc++
 		case wazeroir.OperationKindMemorySize:
-			ce.pushValue(uint64(memoryInst.PageSize()))
+			ce.pushValue(uint64(memoryInst.Pages()))
 			frame.pc++
 		case wazeroir.OperationKindMemoryGrow:
 			n := ce.popValue()
