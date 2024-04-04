@@ -287,14 +287,14 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 			fref := frontend.FunctionIndexToFuncRef(wasm.Index(i + importedFns))
 			e.refToBinaryOffset[fref] = totalSize
 
-			nextRelIdx, currentOffset, updatedBodySize := e.updateRelocationInfos(
+			nextRelIdx, updatedBodySize := e.updateRelocationInfos(
 				totalSize, offsetDelta, fref, len(bodies[i]), relIdx)
 
 			if needSourceInfo {
-				updateSourceMap(cm, currentOffset, module.CodeSection[i], sourceOffsets, i)
+				updateSourceMap(cm, totalSize, module.CodeSection[i], sourceOffsets, i)
 			}
 
-			totalSize = currentOffset + updatedBodySize
+			totalSize = totalSize + updatedBodySize
 			relIdx = nextRelIdx
 		}
 	}
@@ -338,7 +338,7 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 }
 
 // updateRelocationInfos is extracted for testing.
-func (e *engine) updateRelocationInfos(currentOffset int, offsetDelta int64, fref ssa.FuncRef, bodySize int, currentRelIdx int) (nextRelIdx int, nextOffset int, updatedBodySize int) {
+func (e *engine) updateRelocationInfos(currentOffset int, offsetDelta int64, fref ssa.FuncRef, bodySize int, currentRelIdx int) (nextRelIdx int, updatedBodySize int) {
 	trampolineSectionSize := 0
 	// Loop while there are RelocationInfos left and the given RelocationInfo relates to the current function.
 	for ; currentRelIdx < len(e.rels) && e.rels[currentRelIdx].Caller == fref; currentRelIdx++ {
@@ -350,7 +350,7 @@ func (e *engine) updateRelocationInfos(currentOffset int, offsetDelta int64, fre
 		e.rels[currentRelIdx] = r
 		trampolineSectionSize += l
 	}
-	return currentRelIdx, currentOffset, bodySize + trampolineSectionSize
+	return currentRelIdx, bodySize + trampolineSectionSize
 }
 
 // updateSourceMap Update the source maps for the current offset.

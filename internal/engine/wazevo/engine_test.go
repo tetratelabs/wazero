@@ -4,9 +4,12 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"runtime"
 	"testing"
 	"unsafe"
 
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -216,4 +219,162 @@ func Test_checkAddrInBytes(t *testing.T) {
 	require.True(t, checkAddrInBytes(end, bytes))
 	require.False(t, checkAddrInBytes(begin-1, bytes))
 	require.False(t, checkAddrInBytes(end+1, bytes))
+}
+
+func Test_engine_updateRelocationInfos(t *testing.T) {
+	m := newMachine()
+	relocationSize := m.RelocationTrampolineSize(make([]backend.RelocationInfo, 1))
+	tests := []struct {
+		GOARCH            string
+		name              string
+		rels              []backend.RelocationInfo
+		refToBinaryOffset map[ssa.FuncRef]int
+
+		currentOffset int
+		offsetDelta   int64
+		fref          ssa.FuncRef
+		bodySize      int
+		currentRelIdx int
+
+		nextRelIdx      int
+		updatedBodySize int
+		updatedRels     []backend.RelocationInfo
+	}{
+		{
+			name: "empty",
+
+			rels:              []backend.RelocationInfo{},
+			refToBinaryOffset: map[ssa.FuncRef]int{},
+
+			currentOffset: 0,
+			offsetDelta:   0,
+			fref:          ssa.FuncRef(0),
+			bodySize:      0,
+			currentRelIdx: 0,
+
+			nextRelIdx:      0,
+			updatedBodySize: 0,
+			updatedRels:     []backend.RelocationInfo{},
+		},
+		{
+			name: "no trampolines",
+
+			rels:              []backend.RelocationInfo{{Caller: 1, Offset: 124, FuncRef: 3}},
+			refToBinaryOffset: map[ssa.FuncRef]int{1: 500, 3: 800},
+
+			currentOffset: 100,
+			offsetDelta:   -25,
+			fref:          ssa.FuncRef(1),
+			bodySize:      100,
+			currentRelIdx: 0,
+
+			nextRelIdx:      1,
+			updatedBodySize: 100,
+			updatedRels:     []backend.RelocationInfo{{Caller: 1, Offset: 124 - 25, TrampolineOffset: 0, FuncRef: 3}},
+		},
+		{
+			GOARCH: "arm64",
+			name:   "trampoline on arm64",
+
+			rels:              []backend.RelocationInfo{{Caller: 1, Offset: 124, FuncRef: 3}},
+			refToBinaryOffset: map[ssa.FuncRef]int{1: 500, 3: (1<<25)*4 + 100},
+
+			currentOffset: 20,
+			offsetDelta:   -25,
+			fref:          ssa.FuncRef(1),
+			bodySize:      100,
+			currentRelIdx: 0,
+
+			nextRelIdx:      1,
+			updatedBodySize: 100 + relocationSize,
+			updatedRels:     []backend.RelocationInfo{{Caller: 1, Offset: 124 - 25, TrampolineOffset: 120, FuncRef: 3}},
+		},
+		{
+			GOARCH: "arm64",
+			name:   "1 trampoline on arm64",
+
+			rels:              []backend.RelocationInfo{{Caller: 1, Offset: 124, FuncRef: 3}},
+			refToBinaryOffset: map[ssa.FuncRef]int{1: 500, 3: (1<<25)*4 + 100},
+
+			currentOffset: 20,
+			offsetDelta:   -25,
+			fref:          ssa.FuncRef(1),
+			bodySize:      100,
+			currentRelIdx: 0,
+
+			nextRelIdx:      1,
+			updatedBodySize: 100 + relocationSize,
+			updatedRels:     []backend.RelocationInfo{{Caller: 1, Offset: 124 - 25, TrampolineOffset: 100 + relocationSize, FuncRef: 3}},
+		},
+		{
+			GOARCH: "arm64",
+			name:   "multiple trampolines on arm64",
+
+			rels: []backend.RelocationInfo{
+				{Caller: 1, Offset: 124, FuncRef: 3},
+				{Caller: 1, Offset: 136, FuncRef: 4},
+			},
+			refToBinaryOffset: map[ssa.FuncRef]int{1: 500, 3: (1<<25)*4 + 100, 4: -(1<<25)*4 - 100},
+
+			currentOffset: 20,
+			offsetDelta:   -25,
+			fref:          ssa.FuncRef(1),
+			bodySize:      100,
+			currentRelIdx: 0,
+
+			nextRelIdx:      2,
+			updatedBodySize: 100 + 2*relocationSize,
+			updatedRels: []backend.RelocationInfo{
+				{Caller: 1, Offset: 124 - 25, TrampolineOffset: 100 + relocationSize, FuncRef: 3},
+				{Caller: 1, Offset: 136 - 25, TrampolineOffset: 100 + 2*relocationSize, FuncRef: 4},
+			},
+		},
+		{
+			GOARCH: "arm64",
+			name:   "mixed trampolines + within range on arm64",
+
+			rels: []backend.RelocationInfo{
+				{Caller: 1, Offset: 24, FuncRef: 3},
+				{Caller: 1, Offset: 28, FuncRef: 4},
+				{Caller: 1, Offset: 32, FuncRef: 5},
+			},
+			refToBinaryOffset: map[ssa.FuncRef]int{
+				1: 500,
+				3: 400,
+				4: (1<<25)*4 + 100,
+				5: -(1<<25)*4 - 300,
+			},
+
+			currentOffset: 40,
+			offsetDelta:   -20,
+			fref:          ssa.FuncRef(1),
+			bodySize:      124,
+			currentRelIdx: 0,
+
+			nextRelIdx:      3,
+			updatedBodySize: 124 + 2*relocationSize,
+			updatedRels: []backend.RelocationInfo{
+				{Caller: 1, Offset: 4, FuncRef: 3},
+				{Caller: 1, Offset: 8, TrampolineOffset: 124 + 40 - 20 + relocationSize, FuncRef: 4},
+				{Caller: 1, Offset: 12, TrampolineOffset: 124 + 40 - 20 + 2*relocationSize, FuncRef: 5},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.GOARCH != "" && tt.GOARCH != runtime.GOARCH {
+				t.Skip("skipping arch-specific test")
+			}
+			e := &engine{
+				rels:              tt.rels,
+				refToBinaryOffset: tt.refToBinaryOffset,
+				machine:           m,
+			}
+			nextRelIdx, updatedBodySize := e.updateRelocationInfos(
+				tt.currentOffset, tt.offsetDelta, tt.fref, tt.bodySize, tt.currentRelIdx)
+			require.Equal(t, tt.nextRelIdx, nextRelIdx)
+			require.Equal(t, tt.updatedBodySize, updatedBodySize)
+			require.Equal(t, tt.updatedRels, e.rels)
+		})
+	}
 }
