@@ -55,18 +55,18 @@ func TestMemoryInstance_Grow_Size(t *testing.T) {
 			res, ok := m.Grow(5)
 			require.True(t, ok)
 			require.Equal(t, uint32(0), res)
-			require.Equal(t, uint32(5), m.PageSize())
+			require.Equal(t, uint32(5), m.Pages())
 
 			// Zero page grow is well-defined, should return the current page correctly.
 			res, ok = m.Grow(0)
 			require.True(t, ok)
 			require.Equal(t, uint32(5), res)
-			require.Equal(t, uint32(5), m.PageSize())
+			require.Equal(t, uint32(5), m.Pages())
 
 			res, ok = m.Grow(4)
 			require.True(t, ok)
 			require.Equal(t, uint32(5), res)
-			require.Equal(t, uint32(9), m.PageSize())
+			require.Equal(t, uint32(9), m.Pages())
 
 			// At this point, the page size equal 9,
 			// so trying to grow two pages should result in failure.
