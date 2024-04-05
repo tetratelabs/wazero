@@ -223,7 +223,11 @@ func Test_checkAddrInBytes(t *testing.T) {
 
 func Test_engine_updateRelocationInfos(t *testing.T) {
 	m := newMachine()
-	relocationSize := m.RelocationTrampolineSize(make([]backend.RelocationInfo, 1))
+	// Note: This is currently only useful on GOARCH=arm64. The trampoline offset must be nonzero
+	// to be accounted for, and will always be the same size, so we just record its value
+	// and multiply it in the tests where multiple trampolines are expected.
+	// On amd64, trampolines are never generated so this value is always zero.
+	relocationSize := m.RelocationTrampolineSize([]backend.RelocationInfo{{TrampolineOffset: 1}})
 	tests := []struct {
 		GOARCH            string
 		name              string
@@ -291,23 +295,6 @@ func Test_engine_updateRelocationInfos(t *testing.T) {
 		},
 		{
 			GOARCH: "arm64",
-			name:   "1 trampoline on arm64",
-
-			rels:              []backend.RelocationInfo{{Caller: 1, Offset: 124, FuncRef: 3}},
-			refToBinaryOffset: map[ssa.FuncRef]int{1: 500, 3: (1<<25)*4 + 100},
-
-			currentOffset: 20,
-			offsetDelta:   -25,
-			fref:          ssa.FuncRef(1),
-			bodySize:      100,
-			currentRelIdx: 0,
-
-			nextRelIdx:      1,
-			updatedBodySize: 100 + relocationSize,
-			updatedRels:     []backend.RelocationInfo{{Caller: 1, Offset: 124 - 25, TrampolineOffset: 100 + relocationSize, FuncRef: 3}},
-		},
-		{
-			GOARCH: "arm64",
 			name:   "multiple trampolines on arm64",
 
 			rels: []backend.RelocationInfo{
@@ -357,6 +344,45 @@ func Test_engine_updateRelocationInfos(t *testing.T) {
 				{Caller: 1, Offset: 4, FuncRef: 3},
 				{Caller: 1, Offset: 8, TrampolineOffset: 124 + 40 - 20 + relocationSize, FuncRef: 4},
 				{Caller: 1, Offset: 12, TrampolineOffset: 124 + 40 - 20 + 2*relocationSize, FuncRef: 5},
+			},
+		},
+		{
+			GOARCH: "arm64",
+			name:   "extra rel entries + mixed trampolines + within range on arm64",
+
+			rels: []backend.RelocationInfo{
+				{Caller: 1, Offset: 24, FuncRef: 3},
+				{Caller: 2, Offset: 28, FuncRef: 1},
+				{Caller: 3, Offset: 32, FuncRef: 2},
+				{Caller: 10, Offset: 400, FuncRef: 3},
+				{Caller: 10, Offset: 420, FuncRef: 4},
+				{Caller: 10, Offset: 440, FuncRef: 5},
+				{Caller: 12, Offset: 700, FuncRef: 2},
+			},
+			refToBinaryOffset: map[ssa.FuncRef]int{
+				1: 400,
+				2: 500,
+				3: 600,
+				4: (1<<25)*4 + 1000,
+				5: -(1<<25)*4 - 300,
+			},
+
+			currentOffset: 396,
+			offsetDelta:   -20,
+			fref:          ssa.FuncRef(10),
+			bodySize:      124,
+			currentRelIdx: 3,
+
+			nextRelIdx:      6,
+			updatedBodySize: 124 + 2*relocationSize,
+			updatedRels: []backend.RelocationInfo{
+				{Caller: 1, Offset: 24, FuncRef: 3},
+				{Caller: 2, Offset: 28, FuncRef: 1},
+				{Caller: 3, Offset: 32, FuncRef: 2},
+				{Caller: 10, Offset: 380, FuncRef: 3},
+				{Caller: 10, Offset: 400, TrampolineOffset: 396 - 20 + 124 + relocationSize, FuncRef: 4},
+				{Caller: 10, Offset: 420, TrampolineOffset: 396 - 20 + 124 + 2*relocationSize, FuncRef: 5},
+				{Caller: 12, Offset: 700, FuncRef: 2},
 			},
 		},
 	}

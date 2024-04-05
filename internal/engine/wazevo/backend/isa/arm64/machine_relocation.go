@@ -9,8 +9,6 @@ import (
 )
 
 // ResolveRelocations implements backend.Machine ResolveRelocations.
-//
-// TODO: unit test!
 func (m *machine) ResolveRelocations(refToBinaryOffset map[ssa.FuncRef]int, binary []byte, relocations []backend.RelocationInfo) {
 	base := uintptr(unsafe.Pointer(&binary[0]))
 	for _, r := range relocations {
@@ -18,7 +16,8 @@ func (m *machine) ResolveRelocations(refToBinaryOffset map[ssa.FuncRef]int, bina
 		calleeFnOffset := refToBinaryOffset[r.FuncRef]
 		brInstr := binary[instrOffset : instrOffset+4]
 		diff := int64(calleeFnOffset) - (instrOffset)
-		// Check if the diff is within the range of the branch instruction.
+		// The diff was outside the range of the branch instruction, so we use a
+		// trampoline (see UpdateRelocationInfo).
 		if r.TrampolineOffset > 0 {
 			// If the diff is out of range, we need to use a trampoline.
 			diff = int64(r.TrampolineOffset) - instrOffset
@@ -45,17 +44,28 @@ func (m *machine) ResolveRelocations(refToBinaryOffset map[ssa.FuncRef]int, bina
 
 const relocationTrampolineSize = 5 * 4
 
-func (m *machine) RelocationTrampolineSize(rels []backend.RelocationInfo) int {
-	return relocationTrampolineSize * len(rels)
+func (m *machine) RelocationTrampolineSize(rels []backend.RelocationInfo) (trampolineSize int) {
+	for _, rel := range rels {
+		if rel.TrampolineOffset > 0 {
+			trampolineSize += relocationTrampolineSize
+		}
+	}
+	return
 }
 
 func (m *machine) UpdateRelocationInfo(refToBinaryOffset map[ssa.FuncRef]int, trampolineOffset int, r *backend.RelocationInfo) int {
 	instrOffset := r.Offset
 	calleeFnOffset := refToBinaryOffset[r.FuncRef]
+	// BR immediate is 26-bit, shifted right by 2.
+	// So we compute the diff between the (estimated) offset of the target function
+	// and the offset of the callee and we check that the result is within range.
 	diff := int64(calleeFnOffset) - (instrOffset)
 	trampolineSize := 0
-	if diff < -(1<<25)*4 || diff > ((1<<25)-1)*4 {
+	if diff < minSignedInt26*4 || diff > maxSignedInt26*4 {
+		// If it is _not_ within range, then we assign the TrampolineOffset
+		// which will be nonzero for all the cases where a trampoline is actually needed.
 		r.TrampolineOffset = trampolineOffset
+		// Currently the trampoline size is fixed.
 		trampolineSize = relocationTrampolineSize
 	}
 	return trampolineSize

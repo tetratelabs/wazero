@@ -291,7 +291,7 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 				totalSize, offsetDelta, fref, len(bodies[i]), relIdx)
 
 			if needSourceInfo {
-				updateSourceMap(cm, totalSize, module.CodeSection[i], sourceOffsets, i)
+				updateSourceMap(cm, totalSize, module.CodeSection[i], sourceOffsets[i])
 			}
 
 			totalSize = totalSize + updatedBodySize
@@ -352,13 +352,13 @@ func (e *engine) updateRelocationInfos(currentOffset int, offsetDelta int64, fre
 }
 
 // updateSourceMap Update the source maps for the current offset.
-func updateSourceMap(cm *compiledModule, totalSize int, codeSection wasm.Code, sourceOffsets [][]backend.SourceOffsetInfo, i int) {
+func updateSourceMap(cm *compiledModule, totalSize int, codeSection wasm.Code, sourceOffsets []backend.SourceOffsetInfo) {
 	// At the beginning of the function, we add the offset of the function body so that
 	// we can resolve the source location of the call site of before listener call.
 	cm.sourceMap.executableOffsets = append(cm.sourceMap.executableOffsets, uintptr(totalSize))
 	cm.sourceMap.wasmBinaryOffsets = append(cm.sourceMap.wasmBinaryOffsets, codeSection.BodyOffsetInCodeSection)
 
-	for _, info := range sourceOffsets[i] {
+	for _, info := range sourceOffsets {
 		cm.sourceMap.executableOffsets = append(cm.sourceMap.executableOffsets, uintptr(totalSize)+uintptr(info.ExecutableOffset))
 		cm.sourceMap.wasmBinaryOffsets = append(cm.sourceMap.wasmBinaryOffsets, uint64(info.SourceOffset))
 	}
