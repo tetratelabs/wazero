@@ -44,7 +44,7 @@ func (r *recorder) NewFunctionListener(definition api.FunctionDefinition) experi
 func TestFunctionListenerFactory(t *testing.T) {
 	// Set context to one that has an experimental listener
 	factory := &recorder{m: map[string]struct{}{}}
-	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, factory)
+	ctx := experimental.WithFunctionListenerFactory(context.Background(), factory)
 
 	// Define a module with two functions
 	bin := binaryencoding.EncodeModule(&wasm.Module{

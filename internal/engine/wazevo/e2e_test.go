@@ -912,7 +912,7 @@ func TestE2E(t *testing.T) {
 
 func TestE2E_host_functions(t *testing.T) {
 	var buf bytes.Buffer
-	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
+	ctx := experimental.WithFunctionListenerFactory(context.Background(), logging.NewLoggingListenerFactory(&buf))
 
 	for _, tc := range []struct {
 		name string
@@ -1216,7 +1216,7 @@ wasm stack trace:
 func TestListener_local(t *testing.T) {
 	var buf bytes.Buffer
 	config := wazero.NewRuntimeConfigCompiler()
-	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
+	ctx := experimental.WithFunctionListenerFactory(context.Background(), logging.NewLoggingListenerFactory(&buf))
 
 	r := wazero.NewRuntimeWithConfig(ctx, config)
 	defer func() {
@@ -1244,7 +1244,7 @@ func TestListener_local(t *testing.T) {
 func TestListener_imported(t *testing.T) {
 	var buf bytes.Buffer
 	config := wazero.NewRuntimeConfigCompiler()
-	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
+	ctx := experimental.WithFunctionListenerFactory(context.Background(), logging.NewLoggingListenerFactory(&buf))
 
 	r := wazero.NewRuntimeWithConfig(ctx, config)
 	defer func() {
@@ -1295,7 +1295,7 @@ func TestListener_long(t *testing.T) {
 
 	var buf bytes.Buffer
 	config := wazero.NewRuntimeConfigCompiler()
-	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
+	ctx := experimental.WithFunctionListenerFactory(context.Background(), logging.NewLoggingListenerFactory(&buf))
 
 	r := wazero.NewRuntimeWithConfig(ctx, config)
 	defer func() {
@@ -1345,7 +1345,7 @@ func TestListener_long_as_is(t *testing.T) {
 
 	var buf bytes.Buffer
 	config := wazero.NewRuntimeConfigCompiler()
-	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
+	ctx := experimental.WithFunctionListenerFactory(context.Background(), logging.NewLoggingListenerFactory(&buf))
 
 	r := wazero.NewRuntimeWithConfig(ctx, config)
 	defer func() {
@@ -1394,7 +1394,7 @@ func TestListener_long_many_consts(t *testing.T) {
 
 	var buf bytes.Buffer
 	config := wazero.NewRuntimeConfigCompiler()
-	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
+	ctx := experimental.WithFunctionListenerFactory(context.Background(), logging.NewLoggingListenerFactory(&buf))
 
 	r := wazero.NewRuntimeWithConfig(ctx, config)
 	defer func() {

@@ -43,7 +43,7 @@ func TestGrow(t *testing.T) {
 	var log bytes.Buffer
 
 	// Set context to one that has an experimental listener
-	ctx := context.WithValue(testCtx, experimental.FunctionListenerFactoryKey{},
+	ctx := experimental.WithFunctionListenerFactory(testCtx,
 		logging.NewHostLoggingListenerFactory(&log, logging.LogScopeMemory))
 
 	r := wazero.NewRuntime(ctx)
@@ -344,7 +344,7 @@ func TestInstantiateForModule(t *testing.T) {
 	var log bytes.Buffer
 
 	// Set context to one that has an experimental listener
-	ctx := context.WithValue(testCtx, experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&log))
+	ctx := experimental.WithFunctionListenerFactory(testCtx, logging.NewLoggingListenerFactory(&log))
 
 	r := wazero.NewRuntime(ctx)
 	defer r.Close(ctx)
