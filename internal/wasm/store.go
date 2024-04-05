@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/ctxkey"
 	"github.com/tetratelabs/wazero/internal/internalapi"
 	"github.com/tetratelabs/wazero/internal/leb128"
@@ -362,8 +363,13 @@ func (s *Store) instantiate(
 		return nil, err
 	}
 
+	var allocator experimental.MemoryAllocator
+	if ctx != nil {
+		allocator, _ = ctx.Value(ctxkey.MemoryAllocatorKey{}).(experimental.MemoryAllocator)
+	}
+
 	m.buildGlobals(module, m.Engine.FunctionInstanceReference)
-	m.buildMemory(module)
+	m.buildMemory(module, allocator)
 	m.Exports = module.Exports
 	for _, exp := range m.Exports {
 		if exp.Type == ExternTypeTable {

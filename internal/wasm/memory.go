@@ -12,6 +12,7 @@ import (
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/internalapi"
 	"github.com/tetratelabs/wazero/internal/wasmruntime"
 )
@@ -57,11 +58,15 @@ type MemoryInstance struct {
 	// waiters implements atomic wait and notify. It is implemented similarly to golang.org/x/sync/semaphore,
 	// with a fixed weight of 1 and no spurious notifications.
 	waiters sync.Map
+
+	allocator experimental.MemoryAllocator
 }
 
 // NewMemoryInstance creates a new instance based on the parameters in the SectionIDMemory.
-func NewMemoryInstance(memSec *Memory) *MemoryInstance {
-	var size uint64
+func NewMemoryInstance(memSec *Memory, allocator experimental.MemoryAllocator) *MemoryInstance {
+	min := MemoryPagesToBytesNum(memSec.Min)
+	cur := MemoryPagesToBytesNum(memSec.Cap)
+	max := MemoryPagesToBytesNum(memSec.Max)
 	if memSec.IsShared {
 		// Shared memory needs a fixed buffer, so allocate with the maximum size.
 		//
@@ -73,18 +78,22 @@ func NewMemoryInstance(memSec *Memory) *MemoryInstance {
 		// the memory buffer allocation here is virtual and doesn't consume physical memory until it's used.
 		// 	* https://github.com/golang/go/blob/8121604559035734c9677d5281bbdac8b1c17a1e/src/runtime/malloc.go#L1059
 		//	* https://github.com/golang/go/blob/8121604559035734c9677d5281bbdac8b1c17a1e/src/runtime/malloc.go#L1165
-		size = MemoryPagesToBytesNum(memSec.Max)
-	} else {
-		size = MemoryPagesToBytesNum(memSec.Cap)
+		cur = max
 	}
 
-	buffer := make([]byte, MemoryPagesToBytesNum(memSec.Min), size)
+	var buffer []byte
+	if allocator != nil {
+		buffer = allocator.Make(min, cur, max)
+	} else {
+		buffer = make([]byte, min, cur)
+	}
 	return &MemoryInstance{
-		Buffer: buffer,
-		Min:    memSec.Min,
-		Cap:    memoryBytesNumToPages(uint64(cap(buffer))),
-		Max:    memSec.Max,
-		Shared: memSec.IsShared,
+		Buffer:    buffer,
+		Min:       memSec.Min,
+		Cap:       memoryBytesNumToPages(uint64(cap(buffer))),
+		Max:       memSec.Max,
+		Shared:    memSec.IsShared,
+		allocator: allocator,
 	}
 }
 
@@ -226,7 +235,11 @@ func (m *MemoryInstance) Grow(delta uint32) (result uint32, ok bool) {
 		if m.Shared {
 			panic("shared memory cannot be grown, this is a bug in wazero")
 		}
-		m.Buffer = append(m.Buffer, make([]byte, MemoryPagesToBytesNum(delta))...)
+		if m.allocator != nil {
+			m.Buffer = m.allocator.Grow(m.Buffer, MemoryPagesToBytesNum(delta))
+		} else {
+			m.Buffer = append(m.Buffer, make([]byte, MemoryPagesToBytesNum(delta))...)
+		}
 		m.Cap = newPages
 		return currentPages, true
 	} else { // We already have the capacity we need.

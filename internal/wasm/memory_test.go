@@ -832,7 +832,7 @@ func TestNewMemoryInstance_Shared(t *testing.T) {
 	for _, tc := range tests {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			m := NewMemoryInstance(tc.mem)
+			m := NewMemoryInstance(tc.mem, nil)
 			require.Equal(t, tc.mem.Min, m.Min)
 			require.Equal(t, tc.mem.Max, m.Max)
 			require.True(t, m.Shared)
