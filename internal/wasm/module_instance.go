@@ -6,6 +6,8 @@ import (
 	"fmt"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/internal/ctxkey"
 	"github.com/tetratelabs/wazero/sys"
 )
 
@@ -122,6 +124,10 @@ func (m *ModuleInstance) closeWithExitCodeWithoutClosingResource(exitCode uint32
 func (m *ModuleInstance) closeWithExitCode(ctx context.Context, exitCode uint32) (err error) {
 	if !m.setExitCode(exitCode, exitCodeFlagResourceClosed) {
 		return nil // not an error to have already closed
+	}
+	if mem := m.MemoryInstance; mem != nil {
+		allocator, _ := ctx.Value(ctxkey.MemoryAllocatorKey{}).(experimental.MemoryAllocator)
+		allocator.Free(mem.Buffer)
 	}
 	return m.ensureResourcesClosed(ctx)
 }
