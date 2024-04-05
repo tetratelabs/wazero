@@ -63,7 +63,7 @@ type (
 
 		// UpdateRelocationInfo recomputes the RelocationInfo after emitting machine code and returns the updated
 		// RelocationInfo and the size of the trampoline if necessary.
-		UpdateRelocationInfo(refToBinaryOffset map[ssa.FuncRef]int, trampolineOffset int, r RelocationInfo) (res RelocationInfo, trampolineSize int)
+		UpdateRelocationInfo(refToBinaryOffset map[ssa.FuncRef]int, trampolineOffset int, r *RelocationInfo) (trampolineSize int)
 
 		RelocationTrampolineSize(relocations []RelocationInfo) int
 

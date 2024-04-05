@@ -1,6 +1,7 @@
 package arm64
 
 import (
+	"encoding/binary"
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
@@ -48,7 +49,7 @@ func (m *machine) RelocationTrampolineSize(rels []backend.RelocationInfo) int {
 	return relocationTrampolineSize * len(rels)
 }
 
-func (m *machine) UpdateRelocationInfo(refToBinaryOffset map[ssa.FuncRef]int, trampolineOffset int, r backend.RelocationInfo) (backend.RelocationInfo, int) {
+func (m *machine) UpdateRelocationInfo(refToBinaryOffset map[ssa.FuncRef]int, trampolineOffset int, r *backend.RelocationInfo) int {
 	instrOffset := r.Offset
 	calleeFnOffset := refToBinaryOffset[r.FuncRef]
 	diff := int64(calleeFnOffset) - (instrOffset)
@@ -57,10 +58,10 @@ func (m *machine) UpdateRelocationInfo(refToBinaryOffset map[ssa.FuncRef]int, tr
 		r.TrampolineOffset = trampolineOffset
 		trampolineSize = relocationTrampolineSize
 	}
-	return r, trampolineSize
+	return trampolineSize
 }
 
-func encodeTrampoline(addr uint, binary []byte, instrOffset int) {
+func encodeTrampoline(addr uint, bytes []byte, instrOffset int) {
 	// The tmpReg is safe to overwrite.
 	tmpReg := regNumberInEncoding[tmp]
 
@@ -77,10 +78,7 @@ func encodeTrampoline(addr uint, binary []byte, instrOffset int) {
 	}
 
 	for i, inst := range instrs {
-		instrBytes := binary[instrOffset+i*4 : instrOffset+(i+1)*4]
-		instrBytes[0] = byte(inst)
-		instrBytes[1] = byte(inst >> 8)
-		instrBytes[2] = byte(inst >> 16)
-		instrBytes[3] = byte(inst >> 24)
+		instrBytes := bytes[instrOffset+i*4 : instrOffset+(i+1)*4]
+		binary.LittleEndian.PutUint32(instrBytes, inst)
 	}
 }

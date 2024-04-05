@@ -342,13 +342,11 @@ func (e *engine) updateRelocationInfos(currentOffset int, offsetDelta int64, fre
 	trampolineSectionSize := 0
 	// Loop while there are RelocationInfos left and the given RelocationInfo relates to the current function.
 	for ; currentRelIdx < len(e.rels) && e.rels[currentRelIdx].Caller == fref; currentRelIdx++ {
-		r := e.rels[currentRelIdx]
+		r := &e.rels[currentRelIdx]
 		// Update the offset and compute the offset to the trampoline at the end of the function.
 		r.Offset += offsetDelta
 		trampolineOffset := currentOffset + bodySize + trampolineSectionSize
-		r, l := e.machine.UpdateRelocationInfo(e.refToBinaryOffset, trampolineOffset, r)
-		e.rels[currentRelIdx] = r
-		trampolineSectionSize += l
+		trampolineSectionSize += e.machine.UpdateRelocationInfo(e.refToBinaryOffset, trampolineOffset, r)
 	}
 	return currentRelIdx, bodySize + trampolineSectionSize
 }

@@ -2078,8 +2078,8 @@ func (m *machine) RelocationTrampolineSize(relocations []backend.RelocationInfo)
 }
 
 // UpdateRelocationInfo implements backend.Machine.
-func (m *machine) UpdateRelocationInfo(refToBinaryOffset map[ssa.FuncRef]int, trampolineOffset int, r backend.RelocationInfo) (backend.RelocationInfo, int) {
-	return r, 0
+func (m *machine) UpdateRelocationInfo(refToBinaryOffset map[ssa.FuncRef]int, trampolineOffset int, r *backend.RelocationInfo) int {
+	return 0
 }
 
 func (m *machine) lowerIcmpToFlag(xd, yd *backend.SSAValueDefinition, _64 bool) {
