@@ -58,15 +58,6 @@ func virtualProtect(address, size, newprotect uintptr, oldprotect *uint32) error
 	return nil
 }
 
-func mmapMemory(size int) ([]byte, error) {
-	p, err := allocateMemory(uintptr(size), windows_PAGE_READWRITE)
-	if err != nil {
-		return nil, err
-	}
-
-	return unsafe.Slice((*byte)(unsafe.Pointer(p)), size), nil
-}
-
 func mmapCodeSegmentAMD64(size int) ([]byte, error) {
 	p, err := allocateMemory(uintptr(size), windows_PAGE_EXECUTE_READWRITE)
 	if err != nil {

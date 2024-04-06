@@ -23,10 +23,6 @@ func mmapCodeSegmentARM64(size int) ([]byte, error) {
 	panic(errUnsupported)
 }
 
-func mmapMemory(size int) ([]byte, error) {
-	panic(errUnsupported)
-}
-
 func MprotectRX(b []byte) (err error) {
 	panic(errUnsupported)
 }
