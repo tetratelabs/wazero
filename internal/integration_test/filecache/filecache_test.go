@@ -117,8 +117,8 @@ func testListeners(t *testing.T, config wazero.RuntimeConfig) {
 		dir := t.TempDir()
 
 		out := bytes.NewBuffer(nil)
-		ctxWithListener := context.WithValue(context.Background(),
-			experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(out))
+		ctxWithListener := experimental.WithFunctionListenerFactory(
+			context.Background(), logging.NewLoggingListenerFactory(out))
 
 		{
 			cc, err := wazero.NewCompilationCacheWithDir(dir)
@@ -163,8 +163,8 @@ func testListeners(t *testing.T, config wazero.RuntimeConfig) {
 			rc := config.WithCompilationCache(cc)
 
 			out := bytes.NewBuffer(nil)
-			ctxWithListener := context.WithValue(context.Background(),
-				experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(out))
+			ctxWithListener := experimental.WithFunctionListenerFactory(
+				context.Background(), logging.NewLoggingListenerFactory(out))
 			r := wazero.NewRuntimeWithConfig(ctxWithListener, rc)
 			_, err = r.CompileModule(ctxWithListener, wasmBin)
 			require.NoError(t, err)
@@ -200,8 +200,8 @@ func testListeners(t *testing.T, config wazero.RuntimeConfig) {
 
 		// Then compile with listeners -> run it.
 		out := bytes.NewBuffer(nil)
-		ctxWithListener := context.WithValue(context.Background(),
-			experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(out))
+		ctxWithListener := experimental.WithFunctionListenerFactory(
+			context.Background(), logging.NewLoggingListenerFactory(out))
 
 		cc, err := wazero.NewCompilationCacheWithDir(dir)
 		require.NoError(t, err)

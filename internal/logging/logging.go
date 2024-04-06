@@ -94,9 +94,6 @@ func (f LogScopes) String() string {
 	return builder.String()
 }
 
-// LoggerKey is a context.Context Value key with a FunctionLogger value.
-type LoggerKey struct{}
-
 type ParamLogger func(ctx context.Context, mod api.Module, w Writer, params []uint64)
 
 type ParamSampler func(ctx context.Context, mod api.Module, params []uint64) bool

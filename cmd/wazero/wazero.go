@@ -451,7 +451,7 @@ func detectImports(imports []api.FunctionDefinition) importMode {
 
 func maybeHostLogging(ctx context.Context, scopes logging.LogScopes, stdErr logging.Writer) context.Context {
 	if scopes != 0 {
-		return context.WithValue(ctx, experimental.FunctionListenerFactoryKey{}, logging.NewHostLoggingListenerFactory(stdErr, scopes))
+		return experimental.WithFunctionListenerFactory(ctx, logging.NewHostLoggingListenerFactory(stdErr, scopes))
 	}
 	return ctx
 }

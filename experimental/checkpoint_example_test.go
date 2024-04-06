@@ -28,7 +28,7 @@ func Example_enableSnapshotterKey() {
 
 	// Enable experimental snapshotting functionality by setting it to context. We use this
 	// context when invoking functions, indicating to wazero to enable it.
-	ctx = context.WithValue(ctx, experimental.EnableSnapshotterKey{}, struct{}{})
+	ctx = experimental.WithSnapshotter(ctx)
 
 	// Also place a mutable holder of snapshots to be referenced during restore.
 	var snapshots []experimental.Snapshot
@@ -39,8 +39,8 @@ func Example_enableSnapshotterKey() {
 	_, err := rt.NewHostModuleBuilder("example").
 		NewFunctionBuilder().
 		WithFunc(func(ctx context.Context, mod api.Module, snapshotPtr uint32) int32 {
-			// Because we set EnableSnapshotterKey to context, this is non-nil.
-			snapshot := ctx.Value(experimental.SnapshotterKey{}).(experimental.Snapshotter).Snapshot()
+			// Because we enabled snapshots with WithSnapshotter, this is non-nil.
+			snapshot := experimental.GetSnapshotter(ctx).Snapshot()
 
 			// Get our mutable snapshots holder to be able to add to it. Our example only calls snapshot
 			// and restore once but real programs will often call them at multiple layers within a call

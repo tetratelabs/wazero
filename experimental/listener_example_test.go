@@ -59,7 +59,7 @@ func Example_customListenerFactory() {
 	u := uniqGoFuncs{}
 
 	// Set context to one that has an experimental listener
-	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, u)
+	ctx := experimental.WithFunctionListenerFactory(context.Background(), u)
 
 	r := wazero.NewRuntime(ctx)
 	defer r.Close(ctx) // This closes everything this Runtime created.

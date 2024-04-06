@@ -1,5 +1,11 @@
 package experimental
 
+import (
+	"context"
+
+	"github.com/tetratelabs/wazero/internal/ctxkey"
+)
+
 // Snapshot holds the execution state at the time of a Snapshotter.Snapshot call.
 type Snapshot interface {
 	// Restore sets the Wasm execution state to the capture. Because a host function
@@ -18,8 +24,25 @@ type Snapshotter interface {
 // EnableSnapshotterKey is a context key to indicate that snapshotting should be enabled.
 // The context.Context passed to a exported function invocation should have this key set
 // to a non-nil value, and host functions will be able to retrieve it using SnapshotterKey.
-type EnableSnapshotterKey struct{}
+//
+// Deprecated: use WithSnapshotter to enable snapshots.
+type EnableSnapshotterKey = ctxkey.EnableSnapshotterKey
+
+// WithSnapshotter enables snapshots.
+// Passing the returned context to a exported function invocation enables snapshots,
+// and allows host functions to retrieve the Snapshotter using SnapshotterKey.
+func WithSnapshotter(ctx context.Context) context.Context {
+	return context.WithValue(ctx, ctxkey.EnableSnapshotterKey{}, struct{}{})
+}
 
 // SnapshotterKey is a context key to access a Snapshotter from a host function.
 // It is only present if EnableSnapshotter was set in the function invocation context.
-type SnapshotterKey struct{}
+//
+// Deprecated: use GetSnapshotter to get the snapshotter.
+type SnapshotterKey = ctxkey.SnapshotterKey
+
+// GetSnapshotter gets the Snapshotter from a host function.
+// It is only present if WithSnapshotter was called with the function invocation context.
+func GetSnapshotter(ctx context.Context) Snapshotter {
+	return ctx.Value(ctxkey.SnapshotterKey{}).(Snapshotter)
+}

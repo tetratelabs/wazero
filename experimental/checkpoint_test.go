@@ -24,7 +24,7 @@ func TestSnapshotNestedWasmInvocation(t *testing.T) {
 			defer func() {
 				sidechannel = 10
 			}()
-			snapshot := ctx.Value(experimental.SnapshotterKey{}).(experimental.Snapshotter).Snapshot()
+			snapshot := experimental.GetSnapshotter(ctx).Snapshot()
 			snapshots := ctx.Value(snapshotsKey{}).(*[]experimental.Snapshot)
 			idx := len(*snapshots)
 			*snapshots = append(*snapshots, snapshot)
@@ -55,7 +55,7 @@ func TestSnapshotNestedWasmInvocation(t *testing.T) {
 
 	var snapshots []experimental.Snapshot
 	ctx = context.WithValue(ctx, snapshotsKey{}, &snapshots)
-	ctx = context.WithValue(ctx, experimental.EnableSnapshotterKey{}, struct{}{})
+	ctx = experimental.WithSnapshotter(ctx)
 
 	snapshotPtr := uint64(0)
 	res, err := mod.ExportedFunction("snapshot").Call(ctx, snapshotPtr)
@@ -75,7 +75,7 @@ func TestSnapshotMultipleWasmInvocations(t *testing.T) {
 	_, err := rt.NewHostModuleBuilder("example").
 		NewFunctionBuilder().
 		WithFunc(func(ctx context.Context, mod api.Module, snapshotPtr uint32) int32 {
-			snapshot := ctx.Value(experimental.SnapshotterKey{}).(experimental.Snapshotter).Snapshot()
+			snapshot := experimental.GetSnapshotter(ctx).Snapshot()
 			snapshots := ctx.Value(snapshotsKey{}).(*[]experimental.Snapshot)
 			idx := len(*snapshots)
 			*snapshots = append(*snapshots, snapshot)
@@ -103,7 +103,7 @@ func TestSnapshotMultipleWasmInvocations(t *testing.T) {
 
 	var snapshots []experimental.Snapshot
 	ctx = context.WithValue(ctx, snapshotsKey{}, &snapshots)
-	ctx = context.WithValue(ctx, experimental.EnableSnapshotterKey{}, struct{}{})
+	ctx = experimental.WithSnapshotter(ctx)
 
 	snapshotPtr := uint64(0)
 	res, err := mod.ExportedFunction("snapshot").Call(ctx, snapshotPtr)

@@ -92,7 +92,7 @@ func requireProxyModuleWithContext(ctx context.Context, t *testing.T, config waz
 	var log bytes.Buffer
 
 	// Set context to one that has an experimental listener
-	ctx = context.WithValue(ctx, experimental.FunctionListenerFactoryKey{},
+	ctx = experimental.WithFunctionListenerFactory(ctx,
 		proxy.NewLoggingListenerFactory(&log, logging.LogScopeAll))
 
 	r := wazero.NewRuntime(ctx)
@@ -121,7 +121,7 @@ func requireErrnoNosys(t *testing.T, funcName string, params ...uint64) string {
 	var log bytes.Buffer
 
 	// Set context to one that has an experimental listener
-	ctx := context.WithValue(testCtx, experimental.FunctionListenerFactoryKey{},
+	ctx := experimental.WithFunctionListenerFactory(testCtx,
 		proxy.NewLoggingListenerFactory(&log, logging.LogScopeAll))
 
 	r := wazero.NewRuntime(ctx)

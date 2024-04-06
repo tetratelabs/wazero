@@ -60,8 +60,8 @@ func RequireNoDiff(wasmBin []byte, checkMemory, loggingCheck bool, requireNoErro
 	var interPreterLoggingBuf, compilerLoggingBuf bytes.Buffer
 	var errorDuringInvocation bool
 	if loggingCheck {
-		interpreterCtx = context.WithValue(interpreterCtx, experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&interPreterLoggingBuf))
-		compilerCtx = context.WithValue(compilerCtx, experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&compilerLoggingBuf))
+		interpreterCtx = experimental.WithFunctionListenerFactory(interpreterCtx, logging.NewLoggingListenerFactory(&interPreterLoggingBuf))
+		compilerCtx = experimental.WithFunctionListenerFactory(compilerCtx, logging.NewLoggingListenerFactory(&compilerLoggingBuf))
 		defer func() {
 			if !errorDuringInvocation {
 				if !bytes.Equal(compilerLoggingBuf.Bytes(), interPreterLoggingBuf.Bytes()) {

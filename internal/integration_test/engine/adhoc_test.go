@@ -1144,7 +1144,7 @@ func testModuleMemory(t *testing.T, r wazero.Runtime) {
 
 func testTwoIndirection(t *testing.T, r wazero.Runtime) {
 	var buf bytes.Buffer
-	ctx := context.WithValue(testCtx, experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
+	ctx := experimental.WithFunctionListenerFactory(testCtx, logging.NewLoggingListenerFactory(&buf))
 	_, err := r.NewHostModuleBuilder("host").NewFunctionBuilder().WithFunc(func(
 		_ context.Context, m api.Module, d uint32,
 	) uint32 {
@@ -1328,7 +1328,7 @@ func testBeforeListenerGlobals(t *testing.T, r wazero.Runtime) {
 		ExportSection: []wasm.Export{{Name: "f", Type: wasm.ExternTypeFunc, Index: 0}},
 	})
 
-	ctx := context.WithValue(testCtx, experimental.FunctionListenerFactoryKey{}, fnListener)
+	ctx := experimental.WithFunctionListenerFactory(testCtx, fnListener)
 	inst, err := r.Instantiate(ctx, buf)
 	require.NoError(t, err)
 
@@ -1382,7 +1382,7 @@ func testBeforeListenerStackIterator(t *testing.T, r wazero.Runtime) {
 		},
 	}
 
-	ctx := context.WithValue(testCtx, experimental.FunctionListenerFactoryKey{}, fnListener)
+	ctx := experimental.WithFunctionListenerFactory(testCtx, fnListener)
 	_, err := r.NewHostModuleBuilder("host").NewFunctionBuilder().WithFunc(func(x int32) int32 {
 		return x + 100
 	}).Export("f4").Instantiate(ctx)
@@ -1484,7 +1484,7 @@ func testListenerStackIteratorOffset(t *testing.T, r wazero.Runtime) {
 			tape = append(tape, stack)
 		},
 	}
-	ctx := context.WithValue(testCtx, experimental.FunctionListenerFactoryKey{}, fnListener)
+	ctx := experimental.WithFunctionListenerFactory(testCtx, fnListener)
 
 	// Minimal DWARF info section to make debug/dwarf.New() happy.
 	// Necessary to make the compiler emit source offset maps.
@@ -1818,7 +1818,7 @@ func testManyParamsResultsCallManyConsts(t *testing.T, r wazero.Runtime) {
 
 func testManyParamsResultsCallManyConstsListener(t *testing.T, r wazero.Runtime) {
 	var buf bytes.Buffer
-	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
+	ctx := experimental.WithFunctionListenerFactory(context.Background(), logging.NewLoggingListenerFactory(&buf))
 
 	bin, _ := manyParamsResultsMod()
 	mod, err := r.Instantiate(ctx, bin)
@@ -1887,7 +1887,7 @@ func testManyParamsResultsDoubler(t *testing.T, r wazero.Runtime) {
 
 func testManyParamsResultsDoublerListener(t *testing.T, r wazero.Runtime) {
 	var buf bytes.Buffer
-	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
+	ctx := experimental.WithFunctionListenerFactory(context.Background(), logging.NewLoggingListenerFactory(&buf))
 
 	bin, params := manyParamsResultsMod()
 	mod, err := r.Instantiate(ctx, bin)
@@ -1947,7 +1947,7 @@ func testManyParamsResultsSwapper(t *testing.T, r wazero.Runtime) {
 
 func testManyParamsResultsSwapperListener(t *testing.T, r wazero.Runtime) {
 	var buf bytes.Buffer
-	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
+	ctx := experimental.WithFunctionListenerFactory(context.Background(), logging.NewLoggingListenerFactory(&buf))
 
 	bin, params := manyParamsResultsMod()
 	mod, err := r.Instantiate(ctx, bin)
@@ -2002,7 +2002,7 @@ func testManyParamsResultsMain(t *testing.T, r wazero.Runtime) {
 
 func testManyParamsResultsMainListener(t *testing.T, r wazero.Runtime) {
 	var buf bytes.Buffer
-	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
+	ctx := experimental.WithFunctionListenerFactory(context.Background(), logging.NewLoggingListenerFactory(&buf))
 
 	bin, params := manyParamsResultsMod()
 	mod, err := r.Instantiate(ctx, bin)
@@ -2051,7 +2051,7 @@ func testManyParamsResultsCallManyConstsAndPickLastVector(t *testing.T, r wazero
 
 func testManyParamsResultsCallManyConstsAndPickLastVectorListener(t *testing.T, r wazero.Runtime) {
 	var buf bytes.Buffer
-	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&buf))
+	ctx := experimental.WithFunctionListenerFactory(context.Background(), logging.NewLoggingListenerFactory(&buf))
 
 	bin, _ := manyParamsResultsMod()
 	mod, err := r.Instantiate(ctx, bin)
