@@ -126,8 +126,9 @@ func (m *ModuleInstance) closeWithExitCode(ctx context.Context, exitCode uint32)
 		return nil // not an error to have already closed
 	}
 	if mem := m.MemoryInstance; mem != nil {
-		allocator, _ := ctx.Value(ctxkey.MemoryAllocatorKey{}).(experimental.MemoryAllocator)
-		allocator.Free(mem.Buffer)
+		if allocator, ok := ctx.Value(ctxkey.MemoryAllocatorKey{}).(experimental.MemoryAllocator); ok {
+			allocator.Free(mem.Buffer)
+		}
 	}
 	return m.ensureResourcesClosed(ctx)
 }
