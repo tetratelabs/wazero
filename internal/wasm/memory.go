@@ -236,7 +236,7 @@ func (m *MemoryInstance) Grow(delta uint32) (result uint32, ok bool) {
 			panic("shared memory cannot be grown, this is a bug in wazero")
 		}
 		if m.allocator != nil {
-			m.Buffer = m.allocator.Grow(m.Buffer, MemoryPagesToBytesNum(delta))
+			m.Buffer = m.allocator.Grow(MemoryPagesToBytesNum(delta))
 		} else {
 			m.Buffer = append(m.Buffer, make([]byte, MemoryPagesToBytesNum(delta))...)
 		}

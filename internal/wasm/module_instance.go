@@ -127,7 +127,7 @@ func (m *ModuleInstance) closeWithExitCode(ctx context.Context, exitCode uint32)
 	}
 	if mem := m.MemoryInstance; mem != nil {
 		if allocator, ok := ctx.Value(ctxkey.MemoryAllocatorKey{}).(experimental.MemoryAllocator); ok {
-			allocator.Free(mem.Buffer)
+			allocator.Free()
 		}
 	}
 	return m.ensureResourcesClosed(ctx)

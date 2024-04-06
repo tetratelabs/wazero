@@ -8,8 +8,8 @@ import (
 
 type MemoryAllocator interface {
 	Make(min, cap, max uint64) []byte
-	Grow(old []byte, more uint64) []byte
-	Free([]byte)
+	Grow(uint64) []byte
+	Free()
 }
 
 func WithMemoryAllocator(ctx context.Context, allocator MemoryAllocator) context.Context {
