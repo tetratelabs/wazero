@@ -231,15 +231,15 @@ func (m *MemoryInstance) Grow(delta uint32) (result uint32, ok bool) {
 	newPages := currentPages + delta
 	if newPages > m.Max || int32(delta) < 0 {
 		return 0, false
+	} else if m.allocator != nil {
+		m.Buffer = m.allocator.Grow(MemoryPagesToBytesNum(newPages))
+		m.Cap = newPages
+		return currentPages, true
 	} else if newPages > m.Cap { // grow the memory.
 		if m.Shared {
 			panic("shared memory cannot be grown, this is a bug in wazero")
 		}
-		if m.allocator != nil {
-			m.Buffer = m.allocator.Grow(MemoryPagesToBytesNum(delta))
-		} else {
-			m.Buffer = append(m.Buffer, make([]byte, MemoryPagesToBytesNum(delta))...)
-		}
+		m.Buffer = append(m.Buffer, make([]byte, MemoryPagesToBytesNum(delta))...)
 		m.Cap = newPages
 		return currentPages, true
 	} else { // We already have the capacity we need.
