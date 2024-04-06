@@ -37,4 +37,12 @@ func WithSnapshotter(ctx context.Context) context.Context {
 
 // SnapshotterKey is a context key to access a Snapshotter from a host function.
 // It is only present if EnableSnapshotter was set in the function invocation context.
-type SnapshotterKey struct{}
+//
+// Deprecated: use [GetSnapshotter] to get the snapshotter.
+type SnapshotterKey = ctxkey.SnapshotterKey
+
+// GetSnapshotter gets the [Snapshotter] from a host function.
+// It is only present if [WithSnapshotter] was called with the function invocation context.
+func GetSnapshotter(ctx context.Context) Snapshotter {
+	return ctx.Value(ctxkey.SnapshotterKey{}).(Snapshotter)
+}

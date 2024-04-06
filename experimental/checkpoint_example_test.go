@@ -40,7 +40,7 @@ func Example_enableSnapshotterKey() {
 		NewFunctionBuilder().
 		WithFunc(func(ctx context.Context, mod api.Module, snapshotPtr uint32) int32 {
 			// Because we enabled snapshots with WithSnapshotter, this is non-nil.
-			snapshot := ctx.Value(experimental.SnapshotterKey{}).(experimental.Snapshotter).Snapshot()
+			snapshot := experimental.GetSnapshotter(ctx).Snapshot()
 
 			// Get our mutable snapshots holder to be able to add to it. Our example only calls snapshot
 			// and restore once but real programs will often call them at multiple layers within a call

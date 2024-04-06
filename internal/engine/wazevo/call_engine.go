@@ -196,7 +196,7 @@ func (c *callEngine) CallWithStack(ctx context.Context, paramResultStack []uint6
 func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint64) (err error) {
 	snapshotEnabled := ctx.Value(ctxkey.EnableSnapshotterKey{}) != nil
 	if snapshotEnabled {
-		ctx = context.WithValue(ctx, experimental.SnapshotterKey{}, c)
+		ctx = context.WithValue(ctx, ctxkey.SnapshotterKey{}, c)
 	}
 
 	if wazevoapi.StackGuardCheckEnabled {

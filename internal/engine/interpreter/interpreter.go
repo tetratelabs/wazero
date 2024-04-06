@@ -574,7 +574,7 @@ func (ce *callEngine) call(ctx context.Context, params, results []uint64) (_ []u
 	}
 
 	if ctx.Value(ctxkey.EnableSnapshotterKey{}) != nil {
-		ctx = context.WithValue(ctx, experimental.SnapshotterKey{}, ce)
+		ctx = context.WithValue(ctx, ctxkey.SnapshotterKey{}, ce)
 	}
 
 	defer func() {
