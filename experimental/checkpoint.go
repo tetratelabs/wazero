@@ -25,12 +25,12 @@ type Snapshotter interface {
 // The context.Context passed to a exported function invocation should have this key set
 // to a non-nil value, and host functions will be able to retrieve it using SnapshotterKey.
 //
-// Deprecated: use [WithSnapshotter] to enable snapshots.
+// Deprecated: use WithSnapshotter to enable snapshots.
 type EnableSnapshotterKey = ctxkey.EnableSnapshotterKey
 
 // WithSnapshotter enables snapshots.
 // Passing the returned context to a exported function invocation enables snapshots,
-// and allows host functions to retrieve the [Snapshotter] using [SnapshotterKey].
+// and allows host functions to retrieve the Snapshotter using SnapshotterKey.
 func WithSnapshotter(ctx context.Context) context.Context {
 	return context.WithValue(ctx, ctxkey.EnableSnapshotterKey{}, struct{}{})
 }
@@ -38,11 +38,11 @@ func WithSnapshotter(ctx context.Context) context.Context {
 // SnapshotterKey is a context key to access a Snapshotter from a host function.
 // It is only present if EnableSnapshotter was set in the function invocation context.
 //
-// Deprecated: use [GetSnapshotter] to get the snapshotter.
+// Deprecated: use GetSnapshotter to get the snapshotter.
 type SnapshotterKey = ctxkey.SnapshotterKey
 
-// GetSnapshotter gets the [Snapshotter] from a host function.
-// It is only present if [WithSnapshotter] was called with the function invocation context.
+// GetSnapshotter gets the Snapshotter from a host function.
+// It is only present if WithSnapshotter was called with the function invocation context.
 func GetSnapshotter(ctx context.Context) Snapshotter {
 	return ctx.Value(ctxkey.SnapshotterKey{}).(Snapshotter)
 }

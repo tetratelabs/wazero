@@ -27,10 +27,10 @@ type StackIterator interface {
 // FunctionListenerFactoryKey is a context.Context Value key.
 // Its associated value should be a FunctionListenerFactory.
 //
-// Deprecated: use [WithSnapshotter] to enable snapshots.
+// Deprecated: use WithFunctionListenerFactory to enable snapshots.
 type FunctionListenerFactoryKey = ctxkey.FunctionListenerFactoryKey
 
-// WithFunctionListenerFactory registers a [FunctionListenerFactory]
+// WithFunctionListenerFactory registers a FunctionListenerFactory
 // with the context.
 func WithFunctionListenerFactory(ctx context.Context, factory FunctionListenerFactory) context.Context {
 	return context.WithValue(ctx, ctxkey.FunctionListenerFactoryKey{}, factory)
