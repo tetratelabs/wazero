@@ -6,18 +6,20 @@ import (
 	"github.com/tetratelabs/wazero/internal/ctxkey"
 )
 
-// MemoryAllocator is a memory allocation hook.
-type MemoryAllocator interface {
-	// Make is invoked to create a new memory, with the given specification.
-	// Implementations must return a []byte min bytes in length,
-	// should return a []byte with at least cap capacity,
-	// and be prepared to allocate up to max bytes of memory.
-	Make(min, cap, max uint64) []byte
+// MemoryAllocator is a memory allocation hook which is invoked
+// to create a new MemoryBuffer, with the given specification:
+// min is the initial and minimum length of the backing []byte,
+// cap a suggested initial capacity, and max the maximum length
+// that will ever be requested.
+type MemoryAllocator func(min, cap, max uint64) MemoryBuffer
 
-	// Grow is invoked to grow the memory to size bytes in length.
+// MemoryBuffer is a memory buffer that backs a Wasm memory.
+type MemoryBuffer interface {
+	// Return the backing []byte for the memory buffer.
+	Buffer() []byte
+	// Grow the backing memory buffer to size bytes in length.
 	Grow(size uint64) []byte
-
-	// Free is invoked to free the memory.
+	// Free the backing memory buffer.
 	Free()
 }
 
