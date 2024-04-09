@@ -296,8 +296,8 @@ func atomicGrowLength(buf *[]byte, length uintptr) {
 	slicePtr := (*reflect.SliceHeader)(unsafe.Pointer(buf))
 	lenPtr := (*uintptr)(unsafe.Pointer(&slicePtr.Len))
 	for {
-		if old := atomic.LoadUintptr(lenPtr); old > length {
-			// Was already greater.
+		if old := atomic.LoadUintptr(lenPtr); old >= length {
+			// Was already greater or equal.
 			break
 		} else if atomic.CompareAndSwapUintptr(lenPtr, old, length) {
 			// Successfully updated.
