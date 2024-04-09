@@ -30,7 +30,7 @@ type EnableSnapshotterKey = ctxkey.EnableSnapshotterKey
 
 // WithSnapshotter enables snapshots.
 // Passing the returned context to a exported function invocation enables snapshots,
-// and allows host functions to retrieve the Snapshotter using SnapshotterKey.
+// and allows host functions to retrieve the Snapshotter using GetSnapshotter.
 func WithSnapshotter(ctx context.Context) context.Context {
 	return context.WithValue(ctx, ctxkey.EnableSnapshotterKey{}, struct{}{})
 }
