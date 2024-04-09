@@ -43,7 +43,6 @@ func (m *machine) ResolveRelocations(
 	for _, r := range relocations {
 		instrOffset := r.Offset
 		calleeFnOffset := refToBinaryOffset[r.FuncRef]
-		brInstr := executable[instrOffset : instrOffset+4]
 		diff := int64(calleeFnOffset) - (instrOffset)
 		// Check if the diff is within the range of the branch instruction.
 		if diff < minUnconditionalBranchOffset || diff > maxUnconditionalBranchOffset {
@@ -55,16 +54,8 @@ func (m *machine) ResolveRelocations(
 				panic("BUG in trampoline placement")
 			}
 		}
-		// https://developer.arm.com/documentation/ddi0596/2020-12/Base-Instructions/BL--Branch-with-Link-
-		imm26 := uint32(diff / 4)
-		brInstr[0] = byte(imm26)
-		brInstr[1] = byte(imm26 >> 8)
-		brInstr[2] = byte(imm26 >> 16)
-		if diff < 0 {
-			brInstr[3] = (byte(imm26 >> 24 & 0b000000_01)) | 0b100101_10 // Set sign bit.
-		} else {
-			brInstr[3] = (byte(imm26 >> 24 & 0b000000_01)) | 0b100101_00 // No sign bit.
-		}
+		imm26 := diff / 4
+		binary.LittleEndian.PutUint32(executable[instrOffset:instrOffset+4], encodeUnconditionalBranch(true, imm26))
 	}
 }
 
