@@ -2058,7 +2058,7 @@ func (m *machine) Encode(ctx context.Context) {
 }
 
 // ResolveRelocations implements backend.Machine.
-func (m *machine) ResolveRelocations(refToBinaryOffset map[ssa.FuncRef]int, binary []byte, relocations []backend.RelocationInfo) {
+func (m *machine) ResolveRelocations(refToBinaryOffset map[ssa.FuncRef]int, binary []byte, relocations []backend.RelocationInfo, _ []int) {
 	for _, r := range relocations {
 		offset := r.Offset
 		calleeFnOffset := refToBinaryOffset[r.FuncRef]
@@ -2071,6 +2071,9 @@ func (m *machine) ResolveRelocations(refToBinaryOffset map[ssa.FuncRef]int, bina
 		callInstrOffsetBytes[3] = byte(diff >> 24)
 	}
 }
+
+// CallTrampolineIslandInfo implements backend.Machine CallTrampolineIslandInfo.
+func (m *machine) CallTrampolineIslandInfo(_ int) (_, _ int) { return }
 
 func (m *machine) lowerIcmpToFlag(xd, yd *backend.SSAValueDefinition, _64 bool) {
 	x := m.getOperand_Reg(xd)

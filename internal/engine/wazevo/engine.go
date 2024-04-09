@@ -220,6 +220,12 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 	totalSize := 0 // Total binary size of the executable.
 	cm.functionOffsets = make([]int, localFns)
 	bodies := make([][]byte, localFns)
+
+	// Trampoline relocation related variables.
+	trampolineInterval, callTrampolineIslandSize := machine.CallTrampolineIslandInfo(localFns)
+	needCallTrampoline := callTrampolineIslandSize > 0
+	var callTrampolineIslandOffsets []int
+
 	for i := range module.CodeSection {
 		if wazevoapi.DeterministicCompilationVerifierEnabled {
 			i = wazevoapi.DeterministicCompilationVerifierGetRandomizedLocalFunctionIndex(ctx, i)
@@ -240,6 +246,13 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 		body, rels, err := e.compileLocalWasmFunction(ctx, module, wasm.Index(i), fe, ssaBuilder, be, needListener)
 		if err != nil {
 			return nil, fmt.Errorf("compile function %d/%d: %v", i, len(module.CodeSection)-1, err)
+		}
+
+		if needCallTrampoline {
+			if totalSize/trampolineInterval > len(callTrampolineIslandOffsets) {
+				callTrampolineIslandOffsets = append(callTrampolineIslandOffsets, totalSize)
+				totalSize += callTrampolineIslandSize
+			}
 		}
 
 		// Align 16-bytes boundary.
@@ -299,7 +312,7 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 
 	// Resolve relocations for local function calls.
 	if len(e.rels) > 0 {
-		machine.ResolveRelocations(e.refToBinaryOffset, executable, e.rels)
+		machine.ResolveRelocations(e.refToBinaryOffset, executable, e.rels, callTrampolineIslandOffsets)
 	}
 
 	if runtime.GOARCH == "arm64" {

@@ -25,6 +25,11 @@ type mockMachine struct {
 	linkAdjacentBlocks             func(prev, next ssa.BasicBlock)
 }
 
+func (m mockMachine) CallTrampolineIslandInfo(_ int) (_, _ int) {
+	// TODO implement me
+	panic("implement me")
+}
+
 func (m mockMachine) ArgsResultsRegs() (argResultInts, argResultFloats []regalloc.RealReg) {
 	return m.argResultInts, m.argResultFloats
 }
@@ -54,7 +59,7 @@ func (m mockMachine) CompileGoFunctionTrampoline(wazevoapi.ExitCode, *ssa.Signat
 func (m mockMachine) Encode(ctx context.Context) {}
 
 // ResolveRelocations implements Machine.ResolveRelocations.
-func (m mockMachine) ResolveRelocations(map[ssa.FuncRef]int, []byte, []RelocationInfo) {}
+func (m mockMachine) ResolveRelocations(map[ssa.FuncRef]int, []byte, []RelocationInfo, []int) {}
 
 // PostRegAlloc implements Machine.SetupPrologue.
 func (m mockMachine) PostRegAlloc() {}
