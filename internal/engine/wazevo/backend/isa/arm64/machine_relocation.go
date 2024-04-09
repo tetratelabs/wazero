@@ -46,7 +46,6 @@ func (m *machine) ResolveRelocations(
 		brInstr := executable[instrOffset : instrOffset+4]
 		diff := int64(calleeFnOffset) - (instrOffset)
 		// Check if the diff is within the range of the branch instruction.
-		var imm26 uint32
 		if diff < minUnconditionalBranchOffset || diff > maxUnconditionalBranchOffset {
 			// Find the nearest trampoline island from callTrampolineIslandOffsets.
 			islandOffset := findNearestTrampolineIsland(callTrampolineIslandOffsets, int(instrOffset))
@@ -57,7 +56,7 @@ func (m *machine) ResolveRelocations(
 			}
 		}
 		// https://developer.arm.com/documentation/ddi0596/2020-12/Base-Instructions/BL--Branch-with-Link-
-		imm26 = uint32(diff / 4)
+		imm26 := uint32(diff / 4)
 		brInstr[0] = byte(imm26)
 		brInstr[1] = byte(imm26 >> 8)
 		brInstr[2] = byte(imm26 >> 16)
