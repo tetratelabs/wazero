@@ -25,10 +25,7 @@ type mockMachine struct {
 	linkAdjacentBlocks             func(prev, next ssa.BasicBlock)
 }
 
-func (m mockMachine) CallTrampolineIslandInfo(_ int) (_, _ int) {
-	// TODO implement me
-	panic("implement me")
-}
+func (m mockMachine) CallTrampolineIslandInfo(_ int) (_, _ int) { panic("implement me") }
 
 func (m mockMachine) ArgsResultsRegs() (argResultInts, argResultFloats []regalloc.RealReg) {
 	return m.argResultInts, m.argResultFloats

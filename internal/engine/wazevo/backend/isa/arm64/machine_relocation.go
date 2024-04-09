@@ -56,9 +56,8 @@ func (m *machine) ResolveRelocations(
 				panic("BUG in trampoline placement")
 			}
 		}
-		imm26 = uint32(diff / 4)
-
 		// https://developer.arm.com/documentation/ddi0596/2020-12/Base-Instructions/BL--Branch-with-Link-
+		imm26 = uint32(diff / 4)
 		brInstr[0] = byte(imm26)
 		brInstr[1] = byte(imm26 >> 8)
 		brInstr[2] = byte(imm26 >> 16)
