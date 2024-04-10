@@ -220,6 +220,15 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 	totalSize := 0 // Total binary size of the executable.
 	cm.functionOffsets = make([]int, localFns)
 	bodies := make([][]byte, localFns)
+
+	// Trampoline relocation related variables.
+	trampolineInterval, callTrampolineIslandSize, err := machine.CallTrampolineIslandInfo(localFns)
+	if err != nil {
+		return nil, err
+	}
+	needCallTrampoline := callTrampolineIslandSize > 0
+	var callTrampolineIslandOffsets []int // Holds the offsets of trampoline islands.
+
 	for i := range module.CodeSection {
 		if wazevoapi.DeterministicCompilationVerifierEnabled {
 			i = wazevoapi.DeterministicCompilationVerifierGetRandomizedLocalFunctionIndex(ctx, i)
@@ -273,6 +282,14 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 		if wazevoapi.PrintMachineCodeHexPerFunction {
 			fmt.Printf("[[[machine code for %s]]]\n%s\n\n", wazevoapi.GetCurrentFunctionName(ctx), hex.EncodeToString(body))
 		}
+
+		if needCallTrampoline {
+			// If the total size exceeds the trampoline interval, we need to add a trampoline island.
+			if totalSize/trampolineInterval > len(callTrampolineIslandOffsets) {
+				callTrampolineIslandOffsets = append(callTrampolineIslandOffsets, totalSize)
+				totalSize += callTrampolineIslandSize
+			}
+		}
 	}
 
 	// Allocate executable memory and then copy the generated machine code.
@@ -299,7 +316,7 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 
 	// Resolve relocations for local function calls.
 	if len(e.rels) > 0 {
-		machine.ResolveRelocations(e.refToBinaryOffset, executable, e.rels)
+		machine.ResolveRelocations(e.refToBinaryOffset, executable, e.rels, callTrampolineIslandOffsets)
 	}
 
 	if runtime.GOARCH == "arm64" {
@@ -419,7 +436,9 @@ func (e *engine) compileHostModule(ctx context.Context, module *wasm.Module, lis
 
 		be.Init()
 		machine.CompileGoFunctionTrampoline(exitCode, &sig, true)
-		be.Finalize(ctx)
+		if err := be.Finalize(ctx); err != nil {
+			return nil, err
+		}
 		body := be.Buf()
 
 		if wazevoapi.PerfMapEnabled {

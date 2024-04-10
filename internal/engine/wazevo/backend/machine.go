@@ -59,10 +59,19 @@ type (
 		PostRegAlloc()
 
 		// ResolveRelocations resolves the relocations after emitting machine code.
-		ResolveRelocations(refToBinaryOffset map[ssa.FuncRef]int, binary []byte, relocations []RelocationInfo)
+		//  * refToBinaryOffset: the map from the function reference to the executable offset.
+		//  * executable: the binary to resolve the relocations.
+		//  * relocations: the relocations to resolve.
+		//  * callTrampolineIslandOffsets: the offsets of the trampoline islands in the executable.
+		ResolveRelocations(
+			refToBinaryOffset map[ssa.FuncRef]int,
+			executable []byte,
+			relocations []RelocationInfo,
+			callTrampolineIslandOffsets []int,
+		)
 
 		// Encode encodes the machine instructions to the Compiler.
-		Encode(ctx context.Context)
+		Encode(ctx context.Context) error
 
 		// CompileGoFunctionTrampoline compiles the trampoline function  to call a Go function of the given exit code and signature.
 		CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *ssa.Signature, needModuleContextPtr bool) []byte
@@ -83,5 +92,9 @@ type (
 
 		// ArgsResultsRegs returns the registers used for arguments and return values.
 		ArgsResultsRegs() (argResultInts, argResultFloats []regalloc.RealReg)
+
+		// CallTrampolineIslandInfo returns the interval of the offset where the trampoline island is placed, and
+		// the size of the trampoline island. If islandSize is zero, the trampoline island is not used on this machine.
+		CallTrampolineIslandInfo(numFunctions int) (interval, islandSize int, err error)
 	}
 )

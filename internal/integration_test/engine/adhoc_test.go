@@ -74,6 +74,7 @@ var tests = map[string]testCase{
 	"many params many results / call_many_consts_and_pick_last_vector / listener": {f: testManyParamsResultsCallManyConstsAndPickLastVectorListener},
 	"close table importing module": {f: testCloseTableImportingModule},
 	"close table exporting module": {f: testCloseTableExportingModule},
+	"huge binary":                  {f: testHugeBinary},
 }
 
 func TestEngineCompiler(t *testing.T) {
@@ -2360,4 +2361,67 @@ func instantiateClose(t *testing.T, r wazero.Runtime, ctx context.Context, bin [
 	require.NoError(t, err)
 	require.NoError(t, compiled.Close(ctx))
 	runtime.GC()
+}
+
+// testHugeBinary is supposed to do e2e on huge relocation in arm64.
+func testHugeBinary(t *testing.T, r wazero.Runtime) {
+	if testing.Short() {
+		t.Skip("skipping testHugeBinary in short mode since it takes a long time")
+	}
+	var addFuncBody []byte
+	for i := 0; i < 1024; i++ {
+		addFuncBody = append(addFuncBody, wasm.OpcodeLocalGet, 0)
+		addFuncBody = append(addFuncBody, wasm.OpcodeI32Const)
+		addFuncBody = append(addFuncBody, leb128.EncodeInt32(int32(i))...)
+		addFuncBody = append(addFuncBody, wasm.OpcodeI32Add)
+		addFuncBody = append(addFuncBody, wasm.OpcodeLocalSet, 0)
+	}
+	addFuncBody = append(addFuncBody, wasm.OpcodeLocalGet, 0, wasm.OpcodeEnd)
+
+	const functionCount = 40000
+	// The first function calls the second last function.
+	var firstFunctionBody []byte
+	firstFunctionBody = append(firstFunctionBody, wasm.OpcodeLocalGet, 0)
+	firstFunctionBody = append(firstFunctionBody, wasm.OpcodeCall)
+	firstFunctionBody = append(firstFunctionBody, leb128.EncodeUint32(functionCount-2)...)
+	firstFunctionBody = append(firstFunctionBody, wasm.OpcodeEnd)
+	// The last function calls the second function.
+	lastFunctionBody := []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeCall, 1, wasm.OpcodeEnd}
+
+	// Create a Code section with 20000 functions.
+	codes := make([]wasm.Code, functionCount)
+	codes[0] = wasm.Code{Body: firstFunctionBody}
+	for i := 0; i < functionCount-2; i++ {
+		codes[i+1] = wasm.Code{Body: addFuncBody}
+	}
+	codes[functionCount-1] = wasm.Code{Body: lastFunctionBody}
+
+	funcType := wasm.FunctionType{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32}}
+	m := &wasm.Module{}
+	m.FunctionSection = make([]wasm.Index, functionCount)
+	m.CodeSection = codes
+	m.TypeSection = []wasm.FunctionType{funcType}
+	// Export the first and last function.
+	m.ExportSection = []wasm.Export{
+		{Name: "first", Type: wasm.ExternTypeFunc, Index: 0},
+		{Name: "last", Type: wasm.ExternTypeFunc, Index: functionCount - 1},
+	}
+
+	bin := binaryencoding.EncodeModule(m)
+
+	ctx := context.Background()
+	mod, err := r.Instantiate(ctx, bin)
+	require.NoError(t, err)
+
+	first := mod.ExportedFunction("first")
+	require.NotNil(t, first)
+	res, err := first.Call(ctx, 0)
+	require.NoError(t, err)
+	require.Equal(t, uint64(1023*1024/2), res[0])
+
+	last := mod.ExportedFunction("last")
+	require.NotNil(t, last)
+	res, err = last.Call(ctx, 0)
+	require.NoError(t, err)
+	require.Equal(t, uint64(1023*1024/2), res[0])
 }

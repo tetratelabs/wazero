@@ -370,10 +370,9 @@ L3:
 		t.Run(tc.name, func(t *testing.T) {
 			_, _, m := newSetupWithMockContext()
 			m.CompileGoFunctionTrampoline(tc.exitCode, tc.sig, tc.needModuleContextPtr)
-
 			require.Equal(t, tc.exp, m.Format())
-
-			m.Encode(context.Background())
+			err := m.Encode(context.Background())
+			require.NoError(t, err)
 		})
 	}
 }
@@ -521,7 +520,8 @@ L2:
 			_, _, m := newSetupWithMockContext()
 			m.ectx.RootInstr = m.allocateNop()
 			m.insertStackBoundsCheck(tc.requiredStackSize, m.ectx.RootInstr)
-			m.Encode(context.Background())
+			err := m.Encode(context.Background())
+			require.NoError(t, err)
 			require.Equal(t, tc.exp, m.Format())
 		})
 	}

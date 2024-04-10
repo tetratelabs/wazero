@@ -97,11 +97,11 @@ func (m *mockCompiler) Buf() []byte { return m.buf }
 func (m *mockCompiler) TypeOf(v regalloc.VReg) (ret ssa.Type) {
 	return m.typeOf[v.ID()]
 }
-func (m *mockCompiler) Finalize(context.Context) {}
-func (m *mockCompiler) RegAlloc()                {}
-func (m *mockCompiler) Lower()                   {}
-func (m *mockCompiler) Format() string           { return "" }
-func (m *mockCompiler) Init()                    {}
+func (m *mockCompiler) Finalize(context.Context) (err error) { return }
+func (m *mockCompiler) RegAlloc()                            {}
+func (m *mockCompiler) Lower()                               {}
+func (m *mockCompiler) Format() string                       { return "" }
+func (m *mockCompiler) Init()                                {}
 
 func newMockCompilationContext() *mockCompiler {
 	return &mockCompiler{

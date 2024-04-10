@@ -2375,7 +2375,8 @@ L2 (SSA Block: blk2):
 				fmt.Println(be.Format())
 			}
 
-			be.Finalize(context.Background())
+			err = be.Finalize(context.Background())
+			require.NoError(t, err)
 			if verbose {
 				fmt.Println("============ finalization result ============")
 				fmt.Println(be.Format())

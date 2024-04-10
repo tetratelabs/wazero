@@ -535,7 +535,8 @@ func TestMachine_goEntryPreamblePassArg(t *testing.T) {
 			m.executableContext.RootInstr = cur
 			m.goEntryPreamblePassArg(cur, paramSlicePtr, &tc.arg, tc.argSlotBeginOffsetFromSP)
 			require.Equal(t, tc.exp, m.Format())
-			m.Encode(context.Background())
+			err := m.Encode(context.Background())
+			require.NoError(t, err)
 		})
 	}
 }
@@ -688,7 +689,8 @@ func TestMachine_goEntryPreamblePassResult(t *testing.T) {
 			m.executableContext.RootInstr = cur
 			m.goEntryPreamblePassResult(cur, paramSlicePtr, &tc.arg, tc.retStart)
 			require.Equal(t, tc.exp, m.Format())
-			m.Encode(context.Background())
+			err := m.Encode(context.Background())
+			require.NoError(t, err)
 		})
 	}
 }

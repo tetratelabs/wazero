@@ -451,7 +451,8 @@ func TestMachine_CompileGoFunctionTrampoline(t *testing.T) {
 
 			require.Equal(t, tc.exp, m.Format())
 
-			m.Encode(context.Background())
+			err := m.Encode(context.Background())
+			require.NoError(t, err)
 		})
 	}
 }
@@ -519,7 +520,8 @@ func Test_goFunctionCallLoadStackArg(t *testing.T) {
 				m.executableContext.RootInstr = nop
 
 				require.Equal(t, tc.exp, m.Format())
-				m.Encode(context.Background())
+				err := m.Encode(context.Background())
+				require.NoError(t, err)
 			})
 		})
 	}
@@ -585,7 +587,8 @@ func Test_goFunctionCallStoreStackResult(t *testing.T) {
 				m.executableContext.RootInstr = nop
 
 				require.Equal(t, tc.exp, m.Format())
-				m.Encode(context.Background())
+				err := m.Encode(context.Background())
+				require.NoError(t, err)
 			})
 		})
 	}

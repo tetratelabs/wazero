@@ -77,7 +77,8 @@ func TestMachine_setupPrologue(t *testing.T) {
 
 			m.setupPrologue()
 			require.Equal(t, root, m.ectx.RootInstr)
-			m.Encode(context.Background())
+			err := m.Encode(context.Background())
+			require.NoError(t, err)
 			require.Equal(t, tc.exp, m.Format())
 		})
 	}
@@ -151,7 +152,8 @@ func TestMachine_postRegAlloc(t *testing.T) {
 			m.postRegAlloc()
 
 			require.Equal(t, root, m.ectx.RootInstr)
-			m.Encode(context.Background())
+			err := m.Encode(context.Background())
+			require.NoError(t, err)
 			require.Equal(t, tc.exp, m.Format())
 		})
 	}
