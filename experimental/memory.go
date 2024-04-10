@@ -18,6 +18,8 @@ type MemoryBuffer interface {
 	// Return the backing []byte for the memory buffer.
 	Buffer() []byte
 	// Grow the backing memory buffer to size bytes in length.
+	// To back a shared memory, Grow can't change the address
+	// of the backing []byte (only its length/capacity may change).
 	Grow(size uint64) []byte
 	// Free the backing memory buffer.
 	Free()

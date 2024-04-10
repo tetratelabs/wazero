@@ -69,10 +69,10 @@ func NewMemoryInstance(memSec *Memory, allocator experimental.MemoryAllocator) *
 	maxBytes := MemoryPagesToBytesNum(memSec.Max)
 
 	var buffer []byte
-	var alloc experimental.MemoryBuffer
+	var expBuffer experimental.MemoryBuffer
 	if allocator != nil {
-		alloc = allocator(minBytes, capBytes, maxBytes)
-		buffer = alloc.Buffer()
+		expBuffer = allocator(minBytes, capBytes, maxBytes)
+		buffer = expBuffer.Buffer()
 	} else if memSec.IsShared {
 		// Shared memory needs a fixed buffer, so allocate with the maximum size.
 		//
@@ -94,7 +94,7 @@ func NewMemoryInstance(memSec *Memory, allocator experimental.MemoryAllocator) *
 		Cap:       memoryBytesNumToPages(uint64(cap(buffer))),
 		Max:       memSec.Max,
 		Shared:    memSec.IsShared,
-		expBuffer: alloc,
+		expBuffer: expBuffer,
 	}
 }
 
@@ -236,11 +236,11 @@ func (m *MemoryInstance) Grow(delta uint32) (result uint32, ok bool) {
 		buffer := m.expBuffer.Grow(MemoryPagesToBytesNum(newPages))
 		if m.Shared {
 			if unsafe.SliceData(buffer) != unsafe.SliceData(m.Buffer) {
-				panic("shared memory cannot move")
+				panic("shared memory cannot move, this is a bug in the memory allocator")
 			}
 			// We assume grow is called under a guest lock.
 			// But the memory length is accessed elsewhere,
-			// Use atomic to make the new length visible across threads.
+			// so use atomic to make the new length visible across threads.
 			atomicStoreLength(&m.Buffer, uintptr(len(buffer)))
 			m.Cap = memoryBytesNumToPages(uint64(cap(buffer)))
 		} else {
@@ -259,7 +259,7 @@ func (m *MemoryInstance) Grow(delta uint32) (result uint32, ok bool) {
 		if m.Shared {
 			// We assume grow is called under a guest lock.
 			// But the memory length is accessed elsewhere,
-			// Use atomic to make the new length visible across threads.
+			// so use atomic to make the new length visible across threads.
 			atomicStoreLength(&m.Buffer, uintptr(MemoryPagesToBytesNum(newPages)))
 		} else {
 			m.Buffer = m.Buffer[:MemoryPagesToBytesNum(newPages)]
@@ -296,7 +296,7 @@ func PagesToUnitOfBytes(pages uint32) string {
 
 // Uses atomic write to update the length of a slice.
 func atomicStoreLength(slice *[]byte, length uintptr) {
-	slicePtr := (*reflect.SliceHeader)(unsafe.Pointer(&slice))
+	slicePtr := (*reflect.SliceHeader)(unsafe.Pointer(slice))
 	lenPtr := (*uintptr)(unsafe.Pointer(&slicePtr.Len))
 	atomic.StoreUintptr(lenPtr, length)
 }
