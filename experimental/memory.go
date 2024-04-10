@@ -8,7 +8,7 @@ import (
 
 // MemoryAllocator is a memory allocation hook which is invoked
 // to create a new MemoryBuffer, with the given specification:
-// min is the initial and minimum length of the backing []byte,
+// min is the initial and minimum length (in bytes) of the backing []byte,
 // cap a suggested initial capacity, and max the maximum length
 // that will ever be requested.
 type MemoryAllocator func(min, cap, max uint64) MemoryBuffer
