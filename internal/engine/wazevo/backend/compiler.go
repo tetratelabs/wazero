@@ -52,7 +52,7 @@ type Compiler interface {
 
 	// Finalize performs the finalization of the compilation, including machine code emission.
 	// This must be called after RegAlloc.
-	Finalize(ctx context.Context)
+	Finalize(ctx context.Context) error
 
 	// Buf returns the buffer of the encoded machine code. This is only used for testing purpose.
 	Buf() []byte
@@ -175,7 +175,9 @@ func (c *compiler) Compile(ctx context.Context) ([]byte, []RelocationInfo, error
 	if wazevoapi.DeterministicCompilationVerifierEnabled {
 		wazevoapi.VerifyOrSetDeterministicCompilationContextValue(ctx, "After Register Allocation", c.Format())
 	}
-	c.Finalize(ctx)
+	if err := c.Finalize(ctx); err != nil {
+		return nil, nil, err
+	}
 	if wazevoapi.PrintFinalizedMachineCode && wazevoapi.PrintEnabledIndex(ctx) {
 		fmt.Printf("[[[after finalize for %s]]]%s\n", wazevoapi.GetCurrentFunctionName(ctx), c.Format())
 	}
@@ -191,9 +193,9 @@ func (c *compiler) RegAlloc() {
 }
 
 // Finalize implements Compiler.Finalize.
-func (c *compiler) Finalize(ctx context.Context) {
+func (c *compiler) Finalize(ctx context.Context) error {
 	c.mach.PostRegAlloc()
-	c.mach.Encode(ctx)
+	return c.mach.Encode(ctx)
 }
 
 // setCurrentGroupID sets the current instruction group ID.

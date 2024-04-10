@@ -2,6 +2,7 @@ package arm64
 
 import (
 	"encoding/binary"
+	"fmt"
 	"math"
 	"sort"
 
@@ -10,6 +11,7 @@ import (
 )
 
 const (
+	// trampolineCallSize is the size of the trampoline instruction sequence for each function in an island.
 	trampolineCallSize = 4*4 + 4 // Four instructions + 32-bit immediate.
 
 	// Unconditional branch offset is encoded as divided by 4 in imm26.
@@ -17,16 +19,25 @@ const (
 
 	maxUnconditionalBranchOffset = maxSignedInt26 * 4
 	minUnconditionalBranchOffset = minSignedInt26 * 4
+
+	// trampolineIslandInterval is the range of the trampoline island.
+	// Half of the range is used for the trampoline island, and the other half is used for the function.
+	trampolineIslandInterval = maxUnconditionalBranchOffset / 2
+
+	// maxNumFunctions explicitly specifies the maximum number of functions that can be allowed in a single executable.
+	maxNumFunctions = trampolineIslandInterval >> 6
+
+	// maxFunctionExecutableSize is the maximum size of a function that can exist in a trampoline island.
+	// Conservatively set to 1/4 of the trampoline island interval.
+	maxFunctionExecutableSize = trampolineIslandInterval >> 2
 )
 
 // CallTrampolineIslandInfo implements backend.Machine CallTrampolineIslandInfo.
-func (m *machine) CallTrampolineIslandInfo(numFunctions int) (interval, size int) {
-	// Always place trampoline in the middle of the range.
-	// TODO: precondition is that neither the trampoline size or a single function size is bigger than the range.
-	//	Add asserts to check this.
-	interval = int(maxUnconditionalBranchOffset) / 2
-	size = trampolineCallSize * numFunctions
-	return
+func (m *machine) CallTrampolineIslandInfo(numFunctions int) (interval, size int, err error) {
+	if numFunctions > maxNumFunctions {
+		return 0, 0, fmt.Errorf("too many functions: %d > %d", numFunctions, maxNumFunctions)
+	}
+	return trampolineIslandInterval, trampolineCallSize * numFunctions, nil
 }
 
 // ResolveRelocations implements backend.Machine ResolveRelocations.
@@ -46,16 +57,15 @@ func (m *machine) ResolveRelocations(
 		diff := int64(calleeFnOffset) - (instrOffset)
 		// Check if the diff is within the range of the branch instruction.
 		if diff < minUnconditionalBranchOffset || diff > maxUnconditionalBranchOffset {
-			// Find the nearest trampoline island from callTrampolineIslandOffsets.
-			islandOffset := findNearestTrampolineIsland(callTrampolineIslandOffsets, int(instrOffset))
+			// Find the near trampoline island from callTrampolineIslandOffsets.
+			islandOffset := searchTrampolineIsland(callTrampolineIslandOffsets, int(instrOffset))
 			islandTargetOffset := islandOffset + trampolineCallSize*int(r.FuncRef)
 			diff = int64(islandTargetOffset) - (instrOffset)
 			if diff < minUnconditionalBranchOffset || diff > maxUnconditionalBranchOffset {
 				panic("BUG in trampoline placement")
 			}
 		}
-		imm26 := diff / 4
-		binary.LittleEndian.PutUint32(executable[instrOffset:instrOffset+4], encodeUnconditionalBranch(true, imm26))
+		binary.LittleEndian.PutUint32(executable[instrOffset:instrOffset+4], encodeUnconditionalBranch(true, diff))
 	}
 }
 
@@ -91,10 +101,12 @@ func encodeCallTrampolineIsland(refToBinaryOffset map[ssa.FuncRef]int, islandOff
 	}
 }
 
-// findNearestTrampolineIsland finds the nearest trampoline island from callTrampolineIslandOffsets.
+// searchTrampolineIsland finds the nearest trampoline island from callTrampolineIslandOffsets.
+// Note that even if the offset is in the middle of two islands, it returns the latter one.
+// That is ok because the island is always placed in the middle of the range.
+//
 // precondition: callTrampolineIslandOffsets is sorted in ascending order.
-func findNearestTrampolineIsland(callTrampolineIslandOffsets []int, offset int) int {
-	// Find the nearest trampoline island from callTrampolineIslandOffsets.
+func searchTrampolineIsland(callTrampolineIslandOffsets []int, offset int) int {
 	l := len(callTrampolineIslandOffsets)
 	n := sort.Search(l, func(i int) bool {
 		return callTrampolineIslandOffsets[i] >= offset

@@ -222,9 +222,12 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 	bodies := make([][]byte, localFns)
 
 	// Trampoline relocation related variables.
-	trampolineInterval, callTrampolineIslandSize := machine.CallTrampolineIslandInfo(localFns)
+	trampolineInterval, callTrampolineIslandSize, err := machine.CallTrampolineIslandInfo(localFns)
+	if err != nil {
+		return nil, err
+	}
 	needCallTrampoline := callTrampolineIslandSize > 0
-	var callTrampolineIslandOffsets []int
+	var callTrampolineIslandOffsets []int // Holds the offsets of trampoline islands.
 
 	for i := range module.CodeSection {
 		if wazevoapi.DeterministicCompilationVerifierEnabled {
@@ -246,13 +249,6 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 		body, rels, err := e.compileLocalWasmFunction(ctx, module, wasm.Index(i), fe, ssaBuilder, be, needListener)
 		if err != nil {
 			return nil, fmt.Errorf("compile function %d/%d: %v", i, len(module.CodeSection)-1, err)
-		}
-
-		if needCallTrampoline {
-			if totalSize/trampolineInterval > len(callTrampolineIslandOffsets) {
-				callTrampolineIslandOffsets = append(callTrampolineIslandOffsets, totalSize)
-				totalSize += callTrampolineIslandSize
-			}
 		}
 
 		// Align 16-bytes boundary.
@@ -285,6 +281,14 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 		totalSize += len(body)
 		if wazevoapi.PrintMachineCodeHexPerFunction {
 			fmt.Printf("[[[machine code for %s]]]\n%s\n\n", wazevoapi.GetCurrentFunctionName(ctx), hex.EncodeToString(body))
+		}
+
+		if needCallTrampoline {
+			// If the total size exceeds the trampoline interval, we need to add a trampoline island.
+			if totalSize/trampolineInterval > len(callTrampolineIslandOffsets) {
+				callTrampolineIslandOffsets = append(callTrampolineIslandOffsets, totalSize)
+				totalSize += callTrampolineIslandSize
+			}
 		}
 	}
 
@@ -432,7 +436,9 @@ func (e *engine) compileHostModule(ctx context.Context, module *wasm.Module, lis
 
 		be.Init()
 		machine.CompileGoFunctionTrampoline(exitCode, &sig, true)
-		be.Finalize(ctx)
+		if err := be.Finalize(ctx); err != nil {
+			return nil, err
+		}
 		body := be.Buf()
 
 		if wazevoapi.PerfMapEnabled {

@@ -110,7 +110,8 @@ func TestMachine_setupPrologue(t *testing.T) {
 
 			m.setupPrologue()
 			require.Equal(t, root, m.executableContext.RootInstr)
-			m.Encode(context.Background())
+			err := m.Encode(context.Background())
+			require.NoError(t, err)
 			require.Equal(t, tc.exp, m.Format())
 		})
 	}
@@ -223,7 +224,8 @@ func TestMachine_postRegAlloc(t *testing.T) {
 			m.postRegAlloc()
 
 			require.Equal(t, root, m.executableContext.RootInstr)
-			m.Encode(context.Background())
+			err := m.Encode(context.Background())
+			require.NoError(t, err)
 			require.Equal(t, tc.exp, m.Format())
 		})
 	}
@@ -268,7 +270,8 @@ func TestMachine_insertStackBoundsCheck(t *testing.T) {
 			m.executableContext.RootInstr = m.allocateInstr()
 			m.executableContext.RootInstr.asNop0()
 			m.insertStackBoundsCheck(tc.requiredStackSize, m.executableContext.RootInstr)
-			m.Encode(context.Background())
+			err := m.Encode(context.Background())
+			require.NoError(t, err)
 			require.Equal(t, tc.exp, m.Format())
 		})
 	}

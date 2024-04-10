@@ -71,7 +71,7 @@ type (
 		)
 
 		// Encode encodes the machine instructions to the Compiler.
-		Encode(ctx context.Context)
+		Encode(ctx context.Context) error
 
 		// CompileGoFunctionTrampoline compiles the trampoline function  to call a Go function of the given exit code and signature.
 		CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *ssa.Signature, needModuleContextPtr bool) []byte
@@ -95,6 +95,6 @@ type (
 
 		// CallTrampolineIslandInfo returns the interval of the offset where the trampoline island is placed, and
 		// the size of the trampoline island. If islandSize is zero, the trampoline island is not used on this machine.
-		CallTrampolineIslandInfo(numFunctions int) (interval, islandSize int)
+		CallTrampolineIslandInfo(numFunctions int) (interval, islandSize int, err error)
 	}
 )

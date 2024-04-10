@@ -388,11 +388,11 @@ func (m *machine) resolveRelativeAddresses(ctx context.Context) {
 }
 
 const (
-	maxSignedInt26 int64 = 1<<25 - 1
-	minSignedInt26 int64 = -(1 << 25)
+	maxSignedInt26 = 1<<25 - 1
+	minSignedInt26 = -(1 << 25)
 
-	maxSignedInt19 int64 = 1<<19 - 1
-	minSignedInt19 int64 = -(1 << 19)
+	maxSignedInt19 = 1<<19 - 1
+	minSignedInt19 = -(1 << 19)
 )
 
 func (m *machine) insertConditionalJumpTrampoline(cbr *instruction, currentBlk *labelPosition, nextLabel label) {
