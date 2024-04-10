@@ -151,27 +151,24 @@ func (m *ModuleInstance) ensureResourcesClosed(ctx context.Context) (err error) 
 	}
 
 	if sysCtx := m.Sys; sysCtx != nil { // nil if from HostModuleBuilder
-		if err = sysCtx.FS().Close(); err != nil {
-			return err
-		}
+		err = sysCtx.FS().Close()
 		m.Sys = nil
 	}
 
 	if mem := m.MemoryInstance; mem != nil {
-		if mem.allocator != nil {
-			mem.allocator.Free()
-			mem.allocator = nil
+		if mem.expBuffer != nil {
+			mem.expBuffer.Free()
+			mem.expBuffer = nil
 		}
 	}
 
-	if m.CodeCloser == nil {
-		return
+	if m.CodeCloser != nil {
+		if e := m.CodeCloser.Close(ctx); err == nil {
+			err = e
+		}
+		m.CodeCloser = nil
 	}
-	if e := m.CodeCloser.Close(ctx); e != nil && err == nil {
-		err = e
-	}
-	m.CodeCloser = nil
-	return
+	return err
 }
 
 // Memory implements the same method as documented on api.Module.

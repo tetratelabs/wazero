@@ -59,19 +59,19 @@ type MemoryInstance struct {
 	// with a fixed weight of 1 and no spurious notifications.
 	waiters sync.Map
 
-	allocator experimental.MemoryBuffer
+	expBuffer experimental.MemoryBuffer
 }
 
 // NewMemoryInstance creates a new instance based on the parameters in the SectionIDMemory.
 func NewMemoryInstance(memSec *Memory, allocator experimental.MemoryAllocator) *MemoryInstance {
-	min := MemoryPagesToBytesNum(memSec.Min)
-	cur := MemoryPagesToBytesNum(memSec.Cap)
-	max := MemoryPagesToBytesNum(memSec.Max)
+	minBytes := MemoryPagesToBytesNum(memSec.Min)
+	capBytes := MemoryPagesToBytesNum(memSec.Cap)
+	maxBytes := MemoryPagesToBytesNum(memSec.Max)
 
 	var buffer []byte
 	var alloc experimental.MemoryBuffer
 	if allocator != nil {
-		alloc = allocator(min, cur, max)
+		alloc = allocator(minBytes, capBytes, maxBytes)
 		buffer = alloc.Buffer()
 	} else if memSec.IsShared {
 		// Shared memory needs a fixed buffer, so allocate with the maximum size.
@@ -84,9 +84,9 @@ func NewMemoryInstance(memSec *Memory, allocator experimental.MemoryAllocator) *
 		// the memory buffer allocation here is virtual and doesn't consume physical memory until it's used.
 		// 	* https://github.com/golang/go/blob/8121604559035734c9677d5281bbdac8b1c17a1e/src/runtime/malloc.go#L1059
 		//	* https://github.com/golang/go/blob/8121604559035734c9677d5281bbdac8b1c17a1e/src/runtime/malloc.go#L1165
-		buffer = make([]byte, min, max)
+		buffer = make([]byte, minBytes, maxBytes)
 	} else {
-		buffer = make([]byte, min, cur)
+		buffer = make([]byte, minBytes, capBytes)
 	}
 	return &MemoryInstance{
 		Buffer:    buffer,
@@ -94,7 +94,7 @@ func NewMemoryInstance(memSec *Memory, allocator experimental.MemoryAllocator) *
 		Cap:       memoryBytesNumToPages(uint64(cap(buffer))),
 		Max:       memSec.Max,
 		Shared:    memSec.IsShared,
-		allocator: alloc,
+		expBuffer: alloc,
 	}
 }
 
@@ -232,14 +232,16 @@ func (m *MemoryInstance) Grow(delta uint32) (result uint32, ok bool) {
 	newPages := currentPages + delta
 	if newPages > m.Max || int32(delta) < 0 {
 		return 0, false
-	} else if m.allocator != nil {
-		buffer := m.allocator.Grow(MemoryPagesToBytesNum(newPages))
+	} else if m.expBuffer != nil {
+		buffer := m.expBuffer.Grow(MemoryPagesToBytesNum(newPages))
 		if m.Shared {
 			if unsafe.SliceData(buffer) != unsafe.SliceData(m.Buffer) {
 				panic("shared memory cannot move")
 			}
-			// Use atomic to ensure maximum length is visible across threads.
-			atomicGrowLength(&m.Buffer, uintptr(len(buffer)))
+			// We assume grow is called under a guest lock.
+			// But the memory length is accessed elsewhere,
+			// Use atomic to make the new length visible across threads.
+			atomicStoreLength(&m.Buffer, uintptr(len(buffer)))
 			m.Cap = memoryBytesNumToPages(uint64(cap(buffer)))
 		} else {
 			m.Buffer = buffer
@@ -255,8 +257,10 @@ func (m *MemoryInstance) Grow(delta uint32) (result uint32, ok bool) {
 		return currentPages, true
 	} else { // We already have the capacity we need.
 		if m.Shared {
-			// Use atomic to ensure maximum length is visible across threads.
-			atomicGrowLength(&m.Buffer, uintptr(MemoryPagesToBytesNum(newPages)))
+			// We assume grow is called under a guest lock.
+			// But the memory length is accessed elsewhere,
+			// Use atomic to make the new length visible across threads.
+			atomicStoreLength(&m.Buffer, uintptr(MemoryPagesToBytesNum(newPages)))
 		} else {
 			m.Buffer = m.Buffer[:MemoryPagesToBytesNum(newPages)]
 		}
@@ -290,20 +294,11 @@ func PagesToUnitOfBytes(pages uint32) string {
 
 // Below are raw functions used to implement the api.Memory API:
 
-// Uses atomic to set the length of the buf slice to the maximum
-// of the previous and new lengths.
-func atomicGrowLength(buf *[]byte, length uintptr) {
-	slicePtr := (*reflect.SliceHeader)(unsafe.Pointer(buf))
+// Uses atomic write to update the length of a slice.
+func atomicStoreLength(slice *[]byte, length uintptr) {
+	slicePtr := (*reflect.SliceHeader)(unsafe.Pointer(&slice))
 	lenPtr := (*uintptr)(unsafe.Pointer(&slicePtr.Len))
-	for {
-		if old := atomic.LoadUintptr(lenPtr); old >= length {
-			// Was already greater or equal.
-			break
-		} else if atomic.CompareAndSwapUintptr(lenPtr, old, length) {
-			// Successfully updated.
-			break
-		}
-	}
+	atomic.StoreUintptr(lenPtr, length)
 }
 
 // memoryBytesNumToPages converts the given number of bytes into the number of pages.
