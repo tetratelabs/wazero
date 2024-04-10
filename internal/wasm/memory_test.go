@@ -9,6 +9,7 @@ import (
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
@@ -34,9 +35,11 @@ func TestMemoryInstance_Grow_Size(t *testing.T) {
 	tests := []struct {
 		name         string
 		capEqualsMax bool
+		expAllocator bool
 	}{
 		{name: ""},
 		{name: "capEqualsMax", capEqualsMax: true},
+		{name: "expAllocator", expAllocator: true},
 	}
 
 	for _, tt := range tests {
@@ -46,10 +49,14 @@ func TestMemoryInstance_Grow_Size(t *testing.T) {
 			max := uint32(10)
 			maxBytes := MemoryPagesToBytesNum(max)
 			var m *MemoryInstance
-			if tc.capEqualsMax {
-				m = &MemoryInstance{Cap: max, Max: max, Buffer: make([]byte, 0, maxBytes)}
-			} else {
+			switch {
+			default:
 				m = &MemoryInstance{Max: max, Buffer: make([]byte, 0)}
+			case tc.capEqualsMax:
+				m = &MemoryInstance{Cap: max, Max: max, Buffer: make([]byte, 0, maxBytes)}
+			case tc.expAllocator:
+				expBuffer := sliceAllocator(0, 0, maxBytes)
+				m = &MemoryInstance{Max: max, Buffer: expBuffer.Buffer(), expBuffer: expBuffer}
 			}
 
 			res, ok := m.Grow(5)
@@ -814,6 +821,13 @@ func BenchmarkWriteString(b *testing.B) {
 	}
 }
 
+func Test_atomicStoreLength(t *testing.T) {
+	// Doesn't verify atomicity, but at least we're updating the correct thing.
+	slice := make([]byte, 10, 20)
+	atomicStoreLength(&slice, 15)
+	require.Equal(t, 15, len(slice))
+}
+
 func TestNewMemoryInstance_Shared(t *testing.T) {
 	tests := []struct {
 		name string
@@ -832,7 +846,7 @@ func TestNewMemoryInstance_Shared(t *testing.T) {
 	for _, tc := range tests {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			m := NewMemoryInstance(tc.mem)
+			m := NewMemoryInstance(tc.mem, nil)
 			require.Equal(t, tc.mem.Min, m.Min)
 			require.Equal(t, tc.mem.Max, m.Max)
 			require.True(t, m.Shared)
@@ -978,4 +992,26 @@ func requireChannelEmpty(t *testing.T, ch chan string) {
 	default:
 		// fallthrough
 	}
+}
+
+func sliceAllocator(min, cap, max uint64) experimental.MemoryBuffer {
+	return &sliceBuffer{make([]byte, min, cap), max}
+}
+
+type sliceBuffer struct {
+	buf []byte
+	max uint64
+}
+
+func (b *sliceBuffer) Free() {}
+
+func (b *sliceBuffer) Buffer() []byte { return b.buf }
+
+func (b *sliceBuffer) Grow(size uint64) []byte {
+	if cap := uint64(cap(b.buf)); size > cap {
+		b.buf = append(b.buf[:cap], make([]byte, size-cap)...)
+	} else {
+		b.buf = b.buf[:size]
+	}
+	return b.buf
 }

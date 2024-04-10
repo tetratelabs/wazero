@@ -12,6 +12,7 @@ import (
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/internalapi"
 	"github.com/tetratelabs/wazero/internal/wasmruntime"
 )
@@ -57,12 +58,22 @@ type MemoryInstance struct {
 	// waiters implements atomic wait and notify. It is implemented similarly to golang.org/x/sync/semaphore,
 	// with a fixed weight of 1 and no spurious notifications.
 	waiters sync.Map
+
+	expBuffer experimental.MemoryBuffer
 }
 
 // NewMemoryInstance creates a new instance based on the parameters in the SectionIDMemory.
-func NewMemoryInstance(memSec *Memory) *MemoryInstance {
-	var size uint64
-	if memSec.IsShared {
+func NewMemoryInstance(memSec *Memory, allocator experimental.MemoryAllocator) *MemoryInstance {
+	minBytes := MemoryPagesToBytesNum(memSec.Min)
+	capBytes := MemoryPagesToBytesNum(memSec.Cap)
+	maxBytes := MemoryPagesToBytesNum(memSec.Max)
+
+	var buffer []byte
+	var expBuffer experimental.MemoryBuffer
+	if allocator != nil {
+		expBuffer = allocator(minBytes, capBytes, maxBytes)
+		buffer = expBuffer.Buffer()
+	} else if memSec.IsShared {
 		// Shared memory needs a fixed buffer, so allocate with the maximum size.
 		//
 		// The rationale as to why we can simply use make([]byte) to a fixed buffer is that Go's GC is non-relocating.
@@ -73,18 +84,17 @@ func NewMemoryInstance(memSec *Memory) *MemoryInstance {
 		// the memory buffer allocation here is virtual and doesn't consume physical memory until it's used.
 		// 	* https://github.com/golang/go/blob/8121604559035734c9677d5281bbdac8b1c17a1e/src/runtime/malloc.go#L1059
 		//	* https://github.com/golang/go/blob/8121604559035734c9677d5281bbdac8b1c17a1e/src/runtime/malloc.go#L1165
-		size = MemoryPagesToBytesNum(memSec.Max)
+		buffer = make([]byte, minBytes, maxBytes)
 	} else {
-		size = MemoryPagesToBytesNum(memSec.Cap)
+		buffer = make([]byte, minBytes, capBytes)
 	}
-
-	buffer := make([]byte, MemoryPagesToBytesNum(memSec.Min), size)
 	return &MemoryInstance{
-		Buffer: buffer,
-		Min:    memSec.Min,
-		Cap:    memoryBytesNumToPages(uint64(cap(buffer))),
-		Max:    memSec.Max,
-		Shared: memSec.IsShared,
+		Buffer:    buffer,
+		Min:       memSec.Min,
+		Cap:       memoryBytesNumToPages(uint64(cap(buffer))),
+		Max:       memSec.Max,
+		Shared:    memSec.IsShared,
+		expBuffer: expBuffer,
 	}
 }
 
@@ -222,6 +232,22 @@ func (m *MemoryInstance) Grow(delta uint32) (result uint32, ok bool) {
 	newPages := currentPages + delta
 	if newPages > m.Max || int32(delta) < 0 {
 		return 0, false
+	} else if m.expBuffer != nil {
+		buffer := m.expBuffer.Grow(MemoryPagesToBytesNum(newPages))
+		if m.Shared {
+			if unsafe.SliceData(buffer) != unsafe.SliceData(m.Buffer) {
+				panic("shared memory cannot move, this is a bug in the memory allocator")
+			}
+			// We assume grow is called under a guest lock.
+			// But the memory length is accessed elsewhere,
+			// so use atomic to make the new length visible across threads.
+			atomicStoreLength(&m.Buffer, uintptr(len(buffer)))
+			m.Cap = memoryBytesNumToPages(uint64(cap(buffer)))
+		} else {
+			m.Buffer = buffer
+			m.Cap = newPages
+		}
+		return currentPages, true
 	} else if newPages > m.Cap { // grow the memory.
 		if m.Shared {
 			panic("shared memory cannot be grown, this is a bug in wazero")
@@ -231,9 +257,10 @@ func (m *MemoryInstance) Grow(delta uint32) (result uint32, ok bool) {
 		return currentPages, true
 	} else { // We already have the capacity we need.
 		if m.Shared {
-			sp := (*reflect.SliceHeader)(unsafe.Pointer(&m.Buffer))
-			// Use atomic write to ensure new length is visible across threads.
-			atomic.StoreUintptr((*uintptr)(unsafe.Pointer(&sp.Len)), uintptr(MemoryPagesToBytesNum(newPages)))
+			// We assume grow is called under a guest lock.
+			// But the memory length is accessed elsewhere,
+			// so use atomic to make the new length visible across threads.
+			atomicStoreLength(&m.Buffer, uintptr(MemoryPagesToBytesNum(newPages)))
 		} else {
 			m.Buffer = m.Buffer[:MemoryPagesToBytesNum(newPages)]
 		}
@@ -266,6 +293,13 @@ func PagesToUnitOfBytes(pages uint32) string {
 }
 
 // Below are raw functions used to implement the api.Memory API:
+
+// Uses atomic write to update the length of a slice.
+func atomicStoreLength(slice *[]byte, length uintptr) {
+	slicePtr := (*reflect.SliceHeader)(unsafe.Pointer(slice))
+	lenPtr := (*uintptr)(unsafe.Pointer(&slicePtr.Len))
+	atomic.StoreUintptr(lenPtr, length)
+}
 
 // memoryBytesNumToPages converts the given number of bytes into the number of pages.
 func memoryBytesNumToPages(bytesNum uint64) (pages uint32) {

@@ -16,11 +16,11 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	. "github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/experimental/logging"
+	"github.com/tetratelabs/wazero/experimental/wazerotest"
 	. "github.com/tetratelabs/wazero/internal/assemblyscript"
 	"github.com/tetratelabs/wazero/internal/testing/proxy"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/u64"
-	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/sys"
 )
 
@@ -376,7 +376,7 @@ func Test_readAssemblyScriptString(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			mem := wasm.NewMemoryInstance(&wasm.Memory{Min: 1, Cap: 1, Max: 1})
+			mem := wazerotest.NewFixedMemory(wazerotest.PageSize)
 			tc.memory(mem)
 
 			s, ok := readAssemblyScriptString(mem, uint32(tc.offset))
