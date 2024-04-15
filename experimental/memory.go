@@ -30,12 +30,12 @@ func (f MemoryAllocatorFunc) Allocate(cap, max uint64) LinearMemory {
 
 // LinearMemory is an expandable []byte that backs a Wasm linear memory.
 type LinearMemory interface {
-	// Grow the linear memory to size bytes in length.
+	// Reallocates the linear memory to size bytes in length.
 	//
 	// Notes:
-	//   - To back a shared memory, Grow can't change the address of the
+	//   - To back a shared memory, Reallocate can't change the address of the
 	//     backing []byte (only its length/capacity may change).
-	Grow(size uint64) []byte
+	Reallocate(size uint64) []byte
 	// Free the backing memory buffer.
 	Free()
 }
