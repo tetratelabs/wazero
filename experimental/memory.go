@@ -3,7 +3,7 @@ package experimental
 import (
 	"context"
 
-	"github.com/tetratelabs/wazero/internal/ctxkey"
+	"github.com/tetratelabs/wazero/internal/expctxkeys"
 )
 
 // MemoryAllocator is a memory allocation hook which is invoked
@@ -15,7 +15,7 @@ type MemoryAllocator func(min, cap, max uint64) MemoryBuffer
 
 // MemoryBuffer is a memory buffer that backs a Wasm memory.
 type MemoryBuffer interface {
-	// Return the backing []byte for the memory buffer.
+	// Buffer returns the backing []byte for the memory buffer.
 	Buffer() []byte
 	// Grow the backing memory buffer to size bytes in length.
 	// To back a shared memory, Grow can't change the address
@@ -29,7 +29,7 @@ type MemoryBuffer interface {
 // context.Context.
 func WithMemoryAllocator(ctx context.Context, allocator MemoryAllocator) context.Context {
 	if allocator != nil {
-		return context.WithValue(ctx, ctxkey.MemoryAllocatorKey{}, allocator)
+		return context.WithValue(ctx, expctxkeys.MemoryAllocatorKey{}, allocator)
 	}
 	return ctx
 }

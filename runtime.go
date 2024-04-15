@@ -7,7 +7,7 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	experimentalapi "github.com/tetratelabs/wazero/experimental"
-	"github.com/tetratelabs/wazero/internal/ctxkey"
+	"github.com/tetratelabs/wazero/internal/expctxkeys"
 	internalsock "github.com/tetratelabs/wazero/internal/sock"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -242,7 +242,7 @@ func (r *runtime) CompileModule(ctx context.Context, binary []byte) (CompiledMod
 
 func buildFunctionListeners(ctx context.Context, internal *wasm.Module) ([]experimentalapi.FunctionListener, error) {
 	// Test to see if internal code are using an experimental feature.
-	fnlf := ctx.Value(ctxkey.FunctionListenerFactoryKey{})
+	fnlf := ctx.Value(expctxkeys.FunctionListenerFactoryKey{})
 	if fnlf == nil {
 		return nil, nil
 	}
@@ -318,7 +318,7 @@ func (r *runtime) InstantiateModule(
 		return
 	}
 
-	if closeNotifier, ok := ctx.Value(ctxkey.CloseNotifierKey{}).(ctxkey.Notifier); ok {
+	if closeNotifier, ok := ctx.Value(expctxkeys.CloseNotifierKey{}).(experimentalapi.CloseNotifier); ok {
 		mod.(*wasm.ModuleInstance).CloseNotifier = closeNotifier
 	}
 

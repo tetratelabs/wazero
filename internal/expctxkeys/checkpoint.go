@@ -1,4 +1,4 @@
-package ctxkey
+package expctxkeys
 
 // EnableSnapshotterKey is a context key to indicate that snapshotting should be enabled.
 // The context.Context passed to a exported function invocation should have this key set

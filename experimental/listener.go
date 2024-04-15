@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/internal/ctxkey"
+	"github.com/tetratelabs/wazero/internal/expctxkeys"
 )
 
 // StackIterator allows iterating on each function of the call stack, starting
@@ -28,12 +28,12 @@ type StackIterator interface {
 // Its associated value should be a FunctionListenerFactory.
 //
 // Deprecated: use WithFunctionListenerFactory to enable snapshots.
-type FunctionListenerFactoryKey = ctxkey.FunctionListenerFactoryKey
+type FunctionListenerFactoryKey = expctxkeys.FunctionListenerFactoryKey
 
 // WithFunctionListenerFactory registers a FunctionListenerFactory
 // with the context.
 func WithFunctionListenerFactory(ctx context.Context, factory FunctionListenerFactory) context.Context {
-	return context.WithValue(ctx, ctxkey.FunctionListenerFactoryKey{}, factory)
+	return context.WithValue(ctx, expctxkeys.FunctionListenerFactoryKey{}, factory)
 }
 
 // FunctionListenerFactory returns FunctionListeners to be notified when a
