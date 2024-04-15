@@ -6,12 +6,18 @@ import (
 	"github.com/tetratelabs/wazero/internal/expctxkeys"
 )
 
-// MemoryAllocator is a memory allocation hook which is invoked
-// to create a new LinearMemory, with the given specification:
-// min is the initial and minimum length (in bytes) of the backing []byte,
-// cap a suggested initial capacity, and max the maximum length
-// that will ever be requested.
+// MemoryAllocator is a memory allocation hook,
+// invoked to create a LinearMemory.
 type MemoryAllocator interface {
+	// Allocate should create a new LinearMemory with the given specification:
+	// min is the initial and minimum length (in bytes) of the backing []byte,
+	// cap a suggested initial capacity, and max the maximum length
+	// that will ever be requested.
+	//
+	// Notes:
+	//   - To back a shared memory, the address of the backing []byte cannot
+	//     change. This is checked at runtime. Implementations should document
+	//     if the returned LinearMemory meets this requirement.
 	Allocate(min, cap, max uint64) LinearMemory
 }
 
