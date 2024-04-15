@@ -6,21 +6,36 @@ import (
 	"github.com/tetratelabs/wazero/internal/expctxkeys"
 )
 
-// MemoryAllocator is a memory allocation hook which is invoked
-// to create a new MemoryBuffer, with the given specification:
-// min is the initial and minimum length (in bytes) of the backing []byte,
-// cap a suggested initial capacity, and max the maximum length
-// that will ever be requested.
-type MemoryAllocator func(min, cap, max uint64) MemoryBuffer
+// MemoryAllocator is a memory allocation hook,
+// invoked to create a LinearMemory.
+type MemoryAllocator interface {
+	// Allocate should create a new LinearMemory with the given specification:
+	// cap is the suggested initial capacity for the backing []byte,
+	// and max the maximum length that will ever be requested.
+	//
+	// Notes:
+	//   - To back a shared memory, the address of the backing []byte cannot
+	//     change. This is checked at runtime. Implementations should document
+	//     if the returned LinearMemory meets this requirement.
+	Allocate(cap, max uint64) LinearMemory
+}
 
-// MemoryBuffer is a memory buffer that backs a Wasm memory.
-type MemoryBuffer interface {
-	// Buffer returns the backing []byte for the memory buffer.
-	Buffer() []byte
-	// Grow the backing memory buffer to size bytes in length.
-	// To back a shared memory, Grow can't change the address
-	// of the backing []byte (only its length/capacity may change).
-	Grow(size uint64) []byte
+// MemoryAllocatorFunc is a convenience for defining inlining a MemoryAllocator.
+type MemoryAllocatorFunc func(cap, max uint64) LinearMemory
+
+// Allocate implements MemoryAllocator.Allocate.
+func (f MemoryAllocatorFunc) Allocate(cap, max uint64) LinearMemory {
+	return f(cap, max)
+}
+
+// LinearMemory is an expandable []byte that backs a Wasm linear memory.
+type LinearMemory interface {
+	// Reallocates the linear memory to size bytes in length.
+	//
+	// Notes:
+	//   - To back a shared memory, Reallocate can't change the address of the
+	//     backing []byte (only its length/capacity may change).
+	Reallocate(size uint64) []byte
 	// Free the backing memory buffer.
 	Free()
 }

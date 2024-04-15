@@ -59,7 +59,7 @@ type MemoryInstance struct {
 	// with a fixed weight of 1 and no spurious notifications.
 	waiters sync.Map
 
-	expBuffer experimental.MemoryBuffer
+	expBuffer experimental.LinearMemory
 }
 
 // NewMemoryInstance creates a new instance based on the parameters in the SectionIDMemory.
@@ -69,10 +69,10 @@ func NewMemoryInstance(memSec *Memory, allocator experimental.MemoryAllocator) *
 	maxBytes := MemoryPagesToBytesNum(memSec.Max)
 
 	var buffer []byte
-	var expBuffer experimental.MemoryBuffer
+	var expBuffer experimental.LinearMemory
 	if allocator != nil {
-		expBuffer = allocator(minBytes, capBytes, maxBytes)
-		buffer = expBuffer.Buffer()
+		expBuffer = allocator.Allocate(capBytes, maxBytes)
+		buffer = expBuffer.Reallocate(minBytes)
 	} else if memSec.IsShared {
 		// Shared memory needs a fixed buffer, so allocate with the maximum size.
 		//
@@ -233,7 +233,7 @@ func (m *MemoryInstance) Grow(delta uint32) (result uint32, ok bool) {
 	if newPages > m.Max || int32(delta) < 0 {
 		return 0, false
 	} else if m.expBuffer != nil {
-		buffer := m.expBuffer.Grow(MemoryPagesToBytesNum(newPages))
+		buffer := m.expBuffer.Reallocate(MemoryPagesToBytesNum(newPages))
 		if m.Shared {
 			if unsafe.SliceData(buffer) != unsafe.SliceData(m.Buffer) {
 				panic("shared memory cannot move, this is a bug in the memory allocator")

@@ -55,8 +55,8 @@ func TestMemoryInstance_Grow_Size(t *testing.T) {
 			case tc.capEqualsMax:
 				m = &MemoryInstance{Cap: max, Max: max, Buffer: make([]byte, 0, maxBytes)}
 			case tc.expAllocator:
-				expBuffer := sliceAllocator(0, 0, maxBytes)
-				m = &MemoryInstance{Max: max, Buffer: expBuffer.Buffer(), expBuffer: expBuffer}
+				expBuffer := sliceAllocator(0, maxBytes)
+				m = &MemoryInstance{Max: max, Buffer: expBuffer.Reallocate(0), expBuffer: expBuffer}
 			}
 
 			res, ok := m.Grow(5)
@@ -994,8 +994,8 @@ func requireChannelEmpty(t *testing.T, ch chan string) {
 	}
 }
 
-func sliceAllocator(min, cap, max uint64) experimental.MemoryBuffer {
-	return &sliceBuffer{make([]byte, min, cap), max}
+func sliceAllocator(cap, max uint64) experimental.LinearMemory {
+	return &sliceBuffer{make([]byte, cap), max}
 }
 
 type sliceBuffer struct {
@@ -1005,9 +1005,7 @@ type sliceBuffer struct {
 
 func (b *sliceBuffer) Free() {}
 
-func (b *sliceBuffer) Buffer() []byte { return b.buf }
-
-func (b *sliceBuffer) Grow(size uint64) []byte {
+func (b *sliceBuffer) Reallocate(size uint64) []byte {
 	if cap := uint64(cap(b.buf)); size > cap {
 		b.buf = append(b.buf[:cap], make([]byte, size-cap)...)
 	} else {
