@@ -11,8 +11,8 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
-	"github.com/tetratelabs/wazero/internal/ctxkey"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
+	"github.com/tetratelabs/wazero/internal/expctxkeys"
 	"github.com/tetratelabs/wazero/internal/internalapi"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasmdebug"
@@ -194,9 +194,9 @@ func (c *callEngine) CallWithStack(ctx context.Context, paramResultStack []uint6
 
 // CallWithStack implements api.Function.
 func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint64) (err error) {
-	snapshotEnabled := ctx.Value(ctxkey.EnableSnapshotterKey{}) != nil
+	snapshotEnabled := ctx.Value(expctxkeys.EnableSnapshotterKey{}) != nil
 	if snapshotEnabled {
-		ctx = context.WithValue(ctx, ctxkey.SnapshotterKey{}, c)
+		ctx = context.WithValue(ctx, expctxkeys.SnapshotterKey{}, c)
 	}
 
 	if wazevoapi.StackGuardCheckEnabled {

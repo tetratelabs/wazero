@@ -12,7 +12,7 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
-	"github.com/tetratelabs/wazero/internal/ctxkey"
+	"github.com/tetratelabs/wazero/internal/expctxkeys"
 	"github.com/tetratelabs/wazero/internal/filecache"
 	"github.com/tetratelabs/wazero/internal/internalapi"
 	"github.com/tetratelabs/wazero/internal/moremath"
@@ -573,8 +573,8 @@ func (ce *callEngine) call(ctx context.Context, params, results []uint64) (_ []u
 		}
 	}
 
-	if ctx.Value(ctxkey.EnableSnapshotterKey{}) != nil {
-		ctx = context.WithValue(ctx, ctxkey.SnapshotterKey{}, ce)
+	if ctx.Value(expctxkeys.EnableSnapshotterKey{}) != nil {
+		ctx = context.WithValue(ctx, expctxkeys.SnapshotterKey{}, ce)
 	}
 
 	defer func() {
@@ -744,7 +744,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			frame.pc = op.Us[v]
 		case wazeroir.OperationKindCall:
 			func() {
-				if ctx.Value(ctxkey.EnableSnapshotterKey{}) != nil {
+				if ctx.Value(expctxkeys.EnableSnapshotterKey{}) != nil {
 					defer func() {
 						if r := recover(); r != nil {
 							if s, ok := r.(*snapshot); ok && s.ce == ce {

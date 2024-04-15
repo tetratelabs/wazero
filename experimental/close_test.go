@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero/experimental"
-	"github.com/tetratelabs/wazero/internal/ctxkey"
+	"github.com/tetratelabs/wazero/internal/expctxkeys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
@@ -33,7 +33,7 @@ func TestWithCloseNotifier(t *testing.T) {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			if decorated := experimental.WithCloseNotifier(testCtx, tc.notification); tc.expected {
-				require.NotNil(t, decorated.Value(ctxkey.CloseNotifierKey{}))
+				require.NotNil(t, decorated.Value(expctxkeys.CloseNotifierKey{}))
 			} else {
 				require.Same(t, testCtx, decorated)
 			}

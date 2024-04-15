@@ -9,7 +9,7 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
-	"github.com/tetratelabs/wazero/internal/ctxkey"
+	"github.com/tetratelabs/wazero/internal/expctxkeys"
 	"github.com/tetratelabs/wazero/internal/internalapi"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
@@ -125,7 +125,7 @@ type (
 		Source *Module
 
 		// CloseNotifier is an experimental hook called once on close.
-		CloseNotifier ctxkey.Notifier
+		CloseNotifier experimental.CloseNotifier
 	}
 
 	// DataInstance holds bytes corresponding to the data segment in a module.
@@ -365,7 +365,7 @@ func (s *Store) instantiate(
 
 	var allocator experimental.MemoryAllocator
 	if ctx != nil {
-		allocator, _ = ctx.Value(ctxkey.MemoryAllocatorKey{}).(experimental.MemoryAllocator)
+		allocator, _ = ctx.Value(expctxkeys.MemoryAllocatorKey{}).(experimental.MemoryAllocator)
 	}
 
 	m.buildGlobals(module, m.Engine.FunctionInstanceReference)

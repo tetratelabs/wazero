@@ -3,7 +3,7 @@ package experimental
 import (
 	"context"
 
-	"github.com/tetratelabs/wazero/internal/ctxkey"
+	"github.com/tetratelabs/wazero/internal/expctxkeys"
 )
 
 // Snapshot holds the execution state at the time of a Snapshotter.Snapshot call.
@@ -26,23 +26,23 @@ type Snapshotter interface {
 // to a non-nil value, and host functions will be able to retrieve it using SnapshotterKey.
 //
 // Deprecated: use WithSnapshotter to enable snapshots.
-type EnableSnapshotterKey = ctxkey.EnableSnapshotterKey
+type EnableSnapshotterKey = expctxkeys.EnableSnapshotterKey
 
 // WithSnapshotter enables snapshots.
 // Passing the returned context to a exported function invocation enables snapshots,
 // and allows host functions to retrieve the Snapshotter using GetSnapshotter.
 func WithSnapshotter(ctx context.Context) context.Context {
-	return context.WithValue(ctx, ctxkey.EnableSnapshotterKey{}, struct{}{})
+	return context.WithValue(ctx, expctxkeys.EnableSnapshotterKey{}, struct{}{})
 }
 
 // SnapshotterKey is a context key to access a Snapshotter from a host function.
 // It is only present if EnableSnapshotter was set in the function invocation context.
 //
 // Deprecated: use GetSnapshotter to get the snapshotter.
-type SnapshotterKey = ctxkey.SnapshotterKey
+type SnapshotterKey = expctxkeys.SnapshotterKey
 
 // GetSnapshotter gets the Snapshotter from a host function.
 // It is only present if WithSnapshotter was called with the function invocation context.
 func GetSnapshotter(ctx context.Context) Snapshotter {
-	return ctx.Value(ctxkey.SnapshotterKey{}).(Snapshotter)
+	return ctx.Value(expctxkeys.SnapshotterKey{}).(Snapshotter)
 }
