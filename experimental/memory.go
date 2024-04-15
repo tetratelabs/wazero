@@ -7,17 +7,27 @@ import (
 )
 
 // MemoryAllocator is a memory allocation hook which is invoked
-// to create a new MemoryBuffer, with the given specification:
+// to create a new LinearMemory, with the given specification:
 // min is the initial and minimum length (in bytes) of the backing []byte,
 // cap a suggested initial capacity, and max the maximum length
 // that will ever be requested.
-type MemoryAllocator func(min, cap, max uint64) MemoryBuffer
+type MemoryAllocator interface {
+	Allocate(min, cap, max uint64) LinearMemory
+}
 
-// MemoryBuffer is a memory buffer that backs a Wasm memory.
-type MemoryBuffer interface {
-	// Buffer returns the backing []byte for the memory buffer.
+// MemoryAllocatorFunc is a convenience for defining inlining a MemoryAllocator.
+type MemoryAllocatorFunc func(min, cap, max uint64) LinearMemory
+
+// Allocate implements MemoryAllocator.Allocate.
+func (f MemoryAllocatorFunc) Allocate(min, cap, max uint64) LinearMemory {
+	return f(min, cap, max)
+}
+
+// LinearMemory is an expandable []byte that backs a Wasm linear memory.
+type LinearMemory interface {
+	// Buffer returns the backing []byte for the linear memory.
 	Buffer() []byte
-	// Grow the backing memory buffer to size bytes in length.
+	// Grow the linear memory to size bytes in length.
 	// To back a shared memory, Grow can't change the address
 	// of the backing []byte (only its length/capacity may change).
 	Grow(size uint64) []byte

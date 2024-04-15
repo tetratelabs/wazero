@@ -994,7 +994,7 @@ func requireChannelEmpty(t *testing.T, ch chan string) {
 	}
 }
 
-func sliceAllocator(min, cap, max uint64) experimental.MemoryBuffer {
+func sliceAllocator(min, cap, max uint64) experimental.LinearMemory {
 	return &sliceBuffer{make([]byte, min, cap), max}
 }
 

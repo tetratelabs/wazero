@@ -59,7 +59,7 @@ type MemoryInstance struct {
 	// with a fixed weight of 1 and no spurious notifications.
 	waiters sync.Map
 
-	expBuffer experimental.MemoryBuffer
+	expBuffer experimental.LinearMemory
 }
 
 // NewMemoryInstance creates a new instance based on the parameters in the SectionIDMemory.
@@ -69,9 +69,9 @@ func NewMemoryInstance(memSec *Memory, allocator experimental.MemoryAllocator) *
 	maxBytes := MemoryPagesToBytesNum(memSec.Max)
 
 	var buffer []byte
-	var expBuffer experimental.MemoryBuffer
+	var expBuffer experimental.LinearMemory
 	if allocator != nil {
-		expBuffer = allocator(minBytes, capBytes, maxBytes)
+		expBuffer = allocator.Allocate(minBytes, capBytes, maxBytes)
 		buffer = expBuffer.Buffer()
 	} else if memSec.IsShared {
 		// Shared memory needs a fixed buffer, so allocate with the maximum size.
