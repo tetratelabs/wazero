@@ -71,8 +71,8 @@ func NewMemoryInstance(memSec *Memory, allocator experimental.MemoryAllocator) *
 	var buffer []byte
 	var expBuffer experimental.LinearMemory
 	if allocator != nil {
-		expBuffer = allocator.Allocate(minBytes, capBytes, maxBytes)
-		buffer = expBuffer.Buffer()
+		expBuffer = allocator.Allocate(capBytes, maxBytes)
+		buffer = expBuffer.Grow(minBytes)
 	} else if memSec.IsShared {
 		// Shared memory needs a fixed buffer, so allocate with the maximum size.
 		//

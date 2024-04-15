@@ -10,32 +10,31 @@ import (
 // invoked to create a LinearMemory.
 type MemoryAllocator interface {
 	// Allocate should create a new LinearMemory with the given specification:
-	// min is the initial and minimum length (in bytes) of the backing []byte,
-	// cap a suggested initial capacity, and max the maximum length
-	// that will ever be requested.
+	// cap is the suggested initial capacity for the backing []byte,
+	// and max the maximum length that will ever be requested.
 	//
 	// Notes:
 	//   - To back a shared memory, the address of the backing []byte cannot
 	//     change. This is checked at runtime. Implementations should document
 	//     if the returned LinearMemory meets this requirement.
-	Allocate(min, cap, max uint64) LinearMemory
+	Allocate(cap, max uint64) LinearMemory
 }
 
 // MemoryAllocatorFunc is a convenience for defining inlining a MemoryAllocator.
-type MemoryAllocatorFunc func(min, cap, max uint64) LinearMemory
+type MemoryAllocatorFunc func(cap, max uint64) LinearMemory
 
 // Allocate implements MemoryAllocator.Allocate.
-func (f MemoryAllocatorFunc) Allocate(min, cap, max uint64) LinearMemory {
-	return f(min, cap, max)
+func (f MemoryAllocatorFunc) Allocate(cap, max uint64) LinearMemory {
+	return f(cap, max)
 }
 
 // LinearMemory is an expandable []byte that backs a Wasm linear memory.
 type LinearMemory interface {
-	// Buffer returns the backing []byte for the linear memory.
-	Buffer() []byte
 	// Grow the linear memory to size bytes in length.
-	// To back a shared memory, Grow can't change the address
-	// of the backing []byte (only its length/capacity may change).
+	//
+	// Notes:
+	//   - To back a shared memory, Grow can't change the address of the
+	//     backing []byte (only its length/capacity may change).
 	Grow(size uint64) []byte
 	// Free the backing memory buffer.
 	Free()
