@@ -824,7 +824,7 @@ func BenchmarkWriteString(b *testing.B) {
 func Test_atomicStoreLength(t *testing.T) {
 	// Doesn't verify atomicity, but at least we're updating the correct thing.
 	slice := make([]byte, 10, 20)
-	atomicStoreLength(&slice, 15)
+	atomicStoreLengthAndCap(&slice, 15)
 	require.Equal(t, 15, len(slice))
 }
 
