@@ -831,9 +831,9 @@ func Test_atomicStoreLength(t *testing.T) {
 func Test_atomicStoreLengthAndCap(t *testing.T) {
 	// Doesn't verify atomicity, but at least we're updating the correct thing.
 	slice := make([]byte, 10, 20)
-	atomicStoreLengthAndCap(&slice, 15, 20)
-	require.Equal(t, 15, len(slice))
-	require.Equal(t, 20, cap(slice))
+	atomicStoreLengthAndCap(&slice, 12, 18)
+	require.Equal(t, 12, len(slice))
+	require.Equal(t, 18, cap(slice))
 }
 
 func TestNewMemoryInstance_Shared(t *testing.T) {

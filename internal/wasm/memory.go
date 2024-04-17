@@ -297,10 +297,10 @@ func PagesToUnitOfBytes(pages uint32) string {
 // Uses atomic write to update the length of a slice.
 func atomicStoreLengthAndCap(slice *[]byte, length uintptr, cap uintptr) {
 	slicePtr := (*reflect.SliceHeader)(unsafe.Pointer(slice))
-	lenPtr := (*uintptr)(unsafe.Pointer(&slicePtr.Len))
-	atomic.StoreUintptr(lenPtr, length)
 	capPtr := (*uintptr)(unsafe.Pointer(&slicePtr.Cap))
 	atomic.StoreUintptr(capPtr, cap)
+	lenPtr := (*uintptr)(unsafe.Pointer(&slicePtr.Len))
+	atomic.StoreUintptr(lenPtr, length)
 }
 
 // Uses atomic write to update the length of a slice.
