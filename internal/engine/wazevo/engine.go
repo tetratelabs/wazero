@@ -31,10 +31,6 @@ type (
 		// sortedCompiledModules is a list of compiled modules sorted by the initial address of the executable.
 		sortedCompiledModules []*compiledModule
 		mux                   sync.RWMutex
-		// rels is a list of relocations to be resolved. This is reused for each compilation to avoid allocation.
-		rels []backend.RelocationInfo
-		// refToBinaryOffset is reused for each compilation to avoid allocation.
-		refToBinaryOffset map[ssa.FuncRef]int
 		// sharedFunctions is compiled functions shared by all modules.
 		sharedFunctions *sharedFunctions
 		// setFinalizer defaults to runtime.SetFinalizer, but overridable for tests.
@@ -109,12 +105,12 @@ func NewEngine(ctx context.Context, _ api.CoreFeatures, fc filecache.Cache) wasm
 	machine := newMachine()
 	be := backend.NewCompiler(ctx, machine, ssa.NewBuilder())
 	e := &engine{
-		compiledModules: make(map[wasm.ModuleID]*compiledModule), refToBinaryOffset: make(map[ssa.FuncRef]int),
-		setFinalizer:  runtime.SetFinalizer,
-		machine:       machine,
-		be:            be,
-		fileCache:     fc,
-		wazeroVersion: version.GetWazeroVersion(),
+		compiledModules: make(map[wasm.ModuleID]*compiledModule),
+		setFinalizer:    runtime.SetFinalizer,
+		machine:         machine,
+		be:              be,
+		fileCache:       fc,
+		wazeroVersion:   version.GetWazeroVersion(),
 	}
 	e.compileSharedFunctions()
 	return e
@@ -186,12 +182,15 @@ func (exec *executables) compileEntryPreambles(m *wasm.Module, machine backend.M
 
 func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listeners []experimental.FunctionListener, ensureTermination bool) (*compiledModule, error) {
 	withListener := len(listeners) > 0
-	e.rels = e.rels[:0]
 	cm := &compiledModule{
 		offsets: wazevoapi.NewModuleContextOffsetData(module, withListener), parent: e, module: module,
 		ensureTermination: ensureTermination,
 		executables:       &executables{},
 	}
+
+	// rels is a list of relocations to be resolved. This is reused for each compilation to avoid allocation.
+	rels := make([]backend.RelocationInfo, 0)
+	refToBinaryOffset := map[ssa.FuncRef]int{}
 
 	if module.IsHostModule {
 		return e.compileHostModule(ctx, module, listeners)
@@ -268,13 +267,13 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 		}
 
 		fref := frontend.FunctionIndexToFuncRef(fidx)
-		e.refToBinaryOffset[fref] = totalSize
+		refToBinaryOffset[fref] = totalSize
 
 		// At this point, relocation offsets are relative to the start of the function body,
 		// so we adjust it to the start of the executable.
 		for _, r := range rels {
 			r.Offset += int64(totalSize)
-			e.rels = append(e.rels, r)
+			rels = append(rels, r)
 		}
 
 		bodies[i] = body
@@ -315,8 +314,8 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 	}
 
 	// Resolve relocations for local function calls.
-	if len(e.rels) > 0 {
-		machine.ResolveRelocations(e.refToBinaryOffset, executable, e.rels, callTrampolineIslandOffsets)
+	if len(rels) > 0 {
+		machine.ResolveRelocations(refToBinaryOffset, executable, rels, callTrampolineIslandOffsets)
 	}
 
 	if runtime.GOARCH == "arm64" {
@@ -571,7 +570,7 @@ func (e *engine) NewModuleEngine(m *wasm.Module, mi *wasm.ModuleInstance) (wasm.
 	// Note: imported functions are resolved in moduleEngine.ResolveImportedFunction.
 	me.importedFunctions = make([]importedFunction, m.ImportFunctionCount)
 
-	compiled, ok := e.compiledModules[m.ID]
+	compiled, ok := e.getCompiledModuleFromMemory(m)
 	if !ok {
 		return nil, errors.New("source module must be compiled before instantiation")
 	}

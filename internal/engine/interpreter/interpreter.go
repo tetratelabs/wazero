@@ -33,8 +33,6 @@ type engine struct {
 	enabledFeatures   api.CoreFeatures
 	compiledFunctions map[wasm.ModuleID][]compiledFunction // guarded by mutex.
 	mux               sync.RWMutex
-	// labelAddressResolutionCache is the temporary cache used to map LabelKind -> FrameID -> the index to the body.
-	labelAddressResolutionCache [wazeroir.LabelKindNum][]uint64
 }
 
 func NewEngine(_ context.Context, enabledFeatures api.CoreFeatures, _ filecache.Cache) wasm.Engine {
@@ -435,6 +433,8 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult, ret *compiledFunction) 
 		copy(ret.offsetsInWasmBinary, offsets)
 	}
 
+	labelAddressResolutions := [wazeroir.LabelKindNum][]uint64{}
+
 	// First, we iterate all labels, and resolve the address.
 	for i := range ret.body {
 		op := &ret.body[i]
@@ -444,7 +444,7 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult, ret *compiledFunction) 
 			address := uint64(i)
 
 			kind, fid := label.Kind(), label.FrameID()
-			frameToAddresses := e.labelAddressResolutionCache[label.Kind()]
+			frameToAddresses := labelAddressResolutions[label.Kind()]
 			// Expand the slice if necessary.
 			if diff := fid - len(frameToAddresses) + 1; diff > 0 {
 				for j := 0; j < diff; j++ {
@@ -452,7 +452,7 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult, ret *compiledFunction) 
 				}
 			}
 			frameToAddresses[fid] = address
-			e.labelAddressResolutionCache[kind] = frameToAddresses
+			labelAddressResolutions[kind] = frameToAddresses
 		}
 	}
 
@@ -461,31 +461,26 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult, ret *compiledFunction) 
 		op := &ret.body[i]
 		switch op.Kind {
 		case wazeroir.OperationKindBr:
-			e.setLabelAddress(&op.U1, wazeroir.Label(op.U1))
+			e.setLabelAddress(&op.U1, wazeroir.Label(op.U1), labelAddressResolutions)
 		case wazeroir.OperationKindBrIf:
-			e.setLabelAddress(&op.U1, wazeroir.Label(op.U1))
-			e.setLabelAddress(&op.U2, wazeroir.Label(op.U2))
+			e.setLabelAddress(&op.U1, wazeroir.Label(op.U1), labelAddressResolutions)
+			e.setLabelAddress(&op.U2, wazeroir.Label(op.U2), labelAddressResolutions)
 		case wazeroir.OperationKindBrTable:
 			for j := 0; j < len(op.Us); j += 2 {
 				target := op.Us[j]
-				e.setLabelAddress(&op.Us[j], wazeroir.Label(target))
+				e.setLabelAddress(&op.Us[j], wazeroir.Label(target), labelAddressResolutions)
 			}
 		}
-	}
-
-	// Reuses the slices for the subsequent compilation, so clear the content here.
-	for i := range e.labelAddressResolutionCache {
-		e.labelAddressResolutionCache[i] = e.labelAddressResolutionCache[i][:0]
 	}
 	return nil
 }
 
-func (e *engine) setLabelAddress(op *uint64, label wazeroir.Label) {
+func (e *engine) setLabelAddress(op *uint64, label wazeroir.Label, labelAddressResolutions [wazeroir.LabelKindNum][]uint64) {
 	if label.IsReturnTarget() {
 		// Jmp to the end of the possible binary.
 		*op = math.MaxUint64
 	} else {
-		*op = e.labelAddressResolutionCache[label.Kind()][label.FrameID()]
+		*op = labelAddressResolutions[label.Kind()][label.FrameID()]
 	}
 }
 
