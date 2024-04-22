@@ -245,7 +245,7 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 		}
 
 		needListener := len(listeners) > 0 && listeners[i] != nil
-		body, rels, err := e.compileLocalWasmFunction(ctx, module, wasm.Index(i), fe, ssaBuilder, be, needListener)
+		body, relsPerFunc, err := e.compileLocalWasmFunction(ctx, module, wasm.Index(i), fe, ssaBuilder, be, needListener)
 		if err != nil {
 			return nil, fmt.Errorf("compile function %d/%d: %v", i, len(module.CodeSection)-1, err)
 		}
@@ -271,7 +271,7 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 
 		// At this point, relocation offsets are relative to the start of the function body,
 		// so we adjust it to the start of the executable.
-		for _, r := range rels {
+		for _, r := range relsPerFunc {
 			r.Offset += int64(totalSize)
 			rels = append(rels, r)
 		}
