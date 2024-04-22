@@ -17,7 +17,6 @@ e.g. If your source is in Go, you might compile it with TinyGo.
 
 Below are notes wazero contributed so far, in alphabetical order by language.
 
-* [Go]({{< relref "/go.md" >}}) e.g. `GOOS=js GOARCH=wasm go build -o X.wasm X.go`
 * [TinyGo]({{< relref "/tinygo.md" >}}) e.g. `tinygo build -o X.wasm -target=wasi X.go`
 * [Rust]({{< relref "/rust.md" >}}) e.g. `rustc -o X.wasm --target wasm32-wasi X.rs`
 * [Zig]({{< relref "/zig.md" >}}) e.g. `zig build-exe X.zig -target wasm32-wasi`

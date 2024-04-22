@@ -1,5 +1,5 @@
 // Package fstest defines filesystem test cases that help validate host
-// functions implementing WASI and `GOOS=js GOARCH=wasm`. Tests are defined
+// functions implementing WASI. Tests are defined
 // here to reduce duplication and drift.
 //
 // Here's an example using this inside code that compiles to wasm.
@@ -13,9 +13,6 @@
 //
 // Failures found here should result in new tests in the appropriate package,
 // for example, sysfs or wasi_snapshot_preview1.
-//
-// This package must have no dependencies. Otherwise, compiling this with
-// TinyGo or `GOOS=js GOARCH=wasm` can become bloated or complicated.
 package fstest
 
 import (

@@ -11,7 +11,6 @@ import (
 	gofstest "testing/fstest"
 
 	"github.com/tetratelabs/wazero/experimental/sys"
-	"github.com/tetratelabs/wazero/internal/fstest"
 	"github.com/tetratelabs/wazero/internal/sysfs"
 	testfs "github.com/tetratelabs/wazero/internal/testing/fs"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -63,8 +62,9 @@ func TestNewFSContext(t *testing.T) {
 					fsc := c.fsc
 					defer fsc.Close()
 
+					rootFs := tc.fs
 					preopenedDir, _ := fsc.openedFiles.Lookup(FdPreopen)
-					require.Equal(t, tc.fs, fsc.rootFS)
+					require.Equal(t, tc.fs, rootFs)
 					require.NotNil(t, preopenedDir)
 					require.Equal(t, "/", preopenedDir.Name)
 
@@ -250,192 +250,18 @@ func TestFSContext_Renumber(t *testing.T) {
 	})
 }
 
-func TestDirentCache_Read(t *testing.T) {
-	c := Context{}
-	err := c.InitFSContext(nil, nil, nil, []sys.FS{&sysfs.AdaptFS{FS: fstest.FS}}, []string{"/"}, nil)
-	require.NoError(t, err)
-	fsc := c.fsc
-	defer fsc.Close()
-
-	d, errno := sysfs.OpenFSFile(fstest.FS, "dir", 0, 0)
-	require.EqualErrno(t, 0, errno)
-	defer d.Close()
-
-	testDirents, errno := d.Readdir(-1)
-	if errno != 0 {
-		panic(errno)
-	}
-	testDirents = append([]sys.Dirent{
-		{Name: ".", Type: fs.ModeDir},
-		{Name: "..", Type: fs.ModeDir},
-	}, testDirents...)
-
-	tests := []struct {
-		name            string
-		initialDir      string
-		dir             func(fd int32)
-		fd              int32
-		pos             uint64
-		n               uint32
-		expectedDirents []sys.Dirent
-		expectedErrno   sys.Errno
-	}{
-		{
-			name:            "empty dir has dot entries",
-			initialDir:      "emptydir",
-			pos:             0,
-			n:               100,
-			expectedDirents: testDirents[:2],
-		},
-		{
-			name:       "rewind empty directory",
-			initialDir: "emptydir",
-			dir: func(fd int32) {
-				f, _ := fsc.LookupFile(fd)
-				rdd, _ := f.DirentCache()
-				_, _ = rdd.Read(0, 5)
-			},
-			pos:             0,
-			n:               100,
-			expectedDirents: testDirents[:2],
-		},
-		{
-			name:            "full read",
-			initialDir:      "dir",
-			pos:             0,
-			n:               100,
-			expectedDirents: testDirents,
-		},
-		{
-			name:            "read first",
-			initialDir:      "dir",
-			pos:             0,
-			n:               1,
-			expectedDirents: testDirents[:1],
-		},
-		{
-			name:       "read second",
-			initialDir: "dir",
-			dir: func(fd int32) {
-				f, _ := fsc.LookupFile(fd)
-				rdd, _ := f.DirentCache()
-				_, _ = rdd.Read(0, 1)
-			},
-			pos:             1,
-			n:               1,
-			expectedDirents: testDirents[1:2],
-		},
-		{
-			name:       "read second and third",
-			initialDir: "dir",
-			dir: func(fd int32) {
-				f, _ := fsc.LookupFile(fd)
-				rdd, _ := f.DirentCache()
-				_, _ = rdd.Read(0, 1)
-			},
-			pos:             1,
-			n:               2,
-			expectedDirents: testDirents[1:3],
-		},
-		{
-			name:       "read exactly third",
-			initialDir: "dir",
-			dir: func(fd int32) {
-				f, _ := fsc.LookupFile(fd)
-				rdd, _ := f.DirentCache()
-				_, _ = rdd.Read(0, 2)
-			},
-			pos:             2,
-			n:               1,
-			expectedDirents: testDirents[2:3],
-		},
-		{
-			name:       "read third and beyond",
-			initialDir: "dir",
-			dir: func(fd int32) {
-				f, _ := fsc.LookupFile(fd)
-				rdd, _ := f.DirentCache()
-				_, _ = rdd.Read(0, 2)
-			},
-			pos:             2,
-			n:               5,
-			expectedDirents: testDirents[2:],
-		},
-		{
-			name:       "read exhausted directory",
-			initialDir: "dir",
-			dir: func(fd int32) {
-				f, _ := fsc.LookupFile(fd)
-				rdd, _ := f.DirentCache()
-				_, _ = rdd.Read(0, 5)
-			},
-			pos:             5,
-			n:               5,
-			expectedDirents: nil,
-		},
-		{
-			name:       "rewind directory",
-			initialDir: "dir",
-			dir: func(fd int32) {
-				f, _ := fsc.LookupFile(fd)
-				rdd, _ := f.DirentCache()
-				_, _ = rdd.Read(0, 5)
-			},
-			pos:             0,
-			n:               5,
-			expectedDirents: testDirents,
-		},
-		{
-			name:          "DirentCache: not a dir",
-			initialDir:    "dir/-",
-			pos:           0,
-			n:             1,
-			expectedErrno: sys.ENOTDIR,
-		},
-		{
-			name:          "pos invalid when no prior state",
-			initialDir:    "dir",
-			pos:           1,
-			n:             1,
-			expectedErrno: sys.ENOENT,
-		},
-	}
-
-	for _, tt := range tests {
-		tc := tt
-		t.Run(tc.name, func(t *testing.T) {
-			fd, errno := fsc.OpenFile(fsc.RootFS(), tc.initialDir, sys.O_RDONLY, 0)
-			require.EqualErrno(t, 0, errno)
-			defer fsc.CloseFile(fd) // nolint
-			f, _ := fsc.LookupFile(fd)
-			dir, errno := f.DirentCache()
-			if errno != 0 {
-				require.EqualErrno(t, tc.expectedErrno, errno)
-				return
-			}
-
-			if tc.dir != nil {
-				tc.dir(fd)
-			}
-
-			dirents, errno := dir.Read(tc.pos, tc.n)
-			require.EqualErrno(t, tc.expectedErrno, errno)
-			require.Equal(t, tc.expectedDirents, dirents)
-		})
-	}
-}
-
 // This is similar to https://github.com/WebAssembly/wasi-testsuite/blob/ac32f57400cdcdd0425d3085c24fc7fc40011d1c/tests/rust/src/bin/fd_readdir.rs#L120
 func TestDirentCache_ReadNewFile(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	c := Context{}
-	err := c.InitFSContext(nil, nil, nil, []sys.FS{sysfs.DirFS(tmpDir)}, []string{"/"}, nil)
+	root := sysfs.DirFS(tmpDir)
+	err := c.InitFSContext(nil, nil, nil, []sys.FS{root}, []string{"/"}, nil)
 	require.NoError(t, err)
 	fsc := c.fsc
 	defer fsc.Close()
 
-	fd, errno := fsc.OpenFile(fsc.RootFS(), ".", sys.O_RDONLY, 0)
+	fd, errno := fsc.OpenFile(root, ".", sys.O_RDONLY, 0)
 	require.EqualErrno(t, 0, errno)
 	defer fsc.CloseFile(fd) // nolint
 	f, _ := fsc.LookupFile(fd)

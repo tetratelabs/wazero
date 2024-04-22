@@ -49,7 +49,7 @@ func Test_toOsOpenFlag(t *testing.T) {
 	}
 
 	// Example of a flag that can be or'd into O_RDONLY even if not
-	// currently supported in WASI or GOOS=js
+	// currently supported in WASI.
 	const O_NOATIME = sys.Oflag(0x40000)
 	require.Zero(t, 0, toOsOpenFlag(O_NOATIME))
 }
