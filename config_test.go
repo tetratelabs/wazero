@@ -8,12 +8,9 @@ import (
 	"time"
 
 	"github.com/tetratelabs/wazero/api"
-	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/fstest"
 	"github.com/tetratelabs/wazero/internal/platform"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
-	"github.com/tetratelabs/wazero/internal/sysfs"
-	testfs "github.com/tetratelabs/wazero/internal/testing/fs"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/sys"
@@ -316,38 +313,6 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 					require.Equal(t, 2, len(envs))
 					require.Equal(t, "a=b", string(envs[0]))
 					require.Equal(t, "c=de", string(envs[1]))
-				}
-			},
-		},
-		{
-			name: "WithFS",
-			input: func() (ModuleConfig, func(t *testing.T, sys *internalsys.Context)) {
-				testFS := &testfs.FS{}
-				config := base.WithFS(testFS)
-				return config, func(t *testing.T, sys *internalsys.Context) {
-					rootfs := sys.FS().RootFS()
-					require.Equal(t, &sysfs.AdaptFS{FS: testFS}, rootfs)
-				}
-			},
-		},
-		{
-			name: "WithFS overwrites",
-			input: func() (ModuleConfig, func(t *testing.T, sys *internalsys.Context)) {
-				testFS, testFS2 := &testfs.FS{}, &testfs.FS{}
-				config := base.WithFS(testFS).WithFS(testFS2)
-				return config, func(t *testing.T, sys *internalsys.Context) {
-					rootfs := sys.FS().RootFS()
-					require.Equal(t, &sysfs.AdaptFS{FS: testFS2}, rootfs)
-				}
-			},
-		},
-		{
-			name: "WithFS nil",
-			input: func() (ModuleConfig, func(t *testing.T, sys *internalsys.Context)) {
-				config := base.WithFS(nil)
-				return config, func(t *testing.T, sys *internalsys.Context) {
-					rootfs := sys.FS().RootFS()
-					require.Equal(t, experimentalsys.UnimplementedFS{}, rootfs)
 				}
 			},
 		},

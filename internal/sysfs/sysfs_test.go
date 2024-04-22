@@ -212,7 +212,7 @@ human
 	// Make sure O_RDONLY isn't treated bitwise as it is usually zero.
 	t.Run("or'd flag", func(t *testing.T) {
 		// Example of a flag that can be or'd into O_RDONLY even if not
-		// currently supported in WASI or GOOS=js
+		// currently supported in WASI.
 		const O_NOATIME = experimentalsys.Oflag(0x40000)
 
 		f, errno := testFS.OpenFile("animals.txt", experimentalsys.O_RDONLY|O_NOATIME, 0)
