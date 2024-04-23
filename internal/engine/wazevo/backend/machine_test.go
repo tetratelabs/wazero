@@ -56,7 +56,7 @@ func (m mockMachine) CompileGoFunctionTrampoline(wazevoapi.ExitCode, *ssa.Signat
 func (m mockMachine) Encode(context.Context) (err error) { return }
 
 // ResolveRelocations implements Machine.ResolveRelocations.
-func (m mockMachine) ResolveRelocations(map[ssa.FuncRef]int, []byte, []RelocationInfo, []int) {}
+func (m mockMachine) ResolveRelocations([]int, []byte, []RelocationInfo, []int) {}
 
 // PostRegAlloc implements Machine.SetupPrologue.
 func (m mockMachine) PostRegAlloc() {}

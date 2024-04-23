@@ -188,10 +188,6 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 		executables:       &executables{},
 	}
 
-	// rels is a list of relocations to be resolved. This is reused for each compilation to avoid allocation.
-	rels := make([]backend.RelocationInfo, 0)
-	refToBinaryOffset := map[ssa.FuncRef]int{}
-
 	if module.IsHostModule {
 		return e.compileHostModule(ctx, module, listeners)
 	}
@@ -200,6 +196,9 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 	if localFns == 0 {
 		return cm, nil
 	}
+
+	rels := make([]backend.RelocationInfo, 0)
+	refToBinaryOffset := make([]int, importedFns+localFns)
 
 	if wazevoapi.DeterministicCompilationVerifierEnabled {
 		// The compilation must be deterministic regardless of the order of functions being compiled.
