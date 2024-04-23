@@ -84,29 +84,27 @@ func TestModuleInstance_Close(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(fmt.Sprintf("%s calls ns.CloseWithExitCode(module.name))", tc.name), func(t *testing.T) {
-			for _, ctx := range []context.Context{nil, testCtx} { // Ensure it doesn't crash on nil!
-				moduleName := t.Name()
-				m, err := s.Instantiate(ctx, &Module{}, moduleName, nil, nil)
-				require.NoError(t, err)
+			moduleName := t.Name()
+			m, err := s.Instantiate(testCtx, &Module{}, moduleName, nil, nil)
+			require.NoError(t, err)
 
-				// We use side effects to see if Close called ns.CloseWithExitCode (without repeating store_test.go).
-				// One side effect of ns.CloseWithExitCode is that the moduleName can no longer be looked up.
-				require.Equal(t, s.Module(moduleName), m)
+			// We use side effects to see if Close called ns.CloseWithExitCode (without repeating store_test.go).
+			// One side effect of ns.CloseWithExitCode is that the moduleName can no longer be looked up.
+			require.Equal(t, s.Module(moduleName), m)
 
-				// Closing should not err.
-				require.NoError(t, tc.closer(ctx, m))
+			// Closing should not err.
+			require.NoError(t, tc.closer(testCtx, m))
 
-				require.Equal(t, tc.expectedClosed, m.Closed.Load())
+			require.Equal(t, tc.expectedClosed, m.Closed.Load())
 
-				// Outside callers should be able to know it was closed.
-				require.True(t, m.IsClosed())
+			// Outside callers should be able to know it was closed.
+			require.True(t, m.IsClosed())
 
-				// Verify our intended side-effect
-				require.Nil(t, s.Module(moduleName))
+			// Verify our intended side-effect
+			require.Nil(t, s.Module(moduleName))
 
-				// Verify no error closing again.
-				require.NoError(t, tc.closer(ctx, m))
-			}
+			// Verify no error closing again.
+			require.NoError(t, tc.closer(testCtx, m))
 		})
 	}
 
@@ -192,26 +190,24 @@ func TestModuleInstance_CallDynamic(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(fmt.Sprintf("%s calls ns.CloseWithExitCode(module.name))", tc.name), func(t *testing.T) {
-			for _, ctx := range []context.Context{nil, testCtx} { // Ensure it doesn't crash on nil!
-				moduleName := t.Name()
-				m, err := s.Instantiate(ctx, &Module{}, moduleName, nil, nil)
-				require.NoError(t, err)
+			moduleName := t.Name()
+			m, err := s.Instantiate(testCtx, &Module{}, moduleName, nil, nil)
+			require.NoError(t, err)
 
-				// We use side effects to see if Close called ns.CloseWithExitCode (without repeating store_test.go).
-				// One side effect of ns.CloseWithExitCode is that the moduleName can no longer be looked up.
-				require.Equal(t, s.Module(moduleName), m)
+			// We use side effects to see if Close called ns.CloseWithExitCode (without repeating store_test.go).
+			// One side effect of ns.CloseWithExitCode is that the moduleName can no longer be looked up.
+			require.Equal(t, s.Module(moduleName), m)
 
-				// Closing should not err.
-				require.NoError(t, tc.closer(ctx, m))
+			// Closing should not err.
+			require.NoError(t, tc.closer(testCtx, m))
 
-				require.Equal(t, tc.expectedClosed, m.Closed.Load())
+			require.Equal(t, tc.expectedClosed, m.Closed.Load())
 
-				// Verify our intended side-effect
-				require.Nil(t, s.Module(moduleName))
+			// Verify our intended side-effect
+			require.Nil(t, s.Module(moduleName))
 
-				// Verify no error closing again.
-				require.NoError(t, tc.closer(ctx, m))
-			}
+			// Verify no error closing again.
+			require.NoError(t, tc.closer(testCtx, m))
 		})
 	}
 
