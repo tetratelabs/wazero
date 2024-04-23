@@ -19,7 +19,7 @@ func Test_maxNumFunctions(t *testing.T) {
 func Test_encodeCallTrampolineIsland(t *testing.T) {
 	executable := make([]byte, 16*1000)
 	islandOffset := 160
-	refToBinaryOffset := map[ssa.FuncRef]int{0: 0, 1: 16, 2: 1600, 3: 16000}
+	refToBinaryOffset := []int{0: 0, 1: 16, 2: 1600, 3: 16000}
 	encodeCallTrampolineIsland(refToBinaryOffset, islandOffset, executable)
 	for i := 0; i < len(refToBinaryOffset); i++ {
 		offset := islandOffset + trampolineCallSize*i

@@ -2059,7 +2059,7 @@ func (m *machine) Encode(ctx context.Context) (err error) {
 }
 
 // ResolveRelocations implements backend.Machine.
-func (m *machine) ResolveRelocations(refToBinaryOffset map[ssa.FuncRef]int, binary []byte, relocations []backend.RelocationInfo, _ []int) {
+func (m *machine) ResolveRelocations(refToBinaryOffset []int, binary []byte, relocations []backend.RelocationInfo, _ []int) {
 	for _, r := range relocations {
 		offset := r.Offset
 		calleeFnOffset := refToBinaryOffset[r.FuncRef]
