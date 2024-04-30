@@ -157,3 +157,13 @@ func (e testRuntimeErr) RuntimeError() {}
 func (e testRuntimeErr) Error() string {
 	return string(e)
 }
+
+func Test_AddFrame_MaxFrame(t *testing.T) {
+	builder := NewErrorBuilder().(*stackTrace)
+	for i := 0; i < MaxFrames+10; i++ {
+		builder.AddFrame("x.y", nil, nil, []string{"a.go:1:2", "b.go:3:4"})
+	}
+	require.Equal(t, MaxFrames, builder.frameCount)
+	require.Equal(t, MaxFrames*3 /* frame + two inlined sources */ +1, len(builder.lines))
+	require.Equal(t, "... maybe followed by omitted frames", builder.lines[len(builder.lines)-1])
+}
