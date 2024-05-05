@@ -1078,12 +1078,12 @@ func Test2140(t *testing.T) {
 	nodiff.RequireNoDiffT(t, getWasmBinary(t, "2140"), true, true)
 }
 
-func Test2200(t *testing.T) {
+func Test2201(t *testing.T) {
 	if !platform.CompilerSupported() {
 		return
 	}
 	if runtime.GOARCH == "amd64" {
 		t.Skip("TODO: #2198")
 	}
-	nodiff.RequireNoDiffT(t, getWasmBinary(t, "2200"), false, false)
+	nodiff.RequireNoDiffT(t, getWasmBinary(t, "2201"), false, false)
 }
