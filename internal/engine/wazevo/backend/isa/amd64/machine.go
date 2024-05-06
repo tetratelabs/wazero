@@ -1051,7 +1051,7 @@ func (m *machine) lowerAtomicRmw(op ssa.AtomicRmwOp, addr, val ssa.Value, size u
 		}
 
 		// valCopied must be alive at the end of the loop.
-		m.insert(m.allocateInstr().asKeepAlive(valCopied))
+		m.insert(m.allocateInstr().asNopUseReg(valCopied))
 
 		// At this point, accumulator contains the result.
 		m.clearHigherBitsForAtomic(accumulator, size, ret.Type())
@@ -1796,6 +1796,12 @@ func (m *machine) lowerCall(si *ssa.Instruction) {
 		ptrOp := m.getOperand_Mem_Reg(m.c.ValueDefinition(indirectCalleePtr))
 		callInd := m.allocateInstr().asCallIndirect(ptrOp, calleeABI)
 		m.insert(callInd)
+	}
+
+	if isMemmove {
+		for i := regalloc.RealReg(0); i < 16; i++ {
+			m.insert(m.allocateInstr().asNopUseReg(regInfo.RealRegToVReg[xmm0+i]))
+		}
 	}
 
 	var index int
