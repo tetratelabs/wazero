@@ -1758,10 +1758,11 @@ func (m *machine) lowerCall(si *ssa.Instruction) {
 	var directCallee ssa.FuncRef
 	var sigID ssa.SignatureID
 	var args []ssa.Value
+	var isMemmove bool
 	if isDirectCall {
 		directCallee, sigID, args = si.CallData()
 	} else {
-		indirectCalleePtr, sigID, args = si.CallIndirectData()
+		indirectCalleePtr, sigID, args, isMemmove = si.CallIndirectData()
 	}
 	calleeABI := m.c.GetFunctionABI(m.c.SSABuilder().ResolveSignature(sigID))
 
@@ -1777,6 +1778,15 @@ func (m *machine) lowerCall(si *ssa.Instruction) {
 		reg := m.c.VRegOf(arg)
 		def := m.c.ValueDefinition(arg)
 		m.callerGenVRegToFunctionArg(calleeABI, i, reg, def, stackSlotSize)
+	}
+
+	if isMemmove {
+		// Go's memmove *might* use all xmm0-xmm15, so we need to release them.
+		// https://github.com/golang/go/blob/49d42128fd8594c172162961ead19ac95e247d24/src/cmd/compile/abi-internal.md#architecture-specifics
+		// https://github.com/golang/go/blob/49d42128fd8594c172162961ead19ac95e247d24/src/runtime/memmove_amd64.s#L271-L286
+		for i := regalloc.RealReg(0); i < 16; i++ {
+			m.insert(m.allocateInstr().asDefineUninitializedReg(regInfo.RealRegToVReg[xmm0+i]))
+		}
 	}
 
 	if isDirectCall {
