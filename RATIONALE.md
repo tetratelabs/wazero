@@ -471,17 +471,6 @@ case, a user can use multiple runtimes until "multi-store" is better understood.
 If later, we have demand for multiple stores, that can be accomplished by overload. e.g. `Runtime.InstantiateInStore` or
 `Runtime.Store(name) Store`.
 
-## interpreterir
-wazero's intermediate representation (IR) is called `interpreterir`. Lowering into an IR provides us a faster interpreter
-and a closer to assembly representation for used by our compiler.
-
-### Intermediate Representation (IR) design
-`interpreterir`'s initial design borrowed heavily from the defunct `microwasm` format (a.k.a. LightbeamIR). Notably,
-`interpreterir` doesn't have block operations: this simplifies the implementation.
-
-Note: `microwasm` was never specified formally, and only exists in a historical codebase of wasmtime:
-https://github.com/bytecodealliance/wasmtime/blob/v0.29.0/crates/lightbeam/src/microwasm.rs
-
 ## Exit
 
 ### Why do we only return a `sys.ExitError` on a non-zero exit code?
