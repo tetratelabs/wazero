@@ -471,13 +471,13 @@ case, a user can use multiple runtimes until "multi-store" is better understood.
 If later, we have demand for multiple stores, that can be accomplished by overload. e.g. `Runtime.InstantiateInStore` or
 `Runtime.Store(name) Store`.
 
-## wazeroir
-wazero's intermediate representation (IR) is called `wazeroir`. Lowering into an IR provides us a faster interpreter
+## interpreterir
+wazero's intermediate representation (IR) is called `interpreterir`. Lowering into an IR provides us a faster interpreter
 and a closer to assembly representation for used by our compiler.
 
 ### Intermediate Representation (IR) design
-`wazeroir`'s initial design borrowed heavily from the defunct `microwasm` format (a.k.a. LightbeamIR). Notably,
-`wazeroir` doesn't have block operations: this simplifies the implementation.
+`interpreterir`'s initial design borrowed heavily from the defunct `microwasm` format (a.k.a. LightbeamIR). Notably,
+`interpreterir` doesn't have block operations: this simplifies the implementation.
 
 Note: `microwasm` was never specified formally, and only exists in a historical codebase of wasmtime:
 https://github.com/bytecodealliance/wasmtime/blob/v0.29.0/crates/lightbeam/src/microwasm.rs
@@ -1553,7 +1553,7 @@ however, because native code never preempts (see section above), this may lead t
 never get the chance to run, and thus never get the chance to set the sentinel value; effectively preventing
 cancellation from taking place.
 
-[checkexitcode_loop]: https://github.com/tetratelabs/wazero/blob/86444c67a37dbf9e693ae5b365901f64968d9025/internal/wazeroir/compiler.go#L467-L476
+[checkexitcode_loop]: https://github.com/tetratelabs/wazero/blob/86444c67a37dbf9e693ae5b365901f64968d9025/internal/interpreterir/compiler.go#L467-L476
 [native_check]: https://github.com/tetratelabs/wazero/issues/1409
 
 ## Golang patterns

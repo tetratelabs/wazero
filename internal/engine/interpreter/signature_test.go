@@ -1,4 +1,4 @@
-package wazeroir
+package interpreter
 
 import (
 	"testing"
@@ -428,7 +428,7 @@ func TestCompiler_wasmOpcodeSignature(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			c := &Compiler{body: tc.body}
+			c := &compiler{body: tc.body}
 			actual, err := c.wasmOpcodeSignature(tc.body[0], 0)
 			require.NoError(t, err)
 			require.Equal(t, tc.exp, actual)
@@ -443,16 +443,16 @@ func Test_funcTypeToIRSignatures(t *testing.T) {
 		indirectCalls: make([]*signature, 3),
 	}
 
-	require.Equal(t, &signature{in: make([]UnsignedType, 0), out: make([]UnsignedType, 0)}, f.get(0, false))
-	require.Equal(t, &signature{in: []UnsignedType{UnsignedTypeI32}, out: make([]UnsignedType, 0)}, f.get(0, true))
+	require.Equal(t, &signature{in: make([]unsignedType, 0), out: make([]unsignedType, 0)}, f.get(0, false))
+	require.Equal(t, &signature{in: []unsignedType{unsignedTypeI32}, out: make([]unsignedType, 0)}, f.get(0, true))
 	require.NotNil(t, f.directCalls[0])
 	require.NotNil(t, f.indirectCalls[0])
-	require.Equal(t, &signature{in: []UnsignedType{UnsignedTypeI32}, out: []UnsignedType{UnsignedTypeI32}}, f.get(1, false))
-	require.Equal(t, &signature{in: []UnsignedType{UnsignedTypeI32, UnsignedTypeI32}, out: []UnsignedType{UnsignedTypeI32}}, f.get(1, true))
+	require.Equal(t, &signature{in: []unsignedType{unsignedTypeI32}, out: []unsignedType{unsignedTypeI32}}, f.get(1, false))
+	require.Equal(t, &signature{in: []unsignedType{unsignedTypeI32, unsignedTypeI32}, out: []unsignedType{unsignedTypeI32}}, f.get(1, true))
 	require.NotNil(t, f.directCalls[1])
 	require.NotNil(t, f.indirectCalls[1])
-	require.Equal(t, &signature{in: make([]UnsignedType, 0), out: []UnsignedType{UnsignedTypeF64, UnsignedTypeF64}}, f.get(2, false))
-	require.Equal(t, &signature{in: []UnsignedType{UnsignedTypeI32}, out: []UnsignedType{UnsignedTypeF64, UnsignedTypeF64}}, f.get(2, true))
+	require.Equal(t, &signature{in: make([]unsignedType, 0), out: []unsignedType{unsignedTypeF64, unsignedTypeF64}}, f.get(2, false))
+	require.Equal(t, &signature{in: []unsignedType{unsignedTypeI32}, out: []unsignedType{unsignedTypeF64, unsignedTypeF64}}, f.get(2, true))
 	require.NotNil(t, f.directCalls[2])
 	require.NotNil(t, f.indirectCalls[2])
 }
