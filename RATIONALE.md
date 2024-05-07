@@ -471,17 +471,6 @@ case, a user can use multiple runtimes until "multi-store" is better understood.
 If later, we have demand for multiple stores, that can be accomplished by overload. e.g. `Runtime.InstantiateInStore` or
 `Runtime.Store(name) Store`.
 
-## wazeroir
-wazero's intermediate representation (IR) is called `wazeroir`. Lowering into an IR provides us a faster interpreter
-and a closer to assembly representation for used by our compiler.
-
-### Intermediate Representation (IR) design
-`wazeroir`'s initial design borrowed heavily from the defunct `microwasm` format (a.k.a. LightbeamIR). Notably,
-`wazeroir` doesn't have block operations: this simplifies the implementation.
-
-Note: `microwasm` was never specified formally, and only exists in a historical codebase of wasmtime:
-https://github.com/bytecodealliance/wasmtime/blob/v0.29.0/crates/lightbeam/src/microwasm.rs
-
 ## Exit
 
 ### Why do we only return a `sys.ExitError` on a non-zero exit code?
@@ -1545,15 +1534,13 @@ that trampoline function. Therefore, runtime-generated machine code is also corr
 Since [wazero v1.0.0-pre.9](https://github.com/tetratelabs/wazero/releases/tag/v1.0.0-pre.9), the runtime
 supports integration with Go contexts to interrupt execution after a timeout, or in response to explicit cancellation.
 This support is internally implemented as a special opcode `builtinFunctionCheckExitCode` that triggers the execution of
-a Go function (`ModuleInstance.FailIfClosed`) that atomically checks a sentinel value at strategic points in the code
-(e.g. [within loops][checkexitcode_loop]).
+a Go function (`ModuleInstance.FailIfClosed`) that atomically checks a sentinel value at strategic points in the code.
 
 [It _is indeed_ possible to check the sentinel value directly, without leaving the native world][native_check], thus sparing some cycles;
 however, because native code never preempts (see section above), this may lead to a state where the other goroutines
 never get the chance to run, and thus never get the chance to set the sentinel value; effectively preventing
 cancellation from taking place.
 
-[checkexitcode_loop]: https://github.com/tetratelabs/wazero/blob/86444c67a37dbf9e693ae5b365901f64968d9025/internal/wazeroir/compiler.go#L467-L476
 [native_check]: https://github.com/tetratelabs/wazero/issues/1409
 
 ## Golang patterns

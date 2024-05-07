@@ -10,7 +10,6 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
 // testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
@@ -67,8 +66,8 @@ func TestInterpreter_NonTrappingFloatToIntConversion(t *testing.T) {
 
 	tests := []struct {
 		op            wasm.OpcodeMisc
-		inputType     wazeroir.Float
-		outputType    wazeroir.SignedInt
+		inputType     float
+		outputType    signedInt
 		input32bit    []float32
 		input64bit    []float64
 		expected32bit []int32
@@ -77,8 +76,8 @@ func TestInterpreter_NonTrappingFloatToIntConversion(t *testing.T) {
 		{
 			// https://github.com/WebAssembly/spec/blob/c8fd933fa51eb0b511bce027b573aef7ee373726/test/core/conversions.wast#L261-L282
 			op:         wasm.OpcodeMiscI32TruncSatF32S,
-			inputType:  wazeroir.Float32,
-			outputType: wazeroir.SignedInt32,
+			inputType:  f32,
+			outputType: signedInt32,
 			input32bit: []float32{
 				0.0, 0.0, 0x1p-149, -0x1p-149, 1.0, 0x1.19999ap+0, 1.5, -1.0, -0x1.19999ap+0,
 				-1.5, -1.9, -2.0, 2147483520.0, -2147483648.0, 2147483648.0, -2147483904.0,
@@ -93,8 +92,8 @@ func TestInterpreter_NonTrappingFloatToIntConversion(t *testing.T) {
 		{
 			// https://github.com/WebAssembly/spec/blob/c8fd933fa51eb0b511bce027b573aef7ee373726/test/core/conversions.wast#L284-L304
 			op:         wasm.OpcodeMiscI32TruncSatF32U,
-			inputType:  wazeroir.Float32,
-			outputType: wazeroir.SignedUint32,
+			inputType:  f32,
+			outputType: signedUint32,
 			input32bit: []float32{
 				0.0, 0.0, 0x1p-149, -0x1p-149, 1.0, 0x1.19999ap+0, 1.5, 1.9, 2.0, 2147483648, 4294967040.0,
 				-0x1.ccccccp-1, -0x1.fffffep-1, 4294967296.0, -1.0, float32(math.Inf(1)), float32(math.Inf(-1)),
@@ -108,8 +107,8 @@ func TestInterpreter_NonTrappingFloatToIntConversion(t *testing.T) {
 		{
 			// https://github.com/WebAssembly/spec/blob/c8fd933fa51eb0b511bce027b573aef7ee373726/test/core/conversions.wast#L355-L378
 			op:         wasm.OpcodeMiscI64TruncSatF32S,
-			inputType:  wazeroir.Float32,
-			outputType: wazeroir.SignedInt64,
+			inputType:  f32,
+			outputType: signedInt64,
 			input32bit: []float32{
 				0.0, 0.0, 0x1p-149, -0x1p-149, 1.0, 0x1.19999ap+0, 1.5, -1.0, -0x1.19999ap+0, -1.5, -1.9, -2.0, 4294967296,
 				-4294967296, 9223371487098961920.0, -9223372036854775808.0, 9223372036854775808.0, -9223373136366403584.0,
@@ -124,8 +123,8 @@ func TestInterpreter_NonTrappingFloatToIntConversion(t *testing.T) {
 		{
 			// https://github.com/WebAssembly/spec/blob/c8fd933fa51eb0b511bce027b573aef7ee373726/test/core/conversions.wast#L380-L398
 			op:         wasm.OpcodeMiscI64TruncSatF32U,
-			inputType:  wazeroir.Float32,
-			outputType: wazeroir.SignedUint64,
+			inputType:  f32,
+			outputType: signedUint64,
 			input32bit: []float32{
 				0.0, 0.0, 0x1p-149, -0x1p-149, 1.0, 0x1.19999ap+0, 1.5, 4294967296,
 				18446742974197923840.0, -0x1.ccccccp-1, -0x1.fffffep-1, 18446744073709551616.0, -1.0,
@@ -141,8 +140,8 @@ func TestInterpreter_NonTrappingFloatToIntConversion(t *testing.T) {
 		{
 			// https://github.com/WebAssembly/spec/blob/c8fd933fa51eb0b511bce027b573aef7ee373726/test/core/conversions.wast#L306-L327
 			op:         wasm.OpcodeMiscI32TruncSatF64S,
-			inputType:  wazeroir.Float64,
-			outputType: wazeroir.SignedInt32,
+			inputType:  f64,
+			outputType: signedInt32,
 			input64bit: []float64{
 				0.0, 0.0, 0x0.0000000000001p-1022, -0x0.0000000000001p-1022, 1.0, 0x1.199999999999ap+0, 1.5, -1.0,
 				-0x1.199999999999ap+0, -1.5, -1.9, -2.0, 2147483647.0, -2147483648.0, 2147483648.0,
@@ -157,8 +156,8 @@ func TestInterpreter_NonTrappingFloatToIntConversion(t *testing.T) {
 		{
 			// https://github.com/WebAssembly/spec/blob/c8fd933fa51eb0b511bce027b573aef7ee373726/test/core/conversions.wast#L329-L353
 			op:         wasm.OpcodeMiscI32TruncSatF64U,
-			inputType:  wazeroir.Float64,
-			outputType: wazeroir.SignedUint32,
+			inputType:  f64,
+			outputType: signedUint32,
 			input64bit: []float64{
 				0.0, 0.0, 0x0.0000000000001p-1022, -0x0.0000000000001p-1022, 1.0, 0x1.199999999999ap+0, 1.5, 1.9, 2.0,
 				2147483648, 4294967295.0, -0x1.ccccccccccccdp-1, -0x1.fffffffffffffp-1, 1e8, 4294967296.0, -1.0, 1e16, 1e30,
@@ -173,8 +172,8 @@ func TestInterpreter_NonTrappingFloatToIntConversion(t *testing.T) {
 		{
 			// https://github.com/WebAssembly/spec/blob/c8fd933fa51eb0b511bce027b573aef7ee373726/test/core/conversions.wast#L400-L423
 			op:         wasm.OpcodeMiscI64TruncSatF64S,
-			inputType:  wazeroir.Float64,
-			outputType: wazeroir.SignedInt64,
+			inputType:  f64,
+			outputType: signedInt64,
 			input64bit: []float64{
 				0.0, 0.0, 0x0.0000000000001p-1022, -0x0.0000000000001p-1022, 1.0, 0x1.199999999999ap+0, 1.5, -1.0,
 				-0x1.199999999999ap+0, -1.5, -1.9, -2.0, 4294967296, -4294967296, 9223372036854774784.0, -9223372036854775808.0,
@@ -190,8 +189,8 @@ func TestInterpreter_NonTrappingFloatToIntConversion(t *testing.T) {
 		{
 			// https://github.com/WebAssembly/spec/blob/c8fd933fa51eb0b511bce027b573aef7ee373726/test/core/conversions.wast#L425-L447
 			op:         wasm.OpcodeMiscI64TruncSatF64U,
-			inputType:  wazeroir.Float64,
-			outputType: wazeroir.SignedUint64,
+			inputType:  f64,
+			outputType: signedUint64,
 			input64bit: []float64{
 				0.0, 0.0, 0x0.0000000000001p-1022, -0x0.0000000000001p-1022, 1.0, 0x1.199999999999ap+0, 1.5, 4294967295, 4294967296,
 				18446744073709549568.0, -0x1.ccccccccccccdp-1, -0x1.fffffffffffffp-1, 1e8, 1e16, 9223372036854775808,
@@ -216,21 +215,21 @@ func TestInterpreter_NonTrappingFloatToIntConversion(t *testing.T) {
 			for i := 0; i < casenum; i++ {
 				i := i
 				t.Run(strconv.Itoa(i), func(t *testing.T) {
-					var body []wazeroir.UnionOperation
+					var body []unionOperation
 					if in32bit {
-						body = append(body, wazeroir.UnionOperation{
-							Kind: wazeroir.OperationKindConstF32,
+						body = append(body, unionOperation{
+							Kind: operationKindConstF32,
 							U1:   uint64(math.Float32bits(tc.input32bit[i])),
 						})
 					} else {
-						body = append(body, wazeroir.UnionOperation{
-							Kind: wazeroir.OperationKindConstF64,
-							U1:   uint64(math.Float64bits(tc.input64bit[i])),
+						body = append(body, unionOperation{
+							Kind: operationKindConstF64,
+							U1:   math.Float64bits(tc.input64bit[i]),
 						})
 					}
 
-					body = append(body, wazeroir.UnionOperation{
-						Kind: wazeroir.OperationKindITruncFromF,
+					body = append(body, unionOperation{
+						Kind: operationKindITruncFromF,
 						B1:   byte(tc.inputType),
 						B2:   byte(tc.outputType),
 						B3:   true, // NonTrapping = true.
@@ -238,7 +237,7 @@ func TestInterpreter_NonTrappingFloatToIntConversion(t *testing.T) {
 
 					// Return from function.
 					body = append(body,
-						wazeroir.UnionOperation{Kind: wazeroir.OperationKindBr, U1: uint64(math.MaxUint64)},
+						unionOperation{Kind: operationKindBr, U1: uint64(math.MaxUint64)},
 					)
 
 					ce := &callEngine{}
@@ -261,18 +260,18 @@ func TestInterpreter_NonTrappingFloatToIntConversion(t *testing.T) {
 }
 
 func TestInterpreter_CallEngine_callNativeFunc_signExtend(t *testing.T) {
-	translateToIROperationKind := func(op wasm.Opcode) (kind wazeroir.OperationKind) {
+	translateToIRoperationKind := func(op wasm.Opcode) (kind operationKind) {
 		switch op {
 		case wasm.OpcodeI32Extend8S:
-			kind = wazeroir.OperationKindSignExtend32From8
+			kind = operationKindSignExtend32From8
 		case wasm.OpcodeI32Extend16S:
-			kind = wazeroir.OperationKindSignExtend32From16
+			kind = operationKindSignExtend32From16
 		case wasm.OpcodeI64Extend8S:
-			kind = wazeroir.OperationKindSignExtend64From8
+			kind = operationKindSignExtend64From8
 		case wasm.OpcodeI64Extend16S:
-			kind = wazeroir.OperationKindSignExtend64From16
+			kind = operationKindSignExtend64From16
 		case wasm.OpcodeI64Extend32S:
-			kind = wazeroir.OperationKindSignExtend64From32
+			kind = operationKindSignExtend64From32
 		}
 		return
 	}
@@ -307,10 +306,10 @@ func TestInterpreter_CallEngine_callNativeFunc_signExtend(t *testing.T) {
 				ce := &callEngine{}
 				f := &function{
 					moduleInstance: &wasm.ModuleInstance{Engine: &moduleEngine{}},
-					parent: &compiledFunction{body: []wazeroir.UnionOperation{
-						{Kind: wazeroir.OperationKindConstI32, U1: uint64(uint32(tc.in))},
-						{Kind: translateToIROperationKind(tc.opcode)},
-						{Kind: wazeroir.OperationKindBr, U1: uint64(math.MaxUint64)},
+					parent: &compiledFunction{body: []unionOperation{
+						{Kind: operationKindConstI32, U1: uint64(uint32(tc.in))},
+						{Kind: translateToIRoperationKind(tc.opcode)},
+						{Kind: operationKindBr, U1: uint64(math.MaxUint64)},
 					}},
 				}
 				ce.callNativeFunc(testCtx, &wasm.ModuleInstance{}, f)
@@ -361,10 +360,10 @@ func TestInterpreter_CallEngine_callNativeFunc_signExtend(t *testing.T) {
 				ce := &callEngine{}
 				f := &function{
 					moduleInstance: &wasm.ModuleInstance{Engine: &moduleEngine{}},
-					parent: &compiledFunction{body: []wazeroir.UnionOperation{
-						{Kind: wazeroir.OperationKindConstI64, U1: uint64(tc.in)},
-						{Kind: translateToIROperationKind(tc.opcode)},
-						{Kind: wazeroir.OperationKindBr, U1: uint64(math.MaxUint64)},
+					parent: &compiledFunction{body: []unionOperation{
+						{Kind: operationKindConstI64, U1: uint64(tc.in)},
+						{Kind: translateToIRoperationKind(tc.opcode)},
+						{Kind: operationKindBr, U1: uint64(math.MaxUint64)},
 					}},
 				}
 				ce.callNativeFunc(testCtx, &wasm.ModuleInstance{}, f)
@@ -433,8 +432,8 @@ func TestInterpreter_Compile(t *testing.T) {
 func TestEngine_CachedCompiledFunctionPerModule(t *testing.T) {
 	e := NewEngine(testCtx, api.CoreFeaturesV1, nil).(*engine)
 	exp := []compiledFunction{
-		{body: []wazeroir.UnionOperation{}},
-		{body: []wazeroir.UnionOperation{}},
+		{body: []unionOperation{}},
+		{body: []unionOperation{}},
 	}
 	m := &wasm.Module{}
 
