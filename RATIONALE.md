@@ -1540,7 +1540,6 @@ a Go function (`ModuleInstance.FailIfClosed`) that atomically checks a sentinel 
 however, because native code never preempts (see section above), this may lead to a state where the other goroutines
 never get the chance to run, and thus never get the chance to set the sentinel value; effectively preventing
 
-[checkexitcode_loop]: https://github.com/tetratelabs/wazero/blob/86444c67a37dbf9e693ae5b365901f64968d9025/internal/interpreterir/compiler.go#L467-L476
 [native_check]: https://github.com/tetratelabs/wazero/issues/1409
 
 ## Golang patterns
