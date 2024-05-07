@@ -277,12 +277,7 @@ func testHugeStack(t *testing.T, r wazero.Runtime) {
 				t.Run(fmt.Sprintf("offset=%d,size=%d", offset, size), func(t *testing.T) {
 					res, err := fn.Call(testCtx, offset, 0xff, size)
 					require.NoError(t, err)
-
-					const resultNumInUint64 = 180
-					require.Equal(t, resultNumInUint64, len(res))
-					for i := uint64(1); i <= resultNumInUint64; i++ {
-						require.Equal(t, i, res[i-1])
-					}
+					verifyResult(t, res)
 				})
 			}
 		}
