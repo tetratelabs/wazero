@@ -253,17 +253,35 @@ func testHugeStack(t *testing.T, r wazero.Runtime) {
 		require.NoError(t, module.Close(testCtx))
 	}()
 
-	fn := module.ExportedFunction("main")
-	require.NotNil(t, fn)
-
-	res, err := fn.Call(testCtx, 0, 0, 0, 0, 0, 0) // params ignored by wasm
-	require.NoError(t, err)
-
-	const resultNumInUint64 = 180
-	require.Equal(t, resultNumInUint64, len(res))
-	for i := uint64(1); i <= resultNumInUint64; i++ {
-		require.Equal(t, i, res[i-1])
+	verifyResult := func(t *testing.T, res []uint64) {
+		const resultNumInUint64 = 180
+		require.Equal(t, resultNumInUint64, len(res))
+		for i := uint64(1); i <= resultNumInUint64; i++ {
+			require.Equal(t, i, res[i-1])
+		}
 	}
+
+	t.Run("main", func(t *testing.T) {
+		fn := module.ExportedFunction("main")
+		require.NotNil(t, fn)
+		res, err := fn.Call(testCtx, 0, 0, 0, 0, 0, 0) // params ignored by wasm
+		require.NoError(t, err)
+		verifyResult(t, res)
+	})
+
+	t.Run("memory_fill_after_main", func(t *testing.T) {
+		fn := module.ExportedFunction("memory_fill_after_main")
+		require.NotNil(t, fn)
+		for _, offset := range []uint64{0, 2, 4, 8, 16, 32, 48, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768} {
+			for _, size := range []uint64{0, 2, 4, 8, 16, 32, 48, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384} {
+				t.Run(fmt.Sprintf("offset=%d,size=%d", offset, size), func(t *testing.T) {
+					res, err := fn.Call(testCtx, offset, 0xff, size)
+					require.NoError(t, err)
+					verifyResult(t, res)
+				})
+			}
+		}
+	})
 }
 
 // testOverflow ensures that adding one into the maximum integer results in the

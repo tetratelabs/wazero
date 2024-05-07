@@ -1,6 +1,6 @@
 (module
   (func (export "main")
-    (param f32 v128 i32 f64 i64) ;; unused params -> wazeroir always emits the drop operation on this.
+    (param f32 v128 i32 f64 i64)
     (result
       ;; 180 results (in terms of uint64 representations) which use up all all the possible unreserved registers
       ;; of both general purpose and vector types on the function return.
@@ -39,4 +39,33 @@
     (f64.const 8.84e-322) ;; math.Float64frombits(179)
     (f64.const 8.9e-322) ;; math.Float64frombits(180)
   )
+  (func (export "memory_fill_after_main") (param i32 i32 i32)
+    (result
+      ;; 180 results (in terms of uint64 representations) which use up all all the possible unreserved registers
+      ;; of both general purpose and vector types on the function return.
+      v128 f64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 ;; 20
+      v128 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 ;; 40
+      i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 ;; 60
+      i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 ;; 80
+      i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 f64 v128 ;; 100
+      v128 v128 v128 v128 v128 v128 v128 v128 v128 v128 ;; 120
+      v128 v128 v128 v128 v128 v128 v128 v128 v128 v128 ;; 140
+      v128 v128 v128 v128 v128 v128 v128 v128 v128 v128 ;; 160
+      v128 v128 v128 v128 v128 v128 v128 v128 v128 f64 f64 ;; 180
+    )
+    f32.const 0
+    v128.const i64x2 0 0
+    i32.const 0
+    f64.const 0
+    i64.const 0
+    call 0
+    ;; Call memory.fill with params. memory.fill/copy internally calls the Go runtime's runtime.memmove,
+    ;; which has a slightly tricky calling convention. This ensures that across the call to memory.fill
+    ;; the registers are preserved. https://github.com/tetratelabs/wazero/pull/2202
+    local.get 0
+    local.get 1
+    local.get 2
+    memory.fill
+  )
+  (memory 1)
 )
