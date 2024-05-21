@@ -944,8 +944,7 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 func (a *Allocator) releaseCallerSavedRegs(addrReg RealReg) {
 	s := &a.state
 
-	for i := 0; i < 64; i++ {
-		allocated := RealReg(i)
+	for allocated := RealReg(0); allocated < 64; allocated++ {
 		if allocated == addrReg { // If this is the call indirect, we should not touch the addr register.
 			continue
 		}
@@ -974,13 +973,6 @@ func (a *Allocator) fixMergeState(f Function, blk Block) {
 	bID := blk.ID()
 	blkSt := a.getOrAllocateBlockState(bID)
 	desiredOccupants := &blkSt.startRegs
-	aliveOnRegVRegs := make(map[VReg]RealReg)
-	for i := 0; i < 64; i++ {
-		r := RealReg(i)
-		if v := blkSt.startRegs.get(r); v.Valid() {
-			aliveOnRegVRegs[v] = r
-		}
-	}
 
 	if wazevoapi.RegAllocLoggingEnabled {
 		fmt.Println("fixMergeState", blk.ID(), ":", desiredOccupants.format(a.regInfo))
@@ -999,10 +991,9 @@ func (a *Allocator) fixMergeState(f Function, blk Block) {
 		currentOccupantsRev := make(map[VReg]RealReg)
 		pred := blk.Pred(i)
 		predSt := a.getOrAllocateBlockState(pred.ID())
-		for ii := 0; ii < 64; ii++ {
-			r := RealReg(ii)
+		for r := RealReg(0); r < 64; r++ {
 			if v := predSt.endRegs.get(r); v.Valid() {
-				if _, ok := aliveOnRegVRegs[v]; !ok {
+				if _v := blkSt.startRegs.get(r); !_v.Valid() {
 					continue
 				}
 				currentOccupants.add(r, v)
@@ -1029,8 +1020,7 @@ func (a *Allocator) fixMergeState(f Function, blk Block) {
 			fmt.Println("\t", pred.ID(), ":", currentOccupants.format(a.regInfo))
 		}
 
-		for ii := 0; ii < 64; ii++ {
-			r := RealReg(ii)
+		for r := RealReg(0); r < 64; r++ {
 			desiredVReg := desiredOccupants.get(r)
 			if !desiredVReg.Valid() {
 				continue
@@ -1169,8 +1159,7 @@ func (a *Allocator) scheduleSpill(f Function, vs *vrState) {
 	}
 	for pos != definingBlk {
 		st := a.getOrAllocateBlockState(pos.ID())
-		for ii := 0; ii < 64; ii++ {
-			rr := RealReg(ii)
+		for rr := RealReg(0); rr < 64; rr++ {
 			if st.startRegs.get(rr) == v {
 				r = rr
 				// Already in the register, so we can place the spill at the beginning of the block.
