@@ -523,7 +523,7 @@ func (b *builder) Seal(raw BasicBlock) {
 	for _, v := range blk.unknownValues {
 		variable, phiValue := v.variable, v.value
 		typ := b.definedVariableType(variable)
-		blk.addParamOn(typ, phiValue)
+		blk.addParamOn(phiValue)
 		for i := range blk.preds {
 			pred := &blk.preds[i]
 			predValue := b.findValue(typ, variable, pred.blk)

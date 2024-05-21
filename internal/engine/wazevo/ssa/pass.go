@@ -126,7 +126,7 @@ func passRedundantPhiEliminationOpt(b *builder) {
 			paramNum := len(blk.params)
 
 			for paramIndex := 0; paramIndex < paramNum; paramIndex++ {
-				phiValue := blk.params[paramIndex].value
+				phiValue := blk.params[paramIndex]
 				redundant := true
 
 				nonSelfReferencingValue := ValueInvalid
@@ -184,7 +184,7 @@ func passRedundantPhiEliminationOpt(b *builder) {
 
 			// Still need to have the definition of the value of the PHI (previously as the parameter).
 			for _, redundantParamIndex := range redundantParameterIndexes {
-				phiValue := blk.params[redundantParamIndex].value
+				phiValue := blk.params[redundantParamIndex]
 				onlyValue := b.redundantParameterIndexToValue[redundantParamIndex]
 				// Create an alias in this block from the only phi argument to the phi value.
 				b.alias(phiValue, onlyValue)
