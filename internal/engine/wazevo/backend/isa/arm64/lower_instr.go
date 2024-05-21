@@ -351,7 +351,7 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		rn := m.getOperand_NR(m.compiler.ValueDefinition(x), extModeNone)
 		rm := m.getOperand_NR(m.compiler.ValueDefinition(y), extModeNone)
 		rd := operandNR(m.compiler.VRegOf(instr.Return()))
-		m.lowerIRem(ctxVReg, rd, rn, rm, x.Type() == ssa.TypeI64, op == ssa.OpcodeSrem)
+		m.lowerIRem(ctxVReg, rd, rn.nr(), rm, x.Type() == ssa.TypeI64, op == ssa.OpcodeSrem)
 	case ssa.OpcodeVconst:
 		result := m.compiler.VRegOf(instr.Return())
 		lo, hi := instr.VconstData()
@@ -1224,13 +1224,13 @@ func (m *machine) lowerVMinMaxPseudo(instr *ssa.Instruction, max bool) {
 	m.insert(mov2)
 }
 
-func (m *machine) lowerIRem(execCtxVReg regalloc.VReg, rd, rn, rm operand, _64bit, signed bool) {
+func (m *machine) lowerIRem(execCtxVReg regalloc.VReg, rd operand, rn regalloc.VReg, rm operand, _64bit, signed bool) {
 	div := m.allocateInstr()
 
 	if signed {
-		div.asALU(aluOpSDiv, rd, rn, rm, _64bit)
+		div.asALU(aluOpSDiv, rd, operandNR(rn), rm, _64bit)
 	} else {
-		div.asALU(aluOpUDiv, rd, rn, rm, _64bit)
+		div.asALU(aluOpUDiv, rd, operandNR(rn), rm, _64bit)
 	}
 	m.insert(div)
 
@@ -1797,7 +1797,7 @@ func (m *machine) lowerImul(x, y, result ssa.Value) {
 	// TODO: if this comes before Add/Sub, we could merge it by putting it into the place of xzrVReg.
 
 	mul := m.allocateInstr()
-	mul.asALURRRR(aluOpMAdd, operandNR(rd), rn, rm, operandNR(xzrVReg), x.Type().Bits() == 64)
+	mul.asALURRRR(aluOpMAdd, operandNR(rd), rn, rm, xzrVReg, x.Type().Bits() == 64)
 	m.insert(mul)
 }
 

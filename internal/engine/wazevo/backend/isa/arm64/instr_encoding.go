@@ -129,7 +129,7 @@ func (i *instruction) encode(m *machine) {
 			regNumberInEncoding[i.rd.realReg()],
 			regNumberInEncoding[i.rn.realReg()],
 			regNumberInEncoding[i.rm.realReg()],
-			regNumberInEncoding[i.ra.realReg()],
+			regNumberInEncoding[regalloc.VReg(i.u2).RealReg()],
 			uint32(i.u3),
 		))
 	case aluRRImmShift:

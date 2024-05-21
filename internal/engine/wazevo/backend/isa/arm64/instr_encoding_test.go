@@ -1093,16 +1093,16 @@ func TestInstruction_encode(t *testing.T) {
 		{want: "101e306e", setup: func(i *instruction) { i.asLoadFpuConst128(v16VReg, 0, 0) }},
 		{want: "5000009c05000014ffffffffffffffffaaaaaaaaaaaaaaaa", setup: func(i *instruction) { i.asLoadFpuConst128(v16VReg, 0xffffffff_ffffffff, 0xaaaaaaaa_aaaaaaaa) }},
 		{want: "8220061b", setup: func(i *instruction) {
-			i.asALURRRR(aluOpMAdd, operandNR(x2VReg), operandNR(x4VReg), operandNR(x6VReg), operandNR(x8VReg), false)
+			i.asALURRRR(aluOpMAdd, operandNR(x2VReg), operandNR(x4VReg), operandNR(x6VReg), x8VReg, false)
 		}},
 		{want: "8220069b", setup: func(i *instruction) {
-			i.asALURRRR(aluOpMAdd, operandNR(x2VReg), operandNR(x4VReg), operandNR(x6VReg), operandNR(x8VReg), true)
+			i.asALURRRR(aluOpMAdd, operandNR(x2VReg), operandNR(x4VReg), operandNR(x6VReg), x8VReg, true)
 		}},
 		{want: "82a0061b", setup: func(i *instruction) {
-			i.asALURRRR(aluOpMSub, operandNR(x2VReg), operandNR(x4VReg), operandNR(x6VReg), operandNR(x8VReg), false)
+			i.asALURRRR(aluOpMSub, operandNR(x2VReg), operandNR(x4VReg), operandNR(x6VReg), x8VReg, false)
 		}},
 		{want: "82a0069b", setup: func(i *instruction) {
-			i.asALURRRR(aluOpMSub, operandNR(x2VReg), operandNR(x4VReg), operandNR(x6VReg), operandNR(x8VReg), true)
+			i.asALURRRR(aluOpMSub, operandNR(x2VReg), operandNR(x4VReg), operandNR(x6VReg), x8VReg, true)
 		}},
 		{want: "00213f1e", setup: func(i *instruction) { i.asFpuCmp(operandNR(v8VReg), operandNR(v31VReg), false) }},
 		{want: "00217f1e", setup: func(i *instruction) { i.asFpuCmp(operandNR(v8VReg), operandNR(v31VReg), true) }},

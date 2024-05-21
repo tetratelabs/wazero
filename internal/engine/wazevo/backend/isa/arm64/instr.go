@@ -23,7 +23,7 @@ type (
 	instruction struct {
 		prev, next          *instruction
 		u1, u2, u3          uint64
-		rd, rm, rn, ra      operand
+		rd, rm, rn          operand
 		amode               addressMode
 		kind                instructionKind
 		addedBeforeRegAlloc bool
@@ -329,7 +329,7 @@ func (i *instruction) Uses(regs *[]regalloc.VReg) []regalloc.VReg {
 		if rm := i.rm.reg(); rm.Valid() {
 			*regs = append(*regs, rm)
 		}
-		if ra := i.ra.reg(); ra.Valid() {
+		if ra := regalloc.VReg(i.u2); ra.Valid() {
 			*regs = append(*regs, ra)
 		}
 	case useKindRNRN1RM:
@@ -435,8 +435,8 @@ func (i *instruction) AssignUse(index int, reg regalloc.VReg) {
 				i.rm = i.rm.assignReg(reg)
 			}
 		} else {
-			if ra := i.ra.reg(); ra.Valid() {
-				i.ra = i.ra.assignReg(reg)
+			if ra := regalloc.VReg(i.u2); ra.Valid() {
+				i.u2 = uint64(reg)
 			}
 		}
 	case useKindAMode:
@@ -809,10 +809,10 @@ func (i *instruction) asALU(aluOp aluOp, rd, rn, rm operand, dst64bit bool) {
 }
 
 // asALU setups a basic ALU instruction.
-func (i *instruction) asALURRRR(aluOp aluOp, rd, rn, rm, ra operand, dst64bit bool) {
+func (i *instruction) asALURRRR(aluOp aluOp, rd, rn, rm operand, ra regalloc.VReg, dst64bit bool) {
 	i.kind = aluRRRR
 	i.u1 = uint64(aluOp)
-	i.rd, i.rn, i.rm, i.ra = rd, rn, rm, ra
+	i.rd, i.rn, i.rm, i.u2 = rd, rn, rm, uint64(ra)
 	if dst64bit {
 		i.u3 = 1
 	}
@@ -1056,7 +1056,7 @@ func (i *instruction) String() (str string) {
 	case aluRRRR:
 		size := is64SizeBitToSize(i.u3)
 		str = fmt.Sprintf("%s %s, %s, %s, %s", aluOp(i.u1).String(),
-			formatVRegSized(i.rd.nr(), size), formatVRegSized(i.rn.nr(), size), formatVRegSized(i.rm.nr(), size), formatVRegSized(i.ra.nr(), size))
+			formatVRegSized(i.rd.nr(), size), formatVRegSized(i.rn.nr(), size), formatVRegSized(i.rm.nr(), size), formatVRegSized(regalloc.VReg(i.u2), size))
 	case aluRRImm12:
 		size := is64SizeBitToSize(i.u3)
 		str = fmt.Sprintf("%s %s, %s, %s", aluOp(i.u1).String(),
