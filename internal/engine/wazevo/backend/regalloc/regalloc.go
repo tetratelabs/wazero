@@ -974,13 +974,6 @@ func (a *Allocator) fixMergeState(f Function, blk Block) {
 	bID := blk.ID()
 	blkSt := a.getOrAllocateBlockState(bID)
 	desiredOccupants := &blkSt.startRegs
-	aliveOnRegVRegs := make(map[VReg]RealReg)
-	for i := 0; i < 64; i++ {
-		r := RealReg(i)
-		if v := blkSt.startRegs.get(r); v.Valid() {
-			aliveOnRegVRegs[v] = r
-		}
-	}
 
 	if wazevoapi.RegAllocLoggingEnabled {
 		fmt.Println("fixMergeState", blk.ID(), ":", desiredOccupants.format(a.regInfo))
@@ -1002,7 +995,7 @@ func (a *Allocator) fixMergeState(f Function, blk Block) {
 		for ii := 0; ii < 64; ii++ {
 			r := RealReg(ii)
 			if v := predSt.endRegs.get(r); v.Valid() {
-				if _, ok := aliveOnRegVRegs[v]; !ok {
+				if _v := blkSt.startRegs.get(r); !_v.Valid() {
 					continue
 				}
 				currentOccupants.add(r, v)
