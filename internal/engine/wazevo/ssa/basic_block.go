@@ -88,10 +88,12 @@ type (
 	basicBlock struct {
 		id                      BasicBlockID
 		rootInstr, currentInstr *Instruction
-		params                  []blockParam
-		predIter                int
-		preds                   []basicBlockPredecessorInfo
-		success                 []*basicBlock
+		// params are Values that represent parameters to a basicBlock.
+		// Each parameter can be considered as an output of PHI instruction in traditional SSA.
+		params   []Value
+		predIter int
+		preds    []basicBlockPredecessorInfo
+		success  []*basicBlock
 		// singlePred is the alias to preds[0] for fast lookup, and only set after Seal is called.
 		singlePred *basicBlock
 		// lastDefinitions maps Variable to its last definition in this block.
@@ -127,15 +129,6 @@ type (
 	}
 	// BasicBlockID is the unique ID of a basicBlock.
 	BasicBlockID uint32
-
-	// blockParam implements Value and represents a parameter to a basicBlock.
-	blockParam struct {
-		// value is the Value that corresponds to the parameter in this block,
-		// and can be considered as an output of PHI instruction in traditional SSA.
-		value Value
-		// typ is the type of the parameter.
-		typ Type
-	}
 
 	unknownValue struct {
 		// variable is the variable that this unknownValue represents.
@@ -190,13 +183,13 @@ func (bb *basicBlock) ReturnBlock() bool {
 // AddParam implements BasicBlock.AddParam.
 func (bb *basicBlock) AddParam(b Builder, typ Type) Value {
 	paramValue := b.allocateValue(typ)
-	bb.params = append(bb.params, blockParam{typ: typ, value: paramValue})
+	bb.params = append(bb.params, paramValue)
 	return paramValue
 }
 
 // addParamOn adds a parameter to this block whose value is already allocated.
-func (bb *basicBlock) addParamOn(typ Type, value Value) {
-	bb.params = append(bb.params, blockParam{typ: typ, value: value})
+func (bb *basicBlock) addParamOn(value Value) {
+	bb.params = append(bb.params, value)
 }
 
 // Params implements BasicBlock.Params.
@@ -206,8 +199,7 @@ func (bb *basicBlock) Params() int {
 
 // Param implements BasicBlock.Param.
 func (bb *basicBlock) Param(i int) Value {
-	p := &bb.params[i]
-	return p.value
+	return bb.params[i]
 }
 
 // Valid implements BasicBlock.Valid.
@@ -339,7 +331,7 @@ func (bb *basicBlock) addPred(blk BasicBlock, branch *Instruction) {
 func (bb *basicBlock) FormatHeader(b Builder) string {
 	ps := make([]string, len(bb.params))
 	for i, p := range bb.params {
-		ps[i] = p.value.formatWithType(b)
+		ps[i] = p.formatWithType(b)
 	}
 
 	if len(bb.preds) > 0 {
