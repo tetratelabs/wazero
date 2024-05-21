@@ -380,7 +380,7 @@ L2:
 				regalloc.VReg(3).SetRegType(regalloc.RegTypeInt)
 			mc, _, m := newSetupWithMockContext()
 			mc.typeOf = map[regalloc.VRegID]ssa.Type{execCtx.ID(): ssa.TypeI64, 2: ssa.TypeI64, 3: ssa.TypeI64}
-			m.lowerIDiv(execCtx, operandNR(rd), operandNR(rn), operandNR(rm), tc._64bit, tc.signed)
+			m.lowerIDiv(execCtx, rd, operandNR(rn), operandNR(rm), tc._64bit, tc.signed)
 			require.Equal(t, tc.exp, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
 		})
 	}
@@ -451,7 +451,7 @@ fcvtzu w1, s2
 		t.Run(tc.name, func(t *testing.T) {
 			mc, _, m := newSetupWithMockContext()
 			mc.typeOf = map[regalloc.VRegID]ssa.Type{v2VReg.ID(): ssa.TypeI64, x15VReg.ID(): ssa.TypeI64}
-			m.lowerFpuToInt(operandNR(x1VReg), operandNR(v2VReg), x15VReg, false, false, false, tc.nontrapping)
+			m.lowerFpuToInt(x1VReg, operandNR(v2VReg), x15VReg, false, false, false, tc.nontrapping)
 			require.Equal(t, tc.expectedAsm, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
 
 			m.executableContext.FlushPendingInstructions()
@@ -533,7 +533,7 @@ mul x1.4s, x2.4s, x15.4s
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, _, m := newSetupWithMockContext()
-			m.lowerVIMul(operandNR(x1VReg), operandNR(x2VReg), operandNR(x15VReg), tc.arrangement)
+			m.lowerVIMul(x1VReg, operandNR(x2VReg), operandNR(x15VReg), tc.arrangement)
 			require.Equal(t, tc.expectedAsm, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
 
 			m.executableContext.FlushPendingInstructions()
@@ -638,7 +638,7 @@ cset x15, ne
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, _, m := newSetupWithMockContext()
-			m.lowerVcheckTrue(tc.op, operandNR(x1VReg), operandNR(x15VReg), tc.arrangement)
+			m.lowerVcheckTrue(tc.op, operandNR(x1VReg), x15VReg, tc.arrangement)
 			require.Equal(t, tc.expectedAsm, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
 
 			m.executableContext.FlushPendingInstructions()
@@ -723,7 +723,7 @@ add w15, w15, w1?, lsl #1
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, _, m := newSetupWithMockContext()
-			m.lowerVhighBits(operandNR(x1VReg), operandNR(x15VReg), tc.arrangement)
+			m.lowerVhighBits(operandNR(x1VReg), x15VReg, tc.arrangement)
 			require.Equal(t, tc.expectedAsm, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
 
 			m.executableContext.FlushPendingInstructions()
@@ -772,7 +772,7 @@ tbl x1.16b, { v29.16b, v30.16b }, v1?.16b
 			lane1 := lanes[7]<<56 | lanes[6]<<48 | lanes[5]<<40 | lanes[4]<<32 | lanes[3]<<24 | lanes[2]<<16 | lanes[1]<<8 | lanes[0]
 			lane2 := lanes[15]<<56 | lanes[14]<<48 | lanes[13]<<40 | lanes[12]<<32 | lanes[11]<<24 | lanes[10]<<16 | lanes[9]<<8 | lanes[8]
 
-			m.lowerShuffle(operandNR(x1VReg), operandNR(x2VReg), operandNR(x15VReg), lane1, lane2)
+			m.lowerShuffle(x1VReg, operandNR(x2VReg), operandNR(x15VReg), lane1, lane2)
 			require.Equal(t, tc.expectedAsm, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
 
 			m.executableContext.FlushPendingInstructions()
@@ -829,7 +829,7 @@ ushl x1.16b, x2.16b, v2?.16b
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, _, m := newSetupWithMockContext()
-			m.lowerVShift(tc.op, operandNR(x1VReg), operandNR(x2VReg), operandNR(x15VReg), tc.arrangement)
+			m.lowerVShift(tc.op, x1VReg, operandNR(x2VReg), operandNR(x15VReg), tc.arrangement)
 			require.Equal(t, tc.expectedAsm, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
 
 			m.executableContext.FlushPendingInstructions()
@@ -845,12 +845,12 @@ func TestMachine_lowerSelectVec(t *testing.T) {
 	c := operandNR(m.compiler.AllocateVReg(ssa.TypeI32))
 	rn := operandNR(m.compiler.AllocateVReg(ssa.TypeV128))
 	rm := operandNR(m.compiler.AllocateVReg(ssa.TypeV128))
-	rd := operandNR(m.compiler.AllocateVReg(ssa.TypeV128))
+	rd := m.compiler.AllocateVReg(ssa.TypeV128)
 
 	require.Equal(t, 1, int(c.reg().ID()))
 	require.Equal(t, 2, int(rn.reg().ID()))
 	require.Equal(t, 3, int(rm.reg().ID()))
-	require.Equal(t, 4, int(rd.reg().ID()))
+	require.Equal(t, 4, int(rd.ID()))
 
 	m.lowerSelectVec(c, rn, rm, rd)
 	require.Equal(t, `
@@ -898,17 +898,17 @@ mov v5?.8b, v6?.8b
 				typ = ssa.TypeI32
 				ftyp = ssa.TypeF32
 			}
-			tmpI := operandNR(m.compiler.AllocateVReg(typ))
-			tmpF := operandNR(m.compiler.AllocateVReg(ftyp))
+			tmpI := m.compiler.AllocateVReg(typ)
+			tmpF := m.compiler.AllocateVReg(ftyp)
 			rn := operandNR(m.compiler.AllocateVReg(ftyp))
 			rm := operandNR(m.compiler.AllocateVReg(ftyp))
-			rd := operandNR(m.compiler.AllocateVReg(ftyp))
+			rd := m.compiler.AllocateVReg(ftyp)
 
-			require.Equal(t, 1, int(tmpI.reg().ID()))
-			require.Equal(t, 2, int(tmpF.reg().ID()))
+			require.Equal(t, 1, int(tmpI.ID()))
+			require.Equal(t, 2, int(tmpF.ID()))
 			require.Equal(t, 3, int(rn.reg().ID()))
 			require.Equal(t, 4, int(rm.reg().ID()))
-			require.Equal(t, 5, int(rd.reg().ID()))
+			require.Equal(t, 5, int(rd.ID()))
 
 			m.lowerFcopysignImpl(rd, rn, rm, tmpI, tmpF, tc._64bit)
 			require.Equal(t, tc.exp, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
@@ -944,15 +944,15 @@ ror x4?, x2?, x1?
 			} else {
 				typ = ssa.TypeI32
 			}
-			tmpI := operandNR(m.compiler.AllocateVReg(typ))
+			tmpI := m.compiler.AllocateVReg(typ)
 			rn := operandNR(m.compiler.AllocateVReg(typ))
 			rm := operandNR(m.compiler.AllocateVReg(typ))
-			rd := operandNR(m.compiler.AllocateVReg(typ))
+			rd := m.compiler.AllocateVReg(typ)
 
-			require.Equal(t, 1, int(tmpI.reg().ID()))
+			require.Equal(t, 1, int(tmpI.ID()))
 			require.Equal(t, 2, int(rn.reg().ID()))
 			require.Equal(t, 3, int(rm.reg().ID()))
-			require.Equal(t, 4, int(rd.reg().ID()))
+			require.Equal(t, 4, int(rd.ID()))
 
 			m.lowerRotlImpl(rd, rn, rm, tmpI, tc._64bit)
 			require.Equal(t, tc.exp, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
@@ -1370,15 +1370,15 @@ swpalb w3?, w4?, x2?
 			} else {
 				typ = ssa.TypeI32
 			}
-			tmp := operandNR(m.compiler.AllocateVReg(typ))
-			rn := operandNR(m.compiler.AllocateVReg(ssa.TypeI64))
-			rs := operandNR(m.compiler.AllocateVReg(typ))
-			rt := operandNR(m.compiler.AllocateVReg(typ))
+			tmp := m.compiler.AllocateVReg(typ)
+			rn := m.compiler.AllocateVReg(ssa.TypeI64)
+			rs := m.compiler.AllocateVReg(typ)
+			rt := m.compiler.AllocateVReg(typ)
 
-			require.Equal(t, 1, int(tmp.reg().ID()))
-			require.Equal(t, 2, int(rn.reg().ID()))
-			require.Equal(t, 3, int(rs.reg().ID()))
-			require.Equal(t, 4, int(rt.reg().ID()))
+			require.Equal(t, 1, int(tmp.ID()))
+			require.Equal(t, 2, int(rn.ID()))
+			require.Equal(t, 3, int(rs.ID()))
+			require.Equal(t, 4, int(rt.ID()))
 
 			m.lowerAtomicRmwImpl(tc.op, rn, rs, rt, tmp, tc.size, tc.negateArg, tc.flipArg, tc._64bit)
 			require.Equal(t, tc.exp, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
@@ -1458,13 +1458,13 @@ casalb w2?, w3?, x1?
 			} else {
 				typ = ssa.TypeI32
 			}
-			rn := operandNR(m.compiler.AllocateVReg(ssa.TypeI64))
-			rs := operandNR(m.compiler.AllocateVReg(typ))
-			rt := operandNR(m.compiler.AllocateVReg(typ))
+			rn := m.compiler.AllocateVReg(ssa.TypeI64)
+			rs := m.compiler.AllocateVReg(typ)
+			rt := m.compiler.AllocateVReg(typ)
 
-			require.Equal(t, 1, int(rn.reg().ID()))
-			require.Equal(t, 2, int(rs.reg().ID()))
-			require.Equal(t, 3, int(rt.reg().ID()))
+			require.Equal(t, 1, int(rn.ID()))
+			require.Equal(t, 2, int(rs.ID()))
+			require.Equal(t, 3, int(rt.ID()))
 
 			m.lowerAtomicCasImpl(rn, rs, rt, tc.size)
 			require.Equal(t, tc.exp, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
@@ -1544,11 +1544,11 @@ ldarb w2?, x1?
 			} else {
 				typ = ssa.TypeI32
 			}
-			rn := operandNR(m.compiler.AllocateVReg(ssa.TypeI64))
-			rt := operandNR(m.compiler.AllocateVReg(typ))
+			rn := m.compiler.AllocateVReg(ssa.TypeI64)
+			rt := m.compiler.AllocateVReg(typ)
 
-			require.Equal(t, 1, int(rn.reg().ID()))
-			require.Equal(t, 2, int(rt.reg().ID()))
+			require.Equal(t, 1, int(rn.ID()))
+			require.Equal(t, 2, int(rt.ID()))
 
 			m.lowerAtomicLoadImpl(rn, rt, tc.size)
 			require.Equal(t, tc.exp, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")

@@ -165,7 +165,7 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 	cur = m.addsAddOrSubStackPointer(cur, spVReg, frameInfoSize+goCallStackSize, true)
 	ldr := m.allocateInstr()
 	// And load the return address.
-	ldr.asULoad(operandNR(lrVReg),
+	ldr.asULoad(lrVReg,
 		addressModePreOrPostIndex(spVReg, 16 /* stack pointer must be 16-byte aligned. */, false /* increment after loads */), 64)
 	cur = linkInstr(cur, ldr)
 
@@ -187,19 +187,19 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 			switch r.Type {
 			case ssa.TypeI32:
 				mode.imm = 8 // We use uint64 for all basic types, except SIMD v128.
-				loadIntoReg.asULoad(operandNR(r.Reg), mode, 32)
+				loadIntoReg.asULoad(r.Reg, mode, 32)
 			case ssa.TypeI64:
 				mode.imm = 8 // We use uint64 for all basic types, except SIMD v128.
-				loadIntoReg.asULoad(operandNR(r.Reg), mode, 64)
+				loadIntoReg.asULoad(r.Reg, mode, 64)
 			case ssa.TypeF32:
 				mode.imm = 8 // We use uint64 for all basic types, except SIMD v128.
-				loadIntoReg.asFpuLoad(operandNR(r.Reg), mode, 32)
+				loadIntoReg.asFpuLoad(r.Reg, mode, 32)
 			case ssa.TypeF64:
 				mode.imm = 8 // We use uint64 for all basic types, except SIMD v128.
-				loadIntoReg.asFpuLoad(operandNR(r.Reg), mode, 64)
+				loadIntoReg.asFpuLoad(r.Reg, mode, 64)
 			case ssa.TypeV128:
 				mode.imm = 16
-				loadIntoReg.asFpuLoad(operandNR(r.Reg), mode, 128)
+				loadIntoReg.asFpuLoad(r.Reg, mode, 128)
 			default:
 				panic("TODO")
 			}
@@ -213,23 +213,23 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 			switch r.Type {
 			case ssa.TypeI32:
 				mode.imm = 8 // We use uint64 for all basic types, except SIMD v128.
-				loadIntoTmpReg.asULoad(operandNR(intTmp), mode, 32)
+				loadIntoTmpReg.asULoad(intTmp, mode, 32)
 				resultReg = intTmp
 			case ssa.TypeI64:
 				mode.imm = 8 // We use uint64 for all basic types, except SIMD v128.
-				loadIntoTmpReg.asULoad(operandNR(intTmp), mode, 64)
+				loadIntoTmpReg.asULoad(intTmp, mode, 64)
 				resultReg = intTmp
 			case ssa.TypeF32:
 				mode.imm = 8 // We use uint64 for all basic types, except SIMD v128.
-				loadIntoTmpReg.asFpuLoad(operandNR(floatTmp), mode, 32)
+				loadIntoTmpReg.asFpuLoad(floatTmp, mode, 32)
 				resultReg = floatTmp
 			case ssa.TypeF64:
 				mode.imm = 8 // We use uint64 for all basic types, except SIMD v128.
-				loadIntoTmpReg.asFpuLoad(operandNR(floatTmp), mode, 64)
+				loadIntoTmpReg.asFpuLoad(floatTmp, mode, 64)
 				resultReg = floatTmp
 			case ssa.TypeV128:
 				mode.imm = 16
-				loadIntoTmpReg.asFpuLoad(operandNR(floatTmp), mode, 128)
+				loadIntoTmpReg.asFpuLoad(floatTmp, mode, 128)
 				resultReg = floatTmp
 			default:
 				panic("TODO")
@@ -276,7 +276,7 @@ func (m *machine) restoreRegistersInExecutionContext(cur *instruction, regs []re
 	offset := wazevoapi.ExecutionContextOffsetSavedRegistersBegin.I64()
 	for _, v := range regs {
 		load := m.allocateInstr()
-		var as func(dst operand, amode addressMode, sizeInBits byte)
+		var as func(dst regalloc.VReg, amode addressMode, sizeInBits byte)
 		var sizeInBits byte
 		switch v.RegType() {
 		case regalloc.RegTypeInt:
@@ -286,7 +286,7 @@ func (m *machine) restoreRegistersInExecutionContext(cur *instruction, regs []re
 			as = load.asFpuLoad
 			sizeInBits = 128
 		}
-		as(operandNR(v),
+		as(v,
 			addressMode{
 				kind: addressModeKindRegUnsignedImm12,
 				// Execution context is always the first argument.
@@ -380,23 +380,23 @@ func (m *machine) goFunctionCallLoadStackArg(cur *instruction, originalArg0Reg r
 	switch arg.Type {
 	case ssa.TypeI32:
 		mode.imm = 8 // We use uint64 for all basic types, except SIMD v128.
-		load.asULoad(operandNR(intVReg), mode, 32)
+		load.asULoad(intVReg, mode, 32)
 		result = intVReg
 	case ssa.TypeI64:
 		mode.imm = 8 // We use uint64 for all basic types, except SIMD v128.
-		load.asULoad(operandNR(intVReg), mode, 64)
+		load.asULoad(intVReg, mode, 64)
 		result = intVReg
 	case ssa.TypeF32:
 		mode.imm = 8 // We use uint64 for all basic types, except SIMD v128.
-		load.asFpuLoad(operandNR(floatVReg), mode, 32)
+		load.asFpuLoad(floatVReg, mode, 32)
 		result = floatVReg
 	case ssa.TypeF64:
 		mode.imm = 8 // We use uint64 for all basic types, except SIMD v128.
-		load.asFpuLoad(operandNR(floatVReg), mode, 64)
+		load.asFpuLoad(floatVReg, mode, 64)
 		result = floatVReg
 	case ssa.TypeV128:
 		mode.imm = 16
-		load.asFpuLoad(operandNR(floatVReg), mode, 128)
+		load.asFpuLoad(floatVReg, mode, 128)
 		result = floatVReg
 	default:
 		panic("TODO")

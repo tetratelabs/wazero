@@ -207,9 +207,9 @@ func (m *machine) lowerExtLoad(op ssa.Opcode, ptr ssa.Value, offset uint32, ret 
 	amode := m.lowerToAddressMode(ptr, offset, size)
 	load := m.allocateInstr()
 	if signed {
-		load.asSLoad(operandNR(ret), amode, size)
+		load.asSLoad(ret, amode, size)
 	} else {
-		load.asULoad(operandNR(ret), amode, size)
+		load.asULoad(ret, amode, size)
 	}
 	m.insert(load)
 }
@@ -221,11 +221,11 @@ func (m *machine) lowerLoad(ptr ssa.Value, offset uint32, typ ssa.Type, ret ssa.
 	load := m.allocateInstr()
 	switch typ {
 	case ssa.TypeI32, ssa.TypeI64:
-		load.asULoad(operandNR(dst), amode, typ.Bits())
+		load.asULoad(dst, amode, typ.Bits())
 	case ssa.TypeF32, ssa.TypeF64:
-		load.asFpuLoad(operandNR(dst), amode, typ.Bits())
+		load.asFpuLoad(dst, amode, typ.Bits())
 	case ssa.TypeV128:
-		load.asFpuLoad(operandNR(dst), amode, 128)
+		load.asFpuLoad(dst, amode, 128)
 	default:
 		panic("TODO")
 	}
@@ -239,7 +239,7 @@ func (m *machine) lowerLoadSplat(ptr ssa.Value, offset uint32, lane ssa.VecLane,
 	m.lowerConstantI64(offsetReg, int64(offset))
 	addedBase := m.addReg64ToReg64(base, offsetReg)
 
-	rd := operandNR(m.compiler.VRegOf(ret))
+	rd := m.compiler.VRegOf(ret)
 
 	ld1r := m.allocateInstr()
 	ld1r.asVecLoad1R(rd, operandNR(addedBase), ssaLaneToArrangement(lane))
@@ -411,13 +411,13 @@ func (m *machine) addConstToReg64(r regalloc.VReg, c int64) (rd regalloc.VReg) {
 	rd = m.compiler.AllocateVReg(ssa.TypeI64)
 	alu := m.allocateInstr()
 	if imm12Op, ok := asImm12Operand(uint64(c)); ok {
-		alu.asALU(aluOpAdd, operandNR(rd), operandNR(r), imm12Op, true)
+		alu.asALU(aluOpAdd, rd, operandNR(r), imm12Op, true)
 	} else if imm12Op, ok = asImm12Operand(uint64(-c)); ok {
-		alu.asALU(aluOpSub, operandNR(rd), operandNR(r), imm12Op, true)
+		alu.asALU(aluOpSub, rd, operandNR(r), imm12Op, true)
 	} else {
 		tmp := m.compiler.AllocateVReg(ssa.TypeI64)
 		m.load64bitConst(c, tmp)
-		alu.asALU(aluOpAdd, operandNR(rd), operandNR(r), operandNR(tmp), true)
+		alu.asALU(aluOpAdd, rd, operandNR(r), operandNR(tmp), true)
 	}
 	m.insert(alu)
 	return
@@ -426,7 +426,7 @@ func (m *machine) addConstToReg64(r regalloc.VReg, c int64) (rd regalloc.VReg) {
 func (m *machine) addReg64ToReg64(rn, rm regalloc.VReg) (rd regalloc.VReg) {
 	rd = m.compiler.AllocateVReg(ssa.TypeI64)
 	alu := m.allocateInstr()
-	alu.asALU(aluOpAdd, operandNR(rd), operandNR(rn), operandNR(rm), true)
+	alu.asALU(aluOpAdd, rd, operandNR(rn), operandNR(rm), true)
 	m.insert(alu)
 	return
 }
@@ -434,7 +434,7 @@ func (m *machine) addReg64ToReg64(rn, rm regalloc.VReg) (rd regalloc.VReg) {
 func (m *machine) addRegToReg64Ext(rn, rm regalloc.VReg, ext extendOp) (rd regalloc.VReg) {
 	rd = m.compiler.AllocateVReg(ssa.TypeI64)
 	alu := m.allocateInstr()
-	alu.asALU(aluOpAdd, operandNR(rd), operandNR(rn), operandER(rm, ext, 64), true)
+	alu.asALU(aluOpAdd, rd, operandNR(rn), operandER(rm, ext, 64), true)
 	m.insert(alu)
 	return
 }

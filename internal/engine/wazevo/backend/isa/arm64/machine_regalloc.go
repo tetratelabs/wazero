@@ -121,11 +121,11 @@ func (m *machine) InsertReloadRegisterAt(v regalloc.VReg, instr *instruction, af
 	load := m.allocateInstr()
 	switch typ {
 	case ssa.TypeI32, ssa.TypeI64:
-		load.asULoad(operandNR(v), amode, typ.Bits())
+		load.asULoad(v, amode, typ.Bits())
 	case ssa.TypeF32, ssa.TypeF64:
-		load.asFpuLoad(operandNR(v), amode, typ.Bits())
+		load.asFpuLoad(v, amode, typ.Bits())
 	case ssa.TypeV128:
-		load.asFpuLoad(operandNR(v), amode, 128)
+		load.asFpuLoad(v, amode, 128)
 	default:
 		panic("TODO")
 	}

@@ -12,7 +12,7 @@ func TestMachine_resolveAddressingMode(t *testing.T) {
 	t.Run("imm12/arg", func(t *testing.T) {
 		m := &machine{}
 		i := &instruction{}
-		i.asULoad(operandNR(x17VReg), addressMode{
+		i.asULoad(x17VReg, addressMode{
 			kind: addressModeKindArgStackSpace,
 			rn:   spVReg,
 			imm:  128,
@@ -24,7 +24,7 @@ func TestMachine_resolveAddressingMode(t *testing.T) {
 	t.Run("imm12/result", func(t *testing.T) {
 		m := &machine{}
 		i := &instruction{}
-		i.asULoad(operandNR(x17VReg), addressMode{
+		i.asULoad(x17VReg, addressMode{
 			kind: addressModeKindResultStackSpace,
 			rn:   spVReg,
 			imm:  128,
@@ -38,7 +38,7 @@ func TestMachine_resolveAddressingMode(t *testing.T) {
 		m := &machine{executableContext: newExecutableContext()}
 		root := &instruction{kind: udf}
 		i := &instruction{prev: root}
-		i.asULoad(operandNR(x17VReg), addressMode{
+		i.asULoad(x17VReg, addressMode{
 			kind: addressModeKindResultStackSpace,
 			rn:   spVReg,
 		}, 64)

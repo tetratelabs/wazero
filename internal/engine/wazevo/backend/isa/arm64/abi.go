@@ -105,9 +105,9 @@ func (m *machine) LowerParams(args []ssa.Value) {
 			load := m.allocateInstr()
 			switch arg.Type {
 			case ssa.TypeI32, ssa.TypeI64:
-				load.asULoad(operandNR(reg), amode, bits)
+				load.asULoad(reg, amode, bits)
 			case ssa.TypeF32, ssa.TypeF64, ssa.TypeV128:
-				load.asFpuLoad(operandNR(reg), amode, bits)
+				load.asFpuLoad(reg, amode, bits)
 			default:
 				panic("BUG")
 			}
@@ -215,9 +215,9 @@ func (m *machine) callerGenFunctionReturnVReg(a *backend.FunctionABI, retIndex i
 		ldr := m.allocateInstr()
 		switch r.Type {
 		case ssa.TypeI32, ssa.TypeI64:
-			ldr.asULoad(operandNR(reg), amode, r.Type.Bits())
+			ldr.asULoad(reg, amode, r.Type.Bits())
 		case ssa.TypeF32, ssa.TypeF64, ssa.TypeV128:
-			ldr.asFpuLoad(operandNR(reg), amode, r.Type.Bits())
+			ldr.asFpuLoad(reg, amode, r.Type.Bits())
 		default:
 			panic("BUG")
 		}
@@ -315,7 +315,7 @@ func (m *machine) insertAddOrSubStackPointer(rd regalloc.VReg, diff int64, add b
 		} else {
 			ao = aluOpSub
 		}
-		alu.asALU(ao, operandNR(rd), operandNR(spVReg), imm12Operand, true)
+		alu.asALU(ao, rd, operandNR(spVReg), imm12Operand, true)
 		m.insert(alu)
 	} else {
 		m.lowerConstantI64(tmpRegVReg, diff)
@@ -326,7 +326,7 @@ func (m *machine) insertAddOrSubStackPointer(rd regalloc.VReg, diff int64, add b
 		} else {
 			ao = aluOpSub
 		}
-		alu.asALU(ao, operandNR(rd), operandNR(spVReg), operandNR(tmpRegVReg), true)
+		alu.asALU(ao, rd, operandNR(spVReg), operandNR(tmpRegVReg), true)
 		m.insert(alu)
 	}
 }

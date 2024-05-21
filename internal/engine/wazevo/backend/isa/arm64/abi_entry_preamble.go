@@ -64,15 +64,15 @@ func (m *machine) goEntryPreamblePassArg(cur *instruction, paramSlicePtr regallo
 	instr := m.allocateInstr()
 	switch typ {
 	case ssa.TypeI32:
-		instr.asULoad(loadTargetReg, loadMode, 32)
+		instr.asULoad(loadTargetReg.reg(), loadMode, 32)
 	case ssa.TypeI64:
-		instr.asULoad(loadTargetReg, loadMode, 64)
+		instr.asULoad(loadTargetReg.reg(), loadMode, 64)
 	case ssa.TypeF32:
-		instr.asFpuLoad(loadTargetReg, loadMode, 32)
+		instr.asFpuLoad(loadTargetReg.reg(), loadMode, 32)
 	case ssa.TypeF64:
-		instr.asFpuLoad(loadTargetReg, loadMode, 64)
+		instr.asFpuLoad(loadTargetReg.reg(), loadMode, 64)
 	case ssa.TypeV128:
-		instr.asFpuLoad(loadTargetReg, loadMode, 128)
+		instr.asFpuLoad(loadTargetReg.reg(), loadMode, 128)
 	}
 	cur = linkInstr(cur, instr)
 
@@ -118,9 +118,9 @@ func (m *machine) goEntryPreamblePassResult(cur *instruction, resultSlicePtr reg
 		toReg := m.allocateInstr()
 		switch typ {
 		case ssa.TypeI32, ssa.TypeI64:
-			toReg.asULoad(storeTargetReg, loadMode, bits)
+			toReg.asULoad(storeTargetReg.reg(), loadMode, bits)
 		case ssa.TypeF32, ssa.TypeF64, ssa.TypeV128:
-			toReg.asFpuLoad(storeTargetReg, loadMode, bits)
+			toReg.asFpuLoad(storeTargetReg.reg(), loadMode, bits)
 		default:
 			panic("TODO?")
 		}
@@ -218,7 +218,7 @@ func (m *machine) loadOrStoreAtExecutionContext(d regalloc.VReg, offset wazevoap
 	if store {
 		instr.asStore(operandNR(d), mode, 64)
 	} else {
-		instr.asULoad(operandNR(d), mode, 64)
+		instr.asULoad(d, mode, 64)
 	}
 	return linkInstr(prev, instr)
 }

@@ -49,7 +49,7 @@ func TestInstruction_String(t *testing.T) {
 			i: &instruction{
 				kind: loadFpuConst32,
 				u1:   uint64(math.Float32bits(3.0)),
-				rd:   operandNR(regalloc.VReg(0).SetRegType(regalloc.RegTypeFloat)),
+				rd:   regalloc.VReg(0).SetRegType(regalloc.RegTypeFloat),
 			},
 			exp: "ldr s0?, #8; b 8; data.f32 3.000000",
 		},
@@ -57,7 +57,7 @@ func TestInstruction_String(t *testing.T) {
 			i: &instruction{
 				kind: loadFpuConst64,
 				u1:   math.Float64bits(12345.987491),
-				rd:   operandNR(regalloc.VReg(0).SetRegType(regalloc.RegTypeFloat)),
+				rd:   regalloc.VReg(0).SetRegType(regalloc.RegTypeFloat),
 			},
 			exp: "ldr d0?, #8; b 16; data.f64 12345.987491",
 		},
