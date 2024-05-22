@@ -17,6 +17,7 @@ func Test_dummy(t *testing.T) {
 }
 
 func TestInstruction_encode(t *testing.T) {
+	m := NewBackend().(*machine)
 	dummyLabel := label(1)
 	for _, tc := range []struct {
 		setup func(*instruction)
@@ -1279,22 +1280,22 @@ func TestInstruction_encode(t *testing.T) {
 		{want: "9f000091", setup: func(i *instruction) { i.asMove64(spVReg, x4VReg) }},
 		{want: "e0030091", setup: func(i *instruction) { i.asMove64(x0VReg, spVReg) }},
 		{want: "e17bc1a8", setup: func(i *instruction) {
-			i.asLoadPair64(x1VReg, x30VReg, addressModePreOrPostIndex(spVReg, 16, false))
+			i.asLoadPair64(x1VReg, x30VReg, addressModePreOrPostIndex(m, spVReg, 16, false))
 		}},
 		{want: "e17bc1a9", setup: func(i *instruction) {
-			i.asLoadPair64(x1VReg, x30VReg, addressModePreOrPostIndex(spVReg, 16, true))
+			i.asLoadPair64(x1VReg, x30VReg, addressModePreOrPostIndex(m, spVReg, 16, true))
 		}},
 		{want: "e17b81a8", setup: func(i *instruction) {
-			i.asStorePair64(x1VReg, x30VReg, addressModePreOrPostIndex(spVReg, 16, false))
+			i.asStorePair64(x1VReg, x30VReg, addressModePreOrPostIndex(m, spVReg, 16, false))
 		}},
 		{want: "e17b81a9", setup: func(i *instruction) {
-			i.asStorePair64(x1VReg, x30VReg, addressModePreOrPostIndex(spVReg, 16, true))
+			i.asStorePair64(x1VReg, x30VReg, addressModePreOrPostIndex(m, spVReg, 16, true))
 		}},
 		{want: "e17f81a9", setup: func(i *instruction) {
-			i.asStorePair64(x1VReg, xzrVReg, addressModePreOrPostIndex(spVReg, 16, true))
+			i.asStorePair64(x1VReg, xzrVReg, addressModePreOrPostIndex(m, spVReg, 16, true))
 		}},
 		{want: "ff7f81a9", setup: func(i *instruction) {
-			i.asStorePair64(xzrVReg, xzrVReg, addressModePreOrPostIndex(spVReg, 16, true))
+			i.asStorePair64(xzrVReg, xzrVReg, addressModePreOrPostIndex(m, spVReg, 16, true))
 		}},
 		{want: "20000014", setup: func(i *instruction) {
 			i.asBr(dummyLabel)
@@ -2232,12 +2233,13 @@ func TestInstruction_encoding_store_encoding(t *testing.T) {
 			var i *instruction
 			switch tc.k {
 			case store8, store16, store32, store64, fpuStore32, fpuStore64, fpuStore128:
-				i = &instruction{kind: tc.k, amode: tc.amode, rn: operandNR(tc.rn)}
+				i = &instruction{kind: tc.k, rn: operandNR(tc.rn)}
 			case uLoad8, uLoad16, uLoad32, uLoad64, sLoad8, sLoad16, sLoad32, fpuLoad32, fpuLoad64, fpuLoad128:
-				i = &instruction{kind: tc.k, amode: tc.amode, rd: tc.rn}
+				i = &instruction{kind: tc.k, rd: tc.rn}
 			default:
 				t.Fatalf("unknown kind: %v", tc.k)
 			}
+			i.setAmode(&tc.amode)
 			_, _, m := newSetupWithMockContext()
 			i.encode(m)
 			// Note: for quick iteration we can use golang.org/x/arch package to verify the encoding.

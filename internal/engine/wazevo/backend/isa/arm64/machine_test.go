@@ -9,39 +9,43 @@ import (
 )
 
 func TestMachine_resolveAddressingMode(t *testing.T) {
+	m := NewBackend().(*machine)
 	t.Run("imm12/arg", func(t *testing.T) {
-		m := &machine{}
 		i := &instruction{}
-		i.asULoad(x17VReg, addressMode{
+		amode := m.amodePool.Allocate()
+		*amode = addressMode{
 			kind: addressModeKindArgStackSpace,
 			rn:   spVReg,
 			imm:  128,
-		}, 64)
+		}
+		i.asULoad(x17VReg, amode, 64)
 		m.resolveAddressingMode(1024, 0, i)
-		require.Equal(t, addressModeKindRegUnsignedImm12, i.amode.kind)
-		require.Equal(t, int64(128+1024), i.amode.imm)
+		require.Equal(t, addressModeKindRegUnsignedImm12, i.getAmode().kind)
+		require.Equal(t, int64(128+1024), i.getAmode().imm)
 	})
 	t.Run("imm12/result", func(t *testing.T) {
-		m := &machine{}
 		i := &instruction{}
-		i.asULoad(x17VReg, addressMode{
+		amode := m.amodePool.Allocate()
+		*amode = addressMode{
 			kind: addressModeKindResultStackSpace,
 			rn:   spVReg,
 			imm:  128,
-		}, 64)
+		}
+		i.asULoad(x17VReg, amode, 64)
 		m.resolveAddressingMode(0, 256, i)
-		require.Equal(t, addressModeKindRegUnsignedImm12, i.amode.kind)
-		require.Equal(t, int64(128+256), i.amode.imm)
+		require.Equal(t, addressModeKindRegUnsignedImm12, i.getAmode().kind)
+		require.Equal(t, int64(128+256), i.getAmode().imm)
 	})
 
 	t.Run("tmp reg", func(t *testing.T) {
-		m := &machine{executableContext: newExecutableContext()}
 		root := &instruction{kind: udf}
 		i := &instruction{prev: root}
-		i.asULoad(x17VReg, addressMode{
+		amode := m.amodePool.Allocate()
+		*amode = addressMode{
 			kind: addressModeKindResultStackSpace,
 			rn:   spVReg,
-		}, 64)
+		}
+		i.asULoad(x17VReg, amode, 64)
 		m.resolveAddressingMode(0, 0x40000001, i)
 
 		m.executableContext.RootInstr = root

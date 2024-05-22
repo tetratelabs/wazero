@@ -87,7 +87,8 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 		// Module context is always the second argument.
 		moduleCtrPtr := x1VReg
 		store := m.allocateInstr()
-		amode := addressMode{kind: addressModeKindRegUnsignedImm12, rn: execCtrPtr, imm: offset}
+		amode := m.amodePool.Allocate()
+		*amode = addressMode{kind: addressModeKindRegUnsignedImm12, rn: execCtrPtr, imm: offset}
 		store.asStore(operandNR(moduleCtrPtr), amode, 64)
 		cur = linkInstr(cur, store)
 	}
@@ -120,11 +121,9 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 		} else {
 			sizeInBits = 64
 		}
-		store.asStore(operandNR(v),
-			addressMode{
-				kind: addressModeKindPostIndex,
-				rn:   arg0ret0AddrReg, imm: int64(sizeInBits / 8),
-			}, sizeInBits)
+		amode := m.amodePool.Allocate()
+		*amode = addressMode{kind: addressModeKindPostIndex, rn: arg0ret0AddrReg, imm: int64(sizeInBits / 8)}
+		store.asStore(operandNR(v), amode, sizeInBits)
 		cur = linkInstr(cur, store)
 	}
 
@@ -139,7 +138,7 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 		frameSizeReg = xzrVReg
 		sliceSizeReg = xzrVReg
 	}
-	_amode := addressModePreOrPostIndex(spVReg, -16, true)
+	_amode := addressModePreOrPostIndex(m, spVReg, -16, true)
 	storeP := m.allocateInstr()
 	storeP.asStorePair64(frameSizeReg, sliceSizeReg, _amode)
 	cur = linkInstr(cur, storeP)
@@ -165,8 +164,8 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 	cur = m.addsAddOrSubStackPointer(cur, spVReg, frameInfoSize+goCallStackSize, true)
 	ldr := m.allocateInstr()
 	// And load the return address.
-	ldr.asULoad(lrVReg,
-		addressModePreOrPostIndex(spVReg, 16 /* stack pointer must be 16-byte aligned. */, false /* increment after loads */), 64)
+	amode := addressModePreOrPostIndex(m, spVReg, 16 /* stack pointer must be 16-byte aligned. */, false /* increment after loads */)
+	ldr.asULoad(lrVReg, amode, 64)
 	cur = linkInstr(cur, ldr)
 
 	originalRet0Reg := x17VReg // Caller save, so we can use it for whatever we want.
@@ -183,7 +182,8 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 		r := &abi.Rets[i]
 		if r.Kind == backend.ABIArgKindReg {
 			loadIntoReg := m.allocateInstr()
-			mode := addressMode{kind: addressModeKindPostIndex, rn: arg0ret0AddrReg}
+			mode := m.amodePool.Allocate()
+			*mode = addressMode{kind: addressModeKindPostIndex, rn: arg0ret0AddrReg}
 			switch r.Type {
 			case ssa.TypeI32:
 				mode.imm = 8 // We use uint64 for all basic types, except SIMD v128.
@@ -208,7 +208,8 @@ func (m *machine) CompileGoFunctionTrampoline(exitCode wazevoapi.ExitCode, sig *
 			// First we need to load the value to a temporary just like ^^.
 			intTmp, floatTmp := x11VReg, v11VReg
 			loadIntoTmpReg := m.allocateInstr()
-			mode := addressMode{kind: addressModeKindPostIndex, rn: arg0ret0AddrReg}
+			mode := m.amodePool.Allocate()
+			*mode = addressMode{kind: addressModeKindPostIndex, rn: arg0ret0AddrReg}
 			var resultReg regalloc.VReg
 			switch r.Type {
 			case ssa.TypeI32:
@@ -258,12 +259,13 @@ func (m *machine) saveRegistersInExecutionContext(cur *instruction, regs []regal
 		case regalloc.RegTypeFloat:
 			sizeInBits = 128
 		}
-		store.asStore(operandNR(v),
-			addressMode{
-				kind: addressModeKindRegUnsignedImm12,
-				// Execution context is always the first argument.
-				rn: x0VReg, imm: offset,
-			}, sizeInBits)
+		mode := m.amodePool.Allocate()
+		*mode = addressMode{
+			kind: addressModeKindRegUnsignedImm12,
+			// Execution context is always the first argument.
+			rn: x0VReg, imm: offset,
+		}
+		store.asStore(operandNR(v), mode, sizeInBits)
 		store.prev = cur
 		cur.next = store
 		cur = store
@@ -276,7 +278,7 @@ func (m *machine) restoreRegistersInExecutionContext(cur *instruction, regs []re
 	offset := wazevoapi.ExecutionContextOffsetSavedRegistersBegin.I64()
 	for _, v := range regs {
 		load := m.allocateInstr()
-		var as func(dst regalloc.VReg, amode addressMode, sizeInBits byte)
+		var as func(dst regalloc.VReg, amode *addressMode, sizeInBits byte)
 		var sizeInBits byte
 		switch v.RegType() {
 		case regalloc.RegTypeInt:
@@ -286,12 +288,13 @@ func (m *machine) restoreRegistersInExecutionContext(cur *instruction, regs []re
 			as = load.asFpuLoad
 			sizeInBits = 128
 		}
-		as(v,
-			addressMode{
-				kind: addressModeKindRegUnsignedImm12,
-				// Execution context is always the first argument.
-				rn: x0VReg, imm: offset,
-			}, sizeInBits)
+		mode := m.amodePool.Allocate()
+		*mode = addressMode{
+			kind: addressModeKindRegUnsignedImm12,
+			// Execution context is always the first argument.
+			rn: x0VReg, imm: offset,
+		}
+		as(v, mode, sizeInBits)
 		cur = linkInstr(cur, load)
 		offset += 16 // Imm12 must be aligned 16 for vector regs, so we unconditionally load regs at the offset of multiple of 16.
 	}
@@ -324,11 +327,9 @@ func (m *machine) setExitCode(cur *instruction, execCtr regalloc.VReg, exitCode 
 
 	// Set the exit status on the execution context.
 	setExistStatus := m.allocateInstr()
-	setExistStatus.asStore(operandNR(constReg),
-		addressMode{
-			kind: addressModeKindRegUnsignedImm12,
-			rn:   execCtr, imm: wazevoapi.ExecutionContextOffsetExitCodeOffset.I64(),
-		}, 32)
+	mode := m.amodePool.Allocate()
+	*mode = addressMode{kind: addressModeKindRegUnsignedImm12, rn: execCtr, imm: wazevoapi.ExecutionContextOffsetExitCodeOffset.I64()}
+	setExistStatus.asStore(operandNR(constReg), mode, 32)
 	cur = linkInstr(cur, setExistStatus)
 	return cur
 }
@@ -340,12 +341,13 @@ func (m *machine) storeReturnAddressAndExit(cur *instruction) *instruction {
 	cur = linkInstr(cur, adr)
 
 	storeReturnAddr := m.allocateInstr()
-	storeReturnAddr.asStore(operandNR(tmpRegVReg),
-		addressMode{
-			kind: addressModeKindRegUnsignedImm12,
-			// Execution context is always the first argument.
-			rn: x0VReg, imm: wazevoapi.ExecutionContextOffsetGoCallReturnAddress.I64(),
-		}, 64)
+	mode := m.amodePool.Allocate()
+	*mode = addressMode{
+		kind: addressModeKindRegUnsignedImm12,
+		// Execution context is always the first argument.
+		rn: x0VReg, imm: wazevoapi.ExecutionContextOffsetGoCallReturnAddress.I64(),
+	}
+	storeReturnAddr.asStore(operandNR(tmpRegVReg), mode, 64)
 	cur = linkInstr(cur, storeReturnAddr)
 
 	// Exit the execution.
@@ -364,11 +366,12 @@ func (m *machine) saveCurrentStackPointer(cur *instruction, execCtr regalloc.VRe
 	cur = linkInstr(cur, movSp)
 
 	strSp := m.allocateInstr()
-	strSp.asStore(operandNR(tmpRegVReg),
-		addressMode{
-			kind: addressModeKindRegUnsignedImm12,
-			rn:   execCtr, imm: wazevoapi.ExecutionContextOffsetStackPointerBeforeGoCall.I64(),
-		}, 64)
+	mode := m.amodePool.Allocate()
+	*mode = addressMode{
+		kind: addressModeKindRegUnsignedImm12,
+		rn:   execCtr, imm: wazevoapi.ExecutionContextOffsetStackPointerBeforeGoCall.I64(),
+	}
+	strSp.asStore(operandNR(tmpRegVReg), mode, 64)
 	cur = linkInstr(cur, strSp)
 	return cur
 }
@@ -376,7 +379,8 @@ func (m *machine) saveCurrentStackPointer(cur *instruction, execCtr regalloc.VRe
 func (m *machine) goFunctionCallLoadStackArg(cur *instruction, originalArg0Reg regalloc.VReg, arg *backend.ABIArg, intVReg, floatVReg regalloc.VReg) (*instruction, regalloc.VReg) {
 	load := m.allocateInstr()
 	var result regalloc.VReg
-	mode := addressMode{kind: addressModeKindPostIndex, rn: originalArg0Reg}
+	mode := m.amodePool.Allocate()
+	*mode = addressMode{kind: addressModeKindPostIndex, rn: originalArg0Reg}
 	switch arg.Type {
 	case ssa.TypeI32:
 		mode.imm = 8 // We use uint64 for all basic types, except SIMD v128.
@@ -408,7 +412,8 @@ func (m *machine) goFunctionCallLoadStackArg(cur *instruction, originalArg0Reg r
 
 func (m *machine) goFunctionCallStoreStackResult(cur *instruction, originalRet0Reg regalloc.VReg, result *backend.ABIArg, resultVReg regalloc.VReg) *instruction {
 	store := m.allocateInstr()
-	mode := addressMode{kind: addressModeKindPostIndex, rn: originalRet0Reg}
+	mode := m.amodePool.Allocate()
+	*mode = addressMode{kind: addressModeKindPostIndex, rn: originalRet0Reg}
 	var sizeInBits byte
 	switch result.Type {
 	case ssa.TypeI32, ssa.TypeF32:

@@ -3,10 +3,12 @@ package arm64
 import (
 	"fmt"
 	"math"
+	"unsafe"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 )
 
 type (
@@ -25,7 +27,6 @@ type (
 		u1, u2              uint64
 		rd                  regalloc.VReg
 		rm, rn              operand
-		amode               addressMode
 		kind                instructionKind
 		addedBeforeRegAlloc bool
 	}
@@ -342,18 +343,20 @@ func (i *instruction) Uses(regs *[]regalloc.VReg) []regalloc.VReg {
 			*regs = append(*regs, rm)
 		}
 	case useKindAMode:
-		if amodeRN := i.amode.rn; amodeRN.Valid() {
+		amode := i.getAmode()
+		if amodeRN := amode.rn; amodeRN.Valid() {
 			*regs = append(*regs, amodeRN)
 		}
-		if amodeRM := i.amode.rm; amodeRM.Valid() {
+		if amodeRM := amode.rm; amodeRM.Valid() {
 			*regs = append(*regs, amodeRM)
 		}
 	case useKindRNAMode:
 		*regs = append(*regs, i.rn.reg())
-		if amodeRN := i.amode.rn; amodeRN.Valid() {
+		amode := i.getAmode()
+		if amodeRN := amode.rn; amodeRN.Valid() {
 			*regs = append(*regs, amodeRN)
 		}
-		if amodeRM := i.amode.rm; amodeRM.Valid() {
+		if amodeRM := amode.rm; amodeRM.Valid() {
 			*regs = append(*regs, amodeRM)
 		}
 	case useKindCond:
@@ -442,26 +445,30 @@ func (i *instruction) AssignUse(index int, reg regalloc.VReg) {
 		}
 	case useKindAMode:
 		if index == 0 {
-			if amodeRN := i.amode.rn; amodeRN.Valid() {
-				i.amode.rn = reg
+			amode := i.getAmode()
+			if amodeRN := amode.rn; amodeRN.Valid() {
+				amode.rn = reg
 			}
 		} else {
-			if amodeRM := i.amode.rm; amodeRM.Valid() {
-				i.amode.rm = reg
+			amode := i.getAmode()
+			if amodeRM := amode.rm; amodeRM.Valid() {
+				amode.rm = reg
 			}
 		}
 	case useKindRNAMode:
 		if index == 0 {
 			i.rn = i.rn.assignReg(reg)
 		} else if index == 1 {
-			if amodeRN := i.amode.rn; amodeRN.Valid() {
-				i.amode.rn = reg
+			amode := i.getAmode()
+			if amodeRN := amode.rn; amodeRN.Valid() {
+				amode.rn = reg
 			} else {
 				panic("BUG")
 			}
 		} else {
-			if amodeRM := i.amode.rm; amodeRM.Valid() {
-				i.amode.rm = reg
+			amode := i.getAmode()
+			if amodeRM := amode.rm; amodeRM.Valid() {
+				amode.rm = reg
 			} else {
 				panic("BUG")
 			}
@@ -554,21 +561,21 @@ func (i *instruction) asRet() {
 	i.kind = ret
 }
 
-func (i *instruction) asStorePair64(src1, src2 regalloc.VReg, amode addressMode) {
+func (i *instruction) asStorePair64(src1, src2 regalloc.VReg, amode *addressMode) {
 	i.kind = storeP64
 	i.rn = operandNR(src1)
 	i.rm = operandNR(src2)
-	i.amode = amode
+	i.setAmode(amode)
 }
 
-func (i *instruction) asLoadPair64(src1, src2 regalloc.VReg, amode addressMode) {
+func (i *instruction) asLoadPair64(src1, src2 regalloc.VReg, amode *addressMode) {
 	i.kind = loadP64
 	i.rn = operandNR(src1)
 	i.rm = operandNR(src2)
-	i.amode = amode
+	i.setAmode(amode)
 }
 
-func (i *instruction) asStore(src operand, amode addressMode, sizeInBits byte) {
+func (i *instruction) asStore(src operand, amode *addressMode, sizeInBits byte) {
 	switch sizeInBits {
 	case 8:
 		i.kind = store8
@@ -590,10 +597,10 @@ func (i *instruction) asStore(src operand, amode addressMode, sizeInBits byte) {
 		i.kind = fpuStore128
 	}
 	i.rn = src
-	i.amode = amode
+	i.setAmode(amode)
 }
 
-func (i *instruction) asSLoad(dst regalloc.VReg, amode addressMode, sizeInBits byte) {
+func (i *instruction) asSLoad(dst regalloc.VReg, amode *addressMode, sizeInBits byte) {
 	switch sizeInBits {
 	case 8:
 		i.kind = sLoad8
@@ -605,10 +612,10 @@ func (i *instruction) asSLoad(dst regalloc.VReg, amode addressMode, sizeInBits b
 		panic("BUG")
 	}
 	i.rd = dst
-	i.amode = amode
+	i.setAmode(amode)
 }
 
-func (i *instruction) asULoad(dst regalloc.VReg, amode addressMode, sizeInBits byte) {
+func (i *instruction) asULoad(dst regalloc.VReg, amode *addressMode, sizeInBits byte) {
 	switch sizeInBits {
 	case 8:
 		i.kind = uLoad8
@@ -620,10 +627,10 @@ func (i *instruction) asULoad(dst regalloc.VReg, amode addressMode, sizeInBits b
 		i.kind = uLoad64
 	}
 	i.rd = dst
-	i.amode = amode
+	i.setAmode(amode)
 }
 
-func (i *instruction) asFpuLoad(dst regalloc.VReg, amode addressMode, sizeInBits byte) {
+func (i *instruction) asFpuLoad(dst regalloc.VReg, amode *addressMode, sizeInBits byte) {
 	switch sizeInBits {
 	case 32:
 		i.kind = fpuLoad32
@@ -633,7 +640,15 @@ func (i *instruction) asFpuLoad(dst regalloc.VReg, amode addressMode, sizeInBits
 		i.kind = fpuLoad128
 	}
 	i.rd = dst
-	i.amode = amode
+	i.setAmode(amode)
+}
+
+func (i *instruction) getAmode() *addressMode {
+	return wazevoapi.PtrFromUintptr[addressMode](uintptr(i.u1))
+}
+
+func (i *instruction) setAmode(a *addressMode) {
+	i.u1 = uint64(uintptr(unsafe.Pointer(a)))
 }
 
 func (i *instruction) asVecLoad1R(rd regalloc.VReg, rn operand, arr vecArrangement) {
@@ -1102,33 +1117,33 @@ func (i *instruction) String() (str string) {
 			formatVRegSized(i.rn.nr(), size),
 		)
 	case uLoad8:
-		str = fmt.Sprintf("ldrb %s, %s", formatVRegSized(i.rd, 32), i.amode.format(32))
+		str = fmt.Sprintf("ldrb %s, %s", formatVRegSized(i.rd, 32), i.getAmode().format(32))
 	case sLoad8:
-		str = fmt.Sprintf("ldrsb %s, %s", formatVRegSized(i.rd, 32), i.amode.format(32))
+		str = fmt.Sprintf("ldrsb %s, %s", formatVRegSized(i.rd, 32), i.getAmode().format(32))
 	case uLoad16:
-		str = fmt.Sprintf("ldrh %s, %s", formatVRegSized(i.rd, 32), i.amode.format(32))
+		str = fmt.Sprintf("ldrh %s, %s", formatVRegSized(i.rd, 32), i.getAmode().format(32))
 	case sLoad16:
-		str = fmt.Sprintf("ldrsh %s, %s", formatVRegSized(i.rd, 32), i.amode.format(32))
+		str = fmt.Sprintf("ldrsh %s, %s", formatVRegSized(i.rd, 32), i.getAmode().format(32))
 	case uLoad32:
-		str = fmt.Sprintf("ldr %s, %s", formatVRegSized(i.rd, 32), i.amode.format(32))
+		str = fmt.Sprintf("ldr %s, %s", formatVRegSized(i.rd, 32), i.getAmode().format(32))
 	case sLoad32:
-		str = fmt.Sprintf("ldrs %s, %s", formatVRegSized(i.rd, 32), i.amode.format(32))
+		str = fmt.Sprintf("ldrs %s, %s", formatVRegSized(i.rd, 32), i.getAmode().format(32))
 	case uLoad64:
-		str = fmt.Sprintf("ldr %s, %s", formatVRegSized(i.rd, 64), i.amode.format(64))
+		str = fmt.Sprintf("ldr %s, %s", formatVRegSized(i.rd, 64), i.getAmode().format(64))
 	case store8:
-		str = fmt.Sprintf("strb %s, %s", formatVRegSized(i.rn.nr(), 32), i.amode.format(8))
+		str = fmt.Sprintf("strb %s, %s", formatVRegSized(i.rn.nr(), 32), i.getAmode().format(8))
 	case store16:
-		str = fmt.Sprintf("strh %s, %s", formatVRegSized(i.rn.nr(), 32), i.amode.format(16))
+		str = fmt.Sprintf("strh %s, %s", formatVRegSized(i.rn.nr(), 32), i.getAmode().format(16))
 	case store32:
-		str = fmt.Sprintf("str %s, %s", formatVRegSized(i.rn.nr(), 32), i.amode.format(32))
+		str = fmt.Sprintf("str %s, %s", formatVRegSized(i.rn.nr(), 32), i.getAmode().format(32))
 	case store64:
-		str = fmt.Sprintf("str %s, %s", formatVRegSized(i.rn.nr(), 64), i.amode.format(64))
+		str = fmt.Sprintf("str %s, %s", formatVRegSized(i.rn.nr(), 64), i.getAmode().format(64))
 	case storeP64:
 		str = fmt.Sprintf("stp %s, %s, %s",
-			formatVRegSized(i.rn.nr(), 64), formatVRegSized(i.rm.nr(), 64), i.amode.format(64))
+			formatVRegSized(i.rn.nr(), 64), formatVRegSized(i.rm.nr(), 64), i.getAmode().format(64))
 	case loadP64:
 		str = fmt.Sprintf("ldp %s, %s, %s",
-			formatVRegSized(i.rn.nr(), 64), formatVRegSized(i.rm.nr(), 64), i.amode.format(64))
+			formatVRegSized(i.rn.nr(), 64), formatVRegSized(i.rm.nr(), 64), i.getAmode().format(64))
 	case mov64:
 		str = fmt.Sprintf("mov %s, %s",
 			formatVRegSized(i.rd, 64),
@@ -1218,17 +1233,17 @@ func (i *instruction) String() (str string) {
 		str = fmt.Sprintf("fcmp %s, %s",
 			formatVRegSized(i.rn.nr(), size), formatVRegSized(i.rm.nr(), size))
 	case fpuLoad32:
-		str = fmt.Sprintf("ldr %s, %s", formatVRegSized(i.rd, 32), i.amode.format(32))
+		str = fmt.Sprintf("ldr %s, %s", formatVRegSized(i.rd, 32), i.getAmode().format(32))
 	case fpuStore32:
-		str = fmt.Sprintf("str %s, %s", formatVRegSized(i.rn.nr(), 32), i.amode.format(64))
+		str = fmt.Sprintf("str %s, %s", formatVRegSized(i.rn.nr(), 32), i.getAmode().format(64))
 	case fpuLoad64:
-		str = fmt.Sprintf("ldr %s, %s", formatVRegSized(i.rd, 64), i.amode.format(64))
+		str = fmt.Sprintf("ldr %s, %s", formatVRegSized(i.rd, 64), i.getAmode().format(64))
 	case fpuStore64:
-		str = fmt.Sprintf("str %s, %s", formatVRegSized(i.rn.nr(), 64), i.amode.format(64))
+		str = fmt.Sprintf("str %s, %s", formatVRegSized(i.rn.nr(), 64), i.getAmode().format(64))
 	case fpuLoad128:
-		str = fmt.Sprintf("ldr %s, %s", formatVRegSized(i.rd, 128), i.amode.format(64))
+		str = fmt.Sprintf("ldr %s, %s", formatVRegSized(i.rd, 128), i.getAmode().format(64))
 	case fpuStore128:
-		str = fmt.Sprintf("str %s, %s", formatVRegSized(i.rn.nr(), 128), i.amode.format(64))
+		str = fmt.Sprintf("str %s, %s", formatVRegSized(i.rn.nr(), 128), i.getAmode().format(64))
 	case loadFpuConst32:
 		str = fmt.Sprintf("ldr %s, #8; b 8; data.f32 %f", formatVRegSized(i.rd, 32), math.Float32frombits(uint32(i.u1)))
 	case loadFpuConst64:

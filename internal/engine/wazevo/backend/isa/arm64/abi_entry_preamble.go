@@ -59,7 +59,8 @@ func (m *machine) goEntryPreamblePassArg(cur *instruction, paramSlicePtr regallo
 	} else {
 		postIndexImm = 8
 	}
-	loadMode := addressMode{kind: addressModeKindPostIndex, rn: paramSlicePtr, imm: postIndexImm}
+	loadMode := m.amodePool.Allocate()
+	*loadMode = addressMode{kind: addressModeKindPostIndex, rn: paramSlicePtr, imm: postIndexImm}
 
 	instr := m.allocateInstr()
 	switch typ {
@@ -77,7 +78,7 @@ func (m *machine) goEntryPreamblePassArg(cur *instruction, paramSlicePtr regallo
 	cur = linkInstr(cur, instr)
 
 	if isStackArg {
-		var storeMode addressMode
+		var storeMode *addressMode
 		cur, storeMode = m.resolveAddressModeForOffsetAndInsert(cur, argStartOffsetFromSP+arg.Offset, bits, spVReg, true)
 		toStack := m.allocateInstr()
 		toStack.asStore(loadTargetReg, storeMode, bits)
@@ -113,7 +114,7 @@ func (m *machine) goEntryPreamblePassResult(cur *instruction, resultSlicePtr reg
 	}
 
 	if isStackArg {
-		var loadMode addressMode
+		var loadMode *addressMode
 		cur, loadMode = m.resolveAddressModeForOffsetAndInsert(cur, resultStartOffsetFromSP+result.Offset, bits, spVReg, true)
 		toReg := m.allocateInstr()
 		switch typ {
@@ -127,7 +128,8 @@ func (m *machine) goEntryPreamblePassResult(cur *instruction, resultSlicePtr reg
 		cur = linkInstr(cur, toReg)
 	}
 
-	mode := addressMode{kind: addressModeKindPostIndex, rn: resultSlicePtr, imm: postIndexImm}
+	mode := m.amodePool.Allocate()
+	*mode = addressMode{kind: addressModeKindPostIndex, rn: resultSlicePtr, imm: postIndexImm}
 	instr := m.allocateInstr()
 	instr.asStore(storeTargetReg, mode, bits)
 	cur = linkInstr(cur, instr)
@@ -214,7 +216,8 @@ func (m *machine) move64(dst, src regalloc.VReg, prev *instruction) *instruction
 
 func (m *machine) loadOrStoreAtExecutionContext(d regalloc.VReg, offset wazevoapi.Offset, store bool, prev *instruction) *instruction {
 	instr := m.allocateInstr()
-	mode := addressMode{kind: addressModeKindRegUnsignedImm12, rn: savedExecutionContextPtr, imm: offset.I64()}
+	mode := m.amodePool.Allocate()
+	*mode = addressMode{kind: addressModeKindRegUnsignedImm12, rn: savedExecutionContextPtr, imm: offset.I64()}
 	if store {
 		instr.asStore(operandNR(d), mode, 64)
 	} else {

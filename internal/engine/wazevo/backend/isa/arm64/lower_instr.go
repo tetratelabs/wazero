@@ -1879,32 +1879,35 @@ func (m *machine) lowerExitWithCode(execCtxVReg regalloc.VReg, code wazevoapi.Ex
 	loadExitCodeConst.asMOVZ(tmpReg1, uint64(code), 0, true)
 
 	setExitCode := m.allocateInstr()
-	setExitCode.asStore(operandNR(tmpReg1),
-		addressMode{
-			kind: addressModeKindRegUnsignedImm12,
-			rn:   execCtxVReg, imm: wazevoapi.ExecutionContextOffsetExitCodeOffset.I64(),
-		}, 32)
+	mode := m.amodePool.Allocate()
+	*mode = addressMode{
+		kind: addressModeKindRegUnsignedImm12,
+		rn:   execCtxVReg, imm: wazevoapi.ExecutionContextOffsetExitCodeOffset.I64(),
+	}
+	setExitCode.asStore(operandNR(tmpReg1), mode, 32)
 
 	// In order to unwind the stack, we also need to push the current stack pointer:
 	tmp2 := m.compiler.AllocateVReg(ssa.TypeI64)
 	movSpToTmp := m.allocateInstr()
 	movSpToTmp.asMove64(tmp2, spVReg)
 	strSpToExecCtx := m.allocateInstr()
-	strSpToExecCtx.asStore(operandNR(tmp2),
-		addressMode{
-			kind: addressModeKindRegUnsignedImm12,
-			rn:   execCtxVReg, imm: wazevoapi.ExecutionContextOffsetStackPointerBeforeGoCall.I64(),
-		}, 64)
+	mode2 := m.amodePool.Allocate()
+	*mode2 = addressMode{
+		kind: addressModeKindRegUnsignedImm12,
+		rn:   execCtxVReg, imm: wazevoapi.ExecutionContextOffsetStackPointerBeforeGoCall.I64(),
+	}
+	strSpToExecCtx.asStore(operandNR(tmp2), mode2, 64)
 	// Also the address of this exit.
 	tmp3 := m.compiler.AllocateVReg(ssa.TypeI64)
 	currentAddrToTmp := m.allocateInstr()
 	currentAddrToTmp.asAdr(tmp3, 0)
 	storeCurrentAddrToExecCtx := m.allocateInstr()
-	storeCurrentAddrToExecCtx.asStore(operandNR(tmp3),
-		addressMode{
-			kind: addressModeKindRegUnsignedImm12,
-			rn:   execCtxVReg, imm: wazevoapi.ExecutionContextOffsetGoCallReturnAddress.I64(),
-		}, 64)
+	mode3 := m.amodePool.Allocate()
+	*mode3 = addressMode{
+		kind: addressModeKindRegUnsignedImm12,
+		rn:   execCtxVReg, imm: wazevoapi.ExecutionContextOffsetGoCallReturnAddress.I64(),
+	}
+	storeCurrentAddrToExecCtx.asStore(operandNR(tmp3), mode3, 64)
 
 	exitSeq := m.allocateInstr()
 	exitSeq.asExitSequence(execCtxVReg)

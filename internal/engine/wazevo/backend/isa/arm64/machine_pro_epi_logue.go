@@ -70,7 +70,7 @@ func (m *machine) setupPrologue() {
 		//                                          +-----------------+ <----- SP
 		//                                             (low address)
 		//
-		_amode := addressModePreOrPostIndex(spVReg,
+		_amode := addressModePreOrPostIndex(m, spVReg,
 			-16,  // stack pointer must be 16-byte aligned.
 			true, // Decrement before store.
 		)
@@ -168,7 +168,7 @@ func (m *machine) createReturnAddrAndSizeOfArgRetSlot(cur *instruction) *instruc
 	// Saves the return address (lr) and the size_of_arg_ret below the SP.
 	// size_of_arg_ret is used for stack unwinding.
 	pstr := m.allocateInstr()
-	amode := addressModePreOrPostIndex(spVReg, -16, true /* decrement before store */)
+	amode := addressModePreOrPostIndex(m, spVReg, -16, true /* decrement before store */)
 	pstr.asStorePair64(lrVReg, sizeOfArgRetReg, amode)
 	cur = linkInstr(cur, pstr)
 	return cur
@@ -182,7 +182,7 @@ func (m *machine) createFrameSizeSlot(cur *instruction, s int64) *instruction {
 	} else {
 		frameSizeReg = xzrVReg
 	}
-	_amode := addressModePreOrPostIndex(spVReg,
+	_amode := addressModePreOrPostIndex(m, spVReg,
 		-16,  // stack pointer must be 16-byte aligned.
 		true, // Decrement before store.
 	)
@@ -286,7 +286,7 @@ func (m *machine) setupEpilogueAfter(cur *instruction) {
 		for i := range m.clobberedRegs {
 			vr := m.clobberedRegs[l-i] // reverse order to restore.
 			load := m.allocateInstr()
-			amode := addressModePreOrPostIndex(spVReg,
+			amode := addressModePreOrPostIndex(m, spVReg,
 				16,    // stack pointer must be 16-byte aligned.
 				false, // Increment after store.
 			)
@@ -318,7 +318,7 @@ func (m *machine) setupEpilogueAfter(cur *instruction) {
 
 	ldr := m.allocateInstr()
 	ldr.asULoad(lrVReg,
-		addressModePreOrPostIndex(spVReg, 16 /* stack pointer must be 16-byte aligned. */, false /* increment after loads */), 64)
+		addressModePreOrPostIndex(m, spVReg, 16 /* stack pointer must be 16-byte aligned. */, false /* increment after loads */), 64)
 	cur = linkInstr(cur, ldr)
 
 	if s := int64(m.currentABI.AlignedArgResultStackSlotSize()); s > 0 {
@@ -366,11 +366,13 @@ func (m *machine) insertStackBoundsCheck(requiredStackSize int64, cur *instructi
 
 	// ldr tmp2, [executionContext #StackBottomPtr]
 	ldr := m.allocateInstr()
-	ldr.asULoad(tmp2, addressMode{
+	amode := m.amodePool.Allocate()
+	*amode = addressMode{
 		kind: addressModeKindRegUnsignedImm12,
 		rn:   x0VReg, // execution context is always the first argument.
 		imm:  wazevoapi.ExecutionContextOffsetStackBottomPtr.I64(),
-	}, 64)
+	}
+	ldr.asULoad(tmp2, amode, 64)
 	cur = linkInstr(cur, ldr)
 
 	// subs xzr, tmp, tmp2
@@ -388,22 +390,25 @@ func (m *machine) insertStackBoundsCheck(requiredStackSize int64, cur *instructi
 		// First load the requiredStackSize into the temporary register,
 		cur = m.lowerConstantI64AndInsert(cur, tmpRegVReg, requiredStackSize)
 		setRequiredStackSize := m.allocateInstr()
-		setRequiredStackSize.asStore(operandNR(tmpRegVReg),
-			addressMode{
-				kind: addressModeKindRegUnsignedImm12,
-				// Execution context is always the first argument.
-				rn: x0VReg, imm: wazevoapi.ExecutionContextOffsetStackGrowRequiredSize.I64(),
-			}, 64)
+		amode := m.amodePool.Allocate()
+		*amode = addressMode{
+			kind: addressModeKindRegUnsignedImm12,
+			// Execution context is always the first argument.
+			rn: x0VReg, imm: wazevoapi.ExecutionContextOffsetStackGrowRequiredSize.I64(),
+		}
+		setRequiredStackSize.asStore(operandNR(tmpRegVReg), amode, 64)
 
 		cur = linkInstr(cur, setRequiredStackSize)
 	}
 
 	ldrAddress := m.allocateInstr()
-	ldrAddress.asULoad(tmpRegVReg, addressMode{
+	amode2 := m.amodePool.Allocate()
+	*amode2 = addressMode{
 		kind: addressModeKindRegUnsignedImm12,
 		rn:   x0VReg, // execution context is always the first argument
 		imm:  wazevoapi.ExecutionContextOffsetStackGrowCallTrampolineAddress.I64(),
-	}, 64)
+	}
+	ldrAddress.asULoad(tmpRegVReg, amode2, 64)
 	cur = linkInstr(cur, ldrAddress)
 
 	// Then jumps to the stack grow call sequence's address, meaning

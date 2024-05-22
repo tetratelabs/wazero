@@ -44,9 +44,9 @@ func (i *instruction) encode(m *machine) {
 	case callInd:
 		c.Emit4Bytes(encodeUnconditionalBranchReg(regNumberInEncoding[i.rn.realReg()], true))
 	case store8, store16, store32, store64, fpuStore32, fpuStore64, fpuStore128:
-		c.Emit4Bytes(encodeLoadOrStore(i.kind, regNumberInEncoding[i.rn.realReg()], i.amode))
+		c.Emit4Bytes(encodeLoadOrStore(i.kind, regNumberInEncoding[i.rn.realReg()], *i.getAmode()))
 	case uLoad8, uLoad16, uLoad32, uLoad64, sLoad8, sLoad16, sLoad32, fpuLoad32, fpuLoad64, fpuLoad128:
-		c.Emit4Bytes(encodeLoadOrStore(i.kind, regNumberInEncoding[i.rd.RealReg()], i.amode))
+		c.Emit4Bytes(encodeLoadOrStore(i.kind, regNumberInEncoding[i.rd.RealReg()], *i.getAmode()))
 	case vecLoad1R:
 		c.Emit4Bytes(encodeVecLoad1R(
 			regNumberInEncoding[i.rd.RealReg()],
@@ -90,7 +90,7 @@ func (i *instruction) encode(m *machine) {
 		c.Emit4Bytes(encodeMov64(regNumberInEncoding[to], regNumberInEncoding[from], toIsSp, fromIsSp))
 	case loadP64, storeP64:
 		rt, rt2 := regNumberInEncoding[i.rn.realReg()], regNumberInEncoding[i.rm.realReg()]
-		amode := i.amode
+		amode := i.getAmode()
 		rn := regNumberInEncoding[amode.rn.RealReg()]
 		var pre bool
 		switch amode.kind {
