@@ -22,7 +22,7 @@ type (
 	// TODO: optimize the layout later once the impl settles.
 	instruction struct {
 		prev, next          *instruction
-		u1, u2, u3          uint64
+		u1, u2              uint64
 		rd                  regalloc.VReg
 		rm, rn              operand
 		amode               addressMode
@@ -504,35 +504,35 @@ func (i *instruction) callFuncRef() ssa.FuncRef {
 }
 
 // shift must be divided by 16 and must be in range 0-3 (if dst64bit is true) or 0-1 (if dst64bit is false)
-func (i *instruction) asMOVZ(dst regalloc.VReg, imm uint64, shift uint64, dst64bit bool) {
+func (i *instruction) asMOVZ(dst regalloc.VReg, imm uint64, shift uint32, dst64bit bool) {
 	i.kind = movZ
 	i.rd = dst
 	i.u1 = imm
-	i.u2 = shift
+	i.u2 = uint64(shift)
 	if dst64bit {
-		i.u3 = 1
+		i.u2 |= 1 << 32
 	}
 }
 
 // shift must be divided by 16 and must be in range 0-3 (if dst64bit is true) or 0-1 (if dst64bit is false)
-func (i *instruction) asMOVK(dst regalloc.VReg, imm uint64, shift uint64, dst64bit bool) {
+func (i *instruction) asMOVK(dst regalloc.VReg, imm uint64, shift uint32, dst64bit bool) {
 	i.kind = movK
 	i.rd = dst
 	i.u1 = imm
-	i.u2 = shift
+	i.u2 = uint64(shift)
 	if dst64bit {
-		i.u3 = 1
+		i.u2 |= 1 << 32
 	}
 }
 
 // shift must be divided by 16 and must be in range 0-3 (if dst64bit is true) or 0-1 (if dst64bit is false)
-func (i *instruction) asMOVN(dst regalloc.VReg, imm uint64, shift uint64, dst64bit bool) {
+func (i *instruction) asMOVN(dst regalloc.VReg, imm uint64, shift uint32, dst64bit bool) {
 	i.kind = movN
 	i.rd = dst
 	i.u1 = imm
-	i.u2 = shift
+	i.u2 = uint64(shift)
 	if dst64bit {
-		i.u3 = 1
+		i.u2 |= 1 << 32
 	}
 }
 
@@ -661,7 +661,7 @@ func (i *instruction) asCSel(rd regalloc.VReg, rn, rm operand, c condFlag, _64bi
 	i.rm = rm
 	i.u1 = uint64(c)
 	if _64bit {
-		i.u3 = 1
+		i.u2 = 1
 	}
 }
 
@@ -672,7 +672,7 @@ func (i *instruction) asFpuCSel(rd regalloc.VReg, rn, rm operand, c condFlag, _6
 	i.rm = rm
 	i.u1 = uint64(c)
 	if _64bit {
-		i.u3 = 1
+		i.u2 = 1
 	}
 }
 
@@ -692,7 +692,7 @@ func (i *instruction) asBrTableSequence(indexReg regalloc.VReg, targetIndex, tar
 }
 
 func (i *instruction) brTableSequenceOffsetsResolved() {
-	i.u3 = 1 // indicate that the offsets are resolved, for debugging.
+	i.rm.data = 1 // indicate that the offsets are resolved, for debugging.
 }
 
 func (i *instruction) brLabel() label {
@@ -702,7 +702,7 @@ func (i *instruction) brLabel() label {
 // brOffsetResolved is called when the target label is resolved.
 func (i *instruction) brOffsetResolve(offset int64) {
 	i.u2 = uint64(offset)
-	i.u3 = 1 // indicate that the offset is resolved, for debugging.
+	i.rm.data = 1 // indicate that the offset is resolved, for debugging.
 }
 
 func (i *instruction) brOffset() int64 {
@@ -715,7 +715,7 @@ func (i *instruction) asCondBr(c cond, target label, is64bit bool) {
 	i.u1 = c.asUint64()
 	i.u2 = uint64(target)
 	if is64bit {
-		i.u3 = 1
+		i.u2 |= 1 << 32
 	}
 }
 
@@ -747,7 +747,7 @@ func (i *instruction) condBrCond() cond {
 }
 
 func (i *instruction) condBr64bit() bool {
-	return i.u3 == 1
+	return i.u2&(1<<32) != 0
 }
 
 func (i *instruction) asLoadFpuConst32(rd regalloc.VReg, raw uint64) {
@@ -773,7 +773,7 @@ func (i *instruction) asFpuCmp(rn, rm operand, is64bit bool) {
 	i.kind = fpuCmp
 	i.rn, i.rm = rn, rm
 	if is64bit {
-		i.u3 = 1
+		i.u1 = 1
 	}
 }
 
@@ -784,7 +784,7 @@ func (i *instruction) asCCmpImm(rn operand, imm uint64, c condFlag, flag byte, i
 	i.u1 = uint64(c)
 	i.u2 = uint64(flag)
 	if is64bit {
-		i.u3 = 1
+		i.u2 |= 1 << 32
 	}
 }
 
@@ -805,7 +805,7 @@ func (i *instruction) asALU(aluOp aluOp, rd regalloc.VReg, rn, rm operand, dst64
 	i.u1 = uint64(aluOp)
 	i.rd, i.rn, i.rm = rd, rn, rm
 	if dst64bit {
-		i.u3 = 1
+		i.u2 |= 1 << 32
 	}
 }
 
@@ -815,7 +815,7 @@ func (i *instruction) asALURRRR(aluOp aluOp, rd regalloc.VReg, rn, rm operand, r
 	i.u1 = uint64(aluOp)
 	i.rd, i.rn, i.rm, i.u2 = rd, rn, rm, uint64(ra)
 	if dst64bit {
-		i.u3 = 1
+		i.u1 |= 1 << 32
 	}
 }
 
@@ -832,7 +832,7 @@ func (i *instruction) asALUShift(aluOp aluOp, rd regalloc.VReg, rn, rm operand, 
 	i.u1 = uint64(aluOp)
 	i.rd, i.rn, i.rm = rd, rn, rm
 	if dst64bit {
-		i.u3 = 1
+		i.u2 |= 1 << 32
 	}
 }
 
@@ -842,7 +842,7 @@ func (i *instruction) asALUBitmaskImm(aluOp aluOp, rd, rn regalloc.VReg, imm uin
 	i.rn, i.rd = operandNR(rn), rd
 	i.u2 = imm
 	if dst64bit {
-		i.u3 = 1
+		i.u1 |= 1 << 32
 	}
 }
 
@@ -870,7 +870,7 @@ func (i *instruction) asFpuRRR(op fpuBinOp, rd regalloc.VReg, rn, rm operand, ds
 	i.u1 = uint64(op)
 	i.rd, i.rn, i.rm = rd, rn, rm
 	if dst64bit {
-		i.u3 = 1
+		i.u2 = 1
 	}
 }
 
@@ -879,7 +879,7 @@ func (i *instruction) asFpuRR(op fpuUniOp, rd regalloc.VReg, rn operand, dst64bi
 	i.u1 = uint64(op)
 	i.rd, i.rn = rd, rn
 	if dst64bit {
-		i.u3 = 1
+		i.u2 = 1
 	}
 }
 
@@ -889,7 +889,7 @@ func (i *instruction) asExtend(rd, rn regalloc.VReg, fromBits, toBits byte, sign
 	i.u1 = uint64(fromBits)
 	i.u2 = uint64(toBits)
 	if signed {
-		i.u3 = 1
+		i.u2 |= 1 << 32
 	}
 }
 
@@ -956,7 +956,7 @@ func (i *instruction) asVecExtract(rd regalloc.VReg, rn, rm operand, arr vecArra
 func (i *instruction) asVecMovElement(rd regalloc.VReg, rn operand, arr vecArrangement, rdIndex, rnIndex vecIndex) {
 	i.kind = vecMovElement
 	i.u1 = uint64(arr)
-	i.u2, i.u3 = uint64(rdIndex), uint64(rnIndex)
+	i.u2 = uint64(rdIndex) | uint64(rnIndex)<<32
 	i.rn, i.rd = rn, rd
 }
 
@@ -1034,8 +1034,8 @@ func (i *instruction) IsCopy() bool {
 
 // String implements fmt.Stringer.
 func (i *instruction) String() (str string) {
-	is64SizeBitToSize := func(u3 uint64) byte {
-		if u3 == 0 {
+	is64SizeBitToSize := func(v uint64) byte {
+		if v == 0 {
 			return 32
 		}
 		return 64
@@ -1050,20 +1050,20 @@ func (i *instruction) String() (str string) {
 			str = "nop0"
 		}
 	case aluRRR:
-		size := is64SizeBitToSize(i.u3)
+		size := is64SizeBitToSize(i.u2 >> 32)
 		str = fmt.Sprintf("%s %s, %s, %s", aluOp(i.u1).String(),
 			formatVRegSized(i.rd, size), formatVRegSized(i.rn.nr(), size),
 			i.rm.format(size))
 	case aluRRRR:
-		size := is64SizeBitToSize(i.u3)
+		size := is64SizeBitToSize(i.u1 >> 32)
 		str = fmt.Sprintf("%s %s, %s, %s, %s", aluOp(i.u1).String(),
 			formatVRegSized(i.rd, size), formatVRegSized(i.rn.nr(), size), formatVRegSized(i.rm.nr(), size), formatVRegSized(regalloc.VReg(i.u2), size))
 	case aluRRImm12:
-		size := is64SizeBitToSize(i.u3)
+		size := is64SizeBitToSize(i.u2 >> 32)
 		str = fmt.Sprintf("%s %s, %s, %s", aluOp(i.u1).String(),
 			formatVRegSized(i.rd, size), formatVRegSized(i.rn.nr(), size), i.rm.format(size))
 	case aluRRBitmaskImm:
-		size := is64SizeBitToSize(i.u3)
+		size := is64SizeBitToSize(i.u1 >> 32)
 		rd, rn := formatVRegSized(i.rd, size), formatVRegSized(i.rn.nr(), size)
 		if size == 32 {
 			str = fmt.Sprintf("%s %s, %s, #%#x", aluOp(i.u1).String(), rd, rn, uint32(i.u2))
@@ -1071,7 +1071,7 @@ func (i *instruction) String() (str string) {
 			str = fmt.Sprintf("%s %s, %s, #%#x", aluOp(i.u1).String(), rd, rn, i.u2)
 		}
 	case aluRRImmShift:
-		size := is64SizeBitToSize(i.u3)
+		size := is64SizeBitToSize(i.u2 >> 32)
 		str = fmt.Sprintf("%s %s, %s, %#x",
 			aluOp(i.u1).String(),
 			formatVRegSized(i.rd, size),
@@ -1079,7 +1079,7 @@ func (i *instruction) String() (str string) {
 			i.rm.shiftImm(),
 		)
 	case aluRRRShift:
-		size := is64SizeBitToSize(i.u3)
+		size := is64SizeBitToSize(i.u2 >> 32)
 		str = fmt.Sprintf("%s %s, %s, %s",
 			aluOp(i.u1).String(),
 			formatVRegSized(i.rd, size),
@@ -1087,7 +1087,7 @@ func (i *instruction) String() (str string) {
 			i.rm.format(size),
 		)
 	case aluRRRExtend:
-		size := is64SizeBitToSize(i.u3)
+		size := is64SizeBitToSize(i.u2 >> 32)
 		str = fmt.Sprintf("%s %s, %s, %s", aluOp(i.u1).String(),
 			formatVRegSized(i.rd, size),
 			formatVRegSized(i.rn.nr(), size),
@@ -1136,19 +1136,19 @@ func (i *instruction) String() (str string) {
 	case mov32:
 		str = fmt.Sprintf("mov %s, %s", formatVRegSized(i.rd, 32), formatVRegSized(i.rn.nr(), 32))
 	case movZ:
-		size := is64SizeBitToSize(i.u3)
-		str = fmt.Sprintf("movz %s, #%#x, lsl %d", formatVRegSized(i.rd, size), uint16(i.u1), i.u2*16)
+		size := is64SizeBitToSize(i.u2 >> 32)
+		str = fmt.Sprintf("movz %s, #%#x, lsl %d", formatVRegSized(i.rd, size), uint16(i.u1), uint32(i.u2)*16)
 	case movN:
-		size := is64SizeBitToSize(i.u3)
-		str = fmt.Sprintf("movn %s, #%#x, lsl %d", formatVRegSized(i.rd, size), uint16(i.u1), i.u2*16)
+		size := is64SizeBitToSize(i.u2 >> 32)
+		str = fmt.Sprintf("movn %s, #%#x, lsl %d", formatVRegSized(i.rd, size), uint16(i.u1), uint32(i.u2)*16)
 	case movK:
-		size := is64SizeBitToSize(i.u3)
-		str = fmt.Sprintf("movk %s, #%#x, lsl %d", formatVRegSized(i.rd, size), uint16(i.u1), i.u2*16)
+		size := is64SizeBitToSize(i.u2 >> 32)
+		str = fmt.Sprintf("movk %s, #%#x, lsl %d", formatVRegSized(i.rd, size), uint16(i.u1), uint32(i.u2)*16)
 	case extend:
 		fromBits, toBits := byte(i.u1), byte(i.u2)
 
 		var signedStr string
-		if i.u3 == 1 {
+		if i.u2>>32 == 1 {
 			signedStr = "s"
 		} else {
 			signedStr = "u"
@@ -1164,7 +1164,7 @@ func (i *instruction) String() (str string) {
 		}
 		str = fmt.Sprintf("%sxt%s %s, %s", signedStr, fromStr, formatVRegSized(i.rd, toBits), formatVRegSized(i.rn.nr(), 32))
 	case cSel:
-		size := is64SizeBitToSize(i.u3)
+		size := is64SizeBitToSize(i.u2)
 		str = fmt.Sprintf("csel %s, %s, %s, %s",
 			formatVRegSized(i.rd, size),
 			formatVRegSized(i.rn.nr(), size),
@@ -1178,7 +1178,7 @@ func (i *instruction) String() (str string) {
 			str = fmt.Sprintf("cset %s, %s", formatVRegSized(i.rd, 64), condFlag(i.u1))
 		}
 	case cCmpImm:
-		size := is64SizeBitToSize(i.u3)
+		size := is64SizeBitToSize(i.u2 >> 32)
 		str = fmt.Sprintf("ccmp %s, #%#x, #%#x, %s",
 			formatVRegSized(i.rn.nr(), size), i.rm.data,
 			i.u2&0b1111,
@@ -1194,7 +1194,7 @@ func (i *instruction) String() (str string) {
 	case fpuMovFromVec:
 		panic("TODO")
 	case fpuRR:
-		dstSz := is64SizeBitToSize(i.u3)
+		dstSz := is64SizeBitToSize(i.u2)
 		srcSz := dstSz
 		op := fpuUniOp(i.u1)
 		switch op {
@@ -1206,7 +1206,7 @@ func (i *instruction) String() (str string) {
 		str = fmt.Sprintf("%s %s, %s", op.String(),
 			formatVRegSized(i.rd, dstSz), formatVRegSized(i.rn.nr(), srcSz))
 	case fpuRRR:
-		size := is64SizeBitToSize(i.u3)
+		size := is64SizeBitToSize(i.u2)
 		str = fmt.Sprintf("%s %s, %s, %s", fpuBinOp(i.u1).String(),
 			formatVRegSized(i.rd, size), formatVRegSized(i.rn.nr(), size), formatVRegSized(i.rm.nr(), size))
 	case fpuRRI:
@@ -1214,7 +1214,7 @@ func (i *instruction) String() (str string) {
 	case fpuRRRR:
 		panic("TODO")
 	case fpuCmp:
-		size := is64SizeBitToSize(i.u3)
+		size := is64SizeBitToSize(i.u1)
 		str = fmt.Sprintf("fcmp %s, %s",
 			formatVRegSized(i.rn.nr(), size), formatVRegSized(i.rm.nr(), size))
 	case fpuLoad32:
@@ -1243,12 +1243,12 @@ func (i *instruction) String() (str string) {
 		} else {
 			op = "fcvtzu"
 		}
-		if src64 := i.u2 == 1; src64 {
+		if src64 := i.u2&1 != 0; src64 {
 			src = formatVRegWidthVec(i.rn.nr(), vecArrangementD)
 		} else {
 			src = formatVRegWidthVec(i.rn.nr(), vecArrangementS)
 		}
-		if dst64 := i.u3 == 1; dst64 {
+		if dst64 := i.u2&2 != 0; dst64 {
 			dst = formatVRegSized(i.rd, 64)
 		} else {
 			dst = formatVRegSized(i.rd, 32)
@@ -1262,19 +1262,19 @@ func (i *instruction) String() (str string) {
 		} else {
 			op = "ucvtf"
 		}
-		if src64 := i.u2 == 1; src64 {
+		if src64 := i.u2&1 != 0; src64 {
 			src = formatVRegSized(i.rn.nr(), 64)
 		} else {
 			src = formatVRegSized(i.rn.nr(), 32)
 		}
-		if dst64 := i.u3 == 1; dst64 {
+		if dst64 := i.u2&2 != 0; dst64 {
 			dst = formatVRegWidthVec(i.rd, vecArrangementD)
 		} else {
 			dst = formatVRegWidthVec(i.rd, vecArrangementS)
 		}
 		str = fmt.Sprintf("%s %s, %s", op, dst, src)
 	case fpuCSel:
-		size := is64SizeBitToSize(i.u3)
+		size := is64SizeBitToSize(i.u2)
 		str = fmt.Sprintf("fcsel %s, %s, %s, %s",
 			formatVRegSized(i.rd, size),
 			formatVRegSized(i.rn.nr(), size),
@@ -1341,8 +1341,8 @@ func (i *instruction) String() (str string) {
 		panic("TODO")
 	case vecMovElement:
 		str = fmt.Sprintf("mov %s, %s",
-			formatVRegVec(i.rd, vecArrangement(i.u1), vecIndex(i.u2)),
-			formatVRegVec(i.rn.nr(), vecArrangement(i.u1), vecIndex(i.u3)),
+			formatVRegVec(i.rd, vecArrangement(i.u1), vecIndex(i.u2&0xffffffff)),
+			formatVRegVec(i.rn.nr(), vecArrangement(i.u1), vecIndex(i.u2>>32)),
 		)
 	case vecMiscNarrow:
 		panic("TODO")
@@ -1423,15 +1423,15 @@ func (i *instruction) String() (str string) {
 		str = "ret"
 	case br:
 		target := label(i.u1)
-		if i.u3 != 0 {
+		if i.rm.data != 0 {
 			str = fmt.Sprintf("b #%#x (%s)", i.brOffset(), target.String())
 		} else {
 			str = fmt.Sprintf("b %s", target.String())
 		}
 	case condBr:
-		size := is64SizeBitToSize(i.u3)
+		size := is64SizeBitToSize(i.u2 >> 32)
 		c := cond(i.u1)
-		target := label(i.u2)
+		target := label(i.u2 & 0xffffffff)
 		switch c.kind() {
 		case condKindRegisterZero:
 			if !i.condBrOffsetResolved() {
@@ -1790,7 +1790,7 @@ func (i *instruction) asFpuToInt(rd regalloc.VReg, rn operand, rdSigned, src64bi
 		i.u2 = 1
 	}
 	if dst64bit {
-		i.u3 = 1
+		i.u2 |= 2
 	}
 }
 
@@ -1805,7 +1805,7 @@ func (i *instruction) asIntToFpu(rd regalloc.VReg, rn operand, rnSigned, src64bi
 		i.u2 = 1
 	}
 	if dst64bit {
-		i.u3 = 1
+		i.u2 |= 2
 	}
 }
 
@@ -1818,7 +1818,7 @@ func (i *instruction) asExitSequence(ctx regalloc.VReg) *instruction {
 // aluOp determines the type of ALU operation. Instructions whose kind is one of
 // aluRRR, aluRRRR, aluRRImm12, aluRRBitmaskImm, aluRRImmShift, aluRRRShift and aluRRRExtend
 // would use this type.
-type aluOp int
+type aluOp uint32
 
 func (a aluOp) String() string {
 	switch a {
