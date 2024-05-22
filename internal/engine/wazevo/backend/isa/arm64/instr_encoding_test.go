@@ -17,6 +17,7 @@ func Test_dummy(t *testing.T) {
 }
 
 func TestInstruction_encode(t *testing.T) {
+	m := NewBackend().(*machine)
 	dummyLabel := label(1)
 	for _, tc := range []struct {
 		setup func(*instruction)
@@ -27,1058 +28,1058 @@ func TestInstruction_encode(t *testing.T) {
 		{want: "21443bd5", setup: func(i *instruction) { i.asMovFromFPSR(x1VReg) }},
 		{want: "2f08417a", setup: func(i *instruction) { i.asCCmpImm(operandNR(x1VReg), 1, eq, 0b1111, false) }},
 		{want: "201841fa", setup: func(i *instruction) { i.asCCmpImm(operandNR(x1VReg), 1, ne, 0, true) }},
-		{want: "410c010e", setup: func(i *instruction) { i.asVecDup(operandNR(v1VReg), operandNR(v2VReg), vecArrangement8B) }},
-		{want: "410c014e", setup: func(i *instruction) { i.asVecDup(operandNR(v1VReg), operandNR(v2VReg), vecArrangement16B) }},
-		{want: "410c020e", setup: func(i *instruction) { i.asVecDup(operandNR(v1VReg), operandNR(v2VReg), vecArrangement4H) }},
-		{want: "410c024e", setup: func(i *instruction) { i.asVecDup(operandNR(v1VReg), operandNR(v2VReg), vecArrangement8H) }},
-		{want: "410c040e", setup: func(i *instruction) { i.asVecDup(operandNR(v1VReg), operandNR(v2VReg), vecArrangement2S) }},
-		{want: "410c044e", setup: func(i *instruction) { i.asVecDup(operandNR(v1VReg), operandNR(v2VReg), vecArrangement4S) }},
-		{want: "410c084e", setup: func(i *instruction) { i.asVecDup(operandNR(v1VReg), operandNR(v2VReg), vecArrangement2D) }},
-		{want: "4104034e", setup: func(i *instruction) { i.asVecDupElement(operandNR(v1VReg), operandNR(v2VReg), vecArrangementB, 1) }},
-		{want: "4104064e", setup: func(i *instruction) { i.asVecDupElement(operandNR(v1VReg), operandNR(v2VReg), vecArrangementH, 1) }},
-		{want: "41040c4e", setup: func(i *instruction) { i.asVecDupElement(operandNR(v1VReg), operandNR(v2VReg), vecArrangementS, 1) }},
-		{want: "4104184e", setup: func(i *instruction) { i.asVecDupElement(operandNR(v1VReg), operandNR(v2VReg), vecArrangementD, 1) }},
+		{want: "410c010e", setup: func(i *instruction) { i.asVecDup(v1VReg, operandNR(v2VReg), vecArrangement8B) }},
+		{want: "410c014e", setup: func(i *instruction) { i.asVecDup(v1VReg, operandNR(v2VReg), vecArrangement16B) }},
+		{want: "410c020e", setup: func(i *instruction) { i.asVecDup(v1VReg, operandNR(v2VReg), vecArrangement4H) }},
+		{want: "410c024e", setup: func(i *instruction) { i.asVecDup(v1VReg, operandNR(v2VReg), vecArrangement8H) }},
+		{want: "410c040e", setup: func(i *instruction) { i.asVecDup(v1VReg, operandNR(v2VReg), vecArrangement2S) }},
+		{want: "410c044e", setup: func(i *instruction) { i.asVecDup(v1VReg, operandNR(v2VReg), vecArrangement4S) }},
+		{want: "410c084e", setup: func(i *instruction) { i.asVecDup(v1VReg, operandNR(v2VReg), vecArrangement2D) }},
+		{want: "4104034e", setup: func(i *instruction) { i.asVecDupElement(v1VReg, operandNR(v2VReg), vecArrangementB, 1) }},
+		{want: "4104064e", setup: func(i *instruction) { i.asVecDupElement(v1VReg, operandNR(v2VReg), vecArrangementH, 1) }},
+		{want: "41040c4e", setup: func(i *instruction) { i.asVecDupElement(v1VReg, operandNR(v2VReg), vecArrangementS, 1) }},
+		{want: "4104184e", setup: func(i *instruction) { i.asVecDupElement(v1VReg, operandNR(v2VReg), vecArrangementD, 1) }},
 		{want: "4138032e", setup: func(i *instruction) {
-			i.asVecExtract(operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B, 7)
+			i.asVecExtract(v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B, 7)
 		}},
 		{want: "4138036e", setup: func(i *instruction) {
-			i.asVecExtract(operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B, 7)
+			i.asVecExtract(v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B, 7)
 		}},
-		{want: "410c036e", setup: func(i *instruction) { i.asVecMovElement(operandNR(v1VReg), operandNR(v2VReg), vecArrangementB, 1, 1) }},
-		{want: "4114066e", setup: func(i *instruction) { i.asVecMovElement(operandNR(v1VReg), operandNR(v2VReg), vecArrangementH, 1, 1) }},
-		{want: "41240c6e", setup: func(i *instruction) { i.asVecMovElement(operandNR(v1VReg), operandNR(v2VReg), vecArrangementS, 1, 1) }},
-		{want: "4144186e", setup: func(i *instruction) { i.asVecMovElement(operandNR(v1VReg), operandNR(v2VReg), vecArrangementD, 1, 1) }},
+		{want: "410c036e", setup: func(i *instruction) { i.asVecMovElement(v1VReg, operandNR(v2VReg), vecArrangementB, 1, 1) }},
+		{want: "4114066e", setup: func(i *instruction) { i.asVecMovElement(v1VReg, operandNR(v2VReg), vecArrangementH, 1, 1) }},
+		{want: "41240c6e", setup: func(i *instruction) { i.asVecMovElement(v1VReg, operandNR(v2VReg), vecArrangementS, 1, 1) }},
+		{want: "4144186e", setup: func(i *instruction) { i.asVecMovElement(v1VReg, operandNR(v2VReg), vecArrangementD, 1, 1) }},
 		{want: "4104090f", setup: func(i *instruction) {
-			i.asVecShiftImm(vecOpSshr, operandNR(v1VReg), operandNR(v2VReg), operandShiftImm(7), vecArrangement8B)
+			i.asVecShiftImm(vecOpSshr, v1VReg, operandNR(v2VReg), operandShiftImm(7), vecArrangement8B)
 		}},
 		{want: "4104094f", setup: func(i *instruction) {
-			i.asVecShiftImm(vecOpSshr, operandNR(v1VReg), operandNR(v2VReg), operandShiftImm(7), vecArrangement16B)
+			i.asVecShiftImm(vecOpSshr, v1VReg, operandNR(v2VReg), operandShiftImm(7), vecArrangement16B)
 		}},
 		{want: "4104190f", setup: func(i *instruction) {
-			i.asVecShiftImm(vecOpSshr, operandNR(v1VReg), operandNR(v2VReg), operandShiftImm(7), vecArrangement4H)
+			i.asVecShiftImm(vecOpSshr, v1VReg, operandNR(v2VReg), operandShiftImm(7), vecArrangement4H)
 		}},
 		{want: "4104194f", setup: func(i *instruction) {
-			i.asVecShiftImm(vecOpSshr, operandNR(v1VReg), operandNR(v2VReg), operandShiftImm(7), vecArrangement8H)
+			i.asVecShiftImm(vecOpSshr, v1VReg, operandNR(v2VReg), operandShiftImm(7), vecArrangement8H)
 		}},
 		{want: "4104390f", setup: func(i *instruction) {
-			i.asVecShiftImm(vecOpSshr, operandNR(v1VReg), operandNR(v2VReg), operandShiftImm(7), vecArrangement2S)
+			i.asVecShiftImm(vecOpSshr, v1VReg, operandNR(v2VReg), operandShiftImm(7), vecArrangement2S)
 		}},
 		{want: "4104394f", setup: func(i *instruction) {
-			i.asVecShiftImm(vecOpSshr, operandNR(v1VReg), operandNR(v2VReg), operandShiftImm(7), vecArrangement4S)
+			i.asVecShiftImm(vecOpSshr, v1VReg, operandNR(v2VReg), operandShiftImm(7), vecArrangement4S)
 		}},
 		{want: "4104794f", setup: func(i *instruction) {
-			i.asVecShiftImm(vecOpSshr, operandNR(v1VReg), operandNR(v2VReg), operandShiftImm(7), vecArrangement2D)
+			i.asVecShiftImm(vecOpSshr, v1VReg, operandNR(v2VReg), operandShiftImm(7), vecArrangement2D)
 		}},
 
 		{want: "41a40d0f", setup: func(i *instruction) {
-			i.asVecShiftImm(vecOpSshll, operandNR(v1VReg), operandNR(v2VReg), operandShiftImm(3), vecArrangement8B)
+			i.asVecShiftImm(vecOpSshll, v1VReg, operandNR(v2VReg), operandShiftImm(3), vecArrangement8B)
 		}},
 		{want: "41a40d4f", setup: func(i *instruction) { // sshll2
-			i.asVecShiftImm(vecOpSshll, operandNR(v1VReg), operandNR(v2VReg), operandShiftImm(3), vecArrangement16B)
+			i.asVecShiftImm(vecOpSshll, v1VReg, operandNR(v2VReg), operandShiftImm(3), vecArrangement16B)
 		}},
 		{want: "41a41d0f", setup: func(i *instruction) {
-			i.asVecShiftImm(vecOpSshll, operandNR(v1VReg), operandNR(v2VReg), operandShiftImm(3), vecArrangement4H)
+			i.asVecShiftImm(vecOpSshll, v1VReg, operandNR(v2VReg), operandShiftImm(3), vecArrangement4H)
 		}},
 		{want: "41a41d4f", setup: func(i *instruction) { // sshll2
-			i.asVecShiftImm(vecOpSshll, operandNR(v1VReg), operandNR(v2VReg), operandShiftImm(3), vecArrangement8H)
+			i.asVecShiftImm(vecOpSshll, v1VReg, operandNR(v2VReg), operandShiftImm(3), vecArrangement8H)
 		}},
 		{want: "41a43d0f", setup: func(i *instruction) {
-			i.asVecShiftImm(vecOpSshll, operandNR(v1VReg), operandNR(v2VReg), operandShiftImm(3), vecArrangement2S)
+			i.asVecShiftImm(vecOpSshll, v1VReg, operandNR(v2VReg), operandShiftImm(3), vecArrangement2S)
 		}},
 		{want: "41a43d4f", setup: func(i *instruction) { // sshll2
-			i.asVecShiftImm(vecOpSshll, operandNR(v1VReg), operandNR(v2VReg), operandShiftImm(3), vecArrangement4S)
+			i.asVecShiftImm(vecOpSshll, v1VReg, operandNR(v2VReg), operandShiftImm(3), vecArrangement4S)
 		}},
 		{want: "41a40d2f", setup: func(i *instruction) {
-			i.asVecShiftImm(vecOpUshll, operandNR(v1VReg), operandNR(v2VReg), operandShiftImm(3), vecArrangement8B)
+			i.asVecShiftImm(vecOpUshll, v1VReg, operandNR(v2VReg), operandShiftImm(3), vecArrangement8B)
 		}},
 		{want: "41a40d6f", setup: func(i *instruction) { // ushll2
-			i.asVecShiftImm(vecOpUshll, operandNR(v1VReg), operandNR(v2VReg), operandShiftImm(3), vecArrangement16B)
+			i.asVecShiftImm(vecOpUshll, v1VReg, operandNR(v2VReg), operandShiftImm(3), vecArrangement16B)
 		}},
 		{want: "41a41d2f", setup: func(i *instruction) {
-			i.asVecShiftImm(vecOpUshll, operandNR(v1VReg), operandNR(v2VReg), operandShiftImm(3), vecArrangement4H)
+			i.asVecShiftImm(vecOpUshll, v1VReg, operandNR(v2VReg), operandShiftImm(3), vecArrangement4H)
 		}},
 		{want: "41a41d6f", setup: func(i *instruction) { // ushll2
-			i.asVecShiftImm(vecOpUshll, operandNR(v1VReg), operandNR(v2VReg), operandShiftImm(3), vecArrangement8H)
+			i.asVecShiftImm(vecOpUshll, v1VReg, operandNR(v2VReg), operandShiftImm(3), vecArrangement8H)
 		}},
 		{want: "41a43d2f", setup: func(i *instruction) {
-			i.asVecShiftImm(vecOpUshll, operandNR(v1VReg), operandNR(v2VReg), operandShiftImm(3), vecArrangement2S)
+			i.asVecShiftImm(vecOpUshll, v1VReg, operandNR(v2VReg), operandShiftImm(3), vecArrangement2S)
 		}},
 		{want: "41a43d6f", setup: func(i *instruction) { // ushll2
-			i.asVecShiftImm(vecOpUshll, operandNR(v1VReg), operandNR(v2VReg), operandShiftImm(3), vecArrangement4S)
+			i.asVecShiftImm(vecOpUshll, v1VReg, operandNR(v2VReg), operandShiftImm(3), vecArrangement4S)
 		}},
 		{want: "4100030e", setup: func(i *instruction) {
-			i.asVecTbl(1, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
+			i.asVecTbl(1, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
 		}},
 		{want: "4100034e", setup: func(i *instruction) {
-			i.asVecTbl(1, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
+			i.asVecTbl(1, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
 		}},
 		{want: "4120040e", setup: func(i *instruction) {
-			i.asVecTbl(2, operandNR(v1VReg), operandNR(v2VReg), operandNR(v4VReg), vecArrangement8B)
+			i.asVecTbl(2, v1VReg, operandNR(v2VReg), operandNR(v4VReg), vecArrangement8B)
 		}},
 		{want: "4120044e", setup: func(i *instruction) {
-			i.asVecTbl(2, operandNR(v1VReg), operandNR(v2VReg), operandNR(v4VReg), vecArrangement16B)
+			i.asVecTbl(2, v1VReg, operandNR(v2VReg), operandNR(v4VReg), vecArrangement16B)
 		}},
 		{want: "4138030e", setup: func(i *instruction) {
-			i.asVecPermute(vecOpZip1, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
+			i.asVecPermute(vecOpZip1, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
 		}},
 		{want: "4138034e", setup: func(i *instruction) {
-			i.asVecPermute(vecOpZip1, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
+			i.asVecPermute(vecOpZip1, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
 		}},
 		{want: "4138430e", setup: func(i *instruction) {
-			i.asVecPermute(vecOpZip1, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
+			i.asVecPermute(vecOpZip1, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
 		}},
 		{want: "4138434e", setup: func(i *instruction) {
-			i.asVecPermute(vecOpZip1, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
+			i.asVecPermute(vecOpZip1, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
 		}},
 		{want: "4138830e", setup: func(i *instruction) {
-			i.asVecPermute(vecOpZip1, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
+			i.asVecPermute(vecOpZip1, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
 		}},
 		{want: "4138834e", setup: func(i *instruction) {
-			i.asVecPermute(vecOpZip1, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
+			i.asVecPermute(vecOpZip1, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
 		}},
 		{want: "4138c34e", setup: func(i *instruction) {
-			i.asVecPermute(vecOpZip1, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
+			i.asVecPermute(vecOpZip1, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
 		}},
 		{want: "411ca32e", setup: func(i *instruction) {
-			i.asVecRRRRewrite(vecOpBit, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
+			i.asVecRRRRewrite(vecOpBit, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
 		}},
 		{want: "411ca36e", setup: func(i *instruction) {
-			i.asVecRRRRewrite(vecOpBit, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
+			i.asVecRRRRewrite(vecOpBit, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
 		}},
 		{want: "411c236e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpEOR, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
+			i.asVecRRR(vecOpEOR, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
 		}},
 		{want: "411c232e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpEOR, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
+			i.asVecRRR(vecOpEOR, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
 		}},
 		{want: "4184234e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpAdd, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
+			i.asVecRRR(vecOpAdd, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
 		}},
 		{want: "4184a34e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpAdd, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
+			i.asVecRRR(vecOpAdd, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
 		}},
 		{want: "4184e34e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpAdd, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
+			i.asVecRRR(vecOpAdd, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
 		}},
 		{want: "410c230e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSqadd, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
+			i.asVecRRR(vecOpSqadd, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
 		}},
 		{want: "410c234e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSqadd, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
+			i.asVecRRR(vecOpSqadd, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
 		}},
 		{want: "410c630e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSqadd, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
+			i.asVecRRR(vecOpSqadd, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
 		}},
 		{want: "410c634e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSqadd, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
+			i.asVecRRR(vecOpSqadd, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
 		}},
 		{want: "410ca30e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSqadd, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
+			i.asVecRRR(vecOpSqadd, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
 		}},
 		{want: "410ca34e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSqadd, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
+			i.asVecRRR(vecOpSqadd, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
 		}},
 		{want: "410ce34e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSqadd, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
+			i.asVecRRR(vecOpSqadd, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
 		}},
 		{want: "410c232e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpUqadd, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
+			i.asVecRRR(vecOpUqadd, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
 		}},
 		{want: "410c236e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpUqadd, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
+			i.asVecRRR(vecOpUqadd, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
 		}},
 		{want: "410c632e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpUqadd, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
+			i.asVecRRR(vecOpUqadd, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
 		}},
 		{want: "410c636e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpUqadd, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
+			i.asVecRRR(vecOpUqadd, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
 		}},
 		{want: "410ca32e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpUqadd, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
+			i.asVecRRR(vecOpUqadd, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
 		}},
 		{want: "410ca36e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpUqadd, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
+			i.asVecRRR(vecOpUqadd, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
 		}},
 		{want: "410ce36e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpUqadd, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
+			i.asVecRRR(vecOpUqadd, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
 		}},
 		{want: "412c230e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSqsub, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
+			i.asVecRRR(vecOpSqsub, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
 		}},
 		{want: "412c234e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSqsub, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
+			i.asVecRRR(vecOpSqsub, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
 		}},
 		{want: "412c630e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSqsub, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
+			i.asVecRRR(vecOpSqsub, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
 		}},
 		{want: "412c634e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSqsub, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
+			i.asVecRRR(vecOpSqsub, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
 		}},
 		{want: "412ca30e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSqsub, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
+			i.asVecRRR(vecOpSqsub, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
 		}},
 		{want: "412ca34e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSqsub, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
+			i.asVecRRR(vecOpSqsub, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
 		}},
 		{want: "412ce34e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSqsub, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
+			i.asVecRRR(vecOpSqsub, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
 		}},
 		{want: "412c232e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpUqsub, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
+			i.asVecRRR(vecOpUqsub, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
 		}},
 		{want: "412c236e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpUqsub, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
+			i.asVecRRR(vecOpUqsub, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
 		}},
 		{want: "412c632e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpUqsub, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
+			i.asVecRRR(vecOpUqsub, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
 		}},
 		{want: "412c636e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpUqsub, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
+			i.asVecRRR(vecOpUqsub, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
 		}},
 		{want: "412ca32e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpUqsub, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
+			i.asVecRRR(vecOpUqsub, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
 		}},
 		{want: "412ca36e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpUqsub, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
+			i.asVecRRR(vecOpUqsub, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
 		}},
 		{want: "412ce36e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpUqsub, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
+			i.asVecRRR(vecOpUqsub, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
 		}},
 		{want: "4184232e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSub, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
+			i.asVecRRR(vecOpSub, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
 		}},
 		{want: "4184236e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSub, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
+			i.asVecRRR(vecOpSub, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
 		}},
 		{want: "4184632e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSub, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
+			i.asVecRRR(vecOpSub, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
 		}},
 		{want: "4184636e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSub, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
+			i.asVecRRR(vecOpSub, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
 		}},
 		{want: "4184a32e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSub, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
+			i.asVecRRR(vecOpSub, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
 		}},
 		{want: "4184a36e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSub, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
+			i.asVecRRR(vecOpSub, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
 		}},
 		{want: "4184e36e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSub, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
+			i.asVecRRR(vecOpSub, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
 		}},
 		{want: "41bc230e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpAddp, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
+			i.asVecRRR(vecOpAddp, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
 		}},
 		{want: "41bc234e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpAddp, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
+			i.asVecRRR(vecOpAddp, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
 		}},
 		{want: "41bc630e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpAddp, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
+			i.asVecRRR(vecOpAddp, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
 		}},
 		{want: "41bc634e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpAddp, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
+			i.asVecRRR(vecOpAddp, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
 		}},
 		{want: "41bca30e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpAddp, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
+			i.asVecRRR(vecOpAddp, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
 		}},
 		{want: "41bca34e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpAddp, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
+			i.asVecRRR(vecOpAddp, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
 		}},
 		{want: "41bce34e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpAddp, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
+			i.asVecRRR(vecOpAddp, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
 		}},
 		{want: "41bc230e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpAddp, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
+			i.asVecRRR(vecOpAddp, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
 		}},
 		{want: "41b8314e", setup: func(i *instruction) {
-			i.asVecLanes(vecOpAddv, operandNR(v1VReg), operandNR(v2VReg), vecArrangement16B)
+			i.asVecLanes(vecOpAddv, v1VReg, operandNR(v2VReg), vecArrangement16B)
 		}},
 		{want: "41b8710e", setup: func(i *instruction) {
-			i.asVecLanes(vecOpAddv, operandNR(v1VReg), operandNR(v2VReg), vecArrangement4H)
+			i.asVecLanes(vecOpAddv, v1VReg, operandNR(v2VReg), vecArrangement4H)
 		}},
 		{want: "41b8714e", setup: func(i *instruction) {
-			i.asVecLanes(vecOpAddv, operandNR(v1VReg), operandNR(v2VReg), vecArrangement8H)
+			i.asVecLanes(vecOpAddv, v1VReg, operandNR(v2VReg), vecArrangement8H)
 		}},
 		{want: "41b8b14e", setup: func(i *instruction) {
-			i.asVecLanes(vecOpAddv, operandNR(v1VReg), operandNR(v2VReg), vecArrangement4S)
+			i.asVecLanes(vecOpAddv, v1VReg, operandNR(v2VReg), vecArrangement4S)
 		}},
 		{want: "416c230e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSmin, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
+			i.asVecRRR(vecOpSmin, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
 		}},
 		{want: "416c234e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSmin, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
+			i.asVecRRR(vecOpSmin, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
 		}},
 		{want: "416c630e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSmin, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
+			i.asVecRRR(vecOpSmin, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
 		}},
 		{want: "416c634e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSmin, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
+			i.asVecRRR(vecOpSmin, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
 		}},
 		{want: "416ca30e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSmin, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
+			i.asVecRRR(vecOpSmin, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
 		}},
 		{want: "416ca34e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSmin, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
+			i.asVecRRR(vecOpSmin, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
 		}},
 		{want: "416c232e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpUmin, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
+			i.asVecRRR(vecOpUmin, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
 		}},
 		{want: "416c236e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpUmin, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
+			i.asVecRRR(vecOpUmin, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
 		}},
 		{want: "416c632e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpUmin, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
+			i.asVecRRR(vecOpUmin, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
 		}},
 		{want: "416c636e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpUmin, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
+			i.asVecRRR(vecOpUmin, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
 		}},
 		{want: "416ca32e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpUmin, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
+			i.asVecRRR(vecOpUmin, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
 		}},
 		{want: "416ca36e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpUmin, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
+			i.asVecRRR(vecOpUmin, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
 		}},
 		{want: "4164230e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSmax, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
+			i.asVecRRR(vecOpSmax, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
 		}},
 		{want: "4164234e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSmax, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
+			i.asVecRRR(vecOpSmax, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
 		}},
 		{want: "4164630e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSmax, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
+			i.asVecRRR(vecOpSmax, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
 		}},
 		{want: "4164634e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSmax, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
+			i.asVecRRR(vecOpSmax, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
 		}},
 		{want: "4164a30e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSmax, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
+			i.asVecRRR(vecOpSmax, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
 		}},
 		{want: "4164a34e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSmax, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
+			i.asVecRRR(vecOpSmax, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
 		}},
 		{want: "4164232e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpUmax, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
+			i.asVecRRR(vecOpUmax, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
 		}},
 		{want: "4164236e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpUmax, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
+			i.asVecRRR(vecOpUmax, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
 		}},
 		{want: "4164632e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpUmax, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
+			i.asVecRRR(vecOpUmax, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
 		}},
 		{want: "4164636e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpUmax, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
+			i.asVecRRR(vecOpUmax, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
 		}},
 		{want: "4164a32e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpUmax, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
+			i.asVecRRR(vecOpUmax, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
 		}},
 		{want: "4164a36e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpUmax, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
+			i.asVecRRR(vecOpUmax, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
 		}},
 		{want: "41a4232e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpUmaxp, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
+			i.asVecRRR(vecOpUmaxp, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
 		}},
 		{want: "41a4236e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpUmaxp, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
+			i.asVecRRR(vecOpUmaxp, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
 		}},
 		{want: "41a4632e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpUmaxp, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
+			i.asVecRRR(vecOpUmaxp, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
 		}},
 		{want: "41a4636e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpUmaxp, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
+			i.asVecRRR(vecOpUmaxp, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
 		}},
 		{want: "41a4a32e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpUmaxp, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
+			i.asVecRRR(vecOpUmaxp, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
 		}},
 		{want: "41a8312e", setup: func(i *instruction) {
-			i.asVecLanes(vecOpUminv, operandNR(v1VReg), operandNR(v2VReg), vecArrangement8B)
+			i.asVecLanes(vecOpUminv, v1VReg, operandNR(v2VReg), vecArrangement8B)
 		}},
 		{want: "41a8316e", setup: func(i *instruction) {
-			i.asVecLanes(vecOpUminv, operandNR(v1VReg), operandNR(v2VReg), vecArrangement16B)
+			i.asVecLanes(vecOpUminv, v1VReg, operandNR(v2VReg), vecArrangement16B)
 		}},
 		{want: "41a8712e", setup: func(i *instruction) {
-			i.asVecLanes(vecOpUminv, operandNR(v1VReg), operandNR(v2VReg), vecArrangement4H)
+			i.asVecLanes(vecOpUminv, v1VReg, operandNR(v2VReg), vecArrangement4H)
 		}},
 		{want: "41a8716e", setup: func(i *instruction) {
-			i.asVecLanes(vecOpUminv, operandNR(v1VReg), operandNR(v2VReg), vecArrangement8H)
+			i.asVecLanes(vecOpUminv, v1VReg, operandNR(v2VReg), vecArrangement8H)
 		}},
 		{want: "41a8b16e", setup: func(i *instruction) {
-			i.asVecLanes(vecOpUminv, operandNR(v1VReg), operandNR(v2VReg), vecArrangement4S)
+			i.asVecLanes(vecOpUminv, v1VReg, operandNR(v2VReg), vecArrangement4S)
 		}},
 		{want: "4114232e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpUrhadd, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
+			i.asVecRRR(vecOpUrhadd, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
 		}},
 		{want: "4114236e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpUrhadd, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
+			i.asVecRRR(vecOpUrhadd, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
 		}},
 		{want: "4114632e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpUrhadd, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
+			i.asVecRRR(vecOpUrhadd, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
 		}},
 		{want: "4114636e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpUrhadd, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
+			i.asVecRRR(vecOpUrhadd, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
 		}},
 		{want: "4114a32e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpUrhadd, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
+			i.asVecRRR(vecOpUrhadd, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
 		}},
 		{want: "4114a36e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpUrhadd, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
+			i.asVecRRR(vecOpUrhadd, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
 		}},
 		{want: "419c230e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpMul, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
+			i.asVecRRR(vecOpMul, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
 		}},
 		{want: "419c234e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpMul, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
+			i.asVecRRR(vecOpMul, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
 		}},
 		{want: "419c630e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpMul, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
+			i.asVecRRR(vecOpMul, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
 		}},
 		{want: "419c634e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpMul, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
+			i.asVecRRR(vecOpMul, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
 		}},
 		{want: "419ca30e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpMul, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
+			i.asVecRRR(vecOpMul, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
 		}},
 		{want: "419ca34e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpMul, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
+			i.asVecRRR(vecOpMul, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
 		}},
 		{want: "4198200e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpCmeq0, operandNR(v1VReg), operandNR(v2VReg), vecArrangement8B)
+			i.asVecMisc(vecOpCmeq0, v1VReg, operandNR(v2VReg), vecArrangement8B)
 		}},
 		{want: "4198204e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpCmeq0, operandNR(v1VReg), operandNR(v2VReg), vecArrangement16B)
+			i.asVecMisc(vecOpCmeq0, v1VReg, operandNR(v2VReg), vecArrangement16B)
 		}},
 		{want: "4198600e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpCmeq0, operandNR(v1VReg), operandNR(v2VReg), vecArrangement4H)
+			i.asVecMisc(vecOpCmeq0, v1VReg, operandNR(v2VReg), vecArrangement4H)
 		}},
 		{want: "4198604e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpCmeq0, operandNR(v1VReg), operandNR(v2VReg), vecArrangement8H)
+			i.asVecMisc(vecOpCmeq0, v1VReg, operandNR(v2VReg), vecArrangement8H)
 		}},
 		{want: "4198a00e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpCmeq0, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2S)
+			i.asVecMisc(vecOpCmeq0, v1VReg, operandNR(v2VReg), vecArrangement2S)
 		}},
 		{want: "4198a04e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpCmeq0, operandNR(v1VReg), operandNR(v2VReg), vecArrangement4S)
+			i.asVecMisc(vecOpCmeq0, v1VReg, operandNR(v2VReg), vecArrangement4S)
 		}},
 		{want: "4198e04e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpCmeq0, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2D)
+			i.asVecMisc(vecOpCmeq0, v1VReg, operandNR(v2VReg), vecArrangement2D)
 		}},
 		{want: "418c232e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmeq, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
+			i.asVecRRR(vecOpCmeq, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
 		}},
 		{want: "418c236e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmeq, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
+			i.asVecRRR(vecOpCmeq, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
 		}},
 		{want: "418c632e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmeq, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
+			i.asVecRRR(vecOpCmeq, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
 		}},
 		{want: "418c636e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmeq, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
+			i.asVecRRR(vecOpCmeq, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
 		}},
 		{want: "418ca32e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmeq, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
+			i.asVecRRR(vecOpCmeq, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
 		}},
 		{want: "418ca36e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmeq, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
+			i.asVecRRR(vecOpCmeq, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
 		}},
 		{want: "418ce36e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmeq, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
+			i.asVecRRR(vecOpCmeq, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
 		}},
 		{want: "4134230e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmgt, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
+			i.asVecRRR(vecOpCmgt, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
 		}},
 		{want: "4134234e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmgt, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
+			i.asVecRRR(vecOpCmgt, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
 		}},
 		{want: "4134630e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmgt, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
+			i.asVecRRR(vecOpCmgt, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
 		}},
 		{want: "4134634e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmgt, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
+			i.asVecRRR(vecOpCmgt, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
 		}},
 		{want: "4134a30e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmgt, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
+			i.asVecRRR(vecOpCmgt, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
 		}},
 		{want: "4134a34e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmgt, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
+			i.asVecRRR(vecOpCmgt, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
 		}},
 		{want: "4134e34e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmgt, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
+			i.asVecRRR(vecOpCmgt, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
 		}},
 		{want: "4134232e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmhi, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
+			i.asVecRRR(vecOpCmhi, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
 		}},
 		{want: "4134236e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmhi, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
+			i.asVecRRR(vecOpCmhi, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
 		}},
 		{want: "4134632e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmhi, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
+			i.asVecRRR(vecOpCmhi, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
 		}},
 		{want: "4134636e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmhi, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
+			i.asVecRRR(vecOpCmhi, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
 		}},
 		{want: "4134a32e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmhi, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
+			i.asVecRRR(vecOpCmhi, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
 		}},
 		{want: "4134a36e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmhi, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
+			i.asVecRRR(vecOpCmhi, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
 		}},
 		{want: "4134e36e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmhi, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
+			i.asVecRRR(vecOpCmhi, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
 		}},
 		{want: "413c230e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmge, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
+			i.asVecRRR(vecOpCmge, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
 		}},
 		{want: "413c234e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmge, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
+			i.asVecRRR(vecOpCmge, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
 		}},
 		{want: "413c630e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmge, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
+			i.asVecRRR(vecOpCmge, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
 		}},
 		{want: "413c634e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmge, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
+			i.asVecRRR(vecOpCmge, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
 		}},
 		{want: "413ca30e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmge, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
+			i.asVecRRR(vecOpCmge, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
 		}},
 		{want: "413ca34e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmge, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
+			i.asVecRRR(vecOpCmge, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
 		}},
 		{want: "413ce34e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmge, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
+			i.asVecRRR(vecOpCmge, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
 		}},
 		{want: "4134230e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmgt, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
+			i.asVecRRR(vecOpCmgt, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
 		}},
 		{want: "4134234e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmgt, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
+			i.asVecRRR(vecOpCmgt, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
 		}},
 		{want: "4134630e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmgt, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
+			i.asVecRRR(vecOpCmgt, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
 		}},
 		{want: "4134634e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmgt, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
+			i.asVecRRR(vecOpCmgt, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
 		}},
 		{want: "4134a30e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmgt, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
+			i.asVecRRR(vecOpCmgt, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
 		}},
 		{want: "4134a34e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmgt, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
+			i.asVecRRR(vecOpCmgt, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
 		}},
 		{want: "4134e34e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmgt, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
+			i.asVecRRR(vecOpCmgt, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
 		}},
 		{want: "4134232e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmhi, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
+			i.asVecRRR(vecOpCmhi, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
 		}},
 		{want: "4134236e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmhi, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
+			i.asVecRRR(vecOpCmhi, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
 		}},
 		{want: "4134632e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmhi, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
+			i.asVecRRR(vecOpCmhi, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
 		}},
 		{want: "4134636e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmhi, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
+			i.asVecRRR(vecOpCmhi, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
 		}},
 		{want: "4134a32e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmhi, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
+			i.asVecRRR(vecOpCmhi, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
 		}},
 		{want: "4134a36e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmhi, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
+			i.asVecRRR(vecOpCmhi, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
 		}},
 		{want: "4134e36e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmhi, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
+			i.asVecRRR(vecOpCmhi, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
 		}},
 		{want: "413c232e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmhs, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
+			i.asVecRRR(vecOpCmhs, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
 		}},
 		{want: "413c236e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmhs, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
+			i.asVecRRR(vecOpCmhs, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
 		}},
 		{want: "413c632e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmhs, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
+			i.asVecRRR(vecOpCmhs, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
 		}},
 		{want: "413c636e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmhs, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
+			i.asVecRRR(vecOpCmhs, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
 		}},
 		{want: "413ca32e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmhs, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
+			i.asVecRRR(vecOpCmhs, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
 		}},
 		{want: "413ca36e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmhs, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
+			i.asVecRRR(vecOpCmhs, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
 		}},
 		{want: "413ce36e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpCmhs, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
+			i.asVecRRR(vecOpCmhs, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
 		}},
 		{want: "41f4230e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpFmax, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
+			i.asVecRRR(vecOpFmax, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
 		}},
 		{want: "41f4234e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpFmax, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
+			i.asVecRRR(vecOpFmax, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
 		}},
 		{want: "41f4634e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpFmax, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
+			i.asVecRRR(vecOpFmax, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
 		}},
 		{want: "41f4a30e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpFmin, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
+			i.asVecRRR(vecOpFmin, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
 		}},
 		{want: "41f4a34e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpFmin, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
+			i.asVecRRR(vecOpFmin, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
 		}},
 		{want: "41f4e34e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpFmin, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
+			i.asVecRRR(vecOpFmin, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
 		}},
 		{want: "41d4230e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpFadd, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
+			i.asVecRRR(vecOpFadd, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
 		}},
 		{want: "41d4234e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpFadd, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
+			i.asVecRRR(vecOpFadd, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
 		}},
 		{want: "41d4634e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpFadd, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
+			i.asVecRRR(vecOpFadd, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
 		}},
 		{want: "41d4a30e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpFsub, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
+			i.asVecRRR(vecOpFsub, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
 		}},
 		{want: "41d4a34e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpFsub, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
+			i.asVecRRR(vecOpFsub, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
 		}},
 		{want: "41d4e34e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpFsub, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
+			i.asVecRRR(vecOpFsub, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
 		}},
 		{want: "41dc232e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpFmul, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
+			i.asVecRRR(vecOpFmul, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
 		}},
 		{want: "41dc236e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpFmul, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
+			i.asVecRRR(vecOpFmul, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
 		}},
 		{want: "41dc636e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpFmul, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
+			i.asVecRRR(vecOpFmul, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
 		}},
 		{want: "41b4636e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSqrdmulh, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
+			i.asVecRRR(vecOpSqrdmulh, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
 		}},
 		{want: "41b4632e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSqrdmulh, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
+			i.asVecRRR(vecOpSqrdmulh, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
 		}},
 		{want: "41b4a32e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSqrdmulh, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
+			i.asVecRRR(vecOpSqrdmulh, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
 		}},
 		{want: "41b4a36e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSqrdmulh, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
+			i.asVecRRR(vecOpSqrdmulh, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
 		}},
 		{want: "41fc232e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpFdiv, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
+			i.asVecRRR(vecOpFdiv, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
 		}},
 		{want: "41fc236e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpFdiv, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
+			i.asVecRRR(vecOpFdiv, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
 		}},
 		{want: "41fc636e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpFdiv, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
+			i.asVecRRR(vecOpFdiv, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
 		}},
 		{want: "41e4230e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpFcmeq, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
+			i.asVecRRR(vecOpFcmeq, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
 		}},
 		{want: "41e4234e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpFcmeq, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
+			i.asVecRRR(vecOpFcmeq, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
 		}},
 		{want: "41e4634e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpFcmeq, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
+			i.asVecRRR(vecOpFcmeq, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
 		}},
 		{want: "41e4a32e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpFcmgt, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
+			i.asVecRRR(vecOpFcmgt, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
 		}},
 		{want: "41e4a36e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpFcmgt, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
+			i.asVecRRR(vecOpFcmgt, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
 		}},
 		{want: "41e4e36e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpFcmgt, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
+			i.asVecRRR(vecOpFcmgt, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
 		}},
 		{want: "41e4232e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpFcmge, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
+			i.asVecRRR(vecOpFcmge, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
 		}},
 		{want: "41e4236e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpFcmge, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
+			i.asVecRRR(vecOpFcmge, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
 		}},
 		{want: "41e4636e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpFcmge, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
+			i.asVecRRR(vecOpFcmge, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
 		}},
 		{want: "4198210e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpFrintm, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2S)
+			i.asVecMisc(vecOpFrintm, v1VReg, operandNR(v2VReg), vecArrangement2S)
 		}},
 		{want: "4198214e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpFrintm, operandNR(v1VReg), operandNR(v2VReg), vecArrangement4S)
+			i.asVecMisc(vecOpFrintm, v1VReg, operandNR(v2VReg), vecArrangement4S)
 		}},
 		{want: "4198614e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpFrintm, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2D)
+			i.asVecMisc(vecOpFrintm, v1VReg, operandNR(v2VReg), vecArrangement2D)
 		}},
 		{want: "4188210e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpFrintn, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2S)
+			i.asVecMisc(vecOpFrintn, v1VReg, operandNR(v2VReg), vecArrangement2S)
 		}},
 		{want: "4188214e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpFrintn, operandNR(v1VReg), operandNR(v2VReg), vecArrangement4S)
+			i.asVecMisc(vecOpFrintn, v1VReg, operandNR(v2VReg), vecArrangement4S)
 		}},
 		{want: "4188614e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpFrintn, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2D)
+			i.asVecMisc(vecOpFrintn, v1VReg, operandNR(v2VReg), vecArrangement2D)
 		}},
 		{want: "4188a10e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpFrintp, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2S)
+			i.asVecMisc(vecOpFrintp, v1VReg, operandNR(v2VReg), vecArrangement2S)
 		}},
 		{want: "4188a14e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpFrintp, operandNR(v1VReg), operandNR(v2VReg), vecArrangement4S)
+			i.asVecMisc(vecOpFrintp, v1VReg, operandNR(v2VReg), vecArrangement4S)
 		}},
 		{want: "4188e14e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpFrintp, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2D)
+			i.asVecMisc(vecOpFrintp, v1VReg, operandNR(v2VReg), vecArrangement2D)
 		}},
 		{want: "4198a10e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpFrintz, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2S)
+			i.asVecMisc(vecOpFrintz, v1VReg, operandNR(v2VReg), vecArrangement2S)
 		}},
 		{want: "4198a14e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpFrintz, operandNR(v1VReg), operandNR(v2VReg), vecArrangement4S)
+			i.asVecMisc(vecOpFrintz, v1VReg, operandNR(v2VReg), vecArrangement4S)
 		}},
 		{want: "4198e14e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpFrintz, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2D)
+			i.asVecMisc(vecOpFrintz, v1VReg, operandNR(v2VReg), vecArrangement2D)
 		}},
 		{want: "4178610e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpFcvtl, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2S)
+			i.asVecMisc(vecOpFcvtl, v1VReg, operandNR(v2VReg), vecArrangement2S)
 		}},
 		{want: "4178210e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpFcvtl, operandNR(v1VReg), operandNR(v2VReg), vecArrangement4H)
+			i.asVecMisc(vecOpFcvtl, v1VReg, operandNR(v2VReg), vecArrangement4H)
 		}},
 		{want: "4168610e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpFcvtn, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2S)
+			i.asVecMisc(vecOpFcvtn, v1VReg, operandNR(v2VReg), vecArrangement2S)
 		}},
 		{want: "4168210e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpFcvtn, operandNR(v1VReg), operandNR(v2VReg), vecArrangement4H)
+			i.asVecMisc(vecOpFcvtn, v1VReg, operandNR(v2VReg), vecArrangement4H)
 		}},
 		{want: "41b8a10e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpFcvtzs, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2S)
+			i.asVecMisc(vecOpFcvtzs, v1VReg, operandNR(v2VReg), vecArrangement2S)
 		}},
 		{want: "41b8a14e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpFcvtzs, operandNR(v1VReg), operandNR(v2VReg), vecArrangement4S)
+			i.asVecMisc(vecOpFcvtzs, v1VReg, operandNR(v2VReg), vecArrangement4S)
 		}},
 		{want: "41b8e14e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpFcvtzs, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2D)
+			i.asVecMisc(vecOpFcvtzs, v1VReg, operandNR(v2VReg), vecArrangement2D)
 		}},
 		{want: "41b8a12e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpFcvtzu, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2S)
+			i.asVecMisc(vecOpFcvtzu, v1VReg, operandNR(v2VReg), vecArrangement2S)
 		}},
 		{want: "41b8a16e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpFcvtzu, operandNR(v1VReg), operandNR(v2VReg), vecArrangement4S)
+			i.asVecMisc(vecOpFcvtzu, v1VReg, operandNR(v2VReg), vecArrangement4S)
 		}},
 		{want: "41b8e16e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpFcvtzu, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2D)
+			i.asVecMisc(vecOpFcvtzu, v1VReg, operandNR(v2VReg), vecArrangement2D)
 		}},
 		{want: "41d8210e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpScvtf, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2S)
+			i.asVecMisc(vecOpScvtf, v1VReg, operandNR(v2VReg), vecArrangement2S)
 		}},
 		{want: "41d8214e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpScvtf, operandNR(v1VReg), operandNR(v2VReg), vecArrangement4S)
+			i.asVecMisc(vecOpScvtf, v1VReg, operandNR(v2VReg), vecArrangement4S)
 		}},
 		{want: "41d8614e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpScvtf, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2D)
+			i.asVecMisc(vecOpScvtf, v1VReg, operandNR(v2VReg), vecArrangement2D)
 		}},
 		{want: "41d8212e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpUcvtf, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2S)
+			i.asVecMisc(vecOpUcvtf, v1VReg, operandNR(v2VReg), vecArrangement2S)
 		}},
 		{want: "41d8216e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpUcvtf, operandNR(v1VReg), operandNR(v2VReg), vecArrangement4S)
+			i.asVecMisc(vecOpUcvtf, v1VReg, operandNR(v2VReg), vecArrangement4S)
 		}},
 		{want: "41d8616e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpUcvtf, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2D)
+			i.asVecMisc(vecOpUcvtf, v1VReg, operandNR(v2VReg), vecArrangement2D)
 		}},
 		{want: "4148210e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpSqxtn, operandNR(v1VReg), operandNR(v2VReg), vecArrangement8B)
+			i.asVecMisc(vecOpSqxtn, v1VReg, operandNR(v2VReg), vecArrangement8B)
 		}},
 		{want: "4148214e", setup: func(i *instruction) { // sqxtn2
-			i.asVecMisc(vecOpSqxtn, operandNR(v1VReg), operandNR(v2VReg), vecArrangement16B)
+			i.asVecMisc(vecOpSqxtn, v1VReg, operandNR(v2VReg), vecArrangement16B)
 		}},
 		{want: "4148610e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpSqxtn, operandNR(v1VReg), operandNR(v2VReg), vecArrangement4H)
+			i.asVecMisc(vecOpSqxtn, v1VReg, operandNR(v2VReg), vecArrangement4H)
 		}},
 		{want: "4148614e", setup: func(i *instruction) { // sqxtn2
-			i.asVecMisc(vecOpSqxtn, operandNR(v1VReg), operandNR(v2VReg), vecArrangement8H)
+			i.asVecMisc(vecOpSqxtn, v1VReg, operandNR(v2VReg), vecArrangement8H)
 		}},
 		{want: "4148a10e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpSqxtn, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2S)
+			i.asVecMisc(vecOpSqxtn, v1VReg, operandNR(v2VReg), vecArrangement2S)
 		}},
 		{want: "4148a14e", setup: func(i *instruction) { // sqxtun2
-			i.asVecMisc(vecOpSqxtn, operandNR(v1VReg), operandNR(v2VReg), vecArrangement4S)
+			i.asVecMisc(vecOpSqxtn, v1VReg, operandNR(v2VReg), vecArrangement4S)
 		}},
 		{want: "4128212e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpSqxtun, operandNR(v1VReg), operandNR(v2VReg), vecArrangement8B)
+			i.asVecMisc(vecOpSqxtun, v1VReg, operandNR(v2VReg), vecArrangement8B)
 		}},
 		{want: "4128216e", setup: func(i *instruction) { // uqxtun2
-			i.asVecMisc(vecOpSqxtun, operandNR(v1VReg), operandNR(v2VReg), vecArrangement16B)
+			i.asVecMisc(vecOpSqxtun, v1VReg, operandNR(v2VReg), vecArrangement16B)
 		}},
 		{want: "4128612e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpSqxtun, operandNR(v1VReg), operandNR(v2VReg), vecArrangement4H)
+			i.asVecMisc(vecOpSqxtun, v1VReg, operandNR(v2VReg), vecArrangement4H)
 		}},
 		{want: "4128616e", setup: func(i *instruction) { // sqxtun2
-			i.asVecMisc(vecOpSqxtun, operandNR(v1VReg), operandNR(v2VReg), vecArrangement8H)
+			i.asVecMisc(vecOpSqxtun, v1VReg, operandNR(v2VReg), vecArrangement8H)
 		}},
 		{want: "4128a12e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpSqxtun, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2S)
+			i.asVecMisc(vecOpSqxtun, v1VReg, operandNR(v2VReg), vecArrangement2S)
 		}},
 		{want: "4128a16e", setup: func(i *instruction) { // sqxtun2
-			i.asVecMisc(vecOpSqxtun, operandNR(v1VReg), operandNR(v2VReg), vecArrangement4S)
+			i.asVecMisc(vecOpSqxtun, v1VReg, operandNR(v2VReg), vecArrangement4S)
 		}},
 		{want: "4148212e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpUqxtn, operandNR(v1VReg), operandNR(v2VReg), vecArrangement8B)
+			i.asVecMisc(vecOpUqxtn, v1VReg, operandNR(v2VReg), vecArrangement8B)
 		}},
 		{want: "4148216e", setup: func(i *instruction) { // uqxtn2
-			i.asVecMisc(vecOpUqxtn, operandNR(v1VReg), operandNR(v2VReg), vecArrangement16B)
+			i.asVecMisc(vecOpUqxtn, v1VReg, operandNR(v2VReg), vecArrangement16B)
 		}},
 		{want: "4148612e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpUqxtn, operandNR(v1VReg), operandNR(v2VReg), vecArrangement4H)
+			i.asVecMisc(vecOpUqxtn, v1VReg, operandNR(v2VReg), vecArrangement4H)
 		}},
 		{want: "4148616e", setup: func(i *instruction) { // sqxtn2
-			i.asVecMisc(vecOpUqxtn, operandNR(v1VReg), operandNR(v2VReg), vecArrangement8H)
+			i.asVecMisc(vecOpUqxtn, v1VReg, operandNR(v2VReg), vecArrangement8H)
 		}},
 		{want: "4148a12e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpUqxtn, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2S)
+			i.asVecMisc(vecOpUqxtn, v1VReg, operandNR(v2VReg), vecArrangement2S)
 		}},
 		{want: "4148a16e", setup: func(i *instruction) { // sqxtn2
-			i.asVecMisc(vecOpUqxtn, operandNR(v1VReg), operandNR(v2VReg), vecArrangement4S)
+			i.asVecMisc(vecOpUqxtn, v1VReg, operandNR(v2VReg), vecArrangement4S)
 		}},
 		{want: "41b8200e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpAbs, operandNR(v1VReg), operandNR(v2VReg), vecArrangement8B)
+			i.asVecMisc(vecOpAbs, v1VReg, operandNR(v2VReg), vecArrangement8B)
 		}},
 		{want: "41b8204e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpAbs, operandNR(v1VReg), operandNR(v2VReg), vecArrangement16B)
+			i.asVecMisc(vecOpAbs, v1VReg, operandNR(v2VReg), vecArrangement16B)
 		}},
 		{want: "41b8600e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpAbs, operandNR(v1VReg), operandNR(v2VReg), vecArrangement4H)
+			i.asVecMisc(vecOpAbs, v1VReg, operandNR(v2VReg), vecArrangement4H)
 		}},
 		{want: "41b8604e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpAbs, operandNR(v1VReg), operandNR(v2VReg), vecArrangement8H)
+			i.asVecMisc(vecOpAbs, v1VReg, operandNR(v2VReg), vecArrangement8H)
 		}},
 		{want: "41b8a00e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpAbs, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2S)
+			i.asVecMisc(vecOpAbs, v1VReg, operandNR(v2VReg), vecArrangement2S)
 		}},
 		{want: "41b8a04e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpAbs, operandNR(v1VReg), operandNR(v2VReg), vecArrangement4S)
+			i.asVecMisc(vecOpAbs, v1VReg, operandNR(v2VReg), vecArrangement4S)
 		}},
 		{want: "41b8e04e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpAbs, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2D)
+			i.asVecMisc(vecOpAbs, v1VReg, operandNR(v2VReg), vecArrangement2D)
 		}},
 		{want: "41f8a00e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpFabs, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2S)
+			i.asVecMisc(vecOpFabs, v1VReg, operandNR(v2VReg), vecArrangement2S)
 		}},
 		{want: "41f8a04e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpFabs, operandNR(v1VReg), operandNR(v2VReg), vecArrangement4S)
+			i.asVecMisc(vecOpFabs, v1VReg, operandNR(v2VReg), vecArrangement4S)
 		}},
 		{want: "41f8e04e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpFabs, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2D)
+			i.asVecMisc(vecOpFabs, v1VReg, operandNR(v2VReg), vecArrangement2D)
 		}},
 		{want: "41b8202e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpNeg, operandNR(v1VReg), operandNR(v2VReg), vecArrangement8B)
+			i.asVecMisc(vecOpNeg, v1VReg, operandNR(v2VReg), vecArrangement8B)
 		}},
 		{want: "41b8206e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpNeg, operandNR(v1VReg), operandNR(v2VReg), vecArrangement16B)
+			i.asVecMisc(vecOpNeg, v1VReg, operandNR(v2VReg), vecArrangement16B)
 		}},
 		{want: "41b8602e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpNeg, operandNR(v1VReg), operandNR(v2VReg), vecArrangement4H)
+			i.asVecMisc(vecOpNeg, v1VReg, operandNR(v2VReg), vecArrangement4H)
 		}},
 		{want: "41b8606e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpNeg, operandNR(v1VReg), operandNR(v2VReg), vecArrangement8H)
+			i.asVecMisc(vecOpNeg, v1VReg, operandNR(v2VReg), vecArrangement8H)
 		}},
 		{want: "41b8a02e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpNeg, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2S)
+			i.asVecMisc(vecOpNeg, v1VReg, operandNR(v2VReg), vecArrangement2S)
 		}},
 		{want: "41b8a06e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpNeg, operandNR(v1VReg), operandNR(v2VReg), vecArrangement4S)
+			i.asVecMisc(vecOpNeg, v1VReg, operandNR(v2VReg), vecArrangement4S)
 		}},
 		{want: "41b8e06e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpNeg, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2D)
+			i.asVecMisc(vecOpNeg, v1VReg, operandNR(v2VReg), vecArrangement2D)
 		}},
 		{want: "4128a10e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpXtn, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2S)
+			i.asVecMisc(vecOpXtn, v1VReg, operandNR(v2VReg), vecArrangement2S)
 		}},
 		{want: "4128a10e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpXtn, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2S)
+			i.asVecMisc(vecOpXtn, v1VReg, operandNR(v2VReg), vecArrangement2S)
 		}},
 		{want: "41f8a02e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpFneg, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2S)
+			i.asVecMisc(vecOpFneg, v1VReg, operandNR(v2VReg), vecArrangement2S)
 		}},
 		{want: "41f8a06e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpFneg, operandNR(v1VReg), operandNR(v2VReg), vecArrangement4S)
+			i.asVecMisc(vecOpFneg, v1VReg, operandNR(v2VReg), vecArrangement4S)
 		}},
 		{want: "41f8e06e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpFneg, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2D)
+			i.asVecMisc(vecOpFneg, v1VReg, operandNR(v2VReg), vecArrangement2D)
 		}},
 		{want: "41f8a12e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpFsqrt, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2S)
+			i.asVecMisc(vecOpFsqrt, v1VReg, operandNR(v2VReg), vecArrangement2S)
 		}},
 		{want: "41f8a16e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpFsqrt, operandNR(v1VReg), operandNR(v2VReg), vecArrangement4S)
+			i.asVecMisc(vecOpFsqrt, v1VReg, operandNR(v2VReg), vecArrangement4S)
 		}},
 		{want: "41f8e16e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpFsqrt, operandNR(v1VReg), operandNR(v2VReg), vecArrangement2D)
+			i.asVecMisc(vecOpFsqrt, v1VReg, operandNR(v2VReg), vecArrangement2D)
 		}},
-		{want: "4100839a", setup: func(i *instruction) { i.asCSel(operandNR(x1VReg), operandNR(x2VReg), operandNR(x3VReg), eq, true) }},
-		{want: "4110839a", setup: func(i *instruction) { i.asCSel(operandNR(x1VReg), operandNR(x2VReg), operandNR(x3VReg), ne, true) }},
-		{want: "4100831a", setup: func(i *instruction) { i.asCSel(operandNR(x1VReg), operandNR(x2VReg), operandNR(x3VReg), eq, false) }},
-		{want: "4110831a", setup: func(i *instruction) { i.asCSel(operandNR(x1VReg), operandNR(x2VReg), operandNR(x3VReg), ne, false) }},
-		{want: "41cc631e", setup: func(i *instruction) { i.asFpuCSel(operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), gt, true) }},
-		{want: "41bc631e", setup: func(i *instruction) { i.asFpuCSel(operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), lt, true) }},
-		{want: "41cc231e", setup: func(i *instruction) { i.asFpuCSel(operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), gt, false) }},
-		{want: "41bc231e", setup: func(i *instruction) { i.asFpuCSel(operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), lt, false) }},
-		{want: "411c014e", setup: func(i *instruction) { i.asMovToVec(operandNR(v1VReg), operandNR(x2VReg), vecArrangementB, 0) }},
-		{want: "411c024e", setup: func(i *instruction) { i.asMovToVec(operandNR(v1VReg), operandNR(x2VReg), vecArrangementH, 0) }},
-		{want: "411c044e", setup: func(i *instruction) { i.asMovToVec(operandNR(v1VReg), operandNR(x2VReg), vecArrangementS, 0) }},
-		{want: "411c084e", setup: func(i *instruction) { i.asMovToVec(operandNR(v1VReg), operandNR(x2VReg), vecArrangementD, 0) }},
-		{want: "413c010e", setup: func(i *instruction) { i.asMovFromVec(operandNR(x1VReg), operandNR(v2VReg), vecArrangementB, 0, false) }},
-		{want: "413c020e", setup: func(i *instruction) { i.asMovFromVec(operandNR(x1VReg), operandNR(v2VReg), vecArrangementH, 0, false) }},
-		{want: "413c040e", setup: func(i *instruction) { i.asMovFromVec(operandNR(x1VReg), operandNR(v2VReg), vecArrangementS, 0, false) }},
-		{want: "413c084e", setup: func(i *instruction) { i.asMovFromVec(operandNR(x1VReg), operandNR(v2VReg), vecArrangementD, 0, false) }},
-		{want: "412c030e", setup: func(i *instruction) { i.asMovFromVec(operandNR(x1VReg), operandNR(v2VReg), vecArrangementB, 1, true) }},
-		{want: "412c060e", setup: func(i *instruction) { i.asMovFromVec(operandNR(x1VReg), operandNR(v2VReg), vecArrangementH, 1, true) }},
-		{want: "412c0c4e", setup: func(i *instruction) { i.asMovFromVec(operandNR(x1VReg), operandNR(v2VReg), vecArrangementS, 1, true) }},
-		{want: "410c084e", setup: func(i *instruction) { i.asVecDup(operandNR(x1VReg), operandNR(v2VReg), vecArrangement2D) }},
+		{want: "4100839a", setup: func(i *instruction) { i.asCSel(x1VReg, operandNR(x2VReg), operandNR(x3VReg), eq, true) }},
+		{want: "4110839a", setup: func(i *instruction) { i.asCSel(x1VReg, operandNR(x2VReg), operandNR(x3VReg), ne, true) }},
+		{want: "4100831a", setup: func(i *instruction) { i.asCSel(x1VReg, operandNR(x2VReg), operandNR(x3VReg), eq, false) }},
+		{want: "4110831a", setup: func(i *instruction) { i.asCSel(x1VReg, operandNR(x2VReg), operandNR(x3VReg), ne, false) }},
+		{want: "41cc631e", setup: func(i *instruction) { i.asFpuCSel(v1VReg, operandNR(v2VReg), operandNR(v3VReg), gt, true) }},
+		{want: "41bc631e", setup: func(i *instruction) { i.asFpuCSel(v1VReg, operandNR(v2VReg), operandNR(v3VReg), lt, true) }},
+		{want: "41cc231e", setup: func(i *instruction) { i.asFpuCSel(v1VReg, operandNR(v2VReg), operandNR(v3VReg), gt, false) }},
+		{want: "41bc231e", setup: func(i *instruction) { i.asFpuCSel(v1VReg, operandNR(v2VReg), operandNR(v3VReg), lt, false) }},
+		{want: "411c014e", setup: func(i *instruction) { i.asMovToVec(v1VReg, operandNR(x2VReg), vecArrangementB, 0) }},
+		{want: "411c024e", setup: func(i *instruction) { i.asMovToVec(v1VReg, operandNR(x2VReg), vecArrangementH, 0) }},
+		{want: "411c044e", setup: func(i *instruction) { i.asMovToVec(v1VReg, operandNR(x2VReg), vecArrangementS, 0) }},
+		{want: "411c084e", setup: func(i *instruction) { i.asMovToVec(v1VReg, operandNR(x2VReg), vecArrangementD, 0) }},
+		{want: "413c010e", setup: func(i *instruction) { i.asMovFromVec(x1VReg, operandNR(v2VReg), vecArrangementB, 0, false) }},
+		{want: "413c020e", setup: func(i *instruction) { i.asMovFromVec(x1VReg, operandNR(v2VReg), vecArrangementH, 0, false) }},
+		{want: "413c040e", setup: func(i *instruction) { i.asMovFromVec(x1VReg, operandNR(v2VReg), vecArrangementS, 0, false) }},
+		{want: "413c084e", setup: func(i *instruction) { i.asMovFromVec(x1VReg, operandNR(v2VReg), vecArrangementD, 0, false) }},
+		{want: "412c030e", setup: func(i *instruction) { i.asMovFromVec(x1VReg, operandNR(v2VReg), vecArrangementB, 1, true) }},
+		{want: "412c060e", setup: func(i *instruction) { i.asMovFromVec(x1VReg, operandNR(v2VReg), vecArrangementH, 1, true) }},
+		{want: "412c0c4e", setup: func(i *instruction) { i.asMovFromVec(x1VReg, operandNR(v2VReg), vecArrangementS, 1, true) }},
+		{want: "410c084e", setup: func(i *instruction) { i.asVecDup(x1VReg, operandNR(v2VReg), vecArrangement2D) }},
 		{want: "4140036e", setup: func(i *instruction) { // 4140036e
-			i.asVecExtract(operandNR(x1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B, 8)
+			i.asVecExtract(x1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B, 8)
 		}},
 		{want: "4138034e", setup: func(i *instruction) {
-			i.asVecPermute(vecOpZip1, operandNR(x1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
+			i.asVecPermute(vecOpZip1, x1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
 		}},
 		{want: "4104214f", setup: func(i *instruction) {
-			i.asVecShiftImm(vecOpSshr, operandNR(x1VReg), operandNR(x2VReg), operandShiftImm(31), vecArrangement4S)
+			i.asVecShiftImm(vecOpSshr, x1VReg, operandNR(x2VReg), operandShiftImm(31), vecArrangement4S)
 		}},
 		{want: "5b28030b", setup: func(i *instruction) {
-			i.asALU(aluOpAdd, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSL), false)
+			i.asALU(aluOpAdd, tmpRegVReg, operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSL), false)
 		}},
 		{want: "5b28038b", setup: func(i *instruction) {
-			i.asALU(aluOpAdd, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSL), true)
+			i.asALU(aluOpAdd, tmpRegVReg, operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSL), true)
 		}},
 		{want: "5b28032b", setup: func(i *instruction) {
-			i.asALU(aluOpAddS, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSL), false)
+			i.asALU(aluOpAddS, tmpRegVReg, operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSL), false)
 		}},
 		{want: "5b2803ab", setup: func(i *instruction) {
-			i.asALU(aluOpAddS, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSL), true)
+			i.asALU(aluOpAddS, tmpRegVReg, operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSL), true)
 		}},
 		{want: "5b28430b", setup: func(i *instruction) {
-			i.asALU(aluOpAdd, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSR), false)
+			i.asALU(aluOpAdd, tmpRegVReg, operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSR), false)
 		}},
 		{want: "5b28438b", setup: func(i *instruction) {
-			i.asALU(aluOpAdd, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSR), true)
+			i.asALU(aluOpAdd, tmpRegVReg, operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSR), true)
 		}},
 		{want: "5b28432b", setup: func(i *instruction) {
-			i.asALU(aluOpAddS, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSR), false)
+			i.asALU(aluOpAddS, tmpRegVReg, operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSR), false)
 		}},
 		{want: "5b2843ab", setup: func(i *instruction) {
-			i.asALU(aluOpAddS, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSR), true)
+			i.asALU(aluOpAddS, tmpRegVReg, operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSR), true)
 		}},
 		{want: "5b28830b", setup: func(i *instruction) {
-			i.asALU(aluOpAdd, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpASR), false)
+			i.asALU(aluOpAdd, tmpRegVReg, operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpASR), false)
 		}},
 		{want: "5b28838b", setup: func(i *instruction) {
-			i.asALU(aluOpAdd, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpASR), true)
+			i.asALU(aluOpAdd, tmpRegVReg, operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpASR), true)
 		}},
 		{want: "5b28832b", setup: func(i *instruction) {
-			i.asALU(aluOpAddS, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpASR), false)
+			i.asALU(aluOpAddS, tmpRegVReg, operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpASR), false)
 		}},
 		{want: "5b2883ab", setup: func(i *instruction) {
-			i.asALU(aluOpAddS, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpASR), true)
+			i.asALU(aluOpAddS, tmpRegVReg, operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpASR), true)
 		}},
 		{want: "5b28034b", setup: func(i *instruction) {
-			i.asALU(aluOpSub, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSL), false)
+			i.asALU(aluOpSub, tmpRegVReg, operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSL), false)
 		}},
 		{want: "5b2803cb", setup: func(i *instruction) {
-			i.asALU(aluOpSub, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSL), true)
+			i.asALU(aluOpSub, tmpRegVReg, operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSL), true)
 		}},
 		{want: "5b28036b", setup: func(i *instruction) {
-			i.asALU(aluOpSubS, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSL), false)
+			i.asALU(aluOpSubS, tmpRegVReg, operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSL), false)
 		}},
 		{want: "5b2803eb", setup: func(i *instruction) {
-			i.asALU(aluOpSubS, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSL), true)
+			i.asALU(aluOpSubS, tmpRegVReg, operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSL), true)
 		}},
 		{want: "5b28434b", setup: func(i *instruction) {
-			i.asALU(aluOpSub, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSR), false)
+			i.asALU(aluOpSub, tmpRegVReg, operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSR), false)
 		}},
 		{want: "5b2843cb", setup: func(i *instruction) {
-			i.asALU(aluOpSub, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSR), true)
+			i.asALU(aluOpSub, tmpRegVReg, operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSR), true)
 		}},
 		{want: "5b28436b", setup: func(i *instruction) {
-			i.asALU(aluOpSubS, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSR), false)
+			i.asALU(aluOpSubS, tmpRegVReg, operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSR), false)
 		}},
 		{want: "5b2843eb", setup: func(i *instruction) {
-			i.asALU(aluOpSubS, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSR), true)
+			i.asALU(aluOpSubS, tmpRegVReg, operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpLSR), true)
 		}},
 		{want: "5b28834b", setup: func(i *instruction) {
-			i.asALU(aluOpSub, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpASR), false)
+			i.asALU(aluOpSub, tmpRegVReg, operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpASR), false)
 		}},
 		{want: "5b2883cb", setup: func(i *instruction) {
-			i.asALU(aluOpSub, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpASR), true)
+			i.asALU(aluOpSub, tmpRegVReg, operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpASR), true)
 		}},
 		{want: "5b28836b", setup: func(i *instruction) {
-			i.asALU(aluOpSubS, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpASR), false)
+			i.asALU(aluOpSubS, tmpRegVReg, operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpASR), false)
 		}},
 		{want: "5b2883eb", setup: func(i *instruction) {
-			i.asALU(aluOpSubS, operandNR(tmpRegVReg), operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpASR), true)
+			i.asALU(aluOpSubS, tmpRegVReg, operandNR(x2VReg), operandSR(x3VReg, 10, shiftOpASR), true)
 		}},
 		{want: "60033fd6", setup: func(i *instruction) {
 			i.asCallIndirect(tmpRegVReg, nil)
 		}},
 		{want: "fb633bcb", setup: func(i *instruction) {
-			i.asALU(aluOpSub, operandNR(tmpRegVReg), operandNR(spVReg), operandNR(tmpRegVReg), true)
+			i.asALU(aluOpSub, tmpRegVReg, operandNR(spVReg), operandNR(tmpRegVReg), true)
 		}},
 		{want: "fb633b8b", setup: func(i *instruction) {
-			i.asALU(aluOpAdd, operandNR(tmpRegVReg), operandNR(spVReg), operandNR(tmpRegVReg), true)
+			i.asALU(aluOpAdd, tmpRegVReg, operandNR(spVReg), operandNR(tmpRegVReg), true)
 		}},
 		{want: "2000020a", setup: func(i *instruction) {
-			i.asALU(aluOpAnd, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), false)
+			i.asALU(aluOpAnd, x0VReg, operandNR(x1VReg), operandNR(x2VReg), false)
 		}},
 		{want: "2000028a", setup: func(i *instruction) {
-			i.asALU(aluOpAnd, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), true)
+			i.asALU(aluOpAnd, x0VReg, operandNR(x1VReg), operandNR(x2VReg), true)
 		}},
 		{want: "2010028a", setup: func(i *instruction) {
-			i.asALU(aluOpAnd, operandNR(x0VReg), operandNR(x1VReg), operandSR(x2VReg, 4, shiftOpLSL), true)
+			i.asALU(aluOpAnd, x0VReg, operandNR(x1VReg), operandSR(x2VReg, 4, shiftOpLSL), true)
 		}},
 		{want: "2030428a", setup: func(i *instruction) {
-			i.asALU(aluOpAnd, operandNR(x0VReg), operandNR(x1VReg), operandSR(x2VReg, 12, shiftOpLSR), true)
+			i.asALU(aluOpAnd, x0VReg, operandNR(x1VReg), operandSR(x2VReg, 12, shiftOpLSR), true)
 		}},
 		{want: "2000026a", setup: func(i *instruction) {
-			i.asALU(aluOpAnds, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), false)
+			i.asALU(aluOpAnds, x0VReg, operandNR(x1VReg), operandNR(x2VReg), false)
 		}},
 		{want: "200002ea", setup: func(i *instruction) {
-			i.asALU(aluOpAnds, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), true)
+			i.asALU(aluOpAnds, x0VReg, operandNR(x1VReg), operandNR(x2VReg), true)
 		}},
 		{want: "201002ea", setup: func(i *instruction) {
-			i.asALU(aluOpAnds, operandNR(x0VReg), operandNR(x1VReg), operandSR(x2VReg, 4, shiftOpLSL), true)
+			i.asALU(aluOpAnds, x0VReg, operandNR(x1VReg), operandSR(x2VReg, 4, shiftOpLSL), true)
 		}},
 		{want: "203042ea", setup: func(i *instruction) {
-			i.asALU(aluOpAnds, operandNR(x0VReg), operandNR(x1VReg), operandSR(x2VReg, 12, shiftOpLSR), true)
+			i.asALU(aluOpAnds, x0VReg, operandNR(x1VReg), operandSR(x2VReg, 12, shiftOpLSR), true)
 		}},
 		{want: "2000022a", setup: func(i *instruction) {
-			i.asALU(aluOpOrr, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), false)
+			i.asALU(aluOpOrr, x0VReg, operandNR(x1VReg), operandNR(x2VReg), false)
 		}},
 		{want: "200002aa", setup: func(i *instruction) {
-			i.asALU(aluOpOrr, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), true)
+			i.asALU(aluOpOrr, x0VReg, operandNR(x1VReg), operandNR(x2VReg), true)
 		}},
 		{want: "201002aa", setup: func(i *instruction) {
-			i.asALU(aluOpOrr, operandNR(x0VReg), operandNR(x1VReg), operandSR(x2VReg, 4, shiftOpLSL), true)
+			i.asALU(aluOpOrr, x0VReg, operandNR(x1VReg), operandSR(x2VReg, 4, shiftOpLSL), true)
 		}},
 		{want: "201082aa", setup: func(i *instruction) {
-			i.asALU(aluOpOrr, operandNR(x0VReg), operandNR(x1VReg), operandSR(x2VReg, 4, shiftOpASR), true)
+			i.asALU(aluOpOrr, x0VReg, operandNR(x1VReg), operandSR(x2VReg, 4, shiftOpASR), true)
 		}},
 		{want: "2000024a", setup: func(i *instruction) {
-			i.asALU(aluOpEor, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), false)
+			i.asALU(aluOpEor, x0VReg, operandNR(x1VReg), operandNR(x2VReg), false)
 		}},
 		{want: "200002ca", setup: func(i *instruction) {
-			i.asALU(aluOpEor, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), true)
+			i.asALU(aluOpEor, x0VReg, operandNR(x1VReg), operandNR(x2VReg), true)
 		}},
 		{want: "201002ca", setup: func(i *instruction) {
-			i.asALU(aluOpEor, operandNR(x0VReg), operandNR(x1VReg), operandSR(x2VReg, 4, shiftOpLSL), true)
+			i.asALU(aluOpEor, x0VReg, operandNR(x1VReg), operandSR(x2VReg, 4, shiftOpLSL), true)
 		}},
 		{want: "202cc21a", setup: func(i *instruction) {
-			i.asALU(aluOpRotR, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), false)
+			i.asALU(aluOpRotR, x0VReg, operandNR(x1VReg), operandNR(x2VReg), false)
 		}},
 		{want: "202cc29a", setup: func(i *instruction) {
-			i.asALU(aluOpRotR, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), true)
+			i.asALU(aluOpRotR, x0VReg, operandNR(x1VReg), operandNR(x2VReg), true)
 		}},
 		{want: "2000222a", setup: func(i *instruction) {
-			i.asALU(aluOpOrn, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), false)
+			i.asALU(aluOpOrn, x0VReg, operandNR(x1VReg), operandNR(x2VReg), false)
 		}},
 		{want: "200022aa", setup: func(i *instruction) {
-			i.asALU(aluOpOrn, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), true)
+			i.asALU(aluOpOrn, x0VReg, operandNR(x1VReg), operandNR(x2VReg), true)
 		}},
 		{want: "30000010", setup: func(i *instruction) { i.asAdr(v16VReg, 4) }},
 		{want: "50050030", setup: func(i *instruction) { i.asAdr(v16VReg, 169) }},
@@ -1093,16 +1094,16 @@ func TestInstruction_encode(t *testing.T) {
 		{want: "101e306e", setup: func(i *instruction) { i.asLoadFpuConst128(v16VReg, 0, 0) }},
 		{want: "5000009c05000014ffffffffffffffffaaaaaaaaaaaaaaaa", setup: func(i *instruction) { i.asLoadFpuConst128(v16VReg, 0xffffffff_ffffffff, 0xaaaaaaaa_aaaaaaaa) }},
 		{want: "8220061b", setup: func(i *instruction) {
-			i.asALURRRR(aluOpMAdd, operandNR(x2VReg), operandNR(x4VReg), operandNR(x6VReg), operandNR(x8VReg), false)
+			i.asALURRRR(aluOpMAdd, x2VReg, operandNR(x4VReg), operandNR(x6VReg), x8VReg, false)
 		}},
 		{want: "8220069b", setup: func(i *instruction) {
-			i.asALURRRR(aluOpMAdd, operandNR(x2VReg), operandNR(x4VReg), operandNR(x6VReg), operandNR(x8VReg), true)
+			i.asALURRRR(aluOpMAdd, x2VReg, operandNR(x4VReg), operandNR(x6VReg), x8VReg, true)
 		}},
 		{want: "82a0061b", setup: func(i *instruction) {
-			i.asALURRRR(aluOpMSub, operandNR(x2VReg), operandNR(x4VReg), operandNR(x6VReg), operandNR(x8VReg), false)
+			i.asALURRRR(aluOpMSub, x2VReg, operandNR(x4VReg), operandNR(x6VReg), x8VReg, false)
 		}},
 		{want: "82a0069b", setup: func(i *instruction) {
-			i.asALURRRR(aluOpMSub, operandNR(x2VReg), operandNR(x4VReg), operandNR(x6VReg), operandNR(x8VReg), true)
+			i.asALURRRR(aluOpMSub, x2VReg, operandNR(x4VReg), operandNR(x6VReg), x8VReg, true)
 		}},
 		{want: "00213f1e", setup: func(i *instruction) { i.asFpuCmp(operandNR(v8VReg), operandNR(v31VReg), false) }},
 		{want: "00217f1e", setup: func(i *instruction) { i.asFpuCmp(operandNR(v8VReg), operandNR(v31VReg), true) }},
@@ -1200,76 +1201,76 @@ func TestInstruction_encode(t *testing.T) {
 		{want: "f21fbf0e", setup: func(i *instruction) { i.asFpuMov64(v18VReg, v31VReg) }},
 		{want: "f21fbf4e", setup: func(i *instruction) { i.asFpuMov128(v18VReg, v31VReg) }},
 		{want: "40a034ab", setup: func(i *instruction) {
-			i.asALU(aluOpAddS, operandNR(x0VReg), operandNR(x2VReg), operandER(x20VReg, extendOpSXTH, 64), false)
+			i.asALU(aluOpAddS, x0VReg, operandNR(x2VReg), operandER(x20VReg, extendOpSXTH, 64), false)
 		}},
 		{want: "4080348b", setup: func(i *instruction) {
-			i.asALU(aluOpAdd, operandNR(x0VReg), operandNR(x2VReg), operandER(x20VReg, extendOpSXTB, 64), false)
+			i.asALU(aluOpAdd, x0VReg, operandNR(x2VReg), operandER(x20VReg, extendOpSXTB, 64), false)
 		}},
 		{want: "40a0348b", setup: func(i *instruction) {
-			i.asALU(aluOpAdd, operandNR(x0VReg), operandNR(x2VReg), operandER(x20VReg, extendOpSXTH, 64), false)
+			i.asALU(aluOpAdd, x0VReg, operandNR(x2VReg), operandER(x20VReg, extendOpSXTH, 64), false)
 		}},
 		{want: "40c0348b", setup: func(i *instruction) {
-			i.asALU(aluOpAdd, operandNR(x0VReg), operandNR(x2VReg), operandER(x20VReg, extendOpSXTW, 64), false)
+			i.asALU(aluOpAdd, x0VReg, operandNR(x2VReg), operandER(x20VReg, extendOpSXTW, 64), false)
 		}},
 		{want: "4080340b", setup: func(i *instruction) {
-			i.asALU(aluOpAdd, operandNR(x0VReg), operandNR(x2VReg), operandER(x20VReg, extendOpSXTB, 32), false)
+			i.asALU(aluOpAdd, x0VReg, operandNR(x2VReg), operandER(x20VReg, extendOpSXTB, 32), false)
 		}},
 		{want: "40a0340b", setup: func(i *instruction) {
-			i.asALU(aluOpAdd, operandNR(x0VReg), operandNR(x2VReg), operandER(x20VReg, extendOpSXTH, 32), false)
+			i.asALU(aluOpAdd, x0VReg, operandNR(x2VReg), operandER(x20VReg, extendOpSXTH, 32), false)
 		}},
 		{want: "40c0340b", setup: func(i *instruction) {
-			i.asALU(aluOpAdd, operandNR(x0VReg), operandNR(x2VReg), operandER(x20VReg, extendOpSXTW, 32), false)
+			i.asALU(aluOpAdd, x0VReg, operandNR(x2VReg), operandER(x20VReg, extendOpSXTW, 32), false)
 		}},
 		{want: "400034eb", setup: func(i *instruction) {
-			i.asALU(aluOpSubS, operandNR(x0VReg), operandNR(x2VReg), operandER(x20VReg, extendOpUXTB, 64), false)
+			i.asALU(aluOpSubS, x0VReg, operandNR(x2VReg), operandER(x20VReg, extendOpUXTB, 64), false)
 		}},
 		{want: "400034cb", setup: func(i *instruction) {
-			i.asALU(aluOpSub, operandNR(x0VReg), operandNR(x2VReg), operandER(x20VReg, extendOpUXTB, 64), false)
+			i.asALU(aluOpSub, x0VReg, operandNR(x2VReg), operandER(x20VReg, extendOpUXTB, 64), false)
 		}},
 		{want: "402034cb", setup: func(i *instruction) {
-			i.asALU(aluOpSub, operandNR(x0VReg), operandNR(x2VReg), operandER(x20VReg, extendOpUXTH, 64), false)
+			i.asALU(aluOpSub, x0VReg, operandNR(x2VReg), operandER(x20VReg, extendOpUXTH, 64), false)
 		}},
 		{want: "404034cb", setup: func(i *instruction) {
-			i.asALU(aluOpSub, operandNR(x0VReg), operandNR(x2VReg), operandER(x20VReg, extendOpUXTW, 64), false)
+			i.asALU(aluOpSub, x0VReg, operandNR(x2VReg), operandER(x20VReg, extendOpUXTW, 64), false)
 		}},
 		{want: "4000344b", setup: func(i *instruction) {
-			i.asALU(aluOpSub, operandNR(x0VReg), operandNR(x2VReg), operandER(x20VReg, extendOpUXTB, 32), false)
+			i.asALU(aluOpSub, x0VReg, operandNR(x2VReg), operandER(x20VReg, extendOpUXTB, 32), false)
 		}},
 		{want: "4020344b", setup: func(i *instruction) {
-			i.asALU(aluOpSub, operandNR(x0VReg), operandNR(x2VReg), operandER(x20VReg, extendOpUXTH, 32), false)
+			i.asALU(aluOpSub, x0VReg, operandNR(x2VReg), operandER(x20VReg, extendOpUXTH, 32), false)
 		}},
 		{want: "4040344b", setup: func(i *instruction) {
-			i.asALU(aluOpSub, operandNR(x0VReg), operandNR(x2VReg), operandER(x20VReg, extendOpUXTW, 32), false)
+			i.asALU(aluOpSub, x0VReg, operandNR(x2VReg), operandER(x20VReg, extendOpUXTW, 32), false)
 		}},
 		{want: "4000140b", setup: func(i *instruction) {
-			i.asALU(aluOpAdd, operandNR(x0VReg), operandNR(x2VReg), operandNR(x20VReg), false)
+			i.asALU(aluOpAdd, x0VReg, operandNR(x2VReg), operandNR(x20VReg), false)
 		}},
 		{want: "4000148b", setup: func(i *instruction) {
-			i.asALU(aluOpAdd, operandNR(x0VReg), operandNR(x2VReg), operandNR(x20VReg), true)
+			i.asALU(aluOpAdd, x0VReg, operandNR(x2VReg), operandNR(x20VReg), true)
 		}},
 		{want: "40001f8b", setup: func(i *instruction) {
-			i.asALU(aluOpAdd, operandNR(x0VReg), operandNR(x2VReg), operandNR(xzrVReg), true)
+			i.asALU(aluOpAdd, x0VReg, operandNR(x2VReg), operandNR(xzrVReg), true)
 		}},
 		{want: "4000142b", setup: func(i *instruction) {
-			i.asALU(aluOpAddS, operandNR(x0VReg), operandNR(x2VReg), operandNR(x20VReg), false)
+			i.asALU(aluOpAddS, x0VReg, operandNR(x2VReg), operandNR(x20VReg), false)
 		}},
 		{want: "400014ab", setup: func(i *instruction) {
-			i.asALU(aluOpAddS, operandNR(x0VReg), operandNR(x2VReg), operandNR(x20VReg), true)
+			i.asALU(aluOpAddS, x0VReg, operandNR(x2VReg), operandNR(x20VReg), true)
 		}},
 		{want: "4000144b", setup: func(i *instruction) {
-			i.asALU(aluOpSub, operandNR(x0VReg), operandNR(x2VReg), operandNR(x20VReg), false)
+			i.asALU(aluOpSub, x0VReg, operandNR(x2VReg), operandNR(x20VReg), false)
 		}},
 		{want: "400014cb", setup: func(i *instruction) {
-			i.asALU(aluOpSub, operandNR(x0VReg), operandNR(x2VReg), operandNR(x20VReg), true)
+			i.asALU(aluOpSub, x0VReg, operandNR(x2VReg), operandNR(x20VReg), true)
 		}},
 		{want: "40001fcb", setup: func(i *instruction) {
-			i.asALU(aluOpSub, operandNR(x0VReg), operandNR(x2VReg), operandNR(xzrVReg), true)
+			i.asALU(aluOpSub, x0VReg, operandNR(x2VReg), operandNR(xzrVReg), true)
 		}},
 		{want: "400014eb", setup: func(i *instruction) {
-			i.asALU(aluOpSubS, operandNR(x0VReg), operandNR(x2VReg), operandNR(x20VReg), true)
+			i.asALU(aluOpSubS, x0VReg, operandNR(x2VReg), operandNR(x20VReg), true)
 		}},
 		{want: "40001feb", setup: func(i *instruction) {
-			i.asALU(aluOpSubS, operandNR(x0VReg), operandNR(x2VReg), operandNR(xzrVReg), true)
+			i.asALU(aluOpSubS, x0VReg, operandNR(x2VReg), operandNR(xzrVReg), true)
 		}},
 		{want: "c0035fd6", setup: func(i *instruction) { i.asRet() }},
 		{want: "e303042a", setup: func(i *instruction) { i.asMove32(x3VReg, x4VReg) }},
@@ -1279,22 +1280,22 @@ func TestInstruction_encode(t *testing.T) {
 		{want: "9f000091", setup: func(i *instruction) { i.asMove64(spVReg, x4VReg) }},
 		{want: "e0030091", setup: func(i *instruction) { i.asMove64(x0VReg, spVReg) }},
 		{want: "e17bc1a8", setup: func(i *instruction) {
-			i.asLoadPair64(x1VReg, x30VReg, addressModePreOrPostIndex(spVReg, 16, false))
+			i.asLoadPair64(x1VReg, x30VReg, addressModePreOrPostIndex(m, spVReg, 16, false))
 		}},
 		{want: "e17bc1a9", setup: func(i *instruction) {
-			i.asLoadPair64(x1VReg, x30VReg, addressModePreOrPostIndex(spVReg, 16, true))
+			i.asLoadPair64(x1VReg, x30VReg, addressModePreOrPostIndex(m, spVReg, 16, true))
 		}},
 		{want: "e17b81a8", setup: func(i *instruction) {
-			i.asStorePair64(x1VReg, x30VReg, addressModePreOrPostIndex(spVReg, 16, false))
+			i.asStorePair64(x1VReg, x30VReg, addressModePreOrPostIndex(m, spVReg, 16, false))
 		}},
 		{want: "e17b81a9", setup: func(i *instruction) {
-			i.asStorePair64(x1VReg, x30VReg, addressModePreOrPostIndex(spVReg, 16, true))
+			i.asStorePair64(x1VReg, x30VReg, addressModePreOrPostIndex(m, spVReg, 16, true))
 		}},
 		{want: "e17f81a9", setup: func(i *instruction) {
-			i.asStorePair64(x1VReg, xzrVReg, addressModePreOrPostIndex(spVReg, 16, true))
+			i.asStorePair64(x1VReg, xzrVReg, addressModePreOrPostIndex(m, spVReg, 16, true))
 		}},
 		{want: "ff7f81a9", setup: func(i *instruction) {
-			i.asStorePair64(xzrVReg, xzrVReg, addressModePreOrPostIndex(spVReg, 16, true))
+			i.asStorePair64(xzrVReg, xzrVReg, addressModePreOrPostIndex(m, spVReg, 16, true))
 		}},
 		{want: "20000014", setup: func(i *instruction) {
 			i.asBr(dummyLabel)
@@ -1317,478 +1318,478 @@ func TestInstruction_encode(t *testing.T) {
 			i.condBrOffsetResolve(0x80)
 		}},
 		{want: "8328321e", setup: func(i *instruction) {
-			i.asFpuRRR(fpuBinOpAdd, operandNR(v3VReg), operandNR(v4VReg), operandNR(v18VReg), false)
+			i.asFpuRRR(fpuBinOpAdd, v3VReg, operandNR(v4VReg), operandNR(v18VReg), false)
 		}},
 		{want: "8328721e", setup: func(i *instruction) {
-			i.asFpuRRR(fpuBinOpAdd, operandNR(v3VReg), operandNR(v4VReg), operandNR(v18VReg), true)
+			i.asFpuRRR(fpuBinOpAdd, v3VReg, operandNR(v4VReg), operandNR(v18VReg), true)
 		}},
 		{want: "8338321e", setup: func(i *instruction) {
-			i.asFpuRRR(fpuBinOpSub, operandNR(v3VReg), operandNR(v4VReg), operandNR(v18VReg), false)
+			i.asFpuRRR(fpuBinOpSub, v3VReg, operandNR(v4VReg), operandNR(v18VReg), false)
 		}},
 		{want: "8338721e", setup: func(i *instruction) {
-			i.asFpuRRR(fpuBinOpSub, operandNR(v3VReg), operandNR(v4VReg), operandNR(v18VReg), true)
+			i.asFpuRRR(fpuBinOpSub, v3VReg, operandNR(v4VReg), operandNR(v18VReg), true)
 		}},
 		{want: "8308321e", setup: func(i *instruction) {
-			i.asFpuRRR(fpuBinOpMul, operandNR(v3VReg), operandNR(v4VReg), operandNR(v18VReg), false)
+			i.asFpuRRR(fpuBinOpMul, v3VReg, operandNR(v4VReg), operandNR(v18VReg), false)
 		}},
 		{want: "8308721e", setup: func(i *instruction) {
-			i.asFpuRRR(fpuBinOpMul, operandNR(v3VReg), operandNR(v4VReg), operandNR(v18VReg), true)
+			i.asFpuRRR(fpuBinOpMul, v3VReg, operandNR(v4VReg), operandNR(v18VReg), true)
 		}},
 		{want: "8318321e", setup: func(i *instruction) {
-			i.asFpuRRR(fpuBinOpDiv, operandNR(v3VReg), operandNR(v4VReg), operandNR(v18VReg), false)
+			i.asFpuRRR(fpuBinOpDiv, v3VReg, operandNR(v4VReg), operandNR(v18VReg), false)
 		}},
 		{want: "8318721e", setup: func(i *instruction) {
-			i.asFpuRRR(fpuBinOpDiv, operandNR(v3VReg), operandNR(v4VReg), operandNR(v18VReg), true)
+			i.asFpuRRR(fpuBinOpDiv, v3VReg, operandNR(v4VReg), operandNR(v18VReg), true)
 		}},
 		{want: "8348321e", setup: func(i *instruction) {
-			i.asFpuRRR(fpuBinOpMax, operandNR(v3VReg), operandNR(v4VReg), operandNR(v18VReg), false)
+			i.asFpuRRR(fpuBinOpMax, v3VReg, operandNR(v4VReg), operandNR(v18VReg), false)
 		}},
 		{want: "8348721e", setup: func(i *instruction) {
-			i.asFpuRRR(fpuBinOpMax, operandNR(v3VReg), operandNR(v4VReg), operandNR(v18VReg), true)
+			i.asFpuRRR(fpuBinOpMax, v3VReg, operandNR(v4VReg), operandNR(v18VReg), true)
 		}},
 		{want: "8358321e", setup: func(i *instruction) {
-			i.asFpuRRR(fpuBinOpMin, operandNR(v3VReg), operandNR(v4VReg), operandNR(v18VReg), false)
+			i.asFpuRRR(fpuBinOpMin, v3VReg, operandNR(v4VReg), operandNR(v18VReg), false)
 		}},
 		{want: "8358721e", setup: func(i *instruction) {
-			i.asFpuRRR(fpuBinOpMin, operandNR(v3VReg), operandNR(v4VReg), operandNR(v18VReg), true)
+			i.asFpuRRR(fpuBinOpMin, v3VReg, operandNR(v4VReg), operandNR(v18VReg), true)
 		}},
 		{want: "49fd7f11", setup: func(i *instruction) {
-			i.asALU(aluOpAdd, operandNR(x9VReg), operandNR(x10VReg), operandImm12(0b111111111111, 0b1), false)
+			i.asALU(aluOpAdd, x9VReg, operandNR(x10VReg), operandImm12(0b111111111111, 0b1), false)
 		}},
 		{want: "e9ff7f91", setup: func(i *instruction) {
-			i.asALU(aluOpAdd, operandNR(x9VReg), operandNR(spVReg), operandImm12(0b111111111111, 0b1), true)
+			i.asALU(aluOpAdd, x9VReg, operandNR(spVReg), operandImm12(0b111111111111, 0b1), true)
 		}},
 		{want: "49fd3f11", setup: func(i *instruction) {
-			i.asALU(aluOpAdd, operandNR(x9VReg), operandNR(x10VReg), operandImm12(0b111111111111, 0b0), false)
+			i.asALU(aluOpAdd, x9VReg, operandNR(x10VReg), operandImm12(0b111111111111, 0b0), false)
 		}},
 		{want: "5ffd3f91", setup: func(i *instruction) {
-			i.asALU(aluOpAdd, operandNR(spVReg), operandNR(x10VReg), operandImm12(0b111111111111, 0b0), true)
+			i.asALU(aluOpAdd, spVReg, operandNR(x10VReg), operandImm12(0b111111111111, 0b0), true)
 		}},
 		{want: "49fd7f31", setup: func(i *instruction) {
-			i.asALU(aluOpAddS, operandNR(x9VReg), operandNR(x10VReg), operandImm12(0b111111111111, 0b1), false)
+			i.asALU(aluOpAddS, x9VReg, operandNR(x10VReg), operandImm12(0b111111111111, 0b1), false)
 		}},
 		{want: "49fd7fb1", setup: func(i *instruction) {
-			i.asALU(aluOpAddS, operandNR(x9VReg), operandNR(x10VReg), operandImm12(0b111111111111, 0b1), true)
+			i.asALU(aluOpAddS, x9VReg, operandNR(x10VReg), operandImm12(0b111111111111, 0b1), true)
 		}},
 		{want: "49fd3f31", setup: func(i *instruction) {
-			i.asALU(aluOpAddS, operandNR(x9VReg), operandNR(x10VReg), operandImm12(0b111111111111, 0b0), false)
+			i.asALU(aluOpAddS, x9VReg, operandNR(x10VReg), operandImm12(0b111111111111, 0b0), false)
 		}},
 		{want: "49fd3fb1", setup: func(i *instruction) {
-			i.asALU(aluOpAddS, operandNR(x9VReg), operandNR(x10VReg), operandImm12(0b111111111111, 0b0), true)
+			i.asALU(aluOpAddS, x9VReg, operandNR(x10VReg), operandImm12(0b111111111111, 0b0), true)
 		}},
 		{want: "49fd7f51", setup: func(i *instruction) {
-			i.asALU(aluOpSub, operandNR(x9VReg), operandNR(x10VReg), operandImm12(0b111111111111, 0b1), false)
+			i.asALU(aluOpSub, x9VReg, operandNR(x10VReg), operandImm12(0b111111111111, 0b1), false)
 		}},
 		{want: "e9ff7fd1", setup: func(i *instruction) {
-			i.asALU(aluOpSub, operandNR(x9VReg), operandNR(spVReg), operandImm12(0b111111111111, 0b1), true)
+			i.asALU(aluOpSub, x9VReg, operandNR(spVReg), operandImm12(0b111111111111, 0b1), true)
 		}},
 		{want: "49fd3f51", setup: func(i *instruction) {
-			i.asALU(aluOpSub, operandNR(x9VReg), operandNR(x10VReg), operandImm12(0b111111111111, 0b0), false)
+			i.asALU(aluOpSub, x9VReg, operandNR(x10VReg), operandImm12(0b111111111111, 0b0), false)
 		}},
 		{want: "5ffd3fd1", setup: func(i *instruction) {
-			i.asALU(aluOpSub, operandNR(spVReg), operandNR(x10VReg), operandImm12(0b111111111111, 0b0), true)
+			i.asALU(aluOpSub, spVReg, operandNR(x10VReg), operandImm12(0b111111111111, 0b0), true)
 		}},
 		{want: "49fd7f71", setup: func(i *instruction) {
-			i.asALU(aluOpSubS, operandNR(x9VReg), operandNR(x10VReg), operandImm12(0b111111111111, 0b1), false)
+			i.asALU(aluOpSubS, x9VReg, operandNR(x10VReg), operandImm12(0b111111111111, 0b1), false)
 		}},
 		{want: "49fd7ff1", setup: func(i *instruction) {
-			i.asALU(aluOpSubS, operandNR(x9VReg), operandNR(x10VReg), operandImm12(0b111111111111, 0b1), true)
+			i.asALU(aluOpSubS, x9VReg, operandNR(x10VReg), operandImm12(0b111111111111, 0b1), true)
 		}},
 		{want: "49fd3f71", setup: func(i *instruction) {
-			i.asALU(aluOpSubS, operandNR(x9VReg), operandNR(x10VReg), operandImm12(0b111111111111, 0b0), false)
+			i.asALU(aluOpSubS, x9VReg, operandNR(x10VReg), operandImm12(0b111111111111, 0b0), false)
 		}},
 		{want: "49fd3ff1", setup: func(i *instruction) {
-			i.asALU(aluOpSubS, operandNR(x9VReg), operandNR(x10VReg), operandImm12(0b111111111111, 0b0), true)
+			i.asALU(aluOpSubS, x9VReg, operandNR(x10VReg), operandImm12(0b111111111111, 0b0), true)
 		}},
 		{want: "4020d41a", setup: func(i *instruction) {
-			i.asALU(aluOpLsl, operandNR(x0VReg), operandNR(x2VReg), operandNR(x20VReg), false)
+			i.asALU(aluOpLsl, x0VReg, operandNR(x2VReg), operandNR(x20VReg), false)
 		}},
 		{want: "4020d49a", setup: func(i *instruction) {
-			i.asALU(aluOpLsl, operandNR(x0VReg), operandNR(x2VReg), operandNR(x20VReg), true)
+			i.asALU(aluOpLsl, x0VReg, operandNR(x2VReg), operandNR(x20VReg), true)
 		}},
 		{want: "4024d41a", setup: func(i *instruction) {
-			i.asALU(aluOpLsr, operandNR(x0VReg), operandNR(x2VReg), operandNR(x20VReg), false)
+			i.asALU(aluOpLsr, x0VReg, operandNR(x2VReg), operandNR(x20VReg), false)
 		}},
 		{want: "4024d49a", setup: func(i *instruction) {
-			i.asALU(aluOpLsr, operandNR(x0VReg), operandNR(x2VReg), operandNR(x20VReg), true)
+			i.asALU(aluOpLsr, x0VReg, operandNR(x2VReg), operandNR(x20VReg), true)
 		}},
 		{want: "4028d41a", setup: func(i *instruction) {
-			i.asALU(aluOpAsr, operandNR(x0VReg), operandNR(x2VReg), operandNR(x20VReg), false)
+			i.asALU(aluOpAsr, x0VReg, operandNR(x2VReg), operandNR(x20VReg), false)
 		}},
 		{want: "4028d49a", setup: func(i *instruction) {
-			i.asALU(aluOpAsr, operandNR(x0VReg), operandNR(x2VReg), operandNR(x20VReg), true)
+			i.asALU(aluOpAsr, x0VReg, operandNR(x2VReg), operandNR(x20VReg), true)
 		}},
 		{want: "400cd49a", setup: func(i *instruction) {
-			i.asALU(aluOpSDiv, operandNR(x0VReg), operandNR(x2VReg), operandNR(x20VReg), true)
+			i.asALU(aluOpSDiv, x0VReg, operandNR(x2VReg), operandNR(x20VReg), true)
 		}},
 		{want: "400cd41a", setup: func(i *instruction) {
-			i.asALU(aluOpSDiv, operandNR(x0VReg), operandNR(x2VReg), operandNR(x20VReg), false)
+			i.asALU(aluOpSDiv, x0VReg, operandNR(x2VReg), operandNR(x20VReg), false)
 		}},
 		{want: "4008d49a", setup: func(i *instruction) {
-			i.asALU(aluOpUDiv, operandNR(x0VReg), operandNR(x2VReg), operandNR(x20VReg), true)
+			i.asALU(aluOpUDiv, x0VReg, operandNR(x2VReg), operandNR(x20VReg), true)
 		}},
 		{want: "4008d41a", setup: func(i *instruction) {
-			i.asALU(aluOpUDiv, operandNR(x0VReg), operandNR(x2VReg), operandNR(x20VReg), false)
+			i.asALU(aluOpUDiv, x0VReg, operandNR(x2VReg), operandNR(x20VReg), false)
 		}},
 		{want: "407c0013", setup: func(i *instruction) {
-			i.asALUShift(aluOpAsr, operandNR(x0VReg), operandNR(x2VReg), operandShiftImm(0), false)
+			i.asALUShift(aluOpAsr, x0VReg, operandNR(x2VReg), operandShiftImm(0), false)
 		}},
 		{want: "40fc4093", setup: func(i *instruction) {
-			i.asALUShift(aluOpAsr, operandNR(x0VReg), operandNR(x2VReg), operandShiftImm(0), true)
+			i.asALUShift(aluOpAsr, x0VReg, operandNR(x2VReg), operandShiftImm(0), true)
 		}},
 		{want: "407c0113", setup: func(i *instruction) {
-			i.asALUShift(aluOpAsr, operandNR(x0VReg), operandNR(x2VReg), operandShiftImm(1), false)
+			i.asALUShift(aluOpAsr, x0VReg, operandNR(x2VReg), operandShiftImm(1), false)
 		}},
 		{want: "407c1f13", setup: func(i *instruction) {
-			i.asALUShift(aluOpAsr, operandNR(x0VReg), operandNR(x2VReg), operandShiftImm(31), false)
+			i.asALUShift(aluOpAsr, x0VReg, operandNR(x2VReg), operandShiftImm(31), false)
 		}},
 		{want: "40fc4193", setup: func(i *instruction) {
-			i.asALUShift(aluOpAsr, operandNR(x0VReg), operandNR(x2VReg), operandShiftImm(1), true)
+			i.asALUShift(aluOpAsr, x0VReg, operandNR(x2VReg), operandShiftImm(1), true)
 		}},
 		{want: "40fc5f93", setup: func(i *instruction) {
-			i.asALUShift(aluOpAsr, operandNR(x0VReg), operandNR(x2VReg), operandShiftImm(31), true)
+			i.asALUShift(aluOpAsr, x0VReg, operandNR(x2VReg), operandShiftImm(31), true)
 		}},
 		{want: "40fc7f93", setup: func(i *instruction) {
-			i.asALUShift(aluOpAsr, operandNR(x0VReg), operandNR(x2VReg), operandShiftImm(63), true)
+			i.asALUShift(aluOpAsr, x0VReg, operandNR(x2VReg), operandShiftImm(63), true)
 		}},
 		{want: "407c0153", setup: func(i *instruction) {
-			i.asALUShift(aluOpLsr, operandNR(x0VReg), operandNR(x2VReg), operandShiftImm(1), false)
+			i.asALUShift(aluOpLsr, x0VReg, operandNR(x2VReg), operandShiftImm(1), false)
 		}},
 		{want: "407c1f53", setup: func(i *instruction) {
-			i.asALUShift(aluOpLsr, operandNR(x0VReg), operandNR(x2VReg), operandShiftImm(31), false)
+			i.asALUShift(aluOpLsr, x0VReg, operandNR(x2VReg), operandShiftImm(31), false)
 		}},
 		{want: "40fc41d3", setup: func(i *instruction) {
-			i.asALUShift(aluOpLsr, operandNR(x0VReg), operandNR(x2VReg), operandShiftImm(1), true)
+			i.asALUShift(aluOpLsr, x0VReg, operandNR(x2VReg), operandShiftImm(1), true)
 		}},
 		{want: "40fc5fd3", setup: func(i *instruction) {
-			i.asALUShift(aluOpLsr, operandNR(x0VReg), operandNR(x2VReg), operandShiftImm(31), true)
+			i.asALUShift(aluOpLsr, x0VReg, operandNR(x2VReg), operandShiftImm(31), true)
 		}},
 		{want: "40fc7fd3", setup: func(i *instruction) {
-			i.asALUShift(aluOpLsr, operandNR(x0VReg), operandNR(x2VReg), operandShiftImm(63), true)
+			i.asALUShift(aluOpLsr, x0VReg, operandNR(x2VReg), operandShiftImm(63), true)
 		}},
 		{want: "407c0053", setup: func(i *instruction) {
-			i.asALUShift(aluOpLsl, operandNR(x0VReg), operandNR(x2VReg), operandShiftImm(0), false)
+			i.asALUShift(aluOpLsl, x0VReg, operandNR(x2VReg), operandShiftImm(0), false)
 		}},
 		{want: "40fc40d3", setup: func(i *instruction) {
-			i.asALUShift(aluOpLsl, operandNR(x0VReg), operandNR(x2VReg), operandShiftImm(0), true)
+			i.asALUShift(aluOpLsl, x0VReg, operandNR(x2VReg), operandShiftImm(0), true)
 		}},
 		{want: "40781f53", setup: func(i *instruction) {
-			i.asALUShift(aluOpLsl, operandNR(x0VReg), operandNR(x2VReg), operandShiftImm(1), false)
+			i.asALUShift(aluOpLsl, x0VReg, operandNR(x2VReg), operandShiftImm(1), false)
 		}},
 		{want: "40000153", setup: func(i *instruction) {
-			i.asALUShift(aluOpLsl, operandNR(x0VReg), operandNR(x2VReg), operandShiftImm(31), false)
+			i.asALUShift(aluOpLsl, x0VReg, operandNR(x2VReg), operandShiftImm(31), false)
 		}},
 		{want: "40f87fd3", setup: func(i *instruction) {
-			i.asALUShift(aluOpLsl, operandNR(x0VReg), operandNR(x2VReg), operandShiftImm(1), true)
+			i.asALUShift(aluOpLsl, x0VReg, operandNR(x2VReg), operandShiftImm(1), true)
 		}},
 		{want: "408061d3", setup: func(i *instruction) {
-			i.asALUShift(aluOpLsl, operandNR(x0VReg), operandNR(x2VReg), operandShiftImm(31), true)
+			i.asALUShift(aluOpLsl, x0VReg, operandNR(x2VReg), operandShiftImm(31), true)
 		}},
 		{want: "400041d3", setup: func(i *instruction) {
-			i.asALUShift(aluOpLsl, operandNR(x0VReg), operandNR(x2VReg), operandShiftImm(63), true)
+			i.asALUShift(aluOpLsl, x0VReg, operandNR(x2VReg), operandShiftImm(63), true)
 		}},
 		{want: "4000c05a", setup: func(i *instruction) { i.asBitRR(bitOpRbit, x0VReg, x2VReg, false) }},
 		{want: "4000c0da", setup: func(i *instruction) { i.asBitRR(bitOpRbit, x0VReg, x2VReg, true) }},
 		{want: "4010c05a", setup: func(i *instruction) { i.asBitRR(bitOpClz, x0VReg, x2VReg, false) }},
 		{want: "4010c0da", setup: func(i *instruction) { i.asBitRR(bitOpClz, x0VReg, x2VReg, true) }},
 		{want: "4138302e", setup: func(i *instruction) {
-			i.asVecLanes(vecOpUaddlv, operandNR(v1VReg), operandNR(v2VReg), vecArrangement8B)
+			i.asVecLanes(vecOpUaddlv, v1VReg, operandNR(v2VReg), vecArrangement8B)
 		}},
 		{want: "4138306e", setup: func(i *instruction) {
-			i.asVecLanes(vecOpUaddlv, operandNR(v1VReg), operandNR(v2VReg), vecArrangement16B)
+			i.asVecLanes(vecOpUaddlv, v1VReg, operandNR(v2VReg), vecArrangement16B)
 		}},
 		{want: "4138702e", setup: func(i *instruction) {
-			i.asVecLanes(vecOpUaddlv, operandNR(v1VReg), operandNR(v2VReg), vecArrangement4H)
+			i.asVecLanes(vecOpUaddlv, v1VReg, operandNR(v2VReg), vecArrangement4H)
 		}},
 		{want: "4138706e", setup: func(i *instruction) {
-			i.asVecLanes(vecOpUaddlv, operandNR(v1VReg), operandNR(v2VReg), vecArrangement8H)
+			i.asVecLanes(vecOpUaddlv, v1VReg, operandNR(v2VReg), vecArrangement8H)
 		}},
 		{want: "4138b06e", setup: func(i *instruction) {
-			i.asVecLanes(vecOpUaddlv, operandNR(v1VReg), operandNR(v2VReg), vecArrangement4S)
+			i.asVecLanes(vecOpUaddlv, v1VReg, operandNR(v2VReg), vecArrangement4S)
 		}},
 		{want: "41c0230e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSmull, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
+			i.asVecRRR(vecOpSmull, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
 		}},
 		{want: "41c0630e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSmull, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
+			i.asVecRRR(vecOpSmull, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
 		}},
 		{want: "41c0a30e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSmull, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
+			i.asVecRRR(vecOpSmull, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
 		}},
 		{want: "41c0234e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSmull2, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
+			i.asVecRRR(vecOpSmull2, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
 		}},
 		{want: "41c0634e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSmull2, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
+			i.asVecRRR(vecOpSmull2, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
 		}},
 		{want: "41c0a34e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSmull2, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
+			i.asVecRRR(vecOpSmull2, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4S)
 		}},
 		{want: "411c630e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpBic, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
+			i.asVecRRR(vecOpBic, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
 		}},
 		{want: "411c634e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpBic, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
+			i.asVecRRR(vecOpBic, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
 		}},
 		{want: "411c632e", setup: func(i *instruction) {
-			i.asVecRRRRewrite(vecOpBsl, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
+			i.asVecRRRRewrite(vecOpBsl, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
 		}},
 		{want: "411c636e", setup: func(i *instruction) {
-			i.asVecRRRRewrite(vecOpBsl, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
+			i.asVecRRRRewrite(vecOpBsl, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
 		}},
 		{want: "4158202e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpNot, operandNR(v1VReg), operandNR(v2VReg), vecArrangement8B)
+			i.asVecMisc(vecOpNot, v1VReg, operandNR(v2VReg), vecArrangement8B)
 		}},
 		{want: "4158206e", setup: func(i *instruction) {
-			i.asVecMisc(vecOpNot, operandNR(v1VReg), operandNR(v2VReg), vecArrangement16B)
+			i.asVecMisc(vecOpNot, v1VReg, operandNR(v2VReg), vecArrangement16B)
 		}},
 		{want: "411c230e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpAnd, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
+			i.asVecRRR(vecOpAnd, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
 		}},
 		{want: "411c234e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpAnd, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
+			i.asVecRRR(vecOpAnd, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
 		}},
 		{want: "411ca30e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpOrr, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
+			i.asVecRRR(vecOpOrr, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
 		}},
 		{want: "411ca34e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpOrr, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
+			i.asVecRRR(vecOpOrr, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
 		}},
 		{want: "4144230e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSshl, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
+			i.asVecRRR(vecOpSshl, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
 		}},
 		{want: "4144234e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSshl, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
+			i.asVecRRR(vecOpSshl, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
 		}},
 		{want: "4144630e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSshl, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
+			i.asVecRRR(vecOpSshl, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
 		}},
 		{want: "4144634e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSshl, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
+			i.asVecRRR(vecOpSshl, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
 		}},
 		{want: "4144a30e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSshl, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
+			i.asVecRRR(vecOpSshl, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
 		}},
 		{want: "4144e34e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSshl, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
+			i.asVecRRR(vecOpSshl, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
 		}},
 		{want: "4144a30e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSshl, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
+			i.asVecRRR(vecOpSshl, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
 		}},
 		{want: "4144232e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpUshl, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
+			i.asVecRRR(vecOpUshl, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8B)
 		}},
 		{want: "4144236e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpUshl, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
+			i.asVecRRR(vecOpUshl, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement16B)
 		}},
 		{want: "4144632e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpUshl, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
+			i.asVecRRR(vecOpUshl, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement4H)
 		}},
 		{want: "4144636e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpUshl, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
+			i.asVecRRR(vecOpUshl, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement8H)
 		}},
 		{want: "4144a32e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpUshl, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
+			i.asVecRRR(vecOpUshl, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
 		}},
 		{want: "4144e36e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpUshl, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
+			i.asVecRRR(vecOpUshl, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2D)
 		}},
 		{want: "4144a30e", setup: func(i *instruction) {
-			i.asVecRRR(vecOpSshl, operandNR(v1VReg), operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
+			i.asVecRRR(vecOpSshl, v1VReg, operandNR(v2VReg), operandNR(v3VReg), vecArrangement2S)
 		}},
-		{want: "4158200e", setup: func(i *instruction) { i.asVecMisc(vecOpCnt, operandNR(v1VReg), operandNR(v2VReg), vecArrangement8B) }},
-		{want: "4158204e", setup: func(i *instruction) { i.asVecMisc(vecOpCnt, operandNR(v1VReg), operandNR(v2VReg), vecArrangement16B) }},
+		{want: "4158200e", setup: func(i *instruction) { i.asVecMisc(vecOpCnt, v1VReg, operandNR(v2VReg), vecArrangement8B) }},
+		{want: "4158204e", setup: func(i *instruction) { i.asVecMisc(vecOpCnt, v1VReg, operandNR(v2VReg), vecArrangement16B) }},
 		{want: "41c0221e", setup: func(i *instruction) {
-			i.asFpuRR(fpuUniOpCvt32To64, operandNR(v1VReg), operandNR(v2VReg), true)
+			i.asFpuRR(fpuUniOpCvt32To64, v1VReg, operandNR(v2VReg), true)
 		}},
 		{want: "4140621e", setup: func(i *instruction) {
-			i.asFpuRR(fpuUniOpCvt64To32, operandNR(v1VReg), operandNR(v2VReg), true)
+			i.asFpuRR(fpuUniOpCvt64To32, v1VReg, operandNR(v2VReg), true)
 		}},
 		{want: "4140211e", setup: func(i *instruction) {
-			i.asFpuRR(fpuUniOpNeg, operandNR(v1VReg), operandNR(v2VReg), false)
+			i.asFpuRR(fpuUniOpNeg, v1VReg, operandNR(v2VReg), false)
 		}},
 
 		{want: "41c0211e", setup: func(i *instruction) {
-			i.asFpuRR(fpuUniOpSqrt, operandNR(v1VReg), operandNR(v2VReg), false)
+			i.asFpuRR(fpuUniOpSqrt, v1VReg, operandNR(v2VReg), false)
 		}},
 		{want: "41c0611e", setup: func(i *instruction) {
-			i.asFpuRR(fpuUniOpSqrt, operandNR(v1VReg), operandNR(v2VReg), true)
+			i.asFpuRR(fpuUniOpSqrt, v1VReg, operandNR(v2VReg), true)
 		}},
 		{want: "41c0241e", setup: func(i *instruction) {
-			i.asFpuRR(fpuUniOpRoundPlus, operandNR(v1VReg), operandNR(v2VReg), false)
+			i.asFpuRR(fpuUniOpRoundPlus, v1VReg, operandNR(v2VReg), false)
 		}},
 		{want: "41c0641e", setup: func(i *instruction) {
-			i.asFpuRR(fpuUniOpRoundPlus, operandNR(v1VReg), operandNR(v2VReg), true)
+			i.asFpuRR(fpuUniOpRoundPlus, v1VReg, operandNR(v2VReg), true)
 		}},
 		{want: "4140251e", setup: func(i *instruction) {
-			i.asFpuRR(fpuUniOpRoundMinus, operandNR(v1VReg), operandNR(v2VReg), false)
+			i.asFpuRR(fpuUniOpRoundMinus, v1VReg, operandNR(v2VReg), false)
 		}},
 		{want: "4140651e", setup: func(i *instruction) {
-			i.asFpuRR(fpuUniOpRoundMinus, operandNR(v1VReg), operandNR(v2VReg), true)
+			i.asFpuRR(fpuUniOpRoundMinus, v1VReg, operandNR(v2VReg), true)
 		}},
 		{want: "41c0251e", setup: func(i *instruction) {
-			i.asFpuRR(fpuUniOpRoundZero, operandNR(v1VReg), operandNR(v2VReg), false)
+			i.asFpuRR(fpuUniOpRoundZero, v1VReg, operandNR(v2VReg), false)
 		}},
 		{want: "41c0651e", setup: func(i *instruction) {
-			i.asFpuRR(fpuUniOpRoundZero, operandNR(v1VReg), operandNR(v2VReg), true)
+			i.asFpuRR(fpuUniOpRoundZero, v1VReg, operandNR(v2VReg), true)
 		}},
 		{want: "4140241e", setup: func(i *instruction) {
-			i.asFpuRR(fpuUniOpRoundNearest, operandNR(v1VReg), operandNR(v2VReg), false)
+			i.asFpuRR(fpuUniOpRoundNearest, v1VReg, operandNR(v2VReg), false)
 		}},
 		{want: "4140641e", setup: func(i *instruction) {
-			i.asFpuRR(fpuUniOpRoundNearest, operandNR(v1VReg), operandNR(v2VReg), true)
+			i.asFpuRR(fpuUniOpRoundNearest, v1VReg, operandNR(v2VReg), true)
 		}},
-		{want: "4140611e", setup: func(i *instruction) { i.asFpuRR(fpuUniOpNeg, operandNR(v1VReg), operandNR(v2VReg), true) }},
-		{want: "41c0404d", setup: func(i *instruction) { i.asVecLoad1R(operandNR(v1VReg), operandNR(x2VReg), vecArrangement16B) }},
-		{want: "41c4404d", setup: func(i *instruction) { i.asVecLoad1R(operandNR(v1VReg), operandNR(x2VReg), vecArrangement8H) }},
-		{want: "41c8404d", setup: func(i *instruction) { i.asVecLoad1R(operandNR(v1VReg), operandNR(x2VReg), vecArrangement4S) }},
-		{want: "41cc404d", setup: func(i *instruction) { i.asVecLoad1R(operandNR(v1VReg), operandNR(x2VReg), vecArrangement2D) }},
+		{want: "4140611e", setup: func(i *instruction) { i.asFpuRR(fpuUniOpNeg, v1VReg, operandNR(v2VReg), true) }},
+		{want: "41c0404d", setup: func(i *instruction) { i.asVecLoad1R(v1VReg, operandNR(x2VReg), vecArrangement16B) }},
+		{want: "41c4404d", setup: func(i *instruction) { i.asVecLoad1R(v1VReg, operandNR(x2VReg), vecArrangement8H) }},
+		{want: "41c8404d", setup: func(i *instruction) { i.asVecLoad1R(v1VReg, operandNR(x2VReg), vecArrangement4S) }},
+		{want: "41cc404d", setup: func(i *instruction) { i.asVecLoad1R(v1VReg, operandNR(x2VReg), vecArrangement2D) }},
 		{want: "0200e1b8", setup: func(i *instruction) {
-			i.asAtomicRmw(atomicRmwOpAdd, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 4)
+			i.asAtomicRmw(atomicRmwOpAdd, x0VReg, x1VReg, x2VReg, 4)
 		}},
 		{want: "0200e178", setup: func(i *instruction) {
-			i.asAtomicRmw(atomicRmwOpAdd, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 2)
+			i.asAtomicRmw(atomicRmwOpAdd, x0VReg, x1VReg, x2VReg, 2)
 		}},
 		{want: "0200e138", setup: func(i *instruction) {
-			i.asAtomicRmw(atomicRmwOpAdd, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 1)
+			i.asAtomicRmw(atomicRmwOpAdd, x0VReg, x1VReg, x2VReg, 1)
 		}},
 		{want: "0200e1f8", setup: func(i *instruction) {
-			i.asAtomicRmw(atomicRmwOpAdd, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 8)
+			i.asAtomicRmw(atomicRmwOpAdd, x0VReg, x1VReg, x2VReg, 8)
 		}},
 		{want: "0200e1b8", setup: func(i *instruction) {
-			i.asAtomicRmw(atomicRmwOpAdd, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 4)
+			i.asAtomicRmw(atomicRmwOpAdd, x0VReg, x1VReg, x2VReg, 4)
 		}},
 		{want: "0200e178", setup: func(i *instruction) {
-			i.asAtomicRmw(atomicRmwOpAdd, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 2)
+			i.asAtomicRmw(atomicRmwOpAdd, x0VReg, x1VReg, x2VReg, 2)
 		}},
 		{want: "0200e138", setup: func(i *instruction) {
-			i.asAtomicRmw(atomicRmwOpAdd, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 1)
+			i.asAtomicRmw(atomicRmwOpAdd, x0VReg, x1VReg, x2VReg, 1)
 		}},
 		{want: "0210e1b8", setup: func(i *instruction) {
-			i.asAtomicRmw(atomicRmwOpClr, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 4)
+			i.asAtomicRmw(atomicRmwOpClr, x0VReg, x1VReg, x2VReg, 4)
 		}},
 		{want: "0210e178", setup: func(i *instruction) {
-			i.asAtomicRmw(atomicRmwOpClr, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 2)
+			i.asAtomicRmw(atomicRmwOpClr, x0VReg, x1VReg, x2VReg, 2)
 		}},
 		{want: "0210e138", setup: func(i *instruction) {
-			i.asAtomicRmw(atomicRmwOpClr, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 1)
+			i.asAtomicRmw(atomicRmwOpClr, x0VReg, x1VReg, x2VReg, 1)
 		}},
 		{want: "0210e1f8", setup: func(i *instruction) {
-			i.asAtomicRmw(atomicRmwOpClr, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 8)
+			i.asAtomicRmw(atomicRmwOpClr, x0VReg, x1VReg, x2VReg, 8)
 		}},
 		{want: "0210e1b8", setup: func(i *instruction) {
-			i.asAtomicRmw(atomicRmwOpClr, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 4)
+			i.asAtomicRmw(atomicRmwOpClr, x0VReg, x1VReg, x2VReg, 4)
 		}},
 		{want: "0210e178", setup: func(i *instruction) {
-			i.asAtomicRmw(atomicRmwOpClr, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 2)
+			i.asAtomicRmw(atomicRmwOpClr, x0VReg, x1VReg, x2VReg, 2)
 		}},
 		{want: "0210e138", setup: func(i *instruction) {
-			i.asAtomicRmw(atomicRmwOpClr, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 1)
+			i.asAtomicRmw(atomicRmwOpClr, x0VReg, x1VReg, x2VReg, 1)
 		}},
 		{want: "0230e1b8", setup: func(i *instruction) {
-			i.asAtomicRmw(atomicRmwOpSet, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 4)
+			i.asAtomicRmw(atomicRmwOpSet, x0VReg, x1VReg, x2VReg, 4)
 		}},
 		{want: "0230e178", setup: func(i *instruction) {
-			i.asAtomicRmw(atomicRmwOpSet, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 2)
+			i.asAtomicRmw(atomicRmwOpSet, x0VReg, x1VReg, x2VReg, 2)
 		}},
 		{want: "0230e138", setup: func(i *instruction) {
-			i.asAtomicRmw(atomicRmwOpSet, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 1)
+			i.asAtomicRmw(atomicRmwOpSet, x0VReg, x1VReg, x2VReg, 1)
 		}},
 		{want: "0230e1f8", setup: func(i *instruction) {
-			i.asAtomicRmw(atomicRmwOpSet, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 8)
+			i.asAtomicRmw(atomicRmwOpSet, x0VReg, x1VReg, x2VReg, 8)
 		}},
 		{want: "0230e1b8", setup: func(i *instruction) {
-			i.asAtomicRmw(atomicRmwOpSet, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 4)
+			i.asAtomicRmw(atomicRmwOpSet, x0VReg, x1VReg, x2VReg, 4)
 		}},
 		{want: "0230e178", setup: func(i *instruction) {
-			i.asAtomicRmw(atomicRmwOpSet, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 2)
+			i.asAtomicRmw(atomicRmwOpSet, x0VReg, x1VReg, x2VReg, 2)
 		}},
 		{want: "0230e138", setup: func(i *instruction) {
-			i.asAtomicRmw(atomicRmwOpSet, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 1)
+			i.asAtomicRmw(atomicRmwOpSet, x0VReg, x1VReg, x2VReg, 1)
 		}},
 		{want: "0220e1b8", setup: func(i *instruction) {
-			i.asAtomicRmw(atomicRmwOpEor, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 4)
+			i.asAtomicRmw(atomicRmwOpEor, x0VReg, x1VReg, x2VReg, 4)
 		}},
 		{want: "0220e178", setup: func(i *instruction) {
-			i.asAtomicRmw(atomicRmwOpEor, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 2)
+			i.asAtomicRmw(atomicRmwOpEor, x0VReg, x1VReg, x2VReg, 2)
 		}},
 		{want: "0220e138", setup: func(i *instruction) {
-			i.asAtomicRmw(atomicRmwOpEor, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 1)
+			i.asAtomicRmw(atomicRmwOpEor, x0VReg, x1VReg, x2VReg, 1)
 		}},
 		{want: "0220e1f8", setup: func(i *instruction) {
-			i.asAtomicRmw(atomicRmwOpEor, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 8)
+			i.asAtomicRmw(atomicRmwOpEor, x0VReg, x1VReg, x2VReg, 8)
 		}},
 		{want: "0220e1b8", setup: func(i *instruction) {
-			i.asAtomicRmw(atomicRmwOpEor, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 4)
+			i.asAtomicRmw(atomicRmwOpEor, x0VReg, x1VReg, x2VReg, 4)
 		}},
 		{want: "0220e178", setup: func(i *instruction) {
-			i.asAtomicRmw(atomicRmwOpEor, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 2)
+			i.asAtomicRmw(atomicRmwOpEor, x0VReg, x1VReg, x2VReg, 2)
 		}},
 		{want: "0220e138", setup: func(i *instruction) {
-			i.asAtomicRmw(atomicRmwOpEor, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 1)
+			i.asAtomicRmw(atomicRmwOpEor, x0VReg, x1VReg, x2VReg, 1)
 		}},
 		{want: "0280e1b8", setup: func(i *instruction) {
-			i.asAtomicRmw(atomicRmwOpSwp, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 4)
+			i.asAtomicRmw(atomicRmwOpSwp, x0VReg, x1VReg, x2VReg, 4)
 		}},
 		{want: "0280e178", setup: func(i *instruction) {
-			i.asAtomicRmw(atomicRmwOpSwp, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 2)
+			i.asAtomicRmw(atomicRmwOpSwp, x0VReg, x1VReg, x2VReg, 2)
 		}},
 		{want: "0280e138", setup: func(i *instruction) {
-			i.asAtomicRmw(atomicRmwOpSwp, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 1)
+			i.asAtomicRmw(atomicRmwOpSwp, x0VReg, x1VReg, x2VReg, 1)
 		}},
 		{want: "0280e1f8", setup: func(i *instruction) {
-			i.asAtomicRmw(atomicRmwOpSwp, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 8)
+			i.asAtomicRmw(atomicRmwOpSwp, x0VReg, x1VReg, x2VReg, 8)
 		}},
 		{want: "0280e1b8", setup: func(i *instruction) {
-			i.asAtomicRmw(atomicRmwOpSwp, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 4)
+			i.asAtomicRmw(atomicRmwOpSwp, x0VReg, x1VReg, x2VReg, 4)
 		}},
 		{want: "0280e178", setup: func(i *instruction) {
-			i.asAtomicRmw(atomicRmwOpSwp, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 2)
+			i.asAtomicRmw(atomicRmwOpSwp, x0VReg, x1VReg, x2VReg, 2)
 		}},
 		{want: "0280e138", setup: func(i *instruction) {
-			i.asAtomicRmw(atomicRmwOpSwp, operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 1)
+			i.asAtomicRmw(atomicRmwOpSwp, x0VReg, x1VReg, x2VReg, 1)
 		}},
 		{want: "02fce188", setup: func(i *instruction) {
-			i.asAtomicCas(operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 4)
+			i.asAtomicCas(x0VReg, x1VReg, x2VReg, 4)
 		}},
 		{want: "02fce148", setup: func(i *instruction) {
-			i.asAtomicCas(operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 2)
+			i.asAtomicCas(x0VReg, x1VReg, x2VReg, 2)
 		}},
 		{want: "02fce108", setup: func(i *instruction) {
-			i.asAtomicCas(operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 1)
+			i.asAtomicCas(x0VReg, x1VReg, x2VReg, 1)
 		}},
 		{want: "02fce1c8", setup: func(i *instruction) {
-			i.asAtomicCas(operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 8)
+			i.asAtomicCas(x0VReg, x1VReg, x2VReg, 8)
 		}},
 		{want: "02fce188", setup: func(i *instruction) {
-			i.asAtomicCas(operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 4)
+			i.asAtomicCas(x0VReg, x1VReg, x2VReg, 4)
 		}},
 		{want: "02fce148", setup: func(i *instruction) {
-			i.asAtomicCas(operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 2)
+			i.asAtomicCas(x0VReg, x1VReg, x2VReg, 2)
 		}},
 		{want: "02fce108", setup: func(i *instruction) {
-			i.asAtomicCas(operandNR(x0VReg), operandNR(x1VReg), operandNR(x2VReg), 1)
+			i.asAtomicCas(x0VReg, x1VReg, x2VReg, 1)
 		}},
 		{want: "01fcdf88", setup: func(i *instruction) {
-			i.asAtomicLoad(operandNR(x0VReg), operandNR(x1VReg), 4)
+			i.asAtomicLoad(x0VReg, x1VReg, 4)
 		}},
 		{want: "01fcdf48", setup: func(i *instruction) {
-			i.asAtomicLoad(operandNR(x0VReg), operandNR(x1VReg), 2)
+			i.asAtomicLoad(x0VReg, x1VReg, 2)
 		}},
 		{want: "01fcdf08", setup: func(i *instruction) {
-			i.asAtomicLoad(operandNR(x0VReg), operandNR(x1VReg), 1)
+			i.asAtomicLoad(x0VReg, x1VReg, 1)
 		}},
 		{want: "01fcdfc8", setup: func(i *instruction) {
-			i.asAtomicLoad(operandNR(x0VReg), operandNR(x1VReg), 8)
+			i.asAtomicLoad(x0VReg, x1VReg, 8)
 		}},
 		{want: "01fcdf88", setup: func(i *instruction) {
-			i.asAtomicLoad(operandNR(x0VReg), operandNR(x1VReg), 4)
+			i.asAtomicLoad(x0VReg, x1VReg, 4)
 		}},
 		{want: "01fcdf48", setup: func(i *instruction) {
-			i.asAtomicLoad(operandNR(x0VReg), operandNR(x1VReg), 2)
+			i.asAtomicLoad(x0VReg, x1VReg, 2)
 		}},
 		{want: "01fcdf08", setup: func(i *instruction) {
-			i.asAtomicLoad(operandNR(x0VReg), operandNR(x1VReg), 1)
+			i.asAtomicLoad(x0VReg, x1VReg, 1)
 		}},
 		{want: "01fc9f88", setup: func(i *instruction) {
 			i.asAtomicStore(operandNR(x0VReg), operandNR(x1VReg), 4)
@@ -1823,7 +1824,7 @@ func TestInstruction_encode(t *testing.T) {
 					for _, dst64bit := range trueFalse {
 						i := &instruction{prev: cur}
 						cur.next = i
-						i.asIntToFpu(operandNR(v2VReg), operandNR(x10VReg), rnSigned, src64bit, dst64bit)
+						i.asIntToFpu(v2VReg, operandNR(x10VReg), rnSigned, src64bit, dst64bit)
 						cur = i
 					}
 				}
@@ -1838,7 +1839,7 @@ func TestInstruction_encode(t *testing.T) {
 					for _, dst64bit := range trueFalse {
 						i := &instruction{prev: cur}
 						cur.next = i
-						i.asFpuToInt(operandNR(v2VReg), operandNR(x10VReg), rnSigned, src64bit, dst64bit)
+						i.asFpuToInt(v2VReg, operandNR(x10VReg), rnSigned, src64bit, dst64bit)
 						cur = i
 					}
 				}
@@ -2232,12 +2233,13 @@ func TestInstruction_encoding_store_encoding(t *testing.T) {
 			var i *instruction
 			switch tc.k {
 			case store8, store16, store32, store64, fpuStore32, fpuStore64, fpuStore128:
-				i = &instruction{kind: tc.k, amode: tc.amode, rn: operandNR(tc.rn)}
+				i = &instruction{kind: tc.k, rn: operandNR(tc.rn)}
 			case uLoad8, uLoad16, uLoad32, uLoad64, sLoad8, sLoad16, sLoad32, fpuLoad32, fpuLoad64, fpuLoad128:
-				i = &instruction{kind: tc.k, amode: tc.amode, rd: operandNR(tc.rn)}
+				i = &instruction{kind: tc.k, rd: tc.rn}
 			default:
 				t.Fatalf("unknown kind: %v", tc.k)
 			}
+			i.setAmode(&tc.amode)
 			_, _, m := newSetupWithMockContext()
 			i.encode(m)
 			// Note: for quick iteration we can use golang.org/x/arch package to verify the encoding.

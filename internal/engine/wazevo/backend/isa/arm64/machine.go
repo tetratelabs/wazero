@@ -21,6 +21,8 @@ type (
 		regAlloc   regalloc.Allocator
 		regAllocFn *backend.RegAllocFunction[*instruction, *machine]
 
+		amodePool wazevoapi.Pool[addressMode]
+
 		// addendsWorkQueue is used during address lowering, defined here for reuse.
 		addendsWorkQueue wazevoapi.Queue[ssa.Value]
 		addends32        wazevoapi.Queue[addend32]
@@ -105,6 +107,7 @@ func NewBackend() backend.Machine {
 		spillSlots:        make(map[regalloc.VRegID]int64),
 		executableContext: newExecutableContext(),
 		regAlloc:          regalloc.NewAllocator(regInfo),
+		amodePool:         wazevoapi.NewPool[addressMode](resetAddressMode),
 	}
 	return m
 }
@@ -149,6 +152,7 @@ func (m *machine) Reset() {
 	m.maxRequiredStackSizeForCalls = 0
 	m.executableContext.Reset()
 	m.jmpTableTargets = m.jmpTableTargets[:0]
+	m.amodePool.Reset()
 }
 
 // SetCurrentABI implements backend.Machine SetCurrentABI.
@@ -209,7 +213,7 @@ func (m *machine) allocateNop() *instruction {
 }
 
 func (m *machine) resolveAddressingMode(arg0offset, ret0offset int64, i *instruction) {
-	amode := &i.amode
+	amode := i.getAmode()
 	switch amode.kind {
 	case addressModeKindResultStackSpace:
 		amode.imm += ret0offset

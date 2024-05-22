@@ -807,7 +807,7 @@ func TestMachine_lowerToAddressModeFromAddends(t *testing.T) {
 			}
 			actual := m.lowerToAddressModeFromAddends(&a32s, &a64s, tc.dstSizeInBits, tc.offset)
 			require.Equal(t, strings.Join(tc.insts, "\n"), formatEmittedInstructionsInCurrentBlock(m))
-			require.Equal(t, tc.exp, actual, actual.format(tc.dstSizeInBits))
+			require.Equal(t, &tc.exp, actual, actual.format(tc.dstSizeInBits))
 		})
 	}
 }
