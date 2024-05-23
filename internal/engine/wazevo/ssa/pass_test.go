@@ -167,6 +167,8 @@ blk3: () <-- (blk1,blk2)
 					ret.AsReturn(ValuesNil)
 					b.InsertInstruction(ret)
 				}
+
+				b.reversePostOrderedBasicBlocks = []*basicBlock{entry.(*basicBlock), loopHeader.(*basicBlock), end.(*basicBlock)}
 				return nil
 			},
 			before: `

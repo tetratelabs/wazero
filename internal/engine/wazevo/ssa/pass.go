@@ -22,9 +22,9 @@ func (b *builder) RunPasses() {
 func (b *builder) runPreBlockLayoutPasses() {
 	passSortSuccessors(b)
 	passDeadBlockEliminationOpt(b)
-	passRedundantPhiEliminationOpt(b)
 	// The result of passCalculateImmediateDominators will be used by various passes below.
 	passCalculateImmediateDominators(b)
+	passRedundantPhiEliminationOpt(b)
 	passNopInstElimination(b)
 
 	// TODO: implement either conversion of irreducible CFG into reducible one, or irreducible CFG detection where we panic.
@@ -120,9 +120,9 @@ func passRedundantPhiEliminationOpt(b *builder) {
 	//  complexity here is O(BlockNum * Iterations) at the worst case where BlockNum might be the order of thousands.
 	for {
 		changed := false
-		_ = b.blockIteratorBegin() // skip entry block!
+		_ = b.blockIteratorReversePostOrderBegin() // skip entry block!
 		// Below, we intentionally use the named iteration variable name, as this comes with inevitable nested for loops!
-		for blk := b.blockIteratorNext(); blk != nil; blk = b.blockIteratorNext() {
+		for blk := b.blockIteratorReversePostOrderNext(); blk != nil; blk = b.blockIteratorReversePostOrderNext() {
 			paramNum := len(blk.params)
 
 			for paramIndex := 0; paramIndex < paramNum; paramIndex++ {
