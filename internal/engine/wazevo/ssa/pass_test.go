@@ -167,6 +167,9 @@ blk3: () <-- (blk1,blk2)
 					ret.AsReturn(ValuesNil)
 					b.InsertInstruction(ret)
 				}
+
+				// passRedundantPhiEliminationOpt requires the reverse post-order traversal to be calculated.
+				passCalculateImmediateDominators(b)
 				return nil
 			},
 			before: `
