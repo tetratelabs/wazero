@@ -168,7 +168,8 @@ blk3: () <-- (blk1,blk2)
 					b.InsertInstruction(ret)
 				}
 
-				b.reversePostOrderedBasicBlocks = []*basicBlock{entry.(*basicBlock), loopHeader.(*basicBlock), end.(*basicBlock)}
+				// passRedundantPhiEliminationOpt requires the reverse post-order traversal to be calculated.
+				passCalculateImmediateDominators(b)
 				return nil
 			},
 			before: `

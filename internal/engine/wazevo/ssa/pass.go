@@ -109,6 +109,8 @@ func passDeadBlockEliminationOpt(b *builder) {
 }
 
 // passRedundantPhiEliminationOpt eliminates the redundant PHIs (in our terminology, parameters of a block).
+// This requires the reverse post-order traversal to be calculated before calling this function,
+// hence passCalculateImmediateDominators must be called before this.
 func passRedundantPhiEliminationOpt(b *builder) {
 	redundantParameterIndexes := b.ints[:0] // reuse the slice from previous iterations.
 
@@ -118,6 +120,9 @@ func passRedundantPhiEliminationOpt(b *builder) {
 	//  relatively small. For example, sqlite speedtest binary results in the large number of redundant PHIs,
 	//  the maximum number of iteration was 22, which seems to be acceptable but not that small either since the
 	//  complexity here is O(BlockNum * Iterations) at the worst case where BlockNum might be the order of thousands.
+	//  -- Note --
+	// 	Currently, each iteration can run in an order of blocks, but it empirically converges quickly in practice when
+	// 	running on the reverse post-order. It might be possible to optimize this further by using the dominator tree.
 	for {
 		changed := false
 		_ = b.blockIteratorReversePostOrderBegin() // skip entry block!
