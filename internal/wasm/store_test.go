@@ -414,6 +414,7 @@ type mockModuleEngine struct {
 	resolveImportsCalled map[Index]Index
 	importedMemModEngine ModuleEngine
 	lookupEntries        map[Index]mockModuleEngineLookupEntry
+	memoryGrown          int
 }
 
 type mockModuleEngineLookupEntry struct {
@@ -471,6 +472,9 @@ func (e *mockModuleEngine) SetGlobalValue(idx Index, lo, hi uint64) { panic("BUG
 
 // OwnsGlobals implements the same method as documented on wasm.ModuleEngine.
 func (e *mockModuleEngine) OwnsGlobals() bool { return false }
+
+// MemoryGrown implements the same method as documented on wasm.ModuleEngine.
+func (e *mockModuleEngine) MemoryGrown() { e.memoryGrown++ }
 
 // DoneInstantiation implements the same method as documented on wasm.ModuleEngine.
 func (e *mockModuleEngine) DoneInstantiation() {}
