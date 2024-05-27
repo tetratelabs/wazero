@@ -48,6 +48,7 @@ func TestMemoryInstance_Grow_Size(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			max := uint32(10)
 			maxBytes := MemoryPagesToBytesNum(max)
+			me := &mockModuleEngine{}
 			var m *MemoryInstance
 			switch {
 			default:
@@ -58,6 +59,7 @@ func TestMemoryInstance_Grow_Size(t *testing.T) {
 				expBuffer := sliceAllocator(0, maxBytes)
 				m = &MemoryInstance{Max: max, Buffer: expBuffer.Reallocate(0), expBuffer: expBuffer}
 			}
+			m.ownerModuleEngine = me
 
 			res, ok := m.Grow(5)
 			require.True(t, ok)
@@ -93,6 +95,10 @@ func TestMemoryInstance_Grow_Size(t *testing.T) {
 
 			// Ensure that the current page size equals the max.
 			require.Equal(t, max, m.Pages())
+
+			// Growing zero and beyond max won't notify the module engine.
+			// So in total, the memoryGrown should be called 3 times.
+			require.Equal(t, 3, me.memoryGrown)
 
 			if tc.capEqualsMax { // Ensure the capacity isn't more than max.
 				require.Equal(t, maxBytes, uint64(cap(m.Buffer)))
@@ -851,12 +857,14 @@ func TestNewMemoryInstance_Shared(t *testing.T) {
 		},
 	}
 
+	me := &mockModuleEngine{}
 	for _, tc := range tests {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			m := NewMemoryInstance(tc.mem, nil)
+			m := NewMemoryInstance(tc.mem, nil, me)
 			require.Equal(t, tc.mem.Min, m.Min)
 			require.Equal(t, tc.mem.Max, m.Max)
+			require.Equal(t, me, m.ownerModuleEngine)
 			require.True(t, m.Shared)
 		})
 	}

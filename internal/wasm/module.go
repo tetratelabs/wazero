@@ -655,7 +655,7 @@ func paramNames(localNames IndirectNameMap, funcIdx uint32, paramLen int) []stri
 func (m *ModuleInstance) buildMemory(module *Module, allocator experimental.MemoryAllocator) {
 	memSec := module.MemorySection
 	if memSec != nil {
-		m.MemoryInstance = NewMemoryInstance(memSec, allocator)
+		m.MemoryInstance = NewMemoryInstance(memSec, allocator, m.Engine)
 		m.MemoryInstance.definition = &module.MemoryDefinitionSection[0]
 	}
 }
