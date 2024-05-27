@@ -222,6 +222,7 @@ func (m *moduleEngine) MemoryGrown() {
 	m.putLocalMemory()
 }
 
+// putLocalMemory writes the local memory buffer pointer and length to the opaque buffer.
 func (m *moduleEngine) putLocalMemory() {
 	mem := m.module.MemoryInstance
 	offset := m.parent.offsets.LocalMemoryBegin

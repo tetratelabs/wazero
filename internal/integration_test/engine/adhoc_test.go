@@ -1075,7 +1075,7 @@ func testModuleMemory(t *testing.T, r wazero.Runtime) {
 	bin := binaryencoding.EncodeModule(&wasm.Module{
 		TypeSection:     []wasm.FunctionType{{Params: []api.ValueType{api.ValueTypeI32}, ParamNumInUint64: 1}, {}},
 		FunctionSection: []wasm.Index{0, 1},
-		MemorySection:   &wasm.Memory{Min: 1, Cap: 1, Max: 2},
+		MemorySection:   &wasm.Memory{Min: 1, Cap: 1, Max: 20},
 		DataSection: []wasm.DataSegment{
 			{
 				Passive: true,
@@ -1108,6 +1108,10 @@ func testModuleMemory(t *testing.T, r wazero.Runtime) {
 	require.NoError(t, err)
 
 	memory := inst.Memory()
+
+	// Ensures that memory grow by users is working.
+	_, ok := memory.Grow(10)
+	require.True(t, ok)
 
 	buf, ok := memory.Read(0, wasmPhraseSize)
 	require.True(t, ok)
