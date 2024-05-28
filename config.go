@@ -148,7 +148,7 @@ type RuntimeConfig interface {
 	//	customSections := c.CustomSections()
 	WithCustomSections(bool) RuntimeConfig
 
-	// WithCloseOnContextDone ensures the executions of functions to be closed under one of the following circumstances:
+	// WithCloseOnContextDone ensures the executions of functions to be terminated under one of the following circumstances:
 	//
 	// 	- context.Context passed to the Call method of api.Function is canceled during execution. (i.e. ctx by context.WithCancel)
 	// 	- context.Context passed to the Call method of api.Function reaches timeout during execution. (i.e. ctx by context.WithTimeout or context.WithDeadline)
@@ -158,6 +158,8 @@ type RuntimeConfig interface {
 	// api.Function can potentially block the corresponding Goroutine forever. Moreover, it might block the
 	// entire underlying OS thread which runs the api.Function call. See "Why it's safe to execute runtime-generated
 	// machine codes against async Goroutine preemption" section in RATIONALE.md for detail.
+	//
+	// Upon the termination of the function executions, api.Module is closed.
 	//
 	// Note that this comes with a bit of extra cost when enabled. The reason is that internally this forces
 	// interpreter and compiler runtimes to insert the periodical checks on the conditions above. For that reason,
