@@ -1596,6 +1596,10 @@ func pathOpenFn(_ context.Context, mod api.Module, params []uint64) experimental
 		return errno
 	}
 
+	if pathLen == 0 {
+		return experimentalsys.EINVAL
+	}
+
 	fileOpenFlags := openFlags(dirflags, oflags, fdflags, rights)
 	isDir := fileOpenFlags&experimentalsys.O_DIRECTORY != 0
 
