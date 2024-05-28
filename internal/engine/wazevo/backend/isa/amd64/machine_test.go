@@ -443,18 +443,18 @@ L2:
 	}
 }
 
-// mockCpuFlags implements platform.CpuFeatureFlags
+// mockCpuFlags implements platform.CpuFeatureFlags.
 type mockCpuFlags struct {
 	flags      platform.CpuFeature
 	extraFlags platform.CpuFeature
 }
 
-// Has implements the method of the same name in platform.CpuFeatureFlags
+// Has implements the method of the same name in platform.CpuFeatureFlags.
 func (f *mockCpuFlags) Has(flag platform.CpuFeature) bool {
 	return (f.flags & flag) != 0
 }
 
-// HasExtra implements the method of the same name in platform.CpuFeatureFlags
+// HasExtra implements the method of the same name in platform.CpuFeatureFlags.
 func (f *mockCpuFlags) HasExtra(flag platform.CpuFeature) bool {
 	return (f.extraFlags & flag) != 0
 }
