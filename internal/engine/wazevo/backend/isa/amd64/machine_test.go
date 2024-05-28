@@ -460,4 +460,4 @@ func (f *mockCpuFlags) HasExtra(flag platform.CpuFeature) bool {
 }
 
 // Raw implements the method of the same name in platform.CpuFeatureFlags.
-func (f *mockCpuFlags) Raw() [2]uint64 { return [2]uint64{uint64(f.flags), uint64(f.extraFlags)} }
+func (f *mockCpuFlags) Raw() uint64 { return 0 }

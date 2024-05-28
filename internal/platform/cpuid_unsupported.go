@@ -14,4 +14,4 @@ func (c *cpuFeatureFlags) Has(cpuFeature CpuFeature) bool { return false }
 func (c *cpuFeatureFlags) HasExtra(cpuFeature CpuFeature) bool { return false }
 
 // Raw implements the same method on the CpuFeatureFlags interface.
-func (c *cpuFeatureFlags) Raw() [2]uint64 { return [2]uint64{0, 0} }
+func (c *cpuFeatureFlags) Raw() uint64 { return 0 }
