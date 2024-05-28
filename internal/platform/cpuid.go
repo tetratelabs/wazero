@@ -6,6 +6,8 @@ type CpuFeatureFlags interface {
 	Has(cpuFeature CpuFeature) bool
 	// HasExtra returns true when the specified extraFlag (represented as uint64) is supported
 	HasExtra(cpuFeature CpuFeature) bool
+	// Raw returns the raw flags as a pair of uint64 values. This can be used for cache keying.
+	Raw() [2]uint64
 }
 
 type CpuFeature uint64

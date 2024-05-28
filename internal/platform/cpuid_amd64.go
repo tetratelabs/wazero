@@ -3,7 +3,7 @@
 package platform
 
 // CpuFeatures exposes the capabilities for this CPU, queried via the Has, HasExtra methods
-var CpuFeatures CpuFeatureFlags = loadCpuFeatureFlags()
+var CpuFeatures = loadCpuFeatureFlags()
 
 // cpuFeatureFlags implements CpuFeatureFlags interface
 type cpuFeatureFlags struct {
@@ -57,3 +57,6 @@ func (f *cpuFeatureFlags) Has(cpuFeature CpuFeature) bool {
 func (f *cpuFeatureFlags) HasExtra(cpuFeature CpuFeature) bool {
 	return (f.extraFlags & uint64(cpuFeature)) != 0
 }
+
+// Raw implements the same method on the CpuFeatureFlags interface
+func (f *cpuFeatureFlags) Raw() [2]uint64 { return [2]uint64{f.flags, f.extraFlags} }

@@ -31,6 +31,14 @@ func fileCacheKey(m *wasm.Module) (ret filecache.Key) {
 	s := sha256.New()
 	s.Write(m.ID[:])
 	s.Write(magic)
+	// Write the CPU features so that we can cache the compiled module for the same CPU.
+	// This prevents the incompatible CPU features from being used.
+	cpu := platform.CpuFeatures.Raw()
+	// Reuse the `ret` buffer to write the first 16 bytes of the CPU features so that we can avoid the allocation.
+	binary.LittleEndian.PutUint64(ret[:8], cpu[0])
+	binary.LittleEndian.PutUint64(ret[8:16], cpu[1])
+	s.Write(ret[:16])
+	// Finally, write the hash to the ret buffer.
 	s.Sum(ret[:0])
 	return
 }
