@@ -4098,6 +4098,17 @@ func Test_pathOpen_Errors(t *testing.T) {
 `,
 		},
 		{
+			name:          "empty path",
+			fd:            sys.FdPreopen,
+			path:          0,
+			pathLen:       0,
+			expectedErrno: wasip1.ErrnoInval,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=,oflags=,fs_rights_base=,fs_rights_inheriting=,fdflags=)
+<== (opened_fd=,errno=EINVAL)
+`,
+		},
+		{
 			name:          "out-of-memory reading pathLen",
 			fd:            sys.FdPreopen,
 			path:          0,
