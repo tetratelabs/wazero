@@ -225,7 +225,7 @@ const (
 //     support compiler. Use NewRuntimeConfig to safely detect and fallback to
 //     NewRuntimeConfigInterpreter if needed.
 //
-//   - If you are using wazero in buildmode=c-shared, make sure that you set up the alternate signal stack
+//   - If you are using wazero in buildmode=c-archive or c-shared, make sure that you set up the alternate signal stack
 //     by using, e.g. `sigaltstack` combined with `SA_ONSTACK` flag on `sigaction` on Linux,
 //     before calling any api.Function. This is because the Go runtime does not set up the alternate signal stack
 //     for c-shared mode, and wazero uses the different stack than the calling Goroutine.
