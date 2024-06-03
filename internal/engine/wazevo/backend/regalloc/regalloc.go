@@ -1026,6 +1026,12 @@ func (a *Allocator) fixMergeState(f Function, blk Block) {
 	}
 }
 
+// reconcileEdge reconciles the register state between the current block and the predecessor for the real register `r`.
+//
+//   - currentVReg is the current VReg value that sits on the register `r`. This can be VRegInvalid if the register is not used at the end of the predecessor.
+//   - desiredVReg is the desired VReg value that should be on the register `r`.
+//   - freeReg is the temporary register that can be used to swap the values, which may or may not be used.
+//   - typ is the register type of the `r`.
 func (a *Allocator) reconcileEdge(f Function,
 	r RealReg,
 	pred Block,
@@ -1033,19 +1039,24 @@ func (a *Allocator) reconcileEdge(f Function,
 	freeReg VReg,
 	typ RegType,
 ) {
+	// There are four cases to consider:
+	// 1. currentVReg is valid, but desiredVReg is on the stack.
+	// 2. Both currentVReg and desiredVReg are valid.
+	// 3. Desired is on a different register than `r` and currentReg is not valid.
+	// 4. Desired is on the stack and currentReg is not valid.
+
 	s := &a.state
 	if currentVReg.Valid() {
-		// Both are on reg.
 		desiredState := s.getVRegState(desiredVReg.ID())
 		er := desiredState.r
 		if er == RealRegInvalid {
+			// Case 1: currentVReg is valid, but desiredVReg is on the stack.
 			if wazevoapi.RegAllocLoggingEnabled {
 				fmt.Printf("\t\tv%d is desired to be on %s, but currently on the stack\n",
 					desiredVReg.ID(), a.regInfo.RealRegName(r),
 				)
 			}
-			// This case is that the desired value is on the stack, but currentVReg is on the target register.
-			// We need to move the current value to the stack, and reload the desired value.
+			// We need to move the current value to the stack, and reload the desired value into the register.
 			// TODO: we can do better here.
 			f.StoreRegisterBefore(currentVReg.SetRealReg(r), pred.LastInstrForInsertion())
 			s.releaseRealReg(r)
@@ -1054,35 +1065,38 @@ func (a *Allocator) reconcileEdge(f Function,
 			f.ReloadRegisterBefore(desiredVReg.SetRealReg(r), pred.LastInstrForInsertion())
 			s.useRealReg(r, desiredVReg)
 			return
-		}
-
-		if wazevoapi.RegAllocLoggingEnabled {
-			fmt.Printf("\t\tv%d is desired to be on %s, but currently on %s\n",
-				desiredVReg.ID(), a.regInfo.RealRegName(r), a.regInfo.RealRegName(er),
+		} else {
+			// Case 2: Both currentVReg and desiredVReg are valid.
+			if wazevoapi.RegAllocLoggingEnabled {
+				fmt.Printf("\t\tv%d is desired to be on %s, but currently on %s\n",
+					desiredVReg.ID(), a.regInfo.RealRegName(r), a.regInfo.RealRegName(er),
+				)
+			}
+			// This case, we need to swap the values between the current and desired values.
+			f.SwapBefore(
+				currentVReg.SetRealReg(r),
+				desiredVReg.SetRealReg(er),
+				freeReg,
+				pred.LastInstrForInsertion(),
 			)
-		}
-		f.SwapBefore(
-			currentVReg.SetRealReg(r),
-			desiredVReg.SetRealReg(er),
-			freeReg,
-			pred.LastInstrForInsertion(),
-		)
-		s.allocatedRegSet = s.allocatedRegSet.add(freeReg.RealReg())
-		s.releaseRealReg(r)
-		s.releaseRealReg(er)
-		s.useRealReg(r, desiredVReg)
-		s.useRealReg(er, currentVReg)
-		if wazevoapi.RegAllocLoggingEnabled {
-			fmt.Printf("\t\tv%d previously on %s moved to %s\n", currentVReg.ID(), a.regInfo.RealRegName(r), a.regInfo.RealRegName(er))
+			s.allocatedRegSet = s.allocatedRegSet.add(freeReg.RealReg())
+			s.releaseRealReg(r)
+			s.releaseRealReg(er)
+			s.useRealReg(r, desiredVReg)
+			s.useRealReg(er, currentVReg)
+			if wazevoapi.RegAllocLoggingEnabled {
+				fmt.Printf("\t\tv%d previously on %s moved to %s\n", currentVReg.ID(), a.regInfo.RealRegName(r), a.regInfo.RealRegName(er))
+			}
 		}
 	} else {
-		// Desired is on reg, but currently the target register is not used.
 		if wazevoapi.RegAllocLoggingEnabled {
 			fmt.Printf("\t\tv%d is desired to be on %s, current not used\n",
 				desiredVReg.ID(), a.regInfo.RealRegName(r),
 			)
 		}
 		if currentReg := s.getVRegState(desiredVReg.ID()).r; currentReg != RealRegInvalid {
+			// Case 3: Desired is on a different register than `r` and currentReg is not valid.
+			// We simply need to move the desired value to the register.
 			f.InsertMoveBefore(
 				FromRealReg(r, typ),
 				desiredVReg.SetRealReg(currentReg),
@@ -1090,6 +1104,8 @@ func (a *Allocator) reconcileEdge(f Function,
 			)
 			s.releaseRealReg(currentReg)
 		} else {
+			// Case 4: Both currentVReg and desiredVReg are not valid.
+			// We simply need to reload the desired value into the register.
 			s.getVRegState(desiredVReg.ID()).recordReload(f, pred)
 			f.ReloadRegisterBefore(desiredVReg.SetRealReg(r), pred.LastInstrForInsertion())
 		}
