@@ -60,9 +60,8 @@ type (
 		phiDefInstListPool       wazevoapi.Pool[phiDefInstList]
 
 		// Followings are re-used during various places.
-		blks             []Block
-		reals            []RealReg
-		currentOccupants regInUseSet
+		blks  []Block
+		reals []RealReg
 
 		// Following two fields are updated while iterating the blocks in the reverse postorder.
 		state       state
@@ -979,27 +978,15 @@ func (a *Allocator) fixMergeState(f Function, blk Block) {
 	}
 
 	s.currentBlockID = bID
-	a.updateLiveInVRState(a.getOrAllocateBlockState(bID))
+	a.updateLiveInVRState(blkSt)
 
-	currentOccupants := &a.currentOccupants
 	for i := 0; i < preds; i++ {
-		currentOccupants.reset()
 		if i == blkSt.startFromPredIndex {
 			continue
 		}
 
-		currentOccupantsRev := make(map[VReg]RealReg)
 		pred := blk.Pred(i)
 		predSt := a.getOrAllocateBlockState(pred.ID())
-		for r := RealReg(0); r < 64; r++ {
-			if v := predSt.endRegs.get(r); v.Valid() {
-				if _v := blkSt.startRegs.get(r); !_v.Valid() {
-					continue
-				}
-				currentOccupants.add(r, v)
-				currentOccupantsRev[v] = r
-			}
-		}
 
 		s.resetAt(predSt)
 
@@ -1016,17 +1003,13 @@ func (a *Allocator) fixMergeState(f Function, blk Block) {
 			floatTmp = FromRealReg(floatFree, RegTypeFloat)
 		}
 
-		if wazevoapi.RegAllocLoggingEnabled {
-			fmt.Println("\t", pred.ID(), ":", currentOccupants.format(a.regInfo))
-		}
-
 		for r := RealReg(0); r < 64; r++ {
 			desiredVReg := desiredOccupants.get(r)
 			if !desiredVReg.Valid() {
 				continue
 			}
 
-			currentVReg := currentOccupants.get(r)
+			currentVReg := s.regsInUse.get(r)
 			if desiredVReg.ID() == currentVReg.ID() {
 				continue
 			}
@@ -1038,7 +1021,7 @@ func (a *Allocator) fixMergeState(f Function, blk Block) {
 			} else {
 				tmpRealReg = floatTmp
 			}
-			a.reconcileEdge(f, r, pred, currentOccupants, currentOccupantsRev, currentVReg, desiredVReg, tmpRealReg, typ)
+			a.reconcileEdge(f, r, pred, currentVReg, desiredVReg, tmpRealReg, typ)
 		}
 	}
 }
@@ -1046,8 +1029,6 @@ func (a *Allocator) fixMergeState(f Function, blk Block) {
 func (a *Allocator) reconcileEdge(f Function,
 	r RealReg,
 	pred Block,
-	currentOccupants *regInUseSet,
-	currentOccupantsRev map[VReg]RealReg,
 	currentVReg, desiredVReg VReg,
 	freeReg VReg,
 	typ RegType,
@@ -1055,8 +1036,9 @@ func (a *Allocator) reconcileEdge(f Function,
 	s := &a.state
 	if currentVReg.Valid() {
 		// Both are on reg.
-		er, ok := currentOccupantsRev[desiredVReg]
-		if !ok {
+		desiredState := s.getVRegState(desiredVReg.ID())
+		er := desiredState.r
+		if er == RealRegInvalid {
 			if wazevoapi.RegAllocLoggingEnabled {
 				fmt.Printf("\t\tv%d is desired to be on %s, but currently on the stack\n",
 					desiredVReg.ID(), a.regInfo.RealRegName(r),
@@ -1066,12 +1048,11 @@ func (a *Allocator) reconcileEdge(f Function,
 			// We need to move the current value to the stack, and reload the desired value.
 			// TODO: we can do better here.
 			f.StoreRegisterBefore(currentVReg.SetRealReg(r), pred.LastInstrForInsertion())
-			delete(currentOccupantsRev, currentVReg)
+			s.releaseRealReg(r)
 
 			s.getVRegState(desiredVReg.ID()).recordReload(f, pred)
 			f.ReloadRegisterBefore(desiredVReg.SetRealReg(r), pred.LastInstrForInsertion())
-			currentOccupants.add(r, desiredVReg)
-			currentOccupantsRev[desiredVReg] = r
+			s.useRealReg(r, desiredVReg)
 			return
 		}
 
@@ -1087,10 +1068,10 @@ func (a *Allocator) reconcileEdge(f Function,
 			pred.LastInstrForInsertion(),
 		)
 		s.allocatedRegSet = s.allocatedRegSet.add(freeReg.RealReg())
-		currentOccupantsRev[desiredVReg] = r
-		currentOccupantsRev[currentVReg] = er
-		currentOccupants.add(r, desiredVReg)
-		currentOccupants.add(er, currentVReg)
+		s.releaseRealReg(r)
+		s.releaseRealReg(er)
+		s.useRealReg(r, desiredVReg)
+		s.useRealReg(er, currentVReg)
 		if wazevoapi.RegAllocLoggingEnabled {
 			fmt.Printf("\t\tv%d previously on %s moved to %s\n", currentVReg.ID(), a.regInfo.RealRegName(r), a.regInfo.RealRegName(er))
 		}
@@ -1101,23 +1082,18 @@ func (a *Allocator) reconcileEdge(f Function,
 				desiredVReg.ID(), a.regInfo.RealRegName(r),
 			)
 		}
-		if currentReg, ok := currentOccupantsRev[desiredVReg]; ok {
+		if currentReg := s.getVRegState(desiredVReg.ID()).r; currentReg != RealRegInvalid {
 			f.InsertMoveBefore(
 				FromRealReg(r, typ),
 				desiredVReg.SetRealReg(currentReg),
 				pred.LastInstrForInsertion(),
 			)
-			currentOccupants.remove(currentReg)
+			s.releaseRealReg(currentReg)
 		} else {
 			s.getVRegState(desiredVReg.ID()).recordReload(f, pred)
 			f.ReloadRegisterBefore(desiredVReg.SetRealReg(r), pred.LastInstrForInsertion())
 		}
-		currentOccupantsRev[desiredVReg] = r
-		currentOccupants.add(r, desiredVReg)
-	}
-
-	if wazevoapi.RegAllocLoggingEnabled {
-		fmt.Println("\t", pred.ID(), ":", currentOccupants.format(a.regInfo))
+		s.useRealReg(r, desiredVReg)
 	}
 }
 
