@@ -972,6 +972,12 @@ func (a *Allocator) fixMergeState(f Function, blk Block) {
 	bID := blk.ID()
 	blkSt := a.getOrAllocateBlockState(bID)
 	desiredOccupants := &blkSt.startRegs
+	var desiredOccupantsSet RegSet
+	for i, v := range desiredOccupants {
+		if v != VRegInvalid {
+			desiredOccupantsSet = desiredOccupantsSet.add(RealReg(i))
+		}
+	}
 
 	if wazevoapi.RegAllocLoggingEnabled {
 		fmt.Println("fixMergeState", blk.ID(), ":", desiredOccupants.format(a.regInfo))
@@ -993,12 +999,12 @@ func (a *Allocator) fixMergeState(f Function, blk Block) {
 		// Finds the free registers if any.
 		intTmp, floatTmp := VRegInvalid, VRegInvalid
 		if intFree := s.findAllocatable(
-			a.regInfo.AllocatableRegisters[RegTypeInt], desiredOccupants.set,
+			a.regInfo.AllocatableRegisters[RegTypeInt], desiredOccupantsSet,
 		); intFree != RealRegInvalid {
 			intTmp = FromRealReg(intFree, RegTypeInt)
 		}
 		if floatFree := s.findAllocatable(
-			a.regInfo.AllocatableRegisters[RegTypeFloat], desiredOccupants.set,
+			a.regInfo.AllocatableRegisters[RegTypeFloat], desiredOccupantsSet,
 		); floatFree != RealRegInvalid {
 			floatTmp = FromRealReg(floatFree, RegTypeFloat)
 		}
