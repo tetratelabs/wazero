@@ -1952,6 +1952,9 @@ func (m *machine) encodeWithoutSSA(root *instruction) {
 		offset := int64(len(*bufPtr))
 		if cur.kind == nop0 {
 			l := cur.nop0Label()
+			if int(l) >= len(ectx.LabelPositions) {
+				continue
+			}
 			if pos := ectx.LabelPositions[l]; pos != nil {
 				pos.BinaryOffset = offset
 			}
