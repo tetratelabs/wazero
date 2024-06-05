@@ -4525,14 +4525,46 @@ func Test_pathSymlink_errors(t *testing.T) {
 	ok = mem.Write(link, []byte(linkName))
 	require.True(t, ok)
 
-	t.Run("success", func(t *testing.T) {
-		requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.PathSymlinkName,
-			uint64(file), uint64(len(fileName)), uint64(fd), uint64(link), uint64(len(linkName)))
-		require.Contains(t, log.String(), wasip1.ErrnoName(wasip1.ErrnoSuccess))
-		st, err := os.Lstat(joinPath(dirPath, linkName))
-		require.NoError(t, err)
-		require.Equal(t, st.Mode()&os.ModeSymlink, os.ModeSymlink)
-	})
+	success_cases := []struct {
+		name    string
+		fd      int32
+		oldPath string
+		newPath string
+	}{
+		{
+			name:    "dir",
+			fd:      fd,
+			oldPath: fileName,
+			newPath: linkName,
+		},
+		{
+			name:    "preopened root",
+			fd:      sys.FdPreopen,
+			oldPath: fileName,
+			newPath: linkName,
+		},
+	}
+
+	for _, tt := range success_cases {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			file := uint32(0xbb)
+			ok := mem.Write(file, []byte(fileName))
+			require.True(t, ok)
+
+			link := uint32(0xdd)
+			ok = mem.Write(link, []byte(linkName))
+			require.True(t, ok)
+
+			requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.PathSymlinkName,
+				uint64(file), uint64(len(tc.oldPath)), uint64(tc.fd), uint64(link), uint64(len(tc.newPath)))
+			require.Contains(t, log.String(), wasip1.ErrnoName(wasip1.ErrnoSuccess))
+			st, err := os.Lstat(joinPath(dirPath, linkName))
+			require.NoError(t, err)
+			require.Equal(t, st.Mode()&os.ModeSymlink, os.ModeSymlink)
+		})
+	}
 
 	t.Run("errors", func(t *testing.T) {
 		for _, tc := range []struct {
@@ -4941,7 +4973,7 @@ func requireOpenFile(t *testing.T, tmpDir string, pathName string, data []byte, 
 	if readOnly {
 		fsConfig = fsConfig.WithReadOnlyDirMount(tmpDir, "/")
 	} else {
-		fsConfig = fsConfig.WithDirMount(tmpDir, "/")
+		fsConfig = fsConfig.WithDirMount(tmpDir, "preopen")
 	}
 
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFSConfig(fsConfig))
