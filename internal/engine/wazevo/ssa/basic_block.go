@@ -81,10 +81,9 @@ type (
 		rootInstr, currentInstr *Instruction
 		// params are Values that represent parameters to a basicBlock.
 		// Each parameter can be considered as an output of PHI instruction in traditional SSA.
-		params   []Value
-		predIter int
-		preds    []basicBlockPredecessorInfo
-		success  []*basicBlock
+		params  []Value
+		preds   []basicBlockPredecessorInfo
+		success []*basicBlock
 		// singlePred is the alias to preds[0] for fast lookup, and only set after Seal is called.
 		singlePred *basicBlock
 		// lastDefinitions maps Variable to its last definition in this block.
