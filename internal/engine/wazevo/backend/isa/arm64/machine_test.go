@@ -181,10 +181,10 @@ L200:
 
 			ectx := m.executableContext
 
-			originLabelPos := ectx.AllocateLabelPosition(originLabel)
+			originLabelPos := ectx.GetOrAllocateLabelPosition(originLabel)
 			originLabelPos.Begin = cbr
 			originLabelPos.End = linkInstr(cbr, end)
-			originNextLabelPos := ectx.AllocateLabelPosition(originLabelNext)
+			originNextLabelPos := ectx.GetOrAllocateLabelPosition(originLabelNext)
 			originNextLabelPos.Begin = originalEndNext
 			linkInstr(originLabelPos.End, originalEndNext)
 
