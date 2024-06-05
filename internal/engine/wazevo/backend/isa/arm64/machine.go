@@ -187,9 +187,8 @@ func (m *machine) allocateBrTarget() (nop *instruction, l label) {
 	l = ectx.AllocateLabel()
 	nop = m.allocateInstr()
 	nop.asNop0WithLabel(l)
-	pos := ectx.AllocateLabelPosition(l)
+	pos := ectx.GetOrAllocateLabelPosition(l)
 	pos.Begin, pos.End = nop, nop
-	ectx.LabelPositions[l] = pos
 	return
 }
 
@@ -285,7 +284,7 @@ func (m *machine) resolveRelativeAddresses(ctx context.Context) {
 				switch cur.kind {
 				case nop0:
 					l := cur.nop0Label()
-					if pos, ok := ectx.LabelPositions[l]; ok {
+					if pos := ectx.LabelPositions[l]; pos != nil {
 						pos.BinaryOffset = offset + size
 					}
 				case condBr:
@@ -432,8 +431,10 @@ func (m *machine) insertConditionalJumpTrampoline(cbr *instruction, currentBlk *
 func (m *machine) Format() string {
 	ectx := m.executableContext
 	begins := map[*instruction]label{}
-	for l, pos := range ectx.LabelPositions {
-		begins[pos.Begin] = l
+	for _, pos := range ectx.LabelPositions {
+		if pos != nil {
+			begins[pos.Begin] = pos.L
+		}
 	}
 
 	irBlocks := map[label]ssa.BasicBlockID{}
