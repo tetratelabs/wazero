@@ -669,7 +669,7 @@ func TestBuildLoopNestingForest(t *testing.T) {
 			for expBlkID, blk := range blocks {
 				expChildren := tc.expLNF.children[expBlkID]
 				var actualChildren []BasicBlockID
-				for _, child := range blk.loopNestingForestChildren {
+				for _, child := range blk.loopNestingForestChildren.View() {
 					actualChildren = append(actualChildren, child.(*basicBlock).id)
 				}
 				sort.Slice(actualChildren, func(i, j int) bool {

@@ -180,7 +180,7 @@ func passBuildLoopNestingForest(b *builder) {
 			b.loopNestingForestRoots = append(b.loopNestingForestRoots, blk)
 		} else if n == ent {
 		} else if n.loopHeader {
-			n.loopNestingForestChildren = append(n.loopNestingForestChildren, blk)
+			n.loopNestingForestChildren = n.loopNestingForestChildren.Append(&b.varLengthBasicBlockPool, blk)
 		}
 	}
 
@@ -193,7 +193,7 @@ func passBuildLoopNestingForest(b *builder) {
 
 func printLoopNestingForest(root *basicBlock, depth int) {
 	fmt.Println(strings.Repeat("\t", depth), "loop nesting forest root:", root.ID())
-	for _, child := range root.loopNestingForestChildren {
+	for _, child := range root.loopNestingForestChildren.View() {
 		fmt.Println(strings.Repeat("\t", depth+1), "child:", child.ID())
 		if child.LoopHeader() {
 			printLoopNestingForest(child.(*basicBlock), depth+2)
