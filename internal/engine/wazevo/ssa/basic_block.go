@@ -49,20 +49,11 @@ type BasicBlock interface {
 	// ReturnBlock returns ture if this block represents the function return.
 	ReturnBlock() bool
 
-	// FormatHeader returns the debug string of this block, not including instruction.
-	FormatHeader(b Builder) string
-
 	// Valid is true if this block is still valid even after optimizations.
 	Valid() bool
 
 	// Sealed is true if this block has been sealed.
 	Sealed() bool
-
-	// BeginPredIterator returns the first predecessor of this block.
-	BeginPredIterator() BasicBlock
-
-	// NextPredIterator returns the next predecessor of this block.
-	NextPredIterator() BasicBlock
 
 	// Preds returns the number of predecessors of this block.
 	Preds() int
@@ -240,22 +231,6 @@ func (bb *basicBlock) NumPreds() int {
 	return len(bb.preds)
 }
 
-// BeginPredIterator implements BasicBlock.BeginPredIterator.
-func (bb *basicBlock) BeginPredIterator() BasicBlock {
-	bb.predIter = 0
-	return bb.NextPredIterator()
-}
-
-// NextPredIterator implements BasicBlock.NextPredIterator.
-func (bb *basicBlock) NextPredIterator() BasicBlock {
-	if bb.predIter >= len(bb.preds) {
-		return nil
-	}
-	pred := bb.preds[bb.predIter].blk
-	bb.predIter++
-	return pred
-}
-
 // Preds implements BasicBlock.Preds.
 func (bb *basicBlock) Preds() int {
 	return len(bb.preds)
@@ -327,8 +302,8 @@ func (bb *basicBlock) addPred(blk BasicBlock, branch *Instruction) {
 	pred.success = append(pred.success, bb)
 }
 
-// FormatHeader implements BasicBlock.FormatHeader.
-func (bb *basicBlock) FormatHeader(b Builder) string {
+// formatHeader returns the string representation of the header of the basicBlock.
+func (bb *basicBlock) formatHeader(b Builder) string {
 	ps := make([]string, len(bb.params))
 	for i, p := range bb.params {
 		ps[i] = p.formatWithType(b)

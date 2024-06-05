@@ -566,7 +566,7 @@ func (b *builder) Format() string {
 	}
 	for bb := iterBegin(); bb != nil; bb = iterNext() {
 		str.WriteByte('\n')
-		str.WriteString(bb.FormatHeader(b))
+		str.WriteString(bb.formatHeader(b))
 		str.WriteByte('\n')
 
 		for cur := bb.Root(); cur != nil; cur = cur.Next() {
