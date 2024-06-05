@@ -4497,7 +4497,7 @@ func Test_pathRemoveDirectory_Errors(t *testing.T) {
 	}
 }
 
-func Test_pathSymlink_errors(t *testing.T) {
+func Test_pathSymlink(t *testing.T) {
 	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
 
 	dirName := "dir"
