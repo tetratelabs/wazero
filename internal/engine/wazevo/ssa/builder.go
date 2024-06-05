@@ -135,6 +135,7 @@ func NewBuilder() Builder {
 	return &builder{
 		instructionsPool:               wazevoapi.NewPool[Instruction](resetInstruction),
 		basicBlocksPool:                wazevoapi.NewPool[basicBlock](resetBasicBlock),
+		varLengthBasicBlockPool:        wazevoapi.NewVarLengthPool[BasicBlock](),
 		varLengthPool:                  wazevoapi.NewVarLengthPool[Value](),
 		valueAnnotations:               make(map[ValueID]string),
 		signatures:                     make(map[SignatureID]*Signature),
@@ -176,6 +177,8 @@ type builder struct {
 	// The index is blockID of the BasicBlock.
 	dominators []*basicBlock
 	sparseTree dominatorSparseTree
+
+	varLengthBasicBlockPool wazevoapi.VarLengthPool[BasicBlock]
 
 	// loopNestingForestRoots are the roots of the loop nesting forest.
 	loopNestingForestRoots []BasicBlock
@@ -219,6 +222,7 @@ func (b *builder) Init(s *Signature) {
 	b.instructionsPool.Reset()
 	b.basicBlocksPool.Reset()
 	b.varLengthPool.Reset()
+	b.varLengthBasicBlockPool.Reset()
 	b.donePreBlockLayoutPasses = false
 	b.doneBlockLayout = false
 	b.donePostBlockLayoutPasses = false

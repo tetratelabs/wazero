@@ -118,7 +118,7 @@ type (
 
 		// loopNestingForestChildren holds the children of this block in the loop nesting forest.
 		// Non-empty if and only if this block is a loop header (i.e. loopHeader=true)
-		loopNestingForestChildren []BasicBlock
+		loopNestingForestChildren wazevoapi.VarLength[BasicBlock]
 
 		// reversePostOrder is used to sort all the blocks in the function in reverse post order.
 		// This is used in builder.LayoutBlocks.
@@ -137,6 +137,9 @@ type (
 		value Value
 	}
 )
+
+// basicBlockVarLengthNil is the default nil value for basicBlock.loopNestingForestChildren.
+var basicBlockVarLengthNil = wazevoapi.NewNilVarLength[BasicBlock]()
 
 const basicBlockIDReturnBlock = 0xffffffff
 
@@ -297,7 +300,7 @@ func resetBasicBlock(bb *basicBlock) {
 	bb.unknownValues = bb.unknownValues[:0]
 	bb.lastDefinitions = wazevoapi.ResetMap(bb.lastDefinitions)
 	bb.reversePostOrder = -1
-	bb.loopNestingForestChildren = bb.loopNestingForestChildren[:0]
+	bb.loopNestingForestChildren = basicBlockVarLengthNil
 	bb.loopHeader = false
 	bb.sibling = nil
 	bb.child = nil
@@ -390,7 +393,7 @@ func (bb *basicBlock) String() string {
 
 // LoopNestingForestChildren implements BasicBlock.LoopNestingForestChildren.
 func (bb *basicBlock) LoopNestingForestChildren() []BasicBlock {
-	return bb.loopNestingForestChildren
+	return bb.loopNestingForestChildren.View()
 }
 
 // LoopHeader implements BasicBlock.LoopHeader.
