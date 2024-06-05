@@ -1951,16 +1951,16 @@ func pathSymlinkFn(_ context.Context, mod api.Module, params []uint64) experimen
 		return experimentalsys.EFAULT
 	}
 
-	newPathBuf, ok := mem.Read(newPath, newPathLen)
-	if !ok {
-		return experimentalsys.EFAULT
+	_, newPathName, errno := atPath(fsc, mod.Memory(), fd, newPath, newPathLen)
+	if errno != 0 {
+		return errno
 	}
 
 	return dir.FS.Symlink(
 		// Do not join old path since it's only resolved when dereference the link created here.
 		// And the dereference result depends on the opening directory's file descriptor at that point.
 		bufToStr(oldPathBuf),
-		path.Join(dir.Name, bufToStr(newPathBuf)),
+		newPathName,
 	)
 }
 
