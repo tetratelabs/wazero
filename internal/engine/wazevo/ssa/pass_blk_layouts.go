@@ -143,7 +143,7 @@ func passLayoutBlocks(b *builder) {
 	if wazevoapi.SSAValidationEnabled {
 		for _, trampoline := range trampolines {
 			if _, ok := b.blkVisited[trampoline]; !ok {
-				panic("BUG: trampoline block not inserted: " + trampoline.FormatHeader(b))
+				panic("BUG: trampoline block not inserted: " + trampoline.formatHeader(b))
 			}
 			trampoline.validate(b)
 		}
