@@ -192,7 +192,7 @@ func TestBuilder_splitCriticalEdge(t *testing.T) {
 	predInfo := &basicBlockPredecessorInfo{blk: predBlk, branch: originalBrz}
 	trampoline := b.splitCriticalEdge(predBlk, dummyBlk, predInfo)
 	require.NotNil(t, trampoline)
-	require.Equal(t, 100, trampoline.reversePostOrder)
+	require.Equal(t, int32(100), trampoline.reversePostOrder)
 
 	require.Equal(t, trampoline, predInfo.blk)
 	require.Equal(t, originalBrz, predInfo.branch)
