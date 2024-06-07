@@ -754,7 +754,8 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 		killSet := a.reals[:0]
 
 		// Gather the set of registers that will be used in the current instruction.
-		for _, use := range instr.Uses(&a.vs) {
+		uses := instr.Uses(&a.vs)
+		for _, use := range uses {
 			if use.IsRealReg() {
 				r := use.RealReg()
 				currentUsedSet = currentUsedSet.add(r)
@@ -769,7 +770,7 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 			}
 		}
 
-		for i, use := range instr.Uses(&a.vs) {
+		for i, use := range uses {
 			if !use.IsRealReg() {
 				vs := s.getVRegState(use.ID())
 				killed := vs.lastUse == pc
