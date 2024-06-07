@@ -458,11 +458,11 @@ L2 (SSA Block: blk2):
 			name: "single_predecessor_local_refs", m: testcases.SinglePredecessorLocalRefs.Module,
 			afterLoweringARM64: `
 L1 (SSA Block: blk0):
-	mov x132?, xzr
-	cbz w132?, (L2)
-L3 (SSA Block: blk1):
 	mov x131?, xzr
-	mov x0, x131?
+	cbz w131?, (L2)
+L3 (SSA Block: blk1):
+	mov x130?, xzr
+	mov x0, x130?
 	ret
 L2 (SSA Block: blk2):
 L4 (SSA Block: blk3):
