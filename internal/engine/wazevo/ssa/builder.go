@@ -143,7 +143,6 @@ func NewBuilder() Builder {
 		varLengthPool:                  wazevoapi.NewVarLengthPool[Value](),
 		valueAnnotations:               make(map[ValueID]string),
 		signatures:                     make(map[SignatureID]*Signature),
-		blkVisited:                     make(map[*basicBlock]int),
 		valueIDAliases:                 make(map[ValueID]Value),
 		redundantParameterIndexToValue: make(map[int]Value),
 		returnBlk:                      &basicBlock{id: basicBlockIDReturnBlock},
@@ -189,7 +188,6 @@ type builder struct {
 
 	// The followings are used for optimization passes/deterministic compilation.
 	instStack                      []*Instruction
-	blkVisited                     map[*basicBlock]int
 	valueIDToInstruction           []*Instruction
 	blkStack                       []*basicBlock
 	blkStack2                      []*basicBlock
@@ -266,11 +264,6 @@ func (b *builder) Init(s *Signature) {
 	b.blkStack2 = b.blkStack2[:0]
 	b.dominators = b.dominators[:0]
 	b.loopNestingForestRoots = b.loopNestingForestRoots[:0]
-
-	for i := 0; i < b.basicBlocksPool.Allocated(); i++ {
-		blk := b.basicBlocksPool.View(i)
-		delete(b.blkVisited, blk)
-	}
 	b.basicBlocksPool.Reset()
 
 	for v := ValueID(0); v < b.nextValueID; v++ {

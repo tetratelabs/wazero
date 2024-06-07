@@ -15,10 +15,6 @@ import (
 // At the last of pass, this function also does the loop detection and sets the basicBlock.loop flag.
 func passCalculateImmediateDominators(b *builder) {
 	reversePostOrder := b.reversePostOrderedBasicBlocks[:0]
-	exploreStack := b.blkStack[:0]
-	b.clearBlkVisited()
-
-	entryBlk := b.entryBlk()
 
 	// Store the reverse postorder from the entrypoint into reversePostOrder slice.
 	// This calculation of reverse postorder is not described in the paper,
@@ -28,14 +24,17 @@ func passCalculateImmediateDominators(b *builder) {
 	// which is a reasonable assumption as long as SSA Builder is properly used.
 	//
 	// First we push blocks in postorder iteratively visit successors of the entry block.
-	exploreStack = append(exploreStack, entryBlk)
+	entryBlk := b.entryBlk()
+	exploreStack := append(b.blkStack[:0], entryBlk)
+	// These flags are used to track the state of the block in the DFS traversal.
+	// We temporarily use the reversePostOrder field to store the state.
 	const visitStateUnseen, visitStateSeen, visitStateDone = 0, 1, 2
-	b.blkVisited[entryBlk] = visitStateSeen
+	entryBlk.visited = visitStateSeen
 	for len(exploreStack) > 0 {
 		tail := len(exploreStack) - 1
 		blk := exploreStack[tail]
 		exploreStack = exploreStack[:tail]
-		switch b.blkVisited[blk] {
+		switch blk.visited {
 		case visitStateUnseen:
 			// This is likely a bug in the frontend.
 			panic("BUG: unsupported CFG")
@@ -48,16 +47,18 @@ func passCalculateImmediateDominators(b *builder) {
 				if succ.ReturnBlock() || succ.invalid {
 					continue
 				}
-				if b.blkVisited[succ] == visitStateUnseen {
-					b.blkVisited[succ] = visitStateSeen
+				if succ.visited == visitStateUnseen {
+					succ.visited = visitStateSeen
 					exploreStack = append(exploreStack, succ)
 				}
 			}
 			// Finally, we could pop this block once we pop all of its successors.
-			b.blkVisited[blk] = visitStateDone
+			blk.visited = visitStateDone
 		case visitStateDone:
 			// Note: at this point we push blk in postorder despite its name.
 			reversePostOrder = append(reversePostOrder, blk)
+		default:
+			panic("BUG")
 		}
 	}
 	// At this point, reversePostOrder has postorder actually, so we reverse it.
@@ -67,7 +68,7 @@ func passCalculateImmediateDominators(b *builder) {
 	}
 
 	for i, blk := range reversePostOrder {
-		blk.reversePostOrder = i
+		blk.reversePostOrder = int32(i)
 	}
 
 	// Reuse the dominators slice if possible from the previous computation of function.

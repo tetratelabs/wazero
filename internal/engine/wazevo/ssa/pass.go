@@ -78,12 +78,11 @@ func (b *builder) runFinalizingPasses() {
 // passDeadBlockEliminationOpt searches the unreachable blocks, and sets the basicBlock.invalid flag true if so.
 func passDeadBlockEliminationOpt(b *builder) {
 	entryBlk := b.entryBlk()
-	b.clearBlkVisited()
 	b.blkStack = append(b.blkStack, entryBlk)
 	for len(b.blkStack) > 0 {
 		reachableBlk := b.blkStack[len(b.blkStack)-1]
 		b.blkStack = b.blkStack[:len(b.blkStack)-1]
-		b.blkVisited[reachableBlk] = 0 // the value won't be used in this pass.
+		reachableBlk.visited = 1
 
 		if !reachableBlk.sealed && !reachableBlk.ReturnBlock() {
 			panic(fmt.Sprintf("%s is not sealed", reachableBlk))
@@ -94,7 +93,7 @@ func passDeadBlockEliminationOpt(b *builder) {
 		}
 
 		for _, succ := range reachableBlk.success {
-			if _, ok := b.blkVisited[succ]; ok {
+			if succ.visited == 1 {
 				continue
 			}
 			b.blkStack = append(b.blkStack, succ)
@@ -102,9 +101,10 @@ func passDeadBlockEliminationOpt(b *builder) {
 	}
 
 	for blk := b.blockIteratorBegin(); blk != nil; blk = b.blockIteratorNext() {
-		if _, ok := b.blkVisited[blk]; !ok {
+		if blk.visited != 1 {
 			blk.invalid = true
 		}
+		blk.visited = 0
 	}
 }
 
@@ -121,7 +121,7 @@ func passRedundantPhiEliminationOpt(b *builder) {
 	//  the maximum number of iteration was 22, which seems to be acceptable but not that small either since the
 	//  complexity here is O(BlockNum * Iterations) at the worst case where BlockNum might be the order of thousands.
 	//  -- Note --
-	// 	Currently, each iteration can run in an order of blocks, but it empirically converges quickly in practice when
+	// 	Currently, each iteration can run in any order of blocks, but it empirically converges quickly in practice when
 	// 	running on the reverse post-order. It might be possible to optimize this further by using the dominator tree.
 	for {
 		changed := false
@@ -353,18 +353,6 @@ func (b *builder) incRefCount(id ValueID, from *Instruction) {
 		fmt.Printf("v%d referenced from %v\n", id, from.Format(b))
 	}
 	b.valueRefCounts[id]++
-}
-
-// clearBlkVisited clears the b.blkVisited map so that we can reuse it for multiple places.
-func (b *builder) clearBlkVisited() {
-	b.blkStack2 = b.blkStack2[:0]
-	for key := range b.blkVisited {
-		b.blkStack2 = append(b.blkStack2, key)
-	}
-	for _, blk := range b.blkStack2 {
-		delete(b.blkVisited, blk)
-	}
-	b.blkStack2 = b.blkStack2[:0]
 }
 
 // passNopInstElimination eliminates the instructions which is essentially a no-op.

@@ -112,7 +112,10 @@ type (
 
 		// reversePostOrder is used to sort all the blocks in the function in reverse post order.
 		// This is used in builder.LayoutBlocks.
-		reversePostOrder int
+		reversePostOrder int32
+
+		// visited is used during various traversals.
+		visited int32
 
 		// child and sibling are the ones in the dominator tree.
 		child, sibling *basicBlock
@@ -274,6 +277,7 @@ func resetBasicBlock(bb *basicBlock) {
 	bb.unknownValues = bb.unknownValues[:0]
 	bb.lastDefinitions = wazevoapi.ResetMap(bb.lastDefinitions)
 	bb.reversePostOrder = -1
+	bb.visited = 0
 	bb.loopNestingForestChildren = basicBlockVarLengthNil
 	bb.loopHeader = false
 	bb.sibling = nil
