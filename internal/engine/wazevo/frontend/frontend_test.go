@@ -375,13 +375,11 @@ blk3: () <-- (blk1)
 			exp: `
 blk0: (exec_ctx:i64, module_ctx:i64)
 	v2:i32 = Iconst_32 0x0
-	v3:i32 = Iconst_32 0x0
-	v4:i32 = Iconst_32 0x0
 	Brz v2, blk2
 	Jump blk1
 
 blk1: () <-- (blk0)
-	Return v4
+	Return v2
 
 blk2: () <-- (blk0)
 	Jump blk3
@@ -392,12 +390,11 @@ blk3: () <-- (blk2)
 			expAfterPasses: `
 blk0: (exec_ctx:i64, module_ctx:i64)
 	v2:i32 = Iconst_32 0x0
-	v4:i32 = Iconst_32 0x0
 	Brz v2, blk2
 	Jump fallthrough
 
 blk1: () <-- (blk0)
-	Return v4
+	Return v2
 
 blk2: () <-- (blk0)
 	Jump fallthrough

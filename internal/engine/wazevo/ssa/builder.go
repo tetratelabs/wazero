@@ -127,7 +127,11 @@ type Builder interface {
 	// Idom returns the immediate dominator of the given BasicBlock.
 	Idom(blk BasicBlock) BasicBlock
 
+	// VarLengthPool returns the VarLengthPool of Value.
 	VarLengthPool() *wazevoapi.VarLengthPool[Value]
+
+	// InsertZeroValue inserts a zero value constant instruction of the given type.
+	InsertZeroValue(t Type)
 }
 
 // NewBuilder returns a new Builder implementation.
@@ -203,6 +207,32 @@ type builder struct {
 	donePostBlockLayoutPasses bool
 
 	currentSourceOffset SourceOffset
+
+	// zeros are the zero value constants for each type.
+	zeros [typeEnd]Value
+}
+
+// InsertZeroValue implements Builder.InsertZeroValue.
+func (b *builder) InsertZeroValue(t Type) {
+	if b.zeros[t].Valid() {
+		return
+	}
+	zeroInst := b.AllocateInstruction()
+	switch t {
+	case TypeI32:
+		zeroInst.AsIconst32(0)
+	case TypeI64:
+		zeroInst.AsIconst64(0)
+	case TypeF32:
+		zeroInst.AsF32const(0)
+	case TypeF64:
+		zeroInst.AsF64const(0)
+	case TypeV128:
+		zeroInst.AsVconst(0, 0)
+	default:
+		panic("TODO: " + t.String())
+	}
+	b.zeros[t] = zeroInst.Insert(b).Return()
 }
 
 func (b *builder) VarLengthPool() *wazevoapi.VarLengthPool[Value] {
@@ -218,6 +248,7 @@ func (b *builder) ReturnBlock() BasicBlock {
 func (b *builder) Init(s *Signature) {
 	b.nextVariable = 0
 	b.currentSignature = s
+	b.zeros = [typeEnd]Value{ValueInvalid, ValueInvalid, ValueInvalid, ValueInvalid, ValueInvalid, ValueInvalid}
 	resetBasicBlock(b.returnBlk)
 	b.instructionsPool.Reset()
 	b.basicBlocksPool.Reset()
@@ -486,6 +517,9 @@ func (b *builder) findValue(typ Type, variable Variable, blk *basicBlock) Value 
 			value:    value,
 		})
 		return value
+	} else if blk.EntryBlock() {
+		// If this is the entry block, we reach the uninitialized variable which has zero value.
+		return b.zeros[b.definedVariableType(variable)]
 	}
 
 	if pred := blk.singlePred; pred != nil {
