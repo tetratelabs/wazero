@@ -47,7 +47,7 @@ func newCompilationCacheWithDir(cacheDir string) wazero.CompilationCache {
 	return cache
 }
 
-// newRuntimeCompileDestroy creates a new wazero.Runtime, compile a binary, and then delete the runtime.
+// newRuntimeCompileClose creates a new wazero.Runtime, compile a binary, and then delete the runtime.
 func newRuntimeCompileClose(ctx context.Context, config wazero.RuntimeConfig) {
 	r := wazero.NewRuntimeWithConfig(ctx, config)
 	defer r.Close(ctx) // This closes everything this Runtime created except the file system cache.
