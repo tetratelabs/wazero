@@ -66,6 +66,13 @@ considering their efforts before starting your own!
 | [YoMo][26]    | Streaming [Serverless][27] Framework for buildnig Geo-distributed system  |
 | [Wetware][28] | Web3's answer to Cloud hosting                                            |
 
+### Database
+
+| Name                   | Description                                        |
+|:-----------------------|----------------------------------------------------|
+| [wescale][44] | a database proxy that supports OnlineDDL |
+
+
 ## Updating this list
 
 This is a community maintained list. It may have an inaccurate or outdated
@@ -160,3 +167,5 @@ experience.
 [42]: https://github.com/gen2brain/jpegli
 
 [43]: https://github.com/gen2brain/webp
+
+[44]: https://github.com/wesql/wescale
