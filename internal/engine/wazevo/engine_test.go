@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"sort"
 	"testing"
 	"unsafe"
 
@@ -104,19 +105,6 @@ func TestEngine_CompileModule(t *testing.T) {
 }
 
 func TestEngine_sortedCompiledModules(t *testing.T) {
-	getCM := func(addr uintptr) *compiledModule {
-		var buf []byte
-		{
-			// TODO: use unsafe.Slice after floor version is set to Go 1.20.
-			hdr := (*reflect.SliceHeader)(unsafe.Pointer(&buf))
-			hdr.Data = addr
-			hdr.Len = 4
-			hdr.Cap = 4
-		}
-		cm := &compiledModule{executables: &executables{executable: buf}}
-		return cm
-	}
-
 	requireEqualExisting := func(t *testing.T, e *engine, expected []uintptr) {
 		actual := make([]uintptr, 0)
 		for _, cm := range e.sortedCompiledModules {
@@ -125,60 +113,75 @@ func TestEngine_sortedCompiledModules(t *testing.T) {
 		require.Equal(t, expected, actual)
 	}
 
-	m1 := getCM(1)
-	m100 := getCM(100)
-	m5 := getCM(5)
-	m10 := getCM(10)
+	var cms []struct {
+		cm   *compiledModule
+		addr uintptr
+	}
+	for i := 0; i < 4; i++ {
+		cm := &compiledModule{executables: &executables{executable: make([]byte, 100)}}
+		cms = append(cms, struct {
+			cm   *compiledModule
+			addr uintptr
+		}{cm, uintptr(unsafe.Pointer(&cm.executables.executable[0]))})
+	}
+
+	sort.Slice(cms, func(i, j int) bool {
+		return cms[i].addr < cms[j].addr
+	})
+	cm1, addr1 := cms[0].cm, cms[0].addr
+	cm2, addr2 := cms[1].cm, cms[1].addr
+	cm3, addr3 := cms[2].cm, cms[2].addr
+	cm4, addr4 := cms[3].cm, cms[3].addr
 
 	t.Run("add", func(t *testing.T) {
 		e := &engine{}
-		e.addCompiledModuleToSortedList(m1)
-		e.addCompiledModuleToSortedList(m100)
-		e.addCompiledModuleToSortedList(m5)
-		e.addCompiledModuleToSortedList(m10)
-		requireEqualExisting(t, e, []uintptr{1, 5, 10, 100})
+		e.addCompiledModuleToSortedList(cm1)
+		e.addCompiledModuleToSortedList(cm4)
+		e.addCompiledModuleToSortedList(cm2)
+		e.addCompiledModuleToSortedList(cm3)
+		requireEqualExisting(t, e, []uintptr{addr1, addr2, addr3, addr4})
 	})
 	t.Run("delete", func(t *testing.T) {
 		e := &engine{}
-		e.addCompiledModuleToSortedList(m1)
-		e.addCompiledModuleToSortedList(m100)
-		e.addCompiledModuleToSortedList(m5)
-		e.addCompiledModuleToSortedList(m10)
-		e.deleteCompiledModuleFromSortedList(m100)
+		e.addCompiledModuleToSortedList(cm1)
+		e.addCompiledModuleToSortedList(cm4)
+		e.addCompiledModuleToSortedList(cm2)
+		e.addCompiledModuleToSortedList(cm3)
+		e.deleteCompiledModuleFromSortedList(cm4)
 		require.Equal(t, 3, len(e.sortedCompiledModules))
-		requireEqualExisting(t, e, []uintptr{1, 5, 10})
-		e.deleteCompiledModuleFromSortedList(m1)
-		requireEqualExisting(t, e, []uintptr{5, 10})
-		e.deleteCompiledModuleFromSortedList(m10)
-		requireEqualExisting(t, e, []uintptr{5})
-		e.deleteCompiledModuleFromSortedList(m5)
+		requireEqualExisting(t, e, []uintptr{addr1, addr2, addr3})
+		e.deleteCompiledModuleFromSortedList(cm2)
+		requireEqualExisting(t, e, []uintptr{addr1, addr3})
+		e.deleteCompiledModuleFromSortedList(cm1)
+		requireEqualExisting(t, e, []uintptr{addr3})
+		e.deleteCompiledModuleFromSortedList(cm3)
 		requireEqualExisting(t, e, []uintptr{})
 	})
 
 	t.Run("OfAddr", func(t *testing.T) {
 		e := &engine{}
-		e.addCompiledModuleToSortedList(m1)
-		e.addCompiledModuleToSortedList(m100)
-		e.addCompiledModuleToSortedList(m5)
-		e.addCompiledModuleToSortedList(m10)
+		e.addCompiledModuleToSortedList(cm1)
+		e.addCompiledModuleToSortedList(cm4)
+		e.addCompiledModuleToSortedList(cm2)
+		e.addCompiledModuleToSortedList(cm3)
 
 		require.Equal(t, nil, e.compiledModuleOfAddr(0))
-		require.Equal(t, unsafe.Pointer(m1), unsafe.Pointer(e.compiledModuleOfAddr(1)))
-		require.Equal(t, unsafe.Pointer(m1), unsafe.Pointer(e.compiledModuleOfAddr(4)))
-		require.Equal(t, unsafe.Pointer(m5), unsafe.Pointer(e.compiledModuleOfAddr(5)))
-		require.Equal(t, unsafe.Pointer(m5), unsafe.Pointer(e.compiledModuleOfAddr(8)))
-		require.Equal(t, unsafe.Pointer(m10), unsafe.Pointer(e.compiledModuleOfAddr(10)))
-		require.Equal(t, unsafe.Pointer(m10), unsafe.Pointer(e.compiledModuleOfAddr(11)))
-		require.Equal(t, unsafe.Pointer(m10), unsafe.Pointer(e.compiledModuleOfAddr(12)))
-		require.Equal(t, unsafe.Pointer(m100), unsafe.Pointer(e.compiledModuleOfAddr(100)))
-		require.Equal(t, unsafe.Pointer(m100), unsafe.Pointer(e.compiledModuleOfAddr(103)))
-		e.deleteCompiledModuleFromSortedList(m1)
-		require.Equal(t, nil, e.compiledModuleOfAddr(1))
-		require.Equal(t, nil, e.compiledModuleOfAddr(2))
-		require.Equal(t, nil, e.compiledModuleOfAddr(4))
-		e.deleteCompiledModuleFromSortedList(m100)
-		require.Equal(t, nil, e.compiledModuleOfAddr(100))
-		require.Equal(t, nil, e.compiledModuleOfAddr(103))
+		require.Equal(t, unsafe.Pointer(cm1), unsafe.Pointer(e.compiledModuleOfAddr(addr1)))
+		require.Equal(t, unsafe.Pointer(cm1), unsafe.Pointer(e.compiledModuleOfAddr(addr1+10)))
+		require.Equal(t, unsafe.Pointer(cm2), unsafe.Pointer(e.compiledModuleOfAddr(addr2)))
+		require.Equal(t, unsafe.Pointer(cm2), unsafe.Pointer(e.compiledModuleOfAddr(addr2+50)))
+		require.Equal(t, unsafe.Pointer(cm3), unsafe.Pointer(e.compiledModuleOfAddr(addr3)))
+		require.Equal(t, unsafe.Pointer(cm3), unsafe.Pointer(e.compiledModuleOfAddr(addr3+1)))
+		require.Equal(t, unsafe.Pointer(cm3), unsafe.Pointer(e.compiledModuleOfAddr(addr3+2)))
+		require.Equal(t, unsafe.Pointer(cm4), unsafe.Pointer(e.compiledModuleOfAddr(addr4+1)))
+		require.Equal(t, unsafe.Pointer(cm4), unsafe.Pointer(e.compiledModuleOfAddr(addr4+10)))
+		e.deleteCompiledModuleFromSortedList(cm1)
+		require.Equal(t, nil, e.compiledModuleOfAddr(addr1))
+		require.Equal(t, nil, e.compiledModuleOfAddr(addr1+1))
+		require.Equal(t, nil, e.compiledModuleOfAddr(addr1+99))
+		e.deleteCompiledModuleFromSortedList(cm4)
+		require.Equal(t, nil, e.compiledModuleOfAddr(addr4))
+		require.Equal(t, nil, e.compiledModuleOfAddr(addr4+10))
 	})
 }
 
