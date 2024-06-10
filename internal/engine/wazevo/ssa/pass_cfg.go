@@ -203,10 +203,10 @@ func printLoopNestingForest(root *basicBlock, depth int) {
 }
 
 type dominatorSparseTree struct {
-	time         int
+	time         int32
 	euler        []*basicBlock
-	first, depth []int
-	table        [][]int
+	first, depth []int32
+	table        [][]int32
 }
 
 // passBuildDominatorTree builds the dominator tree for the function, and constructs builder.sparseTree.
@@ -233,11 +233,11 @@ func passBuildDominatorTree(b *builder) {
 	n := b.basicBlocksPool.Allocated()
 	st := &b.sparseTree
 	st.euler = append(st.euler[:0], make([]*basicBlock, 2*n-1)...)
-	st.first = append(st.first[:0], make([]int, n)...)
+	st.first = append(st.first[:0], make([]int32, n)...)
 	for i := range st.first {
 		st.first[i] = -1
 	}
-	st.depth = append(st.depth[:0], make([]int, 2*n-1)...)
+	st.depth = append(st.depth[:0], make([]int32, 2*n-1)...)
 	st.time = 0
 
 	// Start building the sparse tree.
@@ -245,9 +245,9 @@ func passBuildDominatorTree(b *builder) {
 	st.buildSparseTable()
 }
 
-func (dt *dominatorSparseTree) eulerTour(node *basicBlock, height int) {
+func (dt *dominatorSparseTree) eulerTour(node *basicBlock, height int32) {
 	if wazevoapi.SSALoggingEnabled {
-		fmt.Println(strings.Repeat("\t", height), "euler tour:", node.ID())
+		fmt.Println(strings.Repeat("\t", int(height)), "euler tour:", node.ID())
 	}
 	dt.euler[dt.time] = node
 	dt.depth[dt.time] = height
@@ -271,13 +271,13 @@ func (dt *dominatorSparseTree) buildSparseTable() {
 	table := dt.table
 
 	if n >= len(table) {
-		table = append(table, make([][]int, n+1)...)
+		table = append(table, make([][]int32, n-len(table)+1)...)
 	}
 	for i := range table {
 		if len(table[i]) < k {
-			table[i] = append(table[i], make([]int, k)...)
+			table[i] = append(table[i], make([]int32, k-len(table[i]))...)
 		}
-		table[i][0] = i
+		table[i][0] = int32(i)
 	}
 
 	for j := 1; 1<<j <= n; j++ {
@@ -293,7 +293,7 @@ func (dt *dominatorSparseTree) buildSparseTable() {
 }
 
 // rmq performs a range minimum query on the sparse table.
-func (dt *dominatorSparseTree) rmq(l, r int) int {
+func (dt *dominatorSparseTree) rmq(l, r int32) int32 {
 	table := dt.table
 	depth := dt.depth
 	j := int(math.Log2(float64(r - l + 1)))

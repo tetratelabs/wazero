@@ -232,10 +232,10 @@ func passRedundantPhiEliminationOpt(b *builder) {
 func passDeadCodeEliminationOpt(b *builder) {
 	nvid := int(b.nextValueID)
 	if nvid >= len(b.valueRefCounts) {
-		b.valueRefCounts = append(b.valueRefCounts, make([]int, b.nextValueID)...)
+		b.valueRefCounts = append(b.valueRefCounts, make([]int, nvid-len(b.valueRefCounts)+1)...)
 	}
 	if nvid >= len(b.valueIDToInstruction) {
-		b.valueIDToInstruction = append(b.valueIDToInstruction, make([]*Instruction, b.nextValueID)...)
+		b.valueIDToInstruction = append(b.valueIDToInstruction, make([]*Instruction, nvid-len(b.valueIDToInstruction)+1)...)
 	}
 
 	// First, we gather all the instructions with side effects.
@@ -358,7 +358,7 @@ func (b *builder) incRefCount(id ValueID, from *Instruction) {
 // passNopInstElimination eliminates the instructions which is essentially a no-op.
 func passNopInstElimination(b *builder) {
 	if int(b.nextValueID) >= len(b.valueIDToInstruction) {
-		b.valueIDToInstruction = append(b.valueIDToInstruction, make([]*Instruction, b.nextValueID)...)
+		b.valueIDToInstruction = append(b.valueIDToInstruction, make([]*Instruction, int(b.nextValueID)-len(b.valueIDToInstruction)+1)...)
 	}
 
 	for blk := b.blockIteratorBegin(); blk != nil; blk = b.blockIteratorNext() {
