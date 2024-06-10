@@ -518,21 +518,42 @@ func (b *builder) findValue(typ Type, variable Variable, blk *basicBlock) Value 
 	// If this block has multiple predecessors, we have to gather the definitions,
 	// and treat them as an argument to this block.
 	//
-	// The first thing is to define a new parameter to this block which may or may not be redundant, but
-	// later we eliminate trivial params in an optimization pass. This must be done before finding the
-	// definitions in the predecessors so that we can break the cycle.
-	paramValue := blk.AddParam(b, typ)
-	b.DefineVariable(variable, paramValue, blk)
-
-	// After the new param is added, we have to manipulate the original branching instructions
-	// in predecessors so that they would pass the definition of `variable` as the argument to
-	// the newly added PHI.
+	// But before that, we have to check if the possible definitions are the same Value.
+	tmpValue := b.allocateValue(typ)
+	// Break the cycle by defining the variable with the tmpValue.
+	b.DefineVariable(variable, tmpValue, blk)
+	// Check all the predecessors if they have the same definition.
+	uniqueValue := ValueInvalid
 	for i := range blk.preds {
-		pred := &blk.preds[i]
-		value := b.findValue(typ, variable, pred.blk)
-		pred.branch.addArgumentBranchInst(b, value)
+		predValue := b.findValue(typ, variable, blk.preds[i].blk)
+		if uniqueValue == ValueInvalid {
+			uniqueValue = predValue
+		} else if uniqueValue != predValue {
+			uniqueValue = ValueInvalid
+			break
+		}
 	}
-	return paramValue
+
+	if uniqueValue != ValueInvalid {
+		// If all the predecessors have the same definition, we can use that value.
+		b.DefineVariable(variable, uniqueValue, blk)
+		b.alias(tmpValue, uniqueValue)
+		return uniqueValue
+	} else {
+		// Otherwise, add the tmpValue to this block as a parameter which may or may not be redundant, but
+		// later we eliminate trivial params in an optimization pass. This must be done before finding the
+		// definitions in the predecessors so that we can break the cycle.
+		blk.addParamOn(tmpValue)
+		// After the new param is added, we have to manipulate the original branching instructions
+		// in predecessors so that they would pass the definition of `variable` as the argument to
+		// the newly added PHI.
+		for i := range blk.preds {
+			pred := &blk.preds[i]
+			value := b.findValue(typ, variable, pred.blk)
+			pred.branch.addArgumentBranchInst(b, value)
+		}
+		return tmpValue
+	}
 }
 
 // Seal implements Builder.Seal.
