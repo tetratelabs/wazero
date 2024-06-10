@@ -3939,6 +3939,18 @@ func Test_pathOpen(t *testing.T) {
 <== (opened_fd=4,errno=ESUCCESS)
 `,
 		},
+		{
+			name:          "sysfs.DirFS file O_DIRECTORY RIGHTS_FD_WRITE",
+			fs:            writeFS,
+			path:          func(*testing.T) string { return fileName },
+			oflags:        wasip1.O_DIRECTORY,
+			rights:        wasip1.RIGHT_FD_WRITE,
+			expectedErrno: wasip1.ErrnoNotdir,
+			expectedLog: `
+==> wasi_snapshot_preview1.path_open(fd=3,dirflags=,path=file,oflags=DIRECTORY,fs_rights_base=FD_WRITE,fs_rights_inheriting=,fdflags=)
+<== (opened_fd=,errno=ENOTDIR)
+`,
+		},
 	}
 
 	for _, tt := range tests {
