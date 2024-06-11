@@ -1708,7 +1708,6 @@ func openFlags(dirflags, oflags, fdflags uint16, rights uint32) (openFlags exper
 	}
 	if oflags&wasip1.O_DIRECTORY != 0 {
 		openFlags |= experimentalsys.O_DIRECTORY
-		return // Early return for directories as the rest of flags doesn't make sense for it.
 	} else if oflags&wasip1.O_EXCL != 0 {
 		openFlags |= experimentalsys.O_EXCL
 	}
