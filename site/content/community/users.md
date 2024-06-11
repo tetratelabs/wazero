@@ -68,8 +68,8 @@ considering their efforts before starting your own!
 
 ### Database
 
-| Name                   | Description                                        |
-|:-----------------------|----------------------------------------------------|
+| Name          | Description                              |
+|:--------------|------------------------------------------|
 | [wescale][44] | a database proxy that supports OnlineDDL |
 
 
