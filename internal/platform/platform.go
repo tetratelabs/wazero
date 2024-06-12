@@ -43,17 +43,3 @@ func MunmapCodeSegment(code []byte) error {
 	}
 	return munmapCodeSegment(code)
 }
-
-// mustMunmapCodeSegment panics instead of returning an error to the
-// application.
-//
-// # Why panic?
-//
-// It is less disruptive to the application to leak the previous block if it
-// could be unmapped than to leak the new block and return an error.
-// Realistically, either scenarios are pretty hard to debug, so we panic.
-func mustMunmapCodeSegment(code []byte) {
-	if err := munmapCodeSegment(code); err != nil {
-		panic(err)
-	}
-}
