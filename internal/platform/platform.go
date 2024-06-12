@@ -36,28 +36,6 @@ func MmapCodeSegment(size int) ([]byte, error) {
 	}
 }
 
-// RemapCodeSegment reallocates the memory mapping of an existing code segment
-// to increase its size. The previous code mapping is unmapped and must not be
-// reused after the function returns.
-//
-// This is similar to mremap(2) on linux, and emulated on platforms which do not
-// have this syscall.
-//
-// See https://man7.org/linux/man-pages/man2/mremap.2.html
-func RemapCodeSegment(code []byte, size int) ([]byte, error) {
-	if size < len(code) {
-		panic("BUG: RemapCodeSegment with size less than code")
-	}
-	if code == nil {
-		return MmapCodeSegment(size)
-	}
-	if runtime.GOARCH == "amd64" {
-		return remapCodeSegmentAMD64(code, size)
-	} else {
-		return remapCodeSegmentARM64(code, size)
-	}
-}
-
 // MunmapCodeSegment unmaps the given memory region.
 func MunmapCodeSegment(code []byte) error {
 	if len(code) == 0 {
