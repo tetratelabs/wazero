@@ -118,7 +118,7 @@ jobs:
     strategy:
       fail-fast: false # don't fail fast as sometimes failures are arch/OS specific
       matrix:
-        os: [ubuntu-22.04, macos-12, windows-2022]
+        os: [ubuntu-22.04, macos-14, windows-2022]
 
     steps:
       - uses: actions/checkout@v3

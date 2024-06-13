@@ -88,16 +88,13 @@ jobs:
         os:
           - version: ubuntu-22.04
             name: Ubuntu
-          - version: macos-12
+            arch: amd64
+          - version: macos-14
             name: macOS
+            arch: arm64
           - version: windows-2022
             name: Windows
-        arch:     [amd64]
-        include:
-          - os:
-              version: macos-14
-              name: macOS
-            arch: arm64
+            arch: amd64
 
     steps:
       - name: Checkout wazero
@@ -170,16 +167,13 @@ jobs:
         os:
           - version: ubuntu-22.04
             name: Ubuntu
-          - version: macos-12
+            arch: amd64
+          - version: macos-14
             name: macOS
+            arch: arm64
           - version: windows-2022
             name: Windows
-        arch:     [amd64]
-        include:
-          - os:
-              version: macos-14
-              name: macOS
-            arch: arm64
+            arch: amd64
 
     steps:
       - name: Checkout wazero
@@ -211,7 +205,7 @@ jobs:
     strategy:
       fail-fast: false # don't fail fast as sometimes failures are arch/OS specific
       matrix:
-        os: [ubuntu-22.04, macos-12, windows-2022]
+        os: [ubuntu-22.04, macos-14, windows-2022]
 
     steps:
       - uses: actions/cache@v3
@@ -274,25 +268,16 @@ jobs:
         os:
         - version: ubuntu-22.04
           name: Ubuntu
-        - version: macos-12
+          arch: amd64
+        - version: macos-14
           name: macOS
+          arch: arm64
         - version: windows-2022
           name: Windows
-        arch:     [amd64]
+          arch: amd64
         go-version:
           - "1.21"
           - "1.22"
-        include:
-          - os:
-              version: macos-14
-              name: macOS
-            arch:       "arm64"
-            go-version: "1.21"
-          - os:
-              version: macos-14
-              name: macOS
-            arch:       "arm64"
-            go-version: "1.22"
 
     steps:
       - id: setup-go

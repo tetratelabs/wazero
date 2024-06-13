@@ -66,8 +66,6 @@ jobs:
         platform:
         - os: ubuntu-22.04
           arch: amd64
-        - os: macos-12
-          arch: amd64
         - os: windows-2022
           arch: amd64
         - os: macos-14
