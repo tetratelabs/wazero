@@ -128,10 +128,11 @@ func passRedundantPhiEliminationOpt(b *builder) {
 		_ = b.blockIteratorReversePostOrderBegin() // skip entry block!
 		// Below, we intentionally use the named iteration variable name, as this comes with inevitable nested for loops!
 		for blk := b.blockIteratorReversePostOrderNext(); blk != nil; blk = b.blockIteratorReversePostOrderNext() {
-			paramNum := len(blk.params)
+			params := blk.params.View()
+			paramNum := len(params)
 
 			for paramIndex := 0; paramIndex < paramNum; paramIndex++ {
-				phiValue := blk.params[paramIndex]
+				phiValue := params[paramIndex]
 				redundant := true
 
 				nonSelfReferencingValue := ValueInvalid
@@ -189,7 +190,7 @@ func passRedundantPhiEliminationOpt(b *builder) {
 
 			// Still need to have the definition of the value of the PHI (previously as the parameter).
 			for _, redundantParamIndex := range redundantParameterIndexes {
-				phiValue := blk.params[redundantParamIndex]
+				phiValue := params[redundantParamIndex]
 				onlyValue := b.redundantParameterIndexToValue[redundantParamIndex]
 				// Create an alias in this block from the only phi argument to the phi value.
 				b.alias(phiValue, onlyValue)
@@ -198,13 +199,13 @@ func passRedundantPhiEliminationOpt(b *builder) {
 			// Finally, Remove the param from the blk.
 			var cur int
 			for paramIndex := 0; paramIndex < paramNum; paramIndex++ {
-				param := blk.params[paramIndex]
+				param := params[paramIndex]
 				if _, ok := b.redundantParameterIndexToValue[paramIndex]; !ok {
-					blk.params[cur] = param
+					params[cur] = param
 					cur++
 				}
 			}
-			blk.params = blk.params[:cur]
+			blk.params.Cut(cur)
 
 			// Clears the map for the next iteration.
 			for _, paramIndex := range redundantParameterIndexes {

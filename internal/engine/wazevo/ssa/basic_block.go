@@ -81,7 +81,7 @@ type (
 		rootInstr, currentInstr *Instruction
 		// params are Values that represent parameters to a basicBlock.
 		// Each parameter can be considered as an output of PHI instruction in traditional SSA.
-		params  []Value
+		params  Values
 		preds   []basicBlockPredecessorInfo
 		success []*basicBlock
 		// singlePred is the alias to preds[0] for fast lookup, and only set after Seal is called.
@@ -179,23 +179,23 @@ func (bb *basicBlock) ReturnBlock() bool {
 // AddParam implements BasicBlock.AddParam.
 func (bb *basicBlock) AddParam(b Builder, typ Type) Value {
 	paramValue := b.allocateValue(typ)
-	bb.params = append(bb.params, paramValue)
+	bb.params = bb.params.Append(&b.(*builder).varLengthPool, paramValue)
 	return paramValue
 }
 
 // addParamOn adds a parameter to this block whose value is already allocated.
-func (bb *basicBlock) addParamOn(value Value) {
-	bb.params = append(bb.params, value)
+func (bb *basicBlock) addParamOn(b *builder, value Value) {
+	bb.params = bb.params.Append(&b.varLengthPool, value)
 }
 
 // Params implements BasicBlock.Params.
 func (bb *basicBlock) Params() int {
-	return len(bb.params)
+	return len(bb.params.View())
 }
 
 // Param implements BasicBlock.Param.
 func (bb *basicBlock) Param(i int) Value {
-	return bb.params[i]
+	return bb.params.View()[i]
 }
 
 // Valid implements BasicBlock.Valid.
@@ -268,7 +268,7 @@ func (bb *basicBlock) Tail() *Instruction {
 
 // reset resets the basicBlock to its initial state so that it can be reused for another function.
 func resetBasicBlock(bb *basicBlock) {
-	bb.params = bb.params[:0]
+	bb.params = ValuesNil
 	bb.rootInstr, bb.currentInstr = nil, nil
 	bb.preds = bb.preds[:0]
 	bb.success = bb.success[:0]
@@ -310,8 +310,8 @@ func (bb *basicBlock) addPred(blk BasicBlock, branch *Instruction) {
 
 // formatHeader returns the string representation of the header of the basicBlock.
 func (bb *basicBlock) formatHeader(b Builder) string {
-	ps := make([]string, len(bb.params))
-	for i, p := range bb.params {
+	ps := make([]string, len(bb.params.View()))
+	for i, p := range bb.params.View() {
 		ps[i] = p.formatWithType(b)
 	}
 
@@ -349,14 +349,14 @@ func (bb *basicBlock) validate(b *builder) {
 			if bb.ReturnBlock() {
 				exp = len(b.currentSignature.Results)
 			} else {
-				exp = len(bb.params)
+				exp = len(bb.params.View())
 			}
 
 			if len(pred.branch.vs.View()) != exp {
 				panic(fmt.Sprintf(
 					"BUG: len(argument at %s) != len(params at %s): %d != %d: %s",
 					pred.blk.Name(), bb.Name(),
-					len(pred.branch.vs.View()), len(bb.params), pred.branch.Format(b),
+					len(pred.branch.vs.View()), len(bb.params.View()), pred.branch.Format(b),
 				))
 			}
 
