@@ -303,7 +303,7 @@ func (b *builder) splitCriticalEdge(pred, succ *basicBlock, predInfo *basicBlock
 		trampoline.validate(b)
 	}
 
-	if len(trampoline.params) > 0 {
+	if len(trampoline.params.View()) > 0 {
 		panic("trampoline should not have params")
 	}
 

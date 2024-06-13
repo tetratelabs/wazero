@@ -543,7 +543,7 @@ func (b *builder) findValue(typ Type, variable Variable, blk *basicBlock) Value 
 		// Otherwise, add the tmpValue to this block as a parameter which may or may not be redundant, but
 		// later we eliminate trivial params in an optimization pass. This must be done before finding the
 		// definitions in the predecessors so that we can break the cycle.
-		blk.addParamOn(tmpValue)
+		blk.addParamOn(b, tmpValue)
 		// After the new param is added, we have to manipulate the original branching instructions
 		// in predecessors so that they would pass the definition of `variable` as the argument to
 		// the newly added PHI.
@@ -567,7 +567,7 @@ func (b *builder) Seal(raw BasicBlock) {
 	for _, v := range blk.unknownValues {
 		variable, phiValue := v.variable, v.value
 		typ := b.definedVariableType(variable)
-		blk.addParamOn(phiValue)
+		blk.addParamOn(b, phiValue)
 		for i := range blk.preds {
 			pred := &blk.preds[i]
 			predValue := b.findValue(typ, variable, pred.blk)
