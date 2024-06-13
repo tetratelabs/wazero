@@ -192,7 +192,7 @@ jobs:
   # This ensures that internal/integration_test/fuzz is runnable, and is not intended to
   # run full-length fuzzing while trying to find low-hanging frontend bugs.
   fuzz:
-    name: Minimal Fuzzing (${{ matrix.platform.os }}, ${{ matrix.platform.arch }} )
+    name: Minimal Fuzzing (${{ matrix.platform.os }}, ${{ matrix.platform.arch }})
     runs-on: ${{ matrix.platform.os }}
     strategy:
       fail-fast: false  # don't fail fast as sometimes failures are arch/OS specific
