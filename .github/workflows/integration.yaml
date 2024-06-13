@@ -78,7 +78,7 @@ jobs:
 
   zig:
     needs: build_zig_test_binary
-    name: Zig (${{ matrix.os.name }}, ${{ matrix.arch }})
+    name: Zig (${{ matrix.os.name }}, ${{ matrix.os.arch }})
     runs-on: ${{ matrix.os.version }}
     strategy:
       fail-fast: false # don't fail fast as sometimes failures are arch/OS specific
@@ -88,16 +88,13 @@ jobs:
         os:
           - version: ubuntu-22.04
             name: Ubuntu
-          - version: macos-12
+            arch: amd64
+          - version: macos-14
             name: macOS
+            arch: arm64
           - version: windows-2022
             name: Windows
-        arch:     [amd64]
-        include:
-          - os:
-              version: macos-14
-              name: macOS
-            arch: arm64
+            arch: amd64
 
     steps:
       - name: Checkout wazero
@@ -160,7 +157,7 @@ jobs:
 
   tinygo:
     needs: build_tinygo_test_binary
-    name: TinyGo (${{ matrix.os.name }}, ${{ matrix.arch }})
+    name: TinyGo (${{ matrix.os.name }}, ${{ matrix.os.arch }})
     runs-on: ${{ matrix.os.version }}
     strategy:
       fail-fast: false # don't fail fast as sometimes failures are arch/OS specific
@@ -170,16 +167,13 @@ jobs:
         os:
           - version: ubuntu-22.04
             name: Ubuntu
-          - version: macos-12
+            arch: amd64
+          - version: macos-14
             name: macOS
+            arch: arm64
           - version: windows-2022
             name: Windows
-        arch:     [amd64]
-        include:
-          - os:
-              version: macos-14
-              name: macOS
-            arch: arm64
+            arch: amd64
 
     steps:
       - name: Checkout wazero
@@ -211,7 +205,7 @@ jobs:
     strategy:
       fail-fast: false # don't fail fast as sometimes failures are arch/OS specific
       matrix:
-        os: [ubuntu-22.04, macos-12, windows-2022]
+        os: [ubuntu-22.04, macos-14, windows-2022]
 
     steps:
       - uses: actions/cache@v3
@@ -264,7 +258,7 @@ jobs:
   go_tests:
     # Due to the embedding of the GOROOT of the building env(https://github.com/golang/go/blob/3c59639b902fada0a2e5a6a35bafd10fc9183b89/src/os/os_test.go#L112),
     # we have to build and cache on each OS unlike others in this file.
-    name: Go-${{ matrix.go-version }} (${{ matrix.os.name }}, ${{ matrix.arch }})
+    name: Go-${{ matrix.go-version }} (${{ matrix.os.name }}, ${{ matrix.os.arch }})
     runs-on: ${{ matrix.os.version }}
     strategy:
       fail-fast: false # don't fail fast as sometimes failures are arch/OS specific
@@ -274,25 +268,16 @@ jobs:
         os:
         - version: ubuntu-22.04
           name: Ubuntu
-        - version: macos-12
+          arch: amd64
+        - version: macos-14
           name: macOS
+          arch: arm64
         - version: windows-2022
           name: Windows
-        arch:     [amd64]
+          arch: amd64
         go-version:
           - "1.21"
           - "1.22"
-        include:
-          - os:
-              version: macos-14
-              name: macOS
-            arch:       "arm64"
-            go-version: "1.21"
-          - os:
-              version: macos-14
-              name: macOS
-            arch:       "arm64"
-            go-version: "1.22"
 
     steps:
       - id: setup-go
@@ -310,7 +295,7 @@ jobs:
           path:
             ${{ env.STDLIB_TESTS }}/testdata/go
           # Use precise Go version from setup-go as patch version differences can effect tests.
-          key: go-wasip1-binaries-${{ matrix.os.version }}-${{ steps.setup-go.outputs.go-version }}-${{ matrix.arch }}
+          key: go-wasip1-binaries-${{ matrix.os.version }}-${{ steps.setup-go.outputs.go-version }}-${{ matrix.os.arch }}
 
       - if: ${{ steps.cache-go-test-binaries.outputs.cache-hit != 'true' }}
         name: Build Test Binaries
