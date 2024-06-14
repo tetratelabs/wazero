@@ -1538,8 +1538,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 		builder.SetCurrentBlock(elseBlk)
 
 	case wasm.OpcodeBrTable:
-		labels := state.tmpForBrTable
-		labels = labels[:0]
+		labels := state.tmpForBrTable[:0]
 		labelCount := c.readI32u()
 		for i := 0; i < int(labelCount); i++ {
 			labels = append(labels, c.readI32u())
@@ -1557,6 +1556,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 		} else {
 			c.lowerBrTable(labels, index)
 		}
+		state.tmpForBrTable = labels // reuse the temporary slice for next use.
 		state.unreachable = true
 
 	case wasm.OpcodeNop:
