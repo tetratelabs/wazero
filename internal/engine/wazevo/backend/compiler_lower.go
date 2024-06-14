@@ -105,11 +105,12 @@ func (c *compiler) lowerBranches(br0, br1 *ssa.Instruction) {
 	}
 
 	if br0.Opcode() == ssa.OpcodeJump {
-		_, args, target := br0.BranchData()
+		_, args, targetBlockID := br0.BranchData()
 		argExists := len(args) != 0
 		if argExists && br1 != nil {
 			panic("BUG: critical edge split failed")
 		}
+		target := c.ssaBuilder.BasicBlock(targetBlockID)
 		if argExists && target.ReturnBlock() {
 			if len(args) > 0 {
 				c.mach.LowerReturns(args)

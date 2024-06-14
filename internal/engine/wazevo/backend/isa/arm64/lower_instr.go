@@ -20,11 +20,12 @@ func (m *machine) LowerSingleBranch(br *ssa.Instruction) {
 	ectx := m.executableContext
 	switch br.Opcode() {
 	case ssa.OpcodeJump:
-		_, _, targetBlk := br.BranchData()
+		_, _, targetBlkID := br.BranchData()
 		if br.IsFallthroughJump() {
 			return
 		}
 		b := m.allocateInstr()
+		targetBlk := m.compiler.SSABuilder().BasicBlock(targetBlkID)
 		target := ectx.GetOrAllocateSSABlockLabel(targetBlk)
 		if target == labelReturn {
 			b.asRet()
@@ -40,7 +41,8 @@ func (m *machine) LowerSingleBranch(br *ssa.Instruction) {
 }
 
 func (m *machine) lowerBrTable(i *ssa.Instruction) {
-	index, targets := i.BrTableData()
+	index, targetBlockIDs := i.BrTableData()
+	targetBlockCount := len(targetBlockIDs.View())
 	indexOperand := m.getOperand_NR(m.compiler.ValueDefinition(index), extModeNone)
 
 	// Firstly, we have to do the bounds check of the index, and
@@ -50,7 +52,7 @@ func (m *machine) lowerBrTable(i *ssa.Instruction) {
 	// subs wzr, index, maxIndexReg
 	// csel adjustedIndex, maxIndexReg, index, hs ;; if index is higher or equal than maxIndexReg.
 	maxIndexReg := m.compiler.AllocateVReg(ssa.TypeI32)
-	m.lowerConstantI32(maxIndexReg, int32(len(targets)-1))
+	m.lowerConstantI32(maxIndexReg, int32(targetBlockCount-1))
 	subs := m.allocateInstr()
 	subs.asALU(aluOpSubS, xzrVReg, indexOperand, operandNR(maxIndexReg), false)
 	m.insert(subs)
@@ -61,23 +63,24 @@ func (m *machine) lowerBrTable(i *ssa.Instruction) {
 
 	brSequence := m.allocateInstr()
 
-	tableIndex := m.addJmpTableTarget(targets)
-	brSequence.asBrTableSequence(adjustedIndex, tableIndex, len(targets))
+	tableIndex := m.addJmpTableTarget(targetBlockIDs)
+	brSequence.asBrTableSequence(adjustedIndex, tableIndex, targetBlockCount)
 	m.insert(brSequence)
 }
 
 // LowerConditionalBranch implements backend.Machine.
 func (m *machine) LowerConditionalBranch(b *ssa.Instruction) {
 	exctx := m.executableContext
-	cval, args, targetBlk := b.BranchData()
+	cval, args, targetBlkID := b.BranchData()
 	if len(args) > 0 {
 		panic(fmt.Sprintf(
 			"conditional branch shouldn't have args; likely a bug in critical edge splitting: from %s to %s",
 			exctx.CurrentSSABlk,
-			targetBlk,
+			targetBlkID,
 		))
 	}
 
+	targetBlk := m.compiler.SSABuilder().BasicBlock(targetBlkID)
 	target := exctx.GetOrAllocateSSABlockLabel(targetBlk)
 	cvalDef := m.compiler.ValueDefinition(cval)
 
