@@ -41,11 +41,40 @@ func OpenFile(path string, flag experimentalsys.Oflag, perm fs.FileMode) (*os.Fi
 	return openFile(path, flag, perm)
 }
 
+func OpenFileAt(
+	dir *os.File,
+	path string,
+	flag experimentalsys.Oflag,
+	perm fs.FileMode,
+) (*os.File, experimentalsys.Errno) {
+	return openFileAt(dir, path, flag, perm)
+}
+
 func OpenOSFile(path string, flag experimentalsys.Oflag, perm fs.FileMode) (experimentalsys.File, experimentalsys.Errno) {
 	f, errno := OpenFile(path, flag, perm)
 	if errno != 0 {
 		return nil, errno
 	}
+
+	return newOsFile(path, flag, perm, f), 0
+}
+
+func OpenOSFileAt(
+	dir experimentalsys.File,
+	path string,
+	flag experimentalsys.Oflag,
+	perm fs.FileMode,
+) (experimentalsys.File, experimentalsys.Errno) {
+	dirOsFile, ok := dir.(*osFile)
+	if !ok {
+		return nil, experimentalsys.EBADF
+	}
+
+	f, errno := OpenFileAt(dirOsFile.file, path, flag, perm)
+	if errno != 0 {
+		return nil, errno
+	}
+
 	return newOsFile(path, flag, perm, f), 0
 }
 
