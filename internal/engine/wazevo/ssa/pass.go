@@ -112,7 +112,7 @@ func passDeadBlockEliminationOpt(b *builder) {
 // This requires the reverse post-order traversal to be calculated before calling this function,
 // hence passCalculateImmediateDominators must be called before this.
 func passRedundantPhiEliminationOpt(b *builder) {
-	redundantParameterIndexes := b.ints[:0] // reuse the slice from previous iterations.
+	redundantParams := b.redundantParams[:0] // reuse the slice from previous iterations.
 
 	// TODO: this might be costly for large programs, but at least, as far as I did the experiment, it's almost the
 	//  same as the single iteration version in terms of the overall compilation time. That *might be* mostly thanks to the fact
@@ -163,55 +163,58 @@ func passRedundantPhiEliminationOpt(b *builder) {
 				}
 
 				if redundant {
-					b.redundantParameterIndexToValue[paramIndex] = nonSelfReferencingValue
-					redundantParameterIndexes = append(redundantParameterIndexes, paramIndex)
+					redundantParams = append(redundantParams, redundantParam{
+						index: paramIndex, uniqueValue: nonSelfReferencingValue,
+					})
 				}
 			}
 
-			if len(b.redundantParameterIndexToValue) == 0 {
+			if len(redundantParams) == 0 {
 				continue
 			}
 			changed = true
 
 			// Remove the redundant PHIs from the argument list of branching instructions.
 			for predIndex := range blk.preds {
-				var cur int
+				redundantParamsCur, predParamCur := 0, 0
 				predBlk := blk.preds[predIndex]
 				branchInst := predBlk.branch
 				view := branchInst.vs.View()
 				for argIndex, value := range view {
-					if _, ok := b.redundantParameterIndexToValue[argIndex]; !ok {
-						view[cur] = value
-						cur++
+					if len(redundantParams) == redundantParamsCur ||
+						redundantParams[redundantParamsCur].index != argIndex {
+						view[predParamCur] = value
+						predParamCur++
+					} else {
+						redundantParamsCur++
 					}
 				}
-				branchInst.vs.Cut(cur)
+				branchInst.vs.Cut(predParamCur)
 			}
 
 			// Still need to have the definition of the value of the PHI (previously as the parameter).
-			for _, redundantParamIndex := range redundantParameterIndexes {
-				phiValue := params[redundantParamIndex]
-				onlyValue := b.redundantParameterIndexToValue[redundantParamIndex]
+			for i := range redundantParams {
+				redundantValue := &redundantParams[i]
+				phiValue := params[redundantValue.index]
 				// Create an alias in this block from the only phi argument to the phi value.
-				b.alias(phiValue, onlyValue)
+				b.alias(phiValue, redundantValue.uniqueValue)
 			}
 
 			// Finally, Remove the param from the blk.
-			var cur int
+			paramsCur, redundantParamsCur := 0, 0
 			for paramIndex := 0; paramIndex < paramNum; paramIndex++ {
 				param := params[paramIndex]
-				if _, ok := b.redundantParameterIndexToValue[paramIndex]; !ok {
-					params[cur] = param
-					cur++
+				if len(redundantParams) == redundantParamsCur || redundantParams[redundantParamsCur].index != paramIndex {
+					params[paramsCur] = param
+					paramsCur++
+				} else {
+					redundantParamsCur++
 				}
 			}
-			blk.params.Cut(cur)
+			blk.params.Cut(paramsCur)
 
 			// Clears the map for the next iteration.
-			for _, paramIndex := range redundantParameterIndexes {
-				delete(b.redundantParameterIndexToValue, paramIndex)
-			}
-			redundantParameterIndexes = redundantParameterIndexes[:0]
+			redundantParams = redundantParams[:0]
 		}
 
 		if !changed {
@@ -220,7 +223,7 @@ func passRedundantPhiEliminationOpt(b *builder) {
 	}
 
 	// Reuse the slice for the future passes.
-	b.ints = redundantParameterIndexes
+	b.redundantParams = redundantParams
 }
 
 // passDeadCodeEliminationOpt traverses all the instructions, and calculates the reference count of each Value, and
