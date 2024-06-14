@@ -134,15 +134,14 @@ type Builder interface {
 // NewBuilder returns a new Builder implementation.
 func NewBuilder() Builder {
 	return &builder{
-		instructionsPool:               wazevoapi.NewPool[Instruction](resetInstruction),
-		basicBlocksPool:                wazevoapi.NewPool[basicBlock](resetBasicBlock),
-		varLengthBasicBlockPool:        wazevoapi.NewVarLengthPool[BasicBlock](),
-		varLengthPool:                  wazevoapi.NewVarLengthPool[Value](),
-		valueAnnotations:               make(map[ValueID]string),
-		signatures:                     make(map[SignatureID]*Signature),
-		valueIDAliases:                 make(map[ValueID]Value),
-		redundantParameterIndexToValue: make(map[int]Value),
-		returnBlk:                      &basicBlock{id: basicBlockIDReturnBlock},
+		instructionsPool:        wazevoapi.NewPool[Instruction](resetInstruction),
+		basicBlocksPool:         wazevoapi.NewPool[basicBlock](resetBasicBlock),
+		varLengthBasicBlockPool: wazevoapi.NewVarLengthPool[BasicBlock](),
+		varLengthPool:           wazevoapi.NewVarLengthPool[Value](),
+		valueAnnotations:        make(map[ValueID]string),
+		signatures:              make(map[SignatureID]*Signature),
+		valueIDAliases:          make(map[ValueID]Value),
+		returnBlk:               &basicBlock{id: basicBlockIDReturnBlock},
 	}
 }
 
@@ -184,12 +183,11 @@ type builder struct {
 	loopNestingForestRoots []BasicBlock
 
 	// The followings are used for optimization passes/deterministic compilation.
-	instStack                      []*Instruction
-	valueIDToInstruction           []*Instruction
-	blkStack                       []*basicBlock
-	blkStack2                      []*basicBlock
-	ints                           []int
-	redundantParameterIndexToValue map[int]Value
+	instStack            []*Instruction
+	valueIDToInstruction []*Instruction
+	blkStack             []*basicBlock
+	blkStack2            []*basicBlock
+	redundantParams      []redundantParam
 
 	// blockIterCur is used to implement blockIteratorBegin and blockIteratorNext.
 	blockIterCur int
@@ -205,6 +203,15 @@ type builder struct {
 
 	// zeros are the zero value constants for each type.
 	zeros [typeEnd]Value
+}
+
+// redundantParam is a pair of the index of the redundant parameter and the Value.
+// This is used to eliminate the redundant parameters in the optimization pass.
+type redundantParam struct {
+	// index is the index of the redundant parameter in the basicBlock.
+	index int
+	// uniqueValue is the Value which is passed to the redundant parameter.
+	uniqueValue Value
 }
 
 // InsertZeroValue implements Builder.InsertZeroValue.
@@ -256,7 +263,7 @@ func (b *builder) Init(s *Signature) {
 		sig.used = false
 	}
 
-	b.ints = b.ints[:0]
+	b.redundantParams = b.redundantParams[:0]
 	b.blkStack = b.blkStack[:0]
 	b.blkStack2 = b.blkStack2[:0]
 	b.dominators = b.dominators[:0]
