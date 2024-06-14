@@ -451,14 +451,14 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				return fmt.Errorf("read immediate: %w", err)
 			}
 
-			list := make([]uint32, nl)
+			sts.ls = sts.ls[:0]
 			for i := uint32(0); i < nl; i++ {
 				l, n, err := leb128.DecodeUint32(br)
 				if err != nil {
 					return fmt.Errorf("read immediate: %w", err)
 				}
 				num += n
-				list[i] = l
+				sts.ls = append(sts.ls, l)
 			}
 			ln, n, err := leb128.DecodeUint32(br)
 			if err != nil {
@@ -511,7 +511,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				}
 			}
 
-			for _, l := range list {
+			for _, l := range sts.ls {
 				if int(l) >= len(controlBlockStack.stack) {
 					return fmt.Errorf("invalid l param given for %s", OpcodeBrTableName)
 				}
@@ -2003,6 +2003,8 @@ var vecSplatValueTypes = [...]ValueType{
 type stacks struct {
 	vs valueTypeStack
 	cs controlBlockStack
+	// ls is the label slice that is reused for each br_table instruction.
+	ls []uint32
 }
 
 func (sts *stacks) reset(functionType *FunctionType) {
@@ -2012,6 +2014,7 @@ func (sts *stacks) reset(functionType *FunctionType) {
 	sts.vs.maximumStackPointer = 0
 	sts.cs.stack = sts.cs.stack[:0]
 	sts.cs.stack = append(sts.cs.stack, controlBlock{blockType: functionType})
+	sts.ls = sts.ls[:0]
 }
 
 type controlBlockStack struct {
