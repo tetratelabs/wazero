@@ -120,9 +120,9 @@ func Test_maybeInvertBranch(t *testing.T) {
 				require.Equal(t, tail, next.preds[0].branch)
 				verify = func(t *testing.T) {
 					require.Equal(t, OpcodeJump, tail.opcode)
-					require.Equal(t, OpcodeBrnz, conditionalBr.opcode) // inversion.
-					require.Equal(t, loopHeader, tail.blk)             // swapped.
-					require.Equal(t, next, conditionalBr.blk)          // swapped.
+					require.Equal(t, OpcodeBrnz, conditionalBr.opcode)                       // inversion.
+					require.Equal(t, loopHeader, b.basicBlock(BasicBlockID(tail.rValue)))    // swapped.
+					require.Equal(t, next, b.basicBlock(BasicBlockID(conditionalBr.rValue))) // swapped.
 					require.Equal(t, conditionalBr, tail.prev)
 
 					// Predecessor info should correctly point to the inverted jump instruction.
@@ -150,9 +150,9 @@ func Test_maybeInvertBranch(t *testing.T) {
 
 				verify = func(t *testing.T) {
 					require.Equal(t, OpcodeJump, tail.opcode)
-					require.Equal(t, OpcodeBrnz, conditionalBr.opcode) // inversion.
-					require.Equal(t, next, tail.blk)                   // swapped.
-					require.Equal(t, nowTarget, conditionalBr.blk)     // swapped.
+					require.Equal(t, OpcodeBrnz, conditionalBr.opcode)                            // inversion.
+					require.Equal(t, next, b.basicBlock(BasicBlockID(tail.rValue)))               // swapped.
+					require.Equal(t, nowTarget, b.basicBlock(BasicBlockID(conditionalBr.rValue))) // swapped.
 					require.Equal(t, conditionalBr, tail.prev)
 
 					require.Equal(t, conditionalBr, nowTarget.preds[0].branch)
@@ -166,7 +166,7 @@ func Test_maybeInvertBranch(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			b := NewBuilder().(*builder)
 			now, next, verify := tc.setup(b)
-			actual := maybeInvertBranches(now, next)
+			actual := maybeInvertBranches(b, now, next)
 			verify(t)
 			require.Equal(t, tc.exp, actual)
 		})
@@ -202,7 +202,7 @@ func TestBuilder_splitCriticalEdge(t *testing.T) {
 
 	replacedBrz := predBlk.rootInstr.next
 	require.Equal(t, OpcodeBrz, replacedBrz.opcode)
-	require.Equal(t, trampoline, replacedBrz.blk)
+	require.Equal(t, trampoline, b.basicBlock(BasicBlockID(replacedBrz.rValue)))
 }
 
 func Test_swapInstruction(t *testing.T) {

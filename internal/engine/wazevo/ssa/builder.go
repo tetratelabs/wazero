@@ -129,6 +129,9 @@ type Builder interface {
 
 	// InsertZeroValue inserts a zero value constant instruction of the given type.
 	InsertZeroValue(t Type)
+
+	// BasicBlock returns the BasicBlock of the given ID.
+	BasicBlock(id BasicBlockID) BasicBlock
 }
 
 // NewBuilder returns a new Builder implementation.
@@ -212,6 +215,18 @@ type redundantParam struct {
 	index int
 	// uniqueValue is the Value which is passed to the redundant parameter.
 	uniqueValue Value
+}
+
+// BasicBlock implements Builder.BasicBlock.
+func (b *builder) BasicBlock(id BasicBlockID) BasicBlock {
+	return b.basicBlock(id)
+}
+
+func (b *builder) basicBlock(id BasicBlockID) *basicBlock {
+	if id == basicBlockIDReturnBlock {
+		return b.returnBlk
+	}
+	return b.basicBlocksPool.View(int(id))
 }
 
 // InsertZeroValue implements Builder.InsertZeroValue.
@@ -362,7 +377,7 @@ func (b *builder) Idom(blk BasicBlock) BasicBlock {
 
 // InsertInstruction implements Builder.InsertInstruction.
 func (b *builder) InsertInstruction(instr *Instruction) {
-	b.currentBB.InsertInstruction(instr)
+	b.currentBB.insertInstruction(b, instr)
 
 	if l := b.currentSourceOffset; l.Valid() {
 		// Emit the source offset info only when the instruction has side effect because

@@ -67,8 +67,11 @@ type (
 
 		labelResolutionPends []labelResolutionPend
 
+		// jmpTableTargets holds the labels of the jump table targets.
 		jmpTableTargets [][]uint32
-		consts          []_const
+		// jmpTableTargetNext is the index to the jmpTableTargets slice to be used for the next jump table.
+		jmpTableTargetsNext int
+		consts              []_const
 
 		constSwizzleMaskConstIndex, constSqmulRoundSatIndex,
 		constI8x16SHLMaskTableIndex, constI8x16LogicalSHRMaskTableIndex,
@@ -131,7 +134,7 @@ func (m *machine) Reset() {
 	m.maxRequiredStackSizeForCalls = 0
 
 	m.amodePool.Reset()
-	m.jmpTableTargets = m.jmpTableTargets[:0]
+	m.jmpTableTargetsNext = 0
 	m.constSwizzleMaskConstIndex = -1
 	m.constSqmulRoundSatIndex = -1
 	m.constI8x16SHLMaskTableIndex = -1
@@ -187,12 +190,12 @@ func (m *machine) LowerSingleBranch(b *ssa.Instruction) {
 	ectx := m.ectx
 	switch b.Opcode() {
 	case ssa.OpcodeJump:
-		_, _, targetBlk := b.BranchData()
+		_, _, targetBlkID := b.BranchData()
 		if b.IsFallthroughJump() {
 			return
 		}
 		jmp := m.allocateInstr()
-		target := ectx.GetOrAllocateSSABlockLabel(targetBlk)
+		target := ectx.GetOrAllocateSSABlockLabel(m.c.SSABuilder().BasicBlock(targetBlkID))
 		if target == backend.LabelReturn {
 			jmp.asRet()
 		} else {
@@ -200,33 +203,40 @@ func (m *machine) LowerSingleBranch(b *ssa.Instruction) {
 		}
 		m.insert(jmp)
 	case ssa.OpcodeBrTable:
-		index, target := b.BrTableData()
-		m.lowerBrTable(index, target)
+		index, targetBlkIDs := b.BrTableData()
+		m.lowerBrTable(index, targetBlkIDs)
 	default:
 		panic("BUG: unexpected branch opcode" + b.Opcode().String())
 	}
 }
 
-func (m *machine) addJmpTableTarget(targets []ssa.BasicBlock) (index int) {
-	// TODO: reuse the slice!
-	labels := make([]uint32, len(targets))
-	for j, target := range targets {
-		labels[j] = uint32(m.ectx.GetOrAllocateSSABlockLabel(target))
+func (m *machine) addJmpTableTarget(targets ssa.Values) (index int) {
+	if m.jmpTableTargetsNext == len(m.jmpTableTargets) {
+		m.jmpTableTargets = append(m.jmpTableTargets, make([]uint32, 0, len(targets.View())))
 	}
-	index = len(m.jmpTableTargets)
-	m.jmpTableTargets = append(m.jmpTableTargets, labels)
+
+	index = m.jmpTableTargetsNext
+	m.jmpTableTargetsNext++
+	m.jmpTableTargets[index] = m.jmpTableTargets[index][:0]
+	for _, targetBlockID := range targets.View() {
+		target := m.c.SSABuilder().BasicBlock(ssa.BasicBlockID(targetBlockID))
+		m.jmpTableTargets[index] = append(m.jmpTableTargets[index],
+			uint32(m.ectx.GetOrAllocateSSABlockLabel(target)))
+	}
 	return
 }
 
 var condBranchMatches = [...]ssa.Opcode{ssa.OpcodeIcmp, ssa.OpcodeFcmp}
 
-func (m *machine) lowerBrTable(index ssa.Value, targets []ssa.BasicBlock) {
+func (m *machine) lowerBrTable(index ssa.Value, targets ssa.Values) {
 	_v := m.getOperand_Reg(m.c.ValueDefinition(index))
 	v := m.copyToTmp(_v.reg())
 
+	targetCount := len(targets.View())
+
 	// First, we need to do the bounds check.
 	maxIndex := m.c.AllocateVReg(ssa.TypeI32)
-	m.lowerIconst(maxIndex, uint64(len(targets)-1), false)
+	m.lowerIconst(maxIndex, uint64(targetCount-1), false)
 	cmp := m.allocateInstr().asCmpRmiR(true, newOperandReg(maxIndex), v, false)
 	m.insert(cmp)
 
@@ -255,23 +265,23 @@ func (m *machine) lowerBrTable(index ssa.Value, targets []ssa.BasicBlock) {
 
 	jmpTable := m.allocateInstr()
 	targetSliceIndex := m.addJmpTableTarget(targets)
-	jmpTable.asJmpTableSequence(targetSliceIndex, len(targets))
+	jmpTable.asJmpTableSequence(targetSliceIndex, targetCount)
 	m.insert(jmpTable)
 }
 
 // LowerConditionalBranch implements backend.Machine.
 func (m *machine) LowerConditionalBranch(b *ssa.Instruction) {
 	exctx := m.ectx
-	cval, args, targetBlk := b.BranchData()
+	cval, args, targetBlkID := b.BranchData()
 	if len(args) > 0 {
 		panic(fmt.Sprintf(
 			"conditional branch shouldn't have args; likely a bug in critical edge splitting: from %s to %s",
 			exctx.CurrentSSABlk,
-			targetBlk,
+			targetBlkID,
 		))
 	}
 
-	target := exctx.GetOrAllocateSSABlockLabel(targetBlk)
+	target := exctx.GetOrAllocateSSABlockLabel(m.c.SSABuilder().BasicBlock(targetBlkID))
 	cvalDef := m.c.ValueDefinition(cval)
 
 	switch m.c.MatchInstrOneOf(cvalDef, condBranchMatches[:]) {

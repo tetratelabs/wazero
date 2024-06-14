@@ -36,6 +36,7 @@ func newSetupWithMockContext() (*mockCompiler, ssa.Builder, *machine) {
 	m := NewBackend().(*machine)
 	m.SetCompiler(ctx)
 	ssaB := ssa.NewBuilder()
+	ctx.ssaBuilder = ssaB
 	blk := ssaB.AllocateBasicBlock()
 	ssaB.SetCurrentBlock(blk)
 	return ctx, ssaB, m
@@ -57,6 +58,7 @@ type mockCompiler struct {
 	definitions map[ssa.Value]*backend.SSAValueDefinition
 	sigs        map[ssa.SignatureID]*ssa.Signature
 	typeOf      map[regalloc.VRegID]ssa.Type
+	ssaBuilder  ssa.Builder
 	relocs      []backend.RelocationInfo
 	buf         []byte
 }
@@ -68,7 +70,7 @@ func (m *mockCompiler) GetFunctionABI(sig *ssa.Signature) *backend.FunctionABI {
 	panic("implement me")
 }
 
-func (m *mockCompiler) SSABuilder() ssa.Builder { return nil }
+func (m *mockCompiler) SSABuilder() ssa.Builder { return m.ssaBuilder }
 
 func (m *mockCompiler) LoopNestingForestRoots() []ssa.BasicBlock { panic("TODO") }
 

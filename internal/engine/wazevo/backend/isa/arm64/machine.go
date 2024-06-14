@@ -35,6 +35,8 @@ type (
 
 		// jmpTableTargets holds the labels of the jump table targets.
 		jmpTableTargets [][]uint32
+		// jmpTableTargetNext is the index to the jmpTableTargets slice to be used for the next jump table.
+		jmpTableTargetsNext int
 
 		// spillSlotSize is the size of the stack slot in bytes used for spilling registers.
 		// During the execution of the function, the stack looks like:
@@ -151,7 +153,7 @@ func (m *machine) Reset() {
 	m.unresolvedAddressModes = m.unresolvedAddressModes[:0]
 	m.maxRequiredStackSizeForCalls = 0
 	m.executableContext.Reset()
-	m.jmpTableTargets = m.jmpTableTargets[:0]
+	m.jmpTableTargetsNext = 0
 	m.amodePool.Reset()
 }
 
@@ -508,13 +510,18 @@ func (m *machine) frameSize() int64 {
 	return s
 }
 
-func (m *machine) addJmpTableTarget(targets []ssa.BasicBlock) (index int) {
-	// TODO: reuse the slice!
-	labels := make([]uint32, len(targets))
-	for j, target := range targets {
-		labels[j] = uint32(m.executableContext.GetOrAllocateSSABlockLabel(target))
+func (m *machine) addJmpTableTarget(targets ssa.Values) (index int) {
+	if m.jmpTableTargetsNext == len(m.jmpTableTargets) {
+		m.jmpTableTargets = append(m.jmpTableTargets, make([]uint32, 0, len(targets.View())))
 	}
-	index = len(m.jmpTableTargets)
-	m.jmpTableTargets = append(m.jmpTableTargets, labels)
+
+	index = m.jmpTableTargetsNext
+	m.jmpTableTargetsNext++
+	m.jmpTableTargets[index] = m.jmpTableTargets[index][:0]
+	for _, targetBlockID := range targets.View() {
+		target := m.compiler.SSABuilder().BasicBlock(ssa.BasicBlockID(targetBlockID))
+		m.jmpTableTargets[index] = append(m.jmpTableTargets[index],
+			uint32(m.executableContext.GetOrAllocateSSABlockLabel(target)))
+	}
 	return
 }

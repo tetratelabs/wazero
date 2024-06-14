@@ -33,7 +33,7 @@ func passLayoutBlocks(b *builder) {
 		}
 		nonSplitBlocks = append(nonSplitBlocks, blk)
 		if i != len(b.reversePostOrderedBasicBlocks)-1 {
-			_ = maybeInvertBranches(blk, b.reversePostOrderedBasicBlocks[i+1])
+			_ = maybeInvertBranches(b, blk, b.reversePostOrderedBasicBlocks[i+1])
 		}
 	}
 
@@ -111,7 +111,7 @@ func passLayoutBlocks(b *builder) {
 			}
 
 			fallthroughBranch := blk.currentInstr
-			if fallthroughBranch.opcode == OpcodeJump && fallthroughBranch.blk == trampoline {
+			if fallthroughBranch.opcode == OpcodeJump && BasicBlockID(fallthroughBranch.rValue) == trampoline.id {
 				// This can be lowered as fallthrough at the end of the block.
 				b.reversePostOrderedBasicBlocks = append(b.reversePostOrderedBasicBlocks, trampoline)
 				trampoline.visited = 1 // mark as inserted.
@@ -157,7 +157,7 @@ func (b *builder) markFallthroughJumps() {
 	for i, blk := range b.reversePostOrderedBasicBlocks {
 		if i < l {
 			cur := blk.currentInstr
-			if cur.opcode == OpcodeJump && cur.blk == b.reversePostOrderedBasicBlocks[i+1] {
+			if cur.opcode == OpcodeJump && BasicBlockID(cur.rValue) == b.reversePostOrderedBasicBlocks[i+1].id {
 				cur.AsFallthroughJump()
 			}
 		}
@@ -168,7 +168,7 @@ func (b *builder) markFallthroughJumps() {
 // nextInRPO is the next block in the reverse post-order.
 //
 // Returns true if the branch is inverted for testing purpose.
-func maybeInvertBranches(now *basicBlock, nextInRPO *basicBlock) bool {
+func maybeInvertBranches(b *builder, now *basicBlock, nextInRPO *basicBlock) bool {
 	fallthroughBranch := now.currentInstr
 	if fallthroughBranch.opcode == OpcodeBrTable {
 		return false
@@ -187,7 +187,8 @@ func maybeInvertBranches(now *basicBlock, nextInRPO *basicBlock) bool {
 	// So this block has two branches (a conditional branch followed by an unconditional branch) at the end.
 	// We can invert the condition of the branch if it makes the fallthrough more likely.
 
-	fallthroughTarget, condTarget := fallthroughBranch.blk.(*basicBlock), condBranch.blk.(*basicBlock)
+	fallthroughTarget := b.basicBlock(BasicBlockID(fallthroughBranch.rValue))
+	condTarget := b.basicBlock(BasicBlockID(condBranch.rValue))
 
 	if fallthroughTarget.loopHeader {
 		// First, if the tail's target is loopHeader, we don't need to do anything here,
@@ -231,8 +232,8 @@ invert:
 	}
 
 	condBranch.InvertBrx()
-	condBranch.blk = fallthroughTarget
-	fallthroughBranch.blk = condTarget
+	condBranch.rValue = Value(fallthroughTarget.ID())
+	fallthroughBranch.rValue = Value(condTarget.ID())
 	if wazevoapi.SSALoggingEnabled {
 		fmt.Printf("inverting branches at %d->%d and %d->%d\n",
 			now.ID(), fallthroughTarget.ID(), now.ID(), condTarget.ID())
@@ -275,7 +276,7 @@ func (b *builder) splitCriticalEdge(pred, succ *basicBlock, predInfo *basicBlock
 	// Replace originalBranch with the newBranch.
 	newBranch := b.AllocateInstruction()
 	newBranch.opcode = originalBranch.opcode
-	newBranch.blk = trampoline
+	newBranch.rValue = Value(trampoline.ID())
 	switch originalBranch.opcode {
 	case OpcodeJump:
 	case OpcodeBrz, OpcodeBrnz:

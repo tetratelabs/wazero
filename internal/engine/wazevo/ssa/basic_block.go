@@ -34,9 +34,6 @@ type BasicBlock interface {
 	// The returned Value is the definition of the param in this block.
 	Param(i int) Value
 
-	// InsertInstruction inserts an instruction that implements Value into the tail of this block.
-	InsertInstruction(raw *Instruction)
-
 	// Root returns the root instruction of this block.
 	Root() *Instruction
 
@@ -208,8 +205,8 @@ func (bb *basicBlock) Sealed() bool {
 	return bb.sealed
 }
 
-// InsertInstruction implements BasicBlock.InsertInstruction.
-func (bb *basicBlock) InsertInstruction(next *Instruction) {
+// insertInstruction implements BasicBlock.InsertInstruction.
+func (bb *basicBlock) insertInstruction(b *builder, next *Instruction) {
 	current := bb.currentInstr
 	if current != nil {
 		current.next = next
@@ -221,12 +218,12 @@ func (bb *basicBlock) InsertInstruction(next *Instruction) {
 
 	switch next.opcode {
 	case OpcodeJump, OpcodeBrz, OpcodeBrnz:
-		target := next.blk.(*basicBlock)
-		target.addPred(bb, next)
+		target := BasicBlockID(next.rValue)
+		b.basicBlock(target).addPred(bb, next)
 	case OpcodeBrTable:
-		for _, _target := range next.targets {
-			target := _target.(*basicBlock)
-			target.addPred(bb, next)
+		for _, _target := range next.rValues.View() {
+			target := BasicBlockID(_target)
+			b.basicBlock(target).addPred(bb, next)
 		}
 	}
 }
@@ -339,7 +336,9 @@ func (bb *basicBlock) validate(b *builder) {
 	if len(bb.preds) > 0 {
 		for _, pred := range bb.preds {
 			if pred.branch.opcode != OpcodeBrTable {
-				if target := pred.branch.blk; target != bb {
+				blockID := int(pred.branch.rValue)
+				target := b.basicBlocksPool.View(blockID)
+				if target != bb {
 					panic(fmt.Sprintf("BUG: '%s' is not branch to %s, but to %s",
 						pred.branch.Format(b), bb.Name(), target.Name()))
 				}
