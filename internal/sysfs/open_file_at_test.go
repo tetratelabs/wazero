@@ -18,7 +18,7 @@ func TestOpenFileAt(t *testing.T) {
 		fileName := "file"
 		filePath := filepath.Join(dirPath, fileName)
 
-		err := os.Mkdir(dirPath, 0o700)
+		err := os.Mkdir(dirPath, 0o777)
 		require.NoError(t, err)
 
 		f, err := os.Create(filePath)
@@ -28,6 +28,7 @@ func TestOpenFileAt(t *testing.T) {
 
 		dir, err := os.Open(dirPath)
 		require.NoError(t, err)
+		defer dir.Close()
 
 		file, errno := OpenFileAt(dir, fileName, sys.O_RDONLY, 0)
 		require.EqualErrno(t, 0, errno)
@@ -44,6 +45,7 @@ func TestOpenFileAt(t *testing.T) {
 
 		dir, err := os.Open(dirPath)
 		require.NoError(t, err)
+		defer dir.Close()
 
 		file, errno := OpenFileAt(dir, fileName, sys.O_RDWR|sys.O_CREAT, 0)
 		require.EqualErrno(t, 0, errno)
@@ -53,16 +55,18 @@ func TestOpenFileAt(t *testing.T) {
 
 	t.Run("create new file under a nested directory", func(t *testing.T) {
 		dirPath := filepath.Join(tempDir, "dir2")
-		nestedDirPath := filepath.Join(dirPath, "dir")
+		nestedDirName := "dir"
+		nestedDirPath := filepath.Join(dirPath, nestedDirName)
 		fileName := "file"
 
 		err := os.MkdirAll(nestedDirPath, 0o700)
 		require.NoError(t, err)
 
-		dir, err := os.Open(nestedDirPath)
+		dir, err := os.Open(dirPath)
 		require.NoError(t, err)
+		defer dir.Close()
 
-		file, errno := OpenFileAt(dir, fileName, sys.O_RDWR|sys.O_CREAT, 0o700)
+		file, errno := OpenFileAt(dir, path.Join(nestedDirName, fileName), sys.O_RDWR|sys.O_CREAT, 0o700)
 		require.EqualErrno(t, 0, errno)
 		err = file.Close()
 		require.NoError(t, err)
@@ -73,7 +77,7 @@ func TestOpenFileAt(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("create file in dot dot", func(t *testing.T) {
+	t.Run("create file in parent", func(t *testing.T) {
 		dirPath := filepath.Join(tempDir, "dir3")
 		fileName := "file"
 		filePath := filepath.Join(tempDir, fileName)
@@ -83,6 +87,7 @@ func TestOpenFileAt(t *testing.T) {
 
 		dir, err := os.Open(dirPath)
 		require.NoError(t, err)
+		defer dir.Close()
 
 		file, errno := OpenFileAt(dir, path.Join("..", fileName), sys.O_RDWR|sys.O_CREAT, 0o700)
 		require.EqualErrno(t, 0, errno)
@@ -95,18 +100,21 @@ func TestOpenFileAt(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("create file in dot dot", func(t *testing.T) {
-		dirPath := filepath.Join(tempDir, "dir3")
+	t.Run("resolve dot dot", func(t *testing.T) {
+		dirPath := filepath.Join(tempDir, "dir4")
+		nestedDirName := "dir"
+		nestedDirPath := filepath.Join(dirPath, nestedDirName)
 		fileName := "file"
-		filePath := filepath.Join(tempDir, fileName)
+		filePath := filepath.Join(dirPath, fileName)
 
-		err := os.MkdirAll(dirPath, 0o700)
+		err := os.MkdirAll(nestedDirPath, 0o700)
 		require.NoError(t, err)
 
 		dir, err := os.Open(dirPath)
 		require.NoError(t, err)
+		defer dir.Close()
 
-		file, errno := OpenFileAt(dir, path.Join("..", fileName), sys.O_RDWR|sys.O_CREAT, 0o700)
+		file, errno := OpenFileAt(dir, path.Join(".", nestedDirName, "..", ".", fileName), sys.O_RDWR|sys.O_CREAT, 0o700)
 		require.EqualErrno(t, 0, errno)
 		err = file.Close()
 		require.NoError(t, err)

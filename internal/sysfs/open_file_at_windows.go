@@ -1,8 +1,10 @@
 package sysfs
 
 import (
+	"fmt"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"unsafe"
@@ -10,18 +12,42 @@ import (
 	"github.com/tetratelabs/wazero/experimental/sys"
 )
 
-func openFileAt(dir *os.File, path string, oflag sys.Oflag, perm fs.FileMode) (*os.File, sys.Errno) {
+func openFileAt(dir *os.File, path_ string, oflag sys.Oflag, perm fs.FileMode) (*os.File, sys.Errno) {
+	// Since `NtCreateFile` doesn't resolve `.` and `..`, we need to do that.
+	// This implementation if adapted from cap-std's implementation of `openat`
+	// on Windows also using `NtCreateFile``.
+
+	sep := string(filepath.Separator)
+	path_ = strings.ReplaceAll(path_, "/", sep)
+	rebuiltPath := ""
+
+	for _, component := range strings.Split(path_, sep) {
+		switch component {
+		case "":
+		case ".":
+		case "..":
+			if len(rebuiltPath) == 0 {
+				rebuiltPath = dir.Name()
+			}
+
+			// And then pop the last component.
+			rebuiltPath, _ = filepath.Split(rebuiltPath)
+		default:
+			rebuiltPath = filepath.Join(rebuiltPath, component)
+		}
+	}
+
 	isDir := oflag&sys.O_DIRECTORY > 0
 	flag := toOsOpenFlag(oflag)
 
-	fd, err := openAt(syscall.Handle(dir.Fd()), path, flag|syscall.O_CLOEXEC, uint32(perm))
+	fd, err := openAt(syscall.Handle(dir.Fd()), rebuiltPath, flag|syscall.O_CLOEXEC, uint32(perm))
 	if err != nil {
 		errno := sys.UnwrapOSError(err)
 
 		switch errno {
 		case sys.EINVAL:
 			// WASI expects ENOTDIR for a file path with a trailing slash.
-			if strings.HasSuffix(path, "/") {
+			if strings.HasSuffix(path_, sep) {
 				errno = sys.ENOTDIR
 			}
 		// To match expectations of WASI, e.g. TinyGo TestStatBadDir, return
@@ -29,7 +55,7 @@ func openFileAt(dir *os.File, path string, oflag sys.Oflag, perm fs.FileMode) (*
 		case sys.ENOTDIR:
 			errno = sys.ENOENT
 		case sys.ENOENT:
-			if isSymlink(path) {
+			if isSymlink(path_) {
 				// Either symlink or hard link not found. We change the returned
 				// errno depending on if it is symlink or not to have consistent
 				// behavior across OSes.
@@ -45,7 +71,7 @@ func openFileAt(dir *os.File, path string, oflag sys.Oflag, perm fs.FileMode) (*
 		return nil, errno
 	}
 
-	return os.NewFile(uintptr(fd), path), 0
+	return os.NewFile(uintptr(fd), path_), 0
 }
 
 // # Differences from syscall.Open
@@ -62,6 +88,15 @@ func openAt(
 	mode int,
 	perm uint32,
 ) (fd syscall.Handle, err error) {
+	rootDirectory := syscall.Handle(0)
+	if !filepath.IsAbs(path) {
+		rootDirectory = dirfd
+	} else {
+		path = "\\??\\" + path
+	}
+
+	fmt.Println(rootDirectory, path)
+
 	if len(path) == 0 {
 		return syscall.InvalidHandle, syscall.ERROR_FILE_NOT_FOUND
 	}
@@ -110,7 +145,7 @@ func openAt(
 
 	objectAttributes := OBJECT_ATTRIBUTES{
 		Length:             uint32(unsafe.Sizeof(OBJECT_ATTRIBUTES{})),
-		RootDirectory:      dirfd,
+		RootDirectory:      rootDirectory,
 		ObjectName:         objectName,
 		Attributes:         OBJ_CASE_INSENSITIVE,
 		SecurityDescriptor: nil,
@@ -129,7 +164,6 @@ func openAt(
 	if disposition == FILE_OPEN && access == FILE_GENERIC_READ {
 		// Necessary for opening directory handles.
 		options |= FILE_OPEN_FOR_BACKUP_INTENT
-		options |= FILE_DIRECTORY_FILE
 	}
 
 	if perm&syscall.S_IWRITE == 0 {
@@ -183,8 +217,9 @@ func openAt(
 		0,
 	)
 	if e != 0 {
+		fmt.Println("openAt", e)
 		return syscall.InvalidHandle, e
 	}
 
-	return fd, e
+	return fd, nil
 }
