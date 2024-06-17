@@ -14,8 +14,9 @@ import (
 
 func openFileAt(dir *os.File, path_ string, oflag sys.Oflag, perm fs.FileMode) (*os.File, sys.Errno) {
 	// Since `NtCreateFile` doesn't resolve `.` and `..`, we need to do that.
-	// This implementation if adapted from cap-std's implementation of `openat`
+	// This implementation is adapted from cap-std's implementation of `openat`
 	// on Windows also using `NtCreateFile``.
+	// See https://github.com/bytecodealliance/cap-std/issues/226
 
 	sep := string(filepath.Separator)
 	path_ = strings.ReplaceAll(path_, "/", sep)
@@ -146,8 +147,8 @@ func openAt(
 		RootDirectory:      rootDirectory,
 		ObjectName:         objectName,
 		Attributes:         OBJ_CASE_INSENSITIVE,
-		SecurityDescriptor: nil,
-		SecurityQoS:        nil,
+		SecurityDescriptor: 0,
+		SecurityQoS:        0,
 	}
 
 	var (
