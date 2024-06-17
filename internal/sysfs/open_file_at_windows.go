@@ -95,8 +95,6 @@ func openAt(
 		path = "\\??\\" + path
 	}
 
-	fmt.Println(rootDirectory, path)
-
 	if len(path) == 0 {
 		return syscall.InvalidHandle, syscall.ERROR_FILE_NOT_FOUND
 	}
