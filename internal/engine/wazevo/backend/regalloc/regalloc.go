@@ -392,17 +392,15 @@ const (
 // The algorithm here is described in https://pfalcon.github.io/ssabook/latest/book-full.pdf Chapter 9.2.
 func (a *Allocator) livenessAnalysis(f Function) {
 	s := &a.state
-	for blk := f.PostOrderBlockIteratorBegin(); blk != nil; blk = f.PostOrderBlockIteratorNext() { // Order doesn't matter.
 
+	for blk := f.PostOrderBlockIteratorBegin(); blk != nil; blk = f.PostOrderBlockIteratorNext() {
 		// We should gather phi value data.
 		for _, p := range blk.BlockParams(&a.vs) {
 			vs := s.getVRegState(p.ID())
 			vs.isPhi = true
 			vs.defBlk = blk
 		}
-	}
 
-	for blk := f.PostOrderBlockIteratorBegin(); blk != nil; blk = f.PostOrderBlockIteratorNext() {
 		blkID := blk.ID()
 		info := a.getOrAllocateBlockState(blkID)
 
@@ -587,7 +585,6 @@ func (a *Allocator) updateLiveInVRState(liveness *blockState) {
 
 func (a *Allocator) finalizeStartReg(blk Block) {
 	bID := blk.ID()
-	liveness := a.getOrAllocateBlockState(bID)
 	s := &a.state
 	currentBlkState := a.getOrAllocateBlockState(bID)
 	if currentBlkState.startFromPredIndex > -1 {
@@ -595,7 +592,7 @@ func (a *Allocator) finalizeStartReg(blk Block) {
 	}
 
 	s.currentBlockID = bID
-	a.updateLiveInVRState(liveness)
+	a.updateLiveInVRState(currentBlkState)
 
 	preds := blk.Preds()
 	var predState *blockState
@@ -624,7 +621,7 @@ func (a *Allocator) finalizeStartReg(blk Block) {
 			s.useRealReg(u.RealReg(), u)
 		}
 		currentBlkState.startFromPredIndex = 0
-	} else if predState != nil {
+	} else {
 		if wazevoapi.RegAllocLoggingEnabled {
 			fmt.Printf("allocating blk%d starting from blk%d (on index=%d) \n",
 				bID, blk.Pred(currentBlkState.startFromPredIndex).ID(), currentBlkState.startFromPredIndex)
