@@ -22,7 +22,6 @@ func main() {}
 //
 //export require_no_diff
 func require_no_diff(binaryPtr uintptr, binarySize int, checkMemory bool, checkLogging bool) {
-	// TODO: use unsafe.Slice after flooring Go 1.20.
 	var wasmBin []byte
 	wasmHdr := (*reflect.SliceHeader)(unsafe.Pointer(&wasmBin))
 	wasmHdr.Data = binaryPtr
@@ -51,7 +50,6 @@ func require_no_diff(binaryPtr uintptr, binarySize int, checkMemory bool, checkL
 //
 //export validate
 func validate(binaryPtr uintptr, binarySize int) {
-	// TODO: use unsafe.Slice after flooring Go 1.20.
 	var wasmBin []byte
 	wasmHdr := (*reflect.SliceHeader)(unsafe.Pointer(&wasmBin))
 	wasmHdr.Data = binaryPtr

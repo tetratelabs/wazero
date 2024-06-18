@@ -189,7 +189,6 @@ func TestCompiledModule_functionIndexOf(t *testing.T) {
 	const executableAddr = 0xaaaa
 	var executable []byte
 	{
-		// TODO: use unsafe.Slice after floor version is set to Go 1.20.
 		hdr := (*reflect.SliceHeader)(unsafe.Pointer(&executable))
 		hdr.Data = executableAddr
 		hdr.Len = 0xffff
