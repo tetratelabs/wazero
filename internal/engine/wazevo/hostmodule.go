@@ -53,7 +53,8 @@ func hostModuleListenersSliceFromOpaque(opaqueBegin uintptr) []experimental.Func
 	var ret []experimental.FunctionListener
 	sh = (*reflect.SliceHeader)(unsafe.Pointer(&ret))
 	sh.Data = uintptr(b)
-	setSliceLimits(sh, uintptr(l), uintptr(c))
+	sh.Len = int(l)
+	sh.Cap = int(c)
 	return ret
 }
 

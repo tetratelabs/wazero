@@ -14,7 +14,6 @@ func UnwindStack(sp, _, top uintptr, returnAddresses []uintptr) []uintptr {
 
 	var stackBuf []byte
 	{
-		// TODO: use unsafe.Slice after floor version is set to Go 1.20.
 		hdr := (*reflect.SliceHeader)(unsafe.Pointer(&stackBuf))
 		hdr.Data = sp
 		hdr.Len = l

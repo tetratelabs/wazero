@@ -556,7 +556,8 @@ func (c *callEngine) cloneStack(l uintptr) (newSP, newFP, newTop uintptr, newSta
 	{
 		sh := (*reflect.SliceHeader)(unsafe.Pointer(&prevStackAligned))
 		sh.Data = c.stackTop - relSp
-		setSliceLimits(sh, relSp, relSp)
+		sh.Len = int(relSp)
+		sh.Cap = int(relSp)
 	}
 	newTop = alignedStackTop(newStack)
 	{
@@ -564,7 +565,8 @@ func (c *callEngine) cloneStack(l uintptr) (newSP, newFP, newTop uintptr, newSta
 		newFP = newTop - relFp
 		sh := (*reflect.SliceHeader)(unsafe.Pointer(&newStackAligned))
 		sh.Data = newSP
-		setSliceLimits(sh, relSp, relSp)
+		sh.Len = int(relSp)
+		sh.Cap = int(relSp)
 	}
 	copy(newStackAligned, prevStackAligned)
 	return
