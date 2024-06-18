@@ -84,6 +84,7 @@ jobs:
 
       - name: Build TinyGo examples
         run: make build.examples.tinygo
+        if: matrix.go-version != '1.20' # fails with TinyGo v0.32.0
 
       - name: Build AssemblyScript examples
         run: make build.examples.as
@@ -105,6 +106,7 @@ jobs:
 
       - name: Build bench cases
         run: make build.bench
+        if: matrix.go-version != '1.20' # fails with TinyGo v0.32.0
 
       - name: Run example tests
         run: make test.examples
