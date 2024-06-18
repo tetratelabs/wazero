@@ -57,6 +57,7 @@ type (
 		allocatedCalleeSavedRegs []VReg
 		vs                       []VReg
 		vs2                      []VRegID
+		is                       []Instr
 		phiDefInstListPool       wazevoapi.Pool[phiDefInstList]
 
 		// Followings are re-used during various places.
@@ -660,6 +661,7 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 	desiredUpdated := a.vs2[:0]
 
 	// Update the last use of each VReg.
+	a.is = a.is[:0] // Stores the copy instructions.
 	var pc programCounter
 	for instr := blk.InstrIteratorBegin(); instr != nil; instr = blk.InstrIteratorNext() {
 		var use, def VReg
@@ -670,6 +672,7 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 		}
 
 		if instr.IsCopy() {
+			a.is = append(a.is, instr)
 			def = instr.Defs(&a.vs)[0]
 			r := def.RealReg()
 			if r != RealRegInvalid {
@@ -722,22 +725,20 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 	}
 
 	// Propagate the desired register values from the end of the block to the beginning.
-	for instr := blk.InstrRevIteratorBegin(); instr != nil; instr = blk.InstrRevIteratorNext() {
-		if instr.IsCopy() {
-			def := instr.Defs(&a.vs)[0]
-			defState := s.getVRegState(def.ID())
-			desired := defState.desiredLoc.realReg()
-			if desired == RealRegInvalid {
-				continue
-			}
+	for _, instr := range a.is {
+		def := instr.Defs(&a.vs)[0]
+		defState := s.getVRegState(def.ID())
+		desired := defState.desiredLoc.realReg()
+		if desired == RealRegInvalid {
+			continue
+		}
 
-			use := instr.Uses(&a.vs)[0]
-			useID := use.ID()
-			useState := s.getVRegState(useID)
-			if s.phiBlk(useID) != succ && useState.desiredLoc == desiredLocUnspecified {
-				useState.desiredLoc = newDesiredLocReg(desired)
-				desiredUpdated = append(desiredUpdated, useID)
-			}
+		use := instr.Uses(&a.vs)[0]
+		useID := use.ID()
+		useState := s.getVRegState(useID)
+		if s.phiBlk(useID) != succ && useState.desiredLoc == desiredLocUnspecified {
+			useState.desiredLoc = newDesiredLocReg(desired)
+			desiredUpdated = append(desiredUpdated, useID)
 		}
 	}
 
@@ -796,10 +797,9 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 		}
 
 		isIndirect := instr.IsIndirectCall()
-		call := instr.IsCall() || isIndirect
-		if call {
+		if instr.IsCall() || isIndirect {
 			addr := RealRegInvalid
-			if instr.IsIndirectCall() {
+			if isIndirect {
 				addr = a.vs[0].RealReg()
 			}
 			a.releaseCallerSavedRegs(addr)
@@ -811,8 +811,8 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 		a.reals = killSet
 
 		defs := instr.Defs(&a.vs)
-		switch {
-		case len(defs) > 1:
+		switch len(defs) {
+		default:
 			// Some instructions define multiple values on real registers.
 			// E.g. call instructions (following calling convention) / div instruction on x64 that defines both rax and rdx.
 			//
@@ -829,7 +829,8 @@ func (a *Allocator) allocBlock(f Function, blk Block) {
 				}
 				s.useRealReg(r, def)
 			}
-		case len(defs) == 1:
+		case 0:
+		case 1:
 			def := defs[0]
 			if def.IsRealReg() {
 				r := def.RealReg()
