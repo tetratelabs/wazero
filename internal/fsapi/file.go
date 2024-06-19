@@ -1,6 +1,10 @@
 package fsapi
 
-import experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
+import (
+	"io/fs"
+
+	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
+)
 
 // File includes methods not yet ready to document for end users, notably
 // non-blocking functionality.
@@ -66,4 +70,22 @@ type File interface {
 	//     immediately true, as data will never become available.
 	//   - See /RATIONALE.md for detailed notes including impact of blocking.
 	Poll(flag Pflag, timeoutMillis int32) (ready bool, errno experimentalsys.Errno)
+
+	// OpenAt opens a file with a path relative to this directory.
+	//
+	// # Parameters
+	//
+	// The `path` parameter must be a relative path. The `flag` and `mode`
+	// parameters have the same semantics as [internal/sysfs.OpenFileAt].
+	//
+	// # Notes
+	//
+	//   - This is like `openat` in POSIX.
+	//     See https://pubs.opengroup.org/onlinepubs/9699919799/functions/open.html
+	OpenAt(
+		fs experimentalsys.FS,
+		path string,
+		flag experimentalsys.Oflag,
+		mode fs.FileMode,
+	) (experimentalsys.File, experimentalsys.Errno)
 }

@@ -1,7 +1,6 @@
 package sysfs
 
 import (
-	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -40,6 +39,10 @@ func openFileAt(dir *os.File, path_ string, oflag sys.Oflag, perm fs.FileMode) (
 
 	isDir := oflag&sys.O_DIRECTORY > 0
 	flag := toOsOpenFlag(oflag)
+
+	if oflag&sys.O_NOFOLLOW == sys.O_NOFOLLOW {
+		flag |= int(sys.O_NOFOLLOW)
+	}
 
 	fd, err := openAt(syscall.Handle(dir.Fd()), rebuiltPath, flag|syscall.O_CLOEXEC, uint32(perm))
 	if err != nil {
@@ -216,8 +219,22 @@ func openAt(
 		0,
 	)
 	if e != 0 {
-		fmt.Println("openAt", e)
 		return syscall.InvalidHandle, e
+	}
+
+	if mode&int(sys.O_NOFOLLOW) == int(sys.O_NOFOLLOW) {
+		// Emulate no follow behavior.
+		var info syscall.ByHandleFileInformation
+
+		err = syscall.GetFileInformationByHandle(fd, &info)
+		if err != nil {
+			return syscall.InvalidHandle, sys.UnwrapOSError(err)
+		}
+
+		if info.FileAttributes&syscall.FILE_ATTRIBUTE_ARCHIVE == syscall.FILE_ATTRIBUTE_ARCHIVE ||
+			info.FileAttributes&syscall.FILE_ATTRIBUTE_REPARSE_POINT == syscall.FILE_ATTRIBUTE_REPARSE_POINT {
+			return syscall.InvalidHandle, sys.ELOOP
+		}
 	}
 
 	return fd, nil

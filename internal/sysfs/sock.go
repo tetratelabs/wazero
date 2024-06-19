@@ -1,6 +1,7 @@
 package sysfs
 
 import (
+	"io/fs"
 	"net"
 	"os"
 
@@ -79,6 +80,15 @@ func (f *tcpListenerFile) IsNonblock() bool {
 // Poll implements the same method as documented on fsapi.File
 func (f *tcpListenerFile) Poll(flag fsapi.Pflag, timeoutMillis int32) (ready bool, errno experimentalsys.Errno) {
 	return false, experimentalsys.ENOSYS
+}
+
+func (f *tcpListenerFile) OpenAt(
+	fs experimentalsys.FS,
+	path string,
+	flag experimentalsys.Oflag,
+	mode fs.FileMode,
+) (experimentalsys.File, experimentalsys.Errno) {
+	return nil, experimentalsys.ENOSYS
 }
 
 var _ socketapi.TCPConn = (*tcpConnFile)(nil)
@@ -184,4 +194,13 @@ func (f *tcpConnFile) IsNonblock() bool {
 // Poll implements the same method as documented on fsapi.File
 func (f *tcpConnFile) Poll(flag fsapi.Pflag, timeoutMillis int32) (ready bool, errno experimentalsys.Errno) {
 	return false, experimentalsys.ENOSYS
+}
+
+func (f *tcpConnFile) OpenAt(
+	fs experimentalsys.FS,
+	path string,
+	flag experimentalsys.Oflag,
+	mode fs.FileMode,
+) (experimentalsys.File, experimentalsys.Errno) {
+	return nil, experimentalsys.ENOSYS
 }

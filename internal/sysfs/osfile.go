@@ -293,3 +293,12 @@ func (f *osFile) Close() experimentalsys.Errno {
 func (f *osFile) close() experimentalsys.Errno {
 	return experimentalsys.UnwrapOSError(f.file.Close())
 }
+
+func (f *osFile) OpenAt(
+	fs experimentalsys.FS,
+	path string,
+	flag experimentalsys.Oflag,
+	mode fs.FileMode,
+) (experimentalsys.File, experimentalsys.Errno) {
+	return OpenOSFileAt(f, path, flag, mode)
+}

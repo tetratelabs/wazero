@@ -65,6 +65,10 @@ func OpenOSFileAt(
 	flag experimentalsys.Oflag,
 	perm fs.FileMode,
 ) (experimentalsys.File, experimentalsys.Errno) {
+	if len(path) == 0 {
+		return nil, experimentalsys.EINVAL
+	}
+
 	dirOsFile, ok := dir.(*osFile)
 	if !ok {
 		return nil, experimentalsys.EBADF
@@ -383,6 +387,15 @@ func (f *fsFile) SetNonblock(bool) experimentalsys.Errno {
 // Poll implements the same method as documented on fsapi.File
 func (f *fsFile) Poll(fsapi.Pflag, int32) (ready bool, errno experimentalsys.Errno) {
 	return false, experimentalsys.ENOSYS
+}
+
+func (f *fsFile) OpenAt(
+	fs experimentalsys.FS,
+	path string,
+	oflags experimentalsys.Oflag,
+	mode fs.FileMode,
+) (experimentalsys.File, experimentalsys.Errno) {
+	return nil, experimentalsys.ENOSYS
 }
 
 // dirError is used for commands that work against a directory, but not a file.

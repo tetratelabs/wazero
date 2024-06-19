@@ -2,6 +2,7 @@ package sys
 
 import (
 	"io"
+	"io/fs"
 	"os"
 
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
@@ -97,6 +98,16 @@ func (noopStdioFile) SetNonblock(bool) experimentalsys.Errno {
 // Poll implements the same method as documented on fsapi.File
 func (noopStdioFile) Poll(fsapi.Pflag, int32) (ready bool, errno experimentalsys.Errno) {
 	return false, experimentalsys.ENOSYS
+}
+
+// OpenAt implements the same method as documented on fsapi.File
+func (noopStdioFile) OpenAt(
+	fs experimentalsys.FS,
+	path string,
+	flag experimentalsys.Oflag,
+	mode fs.FileMode,
+) (experimentalsys.File, experimentalsys.Errno) {
+	return nil, experimentalsys.EBADF
 }
 
 func stdinFileEntry(r io.Reader) (*FileEntry, error) {

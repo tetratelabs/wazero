@@ -124,4 +124,30 @@ func TestOpenFileAt(t *testing.T) {
 		err = file.Close()
 		require.NoError(t, err)
 	})
+
+	t.Run("no follow symlink", func(t *testing.T) {
+		dirPath := filepath.Join(tempDir, "dir5")
+		fileName := "file"
+		linkName := "link"
+		filePath := filepath.Join(dirPath, fileName)
+		linkPath := filepath.Join(dirPath, linkName)
+
+		err := os.MkdirAll(dirPath, 0o700)
+		require.NoError(t, err)
+
+		dir, err := os.Open(dirPath)
+		require.NoError(t, err)
+		defer dir.Close()
+
+		f, err := os.Create(filePath)
+		require.NoError(t, err)
+		err = f.Close()
+		require.NoError(t, err)
+
+		err = os.Symlink(fileName, linkPath)
+		require.NoError(t, err)
+
+		_, err = OpenFileAt(dir, linkName, sys.O_RDONLY|sys.O_NOFOLLOW, 0o700)
+		require.EqualErrno(t, sys.ELOOP, err)
+	})
 }
