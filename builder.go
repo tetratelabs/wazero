@@ -344,12 +344,24 @@ func (b *hostModuleBuilder) Compile(ctx context.Context) (CompiledModule, error)
 	return c, nil
 }
 
+// hostModuleInstance is a wrapper around api.Module that prevents calling ExportedFunction.
+type hostModuleInstance struct{ api.Module }
+
+// ExportedFunction implements api.Module ExportedFunction.
+func (h hostModuleInstance) ExportedFunction(name string) api.Function {
+	panic("calling ExportedFunction is forbidden on host modules")
+}
+
 // Instantiate implements HostModuleBuilder.Instantiate
 func (b *hostModuleBuilder) Instantiate(ctx context.Context) (api.Module, error) {
 	if compiled, err := b.Compile(ctx); err != nil {
 		return nil, err
 	} else {
 		compiled.(*compiledModule).closeWithModule = true
-		return b.r.InstantiateModule(ctx, compiled, NewModuleConfig())
+		m, err := b.r.InstantiateModule(ctx, compiled, NewModuleConfig())
+		if err != nil {
+			return nil, err
+		}
+		return hostModuleInstance{m}, nil
 	}
 }

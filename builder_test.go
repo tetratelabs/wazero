@@ -368,8 +368,12 @@ func TestNewHostModuleBuilder_Instantiate(t *testing.T) {
 	m, err := r.NewHostModuleBuilder("env").Instantiate(testCtx)
 	require.NoError(t, err)
 
+	// Calling ExportedFunction should fail.
+	err = require.CapturePanic(func() { m.ExportedFunction("any") })
+	require.EqualError(t, err, `calling ExportedFunction is forbidden on host modules. See the note on ExportedFunction interface`)
+
 	// If this was instantiated, it would be added to the store under the same name
-	require.Equal(t, r.Module("env"), m)
+	require.Equal(t, r.Module("env"), m.(hostModuleInstance).Module)
 
 	// Closing the module should remove the compiler cache
 	require.NoError(t, m.Close(testCtx))
