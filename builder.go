@@ -179,6 +179,9 @@ type HostFunctionBuilder interface {
 //     are deferred until Compile.
 //   - Functions are indexed in order of calls to NewFunctionBuilder as
 //     insertion ordering is needed by ABI such as Emscripten (invoke_*).
+//   - Because of the semantic of host function that it assumes the existence of "importing module" and it has access to
+//     the memory of the importing module for example, direct use of ExportedFunction interface is forbidden for host modules.
+//     Practically speaking, it is usually meaningless to directly call a host function from Go code as it is already somewhere in Go code.
 type HostModuleBuilder interface {
 	// Note: until golang/go#5860, we can't use example tests to embed code in interface godocs.
 
