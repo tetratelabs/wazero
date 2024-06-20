@@ -1080,3 +1080,10 @@ func Test2201(t *testing.T) {
 	}
 	nodiff.RequireNoDiffT(t, getWasmBinary(t, "2201"), false, false)
 }
+
+func Test2260(t *testing.T) {
+	if !platform.CompilerSupported() {
+		return
+	}
+	nodiff.RequireNoDiffT(t, getWasmBinary(t, "2260"), false, false)
+}
