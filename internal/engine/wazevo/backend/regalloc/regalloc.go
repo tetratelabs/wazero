@@ -432,7 +432,7 @@ func (a *Allocator) livenessAnalysis(f Function) {
 			}
 
 			for _, st := range succInfo.liveIns {
-				if st.phiBlk() != succ {
+				if st.phiBlk() != succ && st.spilled != flagLive { //nolint:gosimple
 					// We use .spilled field to store the flag.
 					st.spilled = flagLive
 					a.ss = append(a.ss, st)
@@ -448,17 +448,18 @@ func (a *Allocator) livenessAnalysis(f Function) {
 				if !def.IsRealReg() {
 					st := s.getOrAllocateVRegState(def)
 					defIsPhi = st.isPhi
-					// We use .spilled field to store the flag.
+					// Note: We use .spilled field to store the flag.
 					st.spilled = flagDeleted
-					a.ss = append(a.ss, st)
 				}
 			}
 			for _, use = range instr.Uses(&a.vs) {
 				if !use.IsRealReg() {
 					st := s.getOrAllocateVRegState(use)
-					// We use .spilled field to store the flag.
-					st.spilled = flagLive
-					a.ss = append(a.ss, st)
+					// Note: We use .spilled field to store the flag.
+					if st.spilled != flagLive { //nolint:gosimple
+						st.spilled = flagLive
+						a.ss = append(a.ss, st)
+					}
 				}
 			}
 
