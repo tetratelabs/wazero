@@ -275,7 +275,7 @@ func (c *Compiler) LowerToSSA() {
 		builder.DefineVariable(variable, value, entryBlock)
 		c.setWasmLocalVariable(wasm.Index(i), variable)
 	}
-	c.declareWasmLocals(entryBlock)
+	c.declareWasmLocals()
 	c.declareNecessaryVariables()
 
 	c.lowerBody(entryBlock)
@@ -295,7 +295,7 @@ func (c *Compiler) setWasmLocalVariable(index wasm.Index, variable ssa.Variable)
 }
 
 // declareWasmLocals declares the SSA variables for the Wasm locals.
-func (c *Compiler) declareWasmLocals(entry ssa.BasicBlock) {
+func (c *Compiler) declareWasmLocals() {
 	localCount := wasm.Index(len(c.wasmFunctionTyp.Params))
 	for i, typ := range c.wasmFunctionLocalTypes {
 		st := WasmTypeToSSAType(typ)
@@ -543,25 +543,17 @@ func (c *Compiler) initializeCurrentBlockKnownBounds() {
 				cb := &c.bounds[i][c.pointers[i]]
 				if cb.id != smallestID {
 					same = false
-					break
 				} else {
 					if cb.bound < minBound {
 						minBound = cb.bound
 					}
+					c.pointers[i]++
 				}
 			}
 
 			if same { // All elements are the same.
 				// Absolute address cannot be used in the intersection since the value might be only defined in one of the predecessors.
 				c.recordKnownSafeBound(smallestID, minBound, ssa.ValueInvalid)
-			}
-
-			// Move pointer(s) for the smallest ID forward (if same, move all).
-			for i := 0; i < preds; i++ {
-				cb := &c.bounds[i][c.pointers[i]]
-				if cb.id == smallestID {
-					c.pointers[i]++
-				}
 			}
 		}
 	}
