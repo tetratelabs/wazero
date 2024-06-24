@@ -282,7 +282,7 @@ func TestMachine_lowerExitWithCode(t *testing.T) {
 	m.nextLabel = 1
 	m.lowerExitWithCode(r15VReg, wazevoapi.ExitCodeUnreachable)
 	m.insert(m.allocateInstr().asUD2())
-	m.FlushpendingInstructions()
+	m.FlushPendingInstructions()
 	m.rootInstr = m.perBlockHead
 	require.Equal(t, `
 	mov.q %rsp, 56(%r15)
@@ -365,7 +365,7 @@ L2:
 			instr := &ssa.Instruction{}
 			instr.AsClz(p)
 			m.lowerClz(instr)
-			m.FlushpendingInstructions()
+			m.FlushPendingInstructions()
 			m.rootInstr = m.perBlockHead
 			require.Equal(t, tc.exp, m.Format())
 		})
@@ -437,7 +437,7 @@ L2:
 			instr := &ssa.Instruction{}
 			instr.AsCtz(p)
 			m.lowerCtz(instr)
-			m.FlushpendingInstructions()
+			m.FlushPendingInstructions()
 			m.rootInstr = m.perBlockHead
 			require.Equal(t, tc.exp, m.Format())
 		})

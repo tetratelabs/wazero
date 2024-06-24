@@ -382,7 +382,7 @@ L2:
 func TestMachine_exitWithCode(t *testing.T) {
 	_, _, m := newSetupWithMockContext()
 	m.lowerExitWithCode(x1VReg, wazevoapi.ExitCodeGrowStack)
-	m.FlushpendingInstructions()
+	m.FlushPendingInstructions()
 	m.encode(m.perBlockHead)
 	require.Equal(t, `
 movz x1?, #0x1, lsl 0
@@ -448,7 +448,7 @@ fcvtzu w1, s2
 			m.lowerFpuToInt(x1VReg, operandNR(v2VReg), x15VReg, false, false, false, tc.nontrapping)
 			require.Equal(t, tc.expectedAsm, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
 
-			m.FlushpendingInstructions()
+			m.FlushPendingInstructions()
 			m.encode(m.perBlockHead)
 		})
 	}
@@ -530,7 +530,7 @@ mul x1.4s, x2.4s, x15.4s
 			m.lowerVIMul(x1VReg, operandNR(x2VReg), operandNR(x15VReg), tc.arrangement)
 			require.Equal(t, tc.expectedAsm, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
 
-			m.FlushpendingInstructions()
+			m.FlushPendingInstructions()
 			m.encode(m.perBlockHead)
 			buf := m.compiler.Buf()
 			require.Equal(t, tc.expectedBytes, hex.EncodeToString(buf))
@@ -635,7 +635,7 @@ cset x15, ne
 			m.lowerVcheckTrue(tc.op, operandNR(x1VReg), x15VReg, tc.arrangement)
 			require.Equal(t, tc.expectedAsm, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
 
-			m.FlushpendingInstructions()
+			m.FlushPendingInstructions()
 			m.encode(m.perBlockHead)
 			buf := m.compiler.Buf()
 			require.Equal(t, tc.expectedBytes, hex.EncodeToString(buf))
@@ -720,7 +720,7 @@ add w15, w15, w1?, lsl #1
 			m.lowerVhighBits(operandNR(x1VReg), x15VReg, tc.arrangement)
 			require.Equal(t, tc.expectedAsm, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
 
-			m.FlushpendingInstructions()
+			m.FlushPendingInstructions()
 			m.encode(m.perBlockHead)
 			buf := m.compiler.Buf()
 			require.Equal(t, tc.expectedBytes, hex.EncodeToString(buf))
@@ -769,7 +769,7 @@ tbl x1.16b, { v29.16b, v30.16b }, v1?.16b
 			m.lowerShuffle(x1VReg, operandNR(x2VReg), operandNR(x15VReg), lane1, lane2)
 			require.Equal(t, tc.expectedAsm, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
 
-			m.FlushpendingInstructions()
+			m.FlushPendingInstructions()
 			m.encode(m.perBlockHead)
 			buf := m.compiler.Buf()
 			require.Equal(t, tc.expectedBytes, hex.EncodeToString(buf))
@@ -826,7 +826,7 @@ ushl x1.16b, x2.16b, v2?.16b
 			m.lowerVShift(tc.op, x1VReg, operandNR(x2VReg), operandNR(x15VReg), tc.arrangement)
 			require.Equal(t, tc.expectedAsm, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
 
-			m.FlushpendingInstructions()
+			m.FlushPendingInstructions()
 			m.encode(m.perBlockHead)
 			buf := m.compiler.Buf()
 			require.Equal(t, tc.expectedBytes, hex.EncodeToString(buf))

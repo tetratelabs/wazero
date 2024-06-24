@@ -74,7 +74,7 @@ func (c *compiler) lowerBlock(blk ssa.BasicBlock) {
 		default:
 			mach.LowerInstr(cur)
 		}
-		mach.FlushpendingInstructions()
+		mach.FlushPendingInstructions()
 	}
 
 	// Finally, if this is the entry block, we have to insert copies of arguments from the real location to the VReg.
@@ -95,11 +95,11 @@ func (c *compiler) lowerBranches(br0, br1 *ssa.Instruction) {
 
 	c.setCurrentGroupID(br0.GroupID())
 	c.mach.LowerSingleBranch(br0)
-	mach.FlushpendingInstructions()
+	mach.FlushPendingInstructions()
 	if br1 != nil {
 		c.setCurrentGroupID(br1.GroupID())
 		c.mach.LowerConditionalBranch(br1)
-		mach.FlushpendingInstructions()
+		mach.FlushPendingInstructions()
 	}
 
 	if br0.Opcode() == ssa.OpcodeJump {
@@ -117,7 +117,7 @@ func (c *compiler) lowerBranches(br0, br1 *ssa.Instruction) {
 			c.lowerBlockArguments(args, target)
 		}
 	}
-	mach.FlushpendingInstructions()
+	mach.FlushPendingInstructions()
 }
 
 func (c *compiler) lowerFunctionArguments(entry ssa.BasicBlock) {
@@ -134,7 +134,7 @@ func (c *compiler) lowerFunctionArguments(entry ssa.BasicBlock) {
 		}
 	}
 	mach.LowerParams(c.tmpVals)
-	mach.FlushpendingInstructions()
+	mach.FlushPendingInstructions()
 }
 
 // lowerBlockArguments lowers how to pass arguments to the given successor block.

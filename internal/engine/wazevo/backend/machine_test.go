@@ -107,8 +107,8 @@ func (m mockMachine) Reset() {
 	m.reset()
 }
 
-// FlushpendingInstructions implements Machine.FlushpendingInstructions.
-func (m mockMachine) FlushpendingInstructions() {}
+// FlushPendingInstructions implements Machine.FlushPendingInstructions.
+func (m mockMachine) FlushPendingInstructions() {}
 
 // InsertMove implements Machine.InsertMove.
 func (m mockMachine) InsertMove(dst, src regalloc.VReg, typ ssa.Type) {

@@ -262,8 +262,8 @@ func (m *machine) insertAtPerBlockHead(i *instruction) {
 	m.perBlockHead = i
 }
 
-// FlushpendingInstructions implements backend.Machine.
-func (m *machine) FlushpendingInstructions() {
+// FlushPendingInstructions implements backend.Machine.
+func (m *machine) FlushPendingInstructions() {
 	l := len(m.pendingInstructions)
 	if l == 0 {
 		return
