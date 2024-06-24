@@ -22,6 +22,10 @@ func TestReadLinkAt(t *testing.T) {
 		require.NoError(t, err)
 		defer dir.Close()
 
+		f, err := os.Create(filepath.Join(dirPath, "file"))
+		require.NoError(t, err)
+		f.Close()
+
 		err = os.Symlink(linkContent, linkPath)
 		require.NoError(t, err)
 
