@@ -33,7 +33,7 @@ type (
 		pendingInstructions []*instruction
 		maxSSABlockID       label
 
-		regAlloc   regalloc.Allocator
+		regAlloc   regalloc.Allocator[*instruction, *labelPosition]
 		regAllocFn regAllocFn
 
 		amodePool wazevoapi.Pool[addressMode]
@@ -144,7 +144,7 @@ func resetLabelPosition(l *labelPosition) {
 func NewBackend() backend.Machine {
 	m := &machine{
 		spillSlots:        make(map[regalloc.VRegID]int64),
-		regAlloc:          regalloc.NewAllocator(regInfo),
+		regAlloc:          regalloc.NewAllocator[*instruction, *labelPosition](regInfo),
 		amodePool:         wazevoapi.NewPool[addressMode](resetAddressMode),
 		instrPool:         wazevoapi.NewPool[instruction](resetInstruction),
 		labelPositionPool: wazevoapi.NewIDedPool[labelPosition](resetLabelPosition),

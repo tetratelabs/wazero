@@ -16,8 +16,8 @@ func TestRegAllocFunctionImpl_ReloadRegisterAfter(t *testing.T) {
 	i1.next = i2
 	i2.prev = i1
 
-	m.InsertReloadRegisterAt(x1VReg, i1, true)
-	m.InsertReloadRegisterAt(v1VReg, i1, true)
+	m.insertReloadRegisterAt(x1VReg, i1, true)
+	m.insertReloadRegisterAt(v1VReg, i1, true)
 
 	require.NotEqual(t, i1, i2.prev)
 	require.NotEqual(t, i1.next, i2)
@@ -30,7 +30,7 @@ func TestRegAllocFunctionImpl_ReloadRegisterAfter(t *testing.T) {
 	require.Equal(t, iload.kind, uLoad64)
 	require.Equal(t, fload.kind, fpuLoad64)
 
-	m.executableContext.RootInstr = i1
+	m.rootInstr = i1
 	require.Equal(t, `
 	ldr d1, [sp, #0x18]
 	ldr x1, [sp, #0x10]
@@ -45,8 +45,8 @@ func TestRegAllocFunctionImpl_StoreRegisterBefore(t *testing.T) {
 	i1.next = i2
 	i2.prev = i1
 
-	m.InsertStoreRegisterAt(x1VReg, i2, false)
-	m.InsertStoreRegisterAt(v1VReg, i2, false)
+	m.insertStoreRegisterAt(x1VReg, i2, false)
+	m.insertStoreRegisterAt(v1VReg, i2, false)
 
 	require.NotEqual(t, i1, i2.prev)
 	require.NotEqual(t, i1.next, i2)
@@ -59,7 +59,7 @@ func TestRegAllocFunctionImpl_StoreRegisterBefore(t *testing.T) {
 	require.Equal(t, iload.kind, store64)
 	require.Equal(t, fload.kind, fpuStore64)
 
-	m.executableContext.RootInstr = i1
+	m.rootInstr = i1
 	require.Equal(t, `
 	str x1, [sp, #0x10]
 	str d1, [sp, #0x18]
@@ -125,13 +125,13 @@ func TestMachine_insertStoreRegisterAt(t *testing.T) {
 					i2.prev = i1
 
 					if after {
-						m.InsertStoreRegisterAt(v1VReg, i1, after)
-						m.InsertStoreRegisterAt(x1VReg, i1, after)
+						m.insertStoreRegisterAt(v1VReg, i1, after)
+						m.insertStoreRegisterAt(x1VReg, i1, after)
 					} else {
-						m.InsertStoreRegisterAt(x1VReg, i2, after)
-						m.InsertStoreRegisterAt(v1VReg, i2, after)
+						m.insertStoreRegisterAt(x1VReg, i2, after)
+						m.insertStoreRegisterAt(v1VReg, i2, after)
 					}
-					m.executableContext.RootInstr = i1
+					m.rootInstr = i1
 					require.Equal(t, tc.expected, m.Format())
 				})
 			}
@@ -198,13 +198,13 @@ func TestMachine_insertReloadRegisterAt(t *testing.T) {
 					i2.prev = i1
 
 					if after {
-						m.InsertReloadRegisterAt(v1VReg, i1, after)
-						m.InsertReloadRegisterAt(x1VReg, i1, after)
+						m.insertReloadRegisterAt(v1VReg, i1, after)
+						m.insertReloadRegisterAt(x1VReg, i1, after)
 					} else {
-						m.InsertReloadRegisterAt(x1VReg, i2, after)
-						m.InsertReloadRegisterAt(v1VReg, i2, after)
+						m.insertReloadRegisterAt(x1VReg, i2, after)
+						m.insertReloadRegisterAt(v1VReg, i2, after)
 					}
-					m.executableContext.RootInstr = i1
+					m.rootInstr = i1
 
 					require.Equal(t, tc.expected, m.Format())
 				})
@@ -215,7 +215,7 @@ func TestMachine_insertReloadRegisterAt(t *testing.T) {
 
 func TestRegMachine_ClobberedRegisters(t *testing.T) {
 	_, _, m := newSetupWithMockContext()
-	m.ClobberedRegisters([]regalloc.VReg{v19VReg, v19VReg, v19VReg, v19VReg})
+	m.regAllocFn.ClobberedRegisters([]regalloc.VReg{v19VReg, v19VReg, v19VReg, v19VReg})
 	require.Equal(t, []regalloc.VReg{v19VReg, v19VReg, v19VReg, v19VReg}, m.clobberedRegs)
 }
 
@@ -284,8 +284,8 @@ func TestMachineMachineswap(t *testing.T) {
 			cur.next = i2
 			i2.prev = cur
 
-			m.Swap(cur, tc.x1, tc.x2, tc.tmp)
-			m.executableContext.RootInstr = cur
+			m.swap(cur, tc.x1, tc.x2, tc.tmp)
+			m.rootInstr = cur
 
 			require.Equal(t, tc.expected, m.Format())
 		})

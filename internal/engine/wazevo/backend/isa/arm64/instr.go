@@ -63,16 +63,6 @@ func (i *instruction) IsReturn() bool {
 	return i.kind == ret
 }
 
-// Next implements regalloc.Instr Next.
-func (i *instruction) Next() regalloc.Instr {
-	return i.next
-}
-
-// Prev implements regalloc.Instr Prev.
-func (i *instruction) Prev() regalloc.Instr {
-	return i.prev
-}
-
 // AddedBeforeRegAlloc implements regalloc.Instr AddedBeforeRegAlloc.
 func (i *instruction) AddedBeforeRegAlloc() bool {
 	return i.addedBeforeRegAlloc

@@ -48,7 +48,7 @@ func TestMachine_resolveAddressingMode(t *testing.T) {
 		i.asULoad(x17VReg, amode, 64)
 		m.resolveAddressingMode(0, 0x40000001, i)
 
-		m.executableContext.RootInstr = root
+		m.rootInstr = root
 		require.Equal(t, `
 	udf
 	movz x27, #0x1, lsl 0
@@ -179,28 +179,23 @@ L200:
 			originalEndNext := m.allocateInstr()
 			originalEndNext.asExitSequence(x0VReg)
 
-			ectx := m.executableContext
+			originLabelPos := m.labelPositionPool.GetOrAllocate(originLabel)
+			originLabelPos.begin = cbr
+			originLabelPos.end = linkInstr(cbr, end)
+			originNextLabelPos := m.labelPositionPool.GetOrAllocate(originLabelNext)
+			originNextLabelPos.begin = originalEndNext
+			linkInstr(originLabelPos.end, originalEndNext)
 
-			originLabelPos := ectx.GetOrAllocateLabelPosition(originLabel)
-			originLabelPos.Begin = cbr
-			originLabelPos.End = linkInstr(cbr, end)
-			originNextLabelPos := ectx.GetOrAllocateLabelPosition(originLabelNext)
-			originNextLabelPos.Begin = originalEndNext
-			linkInstr(originLabelPos.End, originalEndNext)
-
-			ectx.LabelPositions[originLabel] = originLabelPos
-			ectx.LabelPositions[originLabelNext] = originNextLabelPos
-
-			ectx.RootInstr = cbr
+			m.rootInstr = cbr
 			require.Equal(t, tc.expBefore, m.Format())
 
-			ectx.NextLabel = 9999999
+			m.nextLabel = 9999999
 			m.insertConditionalJumpTrampoline(cbr, originLabelPos, originLabelNext)
 
 			require.Equal(t, tc.expAfter, m.Format())
 
 			// The original label position should be updated to the unconditional jump to the original target destination.
-			require.Equal(t, "b L12345", originLabelPos.End.String())
+			require.Equal(t, "b L12345", originLabelPos.end.String())
 		})
 	}
 }

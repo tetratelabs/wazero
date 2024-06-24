@@ -10,13 +10,13 @@ import (
 )
 
 func getPendingInstr(m *machine) *instruction {
-	return m.executableContext.PendingInstructions[0]
+	return m.pendingInstructions[0]
 }
 
 func formatEmittedInstructionsInCurrentBlock(m *machine) string {
-	m.executableContext.FlushPendingInstructions()
+	m.FlushPendingInstructions()
 	var strs []string
-	for cur := m.executableContext.PerBlockHead; cur != nil; cur = cur.next {
+	for cur := m.perBlockHead; cur != nil; cur = cur.next {
 		strs = append(strs, cur.String())
 	}
 	return strings.Join(strs, "\n")

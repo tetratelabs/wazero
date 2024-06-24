@@ -102,14 +102,14 @@ func TestMachine_setupPrologue(t *testing.T) {
 			m.currentABI = &tc.abi
 
 			root := m.allocateNop()
-			m.executableContext.RootInstr = root
+			m.rootInstr = root
 			udf := m.allocateInstr()
 			udf.asUDF()
 			root.next = udf
 			udf.prev = root
 
 			m.setupPrologue()
-			require.Equal(t, root, m.executableContext.RootInstr)
+			require.Equal(t, root, m.rootInstr)
 			err := m.Encode(context.Background())
 			require.NoError(t, err)
 			require.Equal(t, tc.exp, m.Format())
@@ -216,14 +216,14 @@ func TestMachine_postRegAlloc(t *testing.T) {
 			m.currentABI = &tc.abi
 
 			root := m.allocateNop()
-			m.executableContext.RootInstr = root
+			m.rootInstr = root
 			ret := m.allocateInstr()
 			ret.asRet()
 			root.next = ret
 			ret.prev = root
 			m.postRegAlloc()
 
-			require.Equal(t, root, m.executableContext.RootInstr)
+			require.Equal(t, root, m.rootInstr)
 			err := m.Encode(context.Background())
 			require.NoError(t, err)
 			require.Equal(t, tc.exp, m.Format())
@@ -267,9 +267,9 @@ func TestMachine_insertStackBoundsCheck(t *testing.T) {
 		tc := tc
 		t.Run(tc.exp, func(t *testing.T) {
 			_, _, m := newSetupWithMockContext()
-			m.executableContext.RootInstr = m.allocateInstr()
-			m.executableContext.RootInstr.asNop0()
-			m.insertStackBoundsCheck(tc.requiredStackSize, m.executableContext.RootInstr)
+			m.rootInstr = m.allocateInstr()
+			m.rootInstr.asNop0()
+			m.insertStackBoundsCheck(tc.requiredStackSize, m.rootInstr)
 			err := m.Encode(context.Background())
 			require.NoError(t, err)
 			require.Equal(t, tc.exp, m.Format())
