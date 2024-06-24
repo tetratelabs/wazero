@@ -26,9 +26,9 @@ type (
 		// EndBlock is called when the compilation of the current block is finished.
 		EndBlock()
 
-		// FlushPendingInstructions flushes the pending instructions to the buffer.
+		// FlushpendingInstructions flushes the pending instructions to the buffer.
 		// This will be called after the lowering of each SSA Instruction.
-		FlushPendingInstructions()
+		FlushpendingInstructions()
 
 		// DisableStackCheck disables the stack check for the current compilation for debugging/testing.
 		DisableStackCheck()

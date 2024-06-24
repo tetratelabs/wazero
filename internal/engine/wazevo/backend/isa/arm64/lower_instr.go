@@ -791,7 +791,7 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 	default:
 		panic("TODO: lowering " + op.String())
 	}
-	m.FlushPendingInstructions()
+	m.FlushpendingInstructions()
 }
 
 func (m *machine) lowerShuffle(rd regalloc.VReg, rn, rm operand, lane1, lane2 uint64) {

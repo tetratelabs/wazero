@@ -69,14 +69,14 @@ func TestMachine_setupPrologue(t *testing.T) {
 			m.currentABI = &tc.abi
 
 			root := m.allocateNop()
-			m.ectx.RootInstr = root
+			m.rootInstr = root
 			udf := m.allocateInstr()
 			udf.asUD2()
 			root.next = udf
 			udf.prev = root
 
 			m.setupPrologue()
-			require.Equal(t, root, m.ectx.RootInstr)
+			require.Equal(t, root, m.rootInstr)
 			err := m.Encode(context.Background())
 			require.NoError(t, err)
 			require.Equal(t, tc.exp, m.Format())
@@ -144,14 +144,14 @@ func TestMachine_postRegAlloc(t *testing.T) {
 			m.currentABI = &tc.abi
 
 			root := m.allocateNop()
-			m.ectx.RootInstr = root
+			m.rootInstr = root
 			ret := m.allocateInstr()
 			ret.asRet()
 			root.next = ret
 			ret.prev = root
 			m.postRegAlloc()
 
-			require.Equal(t, root, m.ectx.RootInstr)
+			require.Equal(t, root, m.rootInstr)
 			err := m.Encode(context.Background())
 			require.NoError(t, err)
 			require.Equal(t, tc.exp, m.Format())

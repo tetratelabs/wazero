@@ -307,7 +307,7 @@ func TestMachineCompileEntryPreamble(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, _, m := newSetupWithMockContext()
-			m.ectx.RootInstr = m.compileEntryPreamble(tc.sig)
+			m.rootInstr = m.compileEntryPreamble(tc.sig)
 			require.Equal(t, tc.exp, m.Format())
 		})
 	}

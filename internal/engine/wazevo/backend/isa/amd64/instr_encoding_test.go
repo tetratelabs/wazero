@@ -5,7 +5,6 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
@@ -2652,7 +2651,7 @@ func TestInstruction_format_encode(t *testing.T) {
 		},
 		{
 			setup: func(i *instruction) {
-				i.asLEA(newOperandLabel(backend.Label(1234)), r11VReg)
+				i.asLEA(newOperandLabel(label(1234)), r11VReg)
 			},
 			want:       "4c8d1dffffffff",
 			wantFormat: "lea L1234, %r11",

@@ -59,7 +59,7 @@ func (o *operand) format(_64 bool) string {
 	case operandKindImm32:
 		return fmt.Sprintf("$%d", int32(o.imm32()))
 	case operandKindLabel:
-		return backend.Label(o.imm32()).String()
+		return label(o.imm32()).String()
 	default:
 		panic(fmt.Sprintf("BUG: invalid operand: %s", o.kind))
 	}
@@ -85,22 +85,22 @@ func (o *operand) imm32() uint32 {
 	return uint32(o.data)
 }
 
-func (o *operand) label() backend.Label {
+func (o *operand) label() label {
 	switch o.kind {
 	case operandKindLabel:
-		return backend.Label(o.data)
+		return label(o.data)
 	case operandKindMem:
 		mem := o.addressMode()
 		if mem.kind() != amodeRipRel {
 			panic("BUG: invalid label")
 		}
-		return backend.Label(mem.imm32)
+		return label(mem.imm32)
 	default:
 		panic("BUG: invalid operand kind")
 	}
 }
 
-func newOperandLabel(label backend.Label) operand {
+func newOperandLabel(label label) operand {
 	return operand{kind: operandKindLabel, data: uint64(label)}
 }
 
@@ -221,7 +221,7 @@ func (m *machine) newAmodeRegRegShift(imm32 uint32, base, index regalloc.VReg, s
 	return ret
 }
 
-func (m *machine) newAmodeRipRel(label backend.Label) *amode {
+func (m *machine) newAmodeRipRel(label label) *amode {
 	ret := m.amodePool.Allocate()
 	*ret = amode{kindWithShift: uint32(amodeRipRel), imm32: uint32(label)}
 	return ret
@@ -246,7 +246,7 @@ func (a *amode) String() string {
 			"%d(%s,%s,%d)",
 			int32(a.imm32), formatVRegSized(a.base, true), formatVRegSized(a.index, true), shift)
 	case amodeRipRel:
-		return fmt.Sprintf("%s(%%rip)", backend.Label(a.imm32))
+		return fmt.Sprintf("%s(%%rip)", label(a.imm32))
 	default:
 		panic("BUG: invalid amode kind")
 	}

@@ -165,7 +165,6 @@ func NewBackend() backend.Machine {
 	return m
 }
 
-// LowerSingleBranch returns the label for the given basic block.
 func ssaBlockLabel(sb ssa.BasicBlock) label {
 	if sb.ReturnBlock() {
 		return labelReturn
@@ -226,8 +225,8 @@ func (m *machine) insertAtPerBlockHead(i *instruction) {
 	m.perBlockHead = i
 }
 
-// FlushPendingInstructions implements backend.Machine.
-func (m *machine) FlushPendingInstructions() {
+// FlushpendingInstructions implements backend.Machine.
+func (m *machine) FlushpendingInstructions() {
 	l := len(m.pendingInstructions)
 	if l == 0 {
 		return
@@ -384,7 +383,13 @@ func (m *machine) resolveRelativeAddresses(ctx context.Context) {
 
 		var fn string
 		var fnIndex int
+		var labelPosToLabel map[*labelPosition]label
 		if wazevoapi.PerfMapEnabled {
+			labelPosToLabel = make(map[*labelPosition]label)
+			for i := 0; i <= m.labelPositionPool.MaxIDEncountered(); i++ {
+				labelPosToLabel[m.labelPositionPool.Get(i)] = label(i)
+			}
+
 			fn = wazevoapi.GetCurrentFunctionName(ctx)
 			fnIndex = wazevoapi.GetCurrentFunctionIndex(ctx)
 		}
@@ -423,9 +428,7 @@ func (m *machine) resolveRelativeAddresses(ctx context.Context) {
 
 			if wazevoapi.PerfMapEnabled {
 				if size > 0 {
-					l := label(i)
-					labelStr := l.String()
-					wazevoapi.PerfMap.AddModuleEntry(fnIndex, offset, uint64(size), fmt.Sprintf("%s:::::%s", fn, labelStr))
+					wazevoapi.PerfMap.AddModuleEntry(fnIndex, offset, uint64(size), fmt.Sprintf("%s:::::%s", fn, labelPosToLabel[pos]))
 				}
 			}
 			offset += size

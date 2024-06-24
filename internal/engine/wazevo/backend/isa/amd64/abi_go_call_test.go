@@ -398,6 +398,9 @@ func TestMachine_CompileStackGrowCallSequence(t *testing.T) {
 	_, _, m := newSetupWithMockContext()
 	_ = m.CompileStackGrowCallSequence()
 
+	m.nextLabel = 10
+	m.maxSSABlockID = 10
+
 	require.Equal(t, `
 	pushq %rbp
 	movq %rsp, %rbp
@@ -518,8 +521,8 @@ L2:
 		tc := tc
 		t.Run(tc.exp, func(t *testing.T) {
 			_, _, m := newSetupWithMockContext()
-			m.ectx.RootInstr = m.allocateNop()
-			m.insertStackBoundsCheck(tc.requiredStackSize, m.ectx.RootInstr)
+			m.rootInstr = m.allocateNop()
+			m.insertStackBoundsCheck(tc.requiredStackSize, m.rootInstr)
 			err := m.Encode(context.Background())
 			require.NoError(t, err)
 			require.Equal(t, tc.exp, m.Format())

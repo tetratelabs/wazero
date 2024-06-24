@@ -113,7 +113,7 @@ func (f *regAllocFn) InsertMoveBefore(dst, src regalloc.VReg, instr *instruction
 	f.m.insertMoveBefore(dst, src, instr)
 }
 
-// LoopNestingForestChild implements regalloc.Block.
+// LoopNestingForestChild implements regalloc.Function.
 func (f *regAllocFn) LoopNestingForestChild(pos *labelPosition, i int) *labelPosition {
 	childSB := pos.sb.LoopNestingForestChildren()[i]
 	return f.m.getOrAllocateSSABlockLabelPosition(childSB)
