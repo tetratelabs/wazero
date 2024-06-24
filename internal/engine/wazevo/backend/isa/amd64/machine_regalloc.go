@@ -309,11 +309,6 @@ func (m *machine) insertReloadRegisterAt(v regalloc.VReg, instr *instruction, af
 	return linkInstr(cur, prevNext)
 }
 
-// ClobberedRegisters implements backend.RegAllocFunctionMachine.
-func (m *machine) clobberedRegisters(regs []regalloc.VReg) {
-	m.clobberedRegs = append(m.clobberedRegs[:0], regs...)
-}
-
 func (m *machine) swap(cur *instruction, x1, x2, tmp regalloc.VReg) {
 	if x1.RegType() == regalloc.RegTypeInt {
 		prevNext := cur.next

@@ -2137,11 +2137,9 @@ func (m *machine) Encode(ctx context.Context) (err error) {
 		}
 
 		if wazevoapi.PerfMapEnabled {
-			var labelStr string
-			l, _ := labelPosToLabel[pos]
-			labelStr = fmt.Sprintf("%s", l)
+			l := labelPosToLabel[pos]
 			size := int64(len(*bufPtr)) - offset
-			wazevoapi.PerfMap.AddModuleEntry(fnIndex, offset, uint64(size), fmt.Sprintf("%s:::::%s", fn, labelStr))
+			wazevoapi.PerfMap.AddModuleEntry(fnIndex, offset, uint64(size), fmt.Sprintf("%s:::::%s", fn, l))
 		}
 	}
 

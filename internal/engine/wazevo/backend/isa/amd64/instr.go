@@ -641,18 +641,6 @@ func resetInstruction(i *instruction) {
 	*i = instruction{}
 }
 
-func setNext(i *instruction, next *instruction) {
-	i.next = next
-}
-
-func setPrev(i *instruction, prev *instruction) {
-	i.prev = prev
-}
-
-func asNop(i *instruction) {
-	i.kind = nop0
-}
-
 func (i *instruction) asNop0WithLabel(label label) *instruction { //nolint
 	i.kind = nop0
 	i.u1 = uint64(label)
