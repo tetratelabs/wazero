@@ -265,7 +265,7 @@ func (m *machine) Reset() {
 	m.instrPool.Reset()
 	m.labelPositionPool.Reset()
 	m.pendingInstructions = m.pendingInstructions[:0]
-	m.perBlockHead, m.perBlockEnd = nil, nil
+	m.perBlockHead, m.perBlockEnd, m.rootInstr = nil, nil, nil
 	m.orderedSSABlockLabelPos = m.orderedSSABlockLabelPos[:0]
 }
 

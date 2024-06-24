@@ -201,6 +201,9 @@ func (m *machine) Reset() {
 
 	m.spillSlotSize = 0
 	m.maxRequiredStackSizeForCalls = 0
+	m.perBlockHead, m.perBlockEnd, m.rootInstr = nil, nil, nil
+	m.pendingInstructions = m.pendingInstructions[:0]
+	m.orderedSSABlockLabelPos = m.orderedSSABlockLabelPos[:0]
 
 	m.amodePool.Reset()
 	m.jmpTableTargetsNext = 0
@@ -2042,7 +2045,7 @@ func (m *machine) Format() string {
 		if l, ok := begins[cur]; ok {
 			var labelStr string
 			if l <= m.maxSSABlockID {
-				labelStr = fmt.Sprintf("%s (SSA Block: %s):", l, l)
+				labelStr = fmt.Sprintf("%s (SSA Block: blk%d):", l, l)
 			} else {
 				labelStr = fmt.Sprintf("%s:", l)
 			}
