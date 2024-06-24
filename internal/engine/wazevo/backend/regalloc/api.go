@@ -68,8 +68,6 @@ type (
 		InstrRevIteratorNext() Instr
 		// FirstInstr returns the fist instruction in this block where instructions will be inserted after it.
 		FirstInstr() Instr
-		// EndInstr returns the end instruction in this block.
-		EndInstr() Instr
 		// LastInstrForInsertion returns the last instruction in this block where instructions will be inserted before it.
 		// Such insertions only happen when we need to insert spill/reload instructions to adjust the merge edges.
 		// At the time of register allocation, all the critical edges are already split, so there is no need

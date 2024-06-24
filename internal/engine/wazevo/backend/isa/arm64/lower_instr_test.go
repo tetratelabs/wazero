@@ -18,7 +18,6 @@ func TestMachine_LowerConditionalBranch(t *testing.T) {
 		brz bool, intCond ssa.IntegerCmpCond, floatCond ssa.FloatCmpCond,
 		ctx *mockCompiler, builder ssa.Builder, m *machine,
 	) (instr *ssa.Instruction, verify func(t *testing.T)) {
-		m.executableContext.StartLoweringFunction(10)
 		entry := builder.CurrentBlock()
 		isInt := intCond != ssa.IntegerCmpCondInvalid
 
@@ -63,7 +62,6 @@ func TestMachine_LowerConditionalBranch(t *testing.T) {
 	}
 
 	icmpInSameGroupFromParamAndImm12 := func(brz bool, ctx *mockCompiler, builder ssa.Builder, m *machine) (instr *ssa.Instruction, verify func(t *testing.T)) {
-		m.executableContext.StartLoweringFunction(10)
 		entry := builder.CurrentBlock()
 		v1 := entry.AddParam(builder, ssa.TypeI32)
 
@@ -103,7 +101,6 @@ func TestMachine_LowerConditionalBranch(t *testing.T) {
 		{
 			name: "icmp in different group",
 			setup: func(ctx *mockCompiler, builder ssa.Builder, m *machine) (instr *ssa.Instruction, verify func(t *testing.T)) {
-				m.executableContext.StartLoweringFunction(10)
 				entry := builder.CurrentBlock()
 				v1, v2 := entry.AddParam(builder, ssa.TypeI64), entry.AddParam(builder, ssa.TypeI64)
 
@@ -218,7 +215,6 @@ func TestMachine_LowerSingleBranch(t *testing.T) {
 		{
 			name: "b",
 			setup: func(ctx *mockCompiler, builder ssa.Builder, m *machine) (instr *ssa.Instruction) {
-				m.executableContext.StartLoweringFunction(10)
 				jump := builder.AllocateInstruction()
 				jump.AsJump(ssa.ValuesNil, builder.AllocateBasicBlock())
 				builder.InsertInstruction(jump)
@@ -229,7 +225,6 @@ func TestMachine_LowerSingleBranch(t *testing.T) {
 		{
 			name: "ret",
 			setup: func(ctx *mockCompiler, builder ssa.Builder, m *machine) (instr *ssa.Instruction) {
-				m.executableContext.StartLoweringFunction(10)
 				jump := builder.AllocateInstruction()
 				jump.AsJump(ssa.ValuesNil, builder.ReturnBlock())
 				builder.InsertInstruction(jump)

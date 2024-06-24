@@ -12,7 +12,7 @@ import (
 // Encode implements backend.Machine Encode.
 func (m *machine) Encode(ctx context.Context) error {
 	m.resolveRelativeAddresses(ctx)
-	m.encode(m.executableContext.RootInstr)
+	m.encode(m.rootInstr)
 	if l := len(m.compiler.Buf()); l > maxFunctionExecutableSize {
 		return fmt.Errorf("function size exceeds the limit: %d > %d", l, maxFunctionExecutableSize)
 	}

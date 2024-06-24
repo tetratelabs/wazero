@@ -228,10 +228,9 @@ func (m *machine) callerGenFunctionReturnVReg(a *backend.FunctionABI, retIndex i
 }
 
 func (m *machine) resolveAddressModeForOffsetAndInsert(cur *instruction, offset int64, dstBits byte, rn regalloc.VReg, allowTmpRegUse bool) (*instruction, *addressMode) {
-	exct := m.executableContext
-	exct.PendingInstructions = exct.PendingInstructions[:0]
+	m.pendingInstructions = m.pendingInstructions[:0]
 	mode := m.resolveAddressModeForOffset(offset, dstBits, rn, allowTmpRegUse)
-	for _, instr := range exct.PendingInstructions {
+	for _, instr := range m.pendingInstructions {
 		cur = linkInstr(cur, instr)
 	}
 	return cur, mode

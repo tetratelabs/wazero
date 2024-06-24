@@ -17,7 +17,6 @@ import (
 
 // LowerSingleBranch implements backend.Machine.
 func (m *machine) LowerSingleBranch(br *ssa.Instruction) {
-	ectx := m.executableContext
 	switch br.Opcode() {
 	case ssa.OpcodeJump:
 		_, _, targetBlkID := br.BranchData()
@@ -26,11 +25,10 @@ func (m *machine) LowerSingleBranch(br *ssa.Instruction) {
 		}
 		b := m.allocateInstr()
 		targetBlk := m.compiler.SSABuilder().BasicBlock(targetBlkID)
-		target := ectx.GetOrAllocateSSABlockLabel(targetBlk)
-		if target == labelReturn {
+		if targetBlk.ReturnBlock() {
 			b.asRet()
 		} else {
-			b.asBr(target)
+			b.asBr(ssaBlockLabel(targetBlk))
 		}
 		m.insert(b)
 	case ssa.OpcodeBrTable:
@@ -70,18 +68,17 @@ func (m *machine) lowerBrTable(i *ssa.Instruction) {
 
 // LowerConditionalBranch implements backend.Machine.
 func (m *machine) LowerConditionalBranch(b *ssa.Instruction) {
-	exctx := m.executableContext
 	cval, args, targetBlkID := b.BranchData()
 	if len(args) > 0 {
 		panic(fmt.Sprintf(
 			"conditional branch shouldn't have args; likely a bug in critical edge splitting: from %s to %s",
-			exctx.CurrentSSABlk,
+			m.currentLabelPos.sb,
 			targetBlkID,
 		))
 	}
 
 	targetBlk := m.compiler.SSABuilder().BasicBlock(targetBlkID)
-	target := exctx.GetOrAllocateSSABlockLabel(targetBlk)
+	target := ssaBlockLabel(targetBlk)
 	cvalDef := m.compiler.ValueDefinition(cval)
 
 	switch {
@@ -794,7 +791,7 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 	default:
 		panic("TODO: lowering " + op.String())
 	}
-	m.executableContext.FlushPendingInstructions()
+	m.FlushPendingInstructions()
 }
 
 func (m *machine) lowerShuffle(rd regalloc.VReg, rn, rm operand, lane1, lane2 uint64) {
