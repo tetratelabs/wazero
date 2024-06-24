@@ -554,7 +554,7 @@ func (m *machine) Format() string {
 		if l, ok := begins[cur]; ok {
 			var labelStr string
 			if l <= m.maxSSABlockID {
-				labelStr = fmt.Sprintf("%s (SSA Block: %s):", l, l)
+				labelStr = fmt.Sprintf("%s (SSA Block: blk%d):", l, int(l))
 			} else {
 				labelStr = fmt.Sprintf("%s:", l)
 			}

@@ -357,6 +357,7 @@ L2:
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx, b, m := newSetupWithMockContext()
+			m.nextLabel = 1
 			p := b.CurrentBlock().AddParam(b, tc.typ)
 			m.cpuFeatures = tc.cpuFlags
 
@@ -429,6 +430,7 @@ L2:
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx, b, m := newSetupWithMockContext()
+			m.nextLabel = 1
 			p := b.CurrentBlock().AddParam(b, tc.typ)
 			m.cpuFeatures = tc.cpuFlags
 

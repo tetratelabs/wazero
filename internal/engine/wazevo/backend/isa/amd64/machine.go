@@ -16,7 +16,7 @@ import (
 
 // NewBackend returns a new backend for arm64.
 func NewBackend() backend.Machine {
-	return &machine{
+	m := &machine{
 		cpuFeatures:                         platform.CpuFeatures,
 		regAlloc:                            regalloc.NewAllocator[*instruction, *labelPosition](regInfo),
 		spillSlots:                          map[regalloc.VRegID]int64{},
@@ -36,6 +36,8 @@ func NewBackend() backend.Machine {
 		constExtAddPairwiseI16x8uMask1Index: -1,
 		constExtAddPairwiseI16x8uMask2Index: -1,
 	}
+	m.regAllocFn.m = m
+	return m
 }
 
 type (
@@ -278,7 +280,10 @@ func (m *machine) FlushPendingInstructions() {
 func (m *machine) DisableStackCheck() { m.stackBoundsCheckDisabled = true }
 
 // SetCompiler implements backend.Machine.
-func (m *machine) SetCompiler(c backend.Compiler) { m.c = c }
+func (m *machine) SetCompiler(c backend.Compiler) {
+	m.c = c
+	m.regAllocFn.ssaB = c.SSABuilder()
+}
 
 // SetCurrentABI implements backend.Machine.
 func (m *machine) SetCurrentABI(abi *backend.FunctionABI) { m.currentABI = abi }
@@ -2273,6 +2278,7 @@ func (m *machine) allocateBrTarget() (nop *instruction, l label) { //nolint
 func (m *machine) allocateLabel() (label, *labelPosition) {
 	l := m.nextLabel
 	pos := m.labelPositionPool.GetOrAllocate(int(l))
+	m.nextLabel++
 	return l, pos
 }
 

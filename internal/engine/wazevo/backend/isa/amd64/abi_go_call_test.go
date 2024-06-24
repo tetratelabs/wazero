@@ -369,6 +369,7 @@ L3:
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, _, m := newSetupWithMockContext()
+			m.nextLabel = 1
 			m.CompileGoFunctionTrampoline(tc.exitCode, tc.sig, tc.needModuleContextPtr)
 			require.Equal(t, tc.exp, m.Format())
 			err := m.Encode(context.Background())
@@ -396,10 +397,9 @@ func Test_stackGrowSaveVRegs(t *testing.T) {
 
 func TestMachine_CompileStackGrowCallSequence(t *testing.T) {
 	_, _, m := newSetupWithMockContext()
-	_ = m.CompileStackGrowCallSequence()
+	m.nextLabel = 1
 
-	m.nextLabel = 10
-	m.maxSSABlockID = 10
+	_ = m.CompileStackGrowCallSequence()
 
 	require.Equal(t, `
 	pushq %rbp
@@ -521,6 +521,7 @@ L2:
 		tc := tc
 		t.Run(tc.exp, func(t *testing.T) {
 			_, _, m := newSetupWithMockContext()
+			m.nextLabel = 1
 			m.rootInstr = m.allocateNop()
 			m.insertStackBoundsCheck(tc.requiredStackSize, m.rootInstr)
 			err := m.Encode(context.Background())
