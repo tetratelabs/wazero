@@ -411,7 +411,7 @@ func (a *Allocator[I, B]) livenessAnalysis(f Function[I, B]) {
 	var nilInstr I
 	for blk := f.PostOrderBlockIteratorBegin(); blk != nilBlk; blk = f.PostOrderBlockIteratorNext() {
 		// We should gather phi value data.
-		for _, p := range blk.BlockParams(&a.vs) {
+		for _, p := range f.BlockParams(blk, &a.vs) {
 			vs := s.getOrAllocateVRegState(p)
 			vs.isPhi = true
 			vs.defBlk = blk
@@ -719,7 +719,7 @@ func (a *Allocator[I, B]) allocBlock(f Function[I, B], blk B) {
 				vs.desiredLoc = newDesiredLocReg(allocatedRealReg)
 				desiredUpdated = append(desiredUpdated, vs)
 			})
-			for _, p := range succ.BlockParams(&a.vs) {
+			for _, p := range f.BlockParams(succ, &a.vs) {
 				vs := s.getVRegState(p.ID())
 				if vs.desiredLoc.realReg() == RealRegInvalid {
 					vs.desiredLoc = desiredLocStack

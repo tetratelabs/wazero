@@ -7,6 +7,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 )
 
+// regAllocFn implements regalloc.Function.
 type regAllocFn struct {
 	ssaB                   ssa.Builder
 	m                      *machine
@@ -16,7 +17,7 @@ type regAllocFn struct {
 
 // PostOrderBlockIteratorBegin implements regalloc.Function.
 func (f *regAllocFn) PostOrderBlockIteratorBegin() *labelPosition {
-	f.blockIter = len(f.m.orderedLabelPos) - 1
+	f.blockIter = len(f.m.orderedSSABlockLabelPos) - 1
 	return f.PostOrderBlockIteratorNext()
 }
 
@@ -25,7 +26,7 @@ func (f *regAllocFn) PostOrderBlockIteratorNext() *labelPosition {
 	if f.blockIter < 0 {
 		return nil
 	}
-	b := f.m.orderedLabelPos[f.blockIter]
+	b := f.m.orderedSSABlockLabelPos[f.blockIter]
 	f.blockIter--
 	return b
 }
@@ -38,10 +39,10 @@ func (f *regAllocFn) ReversePostOrderBlockIteratorBegin() *labelPosition {
 
 // ReversePostOrderBlockIteratorNext implements regalloc.Function.
 func (f *regAllocFn) ReversePostOrderBlockIteratorNext() *labelPosition {
-	if f.blockIter >= len(f.m.orderedLabelPos) {
+	if f.blockIter >= len(f.m.orderedSSABlockLabelPos) {
 		return nil
 	}
-	b := f.m.orderedLabelPos[f.blockIter]
+	b := f.m.orderedSSABlockLabelPos[f.blockIter]
 	f.blockIter++
 	return b
 }
@@ -115,7 +116,7 @@ func (f *regAllocFn) InsertMoveBefore(dst, src regalloc.VReg, instr *instruction
 // LoopNestingForestChild implements regalloc.Block.
 func (f *regAllocFn) LoopNestingForestChild(pos *labelPosition, i int) *labelPosition {
 	childSB := pos.sb.LoopNestingForestChildren()[i]
-	return pos.m.getOrAllocateSSABlockLabelPosition(childSB)
+	return f.m.getOrAllocateSSABlockLabelPosition(childSB)
 }
 
 // Succ implements regalloc.Block.
@@ -124,28 +125,29 @@ func (f *regAllocFn) Succ(pos *labelPosition, i int) *labelPosition {
 	if succSB.ReturnBlock() {
 		return nil
 	}
-	return pos.m.getOrAllocateSSABlockLabelPosition(succSB)
+	return f.m.getOrAllocateSSABlockLabelPosition(succSB)
 }
 
 // Pred implements regalloc.Block.
 func (f *regAllocFn) Pred(pos *labelPosition, i int) *labelPosition {
 	predSB := pos.sb.Pred(i)
-	return pos.m.getOrAllocateSSABlockLabelPosition(predSB)
+	return f.m.getOrAllocateSSABlockLabelPosition(predSB)
 }
 
-func (pos *labelPosition) ID() int32 {
-	return int32(pos.sb.ID())
-}
-
-// BlockParams implements regalloc.Block.
-func (pos *labelPosition) BlockParams(regs *[]regalloc.VReg) []regalloc.VReg {
-	c := pos.m.compiler
+// BlockParams implements regalloc.Function.
+func (f *regAllocFn) BlockParams(pos *labelPosition, regs *[]regalloc.VReg) []regalloc.VReg {
+	c := f.m.compiler
 	*regs = (*regs)[:0]
 	for i := 0; i < pos.sb.Params(); i++ {
 		v := c.VRegOf(pos.sb.Param(i))
 		*regs = append(*regs, v)
 	}
 	return *regs
+}
+
+// ID implements regalloc.Block.
+func (pos *labelPosition) ID() int32 {
+	return int32(pos.sb.ID())
 }
 
 // InstrIteratorBegin implements regalloc.Block.

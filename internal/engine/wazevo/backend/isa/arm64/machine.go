@@ -15,23 +15,30 @@ import (
 type (
 	// machine implements backend.Machine.
 	machine struct {
-		compiler          backend.Compiler
-		currentABI        *backend.FunctionABI
-		instrPool         wazevoapi.Pool[instruction]
+		compiler   backend.Compiler
+		currentABI *backend.FunctionABI
+		instrPool  wazevoapi.Pool[instruction]
+		// labelPositionPool is the pool of labelPosition. The id is the label where
+		// if the label is less than the maxSSABlockID, it's the ssa.BasicBlockID.
 		labelPositionPool wazevoapi.IDedPool[labelPosition]
 
 		// nextLabel is the next label to be allocated. The first free label comes after maxSSABlockID
 		// so that we can have an identical label for the SSA block ID, which is useful for debugging.
-		nextLabel       label
-		rootInstr       *instruction
+		nextLabel label
+		// rootInstr is the first instruction of the function.
+		rootInstr *instruction
+		// currentLabelPos is the currently-compiled ssa.BasicBlock's labelPosition.
 		currentLabelPos *labelPosition
-		orderedLabelPos []*labelPosition
-		returnLabelPos  labelPosition
+		// orderedSSABlockLabelPos is the ordered list of labelPosition in the generated code for each ssa.BasicBlock.
+		orderedSSABlockLabelPos []*labelPosition
+		// returnLabelPos is the labelPosition for the return block.
+		returnLabelPos labelPosition
 		// perBlockHead and perBlockEnd are the head and tail of the instruction list per currently-compiled ssa.BasicBlock.
 		perBlockHead, perBlockEnd *instruction
 		// pendingInstructions are the instructions which are not yet emitted into the instruction list.
 		pendingInstructions []*instruction
-		maxSSABlockID       label
+		// maxSSABlockID is the maximum ssa.BasicBlockID in the current function.
+		maxSSABlockID label
 
 		regAlloc   regalloc.Allocator[*instruction, *labelPosition]
 		regAllocFn regAllocFn
@@ -118,11 +125,16 @@ type (
 	label uint32
 
 	// labelPosition represents the regions of the generated code which the label represents.
+	// This implements regalloc.Block.
 	labelPosition struct {
-		m               *machine
-		sb              ssa.BasicBlock
-		cur, begin, end *instruction
-		binaryOffset    int64
+		// sb is not nil if this corresponds to a ssa.BasicBlock.
+		sb ssa.BasicBlock
+		// cur is used to walk through the instructions in the block during the register allocation.
+		cur,
+		// begin and end are the first and last instructions of the block.
+		begin, end *instruction
+		// binaryOffset is the offset in the binary where the label is located.
+		binaryOffset int64
 	}
 )
 
@@ -150,10 +162,10 @@ func NewBackend() backend.Machine {
 		labelPositionPool: wazevoapi.NewIDedPool[labelPosition](resetLabelPosition),
 	}
 	m.regAllocFn.m = m
-	m.returnLabelPos.m = m
 	return m
 }
 
+// LowerSingleBranch returns the label for the given basic block.
 func ssaBlockLabel(sb ssa.BasicBlock) label {
 	if sb.ReturnBlock() {
 		return labelReturn
@@ -161,6 +173,7 @@ func ssaBlockLabel(sb ssa.BasicBlock) label {
 	return label(sb.ID())
 }
 
+// getOrAllocateSSABlockLabelPosition returns the labelPosition for the given basic block.
 func (m *machine) getOrAllocateSSABlockLabelPosition(sb ssa.BasicBlock) *labelPosition {
 	if sb.ReturnBlock() {
 		m.returnLabelPos.sb = sb
@@ -169,23 +182,24 @@ func (m *machine) getOrAllocateSSABlockLabelPosition(sb ssa.BasicBlock) *labelPo
 
 	l := ssaBlockLabel(sb)
 	pos := m.labelPositionPool.GetOrAllocate(int(l))
-	pos.m = m
 	pos.sb = sb
 	return pos
 }
 
+// LinkAdjacentBlocks implements backend.Machine.
 func (m *machine) LinkAdjacentBlocks(prev, next ssa.BasicBlock) {
 	prevPos, nextPos := m.getOrAllocateSSABlockLabelPosition(prev), m.getOrAllocateSSABlockLabelPosition(next)
 	prevPos.end.next = nextPos.begin
 }
 
+// StartBlock implements backend.Machine.
 func (m *machine) StartBlock(blk ssa.BasicBlock) {
 	m.currentLabelPos = m.getOrAllocateSSABlockLabelPosition(blk)
 	labelPos := m.currentLabelPos
 	end := m.allocateNop()
 	m.perBlockHead, m.perBlockEnd = end, end
 	labelPos.begin, labelPos.end = end, end
-	m.orderedLabelPos = append(m.orderedLabelPos, labelPos)
+	m.orderedSSABlockLabelPos = append(m.orderedSSABlockLabelPos, labelPos)
 }
 
 // EndBlock implements ExecutableContext.
@@ -253,7 +267,7 @@ func (m *machine) Reset() {
 	m.labelPositionPool.Reset()
 	m.pendingInstructions = m.pendingInstructions[:0]
 	m.perBlockHead, m.perBlockEnd = nil, nil
-	m.orderedLabelPos = m.orderedLabelPos[:0]
+	m.orderedSSABlockLabelPos = m.orderedSSABlockLabelPos[:0]
 }
 
 // StartLoweringFunction implements backend.Machine StartLoweringFunction.
@@ -295,7 +309,6 @@ func (m *machine) allocateBrTarget() (nop *instruction, l label) {
 	nop.asNop0WithLabel(l)
 	pos := m.labelPositionPool.GetOrAllocate(int(l))
 	pos.begin, pos.end = nop, nop
-	pos.m = m
 	return
 }
 
@@ -378,7 +391,7 @@ func (m *machine) resolveRelativeAddresses(ctx context.Context) {
 
 		// Next, in order to determine the offsets of relative jumps, we have to calculate the size of each label.
 		var offset int64
-		for i, pos := range m.orderedLabelPos {
+		for i, pos := range m.orderedSSABlockLabelPos {
 			pos.binaryOffset = offset
 			var size int64
 			for cur := pos.begin; ; cur = cur.next {
@@ -391,7 +404,7 @@ func (m *machine) resolveRelativeAddresses(ctx context.Context) {
 				case condBr:
 					if !cur.condBrOffsetResolved() {
 						var nextLabel label
-						if i < len(m.orderedLabelPos)-1 {
+						if i < len(m.orderedSSABlockLabelPos)-1 {
 							// Note: this is only used when the block ends with fallthrough,
 							// therefore can be safely assumed that the next block exists when it's needed.
 							nextLabel = label(i + 1)

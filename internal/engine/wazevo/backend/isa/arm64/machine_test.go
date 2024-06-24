@@ -160,6 +160,7 @@ L200:
 
 		t.Run(name, func(t *testing.T) {
 			m := NewBackend().(*machine)
+			m.maxSSABlockID, m.nextLabel = 0, 10000000
 			const (
 				originLabel     = 100
 				originLabelNext = 200
@@ -189,7 +190,6 @@ L200:
 			m.rootInstr = cbr
 			require.Equal(t, tc.expBefore, m.Format())
 
-			m.nextLabel = 9999999
 			m.insertConditionalJumpTrampoline(cbr, originLabelPos, originLabelNext)
 
 			require.Equal(t, tc.expAfter, m.Format())

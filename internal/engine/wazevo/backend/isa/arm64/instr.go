@@ -36,18 +36,6 @@ type (
 	instructionKind byte
 )
 
-func asNop0(i *instruction) {
-	i.kind = nop0
-}
-
-func setNext(i, next *instruction) {
-	i.next = next
-}
-
-func setPrev(i, prev *instruction) {
-	i.prev = prev
-}
-
 // IsCall implements regalloc.Instr IsCall.
 func (i *instruction) IsCall() bool {
 	return i.kind == call

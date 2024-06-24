@@ -70,9 +70,6 @@ func TestMachine_LowerConditionalBranch(t *testing.T) {
 		builder.InsertInstruction(iconst)
 		v2 := iconst.Return()
 
-		// Constant can be referenced from different groups because we inline it.
-		builder.SetCurrentBlock(builder.AllocateBasicBlock())
-
 		icmp := builder.AllocateInstruction()
 		icmp.AsIcmp(v1, v2, ssa.IntegerCmpCondEqual)
 		builder.InsertInstruction(icmp)
@@ -374,6 +371,7 @@ L2:
 				regalloc.VReg(2).SetRegType(regalloc.RegTypeInt),
 				regalloc.VReg(3).SetRegType(regalloc.RegTypeInt)
 			mc, _, m := newSetupWithMockContext()
+			m.maxSSABlockID, m.nextLabel = 1, 1
 			mc.typeOf = map[regalloc.VRegID]ssa.Type{execCtx.ID(): ssa.TypeI64, 2: ssa.TypeI64, 3: ssa.TypeI64}
 			m.lowerIDiv(execCtx, rd, operandNR(rn), operandNR(rm), tc._64bit, tc.signed)
 			require.Equal(t, tc.exp, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
@@ -445,6 +443,7 @@ fcvtzu w1, s2
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			mc, _, m := newSetupWithMockContext()
+			m.maxSSABlockID, m.nextLabel = 1, 1
 			mc.typeOf = map[regalloc.VRegID]ssa.Type{v2VReg.ID(): ssa.TypeI64, x15VReg.ID(): ssa.TypeI64}
 			m.lowerFpuToInt(x1VReg, operandNR(v2VReg), x15VReg, false, false, false, tc.nontrapping)
 			require.Equal(t, tc.expectedAsm, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")

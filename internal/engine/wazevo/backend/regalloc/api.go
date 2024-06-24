@@ -4,14 +4,12 @@ import "fmt"
 
 // These interfaces are implemented by ISA-specific backends to abstract away the details, and allow the register
 // allocators to work on any ISA.
-//
-// TODO: the interfaces are not stabilized yet, especially x64 will need some changes. E.g. x64 has an addressing mode
-// 	where index can be in memory. That kind of info will be useful to reduce the register pressure, and should be leveraged
-// 	by the register allocators, like https://docs.rs/regalloc2/latest/regalloc2/enum.OperandConstraint.html
 
 type (
 	// Function is the top-level interface to do register allocation, which corresponds to a CFG containing
 	// Blocks(s).
+	//
+	// I is the type of the instruction, and B is the type of the basic block.
 	Function[I Instr, B Block[I]] interface {
 		// PostOrderBlockIteratorBegin returns the first block in the post-order traversal of the CFG.
 		// In other words, the last blocks in the CFG will be returned first.
@@ -40,6 +38,8 @@ type (
 		Pred(b B, i int) B
 		// Succ returns the i-th successor of the block in the CFG.
 		Succ(b B, i int) B
+		// BlockParams returns the virtual registers used as the parameters of this block.
+		BlockParams(B, *[]VReg) []VReg
 
 		// Followings are for rewriting the function.
 
@@ -58,12 +58,11 @@ type (
 	}
 
 	// Block is a basic block in the CFG of a function, and it consists of multiple instructions, and predecessor Block(s).
+	// Right now, this corresponds to a ssa.BasicBlock lowered to the machine level.
 	Block[I Instr] interface {
 		comparable
 		// ID returns the unique identifier of this block which is ordered in the reverse post-order traversal of the CFG.
 		ID() int32
-		// BlockParams returns the virtual registers used as the parameters of this block.
-		BlockParams(*[]VReg) []VReg
 		// InstrIteratorBegin returns the first instruction in this block. Instructions added after lowering must be skipped.
 		// Note: multiple Instr(s) will not be held at the same time, so it's safe to use the same impl for the return Instr.
 		InstrIteratorBegin() I
