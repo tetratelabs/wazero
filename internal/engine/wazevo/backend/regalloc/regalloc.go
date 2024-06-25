@@ -267,13 +267,7 @@ func (a *Allocator[I, B]) findOrSpillAllocatable(s *state[I, B], allocatable []R
 	r = RealRegInvalid
 	// First, check if the preferredMask has any allocatable register.
 	if preferred != RealRegInvalid && !forbiddenMask.has(preferred) && !s.regsInUse.has(preferred) {
-		for _, candidateReal := range allocatable {
-			// TODO: we should ensure the preferred register is in the allocatable set in the first place,
-			//  but right now, just in case, we check it here.
-			if candidateReal == preferred {
-				return preferred
-			}
-		}
+		return preferred
 	}
 
 	var lastUseAt programCounter
