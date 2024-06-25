@@ -279,10 +279,11 @@ func Test_machine_getOperand_Mem_Imm32_Reg(t *testing.T) {
 
 func TestMachine_lowerExitWithCode(t *testing.T) {
 	_, _, m := newSetupWithMockContext()
+	m.nextLabel = 1
 	m.lowerExitWithCode(r15VReg, wazevoapi.ExitCodeUnreachable)
 	m.insert(m.allocateInstr().asUD2())
-	m.ectx.FlushPendingInstructions()
-	m.ectx.RootInstr = m.ectx.PerBlockHead
+	m.FlushPendingInstructions()
+	m.rootInstr = m.perBlockHead
 	require.Equal(t, `
 	mov.q %rsp, 56(%r15)
 	mov.q %rbp, 1152(%r15)
@@ -356,6 +357,7 @@ L2:
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx, b, m := newSetupWithMockContext()
+			m.nextLabel = 1
 			p := b.CurrentBlock().AddParam(b, tc.typ)
 			m.cpuFeatures = tc.cpuFlags
 
@@ -364,8 +366,8 @@ L2:
 			instr := &ssa.Instruction{}
 			instr.AsClz(p)
 			m.lowerClz(instr)
-			m.ectx.FlushPendingInstructions()
-			m.ectx.RootInstr = m.ectx.PerBlockHead
+			m.FlushPendingInstructions()
+			m.rootInstr = m.perBlockHead
 			require.Equal(t, tc.exp, m.Format())
 		})
 	}
@@ -428,6 +430,7 @@ L2:
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx, b, m := newSetupWithMockContext()
+			m.nextLabel = 1
 			p := b.CurrentBlock().AddParam(b, tc.typ)
 			m.cpuFeatures = tc.cpuFlags
 
@@ -436,8 +439,8 @@ L2:
 			instr := &ssa.Instruction{}
 			instr.AsCtz(p)
 			m.lowerCtz(instr)
-			m.ectx.FlushPendingInstructions()
-			m.ectx.RootInstr = m.ectx.PerBlockHead
+			m.FlushPendingInstructions()
+			m.rootInstr = m.perBlockHead
 			require.Equal(t, tc.exp, m.Format())
 		})
 	}

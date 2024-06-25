@@ -54,11 +54,11 @@ func TestE2E(t *testing.T) {
 		{
 			name: "empty", m: testcases.Empty.Module,
 			afterLoweringARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	ret
 `,
 			afterFinalizeARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
 	add sp, sp, #0x10
@@ -69,7 +69,7 @@ L1 (SSA Block: blk0):
 		{
 			name: "selects", m: testcases.Selects.Module,
 			afterFinalizeARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
 	subs xzr, x4, x5
@@ -89,7 +89,7 @@ L1 (SSA Block: blk0):
 		{
 			name: "consts", m: testcases.Constants.Module,
 			afterLoweringARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	ldr d133?, #8; b 16; data.f64 64.000000
 	mov v1.8b, v133?.8b
 	ldr s132?, #8; b 8; data.f32 32.000000
@@ -101,7 +101,7 @@ L1 (SSA Block: blk0):
 	ret
 `,
 			afterFinalizeARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
 	ldr d1, #8; b 16; data.f64 64.000000
@@ -116,7 +116,7 @@ L1 (SSA Block: blk0):
 		{
 			name: "add sub params return", m: testcases.AddSubParamsReturn.Module,
 			afterLoweringARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	mov x130?, x2
 	mov x131?, x3
 	add w132?, w130?, w131?
@@ -125,7 +125,7 @@ L1 (SSA Block: blk0):
 	ret
 `,
 			afterFinalizeARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
 	add w8, w2, w3
@@ -138,7 +138,7 @@ L1 (SSA Block: blk0):
 		{
 			name: "locals params", m: testcases.LocalsParams.Module,
 			afterLoweringARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	mov x130?, x2
 	mov v131?.8b, v0.8b
 	mov v132?.8b, v1.8b
@@ -162,7 +162,7 @@ L1 (SSA Block: blk0):
 	ret
 `,
 			afterFinalizeARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
 	add x8, x2, x2
@@ -187,7 +187,7 @@ L1 (SSA Block: blk0):
 		{
 			name: "local_param_return", m: testcases.LocalParamReturn.Module,
 			afterLoweringARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	mov x130?, x2
 	mov x131?, xzr
 	mov x1, x131?
@@ -195,7 +195,7 @@ L1 (SSA Block: blk0):
 	ret
 `,
 			afterFinalizeARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
 	mov x1, xzr
@@ -208,7 +208,7 @@ L1 (SSA Block: blk0):
 		{
 			name: "swap_param_and_return", m: testcases.SwapParamAndReturn.Module,
 			afterLoweringARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	mov x130?, x2
 	mov x131?, x3
 	mov x1, x130?
@@ -216,7 +216,7 @@ L1 (SSA Block: blk0):
 	ret
 `,
 			afterFinalizeARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
 	mov x1, x2
@@ -229,19 +229,19 @@ L1 (SSA Block: blk0):
 		{
 			name: "swap_params_and_return", m: testcases.SwapParamsAndReturn.Module,
 			afterLoweringARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	mov x130?, x2
 	mov x131?, x3
-L2 (SSA Block: blk1):
+L1 (SSA Block: blk1):
 	mov x1, x130?
 	mov x0, x131?
 	ret
 `,
 			afterFinalizeARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
-L2 (SSA Block: blk1):
+L1 (SSA Block: blk1):
 	mov x1, x2
 	mov x0, x3
 	add sp, sp, #0x10
@@ -252,15 +252,15 @@ L2 (SSA Block: blk1):
 		{
 			name: "block_br", m: testcases.BlockBr.Module,
 			afterLoweringARM64: `
-L1 (SSA Block: blk0):
-L2 (SSA Block: blk1):
+L0 (SSA Block: blk0):
+L1 (SSA Block: blk1):
 	ret
 `,
 			afterFinalizeARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
-L2 (SSA Block: blk1):
+L1 (SSA Block: blk1):
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
 	ret
@@ -269,11 +269,11 @@ L2 (SSA Block: blk1):
 		{
 			name: "block_br_if", m: testcases.BlockBrIf.Module,
 			afterLoweringARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	mov x128?, x0
 	mov x131?, xzr
-	cbnz w131?, L2
-L3 (SSA Block: blk2):
+	cbnz w131?, L1
+L2 (SSA Block: blk2):
 	movz x132?, #0x3, lsl 0
 	str w132?, [x128?]
 	mov x133?, sp
@@ -281,16 +281,16 @@ L3 (SSA Block: blk2):
 	adr x134?, #0x0
 	str x134?, [x128?, #0x30]
 	exit_sequence x128?
-L2 (SSA Block: blk1):
+L1 (SSA Block: blk1):
 	ret
 `,
 			afterFinalizeARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
 	mov x8, xzr
-	cbnz w8, #0x34 (L2)
-L3 (SSA Block: blk2):
+	cbnz w8, #0x34 (L1)
+L2 (SSA Block: blk2):
 	movz x8, #0x3, lsl 0
 	str w8, [x0]
 	mov x8, sp
@@ -298,7 +298,7 @@ L3 (SSA Block: blk2):
 	adr x8, #0x0
 	str x8, [x0, #0x30]
 	exit_sequence x0
-L2 (SSA Block: blk1):
+L1 (SSA Block: blk1):
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
 	ret
@@ -307,44 +307,44 @@ L2 (SSA Block: blk1):
 		{
 			name: "loop_br", m: testcases.LoopBr.Module,
 			afterLoweringARM64: `
-L1 (SSA Block: blk0):
-L2 (SSA Block: blk1):
-	b L2
+L0 (SSA Block: blk0):
+L1 (SSA Block: blk1):
+	b L1
 `,
 			afterFinalizeARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
-L2 (SSA Block: blk1):
-	b #0x0 (L2)
+L1 (SSA Block: blk1):
+	b #0x0 (L1)
 `,
 		},
 		{
 			name: "loop_with_param_results", m: testcases.LoopBrWithParamResults.Module,
 			afterLoweringARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	mov x130?, x2
-L2 (SSA Block: blk1):
+L1 (SSA Block: blk1):
 	orr w133?, wzr, #0x1
 	cbz w133?, (L3)
 L4 (SSA Block: blk4):
-	b L2
+	b L1
 L3 (SSA Block: blk3):
-L5 (SSA Block: blk2):
+L2 (SSA Block: blk2):
 	mov x0, x130?
 	ret
 `,
 			afterFinalizeARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
-L2 (SSA Block: blk1):
+L1 (SSA Block: blk1):
 	orr w8, wzr, #0x1
 	cbz w8, #0x8 L3
 L4 (SSA Block: blk4):
-	b #-0x8 (L2)
+	b #-0x8 (L1)
 L3 (SSA Block: blk3):
-L5 (SSA Block: blk2):
+L2 (SSA Block: blk2):
 	mov x0, x2
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
@@ -354,24 +354,24 @@ L5 (SSA Block: blk2):
 		{
 			name: "loop_br_if", m: testcases.LoopBrIf.Module,
 			afterLoweringARM64: `
-L1 (SSA Block: blk0):
-L2 (SSA Block: blk1):
+L0 (SSA Block: blk0):
+L1 (SSA Block: blk1):
 	orr w131?, wzr, #0x1
 	cbz w131?, (L3)
 L4 (SSA Block: blk4):
-	b L2
+	b L1
 L3 (SSA Block: blk3):
 	ret
 `,
 			afterFinalizeARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
-L2 (SSA Block: blk1):
+L1 (SSA Block: blk1):
 	orr w8, wzr, #0x1
 	cbz w8, #0x8 L3
 L4 (SSA Block: blk4):
-	b #-0x8 (L2)
+	b #-0x8 (L1)
 L3 (SSA Block: blk3):
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
@@ -381,15 +381,15 @@ L3 (SSA Block: blk3):
 		{
 			name: "block_block_br", m: testcases.BlockBlockBr.Module,
 			afterLoweringARM64: `
-L1 (SSA Block: blk0):
-L2 (SSA Block: blk1):
+L0 (SSA Block: blk0):
+L1 (SSA Block: blk1):
 	ret
 `,
 			afterFinalizeARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
-L2 (SSA Block: blk1):
+L1 (SSA Block: blk1):
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
 	ret
@@ -401,25 +401,25 @@ L2 (SSA Block: blk1):
 			// So we cannot have the general optimization on this kind of redundant branch elimination before register allocations.
 			// Instead, we can do it during the code generation phase where we actually resolve the label offsets.
 			afterLoweringARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	mov x131?, xzr
 	cbz w131?, (L2)
-L3 (SSA Block: blk1):
-	b L4
+L1 (SSA Block: blk1):
+	b L3
 L2 (SSA Block: blk2):
-L4 (SSA Block: blk3):
+L3 (SSA Block: blk3):
 	ret
 `,
 			afterFinalizeARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
 	mov x8, xzr
 	cbz w8, #0x8 L2
-L3 (SSA Block: blk1):
-	b #0x4 (L4)
+L1 (SSA Block: blk1):
+	b #0x4 (L3)
 L2 (SSA Block: blk2):
-L4 (SSA Block: blk3):
+L3 (SSA Block: blk3):
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
 	ret
@@ -428,23 +428,23 @@ L4 (SSA Block: blk3):
 		{
 			name: "if_else", m: testcases.IfElse.Module,
 			afterLoweringARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	mov x131?, xzr
 	cbz w131?, (L2)
-L3 (SSA Block: blk1):
-L4 (SSA Block: blk3):
+L1 (SSA Block: blk1):
+L3 (SSA Block: blk3):
 	ret
 L2 (SSA Block: blk2):
 	ret
 `,
 			afterFinalizeARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
 	mov x8, xzr
 	cbz w8, #0x10 L2
-L3 (SSA Block: blk1):
-L4 (SSA Block: blk3):
+L1 (SSA Block: blk1):
+L3 (SSA Block: blk3):
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
 	ret
@@ -457,32 +457,32 @@ L2 (SSA Block: blk2):
 		{
 			name: "single_predecessor_local_refs", m: testcases.SinglePredecessorLocalRefs.Module,
 			afterLoweringARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	mov x131?, xzr
 	cbz w131?, (L2)
-L3 (SSA Block: blk1):
+L1 (SSA Block: blk1):
 	mov x130?, xzr
 	mov x0, x130?
 	ret
 L2 (SSA Block: blk2):
-L4 (SSA Block: blk3):
+L3 (SSA Block: blk3):
 	mov x130?, xzr
 	mov x0, x130?
 	ret
 `,
 			afterFinalizeARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
 	mov x8, xzr
 	cbz w8, #0x14 L2
-L3 (SSA Block: blk1):
+L1 (SSA Block: blk1):
 	mov x0, xzr
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
 	ret
 L2 (SSA Block: blk2):
-L4 (SSA Block: blk3):
+L3 (SSA Block: blk3):
 	mov x0, xzr
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
@@ -492,29 +492,29 @@ L4 (SSA Block: blk3):
 		{
 			name: "multi_predecessor_local_ref", m: testcases.MultiPredecessorLocalRef.Module,
 			afterLoweringARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	mov x130?, x2
 	mov x131?, x3
 	cbz w130?, (L2)
-L3 (SSA Block: blk1):
+L1 (SSA Block: blk1):
 	mov x132?, x130?
-	b L4
+	b L3
 L2 (SSA Block: blk2):
 	mov x132?, x131?
-L4 (SSA Block: blk3):
+L3 (SSA Block: blk3):
 	mov x0, x132?
 	ret
 `,
 			afterFinalizeARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
 	cbz w2, #0x8 L2
-L3 (SSA Block: blk1):
-	b #0x8 (L4)
+L1 (SSA Block: blk1):
+	b #0x8 (L3)
 L2 (SSA Block: blk2):
 	mov x2, x3
-L4 (SSA Block: blk3):
+L3 (SSA Block: blk3):
 	mov x0, x2
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
@@ -524,17 +524,17 @@ L4 (SSA Block: blk3):
 		{
 			name: "reference_value_from_unsealed_block", m: testcases.ReferenceValueFromUnsealedBlock.Module,
 			afterLoweringARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	mov x130?, x2
-L2 (SSA Block: blk1):
+L1 (SSA Block: blk1):
 	mov x0, x130?
 	ret
 `,
 			afterFinalizeARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
-L2 (SSA Block: blk1):
+L1 (SSA Block: blk1):
 	mov x0, x2
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
@@ -544,30 +544,30 @@ L2 (SSA Block: blk1):
 		{
 			name: "reference_value_from_unsealed_block2", m: testcases.ReferenceValueFromUnsealedBlock2.Module,
 			afterLoweringARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	mov x130?, x2
-L2 (SSA Block: blk1):
-	cbz w130?, (L3)
-L4 (SSA Block: blk5):
-	b L2
-L3 (SSA Block: blk4):
-L5 (SSA Block: blk3):
-L6 (SSA Block: blk2):
+L1 (SSA Block: blk1):
+	cbz w130?, (L4)
+L5 (SSA Block: blk5):
+	b L1
+L4 (SSA Block: blk4):
+L3 (SSA Block: blk3):
+L2 (SSA Block: blk2):
 	mov x131?, xzr
 	mov x0, x131?
 	ret
 `,
 			afterFinalizeARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
-L2 (SSA Block: blk1):
-	cbz w2, #0x8 L3
-L4 (SSA Block: blk5):
-	b #-0x4 (L2)
-L3 (SSA Block: blk4):
-L5 (SSA Block: blk3):
-L6 (SSA Block: blk2):
+L1 (SSA Block: blk1):
+	cbz w2, #0x8 L4
+L5 (SSA Block: blk5):
+	b #-0x4 (L1)
+L4 (SSA Block: blk4):
+L3 (SSA Block: blk3):
+L2 (SSA Block: blk2):
 	mov x0, xzr
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
@@ -578,41 +578,41 @@ L6 (SSA Block: blk2):
 			name: "reference_value_from_unsealed_block3", m: testcases.ReferenceValueFromUnsealedBlock3.Module,
 			// TODO: we should be able to invert cbnz in so that L2 can end with fallthrough. investigate builder.LayoutBlocks function.
 			afterLoweringARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	mov x130?, x2
 	mov x131?, x130?
-L2 (SSA Block: blk1):
-	cbnz w131?, L4
-	b L3
-L4 (SSA Block: blk5):
+L1 (SSA Block: blk1):
+	cbnz w131?, L5
+	b L4
+L5 (SSA Block: blk5):
 	ret
-L3 (SSA Block: blk4):
-L5 (SSA Block: blk3):
+L4 (SSA Block: blk4):
+L3 (SSA Block: blk3):
 	load_const_block_arg x131?, 0x1
-	b L2
+	b L1
 `,
 			afterFinalizeARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
-L2 (SSA Block: blk1):
-	cbnz w2, #0x8 (L4)
-	b #0x10 (L3)
-L4 (SSA Block: blk5):
+L1 (SSA Block: blk1):
+	cbnz w2, #0x8 (L5)
+	b #0x10 (L4)
+L5 (SSA Block: blk5):
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
 	ret
-L3 (SSA Block: blk4):
-L5 (SSA Block: blk3):
+L4 (SSA Block: blk4):
+L3 (SSA Block: blk3):
 	load_const_block_arg x2, 0x1
 	orr w2, wzr, #0x1
-	b #-0x18 (L2)
+	b #-0x18 (L1)
 `,
 		},
 		{
 			name: "call", m: testcases.Call.Module,
 			afterLoweringARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	mov x128?, x0
 	mov x129?, x1
 	mov x0, x128?
@@ -637,7 +637,7 @@ L1 (SSA Block: blk0):
 	ret
 `,
 			afterFinalizeARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	sub sp, sp, #0x10
 	orr x27, xzr, #0x10
@@ -667,7 +667,7 @@ L1 (SSA Block: blk0):
 		{
 			name: "call_many_params", m: testcases.CallManyParams.Module,
 			afterLoweringARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	mov x128?, x0
 	mov x129?, x1
 	mov x130?, x2
@@ -720,7 +720,7 @@ L1 (SSA Block: blk0):
 	ret
 `,
 			afterFinalizeARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	sub sp, sp, #0x20
 	orr x27, xzr, #0x20
@@ -779,7 +779,7 @@ L1 (SSA Block: blk0):
 		{
 			name: "call_many_returns", m: testcases.CallManyReturns.Module,
 			afterLoweringARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	mov x128?, x0
 	mov x129?, x1
 	mov x130?, x2
@@ -876,7 +876,7 @@ L1 (SSA Block: blk0):
 	ret
 `,
 			afterFinalizeARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	orr x27, xzr, #0xc0
 	sub sp, sp, x27
 	stp x30, x27, [sp, #-0x10]!
@@ -949,7 +949,7 @@ L1 (SSA Block: blk0):
 			name: "integer_extensions",
 			m:    testcases.IntegerExtensions.Module,
 			afterLoweringARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	mov x130?, x2
 	mov x131?, x3
 	sxtw x132?, w130?
@@ -969,7 +969,7 @@ L1 (SSA Block: blk0):
 	ret
 `,
 			afterFinalizeARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
 	sxtw x0, w2
@@ -989,7 +989,7 @@ L1 (SSA Block: blk0):
 		{
 			name: "integer bit counts", m: testcases.IntegerBitCounts.Module,
 			afterLoweringARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	mov x130?, x2
 	mov x131?, x3
 	clz w132?, w130?
@@ -1015,7 +1015,7 @@ L1 (SSA Block: blk0):
 	ret
 `,
 			afterFinalizeARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
 	clz w0, w2
@@ -1042,7 +1042,7 @@ L1 (SSA Block: blk0):
 			name: "float_comparisons",
 			m:    testcases.FloatComparisons.Module,
 			afterFinalizeARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	orr x27, xzr, #0x20
 	sub sp, sp, x27
 	stp x30, x27, [sp, #-0x10]!
@@ -1085,7 +1085,7 @@ L1 (SSA Block: blk0):
 			name: "float_conversions",
 			m:    testcases.FloatConversions.Module,
 			afterFinalizeARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
 	msr fpsr, xzr
@@ -1307,7 +1307,7 @@ L3:
 			name: "nontrapping_float_conversions",
 			m:    testcases.NonTrappingFloatConversions.Module,
 			afterFinalizeARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
 	fcvtzs x8, d0
@@ -1328,7 +1328,7 @@ L1 (SSA Block: blk0):
 			name: "many_middle_values",
 			m:    testcases.ManyMiddleValues.Module,
 			afterLoweringARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	mov x130?, x2
 	mov v131?.8b, v0.8b
 	orr w289?, wzr, #0x1
@@ -1454,7 +1454,7 @@ L1 (SSA Block: blk0):
 	ret
 `,
 			afterFinalizeARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str x19, [sp, #-0x10]!
 	str x20, [sp, #-0x10]!
@@ -1620,7 +1620,7 @@ L1 (SSA Block: blk0):
 		{
 			name: "imported_function_call", m: testcases.ImportedFunctionCall.Module,
 			afterLoweringARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	mov x128?, x0
 	mov x129?, x1
 	mov x130?, x2
@@ -1637,7 +1637,7 @@ L1 (SSA Block: blk0):
 	ret
 `,
 			afterFinalizeARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	sub sp, sp, #0x10
 	orr x27, xzr, #0x10
@@ -1658,7 +1658,7 @@ L1 (SSA Block: blk0):
 		{
 			name: "memory_load_basic", m: testcases.MemoryLoadBasic.Module,
 			afterLoweringARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	mov x128?, x0
 	mov x129?, x1
 	mov x130?, x2
@@ -1683,7 +1683,7 @@ L2:
 	ret
 `,
 			afterFinalizeARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
 	uxtw x8, w2
@@ -1710,7 +1710,7 @@ L2:
 		{
 			name: "memory_stores", m: testcases.MemoryStores.Module,
 			afterFinalizeARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
 	mov x8, xzr
@@ -1867,7 +1867,7 @@ L2:
 			name: "globals_mutable[0]",
 			m:    testcases.GlobalsMutable.Module,
 			afterLoweringARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	mov x128?, x0
 	mov x129?, x1
 	ldr w130?, [x129?, #0x10]
@@ -1892,7 +1892,7 @@ L1 (SSA Block: blk0):
 	ret
 `,
 			afterFinalizeARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	sub sp, sp, #0x20
 	orr x27, xzr, #0x20
@@ -1927,7 +1927,7 @@ L1 (SSA Block: blk0):
 			m:           testcases.GlobalsMutable.Module,
 			targetIndex: 1,
 			afterLoweringARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	mov x129?, x1
 	orr w137?, wzr, #0x1
 	str w137?, [x129?, #0x10]
@@ -1940,7 +1940,7 @@ L1 (SSA Block: blk0):
 	ret
 `,
 			afterFinalizeARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
 	orr w8, wzr, #0x1
@@ -1961,87 +1961,87 @@ L1 (SSA Block: blk0):
 			m:           testcases.BrTable.Module,
 			targetIndex: 0,
 			afterLoweringARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	mov x130?, x2
 	orr w137?, wzr, #0x6
 	subs wzr, w130?, w137?
 	csel w138?, w137?, w130?, hs
 	br_table_sequence x138?, table_index=0
-L2 (SSA Block: blk7):
-	b L9
-L3 (SSA Block: blk8):
-L10 (SSA Block: blk5):
+L7 (SSA Block: blk7):
+	b L6
+L8 (SSA Block: blk8):
+L5 (SSA Block: blk5):
 	orr w131?, wzr, #0xc
 	mov x0, x131?
 	ret
-L4 (SSA Block: blk9):
-L11 (SSA Block: blk4):
+L9 (SSA Block: blk9):
+L4 (SSA Block: blk4):
 	movz w132?, #0xd, lsl 0
 	mov x0, x132?
 	ret
-L5 (SSA Block: blk10):
-L12 (SSA Block: blk3):
+L10 (SSA Block: blk10):
+L3 (SSA Block: blk3):
 	orr w133?, wzr, #0xe
 	mov x0, x133?
 	ret
-L6 (SSA Block: blk11):
-L13 (SSA Block: blk2):
+L11 (SSA Block: blk11):
+L2 (SSA Block: blk2):
 	orr w134?, wzr, #0xf
 	mov x0, x134?
 	ret
-L7 (SSA Block: blk12):
-L14 (SSA Block: blk1):
+L12 (SSA Block: blk12):
+L1 (SSA Block: blk1):
 	orr w135?, wzr, #0x10
 	mov x0, x135?
 	ret
-L8 (SSA Block: blk13):
-L9 (SSA Block: blk6):
+L13 (SSA Block: blk13):
+L6 (SSA Block: blk6):
 	movz w136?, #0xb, lsl 0
 	mov x0, x136?
 	ret
 `,
 			afterFinalizeARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
 	orr w8, wzr, #0x6
 	subs wzr, w2, w8
 	csel w8, w8, w2, hs
 	br_table_sequence x8, table_index=0
-L2 (SSA Block: blk7):
-	b #0x54 (L9)
-L3 (SSA Block: blk8):
-L10 (SSA Block: blk5):
+L7 (SSA Block: blk7):
+	b #0x54 (L6)
+L8 (SSA Block: blk8):
+L5 (SSA Block: blk5):
 	orr w0, wzr, #0xc
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
 	ret
-L4 (SSA Block: blk9):
-L11 (SSA Block: blk4):
+L9 (SSA Block: blk9):
+L4 (SSA Block: blk4):
 	movz w0, #0xd, lsl 0
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
 	ret
-L5 (SSA Block: blk10):
-L12 (SSA Block: blk3):
+L10 (SSA Block: blk10):
+L3 (SSA Block: blk3):
 	orr w0, wzr, #0xe
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
 	ret
-L6 (SSA Block: blk11):
-L13 (SSA Block: blk2):
+L11 (SSA Block: blk11):
+L2 (SSA Block: blk2):
 	orr w0, wzr, #0xf
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
 	ret
-L7 (SSA Block: blk12):
-L14 (SSA Block: blk1):
+L12 (SSA Block: blk12):
+L1 (SSA Block: blk1):
 	orr w0, wzr, #0x10
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
 	ret
-L8 (SSA Block: blk13):
-L9 (SSA Block: blk6):
+L13 (SSA Block: blk13):
+L6 (SSA Block: blk6):
 	movz w0, #0xb, lsl 0
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10
@@ -2052,7 +2052,7 @@ L9 (SSA Block: blk6):
 			name: "VecShuffle",
 			m:    testcases.VecShuffle.Module,
 			afterFinalizeARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str q29, [sp, #-0x10]!
 	str q30, [sp, #-0x10]!
@@ -2073,7 +2073,7 @@ L1 (SSA Block: blk0):
 			name: "AtomicRmwAdd",
 			m:    testcases.AtomicRmwAdd.Module,
 			afterFinalizeARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	orr x27, xzr, #0x10
 	sub sp, sp, x27
 	stp x30, x27, [sp, #-0x10]!
@@ -2272,12 +2272,12 @@ L2:
 			name: "icmp_and_zero",
 			m:    testcases.IcmpAndZero.Module,
 			afterFinalizeAMD64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	pushq %rbp
 	movq %rsp, %rbp
 	testl %edi, %ecx
 	jnz L2
-L3 (SSA Block: blk1):
+L1 (SSA Block: blk1):
 	movl $1, %eax
 	movq %rbp, %rsp
 	popq %rbp
@@ -2289,12 +2289,12 @@ L2 (SSA Block: blk2):
 	ret
 `,
 			afterFinalizeARM64: `
-L1 (SSA Block: blk0):
+L0 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
 	ands wzr, w2, w3
 	b.ne #0x14, (L2)
-L3 (SSA Block: blk1):
+L1 (SSA Block: blk1):
 	orr w0, wzr, #0x1
 	add sp, sp, #0x10
 	ldr x30, [sp], #0x10

@@ -18,7 +18,7 @@ type (
 	storeOrReloadInfo struct {
 		reload bool
 		v      VReg
-		instr  Instr
+		instr  *mockInstr
 	}
 
 	// mockBlock implements Block.
@@ -26,7 +26,7 @@ type (
 		id             int32
 		instructions   []*mockInstr
 		preds, succs   []*mockBlock
-		_preds, _succs []Block
+		_preds, _succs []*mockBlock
 		iter           int
 		_entry         bool
 		_loop          bool
@@ -42,13 +42,13 @@ type (
 	}
 )
 
-func (m *mockFunction) LowestCommonAncestor(blk1, blk2 Block) Block { panic("TODO") }
+func (m *mockFunction) LowestCommonAncestor(blk1, blk2 *mockBlock) *mockBlock { panic("TODO") }
 
-func (m *mockFunction) Idom(blk Block) Block { panic("TODO") }
+func (m *mockFunction) Idom(blk *mockBlock) *mockBlock { panic("TODO") }
 
-func (m *mockFunction) SwapBefore(x1, x2, tmp VReg, instr Instr) { panic("TODO") }
+func (m *mockFunction) SwapBefore(x1, x2, tmp VReg, instr *mockInstr) { panic("TODO") }
 
-func (m *mockFunction) InsertMoveBefore(dst, src VReg, instr Instr) { panic("TODO") }
+func (m *mockFunction) InsertMoveBefore(dst, src VReg, instr *mockInstr) { panic("TODO") }
 
 func newMockFunction(blocks ...*mockBlock) *mockFunction {
 	return &mockFunction{blocks: blocks}
@@ -141,22 +141,22 @@ func (m *mockInstr) asIndirectCall() *mockInstr { //nolint:unused
 }
 
 // StoreRegisterAfter implements Function.StoreRegisterAfter.
-func (m *mockFunction) StoreRegisterAfter(v VReg, instr Instr) {
+func (m *mockFunction) StoreRegisterAfter(v VReg, instr *mockInstr) {
 	m.afters = append(m.afters, storeOrReloadInfo{false, v, instr})
 }
 
 // ReloadRegisterBefore implements Function.ReloadRegisterBefore.
-func (m *mockFunction) ReloadRegisterBefore(v VReg, instr Instr) {
+func (m *mockFunction) ReloadRegisterBefore(v VReg, instr *mockInstr) {
 	m.befores = append(m.befores, storeOrReloadInfo{true, v, instr})
 }
 
 // StoreRegisterBefore implements Function.StoreRegisterBefore.
-func (m *mockFunction) StoreRegisterBefore(v VReg, instr Instr) {
+func (m *mockFunction) StoreRegisterBefore(v VReg, instr *mockInstr) {
 	m.befores = append(m.befores, storeOrReloadInfo{false, v, instr})
 }
 
 // ReloadRegisterAfter implements Function.ReloadRegisterAfter.
-func (m *mockFunction) ReloadRegisterAfter(v VReg, instr Instr) {
+func (m *mockFunction) ReloadRegisterAfter(v VReg, instr *mockInstr) {
 	m.afters = append(m.afters, storeOrReloadInfo{true, v, instr})
 }
 
@@ -170,14 +170,14 @@ func (m *mockFunction) ClobberedRegisters(regs []VReg) {
 func (m *mockFunction) Done() {}
 
 // PostOrderBlockIteratorBegin implements Block.
-func (m *mockFunction) PostOrderBlockIteratorBegin() Block {
+func (m *mockFunction) PostOrderBlockIteratorBegin() *mockBlock {
 	m.iter = 1
 	l := len(m.blocks)
 	return m.blocks[l-1]
 }
 
 // PostOrderBlockIteratorNext implements Block.
-func (m *mockFunction) PostOrderBlockIteratorNext() Block {
+func (m *mockFunction) PostOrderBlockIteratorNext() *mockBlock {
 	if m.iter == len(m.blocks) {
 		return nil
 	}
@@ -188,13 +188,13 @@ func (m *mockFunction) PostOrderBlockIteratorNext() Block {
 }
 
 // ReversePostOrderBlockIteratorBegin implements Block.
-func (m *mockFunction) ReversePostOrderBlockIteratorBegin() Block {
+func (m *mockFunction) ReversePostOrderBlockIteratorBegin() *mockBlock {
 	m.iter = 1
 	return m.blocks[0]
 }
 
 // ReversePostOrderBlockIteratorNext implements Block.
-func (m *mockFunction) ReversePostOrderBlockIteratorNext() Block {
+func (m *mockFunction) ReversePostOrderBlockIteratorNext() *mockBlock {
 	if m.iter == len(m.blocks) {
 		return nil
 	}
@@ -209,7 +209,7 @@ func (m *mockBlock) ID() int32 {
 }
 
 // InstrIteratorBegin implements Block.
-func (m *mockBlock) InstrIteratorBegin() Instr {
+func (m *mockBlock) InstrIteratorBegin() *mockInstr {
 	if len(m.instructions) == 0 {
 		return nil
 	}
@@ -218,7 +218,7 @@ func (m *mockBlock) InstrIteratorBegin() Instr {
 }
 
 // InstrIteratorNext implements Block.
-func (m *mockBlock) InstrIteratorNext() Instr {
+func (m *mockBlock) InstrIteratorNext() *mockInstr {
 	if m.iter == len(m.instructions) {
 		return nil
 	}
@@ -228,7 +228,7 @@ func (m *mockBlock) InstrIteratorNext() Instr {
 }
 
 // InstrRevIteratorBegin implements Block.
-func (m *mockBlock) InstrRevIteratorBegin() Instr {
+func (m *mockBlock) InstrRevIteratorBegin() *mockInstr {
 	if len(m.instructions) == 0 {
 		return nil
 	}
@@ -237,7 +237,7 @@ func (m *mockBlock) InstrRevIteratorBegin() Instr {
 }
 
 // InstrRevIteratorNext implements Block.
-func (m *mockBlock) InstrRevIteratorNext() Instr {
+func (m *mockBlock) InstrRevIteratorNext() *mockInstr {
 	m.iter--
 	if m.iter < 0 {
 		return nil
@@ -251,17 +251,14 @@ func (m *mockBlock) Preds() int {
 }
 
 // BlockParams implements Block.
-func (m *mockBlock) BlockParams(ret *[]VReg) []VReg {
-	*ret = append((*ret)[:0], m.blockParams...)
+func (m *mockFunction) BlockParams(blk *mockBlock, ret *[]VReg) []VReg {
+	*ret = append((*ret)[:0], blk.blockParams...)
 	return *ret
 }
 
 func (m *mockBlock) blockParam(v VReg) {
 	m.blockParams = append(m.blockParams, v)
 }
-
-// Pred implements Instr.
-func (m *mockBlock) Pred(i int) Block { return m._preds[i] }
 
 // Defs implements Instr.
 func (m *mockInstr) Defs(ret *[]VReg) []VReg {
@@ -291,10 +288,10 @@ func (m *mockInstr) IsIndirectCall() bool { return m.isIndirect }
 func (m *mockInstr) IsReturn() bool { return false }
 
 // Next implements Instr.
-func (m *mockInstr) Next() Instr { return m.next }
+func (m *mockInstr) Next() *mockInstr { return m.next }
 
 // Prev implements Instr.
-func (m *mockInstr) Prev() Instr { return m.prev }
+func (m *mockInstr) Prev() *mockInstr { return m.prev }
 
 // Entry implements Entry.
 func (m *mockBlock) Entry() bool { return m._entry }
@@ -312,19 +309,29 @@ func (m *mockInstr) AssignDef(reg VReg) {
 	m.defs = []VReg{reg}
 }
 
-var (
-	_ Function = (*mockFunction)(nil)
-	_ Block    = (*mockBlock)(nil)
-	_ Instr    = (*mockInstr)(nil)
-)
+var _ Function[*mockInstr, *mockBlock] = (*mockFunction)(nil)
 
 func (m *mockFunction) LoopNestingForestRoots() int {
 	return len(m.lnfRoots)
 }
 
-func (m *mockFunction) LoopNestingForestRoot(i int) Block {
+// LoopNestingForestRoot implements Function.
+func (m *mockFunction) LoopNestingForestRoot(i int) *mockBlock {
 	return m.lnfRoots[i]
 }
+
+// LoopNestingForestChild implements Function.
+func (m *mockFunction) LoopNestingForestChild(b *mockBlock, i int) *mockBlock {
+	return b.lnfChildren[i]
+}
+
+// Succ implements Function.
+func (m *mockFunction) Succ(b *mockBlock, i int) *mockBlock {
+	return b.succs[i]
+}
+
+// Pred implements Function.
+func (m *mockFunction) Pred(b *mockBlock, i int) *mockBlock { return b._preds[i] }
 
 func (m *mockBlock) LoopHeader() bool {
 	return m._loop
@@ -334,39 +341,17 @@ func (m *mockBlock) Succs() int {
 	return len(m.succs)
 }
 
-func (m *mockBlock) Succ(i int) Block {
-	return m.succs[i]
-}
-
 func (m *mockBlock) LoopNestingForestChildren() int {
 	return len(m.lnfChildren)
 }
 
-func (m *mockBlock) LoopNestingForestChild(i int) Block {
-	return m.lnfChildren[i]
-}
-
-func (m *mockBlock) BeginInstr() Instr {
-	if len(m.instructions) == 0 {
-		return nil
-	}
-	return m.instructions[0]
-}
-
-func (m *mockBlock) EndInstr() Instr {
+func (m *mockBlock) LastInstrForInsertion() *mockInstr {
 	if len(m.instructions) == 0 {
 		return nil
 	}
 	return m.instructions[len(m.instructions)-1]
 }
 
-func (m *mockBlock) LastInstrForInsertion() Instr {
-	if len(m.instructions) == 0 {
-		return nil
-	}
-	return m.instructions[len(m.instructions)-1]
-}
-
-func (m *mockBlock) FirstInstr() Instr {
+func (m *mockBlock) FirstInstr() *mockInstr {
 	return m.instructions[0]
 }

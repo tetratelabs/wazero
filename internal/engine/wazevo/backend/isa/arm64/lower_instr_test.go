@@ -18,7 +18,6 @@ func TestMachine_LowerConditionalBranch(t *testing.T) {
 		brz bool, intCond ssa.IntegerCmpCond, floatCond ssa.FloatCmpCond,
 		ctx *mockCompiler, builder ssa.Builder, m *machine,
 	) (instr *ssa.Instruction, verify func(t *testing.T)) {
-		m.executableContext.StartLoweringFunction(10)
 		entry := builder.CurrentBlock()
 		isInt := intCond != ssa.IntegerCmpCondInvalid
 
@@ -63,7 +62,6 @@ func TestMachine_LowerConditionalBranch(t *testing.T) {
 	}
 
 	icmpInSameGroupFromParamAndImm12 := func(brz bool, ctx *mockCompiler, builder ssa.Builder, m *machine) (instr *ssa.Instruction, verify func(t *testing.T)) {
-		m.executableContext.StartLoweringFunction(10)
 		entry := builder.CurrentBlock()
 		v1 := entry.AddParam(builder, ssa.TypeI32)
 
@@ -71,9 +69,6 @@ func TestMachine_LowerConditionalBranch(t *testing.T) {
 		iconst.AsIconst32(0x4d2)
 		builder.InsertInstruction(iconst)
 		v2 := iconst.Return()
-
-		// Constant can be referenced from different groups because we inline it.
-		builder.SetCurrentBlock(builder.AllocateBasicBlock())
 
 		icmp := builder.AllocateInstruction()
 		icmp.AsIcmp(v1, v2, ssa.IntegerCmpCondEqual)
@@ -103,7 +98,6 @@ func TestMachine_LowerConditionalBranch(t *testing.T) {
 		{
 			name: "icmp in different group",
 			setup: func(ctx *mockCompiler, builder ssa.Builder, m *machine) (instr *ssa.Instruction, verify func(t *testing.T)) {
-				m.executableContext.StartLoweringFunction(10)
 				entry := builder.CurrentBlock()
 				v1, v2 := entry.AddParam(builder, ssa.TypeI64), entry.AddParam(builder, ssa.TypeI64)
 
@@ -218,7 +212,6 @@ func TestMachine_LowerSingleBranch(t *testing.T) {
 		{
 			name: "b",
 			setup: func(ctx *mockCompiler, builder ssa.Builder, m *machine) (instr *ssa.Instruction) {
-				m.executableContext.StartLoweringFunction(10)
 				jump := builder.AllocateInstruction()
 				jump.AsJump(ssa.ValuesNil, builder.AllocateBasicBlock())
 				builder.InsertInstruction(jump)
@@ -229,7 +222,6 @@ func TestMachine_LowerSingleBranch(t *testing.T) {
 		{
 			name: "ret",
 			setup: func(ctx *mockCompiler, builder ssa.Builder, m *machine) (instr *ssa.Instruction) {
-				m.executableContext.StartLoweringFunction(10)
 				jump := builder.AllocateInstruction()
 				jump.AsJump(ssa.ValuesNil, builder.ReturnBlock())
 				builder.InsertInstruction(jump)
@@ -379,6 +371,7 @@ L2:
 				regalloc.VReg(2).SetRegType(regalloc.RegTypeInt),
 				regalloc.VReg(3).SetRegType(regalloc.RegTypeInt)
 			mc, _, m := newSetupWithMockContext()
+			m.maxSSABlockID, m.nextLabel = 1, 1
 			mc.typeOf = map[regalloc.VRegID]ssa.Type{execCtx.ID(): ssa.TypeI64, 2: ssa.TypeI64, 3: ssa.TypeI64}
 			m.lowerIDiv(execCtx, rd, operandNR(rn), operandNR(rm), tc._64bit, tc.signed)
 			require.Equal(t, tc.exp, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
@@ -389,8 +382,8 @@ L2:
 func TestMachine_exitWithCode(t *testing.T) {
 	_, _, m := newSetupWithMockContext()
 	m.lowerExitWithCode(x1VReg, wazevoapi.ExitCodeGrowStack)
-	m.executableContext.FlushPendingInstructions()
-	m.encode(m.executableContext.PerBlockHead)
+	m.FlushPendingInstructions()
+	m.encode(m.perBlockHead)
 	require.Equal(t, `
 movz x1?, #0x1, lsl 0
 str w1?, [x1]
@@ -450,12 +443,13 @@ fcvtzu w1, s2
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			mc, _, m := newSetupWithMockContext()
+			m.maxSSABlockID, m.nextLabel = 1, 1
 			mc.typeOf = map[regalloc.VRegID]ssa.Type{v2VReg.ID(): ssa.TypeI64, x15VReg.ID(): ssa.TypeI64}
 			m.lowerFpuToInt(x1VReg, operandNR(v2VReg), x15VReg, false, false, false, tc.nontrapping)
 			require.Equal(t, tc.expectedAsm, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
 
-			m.executableContext.FlushPendingInstructions()
-			m.encode(m.executableContext.PerBlockHead)
+			m.FlushPendingInstructions()
+			m.encode(m.perBlockHead)
 		})
 	}
 }
@@ -536,8 +530,8 @@ mul x1.4s, x2.4s, x15.4s
 			m.lowerVIMul(x1VReg, operandNR(x2VReg), operandNR(x15VReg), tc.arrangement)
 			require.Equal(t, tc.expectedAsm, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
 
-			m.executableContext.FlushPendingInstructions()
-			m.encode(m.executableContext.PerBlockHead)
+			m.FlushPendingInstructions()
+			m.encode(m.perBlockHead)
 			buf := m.compiler.Buf()
 			require.Equal(t, tc.expectedBytes, hex.EncodeToString(buf))
 		})
@@ -641,8 +635,8 @@ cset x15, ne
 			m.lowerVcheckTrue(tc.op, operandNR(x1VReg), x15VReg, tc.arrangement)
 			require.Equal(t, tc.expectedAsm, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
 
-			m.executableContext.FlushPendingInstructions()
-			m.encode(m.executableContext.PerBlockHead)
+			m.FlushPendingInstructions()
+			m.encode(m.perBlockHead)
 			buf := m.compiler.Buf()
 			require.Equal(t, tc.expectedBytes, hex.EncodeToString(buf))
 		})
@@ -726,8 +720,8 @@ add w15, w15, w1?, lsl #1
 			m.lowerVhighBits(operandNR(x1VReg), x15VReg, tc.arrangement)
 			require.Equal(t, tc.expectedAsm, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
 
-			m.executableContext.FlushPendingInstructions()
-			m.encode(m.executableContext.PerBlockHead)
+			m.FlushPendingInstructions()
+			m.encode(m.perBlockHead)
 			buf := m.compiler.Buf()
 			require.Equal(t, tc.expectedBytes, hex.EncodeToString(buf))
 		})
@@ -775,8 +769,8 @@ tbl x1.16b, { v29.16b, v30.16b }, v1?.16b
 			m.lowerShuffle(x1VReg, operandNR(x2VReg), operandNR(x15VReg), lane1, lane2)
 			require.Equal(t, tc.expectedAsm, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
 
-			m.executableContext.FlushPendingInstructions()
-			m.encode(m.executableContext.PerBlockHead)
+			m.FlushPendingInstructions()
+			m.encode(m.perBlockHead)
 			buf := m.compiler.Buf()
 			require.Equal(t, tc.expectedBytes, hex.EncodeToString(buf))
 		})
@@ -832,8 +826,8 @@ ushl x1.16b, x2.16b, v2?.16b
 			m.lowerVShift(tc.op, x1VReg, operandNR(x2VReg), operandNR(x15VReg), tc.arrangement)
 			require.Equal(t, tc.expectedAsm, "\n"+formatEmittedInstructionsInCurrentBlock(m)+"\n")
 
-			m.executableContext.FlushPendingInstructions()
-			m.encode(m.executableContext.PerBlockHead)
+			m.FlushPendingInstructions()
+			m.encode(m.perBlockHead)
 			buf := m.compiler.Buf()
 			require.Equal(t, tc.expectedBytes, hex.EncodeToString(buf))
 		})

@@ -8,7 +8,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
-func TestMachine_InsertStoreRegisterAt(t *testing.T) {
+func TestMachine_insertStoreRegisterAt(t *testing.T) {
 	for _, tc := range []struct {
 		spillSlotSize int64
 		expected      string
@@ -52,13 +52,13 @@ func TestMachine_InsertStoreRegisterAt(t *testing.T) {
 					i2.prev = i1
 
 					if after {
-						m.InsertStoreRegisterAt(raxVReg, i1, after)
-						m.InsertStoreRegisterAt(xmm1VReg, i1, after)
+						m.insertStoreRegisterAt(raxVReg, i1, after)
+						m.insertStoreRegisterAt(xmm1VReg, i1, after)
 					} else {
-						m.InsertStoreRegisterAt(xmm1VReg, i2, after)
-						m.InsertStoreRegisterAt(raxVReg, i2, after)
+						m.insertStoreRegisterAt(xmm1VReg, i2, after)
+						m.insertStoreRegisterAt(raxVReg, i2, after)
 					}
-					m.ectx.RootInstr = i1
+					m.rootInstr = i1
 					require.Equal(t, tc.expected, m.Format())
 				})
 			}
@@ -66,7 +66,7 @@ func TestMachine_InsertStoreRegisterAt(t *testing.T) {
 	}
 }
 
-func TestMachine_InsertReloadRegisterAt(t *testing.T) {
+func TestMachine_insertReloadRegisterAt(t *testing.T) {
 	for _, tc := range []struct {
 		spillSlotSize int64
 		expected      string
@@ -110,13 +110,13 @@ func TestMachine_InsertReloadRegisterAt(t *testing.T) {
 					i2.prev = i1
 
 					if after {
-						m.InsertReloadRegisterAt(xmm1VReg, i1, after)
-						m.InsertReloadRegisterAt(raxVReg, i1, after)
+						m.insertReloadRegisterAt(xmm1VReg, i1, after)
+						m.insertReloadRegisterAt(raxVReg, i1, after)
 					} else {
-						m.InsertReloadRegisterAt(raxVReg, i2, after)
-						m.InsertReloadRegisterAt(xmm1VReg, i2, after)
+						m.insertReloadRegisterAt(raxVReg, i2, after)
+						m.insertReloadRegisterAt(xmm1VReg, i2, after)
 					}
-					m.ectx.RootInstr = i1
+					m.rootInstr = i1
 					require.Equal(t, tc.expected, m.Format())
 				})
 			}
@@ -154,8 +154,8 @@ func TestMachine_InsertMoveBefore(t *testing.T) {
 			i1.next = i2
 			i2.prev = i1
 
-			m.InsertMoveBefore(tc.dst, tc.src, i2)
-			m.ectx.RootInstr = i1
+			m.insertMoveBefore(tc.dst, tc.src, i2)
+			m.rootInstr = i1
 			require.Equal(t, tc.expected, m.Format())
 		})
 	}
@@ -221,8 +221,8 @@ func TestMachineSwap(t *testing.T) {
 			cur.next = i2
 			i2.prev = cur
 
-			m.Swap(cur, tc.x1, tc.x2, tc.tmp)
-			m.ectx.RootInstr = cur
+			m.swap(cur, tc.x1, tc.x2, tc.tmp)
+			m.rootInstr = cur
 
 			require.Equal(t, tc.expected, m.Format())
 

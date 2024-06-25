@@ -517,7 +517,7 @@ func Test_goFunctionCallLoadStackArg(t *testing.T) {
 				_, result := m.goFunctionCallLoadStackArg(nop, originalArg0Reg, tc.arg, intVReg, floatVReg)
 				require.Equal(t, tc.expResultReg, result)
 
-				m.executableContext.RootInstr = nop
+				m.rootInstr = nop
 
 				require.Equal(t, tc.exp, m.Format())
 				err := m.Encode(context.Background())
@@ -584,7 +584,7 @@ func Test_goFunctionCallStoreStackResult(t *testing.T) {
 				nop := m.allocateNop()
 				m.goFunctionCallStoreStackResult(nop, spVReg, tc.result, tc.resultReg)
 
-				m.executableContext.RootInstr = nop
+				m.rootInstr = nop
 
 				require.Equal(t, tc.exp, m.Format())
 				err := m.Encode(context.Background())

@@ -15,9 +15,7 @@ func (m *machine) PostRegAlloc() {
 
 // setupPrologue initializes the prologue of the function.
 func (m *machine) setupPrologue() {
-	ectx := m.executableContext
-
-	cur := ectx.RootInstr
+	cur := m.rootInstr
 	prevInitInst := cur.next
 
 	//
@@ -196,21 +194,20 @@ func (m *machine) createFrameSizeSlot(cur *instruction, s int64) *instruction {
 // 1. Removes the redundant copy instruction.
 // 2. Inserts the epilogue.
 func (m *machine) postRegAlloc() {
-	ectx := m.executableContext
-	for cur := ectx.RootInstr; cur != nil; cur = cur.next {
+	for cur := m.rootInstr; cur != nil; cur = cur.next {
 		switch cur.kind {
 		case ret:
 			m.setupEpilogueAfter(cur.prev)
 		case loadConstBlockArg:
 			lc := cur
 			next := lc.next
-			m.executableContext.PendingInstructions = m.executableContext.PendingInstructions[:0]
+			m.pendingInstructions = m.pendingInstructions[:0]
 			m.lowerLoadConstantBlockArgAfterRegAlloc(lc)
-			for _, instr := range m.executableContext.PendingInstructions {
+			for _, instr := range m.pendingInstructions {
 				cur = linkInstr(cur, instr)
 			}
 			linkInstr(cur, next)
-			m.executableContext.PendingInstructions = m.executableContext.PendingInstructions[:0]
+			m.pendingInstructions = m.pendingInstructions[:0]
 		default:
 			// Removes the redundant copy instruction.
 			if cur.IsCopy() && cur.rn.realReg() == cur.rd.RealReg() {
@@ -432,11 +429,9 @@ func (m *machine) insertStackBoundsCheck(requiredStackSize int64, cur *instructi
 
 // CompileStackGrowCallSequence implements backend.Machine.
 func (m *machine) CompileStackGrowCallSequence() []byte {
-	ectx := m.executableContext
-
 	cur := m.allocateInstr()
 	cur.asNop0()
-	ectx.RootInstr = cur
+	m.rootInstr = cur
 
 	// Save the callee saved and argument registers.
 	cur = m.saveRegistersInExecutionContext(cur, saveRequiredRegs)
@@ -458,16 +453,14 @@ func (m *machine) CompileStackGrowCallSequence() []byte {
 	ret.asRet()
 	linkInstr(cur, ret)
 
-	m.encode(ectx.RootInstr)
+	m.encode(m.rootInstr)
 	return m.compiler.Buf()
 }
 
 func (m *machine) addsAddOrSubStackPointer(cur *instruction, rd regalloc.VReg, diff int64, add bool) *instruction {
-	ectx := m.executableContext
-
-	ectx.PendingInstructions = ectx.PendingInstructions[:0]
+	m.pendingInstructions = m.pendingInstructions[:0]
 	m.insertAddOrSubStackPointer(rd, diff, add)
-	for _, inserted := range ectx.PendingInstructions {
+	for _, inserted := range m.pendingInstructions {
 		cur = linkInstr(cur, inserted)
 	}
 	return cur

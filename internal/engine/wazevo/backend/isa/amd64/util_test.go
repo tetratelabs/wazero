@@ -138,9 +138,9 @@ func (m *mockCompiler) Compile(context.Context) (_ []byte, _ []backend.Relocatio
 }
 
 func formatEmittedInstructionsInCurrentBlock(m *machine) string {
-	m.ectx.FlushPendingInstructions()
+	m.FlushPendingInstructions()
 	var strs []string
-	for cur := m.ectx.PerBlockHead; cur != nil; cur = cur.next {
+	for cur := m.perBlockHead; cur != nil; cur = cur.next {
 		strs = append(strs, cur.String())
 	}
 	return strings.Join(strs, "\n")

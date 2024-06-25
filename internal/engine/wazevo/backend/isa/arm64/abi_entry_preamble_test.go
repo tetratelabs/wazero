@@ -397,7 +397,7 @@ func TestAbiImpl_constructEntryPreamble(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, _, m := newSetupWithMockContext()
-			m.executableContext.RootInstr = m.constructEntryPreamble(tc.sig)
+			m.rootInstr = m.constructEntryPreamble(tc.sig)
 			require.Equal(t, tc.exp, m.Format())
 		})
 	}
@@ -532,7 +532,7 @@ func TestMachine_goEntryPreamblePassArg(t *testing.T) {
 		t.Run(tc.exp, func(t *testing.T) {
 			_, _, m := newSetupWithMockContext()
 			cur := m.allocateNop()
-			m.executableContext.RootInstr = cur
+			m.rootInstr = cur
 			m.goEntryPreamblePassArg(cur, paramSlicePtr, &tc.arg, tc.argSlotBeginOffsetFromSP)
 			require.Equal(t, tc.exp, m.Format())
 			err := m.Encode(context.Background())
@@ -686,7 +686,7 @@ func TestMachine_goEntryPreamblePassResult(t *testing.T) {
 		t.Run(tc.exp, func(t *testing.T) {
 			_, _, m := newSetupWithMockContext()
 			cur := m.allocateNop()
-			m.executableContext.RootInstr = cur
+			m.rootInstr = cur
 			m.goEntryPreamblePassResult(cur, paramSlicePtr, &tc.arg, tc.retStart)
 			require.Equal(t, tc.exp, m.Format())
 			err := m.Encode(context.Background())

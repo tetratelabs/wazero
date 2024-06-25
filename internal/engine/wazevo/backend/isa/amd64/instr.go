@@ -17,16 +17,6 @@ type instruction struct {
 	kind                instructionKind
 }
 
-// Next implements regalloc.Instr.
-func (i *instruction) Next() regalloc.Instr {
-	return i.next
-}
-
-// Prev implements regalloc.Instr.
-func (i *instruction) Prev() regalloc.Instr {
-	return i.prev
-}
-
 // IsCall implements regalloc.Instr.
 func (i *instruction) IsCall() bool { return i.kind == call }
 
@@ -651,26 +641,14 @@ func resetInstruction(i *instruction) {
 	*i = instruction{}
 }
 
-func setNext(i *instruction, next *instruction) {
-	i.next = next
-}
-
-func setPrev(i *instruction, prev *instruction) {
-	i.prev = prev
-}
-
-func asNop(i *instruction) {
-	i.kind = nop0
-}
-
-func (i *instruction) asNop0WithLabel(label backend.Label) *instruction { //nolint
+func (i *instruction) asNop0WithLabel(label label) *instruction { //nolint
 	i.kind = nop0
 	i.u1 = uint64(label)
 	return i
 }
 
-func (i *instruction) nop0Label() backend.Label {
-	return backend.Label(i.u1)
+func (i *instruction) nop0Label() label {
+	return label(i.u1)
 }
 
 type instructionKind byte
@@ -1161,7 +1139,7 @@ func (i *instruction) asJmp(target operand) *instruction {
 	return i
 }
 
-func (i *instruction) jmpLabel() backend.Label {
+func (i *instruction) jmpLabel() label {
 	switch i.kind {
 	case jmp, jmpIf, lea, xmmUnaryRmR:
 		return i.op1.label()
