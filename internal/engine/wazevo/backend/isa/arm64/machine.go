@@ -412,7 +412,7 @@ func (m *machine) resolveRelativeAddresses(ctx context.Context) {
 						if i < len(m.orderedSSABlockLabelPos)-1 {
 							// Note: this is only used when the block ends with fallthrough,
 							// therefore can be safely assumed that the next block exists when it's needed.
-							nextLabel = label(i + 1)
+							nextLabel = ssaBlockLabel(m.orderedSSABlockLabelPos[i+1].sb)
 						}
 						m.condBrRelocs = append(m.condBrRelocs, condBrReloc{
 							cbr: cur, currentLabelPos: pos, offset: offset + size,
