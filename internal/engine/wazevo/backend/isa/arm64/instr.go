@@ -51,11 +51,6 @@ func (i *instruction) IsReturn() bool {
 	return i.kind == ret
 }
 
-// AddedBeforeRegAlloc implements regalloc.Instr AddedBeforeRegAlloc.
-func (i *instruction) AddedBeforeRegAlloc() bool {
-	return i.addedBeforeRegAlloc
-}
-
 type defKind byte
 
 const (

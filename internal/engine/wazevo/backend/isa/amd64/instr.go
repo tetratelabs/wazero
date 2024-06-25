@@ -26,9 +26,6 @@ func (i *instruction) IsIndirectCall() bool { return i.kind == callIndirect }
 // IsReturn implements regalloc.Instr.
 func (i *instruction) IsReturn() bool { return i.kind == ret }
 
-// AddedBeforeRegAlloc implements regalloc.Instr.
-func (i *instruction) AddedBeforeRegAlloc() bool { return i.addedBeforeRegAlloc }
-
 // String implements regalloc.Instr.
 func (i *instruction) String() string {
 	switch i.kind {

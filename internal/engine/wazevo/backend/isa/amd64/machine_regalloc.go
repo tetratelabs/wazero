@@ -165,7 +165,7 @@ func (pos *labelPosition) InstrIteratorNext() *instruction {
 		pos.cur = instr
 		if instr == nil {
 			return nil
-		} else if instr.AddedBeforeRegAlloc() {
+		} else if instr.addedBeforeRegAlloc {
 			// Only concerned about the instruction added before regalloc.
 			return instr
 		}
@@ -188,7 +188,7 @@ func (pos *labelPosition) InstrRevIteratorNext() *instruction {
 		pos.cur = instr
 		if instr == nil {
 			return nil
-		} else if instr.AddedBeforeRegAlloc() {
+		} else if instr.addedBeforeRegAlloc {
 			// Only concerned about the instruction added before regalloc.
 			return instr
 		}
