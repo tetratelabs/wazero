@@ -229,9 +229,6 @@ func (s *state[I, B]) getVRegState(v VRegID) *vrState[I, B] {
 }
 
 func (s *state[I, B]) useRealReg(r RealReg, vr *vrState[I, B]) {
-	if s.regsInUse.has(r) {
-		panic("BUG: useRealReg: the given real register is already used")
-	}
 	s.regsInUse.add(r, vr)
 	vr.r = r
 	s.allocatedRegSet = s.allocatedRegSet.add(r)
@@ -250,16 +247,16 @@ func (s *state[I, B]) releaseRealReg(r RealReg) {
 func (vs *vrState[I, B]) recordReload(f Function[I, B], blk B) {
 	vs.spilled = true
 	var nilBlk B
-	if vs.lca == nilBlk {
+	if lca := vs.lca; lca == nilBlk {
 		if wazevoapi.RegAllocLoggingEnabled {
 			fmt.Printf("\t\tv%d is reloaded in blk%d,\n", vs.v.ID(), blk.ID())
 		}
 		vs.lca = blk
-	} else {
+	} else if lca != blk {
 		if wazevoapi.RegAllocLoggingEnabled {
 			fmt.Printf("\t\tv%d is reloaded in blk%d, lca=%d\n", vs.v.ID(), blk.ID(), vs.lca.ID())
 		}
-		vs.lca = f.LowestCommonAncestor(vs.lca, blk)
+		vs.lca = f.LowestCommonAncestor(lca, blk)
 		if wazevoapi.RegAllocLoggingEnabled {
 			fmt.Printf("updated lca=%d\n", vs.lca.ID())
 		}
