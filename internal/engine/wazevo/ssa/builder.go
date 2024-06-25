@@ -294,10 +294,6 @@ func (b *builder) Init(s *Signature) {
 	b.nextValueID = 0
 	b.reversePostOrderedBasicBlocks = b.reversePostOrderedBasicBlocks[:0]
 	b.doneBlockLayout = false
-	for i := range b.valueRefCounts {
-		b.valueRefCounts[i] = 0
-	}
-
 	b.currentSourceOffset = sourceOffsetUnknown
 }
 
