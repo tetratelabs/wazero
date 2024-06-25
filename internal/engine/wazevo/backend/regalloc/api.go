@@ -120,7 +120,5 @@ type (
 		IsIndirectCall() bool
 		// IsReturn returns true if this instruction is a return instruction.
 		IsReturn() bool
-		// AddedBeforeRegAlloc returns true if this instruction is added before register allocation.
-		AddedBeforeRegAlloc() bool
 	}
 )
