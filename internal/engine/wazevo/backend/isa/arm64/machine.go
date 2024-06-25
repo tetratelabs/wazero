@@ -40,7 +40,7 @@ type (
 		// maxSSABlockID is the maximum ssa.BasicBlockID in the current function.
 		maxSSABlockID label
 
-		regAlloc   regalloc.Allocator[*instruction, *labelPosition]
+		regAlloc   regalloc.Allocator[*instruction, *labelPosition, *regAllocFn]
 		regAllocFn regAllocFn
 
 		amodePool wazevoapi.Pool[addressMode]
@@ -156,7 +156,7 @@ func resetLabelPosition(l *labelPosition) {
 func NewBackend() backend.Machine {
 	m := &machine{
 		spillSlots:        make(map[regalloc.VRegID]int64),
-		regAlloc:          regalloc.NewAllocator[*instruction, *labelPosition](regInfo),
+		regAlloc:          regalloc.NewAllocator[*instruction, *labelPosition, *regAllocFn](regInfo),
 		amodePool:         wazevoapi.NewPool[addressMode](resetAddressMode),
 		instrPool:         wazevoapi.NewPool[instruction](resetInstruction),
 		labelPositionPool: wazevoapi.NewIDedPool[labelPosition](resetLabelPosition),

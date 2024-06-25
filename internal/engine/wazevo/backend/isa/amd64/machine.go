@@ -18,7 +18,7 @@ import (
 func NewBackend() backend.Machine {
 	m := &machine{
 		cpuFeatures:                         platform.CpuFeatures,
-		regAlloc:                            regalloc.NewAllocator[*instruction, *labelPosition](regInfo),
+		regAlloc:                            regalloc.NewAllocator[*instruction, *labelPosition, *regAllocFn](regInfo),
 		spillSlots:                          map[regalloc.VRegID]int64{},
 		amodePool:                           wazevoapi.NewPool[amode](nil),
 		labelPositionPool:                   wazevoapi.NewIDedPool[labelPosition](resetLabelPosition),
@@ -51,7 +51,7 @@ type (
 
 		cpuFeatures platform.CpuFeatureFlags
 
-		regAlloc        regalloc.Allocator[*instruction, *labelPosition]
+		regAlloc        regalloc.Allocator[*instruction, *labelPosition, *regAllocFn]
 		regAllocFn      regAllocFn
 		regAllocStarted bool
 
