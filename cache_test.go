@@ -14,10 +14,10 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
-//go:embed internal/integration_test/vs/testdata/fac.wasm
+//go:embed testdata/fac.wasm
 var facWasm []byte
 
-//go:embed internal/integration_test/vs/testdata/mem_grow.wasm
+//go:embed testdata/mem_grow.wasm
 var memGrowWasm []byte
 
 func TestCompilationCache(t *testing.T) {
