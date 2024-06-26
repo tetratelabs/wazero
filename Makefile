@@ -20,22 +20,6 @@ main_packages := $(sort $(foreach f,$(dir $(main_sources)),$(if $(findstring ./,
 
 go_test_options ?= -timeout 300s
 
-ensureCompilerFastest := -ldflags '-X github.com/tetratelabs/wazero/internal/integration_test/vs.ensureCompilerFastest=true'
-.PHONY: bench
-bench:
-	@go build ./internal/integration_test/bench/...
-	@# Don't use -test.benchmem as it isn't accurate when comparing against CGO libs
-	@for d in vs/time vs/wasmedge vs/wasmtime ; do \
-		cd ./internal/integration_test/$$d ; \
-		go test -bench=. . -tags='wasmedge' $(ensureCompilerFastest) ; \
-		cd - ;\
-	done
-
-bench_testdata_dir := internal/integration_test/bench/testdata
-.PHONY: build.bench
-build.bench:
-	@tinygo build -o $(bench_testdata_dir)/case.wasm -scheduler=none --no-debug -target=wasi $(bench_testdata_dir)/case.go
-
 .PHONY: test.examples
 test.examples:
 	@go test $(go_test_options) ./examples/... ./imports/assemblyscript/example/... ./imports/emscripten/... ./imports/wasi_snapshot_preview1/example/...
