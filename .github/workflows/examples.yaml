@@ -104,9 +104,5 @@ jobs:
           source ./emsdk/emsdk_env.sh
           make build.examples.emscripten
 
-      - name: Build bench cases
-        run: make build.bench
-        if: matrix.go-version != '1.20' # fails with TinyGo v0.32.0
-
       - name: Run example tests
         run: make test.examples
