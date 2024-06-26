@@ -129,7 +129,7 @@ jobs:
 
       - name: Build test binaries
         run: |
-          go list -f '{{.Dir}}' ./... | egrep -v '(vs|spectest)' | xargs -Ipkg go test pkg -c -o pkg.test
+          go list -f '{{.Dir}}' ./... | egrep -v 'spectest' | xargs -Ipkg go test pkg -c -o pkg.test
           go build -o wazerocli ./cmd/wazero
         env:
           GOARCH: ${{ matrix.arch }}
