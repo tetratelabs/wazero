@@ -4582,7 +4582,7 @@ func (ce *callEngine) callGoFuncWithStack(ctx context.Context, m *wasm.ModuleIns
 
 // v128Dot performs a dot product of two 64-bit vectors.
 // Note: for some reason (which I suspect is due to a bug in Go compiler's regalloc),
-// inlining this function causes a bug which **only happens** with -race AND arm64.
+// inlining this function causes a bug which happens **only when** we run with -race AND arm64 AND Go 1.22.
 func v128Dot(x1Hi, x1Lo, x2Hi, x2Lo uint64) (uint64, uint64) {
 	r1 := int32(int16(x1Lo>>0)) * int32(int16(x2Lo>>0))
 	r2 := int32(int16(x1Lo>>16)) * int32(int16(x2Lo>>16))
