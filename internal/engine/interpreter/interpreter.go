@@ -3900,15 +3900,21 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			frame.pc++
 		case operationKindV128Dot:
 			x2Hi, x2Lo := ce.popValue(), ce.popValue()
+			fmt.Printf("x2Hi: %x, x2Lo: %x\n", x2Hi, x2Lo)
 			x1Hi, x1Lo := ce.popValue(), ce.popValue()
-			ce.pushValue(
-				uint64(uint32(int32(int16(x1Lo>>0))*int32(int16(x2Lo>>0))+int32(int16(x1Lo>>16))*int32(int16(x2Lo>>16)))) |
-					(uint64(uint32(int32(int16(x1Lo>>32))*int32(int16(x2Lo>>32))+int32(int16(x1Lo>>48))*int32(int16(x2Lo>>48)))) << 32),
-			)
-			ce.pushValue(
-				uint64(uint32(int32(int16(x1Hi>>0))*int32(int16(x2Hi>>0))+int32(int16(x1Hi>>16))*int32(int16(x2Hi>>16)))) |
-					(uint64(uint32(int32(int16(x1Hi>>32))*int32(int16(x2Hi>>32))+int32(int16(x1Hi>>48))*int32(int16(x2Hi>>48)))) << 32),
-			)
+			fmt.Printf("x1Hi: %x, x1Lo: %x\n", x1Hi, x1Lo)
+			r1 := int32(int16(x1Lo>>0)) * int32(int16(x2Lo>>0))
+			r2 := int32(int16(x1Lo>>16)) * int32(int16(x2Lo>>16))
+			r3 := int32(int16(x1Lo>>32)) * int32(int16(x2Lo>>32))
+			r4 := int32(int16(x1Lo>>48)) * int32(int16(x2Lo>>48))
+			fmt.Printf("r1: %x, r2: %x, r3: %x, r4: %x\n", r1, r2, r3, r4)
+			ce.pushValue(uint64(uint32(r1+r2)) | (uint64(uint32(r3+r4)) << 32))
+			r5 := int32(int16(x1Hi>>0)) * int32(int16(x2Hi>>0))
+			r6 := int32(int16(x1Hi>>16)) * int32(int16(x2Hi>>16))
+			r7 := int32(int16(x1Hi>>32)) * int32(int16(x2Hi>>32))
+			r8 := int32(int16(x1Hi>>48)) * int32(int16(x2Hi>>48))
+			fmt.Printf("r5: %x, r6: %x, r7: %x, r8: %x\n", r5, r6, r7, r8)
+			ce.pushValue(uint64(uint32(r5+r6)) | (uint64(uint32(r7+r8)) << 32))
 			frame.pc++
 		case operationKindV128ITruncSatFromF:
 			hi, lo := ce.popValue(), ce.popValue()
