@@ -167,7 +167,7 @@ build.spectest.threads:
 
 .PHONY: test
 test:
-	@go test $(go_test_options) $$(go list ./... | grep -vE '$(spectest_v1_dir)|$(spectest_v2_dir)')
+	@go test $(go_test_options) ./...
 	@cd internal/version/testdata && go test $(go_test_options) ./...
 	@cd internal/integration_test/fuzz/wazerolib && CGO_ENABLED=0 WASM_BINARY_PATH=testdata/test.wasm go test ./...
 
@@ -177,17 +177,6 @@ coverpkg = $(shell echo $(main_packages) | tr ' ' ',')
 coverage: ## Generate test coverage
 	@go test -coverprofile=coverage.txt -covermode=atomic --coverpkg=$(coverpkg) $(main_packages)
 	@go tool cover -func coverage.txt
-
-.PHONY: spectest
-spectest:
-	@$(MAKE) spectest.v1
-	@$(MAKE) spectest.v2
-
-spectest.v1:
-	@go test $(go_test_options) $$(go list ./... | grep $(spectest_v1_dir))
-
-spectest.v2:
-	@go test $(go_test_options) $$(go list ./... | grep $(spectest_v2_dir))
 
 golangci_lint_path := $(shell go env GOPATH)/bin/golangci-lint
 
