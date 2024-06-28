@@ -495,7 +495,20 @@ type ModuleConfig interface {
 	WithFSConfig(FSConfig) ModuleConfig
 
 	// WithName configures the module name. Defaults to what was decoded from
-	// the name section. Empty string ("") clears any name.
+	// the name section. Duplicate names are not allowed in a single Runtime.
+	//
+	// Calling this with the empty string "" makes the module anonymous.
+	// That is useful when you want to instantiate the same CompiledModule multiple times like below:
+	//
+	// 	for i := 0; i < N; i++ {
+	//		// Instantiate a new Wasm module from the already compiled `compiledWasm` anonymously without a name.
+	//		instance, err := r.InstantiateModule(ctx, compiledWasm, wazero.NewModuleConfig().WithName(""))
+	//		// ....
+	//	}
+	//
+	// See the `concurrent-instantiation` example for a complete usage.
+	//
+	// Non-empty named modules are available for other modules to import by name.
 	WithName(string) ModuleConfig
 
 	// WithStartFunctions configures the functions to call after the module is
