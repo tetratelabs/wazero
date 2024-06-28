@@ -506,7 +506,7 @@ type ModuleConfig interface {
 	//		// ....
 	//	}
 	//
-	// See the `concurrent-instantiation` example for a complete useage.
+	// See the `concurrent-instantiation` example for a complete usage.
 	//
 	// Non-empty named modules are available for other modules to import by name.
 	WithName(string) ModuleConfig
