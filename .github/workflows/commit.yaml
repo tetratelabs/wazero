@@ -71,6 +71,7 @@ jobs:
         - os: macos-14
           arch: arm64
         go-version:
+          - "1.23.0-rc.1"  # Test the pending next version
           - "1.22"  # Current Go version
           - "1.20"  # Floor Go version of wazero (current - 2)
 
@@ -112,6 +113,7 @@ jobs:
       fail-fast: false  # don't fail fast as sometimes failures are arch/OS specific
       matrix:  # Use versions consistent with wazero's Go support policy.
         go-version:
+          - "1.23.0-rc.1"  # Test the pending next version
           - "1.22"  # Current Go version
           - "1.20"  # Floor Go version of wazero (current - 2)
         arch:

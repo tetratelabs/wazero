@@ -278,6 +278,7 @@ jobs:
         go-version:
           - "1.21"
           - "1.22"
+          - "1.23.0-rc.1"  # Test the pending next version
 
     steps:
       - id: setup-go
