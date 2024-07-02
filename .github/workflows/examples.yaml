@@ -34,7 +34,6 @@ jobs:
     strategy:
       matrix:  # Use versions consistent with TinyGo.
         go-version:
-          - "1.23.0-rc.1"  # Test the pending next version
           - "1.22"
           - "1.20"
 
