@@ -52,7 +52,8 @@ type MemoryInstance struct {
 	definition api.MemoryDefinition
 
 	// Mux is used in interpreter mode to prevent overlapping calls to atomic instructions,
-	// introduced with WebAssembly threads proposal.
+	// introduced with WebAssembly threads proposal, and in compiler mode to make memory modifications
+	// within Grow non-racy for the Go race detector.
 	Mux sync.Mutex
 
 	// waiters implements atomic wait and notify. It is implemented similarly to golang.org/x/sync/semaphore,
@@ -227,6 +228,11 @@ func MemoryPagesToBytesNum(pages uint32) (bytesNum uint64) {
 
 // Grow implements the same method as documented on api.Memory.
 func (m *MemoryInstance) Grow(delta uint32) (result uint32, ok bool) {
+	if m.Shared {
+		m.Mux.Lock()
+		defer m.Mux.Unlock()
+	}
+
 	currentPages := m.Pages()
 	if delta == 0 {
 		return currentPages, true
