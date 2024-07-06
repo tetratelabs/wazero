@@ -12,7 +12,7 @@ var ctx context.Context
 func Example_closeNotifier() {
 	closeCh := make(chan struct{})
 	ctx = experimental.WithCloseNotifier(
-		ctx,
+		context.Background(),
 		experimental.CloseNotifyFunc(func(context.Context, uint32) { close(closeCh) }),
 	)
 
