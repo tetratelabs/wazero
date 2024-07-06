@@ -21,6 +21,8 @@ func Example_epochNanos() {
 	// Generate a fake Atim using sys.Walltime passed to wazero.ModuleConfig.
 	sec, nsec := walltime()
 	st.Atim = sec*1e9 + int64(nsec)
+
+	// Output:
 }
 
 type fileInfoWithSys struct {
@@ -35,4 +37,6 @@ func Example_inode() {
 	st := sys.NewStat_t(info)
 	st.Ino = math.MaxUint64 // arbitrary non-zero value
 	info = &fileInfoWithSys{info, st}
+
+	// Output:
 }

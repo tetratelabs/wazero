@@ -24,4 +24,6 @@ func Example_closeNotifier() {
 	default:
 		// do some more work with the module
 	}
+
+	// Output:
 }

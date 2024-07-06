@@ -20,6 +20,8 @@ func ExampleAdaptFS() {
 
 	moduleConfig = wazero.NewModuleConfig().
 		WithFSConfig(wazero.NewFSConfig().(sysfs.FSConfig).WithSysFSMount(root, "/"))
+
+	// Output:
 }
 
 // This example shows how to configure a sysfs.DirFS
@@ -28,6 +30,8 @@ func ExampleDirFS() {
 
 	moduleConfig = wazero.NewModuleConfig().
 		WithFSConfig(wazero.NewFSConfig().(sysfs.FSConfig).WithSysFSMount(root, "/"))
+
+	// Output:
 }
 
 // This example shows how to configure a sysfs.ReadFS
@@ -37,4 +41,6 @@ func ExampleReadFS() {
 
 	moduleConfig = wazero.NewModuleConfig().
 		WithFSConfig(wazero.NewFSConfig().(sysfs.FSConfig).WithSysFSMount(readOnly, "/"))
+
+	// Output:
 }
