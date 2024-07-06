@@ -187,7 +187,7 @@ golangci_lint_goarch ?= $(shell go env GOARCH)
 
 .PHONY: lint
 lint: $(golangci_lint_path)
-	@GOARCH=$(golangci_lint_goarch) CGO_ENABLED=0 $(golangci_lint_path) run --timeout 5m
+	@GOARCH=$(golangci_lint_goarch) CGO_ENABLED=0 $(golangci_lint_path) run --timeout 5m -E testableexamples
 
 .PHONY: format
 format:

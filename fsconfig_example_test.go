@@ -24,4 +24,6 @@ func Example_fsConfig() {
 	moduleConfig = wazero.NewModuleConfig().
 		// Make "index.html" accessible to the guest as "/index.html".
 		WithFSConfig(wazero.NewFSConfig().WithFSMount(rooted, "/"))
+
+	// Output:
 }
