@@ -161,8 +161,6 @@ type builder struct {
 	currentBB                     *basicBlock
 	returnBlk                     *basicBlock
 
-	// variables track the types for Variable with the index regarded Variable.
-	variables []Type
 	// nextValueID is used by builder.AllocateValue.
 	nextValueID ValueID
 	// nextVariable is used by builder.AllocateVariable.
@@ -411,13 +409,6 @@ func (b *builder) InsertInstruction(instr *Instruction) {
 
 // DefineVariable implements Builder.DefineVariable.
 func (b *builder) DefineVariable(variable Variable, value Value, block BasicBlock) {
-	if b.variables[variable].invalid() {
-		panic("BUG: trying to define variable " + variable.String() + " but is not declared yet")
-	}
-
-	if b.variables[variable] != value.Type() {
-		panic(fmt.Sprintf("BUG: inconsistent type for variable %d: expected %s but got %s", variable, b.variables[variable], value.Type()))
-	}
 	bb := block.(*basicBlock)
 	bb.lastDefinitions[variable] = value
 }
@@ -444,20 +435,9 @@ func (b *builder) EntryBlock() BasicBlock {
 
 // DeclareVariable implements Builder.DeclareVariable.
 func (b *builder) DeclareVariable(typ Type) Variable {
-	v := b.allocateVariable()
-	iv := int(v)
-	if l := len(b.variables); l <= iv {
-		b.variables = append(b.variables, make([]Type, 2*(l+1))...)
-	}
-	b.variables[v] = typ
-	return v
-}
-
-// allocateVariable allocates a new variable.
-func (b *builder) allocateVariable() (ret Variable) {
-	ret = b.nextVariable
+	v := b.nextVariable
 	b.nextVariable++
-	return
+	return v.setType(typ)
 }
 
 // allocateValue implements Builder.AllocateValue.
@@ -493,8 +473,7 @@ func (b *builder) findValueInLinearPath(variable Variable, blk *basicBlock) Valu
 
 // MustFindValue implements Builder.MustFindValue.
 func (b *builder) MustFindValue(variable Variable) Value {
-	typ := b.definedVariableType(variable)
-	return b.findValue(typ, variable, b.currentBB)
+	return b.findValue(variable.getType(), variable, b.currentBB)
 }
 
 // findValue recursively tries to find the latest definition of a `variable`. The algorithm is described in
@@ -522,7 +501,7 @@ func (b *builder) findValue(typ Type, variable Variable, blk *basicBlock) Value 
 		return value
 	} else if blk.EntryBlock() {
 		// If this is the entry block, we reach the uninitialized variable which has zero value.
-		return b.zeros[b.definedVariableType(variable)]
+		return b.zeros[variable.getType()]
 	}
 
 	if pred := blk.singlePred; pred != nil {
@@ -583,7 +562,7 @@ func (b *builder) Seal(raw BasicBlock) {
 
 	for _, v := range blk.unknownValues {
 		variable, phiValue := v.variable, v.value
-		typ := b.definedVariableType(variable)
+		typ := variable.getType()
 		blk.addParamOn(b, phiValue)
 		for i := range blk.preds {
 			pred := &blk.preds[i]
@@ -594,15 +573,6 @@ func (b *builder) Seal(raw BasicBlock) {
 			pred.branch.addArgumentBranchInst(b, predValue)
 		}
 	}
-}
-
-// definedVariableType returns the type of the given variable. If the variable is not defined yet, it panics.
-func (b *builder) definedVariableType(variable Variable) Type {
-	typ := b.variables[variable]
-	if typ.invalid() {
-		panic(fmt.Sprintf("%s is not defined yet", variable))
-	}
-	return typ
 }
 
 // Format implements Builder.Format.
