@@ -15,11 +15,24 @@ import (
 //
 // Variable is useful to track the SSA Values of a variable in the source program, and
 // can be used to find the corresponding latest SSA Value via Builder.FindValue.
+//
+// Higher 4-bit is used to store Type for this variable.
 type Variable uint32
 
 // String implements fmt.Stringer.
 func (v Variable) String() string {
-	return fmt.Sprintf("var%d", v)
+	return fmt.Sprintf("var%d", v&0x0fffffff)
+}
+
+func (v Variable) setType(typ Type) Variable {
+	if v >= 1<<28 {
+		panic(fmt.Sprintf("Too large variable: %d", v))
+	}
+	return Variable(uint32(typ)<<28) | v
+}
+
+func (v Variable) getType() Type {
+	return Type(v >> 28)
 }
 
 // Value represents an SSA value with a type information. The relationship with Variable is 1: N (including 0),
@@ -33,7 +46,7 @@ type ValueID uint32
 
 const (
 	valueIDInvalid ValueID = math.MaxUint32
-	ValueInvalid   Value   = Value(valueIDInvalid)
+	ValueInvalid           = Value(valueIDInvalid)
 )
 
 // Format creates a debug string for this Value using the data stored in Builder.
