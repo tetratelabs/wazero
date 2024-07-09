@@ -28,7 +28,7 @@ func (v Variable) setType(typ Type) Variable {
 	if v >= 1<<28 {
 		panic(fmt.Sprintf("Too large variable: %d", v))
 	}
-	return Variable(uint32(typ)<<28) | v
+	return Variable(typ)<<28 | v
 }
 
 func (v Variable) getType() Type {
