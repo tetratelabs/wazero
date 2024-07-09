@@ -1962,15 +1962,9 @@ func pathSymlinkFn(_ context.Context, mod api.Module, params []uint64) experimen
 	return dir.FS.Symlink(
 		// Do not join old path since it's only resolved when dereference the link created here.
 		// And the dereference result depends on the opening directory's file descriptor at that point.
-		bufToStr(oldPathBuf),
+		unsafe.String(&oldPathBuf[0], int(oldPathLen)),
 		newPathName,
 	)
-}
-
-// bufToStr converts the given byte slice as string unsafely.
-func bufToStr(buf []byte) string {
-	// TODO: use unsafe.String after flooring Go 1.20.
-	return *(*string)(unsafe.Pointer(&buf))
 }
 
 // pathUnlinkFile is the WASI function named PathUnlinkFileName which unlinks a
