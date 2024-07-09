@@ -128,8 +128,6 @@ type compiler struct {
 	ssaValueToVRegs [] /* VRegID to */ regalloc.VReg
 	// ssaValueDefinitions maps ssa.ValueID to its definition.
 	ssaValueDefinitions []SSAValueDefinition
-	// ssaValueRefCounts is a cached list obtained by ssa.Builder.ValueRefCounts().
-	ssaValueRefCounts []int
 	// returnVRegs is the list of virtual registers that store the return values.
 	returnVRegs  []regalloc.VReg
 	varEdges     [][2]regalloc.VReg
@@ -206,8 +204,7 @@ func (c *compiler) setCurrentGroupID(gid ssa.InstructionGroupID) {
 // assignVirtualRegisters assigns a virtual register to each ssa.ValueID Valid in the ssa.Builder.
 func (c *compiler) assignVirtualRegisters() {
 	builder := c.ssaBuilder
-	refCounts := builder.ValueRefCounts()
-	c.ssaValueRefCounts = refCounts
+	refCounts := builder.ValuesInfo()
 
 	need := len(refCounts)
 	if need >= len(c.ssaValueToVRegs) {
@@ -242,7 +239,7 @@ func (c *compiler) assignVirtualRegisters() {
 				c.ssaValueDefinitions[id] = SSAValueDefinition{
 					Instr:    cur,
 					N:        0,
-					RefCount: refCounts[id],
+					RefCount: refCounts[id].RefCount,
 				}
 				c.ssaTypeOfVRegID[vReg.ID()] = ssaTyp
 				N++
@@ -255,7 +252,7 @@ func (c *compiler) assignVirtualRegisters() {
 				c.ssaValueDefinitions[id] = SSAValueDefinition{
 					Instr:    cur,
 					N:        N,
-					RefCount: refCounts[id],
+					RefCount: refCounts[id].RefCount,
 				}
 				c.ssaTypeOfVRegID[vReg.ID()] = ssaTyp
 				N++

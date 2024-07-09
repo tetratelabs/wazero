@@ -235,8 +235,13 @@ func passRedundantPhiEliminationOpt(b *builder) {
 // TODO: the algorithm here might not be efficient. Get back to this later.
 func passDeadCodeEliminationOpt(b *builder) {
 	nvid := int(b.nextValueID)
-	if nvid >= len(b.valueRefCounts) {
-		b.valueRefCounts = append(b.valueRefCounts, make([]int, nvid-len(b.valueRefCounts)+1)...)
+	if nvid >= len(b.valuesInfo) {
+		l := nvid - len(b.valuesInfo) + 1
+		b.valuesInfo = append(b.valuesInfo, make([]ValueInfo, l)...)
+		view := b.valuesInfo[len(b.valuesInfo)-l:]
+		for i := range view {
+			view[i].alias = ValueInvalid
+		}
 	}
 	if nvid >= len(b.valueIDToInstruction) {
 		b.valueIDToInstruction = append(b.valueIDToInstruction, make([]*Instruction, nvid-len(b.valueIDToInstruction)+1)...)
@@ -356,7 +361,8 @@ func (b *builder) incRefCount(id ValueID, from *Instruction) {
 	if wazevoapi.SSALoggingEnabled {
 		fmt.Printf("v%d referenced from %v\n", id, from.Format(b))
 	}
-	b.valueRefCounts[id]++
+	info := &b.valuesInfo[id]
+	info.RefCount++
 }
 
 // passNopInstElimination eliminates the instructions which is essentially a no-op.
