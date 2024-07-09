@@ -264,9 +264,9 @@ blk2: () <-- (blk1)
 					require.True(t, jmp.live)
 					require.True(t, ret.live)
 
-					require.Equal(t, 1, b.valueRefCounts[refOnceVal.ID()])
-					require.Equal(t, 1, b.valueRefCounts[addRes.ID()])
-					require.Equal(t, 3, b.valueRefCounts[refThriceVal.ID()])
+					require.Equal(t, uint32(1), b.valuesInfo[refOnceVal.ID()].RefCount)
+					require.Equal(t, uint32(1), b.valuesInfo[addRes.ID()].RefCount)
+					require.Equal(t, uint32(3), b.valuesInfo[refThriceVal.ID()].RefCount)
 				}
 			},
 			before: `

@@ -124,9 +124,10 @@ func (c *compiler) lowerFunctionArguments(entry ssa.BasicBlock) {
 	mach := c.mach
 
 	c.tmpVals = c.tmpVals[:0]
+	data := c.ssaBuilder.ValuesInfo()
 	for i := 0; i < entry.Params(); i++ {
 		p := entry.Param(i)
-		if c.ssaValueRefCounts[p.ID()] > 0 {
+		if data[p.ID()].RefCount > 0 {
 			c.tmpVals = append(c.tmpVals, p)
 		} else {
 			// If the argument is not used, we can just pass an invalid value.

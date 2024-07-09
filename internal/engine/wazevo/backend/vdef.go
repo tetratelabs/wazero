@@ -18,7 +18,7 @@ type SSAValueDefinition struct {
 	// N is the index of the return value in the instr's return values list.
 	N int
 	// RefCount is the number of references to the result.
-	RefCount int
+	RefCount uint32
 }
 
 func (d *SSAValueDefinition) IsFromInstr() bool {

@@ -94,9 +94,9 @@ type Builder interface {
 	// Returns nil if there's no unseen BasicBlock.
 	BlockIteratorNext() BasicBlock
 
-	// ValueRefCounts returns the map of ValueID to its reference count.
-	// The returned slice must not be modified.
-	ValueRefCounts() []int
+	// ValuesInfo returns the data per Value used to lower the SSA in backend.
+	// This is indexed by ValueID.
+	ValuesInfo() []ValueInfo
 
 	// BlockIteratorReversePostOrderBegin is almost the same as BlockIteratorBegin except it returns the BasicBlock in the reverse post-order.
 	// This is available after RunPasses is run.
@@ -143,7 +143,6 @@ func NewBuilder() Builder {
 		varLengthPool:           wazevoapi.NewVarLengthPool[Value](),
 		valueAnnotations:        make(map[ValueID]string),
 		signatures:              make(map[SignatureID]*Signature),
-		valueIDAliases:          make(map[ValueID]Value),
 		returnBlk:               &basicBlock{id: basicBlockIDReturnBlock},
 	}
 }
@@ -166,12 +165,11 @@ type builder struct {
 	// nextVariable is used by builder.AllocateVariable.
 	nextVariable Variable
 
-	valueIDAliases   map[ValueID]Value
+	// valueAnnotations contains the annotations for each Value, only used for debugging.
 	valueAnnotations map[ValueID]string
 
-	// valueRefCounts is used to lower the SSA in backend, and will be calculated
-	// by the last SSA-level optimization pass.
-	valueRefCounts []int
+	// valuesInfo contains the data per Value used to lower the SSA in backend. This is indexed by ValueID.
+	valuesInfo []ValueInfo
 
 	// dominators stores the immediate dominator of each BasicBlock.
 	// The index is blockID of the BasicBlock.
@@ -204,6 +202,13 @@ type builder struct {
 
 	// zeros are the zero value constants for each type.
 	zeros [typeEnd]Value
+}
+
+// ValueInfo contains the data per Value used to lower the SSA in backend.
+type ValueInfo struct {
+	// RefCount is the reference count of the Value.
+	RefCount uint32
+	alias    Value
 }
 
 // redundantParam is a pair of the index of the redundant parameter and the Value.
@@ -285,8 +290,7 @@ func (b *builder) Init(s *Signature) {
 
 	for v := ValueID(0); v < b.nextValueID; v++ {
 		delete(b.valueAnnotations, v)
-		delete(b.valueIDAliases, v)
-		b.valueRefCounts[v] = 0
+		b.valuesInfo[v] = ValueInfo{alias: ValueInvalid}
 		b.valueIDToInstruction[v] = nil
 	}
 	b.nextValueID = 0
@@ -676,15 +680,24 @@ func (b *builder) blockIteratorReversePostOrderNext() *basicBlock {
 	}
 }
 
-// ValueRefCounts implements Builder.ValueRefCounts.
-func (b *builder) ValueRefCounts() []int {
-	return b.valueRefCounts
+// ValuesInfo implements Builder.ValuesInfo.
+func (b *builder) ValuesInfo() []ValueInfo {
+	return b.valuesInfo
 }
 
 // alias records the alias of the given values. The alias(es) will be
 // eliminated in the optimization pass via resolveArgumentAlias.
 func (b *builder) alias(dst, src Value) {
-	b.valueIDAliases[dst.ID()] = src
+	did := int(dst.ID())
+	if did >= len(b.valuesInfo) {
+		l := did + 1 - len(b.valuesInfo)
+		b.valuesInfo = append(b.valuesInfo, make([]ValueInfo, l)...)
+		view := b.valuesInfo[len(b.valuesInfo)-l:]
+		for i := range view {
+			view[i].alias = ValueInvalid
+		}
+	}
+	b.valuesInfo[did].alias = src
 }
 
 // resolveArgumentAlias resolves the alias of the arguments of the given instruction.
@@ -709,10 +722,13 @@ func (b *builder) resolveArgumentAlias(instr *Instruction) {
 
 // resolveAlias resolves the alias of the given value.
 func (b *builder) resolveAlias(v Value) Value {
+	info := b.valuesInfo
+	l := ValueID(len(info))
 	// Some aliases are chained, so we need to resolve them recursively.
 	for {
-		if src, ok := b.valueIDAliases[v.ID()]; ok {
-			v = src
+		vid := v.ID()
+		if vid < l && info[vid].alias.Valid() {
+			v = info[vid].alias
 		} else {
 			break
 		}
