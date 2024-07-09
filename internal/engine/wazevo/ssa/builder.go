@@ -554,7 +554,6 @@ func (b *builder) findValue(typ Type, variable Variable, blk *basicBlock) Value 
 
 	if uniqueValue != ValueInvalid {
 		// If all the predecessors have the same definition, we can use that value.
-		b.DefineVariable(variable, uniqueValue, blk)
 		b.alias(tmpValue, uniqueValue)
 		return uniqueValue
 	} else {
