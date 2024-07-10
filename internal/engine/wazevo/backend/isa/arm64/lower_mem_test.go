@@ -296,7 +296,8 @@ func TestMachine_collectAddends(t *testing.T) {
 	v1000, v2000 := regalloc.VReg(1000).SetRegType(regalloc.RegTypeInt), regalloc.VReg(2000).SetRegType(regalloc.RegTypeInt)
 	addParam := func(ctx *mockCompiler, b ssa.Builder, typ ssa.Type) ssa.Value {
 		p := b.CurrentBlock().AddParam(b, typ)
-		ctx.definitions[p] = &backend.SSAValueDefinition{BlockParamValue: p, BlkParamVReg: v1000}
+		ctx.vRegMap[p] = v1000
+		ctx.definitions[p] = &backend.SSAValueDefinition{V: p}
 		return p
 	}
 	insertI32Const := func(m *mockCompiler, b ssa.Builder, v uint32) *ssa.Instruction {
@@ -310,14 +311,14 @@ func TestMachine_collectAddends(t *testing.T) {
 		inst := b.AllocateInstruction()
 		inst.AsIconst64(v)
 		b.InsertInstruction(inst)
-		m.definitions[inst.Return()] = &backend.SSAValueDefinition{Instr: inst}
+		m.definitions[inst.Return()] = &backend.SSAValueDefinition{Instr: inst, V: inst.Return()}
 		return inst
 	}
 	insertIadd := func(m *mockCompiler, b ssa.Builder, lhs, rhs ssa.Value) *ssa.Instruction {
 		inst := b.AllocateInstruction()
 		inst.AsIadd(lhs, rhs)
 		b.InsertInstruction(inst)
-		m.definitions[inst.Return()] = &backend.SSAValueDefinition{Instr: inst}
+		m.definitions[inst.Return()] = &backend.SSAValueDefinition{Instr: inst, V: inst.Return()}
 		return inst
 	}
 	insertExt := func(m *mockCompiler, b ssa.Builder, v ssa.Value, from, to byte, signed bool) *ssa.Instruction {
@@ -328,7 +329,7 @@ func TestMachine_collectAddends(t *testing.T) {
 			inst.AsUExtend(v, from, to)
 		}
 		b.InsertInstruction(inst)
-		m.definitions[inst.Return()] = &backend.SSAValueDefinition{Instr: inst}
+		m.definitions[inst.Return()] = &backend.SSAValueDefinition{Instr: inst, V: v}
 		return inst
 	}
 
