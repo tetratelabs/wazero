@@ -41,8 +41,8 @@ func TestAbiImpl_callerGenVRegToFunctionArg_constant_inlining(t *testing.T) {
 	f64 := builder.AllocateInstruction().AsF64const(3.14).Insert(builder)
 	abi := &backend.FunctionABI{}
 	abi.Init(&ssa.Signature{Params: []ssa.Type{ssa.TypeI64, ssa.TypeF64}}, intParamResultRegs, floatParamResultRegs)
-	m.callerGenVRegToFunctionArg(abi, 0, regalloc.VReg(100).SetRegType(regalloc.RegTypeInt), &backend.SSAValueDefinition{Instr: i64, RefCount: 1}, 0)
-	m.callerGenVRegToFunctionArg(abi, 1, regalloc.VReg(50).SetRegType(regalloc.RegTypeFloat), &backend.SSAValueDefinition{Instr: f64, RefCount: 1}, 0)
+	m.callerGenVRegToFunctionArg(abi, 0, regalloc.VReg(100).SetRegType(regalloc.RegTypeInt), backend.SSAValueDefinition{Instr: i64, RefCount: 1}, 0)
+	m.callerGenVRegToFunctionArg(abi, 1, regalloc.VReg(50).SetRegType(regalloc.RegTypeFloat), backend.SSAValueDefinition{Instr: f64, RefCount: 1}, 0)
 	require.Equal(t, `movz x100?, #0xa, lsl 0
 mov x0, x100?
 ldr d50?, #8; b 16; data.f64 3.140000

@@ -132,6 +132,9 @@ type Builder interface {
 
 	// BasicBlock returns the BasicBlock of the given ID.
 	BasicBlock(id BasicBlockID) BasicBlock
+
+	// InstructionOfValue returns the Instruction that produces the given Value or nil if the Value is not produced by any Instruction.
+	InstructionOfValue(v Value) *Instruction
 }
 
 // NewBuilder returns a new Builder implementation.
@@ -776,9 +779,9 @@ func (b *builder) LowestCommonAncestor(blk1, blk2 BasicBlock) BasicBlock {
 	return b.sparseTree.findLCA(blk1.ID(), blk2.ID())
 }
 
-// instructionOfValue returns the instruction that produces the given Value, or nil
+// InstructionOfValue returns the instruction that produces the given Value, or nil
 // if the Value is not produced by any instruction.
-func (b *builder) instructionOfValue(v Value) *Instruction {
+func (b *builder) InstructionOfValue(v Value) *Instruction {
 	instrID := v.instructionID()
 	if instrID <= 0 {
 		return nil

@@ -46,9 +46,9 @@ func TestMachine_LowerConditionalBranch(t *testing.T) {
 		cmpVal := cmpInstr.Return()
 		ctx.vRegMap[cmpVal] = 3
 
-		ctx.definitions[val1] = &backend.SSAValueDefinition{V: val1}
-		ctx.definitions[val2] = &backend.SSAValueDefinition{V: val2}
-		ctx.definitions[cmpVal] = &backend.SSAValueDefinition{Instr: cmpInstr}
+		ctx.definitions[val1] = backend.SSAValueDefinition{V: val1}
+		ctx.definitions[val2] = backend.SSAValueDefinition{V: val2}
+		ctx.definitions[cmpVal] = backend.SSAValueDefinition{Instr: cmpInstr}
 		b := builder.AllocateInstruction()
 		if brz {
 			b.AsBrz(cmpVal, ssa.ValuesNil, builder.AllocateBasicBlock())
@@ -74,9 +74,9 @@ func TestMachine_LowerConditionalBranch(t *testing.T) {
 		icmp.AsIcmp(v1, v2, ssa.IntegerCmpCondEqual)
 		builder.InsertInstruction(icmp)
 		icmpVal := icmp.Return()
-		ctx.definitions[v1] = &backend.SSAValueDefinition{V: v1}
-		ctx.definitions[v2] = &backend.SSAValueDefinition{Instr: iconst}
-		ctx.definitions[icmpVal] = &backend.SSAValueDefinition{Instr: icmp}
+		ctx.definitions[v1] = backend.SSAValueDefinition{V: v1}
+		ctx.definitions[v2] = backend.SSAValueDefinition{Instr: iconst}
+		ctx.definitions[icmpVal] = backend.SSAValueDefinition{Instr: icmp}
 		ctx.vRegMap[v1], ctx.vRegMap[v2], ctx.vRegMap[icmpVal] = intToVReg(1), intToVReg(2), intToVReg(3)
 		b := builder.AllocateInstruction()
 		if brz {
@@ -105,7 +105,7 @@ func TestMachine_LowerConditionalBranch(t *testing.T) {
 				icmp.AsIcmp(v1, v2, ssa.IntegerCmpCondEqual)
 				builder.InsertInstruction(icmp)
 				icmpVal := icmp.Return()
-				ctx.definitions[icmpVal] = &backend.SSAValueDefinition{Instr: icmp, V: icmpVal}
+				ctx.definitions[icmpVal] = backend.SSAValueDefinition{Instr: icmp, V: icmpVal}
 				ctx.vRegMap[v1], ctx.vRegMap[v2], ctx.vRegMap[icmpVal] = intToVReg(1), intToVReg(2), intToVReg(3)
 
 				brz := builder.AllocateInstruction()

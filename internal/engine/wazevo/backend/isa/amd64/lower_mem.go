@@ -130,7 +130,7 @@ func (m *machine) lowerAddendsToAmode(x, y addend, offBase uint32) *amode {
 	}
 }
 
-func (m *machine) lowerAddend(x *backend.SSAValueDefinition) addend {
+func (m *machine) lowerAddend(x backend.SSAValueDefinition) addend {
 	if !x.IsFromInstr() {
 		return addend{m.c.VRegOf(x.V), 0, 0}
 	}
