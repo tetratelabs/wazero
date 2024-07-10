@@ -243,9 +243,6 @@ func passDeadCodeEliminationOpt(b *builder) {
 			view[i].alias = ValueInvalid
 		}
 	}
-	if nvid >= len(b.valueIDToInstruction) {
-		b.valueIDToInstruction = append(b.valueIDToInstruction, make([]*Instruction, nvid-len(b.valueIDToInstruction)+1)...)
-	}
 
 	// First, we gather all the instructions with side effects.
 	liveInstructions := b.instStack[:0]
@@ -263,14 +260,6 @@ func passDeadCodeEliminationOpt(b *builder) {
 				liveInstructions = append(liveInstructions, cur)
 				// The strict side effect should create different instruction groups.
 				gid++
-			}
-
-			r1, rs := cur.Returns()
-			if r1.Valid() {
-				b.valueIDToInstruction[r1.ID()] = cur
-			}
-			for _, r := range rs {
-				b.valueIDToInstruction[r.ID()] = cur
 			}
 		}
 	}
@@ -292,28 +281,28 @@ func passDeadCodeEliminationOpt(b *builder) {
 
 		v1, v2, v3, vs := live.Args()
 		if v1.Valid() {
-			producingInst := b.valueIDToInstruction[v1.ID()]
+			producingInst := b.instructionOfValue(v1)
 			if producingInst != nil {
 				liveInstructions = append(liveInstructions, producingInst)
 			}
 		}
 
 		if v2.Valid() {
-			producingInst := b.valueIDToInstruction[v2.ID()]
+			producingInst := b.instructionOfValue(v2)
 			if producingInst != nil {
 				liveInstructions = append(liveInstructions, producingInst)
 			}
 		}
 
 		if v3.Valid() {
-			producingInst := b.valueIDToInstruction[v3.ID()]
+			producingInst := b.instructionOfValue(v3)
 			if producingInst != nil {
 				liveInstructions = append(liveInstructions, producingInst)
 			}
 		}
 
 		for _, v := range vs {
-			producingInst := b.valueIDToInstruction[v.ID()]
+			producingInst := b.instructionOfValue(v)
 			if producingInst != nil {
 				liveInstructions = append(liveInstructions, producingInst)
 			}
@@ -367,29 +356,13 @@ func (b *builder) incRefCount(id ValueID, from *Instruction) {
 
 // passNopInstElimination eliminates the instructions which is essentially a no-op.
 func passNopInstElimination(b *builder) {
-	if int(b.nextValueID) >= len(b.valueIDToInstruction) {
-		b.valueIDToInstruction = append(b.valueIDToInstruction, make([]*Instruction, int(b.nextValueID)-len(b.valueIDToInstruction)+1)...)
-	}
-
-	for blk := b.blockIteratorBegin(); blk != nil; blk = b.blockIteratorNext() {
-		for cur := blk.rootInstr; cur != nil; cur = cur.next {
-			r1, rs := cur.Returns()
-			if r1.Valid() {
-				b.valueIDToInstruction[r1.ID()] = cur
-			}
-			for _, r := range rs {
-				b.valueIDToInstruction[r.ID()] = cur
-			}
-		}
-	}
-
 	for blk := b.blockIteratorBegin(); blk != nil; blk = b.blockIteratorNext() {
 		for cur := blk.rootInstr; cur != nil; cur = cur.next {
 			switch cur.Opcode() {
 			// TODO: add more logics here.
 			case OpcodeIshl, OpcodeSshr, OpcodeUshr:
 				x, amount := cur.Arg2()
-				definingInst := b.valueIDToInstruction[amount.ID()]
+				definingInst := b.instructionOfValue(amount)
 				if definingInst == nil {
 					// If there's no defining instruction, that means the amount is coming from the parameter.
 					continue
