@@ -222,14 +222,13 @@ func (c *compiler) assignVirtualRegisters() {
 			typ := p.Type()
 			vreg := c.AllocateVReg(typ)
 			c.ssaValueToVRegs[pid] = vreg
-			c.ssaValueDefinitions[pid] = SSAValueDefinition{BlockParamValue: p, BlkParamVReg: vreg}
+			c.ssaValueDefinitions[pid] = SSAValueDefinition{V: p}
 			c.ssaTypeOfVRegID[vreg.ID()] = p.Type()
 		}
 
 		// Assigns each value to a virtual register produced by instructions.
 		for cur := blk.Root(); cur != nil; cur = cur.Next() {
 			r, rs := cur.Returns()
-			var N int
 			if r.Valid() {
 				id := r.ID()
 				ssaTyp := r.Type()
@@ -238,11 +237,10 @@ func (c *compiler) assignVirtualRegisters() {
 				c.ssaValueToVRegs[id] = vReg
 				c.ssaValueDefinitions[id] = SSAValueDefinition{
 					Instr:    cur,
-					N:        0,
+					V:        r,
 					RefCount: refCounts[id].RefCount,
 				}
 				c.ssaTypeOfVRegID[vReg.ID()] = ssaTyp
-				N++
 			}
 			for _, r := range rs {
 				id := r.ID()
@@ -251,11 +249,10 @@ func (c *compiler) assignVirtualRegisters() {
 				c.ssaValueToVRegs[id] = vReg
 				c.ssaValueDefinitions[id] = SSAValueDefinition{
 					Instr:    cur,
-					N:        N,
+					V:        r,
 					RefCount: refCounts[id].RefCount,
 				}
 				c.ssaTypeOfVRegID[vReg.ID()] = ssaTyp
-				N++
 			}
 		}
 	}
