@@ -46,7 +46,8 @@ func TestMachine_getOperand_Reg(t *testing.T) {
 		{
 			name: "block param",
 			setup: func(ctx *mockCompiler, builder ssa.Builder, m *machine) *backend.SSAValueDefinition {
-				return &backend.SSAValueDefinition{BlkParamVReg: raxVReg, Instr: nil, N: 0}
+				ctx.vRegMap[1234] = raxVReg
+				return &backend.SSAValueDefinition{V: 1234, Instr: nil}
 			},
 			exp: newOperandReg(raxVReg),
 		},
@@ -58,7 +59,7 @@ func TestMachine_getOperand_Reg(t *testing.T) {
 				instr.AsIconst32(0xf00000f)
 				builder.InsertInstruction(instr)
 				ctx.vRegCounter = 99
-				return &backend.SSAValueDefinition{Instr: instr, N: 0}
+				return &backend.SSAValueDefinition{Instr: instr}
 			},
 			exp:          newOperandReg(regalloc.VReg(100).SetRegType(regalloc.RegTypeInt)),
 			instructions: []string{"movl $251658255, %r100d?"},
@@ -73,7 +74,7 @@ func TestMachine_getOperand_Reg(t *testing.T) {
 				builder.InsertInstruction(c)
 				r := c.Return()
 				ctx.vRegMap[r] = regalloc.VReg(50)
-				return &backend.SSAValueDefinition{Instr: c, N: 0}
+				return &backend.SSAValueDefinition{V: r}
 			},
 			exp: newOperandReg(regalloc.VReg(50)),
 		},
@@ -87,7 +88,7 @@ func TestMachine_getOperand_Reg(t *testing.T) {
 				builder.InsertInstruction(c)
 				_, rs := c.Returns()
 				ctx.vRegMap[rs[1]] = regalloc.VReg(50)
-				return &backend.SSAValueDefinition{Instr: c, N: 2}
+				return &backend.SSAValueDefinition{V: rs[1]}
 			},
 			exp: newOperandReg(regalloc.VReg(50)),
 		},
@@ -112,7 +113,8 @@ func TestMachine_getOperand_Imm32_Reg(t *testing.T) {
 		{
 			name: "block param falls back to getOperand_Reg",
 			setup: func(ctx *mockCompiler, builder ssa.Builder, m *machine) *backend.SSAValueDefinition {
-				return &backend.SSAValueDefinition{BlkParamVReg: raxVReg, Instr: nil, N: 0}
+				ctx.vRegMap[1234] = raxVReg
+				return &backend.SSAValueDefinition{V: 1234, Instr: nil}
 			},
 			exp: newOperandReg(raxVReg),
 		},
@@ -124,7 +126,7 @@ func TestMachine_getOperand_Imm32_Reg(t *testing.T) {
 				builder.InsertInstruction(instr)
 				ctx.vRegCounter = 99
 				ctx.currentGID = 0xff // const can be merged anytime, regardless of the group id.
-				return &backend.SSAValueDefinition{Instr: instr, N: 0}
+				return &backend.SSAValueDefinition{Instr: instr}
 			},
 			exp: newOperandImm32(0xf00000f),
 		},
@@ -155,7 +157,8 @@ func Test_machine_getOperand_Mem_Imm32_Reg(t *testing.T) {
 		{
 			name: "block param falls back to getOperand_Imm32_Reg",
 			setup: func(ctx *mockCompiler, builder ssa.Builder, m *machine) *backend.SSAValueDefinition {
-				return &backend.SSAValueDefinition{BlkParamVReg: raxVReg, Instr: nil, N: 0}
+				ctx.vRegMap[1234] = raxVReg
+				return &backend.SSAValueDefinition{V: 1234, Instr: nil}
 			},
 			exp: newOperandReg(raxVReg),
 		},
@@ -164,10 +167,11 @@ func Test_machine_getOperand_Mem_Imm32_Reg(t *testing.T) {
 			setup: func(ctx *mockCompiler, builder ssa.Builder, m *machine) *backend.SSAValueDefinition {
 				blk := builder.CurrentBlock()
 				ptr := blk.AddParam(builder, ssa.TypeI64)
-				ctx.definitions[ptr] = &backend.SSAValueDefinition{BlockParamValue: ptr, BlkParamVReg: raxVReg}
+				ctx.vRegMap[ptr] = raxVReg
+				ctx.definitions[ptr] = &backend.SSAValueDefinition{V: ptr}
 				instr := builder.AllocateInstruction()
 				instr.AsLoad(ptr, 123, ssa.TypeI64).Insert(builder)
-				return &backend.SSAValueDefinition{Instr: instr, N: 0}
+				return &backend.SSAValueDefinition{Instr: instr}
 			},
 			exp: newOperandMem(newAmodeImmReg(123, raxVReg)),
 		},
@@ -178,7 +182,7 @@ func Test_machine_getOperand_Mem_Imm32_Reg(t *testing.T) {
 				instr := builder.AllocateInstruction()
 				instr.AsLoad(iconst.Return(), 123, ssa.TypeI64).Insert(builder)
 				ctx.definitions[iconst.Return()] = &backend.SSAValueDefinition{Instr: iconst}
-				return &backend.SSAValueDefinition{Instr: instr, N: 0}
+				return &backend.SSAValueDefinition{Instr: instr}
 			},
 			instructions: []string{
 				"movabsq $579, %r1?", // r1 := 123+456
@@ -197,7 +201,7 @@ func Test_machine_getOperand_Mem_Imm32_Reg(t *testing.T) {
 				ctx.definitions[uextend.Return()] = &backend.SSAValueDefinition{Instr: uextend}
 				ctx.definitions[iconst.Return()] = &backend.SSAValueDefinition{Instr: iconst}
 
-				return &backend.SSAValueDefinition{Instr: instr, N: 0}
+				return &backend.SSAValueDefinition{Instr: instr}
 			},
 			instructions: []string{
 				fmt.Sprintf("movabsq $%d, %%r1?", 0xffffff+123),
@@ -216,7 +220,7 @@ func Test_machine_getOperand_Mem_Imm32_Reg(t *testing.T) {
 				ctx.definitions[uextend.Return()] = &backend.SSAValueDefinition{Instr: uextend}
 				ctx.definitions[iconst.Return()] = &backend.SSAValueDefinition{Instr: iconst}
 
-				return &backend.SSAValueDefinition{Instr: instr, N: 0}
+				return &backend.SSAValueDefinition{Instr: instr}
 			},
 			instructions: []string{
 				fmt.Sprintf("movabsq $%d, %%r1?", 456+123),
@@ -233,11 +237,12 @@ func Test_machine_getOperand_Mem_Imm32_Reg(t *testing.T) {
 				instr := builder.AllocateInstruction()
 				instr.AsLoad(iadd.Return(), 789, ssa.TypeI64).Insert(builder)
 
-				ctx.definitions[p] = &backend.SSAValueDefinition{BlockParamValue: p, BlkParamVReg: raxVReg}
+				ctx.vRegMap[p] = raxVReg
+				ctx.definitions[p] = &backend.SSAValueDefinition{V: p}
 				ctx.definitions[iconst.Return()] = &backend.SSAValueDefinition{Instr: iconst}
 				ctx.definitions[iadd.Return()] = &backend.SSAValueDefinition{Instr: iadd}
 
-				return &backend.SSAValueDefinition{Instr: instr, N: 0}
+				return &backend.SSAValueDefinition{Instr: instr}
 			},
 			exp: newOperandMem(newAmodeImmReg(456+789, raxVReg)),
 		},
@@ -255,7 +260,7 @@ func Test_machine_getOperand_Mem_Imm32_Reg(t *testing.T) {
 				ctx.definitions[iconst2.Return()] = &backend.SSAValueDefinition{Instr: iconst2}
 				ctx.definitions[iadd.Return()] = &backend.SSAValueDefinition{Instr: iadd}
 
-				return &backend.SSAValueDefinition{Instr: instr, N: 0}
+				return &backend.SSAValueDefinition{Instr: instr}
 			},
 			instructions: []string{
 				fmt.Sprintf("movabsq $%d, %%r1?", 123+456+789),
@@ -361,7 +366,8 @@ L2:
 			p := b.CurrentBlock().AddParam(b, tc.typ)
 			m.cpuFeatures = tc.cpuFlags
 
-			ctx.definitions[p] = &backend.SSAValueDefinition{BlockParamValue: p, BlkParamVReg: raxVReg}
+			ctx.vRegMap[p] = raxVReg
+			ctx.definitions[p] = &backend.SSAValueDefinition{V: p}
 			ctx.vRegMap[0] = rcxVReg
 			instr := &ssa.Instruction{}
 			instr.AsClz(p)
@@ -434,7 +440,8 @@ L2:
 			p := b.CurrentBlock().AddParam(b, tc.typ)
 			m.cpuFeatures = tc.cpuFlags
 
-			ctx.definitions[p] = &backend.SSAValueDefinition{BlockParamValue: p, BlkParamVReg: raxVReg}
+			ctx.vRegMap[p] = raxVReg
+			ctx.definitions[p] = &backend.SSAValueDefinition{V: p}
 			ctx.vRegMap[0] = rcxVReg
 			instr := &ssa.Instruction{}
 			instr.AsCtz(p)

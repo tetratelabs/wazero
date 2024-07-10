@@ -253,11 +253,11 @@ func (a *amode) String() string {
 }
 
 func (m *machine) getOperand_Mem_Reg(def *backend.SSAValueDefinition) (op operand) {
-	if def.IsFromBlockParam() {
-		return newOperandReg(def.BlkParamVReg)
+	if !def.IsFromInstr() {
+		return newOperandReg(m.c.VRegOf(def.V))
 	}
 
-	if def.SSAValue().Type() == ssa.TypeV128 {
+	if def.V.Type() == ssa.TypeV128 {
 		// SIMD instructions require strict memory alignment, so we don't support the memory operand for V128 at the moment.
 		return m.getOperand_Reg(def)
 	}
@@ -273,8 +273,8 @@ func (m *machine) getOperand_Mem_Reg(def *backend.SSAValueDefinition) (op operan
 }
 
 func (m *machine) getOperand_Mem_Imm32_Reg(def *backend.SSAValueDefinition) (op operand) {
-	if def.IsFromBlockParam() {
-		return newOperandReg(def.BlkParamVReg)
+	if !def.IsFromInstr() {
+		return newOperandReg(m.c.VRegOf(def.V))
 	}
 
 	if m.c.MatchInstr(def, ssa.OpcodeLoad) {
@@ -288,8 +288,8 @@ func (m *machine) getOperand_Mem_Imm32_Reg(def *backend.SSAValueDefinition) (op 
 }
 
 func (m *machine) getOperand_Imm32_Reg(def *backend.SSAValueDefinition) (op operand) {
-	if def.IsFromBlockParam() {
-		return newOperandReg(def.BlkParamVReg)
+	if !def.IsFromInstr() {
+		return newOperandReg(m.c.VRegOf(def.V))
 	}
 
 	instr := def.Instr
@@ -325,22 +325,12 @@ func asImm32(val uint64, allowSignExt bool) (uint32, bool) {
 
 func (m *machine) getOperand_Reg(def *backend.SSAValueDefinition) (op operand) {
 	var v regalloc.VReg
-	if def.IsFromBlockParam() {
-		v = def.BlkParamVReg
+	if instr := def.Instr; instr != nil && instr.Constant() {
+		// We inline all the constant instructions so that we could reduce the register usage.
+		v = m.lowerConstant(instr)
+		instr.MarkLowered()
 	} else {
-		instr := def.Instr
-		if instr.Constant() {
-			// We inline all the constant instructions so that we could reduce the register usage.
-			v = m.lowerConstant(instr)
-			instr.MarkLowered()
-		} else {
-			if n := def.N; n == 0 {
-				v = m.c.VRegOf(instr.Return())
-			} else {
-				_, rs := instr.Returns()
-				v = m.c.VRegOf(rs[n-1])
-			}
-		}
+		v = m.c.VRegOf(def.V)
 	}
 	return newOperandReg(v)
 }
