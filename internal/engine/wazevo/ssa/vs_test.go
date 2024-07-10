@@ -1,8 +1,9 @@
 package ssa
 
 import (
-	"github.com/tetratelabs/wazero/internal/testing/require"
 	"testing"
+
+	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
 func TestValue_InstructionID(t *testing.T) {
