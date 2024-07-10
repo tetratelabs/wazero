@@ -182,11 +182,10 @@ type builder struct {
 	loopNestingForestRoots []BasicBlock
 
 	// The followings are used for optimization passes/deterministic compilation.
-	instStack            []*Instruction
-	valueIDToInstruction []*Instruction
-	blkStack             []*basicBlock
-	blkStack2            []*basicBlock
-	redundantParams      []redundantParam
+	instStack       []*Instruction
+	blkStack        []*basicBlock
+	blkStack2       []*basicBlock
+	redundantParams []redundantParam
 
 	// blockIterCur is used to implement blockIteratorBegin and blockIteratorNext.
 	blockIterCur int
@@ -291,7 +290,6 @@ func (b *builder) Init(s *Signature) {
 	for v := ValueID(0); v < b.nextValueID; v++ {
 		delete(b.valueAnnotations, v)
 		b.valuesInfo[v] = ValueInfo{alias: ValueInvalid}
-		b.valueIDToInstruction[v] = nil
 	}
 	b.nextValueID = 0
 	b.reversePostOrderedBasicBlocks = b.reversePostOrderedBasicBlocks[:0]
@@ -397,7 +395,7 @@ func (b *builder) InsertInstruction(instr *Instruction) {
 	}
 
 	r1 := b.allocateValue(t1)
-	instr.rValue = r1
+	instr.rValue = r1.setInstructionID(instr.id)
 
 	tsl := len(ts)
 	if tsl == 0 {
@@ -406,7 +404,8 @@ func (b *builder) InsertInstruction(instr *Instruction) {
 
 	rValues := b.varLengthPool.Allocate(tsl)
 	for i := 0; i < tsl; i++ {
-		rValues = rValues.Append(&b.varLengthPool, b.allocateValue(ts[i]))
+		rn := b.allocateValue(ts[i])
+		rValues = rValues.Append(&b.varLengthPool, rn.setInstructionID(instr.id))
 	}
 	instr.rValues = rValues
 }
@@ -775,4 +774,14 @@ func (b *builder) LoopNestingForestRoots() []BasicBlock {
 // LowestCommonAncestor implements Builder.LowestCommonAncestor.
 func (b *builder) LowestCommonAncestor(blk1, blk2 BasicBlock) BasicBlock {
 	return b.sparseTree.findLCA(blk1.ID(), blk2.ID())
+}
+
+// instructionOfValue returns the instruction that produces the given Value, or nil
+// if the Value is not produced by any instruction.
+func (b *builder) instructionOfValue(v Value) *Instruction {
+	instrID := v.instructionID()
+	if instrID <= 0 {
+		return nil
+	}
+	return b.instructionsPool.View(instrID - 1)
 }

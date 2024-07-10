@@ -38,7 +38,8 @@ func (v Variable) getType() Type {
 // Value represents an SSA value with a type information. The relationship with Variable is 1: N (including 0),
 // that means there might be multiple Variable(s) for a Value.
 //
-// Higher 32-bit is used to store Type for this value.
+// 32 to 59-bit is used to store the unique identifier of the Instruction that generates this value if any.
+// 60 to 63-bit is used to store Type for this value.
 type Value uint64
 
 // ValueID is the lower 32bit of Value, which is the pure identifier of Value without type info.
@@ -80,7 +81,7 @@ func (v Value) Valid() bool {
 
 // Type returns the Type of this value.
 func (v Value) Type() Type {
-	return Type(v >> 32)
+	return Type(v >> 60)
 }
 
 // ID returns the valueID of this value.
@@ -90,7 +91,20 @@ func (v Value) ID() ValueID {
 
 // setType sets a type to this Value and returns the updated Value.
 func (v Value) setType(typ Type) Value {
-	return v | Value(typ)<<32
+	return v | Value(typ)<<60
+}
+
+// setInstructionID sets an Instruction.id to this Value and returns the updated Value.
+func (v Value) setInstructionID(id int) Value {
+	if id < 0 || uint(id) >= 1<<28 {
+		panic(fmt.Sprintf("Too large instruction ID: %d", id))
+	}
+	return v | Value(id)<<32
+}
+
+// instructionID() returns the Instruction.id of this Value.
+func (v Value) instructionID() int {
+	return int(v>>32) & 0x0fffffff
 }
 
 // Values is a slice of Value. Use this instead of []Value to reuse the underlying memory.
