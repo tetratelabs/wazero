@@ -152,12 +152,12 @@ func (c *compiler) lowerBlockArguments(args []ssa.Value, succ ssa.BasicBlock) {
 		src := args[i]
 
 		dstReg := c.VRegOf(dst)
-		srcDef := c.ssaValueDefinitions[src.ID()]
-		if srcDef.IsFromInstr() && srcDef.Instr.Constant() {
+		srcInstr := c.ssaBuilder.InstructionOfValue(src)
+		if srcInstr != nil && srcInstr.Constant() {
 			c.constEdges = append(c.constEdges, struct {
 				cInst *ssa.Instruction
 				dst   regalloc.VReg
-			}{cInst: srcDef.Instr, dst: dstReg})
+			}{cInst: srcInstr, dst: dstReg})
 		} else {
 			srcReg := c.VRegOf(src)
 			// Even when the src=dst, insert the move so that we can keep such registers keep-alive.

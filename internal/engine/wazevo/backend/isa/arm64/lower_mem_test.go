@@ -297,28 +297,28 @@ func TestMachine_collectAddends(t *testing.T) {
 	addParam := func(ctx *mockCompiler, b ssa.Builder, typ ssa.Type) ssa.Value {
 		p := b.CurrentBlock().AddParam(b, typ)
 		ctx.vRegMap[p] = v1000
-		ctx.definitions[p] = &backend.SSAValueDefinition{V: p}
+		ctx.definitions[p] = backend.SSAValueDefinition{V: p}
 		return p
 	}
 	insertI32Const := func(m *mockCompiler, b ssa.Builder, v uint32) *ssa.Instruction {
 		inst := b.AllocateInstruction()
 		inst.AsIconst32(v)
 		b.InsertInstruction(inst)
-		m.definitions[inst.Return()] = &backend.SSAValueDefinition{Instr: inst}
+		m.definitions[inst.Return()] = backend.SSAValueDefinition{Instr: inst}
 		return inst
 	}
 	insertI64Const := func(m *mockCompiler, b ssa.Builder, v uint64) *ssa.Instruction {
 		inst := b.AllocateInstruction()
 		inst.AsIconst64(v)
 		b.InsertInstruction(inst)
-		m.definitions[inst.Return()] = &backend.SSAValueDefinition{Instr: inst, V: inst.Return()}
+		m.definitions[inst.Return()] = backend.SSAValueDefinition{Instr: inst, V: inst.Return()}
 		return inst
 	}
 	insertIadd := func(m *mockCompiler, b ssa.Builder, lhs, rhs ssa.Value) *ssa.Instruction {
 		inst := b.AllocateInstruction()
 		inst.AsIadd(lhs, rhs)
 		b.InsertInstruction(inst)
-		m.definitions[inst.Return()] = &backend.SSAValueDefinition{Instr: inst, V: inst.Return()}
+		m.definitions[inst.Return()] = backend.SSAValueDefinition{Instr: inst, V: inst.Return()}
 		return inst
 	}
 	insertExt := func(m *mockCompiler, b ssa.Builder, v ssa.Value, from, to byte, signed bool) *ssa.Instruction {
@@ -329,7 +329,7 @@ func TestMachine_collectAddends(t *testing.T) {
 			inst.AsUExtend(v, from, to)
 		}
 		b.InsertInstruction(inst)
-		m.definitions[inst.Return()] = &backend.SSAValueDefinition{Instr: inst, V: v}
+		m.definitions[inst.Return()] = backend.SSAValueDefinition{Instr: inst, V: v}
 		return inst
 	}
 

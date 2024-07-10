@@ -55,7 +55,7 @@ type mockCompiler struct {
 	currentGID  ssa.InstructionGroupID
 	vRegCounter int
 	vRegMap     map[ssa.Value]regalloc.VReg
-	definitions map[ssa.Value]*backend.SSAValueDefinition
+	definitions map[ssa.Value]backend.SSAValueDefinition
 	sigs        map[ssa.SignatureID]*ssa.Signature
 	typeOf      map[regalloc.VRegID]ssa.Type
 	ssaBuilder  ssa.Builder
@@ -108,7 +108,7 @@ func (m *mockCompiler) Init()                                {}
 func newMockCompilationContext() *mockCompiler {
 	return &mockCompiler{
 		vRegMap:     make(map[ssa.Value]regalloc.VReg),
-		definitions: make(map[ssa.Value]*backend.SSAValueDefinition),
+		definitions: make(map[ssa.Value]backend.SSAValueDefinition),
 		typeOf:      map[regalloc.VRegID]ssa.Type{},
 	}
 }
@@ -128,10 +128,10 @@ func (m *mockCompiler) AllocateVReg(typ ssa.Type) regalloc.VReg {
 }
 
 // ValueDefinition implements backend.Compiler.
-func (m *mockCompiler) ValueDefinition(value ssa.Value) *backend.SSAValueDefinition {
+func (m *mockCompiler) ValueDefinition(value ssa.Value) backend.SSAValueDefinition {
 	definition, exists := m.definitions[value]
 	if !exists {
-		return nil
+		return backend.SSAValueDefinition{}
 	}
 	return definition
 }
@@ -146,7 +146,7 @@ func (m *mockCompiler) VRegOf(value ssa.Value) regalloc.VReg {
 }
 
 // MatchInstr implements backend.Compiler.
-func (m *mockCompiler) MatchInstr(def *backend.SSAValueDefinition, opcode ssa.Opcode) bool {
+func (m *mockCompiler) MatchInstr(def backend.SSAValueDefinition, opcode ssa.Opcode) bool {
 	instr := def.Instr
 	return def.IsFromInstr() &&
 		instr.Opcode() == opcode &&
@@ -155,7 +155,7 @@ func (m *mockCompiler) MatchInstr(def *backend.SSAValueDefinition, opcode ssa.Op
 }
 
 // MatchInstrOneOf implements backend.Compiler.
-func (m *mockCompiler) MatchInstrOneOf(def *backend.SSAValueDefinition, opcodes []ssa.Opcode) ssa.Opcode {
+func (m *mockCompiler) MatchInstrOneOf(def backend.SSAValueDefinition, opcodes []ssa.Opcode) ssa.Opcode {
 	for _, opcode := range opcodes {
 		if m.MatchInstr(def, opcode) {
 			return opcode

@@ -57,7 +57,6 @@ func TestCompiler_lowerBlockArguments(t *testing.T) {
 				}
 
 				c := newCompiler(context.Background(), m, builder)
-				c.ssaValueDefinitions = []SSAValueDefinition{{Instr: i1}, {Instr: i2}, {Instr: f1}, {Instr: f2}}
 				c.ssaValueToVRegs = []regalloc.VReg{0, 1, 2, 3, 4, 5, 6, 7}
 				return c, []ssa.Value{i1.Return(), i2.Return(), f1.Return(), f2.Return()}, succ, func(t *testing.T) {
 					require.Equal(t, 4, len(insertedConstInstructions))
@@ -85,7 +84,6 @@ func TestCompiler_lowerBlockArguments(t *testing.T) {
 					insertMoves = append(insertMoves, struct{ src, dst regalloc.VReg }{src: src, dst: dst})
 				}}
 				c := newCompiler(context.Background(), m, builder)
-				c.ssaValueDefinitions = []SSAValueDefinition{{}, {}, {}, {}}
 				c.ssaValueToVRegs = []regalloc.VReg{0, 1, 2, 3}
 				c.nextVRegID = 100 // Temporary reg should start with 100.
 				return c, []ssa.Value{v2, v1, v3 /* Swaps v1, v2 and pass v3 as-is. */}, blk, func(t *testing.T) {
@@ -123,7 +121,6 @@ func TestCompiler_lowerBlockArguments(t *testing.T) {
 					insertMoves = append(insertMoves, struct{ src, dst regalloc.VReg }{src: src, dst: dst})
 				}}
 				c := newCompiler(context.Background(), m, builder)
-				c.ssaValueDefinitions = []SSAValueDefinition{{}, {}}
 				c.ssaValueToVRegs = []regalloc.VReg{0, 1}
 				return c, []ssa.Value{add.Return()}, blk, func(t *testing.T) {
 					require.Equal(t, 1, len(insertMoves))

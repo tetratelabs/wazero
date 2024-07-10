@@ -182,9 +182,9 @@ func (m *machine) LowerReturns(rets []ssa.Value) {
 
 // callerGenVRegToFunctionArg is the opposite of GenFunctionArgToVReg, which is used to generate the
 // caller side of the function call.
-func (m *machine) callerGenVRegToFunctionArg(a *backend.FunctionABI, argIndex int, reg regalloc.VReg, def *backend.SSAValueDefinition, slotBegin int64) {
+func (m *machine) callerGenVRegToFunctionArg(a *backend.FunctionABI, argIndex int, reg regalloc.VReg, def backend.SSAValueDefinition, slotBegin int64) {
 	arg := &a.Args[argIndex]
-	if def != nil && def.IsFromInstr() {
+	if def.IsFromInstr() {
 		// Constant instructions are inlined.
 		if inst := def.Instr; inst.Constant() {
 			val := inst.Return()

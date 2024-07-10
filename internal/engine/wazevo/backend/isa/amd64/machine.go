@@ -1601,21 +1601,24 @@ func (m *machine) lowerExitIfTrueWithCode(execCtx regalloc.VReg, cond ssa.Value,
 	jmpIf.asJmpIf(condFromSSAIntCmpCond(c).invert(), newOperandLabel(l))
 }
 
-func (m *machine) tryLowerBandToFlag(x, y *backend.SSAValueDefinition) (ok bool) {
-	var target *backend.SSAValueDefinition
+func (m *machine) tryLowerBandToFlag(x, y backend.SSAValueDefinition) (ok bool) {
+	var target backend.SSAValueDefinition
+	var got bool
 	if x.IsFromInstr() && x.Instr.Constant() && x.Instr.ConstantVal() == 0 {
 		if m.c.MatchInstr(y, ssa.OpcodeBand) {
 			target = y
+			got = true
 		}
 	}
 
 	if y.IsFromInstr() && y.Instr.Constant() && y.Instr.ConstantVal() == 0 {
 		if m.c.MatchInstr(x, ssa.OpcodeBand) {
 			target = x
+			got = true
 		}
 	}
 
-	if target == nil {
+	if !got {
 		return false
 	}
 
@@ -1947,9 +1950,9 @@ func (m *machine) lowerCall(si *ssa.Instruction) {
 
 // callerGenVRegToFunctionArg is the opposite of GenFunctionArgToVReg, which is used to generate the
 // caller side of the function call.
-func (m *machine) callerGenVRegToFunctionArg(a *backend.FunctionABI, argIndex int, reg regalloc.VReg, def *backend.SSAValueDefinition, stackSlotSize int64) {
+func (m *machine) callerGenVRegToFunctionArg(a *backend.FunctionABI, argIndex int, reg regalloc.VReg, def backend.SSAValueDefinition, stackSlotSize int64) {
 	arg := &a.Args[argIndex]
-	if def != nil && def.IsFromInstr() {
+	if def.IsFromInstr() {
 		// Constant instructions are inlined.
 		if inst := def.Instr; inst.Constant() {
 			m.insertLoadConstant(inst, reg)
@@ -2210,7 +2213,7 @@ func (m *machine) ResolveRelocations(refToBinaryOffset []int, binary []byte, rel
 // CallTrampolineIslandInfo implements backend.Machine CallTrampolineIslandInfo.
 func (m *machine) CallTrampolineIslandInfo(_ int) (_, _ int, _ error) { return }
 
-func (m *machine) lowerIcmpToFlag(xd, yd *backend.SSAValueDefinition, _64 bool) {
+func (m *machine) lowerIcmpToFlag(xd, yd backend.SSAValueDefinition, _64 bool) {
 	x := m.getOperand_Reg(xd)
 	y := m.getOperand_Mem_Imm32_Reg(yd)
 	cmp := m.allocateInstr().asCmpRmiR(true, y, x.reg(), _64)

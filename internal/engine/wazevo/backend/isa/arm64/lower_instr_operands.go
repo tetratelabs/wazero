@@ -162,7 +162,7 @@ func (o operand) assignReg(v regalloc.VReg) operand {
 //
 // `mode` is used to extend the operand if the bit length is smaller than mode.bits().
 // If the operand can be expressed as operandKindImm12, `mode` is ignored.
-func (m *machine) getOperand_Imm12_ER_SR_NR(def *backend.SSAValueDefinition, mode extMode) (op operand) {
+func (m *machine) getOperand_Imm12_ER_SR_NR(def backend.SSAValueDefinition, mode extMode) (op operand) {
 	if !def.IsFromInstr() {
 		return operandNR(m.compiler.VRegOf(def.V))
 	}
@@ -179,7 +179,7 @@ func (m *machine) getOperand_Imm12_ER_SR_NR(def *backend.SSAValueDefinition, mod
 
 // getOperand_MaybeNegatedImm12_ER_SR_NR is almost the same as getOperand_Imm12_ER_SR_NR, but this might negate the immediate value.
 // If the immediate value is negated, the second return value is true, otherwise always false.
-func (m *machine) getOperand_MaybeNegatedImm12_ER_SR_NR(def *backend.SSAValueDefinition, mode extMode) (op operand, negatedImm12 bool) {
+func (m *machine) getOperand_MaybeNegatedImm12_ER_SR_NR(def backend.SSAValueDefinition, mode extMode) (op operand, negatedImm12 bool) {
 	if !def.IsFromInstr() {
 		return operandNR(m.compiler.VRegOf(def.V)), false
 	}
@@ -208,7 +208,7 @@ func (m *machine) getOperand_MaybeNegatedImm12_ER_SR_NR(def *backend.SSAValueDef
 // ensureValueNR returns an operand of either operandKindER, operandKindSR, or operandKindNR from the given value (defined by `def).
 //
 // `mode` is used to extend the operand if the bit length is smaller than mode.bits().
-func (m *machine) getOperand_ER_SR_NR(def *backend.SSAValueDefinition, mode extMode) (op operand) {
+func (m *machine) getOperand_ER_SR_NR(def backend.SSAValueDefinition, mode extMode) (op operand) {
 	if !def.IsFromInstr() {
 		return operandNR(m.compiler.VRegOf(def.V))
 	}
@@ -251,7 +251,7 @@ func (m *machine) getOperand_ER_SR_NR(def *backend.SSAValueDefinition, mode extM
 // ensureValueNR returns an operand of either operandKindSR or operandKindNR from the given value (defined by `def).
 //
 // `mode` is used to extend the operand if the bit length is smaller than mode.bits().
-func (m *machine) getOperand_SR_NR(def *backend.SSAValueDefinition, mode extMode) (op operand) {
+func (m *machine) getOperand_SR_NR(def backend.SSAValueDefinition, mode extMode) (op operand) {
 	if !def.IsFromInstr() {
 		return operandNR(m.compiler.VRegOf(def.V))
 	}
@@ -273,7 +273,7 @@ func (m *machine) getOperand_SR_NR(def *backend.SSAValueDefinition, mode extMode
 }
 
 // getOperand_ShiftImm_NR returns an operand of either operandKindShiftImm or operandKindNR from the given value (defined by `def).
-func (m *machine) getOperand_ShiftImm_NR(def *backend.SSAValueDefinition, mode extMode, shiftBitWidth byte) (op operand) {
+func (m *machine) getOperand_ShiftImm_NR(def backend.SSAValueDefinition, mode extMode, shiftBitWidth byte) (op operand) {
 	if !def.IsFromInstr() {
 		return operandNR(m.compiler.VRegOf(def.V))
 	}
@@ -289,7 +289,7 @@ func (m *machine) getOperand_ShiftImm_NR(def *backend.SSAValueDefinition, mode e
 // ensureValueNR returns an operand of operandKindNR from the given value (defined by `def).
 //
 // `mode` is used to extend the operand if the bit length is smaller than mode.bits().
-func (m *machine) getOperand_NR(def *backend.SSAValueDefinition, mode extMode) (op operand) {
+func (m *machine) getOperand_NR(def backend.SSAValueDefinition, mode extMode) (op operand) {
 	var v regalloc.VReg
 	if def.IsFromInstr() && def.Instr.Constant() {
 		// We inline all the constant instructions so that we could reduce the register usage.

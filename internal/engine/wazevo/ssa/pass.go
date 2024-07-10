@@ -281,28 +281,28 @@ func passDeadCodeEliminationOpt(b *builder) {
 
 		v1, v2, v3, vs := live.Args()
 		if v1.Valid() {
-			producingInst := b.instructionOfValue(v1)
+			producingInst := b.InstructionOfValue(v1)
 			if producingInst != nil {
 				liveInstructions = append(liveInstructions, producingInst)
 			}
 		}
 
 		if v2.Valid() {
-			producingInst := b.instructionOfValue(v2)
+			producingInst := b.InstructionOfValue(v2)
 			if producingInst != nil {
 				liveInstructions = append(liveInstructions, producingInst)
 			}
 		}
 
 		if v3.Valid() {
-			producingInst := b.instructionOfValue(v3)
+			producingInst := b.InstructionOfValue(v3)
 			if producingInst != nil {
 				liveInstructions = append(liveInstructions, producingInst)
 			}
 		}
 
 		for _, v := range vs {
-			producingInst := b.instructionOfValue(v)
+			producingInst := b.InstructionOfValue(v)
 			if producingInst != nil {
 				liveInstructions = append(liveInstructions, producingInst)
 			}
@@ -362,7 +362,7 @@ func passNopInstElimination(b *builder) {
 			// TODO: add more logics here.
 			case OpcodeIshl, OpcodeSshr, OpcodeUshr:
 				x, amount := cur.Arg2()
-				definingInst := b.instructionOfValue(amount)
+				definingInst := b.InstructionOfValue(amount)
 				if definingInst == nil {
 					// If there's no defining instruction, that means the amount is coming from the parameter.
 					continue

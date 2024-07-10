@@ -252,7 +252,7 @@ func (a *amode) String() string {
 	}
 }
 
-func (m *machine) getOperand_Mem_Reg(def *backend.SSAValueDefinition) (op operand) {
+func (m *machine) getOperand_Mem_Reg(def backend.SSAValueDefinition) (op operand) {
 	if !def.IsFromInstr() {
 		return newOperandReg(m.c.VRegOf(def.V))
 	}
@@ -272,7 +272,7 @@ func (m *machine) getOperand_Mem_Reg(def *backend.SSAValueDefinition) (op operan
 	return m.getOperand_Reg(def)
 }
 
-func (m *machine) getOperand_Mem_Imm32_Reg(def *backend.SSAValueDefinition) (op operand) {
+func (m *machine) getOperand_Mem_Imm32_Reg(def backend.SSAValueDefinition) (op operand) {
 	if !def.IsFromInstr() {
 		return newOperandReg(m.c.VRegOf(def.V))
 	}
@@ -287,7 +287,7 @@ func (m *machine) getOperand_Mem_Imm32_Reg(def *backend.SSAValueDefinition) (op 
 	return m.getOperand_Imm32_Reg(def)
 }
 
-func (m *machine) getOperand_Imm32_Reg(def *backend.SSAValueDefinition) (op operand) {
+func (m *machine) getOperand_Imm32_Reg(def backend.SSAValueDefinition) (op operand) {
 	if !def.IsFromInstr() {
 		return newOperandReg(m.c.VRegOf(def.V))
 	}
@@ -323,7 +323,7 @@ func asImm32(val uint64, allowSignExt bool) (uint32, bool) {
 	return u32val, true
 }
 
-func (m *machine) getOperand_Reg(def *backend.SSAValueDefinition) (op operand) {
+func (m *machine) getOperand_Reg(def backend.SSAValueDefinition) (op operand) {
 	var v regalloc.VReg
 	if instr := def.Instr; instr != nil && instr.Constant() {
 		// We inline all the constant instructions so that we could reduce the register usage.

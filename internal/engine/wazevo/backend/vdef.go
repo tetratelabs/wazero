@@ -5,7 +5,6 @@ import (
 )
 
 // SSAValueDefinition represents a definition of an SSA value.
-// TODO: this eventually should be deleted.
 type SSAValueDefinition struct {
 	V ssa.Value
 	// Instr is not nil if this is a definition from an instruction.
@@ -14,6 +13,7 @@ type SSAValueDefinition struct {
 	RefCount uint32
 }
 
+// IsFromInstr returns true if this definition is from an instruction.
 func (d *SSAValueDefinition) IsFromInstr() bool {
 	return d.Instr != nil
 }
