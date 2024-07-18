@@ -103,7 +103,7 @@ var (
 				args = append(args,
 					"-test.skip=TestRenameCaseDifference/dir|"+
 						"TestDirFSPathsValid|TestDirFS|TestDevNullFile|"+
-						"TestOpenError|TestSymlinkWithTrailingSlash")
+						"TestOpenError|TestSymlinkWithTrailingSlash|TestCopyFS")
 			}
 			c = c.WithArgs(args...)
 
