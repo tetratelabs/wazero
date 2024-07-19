@@ -15,9 +15,9 @@
   (table 22 22 funcref)
 
   (global $__stack_pointer (mut i32) (i32.const 65536))
-  (func $stackSave (export "stackSave") (result i32)
+  (func $stackSave (export "emscripten_stack_get_current") (result i32)
     global.get $__stack_pointer)
-  (func $stackRestore (export "stackRestore") (param i32)
+  (func $stackRestore (export "_emscripten_stack_restore") (param i32)
     local.get 0
     global.set $__stack_pointer)
   (func $setThrew (export "setThrew") (param i32 i32))
