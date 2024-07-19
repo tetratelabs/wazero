@@ -110,21 +110,21 @@ func (v *InvokeFunc) Call(ctx context.Context, mod api.Module, stack []uint64) {
 	// indirection function calls in Emscripten JS is like this:
 	//
 	// function invoke_iii(index,a1,a2) {
-	//  var sp = stackSave();
+	//  var sp = emscripten_stack_get_current();
 	//  try {
 	//    return getWasmTableEntry(index)(a1,a2);
 	//  } catch(e) {
-	//    stackRestore(sp);
+	//    _emscripten_stack_restore(sp);
 	//    if (e !== e+0) throw e;
 	//    _setThrew(1, 0);
 	//  }
 	//}
 
-	// This is the equivalent of "var sp = stackSave();".
+	// This is the equivalent of "var sp = emscripten_stack_get_current();".
 	// We reuse savedStack to save allocations. We allocate with a size of 2
 	// here to accommodate for the input and output of setThrew.
 	var savedStack [2]uint64
-	callOrPanic(ctx, mod, "stackSave", savedStack[:])
+	callOrPanic(ctx, mod, "emscripten_stack_get_current", savedStack[:])
 
 	err := f.CallWithStack(ctx, stack)
 	if err != nil {
@@ -133,9 +133,9 @@ func (v *InvokeFunc) Call(ctx context.Context, mod api.Module, stack []uint64) {
 			panic(err)
 		}
 
-		// This is the equivalent of "stackRestore(sp);".
+		// This is the equivalent of "_emscripten_stack_restore(sp);".
 		// Do not overwrite err here to preserve the original error.
-		callOrPanic(ctx, mod, "stackRestore", savedStack[:])
+		callOrPanic(ctx, mod, "_emscripten_stack_restore", savedStack[:])
 
 		// If we encounter ThrowLongjmpError, this means that the C code did a
 		// longjmp, which in turn called _emscripten_throw_longjmp and that is
