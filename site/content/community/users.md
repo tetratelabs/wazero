@@ -43,11 +43,11 @@ considering their efforts before starting your own!
 
 ### Network
 
-| Name          | Description                                              |
-|:--------------|----------------------------------------------------------|
-| [Benthos][30] | implements 3rd party extension via [WASM processor][31]  |
-| [dapr][15]    | implements 3rd party extension via [WASM middleware][16] |
-| [mosn][9]     | implements 3rd party extension via [proxy-wasm][10]      |
+| Name                   | Description                                                                                          |
+|:-----------------------|------------------------------------------------------------------------------------------------------|
+| [Redpanda Connect][30] | implements 3rd party extension via [WASM processor][31] and [Redpanda Data Transform processor][45]  |
+| [dapr][15]             | implements 3rd party extension via [WASM middleware][16]                                             |
+| [mosn][9]              | implements 3rd party extension via [proxy-wasm][10]                                                  |
 
 ### Security
 
@@ -140,9 +140,9 @@ experience.
 
 [29]: https://github.com/stealthrocket/wazergo
 
-[30]: https://www.benthos.dev/
+[30]: https://docs.redpanda.com/redpanda-connect
 
-[31]: https://www.benthos.dev/docs/components/processors/wasm
+[31]: https://docs.redpanda.com/redpanda-connect/components/processors/wasm/
 
 [32]: https://github.com/stealthrocket/wzprof
 
@@ -169,3 +169,6 @@ experience.
 [43]: https://github.com/gen2brain/webp
 
 [44]: https://github.com/wesql/wescale
+
+[45]: https://docs.redpanda.com/redpanda-connect/components/processors/redpanda_data_transform/
+
