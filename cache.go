@@ -27,7 +27,7 @@ import (
 //   - The cache check happens before the compilation, so if multiple Goroutines are
 //     trying to compile the same module simultaneously, it is possible that they
 //     all compile the module. The design here is that the lock isn't held for the action "Compile"
-//     but only for saving the result. Therefore, we strongly recommend that the embedder
+//     but only for checking and saving the compiled result. Therefore, we strongly recommend that the embedder
 //     does the centralized compilation in a single goroutine to generate cache rather than
 //     trying to Compile in parallel for a single module.
 type CompilationCache interface{ api.Closer }
