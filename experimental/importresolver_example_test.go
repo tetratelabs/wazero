@@ -43,19 +43,20 @@ func Example_importResolver() {
 
 	wasi_snapshot_preview1.MustInstantiate(ctx, r)
 
+	idm, err := r.CompileModule(ctx, inoutdispatcherWasm)
+	if err != nil {
+		log.Panicln(err)
+	}
+	idcm, err := r.CompileModule(ctx, inoutdispatcherclientWasm)
+	if err != nil {
+		log.Panicln(err)
+	}
+
 	const numInstances = 3
 	mods := make([]*mod, numInstances)
 	for i := range mods {
 		mods[i] = &mod{}
 		m := mods[i]
-		idm, err := r.CompileModule(ctx, inoutdispatcherWasm)
-		if err != nil {
-			log.Panicln(err)
-		}
-		idcm, err := r.CompileModule(ctx, inoutdispatcherclientWasm)
-		if err != nil {
-			log.Panicln(err)
-		}
 
 		const inoutDispatcherModuleName = "inoutdispatcher"
 
