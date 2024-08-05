@@ -352,7 +352,7 @@ func (s *Store) instantiate(
 		return nil, err
 	}
 
-	if err = m.resolveImports(module); err != nil {
+	if err = m.resolveImports(ctx, module); err != nil {
 		return nil, err
 	}
 
@@ -410,12 +410,22 @@ func (s *Store) instantiate(
 	return
 }
 
-func (m *ModuleInstance) resolveImports(module *Module) (err error) {
+func (m *ModuleInstance) resolveImports(ctx context.Context, module *Module) (err error) {
+	// Check if ctx contains an ImportResolver.
+	resolveImport, _ := ctx.Value(expctxkeys.ImportResolverKey{}).(experimental.ImportResolver)
+
 	for moduleName, imports := range module.ImportPerModule {
 		var importedModule *ModuleInstance
-		importedModule, err = m.s.module(moduleName)
-		if err != nil {
-			return err
+		if resolveImport != nil {
+			if v := resolveImport(moduleName); v != nil {
+				importedModule = v.(*ModuleInstance)
+			}
+		}
+		if importedModule == nil {
+			importedModule, err = m.s.module(moduleName)
+			if err != nil {
+				return err
+			}
 		}
 
 		for _, i := range imports {

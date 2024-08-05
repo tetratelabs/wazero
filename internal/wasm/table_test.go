@@ -1,6 +1,7 @@
 package wasm
 
 import (
+	"context"
 	"math"
 	"testing"
 
@@ -29,7 +30,7 @@ func Test_resolveImports_table(t *testing.T) {
 			ModuleName: moduleName,
 		}
 		m := &ModuleInstance{Tables: make([]*TableInstance, 1), s: s}
-		err := m.resolveImports(&Module{
+		err := m.resolveImports(context.Background(), &Module{
 			ImportPerModule: map[string][]*Import{
 				moduleName: {{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: Table{Max: &max}}},
 			},
@@ -47,7 +48,7 @@ func Test_resolveImports_table(t *testing.T) {
 			ModuleName: moduleName,
 		}
 		m := &ModuleInstance{Tables: make([]*TableInstance, 1), s: s}
-		err := m.resolveImports(&Module{
+		err := m.resolveImports(context.Background(), &Module{
 			ImportPerModule: map[string][]*Import{
 				moduleName: {{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: importTableType}},
 			},
@@ -64,7 +65,7 @@ func Test_resolveImports_table(t *testing.T) {
 			ModuleName: moduleName,
 		}
 		m := &ModuleInstance{Tables: make([]*TableInstance, 1), s: s}
-		err := m.resolveImports(&Module{
+		err := m.resolveImports(context.Background(), &Module{
 			ImportPerModule: map[string][]*Import{
 				moduleName: {{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: importTableType}},
 			},
@@ -79,7 +80,7 @@ func Test_resolveImports_table(t *testing.T) {
 			ModuleName: moduleName,
 		}
 		m := &ModuleInstance{Tables: make([]*TableInstance, 1), s: s}
-		err := m.resolveImports(&Module{
+		err := m.resolveImports(context.Background(), &Module{
 			ImportPerModule: map[string][]*Import{
 				moduleName: {{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: Table{Type: RefTypeExternref}}},
 			},
