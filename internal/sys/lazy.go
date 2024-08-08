@@ -1,6 +1,8 @@
 package sys
 
 import (
+	"io/fs"
+
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/fsapi"
 	"github.com/tetratelabs/wazero/sys"
@@ -148,4 +150,23 @@ func (d *lazyDir) SetNonblock(bool) experimentalsys.Errno {
 // Poll implements the same method as documented on fsapi.File
 func (d *lazyDir) Poll(fsapi.Pflag, int32) (ready bool, errno experimentalsys.Errno) {
 	return false, experimentalsys.ENOSYS
+}
+
+func (d *lazyDir) OpenAt(
+	fs experimentalsys.FS,
+	path string,
+	flag experimentalsys.Oflag,
+	mode fs.FileMode,
+) (experimentalsys.File, experimentalsys.Errno) {
+	f, ok := d.file()
+	if !ok {
+		return nil, experimentalsys.EBADF
+	}
+
+	dir, ok := f.(fsapi.File)
+	if !ok {
+		return nil, experimentalsys.EBADF
+	}
+
+	return dir.OpenAt(fs, path, flag, mode)
 }
