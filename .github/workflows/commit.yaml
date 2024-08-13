@@ -14,7 +14,7 @@ on:
       - 'netlify.toml'
 
 env:  # Update this prior to requiring a higher minor version in go.mod
-  GO_VERSION: "1.23"
+  GO_VERSION: "1.22"
 
 defaults:
   run:  # use bash for all operating systems unless overridden
@@ -51,7 +51,7 @@ jobs:
             ~/.cache/golangci-lint
             ~/go/pkg/mod
             ~/go/bin
-          key: check-${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum', 'Makefile') }}
+          key: check-${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum', 'Makefile') }}
 
       - run: make build.spectest
 
