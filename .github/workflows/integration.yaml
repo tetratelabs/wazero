@@ -146,8 +146,8 @@ jobs:
 
       - uses: actions/setup-go@v4
         if: steps.binary-cache.outputs.cache-hit != 'true'
-        with:
-          go-version: ${{ env.GO_VERSION }}
+        with:  # Use version consistent with TinyGo.
+          go-version: "1.22"
 
       - name: Build Test Binaries
         if: steps.binary-cache.outputs.cache-hit != 'true'
