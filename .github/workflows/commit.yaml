@@ -14,7 +14,7 @@ on:
       - 'netlify.toml'
 
 env:  # Update this prior to requiring a higher minor version in go.mod
-  GO_VERSION: "1.22"
+  GO_VERSION: "1.23"
 
 defaults:
   run:  # use bash for all operating systems unless overridden
@@ -71,9 +71,8 @@ jobs:
         - os: macos-14
           arch: arm64
         go-version:
-          - "1.23.0-rc.2"  # Test the pending next version
-          - "1.22"  # Current Go version
-          - "1.20"  # Floor Go version of wazero (current - 2)
+          - "1.23"  # Current Go version
+          - "1.21"  # Floor Go version of wazero (current - 2)
 
     steps:
 
@@ -113,9 +112,8 @@ jobs:
       fail-fast: false  # don't fail fast as sometimes failures are arch/OS specific
       matrix:  # Use versions consistent with wazero's Go support policy.
         go-version:
-          - "1.23.0-rc.2"  # Test the pending next version
-          - "1.22"  # Current Go version
-          - "1.20"  # Floor Go version of wazero (current - 2)
+          - "1.23"  # Current Go version
+          - "1.21"  # Floor Go version of wazero (current - 2)
         arch:
           - "amd64"
           - "arm64"
@@ -161,7 +159,7 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions/setup-go@v2
         with:
-          go-version: "1.22"
+          go-version: "1.23"
       - uses: acifani/setup-tinygo@v2
         with:
           tinygo-version: "0.32.0"
