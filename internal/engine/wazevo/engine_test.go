@@ -189,6 +189,7 @@ func TestCompiledModule_functionIndexOf(t *testing.T) {
 	const executableAddr = 0xaaaa
 	var executable []byte
 	{
+		//nolint:staticcheck
 		hdr := (*reflect.SliceHeader)(unsafe.Pointer(&executable))
 		hdr.Data = executableAddr
 		hdr.Len = 0xffff

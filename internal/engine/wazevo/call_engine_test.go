@@ -45,6 +45,7 @@ func TestCallEngine_growStack(t *testing.T) {
 
 		var view []byte
 		{
+			//nolint:staticcheck
 			sh := (*reflect.SliceHeader)(unsafe.Pointer(&view))
 			sh.Data = newSP
 			sh.Len = 5
