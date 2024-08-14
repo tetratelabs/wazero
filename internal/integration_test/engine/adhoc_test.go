@@ -88,8 +88,10 @@ func TestEngineInterpreter(t *testing.T) {
 	runAllTests(t, tests, wazero.NewRuntimeConfigInterpreter().WithCloseOnContextDone(true), false)
 }
 
+type arbitrary struct{}
+
 // testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
-var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
+var testCtx = context.WithValue(context.Background(), arbitrary{}, "arbitrary")
 
 const i32, i64, f32, f64, v128 = wasm.ValueTypeI32, wasm.ValueTypeI64, wasm.ValueTypeF32, wasm.ValueTypeF64, wasm.ValueTypeV128
 
@@ -406,7 +408,8 @@ func testHostFuncMemory(t *testing.T, r wazero.Runtime) {
 
 // testNestedGoContext ensures context is updated when a function calls another.
 func testNestedGoContext(t *testing.T, r wazero.Runtime) {
-	nestedCtx := context.WithValue(context.Background(), struct{}{}, "nested")
+	type arbitrary struct{}
+	nestedCtx := context.WithValue(context.Background(), arbitrary{}, "arbitrary")
 
 	importedName := t.Name() + "-imported"
 	importingName := t.Name() + "-importing"

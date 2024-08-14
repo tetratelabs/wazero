@@ -19,10 +19,12 @@ import (
 	"github.com/tetratelabs/wazero/sys"
 )
 
+type arbitrary struct{}
+
 var (
 	binaryNamedZero = binaryencoding.EncodeModule(&wasm.Module{NameSection: &wasm.NameSection{ModuleName: "0"}})
 	// testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
-	testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
+	testCtx = context.WithValue(context.Background(), arbitrary{}, "arbitrary")
 )
 
 var _ context.Context = &HostContext{}

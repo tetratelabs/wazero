@@ -12,8 +12,10 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
+type arbitrary struct{}
+
 // testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
-var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
+var testCtx = context.WithValue(context.Background(), arbitrary{}, "arbitrary")
 
 func TestInterpreter_peekValues(t *testing.T) {
 	ce := &callEngine{}

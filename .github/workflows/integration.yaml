@@ -18,7 +18,7 @@ defaults:
     shell: bash
 
 env:  # Update this prior to requiring a higher minor version in go.mod
-  GO_VERSION: "1.22"
+  GO_VERSION: "1.23"
   TINYGO_VERSION: "0.32.0"
   ZIG_VERSION: "0.11.0"
   BINARYEN_VERSION: "116"
@@ -146,8 +146,8 @@ jobs:
 
       - uses: actions/setup-go@v4
         if: steps.binary-cache.outputs.cache-hit != 'true'
-        with:
-          go-version: ${{ env.GO_VERSION }}
+        with:  # Use version consistent with TinyGo.
+          go-version: "1.22"
 
       - name: Build Test Binaries
         if: steps.binary-cache.outputs.cache-hit != 'true'
@@ -276,9 +276,8 @@ jobs:
           name: Windows
           arch: amd64
         go-version:
+          - "1.23"
           - "1.21"
-          - "1.22"
-          - "1.23.0-rc.2"  # Test the pending next version
 
     steps:
       - id: setup-go

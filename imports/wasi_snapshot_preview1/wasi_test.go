@@ -18,8 +18,10 @@ import (
 	"github.com/tetratelabs/wazero/sys"
 )
 
+type arbitrary struct{}
+
 // testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
-var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
+var testCtx = context.WithValue(context.Background(), arbitrary{}, "arbitrary")
 
 const testMemoryPageSize = 1
 

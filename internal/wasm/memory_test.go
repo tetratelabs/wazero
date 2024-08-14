@@ -776,6 +776,7 @@ func TestMemoryInstance_Write_overflow(t *testing.T) {
 	}
 
 	buf := []byte{16, 0, 0, 4}
+	//nolint:staticcheck
 	header := (*reflect.SliceHeader)(unsafe.Pointer(&buf))
 	header.Len = int(huge)
 	header.Cap = int(huge)

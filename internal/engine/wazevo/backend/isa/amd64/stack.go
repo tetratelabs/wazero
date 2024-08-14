@@ -12,6 +12,7 @@ func stackView(rbp, top uintptr) []byte {
 	l := int(top - rbp)
 	var stackBuf []byte
 	{
+		//nolint:staticcheck
 		hdr := (*reflect.SliceHeader)(unsafe.Pointer(&stackBuf))
 		hdr.Data = rbp
 		hdr.Len = l
@@ -75,7 +76,7 @@ func GoCallStackView(stackPointerBeforeGoCall *uint64) []uint64 {
 	//                 (low address)
 	data := unsafe.Add(unsafe.Pointer(stackPointerBeforeGoCall), 8)
 	size := *stackPointerBeforeGoCall / 8
-	return unsafe.Slice((*uint64)(data), int(size))
+	return unsafe.Slice((*uint64)(data), size)
 }
 
 func AdjustClonedStack(oldRsp, oldTop, rsp, rbp, top uintptr) {

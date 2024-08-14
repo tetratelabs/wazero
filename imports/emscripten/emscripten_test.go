@@ -35,8 +35,10 @@ var growWasm []byte
 //go:embed testdata/invoke.wasm
 var invokeWasm []byte
 
+type arbitrary struct{}
+
 // testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
-var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
+var testCtx = context.WithValue(context.Background(), arbitrary{}, "arbitrary")
 
 // TestGrow is an integration test until we have an Emscripten example.
 func TestGrow(t *testing.T) {

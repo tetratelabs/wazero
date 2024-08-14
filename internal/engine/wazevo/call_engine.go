@@ -554,6 +554,7 @@ func (c *callEngine) cloneStack(l uintptr) (newSP, newFP, newTop uintptr, newSta
 	// Copy the existing contents in the previous Go-allocated stack into the new one.
 	var prevStackAligned, newStackAligned []byte
 	{
+		//nolint:staticcheck
 		sh := (*reflect.SliceHeader)(unsafe.Pointer(&prevStackAligned))
 		sh.Data = c.stackTop - relSp
 		sh.Len = int(relSp)
@@ -563,6 +564,7 @@ func (c *callEngine) cloneStack(l uintptr) (newSP, newFP, newTop uintptr, newSta
 	{
 		newSP = newTop - relSp
 		newFP = newTop - relFp
+		//nolint:staticcheck
 		sh := (*reflect.SliceHeader)(unsafe.Pointer(&newStackAligned))
 		sh.Data = newSP
 		sh.Len = int(relSp)

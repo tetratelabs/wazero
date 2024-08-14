@@ -3,6 +3,7 @@ package wasm
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -659,20 +660,20 @@ func (s *Store) GetFunctionTypeID(t *FunctionType) (FunctionTypeID, error) {
 }
 
 // CloseWithExitCode implements the same method as documented on wazero.Runtime.
-func (s *Store) CloseWithExitCode(ctx context.Context, exitCode uint32) (err error) {
+func (s *Store) CloseWithExitCode(ctx context.Context, exitCode uint32) error {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 	// Close modules in reverse initialization order.
+	var errs []error
 	for m := s.moduleList; m != nil; m = m.next {
 		// If closing this module errs, proceed anyway to close the others.
-		if e := m.closeWithExitCode(ctx, exitCode); e != nil && err == nil {
-			// TODO: use multiple errors handling in Go 1.20.
-			err = e // first error
+		if err := m.closeWithExitCode(ctx, exitCode); err != nil {
+			errs = append(errs, err)
 		}
 	}
 	s.moduleList = nil
 	s.nameToModule = nil
 	s.nameToModuleCap = 0
 	s.typeIDs = nil
-	return
+	return errors.Join(errs...)
 }
