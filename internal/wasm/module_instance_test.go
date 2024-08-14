@@ -267,7 +267,8 @@ func TestModuleInstance_CloseModuleOnCanceledOrTimeout(t *testing.T) {
 		const duration = time.Second
 		ctx, cancel := context.WithTimeout(context.Background(), duration)
 		defer cancel()
-		done := cc.CloseModuleOnCanceledOrTimeout(context.WithValue(ctx, struct{}{}, 1)) // Wrapping arbitrary context.
+		type arbitrary struct{}
+		done := cc.CloseModuleOnCanceledOrTimeout(context.WithValue(ctx, arbitrary{}, "arbitrary")) // Wrapping arbitrary context.
 		time.Sleep(duration * 2)
 		defer done()
 
@@ -285,7 +286,8 @@ func TestModuleInstance_CloseModuleOnCanceledOrTimeout(t *testing.T) {
 	t.Run("cancel", func(t *testing.T) {
 		cc := &ModuleInstance{ModuleName: "test", s: s, Sys: internalsys.DefaultContext(nil)}
 		ctx, cancel := context.WithCancel(context.Background())
-		done := cc.CloseModuleOnCanceledOrTimeout(context.WithValue(ctx, struct{}{}, 1)) // Wrapping arbitrary context.
+		type arbitrary struct{}
+		done := cc.CloseModuleOnCanceledOrTimeout(context.WithValue(ctx, arbitrary{}, "arbitrary")) // Wrapping arbitrary context.
 		cancel()
 		// Make sure nothing panics or otherwise gets weird with redundant call to cancel().
 		cancel()
@@ -312,7 +314,8 @@ func TestModuleInstance_CloseModuleOnCanceledOrTimeout(t *testing.T) {
 		// Wrap the cancel context by timeout.
 		ctx, cancel = context.WithTimeout(ctx, duration)
 		defer cancel()
-		done := cc.CloseModuleOnCanceledOrTimeout(context.WithValue(ctx, struct{}{}, 1)) // Wrapping arbitrary context.
+		type arbitrary struct{}
+		done := cc.CloseModuleOnCanceledOrTimeout(context.WithValue(ctx, arbitrary{}, "arbitrary")) // Wrapping arbitrary context.
 		time.Sleep(duration * 2)
 		defer done()
 
@@ -335,7 +338,8 @@ func TestModuleInstance_CloseModuleOnCanceledOrTimeout(t *testing.T) {
 		ctx, timeoutDone = context.WithTimeout(ctx, time.Second*1000)
 		defer timeoutDone()
 
-		done := cc.CloseModuleOnCanceledOrTimeout(context.WithValue(ctx, struct{}{}, 1)) // Wrapping arbitrary context.
+		type arbitrary struct{}
+		done := cc.CloseModuleOnCanceledOrTimeout(context.WithValue(ctx, arbitrary{}, "arbitrary")) // Wrapping arbitrary context.
 		cancel()
 		defer done()
 
