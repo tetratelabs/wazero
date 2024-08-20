@@ -158,11 +158,11 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-go@v2
-        with:  # Use version consistent with TinyGo.
-          go-version: "1.22"
+        with:
+          go-version: ${{ env.GO_VERSION }}
       - uses: acifani/setup-tinygo@v2
         with:
-          tinygo-version: "0.32.0"
+          tinygo-version: "0.33.0"
       - run: tinygo build ./cmd/wazero
       - run: tinygo build -size short -target pico -stack-size=8kb ./cmd/wazero
 

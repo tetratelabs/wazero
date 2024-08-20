@@ -19,7 +19,7 @@ defaults:
 
 env:  # Update this prior to requiring a higher minor version in go.mod
   GO_VERSION: "1.23"
-  TINYGO_VERSION: "0.32.0"
+  TINYGO_VERSION: "0.33.0"
   ZIG_VERSION: "0.11.0"
   BINARYEN_VERSION: "116"
   STDLIB_TESTS: "internal/integration_test/stdlibs"
@@ -146,8 +146,8 @@ jobs:
 
       - uses: actions/setup-go@v4
         if: steps.binary-cache.outputs.cache-hit != 'true'
-        with:  # Use version consistent with TinyGo.
-          go-version: "1.22"
+        with:
+          go-version: ${{ env.GO_VERSION }}
 
       - name: Build Test Binaries
         if: steps.binary-cache.outputs.cache-hit != 'true'
