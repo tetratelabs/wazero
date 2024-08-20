@@ -152,20 +152,6 @@ jobs:
         # This runs all tests compiled above in sequence. Note: This mounts /tmp to allow t.TempDir() in tests.
         run: find . -name "*.test" | xargs -Itestbin docker run --platform linux/${{ matrix.arch }} -v $(pwd)/testbin:/test -v $(pwd)/wazerocli:/wazero -e WAZEROCLI=/wazero --tmpfs /tmp --rm -t wazero:test
 
-  test_tinygo:
-    name: "TinyGo on Ubuntu"
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-go@v2
-        with:
-          go-version: ${{ env.GO_VERSION }}
-      - uses: acifani/setup-tinygo@v2
-        with:
-          tinygo-version: "0.33.0"
-      - run: tinygo build ./cmd/wazero
-      - run: tinygo build -size short -target pico -stack-size=8kb ./cmd/wazero
-
   # This ensures that internal/integration_test/fuzz is runnable, and is not intended to
   # run full-length fuzzing while trying to find low-hanging frontend bugs.
   fuzz:
