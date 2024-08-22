@@ -689,7 +689,7 @@ type moduleConfig struct {
 // NewModuleConfig returns a ModuleConfig that can be used for configuring module instantiation.
 func NewModuleConfig() ModuleConfig {
 	return &moduleConfig{
-		startFunctions: []string{"_start"},
+		startFunctions: []string{"_start", "_initialize"},
 		environKeys:    map[string]int{},
 	}
 }
