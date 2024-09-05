@@ -64,6 +64,9 @@ func (c *Context) EnvironSize() uint32 {
 
 // Walltime implements platform.Walltime.
 func (c *Context) Walltime() (sec int64, nsec int32) {
+	if c.walltime == nil {
+		c.walltime = platform.NewFakeWalltime()
+	}
 	return c.walltime()
 }
 
@@ -75,16 +78,25 @@ func (c *Context) WalltimeNanos() int64 {
 
 // WalltimeResolution returns resolution of Walltime.
 func (c *Context) WalltimeResolution() sys.ClockResolution {
+	if c.walltimeResolution == 0 {
+		c.walltimeResolution = sys.ClockResolution(time.Microsecond.Nanoseconds())
+	}
 	return c.walltimeResolution
 }
 
 // Nanotime implements sys.Nanotime.
 func (c *Context) Nanotime() int64 {
+	if c.nanotime == nil {
+		c.nanotime = platform.NewFakeNanotime()
+	}
 	return c.nanotime()
 }
 
 // NanotimeResolution returns resolution of Nanotime.
 func (c *Context) NanotimeResolution() sys.ClockResolution {
+	if c.nanotimeResolution == 0 {
+		c.nanotimeResolution = sys.ClockResolution(time.Nanosecond)
+	}
 	return c.nanotimeResolution
 }
 
@@ -106,6 +118,9 @@ func (c *Context) FS() *FSContext {
 // RandSource is a source of random bytes and defaults to a deterministic source.
 // see wazero.ModuleConfig WithRandSource
 func (c *Context) RandSource() io.Reader {
+	if c.randSource == nil {
+		c.randSource = platform.NewFakeRandSource()
+	}
 	return c.randSource
 }
 
@@ -148,11 +163,7 @@ func NewContext(
 		return nil, fmt.Errorf("environ invalid: %w", err)
 	}
 
-	if randSource == nil {
-		sysCtx.randSource = platform.NewFakeRandSource()
-	} else {
-		sysCtx.randSource = randSource
-	}
+	sysCtx.randSource = randSource
 
 	if walltime != nil {
 		if clockResolutionInvalid(walltimeResolution) {
@@ -160,9 +171,6 @@ func NewContext(
 		}
 		sysCtx.walltime = walltime
 		sysCtx.walltimeResolution = walltimeResolution
-	} else {
-		sysCtx.walltime = platform.NewFakeWalltime()
-		sysCtx.walltimeResolution = sys.ClockResolution(time.Microsecond.Nanoseconds())
 	}
 
 	if nanotime != nil {
@@ -171,9 +179,6 @@ func NewContext(
 		}
 		sysCtx.nanotime = nanotime
 		sysCtx.nanotimeResolution = nanotimeResolution
-	} else {
-		sysCtx.nanotime = platform.NewFakeNanotime()
-		sysCtx.nanotimeResolution = sys.ClockResolution(time.Nanosecond)
 	}
 
 	if nanosleep != nil {
