@@ -45,6 +45,7 @@ func main() {
 			if err != nil {
 				log.Panicf("[%d] failed to instantiate %v", i, err)
 			}
+			defer instance.Close(ctx) // This closes everything this Instance created.
 
 			// Calculates "i + i" by invoking the exported "add" function.
 			result, err := instance.ExportedFunction("add").Call(ctx, uint64(i), uint64(i))
