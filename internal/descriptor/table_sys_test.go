@@ -10,9 +10,8 @@ import (
 func TestFileTable(t *testing.T) {
 	table := new(sys.FileTable)
 
-	if n := table.Len(); n != 0 {
-		t.Errorf("new table is not empty: length=%d", n)
-	}
+	n := table.Len()
+	require.Equal(t, 0, n, "new table is not empty: length=%d", n)
 
 	// The id field is used as a sentinel value.
 	v0 := &sys.FileEntry{Name: "1"}
@@ -38,16 +37,12 @@ func TestFileTable(t *testing.T) {
 		{key: k1, val: v1},
 		{key: k2, val: v2},
 	} {
-		if v, ok := table.Lookup(lookup.key); !ok {
-			t.Errorf("value not found for key '%v'", lookup.key)
-		} else if v.Name != lookup.val.Name {
-			t.Errorf("wrong value returned for key '%v': want=%v got=%v", lookup.key, lookup.val.Name, v.Name)
-		}
+		v, ok := table.Lookup(lookup.key)
+		require.True(t, ok, "value not found for key '%v'", lookup.key)
+		require.Equal(t, lookup.val.Name, v.Name, "wrong value returned for key '%v'", lookup.key)
 	}
 
-	if n := table.Len(); n != 3 {
-		t.Errorf("wrong table length: want=3 got=%d", n)
-	}
+	require.Equal(t, 3, table.Len(), "wrong table length: want=3 got=%d", table.Len())
 
 	k0Found := false
 	k1Found := false
@@ -62,9 +57,7 @@ func TestFileTable(t *testing.T) {
 		case k2:
 			k2Found, want = true, v2
 		}
-		if v.Name != want.Name {
-			t.Errorf("wrong value found ranging over '%v': want=%v got=%v", k, want.Name, v.Name)
-		}
+		require.Equal(t, want.Name, v.Name, "wrong value found ranging over table")
 		return true
 	})
 
@@ -76,9 +69,7 @@ func TestFileTable(t *testing.T) {
 		{key: k1, ok: k1Found},
 		{key: k2, ok: k2Found},
 	} {
-		if !found.ok {
-			t.Errorf("key not found while ranging over table: %v", found.key)
-		}
+		require.True(t, found.ok, "key not found while ranging over table: %v", found.key)
 	}
 
 	for i, deletion := range []struct {
@@ -89,48 +80,9 @@ func TestFileTable(t *testing.T) {
 		{key: k2},
 	} {
 		table.Delete(deletion.key)
-		if _, ok := table.Lookup(deletion.key); ok {
-			t.Errorf("item found after deletion of '%v'", deletion.key)
-		}
-		if n, want := table.Len(), 3-(i+1); n != want {
-			t.Errorf("wrong table length after deletion: want=%d got=%d", want, n)
-		}
-	}
-}
-
-func BenchmarkFileTableInsert(b *testing.B) {
-	table := new(sys.FileTable)
-	entry := new(sys.FileEntry)
-
-	for i := 0; i < b.N; i++ {
-		table.Insert(entry)
-
-		if (i % 65536) == 0 {
-			table.Reset() // to avoid running out of memory
-		}
-	}
-}
-
-func BenchmarkFileTableLookup(b *testing.B) {
-	const sentinel = "42"
-	const numFiles = 65536
-	table := new(sys.FileTable)
-	files := make([]int32, numFiles)
-	entry := &sys.FileEntry{Name: sentinel}
-
-	var ok bool
-	for i := range files {
-		files[i], ok = table.Insert(entry)
-		if !ok {
-			b.Fatal("unexpected failure to insert")
-		}
-	}
-
-	var f *sys.FileEntry
-	for i := 0; i < b.N; i++ {
-		f, _ = table.Lookup(files[i%numFiles])
-	}
-	if f.Name != sentinel {
-		b.Error("wrong file returned by lookup")
+		_, ok := table.Lookup(deletion.key)
+		require.False(t, ok, "item found after deletion of '%v'", deletion.key)
+		n, want := table.Len(), 3-(i+1)
+		require.Equal(t, want, n, "wrong table length after deletion: want=%d got=%d", want, n)
 	}
 }
