@@ -33,13 +33,15 @@ func TestMemoryBytesNumToPages(t *testing.T) {
 
 func TestMemoryInstance_Grow_Size(t *testing.T) {
 	tests := []struct {
-		name         string
-		capEqualsMax bool
-		expAllocator bool
+		name          string
+		capEqualsMax  bool
+		expAllocator  bool
+		failAllocator bool
 	}{
 		{name: ""},
 		{name: "capEqualsMax", capEqualsMax: true},
 		{name: "expAllocator", expAllocator: true},
+		{name: "failAllocator", failAllocator: true},
 	}
 
 	for _, tt := range tests {
@@ -58,6 +60,9 @@ func TestMemoryInstance_Grow_Size(t *testing.T) {
 			case tc.expAllocator:
 				expBuffer := sliceAllocator(0, maxBytes)
 				m = &MemoryInstance{Max: max, Buffer: expBuffer.Reallocate(0), expBuffer: expBuffer}
+			case tc.failAllocator:
+				expBuffer := sliceAllocator(0, maxBytes)
+				m = &MemoryInstance{Max: max * 2, Buffer: expBuffer.Reallocate(0), expBuffer: expBuffer}
 			}
 			m.ownerModuleEngine = me
 
@@ -1023,6 +1028,9 @@ type sliceBuffer struct {
 func (b *sliceBuffer) Free() {}
 
 func (b *sliceBuffer) Reallocate(size uint64) []byte {
+	if size > b.max {
+		return nil
+	}
 	if cap := uint64(cap(b.buf)); size > cap {
 		b.buf = append(b.buf[:cap], make([]byte, size-cap)...)
 	} else {
