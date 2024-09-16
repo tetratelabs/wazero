@@ -239,14 +239,13 @@ func (m *MemoryInstance) Grow(delta uint32) (result uint32, ok bool) {
 		return currentPages, true
 	}
 
-	// If exceeds the max of memory size, we push -1 according to the spec.
 	newPages := currentPages + delta
 	if newPages > m.Max || int32(delta) < 0 {
 		return 0, false
 	} else if m.expBuffer != nil {
 		buffer := m.expBuffer.Reallocate(MemoryPagesToBytesNum(newPages))
-		// If the allocator fails to grow, we push -1 according to the spec.
 		if buffer == nil {
+			// Allocator failed to grow.
 			return 0, false
 		}
 		if m.Shared {
