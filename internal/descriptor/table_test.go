@@ -88,6 +88,43 @@ func TestFileTable(t *testing.T) {
 	}
 }
 
+func BenchmarkFileTableInsert(b *testing.B) {
+	table := new(sys.FileTable)
+	entry := new(sys.FileEntry)
+
+	for i := 0; i < b.N; i++ {
+		table.Insert(entry)
+
+		if (i % 65536) == 0 {
+			table.Reset() // to avoid running out of memory
+		}
+	}
+}
+
+func BenchmarkFileTableLookup(b *testing.B) {
+	const sentinel = "42"
+	const numFiles = 65536
+	table := new(sys.FileTable)
+	files := make([]int32, numFiles)
+	entry := &sys.FileEntry{Name: sentinel}
+
+	var ok bool
+	for i := range files {
+		files[i], ok = table.Insert(entry)
+		if !ok {
+			b.Fatal("unexpected failure to insert")
+		}
+	}
+
+	var f *sys.FileEntry
+	for i := 0; i < b.N; i++ {
+		f, _ = table.Lookup(files[i%numFiles])
+	}
+	if f.Name != sentinel {
+		b.Error("wrong file returned by lookup")
+	}
+}
+
 func Test_sizeOfTable(t *testing.T) {
 	tests := []struct {
 		name         string
