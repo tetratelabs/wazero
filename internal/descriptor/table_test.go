@@ -161,8 +161,8 @@ func Test_sizeOfTable(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			table := new(descriptor.Table[int32, string])
 			tc.operation(table)
-			require.Equal(t, tc.expectedSize, len(table.Masks()))
-			require.Equal(t, tc.expectedSize*64, len(table.Items()))
+			require.Equal(t, tc.expectedSize, len(descriptor.Masks(table)))
+			require.Equal(t, tc.expectedSize*64, len(descriptor.Items(table)))
 		})
 	}
 }
