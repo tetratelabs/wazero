@@ -1,10 +1,10 @@
 package descriptor_test
 
 import (
-	"github.com/tetratelabs/wazero/internal/descriptor"
-	"github.com/tetratelabs/wazero/internal/sys"
 	"testing"
 
+	"github.com/tetratelabs/wazero/internal/descriptor"
+	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
