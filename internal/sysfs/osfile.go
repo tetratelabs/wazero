@@ -118,6 +118,7 @@ func (f *osFile) reopen() (errno experimentalsys.Errno) {
 
 	_ = f.close()
 	f.file, errno = OpenFile(f.path, f.flag, f.perm)
+	f.fd = f.file.Fd()
 	if errno != 0 {
 		return errno
 	}

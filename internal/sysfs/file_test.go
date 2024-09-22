@@ -116,6 +116,26 @@ func TestWriteFdNonblock(t *testing.T) {
 	t.Fatal("writeFd should return EAGAIN at some point")
 }
 
+func TestFileReopenFileUpdatesFD(t *testing.T) {
+	tmpDir := t.TempDir()
+	path := path.Join(tmpDir, "file")
+
+	// Open the file twice. Closing the first file, frees its FD.
+	// Then reopening the second file will take over the first FD.
+	// If reopening the file doesn't update the FD, they won't match.
+	f0 := requireOpenFile(t, path, experimentalsys.O_RDWR|experimentalsys.O_CREAT, 0o600)
+	f1 := requireOpenFile(t, path, experimentalsys.O_RDWR|experimentalsys.O_CREAT, 0o600)
+	defer f1.Close()
+	f0.Close()
+
+	of, ok := f1.(*osFile)
+	require.True(t, ok)
+
+	errno := of.reopen()
+	require.EqualErrno(t, 0, errno)
+	require.Equal(t, of.file.Fd(), of.fd)
+}
+
 func TestFileSetAppend(t *testing.T) {
 	tmpDir := t.TempDir()
 
@@ -124,6 +144,7 @@ func TestFileSetAppend(t *testing.T) {
 
 	// Open without APPEND.
 	f, errno := OpenOSFile(fPath, experimentalsys.O_RDWR, 0o600)
+	defer f.Close()
 	require.EqualErrno(t, 0, errno)
 	require.False(t, f.IsAppend())
 
