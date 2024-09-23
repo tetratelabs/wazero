@@ -92,9 +92,6 @@ func (f *osFile) SetAppend(enable bool) (errno experimentalsys.Errno) {
 }
 
 func (f *osFile) reopen() (errno experimentalsys.Errno) {
-	// Clear any create flag, as we are re-opening, not re-creating.
-	f.flag &= ^experimentalsys.O_CREAT
-
 	var (
 		isDir  bool
 		offset int64
@@ -113,7 +110,9 @@ func (f *osFile) reopen() (errno experimentalsys.Errno) {
 		}
 	}
 
-	file, errno := OpenFile(f.path, f.flag, f.perm)
+	// Clear any create flag, as we are re-opening, not re-creating.
+	flag := f.flag &^ experimentalsys.O_CREAT
+	file, errno := OpenFile(f.path, flag, f.perm)
 	if errno != 0 {
 		return errno
 	}
@@ -121,17 +120,19 @@ func (f *osFile) reopen() (errno experimentalsys.Errno) {
 	if errno != 0 {
 		return errno
 	}
-	_ = f.close()
-	f.file = file
-	f.fd = file.Fd()
 
 	if !isDir {
-		_, err = f.file.Seek(offset, io.SeekStart)
+		_, err = file.Seek(offset, io.SeekStart)
 		if err != nil {
+			_ = file.Close()
 			return experimentalsys.UnwrapOSError(err)
 		}
 	}
 
+	// Only update f on success.
+	_ = f.file.Close()
+	f.file = file
+	f.fd = file.Fd()
 	return 0
 }
 
