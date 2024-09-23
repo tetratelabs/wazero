@@ -113,12 +113,17 @@ func (f *osFile) reopen() (errno experimentalsys.Errno) {
 		}
 	}
 
-	_ = f.close()
-	f.file, errno = OpenFile(f.path, f.flag, f.perm)
-	f.fd = f.file.Fd()
+	file, errno := OpenFile(f.path, f.flag, f.perm)
 	if errno != 0 {
 		return errno
 	}
+	errno = f.checkSameFile(file)
+	if errno != 0 {
+		return errno
+	}
+	_ = f.close()
+	f.file = file
+	f.fd = file.Fd()
 
 	if !isDir {
 		_, err = f.file.Seek(offset, io.SeekStart)
@@ -128,6 +133,21 @@ func (f *osFile) reopen() (errno experimentalsys.Errno) {
 	}
 
 	return 0
+}
+
+func (f *osFile) checkSameFile(osf *os.File) experimentalsys.Errno {
+	fi1, err := f.file.Stat()
+	if err != nil {
+		return experimentalsys.UnwrapOSError(err)
+	}
+	fi2, err := osf.Stat()
+	if err != nil {
+		return experimentalsys.UnwrapOSError(err)
+	}
+	if os.SameFile(fi1, fi2) {
+		return 0
+	}
+	return experimentalsys.ENOENT
 }
 
 // IsNonblock implements the same method as documented on fsapi.File
