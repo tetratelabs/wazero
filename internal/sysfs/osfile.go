@@ -91,9 +91,6 @@ func (f *osFile) SetAppend(enable bool) (errno experimentalsys.Errno) {
 	return fileError(f, f.closed, f.reopen())
 }
 
-// compile-time check to ensure osFile.reopen implements reopenFile.
-var _ reopenFile = (*osFile)(nil).reopen
-
 func (f *osFile) reopen() (errno experimentalsys.Errno) {
 	// Clear any create flag, as we are re-opening, not re-creating.
 	f.flag &= ^experimentalsys.O_CREAT

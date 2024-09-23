@@ -418,13 +418,6 @@ func seek(s io.Seeker, offset int64, whence int) (int64, experimentalsys.Errno) 
 	return newOffset, experimentalsys.UnwrapOSError(err)
 }
 
-// reopenFile allows re-opening a file for reasons such as applying flags or
-// directory iteration.
-type reopenFile func() experimentalsys.Errno
-
-// compile-time check to ensure fsFile.reopen implements reopenFile.
-var _ reopenFile = (*fsFile)(nil).reopen
-
 // reopen implements the same method as documented on reopenFile.
 func (f *fsFile) reopen() experimentalsys.Errno {
 	_ = f.close()
