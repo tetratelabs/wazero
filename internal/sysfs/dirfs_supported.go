@@ -5,6 +5,8 @@ package sysfs
 import (
 	"io/fs"
 	"os"
+	"path"
+	"strings"
 
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 )
@@ -34,9 +36,10 @@ func (d *dirFS) Chmod(path string, perm fs.FileMode) experimentalsys.Errno {
 
 // Symlink implements the same method as documented on sys.FS
 func (d *dirFS) Symlink(oldName, link string) experimentalsys.Errno {
-	// Note: do not resolve `oldName` relative to this dirFS. The link result is always resolved
-	// when dereference the `link` on its usage (e.g. readlink, read, etc).
-	// https://github.com/bytecodealliance/cap-std/blob/v1.0.4/cap-std/src/fs/dir.rs#L404-L409
+	oldName = path.Clean(oldName)
+	if strings.HasPrefix(oldName, "../") {
+		return experimentalsys.EFAULT
+	}
 	err := os.Symlink(oldName, d.join(link))
 	return experimentalsys.UnwrapOSError(err)
 }

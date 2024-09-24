@@ -3,6 +3,8 @@ package sysfs
 import (
 	"io/fs"
 	"os"
+	"path"
+	"strings"
 
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/platform"
@@ -12,7 +14,7 @@ import (
 func DirFS(dir string) experimentalsys.FS {
 	return &dirFS{
 		dir:        dir,
-		cleanedDir: ensureTrailingPathSeparator(dir),
+		cleanedDir: strings.TrimSuffix(dir, "/"),
 	}
 }
 
@@ -84,16 +86,17 @@ func (d *dirFS) Utimens(path string, atim, mtim int64) experimentalsys.Errno {
 	return utimens(d.join(path), atim, mtim)
 }
 
-func (d *dirFS) join(path string) string {
-	switch path {
-	case "", ".", "/":
-		if d.cleanedDir == "/" {
-			return "/"
+func (d *dirFS) join(name string) string {
+	last := strings.HasSuffix(name, "/")
+	name = path.Clean("/" + name)
+	if name == "/" {
+		if d.cleanedDir != "" {
+			return d.cleanedDir
 		}
-		// cleanedDir includes an unnecessary delimiter for the root path.
-		return d.cleanedDir[:len(d.cleanedDir)-1]
+		return "/"
 	}
-	// TODO: Enforce similar to safefilepath.FromFS(path), but be careful as
-	// relative path inputs are allowed. e.g. dir or path == ../
-	return d.cleanedDir + path
+	if last {
+		return d.cleanedDir + name + "/"
+	}
+	return d.cleanedDir + name
 }
