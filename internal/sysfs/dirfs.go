@@ -87,16 +87,20 @@ func (d *dirFS) Utimens(path string, atim, mtim int64) experimentalsys.Errno {
 }
 
 func (d *dirFS) join(name string) string {
-	last := strings.HasSuffix(name, "/")
-	name = path.Clean("/" + name)
-	if name == "/" {
+	// Lexically clean `name` to enforce that it always stays within the root
+	// hierarchy. This is necessary to avoid trivially escaping the root.
+	// See: https://github.com/tetratelabs/wazero/issues/2321
+	// TODO: this violates POSIX pathname resolution semantics.
+	// https://pubs.opengroup.org/onlinepubs/009695399/basedefs/xbd_chap04.html#tag_04_11
+	cleanedName := path.Clean("/" + name)
+	if cleanedName == "/" {
 		if d.cleanedDir != "" {
 			return d.cleanedDir
 		}
 		return "/"
 	}
-	if last {
-		return d.cleanedDir + name + "/"
+	if strings.HasSuffix(name, "/") {
+		return d.cleanedDir + cleanedName + "/"
 	}
-	return d.cleanedDir + name
+	return d.cleanedDir + cleanedName
 }

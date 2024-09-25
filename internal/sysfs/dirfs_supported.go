@@ -36,8 +36,14 @@ func (d *dirFS) Chmod(path string, perm fs.FileMode) experimentalsys.Errno {
 
 // Symlink implements the same method as documented on sys.FS
 func (d *dirFS) Symlink(oldName, link string) experimentalsys.Errno {
+	// Note: do not resolve `oldName` relative to this dirFS.
+	// The link result is always resolved on usage (e.g. readlink, read, etc).
+	// However, this trivially allows escaping the root mount point.
+	// See: https://github.com/tetratelabs/wazero/issues/2321
+	// So, lexically clean `oldName`, and enforce that it always points down
+	// the hierarchy.
 	oldName = path.Clean(oldName)
-	if strings.HasPrefix(oldName, "../") {
+	if strings.HasPrefix(oldName, "../") || strings.HasPrefix(oldName, "/") {
 		return experimentalsys.EFAULT
 	}
 	err := os.Symlink(oldName, d.join(link))
