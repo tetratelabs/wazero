@@ -3,6 +3,7 @@ package descriptor_test
 import (
 	"testing"
 
+	"github.com/tetratelabs/wazero/internal/descriptor"
 	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
@@ -10,9 +11,8 @@ import (
 func TestFileTable(t *testing.T) {
 	table := new(sys.FileTable)
 
-	if n := table.Len(); n != 0 {
-		t.Errorf("new table is not empty: length=%d", n)
-	}
+	n := table.Len()
+	require.Equal(t, 0, n, "new table is not empty: length=%d", n)
 
 	// The id field is used as a sentinel value.
 	v0 := &sys.FileEntry{Name: "1"}
@@ -38,16 +38,12 @@ func TestFileTable(t *testing.T) {
 		{key: k1, val: v1},
 		{key: k2, val: v2},
 	} {
-		if v, ok := table.Lookup(lookup.key); !ok {
-			t.Errorf("value not found for key '%v'", lookup.key)
-		} else if v.Name != lookup.val.Name {
-			t.Errorf("wrong value returned for key '%v': want=%v got=%v", lookup.key, lookup.val.Name, v.Name)
-		}
+		v, ok := table.Lookup(lookup.key)
+		require.True(t, ok, "value not found for key '%v'", lookup.key)
+		require.Equal(t, lookup.val.Name, v.Name, "wrong value returned for key '%v'", lookup.key)
 	}
 
-	if n := table.Len(); n != 3 {
-		t.Errorf("wrong table length: want=3 got=%d", n)
-	}
+	require.Equal(t, 3, table.Len(), "wrong table length: want=3 got=%d", table.Len())
 
 	k0Found := false
 	k1Found := false
@@ -62,9 +58,7 @@ func TestFileTable(t *testing.T) {
 		case k2:
 			k2Found, want = true, v2
 		}
-		if v.Name != want.Name {
-			t.Errorf("wrong value found ranging over '%v': want=%v got=%v", k, want.Name, v.Name)
-		}
+		require.Equal(t, want.Name, v.Name, "wrong value found ranging over table")
 		return true
 	})
 
@@ -76,9 +70,7 @@ func TestFileTable(t *testing.T) {
 		{key: k1, ok: k1Found},
 		{key: k2, ok: k2Found},
 	} {
-		if !found.ok {
-			t.Errorf("key not found while ranging over table: %v", found.key)
-		}
+		require.True(t, found.ok, "key not found while ranging over table: %v", found.key)
 	}
 
 	for i, deletion := range []struct {
@@ -89,12 +81,10 @@ func TestFileTable(t *testing.T) {
 		{key: k2},
 	} {
 		table.Delete(deletion.key)
-		if _, ok := table.Lookup(deletion.key); ok {
-			t.Errorf("item found after deletion of '%v'", deletion.key)
-		}
-		if n, want := table.Len(), 3-(i+1); n != want {
-			t.Errorf("wrong table length after deletion: want=%d got=%d", want, n)
-		}
+		_, ok := table.Lookup(deletion.key)
+		require.False(t, ok, "item found after deletion of '%v'", deletion.key)
+		n, want := table.Len(), 3-(i+1)
+		require.Equal(t, want, n, "wrong table length after deletion: want=%d got=%d", want, n)
 	}
 }
 
@@ -132,5 +122,84 @@ func BenchmarkFileTableLookup(b *testing.B) {
 	}
 	if f.Name != sentinel {
 		b.Error("wrong file returned by lookup")
+	}
+}
+
+func Test_sizeOfTable(t *testing.T) {
+	tests := []struct {
+		name         string
+		operation    func(*descriptor.Table[int32, string])
+		expectedSize int
+	}{
+		{
+			name:         "empty table",
+			operation:    func(table *descriptor.Table[int32, string]) {},
+			expectedSize: 0,
+		},
+		{
+			name: "1 insert",
+			operation: func(table *descriptor.Table[int32, string]) {
+				table.Insert("a")
+			},
+			expectedSize: 1,
+		},
+		{
+			name: "32 inserts",
+			operation: func(table *descriptor.Table[int32, string]) {
+				for i := 0; i < 32; i++ {
+					table.Insert("a")
+				}
+			},
+			expectedSize: 1,
+		},
+		{
+			name: "257 inserts",
+			operation: func(table *descriptor.Table[int32, string]) {
+				for i := 0; i < 257; i++ {
+					table.Insert("a")
+				}
+			},
+			expectedSize: 5,
+		},
+		{
+			name: "1 insert at 63",
+			operation: func(table *descriptor.Table[int32, string]) {
+				table.InsertAt("a", 63)
+			},
+			expectedSize: 1,
+		},
+		{
+			name: "1 insert at 64",
+			operation: func(table *descriptor.Table[int32, string]) {
+				table.InsertAt("a", 64)
+			},
+			expectedSize: 2,
+		},
+		{
+			name: "1 insert at 257",
+			operation: func(table *descriptor.Table[int32, string]) {
+				table.InsertAt("a", 257)
+			},
+			expectedSize: 5,
+		},
+		{
+			name: "insert at until 320",
+			operation: func(table *descriptor.Table[int32, string]) {
+				for i := int32(0); i < 320; i++ {
+					table.InsertAt("a", i)
+				}
+			},
+			expectedSize: 5,
+		},
+	}
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			table := new(descriptor.Table[int32, string])
+			tc.operation(table)
+			require.Equal(t, tc.expectedSize, len(descriptor.Masks(table)))
+			require.Equal(t, tc.expectedSize*64, len(descriptor.Items(table)))
+		})
 	}
 }
