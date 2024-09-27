@@ -747,6 +747,7 @@ func TestDirFS_Symlink(t *testing.T) {
 
 	testFS := DirFS(tmpDir)
 
+	require.EqualErrno(t, sys.EPERM, testFS.Symlink("/test.txt", "sub/test.txt"))
 	require.EqualErrno(t, sys.EEXIST, testFS.Symlink("sub/test.txt", "sub/test.txt"))
 	// Non-existing old name is allowed.
 	require.EqualErrno(t, 0, testFS.Symlink("non-existing", "aa"))
