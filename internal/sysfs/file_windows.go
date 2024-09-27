@@ -8,6 +8,20 @@ import (
 	"github.com/tetratelabs/wazero/experimental/sys"
 )
 
+// NTStatus corresponds with NTSTATUS, error values returned by ntdll.dll and
+// other native functions.
+type NTStatus uint32
+
+func rtlNtStatusToDosErrorNoTeb(ntstatus NTStatus) syscall.Errno {
+	r0, _, _ := syscall.SyscallN(procRtlNtStatusToDosErrorNoTeb.Addr(), uintptr(ntstatus))
+
+	return syscall.Errno(r0)
+}
+
+func (s NTStatus) Errno() syscall.Errno {
+	return rtlNtStatusToDosErrorNoTeb(s)
+}
+
 const (
 	nonBlockingFileReadSupported  = true
 	nonBlockingFileWriteSupported = false
@@ -15,16 +29,26 @@ const (
 	_ERROR_IO_INCOMPLETE = syscall.Errno(996)
 )
 
-var kernel32 = syscall.NewLazyDLL("kernel32.dll")
-
-// procPeekNamedPipe is the syscall.LazyProc in kernel32 for PeekNamedPipe
 var (
+	kernel32 = syscall.NewLazyDLL("kernel32.dll")
+	ntdll    = syscall.NewLazyDLL("ntdll.dll")
+)
+
+var (
+	// procFormatMessageW is the syscall.LazyProc in kernel32 for FormatMessageW
+	procFormatMessageW = kernel32.NewProc("FormatMessageW")
 	// procPeekNamedPipe is the syscall.LazyProc in kernel32 for PeekNamedPipe
 	procPeekNamedPipe = kernel32.NewProc("PeekNamedPipe")
 	// procGetOverlappedResult is the syscall.LazyProc in kernel32 for GetOverlappedResult
 	procGetOverlappedResult = kernel32.NewProc("GetOverlappedResult")
 	// procCreateEventW is the syscall.LazyProc in kernel32 for CreateEventW
 	procCreateEventW = kernel32.NewProc("CreateEventW")
+	// procNtCreateFile is the syscall.LazyProc in ntdll for NtCreateFile
+	procNtCreateFile = ntdll.NewProc("NtCreateFile")
+	// procRtlInitUnicodeString is the syscall.LazyProc in ntdll for RtlInitUnicodeString
+	procRtlInitUnicodeString = ntdll.NewProc("RtlInitUnicodeString")
+	// procRtlNtStatusToDosErrorNoTeb is the syscall.LazyProc in ntdll for RtlNtStatusToDosErrorNoTeb
+	procRtlNtStatusToDosErrorNoTeb = ntdll.NewProc("RtlNtStatusToDosErrorNoTeb")
 )
 
 // readFd returns ENOSYS on unsupported platforms.
