@@ -295,7 +295,7 @@ func TestFunctionExporter_Trace(t *testing.T) {
 			var out bytes.Buffer
 
 			config := wazero.NewModuleConfig()
-			if strings.Contains("ToStderr", tc.name) {
+			if strings.Contains(tc.name), "ToStderr") {
 				config = config.WithStderr(&out)
 			} else {
 				config = config.WithStdout(&out)
