@@ -101,7 +101,7 @@ pub extern "C" fn _allocate(size: u32) -> *mut u8 {
 /// Allocates size bytes and leaks the pointer where they start.
 fn allocate(size: usize) -> *mut u8 {
     // Allocate the amount of bytes needed.
-    let vec: Vec<MaybeUninit<u8>> = Vec::with_capacity(size);
+    let vec: Vec<MaybeUninit<u8>> = vec![MaybeUninit::uninit(); size];
 
     // into_raw leaks the memory to the caller.
     Box::into_raw(vec.into_boxed_slice()) as *mut u8
