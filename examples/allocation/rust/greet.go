@@ -88,7 +88,12 @@ func main() {
 	greetingSize := uint32(ptrSize[0])
 	// This pointer was allocated by Rust, but owned by Go, So, we have to
 	// deallocate it when finished
-	defer deallocate.Call(ctx, uint64(greetingPtr), uint64(greetingSize))
+	defer func() {
+		_, err = deallocate.Call(ctx, uint64(greetingPtr), uint64(greetingSize))
+		if err != nil {
+			log.Panicln(err)
+		}
+	}()
 
 	// The pointer is a linear memory offset, which is where we write the name.
 	if bytes, ok := mod.Memory().Read(greetingPtr, greetingSize); !ok {
