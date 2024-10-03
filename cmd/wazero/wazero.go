@@ -173,7 +173,9 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer) int {
 		"Filesystem path to expose to the binary in the form of <path>[:<wasm path>][:ro]. "+
 			"This may be specified multiple times. When <wasm path> is unset, <path> is used. "+
 			"For example, -mount=/:/ or c:\\:/ makes the entire host volume writeable by wasm. "+
-			"For read-only mounts, append the suffix ':ro'.")
+			"For read-only mounts, append the suffix ':ro'. "+
+			"Note that the volume mount inherently allows the guest to escape the volume via relative path lookups like '../../'. "+
+			"If that is not desired, use wazero as a library and implement a custom fs.FS.")
 
 	var listens sliceFlag
 	flags.Var(&listens, "listen",
