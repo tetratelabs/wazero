@@ -4,6 +4,7 @@ import (
 	"io/fs"
 
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
+	"github.com/tetratelabs/wazero/internal/fsapi"
 )
 
 type ReadFS struct {
@@ -71,7 +72,7 @@ func (r *ReadFS) Utimens(path string, atim, mtim int64) experimentalsys.Errno {
 }
 
 // compile-time check to ensure readFile implements api.File.
-var _ experimentalsys.File = (*readFile)(nil)
+var _ fsapi.File = (*readFile)(nil)
 
 type readFile struct {
 	experimentalsys.File
@@ -114,4 +115,41 @@ func (r *readFile) writeErr() experimentalsys.Errno {
 		return experimentalsys.EISDIR
 	}
 	return experimentalsys.EBADF
+}
+
+func (r *readFile) IsNonblock() bool {
+	return false
+}
+
+func (r *readFile) SetNonblock(bool) experimentalsys.Errno {
+	return experimentalsys.ENOSYS
+}
+
+func (r *readFile) Poll(fsapi.Pflag, int32) (bool, experimentalsys.Errno) {
+	return false, experimentalsys.ENOSYS
+}
+
+func (r *readFile) OpenAt(
+	fs experimentalsys.FS,
+	path string,
+	flag experimentalsys.Oflag,
+	mode fs.FileMode,
+) (experimentalsys.File, experimentalsys.Errno) {
+	// Mask the mutually exclusive bits as they determine write mode.
+	switch flag & (experimentalsys.O_RDONLY | experimentalsys.O_WRONLY | experimentalsys.O_RDWR) {
+	case experimentalsys.O_WRONLY, experimentalsys.O_RDWR:
+		// Return the correct error if a directory was opened for write.
+		if flag&experimentalsys.O_DIRECTORY != 0 {
+			return nil, experimentalsys.EISDIR
+		}
+		return nil, experimentalsys.ENOSYS
+	default: // sys.O_RDONLY (integer zero) so we are ok!
+	}
+
+	dir, ok := r.File.(*osFile)
+	if !ok {
+		return nil, experimentalsys.EBADF
+	}
+
+	return dir.OpenAt(fs, path, flag, mode)
 }
