@@ -43,7 +43,7 @@ type LinearMemory interface {
 }
 
 // WithMemoryAllocator registers the given MemoryAllocator into the given
-// context.Context.
+// context.Context. The context must be passed when initializing a module.
 func WithMemoryAllocator(ctx context.Context, allocator MemoryAllocator) context.Context {
 	if allocator != nil {
 		return context.WithValue(ctx, expctxkeys.MemoryAllocatorKey{}, allocator)
