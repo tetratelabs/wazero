@@ -53,6 +53,7 @@ considering their efforts before starting your own!
 
 | Name                  | Description                                                                                        |
 |:----------------------|----------------------------------------------------------------------------------------------------|
+| [Modus][46]           | An open source, serverless framework for building intelligent functions and APIs                   |
 | [trivy][17]           | implements 3rd party extension via [wasm modules][18]                                              |
 | [RunReveal][34]       | Security data platform which uses Wazero for transforms and alerting                               |
 | [Impart Security][35] | API security solution with a WASM based rules engine using wazero as part of a security mesh layer |
@@ -172,3 +173,4 @@ experience.
 
 [45]: https://docs.redpanda.com/redpanda-connect/components/processors/redpanda_data_transform/
 
+[46]: https://github.com/hypermodeinc/modus
