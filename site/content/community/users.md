@@ -53,19 +53,19 @@ considering their efforts before starting your own!
 
 | Name                  | Description                                                                                        |
 |:----------------------|----------------------------------------------------------------------------------------------------|
-| [Modus][46]           | An open source, serverless framework for building intelligent functions and APIs                   |
 | [trivy][17]           | implements 3rd party extension via [wasm modules][18]                                              |
 | [RunReveal][34]       | Security data platform which uses Wazero for transforms and alerting                               |
 | [Impart Security][35] | API security solution with a WASM based rules engine using wazero as part of a security mesh layer |
 
 ### Cloud Platforms
 
-| Name          | Description                                                               |
-|:--------------|---------------------------------------------------------------------------|
-| [scale][13]   | implements [Polyglot][14] interfaces with WebAssembly via code generation |
-| [taubyte][21] | edge computing and web3 platform that runs [serverless functions][22]     |
-| [YoMo][26]    | Streaming [Serverless][27] Framework for buildnig Geo-distributed system  |
-| [Wetware][28] | Web3's answer to Cloud hosting                                            |
+| Name          | Description                                                                      |
+|:--------------|----------------------------------------------------------------------------------|
+| [Modus][46]   | An open source, serverless framework for building intelligent functions and APIs |
+| [scale][13]   | implements [Polyglot][14] interfaces with WebAssembly via code generation        |
+| [taubyte][21] | edge computing and web3 platform that runs [serverless functions][22]            |
+| [YoMo][26]    | Streaming [Serverless][27] Framework for building Geo-distributed system         |
+| [Wetware][28] | Web3's answer to Cloud hosting                                                   |
 
 ### Database
 
