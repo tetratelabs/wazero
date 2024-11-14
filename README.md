@@ -101,7 +101,7 @@ We currently test Linux (Ubuntu and scratch), MacOS and Windows as packaged by
 * Interpreter
   * Linux is tested on amd64 (native) as well arm64 and riscv64 via emulation.
   * MacOS and Windows are only tested on amd64.
-  * NetBSD and OpenBSD are only tested on amd64.
+  * FreeBSD, NetBSD and OpenBSD are only tested on amd64.
 * Compiler
   * Linux is tested on amd64 (native) as well arm64 via emulation.
   * MacOS and Windows are only tested on amd64.
