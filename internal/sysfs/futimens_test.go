@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/tetratelabs/wazero/experimental/sys"
+	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
@@ -20,6 +21,17 @@ func TestUtimens(t *testing.T) {
 		require.EqualErrno(t, sys.ENOENT, err)
 	})
 	testUtimens(t, false)
+}
+
+func TestFileUtimens(t *testing.T) {
+	testUtimens(t, true)
+
+	testEBADFIfFileClosed(t, func(f experimentalsys.File) experimentalsys.Errno {
+		return f.Utimens(experimentalsys.UTIME_OMIT, experimentalsys.UTIME_OMIT)
+	})
+	testEBADFIfDirClosed(t, func(d experimentalsys.File) experimentalsys.Errno {
+		return d.Utimens(experimentalsys.UTIME_OMIT, experimentalsys.UTIME_OMIT)
+	})
 }
 
 func testUtimens(t *testing.T, futimes bool) {

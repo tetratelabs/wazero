@@ -117,7 +117,7 @@ func Test_NewStat_t(t *testing.T) {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			st := sys.NewStat_t(tc.info)
-			if tc.expectDevIno && runtime.GOOS != "windows" {
+			if tc.expectDevIno && (runtime.GOOS == "linux" || runtime.GOOS == "darwin" || runtime.GOOS == "freebsd") {
 				require.NotEqual(t, uint64(0), st.Dev)
 				require.NotEqual(t, uint64(0), st.Ino)
 			} else {
