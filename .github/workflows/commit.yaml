@@ -152,6 +152,43 @@ jobs:
         # This runs all tests compiled above in sequence. Note: This mounts /tmp to allow t.TempDir() in tests.
         run: find . -name "*.test" | xargs -Itestbin docker run --platform linux/${{ matrix.arch }} -v $(pwd)/testbin:/test -v $(pwd)/wazerocli:/wazero -e WAZEROCLI=/wazero --tmpfs /tmp --rm -t wazero:test
 
+  test_bsd:
+    name: amd64, ${{ matrix.os.name }}
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false  # don't fail fast as sometimes failures are OS specific
+      matrix:
+        os:
+          - name: freebsd
+            version: "14.1"
+          - name: openbsd
+            version: "7.5"
+          - name: netbsd
+            version: "10.0"
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Build test binaries
+        run: |
+          go list -f '{{.Dir}}' ./... | egrep -v 'imports|sysfs' | xargs -Ipkg go test pkg -c -o pkg.test
+          go build -o wazerocli ./cmd/wazero
+        env:
+          GOOS: ${{ matrix.os.name }}
+
+      - name: Run built test binaries
+        uses: cross-platform-actions/action@v0.25.0
+        env:
+          WAZEROCLI: ./wazerocli
+        with:
+          operating_system: ${{ matrix.os.name }}
+          version: ${{ matrix.os.version }}
+          shell: bash
+          sync_files: runner-to-vm
+          environment_variables: WAZEROCLI
+          # This runs all tests compiled above in sequence.
+          run: find . -name "*.test" | xargs -Itestbin nice testbin -test.short
+
   # This ensures that internal/integration_test/fuzz is runnable, and is not intended to
   # run full-length fuzzing while trying to find low-hanging frontend bugs.
   fuzz:

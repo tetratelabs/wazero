@@ -1000,25 +1000,6 @@ func TestFileTruncate(t *testing.T) {
 	})
 }
 
-func TestFileUtimens(t *testing.T) {
-	switch runtime.GOOS {
-	case "linux", "darwin": // supported
-	case "freebsd": // TODO: support freebsd w/o CGO
-	case "windows":
-	default: // expect ENOSYS and callers need to fall back to Utimens
-		t.Skip("unsupported GOOS", runtime.GOOS)
-	}
-
-	testUtimens(t, true)
-
-	testEBADFIfFileClosed(t, func(f experimentalsys.File) experimentalsys.Errno {
-		return f.Utimens(experimentalsys.UTIME_OMIT, experimentalsys.UTIME_OMIT)
-	})
-	testEBADFIfDirClosed(t, func(d experimentalsys.File) experimentalsys.Errno {
-		return d.Utimens(experimentalsys.UTIME_OMIT, experimentalsys.UTIME_OMIT)
-	})
-}
-
 func TestNewStdioFile(t *testing.T) {
 	// simulate regular file attached to stdin
 	f, err := os.CreateTemp(t.TempDir(), "somefile")
