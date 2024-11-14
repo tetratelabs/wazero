@@ -172,7 +172,7 @@ jobs:
 
       - name: Build test binaries
         run: |
-          go list -f '{{.Dir}}' ./... | egrep -v 'imports|sysfs|integration_test/[^s]' | xargs -Ipkg go test pkg -c -o pkg.test
+          go list -f '{{.Dir}}' ./... | egrep -v 'imports|sysfs' | xargs -Ipkg go test pkg -c -o pkg.test
           go build -o wazerocli ./cmd/wazero
         env:
           GOOS: ${{ matrix.os.name }}
@@ -188,7 +188,7 @@ jobs:
           sync_files: runner-to-vm
           environment_variables: WAZEROCLI
           # This runs all tests compiled above in sequence. Note: This mounts /tmp to allow t.TempDir() in tests.
-          run: find . -name "*.test" | xargs -t -Itestbin nice testbin
+          run: find . -name "*.test" | xargs -Itestbin nice testbin -test.v -test.short
 
   # This ensures that internal/integration_test/fuzz is runnable, and is not intended to
   # run full-length fuzzing while trying to find low-hanging frontend bugs.
