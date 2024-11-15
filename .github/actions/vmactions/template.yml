@@ -1,0 +1,24 @@
+name: VM Actions matrix
+description: VM Actions matrix template
+
+inputs:
+  run:
+    description: 'The CI command to run'
+    required: true
+  release:
+    description: 'The OS release version'
+    required: false
+  envs:
+    description: 'The envs to pass into vm'
+    required: false
+
+runs:
+  using: composite
+  steps:
+    - uses: ${VMACTIONS}
+      with:
+        usesh: true
+        copyback: false
+        run: ${{inputs.run}}
+        envs: ${{inputs.envs}}
+        release: ${{inputs.release}}
