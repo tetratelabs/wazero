@@ -1,4 +1,4 @@
-//go:build !(linux || darwin || freebsd || netbsd || dragonfly || solaris || windows) || tinygo
+//go:build !(unix || windows) || tinygo
 
 package platform
 
@@ -9,15 +9,11 @@ import (
 
 var errUnsupported = fmt.Errorf("mmap unsupported on GOOS=%s. Use interpreter instead.", runtime.GOOS)
 
+func mmapCodeSegment(size int, exec bool) ([]byte, error) {
+	panic(errUnsupported)
+}
+
 func munmapCodeSegment(code []byte) error {
-	panic(errUnsupported)
-}
-
-func mmapCodeSegmentAMD64(size int) ([]byte, error) {
-	panic(errUnsupported)
-}
-
-func mmapCodeSegmentARM64(size int) ([]byte, error) {
 	panic(errUnsupported)
 }
 

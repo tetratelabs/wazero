@@ -16,21 +16,21 @@ import (
 func Test_sharedFunctionsFinalizer(t *testing.T) {
 	sf := &sharedFunctions{}
 
-	b1, err := platform.MmapCodeSegment(100)
+	b1, _, err := platform.MmapCodeSegment(100)
 	require.NoError(t, err)
-	b2, err := platform.MmapCodeSegment(100)
+	b2, _, err := platform.MmapCodeSegment(100)
 	require.NoError(t, err)
-	b3, err := platform.MmapCodeSegment(100)
+	b3, _, err := platform.MmapCodeSegment(100)
 	require.NoError(t, err)
-	b6, err := platform.MmapCodeSegment(100)
+	b6, _, err := platform.MmapCodeSegment(100)
 	require.NoError(t, err)
-	b7, err := platform.MmapCodeSegment(100)
+	b7, _, err := platform.MmapCodeSegment(100)
 	require.NoError(t, err)
-	b8, err := platform.MmapCodeSegment(100)
+	b8, _, err := platform.MmapCodeSegment(100)
 	require.NoError(t, err)
-	b9, err := platform.MmapCodeSegment(100)
+	b9, _, err := platform.MmapCodeSegment(100)
 	require.NoError(t, err)
-	b10, err := platform.MmapCodeSegment(100)
+	b10, _, err := platform.MmapCodeSegment(100)
 	require.NoError(t, err)
 
 	sf.memoryGrowExecutable = b1
@@ -54,7 +54,7 @@ func Test_sharedFunctionsFinalizer(t *testing.T) {
 }
 
 func Test_executablesFinalizer(t *testing.T) {
-	b, err := platform.MmapCodeSegment(100)
+	b, _, err := platform.MmapCodeSegment(100)
 	require.NoError(t, err)
 
 	exec := &executables{}

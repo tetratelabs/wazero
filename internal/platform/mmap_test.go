@@ -11,11 +11,11 @@ func Test_MmapCodeSegment(t *testing.T) {
 		t.Skip()
 	}
 
-	_, err := MmapCodeSegment(1234)
+	_, _, err := MmapCodeSegment(1234)
 	require.NoError(t, err)
 	t.Run("panic on zero length", func(t *testing.T) {
 		captured := require.CapturePanic(func() {
-			_, _ = MmapCodeSegment(0)
+			_, _, _ = MmapCodeSegment(0)
 		})
 		require.EqualError(t, captured, "BUG: MmapCodeSegment with zero length")
 	})
@@ -29,7 +29,7 @@ func Test_MunmapCodeSegment(t *testing.T) {
 	// Errors if never mapped
 	require.Error(t, MunmapCodeSegment([]byte{1, 2, 3, 5}))
 
-	newCode, err := MmapCodeSegment(100)
+	newCode, _, err := MmapCodeSegment(100)
 	require.NoError(t, err)
 	// First munmap should succeed.
 	require.NoError(t, MunmapCodeSegment(newCode))

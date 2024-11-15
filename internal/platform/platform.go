@@ -26,15 +26,16 @@ func CompilerSupported() bool {
 // MmapCodeSegment copies the code into the executable region and returns the byte slice of the region.
 //
 // See https://man7.org/linux/man-pages/man2/mmap.2.html for mmap API and flags.
-func MmapCodeSegment(size int) ([]byte, error) {
+func MmapCodeSegment(size int) ([]byte, bool, error) {
 	if size == 0 {
 		panic("BUG: MmapCodeSegment with zero length")
 	}
-	if runtime.GOARCH == "amd64" {
-		return mmapCodeSegmentAMD64(size)
-	} else {
-		return mmapCodeSegmentARM64(size)
+	b, err := mmapCodeSegment(size, true)
+	if err == nil {
+		return b, true, nil
 	}
+	b, err = mmapCodeSegment(size, false)
+	return b, false, err
 }
 
 // MunmapCodeSegment unmaps the given memory region.

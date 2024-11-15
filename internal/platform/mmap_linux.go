@@ -59,8 +59,12 @@ func init() {
 	})
 }
 
-func mmapCodeSegment(size, prot int) ([]byte, error) {
+func mmapCodeSegment(size int, exec bool) ([]byte, error) {
 	flags := syscall.MAP_ANON | syscall.MAP_PRIVATE
+	prot := syscall.PROT_READ | syscall.PROT_WRITE
+	if exec {
+		prot |= syscall.PROT_EXEC
+	}
 
 	for _, hugePagesConfig := range hugePagesConfigs {
 		if hugePagesConfig.match(size) {
@@ -73,4 +77,8 @@ func mmapCodeSegment(size, prot int) ([]byte, error) {
 	}
 
 	return syscall.Mmap(-1, 0, size, prot, flags)
+}
+
+func munmapCodeSegment(code []byte) error {
+	return syscall.Munmap(code)
 }

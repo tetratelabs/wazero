@@ -291,7 +291,7 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 	}
 
 	// Allocate executable memory and then copy the generated machine code.
-	executable, err := platform.MmapCodeSegment(totalSize)
+	executable, isrx, err := platform.MmapCodeSegment(totalSize)
 	if err != nil {
 		panic(err)
 	}
@@ -317,8 +317,8 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 		machine.ResolveRelocations(refToBinaryOffset, executable, rels, callTrampolineIslandOffsets)
 	}
 
-	if runtime.GOARCH == "arm64" {
-		// On arm64, we cannot give all of rwx at the same time, so we change it to exec.
+	if !isrx {
+		// If we didn't map RX, change it to RX.
 		if err = platform.MprotectRX(executable); err != nil {
 			return nil, err
 		}
@@ -460,7 +460,7 @@ func (e *engine) compileHostModule(ctx context.Context, module *wasm.Module, lis
 	}
 
 	// Allocate executable memory and then copy the generated machine code.
-	executable, err := platform.MmapCodeSegment(totalSize)
+	executable, isrx, err := platform.MmapCodeSegment(totalSize)
 	if err != nil {
 		panic(err)
 	}
@@ -475,8 +475,8 @@ func (e *engine) compileHostModule(ctx context.Context, module *wasm.Module, lis
 		wazevoapi.PerfMap.Flush(uintptr(unsafe.Pointer(&executable[0])), cm.functionOffsets)
 	}
 
-	if runtime.GOARCH == "arm64" {
-		// On arm64, we cannot give all of rwx at the same time, so we change it to exec.
+	if !isrx {
+		// If we didn't map RX, change it to RX.
 		if err = platform.MprotectRX(executable); err != nil {
 			return nil, err
 		}
@@ -771,15 +771,15 @@ func executablesFinalizer(exec *executables) {
 }
 
 func mmapExecutable(src []byte) []byte {
-	executable, err := platform.MmapCodeSegment(len(src))
+	executable, isrx, err := platform.MmapCodeSegment(len(src))
 	if err != nil {
 		panic(err)
 	}
 
 	copy(executable, src)
 
-	if runtime.GOARCH == "arm64" {
-		// On arm64, we cannot give all of rwx at the same time, so we change it to exec.
+	if !isrx {
+		// If we didn't map RX, change it to RX.
 		if err = platform.MprotectRX(executable); err != nil {
 			panic(err)
 		}
