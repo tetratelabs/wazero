@@ -14,12 +14,13 @@ var archRequirementsVerified bool
 // CompilerSupported is exported for tests and includes constraints here and also the assembler.
 func CompilerSupported() bool {
 	switch runtime.GOOS {
-	case "darwin", "windows", "linux", "freebsd":
+	case "linux", "darwin", "freebsd", "netbsd", "dragonfly", "windows":
+		return archRequirementsVerified
+	case "solaris", "illumos":
+		return runtime.GOARCH == "amd64" && archRequirementsVerified
 	default:
 		return false
 	}
-
-	return archRequirementsVerified
 }
 
 // MmapCodeSegment copies the code into the executable region and returns the byte slice of the region.
