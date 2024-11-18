@@ -37,14 +37,14 @@ jobs:
           wabt_url=https://github.com/WebAssembly/wabt/releases/download/${wabt_version}/wabt-${wabt_version}-ubuntu.tar.gz
           curl -sSL ${wabt_url} | tar --strip-components 2 -C /usr/local/bin -xzf - wabt-${wabt_version}/bin/wast2json
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
         with:  # not cache: true as we also need to cache golint
           cache: false
           go-version: ${{ env.GO_VERSION }}
 
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         with:
           path: |
             ~/.cache/go-build
@@ -76,15 +76,15 @@ jobs:
 
     steps:
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go-version }}
 
       # Ensure the pagefile is large enough to execute tests like TestStore_hammer_close on Windows.
       - name: configure Pagefile
-        uses: al-cheb/configure-pagefile-action@v1.2
+        uses: al-cheb/configure-pagefile-action@v1.4
         if: runner.os == 'Windows'
         with:
           minimum-size: 8GB
@@ -121,9 +121,9 @@ jobs:
 
     steps:
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go-version }}
 
@@ -137,7 +137,7 @@ jobs:
 
       - name: Set up QEMU
         if: ${{ matrix.arch != 'amd64' }}
-        uses: docker/setup-qemu-action@v2
+        uses: docker/setup-qemu-action@v3
         with:  # Avoid docker.io rate-limits; built with internal-images.yml
           image: ghcr.io/tetratelabs/wazero/internal-binfmt
           platforms: ${{ matrix.arch }}
@@ -167,7 +167,7 @@ jobs:
             version: "10.0"
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Build test binaries
         run: |
@@ -207,7 +207,7 @@ jobs:
             action: 'vmactions/solaris-vm@v1'
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Build test binaries
         run: |
@@ -242,12 +242,12 @@ jobs:
             arch: arm64
 
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         id: cache
         with:
           # Cache corpus and artifacts so that we don't start from scratch but rather with a meaningful corpus
