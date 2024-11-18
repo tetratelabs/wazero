@@ -76,11 +76,11 @@ jobs:
         run: |
           ./emsdk/emsdk install ${{env.EMSDK_VERSION}}
 
-      - name: Install wasm32-wasi target
-        uses: actions-rs/toolchain@v1
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
-          target: wasm32-wasi
+          targets: wasm32-unknown-unknown, wasm32-wasi
 
       - name: Build TinyGo examples
         run: make build.examples.tinygo
