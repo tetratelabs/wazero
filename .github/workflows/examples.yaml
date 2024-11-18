@@ -39,9 +39,9 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go-version }}
 
@@ -59,14 +59,14 @@ jobs:
 
       - name: Cache Emscripten
         id: cache-emsdk
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: emsdk
           key: ${{ runner.os }}-emcc-${{env.EMSDK_VERSION}}
 
       - name: Checkout Emscripten
         if: steps.cache-emsdk.outputs.cache-hit != 'true'
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: emscripten-core/emsdk
           path: emsdk
@@ -76,11 +76,11 @@ jobs:
         run: |
           ./emsdk/emsdk install ${{env.EMSDK_VERSION}}
 
-      - name: Install wasm32-wasi target
-        uses: actions-rs/toolchain@v1
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
-          target: wasm32-wasi
+          targets: wasm32-unknown-unknown, wasm32-wasi
 
       - name: Build TinyGo examples
         run: make build.examples.tinygo

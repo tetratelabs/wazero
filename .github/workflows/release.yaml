@@ -31,14 +31,14 @@ jobs:
     outputs:
       VERSION: ${{ steps.output-version.outputs.VERSION }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
         with:
           cache: false
           go-version: ${{ env.GO_VERSION }}
 
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         with:
           path: |
             ~/go/pkg/mod
@@ -100,7 +100,7 @@ jobs:
       # Downside of this is that, we pressure the cache capacity set per repository. We delete all caches created
       # on PRs on close. See .github/workflows/clear_cache.yaml. On main branch, in any way this cache will be deleted
       # in 7 days, also this at most a few MB, so this won't be an issue.
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         id: cache
         with:
           # Use share the cache containing archives across OSes.
@@ -121,9 +121,9 @@ jobs:
         os: [ubuntu-22.04, macos-14, windows-2022]
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         id: cache
         with:
           # We need this cache to run tests.
@@ -163,11 +163,11 @@ jobs:
     name: Release
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:  # Ensure release_notes.sh can see prior commits
           fetch-depth: 0
 
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         id: cache
         with:
           fail-on-cache-miss: true

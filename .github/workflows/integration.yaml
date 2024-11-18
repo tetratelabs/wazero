@@ -40,9 +40,9 @@ jobs:
 
     steps:
       - name: Checkout wazero
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         id: binary-cache
         with:
           # Use share the cache containing archives across OSes.
@@ -98,9 +98,9 @@ jobs:
 
     steps:
       - name: Checkout wazero
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         id: binary-cache
         with:
           # Use share the cache containing archives across OSes.
@@ -111,7 +111,7 @@ jobs:
           path:
             ${{ env.STDLIB_TESTS }}/testdata/zig
 
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
 
@@ -125,9 +125,9 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout wazero
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         id: binary-cache
         with:
           # Use share the cache containing archives across OSes.
@@ -144,7 +144,7 @@ jobs:
           echo "TINYGOROOT=/usr/local/tinygo" >> $GITHUB_ENV
           echo "/usr/local/tinygo/bin" >> $GITHUB_PATH
 
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
         if: steps.binary-cache.outputs.cache-hit != 'true'
         with:
           go-version: ${{ env.GO_VERSION }}
@@ -177,9 +177,9 @@ jobs:
 
     steps:
       - name: Checkout wazero
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         id: binary-cache
         with:
           # Use share the cache containing archives across OSes.
@@ -190,7 +190,7 @@ jobs:
           path:
             ${{ env.STDLIB_TESTS }}/testdata/tinygo
 
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
 
@@ -208,25 +208,25 @@ jobs:
         os: [ubuntu-22.04, macos-14, windows-2022]
 
     steps:
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         id: cache
         with:
           path:
             ~/go/pkg/mod
           key: integration-test-wasi-testsuite-${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum') }}
 
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
 
       - name: Checkout wazero
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install wazero
         run: go install ./cmd/wazero
 
       - name: Checkout wasi-testsuite
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: WebAssembly/wasi-testsuite
           # prod/testsuite-base branch, as of May 12, 2023.
@@ -235,7 +235,7 @@ jobs:
           path: wasi-testsuite
 
       - name: Initialize Python environment
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11' # latest version of python 3
           cache: pip
@@ -281,16 +281,16 @@ jobs:
 
     steps:
       - id: setup-go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go-version }}
 
       - name: Checkout wazero
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Cache Go test binaries
         id: cache-go-test-binaries
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path:
             ${{ env.STDLIB_TESTS }}/testdata/go
@@ -332,9 +332,9 @@ jobs:
 
     steps:
       - name: Checkout wazero
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         id: binary-cache
         with:
           # Use share the cache containing archives across OSes.
@@ -345,7 +345,7 @@ jobs:
           path:
             ${{ env.STDLIB_TESTS }}/testdata/tinygo
 
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
 
