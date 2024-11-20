@@ -60,8 +60,9 @@ func (f *cpuFeatureFlags) HasExtra(cpuFeature CpuFeature) bool {
 
 // Raw implements the same method on the CpuFeatureFlags interface.
 func (f *cpuFeatureFlags) Raw() uint64 {
-	// Below, we only set the first 4 bits for the features we care about,
-	// instead of setting all the unnecessary bits obtained from the CPUID instruction.
+	// Below, we only set bits for the features we care about,
+	// instead of setting all the unnecessary bits obtained from the
+	// CPUID instruction.
 	var ret uint64
 	if f.Has(CpuFeatureAmd64SSE3) {
 		ret = 1 << 0

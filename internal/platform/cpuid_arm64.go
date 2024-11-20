@@ -22,13 +22,23 @@ func getisar1() uint64
 func loadCpuFeatureFlags() CpuFeatureFlags {
 	switch runtime.GOOS {
 	case "darwin", "windows":
-		// These OSes require ARMv8.1, which includes atomic instructions.
+		// These OSes do not allow userland to read the instruction set attribute registers,
+		// but basically require atomic instructions:
+		// - "darwin" is the desktop version (mobile version is "ios"),
+		//   and the M1 is a ARMv8.4.
+		// - "windows" requires them from Windows 11, see page 12
+		//   https://download.microsoft.com/download/7/8/8/788bf5ab-0751-4928-a22c-dffdc23c27f2/Minimum%20Hardware%20Requirements%20for%20Windows%2011.pdf
 		return &cpuFeatureFlags{
 			isar0: uint64(CpuFeatureArm64Atomic),
 			isar1: 0,
 		}
 	case "linux", "freebsd":
-		// These OSes allow reading the instruction set attribute registers.
+		// These OSes allow userland to read the instruction set attribute registers,
+		// which is otherwise restricted to EL0:
+		// https://kernel.org/doc/Documentation/arm64/cpu-feature-registers.txt
+		// See these for contents of the registers:
+		// https://developer.arm.com/documentation/ddi0601/latest/AArch64-Registers/ID-AA64ISAR0-EL1--AArch64-Instruction-Set-Attribute-Register-0
+		// https://developer.arm.com/documentation/ddi0601/latest/AArch64-Registers/ID-AA64ISAR1-EL1--AArch64-Instruction-Set-Attribute-Register-1
 		return &cpuFeatureFlags{
 			isar0: getisar0(),
 			isar1: getisar1(),
@@ -50,27 +60,12 @@ func (f *cpuFeatureFlags) HasExtra(cpuFeature CpuFeature) bool {
 
 // Raw implements the same method on the CpuFeatureFlags interface.
 func (f *cpuFeatureFlags) Raw() uint64 {
-	// Below, we only set the first 4 bits for the features we care about,
-	// instead of setting all the unnecessary bits obtained from the CPUID instruction.
+	// Below, we only set bits for the features we care about,
+	// instead of setting all the unnecessary bits obtained from the
+	// instruction set attribute registers.
 	var ret uint64
-	switch runtime.GOARCH {
-	case "arm64":
-		if f.Has(CpuFeatureArm64Atomic) {
-			ret = 1 << 0
-		}
-	case "amd64":
-		if f.Has(CpuFeatureAmd64SSE3) {
-			ret = 1 << 0
-		}
-		if f.Has(CpuFeatureAmd64SSE4_1) {
-			ret |= 1 << 1
-		}
-		if f.Has(CpuFeatureAmd64SSE4_2) {
-			ret |= 1 << 2
-		}
-		if f.HasExtra(CpuExtraFeatureAmd64ABM) {
-			ret |= 1 << 3
-		}
+	if f.Has(CpuFeatureArm64Atomic) {
+		ret = 1 << 0
 	}
 	return ret
 }
