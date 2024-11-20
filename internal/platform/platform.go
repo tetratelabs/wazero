@@ -11,7 +11,7 @@ import (
 // archRequirementsVerified is set by platform-specific init to true if the platform is supported
 var archRequirementsVerified bool
 
-// CompilerSupported is exported for tests and includes constraints here and also the assembler.
+// CompilerSupported includes constraints here and also the assembler.
 func CompilerSupported() bool {
 	switch runtime.GOOS {
 	case "linux", "darwin", "freebsd", "netbsd", "dragonfly", "windows":
