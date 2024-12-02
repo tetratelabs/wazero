@@ -708,7 +708,7 @@ func Test_resolveImports(t *testing.T) {
 		m := &ModuleInstance{s: newStore()}
 		m.s.nameToModule[moduleName] = &ModuleInstance{Exports: map[string]*Export{}, ModuleName: moduleName}
 		err := m.resolveImports(context.Background(), &Module{ImportPerModule: map[string][]*Import{moduleName: {{Name: "unknown"}}}})
-		require.EqualError(t, err, "\"unknown\" is not exported in module \"test\"")
+		require.EqualError(t, err, ErrModuleNotExported.Error())
 	})
 	t.Run("func", func(t *testing.T) {
 		t.Run("ok", func(t *testing.T) {
