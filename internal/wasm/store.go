@@ -285,14 +285,19 @@ func (m *ModuleInstance) applyData(data []DataSegment) error {
 	return nil
 }
 
+var (
+	ErrModuleNotExported       = errors.New("module not exported")
+	ErrModuleWrongExternalType = errors.New("module has wrong external type")
+)
+
 // GetExport returns an export of the given name and type or errs if not exported or the wrong type.
 func (m *ModuleInstance) getExport(name string, et ExternType) (*Export, error) {
 	exp, ok := m.Exports[name]
 	if !ok {
-		return nil, fmt.Errorf("%q is not exported in module %q", name, m.ModuleName)
+		return nil, ErrModuleNotExported
 	}
 	if exp.Type != et {
-		return nil, fmt.Errorf("export %q in module %q is a %s, not a %s", name, m.ModuleName, ExternTypeName(exp.Type), ExternTypeName(et))
+		return nil, ErrModuleWrongExternalType
 	}
 	return exp, nil
 }
