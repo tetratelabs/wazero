@@ -9,7 +9,6 @@ import (
 	experimentalapi "github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/expctxkeys"
 	internalsock "github.com/tetratelabs/wazero/internal/sock"
-	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	binaryformat "github.com/tetratelabs/wazero/internal/wasm/binary"
 	"github.com/tetratelabs/wazero/sys"
@@ -289,8 +288,8 @@ func (r *runtime) InstantiateModule(
 	ctx context.Context,
 	compiled CompiledModule,
 	mConfig ModuleConfig,
-) (mod api.Module, err error) {
-	if err = r.failIfClosed(); err != nil {
+) (api.Module, error) {
+	if err := r.failIfClosed(); err != nil {
 		return nil, err
 	}
 
@@ -304,9 +303,9 @@ func (r *runtime) InstantiateModule(
 		}
 	}
 
-	var sysCtx *internalsys.Context
-	if sysCtx, err = config.toSysContext(); err != nil {
-		return
+	sysCtx, err := config.toSysContext()
+	if err != nil {
+		return nil, err
 	}
 
 	name := config.name
@@ -315,23 +314,23 @@ func (r *runtime) InstantiateModule(
 	}
 
 	// Instantiate the module.
-	mod, err = r.store.Instantiate(ctx, code.module, name, sysCtx, code.typeIDs)
+	mod, err := r.store.Instantiate(ctx, code.module, name, sysCtx, code.typeIDs)
 	if err != nil {
 		// If there was an error, don't leak the compiled module.
 		if code.closeWithModule {
 			_ = code.Close(ctx) // don't overwrite the error
 		}
-		return
+		return nil, err
 	}
 
 	if closeNotifier, ok := ctx.Value(expctxkeys.CloseNotifierKey{}).(experimentalapi.CloseNotifier); ok {
-		mod.(*wasm.ModuleInstance).CloseNotifier = closeNotifier
+		mod.CloseNotifier = closeNotifier
 	}
 
 	// Attach the code closer so that anything afterward closes the compiled
 	// code when closing the module.
 	if code.closeWithModule {
-		mod.(*wasm.ModuleInstance).CodeCloser = code
+		mod.CodeCloser = code
 	}
 
 	// Now, invoke any start functions, failing at first error.
@@ -340,20 +339,20 @@ func (r *runtime) InstantiateModule(
 		if start == nil {
 			continue
 		}
-		if _, err = start.Call(ctx); err != nil {
+		if _, err := start.Call(ctx); err != nil {
 			_ = mod.Close(ctx) // Don't leak the module on error.
 
 			if se, ok := err.(*sys.ExitError); ok {
 				if se.ExitCode() == 0 { // Don't err on success.
-					err = nil
+					return mod, nil
 				}
-				return // Don't wrap an exit error
+				return nil, err // Don't wrap an exit error
 			}
 			err = fmt.Errorf("module[%s] function[%s] failed: %w", name, fn, err)
-			return
+			return nil, err
 		}
 	}
-	return
+	return mod, nil
 }
 
 // Close implements api.Closer embedded in Runtime.
