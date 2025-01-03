@@ -4,7 +4,6 @@ import (
 	"io"
 	"io/fs"
 	"os"
-	"runtime"
 
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/fsapi"
@@ -15,7 +14,15 @@ func newOsFile(path string, flag experimentalsys.Oflag, perm fs.FileMode, f *os.
 	// Windows cannot read files written to a directory after it was opened.
 	// This was noticed in #1087 in zig tests. Use a flag instead of a
 	// different type.
-	reopenDir := runtime.GOOS == "windows"
+	//
+	// As POSIX states, if a file is removed from or added to the directory
+	// after the most recent call to opendir() or rewinddir(), whether a
+	// subsequent call to readdir() returns an entry for that file is unspecified.
+	//
+	// So there is no guarantee that files added after opendir() will be visible
+	// in readdir(). We need to reopendir() to get the new state of the directory
+	// before readdir().
+	reopenDir := true
 	return &osFile{path: path, flag: flag, perm: perm, reopenDir: reopenDir, file: f, fd: f.Fd()}
 }
 
