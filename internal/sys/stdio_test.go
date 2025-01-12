@@ -1,6 +1,8 @@
 package sys
 
 import (
+	"bytes"
+	"io"
 	"io/fs"
 	"os"
 	"testing"
@@ -134,5 +136,65 @@ func TestStdio(t *testing.T) {
 				require.Equal(t, len(buf), n) // like io.Discard
 			})
 		}
+	}
+}
+
+type syncable struct {
+	io.Writer
+	Syncd bool
+}
+
+func (s *syncable) Sync() error {
+	s.Syncd = true
+	return nil
+}
+
+func TestStdioSync(t *testing.T) {
+	tmpFile, err := os.CreateTemp(t.TempDir(), "anotherfile")
+	require.NoError(t, err)
+	defer tmpFile.Close()
+
+	syncbuf := &syncable{Writer: bytes.NewBuffer(nil)}
+
+	stdoutNil, err := stdioWriterFileEntry("stdout", nil)
+	require.NoError(t, err)
+
+	stdoutFile, err := stdioWriterFileEntry("stdout", tmpFile)
+	require.NoError(t, err)
+
+	stdoutSync, err := stdioWriterFileEntry("stdout", syncbuf)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name string
+		f    *FileEntry
+	}{
+		{
+			name: "nil",
+			f:    stdoutNil,
+		},
+		{
+			name: "file",
+			f:    stdoutFile,
+		},
+		{
+			name: "syncer",
+			f:    stdoutSync,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			_, errno := tc.f.File.Write([]byte("hello"))
+			require.EqualErrno(t, 0, errno)
+			errno = tc.f.File.Sync()
+			require.EqualErrno(t, 0, errno)
+
+			if tc.f == stdoutSync {
+				require.True(t, syncbuf.Syncd)
+			}
+		})
 	}
 }

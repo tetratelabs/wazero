@@ -36,6 +36,19 @@ func (f *writerFile) Write(buf []byte) (int, experimentalsys.Errno) {
 	return n, experimentalsys.UnwrapOSError(err)
 }
 
+// syncer is a writer that support flushing for fd_sync
+type syncer interface {
+	Sync() error
+}
+
+// Sync implements the same method as documented on sys.File
+func (f *writerFile) Sync() experimentalsys.Errno {
+	if s, ok := f.w.(syncer); ok {
+		return experimentalsys.UnwrapOSError(s.Sync())
+	}
+	return 0
+}
+
 // noopStdinFile is a fs.ModeDevice file for use implementing FdStdin. This is
 // safer than reading from os.DevNull as it can never overrun operating system
 // file descriptors.
