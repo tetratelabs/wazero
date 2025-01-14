@@ -315,6 +315,7 @@ jobs:
           go test -bench='BenchmarkWasip1' -timeout=20m -benchtime=1x
 
   libsodium:
+    needs: build_tinygo_test_binary
     name: libsodium (${{ matrix.os.name }}, ${{ matrix.os.arch }})
     runs-on: ${{ matrix.os.version }}
     strategy:
