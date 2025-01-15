@@ -315,7 +315,6 @@ jobs:
           go test -bench='BenchmarkWasip1' -timeout=20m -benchtime=1x
 
   libsodium:
-    needs: build_tinygo_test_binary
     name: libsodium (${{ matrix.os.name }}, ${{ matrix.os.arch }})
     runs-on: ${{ matrix.os.version }}
     strategy:
@@ -349,6 +348,15 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/.cache/golangci-lint
+            ~/go/pkg/mod
+            ~/go/bin
+          key: integration-test-libsodium-${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum', 'Makefile') }}
 
       - name: Download test binaries
         run: make libsodium
