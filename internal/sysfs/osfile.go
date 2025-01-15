@@ -11,19 +11,17 @@ import (
 )
 
 func newOsFile(path string, flag experimentalsys.Oflag, perm fs.FileMode, f *os.File) fsapi.File {
-	// Windows cannot read files written to a directory after it was opened.
-	// This was noticed in #1087 in zig tests. Use a flag instead of a
-	// different type.
+	// On POSIX, if a file is removed from or added to the directory after the
+	// most recent call to opendir() or rewinddir(), whether a subsequent call
+	// to readdir() returns an entry for that file is unspecified.
 	//
-	// As POSIX states, if a file is removed from or added to the directory
-	// after the most recent call to opendir() or rewinddir(), whether a
-	// subsequent call to readdir() returns an entry for that file is unspecified.
+	// And Windows cannot read files added to a directory after it was opened.
+	// This was noticed in #1087 in zig tests.
 	//
 	// So there is no guarantee that files added after opendir() will be visible
-	// in readdir(). We need to reopendir() to get the new state of the directory
-	// before readdir().
-	reopenDir := true
-	return &osFile{path: path, flag: flag, perm: perm, reopenDir: reopenDir, file: f, fd: f.Fd()}
+	// in readdir(). Since we want those files to be visible, we need to
+	// reopendir() to get the new state of the directory before readdir().
+	return &osFile{path: path, flag: flag, perm: perm, reopenDir: true, file: f, fd: f.Fd()}
 }
 
 // osFile is a file opened with this package, and uses os.File or syscalls to
