@@ -7,7 +7,10 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	experimentalapi "github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/internal/engine/interpreter"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo"
 	"github.com/tetratelabs/wazero/internal/expctxkeys"
+	"github.com/tetratelabs/wazero/internal/platform"
 	internalsock "github.com/tetratelabs/wazero/internal/sock"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -148,6 +151,20 @@ func NewRuntime(ctx context.Context) Runtime {
 // NewRuntimeWithConfig returns a runtime with the given configuration.
 func NewRuntimeWithConfig(ctx context.Context, rConfig RuntimeConfig) Runtime {
 	config := rConfig.(*runtimeConfig)
+	if config.engineKind == engineKindAuto {
+		if platform.CompilerSupports(config.enabledFeatures) {
+			config.engineKind = engineKindCompiler
+		} else {
+			config.engineKind = engineKindInterpreter
+		}
+	}
+	if config.newEngine == nil {
+		if config.engineKind == engineKindCompiler {
+			config.newEngine = wazevo.NewEngine
+		} else {
+			config.newEngine = interpreter.NewEngine
+		}
+	}
 	var engine wasm.Engine
 	var cacheImpl *cache
 	if c := config.cache; c != nil {
