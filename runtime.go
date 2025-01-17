@@ -151,18 +151,20 @@ func NewRuntime(ctx context.Context) Runtime {
 // NewRuntimeWithConfig returns a runtime with the given configuration.
 func NewRuntimeWithConfig(ctx context.Context, rConfig RuntimeConfig) Runtime {
 	config := rConfig.(*runtimeConfig)
-	if config.engineKind == engineKindAuto {
+	configKind := config.engineKind
+	configEngine := config.newEngine
+	if configKind == engineKindAuto {
 		if platform.CompilerSupports(config.enabledFeatures) {
-			config.engineKind = engineKindCompiler
+			configKind = engineKindCompiler
 		} else {
-			config.engineKind = engineKindInterpreter
+			configKind = engineKindInterpreter
 		}
 	}
-	if config.newEngine == nil {
-		if config.engineKind == engineKindCompiler {
-			config.newEngine = wazevo.NewEngine
+	if configEngine == nil {
+		if configKind == engineKindCompiler {
+			configEngine = wazevo.NewEngine
 		} else {
-			config.newEngine = interpreter.NewEngine
+			configEngine = interpreter.NewEngine
 		}
 	}
 	var engine wasm.Engine
@@ -170,10 +172,10 @@ func NewRuntimeWithConfig(ctx context.Context, rConfig RuntimeConfig) Runtime {
 	if c := config.cache; c != nil {
 		// If the Cache is configured, we share the engine.
 		cacheImpl = c.(*cache)
-		engine = cacheImpl.initEngine(config.engineKind, config.newEngine, ctx, config.enabledFeatures)
+		engine = cacheImpl.initEngine(configKind, configEngine, ctx, config.enabledFeatures)
 	} else {
 		// Otherwise, we create a new engine.
-		engine = config.newEngine(ctx, config.enabledFeatures, nil)
+		engine = configEngine(ctx, config.enabledFeatures, nil)
 	}
 	store := wasm.NewStore(config.enabledFeatures, engine)
 	return &runtime{
