@@ -107,17 +107,21 @@ jobs:
 
   test_scratch:
     name: ${{ matrix.arch }}, Linux (scratch), Go-${{ matrix.go-version }}
-    runs-on: ubuntu-22.04
+    runs-on: ${{ matrix.platform.os }}
     strategy:
       fail-fast: false  # don't fail fast as sometimes failures are arch/OS specific
       matrix:  # Use versions consistent with wazero's Go support policy.
         go-version:
           - "1.23"  # Current Go version
           - "1.21"  # Floor Go version of wazero (current - 2)
-        arch:
-          - "amd64"
-          - "arm64"
-          - "riscv64"
+        platform:
+          - os: ubuntu-22.04
+            arch: amd64
+          - os: ubuntu-22.04-arm64
+            arch: arm64
+          - os: ubuntu-22.04
+            arch: riscv64
+            qemu: true
 
     steps:
 
@@ -132,11 +136,11 @@ jobs:
           go list -f '{{.Dir}}' ./... | egrep -v 'spectest' | xargs -Ipkg go test pkg -c -o pkg.test
           go build -o wazerocli ./cmd/wazero
         env:
-          GOARCH: ${{ matrix.arch }}
+          GOARCH: ${{ matrix.platform.arch }}
           CGO_ENABLED: 0
 
       - name: Set up QEMU
-        if: ${{ matrix.arch != 'amd64' }}
+        if: ${{ matrix.platform.qemu }}
         uses: docker/setup-qemu-action@v3
         with:  # Avoid docker.io rate-limits; built with internal-images.yml
           image: ghcr.io/tetratelabs/wazero/internal-binfmt
@@ -146,11 +150,11 @@ jobs:
         run: |
           echo 'FROM scratch' >> Dockerfile
           echo 'CMD ["/test"]' >> Dockerfile
-          docker buildx build -t wazero:test --platform linux/${{ matrix.arch }} .
+          docker buildx build -t wazero:test --platform linux/${{ matrix.platform.arch }} .
 
       - name: Run built test binaries
         # This runs all tests compiled above in sequence. Note: This mounts /tmp to allow t.TempDir() in tests.
-        run: find . -name "*.test" | xargs -Itestbin docker run --platform linux/${{ matrix.arch }} -v $(pwd)/testbin:/test -v $(pwd)/wazerocli:/wazero -e WAZEROCLI=/wazero --tmpfs /tmp --rm -t wazero:test
+        run: find . -name "*.test" | xargs -Itestbin docker run --platform linux/${{ matrix.platform.arch }} -v $(pwd)/testbin:/test -v $(pwd)/wazerocli:/wazero -e WAZEROCLI=/wazero --tmpfs /tmp --rm -t wazero:test
 
   test_bsd:
     name: amd64, ${{ matrix.os.name }}
