@@ -106,7 +106,7 @@ jobs:
         run: bash <(curl -s https://codecov.io/bash)
 
   test_scratch:
-    name: ${{ matrix.arch }}, Linux (scratch), Go-${{ matrix.go-version }}
+    name: ${{ matrix.platform.arch }}, Linux (scratch), Go-${{ matrix.go-version }}
     runs-on: ${{ matrix.platform.os }}
     strategy:
       fail-fast: false  # don't fail fast as sometimes failures are arch/OS specific
