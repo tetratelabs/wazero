@@ -117,7 +117,7 @@ jobs:
         platform:
           - os: ubuntu-22.04
             arch: amd64
-          - os: ubuntu-24.04-arm64
+          - os: ubuntu-22.04-arm
             arch: arm64
           - os: ubuntu-22.04
             arch: riscv64
