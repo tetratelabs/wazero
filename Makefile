@@ -102,7 +102,7 @@ internal/testing/dwarftestdata/testdata/rust/main.wasm.xz:
 	mv $(@D)/target/wasm32-wasip1/debug/main.wasm $(@D)
 	cd $(@D) && xz -k -f ./main.wasm # Rust's DWARF section is huge, so compress it.
 
-# Builds rust using cargo normally, or cargo-wasi.
+# Builds rust using cargo normally
 %.wasm: %.rs
 	@(cd $(@D); cargo build --target $(cargo_target) --release)
 	@mv $(@D)/target/$(cargo_target)/release/$(@F) $(@D)
