@@ -19,9 +19,11 @@ func Test_procExit(t *testing.T) {
 		expectedLog string
 	}{
 		{
-			name:        "success (exitcode 0)",
-			exitCode:    0,
-			expectedLog: ``,
+			name:     "success (exitcode 0)",
+			exitCode: 0,
+			expectedLog: `
+==> wasi_snapshot_preview1.proc_exit(rval=0)
+`,
 		},
 		{
 			name:     "arbitrary non-zero exitcode",
