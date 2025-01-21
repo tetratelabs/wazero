@@ -17,7 +17,7 @@ on:
 
 env:
   EMSDK_VERSION: "3.1.40"
-  TINYGO_VERSION: "0.33.0"
+  TINYGO_VERSION: "0.35.0"
   ZIG_VERSION: "0.11.0"
 
 concurrency:
@@ -80,7 +80,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
-          targets: wasm32-unknown-unknown, wasm32-wasi
+          targets: wasm32-unknown-unknown, wasm32-wasip1
 
       - name: Build TinyGo examples
         run: make build.examples.tinygo

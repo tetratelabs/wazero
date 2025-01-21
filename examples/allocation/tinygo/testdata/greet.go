@@ -38,7 +38,7 @@ func greeting(name string) string {
 // _greet is a WebAssembly export that accepts a string pointer (linear memory
 // offset) and calls greet.
 //
-//export greet
+//go:wasmexport greet
 func _greet(ptr, size uint32) {
 	name := ptrToString(ptr, size)
 	greet(name)
@@ -50,7 +50,7 @@ func _greet(ptr, size uint32) {
 // Note: This uses a uint64 instead of two result values for compatibility with
 // WebAssembly 1.0.
 //
-//export greeting
+//go:wasmexport greeting
 func _greeting(ptr, size uint32) (ptrSize uint64) {
 	name := ptrToString(ptr, size)
 	g := greeting(name)

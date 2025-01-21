@@ -39,7 +39,7 @@ func Example() {
 
 	// Instantiate the guest Wasm into the same runtime. It exports the `add`
 	// function, implemented in WebAssembly.
-	mod, err := r.Instantiate(ctx, addWasm)
+	mod, err := r.InstantiateWithConfig(ctx, addWasm, wazero.NewModuleConfig().WithStartFunctions("_initialize"))
 	if err != nil {
 		log.Panicln(err)
 	}

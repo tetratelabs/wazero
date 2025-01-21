@@ -133,7 +133,7 @@ build.tinygo:
 	@mkdir -p $(tinygo_bin)
 	for value in $(tinygo_tests); do\
 		echo Building $${value}... ;\
-		tinygo test -target wasi -c -o $(tinygo_bin)/$$(echo $$value | sed -e 's/\//_/g').test $${value} 2>&1 >/dev/null  ;\
+		tinygo test -target wasip1 -c -o $(tinygo_bin)/$$(echo $$value | sed -e 's/\//_/g').test $${value} 2>&1 >/dev/null  ;\
 	done
 
 .PHONY: build.gowasip1

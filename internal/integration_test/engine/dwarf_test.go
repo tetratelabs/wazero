@@ -85,77 +85,48 @@ wasm stack trace:
 }
 
 func testRustDWARF(t *testing.T, r wazero.Runtime) {
-	runDWARFTest(t, r, dwarftestdata.RustWasm, `module[] function[_start] failed: wasm error: unreachable
+	runDWARFTest(t, r, dwarftestdata.RustWasm, `module[main-144f120e836a09da.wasm] function[_start] failed: wasm error: unreachable
 wasm stack trace:
-	.__rust_start_panic(i32) i32
-		0xc474: /index.rs:286:39 (inlined)
-		        /const_ptr.rs:870:18 (inlined)
-		        /index.rs:286:39 (inlined)
-		        /mod.rs:1630:46 (inlined)
-		        /mod.rs:405:20 (inlined)
-		        /mod.rs:1630:46 (inlined)
-		        /mod.rs:1548:18 (inlined)
-		        /iter.rs:1478:30 (inlined)
-		        /count.rs:74:18
-	.rust_panic(i32,i32)
-		0xa3f8: /validations.rs:57:19 (inlined)
-		        /validations.rs:57:19 (inlined)
-		        /iter.rs:140:15 (inlined)
-		        /iter.rs:140:15 (inlined)
-		        /iterator.rs:330:13 (inlined)
-		        /iterator.rs:377:9 (inlined)
-		        /mod.rs:1455:35
-	.std::panicking::rust_panic_with_hook::h93e119628869d575(i32,i32,i32,i32,i32)
-		0x42df: /alloc.rs:244:22 (inlined)
-		        /alloc.rs:244:22 (inlined)
-		        /alloc.rs:342:9 (inlined)
-		        /mod.rs:487:1 (inlined)
-		        /mod.rs:487:1 (inlined)
-		        /mod.rs:487:1 (inlined)
-		        /mod.rs:487:1 (inlined)
-		        /mod.rs:487:1 (inlined)
-		        /panicking.rs:292:17 (inlined)
-		        /panicking.rs:292:17
-	.std::panicking::begin_panic_handler::{{closure}}::h2b8c0798e533b227(i32,i32,i32)
-		0xaa8c: /mod.rs:362:12 (inlined)
-		        /mod.rs:1257:22 (inlined)
-		        /mod.rs:1235:21 (inlined)
-		        /mod.rs:1214:26
-	.std::sys_common::backtrace::__rust_end_short_backtrace::h030a533bc034da65(i32)
-		0xc144: /mod.rs:188:26
-	.rust_begin_unwind(i32)
-		0xb7df: /mod.rs:1629:9 (inlined)
-		        /builders.rs:199:17 (inlined)
-		        /result.rs:1352:22 (inlined)
-		        /builders.rs:187:23
-	.core::panicking::panic_fmt::hb1bfc4175f838eff(i32,i32)
-		0xbd3d: /mod.rs:1384:17
-	.main::main::hfd44f54575e6bfdf()
-		0xad2c: /memchr.rs
-	.core::ops::function::FnOnce::call_once::h87e5f77996df3e28(i32)
-		0xbd61: /mod.rs
-	.std::sys_common::backtrace::__rust_begin_short_backtrace::h7ca17eb6aa97f768(i32)
-		0xbd95: /mod.rs:1504:35 (inlined)
-		        /mod.rs:1407:36
-	.std::rt::lang_start::{{closure}}::he4aa401e76315dfe(i32) i32
-		0xae9a: /location.rs:196:6
-	.std::rt::lang_start_internal::h3c39e5d3c278a90f(i32,i32,i32,i32) i32
-	.std::rt::lang_start::h779801844bd22a3c(i32,i32,i32) i32
-		0xab94: /mod.rs:1226:2
-	.__original_main() i32
-		0xc0ae: /methods.rs:1677:13 (inlined)
-		        /mod.rs:165:24 (inlined)
-		        /mod.rs:165:24
-	._start()
-		0xc10f: /mod.rs:187
-	._start.command_export()
-		0xc3de: /iterator.rs:2414:21 (inlined)
-		        /map.rs:124:9 (inlined)
-		        /accum.rs:42:17 (inlined)
-		        /iterator.rs:3347:9 (inlined)
-		        /count.rs:135:5 (inlined)
-		        /count.rs:135:5 (inlined)
-		        /count.rs:71:21`)
+	main-144f120e836a09da.wasm.__rust_start_panic(i32,i32) i32
+		0x3276: /lib.rs:100:17 (inlined)
+		        /lib.rs:43:5
+	main-144f120e836a09da.wasm.rust_panic(i32,i32)
+		0x31c8: /panicking.rs:862:25
+	main-144f120e836a09da.wasm._ZN3std9panicking20rust_panic_with_hook17hf4c55e90d4731159E(i32,i32,i32,i32,i32)
+		0x319b: /panicking.rs:826:5
+	main-144f120e836a09da.wasm._ZN3std9panicking19begin_panic_handler28_$u7b$$u7b$closure$u7d$$u7d$17h9e9ba254d816924bE(i32)
+		0x25e2: /panicking.rs:667:13
+	main-144f120e836a09da.wasm._ZN3std3sys9backtrace26__rust_end_short_backtrace17h5fb21e191bc452e3E(i32)
+		0x251c: /backtrace.rs:170:18
+	main-144f120e836a09da.wasm.rust_begin_unwind(i32)
+		0x2b2f: /panicking.rs:665:5
+	main-144f120e836a09da.wasm._ZN4core9panicking9panic_fmt17hfe24bec0337a4754E(i32,i32)
+		0x798a: /panicking.rs:76:14
+	main-144f120e836a09da.wasm._ZN4main4main17hef810e4bf58d9cdfE()
+		0x373: /main.rs:12:5 (inlined)
+		       /main.rs:7:5 (inlined)
+		       /main.rs:2:5
+	main-144f120e836a09da.wasm._ZN4core3ops8function6FnOnce9call_once17hb3419529f8e10fb1E(i32)
+		0x124: /function.rs:250:5
+	main-144f120e836a09da.wasm._ZN3std3sys9backtrace28__rust_begin_short_backtrace17h6b7139fa671fb72eE(i32)
+		0x289: /backtrace.rs:154:18
+	main-144f120e836a09da.wasm._ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hefb60d097516fc9fE(i32) i32
+		0x20c: /rt.rs:195:18
+	main-144f120e836a09da.wasm._ZN3std2rt19lang_start_internal17h1fceb22bbe5297a1E(i32,i32,i32,i32,i32) i32
+		0x1780: /function.rs:284:13 (inlined)
+		        /panicking.rs:557:40 (inlined)
+		        /panicking.rs:520:19 (inlined)
+		        /panic.rs:358:14 (inlined)
+		        /rt.rs:174:48 (inlined)
+		        /panicking.rs:557:40 (inlined)
+		        /panicking.rs:520:19 (inlined)
+		        /panic.rs:358:14 (inlined)
+		        /rt.rs:174:20
+	main-144f120e836a09da.wasm._ZN3std2rt10lang_start17he470b12ea6d4e370E(i32,i32,i32,i32) i32
+		0x1a8: /rt.rs:194:17
+	main-144f120e836a09da.wasm.__main_void() i32
+	main-144f120e836a09da.wasm._start()
+		0x37: wasisdk:/crt1-command.c:43:13`)
 }
 
 func runDWARFTest(t *testing.T, r wazero.Runtime, bin []byte, exp string) {

@@ -19,7 +19,7 @@ typically a `%.wasm` file.
 the minimal command to build a `%.wasm` binary.
 
 ```bash
-cd testdata; tinygo build -o add.wasm -target=wasi add.go
+(cd testdata; tinygo build -buildmode=c-shared -target=wasip1 -o add.wasm add.go)
 ```
 
 ### Notes
