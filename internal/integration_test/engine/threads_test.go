@@ -54,7 +54,7 @@ func TestThreadsNotEnabled(t *testing.T) {
 }
 
 func TestThreadsCompiler_hammer(t *testing.T) {
-	if !platform.CompilerSupported() {
+	if !platform.CompilerSupports(api.CoreFeaturesV2 | experimental.CoreFeaturesThreads) {
 		t.Skip()
 	}
 	runAllTests(t, threadTests, wazero.NewRuntimeConfigCompiler().WithCoreFeatures(api.CoreFeaturesV2|experimental.CoreFeaturesThreads), false)

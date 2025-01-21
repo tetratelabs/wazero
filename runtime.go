@@ -7,7 +7,10 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	experimentalapi "github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/internal/engine/interpreter"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo"
 	"github.com/tetratelabs/wazero/internal/expctxkeys"
+	"github.com/tetratelabs/wazero/internal/platform"
 	internalsock "github.com/tetratelabs/wazero/internal/sock"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -148,15 +151,31 @@ func NewRuntime(ctx context.Context) Runtime {
 // NewRuntimeWithConfig returns a runtime with the given configuration.
 func NewRuntimeWithConfig(ctx context.Context, rConfig RuntimeConfig) Runtime {
 	config := rConfig.(*runtimeConfig)
+	configKind := config.engineKind
+	configEngine := config.newEngine
+	if configKind == engineKindAuto {
+		if platform.CompilerSupports(config.enabledFeatures) {
+			configKind = engineKindCompiler
+		} else {
+			configKind = engineKindInterpreter
+		}
+	}
+	if configEngine == nil {
+		if configKind == engineKindCompiler {
+			configEngine = wazevo.NewEngine
+		} else {
+			configEngine = interpreter.NewEngine
+		}
+	}
 	var engine wasm.Engine
 	var cacheImpl *cache
 	if c := config.cache; c != nil {
 		// If the Cache is configured, we share the engine.
 		cacheImpl = c.(*cache)
-		engine = cacheImpl.initEngine(config.engineKind, config.newEngine, ctx, config.enabledFeatures)
+		engine = cacheImpl.initEngine(configKind, configEngine, ctx, config.enabledFeatures)
 	} else {
 		// Otherwise, we create a new engine.
-		engine = config.newEngine(ctx, config.enabledFeatures, nil)
+		engine = configEngine(ctx, config.enabledFeatures, nil)
 	}
 	store := wasm.NewStore(config.enabledFeatures, engine)
 	return &runtime{

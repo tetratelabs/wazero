@@ -22,7 +22,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	if !platform.CompilerSupported() {
+	if !platform.CompilerSupports(api.CoreFeaturesV2 | experimental.CoreFeaturesThreads) {
 		os.Exit(0)
 	}
 	os.Exit(m.Run())
