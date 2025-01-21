@@ -19,11 +19,9 @@ func Test_procExit(t *testing.T) {
 		expectedLog string
 	}{
 		{
-			name:     "success (exitcode 0)",
-			exitCode: 0,
-			expectedLog: `
-==> wasi_snapshot_preview1.proc_exit(rval=0)
-`,
+			name:        "success (exitcode 0)",
+			exitCode:    0,
+			expectedLog: ``,
 		},
 		{
 			name:     "arbitrary non-zero exitcode",
@@ -42,11 +40,15 @@ func Test_procExit(t *testing.T) {
 
 			// Since procExit panics, any opcodes afterwards cannot be reached.
 			_, err := mod.ExportedFunction(wasip1.ProcExitName).Call(testCtx, uint64(tc.exitCode))
-			require.Error(t, err)
-			sysErr, ok := err.(*sys.ExitError)
-			require.True(t, ok, err)
-			require.Equal(t, tc.exitCode, sysErr.ExitCode())
-			require.Equal(t, tc.expectedLog, "\n"+log.String())
+			if tc.expectedLog != "" {
+				require.Error(t, err)
+				sysErr, ok := err.(*sys.ExitError)
+				require.True(t, ok, err)
+				require.Equal(t, tc.exitCode, sysErr.ExitCode())
+				require.Equal(t, tc.expectedLog, "\n"+log.String())
+			} else {
+				require.NoError(t, err)
+			}
 		})
 	}
 }

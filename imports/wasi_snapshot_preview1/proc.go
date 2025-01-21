@@ -28,6 +28,10 @@ var procExit = &wasm.HostFunc{
 
 func procExitFn(ctx context.Context, mod api.Module, params []uint64) {
 	exitCode := uint32(params[0])
+	// TinyGo 0.35.0 calls proc_exit from _start, even for exit code 0.
+	if exitCode == 0 {
+		return
+	}
 
 	// Ensure other callers see the exit code.
 	_ = mod.CloseWithExitCode(ctx, exitCode)
