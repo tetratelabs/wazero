@@ -1,6 +1,6 @@
 package main
 
-//export add
+//go:wasmexport add
 func add(x, y uint32) uint32 {
 	return x + y
 }

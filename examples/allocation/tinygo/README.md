@@ -1,7 +1,11 @@
 ## TinyGo allocation example
 
 This example shows how to pass strings in and out of a Wasm function defined
-in TinyGo, built with `tinygo build -o greet.wasm -scheduler=none -target=wasi greet.go`
+in TinyGo, built with 
+
+```bash
+(cd testdata; tinygo build -scheduler=none -target=wasip1 -buildmode=c-shared -o greet.wasm greet.go)
+```
 
 ```bash
 $ go run greet.go wazero
