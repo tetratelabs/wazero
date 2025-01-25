@@ -86,7 +86,7 @@ type (
 		framePointerBeforeGoCall uintptr
 		// memoryWait32TrampolineAddress holds the address of memory_wait32 trampoline function.
 		memoryWait32TrampolineAddress *byte
-		// memoryWait32TrampolineAddress holds the address of memory_wait64 trampoline function.
+		// memoryWait64TrampolineAddress holds the address of memory_wait64 trampoline function.
 		memoryWait64TrampolineAddress *byte
 		// memoryNotifyTrampolineAddress holds the address of the memory_notify trampoline function.
 		memoryNotifyTrampolineAddress *byte

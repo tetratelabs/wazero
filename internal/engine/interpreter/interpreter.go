@@ -118,7 +118,7 @@ type callEngine struct {
 	// f is the initial function for this call engine.
 	f *function
 
-	// stackiterator for Listeners to walk frames and stack.
+	// stackIterator for Listeners to walk frames and stack.
 	stackIterator stackIterator
 }
 

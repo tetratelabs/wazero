@@ -57,7 +57,7 @@ type (
 
 		// jmpTableTargets holds the labels of the jump table targets.
 		jmpTableTargets [][]uint32
-		// jmpTableTargetNext is the index to the jmpTableTargets slice to be used for the next jump table.
+		// jmpTableTargetsNext is the index to the jmpTableTargets slice to be used for the next jump table.
 		jmpTableTargetsNext int
 
 		// spillSlotSize is the size of the stack slot in bytes used for spilling registers.
