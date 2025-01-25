@@ -61,7 +61,7 @@ func NewCompilationCacheWithDir(dirname string) (CompilationCache, error) {
 
 // cache implements Cache interface.
 type cache struct {
-	// eng is the engine for this cache. If the cache is configured, the engine is shared across multiple instances of
+	// engs is the engine for this cache. If the cache is configured, the engine is shared across multiple instances of
 	// Runtime, and its lifetime is not bound to them. Instead, the engine is alive until Cache.Close is called.
 	engs      [engineKindCount]wasm.Engine
 	fileCache filecache.Cache

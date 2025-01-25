@@ -269,7 +269,7 @@ type compilationResult struct {
 	HasTable bool
 	// HasDataInstances is true if the module has data instances which might be used by memory.init or data.drop instructions.
 	HasDataInstances bool
-	// HasDataInstances is true if the module has element instances which might be used by table.init or elem.drop instructions.
+	// HasElementInstances is true if the module has element instances which might be used by table.init or elem.drop instructions.
 	HasElementInstances bool
 }
 
