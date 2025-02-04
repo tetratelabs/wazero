@@ -131,7 +131,9 @@ func callGoFunc(ctx context.Context, mod api.Module, fn *reflect.Value, stack []
 			stack[i] = math.Float64bits(ret.Float())
 		case reflect.Uint32, reflect.Uint64, reflect.Uintptr:
 			stack[i] = ret.Uint()
-		case reflect.Int32, reflect.Int64:
+		case reflect.Int32:
+			stack[i] = uint64(ret.Int()) & 0xFFFFFFFF
+		case reflect.Int64:
 			stack[i] = uint64(ret.Int())
 		default:
 			panic(fmt.Errorf("BUG: result[%d] has an invalid type: %v", i, ret.Kind()))
