@@ -502,8 +502,14 @@ func testHostFunctionNumericParameter(t *testing.T, r wazero.Runtime) {
 		"i32": func(ctx context.Context, p uint32) uint32 {
 			return p + 1
 		},
+		"i32n": func(ctx context.Context, p int32) int32 {
+			return p - 1
+		},
 		"i64": func(ctx context.Context, p uint64) uint64 {
 			return p + 1
+		},
+		"i64n": func(ctx context.Context, p int64) int64 {
+			return p - 1
 		},
 		"f32": func(ctx context.Context, p float32) float32 {
 			return p + 1
@@ -525,10 +531,22 @@ func testHostFunctionNumericParameter(t *testing.T, r wazero.Runtime) {
 			expected: math.MaxUint32,
 		},
 		{
+			name:     "i32n",
+			vt:       i32,
+			input:    api.EncodeI32(math.MinInt32 + 1),
+			expected: api.EncodeI32(math.MinInt32),
+		},
+		{
 			name:     "i64",
 			vt:       i64,
 			input:    math.MaxUint64 - 1,
 			expected: math.MaxUint64,
+		},
+		{
+			name:     "i64n",
+			vt:       i64,
+			input:    api.EncodeI64(math.MinInt64 + 1),
+			expected: api.EncodeI64(math.MinInt64),
 		},
 		{
 			name:     "f32",
