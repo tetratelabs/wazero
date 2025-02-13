@@ -20,7 +20,7 @@ func TestDWARFLines_Line_Zig(t *testing.T) {
 
 	// codeSecStart is the beginning of the code section in the Wasm binary.
 	// If dwarftestdata.ZigWasm has been changed, we need to inspect by `wasm-tools objdump`.
-	const codeSecStart = 0x46
+	const codeSecStart = 0x48
 
 	// These cases are crafted by matching the stack trace result from wasmtime. To verify, run:
 	//
@@ -29,33 +29,33 @@ func TestDWARFLines_Line_Zig(t *testing.T) {
 	// And this should produce the output as:
 	//
 	// Caused by:
-	//    0: failed to invoke command default
-	//    1: error while executing at wasm backtrace:
-	//           0:   0xa9 - builtin.default_panic
-	//                           at /Users/adrian/Downloads/zig-macos-aarch64-0.11.0-dev.3334+cd1417dbd/lib/std/builtin.zig:889:17
-	//           1:   0x6b - main.inlined_b
-	//                           at /Users/adrian/oss/wazero/internal/testing/dwarftestdata/testdata/zig/main.zig:10:5              - main.inlined_a
-	//                           at /Users/adrian/oss/wazero/internal/testing/dwarftestdata/testdata/zig/main.zig:6:5              - main.main
-	//                           at /Users/adrian/oss/wazero/internal/testing/dwarftestdata/testdata/zig/main.zig:2:5
-	//           2:   0xb0 - start.callMain
-	//                           at /Users/adrian/Downloads/zig-macos-aarch64-0.11.0-dev.3334+cd1417dbd/lib/std/start.zig:609:37              - _start
-	//                           at /Users/adrian/Downloads/zig-macos-aarch64-0.11.0-dev.3334+cd1417dbd/lib/std/start.zig:224:5
-	//    2: wasm trap: wasm `unreachable` instruction executed
+	// 0: failed to invoke command default
+	// 1: error while executing at wasm backtrace:
+	//        0:   0xab - builtin.default_panic
+	//                        at /opt/homebrew/Cellar/zig/0.13.0/lib/zig/std/builtin.zig:792:17
+	//        1:   0x6d - main.inlined_b
+	//                        at /Users/anuraag/git/wazero/internal/testing/dwarftestdata/testdata/zig/main.zig:10:5              - main.inlined_a
+	//                        at /Users/anuraag/git/wazero/internal/testing/dwarftestdata/testdata/zig/main.zig:6:5              - main.main
+	//                        at /Users/anuraag/git/wazero/internal/testing/dwarftestdata/testdata/zig/main.zig:2:5
+	//        2:  0x119 - start.callMain
+	//                        at /opt/homebrew/Cellar/zig/0.13.0/lib/zig/std/start.zig:524:37              - start.wasm_freestanding_start
+	//                        at /opt/homebrew/Cellar/zig/0.13.0/lib/zig/std/start.zig:199:5
+	// 2: wasm trap: wasm `unreachable` instruction executed
 	for _, tc := range []struct {
 		offset uint64
 		exp    []string
 	}{
-		{offset: 0xa9 - codeSecStart, exp: []string{
-			"lib/std/builtin.zig:889:17",
+		{offset: 0xab - codeSecStart, exp: []string{
+			"lib/zig/std/builtin.zig:792:17",
 		}},
-		{offset: 0x6b - codeSecStart, exp: []string{
+		{offset: 0x6d - codeSecStart, exp: []string{
 			"zig/main.zig:10:5 (inlined)",
 			"zig/main.zig:6:5 (inlined)",
 			"zig/main.zig:2:5",
 		}},
-		{offset: 0xb0 - codeSecStart, exp: []string{
-			"lib/std/start.zig:609:37 (inlined)",
-			"lib/std/start.zig:224:5",
+		{offset: 0x119 - codeSecStart, exp: []string{
+			"lib/zig/std/start.zig:524:37 (inlined)",
+			"lib/zig/std/start.zig:199:5",
 		}},
 	} {
 		tc := tc

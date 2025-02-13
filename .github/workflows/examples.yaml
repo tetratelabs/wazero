@@ -18,7 +18,7 @@ on:
 env:
   EMSDK_VERSION: "3.1.40"
   TINYGO_VERSION: "0.35.0"
-  ZIG_VERSION: "0.11.0"
+  ZIG_VERSION: "0.13.0"
 
 concurrency:
   # https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#example-using-concurrency-to-cancel-any-in-progress-job-or-run
@@ -34,8 +34,8 @@ jobs:
     strategy:
       matrix:
         go-version:
-          - "1.23"
-          - "1.21"
+          - "1.23" # Max version supported by TinyGo 0.35.0
+          - "1.22"
 
     steps:
       - name: Checkout

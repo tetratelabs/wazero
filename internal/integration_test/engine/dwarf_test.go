@@ -60,17 +60,17 @@ wasm stack trace:
 }
 
 func testZigDWARF(t *testing.T, r wazero.Runtime) {
-	runDWARFTest(t, r, dwarftestdata.ZigWasm, `module[] function[_start] failed: wasm error: unreachable
+	runDWARFTest(t, r, dwarftestdata.ZigWasm, `module[main.wasm] function[_start] failed: wasm error: unreachable
 wasm stack trace:
-	.builtin.default_panic(i32,i32,i32,i32)
-		0x63: /builtin.zig:889:17
-	.main.main() i32
+	main.wasm.builtin.default_panic(i32,i32,i32,i32)
+		0x63: /builtin.zig:792:17
+	main.wasm.main.main(i32) i32
 		0x25: /main.zig:10:5 (inlined)
 		      /main.zig:6:5 (inlined)
 		      /main.zig:2:5
-	._start()
-		0x6a: /start.zig:609:37 (inlined)
-		      /start.zig:224:5`)
+	main.wasm._start()
+		0xd1: /start.zig:524:37 (inlined)
+		      /start.zig:199:5`)
 }
 
 func testCCDWARF(t *testing.T, r wazero.Runtime) {

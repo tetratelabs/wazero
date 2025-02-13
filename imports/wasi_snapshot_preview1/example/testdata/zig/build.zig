@@ -1,16 +1,15 @@
 const std = @import("std");
 const CrossTarget = std.zig.CrossTarget;
 
-pub fn build(b: *std.build.Builder) void {
-    const target = .{.cpu_arch = .wasm32, .os_tag = .wasi};
-    const optimize = b.standardOptimizeOption(.{});
-
+pub fn build(b: *std.Build) void {
     const exe = b.addExecutable(.{
         .name = "cat",
-        .root_source_file = .{ .path = "cat.zig" },
-        .target = target,
-        .optimize = optimize,
+        .root_source_file = b.path("cat.zig"),
+        .target = b.resolveTargetQuery(.{
+            .cpu_arch = .wasm32,
+            .os_tag = .wasi,
+        }),
+        .optimize = b.standardOptimizeOption(.{}),
     });
-
-    exe.install();
+    b.installArtifact(exe);
 }
