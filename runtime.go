@@ -325,7 +325,7 @@ func (r *runtime) InstantiateModule(
 
 	var sysCtx *internalsys.Context
 	if sysCtx, err = config.toSysContext(); err != nil {
-		return
+		return nil, err
 	}
 
 	name := config.name
@@ -340,7 +340,7 @@ func (r *runtime) InstantiateModule(
 		if code.closeWithModule {
 			_ = code.Close(ctx) // don't overwrite the error
 		}
-		return
+		return nil, err
 	}
 
 	if closeNotifier, ok := ctx.Value(expctxkeys.CloseNotifierKey{}).(experimentalapi.CloseNotifier); ok {
