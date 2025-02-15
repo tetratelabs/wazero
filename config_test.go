@@ -670,9 +670,5 @@ func TestNewRuntimeConfig(t *testing.T) {
 	// Should be cloned from the source.
 	require.NotEqual(t, engineLessConfig, c)
 	// Ensures if the correct engine is selected.
-	if platform.CompilerSupported() {
-		require.Equal(t, engineKindCompiler, c.engineKind)
-	} else {
-		require.Equal(t, engineKindInterpreter, c.engineKind)
-	}
+	require.Equal(t, engineKindAuto, c.engineKind)
 }
