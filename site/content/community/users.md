@@ -35,6 +35,12 @@ considering their efforts before starting your own!
 | [waPC][5]                      | implements [Apex][6] interfaces with WebAssembly via code generation          |
 | [wazero-emscripten-embind][36] | Emscripten [Embind][37] and code generation support for Wazero                |
 
+### Infrastructure-as-Code
+
+| Name                   | Description                                        |
+|:-----------------------|----------------------------------------------------|
+| [yoke][47] | A WebAssembly-based package deployer for Kubernetes, enabling declarative and programmable deployments with Wasm |
+
 ### Middleware
 
 | Name                   | Description                                        |
@@ -174,3 +180,5 @@ experience.
 [45]: https://docs.redpanda.com/redpanda-connect/components/processors/redpanda_data_transform/
 
 [46]: https://github.com/hypermodeinc/modus
+
+[47]: https://github.com/yokecd/yoke
