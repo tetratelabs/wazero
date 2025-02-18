@@ -1,16 +1,17 @@
 const std = @import("std");
 const CrossTarget = std.zig.CrossTarget;
 
-pub fn build(b: *std.build.Builder) void {
-    const target = .{.cpu_arch = .wasm32, .os_tag = .freestanding};
-    const optimize = b.standardOptimizeOption(.{});
-
-    const lib = b.addSharedLibrary(.{
+pub fn build(b: *std.Build) void {
+    const lib = b.addExecutable(.{
         .name = "greet",
-        .root_source_file = .{ .path = "greet.zig" },
-        .target = target,
-        .optimize = optimize,
+        .root_source_file = b.path("greet.zig"),
+        .target = b.resolveTargetQuery(.{
+            .cpu_arch = .wasm32,
+            .os_tag = .freestanding,
+        }),
+        .optimize = b.standardOptimizeOption(.{}),
     });
+    lib.entry = .disabled;
     lib.rdynamic = true;
     b.installArtifact(lib);
 }

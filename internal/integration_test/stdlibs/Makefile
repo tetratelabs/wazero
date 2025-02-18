@@ -1,7 +1,7 @@
 # Note: Some tests might fail if Go has been installed with homebrew because
 # the file system layout is different than what the tests expect.
 # Easiest fix is to install without using brew.
-goroot?=$(shell go env GOROOT)
+goroot?=$(shell go env GOROOT)/src
 # Note: The standard binary zig distribution does not ship some testdata.
 # You should override with the zig source code path, otherwise some tests will fail.
 zigroot?=$(shell dirname $(shell which zig))
@@ -50,69 +50,69 @@ tinygo_tests=container/heap \
 	unicode/utf16 \
 	unicode/utf8
 
-gowasip1_tests=src/archive/tar \
-	src/bufio \
-	src/bytes \
-	src/context \
-	src/encoding/ascii85 \
-	src/encoding/asn1 \
-	src/encoding/base32 \
-	src/encoding/base64 \
-	src/encoding/binary \
-	src/encoding/csv \
-	src/encoding/gob \
-	src/encoding/hex \
-	src/encoding/json \
-	src/encoding/pem \
-	src/encoding/xml \
-	src/errors \
-	src/expvar \
-	src/flag \
-	src/fmt \
-	src/hash \
-	src/hash/adler32 \
-	src/hash/crc32 \
-	src/hash/crc64 \
-	src/hash/fnv \
-	src/hash/maphash \
-	src/io \
-	src/io/fs \
-	src/io/ioutil \
-	src/log \
-	src/log/syslog \
-	src/maps \
-	src/math \
-	src/math/big \
-	src/math/bits \
-	src/math/cmplx \
-	src/math/rand \
-	src/mime \
-	src/mime/multipart \
-	src/mime/quotedprintable \
-	src/os \
-	src/os/exec \
-	src/os/signal \
-	src/os/user \
-	src/path \
-	src/reflect \
-	src/regexp \
-	src/regexp/syntax \
-	src/runtime \
-	src/runtime/internal/atomic \
-	src/runtime/internal/math \
-	src/runtime/internal/sys \
-	src/slices \
-	src/sort \
-	src/strconv \
-	src/strings \
-	src/sync \
-	src/sync/atomic \
-	src/syscall \
-	src/testing \
-	src/testing/fstest \
-	src/testing/iotest \
-	src/testing/quick \
-	src/time
+gowasip1_tests=archive/tar \
+	bufio \
+	bytes \
+	context \
+	encoding/ascii85 \
+	encoding/asn1 \
+	encoding/base32 \
+	encoding/base64 \
+	encoding/binary \
+	encoding/csv \
+	encoding/gob \
+	encoding/hex \
+	encoding/json \
+	encoding/pem \
+	encoding/xml \
+	errors \
+	expvar \
+	flag \
+	fmt \
+	hash \
+	hash/adler32 \
+	hash/crc32 \
+	hash/crc64 \
+	hash/fnv \
+	hash/maphash \
+	io \
+	io/fs \
+	io/ioutil \
+	log \
+	log/syslog \
+	maps \
+	math \
+	math/big \
+	math/bits \
+	math/cmplx \
+	math/rand \
+	mime \
+	mime/multipart \
+	mime/quotedprintable \
+	os \
+	os/exec \
+	os/signal \
+	os/user \
+	path \
+	reflect \
+	regexp \
+	regexp/syntax \
+	runtime \
+	runtime/internal/atomic \
+	runtime/internal/math \
+	runtime/internal/sys \
+	slices \
+	sort \
+	strconv \
+	strings \
+	sync \
+	sync/atomic \
+	syscall \
+	testing \
+	testing/fstest \
+	testing/iotest \
+	testing/quick \
+	time
 
 all: build.zig build.tinygo build.gowasip1
 
@@ -141,5 +141,7 @@ build.gowasip1:
 	@mkdir -p $(gowasip1_bin)
 	@cd '$(goroot)'; \
 	for value in $(gowasip1_tests); do\
-	  	GOOS=wasip1 GOARCH=wasm go test -v -c -o $(gowasip1_bin)/$$(echo $$value | sed -e 's/\//_/g').test ./$${value}; \
+		if [ -d ./$${value} ]; then\
+			GOOS=wasip1 GOARCH=wasm go test -v -c -o $(gowasip1_bin)/$$(echo $$value | sed -e 's/\//_/g').test ./$${value}; \
+		fi;\
 	done

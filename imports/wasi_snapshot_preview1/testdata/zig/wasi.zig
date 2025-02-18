@@ -1,6 +1,7 @@
 const std = @import("std");
 const os = std.os;
 const fs = std.fs;
+const posix = std.posix;
 const allocator = std.heap.page_allocator;
 const preopensAlloc = std.fs.wasi.preopensAlloc;
 const stdout = std.io.getStdOut().writer();
@@ -12,7 +13,7 @@ pub fn main() !void {
 
     if (std.mem.eql(u8, args[1], "ls")) {
         // TODO: This only looks at fd 3. See #14678
-        var dir = std.fs.cwd().openIterableDir(args[2], .{}) catch |err| switch (err) {
+        const dir = std.fs.cwd().openDir(args[2], .{}) catch |err| switch (err) {
             error.NotDir => {
                 try stdout.print("ENOTDIR\n", .{});
                 return;
@@ -28,12 +29,12 @@ pub fn main() !void {
             try ls(dir);
         }
     } else if (std.mem.eql(u8, args[1], "stat")) {
-        try stdout.print("stdin isatty: {}\n", .{os.isatty(0)});
-        try stdout.print("stdout isatty: {}\n", .{os.isatty(1)});
-        try stdout.print("stderr isatty: {}\n", .{os.isatty(2)});
-        try stdout.print("/ isatty: {}\n", .{os.isatty(3)});
+        try stdout.print("stdin isatty: {}\n", .{posix.isatty(0)});
+        try stdout.print("stdout isatty: {}\n", .{posix.isatty(1)});
+        try stdout.print("stderr isatty: {}\n", .{posix.isatty(2)});
+        try stdout.print("/ isatty: {}\n", .{posix.isatty(3)});
     } else if (std.mem.eql(u8, args[1], "preopen")) {
-        var wasi_preopens = try preopensAlloc(allocator);
+        const wasi_preopens = try preopensAlloc(allocator);
         // fs.wasi.Preopens does not have a free function
 
         for (wasi_preopens.names, 0..) |preopen, i| {
@@ -42,7 +43,7 @@ pub fn main() !void {
     }
 }
 
-fn ls(dir: std.fs.IterableDir) !void {
+fn ls(dir: std.fs.Dir) !void {
     var iter = dir.iterate();
     while (try iter.next()) |entry| {
         try stdout.print("./{s}\n", .{entry.name});

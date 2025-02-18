@@ -81,7 +81,7 @@ var (
 			}
 			fsuffixstripped := strings.ReplaceAll(fname, ".test", "")
 			inferredpath := strings.ReplaceAll(fsuffixstripped, "_", "/")
-			testdir := filepath.Join(runtime.GOROOT(), inferredpath)
+			testdir := filepath.Join(runtime.GOROOT(), "src", inferredpath)
 			err = os.Chdir(testdir)
 
 			sysroot := filepath.VolumeName(testdir) + string(os.PathSeparator)
@@ -91,20 +91,29 @@ var (
 			c = c.WithFSConfig(
 				wazero.NewFSConfig().
 					WithDirMount(sysroot, "/")).
-				WithEnv("PWD", normalizedTestdir)
+				WithEnv("PWD", normalizedTestdir).
+				WithEnv("GOWASIRUNTIME", "wazero")
 
 			args := []string{fname, "-test.short", "-test.v"}
+
+			// Some distributions of Go such as used by homebrew or GitHub actions do not
+			// contain the LICENSE file in the correct location for these.
+			skip := []string{
+				"TestFileReaddir/sysdir",
+				"TestFileReadDir/sysdir",
+				"TestFileReaddirnames/sysdir",
+			}
 
 			// Skip tests that are fragile on Windows.
 			if runtime.GOOS == "windows" {
 				c = c.
 					WithEnv("GOROOT", normalizeOsPath(runtime.GOROOT()))
 
-				args = append(args,
-					"-test.skip=TestRenameCaseDifference/dir|"+
-						"TestDirFSPathsValid|TestDirFS|TestDevNullFile|"+
-						"TestOpenError|TestSymlinkWithTrailingSlash|TestCopyFS")
+				skip = append(skip, "TestRenameCaseDifference/dir", "TestDirFSPathsValid", "TestDirFS",
+					"TestDevNullFile", "TestOpenError", "TestSymlinkWithTrailingSlash", "TestCopyFS",
+					"TestRoot", "TestOpenInRoot", "ExampleAfterFunc_connection")
 			}
+			args = append(args, "-test.skip="+strings.Join(skip, "|"))
 			c = c.WithArgs(args...)
 
 			return bin, c, stdout, stderr, err
@@ -193,11 +202,15 @@ func requireZeroExitCode(b *testing.B, err error, stdout, stderr *os.File) {
 	b.Helper()
 	if se, ok := err.(*sys.ExitError); ok {
 		if se.ExitCode() != 0 { // Don't err on success.
+			stdout.Seek(0, io.SeekStart)
+			stderr.Seek(0, io.SeekStart)
 			stdoutBytes, _ := io.ReadAll(stdout)
 			stderrBytes, _ := io.ReadAll(stderr)
 			require.NoError(b, err, "stdout: %s\nstderr: %s", string(stdoutBytes), string(stderrBytes))
 		}
 	} else if err != nil {
+		stdout.Seek(0, io.SeekStart)
+		stderr.Seek(0, io.SeekStart)
 		stdoutBytes, _ := io.ReadAll(stdout)
 		stderrBytes, _ := io.ReadAll(stderr)
 		require.NoError(b, err, "stdout: %s\nstderr: %s", string(stdoutBytes), string(stderrBytes))

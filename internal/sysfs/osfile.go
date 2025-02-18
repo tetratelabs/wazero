@@ -275,6 +275,9 @@ func (f *osFile) Pwrite(buf []byte, off int64) (n int, errno experimentalsys.Err
 
 // Truncate implements the same method as documented on sys.File
 func (f *osFile) Truncate(size int64) (errno experimentalsys.Errno) {
+	if size < 0 {
+		return experimentalsys.EINVAL
+	}
 	if errno = experimentalsys.UnwrapOSError(f.file.Truncate(size)); errno != 0 {
 		// Defer validation overhead until we've already had an error.
 		errno = fileError(f, f.closed, errno)
