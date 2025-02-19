@@ -581,10 +581,14 @@ func testHostFunctionNumericParameter(t *testing.T, r wazero.Runtime) {
 			results, err := importing.ExportedFunction("call_return_input").Call(testCtx, test.input)
 			require.NoError(t, err)
 			switch test.vt {
-			case i32, f32:
-				require.Equal(t, uint32(test.expected), uint32(results[0]))
-			case i64, f64:
+			case i32:
+				require.Equal(t, api.DecodeI32(test.expected), api.DecodeI32(results[0]))
+			case f32:
+				require.Equal(t, api.DecodeF32(test.expected), api.DecodeF32(results[0]))
+			case i64:
 				require.Equal(t, test.expected, results[0])
+			case f64:
+				require.Equal(t, api.DecodeF64(test.expected), api.DecodeF64(results[0]))
 			}
 		})
 	}
