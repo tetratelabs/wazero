@@ -43,8 +43,11 @@ func fileCacheKey(m *wasm.Module) (ret filecache.Key) {
 }
 
 func (e *engine) addCompiledModule(module *wasm.Module, cm *compiledModule) (err error) {
+	if module.IsHostModule {
+		return
+	}
 	e.addCompiledModuleToMemory(module, cm)
-	if !module.IsHostModule && e.fileCache != nil {
+	if e.fileCache != nil {
 		err = e.addCompiledModuleToCache(module, cm)
 	}
 	return
@@ -86,6 +89,9 @@ func (e *engine) getCompiledModule(module *wasm.Module, listeners []experimental
 }
 
 func (e *engine) addCompiledModuleToMemory(m *wasm.Module, cm *compiledModule) {
+	if m.IsHostModule {
+		return
+	}
 	e.mux.Lock()
 	defer e.mux.Unlock()
 	e.compiledModules[m.ID] = cm
@@ -95,6 +101,9 @@ func (e *engine) addCompiledModuleToMemory(m *wasm.Module, cm *compiledModule) {
 }
 
 func (e *engine) getCompiledModuleFromMemory(module *wasm.Module) (cm *compiledModule, ok bool) {
+	if module.IsHostModule {
+		return
+	}
 	e.mux.RLock()
 	defer e.mux.RUnlock()
 	cm, ok = e.compiledModules[module.ID]
