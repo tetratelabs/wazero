@@ -59,7 +59,10 @@ func (m *machine) ResolveRelocations(
 		if diff < minUnconditionalBranchOffset || diff > maxUnconditionalBranchOffset {
 			// Find the near trampoline island from callTrampolineIslandOffsets.
 			islandOffset := searchTrampolineIsland(callTrampolineIslandOffsets, int(instrOffset))
-			islandTargetOffset := islandOffset + trampolineCallSize*int(r.FuncRef)
+			// Imported functions don't need trampolines, so we ignore them when we compute the offset
+			// (see also encodeCallTrampolineIsland)
+			funcOffset := int(r.FuncRef) - importedFns
+			islandTargetOffset := islandOffset + trampolineCallSize*funcOffset
 			diff = int64(islandTargetOffset) - (instrOffset)
 			if diff < minUnconditionalBranchOffset || diff > maxUnconditionalBranchOffset {
 				panic("BUG in trampoline placement")
