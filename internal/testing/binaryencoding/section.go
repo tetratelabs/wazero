@@ -124,7 +124,7 @@ func EncodeStartSection(funcidx wasm.Index) []byte {
 	return encodeSection(wasm.SectionIDStart, leb128.EncodeUint32(funcidx))
 }
 
-// encodeEelementSection encodes a wasm.SectionIDElement for the elements in WebAssembly 1.0 (20191205)
+// encodeElementSection encodes a wasm.SectionIDElement for the elements in WebAssembly 1.0 (20191205)
 // Binary Format.
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#element-section%E2%91%A0

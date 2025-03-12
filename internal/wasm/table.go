@@ -236,7 +236,7 @@ func (m *Module) validateTable(enabledFeatures api.CoreFeatures, tables []Table,
 	return nil
 }
 
-// buildTable returns TableInstances if the module defines or imports a table.
+// buildTables returns TableInstances if the module defines or imports a table.
 //   - importedTables: returned as `tables` unmodified.
 //   - importedGlobals: include all instantiated, imported globals.
 //
