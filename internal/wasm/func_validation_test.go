@@ -3589,7 +3589,7 @@ func TestFunctionValidation_redundantEnd(t *testing.T) {
 	require.EqualError(t, err, "unexpected end of function at pc=0x1")
 }
 
-// TestFunctionValidation_redundantEnd is found in th validation fuzzing.
+// TestFunctionValidation_redundantElse is found in th validation fuzzing.
 func TestFunctionValidation_redundantElse(t *testing.T) {
 	for _, tc := range []struct {
 		body   []byte
