@@ -2,12 +2,16 @@ package wazevo
 
 import (
 	"context"
+	"crypto/md5"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math/rand/v2"
 	"runtime"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/api"
@@ -243,7 +247,9 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 	ctx, cancel := context.WithCancelCause(ctx)
 	defer cancel(nil)
 
-	sections := sequence(len(module.CodeSection))
+	// constant seed for demonstration purposes.
+	seq := sequence(0, module.CodeSection)
+	resultmutex := &sync.Mutex{}
 
 	for range workers {
 		go func() {
@@ -253,7 +259,7 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 			machine := newMachine()
 			fe := frontend.NewFrontendCompiler(module, ssaBuilder, &cm.offsets, ensureTermination, withListener, needSourceInfo)
 
-			for i := range sections {
+			for i := seq.Pop(); i < len(module.CodeSection); i = seq.Pop() {
 				if err := ctx.Err(); err != nil {
 					// Compilation canceled!
 					return
@@ -283,12 +289,15 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 					cancel(fmt.Errorf("compile function %d/%d: %v", i, len(module.CodeSection)-1, err))
 					return
 				}
+
+				resultmutex.Lock()
 				compiledFuncs[i] = CompiledLocalFuncResult{
 					Body:             body,
 					RelsPerFunc:      relsPerFunc,
 					IDX:              fidx,
 					SourceOffsetInfo: be.SourceOffsetInfo(),
 				}
+				resultmutex.Unlock()
 			}
 		}()
 	}
@@ -895,13 +904,39 @@ func (cm *compiledModule) getSourceOffset(pc uintptr) uint64 {
 	return cm.sourceMap.wasmBinaryOffsets[index]
 }
 
-func sequence(size int) <-chan int {
-	result := make(chan int)
-	go func() {
-		for i := range size {
-			result <- i
-		}
-		close(result)
-	}()
-	return result
+type seq struct {
+	current int64
+}
+
+func (t *seq) Pop() int {
+	return int(atomic.AddInt64(&t.current, 1))
+}
+
+func chaCha8[T ~[]byte | string](seed T) *rand.ChaCha8 {
+	var (
+		vector [32]byte
+		source = []byte(seed)
+	)
+
+	v1 := md5.Sum(source)
+	v2 := md5.Sum(append(v1[:], source...))
+	copy(vector[:15], v1[:])
+	copy(vector[16:], v2[:])
+
+	return rand.NewChaCha8(vector)
+}
+
+func sequence(seed uint64, src []wasm.Code) *seq {
+	uint64Bytes := func(v uint64) []byte {
+		var b [8]byte
+		binary.NativeEndian.PutUint64(b[:], v)
+		return b[:]
+	}
+	prng := rand.New(chaCha8(uint64Bytes(seed)))
+
+	prng.Shuffle(len(src), func(i, j int) {
+		src[i], src[j] = src[j], src[i]
+	})
+
+	return &seq{current: -1}
 }
