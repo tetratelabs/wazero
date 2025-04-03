@@ -248,7 +248,7 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 	defer cancel(nil)
 
 	// constant seed for demonstration purposes.
-	seq := sequence(0, module.CodeSection)
+	seq, perm := sequence(0, len(module.CodeSection))
 	resultmutex := &sync.Mutex{}
 
 	for range workers {
@@ -259,12 +259,12 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 			machine := newMachine()
 			fe := frontend.NewFrontendCompiler(module, ssaBuilder, &cm.offsets, ensureTermination, withListener, needSourceInfo)
 
-			for i := seq.Pop(); i < len(module.CodeSection); i = seq.Pop() {
+			for ix := seq.Pop(); ix < len(module.CodeSection); ix = seq.Pop() {
 				if err := ctx.Err(); err != nil {
 					// Compilation canceled!
 					return
 				}
-
+				i := perm[ix]
 				if wazevoapi.DeterministicCompilationVerifierEnabled {
 					i = wazevoapi.DeterministicCompilationVerifierGetRandomizedLocalFunctionIndex(ctx, i)
 				}
@@ -926,17 +926,23 @@ func chaCha8[T ~[]byte | string](seed T) *rand.ChaCha8 {
 	return rand.NewChaCha8(vector)
 }
 
-func sequence(seed uint64, src []wasm.Code) *seq {
+func sequence(seed uint64, length int) (*seq, []int) {
 	uint64Bytes := func(v uint64) []byte {
 		var b [8]byte
 		binary.NativeEndian.PutUint64(b[:], v)
 		return b[:]
 	}
+
+	perm := make([]int, 0, length)
+	for idx := range length {
+		perm = append(perm, idx)
+	}
+
 	prng := rand.New(chaCha8(uint64Bytes(seed)))
 
-	prng.Shuffle(len(src), func(i, j int) {
-		src[i], src[j] = src[j], src[i]
+	prng.Shuffle(len(perm), func(i, j int) {
+		perm[i], perm[j] = perm[j], perm[i]
 	})
 
-	return &seq{current: -1}
+	return &seq{current: -1}, perm
 }
