@@ -665,18 +665,18 @@ func (c *Compiler) lowerCurrentOpcode() {
 			tableBaseAddr := c.loadTableBaseAddr(tableInstancePtr)
 			addr := builder.AllocateInstruction().AsIadd(tableBaseAddr, offsetInBytes).Insert(builder).Return()
 
-			// Prepare the loop and following block.
-			beforeLoop := builder.AllocateBasicBlock()
-			loopBlk := builder.AllocateBasicBlock()
-			loopVar := loopBlk.AddParam(builder, ssa.TypeI64)
-			followingBlk := builder.AllocateBasicBlock()
-
 			// Uses the copy trick for faster filling buffer like memory.fill, but in this case we copy 8 bytes at a time.
 			// 	buf := memoryInst.Buffer[offset : offset+fillSize]
 			// 	buf[0:8] = value
 			// 	for i := 8; i < fillSize; i *= 2 { Begin with 8 bytes.
 			// 		copy(buf[i:], buf[:i])
 			// 	}
+
+			// Prepare the loop and following block.
+			beforeLoop := builder.AllocateBasicBlock()
+			loopBlk := builder.AllocateBasicBlock()
+			loopVar := loopBlk.AddParam(builder, ssa.TypeI64)
+			followingBlk := builder.AllocateBasicBlock()
 
 			// Insert the jump to the beforeLoop block; If the fillSize is zero, then jump to the following block to skip entire logics.
 			zero := builder.AllocateInstruction().AsIconst64(0).Insert(builder).Return()
@@ -694,26 +694,18 @@ func (c *Compiler) lowerCurrentOpcode() {
 			builder.SetCurrentBlock(loopBlk)
 			dstAddr := builder.AllocateInstruction().AsIadd(addr, loopVar).Insert(builder).Return()
 
-			// If loopVar*2 > fillSizeInBytes, then count must be fillSizeInBytes-loopVar.
-			var count ssa.Value
-			{
-				loopVarDoubled := builder.AllocateInstruction().AsIadd(loopVar, loopVar).Insert(builder).Return()
-				loopVarDoubledLargerThanFillSize := builder.
-					AllocateInstruction().AsIcmp(loopVarDoubled, fillSizeInBytes, ssa.IntegerCmpCondUnsignedGreaterThanOrEqual).
-					Insert(builder).Return()
-				diff := builder.AllocateInstruction().AsIsub(fillSizeInBytes, loopVar).Insert(builder).Return()
-				count = builder.AllocateInstruction().AsSelect(loopVarDoubledLargerThanFillSize, diff, loopVar).Insert(builder).Return()
-			}
+			newLoopVar := builder.AllocateInstruction().AsIadd(loopVar, loopVar).Insert(builder).Return()
+			newLoopVarLessThanFillSize := builder.AllocateInstruction().
+				AsIcmp(newLoopVar, fillSizeInBytes, ssa.IntegerCmpCondUnsignedLessThan).Insert(builder).Return()
+
+			// On the last iteration, count must be fillSizeInBytes-loopVar.
+			diff := builder.AllocateInstruction().AsIsub(fillSizeInBytes, loopVar).Insert(builder).Return()
+			count := builder.AllocateInstruction().AsSelect(newLoopVarLessThanFillSize, loopVar, diff).Insert(builder).Return()
 
 			c.callMemmove(dstAddr, addr, count)
 
-			shiftAmount := builder.AllocateInstruction().AsIconst64(1).Insert(builder).Return()
-			newLoopVar := builder.AllocateInstruction().AsIshl(loopVar, shiftAmount).Insert(builder).Return()
-			loopVarLessThanFillSize := builder.AllocateInstruction().
-				AsIcmp(newLoopVar, fillSizeInBytes, ssa.IntegerCmpCondUnsignedLessThan).Insert(builder).Return()
-
 			builder.AllocateInstruction().
-				AsBrnz(loopVarLessThanFillSize, c.allocateVarLengthValues(1, newLoopVar), loopBlk).
+				AsBrnz(newLoopVarLessThanFillSize, c.allocateVarLengthValues(1, newLoopVar), loopBlk).
 				Insert(builder)
 
 			c.insertJumpToBlock(ssa.ValuesNil, followingBlk)
@@ -770,26 +762,18 @@ func (c *Compiler) lowerCurrentOpcode() {
 			builder.SetCurrentBlock(loopBlk)
 			dstAddr := builder.AllocateInstruction().AsIadd(addr, loopVar).Insert(builder).Return()
 
-			// If loopVar*2 > fillSizeExt, then count must be fillSizeExt-loopVar.
-			var count ssa.Value
-			{
-				loopVarDoubled := builder.AllocateInstruction().AsIadd(loopVar, loopVar).Insert(builder).Return()
-				loopVarDoubledLargerThanFillSize := builder.
-					AllocateInstruction().AsIcmp(loopVarDoubled, fillSize, ssa.IntegerCmpCondUnsignedGreaterThanOrEqual).
-					Insert(builder).Return()
-				diff := builder.AllocateInstruction().AsIsub(fillSize, loopVar).Insert(builder).Return()
-				count = builder.AllocateInstruction().AsSelect(loopVarDoubledLargerThanFillSize, diff, loopVar).Insert(builder).Return()
-			}
+			newLoopVar := builder.AllocateInstruction().AsIadd(loopVar, loopVar).Insert(builder).Return()
+			newLoopVarLessThanFillSize := builder.AllocateInstruction().
+				AsIcmp(newLoopVar, fillSize, ssa.IntegerCmpCondUnsignedLessThan).Insert(builder).Return()
+
+			// On the last iteration, count must be fillSize-loopVar.
+			diff := builder.AllocateInstruction().AsIsub(fillSize, loopVar).Insert(builder).Return()
+			count := builder.AllocateInstruction().AsSelect(newLoopVarLessThanFillSize, loopVar, diff).Insert(builder).Return()
 
 			c.callMemmove(dstAddr, addr, count)
 
-			shiftAmount := builder.AllocateInstruction().AsIconst64(1).Insert(builder).Return()
-			newLoopVar := builder.AllocateInstruction().AsIshl(loopVar, shiftAmount).Insert(builder).Return()
-			loopVarLessThanFillSize := builder.AllocateInstruction().
-				AsIcmp(newLoopVar, fillSize, ssa.IntegerCmpCondUnsignedLessThan).Insert(builder).Return()
-
 			builder.AllocateInstruction().
-				AsBrnz(loopVarLessThanFillSize, c.allocateVarLengthValues(1, newLoopVar), loopBlk).
+				AsBrnz(newLoopVarLessThanFillSize, c.allocateVarLengthValues(1, newLoopVar), loopBlk).
 				Insert(builder)
 
 			c.insertJumpToBlock(ssa.ValuesNil, followingBlk)
