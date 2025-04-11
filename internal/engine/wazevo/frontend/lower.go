@@ -666,6 +666,9 @@ func (c *Compiler) lowerCurrentOpcode() {
 			addr := builder.AllocateInstruction().AsIadd(tableBaseAddr, offsetInBytes).Insert(builder).Return()
 
 			// Uses the copy trick for faster filling buffer like memory.fill, but in this case we copy 8 bytes at a time.
+			// Tables are rarely huge, so ignore the 8KB maximum.
+			// https://github.com/golang/go/blob/go1.24.0/src/slices/slices.go#L514-L517
+			//
 			// 	buf := memoryInst.Buffer[offset : offset+fillSize]
 			// 	buf[0:8] = value
 			// 	for i := 8; i < fillSize; i *= 2 { Begin with 8 bytes.
@@ -688,8 +691,8 @@ func (c *Compiler) lowerCurrentOpcode() {
 			// buf[0:8] = value
 			builder.SetCurrentBlock(beforeLoop)
 			builder.AllocateInstruction().AsStore(ssa.OpcodeStore, value, addr, 0).Insert(builder)
-			initValue := builder.AllocateInstruction().AsIconst64(8).Insert(builder).Return()
-			c.insertJumpToBlock(c.allocateVarLengthValues(1, initValue), loopBlk)
+			eight := builder.AllocateInstruction().AsIconst64(8).Insert(builder).Return()
+			c.insertJumpToBlock(c.allocateVarLengthValues(1, eight), loopBlk)
 
 			builder.SetCurrentBlock(loopBlk)
 			dstAddr := builder.AllocateInstruction().AsIadd(addr, loopVar).Insert(builder).Return()
@@ -733,11 +736,15 @@ func (c *Compiler) lowerCurrentOpcode() {
 			// Calculate the base address:
 			addr := builder.AllocateInstruction().AsIadd(c.getMemoryBaseValue(false), offset).Insert(builder).Return()
 
-			// Uses the copy trick for faster filling buffer: https://gist.github.com/taylorza/df2f89d5f9ab3ffd06865062a4cf015d
+			// Uses the copy trick for faster filling buffer, with a maximum chunk size of 8KB.
+			// https://github.com/golang/go/blob/go1.24.0/src/bytes/bytes.go#L664-L673
+			//
 			// 	buf := memoryInst.Buffer[offset : offset+fillSize]
 			// 	buf[0] = value
-			// 	for i := 1; i < fillSize; i *= 2 {
-			// 		copy(buf[i:], buf[:i])
+			// 	for i := 1; i < fillSize; {
+			// 		chunk := ((i - 1) & 8191) + 1
+			// 		copy(buf[i:], buf[:chunk])
+			// 		i += chunk
 			// 	}
 
 			// Prepare the loop and following block.
@@ -756,19 +763,26 @@ func (c *Compiler) lowerCurrentOpcode() {
 			// buf[0] = value
 			builder.SetCurrentBlock(beforeLoop)
 			builder.AllocateInstruction().AsStore(ssa.OpcodeIstore8, value, addr, 0).Insert(builder)
-			initValue := builder.AllocateInstruction().AsIconst64(1).Insert(builder).Return()
-			c.insertJumpToBlock(c.allocateVarLengthValues(1, initValue), loopBlk)
+			one := builder.AllocateInstruction().AsIconst64(1).Insert(builder).Return()
+			c.insertJumpToBlock(c.allocateVarLengthValues(1, one), loopBlk)
 
 			builder.SetCurrentBlock(loopBlk)
 			dstAddr := builder.AllocateInstruction().AsIadd(addr, loopVar).Insert(builder).Return()
 
-			newLoopVar := builder.AllocateInstruction().AsIadd(loopVar, loopVar).Insert(builder).Return()
+			// chunk := ((i - 1) & 8191) + 1
+			mask := builder.AllocateInstruction().AsIconst64(16383).Insert(builder).Return()
+			tmp1 := builder.AllocateInstruction().AsIsub(loopVar, one).Insert(builder).Return()
+			tmp2 := builder.AllocateInstruction().AsBand(tmp1, mask).Insert(builder).Return()
+			chunk := builder.AllocateInstruction().AsIadd(tmp2, one).Insert(builder).Return()
+
+			// i += chunk
+			newLoopVar := builder.AllocateInstruction().AsIadd(loopVar, chunk).Insert(builder).Return()
 			newLoopVarLessThanFillSize := builder.AllocateInstruction().
 				AsIcmp(newLoopVar, fillSize, ssa.IntegerCmpCondUnsignedLessThan).Insert(builder).Return()
 
-			// On the last iteration, count must be fillSize-loopVar.
+			// count = min(chunk, fillSize-loopVar)
 			diff := builder.AllocateInstruction().AsIsub(fillSize, loopVar).Insert(builder).Return()
-			count := builder.AllocateInstruction().AsSelect(newLoopVarLessThanFillSize, loopVar, diff).Insert(builder).Return()
+			count := builder.AllocateInstruction().AsSelect(newLoopVarLessThanFillSize, chunk, diff).Insert(builder).Return()
 
 			c.callMemmove(dstAddr, addr, count)
 
