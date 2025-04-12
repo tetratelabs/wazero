@@ -1725,12 +1725,17 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			if fillSize+offset > uint64(len(memoryInst.Buffer)) {
 				panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 			} else if fillSize != 0 {
-				// Uses the copy trick for faster filling buffer.
-				// https://gist.github.com/taylorza/df2f89d5f9ab3ffd06865062a4cf015d
+				// Uses the copy trick for faster filling the buffer with the value.
+				// https://github.com/golang/go/blob/go1.24.0/src/bytes/bytes.go#L664-L673
 				buf := memoryInst.Buffer[offset : offset+fillSize]
-				buf[0] = value
-				for i := 1; i < len(buf); i *= 2 {
-					copy(buf[i:], buf[:i])
+				if value == 0 {
+					clear(buf)
+				} else {
+					buf[0] = value
+					for i := 1; i < len(buf); {
+						chunk := min(i, 8192)
+						i += copy(buf[i:], buf[:chunk])
+					}
 				}
 			}
 			frame.pc++
@@ -1804,7 +1809,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 				panic(wasmruntime.ErrRuntimeInvalidTableAccess)
 			} else if num > 0 {
 				// Uses the copy trick for faster filling the region with the value.
-				// https://gist.github.com/taylorza/df2f89d5f9ab3ffd06865062a4cf015d
+				// https://github.com/golang/go/blob/go1.24.0/src/slices/slices.go#L514-L517
 				targetRegion := table.References[offset : offset+num]
 				targetRegion[0] = ref
 				for i := 1; i < len(targetRegion); i *= 2 {
