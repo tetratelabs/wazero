@@ -770,7 +770,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			dstAddr := builder.AllocateInstruction().AsIadd(addr, loopVar).Insert(builder).Return()
 
 			// chunk := ((i - 1) & 8191) + 1
-			mask := builder.AllocateInstruction().AsIconst64(16383).Insert(builder).Return()
+			mask := builder.AllocateInstruction().AsIconst64(8191).Insert(builder).Return()
 			tmp1 := builder.AllocateInstruction().AsIsub(loopVar, one).Insert(builder).Return()
 			tmp2 := builder.AllocateInstruction().AsBand(tmp1, mask).Insert(builder).Return()
 			chunk := builder.AllocateInstruction().AsIadd(tmp2, one).Insert(builder).Return()
