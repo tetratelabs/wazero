@@ -307,6 +307,42 @@ func (m *machine) lowerCall(si *ssa.Instruction) {
 	}
 }
 
+func (m *machine) lowerTailCall(si *ssa.Instruction) {
+	isDirectCall := si.Opcode() == ssa.OpcodeTailCallReturnCall
+	var indirectCalleePtr ssa.Value
+	var directCallee ssa.FuncRef
+	var sigID ssa.SignatureID
+	var args []ssa.Value
+	if isDirectCall {
+		directCallee, sigID, args = si.CallData()
+	} else {
+		indirectCalleePtr, sigID, args, _ /* on arm64, the calling convention is compatible with the Go runtime */ = si.CallIndirectData()
+	}
+	calleeABI := m.compiler.GetFunctionABI(m.compiler.SSABuilder().ResolveSignature(sigID))
+
+	stackSlotSize := int64(calleeABI.AlignedArgResultStackSlotSize())
+	if m.maxRequiredStackSizeForCalls < stackSlotSize+16 {
+		m.maxRequiredStackSizeForCalls = stackSlotSize + 16 // return address frame.
+	}
+
+	for i, arg := range args {
+		reg := m.compiler.VRegOf(arg)
+		def := m.compiler.ValueDefinition(arg)
+		m.callerGenVRegToFunctionArg(calleeABI, i, reg, def, stackSlotSize)
+	}
+
+	if isDirectCall {
+		tailJump := m.allocateInstr()
+		tailJump.asTailCall(directCallee, calleeABI)
+		m.insert(tailJump)
+	} else {
+		ptr := m.compiler.VRegOf(indirectCalleePtr)
+		callInd := m.allocateInstr()
+		callInd.asTailCallIndirect(ptr, calleeABI)
+		m.insert(callInd)
+	}
+}
+
 func (m *machine) insertAddOrSubStackPointer(rd regalloc.VReg, diff int64, add bool) {
 	if imm12Operand, ok := asImm12Operand(uint64(diff)); ok {
 		alu := m.allocateInstr()

@@ -68,7 +68,7 @@ func (m *machine) ResolveRelocations(
 				panic("BUG in trampoline placement")
 			}
 		}
-		binary.LittleEndian.PutUint32(executable[instrOffset:instrOffset+4], encodeUnconditionalBranch(true, diff))
+		binary.LittleEndian.PutUint32(executable[instrOffset:instrOffset+4], encodeUnconditionalBranch(!r.IsTailCall, diff))
 	}
 }
 

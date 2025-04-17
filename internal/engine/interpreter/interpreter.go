@@ -4336,6 +4336,64 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			memoryInst.Mux.Unlock()
 			ce.pushValue(uint64(old))
 			frame.pc++
+		case operationKindTailCallReturnCall:
+			f := &functions[op.U1]
+			if *f == *(frame.f) {
+				frame.pc = 0
+				continue
+			}
+
+			ce.popFrame()
+
+			frame = &callFrame{f: f, base: len(ce.stack)}
+			moduleInst = f.moduleInstance
+			functions = moduleInst.Engine.(*moduleEngine).functions
+			memoryInst = moduleInst.MemoryInstance
+			globals = moduleInst.Globals
+			tables = moduleInst.Tables
+			typeIDs = moduleInst.TypeIDs
+			dataInstances = moduleInst.DataInstances
+			elementInstances = moduleInst.ElementInstances
+			ce.pushFrame(frame)
+			body = frame.f.parent.body
+			bodyLen = uint64(len(body))
+
+		case operationKindTailCallReturnCallIndirect:
+			offset := ce.popValue()
+			table := tables[op.U2]
+			if offset >= uint64(len(table.References)) {
+				panic(wasmruntime.ErrRuntimeInvalidTableAccess)
+			}
+			rawPtr := table.References[offset]
+			if rawPtr == 0 {
+				panic(wasmruntime.ErrRuntimeInvalidTableAccess)
+			}
+
+			tf := functionFromUintptr(rawPtr)
+			if tf.typeID != typeIDs[op.U1] {
+				panic(wasmruntime.ErrRuntimeIndirectCallTypeMismatch)
+			}
+
+			if *tf == *(frame.f) {
+				frame.pc = 0
+				continue
+			}
+
+			ce.popFrame()
+
+			frame = &callFrame{f: tf, base: len(ce.stack)}
+			moduleInst = f.moduleInstance
+			functions = moduleInst.Engine.(*moduleEngine).functions
+			memoryInst = moduleInst.MemoryInstance
+			globals = moduleInst.Globals
+			tables = moduleInst.Tables
+			typeIDs = moduleInst.TypeIDs
+			dataInstances = moduleInst.DataInstances
+			elementInstances = moduleInst.ElementInstances
+			ce.pushFrame(frame)
+			body = frame.f.parent.body
+			bodyLen = uint64(len(body))
+
 		default:
 			frame.pc++
 		}

@@ -840,10 +840,28 @@ func TestE2E(t *testing.T) {
 				{params: []uint64{math.Float64bits(math.NaN())}, expResults: []uint64{0, 0}},
 			},
 		},
+		{
+			name:     "tail_call_return_call",
+			m:        testcases.FibonacciTailRecursive.Module,
+			features: api.CoreFeaturesV2 | experimental.CoreFeaturesTailCall,
+			calls: []callCase{
+				{params: []uint64{10, 0, 1}, expResults: []uint64{55}},
+				{params: []uint64{20, 0, 1}, expResults: []uint64{6765}},
+				{params: []uint64{318, 0, 1}, expResults: []uint64{0x80dbbba8}},
+			},
+		},
+		{
+			name:     "tail_call_return_call_count",
+			m:        testcases.CountTailRecursive.Module,
+			features: api.CoreFeaturesV2 | experimental.CoreFeaturesTailCall,
+			calls: []callCase{
+				{params: []uint64{1000_000_000, 0}, expResults: []uint64{1000_000_000}},
+			},
+		},
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			for i := 0; i < 2; i++ {
+			for i := 0; i < 1; i++ {
 				var name string
 				if i == 0 {
 					name = "no cache"

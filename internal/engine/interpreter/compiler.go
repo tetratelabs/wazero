@@ -814,6 +814,7 @@ operatorSwitch:
 		c.emit(
 			newOperationCallIndirect(typeIndex, tableIndex),
 		)
+
 	case wasm.OpcodeDrop:
 		r := inclusiveRange{Start: 0, End: 0}
 		if peekValueType == unsignedTypeV128 {
@@ -3423,6 +3424,33 @@ operatorSwitch:
 		default:
 			return fmt.Errorf("unsupported atomic instruction in interpreterir: %s", wasm.AtomicInstructionName(atomicOp))
 		}
+
+	case wasm.OpcodeTailCallReturnCall:
+		c.emit(
+			newOperationTailCallReturnCall(index),
+		)
+
+		// Return operation is stack-polymorphic, and mark the state as unreachable.
+		// That means subsequent instructions in the current control frame are "unreachable"
+		// and can be safely removed.
+		c.markUnreachable()
+
+	case wasm.OpcodeTailCallReturnCallIndirect:
+		typeIndex := index
+		tableIndex, n, err := leb128.LoadUint32(c.body[c.pc+1:])
+		if err != nil {
+			return fmt.Errorf("read target for br_table: %w", err)
+		}
+		c.pc += n
+		c.emit(
+			newOperationTailCallReturnCallIndirect(typeIndex, tableIndex),
+		)
+
+		// Return operation is stack-polymorphic, and mark the state as unreachable.
+		// That means subsequent instructions in the current control frame are "unreachable"
+		// and can be safely removed.
+		c.markUnreachable()
+
 	default:
 		return fmt.Errorf("unsupported instruction in interpreterir: 0x%x", op)
 	}
@@ -3449,7 +3477,10 @@ func (c *compiler) applyToStack(opcode wasm.Opcode) (index uint32, err error) {
 		wasm.OpcodeLocalSet,
 		wasm.OpcodeLocalTee,
 		wasm.OpcodeGlobalGet,
-		wasm.OpcodeGlobalSet:
+		wasm.OpcodeGlobalSet,
+		// tail-call proposal
+		wasm.OpcodeTailCallReturnCall,
+		wasm.OpcodeTailCallReturnCallIndirect:
 		// Assumes that we are at the opcode now so skip it before read immediates.
 		v, num, err := leb128.LoadUint32(c.body[c.pc+1:])
 		if err != nil {

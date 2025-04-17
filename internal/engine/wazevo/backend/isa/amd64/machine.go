@@ -1109,6 +1109,9 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		atomicOp, size := instr.AtomicRmwData()
 		m.lowerAtomicRmw(atomicOp, addr, val, size, instr.Return())
 
+	case ssa.OpcodeTailCallReturnCall, ssa.OpcodeTailCallReturnCallIndirect:
+		m.lowerTailCall(instr)
+
 	default:
 		panic("TODO: lowering " + op.String())
 	}
@@ -1949,6 +1952,53 @@ func (m *machine) lowerCall(si *ssa.Instruction) {
 	for _, r := range rs {
 		m.callerGenFunctionReturnVReg(calleeABI, index, m.c.VRegOf(r), stackSlotSize)
 		index++
+	}
+}
+
+func (m *machine) lowerTailCall(si *ssa.Instruction) {
+	isDirectCall := si.Opcode() == ssa.OpcodeTailCallReturnCall
+	var indirectCalleePtr ssa.Value
+	var directCallee ssa.FuncRef
+	var sigID ssa.SignatureID
+	var args []ssa.Value
+	var isMemmove bool
+	if isDirectCall {
+		directCallee, sigID, args = si.CallData()
+	} else {
+		indirectCalleePtr, sigID, args, isMemmove = si.CallIndirectData()
+		if isMemmove {
+			panic("invalid: memmove tail call")
+		}
+	}
+	calleeABI := m.c.GetFunctionABI(m.c.SSABuilder().ResolveSignature(sigID))
+
+	stackSlotSize := int64(calleeABI.AlignedArgResultStackSlotSize())
+	if m.maxRequiredStackSizeForCalls < stackSlotSize+16 {
+		m.maxRequiredStackSizeForCalls = stackSlotSize + 16 // 16 == return address + RBP.
+	}
+
+	// Note: See machine.SetupPrologue for the stack layout.
+	// The stack pointer decrease/increase will be inserted later in the compilation.
+
+	for i, arg := range args {
+		reg := m.c.VRegOf(arg)
+		def := m.c.ValueDefinition(arg)
+		m.callerGenVRegToFunctionArg(calleeABI, i, reg, def, stackSlotSize)
+	}
+
+	if isDirectCall {
+		call := m.allocateInstr().asTailCallReturnCall(directCallee, calleeABI)
+		m.insert(call)
+	} else {
+		// In a tail call we insert the epilogue before the jump instruction,
+		// so an arbitrary register might be overwritten while restoring the stack.
+		// So, as compared to a regular indirect call, we ensure the pointer is stored
+		// in a caller-saved register (r11).
+		ptrOp := m.getOperand_Reg(m.c.ValueDefinition(indirectCalleePtr))
+		tmpJmp := r11VReg
+		m.InsertMove(tmpJmp, ptrOp.reg(), ssa.TypeI64)
+		callInd := m.allocateInstr().asTailCallReturnCallIndirect(newOperandReg(tmpJmp), calleeABI)
+		m.insert(callInd)
 	}
 }
 

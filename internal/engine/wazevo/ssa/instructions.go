@@ -633,6 +633,10 @@ const (
 	// OpcodeFence is a memory fence operation.
 	OpcodeFence
 
+	OpcodeTailCallReturnCall
+
+	OpcodeTailCallReturnCallIndirect
+
 	// opcodeEnd marks the end of the opcode list.
 	opcodeEnd
 )
@@ -846,6 +850,8 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 	OpcodeAtomicStore:                 sideEffectStrict,
 	OpcodeAtomicCas:                   sideEffectStrict,
 	OpcodeFence:                       sideEffectStrict,
+	OpcodeTailCallReturnCall:          sideEffectStrict,
+	OpcodeTailCallReturnCallIndirect:  sideEffectStrict,
 	OpcodeWideningPairwiseDotProductS: sideEffectNone,
 }
 
@@ -1032,6 +1038,8 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeAtomicStore:                 returnTypesFnNoReturns,
 	OpcodeAtomicCas:                   returnTypesFnSingle,
 	OpcodeFence:                       returnTypesFnNoReturns,
+	OpcodeTailCallReturnCall:          returnTypesFnNoReturns,
+	OpcodeTailCallReturnCallIndirect:  returnTypesFnNoReturns,
 	OpcodeWideningPairwiseDotProductS: returnTypesFnV128,
 }
 
@@ -2038,6 +2046,26 @@ func (i *Instruction) AtomicTargetSize() (size uint64) {
 	return i.u1
 }
 
+// AsTailCallReturnCall initializes this instruction as a call instruction with OpcodeTailCallReturnCall.
+func (i *Instruction) AsTailCallReturnCall(ref FuncRef, sig *Signature, args Values) {
+	i.opcode = OpcodeTailCallReturnCall
+	i.u1 = uint64(ref)
+	i.vs = args
+	i.u2 = uint64(sig.ID)
+	sig.used = true
+}
+
+// AsTailCallReturnCallIndirect initializes this instruction as a call-indirect instruction with OpcodeTailCallReturnCallIndirect.
+func (i *Instruction) AsTailCallReturnCallIndirect(funcPtr Value, sig *Signature, args Values) *Instruction {
+	i.opcode = OpcodeTailCallReturnCallIndirect
+	i.typ = TypeF64
+	i.vs = args
+	i.v = funcPtr
+	i.u1 = uint64(sig.ID)
+	sig.used = true
+	return i
+}
+
 // ReturnVals returns the return values of OpcodeReturn.
 func (i *Instruction) ReturnVals() []Value {
 	return i.vs.View()
@@ -2166,7 +2194,7 @@ func (i *Instruction) AsCall(ref FuncRef, sig *Signature, args Values) {
 
 // CallData returns the call data for this instruction necessary for backends.
 func (i *Instruction) CallData() (ref FuncRef, sigID SignatureID, args []Value) {
-	if i.opcode != OpcodeCall {
+	if i.opcode != OpcodeCall && i.opcode != OpcodeTailCallReturnCall {
 		panic("BUG: CallData only available for OpcodeCall")
 	}
 	ref = FuncRef(i.u1)
@@ -2195,8 +2223,8 @@ func (i *Instruction) AsCallGoRuntimeMemmove(funcPtr Value, sig *Signature, args
 
 // CallIndirectData returns the call indirect data for this instruction necessary for backends.
 func (i *Instruction) CallIndirectData() (funcPtr Value, sigID SignatureID, args []Value, isGoMemmove bool) {
-	if i.opcode != OpcodeCallIndirect {
-		panic("BUG: CallIndirectData only available for OpcodeCallIndirect")
+	if i.opcode != OpcodeCallIndirect && i.opcode != OpcodeTailCallReturnCallIndirect {
+		panic("BUG: CallIndirectData only available for OpcodeCallIndirect and OpcodeTailCallReturnCallIndirect")
 	}
 	funcPtr = i.v
 	sigID = SignatureID(i.u1)
@@ -2620,6 +2648,17 @@ func (i *Instruction) Format(b Builder) string {
 		instSuffix = fmt.Sprintf("_%d, %s, %s, %s", 8*i.u1, i.v.Format(b), i.v2.Format(b), i.v3.Format(b))
 	case OpcodeFence:
 		instSuffix = fmt.Sprintf(" %d", i.u1)
+	case OpcodeTailCallReturnCall, OpcodeTailCallReturnCallIndirect:
+		view := i.vs.View()
+		vs := make([]string, len(view))
+		for idx := range vs {
+			vs[idx] = view[idx].Format(b)
+		}
+		if i.opcode == OpcodeCallIndirect {
+			instSuffix = fmt.Sprintf(" %s:%s, %s", i.v.Format(b), SignatureID(i.u1), strings.Join(vs, ", "))
+		} else {
+			instSuffix = fmt.Sprintf(" %s:%s, %s", FuncRef(i.u1), SignatureID(i.u2), strings.Join(vs, ", "))
+		}
 	case OpcodeWideningPairwiseDotProductS:
 		instSuffix = fmt.Sprintf(" %s, %s", i.v.Format(b), i.v2.Format(b))
 	default:
@@ -2879,6 +2918,10 @@ func (o Opcode) String() (ret string) {
 		return "AtomicStore"
 	case OpcodeFence:
 		return "Fence"
+	case OpcodeTailCallReturnCall:
+		return "ReturnCall"
+	case OpcodeTailCallReturnCallIndirect:
+		return "ReturnCallIndirect"
 	case OpcodeVbor:
 		return "Vbor"
 	case OpcodeVbxor:
