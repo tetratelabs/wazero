@@ -201,6 +201,7 @@ func (m *machine) postRegAlloc() {
 			}
 			// In a tail call, we insert the epilogue before the jump instruction.
 			m.setupEpilogueAfter(tailCall.prev)
+			m.removeUntilRet(cur.next)
 			continue
 		}
 
@@ -290,6 +291,19 @@ func (m *machine) setupEpilogueAfter(cur *instruction) {
 	cur = m.revertRBPRSP(cur)
 
 	linkInstr(cur, prevNext)
+}
+
+func (m *machine) removeUntilRet(cur *instruction) {
+	for ; cur != nil; cur = cur.next {
+		prev, next := cur.prev, cur.next
+		prev.next = next
+		if next != nil {
+			next.prev = prev
+		}
+		if cur.kind == ret {
+			return
+		}
+	}
 }
 
 func (m *machine) addRSP(offset int32, cur *instruction) *instruction {

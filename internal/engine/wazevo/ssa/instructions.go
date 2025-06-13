@@ -633,8 +633,10 @@ const (
 	// OpcodeFence is a memory fence operation.
 	OpcodeFence
 
+	// OpcodeTailCallReturnCall is ...
 	OpcodeTailCallReturnCall
 
+	// OpcodeTailCallReturnCallIndirect is ...
 	OpcodeTailCallReturnCallIndirect
 
 	// opcodeEnd marks the end of the opcode list.
@@ -683,12 +685,44 @@ func (op AtomicRmwOp) String() string {
 type returnTypesFn func(b *builder, instr *Instruction) (t1 Type, ts []Type)
 
 var (
-	returnTypesFnNoReturns returnTypesFn = func(b *builder, instr *Instruction) (t1 Type, ts []Type) { return typeInvalid, nil }
-	returnTypesFnSingle                  = func(b *builder, instr *Instruction) (t1 Type, ts []Type) { return instr.typ, nil }
-	returnTypesFnI32                     = func(b *builder, instr *Instruction) (t1 Type, ts []Type) { return TypeI32, nil }
-	returnTypesFnF32                     = func(b *builder, instr *Instruction) (t1 Type, ts []Type) { return TypeF32, nil }
-	returnTypesFnF64                     = func(b *builder, instr *Instruction) (t1 Type, ts []Type) { return TypeF64, nil }
-	returnTypesFnV128                    = func(b *builder, instr *Instruction) (t1 Type, ts []Type) { return TypeV128, nil }
+	returnTypesFnNoReturns    returnTypesFn = func(b *builder, instr *Instruction) (t1 Type, ts []Type) { return typeInvalid, nil }
+	returnTypesFnSingle                     = func(b *builder, instr *Instruction) (t1 Type, ts []Type) { return instr.typ, nil }
+	returnTypesFnI32                        = func(b *builder, instr *Instruction) (t1 Type, ts []Type) { return TypeI32, nil }
+	returnTypesFnF32                        = func(b *builder, instr *Instruction) (t1 Type, ts []Type) { return TypeF32, nil }
+	returnTypesFnF64                        = func(b *builder, instr *Instruction) (t1 Type, ts []Type) { return TypeF64, nil }
+	returnTypesFnV128                       = func(b *builder, instr *Instruction) (t1 Type, ts []Type) { return TypeV128, nil }
+	returnTypesFnCallIndirect               = func(b *builder, instr *Instruction) (t1 Type, ts []Type) {
+		sigID := SignatureID(instr.u1)
+		sig, ok := b.signatures[sigID]
+		if !ok {
+			panic("BUG")
+		}
+		switch len(sig.Results) {
+		case 0:
+			t1 = typeInvalid
+		case 1:
+			t1 = sig.Results[0]
+		default:
+			t1, ts = sig.Results[0], sig.Results[1:]
+		}
+		return
+	}
+	returnTypesFnCall = func(b *builder, instr *Instruction) (t1 Type, ts []Type) {
+		sigID := SignatureID(instr.u2)
+		sig, ok := b.signatures[sigID]
+		if !ok {
+			panic("BUG")
+		}
+		switch len(sig.Results) {
+		case 0:
+			t1 = typeInvalid
+		case 1:
+			t1 = sig.Results[0]
+		default:
+			t1, ts = sig.Results[0], sig.Results[1:]
+		}
+		return
+	}
 )
 
 // sideEffect provides the info to determine if an instruction has side effects which
@@ -866,105 +900,75 @@ func (i *Instruction) sideEffect() sideEffect {
 
 // instructionReturnTypes provides the function to determine the return types of an instruction.
 var instructionReturnTypes = [opcodeEnd]returnTypesFn{
-	OpcodeExtIaddPairwise: returnTypesFnV128,
-	OpcodeVbor:            returnTypesFnV128,
-	OpcodeVbxor:           returnTypesFnV128,
-	OpcodeVband:           returnTypesFnV128,
-	OpcodeVbnot:           returnTypesFnV128,
-	OpcodeVbandnot:        returnTypesFnV128,
-	OpcodeVbitselect:      returnTypesFnV128,
-	OpcodeVanyTrue:        returnTypesFnI32,
-	OpcodeVallTrue:        returnTypesFnI32,
-	OpcodeVhighBits:       returnTypesFnI32,
-	OpcodeVIadd:           returnTypesFnV128,
-	OpcodeVSaddSat:        returnTypesFnV128,
-	OpcodeVUaddSat:        returnTypesFnV128,
-	OpcodeVIsub:           returnTypesFnV128,
-	OpcodeVSsubSat:        returnTypesFnV128,
-	OpcodeVUsubSat:        returnTypesFnV128,
-	OpcodeVIcmp:           returnTypesFnV128,
-	OpcodeVImin:           returnTypesFnV128,
-	OpcodeVUmin:           returnTypesFnV128,
-	OpcodeVImax:           returnTypesFnV128,
-	OpcodeVUmax:           returnTypesFnV128,
-	OpcodeVImul:           returnTypesFnV128,
-	OpcodeVAvgRound:       returnTypesFnV128,
-	OpcodeVIabs:           returnTypesFnV128,
-	OpcodeVIneg:           returnTypesFnV128,
-	OpcodeVIpopcnt:        returnTypesFnV128,
-	OpcodeVIshl:           returnTypesFnV128,
-	OpcodeVSshr:           returnTypesFnV128,
-	OpcodeVUshr:           returnTypesFnV128,
-	OpcodeExtractlane:     returnTypesFnSingle,
-	OpcodeInsertlane:      returnTypesFnV128,
-	OpcodeBand:            returnTypesFnSingle,
-	OpcodeFcopysign:       returnTypesFnSingle,
-	OpcodeBitcast:         returnTypesFnSingle,
-	OpcodeBor:             returnTypesFnSingle,
-	OpcodeBxor:            returnTypesFnSingle,
-	OpcodeRotl:            returnTypesFnSingle,
-	OpcodeRotr:            returnTypesFnSingle,
-	OpcodeIshl:            returnTypesFnSingle,
-	OpcodeSshr:            returnTypesFnSingle,
-	OpcodeSdiv:            returnTypesFnSingle,
-	OpcodeSrem:            returnTypesFnSingle,
-	OpcodeUdiv:            returnTypesFnSingle,
-	OpcodeUrem:            returnTypesFnSingle,
-	OpcodeUshr:            returnTypesFnSingle,
-	OpcodeJump:            returnTypesFnNoReturns,
-	OpcodeUndefined:       returnTypesFnNoReturns,
-	OpcodeIconst:          returnTypesFnSingle,
-	OpcodeSelect:          returnTypesFnSingle,
-	OpcodeSExtend:         returnTypesFnSingle,
-	OpcodeUExtend:         returnTypesFnSingle,
-	OpcodeSwidenLow:       returnTypesFnV128,
-	OpcodeUwidenLow:       returnTypesFnV128,
-	OpcodeSwidenHigh:      returnTypesFnV128,
-	OpcodeUwidenHigh:      returnTypesFnV128,
-	OpcodeSnarrow:         returnTypesFnV128,
-	OpcodeUnarrow:         returnTypesFnV128,
-	OpcodeSwizzle:         returnTypesFnSingle,
-	OpcodeShuffle:         returnTypesFnV128,
-	OpcodeSplat:           returnTypesFnV128,
-	OpcodeIreduce:         returnTypesFnSingle,
-	OpcodeFabs:            returnTypesFnSingle,
-	OpcodeSqrt:            returnTypesFnSingle,
-	OpcodeCeil:            returnTypesFnSingle,
-	OpcodeFloor:           returnTypesFnSingle,
-	OpcodeTrunc:           returnTypesFnSingle,
-	OpcodeNearest:         returnTypesFnSingle,
-	OpcodeCallIndirect: func(b *builder, instr *Instruction) (t1 Type, ts []Type) {
-		sigID := SignatureID(instr.u1)
-		sig, ok := b.signatures[sigID]
-		if !ok {
-			panic("BUG")
-		}
-		switch len(sig.Results) {
-		case 0:
-			t1 = typeInvalid
-		case 1:
-			t1 = sig.Results[0]
-		default:
-			t1, ts = sig.Results[0], sig.Results[1:]
-		}
-		return
-	},
-	OpcodeCall: func(b *builder, instr *Instruction) (t1 Type, ts []Type) {
-		sigID := SignatureID(instr.u2)
-		sig, ok := b.signatures[sigID]
-		if !ok {
-			panic("BUG")
-		}
-		switch len(sig.Results) {
-		case 0:
-			t1 = typeInvalid
-		case 1:
-			t1 = sig.Results[0]
-		default:
-			t1, ts = sig.Results[0], sig.Results[1:]
-		}
-		return
-	},
+	OpcodeExtIaddPairwise:             returnTypesFnV128,
+	OpcodeVbor:                        returnTypesFnV128,
+	OpcodeVbxor:                       returnTypesFnV128,
+	OpcodeVband:                       returnTypesFnV128,
+	OpcodeVbnot:                       returnTypesFnV128,
+	OpcodeVbandnot:                    returnTypesFnV128,
+	OpcodeVbitselect:                  returnTypesFnV128,
+	OpcodeVanyTrue:                    returnTypesFnI32,
+	OpcodeVallTrue:                    returnTypesFnI32,
+	OpcodeVhighBits:                   returnTypesFnI32,
+	OpcodeVIadd:                       returnTypesFnV128,
+	OpcodeVSaddSat:                    returnTypesFnV128,
+	OpcodeVUaddSat:                    returnTypesFnV128,
+	OpcodeVIsub:                       returnTypesFnV128,
+	OpcodeVSsubSat:                    returnTypesFnV128,
+	OpcodeVUsubSat:                    returnTypesFnV128,
+	OpcodeVIcmp:                       returnTypesFnV128,
+	OpcodeVImin:                       returnTypesFnV128,
+	OpcodeVUmin:                       returnTypesFnV128,
+	OpcodeVImax:                       returnTypesFnV128,
+	OpcodeVUmax:                       returnTypesFnV128,
+	OpcodeVImul:                       returnTypesFnV128,
+	OpcodeVAvgRound:                   returnTypesFnV128,
+	OpcodeVIabs:                       returnTypesFnV128,
+	OpcodeVIneg:                       returnTypesFnV128,
+	OpcodeVIpopcnt:                    returnTypesFnV128,
+	OpcodeVIshl:                       returnTypesFnV128,
+	OpcodeVSshr:                       returnTypesFnV128,
+	OpcodeVUshr:                       returnTypesFnV128,
+	OpcodeExtractlane:                 returnTypesFnSingle,
+	OpcodeInsertlane:                  returnTypesFnV128,
+	OpcodeBand:                        returnTypesFnSingle,
+	OpcodeFcopysign:                   returnTypesFnSingle,
+	OpcodeBitcast:                     returnTypesFnSingle,
+	OpcodeBor:                         returnTypesFnSingle,
+	OpcodeBxor:                        returnTypesFnSingle,
+	OpcodeRotl:                        returnTypesFnSingle,
+	OpcodeRotr:                        returnTypesFnSingle,
+	OpcodeIshl:                        returnTypesFnSingle,
+	OpcodeSshr:                        returnTypesFnSingle,
+	OpcodeSdiv:                        returnTypesFnSingle,
+	OpcodeSrem:                        returnTypesFnSingle,
+	OpcodeUdiv:                        returnTypesFnSingle,
+	OpcodeUrem:                        returnTypesFnSingle,
+	OpcodeUshr:                        returnTypesFnSingle,
+	OpcodeJump:                        returnTypesFnNoReturns,
+	OpcodeUndefined:                   returnTypesFnNoReturns,
+	OpcodeIconst:                      returnTypesFnSingle,
+	OpcodeSelect:                      returnTypesFnSingle,
+	OpcodeSExtend:                     returnTypesFnSingle,
+	OpcodeUExtend:                     returnTypesFnSingle,
+	OpcodeSwidenLow:                   returnTypesFnV128,
+	OpcodeUwidenLow:                   returnTypesFnV128,
+	OpcodeSwidenHigh:                  returnTypesFnV128,
+	OpcodeUwidenHigh:                  returnTypesFnV128,
+	OpcodeSnarrow:                     returnTypesFnV128,
+	OpcodeUnarrow:                     returnTypesFnV128,
+	OpcodeSwizzle:                     returnTypesFnSingle,
+	OpcodeShuffle:                     returnTypesFnV128,
+	OpcodeSplat:                       returnTypesFnV128,
+	OpcodeIreduce:                     returnTypesFnSingle,
+	OpcodeFabs:                        returnTypesFnSingle,
+	OpcodeSqrt:                        returnTypesFnSingle,
+	OpcodeCeil:                        returnTypesFnSingle,
+	OpcodeFloor:                       returnTypesFnSingle,
+	OpcodeTrunc:                       returnTypesFnSingle,
+	OpcodeNearest:                     returnTypesFnSingle,
+	OpcodeCallIndirect:                returnTypesFnCallIndirect,
+	OpcodeCall:                        returnTypesFnCall,
 	OpcodeLoad:                        returnTypesFnSingle,
 	OpcodeVZeroExtLoad:                returnTypesFnV128,
 	OpcodeLoadSplat:                   returnTypesFnV128,
@@ -1038,8 +1042,8 @@ var instructionReturnTypes = [opcodeEnd]returnTypesFn{
 	OpcodeAtomicStore:                 returnTypesFnNoReturns,
 	OpcodeAtomicCas:                   returnTypesFnSingle,
 	OpcodeFence:                       returnTypesFnNoReturns,
-	OpcodeTailCallReturnCall:          returnTypesFnNoReturns,
-	OpcodeTailCallReturnCallIndirect:  returnTypesFnNoReturns,
+	OpcodeTailCallReturnCallIndirect:  returnTypesFnCallIndirect,
+	OpcodeTailCallReturnCall:          returnTypesFnCall,
 	OpcodeWideningPairwiseDotProductS: returnTypesFnV128,
 }
 
@@ -2058,7 +2062,6 @@ func (i *Instruction) AsTailCallReturnCall(ref FuncRef, sig *Signature, args Val
 // AsTailCallReturnCallIndirect initializes this instruction as a call-indirect instruction with OpcodeTailCallReturnCallIndirect.
 func (i *Instruction) AsTailCallReturnCallIndirect(funcPtr Value, sig *Signature, args Values) *Instruction {
 	i.opcode = OpcodeTailCallReturnCallIndirect
-	i.typ = TypeF64
 	i.vs = args
 	i.v = funcPtr
 	i.u1 = uint64(sig.ID)

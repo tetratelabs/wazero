@@ -1566,11 +1566,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			c.callListenerAfter()
 		}
 
-		results := c.nPeekDup(c.results())
-		instr := builder.AllocateInstruction()
-
-		instr.AsReturn(results)
-		builder.InsertInstruction(instr)
+		c.lowerReturn(builder)
 		state.unreachable = true
 
 	case wasm.OpcodeUnreachable:
@@ -3431,6 +3427,14 @@ func (c *Compiler) lowerCurrentOpcode() {
 	c.loweringState.pc++
 }
 
+func (c *Compiler) lowerReturn(builder ssa.Builder) {
+	results := c.nPeekDup(c.results())
+	instr := builder.AllocateInstruction()
+
+	instr.AsReturn(results)
+	builder.InsertInstruction(instr)
+}
+
 func (c *Compiler) lowerExtMul(v1, v2 ssa.Value, from, to ssa.VecLane, signed, low bool) ssa.Value {
 	// TODO: The sequence `Widen; Widen; VIMul` can be substituted for a single instruction on some ISAs.
 	builder := c.ssaBuilder
@@ -3547,6 +3551,7 @@ func (c *Compiler) lowerCall(fnIndex uint32) {
 	builder := c.ssaBuilder
 	state := c.state()
 	isIndirect, sig, args, funcRefOrPtrValue := c.prepareCall(fnIndex)
+
 	call := builder.AllocateInstruction()
 	if isIndirect {
 		call.AsCallIndirect(ssa.Value(funcRefOrPtrValue), sig, args)
@@ -3669,7 +3674,21 @@ func (c *Compiler) lowerTailCallReturnCall(fnIndex uint32) {
 		call.AsTailCallReturnCall(ssa.FuncRef(funcRefOrPtrValue), sig, args)
 	}
 	builder.InsertInstruction(call)
-	state.unreachable = true
+
+	// In a proper tail call, the following code is unreachable since execution
+	// transfers to the callee. However, sometimes the backend might need to fall back to
+	// a regular call, so we include return handling and let the backend delete it
+	// when redundant.
+	first, rest := call.Returns()
+	if first.Valid() {
+		state.push(first)
+	}
+	for _, v := range rest {
+		state.push(v)
+	}
+
+	c.reloadAfterCall()
+	c.lowerReturn(builder)
 }
 
 func (c *Compiler) lowerTailCallReturnCallIndirect(typeIndex, tableIndex uint32) {
@@ -3681,7 +3700,20 @@ func (c *Compiler) lowerTailCallReturnCallIndirect(typeIndex, tableIndex uint32)
 	call.AsTailCallReturnCallIndirect(executablePtr, c.signatures[typ], args)
 	builder.InsertInstruction(call)
 
-	state.unreachable = true
+	// In a proper tail call, the following code is unreachable since execution
+	// transfers to the callee. However, sometimes the backend might need to fall back to
+	// a regular call, so we include return handling and let the backend delete it
+	// when redundant.
+	first, rest := call.Returns()
+	if first.Valid() {
+		state.push(first)
+	}
+	for _, v := range rest {
+		state.push(v)
+	}
+
+	c.reloadAfterCall()
+	c.lowerReturn(builder)
 }
 
 // memOpSetup inserts the bounds check and calculates the address of the memory operation (loads/stores).

@@ -196,8 +196,11 @@ func (m *machine) createFrameSizeSlot(cur *instruction, s int64) *instruction {
 func (m *machine) postRegAlloc() {
 	for cur := m.rootInstr; cur != nil; cur = cur.next {
 		switch cur.kind {
-		case tailCall, tailCallInd, ret:
+		case ret:
 			m.setupEpilogueAfter(cur.prev)
+		case tailCall, tailCallInd:
+			m.setupEpilogueAfter(cur.prev)
+			m.removeUntilRet(cur.next)
 		case loadConstBlockArg:
 			lc := cur
 			next := lc.next
@@ -323,6 +326,19 @@ func (m *machine) setupEpilogueAfter(cur *instruction) {
 	}
 
 	linkInstr(cur, prevNext)
+}
+
+func (m *machine) removeUntilRet(cur *instruction) {
+	for ; cur != nil; cur = cur.next {
+		prev, next := cur.prev, cur.next
+		prev.next = next
+		if next != nil {
+			next.prev = prev
+		}
+		if cur.kind == ret {
+			return
+		}
+	}
 }
 
 // saveRequiredRegs is the set of registers that must be saved/restored during growing stack when there's insufficient

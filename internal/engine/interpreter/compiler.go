@@ -3426,9 +3426,19 @@ operatorSwitch:
 		}
 
 	case wasm.OpcodeTailCallReturnCall:
-		c.emit(
-			newOperationTailCallReturnCall(index),
-		)
+		fdef := c.module.FunctionDefinition(index)
+		functionFrame := c.controlFrames.functionFrame()
+		// Currently we do not support imported functions, we treat them as regular calls.
+		if _, _, isImport := fdef.Import(); isImport {
+			c.emit(newOperationCall(index))
+			dropOp := newOperationDrop(c.getFrameDropRange(functionFrame, false))
+
+			// Cleanup the stack and then jmp to function frame's continuation (meaning return).
+			c.emit(dropOp)
+			c.emit(newOperationBr(functionFrame.asLabel()))
+		} else {
+			c.emit(newOperationTailCallReturnCall(index))
+		}
 
 		// Return operation is stack-polymorphic, and mark the state as unreachable.
 		// That means subsequent instructions in the current control frame are "unreachable"
@@ -3442,9 +3452,10 @@ operatorSwitch:
 			return fmt.Errorf("read target for br_table: %w", err)
 		}
 		c.pc += n
-		c.emit(
-			newOperationTailCallReturnCallIndirect(typeIndex, tableIndex),
-		)
+
+		functionFrame := c.controlFrames.functionFrame()
+		dropRange := c.getFrameDropRange(functionFrame, false)
+		c.emit(newOperationTailCallReturnCallIndirect(typeIndex, tableIndex, dropRange, functionFrame.asLabel()))
 
 		// Return operation is stack-polymorphic, and mark the state as unreachable.
 		// That means subsequent instructions in the current control frame are "unreachable"
