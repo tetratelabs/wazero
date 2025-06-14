@@ -472,6 +472,8 @@ func (e *engine) lowerIR(ir *compilationResult, ret *compiledFunction) error {
 				target := op.Us[j]
 				e.setLabelAddress(&op.Us[j], label(target), labelAddressResolutions)
 			}
+		case operationKindTailCallReturnCallIndirect:
+			e.setLabelAddress(&op.Us[1], label(op.Us[1]), labelAddressResolutions)
 		}
 	}
 	return nil
@@ -4336,11 +4338,78 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			memoryInst.Mux.Unlock()
 			ce.pushValue(uint64(old))
 			frame.pc++
+		case operationKindTailCallReturnCall:
+			f := &functions[op.U1]
+			ce.dropForTailCall(frame, f)
+			if *f == *(frame.f) {
+				// Short-circuit self-recursion.
+				frame.pc = 0
+				continue
+			}
+
+			// The compiler is currently allowing proper tail call only across functions
+			// that belong to the same module; thus, we can overwrite the frame in-place.
+			frame.f = f
+			frame.base = len(ce.stack)
+			frame.pc = 0
+			body = frame.f.parent.body
+			bodyLen = uint64(len(body))
+
+		case operationKindTailCallReturnCallIndirect:
+			offset := ce.popValue()
+			table := tables[op.U2]
+			if offset >= uint64(len(table.References)) {
+				panic(wasmruntime.ErrRuntimeInvalidTableAccess)
+			}
+			rawPtr := table.References[offset]
+			if rawPtr == 0 {
+				panic(wasmruntime.ErrRuntimeInvalidTableAccess)
+			}
+
+			tf := functionFromUintptr(rawPtr)
+			if tf.typeID != typeIDs[op.U1] {
+				panic(wasmruntime.ErrRuntimeIndirectCallTypeMismatch)
+			}
+
+			// We are allowing proper tail calls only across functions that belong to the same
+			// module; for indirect calls, we have to enforce it at run-time.
+			if tf.moduleInstance != f.moduleInstance {
+				// Revert to a normal call.
+				ce.callFunction(ctx, f.moduleInstance, tf)
+				// Return
+				ce.drop(op.Us[0])
+				// Jump to the function frame (return)
+				frame.pc = op.Us[1]
+				continue
+			}
+
+			ce.dropForTailCall(frame, tf)
+			if *tf == *(frame.f) {
+				// Short-circuit self-recursion.
+				frame.pc = 0
+				continue
+			}
+
+			frame.f = tf
+			frame.pc = 0
+			frame.base = len(ce.stack)
+			body = frame.f.parent.body
+			bodyLen = uint64(len(body))
+
 		default:
 			frame.pc++
 		}
 	}
 	ce.popFrame()
+}
+
+func (ce *callEngine) dropForTailCall(frame *callFrame, f *function) {
+	base := frame.base - frame.f.funcType.ParamNumInUint64
+	paramCount := f.funcType.ParamNumInUint64
+	if len(ce.stack) < base+paramCount {
+		panic(fmt.Sprintf("tail call: stack underflow: have %d, need %d", len(ce.stack)-base, paramCount))
+	}
+	ce.stack = append(ce.stack[:base], ce.stack[len(ce.stack)-paramCount:]...)
 }
 
 func wasmCompatMax32bits(v1, v2 uint32) uint64 {
