@@ -188,6 +188,21 @@ func (m *machine) postRegAlloc() {
 				linkInstr(inc, next)
 			}
 			continue
+		case tailCall, tailCallIndirect:
+			// At this point, reg alloc is done, therefore we can safely insert dec RPS instruction
+			// right before the tail call (jump) instruction. If this is done before reg alloc, the stack slot
+			// can point to the wrong location and therefore results in a wrong value.
+			tailCall := cur
+			_, _, _, _, size := backend.ABIInfoFromUint64(tailCall.u2)
+			if size > 0 {
+				dec := m.allocateInstr().asAluRmiR(aluRmiROpcodeSub, newOperandImm32(size), rspVReg, true)
+				linkInstr(tailCall.prev, dec)
+				linkInstr(dec, tailCall)
+			}
+			// In a tail call, we insert the epilogue before the jump instruction.
+			m.setupEpilogueAfter(tailCall.prev)
+			m.removeUntilRet(cur.next)
+			continue
 		}
 
 		// Removes the redundant copy instruction.
@@ -276,6 +291,19 @@ func (m *machine) setupEpilogueAfter(cur *instruction) {
 	cur = m.revertRBPRSP(cur)
 
 	linkInstr(cur, prevNext)
+}
+
+func (m *machine) removeUntilRet(cur *instruction) {
+	for ; cur != nil; cur = cur.next {
+		prev, next := cur.prev, cur.next
+		prev.next = next
+		if next != nil {
+			next.prev = prev
+		}
+		if cur.kind == ret {
+			return
+		}
+	}
 }
 
 func (m *machine) addRSP(offset int32, cur *instruction) *instruction {

@@ -2403,6 +2403,304 @@ var (
 			}}},
 		},
 	}
+	FibonacciTailRecursive = TestCase{
+		Name: "tail_recursive_fibonacci",
+		Module: SingleFunctionModule(
+			wasm.FunctionType{Params: []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32}, Results: []wasm.ValueType{wasm.ValueTypeI32}},
+			[]byte{
+				wasm.OpcodeLocalGet, 0, // n
+				wasm.OpcodeI32Eqz,
+				wasm.OpcodeIf, 0x7f, // if (n == 0) -> i32
+				wasm.OpcodeLocalGet, 1, // then: return a
+				wasm.OpcodeElse,
+				wasm.OpcodeLocalGet, 0, // n
+				wasm.OpcodeI32Const, 1,
+				wasm.OpcodeI32Eq,
+				wasm.OpcodeIf, 0x7f, // if (n == 1) -> i32
+				wasm.OpcodeLocalGet, 2, // then: return b
+				wasm.OpcodeElse,
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeI32Const, 1,
+				wasm.OpcodeI32Sub,
+				wasm.OpcodeLocalGet, 2,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeLocalGet, 2,
+				wasm.OpcodeI32Add,
+				wasm.OpcodeTailCallReturnCall, 0,
+				wasm.OpcodeEnd,
+				wasm.OpcodeEnd,
+				wasm.OpcodeEnd,
+			},
+			nil,
+		),
+	}
+	CountTailRecursive = TestCase{
+		Name: "tail_recursive_count",
+		Module: SingleFunctionModule(
+			wasm.FunctionType{
+				Params:  []wasm.ValueType{wasm.ValueTypeI64, wasm.ValueTypeI64},
+				Results: []wasm.ValueType{wasm.ValueTypeI64},
+			},
+			[]byte{
+				wasm.OpcodeLocalGet, 0, // n
+				wasm.OpcodeI64Eqz,   // n == 0
+				wasm.OpcodeIf, 0x7e, // if (result i64)
+				wasm.OpcodeLocalGet, 1, // return acc
+				wasm.OpcodeElse,
+				wasm.OpcodeLocalGet, 0, // n
+				wasm.OpcodeI64Const, 1,
+				wasm.OpcodeI64Sub,      // n-1
+				wasm.OpcodeLocalGet, 1, // acc
+				wasm.OpcodeI64Const, 1,
+				wasm.OpcodeI64Add, // acc+1
+				wasm.OpcodeTailCallReturnCall, 0,
+				wasm.OpcodeEnd,
+				wasm.OpcodeEnd,
+			},
+			nil,
+		),
+	}
+	// CountTailRecursiveTwoResults is a tail recursive function returning two arguments: (n, acc)
+	CountTailRecursiveTwoResults = TestCase{
+		Name: "tail_recursive_count_two_results",
+		Module: &wasm.Module{
+			TypeSection: []wasm.FunctionType{
+				{
+					Params:  []wasm.ValueType{wasm.ValueTypeI64, wasm.ValueTypeI64},
+					Results: []wasm.ValueType{wasm.ValueTypeI64, wasm.ValueTypeI64},
+				},
+				{
+					Params:  []wasm.ValueType{},
+					Results: []wasm.ValueType{wasm.ValueTypeI64, wasm.ValueTypeI64},
+				},
+			},
+			FunctionSection: []wasm.Index{0},
+			CodeSection: []wasm.Code{{
+				LocalTypes: nil,
+				Body: []byte{
+					wasm.OpcodeLocalGet, 0, // n
+					wasm.OpcodeI64Eqz, // n == 0
+					wasm.OpcodeIf, 1,  // if (blockSignature_vv)
+					wasm.OpcodeLocalGet, 0, // return n
+					wasm.OpcodeLocalGet, 1, // return acc
+					wasm.OpcodeReturn,
+					wasm.OpcodeElse,
+					wasm.OpcodeLocalGet, 0, // n
+					wasm.OpcodeI64Const, 1,
+					wasm.OpcodeI64Sub,      // n-1
+					wasm.OpcodeLocalGet, 1, // acc
+					wasm.OpcodeI64Const, 1,
+					wasm.OpcodeI64Add, // acc+1
+					wasm.OpcodeTailCallReturnCall, 0,
+					wasm.OpcodeEnd,
+					wasm.OpcodeEnd,
+				},
+			}},
+			ExportSection: []wasm.Export{{Name: ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 0}},
+		},
+	}
+
+	// TailCallCompatibleSignatures tests a tail call between functions with compatible but different signatures.
+	// - entry: (a, b, c, d) -> calls tail_caller(a, b, c + d) with a normal call
+	// - tail_caller: (a, b, c) -> tail calls tail_callee(a + c, b)
+	// - tail_callee: (x, y) -> calls helper(x, y) and returns its result
+	// - helper: (x, y) -> returns x * y
+	TailCallCompatibleSignatures = TestCase{
+		Name: "tail_call_compatible_signatures",
+		Module: &wasm.Module{
+			TypeSection: []wasm.FunctionType{
+				{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}},           // helper: (i32, i32) -> i32
+				{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}},           // tail_callee: (i32, i32) -> i32
+				{Params: []wasm.ValueType{i32, i32, i32}, Results: []wasm.ValueType{i32}},      // tail_caller: (i32, i32, i32) -> i32
+				{Params: []wasm.ValueType{i32, i32, i32, i32}, Results: []wasm.ValueType{i32}}, // entry: (i32, i32, i32, i32) -> i32
+			},
+			FunctionSection: []wasm.Index{3, 2, 1, 0}, // entry is index 0, tail_caller is 1, tail_callee is 2, helper is 3
+			CodeSection: []wasm.Code{
+				{ // entry(a, b, c, d) -> tail_caller(a, b, c + d)
+					Body: []byte{
+						wasm.OpcodeLocalGet, 0, // a
+						wasm.OpcodeLocalGet, 1, // b
+						wasm.OpcodeLocalGet, 2, // c
+						wasm.OpcodeLocalGet, 3, // d
+						wasm.OpcodeI32Add,  // c + d
+						wasm.OpcodeCall, 1, // call tail_caller(a, b, c + d)
+						wasm.OpcodeEnd,
+					},
+				},
+				{ // tail_caller(a, b, c) -> tail tail_callee(a + c, b)
+					Body: []byte{
+						wasm.OpcodeLocalGet, 0, // a
+						wasm.OpcodeLocalGet, 2, // c
+						wasm.OpcodeI32Add,      // a + c
+						wasm.OpcodeLocalGet, 1, // b
+						wasm.OpcodeTailCallReturnCall, 2, // tail call tail_callee
+						wasm.OpcodeEnd,
+					},
+				},
+				{ // tail_callee(x, y) -> helper(x, y)
+					Body: []byte{
+						wasm.OpcodeLocalGet, 0, // x
+						wasm.OpcodeLocalGet, 1, // y
+						wasm.OpcodeCall, 3, // call helper(x, y)
+						wasm.OpcodeEnd,
+					},
+				},
+				{ // helper(x, y) -> x * y
+					Body: []byte{
+						wasm.OpcodeLocalGet, 0,
+						wasm.OpcodeLocalGet, 1,
+						wasm.OpcodeI32Mul,
+						wasm.OpcodeEnd,
+					},
+				},
+			},
+			ExportSection: []wasm.Export{{
+				Name:  ExportedFunctionName,
+				Type:  wasm.ExternTypeFunc,
+				Index: 0, // Export entry
+			}},
+		},
+	}
+
+	// TailCallMoreParams tests tail calls where the callee has more parameters than the caller.
+	// This reproduces the ARM64 bug where current=0, callee=16 stack slot sizes cause return value corruption
+	// - entry: () -> calls tail_caller() with no parameters
+	// - tail_caller: () -> tail calls tail_callee(1, 2, 3, 4, 5, 6, 7, 8, 9) with many stack args
+	// - tail_callee: returns multiple values that should be (10, 26) but get corrupted on ARM64
+	TailCallMoreParams = TestCase{
+		Name: "tail_call_more_params",
+		Module: &wasm.Module{
+			TypeSection: []wasm.FunctionType{
+				{Params: []wasm.ValueType{}, Results: []wasm.ValueType{i64, i64}},                                            // type 0: () -> (i64, i64)
+				{Params: []wasm.ValueType{i64, i64, i64, i64, i64, i64, i64, i64, i64}, Results: []wasm.ValueType{i64, i64}}, // type 1: (i64 x 9) -> (i64, i64)
+			},
+			FunctionSection: []wasm.Index{0, 0, 1}, // entry (type 0), tail_caller (type 0), tail_callee (type 1)
+			CodeSection: []wasm.Code{
+				{ // entry() -> tail_caller()
+					Body: []byte{
+						wasm.OpcodeCall, 1, // call tail_caller()
+						wasm.OpcodeEnd,
+					},
+				},
+				{ // tail_caller() -> tail call tail_callee(1,2,3,4,5,6,7,8,9)
+					Body: []byte{
+						wasm.OpcodeI64Const, 1,
+						wasm.OpcodeI64Const, 2,
+						wasm.OpcodeI64Const, 3,
+						wasm.OpcodeI64Const, 4,
+						wasm.OpcodeI64Const, 5,
+						wasm.OpcodeI64Const, 6,
+						wasm.OpcodeI64Const, 7,
+						wasm.OpcodeI64Const, 8,
+						wasm.OpcodeI64Const, 9,
+						wasm.OpcodeTailCallReturnCall, 2, // tail call tail_callee(1,2,3,4,5,6,7,8,9)
+						wasm.OpcodeEnd,
+					},
+				},
+				{ // tail_callee(a,b,c,d,e,f,g,h,i) -> returns (a+b+c+d, e+f+g+h+i)
+					Body: []byte{
+						// First return value: a+b+c+d = 1+2+3+4 = 10
+						wasm.OpcodeLocalGet, 0, // a=1
+						wasm.OpcodeLocalGet, 1, // b=2
+						wasm.OpcodeI64Add,      // a+b=3
+						wasm.OpcodeLocalGet, 2, // c=3
+						wasm.OpcodeI64Add,      // a+b+c=6
+						wasm.OpcodeLocalGet, 3, // d=4
+						wasm.OpcodeI64Add, // a+b+c+d=10
+
+						// Second return value: e+f+g+h+i = 5+6+7+8+9 = 35
+						wasm.OpcodeLocalGet, 4, // e=5
+						wasm.OpcodeLocalGet, 5, // f=6
+						wasm.OpcodeI64Add,      // e+f=11
+						wasm.OpcodeLocalGet, 6, // g=7
+						wasm.OpcodeI64Add,      // e+f+g=18
+						wasm.OpcodeLocalGet, 7, // h=8
+						wasm.OpcodeI64Add,      // e+f+g+h=26
+						wasm.OpcodeLocalGet, 8, // i=9
+						wasm.OpcodeI64Add, // e+f+g+h+i=35
+						wasm.OpcodeEnd,
+					},
+				},
+			},
+			ExportSection: []wasm.Export{{
+				Name:  ExportedFunctionName,
+				Type:  wasm.ExternTypeFunc,
+				Index: 0, // entry function
+			}},
+		},
+	}
+
+	// TailCallManyParams is a tail call that uses stack space as well as registers on both
+	// the amd64 and the arm64 ABIs to use. In these cases we fall back to a plain function call.
+	TailCallManyParams = TestCase{
+		Name: "tail_call_sqlite_pattern",
+		Module: &wasm.Module{
+			TypeSection: []wasm.FunctionType{
+				{Params: []wasm.ValueType{i32, i32, i32, i32, i32, i32, i32}, Results: []wasm.ValueType{i32}},      // type 0: (i32 x 7) -> i32
+				{Params: []wasm.ValueType{i32, i32, i32, i32, i32, i32, i32, i32}, Results: []wasm.ValueType{i32}}, // type 1: (i32 x 8) -> i32
+			},
+			FunctionSection: []wasm.Index{0, 0, 1}, // entry (type 0), caller (type 0), callee (type 1)
+			CodeSection: []wasm.Code{
+				{ // entry(a,b,c,d,e,f,g) -> caller(a,b,c,d,e,f,g)
+					Body: []byte{
+						wasm.OpcodeLocalGet, 0, // a
+						wasm.OpcodeLocalGet, 1, // b
+						wasm.OpcodeLocalGet, 2, // c
+						wasm.OpcodeLocalGet, 3, // d
+						wasm.OpcodeLocalGet, 4, // e
+						wasm.OpcodeLocalGet, 5, // f
+						wasm.OpcodeLocalGet, 6, // g
+						wasm.OpcodeCall, 1, // call caller(a,b,c,d,e,f,g)
+						wasm.OpcodeEnd,
+					},
+				},
+				// The following reproduces a similar case found in the SQLite codebase
+				{ // caller(a,b,c,d,e,f,g) -> tail call callee(a,b,c,d|128,0,e,f,g) - mimics SQLite's pattern
+					Body: []byte{
+						wasm.OpcodeLocalGet, 0, // a
+						wasm.OpcodeLocalGet, 1, // b
+						wasm.OpcodeLocalGet, 2, // c
+						wasm.OpcodeLocalGet, 3, // d
+						wasm.OpcodeI32Const, 31, // const 31 (like SQLite)
+						wasm.OpcodeI32And,            // d & 31
+						wasm.OpcodeI32Const, 0x80, 1, // const 128 (like SQLite)
+						wasm.OpcodeI32Or,       // (d & 31) | 128
+						wasm.OpcodeI32Const, 0, // const 0 (like SQLite)
+						wasm.OpcodeLocalGet, 4, // e
+						wasm.OpcodeLocalGet, 5, // f
+						wasm.OpcodeLocalGet, 6, // g
+						wasm.OpcodeTailCallReturnCall, 2, // tail call callee(a,b,c,(d&31)|128,0,e,f,g)
+						wasm.OpcodeEnd,
+					},
+				},
+				{ // callee(a,b,c,d,e,f,g,h) -> returns a+b+c+d+e+f+g+h
+					Body: []byte{
+						wasm.OpcodeLocalGet, 0,
+						wasm.OpcodeLocalGet, 1,
+						wasm.OpcodeI32Add,
+						wasm.OpcodeLocalGet, 2,
+						wasm.OpcodeI32Add,
+						wasm.OpcodeLocalGet, 3,
+						wasm.OpcodeI32Add,
+						wasm.OpcodeLocalGet, 4,
+						wasm.OpcodeI32Add,
+						wasm.OpcodeLocalGet, 5,
+						wasm.OpcodeI32Add,
+						wasm.OpcodeLocalGet, 6,
+						wasm.OpcodeI32Add,
+						wasm.OpcodeLocalGet, 7,
+						wasm.OpcodeI32Add,
+						wasm.OpcodeEnd,
+					},
+				},
+			},
+			ExportSection: []wasm.Export{{
+				Name:  ExportedFunctionName,
+				Type:  wasm.ExternTypeFunc,
+				Index: 0, // entry function
+			}},
+		},
+	}
 )
 
 // VecShuffleWithLane returns a VecShuffle test with a custom 16-bytes immediate (lane indexes).
