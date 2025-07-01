@@ -36,3 +36,5 @@ Because this is an architecture-specific limitation, the front-end **always** em
       
       - if the tail call **cannot** be handled (i.e., there are stack arguments) the tail call is essentially interpreted as a synonym for a plain call, and the return handling code is kept; 
       - if the tail call CAN be handled, THEN we just remove the useless instructions between the tail-call and the ret instruction during Finalize (postRegAlloc()), as it's dead code anyway.
+
+Finally, in the compiler, indirect calls to local functions, calls host functions and calls to imported functions are all implemented using function pointers. As opposed to the interpreter, they do not require any special handling, but they will still fall back to a plain call if the tail call cannot be handled (i.e., there are stack arguments).
