@@ -3679,6 +3679,7 @@ func (c *Compiler) lowerTailCallReturnCall(fnIndex uint32) {
 	// transfers to the callee. However, sometimes the backend might need to fall back to
 	// a regular call, so we include return handling and let the backend delete it
 	// when redundant.
+	// For details, see internal/engine/RATIONALE.md
 	first, rest := call.Returns()
 	if first.Valid() {
 		state.push(first)
@@ -3704,6 +3705,7 @@ func (c *Compiler) lowerTailCallReturnCallIndirect(typeIndex, tableIndex uint32)
 	// transfers to the callee. However, sometimes the backend might need to fall back to
 	// a regular call, so we include return handling and let the backend delete it
 	// when redundant.
+	// For details, see internal/engine/RATIONALE.md
 	first, rest := call.Returns()
 	if first.Valid() {
 		state.push(first)

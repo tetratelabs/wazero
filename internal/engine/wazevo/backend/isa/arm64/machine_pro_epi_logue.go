@@ -200,6 +200,8 @@ func (m *machine) postRegAlloc() {
 			m.setupEpilogueAfter(cur.prev)
 		case tailCall, tailCallInd:
 			m.setupEpilogueAfter(cur.prev)
+			// If this has been encoded as a proper tail call, we can remove the trailing instructions.
+			// For details, see internal/engine/RATIONALE.md
 			m.removeUntilRet(cur.next)
 		case loadConstBlockArg:
 			lc := cur
@@ -328,6 +330,7 @@ func (m *machine) setupEpilogueAfter(cur *instruction) {
 	linkInstr(cur, prevNext)
 }
 
+// removeUntilRet removes the instructions starting from `cur` until the first `ret` instruction.
 func (m *machine) removeUntilRet(cur *instruction) {
 	for ; cur != nil; cur = cur.next {
 		prev, next := cur.prev, cur.next

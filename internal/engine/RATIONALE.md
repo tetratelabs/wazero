@@ -30,7 +30,7 @@ Similarly to the interpreter, in some cases the compiler will fall back to a pla
 
   a. if the sizes of the required stack space do not match, then we might be writing data at a wrong address
   b. even if the sizes match, we would need special attention not to clear the stack completely before we jump into the callee
-  c. even if we managed to do that, the spill slots are not necessarily matching so, we would still need some special care (notice that other runtimes have completely revolutionized their internal calling conventions _for all cals_ to accommodate tail calls)
+  c. even if we managed to do that, the spill slots are not necessarily matching so, we would still need some special care (notice that other runtimes have completely revolutionized their internal calling conventions _for all calls_ to accommodate tail calls)
 
 Because this is an architecture-specific limitation, the front-end **always** emits `Return` instructions together with the tail call instructions, and the back-end is responsible for deciding whether to emit a tail call or fall back to a regular call:
       

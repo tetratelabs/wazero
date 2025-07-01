@@ -3429,6 +3429,7 @@ operatorSwitch:
 		fdef := c.module.FunctionDefinition(index)
 		functionFrame := c.controlFrames.functionFrame()
 		// Currently we do not support imported functions, we treat them as regular calls.
+		// For details, see internal/engine/RATIONALE.md
 		if _, _, isImport := fdef.Import(); isImport {
 			c.emit(newOperationCall(index))
 			dropOp := newOperationDrop(c.getFrameDropRange(functionFrame, false))

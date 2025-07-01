@@ -322,6 +322,7 @@ func (m *machine) lowerTailCall(si *ssa.Instruction) {
 
 	// We currently support tail calls only when the args are passed via registers
 	// otherwise we fall back to a plain call.
+	// For details, see internal/engine/RATIONALE.md
 	isAllRegs := stackSlotSize == 0
 
 	switch {

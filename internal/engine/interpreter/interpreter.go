@@ -4349,6 +4349,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 
 			// The compiler is currently allowing proper tail call only across functions
 			// that belong to the same module; thus, we can overwrite the frame in-place.
+			// For details, see internal/engine/RATIONALE.md
 			frame.f = f
 			frame.base = len(ce.stack)
 			frame.pc = 0
@@ -4373,6 +4374,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 
 			// We are allowing proper tail calls only across functions that belong to the same
 			// module; for indirect calls, we have to enforce it at run-time.
+			// For details, see internal/engine/RATIONALE.md
 			if tf.moduleInstance != f.moduleInstance {
 				// Revert to a normal call.
 				ce.callFunction(ctx, f.moduleInstance, tf)

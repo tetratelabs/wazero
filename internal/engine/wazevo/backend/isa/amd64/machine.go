@@ -1982,6 +1982,7 @@ func (m *machine) lowerTailCall(si *ssa.Instruction) {
 		// so an arbitrary register might be overwritten while restoring the stack.
 		// So, as compared to a regular indirect call, we ensure the pointer is stored
 		// in a caller-saved register (r11).
+		// For details, see internal/engine/RATIONALE.md
 		ptrOp := m.getOperand_Reg(m.c.ValueDefinition(indirectCalleePtr))
 		tmpJmp := r11VReg
 		m.InsertMove(tmpJmp, ptrOp.reg(), ssa.TypeI64)
