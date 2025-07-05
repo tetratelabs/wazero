@@ -83,7 +83,7 @@ func CheckStackGuardPage(s []byte) {
 const (
 	// DeterministicCompilationVerifierEnabled enables the deterministic compilation verifier. This is disabled by default
 	// since the operation is expensive. But when in doubt, enable this to make sure the compilation is deterministic.
-	DeterministicCompilationVerifierEnabled = false
+	DeterministicCompilationVerifierEnabled = true
 	DeterministicCompilationVerifyingIter   = 5
 )
 
@@ -114,7 +114,10 @@ func NewDeterministicCompilationVerifierContext(ctx context.Context, localFuncti
 // DeterministicCompilationVerifierRandomizeIndexes randomizes the indexes for the deterministic compilation verifier.
 // To get the randomized index, use DeterministicCompilationVerifierGetRandomizedLocalFunctionIndex.
 func DeterministicCompilationVerifierRandomizeIndexes(ctx context.Context) []int {
-	state := ctx.Value(verifierStateContextKey{}).(*verifierState)
+	state, ok := ctx.Value(verifierStateContextKey{}).(*verifierState)
+	if !ok {
+		return nil
+	}
 	if !state.initialCompilationDone {
 		// If this is the first attempt, we use the index as-is order.
 		state.initialCompilationDone = true
@@ -132,9 +135,12 @@ func DeterministicCompilationVerifierRandomizeIndexes(ctx context.Context) []int
 //
 // If the verification fails, this prints the diff and exits the process.
 func VerifyOrSetDeterministicCompilationContextValue(ctx context.Context, scope string, newValue string) {
+	verifierCtx, ok := ctx.Value(verifierStateContextKey{}).(*verifierState)
+	if !ok {
+		return
+	}
 	fn := ctx.Value(currentFunctionNameKey{}).(string)
 	key := fn + ": " + scope
-	verifierCtx := ctx.Value(verifierStateContextKey{}).(*verifierState)
 	oldValue, ok := verifierCtx.values.Load(key)
 	if !ok {
 		verifierCtx.values.Store(key, newValue)

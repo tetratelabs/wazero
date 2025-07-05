@@ -129,9 +129,6 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listene
 		return err
 	}
 
-	if wazevoapi.DeterministicCompilationVerifierEnabled {
-		ctx = wazevoapi.NewDeterministicCompilationVerifierContext(ctx, len(module.CodeSection))
-	}
 	cm, err := e.compileModule(ctx, module, listeners, ensureTermination)
 	if err != nil {
 		return err
@@ -141,9 +138,13 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listene
 	}
 
 	if wazevoapi.DeterministicCompilationVerifierEnabled {
-		for i := 0; i < wazevoapi.DeterministicCompilationVerifyingIter; i++ {
-			_, err := e.compileModule(ctx, module, listeners, ensureTermination)
-			if err != nil {
+		for range wazevoapi.DeterministicCompilationVerifyingIter {
+			if _, err := e.compileModule(
+				wazevoapi.NewDeterministicCompilationVerifierContext(ctx, len(module.CodeSection)),
+				module,
+				listeners,
+				ensureTermination,
+			); err != nil {
 				return err
 			}
 		}
@@ -200,11 +201,8 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 	rels := make([]backend.RelocationInfo, 0)
 	refToBinaryOffset := make([]int, importedFns+localFns)
 
-	var indexes []int
-	if wazevoapi.DeterministicCompilationVerifierEnabled {
-		// The compilation must be deterministic regardless of the order of functions being compiled.
-		indexes = wazevoapi.DeterministicCompilationVerifierRandomizeIndexes(ctx)
-	}
+	// The compilation must be deterministic regardless of the order of functions being compiled.
+	indexes := wazevoapi.DeterministicCompilationVerifierRandomizeIndexes(ctx)
 
 	needSourceInfo := module.DWARFLines != nil
 
@@ -262,7 +260,7 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 					return
 				}
 
-				if wazevoapi.DeterministicCompilationVerifierEnabled {
+				if indexes != nil {
 					i = indexes[i]
 				}
 
@@ -407,9 +405,7 @@ func (e *engine) compileLocalWasmFunction(
 		fmt.Printf("[[[SSA for %s]]]%s\n", wazevoapi.GetCurrentFunctionName(ctx), ssaBuilder.Format())
 	}
 
-	if wazevoapi.DeterministicCompilationVerifierEnabled {
-		wazevoapi.VerifyOrSetDeterministicCompilationContextValue(ctx, "SSA", ssaBuilder.Format())
-	}
+	wazevoapi.VerifyOrSetDeterministicCompilationContextValue(ctx, "SSA", ssaBuilder.Format())
 
 	// Run SSA-level optimization passes.
 	ssaBuilder.RunPasses()
@@ -418,9 +414,7 @@ func (e *engine) compileLocalWasmFunction(
 		fmt.Printf("[[[Optimized SSA for %s]]]%s\n", wazevoapi.GetCurrentFunctionName(ctx), ssaBuilder.Format())
 	}
 
-	if wazevoapi.DeterministicCompilationVerifierEnabled {
-		wazevoapi.VerifyOrSetDeterministicCompilationContextValue(ctx, "Optimized SSA", ssaBuilder.Format())
-	}
+	wazevoapi.VerifyOrSetDeterministicCompilationContextValue(ctx, "Optimized SSA", ssaBuilder.Format())
 
 	// Now our ssaBuilder contains the necessary information to further lower them to
 	// machine code.
