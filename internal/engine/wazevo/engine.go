@@ -200,9 +200,10 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 	rels := make([]backend.RelocationInfo, 0)
 	refToBinaryOffset := make([]int, importedFns+localFns)
 
+	var indexes []int
 	if wazevoapi.DeterministicCompilationVerifierEnabled {
 		// The compilation must be deterministic regardless of the order of functions being compiled.
-		wazevoapi.DeterministicCompilationVerifierRandomizeIndexes(ctx)
+		indexes = wazevoapi.DeterministicCompilationVerifierRandomizeIndexes(ctx)
 	}
 
 	needSourceInfo := module.DWARFLines != nil
@@ -254,13 +255,15 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 			fe := frontend.NewFrontendCompiler(module, ssaBuilder, &cm.offsets, ensureTermination, withListener, needSourceInfo)
 
 			for i := range sections {
+				// Get a stable reference to the outer context.
+				ctx := ctx
 				if err := ctx.Err(); err != nil {
 					// Compilation canceled!
 					return
 				}
 
 				if wazevoapi.DeterministicCompilationVerifierEnabled {
-					i = wazevoapi.DeterministicCompilationVerifierGetRandomizedLocalFunctionIndex(ctx, i)
+					i = indexes[i]
 				}
 
 				fidx := wasm.Index(i + importedFns)
