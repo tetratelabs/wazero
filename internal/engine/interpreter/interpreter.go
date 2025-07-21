@@ -43,6 +43,7 @@ func NewEngine(_ context.Context, enabledFeatures api.CoreFeatures, _ filecache.
 
 // Close implements the same method as documented on wasm.Engine.
 func (e *engine) Close() (err error) {
+	clear(e.compiledFunctions)
 	return
 }
 
