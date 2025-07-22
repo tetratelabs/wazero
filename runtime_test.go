@@ -625,6 +625,9 @@ func TestHostFunctionWithCustomContext(t *testing.T) {
 		{name: "interpreter", config: NewRuntimeConfigInterpreter()},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			if tc.name == "compiler" && !platform.CompilerSupported() {
+				t.Skip("Compiler is not supported on this host")
+			}
 			const fistString = "hello"
 			const secondString = "hello call"
 			hostCtx := &HostContext{fistString}
