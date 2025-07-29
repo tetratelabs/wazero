@@ -133,7 +133,12 @@ jobs:
 
       - name: Build test binaries
         run: |
-          go list -f '{{.Dir}}' ./... | egrep -v 'spectest' | xargs -Ipkg go test pkg -c -o pkg.test
+          parent="$(dirname $PWD)/"
+          go list -f '{{.Dir}}' ./... | egrep -v 'spectest' | while IFS= read -r pkg; do
+          basepath="${pkg#${parent}}"
+          echo go test "${pkg}" -c -o "_tests/${basepath}.test"
+          go test "${pkg}" -c -o "_tests/${basepath}.test"
+          done
           go build -o wazerocli ./cmd/wazero
         env:
           GOARCH: ${{ matrix.platform.arch }}
@@ -149,12 +154,12 @@ jobs:
       - name: Build scratch container
         run: |
           echo 'FROM scratch' >> Dockerfile
-          echo 'CMD ["/test"]' >> Dockerfile
+          echo 'CMD ["/test", "-test.v"]' >> Dockerfile
           docker buildx build -t wazero:test --platform linux/${{ matrix.platform.arch }} .
 
       - name: Run built test binaries
         # This runs all tests compiled above in sequence. Note: This mounts /tmp to allow t.TempDir() in tests.
-        run: find . -name "*.test" | xargs -Itestbin docker run --platform linux/${{ matrix.platform.arch }} -v $(pwd)/testbin:/test -v $(pwd)/wazerocli:/wazero -e WAZEROCLI=/wazero --tmpfs /tmp --rm -t wazero:test
+        run: find _tests -name "*.test" | xargs -t -Itestbin docker run --platform linux/${{ matrix.platform.arch }} -v $(pwd)/testbin:/test -v $(pwd)/wazerocli:/wazero -e WAZEROCLI=/wazero --tmpfs /tmp --rm -t wazero:test
 
   test_bsd:
     name: amd64, ${{ matrix.os.name }}
@@ -175,7 +180,12 @@ jobs:
 
       - name: Build test binaries
         run: |
-          go list -f '{{.Dir}}' ./... | egrep -v 'imports|sysfs' | xargs -Ipkg go test pkg -c -o pkg.test
+          parent="$(dirname $PWD)/"
+          go list -f '{{.Dir}}' ./... | egrep -v 'imports|sysfs' | while IFS= read -r pkg; do
+          basepath="${pkg#${parent}}"
+          echo go test "${pkg}" -c -o "_tests/${basepath}.test"
+          go test "${pkg}" -c -o "_tests/${basepath}.test"
+          done
           go build -o wazerocli ./cmd/wazero
         env:
           GOOS: ${{ matrix.os.name }}
@@ -191,7 +201,7 @@ jobs:
           sync_files: runner-to-vm
           environment_variables: WAZEROCLI
           # This runs all tests compiled above in sequence.
-          run: find . -name "*.test" | xargs -Itestbin nice testbin -test.short
+          run: find _tests -name "*.test" | xargs -t -Itestbin nice testbin -test.short -test.v
 
   test_vm:
     name: amd64, ${{ matrix.os.name }}
@@ -215,7 +225,12 @@ jobs:
 
       - name: Build test binaries
         run: |
-          go list -f '{{.Dir}}' ./... | egrep -v 'imports|sysfs' | xargs -Ipkg go test pkg -c -o pkg.test
+          parent="$(dirname $PWD)/"
+          go list -f '{{.Dir}}' ./... | egrep -v 'imports|sysfs' | while IFS= read -r pkg; do
+          basepath="${pkg#${parent}}"
+          echo go test "${pkg}" -c -o "_tests/${basepath}.test"
+          go test "${pkg}" -c -o "_tests/${basepath}.test"
+          done
           go build -o wazerocli ./cmd/wazero
           envsubst < ./.github/actions/vmactions/template.yml > ./.github/actions/vmactions/action.yml
         env:
@@ -229,7 +244,7 @@ jobs:
         with:
           envs: WAZEROCLI
           # This runs all tests compiled above in sequence.
-          run: find . -name "*.test" | xargs -Itestbin nice testbin -test.short
+          run: find _tests -name "*.test" | xargs -t -Itestbin nice testbin -test.short -test.v
 
   # This ensures that internal/integration_test/fuzz is runnable, and is not intended to
   # run full-length fuzzing while trying to find low-hanging frontend bugs.
