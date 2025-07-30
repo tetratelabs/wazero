@@ -46,7 +46,7 @@ func (m *mockCompiler) SourceOffsetInfo() []backend.SourceOffsetInfo { return ni
 
 func (m *mockCompiler) AddSourceOffsetInfo(int64, ssa.SourceOffset) {}
 
-func (m *mockCompiler) AddRelocationInfo(funcRef ssa.FuncRef) {
+func (m *mockCompiler) AddRelocationInfo(funcRef ssa.FuncRef, isTailCall bool) {
 	m.relocs = append(m.relocs, backend.RelocationInfo{FuncRef: funcRef, Offset: int64(len(m.buf))})
 }
 

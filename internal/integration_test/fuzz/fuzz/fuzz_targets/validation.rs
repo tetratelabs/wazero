@@ -18,6 +18,7 @@ fn run(data: &[u8]) -> Result<()> {
     // Generate the configuration with possibly invalid functions.
     let mut config = Config::arbitrary(&mut u)?;
     config.threads_enabled = true;
+    config.tail_call_enabled = true;
     config.allow_invalid_funcs = true;
 
     let module = wasm_smith::Module::new(config.clone(), &mut u)?;
