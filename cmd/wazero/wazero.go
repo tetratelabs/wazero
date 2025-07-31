@@ -281,6 +281,11 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer) int {
 		rtc = rtc.WithCompilationCache(cache)
 	}
 
+	// Save the current state of the context for compilation.
+	// The -timeout flag is documented as only affecting the runtime of the module
+	// To honor this we must not pass the regular ctx as it will be potentially reassigned from this point onwards.
+	compilationCtx := ctx
+
 	if timeout > 0 {
 		newCtx, cancel := context.WithTimeout(ctx, timeout)
 		ctx = newCtx
@@ -317,7 +322,7 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer) int {
 		conf = conf.WithEnv(env[i], env[i+1])
 	}
 
-	guest, err := rt.CompileModule(ctx, wasm)
+	guest, err := rt.CompileModule(compilationCtx, wasm)
 	if err != nil {
 		fmt.Fprintf(stdErr, "error compiling wasm binary: %v\n", err)
 		return 1
