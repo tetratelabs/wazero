@@ -236,7 +236,7 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 
 	compiledFuncs := make([]CompiledLocalFuncResult, len(module.CodeSection))
 
-	workers := runtime.GOMAXPROCS(0)
+	workers := experimental.GetCompilationWorkers(ctx)
 
 	wg := sync.WaitGroup{}
 	wg.Add(workers)

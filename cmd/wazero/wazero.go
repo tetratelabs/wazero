@@ -91,6 +91,7 @@ func doCompile(args []string, stdErr io.Writer) int {
 	}
 
 	cacheDir := cacheDirFlag(flags)
+	workers := workersFlag(flags)
 
 	_ = flags.Parse(args)
 
@@ -130,6 +131,14 @@ func doCompile(args []string, stdErr io.Writer) int {
 	}
 
 	ctx := context.Background()
+
+	if maxProcs := runtime.GOMAXPROCS(0); *workers > maxProcs {
+		fmt.Fprintf(stdErr, "warning: desired number of compilation workers (%d) greater than GOMAXPROCS (%d) defaulting to GOMAXPROCS\n", *workers, maxProcs)
+		*workers = maxProcs
+	}
+
+	ctx = experimental.WithCompilationWorkers(ctx, *workers)
+
 	rt := wazero.NewRuntimeWithConfig(ctx, c)
 	defer rt.Close(ctx)
 
@@ -207,6 +216,7 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer) int {
 	}
 
 	cacheDir := cacheDirFlag(flags)
+	workers := workersFlag(flags)
 
 	_ = flags.Parse(args)
 
@@ -285,6 +295,13 @@ func doRun(args []string, stdOut io.Writer, stdErr logging.Writer) int {
 	// The -timeout flag is documented as only affecting the runtime of the module
 	// To honor this we must not pass the regular ctx as it will be potentially reassigned from this point onwards.
 	compilationCtx := ctx
+
+	if maxProcs := runtime.GOMAXPROCS(0); *workers > maxProcs {
+		fmt.Fprintf(stdErr, "warning: desired number of compilation workers (%d) greater than GOMAXPROCS (%d) defaulting to GOMAXPROCS\n", *workers, maxProcs)
+		*workers = maxProcs
+	}
+
+	compilationCtx = experimental.WithCompilationWorkers(compilationCtx, *workers)
 
 	if timeout > 0 {
 		newCtx, cancel := context.WithTimeout(ctx, timeout)
@@ -466,6 +483,11 @@ func maybeHostLogging(ctx context.Context, scopes logging.LogScopes, stdErr logg
 func cacheDirFlag(flags *flag.FlagSet) *string {
 	return flags.String("cachedir", "", "Writeable directory for native code compiled from wasm. "+
 		"Contents are re-used for the same version of wazero.")
+}
+
+func workersFlag(flags *flag.FlagSet) *int {
+	return flags.Int("workers", 1, "(experimental) Number of desired compilation workers. "+
+		"Increasing this value may improve compilation speed at the cost of higher memory usage.")
 }
 
 func maybeUseCacheDir(cacheDir *string, stdErr io.Writer) (int, wazero.CompilationCache) {
