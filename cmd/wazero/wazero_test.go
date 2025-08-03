@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -111,6 +112,10 @@ func TestCompile(t *testing.T) {
 				require.NoError(t, err)
 				require.True(t, len(entries) > 0)
 			},
+		},
+		{
+			name:       "workers equal max procs",
+			wazeroOpts: []string{fmt.Sprintf("--workers=%d", runtime.GOMAXPROCS(0))},
 		},
 		{
 			name:       "enable cpu profiling",
