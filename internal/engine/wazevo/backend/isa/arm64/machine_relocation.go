@@ -68,7 +68,10 @@ func (m *machine) ResolveRelocations(
 				panic("BUG in trampoline placement")
 			}
 		}
-		binary.LittleEndian.PutUint32(executable[instrOffset:instrOffset+4], encodeUnconditionalBranch(true, diff))
+		// The unconditional branch instruction is usually encoded as a branch-and-link (BL),
+		// because it is a function call. However, if the instruction is a tail call,
+		// we encode it as a plain unconditional branch (B), so we won't overwrite the link register.
+		binary.LittleEndian.PutUint32(executable[instrOffset:instrOffset+4], encodeUnconditionalBranch(!r.IsTailCall, diff))
 	}
 }
 
