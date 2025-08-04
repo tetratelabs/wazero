@@ -11,13 +11,12 @@ These general rules are however subject to some exceptions, which are detailed b
 
 ### Interpreter
 
-There are 3 cases that needs to be handled in the interpreter:
+There are 4 cases that needs to be handled in the interpreter:
 
 1. **Tail calls to the same function**: this is the simplest case, where we just reset the program counter to the start of the function body. This is straightforward and does not require any special handling.
 2. **Tail calls to a different function**: this is also straightforward, as we just reset the program counter to the start of the function body, then replace the function body with the new function's body. 
-3. **Tail calls to a host function**: in this case, we cannot simply reset the program counter, as the host function is not part of the WebAssembly module. Instead, we fall back to a plain call to the host function, which is the same as if we were calling it from a regular function.
-
-As a further restriction, currently the interpreter does not handle tail calls to any **imported functions** and falls back to a plain call in these cases too.
+3. **Tail calls to an imported function**: in this case, we cannot simply reset the program counter, as the target function is not defined as part of the current WebAssembly module: jumping into the imported module would require a lot more book-keeping. For simplicity, we fall back to a plain call to the imported function, which is the same as if we were calling it from a regular function.
+4. **Tail calls to a host function**: similarly to imported funcions, host functions are defined externally to the current WebAssembly module; moreover they are not defined in WebAssembly, but in the host language, making the straightforward strategy we used above impossible; in this case we also fall back to a plain call.
 
 ### Compiler 
 
