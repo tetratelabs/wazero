@@ -43,12 +43,14 @@ func addressOf(v *byte) uint64 {
 	return uint64(uintptr(unsafe.Pointer(v)))
 }
 
-func TestAdjustClonedStack(t *testing.T) {
-	// In order to allocate slices on Go heap, we need to allocSlice function.
-	allocSlice := func(size int) []byte {
-		return make([]byte, size)
-	}
+// In order to allocate slices on Go heap, we need allocSlice function.
+//
+//go:noinline
+func allocSlice(size int) []byte {
+	return make([]byte, size)
+}
 
+func TestAdjustClonedStack(t *testing.T) {
 	oldStack := allocSlice(512)
 	oldRsp := uintptr(unsafe.Pointer(&oldStack[0]))
 	oldTop := uintptr(unsafe.Pointer(&oldStack[len(oldStack)-1]))
@@ -60,7 +62,7 @@ func TestAdjustClonedStack(t *testing.T) {
 	newStack := allocSlice(1024)
 	rsp := uintptr(unsafe.Pointer(&newStack[0]))
 	rbp := rsp + rbpIndex
-	// Coy old stack to new stack which contains the old pointers to the old stack elements.
+	// Copy old stack to new stack which contains the old pointers to the old stack elements.
 	copy(newStack, oldStack)
 
 	AdjustClonedStack(oldRsp, oldTop, rsp, rbp, uintptr(addressOf(&newStack[len(newStack)-1])))
