@@ -99,8 +99,9 @@ func TestWriteFdNonblock(t *testing.T) {
 
 	// Create a buffer (the content is not relevant)
 	buf := make([]byte, 1024)
-	// Write to the file until the pipe buffer gets filled up.
-	numWrites := 100
+	// From `man 7 pipe`, the default maximum pipe size is 1MiB, so write
+	// more than that to the file until the pipe buffer gets filled up.
+	numWrites := 1111
 	for i := 0; i < numWrites; i++ {
 		_, e := writeFd(fd, buf)
 		if e != 0 {
