@@ -9,6 +9,8 @@ import (
 	"unsafe"
 
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
 	"github.com/tetratelabs/wazero/internal/testing/nodiff"
@@ -119,7 +121,8 @@ func test_signal_stack() {
 		},
 	})
 	ctx := context.Background()
-	config := wazero.NewRuntimeConfigCompiler()
+	config := wazero.NewRuntimeConfigCompiler().WithCoreFeatures(api.CoreFeaturesV2 | experimental.CoreFeaturesTailCall)
+
 	r := wazero.NewRuntimeWithConfig(ctx, config)
 	module, err := r.Instantiate(ctx, bin)
 	if err != nil {

@@ -126,6 +126,11 @@ pub fn run_nodiff(
 
     if check_logging {
         config.reference_types_enabled = false;
+    } else {
+        // Enable tail calls, which is disabled by default,
+        // but skip when check_logging: indentation might be different due to different
+        // stack call depths in the interpreter vs. compiler version.
+        config.tail_call_enabled = true;
     }
 
     // Generate the random module via wasm-smith.
