@@ -2306,6 +2306,70 @@ L2 (SSA Block: blk2):
 	ret
 `,
 		},
+		{
+			name: "tail_recursive_fibonacci",
+			m:    testcases.FibonacciTailRecursive.Module,
+			afterFinalizeAMD64: `
+L0 (SSA Block: blk0):
+	pushq %rbp
+	movq %rsp, %rbp
+	sub $16, %rsp
+	cmpl $0, %ecx
+	jnz L2
+L1 (SSA Block: blk1):
+	jmp L3
+L2 (SSA Block: blk2):
+	cmpl $1, %ecx
+	jnz L5
+L4 (SSA Block: blk4):
+L6 (SSA Block: blk6):
+	movl %esi, %edi
+L3 (SSA Block: blk3):
+	movl %edi, %eax
+	add $16, %rsp
+	movq %rbp, %rsp
+	popq %rbp
+	ret
+L5 (SSA Block: blk5):
+	sub $1, %ecx
+	add %esi, %edi
+	mov.l %rdi, (%rsp)
+	movl %esi, %edi
+	movzx.lq (%rsp), %rsi
+	add $16, %rsp
+	movq %rbp, %rsp
+	popq %rbp
+	tailCall f0
+`,
+			afterFinalizeARM64: `
+L0 (SSA Block: blk0):
+	stp x30, xzr, [sp, #-0x10]!
+	str xzr, [sp, #-0x10]!
+	subs wzr, w2, #0x0
+	b.ne #0x8, (L2)
+L1 (SSA Block: blk1):
+	b #0x10 (L3)
+L2 (SSA Block: blk2):
+	subs wzr, w2, #0x1
+	b.ne #0x18, (L5)
+L4 (SSA Block: blk4):
+L6 (SSA Block: blk6):
+	mov x3, x4
+L3 (SSA Block: blk3):
+	mov x0, x3
+	add sp, sp, #0x10
+	ldr x30, [sp], #0x10
+	ret
+L5 (SSA Block: blk5):
+	sub w2, w2, #0x1
+	add w8, w3, w4
+	mov x3, x4
+	mov x4, x8
+	add sp, sp, #0x10
+	ldr x30, [sp], #0x10
+	b f0
+`,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var exp string
@@ -2322,7 +2386,7 @@ L2 (SSA Block: blk2):
 				t.Fail()
 			}
 
-			err := tc.m.Validate(api.CoreFeaturesV2 | experimental.CoreFeaturesThreads)
+			err := tc.m.Validate(api.CoreFeaturesV2 | experimental.CoreFeaturesThreads | experimental.CoreFeaturesTailCall)
 			require.NoError(t, err)
 
 			ssab := ssa.NewBuilder()

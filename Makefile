@@ -113,6 +113,7 @@ spectest_v1_testdata_dir := $(spectest_v1_dir)/testdata
 spec_version_v1 := wg-1.0
 spectest_v2_dir := $(spectest_base_dir)/v2
 spectest_v2_testdata_dir := $(spectest_v2_dir)/testdata
+
 # Latest draft state as of March 12, 2024.
 spec_version_v2 := 1c5e5d178bd75c79b7a12881c529098beaee2a05
 spectest_threads_dir := $(spectest_base_dir)/threads
@@ -120,6 +121,10 @@ spectest_threads_testdata_dir := $(spectest_threads_dir)/testdata
 # From https://github.com/WebAssembly/threads/tree/upstream-rebuild which has not been merged to main yet.
 # It will likely be renamed to main in the future - https://github.com/WebAssembly/threads/issues/216.
 spec_version_threads := 3635ca51a17e57e106988846c5b0e0cc48ac04fc
+
+spectest_tail_call_dir := $(spectest_base_dir)/tail-call
+spectest_tail_call_testdata_dir := $(spectest_tail_call_dir)/testdata
+spec_version_tail_call := 4fd2339b5e9709e74b326797f69a88b13eac4d47
 
 .PHONY: build.spectest
 build.spectest:
@@ -173,6 +178,15 @@ build.spectest.threads:
 		&& curl -sSL 'https://api.github.com/repos/WebAssembly/threads/contents/test/core?ref=$(spec_version_threads)' | jq -r '.[]| .download_url' | grep -E "atomic.wast" | xargs -Iurl curl -sJL url -O
 	@cd $(spectest_threads_testdata_dir) && for f in `find . -name '*.wast'`; do \
 		wast2json --enable-threads --debug-names $$f; \
+	done
+
+.PHONY: build.spectest.tail_call
+build.spectest.tail_call:
+	mkdir -p $(spectest_tail_call_testdata_dir)
+	cd $(spectest_tail_call_testdata_dir) \
+		&& curl -sSL 'https://api.github.com/repos/WebAssembly/testsuite/contents/proposals/tail-call?ref=$(spec_version_tail_call)' | jq -r '.[]| .download_url' | grep -E ".wast" | xargs -Iurl curl -sJL url -O
+	cd $(spectest_tail_call_testdata_dir) && for f in `find . -name '*.wast'`; do \
+		wast2json --enable-tail-call --debug-names $$f; \
 	done
 
 .PHONY: test

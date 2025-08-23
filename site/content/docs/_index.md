@@ -168,7 +168,9 @@ on this topic!
 
 ## Rationales behind wazero
 
-Please refer to [RATIONALE][rationale] for the notable rationales behind wazero's implementations.
+Please refer to [RATIONALE][rationale] for the notable rationales behind wazero's implementations. 
+An engine-specific [RATIONALE][rationale-engine] is also available for internal implementation details 
+of the interpreter and compiler engines.
 
 [Module]: https://pkg.go.dev/github.com/tetratelabs/wazero@v1.0.0-rc.1/api#Module
 [Runtime]: https://pkg.go.dev/github.com/tetratelabs/wazero#Runtime
@@ -176,5 +178,6 @@ Please refer to [RATIONALE][rationale] for the notable rationales behind wazero'
 [CompiledModule]: https://pkg.go.dev/github.com/tetratelabs/wazero#CompiledModule
 [godoc]: https://pkg.go.dev/github.com/tetratelabs/wazero
 [rationale]: https://github.com/tetratelabs/wazero/blob/main/RATIONALE.md
+[rationale-engine]: https://github.com/tetratelabs/wazero/blob/main/internal/engine/RATIONALE.md
 [wasi]: https://github.com/tetratelabs/wazero/tree/main/imports/wasi_snapshot_preview1/example
 [age-calculator]: https://github.com/tetratelabs/wazero/blob/v1.0.0-rc.1/examples/import-go/age-calculator.go
