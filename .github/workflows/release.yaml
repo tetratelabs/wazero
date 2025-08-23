@@ -11,7 +11,7 @@ on:
     tags: 'v[0-9]+.[0-9]+.[0-9]+**'  # Ex. v0.2.0 v0.2.1-rc2
 
 env: # Update this prior to requiring a higher minor version in go.mod
-  GO_VERSION: "1.24"
+  GO_VERSION: "1.25"
 
 defaults:
   run:  # use bash for all operating systems unless overridden
