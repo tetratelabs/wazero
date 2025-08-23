@@ -18,7 +18,7 @@ defaults:
     shell: bash
 
 env:  # Update this prior to requiring a higher minor version in go.mod
-  GO_VERSION: "1.24"
+  GO_VERSION: "1.25"
   TINYGO_VERSION: "0.35.0"
   ZIG_VERSION: "0.11.0"
   BINARYEN_VERSION: "116"
@@ -276,8 +276,8 @@ jobs:
           name: Windows
           arch: amd64
         go-version:
-          - "1.24"
-          - "1.22"
+          - "1.25"
+          - "1.23"
 
     steps:
       - id: setup-go

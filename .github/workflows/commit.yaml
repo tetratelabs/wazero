@@ -14,7 +14,7 @@ on:
       - 'netlify.toml'
 
 env:  # Update this prior to requiring a higher minor version in go.mod
-  GO_VERSION: "1.24"
+  GO_VERSION: "1.25"
 
 defaults:
   run:  # use bash for all operating systems unless overridden
@@ -71,8 +71,8 @@ jobs:
         - os: macos-14
           arch: arm64
         go-version:
-          - "1.24"  # Current Go version
-          - "1.22"  # Floor Go version of wazero (current - 2)
+          - "1.25"  # Current Go version
+          - "1.23"  # Floor Go version of wazero (current - 2)
 
     steps:
 
@@ -112,8 +112,8 @@ jobs:
       fail-fast: false  # don't fail fast as sometimes failures are arch/OS specific
       matrix:  # Use versions consistent with wazero's Go support policy.
         go-version:
-          - "1.24"  # Current Go version
-          - "1.22"  # Floor Go version of wazero (current - 2)
+          - "1.25"  # Current Go version
+          - "1.23"  # Floor Go version of wazero (current - 2)
         platform:
           - os: ubuntu-22.04
             arch: amd64
