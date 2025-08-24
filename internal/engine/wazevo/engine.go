@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/api"
@@ -244,7 +245,7 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 	ctx, cancel := context.WithCancelCause(ctx)
 	defer cancel(nil)
 
-	sections := sequence(len(module.CodeSection))
+	var count atomic.Uint32
 
 	for range workers {
 		go func() {
@@ -254,11 +255,16 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 			machine := newMachine()
 			fe := frontend.NewFrontendCompiler(module, ssaBuilder, &cm.offsets, ensureTermination, withListener, needSourceInfo)
 
-			for i := range sections {
+			for {
 				// Get a stable reference to the outer context.
 				ctx := ctx
 				if err := ctx.Err(); err != nil {
 					// Compilation canceled!
+					return
+				}
+
+				i := int(count.Add(1)) - 1
+				if i >= len(module.CodeSection) {
 					return
 				}
 
@@ -896,15 +902,4 @@ func (cm *compiledModule) getSourceOffset(pc uintptr) uint64 {
 		return 0
 	}
 	return cm.sourceMap.wasmBinaryOffsets[index]
-}
-
-func sequence(size int) <-chan int {
-	result := make(chan int)
-	go func() {
-		for i := range size {
-			result <- i
-		}
-		close(result)
-	}()
-	return result
 }
