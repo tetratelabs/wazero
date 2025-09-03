@@ -147,7 +147,7 @@ jobs:
       - uses: actions/setup-go@v5
         if: steps.binary-cache.outputs.cache-hit != 'true'
         with:
-          go-version: 1.24 # Latest supported by TinyGo 0.35
+          go-version: 1.24 # Latest supported by TinyGo 0.38
 
       - name: Build Test Binaries
         if: steps.binary-cache.outputs.cache-hit != 'true'
@@ -192,7 +192,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version:  1.24 # Latest supported by TinyGo 0.35
+          go-version:  1.24 # Latest supported by TinyGo 0.38
 
       - name: Run test binaries
         run: |
