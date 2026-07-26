@@ -105,6 +105,16 @@ func Test_newMemorySizer(t *testing.T) {
 			expectedCapacity: 0,
 			expectedMax:      5,
 		},
+		{
+			name:                  "max > memoryLimitPages memoryCapacityFromMax",
+			memoryCapacityFromMax: true,
+			limit:                 5,
+			min:                   0,
+			max:                   &ten,
+			expectedMin:           0,
+			expectedCapacity:      5,
+			expectedMax:           5,
+		},
 	}
 
 	for _, tt := range tests {
