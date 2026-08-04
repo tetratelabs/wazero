@@ -25,6 +25,7 @@ considering their efforts before starting your own!
 | [jpegli][42]     | JPEG encoder/decoder based on jpegli                                                                 |
 | [webp][43]       | WEBP encoder/decoder based on libwebp                                                                |
 | [go-libtiff][48] | TIFF encoder/decoder based on [libtiff][49], also includes libtiff tools like tiff2pdf               |
+| [colorer4go][50] | far2l colorer plugin for syntax highligting, used in f4 Far-like TUI file manager                    |
 
 ### General purpose plugins
 
@@ -182,3 +183,5 @@ experience.
 [48]: https://github.com/klippa-app/go-libtiff
 
 [49]: https://libtiff.gitlab.io/libtiff/
+
+[50]: https://github.com/unxed/colorer4go
