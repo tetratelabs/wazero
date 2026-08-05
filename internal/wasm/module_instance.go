@@ -155,7 +155,7 @@ func (m *ModuleInstance) ensureResourcesClosed(ctx context.Context) (err error) 
 		m.Sys = nil
 	}
 
-	if mem := m.MemoryInstance; mem != nil {
+	if mem := m.MemoryInstance; mem != nil && mem.ownerModuleEngine == m.Engine {
 		if mem.expBuffer != nil {
 			mem.expBuffer.Free()
 			mem.expBuffer = nil

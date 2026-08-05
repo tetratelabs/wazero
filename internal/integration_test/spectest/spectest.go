@@ -114,6 +114,8 @@ func (c commandActionVal) String() string {
 	case "funcref":
 		// All the in and out funcref params are null in spectest (cannot represent non-null as it depends on runtime impl).
 		v = "null"
+	case "exnref":
+		v = "null"
 	case "v128":
 		simdValues, ok := c.Value.([]interface{})
 		if !ok {
@@ -260,6 +262,9 @@ func getNaNBits(strValue string, is32bit bool) (ret uint64) {
 }
 
 func (c commandActionVal) toUint64() (ret uint64) {
+	if c.Value == nil || c.Value == "null" {
+		return 0
+	}
 	strValue := c.Value.(string)
 	if strings.Contains(strValue, "nan") {
 		ret = getNaNBits(strValue, c.ValType == "f32")
@@ -273,9 +278,20 @@ func (c commandActionVal) toUint64() (ret uint64) {
 			ret = original + 1
 		}
 	} else if strings.Contains(c.ValType, "32") {
-		ret, _ = strconv.ParseUint(strValue, 10, 32)
+		// wasm-tools may output signed decimals (e.g. "-1"); handle both.
+		if strings.HasPrefix(strValue, "-") {
+			v, _ := strconv.ParseInt(strValue, 10, 32)
+			ret = uint64(uint32(int32(v)))
+		} else {
+			ret, _ = strconv.ParseUint(strValue, 10, 32)
+		}
 	} else {
-		ret, _ = strconv.ParseUint(strValue, 10, 64)
+		if strings.HasPrefix(strValue, "-") {
+			v, _ := strconv.ParseInt(strValue, 10, 64)
+			ret = uint64(v)
+		} else {
+			ret, _ = strconv.ParseUint(strValue, 10, 64)
+		}
 	}
 	return
 }
@@ -305,6 +321,10 @@ func (c command) expectedError() (err error) {
 		err = wasmruntime.ErrRuntimeUnalignedAtomic
 	case "unreachable":
 		err = wasmruntime.ErrRuntimeUnreachable
+	case "uncaught exception":
+		err = wasmruntime.ErrRuntimeUncaughtException
+	case "null", "null reference", "null function reference", "null function":
+		err = wasmruntime.ErrRuntimeNullReference
 	default:
 		if strings.HasPrefix(c.Text, "uninitialized") {
 			err = wasmruntime.ErrRuntimeInvalidTableAccess
@@ -419,12 +439,17 @@ func RunCase(t *testing.T, testDataFS embed.FS, f string, ctx context.Context, c
 						require.NoError(t, err, msg)
 						require.Equal(t, len(exps), len(results), msg)
 						laneTypes := map[int]string{}
+						skipIndices := map[int]bool{}
 						for i, expV := range c.Exps {
 							if expV.ValType == "v128" {
 								laneTypes[i] = expV.LaneType
 							}
+							// When value is nil for ref types, it means "any ref" — skip comparison.
+							if expV.Value == nil && (expV.ValType == "funcref" || expV.ValType == "externref" || expV.ValType == "exnref") {
+								skipIndices[i] = true
+							}
 						}
-						matched, valuesMsg := valuesEq(results, exps, fn.Definition().ResultTypes(), laneTypes)
+						matched, valuesMsg := valuesEq(results, exps, wasm.FromApiValueType(fn.Definition().ResultTypes()), laneTypes, skipIndices)
 						require.True(t, matched, msg+"\n"+valuesMsg)
 					case "get":
 						_, exps := c.getAssertReturnArgsExps()
@@ -495,6 +520,23 @@ func RunCase(t *testing.T, testDataFS embed.FS, f string, ctx context.Context, c
 					require.NoError(t, err, msg)
 					_, err = r.InstantiateWithConfig(ctx, buf, wazero.NewModuleConfig())
 					require.Error(t, err, msg)
+				case "assert_exception":
+					m := lastInstantiatedModule
+					if c.Action.Module != "" {
+						m = modules[c.Action.Module]
+					}
+					switch c.Action.ActionType {
+					case "invoke":
+						args := c.getAssertReturnArgs()
+						msg = fmt.Sprintf("%s invoke %s (%s)", msg, c.Action.Field, c.Action.Args)
+						if c.Action.Module != "" {
+							msg += " in module " + c.Action.Module
+						}
+						_, err := m.ExportedFunction(c.Action.Field).Call(ctx, args...)
+						require.ErrorIs(t, err, wasmruntime.ErrRuntimeUncaughtException, msg)
+					default:
+						t.Fatalf("unsupported action type type: %v", c)
+					}
 				case "assert_uninstantiable":
 					buf, err := testDataFS.ReadFile(testdataPath(c.Filename))
 					require.NoError(t, err, msg)
@@ -539,12 +581,23 @@ func testdataPath(filename string) string {
 //   - laneTypes maps the index of valueTypes to laneType if valueTypes[i] == wasm.ValueTypeV128.
 //
 // Also, if matched == false this returns non-empty valuesMsg which can be used to augment the test failure message.
-func valuesEq(actual, exps []uint64, valTypes []wasm.ValueType, laneTypes map[int]laneType) (matched bool, valuesMsg string) {
+func valuesEq(actual, exps []uint64, valTypes []wasm.ValueType, laneTypes map[int]laneType, skipIndices map[int]bool) (matched bool, valuesMsg string) {
 	matched = true
 
 	var msgExpValuesStrs, msgActualValuesStrs []string
 	var uint64RepPos int // the index to actual and exps slice.
 	for i, tp := range valTypes {
+		if skipIndices[i] {
+			// Skip comparison for this result (e.g., "any funcref").
+			if tp == wasm.ValueTypeV128 {
+				uint64RepPos += 2
+			} else {
+				uint64RepPos++
+			}
+			msgExpValuesStrs = append(msgExpValuesStrs, "*")
+			msgActualValuesStrs = append(msgActualValuesStrs, "*")
+			continue
+		}
 		switch tp {
 		case wasm.ValueTypeI32:
 			msgExpValuesStrs = append(msgExpValuesStrs, fmt.Sprintf("%d", uint32(exps[uint64RepPos])))

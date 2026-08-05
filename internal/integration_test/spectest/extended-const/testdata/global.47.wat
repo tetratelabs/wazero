@@ -1,0 +1,1 @@
+(import "" "" (global $foo i32))(global $foo i32 (i32.const 0))

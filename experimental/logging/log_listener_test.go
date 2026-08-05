@@ -23,8 +23,8 @@ var testCtx = context.WithValue(context.Background(), arbitrary{}, "arbitrary")
 func Test_loggingListener(t *testing.T) {
 	wasiFuncName := wasi.RandomGetName
 	wasiFuncType := wasm.FunctionType{
-		Params:  []api.ValueType{api.ValueTypeI32, api.ValueTypeI32},
-		Results: []api.ValueType{api.ValueTypeI32},
+		Params:  []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI32},
+		Results: []wasm.ValueType{wasm.ValueTypeI32},
 	}
 	wasiParamNames := []string{"buf", "buf_len"}
 	wasiParams := []uint64{0, 8}
@@ -84,7 +84,7 @@ func Test_loggingListener(t *testing.T) {
 		},
 		{
 			name:     "i32",
-			functype: wasm.FunctionType{Params: []api.ValueType{api.ValueTypeI32}},
+			functype: wasm.FunctionType{Params: []wasm.ValueType{wasm.ValueTypeI32}},
 			params:   []uint64{math.MaxUint32},
 			expected: `--> test.fn(-1)
 <--
@@ -92,7 +92,7 @@ func Test_loggingListener(t *testing.T) {
 		},
 		{
 			name:       "i32 named",
-			functype:   wasm.FunctionType{Params: []api.ValueType{api.ValueTypeI32}},
+			functype:   wasm.FunctionType{Params: []wasm.ValueType{wasm.ValueTypeI32}},
 			params:     []uint64{math.MaxUint32},
 			paramNames: []string{"x"},
 			expected: `--> test.fn(x=-1)
@@ -101,7 +101,7 @@ func Test_loggingListener(t *testing.T) {
 		},
 		{
 			name:     "i64",
-			functype: wasm.FunctionType{Params: []api.ValueType{api.ValueTypeI64}},
+			functype: wasm.FunctionType{Params: []wasm.ValueType{wasm.ValueTypeI64}},
 			params:   []uint64{math.MaxUint64},
 			expected: `--> test.fn(-1)
 <--
@@ -109,7 +109,7 @@ func Test_loggingListener(t *testing.T) {
 		},
 		{
 			name:       "i64 named",
-			functype:   wasm.FunctionType{Params: []api.ValueType{api.ValueTypeI64}},
+			functype:   wasm.FunctionType{Params: []wasm.ValueType{wasm.ValueTypeI64}},
 			params:     []uint64{math.MaxUint64},
 			paramNames: []string{"x"},
 			expected: `--> test.fn(x=-1)
@@ -118,7 +118,7 @@ func Test_loggingListener(t *testing.T) {
 		},
 		{
 			name:     "f32",
-			functype: wasm.FunctionType{Params: []api.ValueType{api.ValueTypeF32}},
+			functype: wasm.FunctionType{Params: []wasm.ValueType{wasm.ValueTypeF32}},
 			params:   []uint64{api.EncodeF32(math.MaxFloat32)},
 			expected: `--> test.fn(3.4028235e+38)
 <--
@@ -126,7 +126,7 @@ func Test_loggingListener(t *testing.T) {
 		},
 		{
 			name:       "f32 named",
-			functype:   wasm.FunctionType{Params: []api.ValueType{api.ValueTypeF32}},
+			functype:   wasm.FunctionType{Params: []wasm.ValueType{wasm.ValueTypeF32}},
 			params:     []uint64{api.EncodeF32(math.MaxFloat32)},
 			paramNames: []string{"x"},
 			expected: `--> test.fn(x=3.4028235e+38)
@@ -135,7 +135,7 @@ func Test_loggingListener(t *testing.T) {
 		},
 		{
 			name:     "f64",
-			functype: wasm.FunctionType{Params: []api.ValueType{api.ValueTypeF64}},
+			functype: wasm.FunctionType{Params: []wasm.ValueType{wasm.ValueTypeF64}},
 			params:   []uint64{api.EncodeF64(math.MaxFloat64)},
 			expected: `--> test.fn(1.7976931348623157e+308)
 <--
@@ -143,7 +143,7 @@ func Test_loggingListener(t *testing.T) {
 		},
 		{
 			name:       "f64 named",
-			functype:   wasm.FunctionType{Params: []api.ValueType{api.ValueTypeF64}},
+			functype:   wasm.FunctionType{Params: []wasm.ValueType{wasm.ValueTypeF64}},
 			params:     []uint64{api.EncodeF64(math.MaxFloat64)},
 			paramNames: []string{"x"},
 			expected: `--> test.fn(x=1.7976931348623157e+308)
@@ -152,7 +152,7 @@ func Test_loggingListener(t *testing.T) {
 		},
 		{
 			name:     "externref",
-			functype: wasm.FunctionType{Params: []api.ValueType{api.ValueTypeExternref}},
+			functype: wasm.FunctionType{Params: []wasm.ValueType{wasm.ValueTypeExternref}},
 			params:   []uint64{0},
 			expected: `--> test.fn(0000000000000000)
 <--
@@ -160,7 +160,7 @@ func Test_loggingListener(t *testing.T) {
 		},
 		{
 			name:       "externref named",
-			functype:   wasm.FunctionType{Params: []api.ValueType{api.ValueTypeExternref}},
+			functype:   wasm.FunctionType{Params: []wasm.ValueType{wasm.ValueTypeExternref}},
 			params:     []uint64{0},
 			paramNames: []string{"x"},
 			expected: `--> test.fn(x=0000000000000000)
@@ -169,7 +169,7 @@ func Test_loggingListener(t *testing.T) {
 		},
 		{
 			name:     "v128",
-			functype: wasm.FunctionType{Params: []api.ValueType{0x7b}},
+			functype: wasm.FunctionType{Params: []wasm.ValueType{0x7b}},
 			params:   []uint64{0, 1},
 			expected: `--> test.fn(00000000000000000000000000000001)
 <--
@@ -177,7 +177,7 @@ func Test_loggingListener(t *testing.T) {
 		},
 		{
 			name:       "v128 named",
-			functype:   wasm.FunctionType{Params: []api.ValueType{0x7b}},
+			functype:   wasm.FunctionType{Params: []wasm.ValueType{0x7b}},
 			params:     []uint64{0, 1},
 			paramNames: []string{"x"},
 			expected: `--> test.fn(x=00000000000000000000000000000001)
@@ -186,7 +186,7 @@ func Test_loggingListener(t *testing.T) {
 		},
 		{
 			name:     "funcref",
-			functype: wasm.FunctionType{Params: []api.ValueType{0x70}},
+			functype: wasm.FunctionType{Params: []wasm.ValueType{0x70}},
 			params:   []uint64{0},
 			expected: `--> test.fn(0000000000000000)
 <--
@@ -194,7 +194,7 @@ func Test_loggingListener(t *testing.T) {
 		},
 		{
 			name:       "funcref named",
-			functype:   wasm.FunctionType{Params: []api.ValueType{0x70}},
+			functype:   wasm.FunctionType{Params: []wasm.ValueType{0x70}},
 			params:     []uint64{0},
 			paramNames: []string{"x"},
 			expected: `--> test.fn(x=0000000000000000)
@@ -203,7 +203,7 @@ func Test_loggingListener(t *testing.T) {
 		},
 		{
 			name:     "no params, one result",
-			functype: wasm.FunctionType{Results: []api.ValueType{api.ValueTypeI32}},
+			functype: wasm.FunctionType{Results: []wasm.ValueType{wasm.ValueTypeI32}},
 			results:  []uint64{math.MaxUint32},
 			expected: `--> test.fn()
 <-- -1
@@ -212,8 +212,8 @@ func Test_loggingListener(t *testing.T) {
 		{
 			name: "one param, one result",
 			functype: wasm.FunctionType{
-				Params:  []api.ValueType{api.ValueTypeI32},
-				Results: []api.ValueType{api.ValueTypeF32},
+				Params:  []wasm.ValueType{wasm.ValueTypeI32},
+				Results: []wasm.ValueType{wasm.ValueTypeF32},
 			},
 			params:  []uint64{math.MaxUint32},
 			results: []uint64{api.EncodeF32(math.MaxFloat32)},
@@ -224,8 +224,8 @@ func Test_loggingListener(t *testing.T) {
 		{
 			name: "two params, two results",
 			functype: wasm.FunctionType{
-				Params:  []api.ValueType{api.ValueTypeI32, api.ValueTypeI64},
-				Results: []api.ValueType{api.ValueTypeF32, api.ValueTypeF64},
+				Params:  []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI64},
+				Results: []wasm.ValueType{wasm.ValueTypeF32, wasm.ValueTypeF64},
 			},
 			params:  []uint64{math.MaxUint32, math.MaxUint64},
 			results: []uint64{api.EncodeF32(math.MaxFloat32), api.EncodeF64(math.MaxFloat64)},
@@ -236,8 +236,8 @@ func Test_loggingListener(t *testing.T) {
 		{
 			name: "two params, two results named",
 			functype: wasm.FunctionType{
-				Params:  []api.ValueType{api.ValueTypeI32, api.ValueTypeI64},
-				Results: []api.ValueType{api.ValueTypeF32, api.ValueTypeF64},
+				Params:  []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI64},
+				Results: []wasm.ValueType{wasm.ValueTypeF32, wasm.ValueTypeF64},
 			},
 			params:     []uint64{math.MaxUint32, math.MaxUint64},
 			paramNames: []string{"x", "y"},

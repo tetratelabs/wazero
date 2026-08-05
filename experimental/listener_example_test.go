@@ -177,10 +177,10 @@ func (f *mockFunctionDefinition) DebugName() string {
 	return f.debugName
 }
 
-func (f *mockFunctionDefinition) ParamTypes() []wasm.ValueType {
-	return []wasm.ValueType{}
+func (f *mockFunctionDefinition) ParamTypes() []api.ValueType {
+	return []api.ValueType{}
 }
 
-func (f *mockFunctionDefinition) ResultTypes() []wasm.ValueType {
-	return []wasm.ValueType{}
+func (f *mockFunctionDefinition) ResultTypes() []api.ValueType {
+	return []api.ValueType{}
 }

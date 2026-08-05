@@ -35,13 +35,12 @@ jobs:
       matrix:
         go-version:
           - "1.25" # Max version supported by TinyGo 0.39.0
-          - "1.24"
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: ${{ matrix.go-version }}
 
@@ -59,14 +58,14 @@ jobs:
 
       - name: Cache Emscripten
         id: cache-emsdk
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: emsdk
           key: ${{ runner.os }}-emcc-${{env.EMSDK_VERSION}}
 
       - name: Checkout Emscripten
         if: steps.cache-emsdk.outputs.cache-hit != 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: emscripten-core/emsdk
           path: emsdk

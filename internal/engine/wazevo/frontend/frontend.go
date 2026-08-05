@@ -4,6 +4,7 @@ package frontend
 import (
 	"bytes"
 	"math"
+	"sync"
 
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/ssa"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
@@ -63,6 +64,24 @@ type Compiler struct {
 
 	execCtxPtrValue, moduleCtxPtrValue ssa.Value
 
+	// throwAllocSig is the signature for the throw-alloc trampoline:
+	// (execCtx, tagIndex) → (exnref). Allocates the Exception and returns
+	// its pointer so compiled code can pass it to the throw trampoline.
+	throwAllocSig ssa.Signature
+	// throwSig is the signature for the throw/throw_ref trampoline:
+	// (execCtx, exnref) → (). Searches for a matching handler and restores.
+	throwSig ssa.Signature
+	// tryTableEnterSig is the signature for the try_table enter trampoline.
+	tryTableEnterSig ssa.Signature
+	// tryTableLeaveSig is the signature for the try_table leave trampoline.
+	tryTableLeaveSig ssa.Signature
+	// tryTableMetadata accumulates try_table metadata during compilation.
+	tryTableMetadata tryTableMetadata
+	// tryTableDepth tracks try_table nesting. When > 0, local.set/local.tee
+	// emit extra stores to the locals save area so handler blocks can read
+	// throw-time values.
+	tryTableDepth int
+
 	// Following are reused for the known safe bounds analysis.
 
 	pointers []int
@@ -97,10 +116,71 @@ func NewFrontendCompiler(m *wasm.Module, ssaBuilder ssa.Builder, offset *wazevoa
 		ensureTermination:                 ensureTermination,
 		interruptCheckInterval:            interruptCheckInterval,
 		needSourceOffsetInfo:              sourceInfo,
+		tryTableMetadata:                  &localTryTableMetadata{},
 		varLengthKnownSafeBoundWithIDPool: wazevoapi.NewVarLengthPool[knownSafeBoundWithID](),
 	}
 	c.declareSignatures(listenerOn)
 	return c
+}
+
+// tryTableMetadata accumulates try_table metadata during compilation.
+type tryTableMetadata interface {
+	Append(info wazevoapi.TryTableInfo) int
+	Table() []wazevoapi.TryTableInfo
+}
+
+// localTryTableMetadata is the single-threaded implementation.
+type localTryTableMetadata struct {
+	table []wazevoapi.TryTableInfo
+}
+
+func (t *localTryTableMetadata) Append(info wazevoapi.TryTableInfo) int {
+	id := len(t.table)
+	t.table = append(t.table, info)
+	return id
+}
+
+func (t *localTryTableMetadata) Table() []wazevoapi.TryTableInfo {
+	return t.table
+}
+
+// SharedTryTableMetadata is the thread-safe implementation for parallel compilation.
+type SharedTryTableMetadata struct {
+	mu        sync.Mutex
+	table     []wazevoapi.TryTableInfo
+	finalized bool
+}
+
+// NewSharedTryTableMetadata creates a new SharedTryTableMetadata.
+func NewSharedTryTableMetadata() *SharedTryTableMetadata {
+	return &SharedTryTableMetadata{}
+}
+
+func (s *SharedTryTableMetadata) Append(info wazevoapi.TryTableInfo) int {
+	if s.finalized {
+		panic("already finalized")
+	}
+	s.mu.Lock()
+	id := len(s.table)
+	s.table = append(s.table, info)
+	s.mu.Unlock()
+	return id
+}
+
+func (s *SharedTryTableMetadata) Table() []wazevoapi.TryTableInfo {
+	s.finalized = true
+	return s.table
+}
+
+// WithTryTableMetadata replaces the try_table metadata table implementation.
+func (c *Compiler) WithTryTableMetadata(t tryTableMetadata) *Compiler {
+	c.tryTableMetadata = t
+	return c
+}
+
+// TryTableMetadata returns the accumulated try_table metadata.
+func (c *Compiler) TryTableMetadata() []wazevoapi.TryTableInfo {
+	return c.tryTableMetadata.Table()
 }
 
 func (c *Compiler) declareSignatures(listenerOn bool) {
@@ -196,6 +276,34 @@ func (c *Compiler) declareSignatures(listenerOn bool) {
 		Results: []ssa.Type{ssa.TypeI32},
 	}
 	c.ssaBuilder.DeclareSignature(&c.memoryNotifySig)
+
+	c.throwAllocSig = ssa.Signature{
+		ID:      c.memoryNotifySig.ID + 1,
+		Params:  []ssa.Type{ssa.TypeI64 /* exec context */, ssa.TypeI64 /* tag index */},
+		Results: []ssa.Type{ssa.TypeI64 /* exnref */},
+	}
+	c.ssaBuilder.DeclareSignature(&c.throwAllocSig)
+
+	c.throwSig = ssa.Signature{
+		ID:      c.throwAllocSig.ID + 1,
+		Params:  []ssa.Type{ssa.TypeI64 /* exec context */, ssa.TypeI64 /* exnref */},
+		Results: []ssa.Type{},
+	}
+	c.ssaBuilder.DeclareSignature(&c.throwSig)
+
+	c.tryTableEnterSig = ssa.Signature{
+		ID:      c.throwSig.ID + 1,
+		Params:  []ssa.Type{ssa.TypeI64 /* exec context */, ssa.TypeI64 /* encoded exit code */},
+		Results: []ssa.Type{},
+	}
+	c.ssaBuilder.DeclareSignature(&c.tryTableEnterSig)
+
+	c.tryTableLeaveSig = ssa.Signature{
+		ID:      c.tryTableEnterSig.ID + 1,
+		Params:  []ssa.Type{ssa.TypeI64 /* exec context */},
+		Results: []ssa.Type{},
+	}
+	c.ssaBuilder.DeclareSignature(&c.tryTableLeaveSig)
 }
 
 // SignatureForWasmFunctionType returns the ssa.Signature for the given wasm.FunctionType.
@@ -228,6 +336,7 @@ func (c *Compiler) Init(idx, typIndex wasm.Index, typ *wasm.FunctionType, localT
 	c.wasmFunctionBody = body
 	c.wasmFunctionBodyOffsetInCodeSection = bodyOffsetInCodeSection
 	c.needListener = needListener
+	c.tryTableDepth = 0
 	c.clearSafeBounds()
 	c.varLengthKnownSafeBoundWithIDPool.Reset()
 	c.knownSafeBoundsAtTheEndOfBlocks = c.knownSafeBoundsAtTheEndOfBlocks[:0]
@@ -236,7 +345,8 @@ func (c *Compiler) Init(idx, typIndex wasm.Index, typ *wasm.FunctionType, localT
 // Note: this assumes 64-bit platform (I believe we won't have 32-bit backend ;)).
 const executionContextPtrTyp, moduleContextPtrTyp = ssa.TypeI64, ssa.TypeI64
 
-// LowerToSSA lowers the current function to SSA function which will be held by ssaBuilder.
+// LowerToSSA lowers the current function to SSA IR which will be held by ssaBuilder.
+//
 // After calling this, the caller will be able to access the SSA info in *Compiler.ssaBuilder.
 //
 // Note that this only does the naive lowering, and do not do any optimization, instead the caller is expected to do so.
@@ -342,23 +452,7 @@ func (c *Compiler) declareNecessaryVariables() {
 }
 
 func (c *Compiler) declareWasmGlobal(typ wasm.ValueType, mutable bool) {
-	var st ssa.Type
-	switch typ {
-	case wasm.ValueTypeI32:
-		st = ssa.TypeI32
-	case wasm.ValueTypeI64,
-		// Both externref and funcref are represented as I64 since we only support 64-bit platforms.
-		wasm.ValueTypeExternref, wasm.ValueTypeFuncref:
-		st = ssa.TypeI64
-	case wasm.ValueTypeF32:
-		st = ssa.TypeF32
-	case wasm.ValueTypeF64:
-		st = ssa.TypeF64
-	case wasm.ValueTypeV128:
-		st = ssa.TypeV128
-	default:
-		panic("TODO: " + wasm.ValueTypeName(typ))
-	}
+	st := WasmTypeToSSAType(typ)
 	v := c.ssaBuilder.DeclareVariable(st)
 	index := wasm.Index(len(c.globalVariables))
 	c.globalVariables = append(c.globalVariables, v)
@@ -374,8 +468,9 @@ func WasmTypeToSSAType(vt wasm.ValueType) ssa.Type {
 	case wasm.ValueTypeI32:
 		return ssa.TypeI32
 	case wasm.ValueTypeI64,
-		// Both externref and funcref are represented as I64 since we only support 64-bit platforms.
-		wasm.ValueTypeExternref, wasm.ValueTypeFuncref:
+		// externref, funcref, and exnref are represented as I64 since we only support 64-bit platforms.
+		wasm.ValueTypeExternref, wasm.ValueTypeFuncref,
+		wasm.ValueTypeExnref:
 		return ssa.TypeI64
 	case wasm.ValueTypeF32:
 		return ssa.TypeF32
@@ -384,6 +479,10 @@ func WasmTypeToSSAType(vt wasm.ValueType) ssa.Type {
 	case wasm.ValueTypeV128:
 		return ssa.TypeV128
 	default:
+		// Concrete ref types (ref $t) have variable bit patterns.
+		if vt.IsRef() {
+			return ssa.TypeI64
+		}
 		panic("TODO: " + wasm.ValueTypeName(vt))
 	}
 }

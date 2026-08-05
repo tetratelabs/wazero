@@ -18,7 +18,7 @@ defaults:
     shell: bash
 
 env:  # Update this prior to requiring a higher minor version in go.mod
-  GO_VERSION: "1.25"
+  GO_VERSION: "1.26"
   ZIG_VERSION: "0.11.0"
   BINARYEN_VERSION: "116"
   STDLIB_TESTS: "internal/integration_test/stdlibs"
@@ -39,9 +39,9 @@ jobs:
 
     steps:
       - name: Checkout wazero
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         id: binary-cache
         with:
           # Use share the cache containing archives across OSes.
@@ -97,9 +97,9 @@ jobs:
 
     steps:
       - name: Checkout wazero
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         id: binary-cache
         with:
           # Use share the cache containing archives across OSes.
@@ -110,7 +110,7 @@ jobs:
           path:
             ${{ env.STDLIB_TESTS }}/testdata/zig
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
 
@@ -128,25 +128,25 @@ jobs:
         os: [ubuntu-24.04, macos-14, windows-2022]
 
     steps:
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         id: cache
         with:
           path:
             ~/go/pkg/mod
           key: integration-test-wasi-testsuite-${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum') }}
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
 
       - name: Checkout wazero
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install wazero
         run: go install ./cmd/wazero
 
       - name: Checkout wasi-testsuite
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: WebAssembly/wasi-testsuite
           # prod/testsuite-base branch, as of May 12, 2023.
@@ -155,7 +155,7 @@ jobs:
           path: wasi-testsuite
 
       - name: Initialize Python environment
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11' # latest version of python 3
           cache: pip
@@ -196,21 +196,21 @@ jobs:
           name: Windows
           arch: amd64
         go-version:
+          - "1.26"
           - "1.25"
-          - "1.24"
 
     steps:
       - id: setup-go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: ${{ matrix.go-version }}
 
       - name: Checkout wazero
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Cache Go test binaries
         id: cache-go-test-binaries
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path:
             ${{ env.STDLIB_TESTS }}/testdata/go
@@ -252,13 +252,13 @@ jobs:
 
     steps:
       - name: Checkout wazero
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: |
             ~/.cache/go-build

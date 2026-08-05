@@ -24,32 +24,32 @@ func TestTableType(t *testing.T) {
 		{
 			name:     "min 0 - funcref",
 			input:    wasm.Table{Type: wasm.RefTypeFuncref},
-			expected: []byte{wasm.RefTypeFuncref, 0x0, 0},
+			expected: []byte{wasm.RefTypeFuncref.Kind(), 0x0, 0},
 		},
 		{
 			name:     "min 0 - externref",
 			input:    wasm.Table{Type: wasm.RefTypeExternref},
-			expected: []byte{wasm.RefTypeExternref, 0x0, 0},
+			expected: []byte{wasm.RefTypeExternref.Kind(), 0x0, 0},
 		},
 		{
 			name:     "min 0, max 0",
 			input:    wasm.Table{Max: &zero, Type: wasm.RefTypeFuncref},
-			expected: []byte{wasm.RefTypeFuncref, 0x1, 0, 0},
+			expected: []byte{wasm.RefTypeFuncref.Kind(), 0x1, 0, 0},
 		},
 		{
 			name:     "min largest",
 			input:    wasm.Table{Min: max, Type: wasm.RefTypeFuncref},
-			expected: []byte{wasm.RefTypeFuncref, 0x0, 0x80, 0x80, 0x80, 0x40},
+			expected: []byte{wasm.RefTypeFuncref.Kind(), 0x0, 0x80, 0x80, 0x80, 0x40},
 		},
 		{
 			name:     "min 0, max largest",
 			input:    wasm.Table{Max: &max, Type: wasm.RefTypeFuncref},
-			expected: []byte{wasm.RefTypeFuncref, 0x1, 0, 0x80, 0x80, 0x80, 0x40},
+			expected: []byte{wasm.RefTypeFuncref.Kind(), 0x1, 0, 0x80, 0x80, 0x80, 0x40},
 		},
 		{
 			name:     "min largest max largest",
 			input:    wasm.Table{Min: max, Max: &max, Type: wasm.RefTypeFuncref},
-			expected: []byte{wasm.RefTypeFuncref, 0x1, 0x80, 0x80, 0x80, 0x40, 0x80, 0x80, 0x80, 0x40},
+			expected: []byte{wasm.RefTypeFuncref.Kind(), 0x1, 0x80, 0x80, 0x80, 0x40, 0x80, 0x80, 0x80, 0x40},
 		},
 	}
 
@@ -84,19 +84,19 @@ func TestDecodeTableType_Errors(t *testing.T) {
 		},
 		{
 			name:        "max < min",
-			input:       []byte{wasm.RefTypeFuncref, 0x1, 0x80, 0x80, 0x4, 0},
+			input:       []byte{wasm.RefTypeFuncref.Kind(), 0x1, 0x80, 0x80, 0x4, 0},
 			expectedErr: "table size minimum must not be greater than maximum",
 			features:    api.CoreFeatureReferenceTypes,
 		},
 		{
 			name:        "min > limit",
-			input:       []byte{wasm.RefTypeFuncref, 0x0, 0xff, 0xff, 0xff, 0xff, 0xf},
+			input:       []byte{wasm.RefTypeFuncref.Kind(), 0x0, 0xff, 0xff, 0xff, 0xff, 0xf},
 			expectedErr: "table min must be at most 134217728",
 			features:    api.CoreFeatureReferenceTypes,
 		},
 		{
 			name:        "shared",
-			input:       []byte{wasm.RefTypeFuncref, 0x2, 0},
+			input:       []byte{wasm.RefTypeFuncref.Kind(), 0x2, 0},
 			expectedErr: "tables cannot be marked as shared",
 			// Shared tables are an error even if threads are enabled.
 			features: experimental.CoreFeaturesThreads,

@@ -3,7 +3,6 @@ package binaryencoding
 import (
 	"testing"
 
-	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
@@ -45,8 +44,8 @@ func TestModule_Encode(t *testing.T) {
 				wasm.SectionIDType, 0x12, // 18 bytes in this section
 				0x03,             // 3 types
 				0x60, 0x00, 0x00, // func=0x60 no param no result
-				0x60, 0x02, i32, i32, 0x01, i32, // func=0x60 2 params and 1 result
-				0x60, 0x04, i32, i32, i32, i32, 0x01, i32, // func=0x60 4 params and 1 result
+				0x60, 0x02, i32.Kind(), i32.Kind(), 0x01, i32.Kind(), // func=0x60 2 params and 1 result
+				0x60, 0x04, i32.Kind(), i32.Kind(), i32.Kind(), i32.Kind(), 0x01, i32.Kind(), // func=0x60 4 params and 1 result
 			),
 		},
 		{
@@ -70,9 +69,9 @@ func TestModule_Encode(t *testing.T) {
 			},
 			expected: append(append(Magic, version...),
 				wasm.SectionIDType, 0x0d, // 13 bytes in this section
-				0x02,                            // 2 types
-				0x60, 0x02, i32, i32, 0x01, i32, // func=0x60 2 params and 1 result
-				0x60, 0x02, f32, f32, 0x01, f32, // func=0x60 2 params and 1 result
+				0x02,                                                 // 2 types
+				0x60, 0x02, i32.Kind(), i32.Kind(), 0x01, i32.Kind(), // func=0x60 2 params and 1 result
+				0x60, 0x02, f32.Kind(), f32.Kind(), 0x01, f32.Kind(), // func=0x60 2 params and 1 result
 				wasm.SectionIDImport, 0x17, // 23 bytes in this section
 				0x02, // 2 imports
 				0x04, 'M', 'a', 't', 'h', 0x03, 'M', 'u', 'l', wasm.ExternTypeFunc,
@@ -112,8 +111,8 @@ func TestModule_Encode(t *testing.T) {
 			},
 			expected: append(append(Magic, version...),
 				wasm.SectionIDTable, 0x04, // 4 bytes in this section
-				0x01,                           // 1 table
-				wasm.RefTypeFuncref, 0x0, 0x03, // func, only min: 3
+				0x01,                                  // 1 table
+				wasm.RefTypeFuncref.Kind(), 0x0, 0x03, // func, only min: 3
 				wasm.SectionIDMemory, 0x04, // 4 bytes in this section
 				0x01,             // 1 memory
 				0x01, 0x01, 0x01, // min and max = 1
@@ -144,8 +143,8 @@ func TestModule_Encode(t *testing.T) {
 			},
 			expected: append(append(Magic, version...),
 				wasm.SectionIDType, 0x07, // 7 bytes in this section
-				0x01,                            // 1 type
-				0x60, 0x02, i32, i32, 0x01, i32, // func=0x60 2 params and 1 result
+				0x01,                                                 // 1 type
+				0x60, 0x02, i32.Kind(), i32.Kind(), 0x01, i32.Kind(), // func=0x60 2 params and 1 result
 				wasm.SectionIDFunction, 0x02, // 2 bytes in this section
 				0x01,                       // 1 function
 				0x00,                       // func[0] type index 0
@@ -179,7 +178,7 @@ func TestModule_Encode(t *testing.T) {
 				GlobalSection: []wasm.Global{
 					{
 						Type: wasm.GlobalType{ValType: i32, Mutable: true},
-						Init: wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeInt32(0)},
+						Init: wasm.NewConstantExpressionFromI32(0),
 					},
 				},
 				ExportSection: []wasm.Export{
@@ -188,7 +187,7 @@ func TestModule_Encode(t *testing.T) {
 			},
 			expected: append(append(Magic, version...),
 				wasm.SectionIDGlobal, 0x06, // 6 bytes in this section
-				0x01, wasm.ValueTypeI32, 0x01, // 1 global i32 mutable
+				0x01, wasm.ValueTypeI32.Kind(), 0x01, // 1 global i32 mutable
 				wasm.OpcodeI32Const, 0x00, wasm.OpcodeEnd, // arbitrary init to zero
 				wasm.SectionIDExport, 0x06, // 6 bytes in this section
 				0x01,           // 1 export

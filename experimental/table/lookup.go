@@ -22,7 +22,7 @@ func LookupFunction(
 	expectedParamTypes, expectedResultTypes []api.ValueType,
 ) api.Function {
 	m := module.(*wasm.ModuleInstance)
-	typ := &wasm.FunctionType{Params: expectedParamTypes, Results: expectedResultTypes}
+	typ := &wasm.FunctionType{Params: wasm.FromApiValueType(expectedParamTypes), Results: wasm.FromApiValueType(expectedResultTypes)}
 	typ.CacheNumInUint64()
 	typeID := m.GetFunctionTypeID(typ)
 	if int(tableIndex) >= len(m.Tables) {

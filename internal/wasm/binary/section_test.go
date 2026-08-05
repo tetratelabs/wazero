@@ -20,18 +20,18 @@ func TestTableSection(t *testing.T) {
 		{
 			name: "min and min with max",
 			input: []byte{
-				0x01,                            // 1 table
-				wasm.RefTypeFuncref, 0x01, 2, 3, // (table 2 3)
+				0x01,                                   // 1 table
+				wasm.RefTypeFuncref.Kind(), 0x01, 2, 3, // (table 2 3)
 			},
 			expected: []wasm.Table{{Min: 2, Max: &three, Type: wasm.RefTypeFuncref}},
 		},
 		{
 			name: "min and min with max - three tables",
 			input: []byte{
-				0x03,                            // 3 table
-				wasm.RefTypeFuncref, 0x01, 2, 3, // (table 2 3)
-				wasm.RefTypeExternref, 0x01, 2, 3, // (table 2 3)
-				wasm.RefTypeFuncref, 0x01, 2, 3, // (table 2 3)
+				0x03,                                   // 3 table
+				wasm.RefTypeFuncref.Kind(), 0x01, 2, 3, // (table 2 3)
+				wasm.RefTypeExternref.Kind(), 0x01, 2, 3, // (table 2 3)
+				wasm.RefTypeFuncref.Kind(), 0x01, 2, 3, // (table 2 3)
 			},
 			expected: []wasm.Table{
 				{Min: 2, Max: &three, Type: wasm.RefTypeFuncref},
@@ -62,9 +62,9 @@ func TestTableSection_Errors(t *testing.T) {
 		{
 			name: "min and min with max",
 			input: []byte{
-				0x02,                            // 2 tables
-				wasm.RefTypeFuncref, 0x00, 0x01, // (table 1)
-				wasm.RefTypeFuncref, 0x01, 0x02, 0x03, // (table 2 3)
+				0x02,                                   // 2 tables
+				wasm.RefTypeFuncref.Kind(), 0x00, 0x01, // (table 1)
+				wasm.RefTypeFuncref.Kind(), 0x01, 0x02, 0x03, // (table 2 3)
 			},
 			expectedErr: "at most one table allowed in module as feature \"reference-types\" is disabled",
 			features:    api.CoreFeaturesV1,

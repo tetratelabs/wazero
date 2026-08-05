@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/experimental/logging"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
@@ -137,44 +136,44 @@ func TestNewFunctionExporterForModule(t *testing.T) {
 			expected: []*wasm.HostFunc{
 				{
 					ExportName: "invoke_v",
-					ParamTypes: []api.ValueType{i32},
+					ParamTypes: []wasm.ValueType{i32},
 					ParamNames: []string{"index"},
 					Code:       wasm.Code{GoFunc: &internal.InvokeFunc{FunctionType: &wasm.FunctionType{}}},
 				},
 				{
 					ExportName:  "invoke_i",
-					ParamTypes:  []api.ValueType{i32},
+					ParamTypes:  []wasm.ValueType{i32},
 					ParamNames:  []string{"index"},
-					ResultTypes: []api.ValueType{i32},
-					Code:        wasm.Code{GoFunc: &internal.InvokeFunc{FunctionType: &wasm.FunctionType{Results: []api.ValueType{i32}}}},
+					ResultTypes: []wasm.ValueType{i32},
+					Code:        wasm.Code{GoFunc: &internal.InvokeFunc{FunctionType: &wasm.FunctionType{Results: []wasm.ValueType{i32}}}},
 				},
 				{
 					ExportName:  "invoke_p",
-					ParamTypes:  []api.ValueType{i32},
+					ParamTypes:  []wasm.ValueType{i32},
 					ParamNames:  []string{"index"},
-					ResultTypes: []api.ValueType{i32},
-					Code:        wasm.Code{GoFunc: &internal.InvokeFunc{FunctionType: &wasm.FunctionType{Results: []api.ValueType{i32}}}},
+					ResultTypes: []wasm.ValueType{i32},
+					Code:        wasm.Code{GoFunc: &internal.InvokeFunc{FunctionType: &wasm.FunctionType{Results: []wasm.ValueType{i32}}}},
 				},
 				{
 					ExportName:  "invoke_j",
-					ParamTypes:  []api.ValueType{i32},
+					ParamTypes:  []wasm.ValueType{i32},
 					ParamNames:  []string{"index"},
-					ResultTypes: []api.ValueType{i64},
-					Code:        wasm.Code{GoFunc: &internal.InvokeFunc{FunctionType: &wasm.FunctionType{Results: []api.ValueType{i64}}}},
+					ResultTypes: []wasm.ValueType{i64},
+					Code:        wasm.Code{GoFunc: &internal.InvokeFunc{FunctionType: &wasm.FunctionType{Results: []wasm.ValueType{i64}}}},
 				},
 				{
 					ExportName:  "invoke_f",
-					ParamTypes:  []api.ValueType{i32},
+					ParamTypes:  []wasm.ValueType{i32},
 					ParamNames:  []string{"index"},
-					ResultTypes: []api.ValueType{f32},
-					Code:        wasm.Code{GoFunc: &internal.InvokeFunc{FunctionType: &wasm.FunctionType{Results: []api.ValueType{f32}}}},
+					ResultTypes: []wasm.ValueType{f32},
+					Code:        wasm.Code{GoFunc: &internal.InvokeFunc{FunctionType: &wasm.FunctionType{Results: []wasm.ValueType{f32}}}},
 				},
 				{
 					ExportName:  "invoke_d",
-					ParamTypes:  []api.ValueType{i32},
+					ParamTypes:  []wasm.ValueType{i32},
 					ParamNames:  []string{"index"},
-					ResultTypes: []api.ValueType{f64},
-					Code:        wasm.Code{GoFunc: &internal.InvokeFunc{FunctionType: &wasm.FunctionType{Results: []api.ValueType{f64}}}},
+					ResultTypes: []wasm.ValueType{f64},
+					Code:        wasm.Code{GoFunc: &internal.InvokeFunc{FunctionType: &wasm.FunctionType{Results: []wasm.ValueType{f64}}}},
 				},
 			},
 		},
@@ -205,7 +204,7 @@ func TestNewFunctionExporterForModule(t *testing.T) {
 			expected: []*wasm.HostFunc{
 				{
 					ExportName: "invoke_v",
-					ParamTypes: []api.ValueType{i32},
+					ParamTypes: []wasm.ValueType{i32},
 					ParamNames: []string{"index"},
 					Code:       wasm.Code{GoFunc: &internal.InvokeFunc{FunctionType: &wasm.FunctionType{}}},
 				},
@@ -231,7 +230,7 @@ func TestNewFunctionExporterForModule(t *testing.T) {
 			expected: []*wasm.HostFunc{
 				{
 					ExportName: "invoke_v",
-					ParamTypes: []api.ValueType{i32},
+					ParamTypes: []wasm.ValueType{i32},
 					ParamNames: []string{"index"},
 					Code:       wasm.Code{GoFunc: &internal.InvokeFunc{FunctionType: &wasm.FunctionType{}}},
 				},
@@ -255,9 +254,9 @@ func TestNewFunctionExporterForModule(t *testing.T) {
 			expected: []*wasm.HostFunc{
 				{
 					ExportName: "invoke_vi",
-					ParamTypes: []api.ValueType{i32, i32},
+					ParamTypes: []wasm.ValueType{i32, i32},
 					ParamNames: []string{"index", "a1"},
-					Code:       wasm.Code{GoFunc: &internal.InvokeFunc{FunctionType: &wasm.FunctionType{Params: []api.ValueType{i32}}}},
+					Code:       wasm.Code{GoFunc: &internal.InvokeFunc{FunctionType: &wasm.FunctionType{Params: []wasm.ValueType{i32}}}},
 				},
 			},
 		},
@@ -281,12 +280,12 @@ func TestNewFunctionExporterForModule(t *testing.T) {
 			expected: []*wasm.HostFunc{
 				{
 					ExportName:  "invoke_iiiii",
-					ParamTypes:  []api.ValueType{i32, i32, i32, i32, i32},
+					ParamTypes:  []wasm.ValueType{i32, i32, i32, i32, i32},
 					ParamNames:  []string{"index", "a1", "a2", "a3", "a4"},
 					ResultTypes: []wasm.ValueType{i32},
 					Code: wasm.Code{GoFunc: &internal.InvokeFunc{FunctionType: &wasm.FunctionType{
-						Params:  []api.ValueType{i32, i32, i32, i32},
-						Results: []api.ValueType{i32},
+						Params:  []wasm.ValueType{i32, i32, i32, i32},
+						Results: []wasm.ValueType{i32},
 					}}},
 				},
 			},
@@ -310,10 +309,10 @@ func TestNewFunctionExporterForModule(t *testing.T) {
 			expected: []*wasm.HostFunc{
 				{
 					ExportName: "invoke_viiiddiiiiii",
-					ParamTypes: []api.ValueType{i32, i32, i32, i32, f64, f64, i32, i32, i32, i32, i32, i32},
+					ParamTypes: []wasm.ValueType{i32, i32, i32, i32, f64, f64, i32, i32, i32, i32, i32, i32},
 					ParamNames: []string{"index", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8", "a9", "a10", "a11"},
 					Code: wasm.Code{GoFunc: &internal.InvokeFunc{FunctionType: &wasm.FunctionType{
-						Params: []api.ValueType{i32, i32, i32, f64, f64, i32, i32, i32, i32, i32, i32},
+						Params: []wasm.ValueType{i32, i32, i32, f64, f64, i32, i32, i32, i32, i32, i32},
 					}}},
 				},
 			},

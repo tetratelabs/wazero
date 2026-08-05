@@ -14,7 +14,7 @@ on:
       - 'netlify.toml'
 
 env:  # Update this prior to requiring a higher minor version in go.mod
-  GO_VERSION: "1.25"
+  GO_VERSION: "1.26"
 
 defaults:
   run:  # use bash for all operating systems unless overridden
@@ -30,20 +30,23 @@ jobs:
     name: Pre-commit check
     runs-on: ubuntu-24.04
     steps:
-      - name: Install latest wast2json
-        run: |  # Needed for build.spectest. wabt includes wast2json.
+      - name: Install latest wast2json and wasm-tools
+        run: |  # Needed for build.spectest. wabt includes wast2json; wasm-tools is used for exception-handling spectests.
           wabt_version=1.0.39
           wabt_url=https://github.com/WebAssembly/wabt/releases/download/${wabt_version}/wabt-${wabt_version}-linux-x64.tar.gz
           curl -sSL ${wabt_url} | tar --strip-components 2 -C /usr/local/bin -xzf - wabt-${wabt_version}/bin/wast2json
+          wasm_tools_version=1.245.1
+          wasm_tools_url=https://github.com/bytecodealliance/wasm-tools/releases/download/v${wasm_tools_version}/wasm-tools-${wasm_tools_version}-x86_64-linux.tar.gz
+          curl -sSL ${wasm_tools_url} | tar --strip-components 1 -C /usr/local/bin -xzf - wasm-tools-${wasm_tools_version}-x86_64-linux/wasm-tools
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:  # not cache: true as we also need to cache golint
           cache: false
           go-version: ${{ env.GO_VERSION }}
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: |
             ~/.cache/go-build
@@ -70,20 +73,20 @@ jobs:
         - os: macos-14
           arch: arm64
         go-version:
-          - "1.25"  # Current Go version
-          - "1.24"  # Floor Go version of wazero (current - 1)
+          - "1.26"  # Current Go version
+          - "1.25"  # Floor Go version of wazero (current - 1)
 
     steps:
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: ${{ matrix.go-version }}
 
       # Ensure the pagefile is large enough to execute tests like TestStore_hammer_close on Windows.
       - name: configure Pagefile
-        uses: al-cheb/configure-pagefile-action@v1.4
+        uses: al-cheb/configure-pagefile-action@v1.5
         if: runner.os == 'Windows'
         with:
           minimum-size: 8GB
@@ -111,8 +114,8 @@ jobs:
       fail-fast: false  # don't fail fast as sometimes failures are arch/OS specific
       matrix:  # Use versions consistent with wazero's Go support policy.
         go-version:
-          - "1.25"  # Current Go version
-          - "1.24"  # Floor Go version of wazero (current - 1)
+          - "1.26"  # Current Go version
+          - "1.25"  # Floor Go version of wazero (current - 1)
         platform:
           - os: ubuntu-24.04
             arch: amd64
@@ -121,15 +124,14 @@ jobs:
             no_prot_exec: true
           - os: ubuntu-24.04-arm
             arch: arm64
-          - os: ubuntu-24.04
+          - os: ubuntu-24.04-riscv
             arch: riscv64
-            qemu: true
 
     steps:
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: ${{ matrix.go-version }}
 
@@ -145,13 +147,6 @@ jobs:
         env:
           GOARCH: ${{ matrix.platform.arch }}
           CGO_ENABLED: 0
-
-      - name: Set up QEMU
-        if: ${{ matrix.platform.qemu }}
-        uses: docker/setup-qemu-action@v3
-        with:  # Avoid docker.io rate-limits; built with internal-images.yml
-          image: ghcr.io/tetratelabs/wazero/internal-binfmt
-          platforms: ${{ matrix.arch }}
 
       - name: Build scratch container
         run: |
@@ -195,7 +190,7 @@ jobs:
             version: "10.1"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Build test binaries
         run: |
@@ -210,7 +205,7 @@ jobs:
           GOOS: ${{ matrix.os.name }}
 
       - name: Run built test binaries
-        uses: cross-platform-actions/action@v0.30.0
+        uses: cross-platform-actions/action@v0.32.0
         env:
           WAZEROCLI: ./wazerocli
         with:
@@ -240,7 +235,7 @@ jobs:
             action: 'vmactions/solaris-vm@v1'
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Build test binaries
         run: |
@@ -280,12 +275,12 @@ jobs:
             arch: arm64
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         id: cache
         with:
           # Cache corpus and artifacts so that we don't start from scratch but rather with a meaningful corpus

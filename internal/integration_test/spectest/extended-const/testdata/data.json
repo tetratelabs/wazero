@@ -1,0 +1,6 @@
+{"source_filename": "./data.wast",
+ "commands": [
+  {"type": "module", "line": 3, "filename": "data.0.wasm"}, 
+  {"type": "module", "line": 8, "filename": "data.1.wasm"}, 
+  {"type": "module", "line": 13, "filename": "data.2.wasm"}, 
+  {"type": "module", "line": 20, "filename": "data.3.wasm"}]}

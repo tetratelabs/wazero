@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
@@ -21,10 +22,7 @@ func TestDecodeConstantExpression(t *testing.T) {
 				0x80, 0, // Multi byte zero.
 				wasm.OpcodeEnd,
 			},
-			exp: wasm.ConstantExpression{
-				Opcode: wasm.OpcodeRefFunc,
-				Data:   []byte{0x80, 0},
-			},
+			exp: wasm.NewConstantExpressionFromOpcode(wasm.OpcodeRefFunc, []byte{0x80, 0}),
 		},
 		{
 			in: []byte{
@@ -32,36 +30,23 @@ func TestDecodeConstantExpression(t *testing.T) {
 				0x80, 0x80, 0x80, 0x4f, // 165675008 in varint encoding.
 				wasm.OpcodeEnd,
 			},
-			exp: wasm.ConstantExpression{
-				Opcode: wasm.OpcodeRefFunc,
-				Data:   []byte{0x80, 0x80, 0x80, 0x4f},
-			},
+			exp: wasm.NewConstantExpressionFromOpcode(wasm.OpcodeRefFunc, []byte{0x80, 0x80, 0x80, 0x4f}),
 		},
 		{
 			in: []byte{
 				wasm.OpcodeRefNull,
-				wasm.RefTypeFuncref,
+				wasm.RefTypeFuncref.Kind(),
 				wasm.OpcodeEnd,
 			},
-			exp: wasm.ConstantExpression{
-				Opcode: wasm.OpcodeRefNull,
-				Data: []byte{
-					wasm.RefTypeFuncref,
-				},
-			},
+			exp: wasm.NewConstantExpressionFromOpcode(wasm.OpcodeRefNull, []byte{wasm.RefTypeFuncref.Kind()}),
 		},
 		{
 			in: []byte{
 				wasm.OpcodeRefNull,
-				wasm.RefTypeExternref,
+				wasm.RefTypeExternref.Kind(),
 				wasm.OpcodeEnd,
 			},
-			exp: wasm.ConstantExpression{
-				Opcode: wasm.OpcodeRefNull,
-				Data: []byte{
-					wasm.RefTypeExternref,
-				},
-			},
+			exp: wasm.NewConstantExpressionFromOpcode(wasm.OpcodeRefNull, []byte{wasm.RefTypeExternref.Kind()}),
 		},
 		{
 			in: []byte{
@@ -71,11 +56,24 @@ func TestDecodeConstantExpression(t *testing.T) {
 				1, 1, 1, 1, 1, 1, 1, 1,
 				wasm.OpcodeEnd,
 			},
+			exp: wasm.NewConstantExpressionFromOpcode(wasm.OpcodeVecV128Const, []byte{
+				1, 1, 1, 1, 1, 1, 1, 1,
+				1, 1, 1, 1, 1, 1, 1, 1,
+			}),
+		},
+		{
+			in: []byte{
+				wasm.OpcodeI32Const, 1,
+				wasm.OpcodeI32Const, 1,
+				wasm.OpcodeI32Add,
+				wasm.OpcodeEnd,
+			},
 			exp: wasm.ConstantExpression{
-				Opcode: wasm.OpcodeVecV128Const,
 				Data: []byte{
-					1, 1, 1, 1, 1, 1, 1, 1,
-					1, 1, 1, 1, 1, 1, 1, 1,
+					wasm.OpcodeI32Const, 1,
+					wasm.OpcodeI32Const, 1,
+					wasm.OpcodeI32Add,
+					wasm.OpcodeEnd,
 				},
 			},
 		},
@@ -86,7 +84,7 @@ func TestDecodeConstantExpression(t *testing.T) {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			var actual wasm.ConstantExpression
 			err := decodeConstantExpression(bytes.NewReader(tc.in),
-				api.CoreFeatureBulkMemoryOperations|api.CoreFeatureSIMD, &actual)
+				api.CoreFeatureBulkMemoryOperations|api.CoreFeatureSIMD|experimental.CoreFeaturesExtendedConst, &actual)
 			require.NoError(t, err)
 			require.Equal(t, tc.exp, actual)
 		})
@@ -104,7 +102,7 @@ func TestDecodeConstantExpression_errors(t *testing.T) {
 				wasm.OpcodeRefFunc,
 				0,
 			},
-			expectedErr: "look for end opcode: EOF",
+			expectedErr: "read const expression opcode: EOF",
 			features:    api.CoreFeatureBulkMemoryOperations,
 		},
 		{
@@ -120,13 +118,21 @@ func TestDecodeConstantExpression_errors(t *testing.T) {
 				0xff,
 				wasm.OpcodeEnd,
 			},
-			expectedErr: "invalid type for ref.null: 0xff",
+			expectedErr: "read const expression opcode: EOF",
 			features:    api.CoreFeatureBulkMemoryOperations,
 		},
 		{
 			in: []byte{
 				wasm.OpcodeRefNull,
-				wasm.RefTypeExternref,
+				0x80, // LEB128 continuation bit set with no following byte
+			},
+			expectedErr: "invalid type for ref.null: 0x80",
+			features:    api.CoreFeatureBulkMemoryOperations,
+		},
+		{
+			in: []byte{
+				wasm.OpcodeRefNull,
+				wasm.RefTypeExternref.Kind(),
 				wasm.OpcodeEnd,
 			},
 			expectedErr: "ref.null is not supported as feature \"bulk-memory-operations\" is disabled",
@@ -177,6 +183,16 @@ func TestDecodeConstantExpression_errors(t *testing.T) {
 			},
 			expectedErr: "read vector const instruction immediates: needs 16 bytes but was 8 bytes",
 			features:    api.CoreFeatureSIMD,
+		},
+		{
+			in: []byte{
+				wasm.OpcodeI32Const, 1,
+				wasm.OpcodeI32Const, 1,
+				wasm.OpcodeI32Add,
+				wasm.OpcodeEnd,
+			},
+			expectedErr: "i32.add is not supported in a constant expression as feature \"extended-const\" is disabled",
+			features:    api.CoreFeaturesV2,
 		},
 	}
 

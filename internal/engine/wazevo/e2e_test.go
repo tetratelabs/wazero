@@ -896,6 +896,69 @@ func TestE2E(t *testing.T) {
 				{params: []uint64{1, 2, 3, 4, 5, 6, 7}, expResults: []uint64{156}},
 			},
 		},
+		// ---- Exception Handling ----
+		{
+			name:     "throw_only",
+			m:        testcases.ThrowOnly.Module,
+			features: api.CoreFeaturesV2 | experimental.CoreFeaturesExceptionHandling,
+			calls:    []callCase{{expErr: "uncaught exception"}},
+		},
+		{
+			name:     "throw_with_param",
+			m:        testcases.ThrowWithParam.Module,
+			features: api.CoreFeaturesV2 | experimental.CoreFeaturesExceptionHandling,
+			calls:    []callCase{{params: []uint64{42}, expErr: "uncaught exception"}},
+		},
+		{
+			name:     "try_table_catch_all_empty",
+			m:        testcases.TryTableCatchAllEmpty.Module,
+			features: api.CoreFeaturesV2 | experimental.CoreFeaturesExceptionHandling,
+			calls:    []callCase{{expResults: []uint64{42}}},
+		},
+		{
+			name:     "try_table_catch_all_throw",
+			m:        testcases.TryTableCatchAllThrow.Module,
+			features: api.CoreFeaturesV2 | experimental.CoreFeaturesExceptionHandling,
+			calls:    []callCase{{expResults: []uint64{42}}},
+		},
+		{
+			name:     "try_table_catch_throw",
+			m:        testcases.TryTableCatchThrow.Module,
+			features: api.CoreFeaturesV2 | experimental.CoreFeaturesExceptionHandling,
+			calls:    []callCase{{expResults: []uint64{23}}},
+		},
+		{
+			name:     "try_table_catch_param_throw",
+			m:        testcases.TryTableCatchParamThrow.Module,
+			features: api.CoreFeaturesV2 | experimental.CoreFeaturesExceptionHandling,
+			calls:    []callCase{{params: []uint64{42}, expResults: []uint64{42}}},
+		},
+		{
+			name:     "try_table_catch_many_param_throw",
+			m:        testcases.TryTableCatchManyParamThrow.Module,
+			features: api.CoreFeaturesV2 | experimental.CoreFeaturesExceptionHandling,
+			calls:    []callCase{{params: []uint64{1, 2, 3, 4, 5}, expResults: []uint64{1, 2, 3, 4, 5}}},
+		},
+		{
+			// Verifies that removeUntilRet does not accidentally remove the catch handler
+			// block code that follows the tail-call path in the instruction stream.
+			// param=0: throw $e is caught → returns 42 (catch handler intact).
+			// param=1: return_call $target (tail call) → returns 99.
+			name:     "try_table_catch_with_return_call",
+			m:        testcases.TryTableCatchWithReturnCall.Module,
+			features: api.CoreFeaturesV2 | experimental.CoreFeaturesExceptionHandling | experimental.CoreFeaturesTailCall,
+			calls: []callCase{
+				{params: []uint64{0}, expResults: []uint64{42}}, // throw path: catch handler intact → 42
+				{params: []uint64{1}, expResults: []uint64{99}}, // tail-call path: return_call $target → 99
+			},
+		},
+		{
+			name: "large_method_body_many_args", m: testcases.LargeMethodBodyWithManyArgs.Module,
+			calls: []callCase{{
+				params:     []uint64{1, 2, 3, 4, 5, 6, 7, 8, 9},
+				expResults: []uint64{9},
+			}},
+		},
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {

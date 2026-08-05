@@ -1,0 +1,14 @@
+{"source_filename": "./elem.wast",
+ "commands": [
+  {"type": "module", "line": 3, "filename": "elem.0.wasm"}, 
+  {"type": "assert_return", "line": 11, "action": {"type": "invoke", "field": "call_in_table", "args": [{"type": "i32", "value": "3"}]}, "expected": [{"type": "i32", "value": "42"}]}, 
+  {"type": "assert_trap", "line": 12, "action": {"type": "invoke", "field": "call_in_table", "args": [{"type": "i32", "value": "0"}]}, "text": "uninitialized element", "expected": [{"type": "i32"}]}, 
+  {"type": "module", "line": 14, "filename": "elem.1.wasm"}, 
+  {"type": "assert_return", "line": 22, "action": {"type": "invoke", "field": "call_in_table", "args": [{"type": "i32", "value": "1"}]}, "expected": [{"type": "i32", "value": "42"}]}, 
+  {"type": "assert_trap", "line": 23, "action": {"type": "invoke", "field": "call_in_table", "args": [{"type": "i32", "value": "0"}]}, "text": "uninitialized element", "expected": [{"type": "i32"}]}, 
+  {"type": "module", "line": 25, "filename": "elem.2.wasm"}, 
+  {"type": "assert_return", "line": 33, "action": {"type": "invoke", "field": "call_in_table", "args": [{"type": "i32", "value": "4"}]}, "expected": [{"type": "i32", "value": "42"}]}, 
+  {"type": "assert_trap", "line": 34, "action": {"type": "invoke", "field": "call_in_table", "args": [{"type": "i32", "value": "0"}]}, "text": "uninitialized element", "expected": [{"type": "i32"}]}, 
+  {"type": "module", "line": 38, "filename": "elem.3.wasm"}, 
+  {"type": "assert_return", "line": 55, "action": {"type": "invoke", "field": "call_in_table", "args": [{"type": "i32", "value": "6"}]}, "expected": [{"type": "i32", "value": "42"}]}, 
+  {"type": "assert_trap", "line": 56, "action": {"type": "invoke", "field": "call_in_table", "args": [{"type": "i32", "value": "0"}]}, "text": "uninitialized element", "expected": [{"type": "i32"}]}]}

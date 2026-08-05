@@ -14,6 +14,7 @@ import (
 
 func TestLookupFunction(t *testing.T) {
 	const i32 = wasm.ValueTypeI32
+	const i32a = api.ValueTypeI32
 	bytes := binaryencoding.EncodeModule(&wasm.Module{
 		TypeSection: []wasm.FunctionType{
 			{Results: []wasm.ValueType{i32}},
@@ -34,9 +35,12 @@ func TestLookupFunction(t *testing.T) {
 		},
 		ElementSection: []wasm.ElementSegment{
 			{
-				OffsetExpr: wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: []byte{0}},
-				Init:       []wasm.Index{0, 1},
-				Type:       wasm.RefTypeFuncref,
+				OffsetExpr: wasm.NewConstantExpressionFromI32(0),
+				Init: []wasm.ConstantExpression{
+					wasm.NewConstantExpressionFromOpcode(wasm.OpcodeRefFunc, []byte{0}),
+					wasm.NewConstantExpressionFromOpcode(wasm.OpcodeRefFunc, []byte{1}),
+				},
+				Type: wasm.RefTypeFuncref,
 			},
 		},
 		TableSection: []wasm.Table{{Type: wasm.RefTypeFuncref, Min: 100}},
@@ -48,14 +52,14 @@ func TestLookupFunction(t *testing.T) {
 	require.NotNil(t, m)
 
 	t.Run("v_i32", func(t *testing.T) {
-		f := table.LookupFunction(m, 0, 0, nil, []api.ValueType{i32})
+		f := table.LookupFunction(m, 0, 0, nil, []api.ValueType{i32a})
 		var result [1]uint64
 		err = f.CallWithStack(context.Background(), result[:])
 		require.NoError(t, err)
 		require.Equal(t, uint64(1), result[0])
 	})
 	t.Run("i32i32_i32i32", func(t *testing.T) {
-		f := table.LookupFunction(m, 0, 1, []api.ValueType{i32, i32}, []api.ValueType{i32, i32})
+		f := table.LookupFunction(m, 0, 1, []api.ValueType{i32a, i32a}, []api.ValueType{i32a, i32a})
 		stack := [2]uint64{100, 200}
 		err = f.CallWithStack(context.Background(), stack[:])
 		require.NoError(t, err)
@@ -65,11 +69,11 @@ func TestLookupFunction(t *testing.T) {
 
 	t.Run("panics", func(t *testing.T) {
 		err := require.CapturePanic(func() {
-			table.LookupFunction(m, 0, 2000, nil, []api.ValueType{i32})
+			table.LookupFunction(m, 0, 2000, nil, []api.ValueType{i32a})
 		})
 		require.Equal(t, "invalid table access", err.Error())
 		err = require.CapturePanic(func() {
-			table.LookupFunction(m, 1000, 0, nil, []api.ValueType{i32})
+			table.LookupFunction(m, 1000, 0, nil, []api.ValueType{i32a})
 		})
 		require.Equal(t, "table index out of range", err.Error())
 		err = require.CapturePanic(func() {
@@ -77,15 +81,15 @@ func TestLookupFunction(t *testing.T) {
 		})
 		require.Equal(t, "indirect call type mismatch", err.Error())
 		err = require.CapturePanic(func() {
-			table.LookupFunction(m, 0, 0, []api.ValueType{i32}, nil)
+			table.LookupFunction(m, 0, 0, []api.ValueType{i32a}, nil)
 		})
 		require.Equal(t, "indirect call type mismatch", err.Error())
 		err = require.CapturePanic(func() {
-			table.LookupFunction(m, 0, 1, []api.ValueType{i32, i32}, nil)
+			table.LookupFunction(m, 0, 1, []api.ValueType{i32a, i32a}, nil)
 		})
 		require.Equal(t, "indirect call type mismatch", err.Error())
 		err = require.CapturePanic(func() {
-			table.LookupFunction(m, 0, 1, []api.ValueType{i32, i32}, []api.ValueType{i32, api.ValueTypeF32})
+			table.LookupFunction(m, 0, 1, []api.ValueType{i32a, i32a}, []api.ValueType{i32a, api.ValueTypeF32})
 		})
 		require.Equal(t, "indirect call type mismatch", err.Error())
 	})

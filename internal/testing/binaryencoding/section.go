@@ -89,6 +89,16 @@ func encodeMemorySection(memory *wasm.Memory) []byte {
 	return encodeSection(wasm.SectionIDMemory, contents)
 }
 
+// encodeTagSection encodes a wasm.SectionIDTag for the given tags.
+func encodeTagSection(tags []wasm.Tag) []byte {
+	contents := leb128.EncodeUint32(uint32(len(tags)))
+	for _, tag := range tags {
+		contents = append(contents, 0x00) // attribute byte (always 0)
+		contents = append(contents, leb128.EncodeUint32(tag.Type)...)
+	}
+	return encodeSection(wasm.SectionIDTag, contents)
+}
+
 // encodeGlobalSection encodes a wasm.SectionIDGlobal for the given globals in WebAssembly 1.0 (20191205) Binary
 // Format.
 //

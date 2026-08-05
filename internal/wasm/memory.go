@@ -342,7 +342,7 @@ func (m *MemoryInstance) readUint32Le(offset uint32) (uint32, bool) {
 	if !m.hasSize(offset, 4) {
 		return 0, false
 	}
-	return binary.LittleEndian.Uint32(m.Buffer[offset : offset+4]), true
+	return binary.LittleEndian.Uint32(m.Buffer[offset:]), true
 }
 
 // readUint64Le implements ReadUint64Le without using a context. This is extracted as both ints and floats are stored in
@@ -351,7 +351,7 @@ func (m *MemoryInstance) readUint64Le(offset uint32) (uint64, bool) {
 	if !m.hasSize(offset, 8) {
 		return 0, false
 	}
-	return binary.LittleEndian.Uint64(m.Buffer[offset : offset+8]), true
+	return binary.LittleEndian.Uint64(m.Buffer[offset:]), true
 }
 
 // writeUint32Le implements WriteUint32Le without using a context. This is extracted as both ints and floats are stored

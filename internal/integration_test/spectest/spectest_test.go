@@ -456,7 +456,7 @@ func Test_valuesEq(t *testing.T) {
 	for _, tc := range tests {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			actualMatched, actualValuesMsg := valuesEq(tc.actual, tc.exps, tc.valueTypes, tc.laneTypes)
+			actualMatched, actualValuesMsg := valuesEq(tc.actual, tc.exps, tc.valueTypes, tc.laneTypes, nil)
 			require.Equal(t, tc.expMatched, actualMatched)
 			require.Equal(t, tc.expValuesMsg, actualValuesMsg)
 		})

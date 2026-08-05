@@ -37,12 +37,12 @@ func TestModule_ValidateFunction_validateFunctionWithMaxStackValues(t *testing.T
 
 	t.Run("not exceed", func(t *testing.T) {
 		err := m.validateFunctionWithMaxStackValues(&stacks{}, api.CoreFeaturesV1,
-			0, []Index{0}, nil, nil, nil, max+1, nil, bytes.NewReader(nil))
+			0, []Index{0}, nil, nil, nil, nil, max+1, nil, bytes.NewReader(nil))
 		require.NoError(t, err)
 	})
 	t.Run("exceed", func(t *testing.T) {
 		err := m.validateFunctionWithMaxStackValues(&stacks{}, api.CoreFeaturesV1,
-			0, []Index{0}, nil, nil, nil, max, nil, bytes.NewReader(nil))
+			0, []Index{0}, nil, nil, nil, nil, max, nil, bytes.NewReader(nil))
 		require.Error(t, err)
 		expMsg := fmt.Sprintf("function may have %d stack values, which exceeds limit %d", valuesNum, max)
 		require.Equal(t, expMsg, err.Error())
@@ -86,7 +86,7 @@ func TestModule_ValidateFunction_SignExtensionOps(t *testing.T) {
 					CodeSection:     []Code{{Body: []byte{tc.input}}},
 				}
 				err := m.validateFunction(&stacks{}, api.CoreFeaturesV1,
-					0, []Index{0}, nil, nil, nil, nil,
+					0, []Index{0}, nil, nil, nil, nil, nil,
 					bytes.NewReader(nil))
 				require.EqualError(t, err, tc.expectedErrOnDisable)
 			})
@@ -105,7 +105,7 @@ func TestModule_ValidateFunction_SignExtensionOps(t *testing.T) {
 					CodeSection:     []Code{{Body: body}},
 				}
 				err := m.validateFunction(&stacks{}, api.CoreFeatureSignExtensionOps,
-					0, []Index{0}, nil, nil, nil,
+					0, []Index{0}, nil, nil, nil, nil,
 					nil, bytes.NewReader(nil))
 				require.NoError(t, err)
 			})
@@ -162,7 +162,7 @@ func TestModule_ValidateFunction_NonTrappingFloatToIntConversion(t *testing.T) {
 					CodeSection:     []Code{{Body: []byte{OpcodeMiscPrefix, tc.input}}},
 				}
 				err := m.validateFunction(&stacks{}, api.CoreFeaturesV1,
-					0, []Index{0}, nil, nil, nil, nil, bytes.NewReader(nil))
+					0, []Index{0}, nil, nil, nil, nil, nil, bytes.NewReader(nil))
 				require.EqualError(t, err, tc.expectedErrOnDisable)
 			})
 			t.Run("enabled", func(t *testing.T) {
@@ -181,7 +181,7 @@ func TestModule_ValidateFunction_NonTrappingFloatToIntConversion(t *testing.T) {
 					CodeSection:     []Code{{Body: body}},
 				}
 				err := m.validateFunction(&stacks{}, api.CoreFeatureNonTrappingFloatToIntConversion,
-					0, []Index{0}, nil, nil, nil, nil, bytes.NewReader(nil))
+					0, []Index{0}, nil, nil, nil, nil, nil, bytes.NewReader(nil))
 				require.NoError(t, err)
 			})
 		})
@@ -259,12 +259,12 @@ func TestModule_ValidateFunction_MultiValue(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Run("disabled", func(t *testing.T) {
 				err := tc.module.validateFunction(&stacks{}, api.CoreFeaturesV1,
-					0, []Index{0}, nil, nil, nil, nil, bytes.NewReader(nil))
+					0, []Index{0}, nil, nil, nil, nil, nil, bytes.NewReader(nil))
 				require.EqualError(t, err, tc.expectedErrOnDisable)
 			})
 			t.Run("enabled", func(t *testing.T) {
 				err := tc.module.validateFunction(&stacks{}, api.CoreFeatureMultiValue,
-					0, []Index{0}, nil, nil, nil, nil, bytes.NewReader(nil))
+					0, []Index{0}, nil, nil, nil, nil, nil, bytes.NewReader(nil))
 				require.NoError(t, err)
 			})
 		})
@@ -302,7 +302,7 @@ func TestModule_ValidateFunction_BulkMemoryOperations(t *testing.T) {
 					DataCountSection: &c,
 				}
 				err := m.validateFunction(&stacks{}, api.CoreFeatureBulkMemoryOperations,
-					0, []Index{0}, nil, &Memory{}, []Table{{}, {}}, nil, bytes.NewReader(nil))
+					0, []Index{0}, nil, &Memory{}, []Table{{}, {}}, nil, nil, bytes.NewReader(nil))
 				require.NoError(t, err)
 			})
 		}
@@ -666,7 +666,7 @@ func TestModule_ValidateFunction_BulkMemoryOperations(t *testing.T) {
 					c := uint32(0)
 					m.DataCountSection = &c
 				}
-				err := m.validateFunction(&stacks{}, tc.flag, 0, []Index{0}, nil, tc.memory, tc.tables, nil, bytes.NewReader(nil))
+				err := m.validateFunction(&stacks{}, tc.flag, 0, []Index{0}, nil, tc.memory, tc.tables, nil, nil, bytes.NewReader(nil))
 				require.EqualError(t, err, tc.expectedErr)
 			})
 		}
@@ -2203,7 +2203,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			err := tc.module.validateFunction(&stacks{}, api.CoreFeatureMultiValue,
-				0, []Index{0}, nil, nil, nil, nil, bytes.NewReader(nil))
+				0, []Index{0}, nil, nil, nil, nil, nil, bytes.NewReader(nil))
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}
@@ -2221,7 +2221,7 @@ func TestModule_funcValidation_CallIndirect(t *testing.T) {
 			}}},
 		}
 		err := m.validateFunction(&stacks{}, api.CoreFeatureReferenceTypes,
-			0, []Index{0}, nil, &Memory{}, []Table{{Type: RefTypeFuncref}}, nil, bytes.NewReader(nil))
+			0, []Index{0}, nil, &Memory{}, []Table{{Type: RefTypeFuncref}}, nil, nil, bytes.NewReader(nil))
 		require.NoError(t, err)
 	})
 	t.Run("non zero table index", func(t *testing.T) {
@@ -2236,12 +2236,12 @@ func TestModule_funcValidation_CallIndirect(t *testing.T) {
 		}
 		t.Run("disabled", func(t *testing.T) {
 			err := m.validateFunction(&stacks{}, api.CoreFeaturesV1,
-				0, []Index{0}, nil, &Memory{}, []Table{{}, {}}, nil, bytes.NewReader(nil))
+				0, []Index{0}, nil, &Memory{}, []Table{{}, {}}, nil, nil, bytes.NewReader(nil))
 			require.EqualError(t, err, "table index must be zero but was 100: feature \"reference-types\" is disabled")
 		})
 		t.Run("enabled but out of range", func(t *testing.T) {
 			err := m.validateFunction(&stacks{}, api.CoreFeatureReferenceTypes,
-				0, []Index{0}, nil, &Memory{}, []Table{{}, {}}, nil, bytes.NewReader(nil))
+				0, []Index{0}, nil, &Memory{}, []Table{{}, {}}, nil, nil, bytes.NewReader(nil))
 			require.EqualError(t, err, "unknown table index: 100")
 		})
 	})
@@ -2256,7 +2256,7 @@ func TestModule_funcValidation_CallIndirect(t *testing.T) {
 			}}},
 		}
 		err := m.validateFunction(&stacks{}, api.CoreFeatureReferenceTypes,
-			0, []Index{0}, nil, &Memory{}, []Table{{Type: RefTypeExternref}}, nil, bytes.NewReader(nil))
+			0, []Index{0}, nil, &Memory{}, []Table{{Type: RefTypeExternref}}, nil, nil, bytes.NewReader(nil))
 		require.EqualError(t, err, "table is not funcref type but was externref for call_indirect")
 	})
 }
@@ -2273,7 +2273,7 @@ func TestModule_funcValidation_RefTypes(t *testing.T) {
 			name: "ref.null (funcref)",
 			flag: api.CoreFeatureReferenceTypes,
 			body: []byte{
-				OpcodeRefNull, ValueTypeFuncref,
+				OpcodeRefNull, ValueTypeFuncref.Kind(),
 				OpcodeDrop, OpcodeEnd,
 			},
 		},
@@ -2281,7 +2281,7 @@ func TestModule_funcValidation_RefTypes(t *testing.T) {
 			name: "ref.null (externref)",
 			flag: api.CoreFeatureReferenceTypes,
 			body: []byte{
-				OpcodeRefNull, ValueTypeExternref,
+				OpcodeRefNull, ValueTypeExternref.Kind(),
 				OpcodeDrop, OpcodeEnd,
 			},
 		},
@@ -2289,7 +2289,7 @@ func TestModule_funcValidation_RefTypes(t *testing.T) {
 			name: "ref.null - disabled",
 			flag: api.CoreFeaturesV1,
 			body: []byte{
-				OpcodeRefNull, ValueTypeFuncref,
+				OpcodeRefNull, ValueTypeFuncref.Kind(),
 				OpcodeDrop, OpcodeEnd,
 			},
 			expectedErr: "ref.null invalid as feature \"reference-types\" is disabled",
@@ -2298,7 +2298,7 @@ func TestModule_funcValidation_RefTypes(t *testing.T) {
 			name: "ref.is_null",
 			flag: api.CoreFeatureReferenceTypes,
 			body: []byte{
-				OpcodeRefNull, ValueTypeFuncref,
+				OpcodeRefNull, ValueTypeFuncref.Kind(),
 				OpcodeRefIsNull,
 				OpcodeDrop, OpcodeEnd,
 			},
@@ -2341,6 +2341,23 @@ func TestModule_funcValidation_RefTypes(t *testing.T) {
 			},
 			expectedErr: "ref.func invalid as feature \"reference-types\" is disabled",
 		},
+		{
+			name: "ref.null (concrete type) - typed-function-references disabled",
+			flag: api.CoreFeatureReferenceTypes,
+			body: []byte{
+				OpcodeRefNull, 0x00, // type index 0, not an abstract heap type
+				OpcodeDrop, OpcodeEnd,
+			},
+			expectedErr: `ref.null with concrete type invalid as feature "typed-function-references" is disabled`,
+		},
+		{
+			name: "ref.null (concrete type) - typed-function-references enabled",
+			flag: api.CoreFeatureReferenceTypes | experimental.CoreFeaturesTypedFunctionReferences,
+			body: []byte{
+				OpcodeRefNull, 0x00, // type index 0
+				OpcodeDrop, OpcodeEnd,
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -2352,7 +2369,7 @@ func TestModule_funcValidation_RefTypes(t *testing.T) {
 				CodeSection:     []Code{{Body: tc.body}},
 			}
 			err := m.validateFunction(&stacks{}, tc.flag,
-				0, []Index{0}, nil, nil, nil, tc.declaredFunctionIndexes, bytes.NewReader(nil))
+				0, []Index{0}, nil, nil, nil, nil, tc.declaredFunctionIndexes, bytes.NewReader(nil))
 			if tc.expectedErr != "" {
 				require.EqualError(t, err, tc.expectedErr)
 			} else {
@@ -2373,7 +2390,7 @@ func TestModule_funcValidation_TableGrowSizeFill(t *testing.T) {
 		{
 			name: "table.grow (funcref)",
 			body: []byte{
-				OpcodeRefNull, RefTypeFuncref,
+				OpcodeRefNull, RefTypeFuncref.Kind(),
 				OpcodeI32Const, 1, // number of elements
 				OpcodeMiscPrefix, OpcodeMiscTableGrow,
 				0, // Table Index.
@@ -2385,7 +2402,7 @@ func TestModule_funcValidation_TableGrowSizeFill(t *testing.T) {
 		{
 			name: "table.grow (funcref) - type mismatch",
 			body: []byte{
-				OpcodeRefNull, RefTypeFuncref,
+				OpcodeRefNull, RefTypeFuncref.Kind(),
 				OpcodeI32Const, 1, // number of elements
 				OpcodeMiscPrefix, OpcodeMiscTableGrow,
 				1, // Table of externref type -> mismatch.
@@ -2397,7 +2414,7 @@ func TestModule_funcValidation_TableGrowSizeFill(t *testing.T) {
 		{
 			name: "table.grow (externref)",
 			body: []byte{
-				OpcodeRefNull, RefTypeExternref,
+				OpcodeRefNull, RefTypeExternref.Kind(),
 				OpcodeI32Const, 1, // number of elements
 				OpcodeMiscPrefix, OpcodeMiscTableGrow,
 				1, // Table Index.
@@ -2409,7 +2426,7 @@ func TestModule_funcValidation_TableGrowSizeFill(t *testing.T) {
 		{
 			name: "table.grow (externref) type mismatch",
 			body: []byte{
-				OpcodeRefNull, RefTypeExternref,
+				OpcodeRefNull, RefTypeExternref.Kind(),
 				OpcodeI32Const, 1, // number of elements
 				OpcodeMiscPrefix, OpcodeMiscTableGrow,
 				0, // Table of funcref type -> mismatch.
@@ -2421,7 +2438,7 @@ func TestModule_funcValidation_TableGrowSizeFill(t *testing.T) {
 		{
 			name: "table.grow - table not found",
 			body: []byte{
-				OpcodeRefNull, RefTypeFuncref,
+				OpcodeRefNull, RefTypeFuncref.Kind(),
 				OpcodeI32Const, 1, // number of elements
 				OpcodeMiscPrefix, OpcodeMiscTableGrow,
 				10, // Table Index.
@@ -2454,7 +2471,7 @@ func TestModule_funcValidation_TableGrowSizeFill(t *testing.T) {
 			name: "table.fill (funcref)",
 			body: []byte{
 				OpcodeI32Const, 1, // offset
-				OpcodeRefNull, RefTypeFuncref,
+				OpcodeRefNull, RefTypeFuncref.Kind(),
 				OpcodeI32Const, 1, // number of elements
 				OpcodeMiscPrefix, OpcodeMiscTableFill,
 				0, // Table Index.
@@ -2466,7 +2483,7 @@ func TestModule_funcValidation_TableGrowSizeFill(t *testing.T) {
 			name: "table.fill (funcref) - type mismatch",
 			body: []byte{
 				OpcodeI32Const, 1, // offset
-				OpcodeRefNull, RefTypeFuncref,
+				OpcodeRefNull, RefTypeFuncref.Kind(),
 				OpcodeI32Const, 1, // number of elements
 				OpcodeMiscPrefix, OpcodeMiscTableFill,
 				1, // Table of externref type -> mismatch.
@@ -2479,7 +2496,7 @@ func TestModule_funcValidation_TableGrowSizeFill(t *testing.T) {
 			name: "table.fill (externref)",
 			body: []byte{
 				OpcodeI32Const, 1, // offset
-				OpcodeRefNull, RefTypeExternref,
+				OpcodeRefNull, RefTypeExternref.Kind(),
 				OpcodeI32Const, 1, // number of elements
 				OpcodeMiscPrefix, OpcodeMiscTableFill,
 				1, // Table Index.
@@ -2491,7 +2508,7 @@ func TestModule_funcValidation_TableGrowSizeFill(t *testing.T) {
 			name: "table.fill (externref) - type mismatch",
 			body: []byte{
 				OpcodeI32Const, 1, // offset
-				OpcodeRefNull, RefTypeExternref,
+				OpcodeRefNull, RefTypeExternref.Kind(),
 				OpcodeI32Const, 1, // number of elements
 				OpcodeMiscPrefix, OpcodeMiscTableFill,
 				0, // Table of funcref type -> mismatch.
@@ -2521,7 +2538,7 @@ func TestModule_funcValidation_TableGrowSizeFill(t *testing.T) {
 				CodeSection:     []Code{{Body: tc.body}},
 			}
 			err := m.validateFunction(&stacks{}, tc.flag,
-				0, []Index{0}, nil, nil, tables, nil, bytes.NewReader(nil))
+				0, []Index{0}, nil, nil, tables, nil, nil, bytes.NewReader(nil))
 			if tc.expectedErr != "" {
 				require.EqualError(t, err, tc.expectedErr)
 			} else {
@@ -2576,7 +2593,7 @@ func TestModule_funcValidation_TableGetSet(t *testing.T) {
 			name: "table.set (funcref)",
 			body: []byte{
 				OpcodeI32Const, 0,
-				OpcodeRefNull, ValueTypeFuncref,
+				OpcodeRefNull, ValueTypeFuncref.Kind(),
 				OpcodeTableSet, 0,
 				OpcodeEnd,
 			},
@@ -2586,7 +2603,7 @@ func TestModule_funcValidation_TableGetSet(t *testing.T) {
 			name: "table.set type mismatch (src=funcref, dst=externref)",
 			body: []byte{
 				OpcodeI32Const, 0,
-				OpcodeRefNull, ValueTypeFuncref,
+				OpcodeRefNull, ValueTypeFuncref.Kind(),
 				OpcodeTableSet, 1,
 				OpcodeEnd,
 			},
@@ -2597,7 +2614,7 @@ func TestModule_funcValidation_TableGetSet(t *testing.T) {
 			name: "table.set (externref)",
 			body: []byte{
 				OpcodeI32Const, 0,
-				OpcodeRefNull, ValueTypeExternref,
+				OpcodeRefNull, ValueTypeExternref.Kind(),
 				OpcodeTableSet, 1,
 				OpcodeEnd,
 			},
@@ -2607,7 +2624,7 @@ func TestModule_funcValidation_TableGetSet(t *testing.T) {
 			name: "table.set type mismatch (src=externref, dst=funcref)",
 			body: []byte{
 				OpcodeI32Const, 0,
-				OpcodeRefNull, ValueTypeExternref,
+				OpcodeRefNull, ValueTypeExternref.Kind(),
 				OpcodeTableSet, 0,
 				OpcodeEnd,
 			},
@@ -2634,7 +2651,7 @@ func TestModule_funcValidation_TableGetSet(t *testing.T) {
 				CodeSection:     []Code{{Body: tc.body}},
 			}
 			err := m.validateFunction(&stacks{}, tc.flag,
-				0, []Index{0}, nil, nil, tables, nil, bytes.NewReader(nil))
+				0, []Index{0}, nil, nil, tables, nil, nil, bytes.NewReader(nil))
 			if tc.expectedErr != "" {
 				require.EqualError(t, err, tc.expectedErr)
 			} else {
@@ -2655,7 +2672,7 @@ func TestModule_funcValidation_Select_error(t *testing.T) {
 			name: "typed_select (disabled)",
 			body: []byte{
 				OpcodeI32Const, 0, OpcodeI32Const, 0, OpcodeI32Const, 0,
-				OpcodeTypedSelect, 1, ValueTypeI32, // immediate vector's size must be one
+				OpcodeTypedSelect, 1, ValueTypeI32.Kind(), // immediate vector's size must be one
 				OpcodeDrop,
 				OpcodeEnd,
 			},
@@ -2692,7 +2709,7 @@ func TestModule_funcValidation_Select_error(t *testing.T) {
 				CodeSection:     []Code{{Body: tc.body}},
 			}
 			err := m.validateFunction(&stacks{}, tc.flag,
-				0, []Index{0}, nil, nil, nil, nil, bytes.NewReader(nil))
+				0, []Index{0}, nil, nil, nil, nil, nil, bytes.NewReader(nil))
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}
@@ -3178,7 +3195,7 @@ func TestModule_funcValidation_SIMD(t *testing.T) {
 				CodeSection:     []Code{{Body: tc.body}},
 			}
 			err := m.validateFunction(&stacks{}, api.CoreFeatureSIMD,
-				0, []Index{0}, nil, &Memory{}, nil, nil, bytes.NewReader(nil))
+				0, []Index{0}, nil, &Memory{}, nil, nil, nil, bytes.NewReader(nil))
 			require.NoError(t, err)
 		})
 	}
@@ -3324,7 +3341,7 @@ func TestModule_funcValidation_SIMD_error(t *testing.T) {
 				CodeSection:     []Code{{Body: tc.body}},
 			}
 			err := m.validateFunction(&stacks{}, tc.flag,
-				0, []Index{0}, nil, &Memory{}, nil, nil, bytes.NewReader(nil))
+				0, []Index{0}, nil, &Memory{}, nil, nil, nil, bytes.NewReader(nil))
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}
@@ -3442,7 +3459,7 @@ func TestFuncValidation_UnreachableBrTable_NotModifyTypes(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			err := tc.m.validateFunction(&stacks{}, api.CoreFeaturesV2,
-				0, nil, nil, nil, nil, nil, bytes.NewReader(nil))
+				0, nil, nil, nil, nil, nil, nil, bytes.NewReader(nil))
 			require.NoError(t, err)
 
 			// Ensures that funcType has remained intact.
@@ -3567,7 +3584,7 @@ func TestModule_funcValidation_loopWithParams(t *testing.T) {
 				CodeSection:     []Code{{Body: tc.body}},
 			}
 			err := m.validateFunction(&stacks{}, api.CoreFeatureMultiValue,
-				0, []Index{0}, nil, nil, nil, nil, bytes.NewReader(nil))
+				0, []Index{0}, nil, nil, nil, nil, nil, bytes.NewReader(nil))
 			if tc.expErr != "" {
 				require.EqualError(t, err, tc.expErr)
 			} else {
@@ -3585,7 +3602,7 @@ func TestFunctionValidation_redundantEnd(t *testing.T) {
 		CodeSection:     []Code{{Body: []byte{OpcodeEnd, OpcodeEnd}}},
 	}
 	err := m.validateFunction(&stacks{}, api.CoreFeaturesV2,
-		0, nil, nil, nil, nil, nil, bytes.NewReader(nil))
+		0, nil, nil, nil, nil, nil, nil, bytes.NewReader(nil))
 	require.EqualError(t, err, "unexpected end of function at pc=0x1")
 }
 
@@ -3618,7 +3635,7 @@ func TestFunctionValidation_redundantElse(t *testing.T) {
 		t.Run(tc.expErr, func(t *testing.T) {
 			m := &Module{TypeSection: []FunctionType{{}}, FunctionSection: []Index{0}, CodeSection: []Code{{Body: tc.body}}}
 			err := m.validateFunction(&stacks{}, api.CoreFeaturesV2,
-				0, nil, nil, nil, nil, nil, bytes.NewReader(nil))
+				0, nil, nil, nil, nil, nil, nil, bytes.NewReader(nil))
 			require.EqualError(t, err, tc.expErr)
 		})
 	}
@@ -4272,13 +4289,13 @@ func TestModule_funcValidation_Atomic(t *testing.T) {
 
 				t.Run("with memory", func(t *testing.T) {
 					err := m.validateFunction(&stacks{}, experimental.CoreFeaturesThreads,
-						0, []Index{0}, nil, &Memory{}, []Table{}, nil, bytes.NewReader(nil))
+						0, []Index{0}, nil, &Memory{}, []Table{}, nil, nil, bytes.NewReader(nil))
 					require.NoError(t, err)
 				})
 
 				t.Run("without memory", func(t *testing.T) {
 					err := m.validateFunction(&stacks{}, experimental.CoreFeaturesThreads,
-						0, []Index{0}, nil, nil, []Table{}, nil, bytes.NewReader(nil))
+						0, []Index{0}, nil, nil, []Table{}, nil, nil, bytes.NewReader(nil))
 					// Only fence doesn't require memory
 					if tc.name == "memory.atomic.fence" {
 						require.NoError(t, err)
@@ -4301,7 +4318,7 @@ func TestModule_funcValidation_Atomic(t *testing.T) {
 			CodeSection:     []Code{{Body: body}},
 		}
 		err := m.validateFunction(&stacks{}, experimental.CoreFeaturesThreads,
-			0, []Index{0}, nil, &Memory{}, []Table{}, nil, bytes.NewReader(nil))
+			0, []Index{0}, nil, &Memory{}, []Table{}, nil, nil, bytes.NewReader(nil))
 		require.Error(t, err, "invalid immediate value for atomic.fence")
 	})
 
@@ -4864,9 +4881,43 @@ func TestModule_funcValidation_Atomic(t *testing.T) {
 					CodeSection:     []Code{{Body: body}},
 				}
 				err := m.validateFunction(&stacks{}, experimental.CoreFeaturesThreads,
-					0, []Index{0}, nil, &Memory{}, []Table{}, nil, bytes.NewReader(nil))
+					0, []Index{0}, nil, &Memory{}, []Table{}, nil, nil, bytes.NewReader(nil))
 				require.Error(t, err, "invalid memory alignment")
 			})
 		}
 	})
+}
+
+func TestValidation_LegacyExceptionHandlingOpcodes(t *testing.T) {
+	for _, tc := range []struct {
+		opcode byte
+		name   string
+	}{
+		{OpcodeLegacyTry, "try"},
+		{OpcodeLegacyCatch, "catch"},
+		{OpcodeLegacyRethrow, "rethrow"},
+		{OpcodeLegacyDelegate, "delegate"},
+		{OpcodeLegacyCatchAll, "catch_all"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m := &Module{
+				TypeSection:     []FunctionType{v_v},
+				FunctionSection: []Index{0},
+				CodeSection:     []Code{{Body: []byte{tc.opcode, OpcodeEnd}}},
+			}
+			t.Run("with EH enabled", func(t *testing.T) {
+				err := m.validateFunction(&stacks{}, api.CoreFeaturesV2|experimental.CoreFeaturesExceptionHandling,
+					0, []Index{0}, nil, nil, nil, nil, nil, bytes.NewReader(nil))
+				require.Error(t, err)
+				require.Contains(t, err.Error(), "legacy exception handling instruction")
+				require.Contains(t, err.Error(), "wasm-opt --translate-to-exnref")
+			})
+			t.Run("without EH enabled", func(t *testing.T) {
+				err := m.validateFunction(&stacks{}, api.CoreFeaturesV2,
+					0, []Index{0}, nil, nil, nil, nil, nil, bytes.NewReader(nil))
+				require.Error(t, err)
+				require.Contains(t, err.Error(), "invalid instruction")
+			})
+		})
+	}
 }

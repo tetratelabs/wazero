@@ -537,6 +537,235 @@ func Test_pollOneoff_Zero(t *testing.T) {
 	require.Equal(t, uint32(1), nevents)
 }
 
+// Test_pollOneoff_NonStdinPollable verifies that poll_oneoff correctly polls
+// non-stdin fds that implement Pollable (e.g. custom fs.FS mounts).
+func Test_pollOneoff_NonStdinPollable(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create a file so we can open it and get an fd.
+	require.NoError(t, os.WriteFile(tmpDir+"/test.txt", []byte("data"), 0o600))
+
+	cfg := wazero.NewModuleConfig().WithFSConfig(
+		wazero.NewFSConfig().WithDirMount(tmpDir, "/"),
+	)
+	mod, r, log := requireProxyModule(t, cfg)
+	defer r.Close(testCtx)
+	defer log.Reset()
+
+	fd := requirePollOpenFile(t, mod, "test.txt")
+
+	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
+	entry, ok := fsc.LookupFile(fd)
+	require.True(t, ok)
+	entry.File = &pollableFile{ready: true}
+
+	maskMemory(t, mod, 1024)
+
+	out := uint32(128)
+	resultNevents := uint32(512)
+
+	// Subscribe to fd read on our custom pollable fd.
+	mod.Memory().Write(0, fdReadSubFd(byte(fd)))
+
+	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.PollOneoffName,
+		uint64(0), uint64(out), uint64(1), uint64(resultNevents))
+
+	require.Equal(t, `
+==> wasi_snapshot_preview1.poll_oneoff(in=0,out=128,nsubscriptions=1)
+<== (nevents=1,errno=ESUCCESS)
+`, "\n"+log.String())
+
+	// Verify the event was written with success.
+	outMem, ok := mod.Memory().Read(out, 32)
+	require.True(t, ok)
+	require.Equal(t, byte(wasip1.ErrnoSuccess), outMem[8])
+	require.Equal(t, byte(wasip1.EventTypeFdRead), outMem[10])
+
+	nevents, ok := mod.Memory().ReadUint32Le(resultNevents)
+	require.True(t, ok)
+	require.Equal(t, uint32(1), nevents)
+}
+
+func Test_pollOneoff_NonStdinPollUnsupported(t *testing.T) {
+	tmpDir := t.TempDir()
+	require.NoError(t, os.WriteFile(tmpDir+"/test.txt", []byte("data"), 0o600))
+
+	cfg := wazero.NewModuleConfig().WithFSConfig(
+		wazero.NewFSConfig().WithDirMount(tmpDir, "/"),
+	)
+
+	tests := []struct {
+		name string
+		file experimentalsys.File
+	}{
+		{
+			name: "file does not implement Pollable",
+			file: experimentalsys.UnimplementedFile{},
+		},
+		{
+			name: "file Poll returns ENOSYS",
+			file: &pollableFile{errno: experimentalsys.ENOSYS},
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			mod, r, log := requireProxyModule(t, cfg)
+			defer r.Close(testCtx)
+			defer log.Reset()
+
+			fd := requirePollOpenFile(t, mod, "test.txt")
+			fsc := mod.(*wasm.ModuleInstance).Sys.FS()
+			entry, ok := fsc.LookupFile(fd)
+			require.True(t, ok)
+			if tc.file != nil {
+				entry.File = tc.file
+			}
+
+			maskMemory(t, mod, 1024)
+
+			out := uint32(128)
+			resultNevents := uint32(512)
+			mod.Memory().Write(0, fdReadSubFd(byte(fd)))
+
+			requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.PollOneoffName,
+				uint64(0), uint64(out), uint64(1), uint64(resultNevents))
+
+			require.Equal(t, `
+==> wasi_snapshot_preview1.poll_oneoff(in=0,out=128,nsubscriptions=1)
+<== (nevents=1,errno=ESUCCESS)
+`, "\n"+log.String())
+
+			outMem, ok := mod.Memory().Read(out, 32)
+			require.True(t, ok)
+			require.Equal(t, byte(wasip1.ErrnoNotsup), outMem[8])
+			require.Equal(t, byte(wasip1.EventTypeFdRead), outMem[10])
+
+			nevents, ok := mod.Memory().ReadUint32Le(resultNevents)
+			require.True(t, ok)
+			require.Equal(t, uint32(1), nevents)
+		})
+	}
+}
+
+func Test_pollOneoff_NonStdinPollableNotReady(t *testing.T) {
+	tmpDir := t.TempDir()
+	require.NoError(t, os.WriteFile(tmpDir+"/test.txt", []byte("data"), 0o600))
+
+	cfg := wazero.NewModuleConfig().WithFSConfig(
+		wazero.NewFSConfig().WithDirMount(tmpDir, "/"),
+	)
+	mod, r, log := requireProxyModule(t, cfg)
+	defer r.Close(testCtx)
+	defer log.Reset()
+
+	fd := requirePollOpenFile(t, mod, "test.txt")
+	poller := &pollableFile{}
+	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
+	entry, ok := fsc.LookupFile(fd)
+	require.True(t, ok)
+	entry.File = poller
+
+	maskMemory(t, mod, 1024)
+
+	out := uint32(128)
+	resultNevents := uint32(512)
+	mod.Memory().Write(0,
+		concat(
+			clockNsSub(uint64(20*time.Millisecond)),
+			fdReadSubFd(byte(fd)),
+		),
+	)
+
+	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.PollOneoffName,
+		uint64(0), uint64(out), uint64(2), uint64(resultNevents))
+
+	require.Equal(t, `
+==> wasi_snapshot_preview1.poll_oneoff(in=0,out=128,nsubscriptions=2)
+<== (nevents=1,errno=ESUCCESS)
+`, "\n"+log.String())
+	require.Equal(t, []int32{20}, poller.timeouts)
+
+	outMem, ok := mod.Memory().Read(out, 64)
+	require.True(t, ok)
+	require.Equal(t, byte(wasip1.ErrnoSuccess), outMem[8])
+	require.Equal(t, byte(wasip1.EventTypeClock), outMem[10])
+	require.Equal(t, make([]byte, 32), outMem[32:64])
+
+	nevents, ok := mod.Memory().ReadUint32Le(resultNevents)
+	require.True(t, ok)
+	require.Equal(t, uint32(1), nevents)
+}
+
+func Test_pollOneoff_NonStdinPollableTimeoutBudget(t *testing.T) {
+	tmpDir := t.TempDir()
+	require.NoError(t, os.WriteFile(tmpDir+"/one.txt", []byte("one"), 0o600))
+	require.NoError(t, os.WriteFile(tmpDir+"/two.txt", []byte("two"), 0o600))
+
+	cfg := wazero.NewModuleConfig().WithFSConfig(
+		wazero.NewFSConfig().WithDirMount(tmpDir, "/"),
+	)
+	mod, r, log := requireProxyModule(t, cfg)
+	defer r.Close(testCtx)
+	defer log.Reset()
+
+	firstFD := requirePollOpenFile(t, mod, "one.txt")
+	secondFD := requirePollOpenFile(t, mod, "two.txt")
+
+	firstPoller := &pollableFile{sleep: 20 * time.Millisecond}
+	secondPoller := &pollableFile{}
+
+	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
+	firstEntry, ok := fsc.LookupFile(firstFD)
+	require.True(t, ok)
+	firstEntry.File = firstPoller
+	secondEntry, ok := fsc.LookupFile(secondFD)
+	require.True(t, ok)
+	secondEntry.File = secondPoller
+
+	maskMemory(t, mod, 1024)
+
+	out := uint32(128)
+	resultNevents := uint32(512)
+	mod.Memory().Write(0,
+		concat(
+			clockNsSub(uint64(10*time.Millisecond)),
+			fdReadSubFd(byte(firstFD)),
+			fdReadSubFd(byte(secondFD)),
+		),
+	)
+
+	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.PollOneoffName,
+		uint64(0), uint64(out), uint64(3), uint64(resultNevents))
+
+	require.Equal(t, `
+==> wasi_snapshot_preview1.poll_oneoff(in=0,out=128,nsubscriptions=3)
+<== (nevents=1,errno=ESUCCESS)
+`, "\n"+log.String())
+	require.Equal(t, []int32{10}, firstPoller.timeouts)
+	require.Equal(t, []int32{0}, secondPoller.timeouts)
+
+	outMem, ok := mod.Memory().Read(out, 96)
+	require.True(t, ok)
+	require.Equal(t, byte(wasip1.ErrnoSuccess), outMem[8])
+	require.Equal(t, byte(wasip1.EventTypeClock), outMem[10])
+	require.Equal(t, make([]byte, 64), outMem[32:96])
+
+	nevents, ok := mod.Memory().ReadUint32Le(resultNevents)
+	require.True(t, ok)
+	require.Equal(t, uint32(1), nevents)
+}
+
+func requirePollOpenFile(t *testing.T, mod api.Module, name string) int32 {
+	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
+	preopen, ok := fsc.LookupFile(sys.FdPreopen)
+	require.True(t, ok)
+	fd, errno := fsc.OpenFile(preopen.FS, name, experimentalsys.O_RDONLY, 0)
+	require.EqualErrno(t, 0, errno)
+	return fd
+}
+
 func concat(bytes ...[]byte) []byte {
 	var res []byte
 	for i := range bytes {
@@ -637,4 +866,25 @@ func (p *pollStdinFile) Poll(flag experimentalsys.Pflag, timeoutMillis int32) (r
 		return false, experimentalsys.ENOTSUP
 	}
 	return p.ready, 0
+}
+
+type pollableFile struct {
+	experimentalsys.UnimplementedFile
+
+	ready    bool
+	errno    experimentalsys.Errno
+	sleep    time.Duration
+	timeouts []int32
+}
+
+// Poll implements the same method as documented on experimentalsys.Pollable
+func (p *pollableFile) Poll(flag experimentalsys.Pflag, timeoutMillis int32) (ready bool, errno experimentalsys.Errno) {
+	if flag != experimentalsys.POLLIN {
+		return false, experimentalsys.ENOTSUP
+	}
+	p.timeouts = append(p.timeouts, timeoutMillis)
+	if p.sleep > 0 {
+		time.Sleep(p.sleep)
+	}
+	return p.ready, p.errno
 }

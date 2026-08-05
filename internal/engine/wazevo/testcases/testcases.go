@@ -1,6 +1,7 @@
 package testcases
 
 import (
+	"bytes"
 	"math"
 
 	"github.com/tetratelabs/wazero/internal/leb128"
@@ -344,7 +345,7 @@ var (
 			wasm.OpcodeLocalGet, 2, // x
 			wasm.OpcodeLocalGet, 3, // y
 			wasm.OpcodeLocalGet, 1, // cond
-			wasm.OpcodeTypedSelect, 1, wasm.ValueTypeI64,
+			wasm.OpcodeTypedSelect, 1, wasm.ValueTypeI64.Kind(),
 
 			// f32 select.
 			wasm.OpcodeLocalGet, 4, // x
@@ -353,7 +354,7 @@ var (
 			wasm.OpcodeLocalGet, 6,
 			wasm.OpcodeLocalGet, 7,
 			wasm.OpcodeF64Gt,
-			wasm.OpcodeTypedSelect, 1, wasm.ValueTypeF32,
+			wasm.OpcodeTypedSelect, 1, wasm.ValueTypeF32.Kind(),
 
 			// f64 select.
 			wasm.OpcodeLocalGet, 6, // x
@@ -362,7 +363,7 @@ var (
 			wasm.OpcodeLocalGet, 4,
 			wasm.OpcodeLocalGet, 5,
 			wasm.OpcodeF32Ne,
-			wasm.OpcodeTypedSelect, 1, wasm.ValueTypeF64,
+			wasm.OpcodeTypedSelect, 1, wasm.ValueTypeF64.Kind(),
 
 			wasm.OpcodeEnd,
 		}, nil),
@@ -1781,7 +1782,11 @@ var (
 				{
 					OffsetExpr: constExprI32(0), TableIndex: 0, Type: wasm.RefTypeFuncref, Mode: wasm.ElementModeActive,
 					// Set the function 1, 2, 3 at the beginning of the table.
-					Init: []wasm.Index{1, 2, 3},
+					Init: []wasm.ConstantExpression{
+						wasm.NewConstantExpressionFromOpcode(wasm.OpcodeRefFunc, []byte{1}),
+						wasm.NewConstantExpressionFromOpcode(wasm.OpcodeRefFunc, []byte{2}),
+						wasm.NewConstantExpressionFromOpcode(wasm.OpcodeRefFunc, []byte{3}),
+					},
 				},
 			},
 			CodeSection: []wasm.Code{
@@ -2720,6 +2725,407 @@ func VecShuffleWithLane(lane ...byte) *wasm.Module {
 	}
 }
 
+// Exception Handling test cases.
+
+// ThrowOnly: a function that always throws tag 0 (no params).
+// Expected: uncaught exception trap.
+//
+//	(module
+//	  (tag $e)
+//	  (func (export "f") (throw $e))
+//	)
+var ThrowOnly = TestCase{
+	Name: "throw_only",
+	Module: &wasm.Module{
+		TypeSection:     []wasm.FunctionType{vv},
+		FunctionSection: []wasm.Index{0},
+		TagSection:      []wasm.Tag{{Type: 0}},
+		CodeSection: []wasm.Code{{
+			Body: []byte{
+				wasm.OpcodeThrow, 0, // throw $e (tag index 0)
+				wasm.OpcodeEnd,
+			},
+		}},
+		ExportSection: []wasm.Export{{Name: ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 0}},
+	},
+}
+
+// ThrowWithParam: throws tag 0 (i32 param) with the function's i32 parameter.
+// Expected: uncaught exception trap.
+//
+//	(module
+//	  (tag $e (param i32))
+//	  (func (export "f") (param i32) (local.get 0) (throw $e))
+//	)
+var ThrowWithParam = TestCase{
+	Name: "throw_with_param",
+	Module: &wasm.Module{
+		TypeSection: []wasm.FunctionType{
+			{Params: []wasm.ValueType{i32}}, // type 0: tag type (i32) -> ()
+			{Params: []wasm.ValueType{i32}}, // type 1: func type (i32) -> ()
+		},
+		FunctionSection: []wasm.Index{1},
+		TagSection:      []wasm.Tag{{Type: 0}},
+		CodeSection: []wasm.Code{{
+			Body: []byte{
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeThrow, 0, // throw $e (tag index 0)
+				wasm.OpcodeEnd,
+			},
+		}},
+		ExportSection: []wasm.Export{{Name: ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 0}},
+	},
+}
+
+// TryTableCatchAllEmpty: try_table with catch_all where the body does not throw.
+// The try_table body pushes 42 and returns. catch_all is never triggered.
+//
+//	(module
+//	  (func (export "f") (result i32)
+//	    (block $caught              ;; catch_all target, expects 0 values
+//	      (try_table (catch_all $caught)
+//	        (i32.const 42)
+//	        (return)
+//	      )
+//	      (i32.const 99)
+//	      (return)
+//	    )
+//	    (i32.const 0)
+//	  )
+//	)
+var TryTableCatchAllEmpty = TestCase{
+	Name: "try_table_catch_all_empty",
+	Module: &wasm.Module{
+		TypeSection:     []wasm.FunctionType{{Results: []wasm.ValueType{i32}}},
+		FunctionSection: []wasm.Index{0},
+		CodeSection: []wasm.Code{{
+			Body: []byte{
+				// block $caught -- void block (catch_all delivers 0 values)
+				wasm.OpcodeBlock, blockSignature_vv,
+				// try_table (catch_all $caught) -- void block
+				wasm.OpcodeTryTable, blockSignature_vv,
+				1,                      // catch clause count = 1
+				wasm.CatchKindCatchAll, // catch_all
+				0,                      // label index 0 = $caught (try_table not yet on stack)
+				// body: return 42 directly
+				wasm.OpcodeI32Const, 42,
+				wasm.OpcodeReturn,
+				wasm.OpcodeEnd, // end try_table
+				// After try_table (catch_all path): return 99
+				wasm.OpcodeI32Const, 0xe3, 0x00, // 99 in signed LEB128
+				wasm.OpcodeReturn,
+				wasm.OpcodeEnd, // end block $caught
+				// Should not reach here.
+				wasm.OpcodeI32Const, 0,
+				wasm.OpcodeEnd, // end function
+			},
+		}},
+		ExportSection: []wasm.Export{{Name: ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 0}},
+	},
+}
+
+// TryTableCatchAllThrow: try_table with catch_all where the body throws.
+// The catch_all catches the exception, falls through, and returns 42.
+//
+//	(module
+//	  (tag $e)
+//	  (func (export "f") (result i32)
+//	    (block $caught
+//	      (try_table (catch_all $caught)
+//	        (throw $e)
+//	      )
+//	      (unreachable)
+//	    )
+//	    (i32.const 42)
+//	  )
+//	)
+var TryTableCatchAllThrow = TestCase{
+	Name: "try_table_catch_all_throw",
+	Module: &wasm.Module{
+		TypeSection:     []wasm.FunctionType{vv, {Results: []wasm.ValueType{i32}}},
+		FunctionSection: []wasm.Index{1},       // func type 1: () -> i32
+		TagSection:      []wasm.Tag{{Type: 0}}, // tag type 0: () -> ()
+		CodeSection: []wasm.Code{{
+			Body: []byte{
+				wasm.OpcodeBlock, blockSignature_vv, // block $caught
+				wasm.OpcodeTryTable, blockSignature_vv, // try_table
+				1,                      // 1 catch clause
+				wasm.CatchKindCatchAll, // catch_all
+				0,                      // label 0 = $caught
+				wasm.OpcodeThrow, 0,    // throw tag 0
+				wasm.OpcodeEnd,         // end try_table
+				wasm.OpcodeUnreachable, // after try_table (unreachable)
+				wasm.OpcodeEnd,         // end block $caught
+				wasm.OpcodeI32Const, 42,
+				wasm.OpcodeEnd, // end func
+			},
+		}},
+		ExportSection: []wasm.Export{{Name: ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 0}},
+	},
+}
+
+// TryTableCatchThrow: try_table with catch $e0 (specific tag, no params) where
+// the body throws. The catch dispatches to the enclosing block.
+//
+//	(module
+//	  (tag $e0)
+//	  (func (export "f") (result i32)
+//	    (block $h                           ;; label 0
+//	      (try_table (result i32) (catch $e0 $h)
+//	        (throw $e0)
+//	        (i32.const 42)
+//	      )
+//	      (return)
+//	    )
+//	    (i32.const 23)
+//	  )
+//	)
+var TryTableCatchThrow = TestCase{
+	Name: "try_table_catch_throw",
+	Module: &wasm.Module{
+		TypeSection:     []wasm.FunctionType{vv, {Results: []wasm.ValueType{i32}}},
+		FunctionSection: []wasm.Index{1},       // func type 1: () -> i32
+		TagSection:      []wasm.Tag{{Type: 0}}, // tag type 0: () -> ()
+		CodeSection: []wasm.Code{{
+			Body: []byte{
+				wasm.OpcodeBlock, blockSignature_vv, // block $h (label 0)
+				wasm.OpcodeTryTable, 0x7F, // try_table (result i32)
+				1,                   // 1 catch clause
+				wasm.CatchKindCatch, // catch
+				0,                   // tag index 0 ($e0)
+				0,                   // label 0 ($h)
+				wasm.OpcodeThrow, 0, // throw tag 0
+				wasm.OpcodeI32Const, 42, // (unreachable but needed for type)
+				wasm.OpcodeEnd,    // end try_table
+				wasm.OpcodeReturn, // return try_table result
+				wasm.OpcodeEnd,    // end block $h
+				wasm.OpcodeI32Const, 23,
+				wasm.OpcodeEnd, // end func
+			},
+		}},
+		ExportSection: []wasm.Export{{Name: ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 0}},
+	},
+}
+
+// TryTableCatchParamThrow: try_table with catch $e-i32 where the tag has an i32 parameter.
+// The exception parameter is forwarded to the catch target block.
+//
+//	(module
+//	  (tag $e-i32 (param i32))
+//	  (func (export "f") (param i32) (result i32)
+//	    (block $h (result i32)
+//	      (try_table (result i32) (catch $e-i32 $h)
+//	        (throw $e-i32 (local.get 0))
+//	        (i32.const 2)
+//	      )
+//	      (return)
+//	    )
+//	    (return)
+//	  )
+//	)
+var TryTableCatchParamThrow = TestCase{
+	Name: "try_table_catch_param_throw",
+	Module: &wasm.Module{
+		TypeSection: []wasm.FunctionType{
+			{Params: []wasm.ValueType{i32}},                                 // type 0: (i32) -> () for tag
+			{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32}}, // type 1: (i32) -> (i32) for func
+		},
+		FunctionSection: []wasm.Index{1},       // func type 1
+		TagSection:      []wasm.Tag{{Type: 0}}, // tag type 0: (i32) -> ()
+		CodeSection: []wasm.Code{{
+			Body: []byte{
+				wasm.OpcodeBlock, 0x7F, // block $h (result i32)  -- label 0
+				wasm.OpcodeTryTable, 0x7F, // try_table (result i32)
+				1,                      // 1 catch clause
+				wasm.CatchKindCatch,    // catch
+				0,                      // tag index 0 ($e-i32)
+				0,                      // label 0 ($h)
+				wasm.OpcodeLocalGet, 0, // local.get 0
+				wasm.OpcodeThrow, 0, // throw tag 0
+				wasm.OpcodeI32Const, 2, // (unreachable but needed for type)
+				wasm.OpcodeEnd,    // end try_table
+				wasm.OpcodeReturn, // return try_table result
+				wasm.OpcodeEnd,    // end block $h
+				wasm.OpcodeReturn, // return
+				wasm.OpcodeEnd,    // end func
+			},
+		}},
+		ExportSection: []wasm.Export{{Name: ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 0}},
+	},
+}
+
+// TryTableCatchManyParamThrow: try_table with catch $e where the tag has 5 i32 parameters.
+// This exercises tags with more than 4 parameters, exposing the hardcoded 4-param limit in
+// caughtExceptionParams [4]uint64. The 5th (and beyond) parameter will be silently dropped
+// under the current implementation.
+//
+//	(module
+//	  (tag $e (param i32 i32 i32 i32 i32))
+//	  (func (export "f") (param i32 i32 i32 i32 i32) (result i32 i32 i32 i32 i32)
+//	    (block $h (result i32 i32 i32 i32 i32)
+//	      (try_table (result i32 i32 i32 i32 i32) (catch $e $h)
+//	        (local.get 0)
+//	        (local.get 1)
+//	        (local.get 2)
+//	        (local.get 3)
+//	        (local.get 4)
+//	        (throw $e)
+//	        (i32.const 0) (i32.const 0) (i32.const 0) (i32.const 0) (i32.const 0)
+//	      )
+//	      (return)
+//	    )
+//	    (return)
+//	  )
+//	)
+var TryTableCatchManyParamThrow = TestCase{
+	Name: "try_table_catch_many_param_throw",
+	Module: &wasm.Module{
+		TypeSection: []wasm.FunctionType{
+			{Params: []wasm.ValueType{i32, i32, i32, i32, i32}},                                                     // type 0: (i32x5) -> () for tag
+			{Params: []wasm.ValueType{i32, i32, i32, i32, i32}, Results: []wasm.ValueType{i32, i32, i32, i32, i32}}, // type 1: (i32x5) -> (i32x5) for func
+			{Results: []wasm.ValueType{i32, i32, i32, i32, i32}},                                                    // type 2: () -> (i32x5) for block/try_table
+		},
+		FunctionSection: []wasm.Index{1},       // func type 1
+		TagSection:      []wasm.Tag{{Type: 0}}, // tag type 0: (i32x5) -> ()
+		CodeSection: []wasm.Code{{
+			Body: []byte{
+				wasm.OpcodeBlock, 0x02, // block $h (result i32 i32 i32 i32 i32) -- type index 2
+				wasm.OpcodeTryTable, 0x02, // try_table (result i32 i32 i32 i32 i32) -- type index 2
+				1,                      // 1 catch clause
+				wasm.CatchKindCatch,    // catch
+				0,                      // tag index 0 ($e)
+				0,                      // label 0 ($h)
+				wasm.OpcodeLocalGet, 0, // local.get 0
+				wasm.OpcodeLocalGet, 1, // local.get 1
+				wasm.OpcodeLocalGet, 2, // local.get 2
+				wasm.OpcodeLocalGet, 3, // local.get 3
+				wasm.OpcodeLocalGet, 4, // local.get 4
+				wasm.OpcodeThrow, 0, // throw tag 0
+				wasm.OpcodeI32Const, 0, // unreachable dummy results
+				wasm.OpcodeI32Const, 0,
+				wasm.OpcodeI32Const, 0,
+				wasm.OpcodeI32Const, 0,
+				wasm.OpcodeI32Const, 0,
+				wasm.OpcodeEnd,    // end try_table
+				wasm.OpcodeReturn, // return try_table result
+				wasm.OpcodeEnd,    // end block $h
+				wasm.OpcodeReturn, // return
+				wasm.OpcodeEnd,    // end func
+			},
+		}},
+		ExportSection: []wasm.Export{{Name: ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 0}},
+	},
+}
+
+// TryTableCatchWithReturnCall exercises the interaction between try_table and tail calls.
+// The try_table body performs a conditional:
+//   - param=1: TryTableLeave (pops handler) + return_call $target → returns 99
+//   - param=0: throw $e (caught by the catch clause) → catch handler returns 42
+//
+// This verifies two things:
+//
+//  1. removeUntilRet does not accidentally remove the catch handler block that follows
+//     the tail-call path in the instruction stream.
+//
+//  2. TryTableLeave + return_call correctly pass control to the tail callee.
+//
+//     (module
+//     (tag $e)
+//     (func $target (result i32) (i32.const 99))
+//     (func (export "f") (param i32) (result i32)
+//     (block $h
+//     (try_table (catch $e $h)
+//     (if (local.get 0)
+//     (then (return_call $target))
+//     (else (throw $e))
+//     )
+//     (unreachable)
+//     )
+//     (return)
+//     )
+//     (i32.const 42)
+//     )
+//     )
+var TryTableCatchWithReturnCall = TestCase{
+	Name: "try_table_catch_with_return_call",
+	Module: &wasm.Module{
+		TypeSection: []wasm.FunctionType{
+			vv,                               // type 0: () -> () for tag $e
+			{Results: []wasm.ValueType{i32}}, // type 1: () -> i32 for $target
+			{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32}}, // type 2: (i32) -> i32 for $f
+		},
+		FunctionSection: []wasm.Index{1, 2}, // $target = func 0 (type 1), $f = func 1 (type 2)
+		TagSection:      []wasm.Tag{{Type: 0}},
+		CodeSection: []wasm.Code{
+			{Body: []byte{wasm.OpcodeI32Const, 0xe3, 0x00, wasm.OpcodeEnd}}, // $target: () -> i32 (99 in signed LEB128)
+			{Body: []byte{
+				// block $h (void) = label 0; catch $e delivers 0 values to label 0.
+				wasm.OpcodeBlock, blockSignature_vv,
+				// try_table (result i32): type is declared even though the body is unreachable
+				// (both if-branches diverge). The result is consumed by the return on the normal
+				// path (which is also unreachable), satisfying the validator.
+				wasm.OpcodeTryTable, 0x7F,
+				1,                   // 1 catch clause
+				wasm.CatchKindCatch, // catch $e (no params) → label 0 ($h)
+				0,                   // tag index 0
+				0,                   // label 0 ($h)
+				// body: conditional — both branches diverge.
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeIf, blockSignature_vv, // void if — both branches diverge
+				// then: TryTableLeave (pops handler) + return_call $target (tail call)
+				wasm.OpcodeTailCallReturnCall, 0,
+				wasm.OpcodeElse,
+				// else: throw $e → caught by try_table → branches to end of block $h
+				wasm.OpcodeThrow, 0,
+				wasm.OpcodeEnd,         // end if
+				wasm.OpcodeUnreachable, // unreachable
+				wasm.OpcodeEnd,         // end try_table
+				wasm.OpcodeReturn,      // unreachable (never reached)
+				wasm.OpcodeEnd,         // end block $h
+				// catch handler: reached when $e is caught (jumped to end of block $h)
+				wasm.OpcodeI32Const, 42,
+				wasm.OpcodeEnd, // end func
+			}},
+		},
+		ExportSection: []wasm.Export{{Name: ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 1}},
+	},
+}
+
+var LargeMethodBodyWithManyArgs = TestCase{
+	Name: "large_method_body_with_many_args",
+	Module: &wasm.Module{
+		TypeSection:     []wasm.FunctionType{{Params: []wasm.ValueType{i32, i32, i32, i32, i32, i32, i32, i32, i32}, Results: []wasm.ValueType{i32}}},
+		ExportSection:   []wasm.Export{{Name: ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 0}},
+		MemorySection:   &wasm.Memory{Min: 1},
+		FunctionSection: []wasm.Index{0},
+		CodeSection: []wasm.Code{{
+			Body: func() []byte {
+				var body bytes.Buffer
+				body.WriteByte(wasm.OpcodeLocalGet)
+				body.Write(leb128.EncodeUint32(8))
+				body.WriteByte(wasm.OpcodeIf)
+				body.WriteByte(blockSignature_vv)
+
+				for i := 0; i < 14000; i++ { // 14000 is an arbitrary number large enough to ensure that arm64 needs to introduce conditional branch trampolines
+					body.WriteByte(wasm.OpcodeI32Const)
+					body.Write(leb128.EncodeInt32(int32((i * 4) & 0xfffc))) // arbitrary constant that depends on the loop index
+					body.WriteByte(wasm.OpcodeLocalGet)
+					body.Write(leb128.EncodeUint32(8))
+					body.WriteByte(wasm.OpcodeI32Store)
+					body.WriteByte(2) // align (log2)
+					body.WriteByte(0) // offset
+				}
+				body.WriteByte(wasm.OpcodeEnd) // end if
+				body.WriteByte(wasm.OpcodeLocalGet)
+				body.Write(leb128.EncodeUint32(8))
+				body.WriteByte(wasm.OpcodeEnd) // end function
+
+				return body.Bytes()
+			}(),
+		}},
+	},
+}
+
 type TestCase struct {
 	Name             string
 	Imported, Module *wasm.Module
@@ -2770,46 +3176,40 @@ func maskedBuf(size int) []byte {
 }
 
 func constExprI32(i int32) wasm.ConstantExpression {
-	return wasm.ConstantExpression{
-		Opcode: wasm.OpcodeI32Const,
-		Data:   leb128.EncodeInt32(i),
-	}
+	return wasm.NewConstantExpressionFromI32(i)
 }
 
 func constExprI64(i int64) wasm.ConstantExpression {
-	return wasm.ConstantExpression{
-		Opcode: wasm.OpcodeI64Const,
-		Data:   leb128.EncodeInt64(i),
-	}
+	return wasm.NewConstantExpressionFromI64(i)
 }
 
 func constExprF32(i float32) wasm.ConstantExpression {
 	b := math.Float32bits(i)
-	return wasm.ConstantExpression{
-		Opcode: wasm.OpcodeF32Const,
-		Data:   []byte{byte(b), byte(b >> 8), byte(b >> 16), byte(b >> 24)},
-	}
+	return wasm.NewConstantExpressionFromOpcode(
+		wasm.OpcodeF32Const, []byte{
+			byte(b), byte(b >> 8), byte(b >> 16), byte(b >> 24),
+		},
+	)
 }
 
 func constExprF64(i float64) wasm.ConstantExpression {
 	b := math.Float64bits(i)
-	return wasm.ConstantExpression{
-		Opcode: wasm.OpcodeF64Const,
-		Data: []byte{
+	return wasm.NewConstantExpressionFromOpcode(
+		wasm.OpcodeF64Const, []byte{
 			byte(b), byte(b >> 8), byte(b >> 16), byte(b >> 24),
 			byte(b >> 32), byte(b >> 40), byte(b >> 48), byte(b >> 56),
 		},
-	}
+	)
 }
 
 func constExprV128(lo, hi uint64) wasm.ConstantExpression {
-	return wasm.ConstantExpression{
-		Opcode: wasm.OpcodeVecV128Const,
-		Data: []byte{
+	return wasm.NewConstantExpressionFromOpcode(
+		wasm.OpcodeVecV128Const,
+		[]byte{
 			byte(lo), byte(lo >> 8), byte(lo >> 16), byte(lo >> 24),
 			byte(lo >> 32), byte(lo >> 40), byte(lo >> 48), byte(lo >> 56),
 			byte(hi), byte(hi >> 8), byte(hi >> 16), byte(hi >> 24),
 			byte(hi >> 32), byte(hi >> 40), byte(hi >> 48), byte(hi >> 56),
 		},
-	}
+	)
 }

@@ -1237,12 +1237,14 @@ func (m *machine) lowerIRem(execCtxVReg regalloc.VReg, rd, rn regalloc.VReg, rm 
 	}
 	m.insert(div)
 
+	// Copy rd to a temp register to keep it after the exit sequence.
+	tmpReg := m.copyToTmp(rd)
+
 	// Check if rm is zero:
 	m.exitIfNot(execCtxVReg, registerAsRegNotZeroCond(rm.nr()), _64bit, wazevoapi.ExitCodeIntegerDivisionByZero)
 
-	// rd = rn-rd*rm by MSUB instruction.
 	msub := m.allocateInstr()
-	msub.asALURRRR(aluOpMSub, rd, operandNR(rd), rm, rn, _64bit)
+	msub.asALURRRR(aluOpMSub, rd, operandNR(tmpReg), rm, rn, _64bit)
 	m.insert(msub)
 }
 

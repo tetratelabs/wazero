@@ -18,7 +18,7 @@ func EncodeImport(i *wasm.Import) []byte {
 	case wasm.ExternTypeFunc:
 		data = append(data, leb128.EncodeUint32(i.DescFunc)...)
 	case wasm.ExternTypeTable:
-		data = append(data, wasm.RefTypeFuncref)
+		data = append(data, wasm.RefTypeFuncref.Kind())
 		data = append(data, EncodeLimitsType(i.DescTable.Min, i.DescTable.Max, false)...)
 	case wasm.ExternTypeMemory:
 		maxPtr := &i.DescMem.Max
@@ -32,7 +32,10 @@ func EncodeImport(i *wasm.Import) []byte {
 		if g.Mutable {
 			mutable = 1
 		}
-		data = append(data, g.ValType, mutable)
+		data = append(data, g.ValType.Kind(), mutable)
+	case wasm.ExternTypeTag:
+		data = append(data, 0x00) // attribute byte
+		data = append(data, leb128.EncodeUint32(i.DescTag)...)
 	default:
 		panic(fmt.Errorf("invalid externtype: %s", wasm.ExternTypeName(i.Type)))
 	}

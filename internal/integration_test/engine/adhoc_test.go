@@ -937,12 +937,12 @@ func testLookupFunction(t *testing.T, r wazero.Runtime) {
 		TableSection: []wasm.Table{{Min: 10, Type: wasm.RefTypeFuncref}},
 		ElementSection: []wasm.ElementSegment{
 			{
-				OffsetExpr: wasm.ConstantExpression{
-					Opcode: wasm.OpcodeI32Const,
-					Data:   []byte{0},
-				},
+				OffsetExpr: wasm.NewConstantExpressionFromI32(0),
 				TableIndex: 0,
-				Init:       []wasm.Index{2, 0},
+				Init: []wasm.ConstantExpression{
+					wasm.NewConstantExpressionFromOpcode(wasm.OpcodeRefFunc, []byte{2}),
+					wasm.NewConstantExpressionFromOpcode(wasm.OpcodeRefFunc, []byte{0}),
+				},
 			},
 		},
 	})
@@ -952,31 +952,31 @@ func testLookupFunction(t *testing.T, r wazero.Runtime) {
 
 	t.Run("null reference", func(t *testing.T) {
 		err = require.CapturePanic(func() {
-			table.LookupFunction(inst, 0, 3, nil, []wasm.ValueType{i32})
+			table.LookupFunction(inst, 0, 3, nil, wasm.ToApiValueType([]wasm.ValueType{i32}))
 		})
 		require.Equal(t, wasmruntime.ErrRuntimeInvalidTableAccess, err)
 	})
 
 	t.Run("out of range", func(t *testing.T) {
 		err = require.CapturePanic(func() {
-			table.LookupFunction(inst, 0, 1000, nil, []wasm.ValueType{i32})
+			table.LookupFunction(inst, 0, 1000, nil, wasm.ToApiValueType([]wasm.ValueType{i32}))
 		})
 		require.Equal(t, wasmruntime.ErrRuntimeInvalidTableAccess, err)
 	})
 
 	t.Run("type mismatch", func(t *testing.T) {
 		err = require.CapturePanic(func() {
-			table.LookupFunction(inst, 0, 0, []wasm.ValueType{i32}, nil)
+			table.LookupFunction(inst, 0, 0, wasm.ToApiValueType([]wasm.ValueType{i32}), nil)
 		})
 		require.Equal(t, wasmruntime.ErrRuntimeIndirectCallTypeMismatch, err)
 	})
 	t.Run("ok", func(t *testing.T) {
-		f2 := table.LookupFunction(inst, 0, 0, nil, []wasm.ValueType{i32})
+		f2 := table.LookupFunction(inst, 0, 0, nil, wasm.ToApiValueType([]wasm.ValueType{i32}))
 		res, err := f2.Call(testCtx)
 		require.NoError(t, err)
 		require.Equal(t, uint64(3), res[0])
 
-		f0 := table.LookupFunction(inst, 0, 1, nil, []wasm.ValueType{i32})
+		f0 := table.LookupFunction(inst, 0, 1, nil, wasm.ToApiValueType([]wasm.ValueType{i32}))
 		res, err = f0.Call(testCtx)
 		require.NoError(t, err)
 		require.Equal(t, uint64(1), res[0])
@@ -1103,7 +1103,7 @@ func testModuleMemory(t *testing.T, r wazero.Runtime) {
 	one := uint32(1)
 
 	bin := binaryencoding.EncodeModule(&wasm.Module{
-		TypeSection:     []wasm.FunctionType{{Params: []api.ValueType{api.ValueTypeI32}, ParamNumInUint64: 1}, {}},
+		TypeSection:     []wasm.FunctionType{{Params: []wasm.ValueType{wasm.ValueTypeI32}, ParamNumInUint64: 1}, {}},
 		FunctionSection: []wasm.Index{0, 1},
 		MemorySection:   &wasm.Memory{Min: 1, Cap: 1, Max: 20},
 		DataSection: []wasm.DataSegment{
@@ -1358,11 +1358,11 @@ func testBeforeListenerGlobals(t *testing.T, r wazero.Runtime) {
 		GlobalSection: []wasm.Global{
 			{
 				Type: wasm.GlobalType{ValType: wasm.ValueTypeI32, Mutable: true},
-				Init: wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeInt32(100)},
+				Init: wasm.NewConstantExpressionFromI32(100),
 			},
 			{
 				Type: wasm.GlobalType{ValType: wasm.ValueTypeI32, Mutable: true},
-				Init: wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeInt32(200)},
+				Init: wasm.NewConstantExpressionFromI32(200),
 			},
 		},
 		CodeSection: []wasm.Code{
@@ -1445,23 +1445,23 @@ func testBeforeListenerStackIterator(t *testing.T, r wazero.Runtime) {
 		TypeSection: []wasm.FunctionType{
 			// f1 type
 			{
-				Params:  []api.ValueType{api.ValueTypeI32, api.ValueTypeI32, api.ValueTypeI32},
-				Results: []api.ValueType{},
+				Params:  []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32},
+				Results: []wasm.ValueType{},
 			},
 			// f2 type
 			{
-				Params:  []api.ValueType{},
-				Results: []api.ValueType{api.ValueTypeI32},
+				Params:  []wasm.ValueType{},
+				Results: []wasm.ValueType{wasm.ValueTypeI32},
 			},
 			// f3 type
 			{
-				Params:  []api.ValueType{api.ValueTypeI32},
-				Results: []api.ValueType{api.ValueTypeI32},
+				Params:  []wasm.ValueType{wasm.ValueTypeI32},
+				Results: []wasm.ValueType{wasm.ValueTypeI32},
 			},
 			// f4 type
 			{
-				Params:  []api.ValueType{api.ValueTypeI32},
-				Results: []api.ValueType{api.ValueTypeI32},
+				Params:  []wasm.ValueType{wasm.ValueTypeI32},
+				Results: []wasm.ValueType{wasm.ValueTypeI32},
 			},
 		},
 		ImportFunctionCount: 1,
@@ -1551,11 +1551,11 @@ func testListenerStackIteratorOffset(t *testing.T, r wazero.Runtime) {
 	encoded := binaryencoding.EncodeModule(&wasm.Module{
 		TypeSection: []wasm.FunctionType{
 			// f1 type
-			{Params: []api.ValueType{api.ValueTypeI32, api.ValueTypeI32, api.ValueTypeI32}},
+			{Params: []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32}},
 			// f2 type
-			{Results: []api.ValueType{api.ValueTypeI32}},
+			{Results: []wasm.ValueType{wasm.ValueTypeI32}},
 			// f3 type
-			{Params: []api.ValueType{api.ValueTypeI32}, Results: []api.ValueType{api.ValueTypeI32}},
+			{Params: []wasm.ValueType{wasm.ValueTypeI32}, Results: []wasm.ValueType{wasm.ValueTypeI32}},
 		},
 		FunctionSection: []wasm.Index{0, 1, 2},
 		NameSection: &wasm.NameSection{
@@ -2136,7 +2136,7 @@ func testImportedMutableGlobalUpdate(t *testing.T, r wazero.Runtime) {
 		GlobalSection: []wasm.Global{
 			{
 				Type: wasm.GlobalType{ValType: i32, Mutable: true},
-				Init: wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: []byte{1}},
+				Init: wasm.NewConstantExpressionFromI32(1),
 			},
 		},
 		NameSection: &wasm.NameSection{ModuleName: "imported"},
@@ -2244,12 +2244,13 @@ func testCloseTableExportingModule(t *testing.T, r wazero.Runtime) {
 		NameSection:  &wasm.NameSection{ModuleName: "exporting"},
 		ElementSection: []wasm.ElementSegment{
 			{
-				OffsetExpr: wasm.ConstantExpression{
-					Opcode: wasm.OpcodeI32Const,
-					Data:   leb128.EncodeInt32(5),
-				}, TableIndex: 0, Type: wasm.RefTypeFuncref, Mode: wasm.ElementModeActive,
+				OffsetExpr: wasm.NewConstantExpressionFromI32(5),
+				TableIndex: 0, Type: wasm.RefTypeFuncref, Mode: wasm.ElementModeActive,
 				// Set the function 0, 1 at table offset 5.
-				Init: []wasm.Index{0, 1},
+				Init: []wasm.ConstantExpression{
+					wasm.NewConstantExpressionFromOpcode(wasm.OpcodeRefFunc, []byte{0}),
+					wasm.NewConstantExpressionFromOpcode(wasm.OpcodeRefFunc, []byte{1}),
+				},
 			},
 		},
 		TypeSection:     []wasm.FunctionType{{Results: []wasm.ValueType{i32}}},
@@ -2357,12 +2358,13 @@ func testCloseTableImportingModule(t *testing.T, r wazero.Runtime) {
 		},
 		ElementSection: []wasm.ElementSegment{
 			{
-				OffsetExpr: wasm.ConstantExpression{
-					Opcode: wasm.OpcodeI32Const,
-					Data:   leb128.EncodeInt32(5),
-				}, TableIndex: 0, Type: wasm.RefTypeFuncref, Mode: wasm.ElementModeActive,
+				OffsetExpr: wasm.NewConstantExpressionFromI32(5),
+				TableIndex: 0, Type: wasm.RefTypeFuncref, Mode: wasm.ElementModeActive,
 				// Set the function 0, 1 at table offset 5.
-				Init: []wasm.Index{0, 1},
+				Init: []wasm.ConstantExpression{
+					wasm.NewConstantExpressionFromOpcode(wasm.OpcodeRefFunc, []byte{0}),
+					wasm.NewConstantExpressionFromOpcode(wasm.OpcodeRefFunc, []byte{1}),
+				},
 			},
 		},
 		FunctionSection: []wasm.Index{0, 0},

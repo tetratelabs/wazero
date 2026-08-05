@@ -430,6 +430,12 @@ func (m *mockCloser) Close(context.Context) error {
 	return nil
 }
 
+type freeRecordingMemory struct{ freed bool }
+
+func (f *freeRecordingMemory) Reallocate(uint64) []byte { return nil }
+
+func (f *freeRecordingMemory) Free() { f.freed = true }
+
 func TestModuleInstance_ensureResourcesClosed(t *testing.T) {
 	closer := &mockCloser{}
 
@@ -451,4 +457,27 @@ func TestModuleInstance_ensureResourcesClosed(t *testing.T) {
 		require.NoError(t, err)
 	}
 	require.Equal(t, 2, closer.called)
+
+	t.Run("frees owned memory", func(t *testing.T) {
+		owner := &mockModuleEngine{}
+		buf := &freeRecordingMemory{}
+		mem := &MemoryInstance{expBuffer: buf, ownerModuleEngine: owner}
+		m := &ModuleInstance{MemoryInstance: mem, Engine: owner}
+
+		require.NoError(t, m.ensureResourcesClosed(context.Background()))
+		require.True(t, buf.freed)
+		require.Nil(t, mem.expBuffer)
+	})
+
+	t.Run("does not free imported memory", func(t *testing.T) {
+		owner := &mockModuleEngine{}
+		importer := &mockModuleEngine{}
+		buf := &freeRecordingMemory{}
+		mem := &MemoryInstance{expBuffer: buf, ownerModuleEngine: owner}
+		m := &ModuleInstance{MemoryInstance: mem, Engine: importer}
+
+		require.NoError(t, m.ensureResourcesClosed(context.Background()))
+		require.False(t, buf.freed)
+		require.NotNil(t, mem.expBuffer)
+	})
 }

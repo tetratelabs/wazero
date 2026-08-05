@@ -84,7 +84,7 @@ func TestEncodeImport(t *testing.T) {
 				0x04, 'm', 'a', 't', 'h',
 				0x02, 'p', 'i',
 				wasm.ExternTypeGlobal,
-				wasm.ValueTypeF64, 0x00, // 0 == const
+				wasm.ValueTypeF64.Kind(), 0x00, // 0 == const
 			},
 		},
 		{
@@ -99,7 +99,7 @@ func TestEncodeImport(t *testing.T) {
 				0x04, 'm', 'a', 't', 'h',
 				0x02, 'p', 'i',
 				wasm.ExternTypeGlobal,
-				wasm.ValueTypeF64, 0x01, // 1 == var
+				wasm.ValueTypeF64.Kind(), 0x01, // 1 == var
 			},
 		},
 		{
@@ -114,7 +114,7 @@ func TestEncodeImport(t *testing.T) {
 				0x02, 'm', 'y',
 				0x05, 't', 'a', 'b', 'l', 'e',
 				wasm.ExternTypeTable,
-				wasm.RefTypeFuncref,
+				wasm.RefTypeFuncref.Kind(),
 				0x1, 0x1, 0x2, // Limit with max.
 			},
 		},

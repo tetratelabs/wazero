@@ -373,10 +373,7 @@ func Test888(t *testing.T) {
 						ValType: wasm.ValueTypeFuncref,
 						Mutable: false,
 					},
-					Init: wasm.ConstantExpression{
-						Opcode: wasm.OpcodeRefNull,
-						Data:   []byte{wasm.ValueTypeFuncref},
-					},
+					Init: wasm.NewConstantExpressionFromOpcode(wasm.OpcodeRefNull, []byte{wasm.ValueTypeFuncref.Kind()}),
 				},
 			},
 			ExportSection: []wasm.Export{

@@ -146,7 +146,7 @@ func (e *functionExporter) ExportFunctions(builder wazero.HostModuleBuilder) {
 var abortMessageEnabled = &wasm.HostFunc{
 	ExportName: AbortName,
 	Name:       "~lib/builtins/abort",
-	ParamTypes: []api.ValueType{i32, i32, i32, i32},
+	ParamTypes: []wasm.ValueType{i32, i32, i32, i32},
 	ParamNames: []string{"message", "fileName", "lineNumber", "columnNumber"},
 	Code:       wasm.Code{GoFunc: api.GoModuleFunc(abortWithMessage)},
 }
@@ -195,7 +195,7 @@ var traceDisabled = traceStdout.WithGoModuleFunc(func(context.Context, api.Modul
 var traceStdout = &wasm.HostFunc{
 	ExportName: TraceName,
 	Name:       "~lib/builtins/trace",
-	ParamTypes: []api.ValueType{i32, i32, f64, f64, f64, f64, f64},
+	ParamTypes: []wasm.ValueType{i32, i32, f64, f64, f64, f64, f64},
 	ParamNames: []string{"message", "nArgs", "arg0", "arg1", "arg2", "arg3", "arg4"},
 	Code: wasm.Code{
 		GoFunc: api.GoModuleFunc(func(_ context.Context, mod api.Module, stack []uint64) {
@@ -281,7 +281,7 @@ func formatFloat(f float64) string {
 var seed = &wasm.HostFunc{
 	ExportName:  SeedName,
 	Name:        "~lib/builtins/seed",
-	ResultTypes: []api.ValueType{f64},
+	ResultTypes: []wasm.ValueType{f64},
 	ResultNames: []string{"rand"},
 	Code: wasm.Code{
 		GoFunc: api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {

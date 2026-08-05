@@ -183,6 +183,23 @@ func serializeCompiledModule(wazeroVersion string, cm *compiledModule) io.Reader
 	} else {
 		buf.WriteByte(0) // indicates that source map is not present.
 	}
+	// Try-table info: number of try_tables (4 bytes), then for each:
+	// numLocals (4 bytes), reuseLocals (1 byte), clause count (4 bytes),
+	// then for each clause: kind (1 byte) + tagIndex (4 bytes).
+	buf.Write(u32.LeBytes(uint32(len(cm.tryTableInfo))))
+	for _, info := range cm.tryTableInfo {
+		buf.Write(u32.LeBytes(uint32(info.NumLocals)))
+		b := byte(0)
+		if info.ReuseLocals {
+			b = 1
+		}
+		buf.WriteByte(b)
+		buf.Write(u32.LeBytes(uint32(len(info.CatchClauses))))
+		for _, c := range info.CatchClauses {
+			buf.WriteByte(c.Kind)
+			buf.Write(u32.LeBytes(c.TagIndex))
+		}
+	}
 	return bytes.NewReader(buf.Bytes())
 }
 
@@ -290,6 +307,41 @@ func deserializeCompiledModule(wazeroVersion string, reader io.ReadCloser) (cm *
 			sm.wasmBinaryOffsets = append(sm.wasmBinaryOffsets, wasmBinaryOffset)
 			// executableOffsets is absolute address, so we need to add executableOffset.
 			sm.executableOffsets = append(sm.executableOffsets, uintptr(executableRelativeOffset)+executableOffset)
+		}
+	}
+	// Try-table info.
+	if _, err = io.ReadFull(reader, eightBytes[:4]); err != nil {
+		// Treat old cache entries without try-table data as stale (trigger recompile).
+		return nil, true, nil
+	}
+	tableLen := binary.LittleEndian.Uint32(eightBytes[:4])
+	if tableLen > 0 {
+		cm.tryTableInfo = make([]wazevoapi.TryTableInfo, tableLen)
+		for i := uint32(0); i < tableLen; i++ {
+			if _, err = io.ReadFull(reader, eightBytes[:5]); err != nil {
+				return nil, false, fmt.Errorf("compilationcache: error reading try_table[%d] header: %v", i, err)
+			}
+			numLocals := int(binary.LittleEndian.Uint32(eightBytes[:4]))
+			reuseLocals := eightBytes[4] != 0
+			if _, err = io.ReadFull(reader, eightBytes[:4]); err != nil {
+				return nil, false, fmt.Errorf("compilationcache: error reading catch clause count for try_table[%d]: %v", i, err)
+			}
+			clauseCount := binary.LittleEndian.Uint32(eightBytes[:4])
+			clauses := make([]wazevoapi.CatchClauseInstance, clauseCount)
+			for j := uint32(0); j < clauseCount; j++ {
+				if _, err = io.ReadFull(reader, eightBytes[:5]); err != nil {
+					return nil, false, fmt.Errorf("compilationcache: error reading catch clause[%d][%d]: %v", i, j, err)
+				}
+				clauses[j] = wazevoapi.CatchClauseInstance{
+					Kind:     eightBytes[0],
+					TagIndex: binary.LittleEndian.Uint32(eightBytes[1:5]),
+				}
+			}
+			cm.tryTableInfo[i] = wazevoapi.TryTableInfo{
+				CatchClauses: clauses,
+				NumLocals:    numLocals,
+				ReuseLocals:  reuseLocals,
+			}
 		}
 	}
 	return

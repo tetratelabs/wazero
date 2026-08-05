@@ -155,8 +155,8 @@ func setupHostCallBench(requireNoError func(error)) *wasm.ModuleInstance {
 	// Build the importing module.
 	importingModuleBin := binaryencoding.EncodeModule(&wasm.Module{
 		TypeSection: []wasm.FunctionType{{
-			Params:  []wasm.ValueType{i32},
-			Results: []wasm.ValueType{f32},
+			Params:  []wasm.ValueType{wasm.ValueType(i32)},
+			Results: []wasm.ValueType{wasm.ValueType(f32)},
 		}},
 		ImportSection: []wasm.Import{
 			// Placeholders for imports from hostModule.

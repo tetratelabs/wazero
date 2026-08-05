@@ -12,7 +12,7 @@ func encodeGlobal(g wasm.Global) (data []byte) {
 	if g.Type.Mutable {
 		mutable = 1
 	}
-	data = []byte{g.Type.ValType, mutable}
+	data = []byte{g.Type.ValType.Kind(), mutable}
 	data = append(data, encodeConstantExpression(g.Init)...)
 	return
 }

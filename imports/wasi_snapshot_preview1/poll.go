@@ -38,7 +38,7 @@ import (
 // See https://linux.die.net/man/3/poll
 var pollOneoff = newHostFunc(
 	wasip1.PollOneoffName, pollOneoffFn,
-	[]api.ValueType{i32, i32, i32, i32},
+	[]wasm.ValueType{i32, i32, i32, i32},
 	"in", "out", "nsubscriptions", "result.nevents",
 )
 
@@ -83,8 +83,11 @@ func pollOneoffFn(_ context.Context, mod api.Module, params []uint64) sys.Errno 
 
 	// Extract FS context, used in the body of the for loop for FS access.
 	fsc := mod.(*wasm.ModuleInstance).Sys.FS()
-	// Slice of events that are processed out of the loop (blocking stdin subscribers).
-	var blockingStdinSubs []*event
+	// blockingPollSubs are fd read subscriptions processed after the loop via polling.
+	var blockingPollSubs []struct {
+		evt  *event
+		file sys.File
+	}
 	// The timeout is initialized at max Duration, the loop will find the minimum.
 	var timeout time.Duration = 1<<63 - 1
 	// Count of all the subscriptions that have been already written back to outBuf.
@@ -135,9 +138,12 @@ func pollOneoffFn(_ context.Context, mod api.Module, params []uint64) sys.Errno 
 				writeEvent(outBuf[outOffset:], evt)
 				nevents++
 			} else {
-				// if the fd is Stdin, and it is in blocking mode,
-				// do not ack yet, append to a slice for delayed evaluation.
-				blockingStdinSubs = append(blockingStdinSubs, evt)
+				// The fd is in blocking mode; do not ack yet, append
+				// to a slice for deferred polling evaluation.
+				blockingPollSubs = append(blockingPollSubs, struct {
+					evt  *event
+					file sys.File
+				}{evt, file.File})
 			}
 		case wasip1.EventTypeFdWrite:
 			fd := int32(le.Uint32(argBuf))
@@ -168,24 +174,38 @@ func pollOneoffFn(_ context.Context, mod api.Module, params []uint64) sys.Errno 
 		return 0
 	}
 
-	// If there are blocking stdin subscribers, check for data with given timeout.
-	stdin, ok := fsc.LookupFile(internalsys.FdStdin)
-	if !ok {
-		return sys.EBADF
-	}
-
-	// Wait for the timeout to expire, or for some data to become available on Stdin.
-	if p, ok := stdin.File.(sys.Pollable); ok {
-		if stdinReady, errno := p.Poll(sys.POLLIN, int32(timeout.Milliseconds())); errno != 0 {
-			return errno
-		} else if stdinReady {
-			// stdin has data ready to for reading, write back all the events
-			for i := range blockingStdinSubs {
-				evt := blockingStdinSubs[i]
-				evt.errno = 0
-				writeEvent(outBuf[nevents*32:], evt)
+	// Wait for the timeout to expire, or for data to become available on
+	// each blocking fd subscriber. The remaining time budget is tracked
+	// across iterations so total wall time never exceeds the timeout.
+	remaining := timeout
+	for _, sub := range blockingPollSubs {
+		p, ok := sub.file.(sys.Pollable)
+		if !ok {
+			sub.evt.errno = wasip1.ErrnoNotsup
+			writeEvent(outBuf[nevents*32:], sub.evt)
+			nevents++
+			continue
+		}
+		start := time.Now()
+		ready, errno := p.Poll(sys.POLLIN, int32(remaining.Milliseconds()))
+		switch errno {
+		case 0:
+			if ready {
+				sub.evt.errno = 0
+				writeEvent(outBuf[nevents*32:], sub.evt)
 				nevents++
 			}
+		case sys.ENOSYS, sys.ENOTSUP:
+			sub.evt.errno = wasip1.ErrnoNotsup
+			writeEvent(outBuf[nevents*32:], sub.evt)
+			nevents++
+		default:
+			return errno
+		}
+		if elapsed := time.Since(start); elapsed < remaining {
+			remaining -= elapsed
+		} else {
+			remaining = 0
 		}
 	}
 

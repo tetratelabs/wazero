@@ -1,0 +1,1 @@
+(module (tag $e) (func (catch $e))) 

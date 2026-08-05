@@ -40,6 +40,7 @@ func TestSerializeCompiledModule(t *testing.T) {
 				[]byte{1, 2, 3, 4, 5},       // code.
 				crcf([]byte{1, 2, 3, 4, 5}), // crc for the code.
 				[]byte{0},                   // no source map.
+				u32.LeBytes(0),              // empty catch clause table.
 			),
 		},
 		{
@@ -57,6 +58,7 @@ func TestSerializeCompiledModule(t *testing.T) {
 				[]byte{1, 2, 3, 4, 5},       // code.
 				crcf([]byte{1, 2, 3, 4, 5}), // crc for the code.
 				[]byte{0},                   // no source map.
+				u32.LeBytes(0),              // empty catch clause table.
 			),
 		},
 		{
@@ -78,6 +80,7 @@ func TestSerializeCompiledModule(t *testing.T) {
 				[]byte{1, 2, 3, 4, 5, 1, 2, 3},       // code.
 				crcf([]byte{1, 2, 3, 4, 5, 1, 2, 3}), // crc for the code.
 				[]byte{0},                            // no source map.
+				u32.LeBytes(0),                       // empty catch clause table.
 			),
 		},
 	}
@@ -153,6 +156,7 @@ func TestDeserializeCompiledModule(t *testing.T) {
 				[]byte{1, 2, 3, 4, 5},       // machine code.
 				crcf([]byte{1, 2, 3, 4, 5}), // machine code.
 				[]byte{0},                   // no source map.
+				u32.LeBytes(0),              // empty catch clause table.
 			),
 			expCompiledModule: &compiledModule{
 				executables:     &executables{executable: []byte{1, 2, 3, 4, 5}},
@@ -176,7 +180,8 @@ func TestDeserializeCompiledModule(t *testing.T) {
 				u64.LeBytes(10),                             // size.
 				[]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},       // machine code.
 				crcf([]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}), // crc for machine code.
-				[]byte{0}, // no source map.
+				[]byte{0},      // no source map.
+				u32.LeBytes(0), // empty catch clause table.
 			),
 			importedFunctionCount: 1,
 			expCompiledModule: &compiledModule{
@@ -185,6 +190,23 @@ func TestDeserializeCompiledModule(t *testing.T) {
 			},
 			expStaleCache: false,
 			expErr:        "",
+		},
+		{
+			name: "old cache without catch clause table (stale)",
+			in: concat(
+				magic,
+				[]byte{byte(len(testVersion))},
+				[]byte(testVersion),
+				u32.LeBytes(1), // number of functions.
+				u64.LeBytes(0), // offset.
+				// Executable.
+				u64.LeBytes(5),              // size.
+				[]byte{1, 2, 3, 4, 5},       // machine code.
+				crcf([]byte{1, 2, 3, 4, 5}), // machine code.
+				[]byte{0},                   // no source map.
+				// no catch clause table — old format.
+			),
+			expStaleCache: true,
 		},
 		{
 			name: "reading executable offset",

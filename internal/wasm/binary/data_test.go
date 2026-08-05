@@ -37,11 +37,8 @@ func Test_decodeDataSegment(t *testing.T) {
 				0x2, 0xf, 0xf,
 			},
 			exp: wasm.DataSegment{
-				OffsetExpression: wasm.ConstantExpression{
-					Opcode: wasm.OpcodeI32Const,
-					Data:   []byte{0x1},
-				},
-				Init: []byte{0xf, 0xf},
+				OffsetExpression: wasm.NewConstantExpressionFromI32(1),
+				Init:             []byte{0xf, 0xf},
 			},
 			features: api.CoreFeatureBulkMemoryOperations,
 		},
@@ -52,7 +49,7 @@ func Test_decodeDataSegment(t *testing.T) {
 				wasm.OpcodeI32Const, 0x1,
 				0x2, 0xf, 0xf,
 			},
-			expErr:   "read offset expression: constant expression has been not terminated",
+			expErr:   "read offset expression: invalid byte for const expression op code: 0x2",
 			features: api.CoreFeatureBulkMemoryOperations,
 		},
 		{
@@ -77,11 +74,8 @@ func Test_decodeDataSegment(t *testing.T) {
 				0x2, 0xf, 0xf,
 			},
 			exp: wasm.DataSegment{
-				OffsetExpression: wasm.ConstantExpression{
-					Opcode: wasm.OpcodeI32Const,
-					Data:   []byte{0x1},
-				},
-				Init: []byte{0xf, 0xf},
+				OffsetExpression: wasm.NewConstantExpressionFromI32(1),
+				Init:             []byte{0xf, 0xf},
 			},
 			features: api.CoreFeatureBulkMemoryOperations,
 		},
@@ -106,7 +100,7 @@ func Test_decodeDataSegment(t *testing.T) {
 				// Two initial data.
 				0x2, 0xf, 0xf,
 			},
-			expErr:   "read offset expression: constant expression has been not terminated",
+			expErr:   "read offset expression: invalid byte for const expression op code: 0x2",
 			features: api.CoreFeatureBulkMemoryOperations,
 		},
 		{

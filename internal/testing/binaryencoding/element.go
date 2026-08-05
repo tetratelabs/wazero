@@ -27,8 +27,17 @@ func encodeElement(e *wasm.ElementSegment) (ret []byte) {
 		ret = append(ret, leb128.EncodeInt32(int32(e.TableIndex))...)
 		ret = append(ret, encodeConstantExpression(e.OffsetExpr)...)
 		ret = append(ret, leb128.EncodeUint32(uint32(len(e.Init)))...)
-		for _, idx := range e.Init {
-			ret = append(ret, leb128.EncodeInt32(int32(idx))...)
+		for _, expr := range e.Init {
+			if expr.Data[0] == wasm.OpcodeRefFunc {
+				u32, n, _ := leb128.DecodeUint32(bytes.NewReader(expr.Data[1:]))
+				ind := uint32(u32)
+				ret = append(ret, leb128.EncodeUint32(ind)...)
+				if expr.Data[1+n] != wasm.OpcodeEnd {
+					panic("only single op ref.func is supported for active element encoding")
+				}
+			} else {
+				panic("only ref.func is supported for active element encoding")
+			}
 		}
 	} else {
 		panic("TODO: support encoding for non-active elements in bulk-memory-operations proposal")

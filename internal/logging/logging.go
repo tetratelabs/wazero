@@ -25,6 +25,7 @@ const (
 	ValueTypeV128      ValueType = 0x7b // same as wasm.ValueTypeV128
 	ValueTypeFuncref   ValueType = 0x70 // same as wasm.ValueTypeFuncref
 	ValueTypeExternref           = api.ValueTypeExternref
+	ValueTypeExnref    ValueType = 0x69 // same as wasm.ValueTypeExnref
 
 	// ValueTypeMemI32 is a non-standard type which writes ValueTypeI32 from the memory offset.
 	ValueTypeMemI32 = 0xfd
@@ -211,7 +212,7 @@ func ValWriterForType(vt ValueType) ValWriter {
 		return writeF64
 	case ValueTypeV128:
 		return writeV128
-	case ValueTypeExternref, ValueTypeFuncref:
+	case ValueTypeExternref, ValueTypeFuncref, ValueTypeExnref:
 		return writeRef
 	case ValueTypeMemI32:
 		return writeMemI32

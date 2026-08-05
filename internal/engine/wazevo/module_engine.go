@@ -136,6 +136,14 @@ func (m *moduleEngine) setupOpaque() {
 		}
 	}
 
+	if tagOffset := offsets.TagsBegin; tagOffset >= 0 {
+		for _, tag := range inst.Tags {
+			binary.LittleEndian.PutUint64(opaque[tagOffset:],
+				uint64(uintptr(unsafe.Pointer(tag))))
+			tagOffset += 8
+		}
+	}
+
 	if beforeListenerOffset := offsets.BeforeListenerTrampolines1stElement; beforeListenerOffset >= 0 {
 		binary.LittleEndian.PutUint64(opaque[beforeListenerOffset:], uint64(uintptr(unsafe.Pointer(&m.parent.listenerBeforeTrampolines[0]))))
 	}
@@ -208,6 +216,10 @@ func (m *moduleEngine) NewFunction(index wasm.Index) api.Function {
 	ce.execCtx.memoryWait32TrampolineAddress = sharedFunctions.memoryWait32Address
 	ce.execCtx.memoryWait64TrampolineAddress = sharedFunctions.memoryWait64Address
 	ce.execCtx.memoryNotifyTrampolineAddress = sharedFunctions.memoryNotifyAddress
+	ce.execCtx.throwAllocTrampolineAddress = sharedFunctions.throwAllocTrampolineAddress
+	ce.execCtx.throwTrampolineAddress = sharedFunctions.throwTrampolineAddress
+	ce.execCtx.tryTableEnterTrampolineAddress = sharedFunctions.tryTableEnterAddress
+	ce.execCtx.tryTableLeaveTrampolineAddress = sharedFunctions.tryTableLeaveAddress
 	ce.execCtx.memmoveAddress = memmovPtr
 	ce.init()
 	return ce
