@@ -653,6 +653,9 @@ func (m *Module) validateConstExpression(globals []GlobalType, numFuncs uint32, 
 			if uint32(len(globals)) <= globalIndex {
 				return 0, 0, 0, fmt.Errorf("global index out of range")
 			}
+			if globals[globalIndex].Mutable {
+				return 0, 0, 0, fmt.Errorf("global.get %d: global must be immutable", globalIndex)
+			}
 			return globals[globalIndex].ValType, 0, 0, nil
 		},
 		func(funcIndex Index) (Reference, error) {
@@ -723,6 +726,9 @@ func (m *Module) resolveConstExprGlobalType(enabledFeatures api.CoreFeatures, se
 				continue
 			}
 			if idx == cur {
+				if err := requireImmutableForConstExpr(imp.DescGlobal, sectionID, sectionIdx, idx); err != nil {
+					return 0, err
+				}
 				return imp.DescGlobal.ValType, nil
 			}
 			cur++
@@ -752,7 +758,20 @@ func (m *Module) resolveConstExprGlobalType(enabledFeatures api.CoreFeatures, se
 		return 0, fmt.Errorf("%s[%d] (global.get %d): out of range of initialized globals", SectionIDName(sectionID), sectionIdx, idx)
 	}
 
+	if err := requireImmutableForConstExpr(m.GlobalSection[idx].Type, sectionID, sectionIdx, idx); err != nil {
+		return 0, err
+	}
 	return m.GlobalSection[idx].Type.ValType, nil
+}
+
+// requireImmutableForConstExpr rejects a global.get in a constant expression that names a
+// mutable global, which a constant expression may not do.
+func requireImmutableForConstExpr(g GlobalType, sectionID SectionID, sectionIdx Index, idx Index) error {
+	if g.Mutable {
+		return fmt.Errorf("%s[%d] (global.get %d): global must be immutable",
+			SectionIDName(sectionID), sectionIdx, idx)
+	}
+	return nil
 }
 
 func paramNames(localNames IndirectNameMap, funcIdx uint32, paramLen int) []string {

@@ -37,6 +37,15 @@ var (
 	ErrRuntimeUncaughtException = New("uncaught exception")
 	// ErrRuntimeNullReference indicates a null reference was used where a non-null reference was expected.
 	ErrRuntimeNullReference = New("null reference")
+	// ErrRuntimeTooManyExceptions indicates the exception handle space is exhausted, which
+	// only a platform whose Reference is narrower than 64 bits can reach.
+	ErrRuntimeTooManyExceptions = New("too many exceptions")
+	// ErrRuntimeExpiredExceptionRef indicates an exnref was used by a call that cannot reach
+	// it: nothing the call holds, and no global or table, names that exception. A handle
+	// cannot cross the host boundary in either direction (see the exception handling notes
+	// on experimental.CoreFeaturesExceptionHandling), so guest code alone can reach this,
+	// and only where the runtime's own accounting has gone wrong.
+	ErrRuntimeExpiredExceptionRef = New("expired exception reference")
 )
 
 // Error is returned by a wasm.Engine during the execution of Wasm functions, and they indicate that the Wasm runtime

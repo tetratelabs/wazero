@@ -482,6 +482,78 @@ func TestModule_validateGlobals(t *testing.T) {
 		err := m.validateGlobals(globalDeclarations, 0, 9)
 		require.NoError(t, err)
 	})
+	// A constant expression is evaluated once, at instantiation, so global.get in one may
+	// only name an immutable global: "global.get x is constant if C.globals[x] is of the
+	// form (ε t)", a global type being mut? valtype.
+	t.Run("mutable imported global", func(t *testing.T) {
+		m := Module{
+			ImportGlobalCount: 1,
+			GlobalSection: []Global{
+				{
+					Type: GlobalType{ValType: ValueTypeI32},
+					Init: NewConstantExpressionFromOpcode(OpcodeGlobalGet, []byte{0}),
+				},
+			},
+			ImportSection: []Import{{Type: ExternTypeGlobal}},
+		}
+		globalDeclarations := []GlobalType{
+			{ValType: ValueTypeI32, Mutable: true}, // Imported one.
+			{},                                     // the local one trying to validate.
+		}
+		err := m.validateGlobals(globalDeclarations, 0, 9)
+		require.EqualError(t, err, "global.get 0: global must be immutable")
+	})
+}
+
+// TestModule_mutableGlobalInConstExpr covers the rule on the other constant expressions a
+// module can hold. There are two independent paths that resolve a global for a constant
+// expression -- validateConstExpression, from the section validators, and
+// resolveConstExprGlobalType, from declaredFunctionIndexes and validateTable -- so both are
+// exercised here.
+func TestModule_mutableGlobalInConstExpr(t *testing.T) {
+	mutI32 := GlobalType{ValType: ValueTypeI32, Mutable: true}
+	globalGet0 := NewConstantExpressionFromOpcode(OpcodeGlobalGet, []byte{0})
+	importMutI32 := []Import{{Type: ExternTypeGlobal, DescGlobal: mutI32}}
+
+	// validateConstExpression, reached through the data section validator.
+	t.Run("data segment offset", func(t *testing.T) {
+		m := Module{
+			ImportGlobalCount: 1,
+			ImportSection:     importMutI32,
+			DataSection:       []DataSegment{{OffsetExpression: globalGet0}},
+		}
+		err := m.validateMemory(&Memory{Min: 1, Cap: 1, Max: 1}, []GlobalType{mutI32}, api.CoreFeaturesV2)
+		require.EqualError(t, err, "calculate offset: global.get 0: global must be immutable")
+	})
+
+	// resolveConstExprGlobalType, reached through the table/element validator.
+	t.Run("element segment offset", func(t *testing.T) {
+		m := Module{
+			ImportGlobalCount: 1,
+			ImportSection:     importMutI32,
+			ElementSection: []ElementSegment{{
+				OffsetExpr: globalGet0,
+				Init:       []ConstantExpression{{Data: []byte{OpcodeRefNull, byte(RefTypeFuncref), OpcodeEnd}}},
+				Type:       RefTypeFuncref,
+				Mode:       ElementModeActive,
+			}},
+		}
+		err := m.validateTable(api.CoreFeaturesV2, []Table{{Type: RefTypeFuncref, Min: 1}}, MaximumTableIndex)
+		require.EqualError(t, err,
+			"element[0] couldn't evaluate offset expression: element[0] (global.get 0): global must be immutable")
+	})
+
+	// resolveConstExprGlobalType, reached through declaredFunctionIndexes.
+	t.Run("global initialiser", func(t *testing.T) {
+		m := Module{
+			ImportGlobalCount: 1,
+			ImportSection:     importMutI32,
+			GlobalSection:     []Global{{Type: GlobalType{ValType: ValueTypeI32}, Init: globalGet0}},
+		}
+		_, err := m.declaredFunctionIndexes(api.CoreFeaturesV2)
+		require.EqualError(t, err,
+			"global[0] failed to initialize: global[0] (global.get 0): global must be immutable")
+	})
 }
 
 func TestModule_validateFunctions(t *testing.T) {

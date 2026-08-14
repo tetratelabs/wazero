@@ -30,14 +30,12 @@ const (
 	ExitCodeMemoryWait64
 	ExitCodeMemoryNotify
 	ExitCodeUnalignedAtomic
-	// ExitCodeThrowAlloc is the first phase of wasm throw: Go allocates the
-	// Exception heap object (with Params sized to the tag's param count) and
-	// writes its Params data pointer to execCtx.exceptionParamsPtr.
-	// Compiled code then stores params directly into the Exception.Params slice,
-	// followed by ExitCodeThrow to search for a matching handler.
+	// ExitCodeThrowAlloc is an exit code for starting a throw: it records the raise and
+	// returns a params buffer sized to the tag, for compiled code to store the params into.
 	ExitCodeThrowAlloc
 	// ExitCodeThrow is the shared throw/throw_ref exit code.
-	// The exnref is passed on the stack. The handler searches for a
+	// The exnref is passed on the stack, and is zero for a throw, whose exception
+	// the throw-alloc exit has already recorded. The handler searches for a
 	// matching catch clause and restores the stack checkpoint.
 	ExitCodeThrow
 	// ExitCodeNullReference is an exit code for a null reference trap (throw_ref with null exnref).
@@ -49,6 +47,25 @@ const (
 	// ExitCodeTryTableLeave is an exit code for leaving a try_table block.
 	// The dispatch loop pops the most recent try handler.
 	ExitCodeTryTableLeave
+	// ExitCodeExnrefSlotFill is an exit code for the write barrier over a run of
+	// exnref-typed table slots, which table.fill writes.
+	ExitCodeExnrefSlotFill
+	// ExitCodeExnrefSlotCopy is an exit code for the write barrier over a run of
+	// exnref-typed table slots copied from elsewhere, which table.copy and table.init write.
+	ExitCodeExnrefSlotCopy
+	// ExitCodeExnrefSlotLoad is an exit code for the read barrier on an exnref-typed global
+	// or table slot: what the slot names becomes reachable from this call, so the runtime
+	// has to pin it before compiled code can hold the handle.
+	ExitCodeExnrefSlotLoad
+	// ExitCodeExnrefSlotStore is an exit code for the write barrier on an exnref-typed
+	// global or table slot: the slot becomes a durable holder of what it now names, and
+	// stops being one for what it held.
+	ExitCodeExnrefSlotStore
+	// ExitCodeAdjustExnrefs is an exit code for adjusting the call's exnref reference counts:
+	// one handle gains a reference, another loses one. Either may be zero, meaning nothing.
+	// One exit covers all of it because the instructions that move an exnref between a local
+	// and the operand stack do both at once.
+	ExitCodeAdjustExnrefs
 	exitCodeMax
 )
 
@@ -103,14 +120,24 @@ func (e ExitCode) String() string {
 		return "memory_wait32"
 	case ExitCodeMemoryWait64:
 		return "memory_wait64"
+	case ExitCodeExnrefSlotFill:
+		return "exnref_slot_fill"
+	case ExitCodeExnrefSlotCopy:
+		return "exnref_slot_copy"
+	case ExitCodeExnrefSlotLoad:
+		return "exnref_slot_load"
+	case ExitCodeExnrefSlotStore:
+		return "exnref_slot_store"
+	case ExitCodeAdjustExnrefs:
+		return "adjust_exnrefs"
 	case ExitCodeMemoryNotify:
 		return "memory_notify"
 	case ExitCodeThrowAlloc:
 		return "throw_alloc"
-	case ExitCodeThrow:
-		return "throw"
 	case ExitCodeNullReference:
 		return "null_reference"
+	case ExitCodeThrow:
+		return "throw"
 	case ExitCodeTryTableEnter:
 		return "try_table_enter"
 	case ExitCodeTryTableLeave:

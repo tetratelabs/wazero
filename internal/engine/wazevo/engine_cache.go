@@ -184,7 +184,8 @@ func serializeCompiledModule(wazeroVersion string, cm *compiledModule) io.Reader
 	}
 	// Try-table info: number of try_tables (4 bytes), then for each:
 	// numLocals (4 bytes), reuseLocals (1 byte), clause count (4 bytes),
-	// then for each clause: kind (1 byte) + tagIndex (4 bytes).
+	// then for each clause: kind (1 byte) + tagIndex (4 bytes), then
+	// exnref local count (4 bytes) and each index (4 bytes).
 	buf.Write(u32.LeBytes(uint32(len(cm.tryTableInfo))))
 	for _, info := range cm.tryTableInfo {
 		buf.Write(u32.LeBytes(uint32(info.NumLocals)))
@@ -197,6 +198,10 @@ func serializeCompiledModule(wazeroVersion string, cm *compiledModule) io.Reader
 		for _, c := range info.CatchClauses {
 			buf.WriteByte(c.Kind)
 			buf.Write(u32.LeBytes(c.TagIndex))
+		}
+		buf.Write(u32.LeBytes(uint32(len(info.ExnrefLocals))))
+		for _, l := range info.ExnrefLocals {
+			buf.Write(u32.LeBytes(l))
 		}
 	}
 	return bytes.NewReader(buf.Bytes())
@@ -336,10 +341,24 @@ func deserializeCompiledModule(wazeroVersion string, reader io.ReadCloser) (cm *
 					TagIndex: binary.LittleEndian.Uint32(eightBytes[1:5]),
 				}
 			}
+			if _, err = io.ReadFull(reader, eightBytes[:4]); err != nil {
+				return nil, false, fmt.Errorf("compilationcache: error reading exnref local count for try_table[%d]: %v", i, err)
+			}
+			var exnrefLocals []uint32
+			if n := binary.LittleEndian.Uint32(eightBytes[:4]); n > 0 {
+				exnrefLocals = make([]uint32, n)
+				for j := range exnrefLocals {
+					if _, err = io.ReadFull(reader, eightBytes[:4]); err != nil {
+						return nil, false, fmt.Errorf("compilationcache: error reading exnref local[%d][%d]: %v", i, j, err)
+					}
+					exnrefLocals[j] = binary.LittleEndian.Uint32(eightBytes[:4])
+				}
+			}
 			cm.tryTableInfo[i] = wazevoapi.TryTableInfo{
 				CatchClauses: clauses,
 				NumLocals:    numLocals,
 				ReuseLocals:  reuseLocals,
+				ExnrefLocals: exnrefLocals,
 			}
 		}
 	}

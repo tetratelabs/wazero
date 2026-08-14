@@ -38,6 +38,7 @@ type engine struct {
 	enabledFeatures   api.CoreFeatures
 	compiledFunctions map[wasm.ModuleID]*compiledFunctionWithCount // guarded by mutex.
 	mux               sync.Mutex
+	exceptions        wasm.ExceptionStore // exceptions outliving the call that threw them.
 }
 
 func NewEngine(_ context.Context, enabledFeatures api.CoreFeatures, _ filecache.Cache) wasm.Engine {
@@ -112,6 +113,10 @@ type moduleEngine struct {
 
 	// parentEngine holds *engine from which this module engine is created from.
 	parentEngine *engine
+
+	// instance is the module instance this engine was created for, used on close to drop
+	// the exnrefs its globals and tables still hold.
+	instance *wasm.ModuleInstance
 }
 
 // GetGlobalValue implements the same method as documented on wasm.ModuleEngine.
@@ -145,15 +150,23 @@ type restorable interface {
 // thrownException is the panic value for wasm exception propagation.
 type thrownException struct {
 	exception *wasm.Exception
+	// The stack this raise started on.
+	trace []capturedFrame
 	// Fields populated by canRestore for doRestore.
 	clause *exceptionTableCatchClause
 	values []uint64
 }
 
+// capturedFrame is one frame of a stack recorded at a raise.
+type capturedFrame struct {
+	f  *function
+	pc uint64
+}
+
 func (t *thrownException) canRestore(ce *callEngine, callerFrameCount int) bool {
 	ce.frames = ce.frames[:callerFrameCount]
 	frame := ce.frames[callerFrameCount-1]
-	t.clause, t.values = searchExceptionTable(t.exception, frame)
+	t.clause, t.values = ce.searchExceptionTable(t.exception, frame)
 	return t.clause != nil
 }
 
@@ -182,26 +195,37 @@ type callEngine struct {
 
 	// stackiterator for Listeners to walk frames and stack.
 	stackIterator stackIterator
+
+	// engine is the engine this call engine was created from.
+	engine *engine
+
+	// heldExceptions contains the exceptions referenced within this call, keyed by exnref
+	// handle.
+	heldExceptions map[wasm.Reference]*wasm.Exception
 }
 
 // matchCatchClause checks whether a single catch clause matches the given exception.
 // Returns whether it matched and the values to push onto the stack.
-func matchCatchClause(kind byte, clauseTag *wasm.TagInstance, exn *wasm.Exception) (matched bool, values []uint64) {
+func (ce *callEngine) matchCatchClause(kind byte, clauseTag *wasm.TagInstance, exn *wasm.Exception) (matched bool, values []uint64) {
 	switch kind {
 	case wasm.CatchKindCatch:
 		if exn.Tag == clauseTag {
+			ce.holdParamRefs(exn)
 			return true, slices.Clone(exn.Params)
 		}
 	case wasm.CatchKindCatchRef:
 		if exn.Tag == clauseTag {
+			ce.holdParamRefs(exn)
+			ce.holdException(exn)
 			values = slices.Clone(exn.Params)
-			values = append(values, uint64(uintptr(unsafe.Pointer(exn))))
+			values = append(values, uint64(exn.ID))
 			return true, values
 		}
 	case wasm.CatchKindCatchAll:
 		return true, nil
 	case wasm.CatchKindCatchAllRef:
-		return true, []uint64{uint64(uintptr(unsafe.Pointer(exn)))}
+		ce.holdException(exn)
+		return true, []uint64{uint64(exn.ID)}
 	}
 	return false, nil
 }
@@ -210,8 +234,7 @@ func matchCatchClause(kind byte, clauseTag *wasm.TagInstance, exn *wasm.Exceptio
 // for a handler matching the given exception at the current PC. Returns the
 // matched clause and catch values, or nil if no handler matches. Searches
 // backwards so inner try_tables (which have higher indices) are checked first.
-// This function is pure — it does not modify callEngine state.
-func searchExceptionTable(exn *wasm.Exception, frame *callFrame) (*exceptionTableCatchClause, []uint64) {
+func (ce *callEngine) searchExceptionTable(exn *wasm.Exception, frame *callFrame) (*exceptionTableCatchClause, []uint64) {
 	table := frame.f.parent.exceptionTable
 	pc := frame.pc
 	for i := len(table) - 1; i >= 0; i-- {
@@ -225,7 +248,7 @@ func searchExceptionTable(exn *wasm.Exception, frame *callFrame) (*exceptionTabl
 			if clause.kind == wasm.CatchKindCatch || clause.kind == wasm.CatchKindCatchRef {
 				clauseTag = frame.f.moduleInstance.Tags[clause.tagIndex]
 			}
-			matched, values := matchCatchClause(clause.kind, clauseTag, exn)
+			matched, values := ce.matchCatchClause(clause.kind, clauseTag, exn)
 			if matched {
 				return clause, values
 			}
@@ -272,8 +295,76 @@ func (ce *callEngine) callWithUnwind(ctx context.Context, m *wasm.ModuleInstance
 	return caught
 }
 
+// holdException makes exn resolvable by its handle for the rest of the call.
+func (ce *callEngine) holdException(exn *wasm.Exception) {
+	if ce.heldExceptions == nil {
+		ce.heldExceptions = make(map[wasm.Reference]*wasm.Exception)
+	}
+	ce.heldExceptions[exn.ID] = exn
+}
+
+// holdParamRefs holds the exceptions named by exn's exnref params, which a tag-matched
+// clause is about to push for the handler.
+func (ce *callEngine) holdParamRefs(exn *wasm.Exception) {
+	for _, p := range exn.ParamRefs {
+		ce.holdException(p)
+	}
+}
+
+// resolveExnrefParamRefs resolves the exceptions a raise's exnref params name. Only the raising call
+// can: it is the one holding them, having had them on its operand stack. Ones it cannot reach
+// are left out -- nothing can, so there is nothing to keep alive.
+func (ce *callEngine) resolveExnrefParamRefs(tag *wasm.TagInstance, params []uint64) []*wasm.Exception {
+	var refs []*wasm.Exception
+	for i, t := range tag.Type.Params {
+		if wasm.IsExnref(t) {
+			if p := ce.heldExceptions[wasm.Reference(params[i])]; p != nil {
+				refs = append(refs, p)
+			}
+		}
+	}
+	return refs
+}
+
+// storeExnrefSlot is the write barrier for an exnref-typed global or table slot. The
+// handle comes from guest code, so this call must hold what it names.
+func (ce *callEngine) storeExnrefSlot(slot *wasm.Reference, handle wasm.Reference) {
+	var exn *wasm.Exception
+	if handle != 0 {
+		if exn = ce.heldExceptions[handle]; exn == nil {
+			panic(wasmruntime.ErrRuntimeExpiredExceptionRef)
+		}
+	}
+	ce.engine.exceptions.StoreSlot(slot, exn)
+}
+
+// loadExnrefSlot is the read barrier: what a slot names becomes reachable from this call,
+// so it stays resolvable even if the slot is overwritten before the call ends.
+func (ce *callEngine) loadExnrefSlot(slot *wasm.Reference) wasm.Reference {
+	exn := ce.engine.exceptions.LoadSlot(slot)
+	if exn == nil {
+		return 0
+	}
+	ce.holdException(exn)
+	return exn.ID
+}
+
+// captureFrames records the live wasm stack, innermost first.
+func (ce *callEngine) captureFrames() []capturedFrame {
+	n := len(ce.frames)
+	if n > wasmdebug.MaxFrames {
+		n = wasmdebug.MaxFrames
+	}
+	frames := make([]capturedFrame, n)
+	for i := range frames {
+		frame := ce.frames[len(ce.frames)-1-i]
+		frames[i] = capturedFrame{f: frame.f, pc: frame.pc}
+	}
+	return frames
+}
+
 func (e *moduleEngine) newCallEngine(compiled *function) *callEngine {
-	return &callEngine{f: compiled}
+	return &callEngine{f: compiled, engine: e.parentEngine}
 }
 
 func (ce *callEngine) pushValue(v uint64) {
@@ -551,6 +642,7 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 func (e *engine) NewModuleEngine(module *wasm.Module, instance *wasm.ModuleInstance) (wasm.ModuleEngine, error) {
 	me := &moduleEngine{
 		parentEngine: e,
+		instance:     instance,
 		functions:    make([]function, len(module.FunctionSection)+int(module.ImportFunctionCount)),
 	}
 
@@ -682,6 +774,11 @@ func (e *moduleEngine) ResolveImportedMemory(wasm.ModuleEngine) {}
 // DoneInstantiation implements wasm.ModuleEngine.
 func (e *moduleEngine) DoneInstantiation() {}
 
+// ModuleClosed implements wasm.ModuleEngine.
+func (e *moduleEngine) ModuleClosed() {
+	e.parentEngine.exceptions.ReleaseModuleSlots(e.instance)
+}
+
 // FunctionInstanceReference implements the same method as documented on wasm.ModuleEngine.
 func (e *moduleEngine) FunctionInstanceReference(funcIndex wasm.Index) wasm.Reference {
 	return uintptr(unsafe.Pointer(&e.functions[funcIndex]))
@@ -768,6 +865,9 @@ func (ce *callEngine) call(ctx context.Context, params, results []uint64) (_ []u
 		if v := recover(); v != nil {
 			err = ce.recoverOnCall(ctx, m, v)
 		}
+
+		// Drop this call's pins. What a global or table holds stays alive in the store.
+		clear(ce.heldExceptions)
 	}()
 
 	ce.pushValues(params)
@@ -807,32 +907,49 @@ func (ce *callEngine) recoverOnCall(ctx context.Context, m *wasm.ModuleInstance,
 		panic(s)
 	}
 
-	// If an exception reached the top level without being caught, convert it to an uncaught exception error.
-	if _, ok := v.(*thrownException); ok {
-		v = wasmruntime.ErrRuntimeUncaughtException
-	}
-
 	builder := wasmdebug.NewErrorBuilder()
-	frameCount := len(ce.frames)
 	functionListeners := make([]functionListenerInvocation, 0, 16)
-
-	if frameCount > wasmdebug.MaxFrames {
-		frameCount = wasmdebug.MaxFrames
-	}
-	for i := 0; i < frameCount; i++ {
-		frame := ce.popFrame()
-		f := frame.f
-		def := f.definition()
+	addFrame := func(cf capturedFrame) {
+		def := cf.f.definition()
 		var sources []string
-		if parent := frame.f.parent; parent.body != nil && len(parent.offsetsInWasmBinary) > 0 {
-			sources = parent.source.DWARFLines.Line(parent.offsetsInWasmBinary[frame.pc])
+		if parent := cf.f.parent; parent.body != nil && len(parent.offsetsInWasmBinary) > 0 {
+			sources = parent.source.DWARFLines.Line(parent.offsetsInWasmBinary[cf.pc])
 		}
 		builder.AddFrame(def.DebugName(), def.ParamTypes(), def.ResultTypes(), sources)
-		if f.parent.listener != nil {
-			functionListeners = append(functionListeners, functionListenerInvocation{
-				FunctionListener: f.parent.listener,
-				def:              f.definition(),
-			})
+	}
+
+	if thrown, ok := v.(*thrownException); ok {
+		// Uncaught. Searching for a handler popped the frames it unwound, so replay what
+		// was captured at the raise instead of walking what is left of the stack. These
+		// frames get no listener notification: each was aborted as it was unwound.
+		origin, _ := thrown.exception.Origin.([]capturedFrame)
+		for _, cf := range thrown.trace {
+			addFrame(cf)
+		}
+		// Thrown somewhere other than where it was last thrown: report both. These frames
+		// are long gone, so they are context rather than part of the stack that aborted.
+		if !slices.Equal(origin, thrown.trace) {
+			builder.StartSection(wasmdebug.ExceptionOriginSection)
+			for _, cf := range origin {
+				addFrame(cf)
+			}
+		}
+		v = wasmruntime.ErrRuntimeUncaughtException
+	} else {
+		frameCount := len(ce.frames)
+		if frameCount > wasmdebug.MaxFrames {
+			frameCount = wasmdebug.MaxFrames
+		}
+		for i := 0; i < frameCount; i++ {
+			frame := ce.popFrame()
+			f := frame.f
+			addFrame(capturedFrame{f: f, pc: frame.pc})
+			if f.parent.listener != nil {
+				functionListeners = append(functionListeners, functionListenerInvocation{
+					FunctionListener: f.parent.listener,
+					def:              f.definition(),
+				})
+			}
 		}
 	}
 
@@ -990,6 +1107,11 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			frame.pc++
 		case operationKindGlobalGet:
 			g := globals[op.U1]
+			if wasm.IsExnref(g.Type.ValType) {
+				ce.pushValue(uint64(ce.loadExnrefSlot(wasm.ExnrefSlot(g))))
+				frame.pc++
+				continue
+			}
 			ce.pushValue(g.Val)
 			if g.Type.ValType == wasm.ValueTypeV128 {
 				ce.pushValue(g.ValHi)
@@ -1000,7 +1122,12 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			if g.Type.ValType == wasm.ValueTypeV128 {
 				g.ValHi = ce.popValue()
 			}
-			g.Val = ce.popValue()
+			v := ce.popValue()
+			if wasm.IsExnref(g.Type.ValType) {
+				ce.storeExnrefSlot(wasm.ExnrefSlot(g), wasm.Reference(v))
+			} else {
+				g.Val = v
+			}
 			frame.pc++
 		case operationKindLoad:
 			offset := ce.popMemoryOffset(op)
@@ -1949,6 +2076,14 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 				inTableOffset+copySize > uint64(len(table.References)) {
 				panic(wasmruntime.ErrRuntimeInvalidTableAccess)
 			} else if copySize != 0 {
+				if wasm.IsExnref(table.Type) {
+					for i := uint64(0); i < copySize; i++ {
+						ce.engine.exceptions.CopySlot(&table.References[inTableOffset+i],
+							&elementInstance[inElementOffset+i])
+					}
+					frame.pc++
+					continue
+				}
 				copy(table.References[inTableOffset:inTableOffset+copySize], elementInstance[inElementOffset:])
 			}
 			frame.pc++
@@ -1963,6 +2098,16 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			if sourceOffset+copySize > uint64(len(srcTable)) || destinationOffset+copySize > uint64(len(dstTable)) {
 				panic(wasmruntime.ErrRuntimeInvalidTableAccess)
 			} else if copySize != 0 {
+				if wasm.IsExnref(tables[op.U2].Type) {
+					// Snapshot the source: the regions may overlap, and each write releases
+					// what the destination slot held.
+					src := slices.Clone(srcTable[sourceOffset : sourceOffset+copySize])
+					for i := range src {
+						ce.engine.exceptions.CopySlot(&dstTable[destinationOffset+uint64(i)], &src[i])
+					}
+					frame.pc++
+					continue
+				}
 				copy(dstTable[destinationOffset:], srcTable[sourceOffset:sourceOffset+copySize])
 			}
 			frame.pc++
@@ -1977,6 +2122,11 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 				panic(wasmruntime.ErrRuntimeInvalidTableAccess)
 			}
 
+			if wasm.IsExnref(table.Type) {
+				ce.pushValue(uint64(ce.loadExnrefSlot(&table.References[offset])))
+				frame.pc++
+				continue
+			}
 			ce.pushValue(uint64(table.References[offset]))
 			frame.pc++
 		case operationKindTableSet:
@@ -1988,6 +2138,11 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 				panic(wasmruntime.ErrRuntimeInvalidTableAccess)
 			}
 
+			if wasm.IsExnref(table.Type) {
+				ce.storeExnrefSlot(&table.References[offset], wasm.Reference(ref))
+				frame.pc++
+				continue
+			}
 			table.References[offset] = uintptr(ref) // externrefs are opaque uint64.
 			frame.pc++
 		case operationKindTableSize:
@@ -1997,7 +2152,18 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 		case operationKindTableGrow:
 			table := tables[op.U1]
 			num, ref := ce.popValue(), ce.popValue()
+			before := uint64(len(table.References))
 			ret := table.Grow(uint32(num), uintptr(ref))
+			if wasm.IsExnref(table.Type) && ref != 0 && uint64(len(table.References)) > before {
+				// Grow wrote the slots already; record one more naming apiece.
+				exn := ce.heldExceptions[wasm.Reference(ref)]
+				if exn == nil {
+					panic(wasmruntime.ErrRuntimeExpiredExceptionRef)
+				}
+				for i := before; i < uint64(len(table.References)); i++ {
+					ce.engine.exceptions.Retain(exn)
+				}
+			}
 			ce.pushValue(uint64(ret))
 			frame.pc++
 		case operationKindTableFill:
@@ -2007,6 +2173,10 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			offset := ce.popValue()
 			if num+offset > uint64(len(table.References)) {
 				panic(wasmruntime.ErrRuntimeInvalidTableAccess)
+			} else if wasm.IsExnref(table.Type) {
+				for i := offset; i < offset+num; i++ {
+					ce.storeExnrefSlot(&table.References[i], ref)
+				}
 			} else if num > 0 {
 				// Uses the copy trick for faster filling the region with the value.
 				// https://github.com/golang/go/blob/go1.24.0/src/slices/slices.go#L514-L517
@@ -4544,26 +4714,38 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			for i := paramCount - 1; i >= 0; i-- {
 				params[i] = ce.popValue()
 			}
-			exn := &wasm.Exception{Tag: tag, Params: params}
-			if clause, values := searchExceptionTable(exn, frame); clause != nil {
+			// Capture where this is being thrown while the frames are still live: the
+			// search for a handler is about to pop them. This raise is also the
+			// exception's origin, so the two start out as one and the same.
+			trace := ce.captureFrames()
+			exn := ce.engine.exceptions.NewException(tag, params, trace, ce.resolveExnrefParamRefs(tag, params))
+			// Nothing records this anywhere: while it propagates the panic value holds it,
+			// and if a handler takes it by reference that is what pins it to the call.
+			if clause, values := ce.searchExceptionTable(exn, frame); clause != nil {
 				ce.applyExceptionHandler(frame, clause, values)
 				continue
 			}
-			panic(&thrownException{exception: exn})
+			panic(&thrownException{exception: exn, trace: trace})
 
 		case operationKindThrowRef:
 			v := ce.popValue()
 			if v == 0 {
 				panic(wasmruntime.ErrRuntimeNullReference) // throw_ref on null exnref traps
 			}
-			// Read the Exception pointer directly from the uint64 value to avoid
-			// conversion from uintptr into unsafe.Pointer, which triggers checkptr.
-			exn := *(**wasm.Exception)(unsafe.Pointer(&v))
-			if clause, values := searchExceptionTable(exn, frame); clause != nil {
+			exn := ce.heldExceptions[wasm.Reference(v)]
+			if exn == nil {
+				// One this call cannot reach, such as a handle host code kept from an
+				// earlier call.
+				panic(wasmruntime.ErrRuntimeExpiredExceptionRef)
+			}
+			// This raise starts where the throw_ref is, not where the exception first came
+			// from -- exn.Origin still holds that.
+			trace := ce.captureFrames()
+			if clause, values := ce.searchExceptionTable(exn, frame); clause != nil {
 				ce.applyExceptionHandler(frame, clause, values)
 				continue
 			}
-			panic(&thrownException{exception: exn})
+			panic(&thrownException{exception: exn, trace: trace})
 
 		case operationKindTailCallReturnCall:
 			f := &functions[op.U1]
@@ -4907,6 +5089,17 @@ func (ce *callEngine) callNativeFuncWithListener(ctx context.Context, m *wasm.Mo
 	ce.stackIterator.reset(ce.stack, ce.frames, f)
 	fnl.Before(ctx, m, def, ce.peekValues(typ.ParamNumInUint64), &ce.stackIterator)
 	ce.stackIterator.clear()
+	// A frame an exception unwinds leaves without returning, which is what Abort reports.
+	// It fires here rather than where the exception comes to rest, since the frame is gone
+	// either way. Other panics unwind the whole call, which recoverOnCall reports.
+	defer func() {
+		if r := recover(); r != nil {
+			if _, ok := r.(*thrownException); ok {
+				fnl.Abort(ctx, m, def, experimental.ErrUnwoundByException)
+			}
+			panic(r)
+		}
+	}()
 	ce.callNativeFunc(ctx, m, f)
 	fnl.After(ctx, m, def, ce.peekValues(typ.ResultNumInUint64))
 	return ctx

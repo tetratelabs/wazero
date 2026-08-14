@@ -45,6 +45,10 @@ type (
 		// The followings are reused for compiling shared functions.
 		machine backend.Machine
 		be      backend.Compiler
+
+		// exceptions holds the exceptions that outlive the call that threw them, shared by
+		// every call this engine runs. See wasm.ExceptionStore.
+		exceptions wasm.ExceptionStore
 	}
 
 	sharedFunctions struct {
@@ -68,7 +72,7 @@ type (
 		// memoryNotifyAddress is the address of memory.notify builtin function
 		memoryNotifyAddress *byte
 		// throwAllocTrampolineAddress is the address of the throw-alloc trampoline:
-		// phase 1 of throw, which allocates the Exception heap object.
+		// phase 1 of throw, which records the raise and returns the params buffer.
 		throwAllocTrampolineAddress *byte
 		// throwTrampolineAddress is the address of the throw/throw_ref trampoline function.
 		throwTrampolineAddress *byte
@@ -76,6 +80,19 @@ type (
 		tryTableEnterAddress *byte
 		// tryTableLeaveAddress is the address of try_table leave trampoline.
 		tryTableLeaveAddress *byte
+		// exnrefSlotLoadAddress and exnrefSlotStoreAddress are the addresses of the
+		// barriers an exnref-typed global or table slot is accessed through. Compiled code
+		// hands them the address of the slot; the runtime owns the access itself, so that
+		// it cannot race another barrier on the same slot.
+		exnrefSlotLoadAddress  *byte
+		exnrefSlotStoreAddress *byte
+		// exnrefSlotFillAddress and exnrefSlotCopyAddress are the addresses of the barriers
+		// over a run of exnref-typed table slots, which the bulk table operations write.
+		exnrefSlotFillAddress *byte
+		exnrefSlotCopyAddress *byte
+		// adjustExnrefsAddress is the address of the trampoline that adjusts a call's exnref
+		// reference counts.
+		adjustExnrefsAddress *byte
 		listenerTrampolines  listenerTrampolines
 	}
 
@@ -753,7 +770,7 @@ func (e *engine) NewModuleEngine(m *wasm.Module, mi *wasm.ModuleInstance) (wasm.
 }
 
 func (e *engine) compileSharedFunctions() {
-	var sizes [12]int
+	var sizes [17]int
 	var trampolines []byte
 
 	addTrampoline := func(i int, buf []byte) {
@@ -824,7 +841,7 @@ func (e *engine) compileSharedFunctions() {
 	e.be.Init()
 	addTrampoline(8,
 		e.machine.CompileGoFunctionTrampoline(wazevoapi.ExitCodeThrowAlloc, &ssa.Signature{
-			// exec context, tag index → exnref
+			// exec context, tag index → params buffer
 			Params:  []ssa.Type{ssa.TypeI64, ssa.TypeI64},
 			Results: []ssa.Type{ssa.TypeI64},
 		}, false))
@@ -850,6 +867,46 @@ func (e *engine) compileSharedFunctions() {
 		e.machine.CompileGoFunctionTrampoline(wazevoapi.ExitCodeTryTableLeave, &ssa.Signature{
 			// exec context
 			Params:  []ssa.Type{ssa.TypeI64},
+			Results: []ssa.Type{},
+		}, false))
+
+	e.be.Init()
+	addTrampoline(12,
+		e.machine.CompileGoFunctionTrampoline(wazevoapi.ExitCodeExnrefSlotLoad, &ssa.Signature{
+			// exec context, slot address → exnref
+			Params:  []ssa.Type{ssa.TypeI64, ssa.TypeI64},
+			Results: []ssa.Type{ssa.TypeI64},
+		}, false))
+
+	e.be.Init()
+	addTrampoline(13,
+		e.machine.CompileGoFunctionTrampoline(wazevoapi.ExitCodeExnrefSlotStore, &ssa.Signature{
+			// exec context, slot address, exnref
+			Params:  []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI64},
+			Results: []ssa.Type{},
+		}, false))
+
+	e.be.Init()
+	addTrampoline(14,
+		e.machine.CompileGoFunctionTrampoline(wazevoapi.ExitCodeExnrefSlotFill, &ssa.Signature{
+			// exec context, slot address, exnref, count
+			Params:  []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI64, ssa.TypeI64},
+			Results: []ssa.Type{},
+		}, false))
+
+	e.be.Init()
+	addTrampoline(15,
+		e.machine.CompileGoFunctionTrampoline(wazevoapi.ExitCodeExnrefSlotCopy, &ssa.Signature{
+			// exec context, destination address, source address, count
+			Params:  []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI64, ssa.TypeI64},
+			Results: []ssa.Type{},
+		}, false))
+
+	e.be.Init()
+	addTrampoline(16,
+		e.machine.CompileGoFunctionTrampoline(wazevoapi.ExitCodeAdjustExnrefs, &ssa.Signature{
+			// exec context, handle gaining a reference, handle losing one
+			Params:  []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI64},
 			Results: []ssa.Type{},
 		}, false))
 
@@ -883,6 +940,16 @@ func (e *engine) compileSharedFunctions() {
 	fns.tryTableEnterAddress = &fns.executable[offset]
 	offset += sizes[10]
 	fns.tryTableLeaveAddress = &fns.executable[offset]
+	offset += sizes[11]
+	fns.exnrefSlotLoadAddress = &fns.executable[offset]
+	offset += sizes[12]
+	fns.exnrefSlotStoreAddress = &fns.executable[offset]
+	offset += sizes[13]
+	fns.exnrefSlotFillAddress = &fns.executable[offset]
+	offset += sizes[14]
+	fns.exnrefSlotCopyAddress = &fns.executable[offset]
+	offset += sizes[15]
+	fns.adjustExnrefsAddress = &fns.executable[offset]
 
 	if wazevoapi.PerfMapEnabled {
 		wazevoapi.PerfMap.AddEntry(uintptr(unsafe.Pointer(fns.memoryGrowAddress)), uint64(sizes[0]), "memory_grow_trampoline")
@@ -893,10 +960,15 @@ func (e *engine) compileSharedFunctions() {
 		wazevoapi.PerfMap.AddEntry(uintptr(unsafe.Pointer(fns.memoryWait32Address)), uint64(sizes[5]), "memory_wait32_trampoline")
 		wazevoapi.PerfMap.AddEntry(uintptr(unsafe.Pointer(fns.memoryWait64Address)), uint64(sizes[6]), "memory_wait64_trampoline")
 		wazevoapi.PerfMap.AddEntry(uintptr(unsafe.Pointer(fns.memoryNotifyAddress)), uint64(sizes[7]), "memory_notify_trampoline")
-		wazevoapi.PerfMap.AddEntry(uintptr(unsafe.Pointer(fns.throwAllocTrampolineAddress)), uint64(sizes[8]), "throw_alloc_trampoline")
+		wazevoapi.PerfMap.AddEntry(uintptr(unsafe.Pointer(fns.throwAllocTrampolineAddress)), uint64(sizes[8]), "alloc_exception_trampoline")
 		wazevoapi.PerfMap.AddEntry(uintptr(unsafe.Pointer(fns.throwTrampolineAddress)), uint64(sizes[9]), "throw_trampoline")
 		wazevoapi.PerfMap.AddEntry(uintptr(unsafe.Pointer(fns.tryTableEnterAddress)), uint64(sizes[10]), "try_table_enter_trampoline")
 		wazevoapi.PerfMap.AddEntry(uintptr(unsafe.Pointer(fns.tryTableLeaveAddress)), uint64(sizes[11]), "try_table_leave_trampoline")
+		wazevoapi.PerfMap.AddEntry(uintptr(unsafe.Pointer(fns.exnrefSlotLoadAddress)), uint64(sizes[12]), "exnref_slot_load_trampoline")
+		wazevoapi.PerfMap.AddEntry(uintptr(unsafe.Pointer(fns.exnrefSlotStoreAddress)), uint64(sizes[13]), "exnref_slot_store_trampoline")
+		wazevoapi.PerfMap.AddEntry(uintptr(unsafe.Pointer(fns.exnrefSlotFillAddress)), uint64(sizes[14]), "exnref_slot_fill_trampoline")
+		wazevoapi.PerfMap.AddEntry(uintptr(unsafe.Pointer(fns.exnrefSlotCopyAddress)), uint64(sizes[15]), "exnref_slot_copy_trampoline")
+		wazevoapi.PerfMap.AddEntry(uintptr(unsafe.Pointer(fns.adjustExnrefsAddress)), uint64(sizes[16]), "adjust_exnrefs_trampoline")
 	}
 
 	e.sharedFunctions = fns

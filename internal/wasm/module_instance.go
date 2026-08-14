@@ -17,7 +17,11 @@ func (m *ModuleInstance) FailIfClosed() (err error) {
 		case exitCodeFlagResourceNotClosed:
 			// This happens when this module is closed asynchronously in CloseModuleOnCanceledOrTimeout,
 			// and the closure of resources have been deferred here.
-			_ = m.ensureResourcesClosed(context.Background())
+			exitCode := uint32(closed >> 32)
+			updatedClosed := exitCodeFlagResourceClosed | uint64(exitCode)<<32
+			if m.Closed.CompareAndSwap(closed, updatedClosed) {
+				_ = m.ensureResourcesClosed(context.Background())
+			}
 		}
 		return sys.NewExitError(uint32(closed >> 32)) // Unpack the high order bits as the exit code.
 	}
@@ -162,12 +166,17 @@ func (m *ModuleInstance) ensureResourcesClosed(ctx context.Context) (err error) 
 		}
 	}
 
+	if m.Engine != nil { // nil if instantiation failed before the engine was created.
+		m.Engine.ModuleClosed()
+	}
+
 	if m.CodeCloser != nil {
 		if e := m.CodeCloser.Close(ctx); err == nil {
 			err = e
 		}
 		m.CodeCloser = nil
 	}
+
 	return err
 }
 
@@ -207,7 +216,7 @@ func (m *ModuleInstance) ExportedFunction(name string) api.Function {
 	if err != nil {
 		return nil
 	}
-	return m.Engine.NewFunction(exp.Index)
+	return hostCallable(m.Source.FunctionDefinition(exp.Index), m.Engine.NewFunction(exp.Index))
 }
 
 // ExportedFunctionDefinitions implements the same method as documented on

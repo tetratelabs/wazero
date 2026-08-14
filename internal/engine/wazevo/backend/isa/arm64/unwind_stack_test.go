@@ -6,6 +6,7 @@ import (
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/tetratelabs/wazero/internal/wasmdebug"
 )
 
 func TestUnwindStack(t *testing.T) {
@@ -105,7 +106,7 @@ func TestUnwindStack(t *testing.T) {
 				binary.LittleEndian.PutUint64(buf[i*8:], v)
 			}
 			sp := uintptr(unsafe.Pointer(&buf[0]))
-			returnAddresses := UnwindStack(sp, 0, uintptr(unsafe.Pointer(&buf[len(buf)-1])), nil)
+			returnAddresses := UnwindStack(sp, 0, uintptr(unsafe.Pointer(&buf[len(buf)-1])), nil, wasmdebug.MaxFrames)
 			require.Equal(t, tc.exp, returnAddresses)
 		})
 	}

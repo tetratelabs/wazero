@@ -64,8 +64,8 @@ type Compiler struct {
 	execCtxPtrValue, moduleCtxPtrValue ssa.Value
 
 	// throwAllocSig is the signature for the throw-alloc trampoline:
-	// (execCtx, tagIndex) → (exnref). Allocates the Exception and returns
-	// its pointer so compiled code can pass it to the throw trampoline.
+	// (execCtx, tagIndex) → (params buffer). Records the raise and returns the
+	// buffer for compiled code to store the params into.
 	throwAllocSig ssa.Signature
 	// throwSig is the signature for the throw/throw_ref trampoline:
 	// (execCtx, exnref) → (). Searches for a matching handler and restores.
@@ -74,6 +74,19 @@ type Compiler struct {
 	tryTableEnterSig ssa.Signature
 	// tryTableLeaveSig is the signature for the try_table leave trampoline.
 	tryTableLeaveSig ssa.Signature
+	// exnrefSlotLoadSig and exnrefSlotStoreSig are the signatures for the barriers an
+	// exnref-typed global or table slot is accessed through: (execCtx, slot address) →
+	// (exnref), and (execCtx, slot address, exnref) → (). The runtime does the access
+	// itself, so that it cannot race another barrier on the same slot.
+	exnrefSlotLoadSig  ssa.Signature
+	exnrefSlotStoreSig ssa.Signature
+	// exnrefSlotFillSig and exnrefSlotCopySig are the signatures for the barriers over a
+	// run of exnref-typed table slots: (execCtx, addr, exnref|srcAddr, count) → ().
+	exnrefSlotFillSig ssa.Signature
+	exnrefSlotCopySig ssa.Signature
+	// adjustExnrefsSig is the signature for the reference count adjustment trampoline:
+	// (execCtx, handle gaining a reference, handle losing one) → ().
+	adjustExnrefsSig ssa.Signature
 	// tryTableMetadata accumulates try_table metadata during compilation.
 	tryTableMetadata tryTableMetadata
 	// tryTableDepth tracks try_table nesting. When > 0, local.set/local.tee
@@ -278,7 +291,7 @@ func (c *Compiler) declareSignatures(listenerOn bool) {
 	c.throwAllocSig = ssa.Signature{
 		ID:      c.memoryNotifySig.ID + 1,
 		Params:  []ssa.Type{ssa.TypeI64 /* exec context */, ssa.TypeI64 /* tag index */},
-		Results: []ssa.Type{ssa.TypeI64 /* exnref */},
+		Results: []ssa.Type{ssa.TypeI64 /* params buffer */},
 	}
 	c.ssaBuilder.DeclareSignature(&c.throwAllocSig)
 
@@ -302,6 +315,41 @@ func (c *Compiler) declareSignatures(listenerOn bool) {
 		Results: []ssa.Type{},
 	}
 	c.ssaBuilder.DeclareSignature(&c.tryTableLeaveSig)
+
+	c.exnrefSlotLoadSig = ssa.Signature{
+		ID:      c.tryTableLeaveSig.ID + 1,
+		Params:  []ssa.Type{ssa.TypeI64 /* exec context */, ssa.TypeI64 /* slot address */},
+		Results: []ssa.Type{ssa.TypeI64 /* exnref */},
+	}
+	c.ssaBuilder.DeclareSignature(&c.exnrefSlotLoadSig)
+
+	c.exnrefSlotStoreSig = ssa.Signature{
+		ID:      c.exnrefSlotLoadSig.ID + 1,
+		Params:  []ssa.Type{ssa.TypeI64 /* exec context */, ssa.TypeI64 /* slot address */, ssa.TypeI64 /* exnref */},
+		Results: []ssa.Type{},
+	}
+	c.ssaBuilder.DeclareSignature(&c.exnrefSlotStoreSig)
+
+	c.exnrefSlotFillSig = ssa.Signature{
+		ID:      c.exnrefSlotStoreSig.ID + 1,
+		Params:  []ssa.Type{ssa.TypeI64 /* exec context */, ssa.TypeI64 /* addr */, ssa.TypeI64 /* exnref */, ssa.TypeI64 /* count */},
+		Results: []ssa.Type{},
+	}
+	c.ssaBuilder.DeclareSignature(&c.exnrefSlotFillSig)
+
+	c.exnrefSlotCopySig = ssa.Signature{
+		ID:      c.exnrefSlotFillSig.ID + 1,
+		Params:  []ssa.Type{ssa.TypeI64 /* exec context */, ssa.TypeI64 /* dst */, ssa.TypeI64 /* src */, ssa.TypeI64 /* count */},
+		Results: []ssa.Type{},
+	}
+	c.ssaBuilder.DeclareSignature(&c.exnrefSlotCopySig)
+
+	c.adjustExnrefsSig = ssa.Signature{
+		ID:      c.exnrefSlotCopySig.ID + 1,
+		Params:  []ssa.Type{ssa.TypeI64 /* exec context */, ssa.TypeI64 /* gains a ref */, ssa.TypeI64 /* loses one */},
+		Results: []ssa.Type{},
+	}
+	c.ssaBuilder.DeclareSignature(&c.adjustExnrefsSig)
 }
 
 // SignatureForWasmFunctionType returns the ssa.Signature for the given wasm.FunctionType.
@@ -569,6 +617,19 @@ func (c *Compiler) allocateVarLengthValues(_cap int, vs ...ssa.Value) ssa.Values
 	pool := builder.VarLengthPool()
 	args := pool.Allocate(_cap)
 	args = args.Append(pool, vs...)
+	return args
+}
+
+// allocateVarLengthStackValues is allocateVarLengthValues for a run of operand stack slots,
+// taking the SSA value out of each. Every conversion from the operand stack to ssa.Values
+// goes through here, so that the stack's element type is known in one place.
+func (c *Compiler) allocateVarLengthStackValues(_cap int, svs []stackValue) ssa.Values {
+	builder := c.ssaBuilder
+	pool := builder.VarLengthPool()
+	args := pool.Allocate(_cap)
+	for i := range svs {
+		args = args.Append(pool, svs[i].v)
+	}
 	return args
 }
 

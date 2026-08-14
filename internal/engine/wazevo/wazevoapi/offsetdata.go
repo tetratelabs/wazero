@@ -54,26 +54,46 @@ const (
 	ExecutionContextOffsetMemoryWait64TrampolineAddress Offset = 1168
 	ExecutionContextOffsetMemoryNotifyTrampolineAddress Offset = 1176
 	// ExecutionContextOffsetThrowAllocTrampolineAddress is the address of the
-	// throw-alloc trampoline, which allocates the Exception heap object,
-	// sets exceptionParamsPtr, and returns the exnref.
-	ExecutionContextOffsetThrowAllocTrampolineAddress    Offset = 1184
-	ExecutionContextOffsetThrowTrampolineAddress         Offset = 1192
+	// throw-alloc trampoline, which records the raise and returns a params
+	// buffer sized to the tag.
+	ExecutionContextOffsetThrowAllocTrampolineAddress Offset = 1184
+	// ExecutionContextOffsetThrowTrampolineAddress is the address of the raise trampoline,
+	// which searches the active try handlers for one catching the in-flight exception.
+	ExecutionContextOffsetThrowTrampolineAddress Offset = 1192
+	// ExecutionContextOffsetTryTableEnterTrampolineAddress and
+	// ExecutionContextOffsetTryTableLeaveTrampolineAddress are the addresses of the
+	// trampolines that push and pop a try_table's handler checkpoint.
 	ExecutionContextOffsetTryTableEnterTrampolineAddress Offset = 1200
 	ExecutionContextOffsetTryTableLeaveTrampolineAddress Offset = 1208
-	// ExecutionContextOffsetExceptionPtr holds the pointer to the Exception struct,
-	// used on the throw side and by catch_ref/catch_all_ref handlers.
-	ExecutionContextOffsetExceptionPtr Offset = 1216
-	// ExecutionContextOffsetExceptionParamsPtr points into the Exception's
-	// Params slice backing array. Used by both throw (store params) and
-	// catch (load params) sides.
-	ExecutionContextOffsetExceptionParamsPtr Offset = 1224
+	// ExecutionContextOffsetExnrefSlotLoadTrampolineAddress is the address of the read
+	// barrier compiled code calls to access an exnref-typed global or table slot.
+	ExecutionContextOffsetExnrefSlotLoadTrampolineAddress Offset = 1216
+	// ExecutionContextOffsetExnrefSlotStoreTrampolineAddress is the address of the write
+	// barrier compiled code calls to access an exnref-typed global or table slot.
+	ExecutionContextOffsetExnrefSlotStoreTrampolineAddress Offset = 1224
+	// ExecutionContextOffsetExnrefSlotFillTrampolineAddress is the address of the barrier
+	// over a run of exnref-typed table slots, which table.fill writes.
+	ExecutionContextOffsetExnrefSlotFillTrampolineAddress Offset = 1232
+	// ExecutionContextOffsetExnrefSlotCopyTrampolineAddress is the address of the barrier
+	// over a run of exnref-typed table slots copied from elsewhere.
+	ExecutionContextOffsetExnrefSlotCopyTrampolineAddress Offset = 1240
+	// ExecutionContextOffsetAdjustExnrefsTrampolineAddress is the address of the trampoline
+	// compiled code calls to adjust its exnref reference counts.
+	ExecutionContextOffsetAdjustExnrefsTrampolineAddress Offset = 1248
+	// ExecutionContextOffsetCaughtExceptionParams is the offset of `caughtExceptionParams`
+	// (a *uint64), the address of the params of the exception a handler was just entered
+	// for. A load at this offset yields the address the handler reads the param values from.
+	ExecutionContextOffsetCaughtExceptionParams Offset = 1256
+	// ExecutionContextOffsetCaughtExceptionRef is the handle naming the exception a handler
+	// was just entered for, which catch_ref and catch_all_ref push as an exnref.
+	ExecutionContextOffsetCaughtExceptionRef Offset = 1264
 	// ExecutionContextOffsetCaughtExceptionClauseIdx is the matched catch clause index
-	// written by handleException and read by compiled handler dispatch code.
-	ExecutionContextOffsetCaughtExceptionClauseIdx Offset = 1232
+	// written by the raise trampoline and read by compiled handler dispatch code.
+	ExecutionContextOffsetCaughtExceptionClauseIdx Offset = 1272
 	// ExecutionContextOffsetLocalsSaveAreaPtr points to a heap-allocated buffer
 	// where locals are mirrored inside try_table bodies, so that handler blocks
 	// can read throw-time local values after stack-clone restore.
-	ExecutionContextOffsetLocalsSaveAreaPtr Offset = 1240
+	ExecutionContextOffsetLocalsSaveAreaPtr Offset = 1280
 )
 
 // ModuleContextOffsetData allows the compilers to get the information about offsets to the fields of wazevo.moduleContextOpaque,

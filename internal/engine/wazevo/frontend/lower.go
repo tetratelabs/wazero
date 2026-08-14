@@ -15,10 +15,20 @@ import (
 )
 
 type (
+	// stackValue is one slot of the Wasm operand stack: the SSA value in it, and the Wasm
+	// type it has. The Wasm type is not recoverable from the SSA value: i64, funcref,
+	// externref, exnref and the concrete ref types all lower to ssa.TypeI64, and telling
+	// them apart is what lets the lowering know which slots hold something the runtime has
+	// to account for.
+	stackValue struct {
+		v ssa.Value
+		t wasm.ValueType
+	}
+
 	// loweringState is used to keep the state of lowering.
 	loweringState struct {
 		// values holds the values on the Wasm stack.
-		values           []ssa.Value
+		values           []stackValue
 		controlFrames    []controlFrame
 		unreachable      bool
 		unreachableDepth int
@@ -39,14 +49,24 @@ type (
 		clonedArgs ssa.Values
 	}
 
+	// resolvedCatch is a try_table catch clause with its branch target resolved.
+	resolvedCatch struct {
+		clause    catchClause
+		targetBlk ssa.BasicBlock
+		// targetHeight is the operand stack height its label unwinds to. Taking this clause
+		// discards everything between there and the try_table's own height, so this is what
+		// says which slots the handler has to release. See releaseExnrefsUnwoundByCatch.
+		targetHeight int
+	}
+
 	controlFrameKind byte
 )
 
 // String implements fmt.Stringer for debugging.
 func (l *loweringState) String() string {
 	var str []string
-	for _, v := range l.values {
-		str = append(str, fmt.Sprintf("v%v", v.ID()))
+	for _, sv := range l.values {
+		str = append(str, fmt.Sprintf("v%v", sv.v.ID()))
 	}
 	var frames []string
 	for i := range l.controlFrames {
@@ -110,19 +130,29 @@ func (l *loweringState) reset() {
 }
 
 func (l *loweringState) peek() (ret ssa.Value) {
-	tail := len(l.values) - 1
-	return l.values[tail]
+	return l.values[len(l.values)-1].v
+}
+
+func (l *loweringState) truncate(height int) {
+	l.values = l.values[:height]
 }
 
 func (l *loweringState) pop() (ret ssa.Value) {
 	tail := len(l.values) - 1
-	ret = l.values[tail]
+	ret = l.values[tail].v
 	l.values = l.values[:tail]
 	return
 }
 
-func (l *loweringState) push(ret ssa.Value) {
-	l.values = append(l.values, ret)
+func (l *loweringState) popTyped() stackValue {
+	tail := len(l.values) - 1
+	ret := l.values[tail]
+	l.values = l.values[:tail]
+	return ret
+}
+
+func (l *loweringState) push(v ssa.Value, t wasm.ValueType) {
+	l.values = append(l.values, stackValue{v: v, t: t})
 }
 
 func (c *Compiler) nPeekDup(n int) ssa.Values {
@@ -133,7 +163,22 @@ func (c *Compiler) nPeekDup(n int) ssa.Values {
 	l := c.state()
 	tail := len(l.values)
 
-	args := c.allocateVarLengthValues(n, l.values[tail-n:tail]...)
+	return c.allocateVarLengthStackValues(n, l.values[tail-n:tail])
+}
+
+func (c *Compiler) nPeekInto(args ssa.Values, n int) ssa.Values {
+	l := c.state()
+	pool := c.ssaBuilder.VarLengthPool()
+	for _, sv := range l.values[len(l.values)-n:] {
+		args = args.Append(pool, sv.v)
+	}
+	return args
+}
+
+func (c *Compiler) nPopInto(args ssa.Values, n int) ssa.Values {
+	args = c.nPeekInto(args, n)
+	l := c.state()
+	l.truncate(len(l.values) - n)
 	return args
 }
 
@@ -206,7 +251,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 
 		iconst := builder.AllocateInstruction().AsIconst32(uint32(c)).Insert(builder)
 		value := iconst.Return()
-		state.push(value)
+		state.push(value, wasm.ValueTypeI32)
 	case wasm.OpcodeI64Const:
 		c := c.readI64s()
 		if state.unreachable {
@@ -214,7 +259,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 		}
 		iconst := builder.AllocateInstruction().AsIconst64(uint64(c)).Insert(builder)
 		value := iconst.Return()
-		state.push(value)
+		state.push(value, wasm.ValueTypeI64)
 	case wasm.OpcodeF32Const:
 		f32 := c.readF32()
 		if state.unreachable {
@@ -224,7 +269,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			AsF32const(f32).
 			Insert(builder).
 			Return()
-		state.push(f32const)
+		state.push(f32const, wasm.ValueTypeF32)
 	case wasm.OpcodeF64Const:
 		f64 := c.readF64()
 		if state.unreachable {
@@ -234,127 +279,127 @@ func (c *Compiler) lowerCurrentOpcode() {
 			AsF64const(f64).
 			Insert(builder).
 			Return()
-		state.push(f64const)
+		state.push(f64const, wasm.ValueTypeF64)
 	case wasm.OpcodeI32Add, wasm.OpcodeI64Add:
 		if state.unreachable {
 			break
 		}
-		y, x := state.pop(), state.pop()
+		y, x := state.pop(), state.popTyped()
 		iadd := builder.AllocateInstruction()
-		iadd.AsIadd(x, y)
+		iadd.AsIadd(x.v, y)
 		builder.InsertInstruction(iadd)
 		value := iadd.Return()
-		state.push(value)
+		state.push(value, x.t)
 	case wasm.OpcodeI32Sub, wasm.OpcodeI64Sub:
 		if state.unreachable {
 			break
 		}
-		y, x := state.pop(), state.pop()
+		y, x := state.pop(), state.popTyped()
 		isub := builder.AllocateInstruction()
-		isub.AsIsub(x, y)
+		isub.AsIsub(x.v, y)
 		builder.InsertInstruction(isub)
 		value := isub.Return()
-		state.push(value)
+		state.push(value, x.t)
 	case wasm.OpcodeF32Add, wasm.OpcodeF64Add:
 		if state.unreachable {
 			break
 		}
-		y, x := state.pop(), state.pop()
+		y, x := state.pop(), state.popTyped()
 		iadd := builder.AllocateInstruction()
-		iadd.AsFadd(x, y)
+		iadd.AsFadd(x.v, y)
 		builder.InsertInstruction(iadd)
 		value := iadd.Return()
-		state.push(value)
+		state.push(value, x.t)
 	case wasm.OpcodeI32Mul, wasm.OpcodeI64Mul:
 		if state.unreachable {
 			break
 		}
-		y, x := state.pop(), state.pop()
+		y, x := state.pop(), state.popTyped()
 		imul := builder.AllocateInstruction()
-		imul.AsImul(x, y)
+		imul.AsImul(x.v, y)
 		builder.InsertInstruction(imul)
 		value := imul.Return()
-		state.push(value)
+		state.push(value, x.t)
 	case wasm.OpcodeF32Sub, wasm.OpcodeF64Sub:
 		if state.unreachable {
 			break
 		}
-		y, x := state.pop(), state.pop()
+		y, x := state.pop(), state.popTyped()
 		isub := builder.AllocateInstruction()
-		isub.AsFsub(x, y)
+		isub.AsFsub(x.v, y)
 		builder.InsertInstruction(isub)
 		value := isub.Return()
-		state.push(value)
+		state.push(value, x.t)
 	case wasm.OpcodeF32Mul, wasm.OpcodeF64Mul:
 		if state.unreachable {
 			break
 		}
-		y, x := state.pop(), state.pop()
+		y, x := state.pop(), state.popTyped()
 		isub := builder.AllocateInstruction()
-		isub.AsFmul(x, y)
+		isub.AsFmul(x.v, y)
 		builder.InsertInstruction(isub)
 		value := isub.Return()
-		state.push(value)
+		state.push(value, x.t)
 	case wasm.OpcodeF32Div, wasm.OpcodeF64Div:
 		if state.unreachable {
 			break
 		}
-		y, x := state.pop(), state.pop()
+		y, x := state.pop(), state.popTyped()
 		isub := builder.AllocateInstruction()
-		isub.AsFdiv(x, y)
+		isub.AsFdiv(x.v, y)
 		builder.InsertInstruction(isub)
 		value := isub.Return()
-		state.push(value)
+		state.push(value, x.t)
 	case wasm.OpcodeF32Max, wasm.OpcodeF64Max:
 		if state.unreachable {
 			break
 		}
-		y, x := state.pop(), state.pop()
+		y, x := state.pop(), state.popTyped()
 		isub := builder.AllocateInstruction()
-		isub.AsFmax(x, y)
+		isub.AsFmax(x.v, y)
 		builder.InsertInstruction(isub)
 		value := isub.Return()
-		state.push(value)
+		state.push(value, x.t)
 	case wasm.OpcodeF32Min, wasm.OpcodeF64Min:
 		if state.unreachable {
 			break
 		}
-		y, x := state.pop(), state.pop()
+		y, x := state.pop(), state.popTyped()
 		isub := builder.AllocateInstruction()
-		isub.AsFmin(x, y)
+		isub.AsFmin(x.v, y)
 		builder.InsertInstruction(isub)
 		value := isub.Return()
-		state.push(value)
+		state.push(value, x.t)
 	case wasm.OpcodeI64Extend8S:
 		if state.unreachable {
 			break
 		}
-		c.insertIntegerExtend(true, 8, 64)
+		c.insertIntegerExtend(true, 8, wasm.ValueTypeI64)
 	case wasm.OpcodeI64Extend16S:
 		if state.unreachable {
 			break
 		}
-		c.insertIntegerExtend(true, 16, 64)
+		c.insertIntegerExtend(true, 16, wasm.ValueTypeI64)
 	case wasm.OpcodeI64Extend32S, wasm.OpcodeI64ExtendI32S:
 		if state.unreachable {
 			break
 		}
-		c.insertIntegerExtend(true, 32, 64)
+		c.insertIntegerExtend(true, 32, wasm.ValueTypeI64)
 	case wasm.OpcodeI64ExtendI32U:
 		if state.unreachable {
 			break
 		}
-		c.insertIntegerExtend(false, 32, 64)
+		c.insertIntegerExtend(false, 32, wasm.ValueTypeI64)
 	case wasm.OpcodeI32Extend8S:
 		if state.unreachable {
 			break
 		}
-		c.insertIntegerExtend(true, 8, 32)
+		c.insertIntegerExtend(true, 8, wasm.ValueTypeI32)
 	case wasm.OpcodeI32Extend16S:
 		if state.unreachable {
 			break
 		}
-		c.insertIntegerExtend(true, 16, 32)
+		c.insertIntegerExtend(true, 16, wasm.ValueTypeI32)
 	case wasm.OpcodeI32Eqz, wasm.OpcodeI64Eqz:
 		if state.unreachable {
 			break
@@ -371,7 +416,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			AsIcmp(x, zero.Return(), ssa.IntegerCmpCondEqual).
 			Insert(builder).
 			Return()
-		state.push(icmp)
+		state.push(icmp, wasm.ValueTypeI32)
 	case wasm.OpcodeI32Eq, wasm.OpcodeI64Eq:
 		if state.unreachable {
 			break
@@ -457,59 +502,59 @@ func (c *Compiler) lowerCurrentOpcode() {
 		if state.unreachable {
 			break
 		}
-		x := state.pop()
-		v := builder.AllocateInstruction().AsFneg(x).Insert(builder).Return()
-		state.push(v)
+		x := state.popTyped()
+		v := builder.AllocateInstruction().AsFneg(x.v).Insert(builder).Return()
+		state.push(v, x.t)
 	case wasm.OpcodeF32Sqrt, wasm.OpcodeF64Sqrt:
 		if state.unreachable {
 			break
 		}
-		x := state.pop()
-		v := builder.AllocateInstruction().AsSqrt(x).Insert(builder).Return()
-		state.push(v)
+		x := state.popTyped()
+		v := builder.AllocateInstruction().AsSqrt(x.v).Insert(builder).Return()
+		state.push(v, x.t)
 	case wasm.OpcodeF32Abs, wasm.OpcodeF64Abs:
 		if state.unreachable {
 			break
 		}
-		x := state.pop()
-		v := builder.AllocateInstruction().AsFabs(x).Insert(builder).Return()
-		state.push(v)
+		x := state.popTyped()
+		v := builder.AllocateInstruction().AsFabs(x.v).Insert(builder).Return()
+		state.push(v, x.t)
 	case wasm.OpcodeF32Copysign, wasm.OpcodeF64Copysign:
 		if state.unreachable {
 			break
 		}
-		y, x := state.pop(), state.pop()
-		v := builder.AllocateInstruction().AsFcopysign(x, y).Insert(builder).Return()
-		state.push(v)
+		y, x := state.pop(), state.popTyped()
+		v := builder.AllocateInstruction().AsFcopysign(x.v, y).Insert(builder).Return()
+		state.push(v, x.t)
 
 	case wasm.OpcodeF32Ceil, wasm.OpcodeF64Ceil:
 		if state.unreachable {
 			break
 		}
-		x := state.pop()
-		v := builder.AllocateInstruction().AsCeil(x).Insert(builder).Return()
-		state.push(v)
+		x := state.popTyped()
+		v := builder.AllocateInstruction().AsCeil(x.v).Insert(builder).Return()
+		state.push(v, x.t)
 	case wasm.OpcodeF32Floor, wasm.OpcodeF64Floor:
 		if state.unreachable {
 			break
 		}
-		x := state.pop()
-		v := builder.AllocateInstruction().AsFloor(x).Insert(builder).Return()
-		state.push(v)
+		x := state.popTyped()
+		v := builder.AllocateInstruction().AsFloor(x.v).Insert(builder).Return()
+		state.push(v, x.t)
 	case wasm.OpcodeF32Trunc, wasm.OpcodeF64Trunc:
 		if state.unreachable {
 			break
 		}
-		x := state.pop()
-		v := builder.AllocateInstruction().AsTrunc(x).Insert(builder).Return()
-		state.push(v)
+		x := state.popTyped()
+		v := builder.AllocateInstruction().AsTrunc(x.v).Insert(builder).Return()
+		state.push(v, x.t)
 	case wasm.OpcodeF32Nearest, wasm.OpcodeF64Nearest:
 		if state.unreachable {
 			break
 		}
-		x := state.pop()
-		v := builder.AllocateInstruction().AsNearest(x).Insert(builder).Return()
-		state.push(v)
+		x := state.popTyped()
+		v := builder.AllocateInstruction().AsNearest(x.v).Insert(builder).Return()
+		state.push(v, x.t)
 	case wasm.OpcodeI64TruncF64S, wasm.OpcodeI64TruncF32S,
 		wasm.OpcodeI32TruncF64S, wasm.OpcodeI32TruncF32S,
 		wasm.OpcodeI64TruncF64U, wasm.OpcodeI64TruncF32U,
@@ -517,14 +562,19 @@ func (c *Compiler) lowerCurrentOpcode() {
 		if state.unreachable {
 			break
 		}
+		dstType := wasm.ValueTypeI32
+		switch op {
+		case wasm.OpcodeI64TruncF64S, wasm.OpcodeI64TruncF32S, wasm.OpcodeI64TruncF64U, wasm.OpcodeI64TruncF32U:
+			dstType = wasm.ValueTypeI64
+		}
 		ret := builder.AllocateInstruction().AsFcvtToInt(
 			state.pop(),
 			c.execCtxPtrValue,
 			op == wasm.OpcodeI64TruncF64S || op == wasm.OpcodeI64TruncF32S || op == wasm.OpcodeI32TruncF32S || op == wasm.OpcodeI32TruncF64S,
-			op == wasm.OpcodeI64TruncF64S || op == wasm.OpcodeI64TruncF32S || op == wasm.OpcodeI64TruncF64U || op == wasm.OpcodeI64TruncF32U,
+			dstType == wasm.ValueTypeI64,
 			false,
 		).Insert(builder).Return()
-		state.push(ret)
+		state.push(ret, dstType)
 	case wasm.OpcodeMiscPrefix:
 		state.pc++
 		// A misc opcode is encoded as an unsigned variable 32-bit integer.
@@ -543,14 +593,20 @@ func (c *Compiler) lowerCurrentOpcode() {
 			if state.unreachable {
 				break
 			}
+			dstType := wasm.ValueTypeI32
+			switch miscOp {
+			case wasm.OpcodeMiscI64TruncSatF64S, wasm.OpcodeMiscI64TruncSatF32S,
+				wasm.OpcodeMiscI64TruncSatF64U, wasm.OpcodeMiscI64TruncSatF32U:
+				dstType = wasm.ValueTypeI64
+			}
 			ret := builder.AllocateInstruction().AsFcvtToInt(
 				state.pop(),
 				c.execCtxPtrValue,
 				miscOp == wasm.OpcodeMiscI64TruncSatF64S || miscOp == wasm.OpcodeMiscI64TruncSatF32S || miscOp == wasm.OpcodeMiscI32TruncSatF32S || miscOp == wasm.OpcodeMiscI32TruncSatF64S,
-				miscOp == wasm.OpcodeMiscI64TruncSatF64S || miscOp == wasm.OpcodeMiscI64TruncSatF32S || miscOp == wasm.OpcodeMiscI64TruncSatF64U || miscOp == wasm.OpcodeMiscI64TruncSatF32U,
+				dstType == wasm.ValueTypeI64,
 				true,
 			).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, dstType)
 
 		case wasm.OpcodeMiscTableSize:
 			tableIndex := c.readI32u()
@@ -568,7 +624,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			loadTableLen := builder.AllocateInstruction().
 				AsLoad(tableInstancePtr, tableInstanceLenOffset, ssa.TypeI32).
 				Insert(builder)
-			state.push(loadTableLen.Return())
+			state.push(loadTableLen.Return(), wasm.ValueTypeI32)
 
 		case wasm.OpcodeMiscTableGrow:
 			tableIndex := c.readI32u()
@@ -594,7 +650,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 				AllocateInstruction().
 				AsCallIndirect(tableGrowPtr, &c.tableGrowSig, args).
 				Insert(builder).Return()
-			state.push(callGrowRet)
+			state.push(callGrowRet, wasm.ValueTypeI32)
 
 		case wasm.OpcodeMiscTableCopy:
 			dstTableIndex := c.readI32u()
@@ -624,6 +680,10 @@ func (c *Compiler) lowerCurrentOpcode() {
 			srcOffsetInBytes := builder.AllocateInstruction().AsIshl(srcOffset, three).Insert(builder).Return()
 			srcAddr := builder.AllocateInstruction().AsIadd(srcTableBaseAddr, srcOffsetInBytes).Insert(builder).Return()
 
+			if c.exnrefTable(dstTableIndex) {
+				c.copyExnrefSlots(dstAddr, srcAddr, copySize)
+				break
+			}
 			copySizeInBytes := builder.AllocateInstruction().AsIshl(copySize, three).Insert(builder).Return()
 			c.callMemmove(dstAddr, srcAddr, copySizeInBytes)
 
@@ -673,6 +733,11 @@ func (c *Compiler) lowerCurrentOpcode() {
 			// Calculate the base address of the table.
 			tableBaseAddr := c.loadTableBaseAddr(tableInstancePtr)
 			addr := builder.AllocateInstruction().AsIadd(tableBaseAddr, offsetInBytes).Insert(builder).Return()
+
+			if c.exnrefTable(tableIndex) {
+				c.fillExnrefSlots(addr, value, fillSizeExt)
+				break
+			}
 
 			// Uses the copy trick for faster filling buffer like memory.fill, but in this case we copy 8 bytes at a time.
 			// Tables are rarely huge, so ignore the 8KB maximum.
@@ -865,6 +930,11 @@ func (c *Compiler) lowerCurrentOpcode() {
 			elemInstBaseAddr := builder.AllocateInstruction().AsLoad(elemInstPtr, 0, ssa.TypeI64).Insert(builder).Return()
 			srcAddr := builder.AllocateInstruction().AsIadd(elemInstBaseAddr, srcOffsetInBytes).Insert(builder).Return()
 
+			if c.exnrefTable(tableIndex) {
+				c.copyExnrefSlots(dstAddr, srcAddr, copySize)
+				break
+			}
+
 			copySizeInBytes := builder.AllocateInstruction().AsIshl(copySize, three).Insert(builder).Return()
 			c.callMemmove(dstAddr, srcAddr, copySizeInBytes)
 
@@ -894,7 +964,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 		reinterpret := builder.AllocateInstruction().
 			AsBitcast(state.pop(), ssa.TypeI32).
 			Insert(builder).Return()
-		state.push(reinterpret)
+		state.push(reinterpret, wasm.ValueTypeI32)
 
 	case wasm.OpcodeI64ReinterpretF64:
 		if state.unreachable {
@@ -903,7 +973,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 		reinterpret := builder.AllocateInstruction().
 			AsBitcast(state.pop(), ssa.TypeI64).
 			Insert(builder).Return()
-		state.push(reinterpret)
+		state.push(reinterpret, wasm.ValueTypeI64)
 
 	case wasm.OpcodeF32ReinterpretI32:
 		if state.unreachable {
@@ -912,7 +982,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 		reinterpret := builder.AllocateInstruction().
 			AsBitcast(state.pop(), ssa.TypeF32).
 			Insert(builder).Return()
-		state.push(reinterpret)
+		state.push(reinterpret, wasm.ValueTypeF32)
 
 	case wasm.OpcodeF64ReinterpretI64:
 		if state.unreachable {
@@ -921,150 +991,150 @@ func (c *Compiler) lowerCurrentOpcode() {
 		reinterpret := builder.AllocateInstruction().
 			AsBitcast(state.pop(), ssa.TypeF64).
 			Insert(builder).Return()
-		state.push(reinterpret)
+		state.push(reinterpret, wasm.ValueTypeF64)
 
 	case wasm.OpcodeI32DivS, wasm.OpcodeI64DivS:
 		if state.unreachable {
 			break
 		}
-		y, x := state.pop(), state.pop()
-		result := builder.AllocateInstruction().AsSDiv(x, y, c.execCtxPtrValue).Insert(builder).Return()
-		state.push(result)
+		y, x := state.pop(), state.popTyped()
+		result := builder.AllocateInstruction().AsSDiv(x.v, y, c.execCtxPtrValue).Insert(builder).Return()
+		state.push(result, x.t)
 
 	case wasm.OpcodeI32DivU, wasm.OpcodeI64DivU:
 		if state.unreachable {
 			break
 		}
-		y, x := state.pop(), state.pop()
-		result := builder.AllocateInstruction().AsUDiv(x, y, c.execCtxPtrValue).Insert(builder).Return()
-		state.push(result)
+		y, x := state.pop(), state.popTyped()
+		result := builder.AllocateInstruction().AsUDiv(x.v, y, c.execCtxPtrValue).Insert(builder).Return()
+		state.push(result, x.t)
 
 	case wasm.OpcodeI32RemS, wasm.OpcodeI64RemS:
 		if state.unreachable {
 			break
 		}
-		y, x := state.pop(), state.pop()
-		result := builder.AllocateInstruction().AsSRem(x, y, c.execCtxPtrValue).Insert(builder).Return()
-		state.push(result)
+		y, x := state.pop(), state.popTyped()
+		result := builder.AllocateInstruction().AsSRem(x.v, y, c.execCtxPtrValue).Insert(builder).Return()
+		state.push(result, x.t)
 
 	case wasm.OpcodeI32RemU, wasm.OpcodeI64RemU:
 		if state.unreachable {
 			break
 		}
-		y, x := state.pop(), state.pop()
-		result := builder.AllocateInstruction().AsURem(x, y, c.execCtxPtrValue).Insert(builder).Return()
-		state.push(result)
+		y, x := state.pop(), state.popTyped()
+		result := builder.AllocateInstruction().AsURem(x.v, y, c.execCtxPtrValue).Insert(builder).Return()
+		state.push(result, x.t)
 
 	case wasm.OpcodeI32And, wasm.OpcodeI64And:
 		if state.unreachable {
 			break
 		}
-		y, x := state.pop(), state.pop()
+		y, x := state.pop(), state.popTyped()
 		and := builder.AllocateInstruction()
-		and.AsBand(x, y)
+		and.AsBand(x.v, y)
 		builder.InsertInstruction(and)
 		value := and.Return()
-		state.push(value)
+		state.push(value, x.t)
 	case wasm.OpcodeI32Or, wasm.OpcodeI64Or:
 		if state.unreachable {
 			break
 		}
-		y, x := state.pop(), state.pop()
+		y, x := state.pop(), state.popTyped()
 		or := builder.AllocateInstruction()
-		or.AsBor(x, y)
+		or.AsBor(x.v, y)
 		builder.InsertInstruction(or)
 		value := or.Return()
-		state.push(value)
+		state.push(value, x.t)
 	case wasm.OpcodeI32Xor, wasm.OpcodeI64Xor:
 		if state.unreachable {
 			break
 		}
-		y, x := state.pop(), state.pop()
+		y, x := state.pop(), state.popTyped()
 		xor := builder.AllocateInstruction()
-		xor.AsBxor(x, y)
+		xor.AsBxor(x.v, y)
 		builder.InsertInstruction(xor)
 		value := xor.Return()
-		state.push(value)
+		state.push(value, x.t)
 	case wasm.OpcodeI32Shl, wasm.OpcodeI64Shl:
 		if state.unreachable {
 			break
 		}
-		y, x := state.pop(), state.pop()
+		y, x := state.pop(), state.popTyped()
 		ishl := builder.AllocateInstruction()
-		ishl.AsIshl(x, y)
+		ishl.AsIshl(x.v, y)
 		builder.InsertInstruction(ishl)
 		value := ishl.Return()
-		state.push(value)
+		state.push(value, x.t)
 	case wasm.OpcodeI32ShrU, wasm.OpcodeI64ShrU:
 		if state.unreachable {
 			break
 		}
-		y, x := state.pop(), state.pop()
+		y, x := state.pop(), state.popTyped()
 		ishl := builder.AllocateInstruction()
-		ishl.AsUshr(x, y)
+		ishl.AsUshr(x.v, y)
 		builder.InsertInstruction(ishl)
 		value := ishl.Return()
-		state.push(value)
+		state.push(value, x.t)
 	case wasm.OpcodeI32ShrS, wasm.OpcodeI64ShrS:
 		if state.unreachable {
 			break
 		}
-		y, x := state.pop(), state.pop()
+		y, x := state.pop(), state.popTyped()
 		ishl := builder.AllocateInstruction()
-		ishl.AsSshr(x, y)
+		ishl.AsSshr(x.v, y)
 		builder.InsertInstruction(ishl)
 		value := ishl.Return()
-		state.push(value)
+		state.push(value, x.t)
 	case wasm.OpcodeI32Rotl, wasm.OpcodeI64Rotl:
 		if state.unreachable {
 			break
 		}
-		y, x := state.pop(), state.pop()
+		y, x := state.pop(), state.popTyped()
 		rotl := builder.AllocateInstruction()
-		rotl.AsRotl(x, y)
+		rotl.AsRotl(x.v, y)
 		builder.InsertInstruction(rotl)
 		value := rotl.Return()
-		state.push(value)
+		state.push(value, x.t)
 	case wasm.OpcodeI32Rotr, wasm.OpcodeI64Rotr:
 		if state.unreachable {
 			break
 		}
-		y, x := state.pop(), state.pop()
+		y, x := state.pop(), state.popTyped()
 		rotr := builder.AllocateInstruction()
-		rotr.AsRotr(x, y)
+		rotr.AsRotr(x.v, y)
 		builder.InsertInstruction(rotr)
 		value := rotr.Return()
-		state.push(value)
+		state.push(value, x.t)
 	case wasm.OpcodeI32Clz, wasm.OpcodeI64Clz:
 		if state.unreachable {
 			break
 		}
-		x := state.pop()
+		x := state.popTyped()
 		clz := builder.AllocateInstruction()
-		clz.AsClz(x)
+		clz.AsClz(x.v)
 		builder.InsertInstruction(clz)
 		value := clz.Return()
-		state.push(value)
+		state.push(value, x.t)
 	case wasm.OpcodeI32Ctz, wasm.OpcodeI64Ctz:
 		if state.unreachable {
 			break
 		}
-		x := state.pop()
+		x := state.popTyped()
 		ctz := builder.AllocateInstruction()
-		ctz.AsCtz(x)
+		ctz.AsCtz(x.v)
 		builder.InsertInstruction(ctz)
 		value := ctz.Return()
-		state.push(value)
+		state.push(value, x.t)
 	case wasm.OpcodeI32Popcnt, wasm.OpcodeI64Popcnt:
 		if state.unreachable {
 			break
 		}
-		x := state.pop()
+		x := state.popTyped()
 		popcnt := builder.AllocateInstruction()
-		popcnt.AsPopcnt(x)
+		popcnt.AsPopcnt(x.v)
 		builder.InsertInstruction(popcnt)
 		value := popcnt.Return()
-		state.push(value)
+		state.push(value, x.t)
 
 	case wasm.OpcodeI32WrapI64:
 		if state.unreachable {
@@ -1072,20 +1142,28 @@ func (c *Compiler) lowerCurrentOpcode() {
 		}
 		x := state.pop()
 		wrap := builder.AllocateInstruction().AsIreduce(x, ssa.TypeI32).Insert(builder).Return()
-		state.push(wrap)
+		state.push(wrap, wasm.ValueTypeI32)
 	case wasm.OpcodeGlobalGet:
 		index := c.readI32u()
 		if state.unreachable {
 			break
 		}
+		if c.exnrefGlobal(index) {
+			state.push(c.loadExnrefSlot(c.wasmGlobalAddr(index)), wasm.ValueTypeExnref)
+			break
+		}
 		v := c.getWasmGlobalValue(index, false)
-		state.push(v)
+		state.push(v, c.globalType(index))
 	case wasm.OpcodeGlobalSet:
 		index := c.readI32u()
 		if state.unreachable {
 			break
 		}
 		v := state.pop()
+		if c.exnrefGlobal(index) {
+			c.storeExnrefSlot(c.wasmGlobalAddr(index), v)
+			break
+		}
 		c.setWasmGlobalValue(index, v)
 	case wasm.OpcodeLocalGet:
 		index := c.readI32u()
@@ -1093,7 +1171,14 @@ func (c *Compiler) lowerCurrentOpcode() {
 			break
 		}
 		variable := c.localVariable(index)
-		state.push(builder.MustFindValue(variable))
+		v := builder.MustFindValue(variable)
+		lt := c.localType(index)
+		if wasm.IsExnref(lt) {
+			// The copy this leaves on the stack is a reference of its own: the local can be
+			// overwritten while it is still live, so it cannot lean on the local's.
+			c.adjustExnrefs(v, ssa.ValueInvalid)
+		}
+		state.push(v, lt)
 
 	case wasm.OpcodeLocalSet:
 		index := c.readI32u()
@@ -1102,6 +1187,11 @@ func (c *Compiler) lowerCurrentOpcode() {
 		}
 		variable := c.localVariable(index)
 		newValue := state.pop()
+		if wasm.IsExnref(c.localType(index)) {
+			// The stack slot's reference moves into the local, so the count does not change
+			// for the value being stored. What the local held loses its reference.
+			c.adjustExnrefs(ssa.ValueInvalid, builder.MustFindValue(variable))
+		}
 		builder.DefineVariableInCurrentBB(variable, newValue)
 		if c.tryTableDepth > 0 {
 			c.storeLocalToSaveArea(wasm.Index(index), newValue)
@@ -1114,6 +1204,11 @@ func (c *Compiler) lowerCurrentOpcode() {
 		}
 		variable := c.localVariable(index)
 		newValue := state.peek()
+		if wasm.IsExnref(c.localType(index)) {
+			// Unlike local.set this does not pop, so the stack slot keeps its reference and
+			// the local takes one of its own. What the local held loses one.
+			c.adjustExnrefs(newValue, builder.MustFindValue(variable))
+		}
 		builder.DefineVariableInCurrentBB(variable, newValue)
 		if c.tryTableDepth > 0 {
 			c.storeLocalToSaveArea(wasm.Index(index), newValue)
@@ -1130,13 +1225,23 @@ func (c *Compiler) lowerCurrentOpcode() {
 
 		cond := state.pop()
 		v2 := state.pop()
-		v1 := state.pop()
+		// The result has the operands' type, which select's own immediate repeats but the
+		// stack already knows -- and the stack's is the one that distinguishes the reference
+		// types sharing ssa.TypeI64.
+		v1 := state.popTyped()
 
 		sl := builder.AllocateInstruction().
-			AsSelect(cond, v1, v2).
+			AsSelect(cond, v1.v, v2).
 			Insert(builder).
 			Return()
-		state.push(sl)
+		if wasm.IsExnref(v1.t) {
+			// Both operands had a reference and only one survives, but which is not known
+			// until it runs. Taking one for the result and releasing both nets out correctly
+			// either way: the survivor keeps a reference and the loser's goes.
+			c.adjustExnrefs(sl, v1.v)
+			c.adjustExnrefs(ssa.ValueInvalid, v2)
+		}
+		state.push(sl, v1.t)
 
 	case wasm.OpcodeMemorySize:
 		state.pc++ // skips the memory index.
@@ -1169,7 +1274,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			AsUshr(memSizeInBytes, amount.Return()).
 			Insert(builder).
 			Return()
-		state.push(memSize)
+		state.push(memSize, wasm.ValueTypeI32)
 
 	case wasm.OpcodeMemoryGrow:
 		state.pc++ // skips the memory index.
@@ -1191,7 +1296,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			AllocateInstruction().
 			AsCallIndirect(memoryGrowPtr, &c.memoryGrowSig, args).
 			Insert(builder).Return()
-		state.push(callGrowRet)
+		state.push(callGrowRet, wasm.ValueTypeI32)
 
 		// After the memory grow, reload the cached memory base and len.
 		c.reloadMemoryBaseLen()
@@ -1281,40 +1386,55 @@ func (c *Compiler) lowerCurrentOpcode() {
 		baseAddr := state.pop()
 		addr := c.memOpSetup(baseAddr, uint64(offset), opSize)
 		load := builder.AllocateInstruction()
+		var vt wasm.ValueType
 		switch op {
 		case wasm.OpcodeI32Load:
 			load.AsLoad(addr, offset, ssa.TypeI32)
+			vt = wasm.ValueTypeI32
 		case wasm.OpcodeI64Load:
 			load.AsLoad(addr, offset, ssa.TypeI64)
+			vt = wasm.ValueTypeI64
 		case wasm.OpcodeF32Load:
 			load.AsLoad(addr, offset, ssa.TypeF32)
+			vt = wasm.ValueTypeF32
 		case wasm.OpcodeF64Load:
 			load.AsLoad(addr, offset, ssa.TypeF64)
+			vt = wasm.ValueTypeF64
 		case wasm.OpcodeI32Load8S:
 			load.AsExtLoad(ssa.OpcodeSload8, addr, offset, false)
+			vt = wasm.ValueTypeI32
 		case wasm.OpcodeI32Load8U:
 			load.AsExtLoad(ssa.OpcodeUload8, addr, offset, false)
+			vt = wasm.ValueTypeI32
 		case wasm.OpcodeI32Load16S:
 			load.AsExtLoad(ssa.OpcodeSload16, addr, offset, false)
+			vt = wasm.ValueTypeI32
 		case wasm.OpcodeI32Load16U:
 			load.AsExtLoad(ssa.OpcodeUload16, addr, offset, false)
+			vt = wasm.ValueTypeI32
 		case wasm.OpcodeI64Load8S:
 			load.AsExtLoad(ssa.OpcodeSload8, addr, offset, true)
+			vt = wasm.ValueTypeI64
 		case wasm.OpcodeI64Load8U:
 			load.AsExtLoad(ssa.OpcodeUload8, addr, offset, true)
+			vt = wasm.ValueTypeI64
 		case wasm.OpcodeI64Load16S:
 			load.AsExtLoad(ssa.OpcodeSload16, addr, offset, true)
+			vt = wasm.ValueTypeI64
 		case wasm.OpcodeI64Load16U:
 			load.AsExtLoad(ssa.OpcodeUload16, addr, offset, true)
+			vt = wasm.ValueTypeI64
 		case wasm.OpcodeI64Load32S:
 			load.AsExtLoad(ssa.OpcodeSload32, addr, offset, true)
+			vt = wasm.ValueTypeI64
 		case wasm.OpcodeI64Load32U:
 			load.AsExtLoad(ssa.OpcodeUload32, addr, offset, true)
+			vt = wasm.ValueTypeI64
 		default:
 			panic("BUG")
 		}
 		builder.InsertInstruction(load)
-		state.push(load.Return())
+		state.push(load.Return(), vt)
 	case wasm.OpcodeBlock:
 		// Note: we do not need to create a BB for this as that would always have only one predecessor
 		// which is the current BB, and therefore it's always ok to merge them in any way.
@@ -1356,14 +1476,14 @@ func (c *Compiler) lowerCurrentOpcode() {
 			blockType:                    bt,
 		})
 
-		args := c.allocateVarLengthValues(len(bt.Params), state.values[originalLen:]...)
+		args := c.nPeekDup(len(bt.Params))
 
 		// Insert the jump to the header of loop.
 		br := builder.AllocateInstruction()
 		br.AsJump(args, loopHeader)
 		builder.InsertInstruction(br)
 
-		c.switchTo(originalLen, loopHeader)
+		c.switchTo(originalLen, loopHeader, bt.Params)
 
 		if c.ensureTermination {
 			checkModuleExitCodePtr := builder.AllocateInstruction().
@@ -1395,7 +1515,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 		// multiple definitions (one in Then and another in Else blocks).
 		c.addBlockParamsFromWasmTypes(bt.Results, followingBlk)
 
-		args := c.allocateVarLengthValues(len(bt.Params), state.values[len(state.values)-len(bt.Params):]...)
+		args := c.nPeekDup(len(bt.Params))
 
 		// Insert the conditional jump to the Else block.
 		brz := builder.AllocateInstruction()
@@ -1440,10 +1560,10 @@ func (c *Compiler) lowerCurrentOpcode() {
 		}
 
 		// Reset the stack so that we can correctly handle the else block.
-		state.values = state.values[:ifctrl.originalStackLenWithoutParam]
+		state.truncate(ifctrl.originalStackLenWithoutParam)
 		elseBlk := ifctrl.blk
-		for _, arg := range ifctrl.clonedArgs.View() {
-			state.push(arg)
+		for i, arg := range ifctrl.clonedArgs.View() {
+			state.push(arg, ifctrl.blockType.Params[i])
 		}
 
 		builder.SetCurrentBlock(elseBlk)
@@ -1476,8 +1596,6 @@ func (c *Compiler) lowerCurrentOpcode() {
 		}
 
 		switch ctrl.kind {
-		case controlFrameKindFunction:
-			break // This is the very end of function.
 		case controlFrameKindLoop:
 			// Loop header block can be reached from any br/br_table contained in the loop,
 			// so now that we've reached End of it, we can seal it.
@@ -1496,7 +1614,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 		builder.Seal(followingBlk)
 
 		// Ready to start translating the following block.
-		c.switchTo(ctrl.originalStackLenWithoutParam, followingBlk)
+		c.switchTo(ctrl.originalStackLenWithoutParam, followingBlk, ctrl.blockType.Results)
 
 	case wasm.OpcodeBr:
 		labelIndex := c.readI32u()
@@ -1507,6 +1625,12 @@ func (c *Compiler) lowerCurrentOpcode() {
 		c.emitTryTableLeaves(int(labelIndex))
 		targetBlk, argNum := state.brTargetArgNumFor(labelIndex)
 		args := c.nPeekDup(argNum)
+		if !targetBlk.ReturnBlock() {
+			// A branch to the function's own label is the frame exit, which
+			// insertJumpToBlock owns; releasing here as well would release it twice.
+			from, to := c.branchRange(labelIndex, argNum)
+			c.releaseExnrefs(from, to, false)
+		}
 		c.insertJumpToBlock(args, targetBlk)
 
 		state.unreachable = true
@@ -1521,42 +1645,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 
 		targetBlk, argNum := state.brTargetArgNumFor(labelIndex)
 		args := c.nPeekDup(argNum)
-		var sealTargetBlk bool
-
-		// If the branch exits any try_table frames, emit TryTableLeave
-		// calls in a trampoline block that only runs on the taken path.
-		if c.branchExitsTryTable(int(labelIndex)) {
-			current := builder.CurrentBlock()
-			trampolineBlk := builder.AllocateBasicBlock()
-			builder.SetCurrentBlock(trampolineBlk)
-			c.emitTryTableLeaves(int(labelIndex))
-			c.insertJumpToBlock(args, targetBlk)
-			builder.SetCurrentBlock(current)
-			targetBlk = trampolineBlk
-			sealTargetBlk = true
-			args = ssa.ValuesNil
-		}
-
-		if c.needListener && targetBlk.ReturnBlock() { // In this case, we have to call the listener before returning.
-			// Save the currently active block.
-			current := builder.CurrentBlock()
-
-			// Allocate the trampoline block to the return where we call the listener.
-			targetBlk = builder.AllocateBasicBlock()
-			builder.SetCurrentBlock(targetBlk)
-			sealTargetBlk = true
-
-			c.callListenerAfter()
-
-			instr := builder.AllocateInstruction()
-			instr.AsReturn(args)
-			builder.InsertInstruction(instr)
-
-			args = ssa.ValuesNil
-
-			// Revert the current block.
-			builder.SetCurrentBlock(current)
-		}
+		targetBlk, args, sealTargetBlk := c.takenEdgeTarget(labelIndex, argNum, targetBlk, args)
 
 		// Insert the conditional jump to the target block.
 		brnz := builder.AllocateInstruction()
@@ -1588,8 +1677,15 @@ func (c *Compiler) lowerCurrentOpcode() {
 
 		index := state.pop()
 		if labelCount == 0 { // If this br_table is empty, we can just emit the unconditional jump.
+			c.emitTryTableLeaves(int(labels[0]))
 			targetBlk, argNum := state.brTargetArgNumFor(labels[0])
 			args := c.nPeekDup(argNum)
+			// Unconditional, like br, so the releases can go in this block rather than a
+			// block of their own.
+			if !targetBlk.ReturnBlock() {
+				from, to := c.branchRange(labels[0], argNum)
+				c.releaseExnrefs(from, to, false)
+			}
 			c.insertJumpToBlock(args, targetBlk)
 		} else {
 			c.lowerBrTable(labels, index)
@@ -1638,7 +1734,9 @@ func (c *Compiler) lowerCurrentOpcode() {
 		if state.unreachable {
 			break
 		}
-		_ = state.pop()
+		if dropped := state.popTyped(); wasm.IsExnref(dropped.t) {
+			c.adjustExnrefs(ssa.ValueInvalid, dropped.v)
+		}
 	case wasm.OpcodeF64ConvertI32S, wasm.OpcodeF64ConvertI64S, wasm.OpcodeF64ConvertI32U, wasm.OpcodeF64ConvertI64U:
 		if state.unreachable {
 			break
@@ -1648,7 +1746,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			op == wasm.OpcodeF64ConvertI32S || op == wasm.OpcodeF64ConvertI64S,
 			true,
 		).Insert(builder).Return()
-		state.push(result)
+		state.push(result, wasm.ValueTypeF64)
 	case wasm.OpcodeF32ConvertI32S, wasm.OpcodeF32ConvertI64S, wasm.OpcodeF32ConvertI32U, wasm.OpcodeF32ConvertI64U:
 		if state.unreachable {
 			break
@@ -1658,7 +1756,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			op == wasm.OpcodeF32ConvertI32S || op == wasm.OpcodeF32ConvertI64S,
 			false,
 		).Insert(builder).Return()
-		state.push(result)
+		state.push(result, wasm.ValueTypeF32)
 	case wasm.OpcodeF32DemoteF64:
 		if state.unreachable {
 			break
@@ -1666,7 +1764,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 		cvt := builder.AllocateInstruction()
 		cvt.AsFdemote(state.pop())
 		builder.InsertInstruction(cvt)
-		state.push(cvt.Return())
+		state.push(cvt.Return(), wasm.ValueTypeF32)
 	case wasm.OpcodeF64PromoteF32:
 		if state.unreachable {
 			break
@@ -1674,7 +1772,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 		cvt := builder.AllocateInstruction()
 		cvt.AsFpromote(state.pop())
 		builder.InsertInstruction(cvt)
-		state.push(cvt.Return())
+		state.push(cvt.Return(), wasm.ValueTypeF64)
 
 	case wasm.OpcodeVecPrefix:
 		state.pc++
@@ -1690,7 +1788,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 				break
 			}
 			ret := builder.AllocateInstruction().AsVconst(lo, hi).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecV128Load:
 			_, offset := c.readMemArg()
 			if state.unreachable {
@@ -1701,7 +1799,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			load := builder.AllocateInstruction()
 			load.AsLoad(addr, offset, ssa.TypeV128)
 			builder.InsertInstruction(load)
-			state.push(load.Return())
+			state.push(load.Return(), wasm.ValueTypeV128)
 		case wasm.OpcodeVecV128Load8Lane, wasm.OpcodeVecV128Load16Lane, wasm.OpcodeVecV128Load32Lane:
 			_, offset := c.readMemArg()
 			state.pc++
@@ -1729,7 +1827,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			ret := builder.AllocateInstruction().
 				AsInsertlane(vector, load, laneIndex, lane).
 				Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecV128Load64Lane:
 			_, offset := c.readMemArg()
 			state.pc++
@@ -1746,7 +1844,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			ret := builder.AllocateInstruction().
 				AsInsertlane(vector, load, laneIndex, ssa.VecLaneI64x2).
 				Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 
 		case wasm.OpcodeVecV128Load32zero, wasm.OpcodeVecV128Load64zero:
 			_, offset := c.readMemArg()
@@ -1768,7 +1866,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			ret := builder.AllocateInstruction().
 				AsVZeroExtLoad(addr, offset, scalarType).
 				Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 
 		case wasm.OpcodeVecV128Load8x8u, wasm.OpcodeVecV128Load8x8s,
 			wasm.OpcodeVecV128Load16x4u, wasm.OpcodeVecV128Load16x4s,
@@ -1804,7 +1902,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			ret := builder.AllocateInstruction().
 				AsWiden(load, lane, signed, true).
 				Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecV128Load8Splat, wasm.OpcodeVecV128Load16Splat,
 			wasm.OpcodeVecV128Load32Splat, wasm.OpcodeVecV128Load64Splat:
 			_, offset := c.readMemArg()
@@ -1828,7 +1926,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			ret := builder.AllocateInstruction().
 				AsLoadSplat(addr, offset, lane).
 				Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecV128Store:
 			_, offset := c.readMemArg()
 			if state.unreachable {
@@ -1876,7 +1974,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			}
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVbnot(v1).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecV128And:
 			if state.unreachable {
 				break
@@ -1884,7 +1982,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v2 := state.pop()
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVband(v1, v2).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecV128AndNot:
 			if state.unreachable {
 				break
@@ -1892,7 +1990,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v2 := state.pop()
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVbandnot(v1, v2).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecV128Or:
 			if state.unreachable {
 				break
@@ -1900,7 +1998,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v2 := state.pop()
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVbor(v1, v2).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecV128Xor:
 			if state.unreachable {
 				break
@@ -1908,7 +2006,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v2 := state.pop()
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVbxor(v1, v2).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecV128Bitselect:
 			if state.unreachable {
 				break
@@ -1917,14 +2015,14 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v2 := state.pop()
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVbitselect(c, v1, v2).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecV128AnyTrue:
 			if state.unreachable {
 				break
 			}
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVanyTrue(v1).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeI32)
 		case wasm.OpcodeVecI8x16AllTrue, wasm.OpcodeVecI16x8AllTrue, wasm.OpcodeVecI32x4AllTrue, wasm.OpcodeVecI64x2AllTrue:
 			if state.unreachable {
 				break
@@ -1942,7 +2040,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			}
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVallTrue(v1, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeI32)
 		case wasm.OpcodeVecI8x16BitMask, wasm.OpcodeVecI16x8BitMask, wasm.OpcodeVecI32x4BitMask, wasm.OpcodeVecI64x2BitMask:
 			if state.unreachable {
 				break
@@ -1960,7 +2058,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			}
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVhighBits(v1, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeI32)
 		case wasm.OpcodeVecI8x16Abs, wasm.OpcodeVecI16x8Abs, wasm.OpcodeVecI32x4Abs, wasm.OpcodeVecI64x2Abs:
 			if state.unreachable {
 				break
@@ -1978,7 +2076,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			}
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVIabs(v1, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecI8x16Neg, wasm.OpcodeVecI16x8Neg, wasm.OpcodeVecI32x4Neg, wasm.OpcodeVecI64x2Neg:
 			if state.unreachable {
 				break
@@ -1996,7 +2094,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			}
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVIneg(v1, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecI8x16Popcnt:
 			if state.unreachable {
 				break
@@ -2005,7 +2103,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v1 := state.pop()
 
 			ret := builder.AllocateInstruction().AsVIpopcnt(v1, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecI8x16Add, wasm.OpcodeVecI16x8Add, wasm.OpcodeVecI32x4Add, wasm.OpcodeVecI64x2Add:
 			if state.unreachable {
 				break
@@ -2024,7 +2122,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v2 := state.pop()
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVIadd(v1, v2, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecI8x16AddSatS, wasm.OpcodeVecI16x8AddSatS:
 			if state.unreachable {
 				break
@@ -2039,7 +2137,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v2 := state.pop()
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVSaddSat(v1, v2, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecI8x16AddSatU, wasm.OpcodeVecI16x8AddSatU:
 			if state.unreachable {
 				break
@@ -2054,7 +2152,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v2 := state.pop()
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVUaddSat(v1, v2, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecI8x16SubSatS, wasm.OpcodeVecI16x8SubSatS:
 			if state.unreachable {
 				break
@@ -2069,7 +2167,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v2 := state.pop()
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVSsubSat(v1, v2, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecI8x16SubSatU, wasm.OpcodeVecI16x8SubSatU:
 			if state.unreachable {
 				break
@@ -2084,7 +2182,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v2 := state.pop()
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVUsubSat(v1, v2, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 
 		case wasm.OpcodeVecI8x16Sub, wasm.OpcodeVecI16x8Sub, wasm.OpcodeVecI32x4Sub, wasm.OpcodeVecI64x2Sub:
 			if state.unreachable {
@@ -2104,7 +2202,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v2 := state.pop()
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVIsub(v1, v2, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecI8x16MinS, wasm.OpcodeVecI16x8MinS, wasm.OpcodeVecI32x4MinS:
 			if state.unreachable {
 				break
@@ -2121,7 +2219,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v2 := state.pop()
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVImin(v1, v2, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecI8x16MinU, wasm.OpcodeVecI16x8MinU, wasm.OpcodeVecI32x4MinU:
 			if state.unreachable {
 				break
@@ -2138,7 +2236,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v2 := state.pop()
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVUmin(v1, v2, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecI8x16MaxS, wasm.OpcodeVecI16x8MaxS, wasm.OpcodeVecI32x4MaxS:
 			if state.unreachable {
 				break
@@ -2155,7 +2253,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v2 := state.pop()
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVImax(v1, v2, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecI8x16MaxU, wasm.OpcodeVecI16x8MaxU, wasm.OpcodeVecI32x4MaxU:
 			if state.unreachable {
 				break
@@ -2172,7 +2270,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v2 := state.pop()
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVUmax(v1, v2, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecI8x16AvgrU, wasm.OpcodeVecI16x8AvgrU:
 			if state.unreachable {
 				break
@@ -2187,7 +2285,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v2 := state.pop()
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVAvgRound(v1, v2, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecI16x8Mul, wasm.OpcodeVecI32x4Mul, wasm.OpcodeVecI64x2Mul:
 			if state.unreachable {
 				break
@@ -2204,7 +2302,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v2 := state.pop()
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVImul(v1, v2, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecI16x8Q15mulrSatS:
 			if state.unreachable {
 				break
@@ -2212,7 +2310,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v2 := state.pop()
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsSqmulRoundSat(v1, v2, ssa.VecLaneI16x8).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecI8x16Eq, wasm.OpcodeVecI16x8Eq, wasm.OpcodeVecI32x4Eq, wasm.OpcodeVecI64x2Eq:
 			if state.unreachable {
 				break
@@ -2232,7 +2330,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().
 				AsVIcmp(v1, v2, ssa.IntegerCmpCondEqual, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecI8x16Ne, wasm.OpcodeVecI16x8Ne, wasm.OpcodeVecI32x4Ne, wasm.OpcodeVecI64x2Ne:
 			if state.unreachable {
 				break
@@ -2252,7 +2350,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().
 				AsVIcmp(v1, v2, ssa.IntegerCmpCondNotEqual, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecI8x16LtS, wasm.OpcodeVecI16x8LtS, wasm.OpcodeVecI32x4LtS, wasm.OpcodeVecI64x2LtS:
 			if state.unreachable {
 				break
@@ -2272,7 +2370,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().
 				AsVIcmp(v1, v2, ssa.IntegerCmpCondSignedLessThan, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecI8x16LtU, wasm.OpcodeVecI16x8LtU, wasm.OpcodeVecI32x4LtU:
 			if state.unreachable {
 				break
@@ -2290,7 +2388,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().
 				AsVIcmp(v1, v2, ssa.IntegerCmpCondUnsignedLessThan, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecI8x16LeS, wasm.OpcodeVecI16x8LeS, wasm.OpcodeVecI32x4LeS, wasm.OpcodeVecI64x2LeS:
 			if state.unreachable {
 				break
@@ -2310,7 +2408,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().
 				AsVIcmp(v1, v2, ssa.IntegerCmpCondSignedLessThanOrEqual, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecI8x16LeU, wasm.OpcodeVecI16x8LeU, wasm.OpcodeVecI32x4LeU:
 			if state.unreachable {
 				break
@@ -2328,7 +2426,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().
 				AsVIcmp(v1, v2, ssa.IntegerCmpCondUnsignedLessThanOrEqual, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecI8x16GtS, wasm.OpcodeVecI16x8GtS, wasm.OpcodeVecI32x4GtS, wasm.OpcodeVecI64x2GtS:
 			if state.unreachable {
 				break
@@ -2348,7 +2446,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().
 				AsVIcmp(v1, v2, ssa.IntegerCmpCondSignedGreaterThan, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecI8x16GtU, wasm.OpcodeVecI16x8GtU, wasm.OpcodeVecI32x4GtU:
 			if state.unreachable {
 				break
@@ -2366,7 +2464,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().
 				AsVIcmp(v1, v2, ssa.IntegerCmpCondUnsignedGreaterThan, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecI8x16GeS, wasm.OpcodeVecI16x8GeS, wasm.OpcodeVecI32x4GeS, wasm.OpcodeVecI64x2GeS:
 			if state.unreachable {
 				break
@@ -2386,7 +2484,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().
 				AsVIcmp(v1, v2, ssa.IntegerCmpCondSignedGreaterThanOrEqual, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecI8x16GeU, wasm.OpcodeVecI16x8GeU, wasm.OpcodeVecI32x4GeU:
 			if state.unreachable {
 				break
@@ -2404,7 +2502,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().
 				AsVIcmp(v1, v2, ssa.IntegerCmpCondUnsignedGreaterThanOrEqual, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecF32x4Max, wasm.OpcodeVecF64x2Max:
 			if state.unreachable {
 				break
@@ -2419,7 +2517,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v2 := state.pop()
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVFmax(v1, v2, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecF32x4Abs, wasm.OpcodeVecF64x2Abs:
 			if state.unreachable {
 				break
@@ -2433,7 +2531,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			}
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVFabs(v1, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecF32x4Min, wasm.OpcodeVecF64x2Min:
 			if state.unreachable {
 				break
@@ -2448,7 +2546,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v2 := state.pop()
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVFmin(v1, v2, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecF32x4Neg, wasm.OpcodeVecF64x2Neg:
 			if state.unreachable {
 				break
@@ -2462,7 +2560,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			}
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVFneg(v1, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecF32x4Sqrt, wasm.OpcodeVecF64x2Sqrt:
 			if state.unreachable {
 				break
@@ -2476,7 +2574,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			}
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVSqrt(v1, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 
 		case wasm.OpcodeVecF32x4Add, wasm.OpcodeVecF64x2Add:
 			if state.unreachable {
@@ -2492,7 +2590,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v2 := state.pop()
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVFadd(v1, v2, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecF32x4Sub, wasm.OpcodeVecF64x2Sub:
 			if state.unreachable {
 				break
@@ -2507,7 +2605,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v2 := state.pop()
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVFsub(v1, v2, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecF32x4Mul, wasm.OpcodeVecF64x2Mul:
 			if state.unreachable {
 				break
@@ -2522,7 +2620,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v2 := state.pop()
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVFmul(v1, v2, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecF32x4Div, wasm.OpcodeVecF64x2Div:
 			if state.unreachable {
 				break
@@ -2537,7 +2635,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v2 := state.pop()
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVFdiv(v1, v2, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 
 		case wasm.OpcodeVecI16x8ExtaddPairwiseI8x16S, wasm.OpcodeVecI16x8ExtaddPairwiseI8x16U:
 			if state.unreachable {
@@ -2546,7 +2644,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v := state.pop()
 			signed := vecOp == wasm.OpcodeVecI16x8ExtaddPairwiseI8x16S
 			ret := builder.AllocateInstruction().AsExtIaddPairwise(v, ssa.VecLaneI8x16, signed).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 
 		case wasm.OpcodeVecI32x4ExtaddPairwiseI16x8S, wasm.OpcodeVecI32x4ExtaddPairwiseI16x8U:
 			if state.unreachable {
@@ -2555,7 +2653,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v := state.pop()
 			signed := vecOp == wasm.OpcodeVecI32x4ExtaddPairwiseI16x8S
 			ret := builder.AllocateInstruction().AsExtIaddPairwise(v, ssa.VecLaneI16x8, signed).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 
 		case wasm.OpcodeVecI16x8ExtMulLowI8x16S, wasm.OpcodeVecI16x8ExtMulLowI8x16U:
 			if state.unreachable {
@@ -2567,7 +2665,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 				v1, v2,
 				ssa.VecLaneI8x16, ssa.VecLaneI16x8,
 				vecOp == wasm.OpcodeVecI16x8ExtMulLowI8x16S, true)
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 
 		case wasm.OpcodeVecI16x8ExtMulHighI8x16S, wasm.OpcodeVecI16x8ExtMulHighI8x16U:
 			if state.unreachable {
@@ -2579,7 +2677,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 				v1, v2,
 				ssa.VecLaneI8x16, ssa.VecLaneI16x8,
 				vecOp == wasm.OpcodeVecI16x8ExtMulHighI8x16S, false)
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 
 		case wasm.OpcodeVecI32x4ExtMulLowI16x8S, wasm.OpcodeVecI32x4ExtMulLowI16x8U:
 			if state.unreachable {
@@ -2591,7 +2689,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 				v1, v2,
 				ssa.VecLaneI16x8, ssa.VecLaneI32x4,
 				vecOp == wasm.OpcodeVecI32x4ExtMulLowI16x8S, true)
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 
 		case wasm.OpcodeVecI32x4ExtMulHighI16x8S, wasm.OpcodeVecI32x4ExtMulHighI16x8U:
 			if state.unreachable {
@@ -2603,7 +2701,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 				v1, v2,
 				ssa.VecLaneI16x8, ssa.VecLaneI32x4,
 				vecOp == wasm.OpcodeVecI32x4ExtMulHighI16x8S, false)
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecI64x2ExtMulLowI32x4S, wasm.OpcodeVecI64x2ExtMulLowI32x4U:
 			if state.unreachable {
 				break
@@ -2614,7 +2712,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 				v1, v2,
 				ssa.VecLaneI32x4, ssa.VecLaneI64x2,
 				vecOp == wasm.OpcodeVecI64x2ExtMulLowI32x4S, true)
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 
 		case wasm.OpcodeVecI64x2ExtMulHighI32x4S, wasm.OpcodeVecI64x2ExtMulHighI32x4U:
 			if state.unreachable {
@@ -2626,7 +2724,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 				v1, v2,
 				ssa.VecLaneI32x4, ssa.VecLaneI64x2,
 				vecOp == wasm.OpcodeVecI64x2ExtMulHighI32x4S, false)
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 
 		case wasm.OpcodeVecI32x4DotI16x8S:
 			if state.unreachable {
@@ -2636,7 +2734,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v1 := state.pop()
 
 			ret := builder.AllocateInstruction().AsWideningPairwiseDotProductS(v1, v2).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 
 		case wasm.OpcodeVecF32x4Eq, wasm.OpcodeVecF64x2Eq:
 			if state.unreachable {
@@ -2653,7 +2751,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().
 				AsVFcmp(v1, v2, ssa.FloatCmpCondEqual, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecF32x4Ne, wasm.OpcodeVecF64x2Ne:
 			if state.unreachable {
 				break
@@ -2669,7 +2767,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().
 				AsVFcmp(v1, v2, ssa.FloatCmpCondNotEqual, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecF32x4Lt, wasm.OpcodeVecF64x2Lt:
 			if state.unreachable {
 				break
@@ -2685,7 +2783,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().
 				AsVFcmp(v1, v2, ssa.FloatCmpCondLessThan, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecF32x4Le, wasm.OpcodeVecF64x2Le:
 			if state.unreachable {
 				break
@@ -2701,7 +2799,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().
 				AsVFcmp(v1, v2, ssa.FloatCmpCondLessThanOrEqual, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecF32x4Gt, wasm.OpcodeVecF64x2Gt:
 			if state.unreachable {
 				break
@@ -2717,7 +2815,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().
 				AsVFcmp(v1, v2, ssa.FloatCmpCondGreaterThan, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecF32x4Ge, wasm.OpcodeVecF64x2Ge:
 			if state.unreachable {
 				break
@@ -2733,7 +2831,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().
 				AsVFcmp(v1, v2, ssa.FloatCmpCondGreaterThanOrEqual, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecF32x4Ceil, wasm.OpcodeVecF64x2Ceil:
 			if state.unreachable {
 				break
@@ -2747,7 +2845,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			}
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVCeil(v1, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecF32x4Floor, wasm.OpcodeVecF64x2Floor:
 			if state.unreachable {
 				break
@@ -2761,7 +2859,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			}
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVFloor(v1, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecF32x4Trunc, wasm.OpcodeVecF64x2Trunc:
 			if state.unreachable {
 				break
@@ -2775,7 +2873,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			}
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVTrunc(v1, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecF32x4Nearest, wasm.OpcodeVecF64x2Nearest:
 			if state.unreachable {
 				break
@@ -2789,7 +2887,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			}
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVNearest(v1, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecF32x4Pmin, wasm.OpcodeVecF64x2Pmin:
 			if state.unreachable {
 				break
@@ -2804,7 +2902,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v2 := state.pop()
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVMinPseudo(v1, v2, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecF32x4Pmax, wasm.OpcodeVecF64x2Pmax:
 			if state.unreachable {
 				break
@@ -2819,7 +2917,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v2 := state.pop()
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVMaxPseudo(v1, v2, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecI32x4TruncSatF32x4S, wasm.OpcodeVecI32x4TruncSatF32x4U:
 			if state.unreachable {
 				break
@@ -2827,7 +2925,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().
 				AsVFcvtToIntSat(v1, ssa.VecLaneF32x4, vecOp == wasm.OpcodeVecI32x4TruncSatF32x4S).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecI32x4TruncSatF64x2SZero, wasm.OpcodeVecI32x4TruncSatF64x2UZero:
 			if state.unreachable {
 				break
@@ -2835,7 +2933,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().
 				AsVFcvtToIntSat(v1, ssa.VecLaneF64x2, vecOp == wasm.OpcodeVecI32x4TruncSatF64x2SZero).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecF32x4ConvertI32x4S, wasm.OpcodeVecF32x4ConvertI32x4U:
 			if state.unreachable {
 				break
@@ -2843,7 +2941,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().
 				AsVFcvtFromInt(v1, ssa.VecLaneF32x4, vecOp == wasm.OpcodeVecF32x4ConvertI32x4S).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecF64x2ConvertLowI32x4S, wasm.OpcodeVecF64x2ConvertLowI32x4U:
 			if state.unreachable {
 				break
@@ -2857,7 +2955,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			ret := builder.AllocateInstruction().
 				AsVFcvtFromInt(v1, ssa.VecLaneF64x2, vecOp == wasm.OpcodeVecF64x2ConvertLowI32x4S).
 				Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecI8x16NarrowI16x8S, wasm.OpcodeVecI8x16NarrowI16x8U:
 			if state.unreachable {
 				break
@@ -2867,7 +2965,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			ret := builder.AllocateInstruction().
 				AsNarrow(v1, v2, ssa.VecLaneI16x8, vecOp == wasm.OpcodeVecI8x16NarrowI16x8S).
 				Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecI16x8NarrowI32x4S, wasm.OpcodeVecI16x8NarrowI32x4U:
 			if state.unreachable {
 				break
@@ -2877,7 +2975,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			ret := builder.AllocateInstruction().
 				AsNarrow(v1, v2, ssa.VecLaneI32x4, vecOp == wasm.OpcodeVecI16x8NarrowI32x4S).
 				Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecI16x8ExtendLowI8x16S, wasm.OpcodeVecI16x8ExtendLowI8x16U:
 			if state.unreachable {
 				break
@@ -2886,7 +2984,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			ret := builder.AllocateInstruction().
 				AsWiden(v1, ssa.VecLaneI8x16, vecOp == wasm.OpcodeVecI16x8ExtendLowI8x16S, true).
 				Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecI16x8ExtendHighI8x16S, wasm.OpcodeVecI16x8ExtendHighI8x16U:
 			if state.unreachable {
 				break
@@ -2895,7 +2993,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			ret := builder.AllocateInstruction().
 				AsWiden(v1, ssa.VecLaneI8x16, vecOp == wasm.OpcodeVecI16x8ExtendHighI8x16S, false).
 				Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecI32x4ExtendLowI16x8S, wasm.OpcodeVecI32x4ExtendLowI16x8U:
 			if state.unreachable {
 				break
@@ -2904,7 +3002,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			ret := builder.AllocateInstruction().
 				AsWiden(v1, ssa.VecLaneI16x8, vecOp == wasm.OpcodeVecI32x4ExtendLowI16x8S, true).
 				Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecI32x4ExtendHighI16x8S, wasm.OpcodeVecI32x4ExtendHighI16x8U:
 			if state.unreachable {
 				break
@@ -2913,7 +3011,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			ret := builder.AllocateInstruction().
 				AsWiden(v1, ssa.VecLaneI16x8, vecOp == wasm.OpcodeVecI32x4ExtendHighI16x8S, false).
 				Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecI64x2ExtendLowI32x4S, wasm.OpcodeVecI64x2ExtendLowI32x4U:
 			if state.unreachable {
 				break
@@ -2922,7 +3020,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			ret := builder.AllocateInstruction().
 				AsWiden(v1, ssa.VecLaneI32x4, vecOp == wasm.OpcodeVecI64x2ExtendLowI32x4S, true).
 				Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecI64x2ExtendHighI32x4S, wasm.OpcodeVecI64x2ExtendHighI32x4U:
 			if state.unreachable {
 				break
@@ -2931,7 +3029,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			ret := builder.AllocateInstruction().
 				AsWiden(v1, ssa.VecLaneI32x4, vecOp == wasm.OpcodeVecI64x2ExtendHighI32x4S, false).
 				Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 
 		case wasm.OpcodeVecF64x2PromoteLowF32x4Zero:
 			if state.unreachable {
@@ -2941,7 +3039,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			ret := builder.AllocateInstruction().
 				AsFvpromoteLow(v1, ssa.VecLaneF32x4).
 				Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecF32x4DemoteF64x2Zero:
 			if state.unreachable {
 				break
@@ -2950,7 +3048,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			ret := builder.AllocateInstruction().
 				AsFvdemote(v1, ssa.VecLaneF64x2).
 				Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecI8x16Shl, wasm.OpcodeVecI16x8Shl, wasm.OpcodeVecI32x4Shl, wasm.OpcodeVecI64x2Shl:
 			if state.unreachable {
 				break
@@ -2969,7 +3067,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v2 := state.pop()
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVIshl(v1, v2, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecI8x16ShrS, wasm.OpcodeVecI16x8ShrS, wasm.OpcodeVecI32x4ShrS, wasm.OpcodeVecI64x2ShrS:
 			if state.unreachable {
 				break
@@ -2988,7 +3086,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v2 := state.pop()
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVSshr(v1, v2, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecI8x16ShrU, wasm.OpcodeVecI16x8ShrU, wasm.OpcodeVecI32x4ShrU, wasm.OpcodeVecI64x2ShrU:
 			if state.unreachable {
 				break
@@ -3007,7 +3105,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v2 := state.pop()
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsVUshr(v1, v2, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecI8x16ExtractLaneS, wasm.OpcodeVecI16x8ExtractLaneS:
 			state.pc++
 			if state.unreachable {
@@ -3023,7 +3121,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v1 := state.pop()
 			index := c.wasmFunctionBody[state.pc]
 			ext := builder.AllocateInstruction().AsExtractlane(v1, index, lane, true).Insert(builder).Return()
-			state.push(ext)
+			state.push(ext, wasm.ValueTypeI32)
 		case wasm.OpcodeVecI8x16ExtractLaneU, wasm.OpcodeVecI16x8ExtractLaneU,
 			wasm.OpcodeVecI32x4ExtractLane, wasm.OpcodeVecI64x2ExtractLane,
 			wasm.OpcodeVecF32x4ExtractLane, wasm.OpcodeVecF64x2ExtractLane:
@@ -3032,24 +3130,25 @@ func (c *Compiler) lowerCurrentOpcode() {
 				break
 			}
 			var lane ssa.VecLane
+			var vt wasm.ValueType
 			switch vecOp {
 			case wasm.OpcodeVecI8x16ExtractLaneU:
-				lane = ssa.VecLaneI8x16
+				lane, vt = ssa.VecLaneI8x16, wasm.ValueTypeI32
 			case wasm.OpcodeVecI16x8ExtractLaneU:
-				lane = ssa.VecLaneI16x8
+				lane, vt = ssa.VecLaneI16x8, wasm.ValueTypeI32
 			case wasm.OpcodeVecI32x4ExtractLane:
-				lane = ssa.VecLaneI32x4
+				lane, vt = ssa.VecLaneI32x4, wasm.ValueTypeI32
 			case wasm.OpcodeVecI64x2ExtractLane:
-				lane = ssa.VecLaneI64x2
+				lane, vt = ssa.VecLaneI64x2, wasm.ValueTypeI64
 			case wasm.OpcodeVecF32x4ExtractLane:
-				lane = ssa.VecLaneF32x4
+				lane, vt = ssa.VecLaneF32x4, wasm.ValueTypeF32
 			case wasm.OpcodeVecF64x2ExtractLane:
-				lane = ssa.VecLaneF64x2
+				lane, vt = ssa.VecLaneF64x2, wasm.ValueTypeF64
 			}
 			v1 := state.pop()
 			index := c.wasmFunctionBody[state.pc]
 			ext := builder.AllocateInstruction().AsExtractlane(v1, index, lane, false).Insert(builder).Return()
-			state.push(ext)
+			state.push(ext, vt)
 		case wasm.OpcodeVecI8x16ReplaceLane, wasm.OpcodeVecI16x8ReplaceLane,
 			wasm.OpcodeVecI32x4ReplaceLane, wasm.OpcodeVecI64x2ReplaceLane,
 			wasm.OpcodeVecF32x4ReplaceLane, wasm.OpcodeVecF64x2ReplaceLane:
@@ -3076,7 +3175,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v1 := state.pop()
 			index := c.wasmFunctionBody[state.pc]
 			ret := builder.AllocateInstruction().AsInsertlane(v1, v2, index, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 		case wasm.OpcodeVecV128i8x16Shuffle:
 			state.pc++
 			laneIndexes := c.wasmFunctionBody[state.pc : state.pc+16]
@@ -3087,7 +3186,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v2 := state.pop()
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsShuffle(v1, v2, laneIndexes).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 
 		case wasm.OpcodeVecI8x16Swizzle:
 			if state.unreachable {
@@ -3096,7 +3195,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			v2 := state.pop()
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsSwizzle(v1, v2, ssa.VecLaneI8x16).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 
 		case wasm.OpcodeVecI8x16Splat,
 			wasm.OpcodeVecI16x8Splat,
@@ -3124,7 +3223,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			}
 			v1 := state.pop()
 			ret := builder.AllocateInstruction().AsSplat(v1, lane).Insert(builder).Return()
-			state.push(ret)
+			state.push(ret, wasm.ValueTypeV128)
 
 		default:
 			panic("TODO: unsupported vector instruction: " + wasm.VectorInstructionName(vecOp))
@@ -3170,7 +3269,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			memoryWaitRet := builder.AllocateInstruction().
 				AsCallIndirect(memoryWaitPtr, sig, args).
 				Insert(builder).Return()
-			state.push(memoryWaitRet)
+			state.push(memoryWaitRet, wasm.ValueTypeI32)
 		case wasm.OpcodeAtomicMemoryNotify:
 			_, offset := c.readMemArg()
 			if state.unreachable {
@@ -3191,7 +3290,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			memoryNotifyRet := builder.AllocateInstruction().
 				AsCallIndirect(memoryNotifyPtr, &c.memoryNotifySig, args).
 				Insert(builder).Return()
-			state.push(memoryNotifyRet)
+			state.push(memoryNotifyRet, wasm.ValueTypeI32)
 		case wasm.OpcodeAtomicI32Load, wasm.OpcodeAtomicI64Load, wasm.OpcodeAtomicI32Load8U, wasm.OpcodeAtomicI32Load16U, wasm.OpcodeAtomicI64Load8U, wasm.OpcodeAtomicI64Load16U, wasm.OpcodeAtomicI64Load32U:
 			_, offset := c.readMemArg()
 			if state.unreachable {
@@ -3212,17 +3311,18 @@ func (c *Compiler) lowerCurrentOpcode() {
 				size = 1
 			}
 
-			var typ ssa.Type
+			var typ wasm.ValueType
 			switch atomicOp {
 			case wasm.OpcodeAtomicI64Load, wasm.OpcodeAtomicI64Load32U, wasm.OpcodeAtomicI64Load16U, wasm.OpcodeAtomicI64Load8U:
-				typ = ssa.TypeI64
+				typ = wasm.ValueTypeI64
 			case wasm.OpcodeAtomicI32Load, wasm.OpcodeAtomicI32Load16U, wasm.OpcodeAtomicI32Load8U:
-				typ = ssa.TypeI32
+				typ = wasm.ValueTypeI32
 			}
 
 			addr := c.atomicMemOpSetup(baseAddr, uint64(offset), size)
-			res := builder.AllocateInstruction().AsAtomicLoad(addr, size, typ).Insert(builder).Return()
-			state.push(res)
+			res := builder.AllocateInstruction().
+				AsAtomicLoad(addr, size, WasmTypeToSSAType(typ)).Insert(builder).Return()
+			state.push(res, typ)
 		case wasm.OpcodeAtomicI32Store, wasm.OpcodeAtomicI64Store, wasm.OpcodeAtomicI32Store8, wasm.OpcodeAtomicI32Store16, wasm.OpcodeAtomicI64Store8, wasm.OpcodeAtomicI64Store16, wasm.OpcodeAtomicI64Store32:
 			_, offset := c.readMemArg()
 			if state.unreachable {
@@ -3257,7 +3357,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 				break
 			}
 
-			val := state.pop()
+			val := state.popTyped()
 			baseAddr := state.pop()
 
 			var rmwOp ssa.AtomicRmwOp
@@ -3338,15 +3438,15 @@ func (c *Compiler) lowerCurrentOpcode() {
 			}
 
 			addr := c.atomicMemOpSetup(baseAddr, uint64(offset), size)
-			res := builder.AllocateInstruction().AsAtomicRmw(rmwOp, addr, val, size).Insert(builder).Return()
-			state.push(res)
+			res := builder.AllocateInstruction().AsAtomicRmw(rmwOp, addr, val.v, size).Insert(builder).Return()
+			state.push(res, val.t)
 		case wasm.OpcodeAtomicI32RmwCmpxchg, wasm.OpcodeAtomicI64RmwCmpxchg, wasm.OpcodeAtomicI32Rmw8CmpxchgU, wasm.OpcodeAtomicI32Rmw16CmpxchgU, wasm.OpcodeAtomicI64Rmw8CmpxchgU, wasm.OpcodeAtomicI64Rmw16CmpxchgU, wasm.OpcodeAtomicI64Rmw32CmpxchgU:
 			_, offset := c.readMemArg()
 			if state.unreachable {
 				break
 			}
 
-			repl := state.pop()
+			repl := state.popTyped()
 			exp := state.pop()
 			baseAddr := state.pop()
 
@@ -3362,8 +3462,8 @@ func (c *Compiler) lowerCurrentOpcode() {
 				size = 1
 			}
 			addr := c.atomicMemOpSetup(baseAddr, uint64(offset), size)
-			res := builder.AllocateInstruction().AsAtomicCas(addr, exp, repl, size).Insert(builder).Return()
-			state.push(res)
+			res := builder.AllocateInstruction().AsAtomicCas(addr, exp, repl.v, size).Insert(builder).Return()
+			state.push(res, repl.t)
 		case wasm.OpcodeAtomicFence:
 			order := c.readByte()
 			if state.unreachable {
@@ -3396,31 +3496,36 @@ func (c *Compiler) lowerCurrentOpcode() {
 			AllocateInstruction().
 			AsCallIndirect(refFuncPtr, &c.refFuncSig, args).
 			Insert(builder).Return()
-		state.push(refFuncRet)
+		state.push(refFuncRet, wasm.ValueTypeFuncref)
 
 	case wasm.OpcodeRefNull:
+		var nullType wasm.ValueType
 		switch reftype := c.wasmFunctionBody[c.loweringState.pc+1]; wasm.ValueType(reftype) {
 		case wasm.ValueTypeFuncref, wasm.ValueTypeExternref, wasm.ValueTypeExnref:
+			nullType = wasm.ValueType(reftype)
 			c.loweringState.pc++
 		default:
-			c.readI32u()
+			nullType = wasm.ValueTypeConcreteRef(c.readI32u(), true)
 		}
 		if state.unreachable {
 			break
 		}
 		ret := builder.AllocateInstruction().AsIconst64(0).Insert(builder).Return()
-		state.push(ret)
+		state.push(ret, nullType)
 	case wasm.OpcodeRefIsNull:
 		if state.unreachable {
 			break
 		}
-		r := state.pop()
+		r := state.popTyped()
 		zero := builder.AllocateInstruction().AsIconst64(0).Insert(builder)
 		icmp := builder.AllocateInstruction().
-			AsIcmp(r, zero.Return(), ssa.IntegerCmpCondEqual).
+			AsIcmp(r.v, zero.Return(), ssa.IntegerCmpCondEqual).
 			Insert(builder).
 			Return()
-		state.push(icmp)
+		if wasm.IsExnref(r.t) {
+			c.adjustExnrefs(ssa.ValueInvalid, r.v)
+		}
+		state.push(icmp, wasm.ValueTypeI32)
 	case wasm.OpcodeTableSet:
 		tableIndex := c.readI32u()
 		if state.unreachable {
@@ -3430,6 +3535,10 @@ func (c *Compiler) lowerCurrentOpcode() {
 		targetOffsetInTable := state.pop()
 
 		elementAddr := c.lowerAccessTableWithBoundsCheck(tableIndex, targetOffsetInTable)
+		if c.exnrefTable(tableIndex) {
+			c.storeExnrefSlot(elementAddr, r)
+			break
+		}
 		builder.AllocateInstruction().AsStore(ssa.OpcodeStore, r, elementAddr, 0).Insert(builder)
 
 	case wasm.OpcodeTableGet:
@@ -3439,8 +3548,12 @@ func (c *Compiler) lowerCurrentOpcode() {
 		}
 		targetOffsetInTable := state.pop()
 		elementAddr := c.lowerAccessTableWithBoundsCheck(tableIndex, targetOffsetInTable)
+		if c.exnrefTable(tableIndex) {
+			state.push(c.loadExnrefSlot(elementAddr), wasm.ValueTypeExnref)
+			break
+		}
 		loaded := builder.AllocateInstruction().AsLoad(elementAddr, 0, ssa.TypeI64).Insert(builder).Return()
-		state.push(loaded)
+		state.push(loaded, c.tableType(tableIndex))
 
 	case wasm.OpcodeTailCallReturnCallIndirect:
 		typeIndex := c.readI32u()
@@ -3448,9 +3561,6 @@ func (c *Compiler) lowerCurrentOpcode() {
 		if state.unreachable {
 			break
 		}
-		// Per spec, return_call leaves the current frame, so all enclosing
-		// try_table handlers must be popped before the tail call.
-		c.emitTryTableLeaves(len(c.state().controlFrames))
 		_, _ = typeIndex, tableIndex
 		c.lowerTailCallReturnCallIndirect(typeIndex, tableIndex)
 		state.unreachable = true
@@ -3460,9 +3570,6 @@ func (c *Compiler) lowerCurrentOpcode() {
 		if state.unreachable {
 			break
 		}
-		// Per spec, return_call leaves the current frame, so all enclosing
-		// try_table handlers must be popped before the tail call.
-		c.emitTryTableLeaves(len(c.state().controlFrames))
 		c.lowerTailCallReturnCall(fnIndex)
 		state.unreachable = true
 
@@ -3473,44 +3580,32 @@ func (c *Compiler) lowerCurrentOpcode() {
 		}
 		tagType := c.resolveTagType(tagIndex)
 		// Pop the tag's param values from the stack.
-		var throwParams []ssa.Value
-		if tagType != nil {
-			throwParams = make([]ssa.Value, len(tagType.Params))
-			for i := len(tagType.Params) - 1; i >= 0; i-- {
-				throwParams[i] = state.pop()
-			}
+		throwParams := make([]ssa.Value, len(tagType.Params))
+		for i := len(tagType.Params) - 1; i >= 0; i-- {
+			throwParams[i] = state.pop()
 		}
 
 		c.storeCallerModuleContext()
 
 		tagIdxVal := builder.AllocateInstruction().AsIconst64(uint64(tagIndex)).Insert(builder).Return()
 
-		// We need to store the throwParams in the exception and then throw it.
-		// However, each exception might have a variable number of parameters,
-		// so we let Go allocate the reference on the heap.
-		// The Go side allocates the Exception object (Params sized to nParams)
-		// and stores the pointer to the backing-array into execCtx.exceptionParamsPtr.
+		// Each tag has its own number of params, so Go allocates the buffer: the
+		// trampoline records the raise and returns the buffer for the stores below.
 		throwAllocPtr := builder.AllocateInstruction().
 			AsLoad(c.execCtxPtrValue,
 				wazevoapi.ExecutionContextOffsetThrowAllocTrampolineAddress.U32(),
 				ssa.TypeI64,
 			).Insert(builder).Return()
 		throwAllocArgs := c.allocateVarLengthValues(2, c.execCtxPtrValue, tagIdxVal)
-		exnref := builder.AllocateInstruction().
+		paramsPtr := builder.AllocateInstruction().
 			AsCallIndirect(throwAllocPtr, &c.throwAllocSig, throwAllocArgs).
 			Insert(builder).Return()
 
 		// Reload memory pointers invalidated by the Go call.
 		c.reloadAfterCall()
 
-		// We can now store each param directly into Exception.Params using the pointer
-		// stored into execCtx.exceptionParamsPtr.
+		// We can now store each param directly into that buffer.
 		if len(throwParams) > 0 {
-			paramsPtr := builder.AllocateInstruction().
-				AsLoad(c.execCtxPtrValue,
-					wazevoapi.ExecutionContextOffsetExceptionParamsPtr.U32(),
-					ssa.TypeI64,
-				).Insert(builder).Return()
 			for i, v := range throwParams {
 				switch v.Type() {
 				case ssa.TypeF32:
@@ -3525,7 +3620,9 @@ func (c *Compiler) lowerCurrentOpcode() {
 		}
 
 		// We return again control to Go to search and dispatch to a matching catch clause.
-		c.emitThrow(exnref)
+		// The throw-alloc trampoline already recorded the raise, so no exnref here.
+		zero := builder.AllocateInstruction().AsIconst64(0).Insert(builder).Return()
+		c.emitThrow(zero)
 		state.unreachable = true
 
 	case wasm.OpcodeThrowRef:
@@ -3590,11 +3687,17 @@ func (c *Compiler) lowerCurrentOpcode() {
 				TagIndex: cc.tagIndex,
 			})
 		}
-		numLocals := len(c.wasmFunctionTyp.Params) + len(c.wasmFunctionLocalTypes)
+		var exnrefLocals []uint32
+		for i := 0; i < c.numLocals(); i++ {
+			if wasm.IsExnref(c.localType(wasm.Index(i))) {
+				exnrefLocals = append(exnrefLocals, uint32(i))
+			}
+		}
 		tryTableID := c.tryTableMetadata.Append(wazevoapi.TryTableInfo{
 			CatchClauses: clauseInstances,
-			NumLocals:    numLocals,
+			NumLocals:    c.numLocals(),
 			ReuseLocals:  c.tryTableDepth > 0,
+			ExnrefLocals: exnrefLocals,
 		})
 
 		// Allocate the following block (after try_table end) and body block.
@@ -3602,104 +3705,33 @@ func (c *Compiler) lowerCurrentOpcode() {
 		c.addBlockParamsFromWasmTypes(bt.Results, followingBlk)
 		bodyBlk := builder.AllocateBasicBlock()
 
+		// Resolve each catch clause's branch target now. Catch label indices are
+		// relative to the scope enclosing the try_table (the try_table is not yet
+		// on the control stack, per spec), so they must be resolved here, before
+		// the frame is pushed.
+		catches := make([]resolvedCatch, len(catchClauses))
+		for i, cc := range catchClauses {
+			targetBlk, _ := state.brTargetArgNumFor(cc.labelIdx)
+			catches[i] = resolvedCatch{
+				clause:       cc,
+				targetBlk:    targetBlk,
+				targetHeight: state.ctrlPeekAt(int(cc.labelIdx)).originalStackLenWithoutParam,
+			}
+		}
+
+		tryHeight := len(state.values) - len(bt.Params)
 		if len(catchClauses) > 0 {
-			// Store the caller module context so the dispatch loop can find the module.
-			c.storeCallerModuleContext()
-
-			// For each catch clause, create a handler block that loads exception
-			// params and jumps to the wasm target label.
-			// NOTE: catch clause label indices do NOT include the try_table itself
-			// (the try_table is pushed onto the control stack after the catch clauses
-			// are processed, per the spec). So we resolve labels BEFORE pushing.
-			varPool := builder.VarLengthPool()
-			targets := varPool.Allocate(len(catchClauses) + 1) // +1 for bodyBlk
-
-			currentBlk := builder.CurrentBlock()
-			for _, cc := range catchClauses {
-				handlerBlk := builder.AllocateBasicBlock()
-				builder.SetCurrentBlock(handlerBlk)
-				c.reloadAfterCall()
-				c.reloadLocalsFromSaveArea()
-
-				// Resolve the wasm target label.
-				targetBlk, _ := state.brTargetArgNumFor(cc.labelIdx)
-
-				// Load exception params and jump to wasm target.
-				var brArgs []ssa.Value
-				switch cc.kind {
-				case wasm.CatchKindCatch:
-					if tagType := c.resolveTagType(cc.tagIndex); tagType != nil {
-						brArgs = c.loadExceptionParams(tagType)
-					}
-				case wasm.CatchKindCatchRef:
-					if tagType := c.resolveTagType(cc.tagIndex); tagType != nil {
-						brArgs = c.loadExceptionParams(tagType)
-					}
-					brArgs = append(brArgs, c.loadExnRef())
-				case wasm.CatchKindCatchAll:
-					// No values.
-				case wasm.CatchKindCatchAllRef:
-					brArgs = append(brArgs, c.loadExnRef())
-				}
-
-				// Pop any enclosing try_table handlers that the jump crosses.
-				c.emitTryTableLeaves(int(cc.labelIdx))
-
-				jmpArgs := c.allocateVarLengthValues(len(brArgs), brArgs...)
-				c.insertJumpToBlock(jmpArgs, targetBlk)
-
-				targets = targets.Append(varPool, ssa.Value(handlerBlk.ID()))
-			}
-			// Last target is the body block (default for clauseIdx == -1 / out of range).
-			targets = targets.Append(varPool, ssa.Value(bodyBlk.ID()))
-
-			// Back to the original block: call the try_table enter trampoline,
-			// then dispatch on the caught clause index.
-			builder.SetCurrentBlock(currentBlk)
-			encodedExitCode := uint64(wazevoapi.ExitCodeTryTableEnter | wazevoapi.ExitCode(tryTableID<<8))
-
-			// Load trampoline address from execCtx.
-			enterPtr := builder.AllocateInstruction().
-				AsLoad(c.execCtxPtrValue,
-					wazevoapi.ExecutionContextOffsetTryTableEnterTrampolineAddress.U32(),
-					ssa.TypeI64,
-				).Insert(builder).Return()
-
-			// Call the trampoline: (execCtx, encodedExitCode) -> ().
-			exitCodeVal := builder.AllocateInstruction().AsIconst64(encodedExitCode).Insert(builder).Return()
-			args := c.allocateVarLengthValues(2, c.execCtxPtrValue, exitCodeVal)
-			builder.AllocateInstruction().
-				AsCallIndirect(enterPtr, &c.tryTableEnterSig, args).
-				Insert(builder)
-
-			// Load the caught clause index written by the dispatch loop.
-			clauseIdx := builder.AllocateInstruction().
-				AsLoad(c.execCtxPtrValue,
-					wazevoapi.ExecutionContextOffsetCaughtExceptionClauseIdx.U32(),
-					ssa.TypeI64,
-				).Insert(builder).Return()
-
-			// Dispatch to handler blocks or body block via br_table.
-			brTable := builder.AllocateInstruction()
-			brTable.AsBrTable(clauseIdx, targets)
-			builder.InsertInstruction(brTable)
-
-			// Seal handler blocks after BrTable is inserted (so predecessors are registered).
-			for _, targetID := range targets.View() {
-				blk := builder.BasicBlock(ssa.BasicBlockID(targetID))
-				if !blk.Sealed() {
-					builder.Seal(blk)
-				}
-			}
+			// The rewind a catch does puts the whole operand stack back as it is here, the
+			// try_table's own block parameters included, so that is the height a handler
+			// unwinds from.
+			c.emitTryTableEntry(tryTableID, catches, len(state.values), bodyBlk)
 		} else {
 			// No catch clauses — try_table acts as a plain block.
 			// Jump directly to body without entering exception handling.
 			c.insertJumpToBlock(ssa.ValuesNil, bodyBlk)
 		}
 
-		if !bodyBlk.Sealed() {
-			builder.Seal(bodyBlk)
-		}
+		builder.Seal(bodyBlk)
 		builder.SetCurrentBlock(bodyBlk)
 		if len(catchClauses) > 0 {
 			// Body block is entered after the trampoline call, so we need to reload.
@@ -3717,7 +3749,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 		}
 		state.ctrlPush(controlFrame{
 			kind:                         kind,
-			originalStackLenWithoutParam: len(state.values) - len(bt.Params),
+			originalStackLenWithoutParam: tryHeight,
 			followingBlock:               followingBlk,
 			blockType:                    bt,
 		})
@@ -3726,15 +3758,15 @@ func (c *Compiler) lowerCurrentOpcode() {
 		if state.unreachable {
 			break
 		}
-		r := state.pop()
+		r := state.popTyped()
 		zero := builder.AllocateInstruction().AsIconst64(0).Insert(builder)
 		checkNull := builder.AllocateInstruction().
-			AsIcmp(r, zero.Return(), ssa.IntegerCmpCondEqual).
+			AsIcmp(r.v, zero.Return(), ssa.IntegerCmpCondEqual).
 			Insert(builder).Return()
 		exitIfNull := builder.AllocateInstruction()
 		exitIfNull.AsExitIfTrueWithCode(c.execCtxPtrValue, checkNull, wazevoapi.ExitCodeNullReference)
 		builder.InsertInstruction(exitIfNull)
-		state.push(r)
+		state.push(r.v, r.t)
 
 	case wasm.OpcodeBrOnNull:
 		labelIndex := c.readI32u()
@@ -3742,40 +3774,17 @@ func (c *Compiler) lowerCurrentOpcode() {
 			break
 		}
 
-		r := state.pop()
+		r := state.popTyped()
 		zero := builder.AllocateInstruction().AsIconst64(0).Insert(builder)
 		isNull := builder.AllocateInstruction().
-			AsIcmp(r, zero.Return(), ssa.IntegerCmpCondEqual).
+			AsIcmp(r.v, zero.Return(), ssa.IntegerCmpCondEqual).
 			Insert(builder).Return()
 
 		targetBlk, argNum := state.brTargetArgNumFor(labelIndex)
 		args := c.nPeekDup(argNum)
-		var sealTargetBlk bool
-
-		if c.branchExitsTryTable(int(labelIndex)) {
-			current := builder.CurrentBlock()
-			trampolineBlk := builder.AllocateBasicBlock()
-			builder.SetCurrentBlock(trampolineBlk)
-			c.emitTryTableLeaves(int(labelIndex))
-			c.insertJumpToBlock(args, targetBlk)
-			builder.SetCurrentBlock(current)
-			targetBlk = trampolineBlk
-			sealTargetBlk = true
-			args = ssa.ValuesNil
-		}
-
-		if c.needListener && targetBlk.ReturnBlock() {
-			current := builder.CurrentBlock()
-			targetBlk = builder.AllocateBasicBlock()
-			builder.SetCurrentBlock(targetBlk)
-			sealTargetBlk = true
-			c.callListenerAfter()
-			instr := builder.AllocateInstruction()
-			instr.AsReturn(args)
-			builder.InsertInstruction(instr)
-			args = ssa.ValuesNil
-			builder.SetCurrentBlock(current)
-		}
+		// The branch carries argNum values off the stack; the operand it popped is null on the
+		// edge it is taken on, so it is not one of them and has no reference to release.
+		targetBlk, args, sealTargetBlk := c.takenEdgeTarget(labelIndex, argNum, targetBlk, args)
 
 		brnz := builder.AllocateInstruction()
 		brnz.AsBrnz(isNull, args, targetBlk)
@@ -3790,7 +3799,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 		c.insertJumpToBlock(ssa.ValuesNil, elseBlk)
 		builder.Seal(elseBlk)
 		builder.SetCurrentBlock(elseBlk)
-		state.push(r)
+		state.push(r.v, r.t)
 
 	case wasm.OpcodeBrOnNonNull:
 		labelIndex := c.readI32u()
@@ -3810,32 +3819,10 @@ func (c *Compiler) lowerCurrentOpcode() {
 		// The ref is the last value delivered to the label target.
 		args := c.nPeekDup(argNum - 1)
 		args = args.Append(builder.VarLengthPool(), r)
-		var sealTargetBlk bool
-
-		if c.branchExitsTryTable(int(labelIndex)) {
-			current := builder.CurrentBlock()
-			trampolineBlk := builder.AllocateBasicBlock()
-			builder.SetCurrentBlock(trampolineBlk)
-			c.emitTryTableLeaves(int(labelIndex))
-			c.insertJumpToBlock(args, targetBlk)
-			builder.SetCurrentBlock(current)
-			targetBlk = trampolineBlk
-			sealTargetBlk = true
-			args = ssa.ValuesNil
-		}
-
-		if c.needListener && targetBlk.ReturnBlock() {
-			current := builder.CurrentBlock()
-			targetBlk = builder.AllocateBasicBlock()
-			builder.SetCurrentBlock(targetBlk)
-			sealTargetBlk = true
-			c.callListenerAfter()
-			instr := builder.AllocateInstruction()
-			instr.AsReturn(args)
-			builder.InsertInstruction(instr)
-			args = ssa.ValuesNil
-			builder.SetCurrentBlock(current)
-		}
+		// Only argNum-1 of the label's values come off the stack, so one more slot than for an
+		// ordinary branch is discarded here. The ref itself travels to the label, so its
+		// reference travels with it.
+		targetBlk, args, sealTargetBlk := c.takenEdgeTarget(labelIndex, argNum-1, targetBlk, args)
 
 		brnz := builder.AllocateInstruction()
 		brnz.AsBrnz(isNonNull, args, targetBlk)
@@ -3863,7 +3850,6 @@ func (c *Compiler) lowerCurrentOpcode() {
 		if state.unreachable {
 			break
 		}
-		c.emitTryTableLeaves(len(c.state().controlFrames))
 		c.lowerTailCallReturnCallRef(typeIndex)
 		state.unreachable = true
 
@@ -3882,9 +3868,27 @@ func (c *Compiler) lowerCurrentOpcode() {
 
 func (c *Compiler) lowerReturn(builder ssa.Builder) {
 	results := c.nPeekDup(c.results())
+	from, to := c.frameExitRange()
+	c.releaseExnrefs(from, to, true)
 	instr := builder.AllocateInstruction()
 
 	instr.AsReturn(results)
+	builder.InsertInstruction(instr)
+}
+
+// lowerTailCallReturn emits the fallback return for a return_call, which makes the callee's
+// results this function's results verbatim. It is emitted whether or not the backend ends up
+// replacing this frame with the callee's: for a real tail call this frame is gone by the time
+// the callee runs, so the return is unreachable and the backend drops it.
+func (c *Compiler) lowerTailCallReturn(builder ssa.Builder, call *ssa.Instruction) {
+	first, rest := call.Returns()
+	var vs []ssa.Value
+	if first.Valid() {
+		vs = append(vs, first)
+	}
+	vs = append(vs, rest...)
+	instr := builder.AllocateInstruction()
+	instr.AsReturn(c.allocateVarLengthValues(len(vs), vs...))
 	builder.InsertInstruction(instr)
 }
 
@@ -3948,9 +3952,8 @@ func (c *Compiler) lowerAccessTableWithBoundsCheck(tableIndex uint32, elementOff
 	return calcElementAddressInTable.Return()
 }
 
-func (c *Compiler) prepareCall(fnIndex uint32) (isIndirect bool, sig *ssa.Signature, args ssa.Values, funcRefOrPtrValue uint64) {
+func (c *Compiler) prepareCall(fnIndex uint32) (isIndirect bool, typ *wasm.FunctionType, sig *ssa.Signature, args ssa.Values, funcRefOrPtrValue uint64) {
 	builder := c.ssaBuilder
-	state := c.state()
 	var typIndex wasm.Index
 	if fnIndex < c.m.ImportFunctionCount {
 		// Before transfer the control to the callee, we have to store the current module's moduleContextPtr
@@ -3970,19 +3973,16 @@ func (c *Compiler) prepareCall(fnIndex uint32) (isIndirect bool, sig *ssa.Signat
 	} else {
 		typIndex = c.m.FunctionSection[fnIndex-c.m.ImportFunctionCount]
 	}
-	typ := &c.m.TypeSection[typIndex]
+	typ = &c.m.TypeSection[typIndex]
 
 	argN := len(typ.Params)
-	tail := len(state.values) - argN
-	vs := state.values[tail:]
-	state.values = state.values[:tail]
-	args = c.allocateVarLengthValues(2+len(vs), c.execCtxPtrValue)
+	args = c.allocateVarLengthValues(2+argN, c.execCtxPtrValue)
 
 	sig = c.signatures[typ]
 	if fnIndex >= c.m.ImportFunctionCount {
 		args = args.Append(builder.VarLengthPool(), c.moduleCtxPtrValue) // This case the callee module is itself.
-		args = args.Append(builder.VarLengthPool(), vs...)
-		return false, sig, args, uint64(FunctionIndexToFuncRef(fnIndex))
+		args = c.nPopInto(args, argN)
+		return false, typ, sig, args, uint64(FunctionIndexToFuncRef(fnIndex))
 	} else {
 		// This case we have to read the address of the imported function from the module context.
 		moduleCtx := c.moduleCtxPtrValue
@@ -3994,16 +3994,15 @@ func (c *Compiler) prepareCall(fnIndex uint32) (isIndirect bool, sig *ssa.Signat
 		builder.InsertInstruction(loadModuleCtxPtr)
 
 		args = args.Append(builder.VarLengthPool(), loadModuleCtxPtr.Return())
-		args = args.Append(builder.VarLengthPool(), vs...)
+		args = c.nPopInto(args, argN)
 
-		return true, sig, args, uint64(loadFuncPtr.Return())
+		return true, typ, sig, args, uint64(loadFuncPtr.Return())
 	}
 }
 
 func (c *Compiler) lowerCall(fnIndex uint32) {
 	builder := c.ssaBuilder
-	state := c.state()
-	isIndirect, sig, args, funcRefOrPtrValue := c.prepareCall(fnIndex)
+	isIndirect, typ, sig, args, funcRefOrPtrValue := c.prepareCall(fnIndex)
 
 	call := builder.AllocateInstruction()
 	if isIndirect {
@@ -4013,13 +4012,7 @@ func (c *Compiler) lowerCall(fnIndex uint32) {
 	}
 	builder.InsertInstruction(call)
 
-	first, rest := call.Returns()
-	if first.Valid() {
-		state.push(first)
-	}
-	for _, v := range rest {
-		state.push(v)
-	}
+	c.pushCallResults(call, typ.Results)
 
 	c.reloadAfterCall()
 }
@@ -4082,11 +4075,8 @@ func (c *Compiler) prepareCallIndirect(typeIndex, tableIndex uint32) (ssa.Value,
 	moduleContextOpaquePtr := loadModuleContextOpaquePtr.Return()
 
 	typ := &c.m.TypeSection[typeIndex]
-	tail := len(state.values) - len(typ.Params)
-	vs := state.values[tail:]
-	state.values = state.values[:tail]
-	args := c.allocateVarLengthValues(2+len(vs), c.execCtxPtrValue, moduleContextOpaquePtr)
-	args = args.Append(builder.VarLengthPool(), vs...)
+	args := c.allocateVarLengthValues(2+len(typ.Params), c.execCtxPtrValue, moduleContextOpaquePtr)
+	args = c.nPopInto(args, len(typ.Params))
 
 	// Before transfer the control to the callee, we have to store the current module's moduleContextPtr
 	// into execContext.callerModuleContextPtr in case when the callee is a Go function.
@@ -4097,28 +4087,22 @@ func (c *Compiler) prepareCallIndirect(typeIndex, tableIndex uint32) (ssa.Value,
 
 func (c *Compiler) lowerCallIndirect(typeIndex, tableIndex uint32) {
 	builder := c.ssaBuilder
-	state := c.state()
 	executablePtr, typ, args := c.prepareCallIndirect(typeIndex, tableIndex)
 
 	call := builder.AllocateInstruction()
 	call.AsCallIndirect(executablePtr, c.signatures[typ], args)
 	builder.InsertInstruction(call)
 
-	first, rest := call.Returns()
-	if first.Valid() {
-		state.push(first)
-	}
-	for _, v := range rest {
-		state.push(v)
-	}
+	c.pushCallResults(call, typ.Results)
 
 	c.reloadAfterCall()
 }
 
 func (c *Compiler) lowerTailCallReturnCall(fnIndex uint32) {
-	isIndirect, sig, args, funcRefOrPtrValue := c.prepareCall(fnIndex)
+	isIndirect, typ, sig, args, funcRefOrPtrValue := c.prepareCall(fnIndex)
 	builder := c.ssaBuilder
-	state := c.state()
+	c.emitTryTableLeaves(len(c.state().controlFrames))
+	c.releaseExnrefsOnTailCall()
 
 	call := builder.AllocateInstruction()
 	if isIndirect {
@@ -4133,22 +4117,17 @@ func (c *Compiler) lowerTailCallReturnCall(fnIndex uint32) {
 	// a regular call, so we include return handling and let the backend delete it
 	// when redundant.
 	// For details, see internal/engine/RATIONALE.md
-	first, rest := call.Returns()
-	if first.Valid() {
-		state.push(first)
-	}
-	for _, v := range rest {
-		state.push(v)
-	}
+	c.pushCallResults(call, typ.Results)
 
 	c.reloadAfterCall()
-	c.lowerReturn(builder)
+	c.lowerTailCallReturn(builder, call)
 }
 
 func (c *Compiler) lowerTailCallReturnCallIndirect(typeIndex, tableIndex uint32) {
 	builder := c.ssaBuilder
-	state := c.state()
 	executablePtr, typ, args := c.prepareCallIndirect(typeIndex, tableIndex)
+	c.emitTryTableLeaves(len(c.state().controlFrames))
+	c.releaseExnrefsOnTailCall()
 
 	call := builder.AllocateInstruction()
 	call.AsTailCallReturnCallIndirect(executablePtr, c.signatures[typ], args)
@@ -4159,16 +4138,10 @@ func (c *Compiler) lowerTailCallReturnCallIndirect(typeIndex, tableIndex uint32)
 	// a regular call, so we include return handling and let the backend delete it
 	// when redundant.
 	// For details, see internal/engine/RATIONALE.md
-	first, rest := call.Returns()
-	if first.Valid() {
-		state.push(first)
-	}
-	for _, v := range rest {
-		state.push(v)
-	}
+	c.pushCallResults(call, typ.Results)
 
 	c.reloadAfterCall()
-	c.lowerReturn(builder)
+	c.lowerTailCallReturn(builder, call)
 }
 
 func (c *Compiler) prepareCallRef(typeIndex uint32) (ssa.Value, *wasm.FunctionType, ssa.Values) {
@@ -4199,11 +4172,8 @@ func (c *Compiler) prepareCallRef(typeIndex uint32) (ssa.Value, *wasm.FunctionTy
 	moduleContextOpaquePtr := loadModuleContextOpaquePtr.Return()
 
 	typ := &c.m.TypeSection[typeIndex]
-	tail := len(state.values) - len(typ.Params)
-	vs := state.values[tail:]
-	state.values = state.values[:tail]
-	args := c.allocateVarLengthValues(2+len(vs), c.execCtxPtrValue, moduleContextOpaquePtr)
-	args = args.Append(builder.VarLengthPool(), vs...)
+	args := c.allocateVarLengthValues(2+len(typ.Params), c.execCtxPtrValue, moduleContextOpaquePtr)
+	args = c.nPopInto(args, len(typ.Params))
 
 	c.storeCallerModuleContext()
 
@@ -4212,28 +4182,22 @@ func (c *Compiler) prepareCallRef(typeIndex uint32) (ssa.Value, *wasm.FunctionTy
 
 func (c *Compiler) lowerCallRef(typeIndex uint32) {
 	builder := c.ssaBuilder
-	state := c.state()
 	executablePtr, typ, args := c.prepareCallRef(typeIndex)
 
 	call := builder.AllocateInstruction()
 	call.AsCallIndirect(executablePtr, c.signatures[typ], args)
 	builder.InsertInstruction(call)
 
-	first, rest := call.Returns()
-	if first.Valid() {
-		state.push(first)
-	}
-	for _, v := range rest {
-		state.push(v)
-	}
+	c.pushCallResults(call, typ.Results)
 
 	c.reloadAfterCall()
 }
 
 func (c *Compiler) lowerTailCallReturnCallRef(typeIndex uint32) {
 	builder := c.ssaBuilder
-	state := c.state()
 	executablePtr, typ, args := c.prepareCallRef(typeIndex)
+	c.emitTryTableLeaves(len(c.state().controlFrames))
+	c.releaseExnrefsOnTailCall()
 
 	call := builder.AllocateInstruction()
 	call.AsTailCallReturnCallIndirect(executablePtr, c.signatures[typ], args)
@@ -4244,16 +4208,10 @@ func (c *Compiler) lowerTailCallReturnCallRef(typeIndex uint32) {
 	// a regular call, so we include return handling and let the backend delete it
 	// when redundant.
 	// For details, see internal/engine/RATIONALE.md
-	first, rest := call.Returns()
-	if first.Valid() {
-		state.push(first)
-	}
-	for _, v := range rest {
-		state.push(v)
-	}
+	c.pushCallResults(call, typ.Results)
 
 	c.reloadAfterCall()
-	c.lowerReturn(builder)
+	c.lowerTailCallReturn(builder, call)
 }
 
 // memOpSetup inserts the bounds check and calculates the address of the memory operation (loads/stores).
@@ -4404,6 +4362,328 @@ func (c *Compiler) reloadMemoryBaseLen() {
 	c.resetAbsoluteAddressInSafeBounds()
 }
 
+// globalType returns the value type of the global at index, imported or defined here.
+func (c *Compiler) globalType(index wasm.Index) wasm.ValueType {
+	if index < c.m.ImportGlobalCount {
+		var seen wasm.Index
+		for i := range c.m.ImportSection {
+			imp := &c.m.ImportSection[i]
+			if imp.Type != wasm.ExternTypeGlobal {
+				continue
+			}
+			if seen == index {
+				return imp.DescGlobal.ValType
+			}
+			seen++
+		}
+		panic("BUG: global index out of range of imported globals")
+	}
+	return c.m.GlobalSection[index-c.m.ImportGlobalCount].Type.ValType
+}
+
+// localType returns the value type of the local at index, which is a parameter first and one
+// of the function's own declared locals after those.
+func (c *Compiler) localType(index wasm.Index) wasm.ValueType {
+	if params := c.wasmFunctionTyp.Params; index < wasm.Index(len(params)) {
+		return params[index]
+	}
+	return c.wasmFunctionLocalTypes[index-wasm.Index(len(c.wasmFunctionTyp.Params))]
+}
+
+// numLocals is how many locals the function has, its parameters included.
+func (c *Compiler) numLocals() int {
+	return len(c.wasmFunctionTyp.Params) + len(c.wasmFunctionLocalTypes)
+}
+
+// exnrefGlobal reports whether the global at index holds exnrefs.
+func (c *Compiler) exnrefGlobal(index wasm.Index) bool {
+	return wasm.IsExnref(c.globalType(index))
+}
+
+// tableType returns the element type of the table at index, imported or defined here.
+func (c *Compiler) tableType(index wasm.Index) wasm.ValueType {
+	if index < c.m.ImportTableCount {
+		var seen wasm.Index
+		for i := range c.m.ImportSection {
+			imp := &c.m.ImportSection[i]
+			if imp.Type != wasm.ExternTypeTable {
+				continue
+			}
+			if seen == index {
+				return imp.DescTable.Type
+			}
+			seen++
+		}
+		panic("BUG: table index out of range of imported tables")
+	}
+	return c.m.TableSection[index-c.m.ImportTableCount].Type
+}
+
+// exnrefTable reports whether the table at index holds exnrefs.
+func (c *Compiler) exnrefTable(index wasm.Index) bool {
+	return wasm.IsExnref(c.tableType(index))
+}
+
+// wasmGlobalAddr returns the address of a global's value: inline in the module context for
+// one this module defines, behind a pointer for an imported one.
+func (c *Compiler) wasmGlobalAddr(index wasm.Index) ssa.Value {
+	builder := c.ssaBuilder
+	opaqueOffset := c.offset.GlobalInstanceOffset(index)
+	if index < c.m.ImportGlobalCount {
+		return builder.AllocateInstruction().
+			AsLoad(c.moduleCtxPtrValue, uint32(opaqueOffset), ssa.TypeI64).
+			Insert(builder).Return()
+	}
+	offset := builder.AllocateInstruction().AsIconst64(uint64(opaqueOffset)).Insert(builder).Return()
+	return builder.AllocateInstruction().
+		AsIadd(c.moduleCtxPtrValue, offset).Insert(builder).Return()
+}
+
+// loadExnrefSlot reads an exnref-typed slot through the runtime's read barrier, which pins
+// what it names before compiled code gets the handle.
+func (c *Compiler) loadExnrefSlot(addr ssa.Value) ssa.Value {
+	builder := c.ssaBuilder
+	c.storeCallerModuleContext()
+	trampoline := builder.AllocateInstruction().
+		AsLoad(c.execCtxPtrValue,
+			wazevoapi.ExecutionContextOffsetExnrefSlotLoadTrampolineAddress.U32(),
+			ssa.TypeI64,
+		).Insert(builder).Return()
+	args := c.allocateVarLengthValues(2, c.execCtxPtrValue, addr)
+	v := builder.AllocateInstruction().
+		AsCallIndirect(trampoline, &c.exnrefSlotLoadSig, args).Insert(builder).Return()
+	c.reloadAfterCall()
+	return v
+}
+
+// fillExnrefSlots writes count exnref-typed slots at addr through the runtime's barrier.
+func (c *Compiler) fillExnrefSlots(addr, value, count ssa.Value) {
+	c.callExnrefSlotRun(wazevoapi.ExecutionContextOffsetExnrefSlotFillTrampolineAddress.U32(),
+		&c.exnrefSlotFillSig, addr, value, count)
+}
+
+// copyExnrefSlots copies count exnref-typed slots from src to dst through the runtime's
+// barrier, for table.copy and table.init.
+func (c *Compiler) copyExnrefSlots(dst, src, count ssa.Value) {
+	c.callExnrefSlotRun(wazevoapi.ExecutionContextOffsetExnrefSlotCopyTrampolineAddress.U32(),
+		&c.exnrefSlotCopySig, dst, src, count)
+}
+
+func (c *Compiler) callExnrefSlotRun(trampolineOffset uint32, sig *ssa.Signature, a, b, count ssa.Value) {
+	builder := c.ssaBuilder
+	c.storeCallerModuleContext()
+	trampoline := builder.AllocateInstruction().
+		AsLoad(c.execCtxPtrValue, trampolineOffset, ssa.TypeI64).Insert(builder).Return()
+	args := c.allocateVarLengthValues(4, c.execCtxPtrValue, a, b, count)
+	builder.AllocateInstruction().AsCallIndirect(trampoline, sig, args).Insert(builder)
+	c.reloadAfterCall()
+}
+
+// adjustExnrefs emits the reference count adjustment for one exnref moving between an operand
+// stack slot and a local: inc gains a reference, dec loses one. Either may be ssa.ValueInvalid
+// for "nothing".
+//
+// The call is guarded on the handles being non-null, so a local that holds `ref.null exn` --
+// which is every exnref local until something catches -- costs a compare and a not-taken
+// branch and no exit. That is what keeps a function that never sees an exception free of this
+// even when it has exnref locals.
+func (c *Compiler) adjustExnrefs(inc, dec ssa.Value) {
+	builder := c.ssaBuilder
+	zero := builder.AllocateInstruction().AsIconst64(0).Insert(builder).Return()
+
+	// Non-null if either handle is, which is one test for the pair.
+	var probe ssa.Value
+	switch {
+	case inc.Valid() && dec.Valid():
+		or := builder.AllocateInstruction()
+		or.AsBor(inc, dec)
+		probe = or.Insert(builder).Return()
+	case inc.Valid():
+		probe = inc
+	default:
+		probe = dec
+	}
+	isNull := builder.AllocateInstruction().
+		AsIcmp(probe, zero, ssa.IntegerCmpCondEqual).Insert(builder).Return()
+
+	adjustBlk, contBlk := builder.AllocateBasicBlock(), builder.AllocateBasicBlock()
+	builder.InsertInstruction(builder.AllocateInstruction().AsBrnz(isNull, ssa.ValuesNil, contBlk))
+	c.insertJumpToBlock(ssa.ValuesNil, adjustBlk)
+
+	builder.SetCurrentBlock(adjustBlk)
+	incArg, decArg := inc, dec
+	if !incArg.Valid() {
+		incArg = zero
+	}
+	if !decArg.Valid() {
+		decArg = zero
+	}
+	trampoline := builder.AllocateInstruction().
+		AsLoad(c.execCtxPtrValue,
+			wazevoapi.ExecutionContextOffsetAdjustExnrefsTrampolineAddress.U32(),
+			ssa.TypeI64,
+		).Insert(builder).Return()
+	args := c.allocateVarLengthValues(3, c.execCtxPtrValue, incArg, decArg)
+	builder.AllocateInstruction().
+		AsCallIndirect(trampoline, &c.adjustExnrefsSig, args).Insert(builder)
+	c.insertJumpToBlock(ssa.ValuesNil, contBlk)
+	builder.Seal(adjustBlk)
+
+	builder.SetCurrentBlock(contBlk)
+	builder.Seal(contBlk)
+}
+
+// The lowering releases exnref references at every point control leaves for somewhere that
+// resumes with a shallower operand stack. Which slots those are is always a half-open range
+// between two recorded heights, so every release site below reduces to releaseExnrefs.
+//
+// The height control resumes at is a compile-time constant for every transfer but one. A raise
+// is the exception: which clause matches is decided at runtime by matchException, so a raise
+// releases in two steps -- everything above the try_table at the raise site, then the rest at
+// whichever dispatch arm is taken. That is the only place `to` below is not the stack top.
+
+// releaseExnrefSlots releases the reference each exnref-typed slot holds. Every release in the
+// lowering funnels through here.
+func (c *Compiler) releaseExnrefSlots(svs []stackValue) {
+	for _, sv := range svs {
+		if wasm.IsExnref(sv.t) {
+			c.adjustExnrefs(ssa.ValueInvalid, sv.v)
+		}
+	}
+}
+
+// releaseExnrefs releases what the frame stops owning as control leaves: the operand stack
+// slots in [from, to), and -- when the frame itself does not survive the transfer -- what its
+// exnref locals hold.
+func (c *Compiler) releaseExnrefs(from, to int, withLocals bool) {
+	c.releaseExnrefSlots(c.state().values[from:to])
+	if withLocals {
+		c.releaseExnrefLocals()
+	}
+}
+
+// anyExnrefIn reports whether releaseExnrefs over the same range would emit anything, so that
+// a conditional transfer only pays for a block of its own when there is something to release.
+// Taking the same bounds is what keeps the question and the answer from drifting apart.
+func (c *Compiler) anyExnrefIn(from, to int, withLocals bool) bool {
+	for _, sv := range c.state().values[from:to] {
+		if wasm.IsExnref(sv.t) {
+			return true
+		}
+	}
+	if withLocals {
+		for i := 0; i < len(c.wasmFunctionTyp.Params)+len(c.wasmFunctionLocalTypes); i++ {
+			if wasm.IsExnref(c.localType(wasm.Index(i))) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// branchRange is what a branch to labelIndex discards: everything above its label's height
+// except the carried values it delivers from the top of the stack. Per the spec a branch
+// unwinds the operand stack to its label's height, so those slots simply cease to exist.
+//
+// carried is a parameter rather than the label's own arity because br_on_non_null delivers one
+// of the label's values from the operand it popped, so one fewer comes off the stack.
+func (c *Compiler) branchRange(labelIndex uint32, carried int) (from, to int) {
+	state := c.state()
+	return state.ctrlPeekAt(int(labelIndex)).originalStackLenWithoutParam, len(state.values) - carried
+}
+
+// frameExitRange is what leaving the frame discards: every operand slot the return does not
+// carry. Pair it with withLocals, since a frame's locals cease to exist with it.
+func (c *Compiler) frameExitRange() (from, to int) {
+	return 0, len(c.state().values) - c.results()
+}
+
+// takenEdgeTarget is the block a conditional branch to labelIndex should target, and the
+// arguments to carry there. A branch discards operand stack slots, and leaving the frame
+// discards its locals too, but only when the branch is taken -- so when there is anything to
+// release, the branch is routed through a block of its own that releases and then jumps on.
+// The third result reports whether that block was allocated here and so needs sealing.
+//
+// Every conditional branch shares this: br_if, br_on_null and br_on_non_null all discard the
+// same way, and having said it once is what keeps them from drifting apart.
+func (c *Compiler) takenEdgeTarget(
+	labelIndex uint32, carried int, targetBlk ssa.BasicBlock, args ssa.Values,
+) (ssa.BasicBlock, ssa.Values, bool) {
+	builder := c.ssaBuilder
+	isRet := targetBlk.ReturnBlock()
+
+	// The listener has to be called before returning, and the handlers the branch leaves
+	// have to be popped, both of which need a block of its own even when there is nothing
+	// to release.
+	restructure := (isRet && c.needListener) || c.branchExitsTryTable(int(labelIndex))
+	from, to := c.branchRange(labelIndex, carried)
+	if isRet {
+		from, to = c.frameExitRange()
+	}
+	if !restructure && !c.anyExnrefIn(from, to, isRet) {
+		return targetBlk, args, false
+	}
+
+	current := builder.CurrentBlock()
+	tramp := builder.AllocateBasicBlock()
+	builder.SetCurrentBlock(tramp)
+	c.emitTryTableLeaves(int(labelIndex))
+	if !isRet {
+		c.releaseExnrefs(from, to, false)
+	}
+	// A jump to the return block lowers as a return, carrying its arguments as the results,
+	// and insertJumpToBlock is what calls the listener and releases the frame on that path.
+	c.insertJumpToBlock(args, targetBlk)
+	builder.SetCurrentBlock(current)
+	return tramp, ssa.ValuesNil, true
+}
+
+// releaseExnrefsOnTailCall releases every reference the frame holds as a return_call replaces
+// it: its exnref locals, and everything still on the operand stack, which the tail call
+// discards in full. The arguments are not among them -- their references left with them, into
+// the callee's parameters -- so this has to run after they have been popped.
+//
+// It also has to run *before* the tail call itself. A real tail call is a jump, so anything
+// emitted after it only runs when the backend falls back to a regular call, and the frame it
+// belongs to would leave without releasing anything. Releasing this early is safe because an
+// argument the frame also keeps in a local was copied there by a local.get, which took a
+// reference of its own.
+func (c *Compiler) releaseExnrefsOnTailCall() {
+	c.releaseExnrefs(0, len(c.state().values), true)
+}
+
+// releaseExnrefLocals releases what this frame's exnref locals hold, parameters included. A
+// parameter is owned, not borrowed: the caller's reference moves into it when the call is made,
+// so this frame is the one that has to let go. That is what makes a return_call work, where
+// there is no "after the call" for a caller to release anything in.
+//
+// Which locals these are is known at compile time, so a function with none emits nothing.
+func (c *Compiler) releaseExnrefLocals() {
+	builder := c.ssaBuilder
+	for i := 0; i < len(c.wasmFunctionTyp.Params)+len(c.wasmFunctionLocalTypes); i++ {
+		if !wasm.IsExnref(c.localType(wasm.Index(i))) {
+			continue
+		}
+		c.adjustExnrefs(ssa.ValueInvalid, builder.MustFindValue(c.localVariable(wasm.Index(i))))
+	}
+}
+
+// storeExnrefSlot writes an exnref-typed slot through the runtime's write barrier, which
+// does the write itself so the slot and the runtime's count cannot disagree.
+func (c *Compiler) storeExnrefSlot(addr, v ssa.Value) {
+	builder := c.ssaBuilder
+	c.storeCallerModuleContext()
+	trampoline := builder.AllocateInstruction().
+		AsLoad(c.execCtxPtrValue,
+			wazevoapi.ExecutionContextOffsetExnrefSlotStoreTrampolineAddress.U32(),
+			ssa.TypeI64,
+		).Insert(builder).Return()
+	args := c.allocateVarLengthValues(3, c.execCtxPtrValue, addr, v)
+	builder.AllocateInstruction().
+		AsCallIndirect(trampoline, &c.exnrefSlotStoreSig, args).Insert(builder)
+	c.reloadAfterCall()
+}
+
 func (c *Compiler) setWasmGlobalValue(index wasm.Index, v ssa.Value) {
 	variable := c.globalVariables[index]
 	opaqueOffset := c.offset.GlobalInstanceOffset(index)
@@ -4544,7 +4824,7 @@ func (c *Compiler) insertIcmp(cond ssa.IntegerCmpCond) {
 	cmp.AsIcmp(x, y, cond)
 	builder.InsertInstruction(cmp)
 	value := cmp.Return()
-	state.push(value)
+	state.push(value, wasm.ValueTypeI32)
 }
 
 func (c *Compiler) insertFcmp(cond ssa.FloatCmpCond) {
@@ -4554,7 +4834,7 @@ func (c *Compiler) insertFcmp(cond ssa.FloatCmpCond) {
 	cmp.AsFcmp(x, y, cond)
 	builder.InsertInstruction(cmp)
 	value := cmp.Return()
-	state.push(value)
+	state.push(value, wasm.ValueTypeI32)
 }
 
 // storeCallerModuleContext stores the current module's moduleContextPtr into execContext.callerModuleContextPtr.
@@ -4567,7 +4847,8 @@ func (c *Compiler) storeCallerModuleContext() {
 	builder.InsertInstruction(store)
 }
 
-// resolveTagType returns the FunctionType for the tag at the given module-local index.
+// resolveTagType returns the FunctionType for the tag at the given module-local index, which
+// validation has already put in range.
 func (c *Compiler) resolveTagType(tagIndex uint32) *wasm.FunctionType {
 	if tagIndex < c.m.ImportTagCount {
 		cur := uint32(0)
@@ -4581,18 +4862,147 @@ func (c *Compiler) resolveTagType(tagIndex uint32) *wasm.FunctionType {
 			}
 			cur++
 		}
-	} else {
-		tagSectionIdx := tagIndex - c.m.ImportTagCount
-		if tagSectionIdx < uint32(len(c.m.TagSection)) {
-			typeIdx := c.m.TagSection[tagSectionIdx].Type
-			return &c.m.TypeSection[typeIdx]
+	} else if tagSectionIdx := tagIndex - c.m.ImportTagCount; tagSectionIdx < uint32(len(c.m.TagSection)) {
+		return &c.m.TypeSection[c.m.TagSection[tagSectionIdx].Type]
+	}
+	panic("BUG: tag index out of range")
+}
+
+// emitTryTableEntry emits a try_table's entry: it pushes the handler checkpoint and then
+// dispatches on the clause the runtime matched.
+//
+// The block is entered twice with different outcomes. Falling into it normally, the
+// trampoline records a checkpoint and reports no clause, so the dispatch falls through to
+// the body. When a raise later finds this handler, the runtime rewinds the stack to that
+// checkpoint and re-enters here with the matched clause index, so the same dispatch sends
+// control to that clause's handler.
+func (c *Compiler) emitTryTableEntry(tryTableID int, catches []resolvedCatch, restoredHeight int, bodyBlk ssa.BasicBlock) {
+	builder := c.ssaBuilder
+	entryBlk := builder.CurrentBlock()
+
+	// The try_table ID rides in the upper bits of the exit code, the way a Go function
+	// index does.
+	c.storeCallerModuleContext()
+	enterPtr := builder.AllocateInstruction().
+		AsLoad(c.execCtxPtrValue,
+			wazevoapi.ExecutionContextOffsetTryTableEnterTrampolineAddress.U32(),
+			ssa.TypeI64,
+		).Insert(builder).Return()
+	encodedExitCode := uint64(wazevoapi.ExitCodeTryTableEnter | wazevoapi.ExitCode(tryTableID<<8))
+	exitCodeVal := builder.AllocateInstruction().AsIconst64(encodedExitCode).Insert(builder).Return()
+	builder.AllocateInstruction().
+		AsCallIndirect(enterPtr, &c.tryTableEnterSig, c.allocateVarLengthValues(2, c.execCtxPtrValue, exitCodeVal)).
+		Insert(builder)
+
+	clauseIdx := builder.AllocateInstruction().
+		AsLoad(c.execCtxPtrValue,
+			wazevoapi.ExecutionContextOffsetCaughtExceptionClauseIdx.U32(),
+			ssa.TypeI64,
+		).Insert(builder).Return()
+
+	// One target per clause, with the body last as the default: the trampoline reports -1
+	// on the normal path, which br_table clamps onto it.
+	varPool := builder.VarLengthPool()
+	targets := varPool.Allocate(len(catches) + 1)
+	handlers := make([]ssa.BasicBlock, len(catches))
+	for i := range catches {
+		handlers[i] = builder.AllocateBasicBlock()
+		targets = targets.Append(varPool, ssa.Value(handlers[i].ID()))
+	}
+	targets = targets.Append(varPool, ssa.Value(bodyBlk.ID()))
+
+	brTable := builder.AllocateInstruction()
+	brTable.AsBrTable(clauseIdx, targets)
+	builder.InsertInstruction(brTable)
+
+	// Sealed only now: inserting the br_table is what registers this block as their
+	// predecessor, and a handler reads variables (the locals it reloads) that have to
+	// resolve through it.
+	for _, targetID := range targets.View() {
+		if blk := builder.BasicBlock(ssa.BasicBlockID(targetID)); !blk.Sealed() {
+			builder.Seal(blk)
 		}
 	}
-	return nil
+
+	for i, rc := range catches {
+		builder.SetCurrentBlock(handlers[i])
+		// Reached after a Go call that rewound the stack, so the cached pointers are stale
+		// and the locals hold their values from this block rather than from the throw.
+		c.reloadAfterCall()
+		c.reloadLocalsFromSaveArea()
+
+		// The params of what was caught, and the handle naming it, both live in the
+		// execution context: the runtime wrote them there when it matched this clause.
+		var brArgs []ssa.Value
+		switch rc.clause.kind {
+		case wasm.CatchKindCatch:
+			brArgs = c.loadExceptionParams(c.loadCaughtExceptionParams(), c.resolveTagType(rc.clause.tagIndex))
+		case wasm.CatchKindCatchRef:
+			brArgs = c.loadExceptionParams(c.loadCaughtExceptionParams(), c.resolveTagType(rc.clause.tagIndex))
+			brArgs = append(brArgs, c.loadExnRef())
+		case wasm.CatchKindCatchAll:
+			// No values.
+		case wasm.CatchKindCatchAllRef:
+			brArgs = append(brArgs, c.loadExnRef())
+		}
+
+		// The handler's own checkpoint is gone -- the raise that reached it popped every
+		// handler at and above it -- but any enclosing one the branch leaves has to be.
+		c.emitTryTableLeaves(int(rc.clause.labelIdx))
+
+		c.branchToCatchTarget(rc, restoredHeight, c.allocateVarLengthValues(len(brArgs), brArgs...))
+	}
+
+	builder.SetCurrentBlock(entryBlk)
+}
+
+// loadCaughtExceptionParams loads the address of the params of the exception a handler was
+// just entered for. The runtime writes it as a Go pointer, which is what keeps the buffer
+// alive while the handler reads through it.
+func (c *Compiler) loadCaughtExceptionParams() ssa.Value {
+	builder := c.ssaBuilder
+	return builder.AllocateInstruction().
+		AsLoad(c.execCtxPtrValue,
+			wazevoapi.ExecutionContextOffsetCaughtExceptionParams.U32(),
+			ssa.TypeI64,
+		).Insert(builder).Return()
+}
+
+// branchToCatchTarget emits a matched catch clause's branch out of its handler block:
+// whatever the branch unwinds past is released, then it jumps to the resolved target with
+// the values the clause hands over. restoredHeight is the operand stack height the rewind
+// puts back, which is what the branch unwinds from.
+//
+// It spells this out rather than going through insertJumpToBlock, whose frame-exit handling
+// reads the operand stack wherever lowering happens to be. That is the wrong stack here: the
+// dispatch block is built lazily at the first raise inside the try body, which is not where
+// control leaves from. What leaves is fixed by the try_table's height and the clause's label,
+// and by nothing else.
+func (c *Compiler) branchToCatchTarget(rc resolvedCatch, restoredHeight int, args ssa.Values) {
+	builder := c.ssaBuilder
+	isRet := rc.targetBlk.ReturnBlock()
+	if isRet && c.needListener {
+		// The results are the ones the clause pushed, not the top of the operand stack:
+		// this is not a fall-through return.
+		c.callListenerAfterWith(args)
+	}
+	// isRet carries the locals: a label at the function's own depth unwinds to height zero,
+	// so the range already covers every operand slot and only the locals remain.
+	c.releaseExnrefs(rc.targetHeight, restoredHeight, isRet)
+	jmp := builder.AllocateInstruction()
+	jmp.AsJump(args, rc.targetBlk)
+	builder.InsertInstruction(jmp)
 }
 
 // emitThrow emits a call to the shared throw trampoline with the given exnref,
-// followed by an unreachable exit (throw never returns).
+// followed by an unreachable exit (throw never returns). A throw_ref passes what it is
+// raising; a throw passes zero, the throw-alloc trampoline having recorded its raise
+// already.
+//
+// Nothing is released here. The trampoline rewinds to the catching try_table's checkpoint,
+// which restores the reference counts recorded with it -- exactly what drops the references
+// every frame and operand slot the raise discards, including those of frames it passes clean
+// through, whose compiled code never runs again to release anything itself.
 func (c *Compiler) emitThrow(exnref ssa.Value) {
 	builder := c.ssaBuilder
 	throwPtr := builder.AllocateInstruction().
@@ -4608,6 +5018,22 @@ func (c *Compiler) emitThrow(exnref ssa.Value) {
 	exit := builder.AllocateInstruction()
 	exit.AsExitWithCode(c.execCtxPtrValue, wazevoapi.ExitCodeUnreachable)
 	builder.InsertInstruction(exit)
+}
+
+// pushCallResults pushes a call's wasm results onto the value stack, typed by the callee's
+// signature -- which is the only thing that says whether a result is an i64 or a reference.
+func (c *Compiler) pushCallResults(call *ssa.Instruction, results []wasm.ValueType) {
+	state := c.state()
+	first, rest := call.Returns()
+	i := 0
+	if first.Valid() {
+		state.push(first, results[i])
+		i++
+	}
+	for _, v := range rest {
+		state.push(v, results[i])
+		i++
+	}
 }
 
 // loadLocalsSaveAreaPtr emits a load of the locals save area pointer from execCtx.
@@ -4628,27 +5054,36 @@ func (c *Compiler) storeLocalToSaveArea(localIdx wasm.Index, val ssa.Value) {
 	c.ssaBuilder.InsertInstruction(store)
 }
 
-// reloadLocalsFromSaveArea loads all locals from the heap-allocated save area
-// and redefines the SSA variables, so handler blocks see throw-time values.
+// reloadLocalsFromSaveArea loads all locals from the heap-allocated save area and redefines
+// the SSA variables, so a handler block sees the values the locals had at the throw rather
+// than the ones the rewound stack restored.
+//
+// An exnref local swaps one handle for another here without an instruction saying so, so the
+// counts have to be told, and the two halves of that are emitted in different places because
+// neither one knows both handles. This is the half this side knows: the value the rewind
+// restored stops being held. The other -- taking a reference for the value coming out of the
+// save area -- is done by the rewind, which is the last place a reference to it still exists.
+// See wazevo.callEngine.adoptSaveAreaExnrefs, which spells the pair out.
 func (c *Compiler) reloadLocalsFromSaveArea() {
 	builder := c.ssaBuilder
 	ptr := c.loadLocalsSaveAreaPtr()
-	numParams := len(c.wasmFunctionTyp.Params)
-	numLocals := numParams + len(c.wasmFunctionLocalTypes)
-	for i := 0; i < numLocals; i++ {
+	restored := make([]ssa.Value, c.numLocals())
+	for i := range restored {
 		localIdx := wasm.Index(i)
-		var wasmType wasm.ValueType
-		if i < numParams {
-			wasmType = c.wasmFunctionTyp.Params[i]
-		} else {
-			wasmType = c.wasmFunctionLocalTypes[i-numParams]
-		}
-		ssaType := WasmTypeToSSAType(wasmType)
-		load := builder.AllocateInstruction()
-		load.AsLoad(ptr, uint32(localIdx)*16, ssaType)
-		builder.InsertInstruction(load)
 		variable := c.localVariable(localIdx)
+		restored[i] = ssa.ValueInvalid
+		if wasm.IsExnref(c.localType(localIdx)) {
+			restored[i] = builder.MustFindValue(variable)
+		}
+		load := builder.AllocateInstruction()
+		load.AsLoad(ptr, uint32(localIdx)*16, WasmTypeToSSAType(c.localType(localIdx)))
+		builder.InsertInstruction(load)
 		builder.DefineVariableInCurrentBB(variable, load.Return())
+	}
+	for i := range restored {
+		if restored[i].Valid() {
+			c.adjustExnrefs(ssa.ValueInvalid, restored[i])
+		}
 	}
 }
 
@@ -4656,12 +5091,9 @@ func (c *Compiler) reloadLocalsFromSaveArea() {
 func (c *Compiler) storeAllLocalsToSaveArea() {
 	builder := c.ssaBuilder
 	ptr := c.loadLocalsSaveAreaPtr()
-	numParams := len(c.wasmFunctionTyp.Params)
-	numLocals := numParams + len(c.wasmFunctionLocalTypes)
-	for i := 0; i < numLocals; i++ {
+	for i := 0; i < c.numLocals(); i++ {
 		localIdx := wasm.Index(i)
-		variable := c.localVariable(localIdx)
-		val := builder.MustFindValue(variable)
+		val := builder.MustFindValue(c.localVariable(localIdx))
 		store := builder.AllocateInstruction()
 		store.AsStore(ssa.OpcodeStore, val, ptr, uint32(localIdx)*16)
 		builder.InsertInstruction(store)
@@ -4724,31 +5156,21 @@ func (c *Compiler) emitTryTableLeaves(depth int) {
 	}
 }
 
-// catchClause holds a parsed catch clause from a try_table instruction.
 type catchClause struct {
 	kind     byte
 	tagIndex uint32
 	labelIdx uint32
 }
 
-// loadExceptionParams loads the exception params from the caught Exception's
-// Params slice. The dispatch loop sets execCtx.exceptionParamsPtr to the
-// slice's backing-array pointer after matching a handler. We load that pointer
-// and then read each param from [ptr + i*8], mirroring the stores emitted by
-// the throw lowering. Float params were bitcast to integers at the throw site,
-// so we load as integer and bitcast back to the original type.
-func (c *Compiler) loadExceptionParams(tagType *wasm.FunctionType) []ssa.Value {
+// loadExceptionParams reads the caught exception's params out of paramsPtr, the buffer
+// execCtx.caughtExceptionParams points at, one per param at [ptr + i*8], mirroring the
+// stores emitted by the throw lowering. Float params were bitcast to integers at the throw site, so we load
+// as integer and bitcast back to the original type.
+func (c *Compiler) loadExceptionParams(paramsPtr ssa.Value, tagType *wasm.FunctionType) []ssa.Value {
 	if len(tagType.Params) == 0 {
 		return nil
 	}
 	builder := c.ssaBuilder
-
-	// Load the pointer to the caught Exception's Params backing array.
-	paramsPtr := builder.AllocateInstruction().
-		AsLoad(c.execCtxPtrValue,
-			wazevoapi.ExecutionContextOffsetExceptionParamsPtr.U32(),
-			ssa.TypeI64,
-		).Insert(builder).Return()
 
 	var values []ssa.Value
 	for i, vt := range tagType.Params {
@@ -4779,13 +5201,13 @@ func (c *Compiler) loadExceptionParams(tagType *wasm.FunctionType) []ssa.Value {
 	return values
 }
 
-// loadExnRef loads the exnref (pointer to Exception) from the executionContext.
-// The dispatch loop writes it to exceptionPtr after matching a handler.
+// loadExnRef loads the handle naming the exception a handler was just entered for, which the
+// runtime writes to execCtx after matching a clause.
 func (c *Compiler) loadExnRef() ssa.Value {
 	builder := c.ssaBuilder
 	return builder.AllocateInstruction().
 		AsLoad(c.execCtxPtrValue,
-			wazevoapi.ExecutionContextOffsetExceptionPtr.U32(),
+			wazevoapi.ExecutionContextOffsetCaughtExceptionRef.U32(),
 			ssa.TypeI64,
 		).Insert(builder).Return()
 }
@@ -4901,6 +5323,11 @@ func (c *Compiler) insertJumpToBlock(args ssa.Values, targetBlk ssa.BasicBlock) 
 		if c.needListener {
 			c.callListenerAfter()
 		}
+		// The frame is leaving, so its references go. Doing it here rather than at each
+		// return-shaped instruction is what covers the implicit return at the function's End,
+		// which reaches the return block by an ordinary jump like any branch to it does.
+		from, to := c.frameExitRange()
+		c.releaseExnrefs(from, to, true)
 	}
 
 	builder := c.ssaBuilder
@@ -4909,36 +5336,40 @@ func (c *Compiler) insertJumpToBlock(args ssa.Values, targetBlk ssa.BasicBlock) 
 	builder.InsertInstruction(jmp)
 }
 
-func (c *Compiler) insertIntegerExtend(signed bool, from, to byte) {
+// insertIntegerExtend widens the operand from a from-bit value to a to-typed one. to is the
+// Wasm type the opcode extends to, which the width to extend to follows from -- that direction
+// is the sound one, the way back is not.
+func (c *Compiler) insertIntegerExtend(signed bool, from byte, to wasm.ValueType) {
 	state := c.state()
 	builder := c.ssaBuilder
 	v := state.pop()
 	extend := builder.AllocateInstruction()
-	if signed {
-		extend.AsSExtend(v, from, to)
+	if toBits := WasmTypeToSSAType(to).Bits(); signed {
+		extend.AsSExtend(v, from, toBits)
 	} else {
-		extend.AsUExtend(v, from, to)
+		extend.AsUExtend(v, from, toBits)
 	}
 	builder.InsertInstruction(extend)
-	value := extend.Return()
-	state.push(value)
+	state.push(extend.Return(), to)
 }
 
-func (c *Compiler) switchTo(originalStackLen int, targetBlk ssa.BasicBlock) {
+// switchTo adjusts the operand stack to originalStackLen and starts translating targetBlk,
+// pushing its parameters back. paramTypes are their Wasm types, which the block's SSA
+// parameters do not carry.
+func (c *Compiler) switchTo(originalStackLen int, targetBlk ssa.BasicBlock, paramTypes []wasm.ValueType) {
 	if targetBlk.Preds() == 0 {
 		c.loweringState.unreachable = true
 	}
 
 	// Now we should adjust the stack and start translating the continuation block.
-	c.loweringState.values = c.loweringState.values[:originalStackLen]
+	c.loweringState.truncate(originalStackLen)
 
 	c.ssaBuilder.SetCurrentBlock(targetBlk)
 
 	// At this point, blocks params consist only of the Wasm-level parameters,
 	// (since it's added only when we are trying to resolve variable *inside* this block).
 	for i := 0; i < targetBlk.Params(); i++ {
-		value := targetBlk.Param(i)
-		c.loweringState.push(value)
+		c.loweringState.push(targetBlk.Param(i), paramTypes[i])
 	}
 }
 
@@ -4974,6 +5405,13 @@ func (c *Compiler) lowerBrTable(labels []uint32, index ssa.Value) {
 		trampoline := builder.AllocateBasicBlock()
 		builder.SetCurrentBlock(trampoline)
 		c.emitTryTableLeaves(int(l))
+		// Each target unwinds to its own label's height, so what it discards is its own; the
+		// trampoline is where that can be said per target. A target that is the return block
+		// is handled by insertJumpToBlock.
+		if !targetBlk.ReturnBlock() {
+			from, to := c.branchRange(l, numArgs)
+			c.releaseExnrefs(from, to, false)
+		}
 		c.insertJumpToBlock(args, targetBlk)
 		trampolineBlockIDs = trampolineBlockIDs.Append(builder.VarLengthPool(), ssa.Value(trampoline.ID()))
 	}
@@ -5027,7 +5465,16 @@ func (c *Compiler) callListenerBefore() {
 		Insert(builder)
 }
 
+// callListenerAfter calls the after-listener with the function's results, which on an
+// ordinary return are the top of the operand stack.
 func (c *Compiler) callListenerAfter() {
+	c.callListenerAfterWith(c.nPeekDup(c.results()))
+}
+
+// callListenerAfterWith is callListenerAfter for a return whose results are not the top of
+// the operand stack: a catch clause branching to the function's own label returns what the
+// clause handed over, and the stack it left behind is discarded rather than returned.
+func (c *Compiler) callListenerAfterWith(results ssa.Values) {
 	c.storeCallerModuleContext()
 
 	builder := c.ssaBuilder
@@ -5050,9 +5497,10 @@ func (c *Compiler) callListenerAfter() {
 		builder.AllocateInstruction().AsIconst32(c.wasmLocalFunctionIndex).Insert(builder).Return(),
 	)
 
-	l := c.state()
-	tail := len(l.values)
-	args = args.Append(c.ssaBuilder.VarLengthPool(), l.values[tail-c.results():tail]...)
+	pool := builder.VarLengthPool()
+	for _, v := range results.View() {
+		args = args.Append(pool, v)
+	}
 	builder.AllocateInstruction().
 		AsCallIndirect(afterListenerPtr, afterSig, args).
 		Insert(builder)
