@@ -1366,6 +1366,26 @@ func (c *Compiler) lowerCurrentOpcode() {
 		c.switchTo(originalLen, loopHeader)
 
 		if c.ensureTermination {
+			// Test the module's closed state inline, and exit to the host only when it
+			// is set. What the checkModuleExitCode trampoline goes to Go to fetch is a
+			// single word — wasm.ModuleInstance.Closed, whose address the call engine
+			// puts in the execution context — so read it here and keep the trampoline
+			// call on the cold path. Exiting from native code on every back-edge is
+			// what makes ensureTermination cost multiples on loop-heavy modules; the
+			// check itself is a load and a well-predicted branch.
+			closedPtr := builder.AllocateInstruction().
+				AsLoad(c.execCtxPtrValue,
+					wazevoapi.ExecutionContextOffsetModuleClosedPtr.U32(),
+					ssa.TypeI64,
+				).Insert(builder).Return()
+			closed := builder.AllocateInstruction().
+				AsLoad(closedPtr, 0, ssa.TypeI64).Insert(builder).Return()
+
+			checkBlk, afterBlk := builder.AllocateBasicBlock(), builder.AllocateBasicBlock()
+			builder.AllocateInstruction().AsBrnz(closed, ssa.ValuesNil, checkBlk).Insert(builder)
+			builder.AllocateInstruction().AsJump(ssa.ValuesNil, afterBlk).Insert(builder)
+
+			builder.SetCurrentBlock(checkBlk)
 			checkModuleExitCodePtr := builder.AllocateInstruction().
 				AsLoad(c.execCtxPtrValue,
 					wazevoapi.ExecutionContextOffsetCheckModuleExitCodeTrampolineAddress.U32(),
@@ -1376,6 +1396,11 @@ func (c *Compiler) lowerCurrentOpcode() {
 			builder.AllocateInstruction().
 				AsCallIndirect(checkModuleExitCodePtr, &c.checkModuleExitCodeSig, args).
 				Insert(builder)
+			builder.AllocateInstruction().AsJump(ssa.ValuesNil, afterBlk).Insert(builder)
+
+			builder.Seal(checkBlk)
+			builder.SetCurrentBlock(afterBlk)
+			builder.Seal(afterBlk)
 		}
 	case wasm.OpcodeIf:
 		bt := c.readBlockType()

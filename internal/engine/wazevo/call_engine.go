@@ -144,6 +144,11 @@ type (
 		// localsSaveAreaPtr points to the tryHandler's localsSaveArea slice
 		// backing array. Handlers load locals from this slice.
 		localsSaveAreaPtr uintptr
+		// moduleClosedPtr is the address of the calling module instance's Closed word
+		// (wasm.ModuleInstance.Closed), set per call when ensureTermination is enabled.
+		// Compiled loop back-edges load it and call the checkModuleExitCode trampoline
+		// only when it is non-zero, instead of exiting to Go on every back-edge.
+		moduleClosedPtr uintptr
 	}
 )
 
@@ -334,6 +339,11 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 	if ensureTermination {
 		done := m.CloseModuleOnCanceledOrTimeout(ctx)
 		defer done()
+		// The back-edge checks compiled into this module read the Closed word directly:
+		// it is the same fact FailIfClosed asks, and it is written atomically by whoever
+		// closes the module -- the watchdog above, a context cancellation, or an explicit
+		// CloseWithExitCode from another goroutine.
+		c.execCtx.moduleClosedPtr = uintptr(unsafe.Pointer(&m.Closed))
 	}
 
 	if c.stackTop&(16-1) != 0 {
