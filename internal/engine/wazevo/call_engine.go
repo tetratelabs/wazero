@@ -149,6 +149,13 @@ type (
 		// Compiled loop back-edges load it and call the checkModuleExitCode trampoline
 		// only when it is non-zero, instead of exiting to Go on every back-edge.
 		moduleClosedPtr uintptr
+		// interruptCounter is incremented by compiled loop back-edges when ensureTermination
+		// is enabled. Every Nth back-edge (see the loop lowering in the frontend package),
+		// compiled code exits to the checkModuleExitCode trampoline even when Closed is
+		// still zero: the exit into Go code is the loop's only safepoint, since the Go
+		// runtime cannot asynchronously preempt goroutines executing wazevo-generated
+		// machine code.
+		interruptCounter uint64
 	}
 )
 
@@ -343,6 +350,12 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 		// it is the same fact FailIfClosed asks, and it is written atomically by whoever
 		// closes the module -- the watchdog above, a context cancellation, or an explicit
 		// CloseWithExitCode from another goroutine.
+		//
+		// Compiled code reads it with a plain 64-bit load rather than an atomic one. That
+		// is tear-free on the architectures wazevo supports, since the word is naturally
+		// aligned, and only eventual visibility is needed: the counter-driven exit below
+		// bounds how long a stale read can delay the check. Test_moduleClosedPtrLayout
+		// pins the assumption that the value sits at offset 0 of the atomic.Uint64.
 		c.execCtx.moduleClosedPtr = uintptr(unsafe.Pointer(&m.Closed))
 	}
 

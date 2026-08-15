@@ -78,6 +78,13 @@ const (
 	// the address of the calling module instance's Closed word, which compiled code tests
 	// at loop back-edges when ensureTermination is enabled.
 	ExecutionContextOffsetModuleClosedPtr Offset = 1248
+	// ExecutionContextOffsetInterruptCounter is an offset of `interruptCounter` field in wazevo.executionContext.
+	// Compiled loop back-edges increment it when ensureTermination is enabled, and exit to the
+	// checkModuleExitCode trampoline every N back-edges regardless of the Closed word.
+	// The Go runtime cannot asynchronously preempt goroutines executing wazevo-generated machine
+	// code, so that unconditional exit is the only safepoint inside a wasm loop: without it, a
+	// spinning module would never yield, and stop-the-world GC would livelock waiting on it.
+	ExecutionContextOffsetInterruptCounter Offset = 1256
 )
 
 // ModuleContextOffsetData allows the compilers to get the information about offsets to the fields of wazevo.moduleContextOpaque,

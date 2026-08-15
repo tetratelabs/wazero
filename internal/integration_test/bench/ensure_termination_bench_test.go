@@ -1,8 +1,11 @@
 package bench
 
 // What WithCloseOnContextDone costs a loop-heavy module: the same wasm, on a runtime with
-// ensureTermination off and on. The check is compiled into every loop back-edge, so a
-// module whose work IS a loop pays it on every iteration.
+// ensureTermination off and on. With it on, each loop back-edge tests the module's Closed
+// word inline and also bumps a counter that forces an exit to Go every Nth back-edge
+// (the exit is a GC safepoint: Go cannot asynchronously preempt goroutines running
+// generated machine code), so a module whose work IS a loop pays the loads and branches
+// on every iteration but rarely exits.
 //
 //	go test -bench BenchmarkEnsureTermination -benchtime 2s -count 5 ./internal/integration_test/bench/
 
@@ -11,10 +14,14 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
+	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
-// sumLoopWasm is a module whose only export is a counting loop, assembled here because
-// this package has no wat2wasm. Section sizes are computed rather than hand-counted.
+// blockTypeEmpty is the block type of a block or loop producing no results.
+const blockTypeEmpty = 0x40
+
+// sumLoopWasm is a module whose only export is a counting loop:
 //
 //	(module
 //	  (func (export "sum") (param i32) (result i64) (local i64)
@@ -26,26 +33,34 @@ import (
 //	        (br 0)))
 //	    (local.get 1)))
 func sumLoopWasm() []byte {
-	section := func(id byte, content ...byte) []byte {
-		return append([]byte{id, byte(len(content))}, content...)
-	}
-	body := []byte{
-		0x01, 0x01, 0x7e, // one i64 local: the accumulator
-		0x02, 0x40, // block
-		0x03, 0x40, // loop
-		0x20, 0x00, 0x45, 0x0d, 0x01, // br_if 1 (i32.eqz (local.get 0))
-		0x20, 0x01, 0x20, 0x00, 0xad, 0x7c, 0x21, 0x01, // acc += u64(n)
-		0x20, 0x00, 0x41, 0x01, 0x6b, 0x21, 0x00, // n -= 1
-		0x0c, 0x00, // br 0
-		0x0b, 0x0b, // end loop, end block
-		0x20, 0x01, // local.get 1
-		0x0b, // end func
-	}
-	out := []byte{0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00} // magic + version
-	out = append(out, section(1, 0x01, 0x60, 0x01, 0x7f, 0x01, 0x7e)...)         // type: (i32)->i64
-	out = append(out, section(3, 0x01, 0x00)...)                                 // func 0: type 0
-	out = append(out, section(7, 0x01, 0x03, 's', 'u', 'm', 0x00, 0x00)...)      // export "sum"
-	return append(out, section(10, append([]byte{0x01, byte(len(body))}, body...)...)...)
+	return binaryencoding.EncodeModule(&wasm.Module{
+		TypeSection: []wasm.FunctionType{{
+			Params:  []wasm.ValueType{wasm.ValueTypeI32},
+			Results: []wasm.ValueType{wasm.ValueTypeI64},
+		}},
+		FunctionSection: []wasm.Index{0},
+		ExportSection:   []wasm.Export{{Name: "sum", Type: wasm.ExternTypeFunc, Index: 0}},
+		CodeSection: []wasm.Code{{
+			LocalTypes: []wasm.ValueType{wasm.ValueTypeI64}, // the accumulator
+			Body: []byte{
+				wasm.OpcodeBlock, blockTypeEmpty,
+				wasm.OpcodeLoop, blockTypeEmpty,
+				// Leave the loop once the counter reaches zero.
+				wasm.OpcodeLocalGet, 0, wasm.OpcodeI32Eqz, wasm.OpcodeBrIf, 1,
+				// acc += u64(n)
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeLocalGet, 0, wasm.OpcodeI64ExtendI32U,
+				wasm.OpcodeI64Add, wasm.OpcodeLocalSet, 1,
+				// n -= 1
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeI32Const, 1, wasm.OpcodeI32Sub, wasm.OpcodeLocalSet, 0,
+				wasm.OpcodeBr, 0,
+				wasm.OpcodeEnd, wasm.OpcodeEnd, // end loop, end block
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeEnd, // end func
+			},
+		}},
+	})
 }
 
 func BenchmarkEnsureTermination(b *testing.B) {

@@ -81,4 +81,19 @@ func Test_ExecutionContextOffsets(t *testing.T) {
 	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.exceptionParamsPtr)), wazevoapi.ExecutionContextOffsetExceptionParamsPtr)
 	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.caughtExceptionClauseIdx)), wazevoapi.ExecutionContextOffsetCaughtExceptionClauseIdx)
 	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.localsSaveAreaPtr)), wazevoapi.ExecutionContextOffsetLocalsSaveAreaPtr)
+	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.moduleClosedPtr)), wazevoapi.ExecutionContextOffsetModuleClosedPtr)
+	require.Equal(t, wazevoapi.Offset(unsafe.Offsetof(execCtx.interruptCounter)), wazevoapi.ExecutionContextOffsetInterruptCounter)
+}
+
+// Test_moduleClosedPtrLayout pins the assumption callWithStack makes when it stores
+// uintptr(unsafe.Pointer(&m.Closed)) into execCtx.moduleClosedPtr: that the uint64 value of
+// an atomic.Uint64 lives at offset 0 of the struct, so that compiled loop back-edges can
+// read it with a plain aligned 64-bit load.
+func Test_moduleClosedPtrLayout(t *testing.T) {
+	var m wasm.ModuleInstance
+	const sentinel = uint64(0x1122334455667788)
+	m.Closed.Store(sentinel)
+	require.Equal(t, sentinel, *(*uint64)(unsafe.Pointer(&m.Closed)))
+	// Naturally aligned, so the load compiled code performs cannot tear.
+	require.Equal(t, uintptr(0), uintptr(unsafe.Pointer(&m.Closed))%8)
 }
