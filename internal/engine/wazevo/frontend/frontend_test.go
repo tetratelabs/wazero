@@ -259,12 +259,23 @@ signatures:
 blk0: (exec_ctx:i64, module_ctx:i64)
 	Jump blk1
 
-blk1: () <-- (blk0,blk1)
-	v2:i64 = Load exec_ctx, 0x58
-	CallIndirect v2:sig2, exec_ctx
-	Jump blk1
+blk1: () <-- (blk0,blk4,blk3)
+	v2:i64 = Load exec_ctx, 0x4e0
+	v3:i64 = Load v2, 0x0
+	v4:i64 = Iconst_64 0x0
+	v5:i32 = Icmp neq, v3, v4
+	Brnz v5, blk3
+	Jump blk4
 
 blk2: ()
+
+blk3: () <-- (blk1)
+	v6:i64 = Load exec_ctx, 0x58
+	CallIndirect v6:sig2, exec_ctx
+	Jump blk1
+
+blk4: () <-- (blk1)
+	Jump blk1
 `,
 			expAfterPasses: `
 signatures:
@@ -273,9 +284,20 @@ signatures:
 blk0: (exec_ctx:i64, module_ctx:i64)
 	Jump fallthrough
 
-blk1: () <-- (blk0,blk1)
-	v2:i64 = Load exec_ctx, 0x58
-	CallIndirect v2:sig2, exec_ctx
+blk1: () <-- (blk0,blk4,blk3)
+	v2:i64 = Load exec_ctx, 0x4e0
+	v3:i64 = Load v2, 0x0
+	v4:i64 = Iconst_64 0x0
+	v5:i32 = Icmp neq, v3, v4
+	Brnz v5, blk3
+	Jump fallthrough
+
+blk4: () <-- (blk1)
+	Jump blk1
+
+blk3: () <-- (blk1)
+	v6:i64 = Load exec_ctx, 0x58
+	CallIndirect v6:sig2, exec_ctx
 	Jump blk1
 `,
 		},

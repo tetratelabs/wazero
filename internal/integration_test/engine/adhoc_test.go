@@ -184,6 +184,29 @@ func testEnsureTerminationOnClose(t *testing.T, r wazero.Runtime) {
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "module closed with exit_code(2)")
 	})
+
+	// Verifies cancellation propagates even when the wasm goroutine is the only
+	// thing on the only P. This is the worst case: under GOMAXPROCS=1, with a
+	// pure tight wasm loop, the wasm goroutine must voluntarily release the P
+	// (via runtime.entersyscall around the native-code segment, on wazevo) so
+	// that the watchdog goroutine can run and set ModuleInstance.Closed.
+	// Without that, no other goroutine could fire to mark the call canceled,
+	// and the call would hang.
+	t.Run("context cancel under GOMAXPROCS=1", func(t *testing.T) {
+		_, infinite := newInfiniteLoopFn(t)
+
+		prev := runtime.GOMAXPROCS(1)
+		t.Cleanup(func() { runtime.GOMAXPROCS(prev) })
+
+		ctx, cancel := context.WithCancel(context.Background())
+		go func() {
+			time.Sleep(50 * time.Millisecond)
+			cancel()
+		}()
+		_, err = infinite.Call(ctx)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "module closed with context canceled")
+	})
 }
 
 func testUserDefinedPrimitiveHostFunc(t *testing.T, r wazero.Runtime) {

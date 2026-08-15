@@ -1429,16 +1429,36 @@ func (c *Compiler) lowerCurrentOpcode() {
 		c.switchTo(originalLen, loopHeader)
 
 		if c.ensureTermination {
-			checkModuleExitCodePtr := builder.AllocateInstruction().
+			// Cheap inline check: load moduleClosedPtr from execCtx, then load the
+			// ModuleInstance.Closed it points to. If zero, fall through to the loop
+			// body. If non-zero (set by the cancellation watchdog OR by an explicit
+			// module.Close from another goroutine), branch out to moduleClosedBlk,
+			// which re-enters Go to report the error.
+			//
+			// Neither load needs atomic semantics. The pointer is written once at
+			// callEngine setup; the flag is a single aligned word that only ever goes
+			// from zero to non-zero, so the worst a racing close can cost is being
+			// noticed an iteration later.
+			closedPtr := builder.AllocateInstruction().
 				AsLoad(c.execCtxPtrValue,
-					wazevoapi.ExecutionContextOffsetCheckModuleExitCodeTrampolineAddress.U32(),
+					wazevoapi.ExecutionContextOffsetModuleClosedPtr.U32(),
 					ssa.TypeI64,
 				).Insert(builder).Return()
+			closed := builder.AllocateInstruction().
+				AsLoad(closedPtr, 0, ssa.TypeI64).Insert(builder).Return()
 
-			args := c.allocateVarLengthValues(1, c.execCtxPtrValue)
+			zero := builder.AllocateInstruction().AsIconst64(0).Insert(builder).Return()
+			closedNonZero := builder.AllocateInstruction().
+				AsIcmp(closed, zero, ssa.IntegerCmpCondNotEqual).Insert(builder).Return()
+
+			moduleClosedSlow, loopBody := builder.AllocateBasicBlock(), builder.AllocateBasicBlock()
 			builder.AllocateInstruction().
-				AsCallIndirect(checkModuleExitCodePtr, &c.checkModuleExitCodeSig, args).
+				AsBrnz(closedNonZero, ssa.ValuesNil, moduleClosedSlow).
 				Insert(builder)
+			c.insertJumpToBlock(ssa.ValuesNil, loopBody)
+
+			builder.SetCurrentBlock(loopBody)
+			builder.Seal(loopBody)
 		}
 	case wasm.OpcodeIf:
 		bt := c.readBlockType()
@@ -1542,6 +1562,9 @@ func (c *Compiler) lowerCurrentOpcode() {
 		case controlFrameKindFunction:
 			break // This is the very end of function.
 		case controlFrameKindLoop:
+			if c.ensureTermination {
+				c.lowerModuleClosedSlowCheck(&ctrl)
+			}
 			// Loop header block can be reached from any br/br_table contained in the loop,
 			// so now that we've reached End of it, we can seal it.
 			builder.Seal(ctrl.blk)
@@ -5003,6 +5026,41 @@ func (c *Compiler) insertJumpToBlock(args ssa.Values, targetBlk ssa.BasicBlock) 
 	jmp := builder.AllocateInstruction()
 	jmp.AsJump(args, targetBlk)
 	builder.InsertInstruction(jmp)
+}
+
+// lowerModuleClosedSlowCheck fills in the block a loop's module-closed check branches to when it finds
+// the flag set.
+//
+// The slow check body is emitted at the loop's end, rather than more naturally being emitted
+// in the loop header, because block layout follows the order blocks were first written to:
+// written last, this one lands after the whole loop, and the check falls through into the
+// body instead of branching to it. This matters on benchmarks: both amd64 and arm64 predict
+// a forward branch is not taken until there is a branch prediction history, so making the
+// rare path (module closed) the forward branch instead of the loop body being a forward
+// branch provides a measurable speedup.
+func (c *Compiler) lowerModuleClosedSlowCheck(ctrl *controlFrame) {
+	builder := c.ssaBuilder
+
+	moduleClosedBlk := ctrl.blk.Succ(0) // Succ 0 is the slow path branch from the loopHeader
+	builder.SetCurrentBlock(moduleClosedBlk)
+
+	checkModuleExitCodePtr := builder.AllocateInstruction().
+		AsLoad(c.execCtxPtrValue,
+			wazevoapi.ExecutionContextOffsetCheckModuleExitCodeTrampolineAddress.U32(),
+			ssa.TypeI64,
+		).Insert(builder).Return()
+	builder.AllocateInstruction().
+		AsCallIndirect(checkModuleExitCodePtr, &c.checkModuleExitCodeSig,
+			c.allocateVarLengthValues(1, c.execCtxPtrValue)).
+		Insert(builder)
+
+	loopHeader := ctrl.blk
+	backArgs := c.allocateVarLengthValues(loopHeader.Params())
+	for i := 0; i < loopHeader.Params(); i++ {
+		backArgs = backArgs.Append(builder.VarLengthPool(), loopHeader.Param(i))
+	}
+	c.insertJumpToBlock(backArgs, loopHeader)
+	builder.Seal(moduleClosedBlk)
 }
 
 func (c *Compiler) insertIntegerExtend(signed bool, from, to byte) {
