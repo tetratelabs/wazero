@@ -277,7 +277,7 @@ blk4: () <-- (blk1)
 	v5:i64 = Iconst_64 0x1
 	v6:i64 = Iadd v4, v5
 	Store v6, exec_ctx, 0x4e8
-	v7:i64 = Iconst_64 0xfff
+	v7:i64 = Iconst_64 0xff
 	v8:i64 = Band v6, v7
 	Brz v8, blk3
 	Jump blk5
@@ -303,7 +303,7 @@ blk4: () <-- (blk1)
 	v5:i64 = Iconst_64 0x1
 	v6:i64 = Iadd v4, v5
 	Store v6, exec_ctx, 0x4e8
-	v7:i64 = Iconst_64 0xfff
+	v7:i64 = Iconst_64 0xff
 	v8:i64 = Band v6, v7
 	Brnz v8, blk8
 	Jump fallthrough

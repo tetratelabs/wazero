@@ -15,13 +15,19 @@ import (
 )
 
 // interruptCheckInterval is the number of loop back-edges between two unconditional exits
-// to Go code when ensureTermination is enabled. See the loop lowering below: the exit
-// exists to be a safepoint, not to check anything, so it can be rare. What bounds it is
-// stop-the-world latency rather than throughput, since a GC waiting on a spinning module
-// waits at most this many back-edges.
+// to Go code when ensureTermination is enabled. See the loop lowering below: the exit is
+// there to be a safepoint, not to check anything, since the Closed test on every back-edge
+// already handles interruption. So the interval trades throughput against how long the rest
+// of the process waits on a spinning module -- a stop-the-world GC in particular, which has
+// to meet every wasm goroutine several times before it can finish, and so waits for rather
+// more than one interval.
+//
+// 256 is the largest value that leaves GC pauses and scheduler latency no worse than exiting
+// on every back-edge, which is what this replaces. Throughput is already flat by here, so
+// raising it buys nothing and costs pauses; re-measure both before changing it.
 //
 // Must be a power of two: the lowering tests interruptCheckInterval-1 as a bit mask.
-const interruptCheckInterval uint64 = 1 << 12
+const interruptCheckInterval uint64 = 1 << 8
 
 type (
 	// loweringState is used to keep the state of lowering.
