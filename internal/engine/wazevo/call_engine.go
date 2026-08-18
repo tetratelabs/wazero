@@ -49,6 +49,13 @@ type (
 		// pendingException holds the most recently caught exception, so handler
 		// code can read its params after re-entry.
 		pendingException *wasm.Exception
+		// tryStackPool and trySaveAreaPool are LIFO free lists that reuse the
+		// buffers allocated for try_table entry checkpoints. try handlers are
+		// strictly stack-disciplined, so buffers released on leave/catch can
+		// be reused by the next enter, avoiding a stack-clone allocation per
+		// dynamic try_table enter.
+		tryStackPool    [][]byte
+		trySaveAreaPool [][]uint64
 	}
 
 	// tryHandler records the state at a try_table entry for exception handling.
@@ -617,14 +624,28 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 			info := &me.parent.tryTableInfo[tryTableID]
 			returnAddress := c.execCtx.goCallReturnAddress
 			oldTop, oldSp := c.stackTop, uintptr(unsafe.Pointer(c.execCtx.stackPointerBeforeGoCall))
-			newSP, newFP, newTop, newStack := c.cloneStack(uintptr(len(c.stack)) + 16)
+			needLen := uintptr(len(c.stack)) + 16
+			var newSP, newFP, newTop uintptr
+			var newStack []byte
+			if newStack = c.takePooledTryStack(needLen); newStack != nil {
+				newSP, newFP, newTop = c.cloneStackInto(newStack)
+			} else {
+				newSP, newFP, newTop, newStack = c.cloneStack(needLen)
+			}
 			adjustClonedStack(oldSp, oldTop, newSP, newFP, newTop)
 
 			// Allocate a heap buffer for locals so handlers can read throw-time values.
 			// Nested try_tables in the same function (ReuseLocals) share the enclosing handler's save area.
 			var saveArea []uint64
 			if info.NumLocals > 0 && !info.ReuseLocals {
-				saveArea = make([]uint64, info.NumLocals*2) // 16 bytes per local
+				need := info.NumLocals * 2 // 16 bytes per local
+				if n := len(c.trySaveAreaPool); n > 0 && cap(c.trySaveAreaPool[n-1]) >= need {
+					saveArea = c.trySaveAreaPool[n-1][:need]
+					c.trySaveAreaPool = c.trySaveAreaPool[:n-1]
+					clear(saveArea)
+				} else {
+					saveArea = make([]uint64, need)
+				}
 				c.execCtx.localsSaveAreaPtr = uintptr(unsafe.Pointer(&saveArea[0]))
 			}
 
@@ -648,9 +669,10 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 		case wazevoapi.ExitCodeTryTableLeave:
 			// Pop the most recent try handler and restore the locals save
 			// area pointer from the handler below (or clear it).
-			if len(c.tryHandlers) > 0 {
-				c.tryHandlers = c.tryHandlers[:len(c.tryHandlers)-1]
-				c.restoreLocalsSaveAreaPtr(len(c.tryHandlers) - 1)
+			if n := len(c.tryHandlers); n > 0 {
+				c.poolTryHandlerBuffers(&c.tryHandlers[n-1])
+				c.tryHandlers = c.tryHandlers[:n-1]
+				c.restoreLocalsSaveAreaPtr(n - 2)
 			}
 			c.execCtx.exitCode = wazevoapi.ExitCodeOK
 			afterGoFunctionCallEntrypoint(c.execCtx.goCallReturnAddress, c.execCtxPtr,
@@ -685,14 +707,24 @@ func (c *callEngine) doHandleException(exn *wasm.Exception) bool {
 				// the nearest enclosing one (same-function reuse).
 				c.restoreLocalsSaveAreaPtr(i)
 
-				// Pop all handlers at and above this one.
+				// Pop all handlers at and above this one. Handlers strictly
+				// above the match can never be restored again, so their
+				// buffers go back to the pools. The matched handler's own
+				// buffers must NOT be pooled: its cloned stack becomes the
+				// live stack below, and its locals save area may still be
+				// referenced through localsSaveAreaPtr.
+				for j := i + 1; j < len(c.tryHandlers); j++ {
+					c.poolTryHandlerBuffers(&c.tryHandlers[j])
+				}
 				c.tryHandlers = c.tryHandlers[:i]
 
 				// Store the caught exception so handler code can read params.
 				c.pendingException = exn
 
-				// Restore the cloned stack (like snapshot.doRestore).
+				// Restore the cloned stack (like snapshot.doRestore). The
+				// replaced live stack becomes reusable for future enters.
 				spp := *(**uint64)(unsafe.Pointer(&h.sp))
+				c.tryStackPool = append(c.tryStackPool, c.stack)
 				c.stack = h.stack
 				c.stackTop = h.top
 				ec := &c.execCtx
@@ -758,9 +790,45 @@ func (c *callEngine) growStack() (newSP, newFP uintptr, err error) {
 	return
 }
 
+// takePooledTryStack pops a pooled stack buffer with capacity of at least l,
+// or returns nil when none fits. Undersized buffers (the engine stack grew
+// since they were pooled) are discarded.
+func (c *callEngine) takePooledTryStack(l uintptr) []byte {
+	for n := len(c.tryStackPool); n > 0; n-- {
+		buf := c.tryStackPool[n-1]
+		c.tryStackPool[n-1] = nil
+		c.tryStackPool = c.tryStackPool[:n-1]
+		if uintptr(cap(buf)) >= l {
+			return buf[:l]
+		}
+	}
+	return nil
+}
+
+// poolTryHandlerBuffers returns the handler's buffers to the free lists and
+// clears the handler's references so the slice element does not keep them
+// reachable (and no longer aliases the pooled buffers).
+func (c *callEngine) poolTryHandlerBuffers(h *tryHandler) {
+	if h.stack != nil {
+		c.tryStackPool = append(c.tryStackPool, h.stack)
+		h.stack = nil
+	}
+	if h.localsSaveArea != nil {
+		c.trySaveAreaPool = append(c.trySaveAreaPool, h.localsSaveArea)
+		h.localsSaveArea = nil
+	}
+}
+
 func (c *callEngine) cloneStack(l uintptr) (newSP, newFP, newTop uintptr, newStack []byte) {
 	newStack = make([]byte, l)
+	newSP, newFP, newTop = c.cloneStackInto(newStack)
+	return
+}
 
+// cloneStackInto copies the live stack contents into newStack, like
+// cloneStack, but into a caller-provided buffer (e.g. one reused from
+// tryStackPool).
+func (c *callEngine) cloneStackInto(newStack []byte) (newSP, newFP, newTop uintptr) {
 	relSp := c.stackTop - uintptr(unsafe.Pointer(c.execCtx.stackPointerBeforeGoCall))
 	relFp := c.stackTop - c.execCtx.framePointerBeforeGoCall
 
