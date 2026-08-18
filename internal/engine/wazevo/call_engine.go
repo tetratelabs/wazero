@@ -62,11 +62,31 @@ type (
 	// On match, we restore the stack to the checkpoint state and re-enter at returnAddress.
 	tryHandler struct {
 		// Cloned stack and state from the try_table entry checkpoint,
-		// using the same approach as experimental.Snapshot.
+		// using the same approach as experimental.Snapshot. The full clone
+		// is only taken when the snapshotter is enabled (stack != nil); in
+		// the common case the checkpoint is recorded as spOff/fpOff plus a
+		// small snapshot of the trampoline-owned stack window instead.
 		sp, fp, top    uintptr
 		returnAddress  *byte
 		savedRegisters [64][2]uint64
-		stack          []byte // cloned stack
+		stack          []byte // cloned stack, nil in offset mode
+		// spOff/fpOff record the checkpoint stack/frame pointers as offsets
+		// from the aligned stack top. The frames between a try_table entry
+		// and a throw remain intact in the live stack, so the checkpoint can
+		// be restored by recomputing the pointers against the current stack
+		// top; offsets survive stack growth because growStack copies the
+		// contents top-aligned into the new buffer.
+		spOff, fpOff uintptr
+		// trampWindow snapshots the trampoline-owned region at the entry
+		// stack pointer ([sp, sp+16+frame_size+16), per the Go-call stack
+		// layout: frame_size, sliceSize, the arg/ret slice, the return
+		// address and size_of_arg_ret). A later trampoline exit from the
+		// same frame (e.g. the throw itself) reuses this region, so it must
+		// be restored before resuming at the entry continuation — most
+		// importantly the trampoline return address, which would otherwise
+		// make the resumed code continue after the *throw* site.
+		trampWindow      [32]uint64
+		trampWindowBytes uintptr
 		// catchClauses describes what exceptions this handler catches.
 		catchClauses []wazevoapi.CatchClauseInstance
 		// localsSaveArea is a heap buffer where locals are mirrored inside
@@ -624,15 +644,41 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 			info := &me.parent.tryTableInfo[tryTableID]
 			returnAddress := c.execCtx.goCallReturnAddress
 			oldTop, oldSp := c.stackTop, uintptr(unsafe.Pointer(c.execCtx.stackPointerBeforeGoCall))
-			needLen := uintptr(len(c.stack)) + 16
 			var newSP, newFP, newTop uintptr
 			var newStack []byte
-			if newStack = c.takePooledTryStack(needLen); newStack != nil {
-				newSP, newFP, newTop = c.cloneStackInto(newStack)
+			var spOff, fpOff uintptr
+			var trampWindow [32]uint64
+			var trampWindowBytes uintptr
+			if snapshotEnabled {
+				// Snapshot restores can rewind the live stack to an earlier
+				// state, which would invalidate offset-based checkpoints, so
+				// keep the full clone in that case.
+				needLen := uintptr(len(c.stack)) + 16
+				if newStack = c.takePooledTryStack(needLen); newStack != nil {
+					newSP, newFP, newTop = c.cloneStackInto(newStack)
+				} else {
+					newSP, newFP, newTop, newStack = c.cloneStack(needLen)
+				}
+				adjustClonedStack(oldSp, oldTop, newSP, newFP, newTop)
 			} else {
-				newSP, newFP, newTop, newStack = c.cloneStack(needLen)
+				spOff = oldTop - oldSp
+				fpOff = oldTop - c.execCtx.framePointerBeforeGoCall
+				// Record the entry-time stack top so a stack-buffer move
+				// (growStack) between entry and throw can be detected and
+				// stack-absolute values in the window rebased on restore.
+				newTop = oldTop
+				// Snapshot the trampoline-owned window at the entry stack
+				// pointer (ISA-specific layout, see trampolineWindowBytes).
+				// Derive the view from the typed stack pointer (not a bare
+				// uintptr) to stay checkptr-clean under -race.
+				spPtr := c.execCtx.stackPointerBeforeGoCall
+				trampWindowBytes = trampolineWindowBytes(spPtr, c.execCtx.framePointerBeforeGoCall)
+				if max := uintptr(len(trampWindow)) * 8; trampWindowBytes > max {
+					trampWindowBytes = max
+				}
+				win := unsafe.Slice((*byte)(unsafe.Pointer(spPtr)), trampWindowBytes)
+				copy(unsafe.Slice((*byte)(unsafe.Pointer(&trampWindow[0])), trampWindowBytes), win)
 			}
-			adjustClonedStack(oldSp, oldTop, newSP, newFP, newTop)
 
 			// Allocate a heap buffer for locals so handlers can read throw-time values.
 			// Nested try_tables in the same function (ReuseLocals) share the enclosing handler's save area.
@@ -650,15 +696,19 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 			}
 
 			c.tryHandlers = append(c.tryHandlers, tryHandler{
-				sp:             newSP,
-				fp:             newFP,
-				top:            newTop,
-				returnAddress:  returnAddress,
-				savedRegisters: c.execCtx.savedRegisters,
-				stack:          newStack,
-				catchClauses:   info.CatchClauses,
-				moduleInstance: mod,
-				localsSaveArea: saveArea,
+				sp:               newSP,
+				fp:               newFP,
+				top:              newTop,
+				spOff:            spOff,
+				fpOff:            fpOff,
+				trampWindow:      trampWindow,
+				trampWindowBytes: trampWindowBytes,
+				returnAddress:    returnAddress,
+				savedRegisters:   c.execCtx.savedRegisters,
+				stack:            newStack,
+				catchClauses:     info.CatchClauses,
+				moduleInstance:   mod,
+				localsSaveArea:   saveArea,
 			})
 			// Set clauseIdx = -1 (no exception) in execCtx for the compiled code
 			// to read after the trampoline returns.
@@ -721,16 +771,43 @@ func (c *callEngine) doHandleException(exn *wasm.Exception) bool {
 				// Store the caught exception so handler code can read params.
 				c.pendingException = exn
 
-				// Restore the cloned stack (like snapshot.doRestore). The
-				// replaced live stack becomes reusable for future enters.
-				spp := *(**uint64)(unsafe.Pointer(&h.sp))
-				c.tryStackPool = append(c.tryStackPool, c.stack)
-				c.stack = h.stack
-				c.stackTop = h.top
 				ec := &c.execCtx
-				ec.stackBottomPtr = &c.stack[0]
-				ec.stackPointerBeforeGoCall = spp
-				ec.framePointerBeforeGoCall = h.fp
+				if h.stack != nil {
+					// Clone mode (snapshotter enabled): restore the cloned
+					// stack (like snapshot.doRestore). The replaced live
+					// stack becomes reusable for future enters.
+					spp := *(**uint64)(unsafe.Pointer(&h.sp))
+					c.tryStackPool = append(c.tryStackPool, c.stack)
+					c.stack = h.stack
+					c.stackTop = h.top
+					ec.stackBottomPtr = &c.stack[0]
+					ec.stackPointerBeforeGoCall = spp
+					ec.framePointerBeforeGoCall = h.fp
+				} else {
+					// Offset mode: the checkpoint frames are still intact in
+					// the live stack; recompute the pointers against the
+					// current stack top (the stack may have been reallocated
+					// by growStack since the try_table entry, but growth
+					// preserves top-relative positions), and restore the
+					// trampoline-owned window that later trampoline exits
+					// from the same frame may have overwritten. The frames
+					// between the checkpoint and the throw point are
+					// abandoned, as in native unwinding.
+					sp := c.stackTop - h.spOff
+					// Derive the restore window pointer from the stack slice
+					// itself (not a bare uintptr) to stay checkptr-clean
+					// under -race.
+					spPtr := unsafe.Add(unsafe.Pointer(&c.stack[0]), sp-uintptr(unsafe.Pointer(&c.stack[0])))
+					win := unsafe.Slice((*byte)(spPtr), h.trampWindowBytes)
+					copy(win, unsafe.Slice((*byte)(unsafe.Pointer(&h.trampWindow[0])), h.trampWindowBytes))
+					spp := (*uint64)(spPtr)
+					// If growStack moved the stack buffer since the try_table
+					// entry (h.top records the entry-time top), stack-absolute
+					// values in the restored window must be rebased.
+					rebaseTrampolineWindow(spp, h.trampWindowBytes, c.stackTop-h.top)
+					ec.stackPointerBeforeGoCall = spp
+					ec.framePointerBeforeGoCall = c.stackTop - h.fpOff
+				}
 				ec.goCallReturnAddress = h.returnAddress
 				ec.savedRegisters = h.savedRegisters
 
