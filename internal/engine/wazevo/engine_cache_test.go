@@ -322,7 +322,7 @@ func Test_fileCacheKey(t *testing.T) {
 	m := &wasm.Module{}
 	s.Sum(m.ID[:0])
 	original := m.ID
-	result := fileCacheKey(m)
+	result := fileCacheKey(m, false)
 	require.Equal(t, original, m.ID)
 	require.NotEqual(t, original, result)
 }

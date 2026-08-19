@@ -775,10 +775,10 @@ func paramNames(localNames IndirectNameMap, funcIdx uint32, paramLen int) []stri
 	return nil
 }
 
-func (m *ModuleInstance) buildMemory(module *Module, allocator experimental.MemoryAllocator) {
+func (m *ModuleInstance) buildMemory(module *Module, allocator experimental.MemoryAllocator, guarded bool) {
 	memSec := module.MemorySection
 	if memSec != nil {
-		m.MemoryInstance = NewMemoryInstance(memSec, allocator, m.Engine)
+		m.MemoryInstance = NewMemoryInstance(memSec, allocator, guarded, m.Engine)
 		m.MemoryInstance.definition = &module.MemoryDefinitionSection[0]
 	}
 }

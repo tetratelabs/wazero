@@ -14,6 +14,7 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/internalapi"
+	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/wasmruntime"
 )
 
@@ -64,21 +65,37 @@ type MemoryInstance struct {
 	ownerModuleEngine ModuleEngine
 
 	expBuffer experimental.LinearMemory
+
+	// GuardBacked is true when the memory is backed by a guard-page
+	// reservation (see experimental.WithGuardPageMemory), which allows the
+	// compiler to omit per-access bounds checks.
+	GuardBacked bool
 }
 
 // NewMemoryInstance creates a new instance based on the parameters in the SectionIDMemory.
-func NewMemoryInstance(memSec *Memory, allocator experimental.MemoryAllocator, moduleEngine ModuleEngine) *MemoryInstance {
+func NewMemoryInstance(memSec *Memory, allocator experimental.MemoryAllocator, guarded bool, moduleEngine ModuleEngine) *MemoryInstance {
 	minBytes := MemoryPagesToBytesNum(memSec.Min)
 	capBytes := MemoryPagesToBytesNum(memSec.Cap)
 	maxBytes := MemoryPagesToBytesNum(memSec.Max)
 
 	var buffer []byte
 	var expBuffer experimental.LinearMemory
-	if allocator != nil {
+	var guardBacked bool
+	if guarded && platform.GuardPageMemorySupported && !memSec.IsShared && allocator == nil {
+		if g, err := newGuardedLinearMemory(maxBytes); err == nil {
+			expBuffer = g
+			buffer = expBuffer.Reallocate(minBytes)
+			_ = buffer[:minBytes] // Bounds check that the minimum was allocated.
+			guardBacked = true
+		}
+		// On reservation failure, fall through to the regular allocation
+		// below (the engine will refuse to pair it with checkless code).
+	}
+	if buffer == nil && !guardBacked && allocator != nil {
 		expBuffer = allocator.Allocate(capBytes, maxBytes)
 		buffer = expBuffer.Reallocate(minBytes)
 		_ = buffer[:minBytes] // Bounds check that the minimum was allocated.
-	} else if memSec.IsShared {
+	} else if buffer == nil && memSec.IsShared {
 		// Shared memory needs a fixed buffer, so allocate with the maximum size.
 		//
 		// The rationale as to why we can simply use make([]byte) to a fixed buffer is that Go's GC is non-relocating.
@@ -89,10 +106,11 @@ func NewMemoryInstance(memSec *Memory, allocator experimental.MemoryAllocator, m
 		// the memory buffer allocation here is virtual and doesn't consume physical memory until it's used.
 		// 	* https://github.com/golang/go/blob/go1.24.0/src/runtime/malloc.go#L1059
 		buffer = make([]byte, minBytes, maxBytes)
-	} else {
+	} else if buffer == nil {
 		buffer = make([]byte, minBytes, capBytes)
 	}
 	return &MemoryInstance{
+		GuardBacked:       guardBacked,
 		Buffer:            buffer,
 		Min:               memSec.Min,
 		Cap:               memoryBytesNumToPages(uint64(cap(buffer))),

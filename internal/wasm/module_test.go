@@ -852,7 +852,7 @@ func TestModule_buildGlobals(t *testing.T) {
 func TestModule_buildMemoryInstance(t *testing.T) {
 	t.Run("nil", func(t *testing.T) {
 		m := ModuleInstance{}
-		m.buildMemory(&Module{}, nil)
+		m.buildMemory(&Module{}, nil, false)
 		require.Nil(t, m.MemoryInstance)
 	})
 	t.Run("non-nil", func(t *testing.T) {
@@ -863,7 +863,7 @@ func TestModule_buildMemoryInstance(t *testing.T) {
 		m.buildMemory(&Module{
 			MemorySection:           &Memory{Min: min, Cap: min, Max: max},
 			MemoryDefinitionSection: []MemoryDefinition{mDef},
-		}, nil)
+		}, nil, false)
 		mem := m.MemoryInstance
 		require.Equal(t, min, mem.Min)
 		require.Equal(t, max, mem.Max)

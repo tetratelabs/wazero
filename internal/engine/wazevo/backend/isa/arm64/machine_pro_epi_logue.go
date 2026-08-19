@@ -563,3 +563,38 @@ func (m *machine) addsAddOrSubStackPointer(cur *instruction, rd regalloc.VReg, d
 	}
 	return cur
 }
+
+// CompileGuardFaultExitSequence implements backend.Machine.
+//
+// The guard-page fault handler redirects a faulting thread here with the
+// execution context pointer in x0 and the faulting program counter in x1.
+// The sequence records the trap exactly like an inline lowerExitWithCode
+// (exit code, stack pointer for unwinding, trap address for source mapping)
+// and then exits the wasm execution.
+func (m *machine) CompileGuardFaultExitSequence() []byte {
+	cur := m.allocateInstr()
+	cur.asNop0()
+	m.rootInstr = cur
+
+	// Set the exit status on the execution context (uses x17 as scratch).
+	cur = m.setExitCode(cur, x0VReg, wazevoapi.ExitCodeMemoryOutOfBounds)
+
+	// Save the current stack pointer for stack unwinding.
+	cur = m.saveCurrentStackPointer(cur, x0VReg)
+
+	// Store the faulting program counter (x1) as the "return address" of
+	// this exit so stack traces point at the faulting wasm instruction.
+	storeFaultPC := m.allocateInstr()
+	mode := m.amodePool.Allocate()
+	*mode = addressMode{kind: addressModeKindRegUnsignedImm12, rn: x0VReg, imm: wazevoapi.ExecutionContextOffsetGoCallReturnAddress.I64()}
+	storeFaultPC.asStore(operandNR(x1VReg), mode, 64)
+	cur = linkInstr(cur, storeFaultPC)
+
+	// Exit the execution.
+	exitSeq := m.allocateInstr()
+	exitSeq.asExitSequence(x0VReg)
+	linkInstr(cur, exitSeq)
+
+	m.encode(m.rootInstr)
+	return m.compiler.Buf()
+}

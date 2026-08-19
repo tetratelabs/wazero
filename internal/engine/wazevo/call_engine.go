@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"runtime"
+	"runtime/debug"
 	"sync/atomic"
 	"unsafe"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 	"github.com/tetratelabs/wazero/internal/expctxkeys"
 	"github.com/tetratelabs/wazero/internal/internalapi"
+	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasmdebug"
 	"github.com/tetratelabs/wazero/internal/wasmruntime"
@@ -49,6 +51,10 @@ type (
 		// pendingException holds the most recently caught exception, so handler
 		// code can read its params after re-entry.
 		pendingException *wasm.Exception
+		// guardStackLo is the base address of the stack range currently
+		// registered with the guard-fault signal handler (0 if none). Only
+		// used when the module was compiled for guard-page backed memory.
+		guardStackLo uintptr
 	}
 
 	// tryHandler records the state at a try_table entry for exception handling.
@@ -171,6 +177,45 @@ func (c *callEngine) init() {
 		c.execCtx.stackBottomPtr = &c.stack[0]
 	}
 	c.execCtxPtr = uintptr(unsafe.Pointer(&c.execCtx))
+	c.updateGuardStackRegistration()
+}
+
+// updateGuardStackRegistration (re)registers this call engine's stack range
+// with the guard-fault signal handler, so a hardware fault raised by the
+// checkless code running on this stack can be redirected to the guard-fault
+// exit sequence with the right execution context. Must be called whenever
+// c.stack changes identity. No-op unless the module was compiled for
+// guard-page backed memory (which implies the handler is installed).
+func (c *callEngine) updateGuardStackRegistration() {
+	if c.parent == nil || c.parent.parent == nil {
+		return // only happens in unit tests constructing a bare callEngine.
+	}
+	cm := c.parent.parent
+	if !cm.guardedMemory {
+		return
+	}
+	lo := uintptr(unsafe.Pointer(&c.stack[0]))
+	hi := lo + uintptr(len(c.stack))
+	if c.guardStackLo != 0 {
+		if c.guardStackLo == lo {
+			return
+		}
+		platform.GuardSigStackDel(c.guardStackLo)
+	} else {
+		// First registration: arrange for deregistration when this call
+		// engine is garbage collected.
+		runtime.SetFinalizer(c, func(c *callEngine) {
+			if c.guardStackLo != 0 {
+				platform.GuardSigStackDel(c.guardStackLo)
+			}
+		})
+	}
+	exitSeq := uintptr(unsafe.Pointer(cm.parent.sharedFunctions.guardFaultExitAddress))
+	if !platform.GuardSigStackAdd(lo, hi, c.execCtxPtr, exitSeq) {
+		c.guardStackLo = 0
+		panic("wazero: the guard-fault handler's stack registry is full; too many concurrent call engines with guard-page memory")
+	}
+	c.guardStackLo = lo
 }
 
 // alignedStackTop returns 16-bytes aligned stack top of given stack.
@@ -259,6 +304,13 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 	}
 
 	p := c.parent
+	if p.parent.guardedMemory {
+		// With guard-page backed memory, out-of-bounds accesses surface as
+		// hardware faults; make them recoverable panics so the deferred
+		// handler below can translate them to the regular wasm trap.
+		old := debug.SetPanicOnFault(true)
+		defer debug.SetPanicOnFault(old)
+	}
 	ensureTermination := p.parent.ensureTermination
 	m := p.module
 	if ensureTermination {
@@ -286,6 +338,13 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 			panic(s)
 		}
 		if r != nil {
+			// A hardware fault inside a registered guard region is a guest
+			// out-of-bounds memory access (guard-page backed memory omits
+			// explicit bounds checks); translate it to the regular trap.
+			// Faults anywhere else keep propagating as runtime errors.
+			if fe, ok := r.(interface{ Addr() uintptr }); ok && platform.IsGuardRegionAddr(fe.Addr()) {
+				r = wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess
+			}
 			type listenerForAbort struct {
 				def api.FunctionDefinition
 				lsn experimental.FunctionListener
@@ -695,6 +754,7 @@ func (c *callEngine) doHandleException(exn *wasm.Exception) bool {
 				spp := *(**uint64)(unsafe.Pointer(&h.sp))
 				c.stack = h.stack
 				c.stackTop = h.top
+				c.updateGuardStackRegistration()
 				ec := &c.execCtx
 				ec.stackBottomPtr = &c.stack[0]
 				ec.stackPointerBeforeGoCall = spp
@@ -755,6 +815,7 @@ func (c *callEngine) growStack() (newSP, newFP uintptr, err error) {
 	newLen := 2*currentLen + c.execCtx.stackGrowRequiredSize + 16 // Stack might be aligned to 16 bytes, so add 16 bytes just in case.
 	newSP, newFP, c.stackTop, c.stack = c.cloneStack(newLen)
 	c.execCtx.stackBottomPtr = &c.stack[0]
+	c.updateGuardStackRegistration()
 	return
 }
 
@@ -896,6 +957,7 @@ func (s *snapshot) doRestore() {
 	c := s.c
 	c.stack = s.stack
 	c.stackTop = s.top
+	c.updateGuardStackRegistration()
 	ec := &c.execCtx
 	ec.stackBottomPtr = &c.stack[0]
 	ec.stackPointerBeforeGoCall = spp

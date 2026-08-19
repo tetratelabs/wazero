@@ -367,10 +367,11 @@ func (s *Store) instantiate(
 	}
 
 	allocator, _ := ctx.Value(expctxkeys.MemoryAllocatorKey{}).(experimental.MemoryAllocator)
+	guardedMemory, _ := ctx.Value(expctxkeys.GuardPageMemoryKey{}).(bool)
 
 	m.buildGlobals(module, m.Engine.FunctionInstanceReference)
 	m.buildTags(module)
-	m.buildMemory(module, allocator)
+	m.buildMemory(module, allocator, guardedMemory)
 	m.Exports = module.Exports
 	for _, exp := range m.Exports {
 		if exp.Type == ExternTypeTable {

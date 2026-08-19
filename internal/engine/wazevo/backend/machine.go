@@ -99,6 +99,13 @@ type (
 		// call the stack grow builtin function.
 		CompileStackGrowCallSequence() []byte
 
+		// CompileGuardFaultExitSequence returns the sequence of instructions that exits the wasm
+		// execution with ExitCodeMemoryOutOfBounds. When guard-page-backed memory is enabled, the
+		// signal handler redirects a faulting thread here with the execution context pointer and
+		// the faulting program counter placed in ISA-specific registers (arm64: x0 and x1,
+		// amd64: rax and rcx).
+		CompileGuardFaultExitSequence() []byte
+
 		// CompileEntryPreamble returns the sequence of instructions shared by multiple functions to
 		// enter the function from Go.
 		CompileEntryPreamble(signature *ssa.Signature) []byte

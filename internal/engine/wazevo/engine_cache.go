@@ -26,10 +26,17 @@ var crc = crc32.MakeTable(crc32.Castagnoli)
 // fileCacheKey returns a key for the file cache.
 // In order to avoid collisions with the existing compiler, we do not use m.ID directly,
 // but instead we rehash it with magic.
-func fileCacheKey(m *wasm.Module) (ret filecache.Key) {
+func fileCacheKey(m *wasm.Module, guardedMemory bool) (ret filecache.Key) {
 	s := sha256.New()
 	s.Write(m.ID[:])
 	s.Write(magic)
+	// Guarded-memory compilation omits bounds checks, so its artifacts must
+	// not be mixed with regular ones.
+	if guardedMemory {
+		s.Write([]byte{1})
+	} else {
+		s.Write([]byte{0})
+	}
 	// Write the CPU features so that we can cache the compiled module for the same CPU.
 	// This prevents the incompatible CPU features from being used.
 	cpu := platform.CpuFeatures.Raw()
@@ -116,7 +123,7 @@ func (e *engine) addCompiledModuleToCache(module *wasm.Module, cm *compiledModul
 	if e.fileCache == nil || module.IsHostModule {
 		return
 	}
-	err = e.fileCache.Add(fileCacheKey(module), serializeCompiledModule(e.wazeroVersion, cm))
+	err = e.fileCache.Add(fileCacheKey(module, e.guardedMemory), serializeCompiledModule(e.wazeroVersion, cm))
 	return
 }
 
@@ -127,7 +134,7 @@ func (e *engine) getCompiledModuleFromCache(module *wasm.Module) (cm *compiledMo
 
 	// Check if the entries exist in the external cache.
 	var cached io.ReadCloser
-	cached, hit, err = e.fileCache.Get(fileCacheKey(module))
+	cached, hit, err = e.fileCache.Get(fileCacheKey(module, e.guardedMemory))
 	if !hit || err != nil {
 		return
 	}
@@ -141,7 +148,7 @@ func (e *engine) getCompiledModuleFromCache(module *wasm.Module) (cm *compiledMo
 		hit = false
 		return
 	} else if staleCache {
-		return nil, false, e.fileCache.Delete(fileCacheKey(module))
+		return nil, false, e.fileCache.Delete(fileCacheKey(module, e.guardedMemory))
 	}
 	return
 }

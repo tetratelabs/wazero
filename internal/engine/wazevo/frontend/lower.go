@@ -1314,6 +1314,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			panic("BUG")
 		}
 		builder.InsertInstruction(load)
+		c.markGuestMemoryLoad(load)
 		state.push(load.Return())
 	case wasm.OpcodeBlock:
 		// Note: we do not need to create a BB for this as that would always have only one predecessor
@@ -1701,6 +1702,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 			load := builder.AllocateInstruction()
 			load.AsLoad(addr, offset, ssa.TypeV128)
 			builder.InsertInstruction(load)
+			c.markGuestMemoryLoad(load)
 			state.push(load.Return())
 		case wasm.OpcodeVecV128Load8Lane, wasm.OpcodeVecV128Load16Lane, wasm.OpcodeVecV128Load32Lane:
 			_, offset := c.readMemArg()
@@ -1723,9 +1725,11 @@ func (c *Compiler) lowerCurrentOpcode() {
 			vector := state.pop()
 			baseAddr := state.pop()
 			addr := c.memOpSetup(baseAddr, uint64(offset), opSize)
-			load := builder.AllocateInstruction().
+			loadInstr := builder.AllocateInstruction().
 				AsExtLoad(loadOp, addr, offset, false).
-				Insert(builder).Return()
+				Insert(builder)
+			c.markGuestMemoryLoad(loadInstr)
+			load := loadInstr.Return()
 			ret := builder.AllocateInstruction().
 				AsInsertlane(vector, load, laneIndex, lane).
 				Insert(builder).Return()
@@ -1740,9 +1744,11 @@ func (c *Compiler) lowerCurrentOpcode() {
 			vector := state.pop()
 			baseAddr := state.pop()
 			addr := c.memOpSetup(baseAddr, uint64(offset), 8)
-			load := builder.AllocateInstruction().
+			loadInstr := builder.AllocateInstruction().
 				AsLoad(addr, offset, ssa.TypeI64).
-				Insert(builder).Return()
+				Insert(builder)
+			c.markGuestMemoryLoad(loadInstr)
+			load := loadInstr.Return()
 			ret := builder.AllocateInstruction().
 				AsInsertlane(vector, load, laneIndex, ssa.VecLaneI64x2).
 				Insert(builder).Return()
@@ -1765,10 +1771,11 @@ func (c *Compiler) lowerCurrentOpcode() {
 			baseAddr := state.pop()
 			addr := c.memOpSetup(baseAddr, uint64(offset), uint64(scalarType.Size()))
 
-			ret := builder.AllocateInstruction().
+			loadInstr := builder.AllocateInstruction().
 				AsVZeroExtLoad(addr, offset, scalarType).
-				Insert(builder).Return()
-			state.push(ret)
+				Insert(builder)
+			c.markGuestMemoryLoad(loadInstr)
+			state.push(loadInstr.Return())
 
 		case wasm.OpcodeVecV128Load8x8u, wasm.OpcodeVecV128Load8x8s,
 			wasm.OpcodeVecV128Load16x4u, wasm.OpcodeVecV128Load16x4s,
@@ -1798,9 +1805,11 @@ func (c *Compiler) lowerCurrentOpcode() {
 			}
 			baseAddr := state.pop()
 			addr := c.memOpSetup(baseAddr, uint64(offset), 8)
-			load := builder.AllocateInstruction().
+			loadInstr := builder.AllocateInstruction().
 				AsLoad(addr, offset, ssa.TypeF64).
-				Insert(builder).Return()
+				Insert(builder)
+			c.markGuestMemoryLoad(loadInstr)
+			load := loadInstr.Return()
 			ret := builder.AllocateInstruction().
 				AsWiden(load, lane, signed, true).
 				Insert(builder).Return()
@@ -1825,10 +1834,11 @@ func (c *Compiler) lowerCurrentOpcode() {
 			}
 			baseAddr := state.pop()
 			addr := c.memOpSetup(baseAddr, uint64(offset), opSize)
-			ret := builder.AllocateInstruction().
+			loadInstr := builder.AllocateInstruction().
 				AsLoadSplat(addr, offset, lane).
-				Insert(builder).Return()
-			state.push(ret)
+				Insert(builder)
+			c.markGuestMemoryLoad(loadInstr)
+			state.push(loadInstr.Return())
 		case wasm.OpcodeVecV128Store:
 			_, offset := c.readMemArg()
 			if state.unreachable {
@@ -4261,6 +4271,29 @@ func (c *Compiler) memOpSetup(baseAddr ssa.Value, constOffset, operationSizeInBy
 	address = ssa.ValueInvalid
 	builder := c.ssaBuilder
 
+	// With guard-page backed memory, any u32 base + u32 static offset +
+	// access size lands inside the reserved (and partially inaccessible)
+	// region, so an out-of-bounds access faults in hardware instead of
+	// requiring an explicit check; the fault is translated back to the
+	// regular out-of-bounds trap by the call engine.
+	if c.memoryGuarded {
+		baseAddrID := baseAddr.ID()
+		if known := c.getKnownSafeBound(baseAddrID); known.valid() && known.absoluteAddr.Valid() {
+			return known.absoluteAddr
+		}
+		memBase := c.getMemoryBaseValue(false)
+		extBaseAddr := builder.AllocateInstruction().
+			AsUExtend(baseAddr, 32, 64).
+			Insert(builder).
+			Return()
+		address = builder.AllocateInstruction().
+			AsIadd(memBase, extBaseAddr).Insert(builder).Return()
+		// Record the computed absolute address so subsequent accesses on the
+		// same base value in this block reuse it.
+		c.recordKnownSafeBound(baseAddrID, 1<<62, address)
+		return
+	}
+
 	baseAddrID := baseAddr.ID()
 	ceil := constOffset + operationSizeInBytes
 	if known := c.getKnownSafeBound(baseAddrID); known.valid() {
@@ -5150,4 +5183,14 @@ func (c *Compiler) boundsCheckInMemory(memLen, offset, size ssa.Value) {
 	builder.AllocateInstruction().
 		AsExitIfTrueWithCode(c.execCtxPtrValue, cmp, wazevoapi.ExitCodeMemoryOutOfBounds).
 		Insert(builder)
+}
+
+// markGuestMemoryLoad marks a guest linear-memory load as trapping when the
+// memory is guard-page backed and bounds checks are omitted: the access
+// itself then carries the wasm out-of-bounds trap semantics and must not be
+// dead-code-eliminated even if its result is unused.
+func (c *Compiler) markGuestMemoryLoad(load *ssa.Instruction) {
+	if c.memoryGuarded {
+		load.MarkAsTrapping()
+	}
 }

@@ -46,6 +46,11 @@ func (m mockMachine) CompileStackGrowCallSequence() []byte {
 	panic("TODO")
 }
 
+// CompileGuardFaultExitSequence implements backend.Machine.
+func (m mockMachine) CompileGuardFaultExitSequence() []byte {
+	panic("TODO")
+}
+
 // CompileGoFunctionTrampoline implements Machine.CompileGoFunctionTrampoline.
 func (m mockMachine) CompileGoFunctionTrampoline(wazevoapi.ExitCode, *ssa.Signature, bool) []byte {
 	panic("TODO")

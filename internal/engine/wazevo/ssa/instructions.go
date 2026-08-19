@@ -37,6 +37,9 @@ type Instruction struct {
 	sourceOffset   SourceOffset
 	live           bool
 	alreadyLowered bool
+	// trapping overrides the opcode's static side-effect classification to
+	// sideEffectTraps. See MarkAsTrapping.
+	trapping bool
 }
 
 // SourceOffset represents the offset of the source of an instruction.
@@ -893,11 +896,25 @@ var instructionSideEffects = [opcodeEnd]sideEffect{
 
 // sideEffect returns true if this instruction has side effects.
 func (i *Instruction) sideEffect() sideEffect {
+	if i.trapping {
+		return sideEffectTraps
+	}
 	if e := instructionSideEffects[i.opcode]; e == sideEffectUnknown {
 		panic("BUG: side effect info not registered for " + i.opcode.String())
 	} else {
 		return e
 	}
+}
+
+// MarkAsTrapping overrides this instruction's side-effect classification to
+// sideEffectTraps: the instruction stays alive even if its result is unused,
+// but may still be reordered within its instruction group. This is used for
+// memory accesses compiled without explicit bounds checks (guard-page backed
+// memory), where the hardware fault raised by the access itself implements
+// the wasm out-of-bounds trap and the access therefore must not be
+// dead-code-eliminated.
+func (i *Instruction) MarkAsTrapping() {
+	i.trapping = true
 }
 
 // instructionReturnTypes provides the function to determine the return types of an instruction.

@@ -31,6 +31,9 @@ type Compiler struct {
 	refFuncSig             ssa.Signature
 	memmoveSig             ssa.Signature
 	ensureTermination      bool
+	// memoryGuarded is true when linear memory is guard-page backed, so
+	// per-access bounds checks can be omitted (see memOpSetup).
+	memoryGuarded bool
 
 	// Followings are reset by per function.
 
@@ -106,13 +109,14 @@ type (
 var knownSafeBoundsAtTheEndOfBlockNil = wazevoapi.NewNilVarLength[knownSafeBoundWithID]()
 
 // NewFrontendCompiler returns a frontend Compiler.
-func NewFrontendCompiler(m *wasm.Module, ssaBuilder ssa.Builder, offset *wazevoapi.ModuleContextOffsetData, ensureTermination bool, listenerOn bool, sourceInfo bool) *Compiler {
+func NewFrontendCompiler(m *wasm.Module, ssaBuilder ssa.Builder, offset *wazevoapi.ModuleContextOffsetData, ensureTermination bool, listenerOn bool, sourceInfo bool, memoryGuarded bool) *Compiler {
 	c := &Compiler{
 		m:                                 m,
 		ssaBuilder:                        ssaBuilder,
 		br:                                bytes.NewReader(nil),
 		offset:                            offset,
 		ensureTermination:                 ensureTermination,
+		memoryGuarded:                     memoryGuarded,
 		needSourceOffsetInfo:              sourceInfo,
 		tryTableMetadata:                  &localTryTableMetadata{},
 		varLengthKnownSafeBoundWithIDPool: wazevoapi.NewVarLengthPool[knownSafeBoundWithID](),

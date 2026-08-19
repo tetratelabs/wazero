@@ -438,3 +438,40 @@ func (m *machine) insertStackBoundsCheck(requiredStackSize int64, cur *instructi
 
 	return cur
 }
+
+// CompileGuardFaultExitSequence implements backend.Machine.
+//
+// The guard-page fault handler redirects a faulting thread here with the
+// execution context pointer in rax and the faulting program counter in rcx.
+// The sequence records the trap exactly like an inline lowerExitWithCode
+// (exit code, RSP/RBP for unwinding, trap address for source mapping) and
+// then exits the wasm execution.
+func (m *machine) CompileGuardFaultExitSequence() []byte {
+	cur := m.allocateNop()
+	m.rootInstr = cur
+
+	execCtx := raxVReg
+	// RBP is saved into the execution context before it is reused as the
+	// scratch register for the exit code constant, same as lowerExitWithCode.
+	exitCodeReg := rbpVReg
+	saveRsp, saveRbp, setExitCode := m.allocateExitInstructions(execCtx, exitCodeReg)
+	cur = linkInstr(cur, saveRsp)
+	cur = linkInstr(cur, saveRbp)
+	cur = linkInstr(cur, m.allocateInstr().asImm(exitCodeReg, uint64(wazevoapi.ExitCodeMemoryOutOfBounds), false))
+	cur = linkInstr(cur, setExitCode)
+
+	// Store the faulting program counter (rcx) as the "return address" of
+	// this exit so stack traces point at the faulting wasm instruction.
+	storeFaultPC := m.allocateInstr().asMovRM(
+		rcxVReg,
+		newOperandMem(m.newAmodeImmReg(wazevoapi.ExecutionContextOffsetGoCallReturnAddress.U32(), execCtx)),
+		8,
+	)
+	cur = linkInstr(cur, storeFaultPC)
+
+	// Exit the execution.
+	linkInstr(cur, m.allocateExitSeq(execCtx))
+
+	m.encodeWithoutSSA(m.rootInstr)
+	return m.c.Buf()
+}
