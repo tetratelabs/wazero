@@ -60,6 +60,11 @@ type (
 		// jmpTableTargetNext is the index to the jmpTableTargets slice to be used for the next jump table.
 		jmpTableTargetsNext int
 
+		// trapIslands are this function's shared conditional-trap exit
+		// sequences, one per exit code, emitted once after register
+		// allocation (see lowerExitIfTrueWithCodeShared and emitTrapIslands).
+		trapIslands []trapIsland
+
 		// spillSlotSize is the size of the stack slot in bytes used for spilling registers.
 		// During the execution of the function, the stack looks like:
 		//
@@ -114,6 +119,13 @@ type (
 		// Next block's labelPosition.
 		nextLabel label
 		offset    int64
+	}
+
+	// trapIsland is a shared per-function exit sequence for conditional traps
+	// with the given exit code, reachable via the label.
+	trapIsland struct {
+		code wazevoapi.ExitCode
+		l    label
 	}
 )
 
@@ -267,6 +279,22 @@ func (m *machine) Reset() {
 	m.pendingInstructions = m.pendingInstructions[:0]
 	m.perBlockHead, m.perBlockEnd, m.rootInstr = nil, nil, nil
 	m.orderedSSABlockLabelPos = m.orderedSSABlockLabelPos[:0]
+	m.trapIslands = m.trapIslands[:0]
+}
+
+// getOrCreateTrapIsland returns the label of this function's shared trap
+// island for the given exit code, allocating it on first use. The island
+// itself is materialized by emitTrapIslands after register allocation.
+func (m *machine) getOrCreateTrapIsland(code wazevoapi.ExitCode) label {
+	for _, ti := range m.trapIslands {
+		if ti.code == code {
+			return ti.l
+		}
+	}
+	l := m.nextLabel
+	m.nextLabel++
+	m.trapIslands = append(m.trapIslands, trapIsland{code: code, l: l})
+	return l
 }
 
 // StartLoweringFunction implements backend.Machine StartLoweringFunction.

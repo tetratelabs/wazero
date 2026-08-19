@@ -34,6 +34,7 @@ considering their efforts before starting your own!
 | [go-plugin][2]                 | implements [Protocol Buffers][8] services with WebAssembly vi code generation |
 | [waPC][5]                      | implements [Apex][6] interfaces with WebAssembly via code generation          |
 | [wazero-emscripten-embind][36] | Emscripten [Embind][37] and code generation support for Wazero                |
+| [f4][51]                       | Far Manager clone in Go using wazero for plug-in system                       |
 
 ### Infrastructure-as-Code
 
@@ -79,6 +80,10 @@ considering their efforts before starting your own!
 |:--------------|------------------------------------------|
 | [wescale][44] | a database proxy that supports OnlineDDL |
 
+### Transpilation
+| Name              | Description                                 |
+|:------------------|---------------------------------------------|
+| [colorer4go][50]  | Far Manager colorer plugin ported via wasm  |
 
 ## Updating this list
 
@@ -182,3 +187,7 @@ experience.
 [48]: https://github.com/klippa-app/go-libtiff
 
 [49]: https://libtiff.gitlab.io/libtiff/
+
+[50]: https://github.com/unxed/colorer4go
+
+[51]: https://github.com/unxed/f4

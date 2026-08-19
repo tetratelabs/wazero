@@ -11,6 +11,85 @@ import (
 func (m *machine) PostRegAlloc() {
 	m.setupPrologue()
 	m.postRegAlloc()
+	m.emitTrapIslands()
+}
+
+// emitTrapIslands materializes the shared trap islands allocated by
+// lowerExitIfTrueWithCodeShared at the end of the function body. Islands are
+// only ever branched to (never fallen into) and never return, so they can be
+// emitted after register allocation using real registers only: the execution
+// context arrives in the reserved tmp register and x17 serves as scratch,
+// which is fine to clobber on a path that exits the function.
+func (m *machine) emitTrapIslands() {
+	if len(m.trapIslands) == 0 {
+		return
+	}
+
+	lastPos := m.orderedSSABlockLabelPos[len(m.orderedSSABlockLabelPos)-1]
+	// The epilogue insertion may have appended instructions past the recorded
+	// block end; walk to the true tail so islands come after everything.
+	cur := lastPos.end
+	for cur.next != nil {
+		cur = cur.next
+	}
+
+	for _, ti := range m.trapIslands {
+		nop := m.allocateInstr()
+		nop.asNop0WithLabel(ti.l)
+		pos := m.labelPositionPool.GetOrAllocate(int(ti.l))
+		pos.begin, pos.end = nop, nop
+		cur = linkInstr(cur, nop)
+
+		// Set the exit code in the execution context.
+		movz := m.allocateInstr()
+		movz.asMOVZ(x17VReg, uint64(ti.code), 0, true)
+		cur = linkInstr(cur, movz)
+
+		setExitCode := m.allocateInstr()
+		mode := m.amodePool.Allocate()
+		*mode = addressMode{
+			kind: addressModeKindRegUnsignedImm12,
+			rn:   tmpRegVReg, imm: wazevoapi.ExecutionContextOffsetExitCodeOffset.I64(),
+		}
+		setExitCode.asStore(operandNR(x17VReg), mode, 32)
+		cur = linkInstr(cur, setExitCode)
+
+		// Push the current stack pointer so the stack can be unwound.
+		movSp := m.allocateInstr()
+		movSp.asMove64(x17VReg, spVReg)
+		cur = linkInstr(cur, movSp)
+
+		strSp := m.allocateInstr()
+		mode2 := m.amodePool.Allocate()
+		*mode2 = addressMode{
+			kind: addressModeKindRegUnsignedImm12,
+			rn:   tmpRegVReg, imm: wazevoapi.ExecutionContextOffsetStackPointerBeforeGoCall.I64(),
+		}
+		strSp.asStore(operandNR(x17VReg), mode2, 64)
+		cur = linkInstr(cur, strSp)
+
+		// Record the address of this exit.
+		adr := m.allocateInstr()
+		adr.asAdr(x17VReg, 0)
+		cur = linkInstr(cur, adr)
+
+		strAddr := m.allocateInstr()
+		mode3 := m.amodePool.Allocate()
+		*mode3 = addressMode{
+			kind: addressModeKindRegUnsignedImm12,
+			rn:   tmpRegVReg, imm: wazevoapi.ExecutionContextOffsetGoCallReturnAddress.I64(),
+		}
+		strAddr.asStore(operandNR(x17VReg), mode3, 64)
+		cur = linkInstr(cur, strAddr)
+
+		exitSeq := m.allocateInstr()
+		exitSeq.asExitSequence(tmpRegVReg)
+		cur = linkInstr(cur, exitSeq)
+	}
+
+	// Extend the last block to cover the islands so that label offset
+	// resolution walks over them.
+	lastPos.end = cur
 }
 
 // setupPrologue initializes the prologue of the function.

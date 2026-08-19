@@ -300,7 +300,14 @@ func (c *FSContext) Renumber(from, to int32) sys.Errno {
 	// https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_renumberfd-fd-to-fd---errno
 	// https://github.com/bytecodealliance/wasmtime/blob/main/crates/wasi-common/src/snapshots/preview_1.rs#L531-L546
 	if toFile, ok := c.openedFiles.Lookup(to); ok {
-		if toFile.IsPreopen {
+		// Stdio file descriptors (0-2) are registered as preopens, but unlike
+		// directory preopens they are legitimate dup2/freopen targets: libc
+		// emulates `freopen(path, mode, stdin)` as open + fd_renumber(fd, 0).
+		// wasmtime permits this; refusing it breaks guests that redirect
+		// stdio (e.g. PostgreSQL initdb feeding its bootstrap script through
+		// stdin). Only directory preopens remain protected, as replacing
+		// those would corrupt libc's preopen path-resolution table.
+		if toFile.IsPreopen && to > FdStderr {
 			return sys.ENOTSUP
 		}
 		_ = toFile.File.Close()

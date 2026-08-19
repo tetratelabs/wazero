@@ -170,7 +170,14 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		m.lowerExitWithCode(m.compiler.VRegOf(execCtx), code)
 	case ssa.OpcodeExitIfTrueWithCode:
 		execCtx, c, code := instr.ExitIfTrueWithCodeData()
-		m.lowerExitIfTrueWithCode(m.compiler.VRegOf(execCtx), c, code)
+		if instr.SourceOffset().Valid() {
+			// When source offset info is tracked (debug info), keep the exit
+			// sequence inline so the recorded trap address maps back to this
+			// specific site.
+			m.lowerExitIfTrueWithCode(m.compiler.VRegOf(execCtx), c, code)
+		} else {
+			m.lowerExitIfTrueWithCodeShared(m.compiler.VRegOf(execCtx), c, code)
+		}
 	case ssa.OpcodeStore, ssa.OpcodeIstore8, ssa.OpcodeIstore16, ssa.OpcodeIstore32:
 		m.lowerStore(instr)
 	case ssa.OpcodeLoad:
@@ -1991,6 +1998,39 @@ func (m *machine) lowerExitIfTrueWithCode(execCtxVReg regalloc.VReg, cond ssa.Va
 	// conditional branch target is after exit.
 	l := m.insertBrTargetLabel()
 	cbr.asCondBr(condFlagFromSSAIntegerCmpCond(c).invert().asCond(), l, false /* ignored */)
+}
+
+// lowerExitIfTrueWithCodeShared lowers a conditional trap by branching to a
+// per-function trap island shared by all sites trapping with the same exit
+// code, instead of inlining the whole exit sequence at each site. The hot
+// path falls through (the branch is taken only when trapping), and the
+// island is materialized once, after register allocation, by
+// emitTrapIslands.
+func (m *machine) lowerExitIfTrueWithCodeShared(execCtxVReg regalloc.VReg, cond ssa.Value, code wazevoapi.ExitCode) {
+	condDef := m.compiler.ValueDefinition(cond)
+	if !m.compiler.MatchInstr(condDef, ssa.OpcodeIcmp) {
+		panic("TODO: OpcodeExitIfTrueWithCode must come after Icmp at the moment: " + condDef.Instr.Opcode().String())
+	}
+	condDef.Instr.MarkLowered()
+
+	cvalInstr := condDef.Instr
+	x, y, c := cvalInstr.IcmpData()
+	signed := c.Signed()
+
+	if !m.tryLowerBandToFlag(x, y) {
+		m.lowerIcmpToFlag(x, y, signed)
+	}
+
+	// The island runs after register allocation, so it needs the execution
+	// context in a fixed register: the reserved tmp register, which is never
+	// allocated and holds no live value between lowered sequences.
+	mov := m.allocateInstr()
+	mov.asMove64(tmpRegVReg, execCtxVReg)
+	m.insert(mov)
+
+	cbr := m.allocateInstr()
+	cbr.asCondBr(condFlagFromSSAIntegerCmpCond(c).asCond(), m.getOrCreateTrapIsland(code), false /* ignored */)
+	m.insert(cbr)
 }
 
 func (m *machine) lowerSelect(c, x, y, result ssa.Value) {

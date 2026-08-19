@@ -214,16 +214,19 @@ type memorySizer func(minPages uint32, maxPages *uint32) (min uint32, capacity u
 func newMemorySizer(memoryLimitPages uint32, memoryCapacityFromMax bool) memorySizer {
 	return func(minPages uint32, maxPages *uint32) (min, capacity, max uint32) {
 		if maxPages != nil {
-			if memoryCapacityFromMax {
-				return minPages, *maxPages, *maxPages
-			}
 			// This is an invalid value: let it propagate, we will fail later.
 			if *maxPages > wasm.MemoryLimitPages {
 				return minPages, minPages, *maxPages
 			}
 			// This is a valid value, but it goes over the run-time limit: return the limit.
 			if *maxPages > memoryLimitPages {
+				if memoryCapacityFromMax {
+					return minPages, memoryLimitPages, memoryLimitPages
+				}
 				return minPages, minPages, memoryLimitPages
+			}
+			if memoryCapacityFromMax {
+				return minPages, *maxPages, *maxPages
 			}
 			return minPages, minPages, *maxPages
 		}

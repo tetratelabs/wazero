@@ -2520,6 +2520,40 @@ func Test_fdRenumber(t *testing.T) {
 <== errno=ESUCCESS
 `,
 		},
+		// Stdio fds are flagged as preopens but, unlike directory preopens,
+		// they are valid renumber targets: libc emulates freopen/dup2 onto
+		// stdio as open + fd_renumber(fd, stdioFd), e.g. when a program
+		// redirects its own stdin from a file. wasmtime permits this.
+		{
+			name:          "file to stdin",
+			from:          fileFD,
+			to:            sys.FdStdin,
+			expectedErrno: wasip1.ErrnoSuccess,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_renumber(fd=4,to=0)
+<== errno=ESUCCESS
+`,
+		},
+		{
+			name:          "file to stdout",
+			from:          fileFD,
+			to:            sys.FdStdout,
+			expectedErrno: wasip1.ErrnoSuccess,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_renumber(fd=4,to=1)
+<== errno=ESUCCESS
+`,
+		},
+		{
+			name:          "file to stderr",
+			from:          fileFD,
+			to:            sys.FdStderr,
+			expectedErrno: wasip1.ErrnoSuccess,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_renumber(fd=4,to=2)
+<== errno=ESUCCESS
+`,
+		},
 	}
 
 	for _, tt := range tests {

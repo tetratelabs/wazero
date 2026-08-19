@@ -248,6 +248,34 @@ func TestFSContext_Renumber(t *testing.T) {
 		// Both are preopen.
 		require.Equal(t, sys.ENOTSUP, fsc.Renumber(3, 3))
 	})
+
+	t.Run("stdio fds are valid renumber targets", func(t *testing.T) {
+		// libc emulates `freopen(path, mode, stdin)` and `dup2(fd, STDIN_FILENO)`
+		// as open + fd_renumber(fd, 0). Unlike directory preopens, stdio file
+		// descriptors must accept renumbering, like wasmtime does.
+		for _, stdioFd := range []int32{FdStdin, FdStdout, FdStderr} {
+			fromFd, errno := fsc.OpenFile(dirFS, dirName, sys.O_RDONLY, 0)
+			require.EqualErrno(t, 0, errno)
+
+			fromFile, ok := fsc.LookupFile(fromFd)
+			require.True(t, ok)
+
+			// Sanity check the target is a stdio entry flagged as preopen.
+			toFile, ok := fsc.LookupFile(stdioFd)
+			require.True(t, ok)
+			require.True(t, toFile.IsPreopen)
+
+			require.EqualErrno(t, 0, fsc.Renumber(fromFd, stdioFd))
+
+			renumbered, ok := fsc.LookupFile(stdioFd)
+			require.True(t, ok)
+			require.Equal(t, fromFile, renumbered)
+
+			// Previous file descriptor shouldn't be used.
+			_, ok = fsc.LookupFile(fromFd)
+			require.False(t, ok)
+		}
+	})
 }
 
 // This is similar to https://github.com/WebAssembly/wasi-testsuite/blob/ac32f57400cdcdd0425d3085c24fc7fc40011d1c/tests/rust/src/bin/fd_readdir.rs#L120

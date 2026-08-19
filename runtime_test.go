@@ -816,6 +816,63 @@ func (e *mockEngine) Close() (err error) {
 	return
 }
 
+// TestRuntime_CrossRuntimeInstantiate_TypeIDMismatch is a regression test for
+// https://github.com/wazero/wazero/pull/2497#issuecomment-4824630517.
+// When a module is compiled in one runtime and instantiated in another, the
+// TypeIDs cached in the compiled module belong to the compiling store. If the
+// instantiating store has assigned different IDs (because it saw types in a
+// different order), the import signature check using TypeIDs falsely rejects
+// structurally identical signatures.
+func TestRuntime_CrossRuntimeInstantiate_TypeIDMismatch(t *testing.T) {
+	// The wasm module declares multiple types so that the imported function
+	// type gets a non-zero index. When the host module in a fresh store
+	// registers only that one type, it gets ID 0 while the compiled module
+	// has a higher ID from the compiling store — triggering a false mismatch.
+	wasmBin := binaryencoding.EncodeModule(&wasm.Module{
+		TypeSection: []wasm.FunctionType{
+			{Params: []wasm.ValueType{wasm.ValueTypeI32}, Results: []wasm.ValueType{wasm.ValueTypeI32}},
+			{Params: []wasm.ValueType{wasm.ValueTypeI64}, Results: []wasm.ValueType{wasm.ValueTypeI64}},
+			// Type index 2 is the one used by the import.
+			{Params: []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI64}, Results: []wasm.ValueType{wasm.ValueTypeI64}},
+		},
+		ImportSection: []wasm.Import{
+			{Module: "env", Name: "proxy", Type: wasm.ExternTypeFunc, DescFunc: 2},
+		},
+		FunctionSection: []wasm.Index{0},
+		CodeSection: []wasm.Code{
+			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeEnd}},
+		},
+		ExportSection: []wasm.Export{
+			{Name: "f", Type: wasm.ExternTypeFunc, Index: 1},
+		},
+	})
+
+	// Share a compilation cache between the two runtimes, as real libraries do
+	// (e.g. fastschema/qjs compiles once and instantiates in fresh runtimes).
+	cache := NewCompilationCache()
+	config := NewRuntimeConfig().WithCompilationCache(cache)
+
+	// Compile in runtime1.
+	r1 := NewRuntimeWithConfig(testCtx, config)
+	defer r1.Close(testCtx)
+	compiled, err := r1.CompileModule(testCtx, wasmBin)
+	require.NoError(t, err)
+
+	// Instantiate in runtime2, which has only the host module.
+	r2 := NewRuntimeWithConfig(testCtx, config)
+	defer r2.Close(testCtx)
+
+	proxyFn := func(ctx context.Context, a uint32, b uint64) uint64 { return b }
+	_, err = r2.NewHostModuleBuilder("env").
+		NewFunctionBuilder().WithFunc(proxyFn).Export("proxy").
+		Instantiate(testCtx)
+	require.NoError(t, err)
+
+	mod, err := r2.InstantiateModule(testCtx, compiled, NewModuleConfig())
+	require.NoError(t, err, "cross-runtime instantiation with identical signatures must not fail")
+	require.NoError(t, mod.Close(testCtx))
+}
+
 // TestNewRuntime_concurrent ensures that concurrent execution of NewRuntime is race-free.
 // This depends on -race flag.
 func TestNewRuntime_concurrent(t *testing.T) {

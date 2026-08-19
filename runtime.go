@@ -333,8 +333,16 @@ func (r *runtime) InstantiateModule(
 		name = code.module.NameSection.ModuleName
 	}
 
+	// Recompute typeIDs for the instantiating store. The compiled module may
+	// have been compiled in a different runtime/store (shared compilation
+	// cache pattern), so its cached typeIDs can differ from this store's.
+	typeIDs, err := r.store.GetFunctionTypeIDs(code.module.TypeSection)
+	if err != nil {
+		return nil, err
+	}
+
 	// Instantiate the module.
-	mod, err = r.store.Instantiate(ctx, code.module, name, sysCtx, code.typeIDs)
+	mod, err = r.store.Instantiate(ctx, code.module, name, sysCtx, typeIDs)
 	if err != nil {
 		// If there was an error, don't leak the compiled module.
 		if code.closeWithModule {

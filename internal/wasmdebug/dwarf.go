@@ -27,9 +27,6 @@ type line struct {
 
 // NewDWARFLines returns DWARFLines for the given *dwarf.Data.
 func NewDWARFLines(d *dwarf.Data) *DWARFLines {
-	if d == nil {
-		return nil
-	}
 	return &DWARFLines{d: d, linesPerEntry: map[dwarf.Offset][]line{}}
 }
 
@@ -49,7 +46,7 @@ func isTombstoneAddr(addr uint64) bool {
 // Line returns the line information for the given instructionOffset which is an offset in
 // the code section of the original Wasm binary. Returns empty string if the info is not found.
 func (d *DWARFLines) Line(instructionOffset uint64) (ret []string) {
-	if d == nil {
+	if d == nil || d.d == nil {
 		return
 	}
 

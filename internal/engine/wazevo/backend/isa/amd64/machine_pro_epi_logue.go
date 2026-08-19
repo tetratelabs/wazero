@@ -3,12 +3,75 @@ package amd64
 import (
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/backend/regalloc"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
 )
 
 // PostRegAlloc implements backend.Machine.
 func (m *machine) PostRegAlloc() {
 	m.setupPrologue()
 	m.postRegAlloc()
+	m.emitTrapIslands()
+}
+
+// emitTrapIslands materializes the shared trap islands allocated by
+// lowerExitIfTrueWithCodeShared at the end of the function body. Islands are
+// only ever branched to (never fallen into) and never return, so they can be
+// emitted after register allocation using real registers only: the execution
+// context is reloaded from the stack slot written at the trap site, into
+// RAX, and RBP serves as scratch — both are dead on a path that exits the
+// function (the original RBP is stored for unwinding before it is
+// clobbered).
+func (m *machine) emitTrapIslands() {
+	if len(m.trapIslands) == 0 {
+		return
+	}
+
+	lastPos := m.orderedSSABlockLabelPos[len(m.orderedSSABlockLabelPos)-1]
+	// The epilogue insertion may have appended instructions past the recorded
+	// block end; walk to the true tail so islands come after everything.
+	cur := lastPos.end
+	for cur.next != nil {
+		cur = cur.next
+	}
+
+	for _, ti := range m.trapIslands {
+		nop := m.allocateInstr().asNop0WithLabel(ti.l)
+		pos := m.labelPositionPool.GetOrAllocate(int(ti.l))
+		pos.begin, pos.end = nop, nop
+		cur = linkInstr(cur, nop)
+
+		// Reload the execution context stored by the trap site.
+		reload := m.allocateInstr().asMov64MR(
+			newOperandMem(m.newAmodeImmReg(trapIslandCtxOffsetFromRSP, rspVReg)),
+			raxVReg,
+		)
+		cur = linkInstr(cur, reload)
+
+		// Save RSP and the original RBP (before RBP is used as scratch), and
+		// store the exit code.
+		saveRsp, saveRbp, setExitCode := m.allocateExitInstructions(raxVReg, rbpVReg)
+		cur = linkInstr(cur, saveRsp)
+		cur = linkInstr(cur, saveRbp)
+		cur = linkInstr(cur, m.allocateInstr().asImm(rbpVReg, uint64(ti.code), false))
+		cur = linkInstr(cur, setExitCode)
+
+		// Record the address of this exit.
+		addrNop, addrLabel := m.allocateBrTarget()
+		cur = linkInstr(cur, addrNop)
+		cur = linkInstr(cur, m.allocateInstr().asLEA(newOperandLabel(addrLabel), rbpVReg))
+		saveRip := m.allocateInstr().asMovRM(
+			rbpVReg,
+			newOperandMem(m.newAmodeImmReg(wazevoapi.ExecutionContextOffsetGoCallReturnAddress.U32(), raxVReg)),
+			8,
+		)
+		cur = linkInstr(cur, saveRip)
+
+		cur = linkInstr(cur, m.allocateExitSeq(raxVReg))
+	}
+
+	// Extend the last block to cover the islands so that encoding and label
+	// resolution walk over them.
+	lastPos.end = cur
 }
 
 func (m *machine) setupPrologue() {

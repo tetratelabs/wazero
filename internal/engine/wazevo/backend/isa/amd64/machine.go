@@ -89,7 +89,13 @@ type (
 		jmpTableTargets [][]uint32
 		// jmpTableTargetNext is the index to the jmpTableTargets slice to be used for the next jump table.
 		jmpTableTargetsNext int
-		consts              []_const
+
+		// trapIslands are this function's shared conditional-trap exit
+		// sequences, one per exit code, emitted once after register
+		// allocation (see lowerExitIfTrueWithCodeShared and emitTrapIslands).
+		trapIslands []trapIsland
+
+		consts []_const
 
 		constSwizzleMaskConstIndex, constSqmulRoundSatIndex,
 		constI8x16SHLMaskTableIndex, constI8x16LogicalSHRMaskTableIndex,
@@ -181,6 +187,34 @@ func (m *machine) getOrAllocateConstLabel(i *int, _var []byte) label {
 	return m.consts[index].label
 }
 
+// trapIsland is a shared per-function exit sequence for conditional traps
+// with the given exit code, reachable via the label.
+type trapIsland struct {
+	code wazevoapi.ExitCode
+	l    label
+}
+
+// trapIslandCtxOffsetFromRSP is where a conditional-trap site stores the
+// execution context pointer for the island to reload: the word just below
+// the stack pointer (disp32 -16), which holds no live data and cannot be
+// overwritten between the site and the island (no call or push intervenes,
+// and signal handlers run on their own stack).
+const trapIslandCtxOffsetFromRSP uint32 = 0xffff_fff0
+
+// getOrCreateTrapIsland returns the label of this function's shared trap
+// island for the given exit code, allocating it on first use. The island
+// itself is materialized by emitTrapIslands after register allocation.
+func (m *machine) getOrCreateTrapIsland(code wazevoapi.ExitCode) label {
+	for _, ti := range m.trapIslands {
+		if ti.code == code {
+			return ti.l
+		}
+	}
+	l, _ := m.allocateLabel()
+	m.trapIslands = append(m.trapIslands, trapIsland{code: code, l: l})
+	return l
+}
+
 // Reset implements backend.Machine.
 func (m *machine) Reset() {
 	m.consts = m.consts[:0]
@@ -204,6 +238,7 @@ func (m *machine) Reset() {
 	m.perBlockHead, m.perBlockEnd, m.rootInstr = nil, nil, nil
 	m.pendingInstructions = m.pendingInstructions[:0]
 	m.orderedSSABlockLabelPos = m.orderedSSABlockLabelPos[:0]
+	m.trapIslands = m.trapIslands[:0]
 
 	m.amodePool.Reset()
 	m.jmpTableTargetsNext = 0
@@ -1028,7 +1063,14 @@ func (m *machine) LowerInstr(instr *ssa.Instruction) {
 		m.lowerExitWithCode(m.c.VRegOf(execCtx), code)
 	case ssa.OpcodeExitIfTrueWithCode:
 		execCtx, c, code := instr.ExitIfTrueWithCodeData()
-		m.lowerExitIfTrueWithCode(m.c.VRegOf(execCtx), c, code)
+		if instr.SourceOffset().Valid() {
+			// When source offset info is tracked (debug info), keep the exit
+			// sequence inline so the recorded trap address maps back to this
+			// specific site.
+			m.lowerExitIfTrueWithCode(m.c.VRegOf(execCtx), c, code)
+		} else {
+			m.lowerExitIfTrueWithCodeShared(m.c.VRegOf(execCtx), c, code)
+		}
 	case ssa.OpcodeLoad:
 		ptr, offset, typ := instr.LoadData()
 		dst := m.c.VRegOf(instr.Return())
@@ -1602,6 +1644,42 @@ func (m *machine) lowerExitIfTrueWithCode(execCtx regalloc.VReg, cond ssa.Value,
 	m.insert(jmpIf)
 	l := m.lowerExitWithCode(execCtxTmp, code)
 	jmpIf.asJmpIf(condFromSSAIntCmpCond(c).invert(), newOperandLabel(l))
+}
+
+// lowerExitIfTrueWithCodeShared lowers a conditional trap by branching to a
+// per-function trap island shared by all sites trapping with the same exit
+// code, instead of inlining the whole exit sequence at each site. The hot
+// path falls through (the branch is taken only when trapping), and the
+// island is materialized once, after register allocation, by
+// emitTrapIslands.
+func (m *machine) lowerExitIfTrueWithCodeShared(execCtx regalloc.VReg, cond ssa.Value, code wazevoapi.ExitCode) {
+	condDef := m.c.ValueDefinition(cond)
+	if !m.c.MatchInstr(condDef, ssa.OpcodeIcmp) {
+		panic("TODO: ExitIfTrue must come after Icmp at the moment: " + condDef.Instr.Opcode().String())
+	}
+	cvalInstr := condDef.Instr
+	cvalInstr.MarkLowered()
+
+	// The island runs after register allocation and needs the execution
+	// context in a known location; unlike arm64 there is no reserved scratch
+	// register, so it is handed over through the word just below the stack
+	// pointer (see trapIslandCtxOffsetFromRSP).
+	store := m.allocateInstr().asMovRM(
+		execCtx,
+		newOperandMem(m.newAmodeImmReg(trapIslandCtxOffsetFromRSP, rspVReg)),
+		8,
+	)
+	m.insert(store)
+
+	x, y, c := cvalInstr.IcmpData()
+	xx, yy := m.c.ValueDefinition(x), m.c.ValueDefinition(y)
+	if !m.tryLowerBandToFlag(xx, yy) {
+		m.lowerIcmpToFlag(xx, yy, x.Type() == ssa.TypeI64)
+	}
+
+	jmpIf := m.allocateInstr()
+	jmpIf.asJmpIf(condFromSSAIntCmpCond(c), newOperandLabel(m.getOrCreateTrapIsland(code)))
+	m.insert(jmpIf)
 }
 
 func (m *machine) tryLowerBandToFlag(x, y backend.SSAValueDefinition) (ok bool) {
