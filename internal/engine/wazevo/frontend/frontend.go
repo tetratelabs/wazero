@@ -30,6 +30,7 @@ type Compiler struct {
 	tableGrowSig           ssa.Signature
 	refFuncSig             ssa.Signature
 	memmoveSig             ssa.Signature
+	memclrSig              ssa.Signature
 	ensureTermination      bool
 
 	// Followings are reset by per function.
@@ -302,6 +303,13 @@ func (c *Compiler) declareSignatures(listenerOn bool) {
 		Results: []ssa.Type{},
 	}
 	c.ssaBuilder.DeclareSignature(&c.tryTableLeaveSig)
+
+	c.memclrSig = ssa.Signature{
+		ID: c.tryTableLeaveSig.ID + 1,
+		// ptr and the byte count.
+		Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64},
+	}
+	c.ssaBuilder.DeclareSignature(&c.memclrSig)
 }
 
 // SignatureForWasmFunctionType returns the ssa.Signature for the given wasm.FunctionType.

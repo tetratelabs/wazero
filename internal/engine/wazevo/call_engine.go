@@ -144,6 +144,9 @@ type (
 		// localsSaveAreaPtr points to the tryHandler's localsSaveArea slice
 		// backing array. Handlers load locals from this slice.
 		localsSaveAreaPtr uintptr
+		// memclrAddress holds the address of memclrNoHeapPointers implemented
+		// by the Go runtime. See memclr.go.
+		memclrAddress uintptr
 	}
 )
 

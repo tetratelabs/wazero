@@ -745,65 +745,128 @@ func (c *Compiler) lowerCurrentOpcode() {
 			// Calculate the base address:
 			addr := builder.AllocateInstruction().AsIadd(c.getMemoryBaseValue(false), offset).Insert(builder).Return()
 
-			// Uses the copy trick for faster filling buffer, with a maximum chunk size of 8KB.
-			// https://github.com/golang/go/blob/go1.24.0/src/bytes/bytes.go#L664-L673
+			// Fill the region with inline 128-bit stores of the splat byte
+			// pattern: a 64-bytes-per-iteration main loop, a 16-byte loop for
+			// the remainder, and a byte tail. Large zero fills (the dominant
+			// case in practice: buffer clearing) are dispatched to the Go
+			// runtime's memclrNoHeapPointers, which uses the widest stores
+			// the platform has and non-temporal stores for very large sizes.
 			//
-			// 	buf := memoryInst.Buffer[offset : offset+fillSize]
-			// 	buf[0] = value
-			// 	for i := 1; i < fillSize; {
-			// 		chunk := ((i - 1) & 8191) + 1
-			// 		copy(buf[i:], buf[:chunk])
-			// 		i += chunk
+			// 	if fillSize >= 64 {
+			// 		if fillSize >= 1024 && (value&0xff) == 0 {
+			// 			memclr(addr, fillSize); goto done
+			// 		}
 			// 	}
+			// 	pattern := i8x16.splat(value)
+			// 	i := 0
+			// 	for ; i+64 <= fillSize; i += 64 { store128x4(addr+i, pattern) }
+			// 	for ; i+16 <= fillSize; i += 16 { store128(addr+i, pattern) }
+			// 	for ; i < fillSize; i++ { store8(addr+i, value) }
 
-			// Prepare the loop and following block.
-			beforeLoop := builder.AllocateBasicBlock()
-			loopBlk := builder.AllocateBasicBlock()
-			loopVar := loopBlk.AddParam(builder, ssa.TypeI64)
+			gateBlk := builder.AllocateBasicBlock()
+			memclrBlk := builder.AllocateBasicBlock()
+			mainLoopBlk := builder.AllocateBasicBlock()
+			mainLoopVar := mainLoopBlk.AddParam(builder, ssa.TypeI64)
+			midLoopBlk := builder.AllocateBasicBlock()
+			midLoopVar := midLoopBlk.AddParam(builder, ssa.TypeI64)
+			midBodyBlk := builder.AllocateBasicBlock()
+			tailLoopBlk := builder.AllocateBasicBlock()
+			tailLoopVar := tailLoopBlk.AddParam(builder, ssa.TypeI64)
+			tailBodyBlk := builder.AllocateBasicBlock()
 			followingBlk := builder.AllocateBasicBlock()
 
-			// Insert the jump to the beforeLoop block; If the fillSize is zero, then jump to the following block to skip entire logics.
+			// The 128-bit splat pattern, used by all inline store paths.
+			pattern := builder.AllocateInstruction().AsSplat(value, ssa.VecLaneI8x16).Insert(builder).Return()
+
 			zero := builder.AllocateInstruction().AsIconst64(0).Insert(builder).Return()
-			ifFillSizeZero := builder.AllocateInstruction().AsIcmp(fillSize, zero, ssa.IntegerCmpCondEqual).
-				Insert(builder).Return()
-			builder.AllocateInstruction().AsBrnz(ifFillSizeZero, ssa.ValuesNil, followingBlk).Insert(builder)
-			c.insertJumpToBlock(ssa.ValuesNil, beforeLoop)
+			sixtyFour := builder.AllocateInstruction().AsIconst64(64).Insert(builder).Return()
 
-			// buf[0] = value
-			builder.SetCurrentBlock(beforeLoop)
-			builder.AllocateInstruction().AsStore(ssa.OpcodeIstore8, value, addr, 0).Insert(builder)
-			one := builder.AllocateInstruction().AsIconst64(1).Insert(builder).Return()
-			c.insertJumpToBlock(c.allocateVarLengthValues(1, one), loopBlk)
-
-			builder.SetCurrentBlock(loopBlk)
-			dstAddr := builder.AllocateInstruction().AsIadd(addr, loopVar).Insert(builder).Return()
-
-			// chunk := ((i - 1) & 8191) + 1
-			mask := builder.AllocateInstruction().AsIconst64(8191).Insert(builder).Return()
-			tmp1 := builder.AllocateInstruction().AsIsub(loopVar, one).Insert(builder).Return()
-			tmp2 := builder.AllocateInstruction().AsBand(tmp1, mask).Insert(builder).Return()
-			chunk := builder.AllocateInstruction().AsIadd(tmp2, one).Insert(builder).Return()
-
-			// i += chunk
-			newLoopVar := builder.AllocateInstruction().AsIadd(loopVar, chunk).Insert(builder).Return()
-			newLoopVarLessThanFillSize := builder.AllocateInstruction().
-				AsIcmp(newLoopVar, fillSize, ssa.IntegerCmpCondUnsignedLessThan).Insert(builder).Return()
-
-			// count = min(chunk, fillSize-loopVar)
-			diff := builder.AllocateInstruction().AsIsub(fillSize, loopVar).Insert(builder).Return()
-			count := builder.AllocateInstruction().AsSelect(newLoopVarLessThanFillSize, chunk, diff).Insert(builder).Return()
-
-			c.callMemmove(dstAddr, addr, count)
-
+			// Small fills (including zero-length) go straight to the 16-byte
+			// loop, which falls through to the byte tail.
+			fillSizeLessThan64 := builder.AllocateInstruction().
+				AsIcmp(fillSize, sixtyFour, ssa.IntegerCmpCondUnsignedLessThan).Insert(builder).Return()
 			builder.AllocateInstruction().
-				AsBrnz(newLoopVarLessThanFillSize, c.allocateVarLengthValues(1, newLoopVar), loopBlk).
+				AsBrnz(fillSizeLessThan64, c.allocateVarLengthValues(1, zero), midLoopBlk).
 				Insert(builder)
+			c.insertJumpToBlock(ssa.ValuesNil, gateBlk)
 
+			// gate: large zero fills to memclr, everything else inline.
+			builder.SetCurrentBlock(gateBlk)
+			valueU64 := builder.AllocateInstruction().AsUExtend(value, 32, 64).Insert(builder).Return()
+			ff := builder.AllocateInstruction().AsIconst64(0xff).Insert(builder).Return()
+			valueByte := builder.AllocateInstruction().AsBand(valueU64, ff).Insert(builder).Return()
+			valueIsZero := builder.AllocateInstruction().
+				AsIcmp(valueByte, zero, ssa.IntegerCmpCondEqual).Insert(builder).Return()
+			kilo := builder.AllocateInstruction().AsIconst64(1024).Insert(builder).Return()
+			fillSizeBig := builder.AllocateInstruction().
+				AsIcmp(fillSize, kilo, ssa.IntegerCmpCondUnsignedGreaterThanOrEqual).Insert(builder).Return()
+			useMemclr := builder.AllocateInstruction().AsBand(valueIsZero, fillSizeBig).Insert(builder).Return()
+			builder.AllocateInstruction().
+				AsBrnz(useMemclr, ssa.ValuesNil, memclrBlk).
+				Insert(builder)
+			c.insertJumpToBlock(c.allocateVarLengthValues(1, zero), mainLoopBlk)
+
+			builder.SetCurrentBlock(memclrBlk)
+			c.callMemclr(addr, fillSize)
 			c.insertJumpToBlock(ssa.ValuesNil, followingBlk)
+
+			// Main loop: four 16-byte stores per iteration. Only entered
+			// while mainLoopVar+64 <= fillSize, so the stores stay within the
+			// bounds-checked region.
+			builder.SetCurrentBlock(mainLoopBlk)
+			mainDst := builder.AllocateInstruction().AsIadd(addr, mainLoopVar).Insert(builder).Return()
+			builder.AllocateInstruction().AsStore(ssa.OpcodeStore, pattern, mainDst, 0).Insert(builder)
+			builder.AllocateInstruction().AsStore(ssa.OpcodeStore, pattern, mainDst, 16).Insert(builder)
+			builder.AllocateInstruction().AsStore(ssa.OpcodeStore, pattern, mainDst, 32).Insert(builder)
+			builder.AllocateInstruction().AsStore(ssa.OpcodeStore, pattern, mainDst, 48).Insert(builder)
+			newMainLoopVar := builder.AllocateInstruction().AsIadd(mainLoopVar, sixtyFour).Insert(builder).Return()
+			nextMainCeil := builder.AllocateInstruction().AsIadd(newMainLoopVar, sixtyFour).Insert(builder).Return()
+			canContinueMain := builder.AllocateInstruction().
+				AsIcmp(nextMainCeil, fillSize, ssa.IntegerCmpCondUnsignedLessThanOrEqual).Insert(builder).Return()
+			builder.AllocateInstruction().
+				AsBrnz(canContinueMain, c.allocateVarLengthValues(1, newMainLoopVar), mainLoopBlk).
+				Insert(builder)
+			c.insertJumpToBlock(c.allocateVarLengthValues(1, newMainLoopVar), midLoopBlk)
+
+			// 16-byte loop header: run the body while midLoopVar+16 <= fillSize.
+			builder.SetCurrentBlock(midLoopBlk)
+			sixteen := builder.AllocateInstruction().AsIconst64(16).Insert(builder).Return()
+			midCeil := builder.AllocateInstruction().AsIadd(midLoopVar, sixteen).Insert(builder).Return()
+			midDone := builder.AllocateInstruction().
+				AsIcmp(midCeil, fillSize, ssa.IntegerCmpCondUnsignedGreaterThan).Insert(builder).Return()
+			builder.AllocateInstruction().
+				AsBrnz(midDone, c.allocateVarLengthValues(1, midLoopVar), tailLoopBlk).
+				Insert(builder)
+			c.insertJumpToBlock(ssa.ValuesNil, midBodyBlk)
+
+			builder.SetCurrentBlock(midBodyBlk)
+			midDst := builder.AllocateInstruction().AsIadd(addr, midLoopVar).Insert(builder).Return()
+			builder.AllocateInstruction().AsStore(ssa.OpcodeStore, pattern, midDst, 0).Insert(builder)
+			c.insertJumpToBlock(c.allocateVarLengthValues(1, midCeil), midLoopBlk)
+
+			// Byte tail loop header: exit when tailLoopVar reaches fillSize.
+			builder.SetCurrentBlock(tailLoopBlk)
+			tailDone := builder.AllocateInstruction().
+				AsIcmp(tailLoopVar, fillSize, ssa.IntegerCmpCondUnsignedGreaterThanOrEqual).Insert(builder).Return()
+			builder.AllocateInstruction().AsBrnz(tailDone, ssa.ValuesNil, followingBlk).Insert(builder)
+			c.insertJumpToBlock(ssa.ValuesNil, tailBodyBlk)
+
+			builder.SetCurrentBlock(tailBodyBlk)
+			tailDst := builder.AllocateInstruction().AsIadd(addr, tailLoopVar).Insert(builder).Return()
+			builder.AllocateInstruction().AsStore(ssa.OpcodeIstore8, value, tailDst, 0).Insert(builder)
+			one := builder.AllocateInstruction().AsIconst64(1).Insert(builder).Return()
+			newTailLoopVar := builder.AllocateInstruction().AsIadd(tailLoopVar, one).Insert(builder).Return()
+			c.insertJumpToBlock(c.allocateVarLengthValues(1, newTailLoopVar), tailLoopBlk)
+
 			builder.SetCurrentBlock(followingBlk)
 
-			builder.Seal(beforeLoop)
-			builder.Seal(loopBlk)
+			builder.Seal(gateBlk)
+			builder.Seal(memclrBlk)
+			builder.Seal(mainLoopBlk)
+			builder.Seal(midLoopBlk)
+			builder.Seal(midBodyBlk)
+			builder.Seal(tailLoopBlk)
+			builder.Seal(tailBodyBlk)
 			builder.Seal(followingBlk)
 
 		case wasm.OpcodeMiscMemoryInit:
@@ -4376,6 +4439,20 @@ func (c *Compiler) callMemmove(dst, src, size ssa.Value) {
 			ssa.TypeI64,
 		).Insert(builder).Return()
 	builder.AllocateInstruction().AsCallGoRuntimeMemmove(memmovePtr, &c.memmoveSig, args).Insert(builder)
+}
+
+// callMemclr emits a call to the Go runtime's memclrNoHeapPointers through
+// the same mechanism as callMemmove (the isMemmove call handling also covers
+// memclr: both may clobber every vector register).
+func (c *Compiler) callMemclr(ptr, size ssa.Value) {
+	args := c.allocateVarLengthValues(2, ptr, size)
+	builder := c.ssaBuilder
+	memclrPtr := builder.AllocateInstruction().
+		AsLoad(c.execCtxPtrValue,
+			wazevoapi.ExecutionContextOffsetMemclrAddress.U32(),
+			ssa.TypeI64,
+		).Insert(builder).Return()
+	builder.AllocateInstruction().AsCallGoRuntimeMemmove(memclrPtr, &c.memclrSig, args).Insert(builder)
 }
 
 func (c *Compiler) reloadAfterCall() {
