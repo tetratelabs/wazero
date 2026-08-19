@@ -66,6 +66,11 @@ func (m *machine) lowerBrTable(i *ssa.Instruction) {
 	m.insert(brSequence)
 }
 
+var (
+	condBranchFusionMatchesIcmp = [...]ssa.Opcode{ssa.OpcodeIcmp}
+	condBranchFusionMatchesFcmp = [...]ssa.Opcode{ssa.OpcodeFcmp}
+)
+
 // LowerConditionalBranch implements backend.Machine.
 func (m *machine) LowerConditionalBranch(b *ssa.Instruction) {
 	cval, args, targetBlkID := b.BranchData()
@@ -82,7 +87,7 @@ func (m *machine) LowerConditionalBranch(b *ssa.Instruction) {
 	cvalDef := m.compiler.ValueDefinition(cval)
 
 	switch {
-	case m.compiler.MatchInstr(cvalDef, ssa.OpcodeIcmp): // This case, we can use the ALU flag set by SUBS instruction.
+	case m.compiler.MatchPureInstrOneOf(cvalDef, condBranchFusionMatchesIcmp[:]) == ssa.OpcodeIcmp: // This case, we can use the ALU flag set by SUBS instruction.
 		cvalInstr := cvalDef.Instr
 		x, y, c := cvalInstr.IcmpData()
 		cc, signed := condFlagFromSSAIntegerCmpCond(c), c.Signed()
@@ -97,7 +102,7 @@ func (m *machine) LowerConditionalBranch(b *ssa.Instruction) {
 		cbr.asCondBr(cc.asCond(), target, false /* ignored */)
 		m.insert(cbr)
 		cvalDef.Instr.MarkLowered()
-	case m.compiler.MatchInstr(cvalDef, ssa.OpcodeFcmp): // This case we can use the Fpu flag directly.
+	case m.compiler.MatchPureInstrOneOf(cvalDef, condBranchFusionMatchesFcmp[:]) == ssa.OpcodeFcmp: // This case we can use the Fpu flag directly.
 		cvalInstr := cvalDef.Instr
 		x, y, c := cvalInstr.FcmpData()
 		cc := condFlagFromSSAFloatCmpCond(c)
@@ -2038,13 +2043,13 @@ func (m *machine) lowerSelect(c, x, y, result ssa.Value) {
 
 	var cc condFlag
 	switch {
-	case m.compiler.MatchInstr(cvalDef, ssa.OpcodeIcmp): // This case, we can use the ALU flag set by SUBS instruction.
+	case m.compiler.MatchPureInstrOneOf(cvalDef, condBranchFusionMatchesIcmp[:]) == ssa.OpcodeIcmp: // This case, we can use the ALU flag set by SUBS instruction.
 		cvalInstr := cvalDef.Instr
 		x, y, c := cvalInstr.IcmpData()
 		cc = condFlagFromSSAIntegerCmpCond(c)
 		m.lowerIcmpToFlag(x, y, c.Signed())
 		cvalDef.Instr.MarkLowered()
-	case m.compiler.MatchInstr(cvalDef, ssa.OpcodeFcmp): // This case we can use the Fpu flag directly.
+	case m.compiler.MatchPureInstrOneOf(cvalDef, condBranchFusionMatchesFcmp[:]) == ssa.OpcodeFcmp: // This case we can use the Fpu flag directly.
 		cvalInstr := cvalDef.Instr
 		x, y, c := cvalInstr.FcmpData()
 		cc = condFlagFromSSAFloatCmpCond(c)

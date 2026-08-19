@@ -105,6 +105,8 @@ func TestMachine_LowerConditionalBranch(t *testing.T) {
 				icmp.AsIcmp(v1, v2, ssa.IntegerCmpCondEqual)
 				builder.InsertInstruction(icmp)
 				icmpVal := icmp.Return()
+				ctx.definitions[v1] = backend.SSAValueDefinition{V: v1}
+				ctx.definitions[v2] = backend.SSAValueDefinition{V: v2}
 				ctx.definitions[icmpVal] = backend.SSAValueDefinition{Instr: icmp, V: icmpVal}
 				ctx.vRegMap[v1], ctx.vRegMap[v2], ctx.vRegMap[icmpVal] = intToVReg(1), intToVReg(2), intToVReg(3)
 
@@ -112,13 +114,18 @@ func TestMachine_LowerConditionalBranch(t *testing.T) {
 				brz.AsBrz(icmpVal, ssa.ValuesNil, builder.AllocateBasicBlock())
 				builder.InsertInstruction(brz)
 
-				// Indicate that currently compiling in the different group.
+				// Indicate that currently compiling in the different group:
+				// pure comparisons now fuse into the branch across group
+				// boundaries (their evaluation is sunk to the branch site).
 				ctx.currentGID = 1000
 				return brz, func(t *testing.T) {
-					require.False(t, icmp.Lowered())
+					require.True(t, icmp.Lowered())
 				}
 			},
-			instructions: []string{"cbz w3?, (L1)"},
+			instructions: []string{
+				"subs xzr, x1?, x2?",
+				"b.ne L1",
+			},
 		},
 		{
 			name: "brz / icmp in the same group / params",

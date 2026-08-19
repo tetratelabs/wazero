@@ -87,6 +87,16 @@ type Compiler interface {
 	// Note: caller should be careful to avoid excessive allocation on opcodes slice.
 	MatchInstrOneOf(def SSAValueDefinition, opcodes []ssa.Opcode) ssa.Opcode
 
+	// MatchPureInstrOneOf is like MatchInstrOneOf but without the
+	// instruction-group restriction. It must only be used with pure
+	// (side-effect-free, non-trapping) opcodes whose evaluation can be sunk
+	// to the matching site regardless of intervening side effects, e.g. an
+	// integer comparison sunk into the conditional branch that consumes it.
+	// The not-yet-lowered check keeps this sound under any lowering order:
+	// if the definition was already materialized elsewhere, the match fails
+	// and the caller falls back to using the materialized value.
+	MatchPureInstrOneOf(def SSAValueDefinition, opcodes []ssa.Opcode) ssa.Opcode
+
 	// AddRelocationInfo appends the relocation information for the function reference at the current buffer offset.
 	AddRelocationInfo(funcRef ssa.FuncRef, isTailCall bool)
 
@@ -309,6 +319,27 @@ func (c *compiler) MatchInstr(def SSAValueDefinition, opcode ssa.Opcode) bool {
 		instr.Opcode() == opcode &&
 		instr.GroupID() == c.currentGID &&
 		def.RefCount < 2
+}
+
+// MatchPureInstrOneOf implements Compiler.MatchPureInstrOneOf.
+func (c *compiler) MatchPureInstrOneOf(def SSAValueDefinition, opcodes []ssa.Opcode) ssa.Opcode {
+	instr := def.Instr
+	if !def.IsFromInstr() {
+		return ssa.OpcodeInvalid
+	}
+	if def.RefCount >= 2 {
+		return ssa.OpcodeInvalid
+	}
+	if instr.Lowered() {
+		return ssa.OpcodeInvalid
+	}
+	opcode := instr.Opcode()
+	for _, op := range opcodes {
+		if opcode == op {
+			return opcode
+		}
+	}
+	return ssa.OpcodeInvalid
 }
 
 // MatchInstrOneOf implements Compiler.MatchInstrOneOf.

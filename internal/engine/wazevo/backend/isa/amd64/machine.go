@@ -437,7 +437,7 @@ func (m *machine) LowerConditionalBranch(b *ssa.Instruction) {
 	target := ssaBlockLabel(m.c.SSABuilder().BasicBlock(targetBlkID))
 	cvalDef := m.c.ValueDefinition(cval)
 
-	switch m.c.MatchInstrOneOf(cvalDef, condBranchMatches[:]) {
+	switch m.c.MatchPureInstrOneOf(cvalDef, condBranchMatches[:]) {
 	case ssa.OpcodeIcmp:
 		cvalInstr := cvalDef.Instr
 		x, y, c := cvalInstr.IcmpData()
@@ -1316,7 +1316,7 @@ func (m *machine) lowerSelect(x, y, cval, ret ssa.Value) {
 
 	var cond cond
 	cvalDef := m.c.ValueDefinition(cval)
-	switch m.c.MatchInstrOneOf(cvalDef, condBranchMatches[:]) {
+	switch m.c.MatchPureInstrOneOf(cvalDef, condBranchMatches[:]) {
 	case ssa.OpcodeIcmp:
 		icmp := cvalDef.Instr
 		xc, yc, cc := icmp.IcmpData()
