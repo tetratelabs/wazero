@@ -745,65 +745,93 @@ func (c *Compiler) lowerCurrentOpcode() {
 			// Calculate the base address:
 			addr := builder.AllocateInstruction().AsIadd(c.getMemoryBaseValue(false), offset).Insert(builder).Return()
 
-			// Uses the copy trick for faster filling buffer, with a maximum chunk size of 8KB.
-			// https://github.com/golang/go/blob/go1.24.0/src/bytes/bytes.go#L664-L673
+			// Fill the region with inline stores: a 32-bytes-per-iteration
+			// main loop of four 8-byte stores of the broadcast byte pattern,
+			// then a byte tail loop. This keeps the fill entirely inside the
+			// generated code (no per-chunk calls into the Go runtime) and,
+			// unlike the previous copy-doubling approach, only writes the
+			// region instead of re-reading previously written chunks.
 			//
-			// 	buf := memoryInst.Buffer[offset : offset+fillSize]
-			// 	buf[0] = value
-			// 	for i := 1; i < fillSize; {
-			// 		chunk := ((i - 1) & 8191) + 1
-			// 		copy(buf[i:], buf[:chunk])
-			// 		i += chunk
+			// 	pattern := u64(value&0xff) * 0x0101010101010101
+			// 	i := 0
+			// 	for ; i+32 <= fillSize; i += 32 {
+			// 		store64(addr+i, pattern); store64(addr+i+8, pattern)
+			// 		store64(addr+i+16, pattern); store64(addr+i+24, pattern)
+			// 	}
+			// 	for ; i < fillSize; i++ {
+			// 		store8(addr+i, value)
 			// 	}
 
-			// Prepare the loop and following block.
-			beforeLoop := builder.AllocateBasicBlock()
-			loopBlk := builder.AllocateBasicBlock()
-			loopVar := loopBlk.AddParam(builder, ssa.TypeI64)
+			prepBlk := builder.AllocateBasicBlock()
+			mainLoopBlk := builder.AllocateBasicBlock()
+			mainLoopVar := mainLoopBlk.AddParam(builder, ssa.TypeI64)
+			tailLoopBlk := builder.AllocateBasicBlock()
+			tailLoopVar := tailLoopBlk.AddParam(builder, ssa.TypeI64)
+			tailBodyBlk := builder.AllocateBasicBlock()
 			followingBlk := builder.AllocateBasicBlock()
 
-			// Insert the jump to the beforeLoop block; If the fillSize is zero, then jump to the following block to skip entire logics.
+			// If fillSize == 0, skip everything.
 			zero := builder.AllocateInstruction().AsIconst64(0).Insert(builder).Return()
 			ifFillSizeZero := builder.AllocateInstruction().AsIcmp(fillSize, zero, ssa.IntegerCmpCondEqual).
 				Insert(builder).Return()
 			builder.AllocateInstruction().AsBrnz(ifFillSizeZero, ssa.ValuesNil, followingBlk).Insert(builder)
-			c.insertJumpToBlock(ssa.ValuesNil, beforeLoop)
+			c.insertJumpToBlock(ssa.ValuesNil, prepBlk)
 
-			// buf[0] = value
-			builder.SetCurrentBlock(beforeLoop)
-			builder.AllocateInstruction().AsStore(ssa.OpcodeIstore8, value, addr, 0).Insert(builder)
-			one := builder.AllocateInstruction().AsIconst64(1).Insert(builder).Return()
-			c.insertJumpToBlock(c.allocateVarLengthValues(1, one), loopBlk)
-
-			builder.SetCurrentBlock(loopBlk)
-			dstAddr := builder.AllocateInstruction().AsIadd(addr, loopVar).Insert(builder).Return()
-
-			// chunk := ((i - 1) & 8191) + 1
-			mask := builder.AllocateInstruction().AsIconst64(8191).Insert(builder).Return()
-			tmp1 := builder.AllocateInstruction().AsIsub(loopVar, one).Insert(builder).Return()
-			tmp2 := builder.AllocateInstruction().AsBand(tmp1, mask).Insert(builder).Return()
-			chunk := builder.AllocateInstruction().AsIadd(tmp2, one).Insert(builder).Return()
-
-			// i += chunk
-			newLoopVar := builder.AllocateInstruction().AsIadd(loopVar, chunk).Insert(builder).Return()
-			newLoopVarLessThanFillSize := builder.AllocateInstruction().
-				AsIcmp(newLoopVar, fillSize, ssa.IntegerCmpCondUnsignedLessThan).Insert(builder).Return()
-
-			// count = min(chunk, fillSize-loopVar)
-			diff := builder.AllocateInstruction().AsIsub(fillSize, loopVar).Insert(builder).Return()
-			count := builder.AllocateInstruction().AsSelect(newLoopVarLessThanFillSize, chunk, diff).Insert(builder).Return()
-
-			c.callMemmove(dstAddr, addr, count)
-
+			builder.SetCurrentBlock(prepBlk)
+			// pattern = u64(value & 0xff) * 0x0101010101010101.
+			valueU64 := builder.AllocateInstruction().AsUExtend(value, 32, 64).Insert(builder).Return()
+			ff := builder.AllocateInstruction().AsIconst64(0xff).Insert(builder).Return()
+			valueByte := builder.AllocateInstruction().AsBand(valueU64, ff).Insert(builder).Return()
+			broadcast := builder.AllocateInstruction().AsIconst64(0x0101010101010101).Insert(builder).Return()
+			pattern := builder.AllocateInstruction().AsImul(valueByte, broadcast).Insert(builder).Return()
+			thirtyTwo := builder.AllocateInstruction().AsIconst64(32).Insert(builder).Return()
+			// Enter the main loop only if fillSize >= 32.
+			fillSizeLessThan32 := builder.AllocateInstruction().
+				AsIcmp(fillSize, thirtyTwo, ssa.IntegerCmpCondUnsignedLessThan).Insert(builder).Return()
 			builder.AllocateInstruction().
-				AsBrnz(newLoopVarLessThanFillSize, c.allocateVarLengthValues(1, newLoopVar), loopBlk).
+				AsBrnz(fillSizeLessThan32, c.allocateVarLengthValues(1, zero), tailLoopBlk).
 				Insert(builder)
+			c.insertJumpToBlock(c.allocateVarLengthValues(1, zero), mainLoopBlk)
 
-			c.insertJumpToBlock(ssa.ValuesNil, followingBlk)
+			// Main loop: four 8-byte stores per iteration. The loop is only
+			// entered while mainLoopVar+32 <= fillSize, so the stores stay
+			// within the bounds-checked region.
+			builder.SetCurrentBlock(mainLoopBlk)
+			mainDst := builder.AllocateInstruction().AsIadd(addr, mainLoopVar).Insert(builder).Return()
+			builder.AllocateInstruction().AsStore(ssa.OpcodeStore, pattern, mainDst, 0).Insert(builder)
+			builder.AllocateInstruction().AsStore(ssa.OpcodeStore, pattern, mainDst, 8).Insert(builder)
+			builder.AllocateInstruction().AsStore(ssa.OpcodeStore, pattern, mainDst, 16).Insert(builder)
+			builder.AllocateInstruction().AsStore(ssa.OpcodeStore, pattern, mainDst, 24).Insert(builder)
+			newMainLoopVar := builder.AllocateInstruction().AsIadd(mainLoopVar, thirtyTwo).Insert(builder).Return()
+			nextCeil := builder.AllocateInstruction().AsIadd(newMainLoopVar, thirtyTwo).Insert(builder).Return()
+			canContinueMain := builder.AllocateInstruction().
+				AsIcmp(nextCeil, fillSize, ssa.IntegerCmpCondUnsignedLessThanOrEqual).Insert(builder).Return()
+			builder.AllocateInstruction().
+				AsBrnz(canContinueMain, c.allocateVarLengthValues(1, newMainLoopVar), mainLoopBlk).
+				Insert(builder)
+			c.insertJumpToBlock(c.allocateVarLengthValues(1, newMainLoopVar), tailLoopBlk)
+
+			// Tail loop header: exit when tailLoopVar reaches fillSize.
+			builder.SetCurrentBlock(tailLoopBlk)
+			tailDone := builder.AllocateInstruction().
+				AsIcmp(tailLoopVar, fillSize, ssa.IntegerCmpCondUnsignedGreaterThanOrEqual).Insert(builder).Return()
+			builder.AllocateInstruction().AsBrnz(tailDone, ssa.ValuesNil, followingBlk).Insert(builder)
+			c.insertJumpToBlock(ssa.ValuesNil, tailBodyBlk)
+
+			// Tail loop body: one byte store, then back to the header.
+			builder.SetCurrentBlock(tailBodyBlk)
+			tailDst := builder.AllocateInstruction().AsIadd(addr, tailLoopVar).Insert(builder).Return()
+			builder.AllocateInstruction().AsStore(ssa.OpcodeIstore8, value, tailDst, 0).Insert(builder)
+			one := builder.AllocateInstruction().AsIconst64(1).Insert(builder).Return()
+			newTailLoopVar := builder.AllocateInstruction().AsIadd(tailLoopVar, one).Insert(builder).Return()
+			c.insertJumpToBlock(c.allocateVarLengthValues(1, newTailLoopVar), tailLoopBlk)
+
 			builder.SetCurrentBlock(followingBlk)
 
-			builder.Seal(beforeLoop)
-			builder.Seal(loopBlk)
+			builder.Seal(prepBlk)
+			builder.Seal(mainLoopBlk)
+			builder.Seal(tailLoopBlk)
+			builder.Seal(tailBodyBlk)
 			builder.Seal(followingBlk)
 
 		case wasm.OpcodeMiscMemoryInit:
