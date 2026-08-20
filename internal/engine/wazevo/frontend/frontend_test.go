@@ -257,48 +257,82 @@ signatures:
 	sig2: i64_v
 
 blk0: (exec_ctx:i64, module_ctx:i64)
-	Jump blk1
-
-blk1: () <-- (blk0,blk4,blk3)
-	v2:i64 = Load exec_ctx, 0x4e0
+	v2:i64 = Load exec_ctx, 0x4e8
 	v3:i64 = Load v2, 0x0
 	v4:i64 = Iconst_64 0x0
 	v5:i32 = Icmp neq, v3, v4
-	Brnz v5, blk3
-	Jump blk4
+	Brnz v5, blk1
+	Jump blk2
 
-blk2: ()
+blk1: () <-- (blk0)
+	v11:i64 = Load exec_ctx, 0x58
+	CallIndirect v11:sig2, exec_ctx
+	Jump blk2
 
-blk3: () <-- (blk1)
-	v6:i64 = Load exec_ctx, 0x58
-	CallIndirect v6:sig2, exec_ctx
-	Jump blk1
+blk2: () <-- (blk0,blk1)
+	Jump blk3
 
-blk4: () <-- (blk1)
-	Jump blk1
+blk3: () <-- (blk2,blk6)
+	v6:i64 = Load exec_ctx, 0x4e8
+	v7:i64 = Load v6, 0x0
+	v8:i64 = Iconst_64 0x0
+	v9:i32 = Icmp neq, v7, v8
+	Brnz v9, blk5
+	Jump blk6
+
+blk4: ()
+
+blk5: () <-- (blk3)
+	v10:i64 = Load exec_ctx, 0x58
+	CallIndirect v10:sig2, exec_ctx
+	Jump blk6
+
+blk6: () <-- (blk3,blk5)
+	Jump blk3
 `,
+			// Both checks have the same shape: test, cold block last, rejoin the body.
+			// blk7 and blk8 are split critical edges; both are empty fallthroughs.
 			expAfterPasses: `
 signatures:
 	sig2: i64_v
 
 blk0: (exec_ctx:i64, module_ctx:i64)
-	Jump fallthrough
-
-blk1: () <-- (blk0,blk4,blk3)
-	v2:i64 = Load exec_ctx, 0x4e0
+	v2:i64 = Load exec_ctx, 0x4e8
 	v3:i64 = Load v2, 0x0
 	v4:i64 = Iconst_64 0x0
 	v5:i32 = Icmp neq, v3, v4
-	Brnz v5, blk3
+	Brnz v5, blk1
 	Jump fallthrough
 
-blk4: () <-- (blk1)
-	Jump blk1
+blk7: () <-- (blk0)
+	Jump fallthrough
 
-blk3: () <-- (blk1)
-	v6:i64 = Load exec_ctx, 0x58
-	CallIndirect v6:sig2, exec_ctx
-	Jump blk1
+blk2: () <-- (blk7,blk1)
+	Jump fallthrough
+
+blk3: () <-- (blk2,blk6)
+	v6:i64 = Load exec_ctx, 0x4e8
+	v7:i64 = Load v6, 0x0
+	v8:i64 = Iconst_64 0x0
+	v9:i32 = Icmp neq, v7, v8
+	Brnz v9, blk5
+	Jump fallthrough
+
+blk8: () <-- (blk3)
+	Jump fallthrough
+
+blk6: () <-- (blk8,blk5)
+	Jump blk3
+
+blk5: () <-- (blk3)
+	v10:i64 = Load exec_ctx, 0x58
+	CallIndirect v10:sig2, exec_ctx
+	Jump blk6
+
+blk1: () <-- (blk0)
+	v11:i64 = Load exec_ctx, 0x58
+	CallIndirect v11:sig2, exec_ctx
+	Jump blk2
 `,
 		},
 		{
