@@ -2460,7 +2460,7 @@ var useKinds = [instrMax]useKind{
 	fcvtToSintSequence:     useKindFcvtToSintSequence,
 	defineUninitializedReg: useKindNone,
 	fcvtToUintSequence:     useKindFcvtToUintSequence,
-	xmmCMov:                useKindOp1,
+	xmmCMov:                useKindOp1Op2Reg,
 	idivRemSequence:        useKindDivRem,
 	blendvpd:               useKindBlendvpd,
 	mfence:                 useKindNone,
