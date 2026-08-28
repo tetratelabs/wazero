@@ -19,9 +19,13 @@ var version string
 // then this returns "0.1.2-12314124-abcd".
 //
 // Note: this is tested in ./testdata/main_test.go with a separate go.mod to pretend as the wazero user.
-func GetWazeroVersion() (ret string) {
+func GetWazeroVersion() string {
+	return version
+}
+
+func init() {
 	if len(version) != 0 {
-		return version
+		return
 	}
 
 	info, ok := debug.ReadBuildInfo()
@@ -29,22 +33,18 @@ func GetWazeroVersion() (ret string) {
 		for _, dep := range info.Deps {
 			// Note: here's the assumption that wazero is imported as github.com/tetratelabs/wazero.
 			if strings.Contains(dep.Path, "github.com/tetratelabs/wazero") {
-				ret = dep.Version
+				version = dep.Version
 			}
 		}
 
 		// In wazero CLI, wazero is a main module, so we have to get the version info from info.Main.
-		if versionMissing(ret) {
-			ret = info.Main.Version
+		if versionMissing(version) {
+			version = info.Main.Version
 		}
 	}
-	if versionMissing(ret) {
-		return Default // don't return parens
+	if versionMissing(version) {
+		version = Default // don't return parens
 	}
-
-	// Cache for the subsequent calls.
-	version = ret
-	return ret
 }
 
 func versionMissing(ret string) bool {
