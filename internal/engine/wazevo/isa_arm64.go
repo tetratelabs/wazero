@@ -13,8 +13,8 @@ func newMachine() backend.Machine {
 
 // unwindStack is a function to unwind the stack, and appends return addresses to `returnAddresses` slice.
 // The implementation must be aligned with the ABI/Calling convention.
-func unwindStack(sp, fp, top uintptr, returnAddresses []uintptr) []uintptr {
-	return arm64.UnwindStack(sp, fp, top, returnAddresses)
+func unwindStack(sp, fp, top uintptr, returnAddresses []uintptr, maxFrames int) []uintptr {
+	return arm64.UnwindStack(sp, fp, top, returnAddresses, maxFrames)
 }
 
 // goCallStackView is a function to get a view of the stack before a Go call, which

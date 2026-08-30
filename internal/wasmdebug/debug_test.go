@@ -117,6 +117,37 @@ wasm stack trace:
 	x.y()`,
 			expectUnwrap: wasmruntime.ErrRuntimeStackOverflow,
 		},
+		{
+			name: "section",
+			build: func(builder ErrorBuilder) error {
+				builder.AddFrame("x.y", nil, nil, nil)
+				builder.StartSection(ExceptionOriginSection)
+				builder.AddFrame("x.a", nil, nil, []string{"a.go:1:1"})
+				builder.AddFrame("x.b", nil, nil, nil)
+				return builder.FromRecovered(wasmruntime.ErrRuntimeUncaughtException)
+			},
+			expectedErr: `wasm error: uncaught exception
+wasm stack trace:
+	x.y()
+originally thrown at:
+	x.a()
+		a.go:1:1
+	x.b()`,
+			expectUnwrap: wasmruntime.ErrRuntimeUncaughtException,
+		},
+		{
+			// A section nothing was added to says nothing, so it should not be printed.
+			name: "empty section",
+			build: func(builder ErrorBuilder) error {
+				builder.AddFrame("x.y", nil, nil, nil)
+				builder.StartSection(ExceptionOriginSection)
+				return builder.FromRecovered(wasmruntime.ErrRuntimeUncaughtException)
+			},
+			expectedErr: `wasm error: uncaught exception
+wasm stack trace:
+	x.y()`,
+			expectUnwrap: wasmruntime.ErrRuntimeUncaughtException,
+		},
 	}
 
 	for _, tt := range tests {

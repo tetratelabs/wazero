@@ -52,16 +52,39 @@ func TestModuleInstance_LookupFunction(t *testing.T) {
 	})
 
 	t.Run("wasm", func(t *testing.T) {
+		// The looked up index has to be one the defining module actually declares: the
+		// lookup consults its signature to decide whether the host may call it at all.
+		wasmModule := &Module{
+			TypeSection:     []FunctionType{{}},
+			FunctionSection: []Index{0, 0, 0},
+			CodeSection:     []Code{{}, {}, {}},
+		}
 		me.lookupEntries[2] = mockModuleEngineLookupEntry{
-			m: &ModuleInstance{
-				Source: &Module{},
-				Engine: me,
-			},
-			index: 100,
+			m:     &ModuleInstance{Source: wasmModule, Engine: me},
+			index: 2,
 		}
 		wf, ok := m.LookupFunction(nil, 0, 2).(*mockCallEngine)
 		require.True(t, ok)
-		require.Equal(t, Index(100), wf.index)
+		require.Equal(t, Index(2), wf.index)
+	})
+
+	t.Run("wasm with an exnref in its signature", func(t *testing.T) {
+		// Not callable from the host, so the lookup hands back something that says so
+		// rather than the engine's own call engine. See hostCallable.
+		wasmModule := &Module{
+			TypeSection:     []FunctionType{{Params: []ValueType{ValueTypeExnref}}},
+			FunctionSection: []Index{0},
+			CodeSection:     []Code{{}},
+		}
+		me.lookupEntries[3] = mockModuleEngineLookupEntry{
+			m:     &ModuleInstance{Source: wasmModule, Engine: me},
+			index: 0,
+		}
+		uf, ok := m.LookupFunction(nil, 0, 3).(*uncallableFunction)
+		require.True(t, ok)
+		_, err := uf.Call(context.Background(), 0)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "exnref in its signature")
 	})
 }
 

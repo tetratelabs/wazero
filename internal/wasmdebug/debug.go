@@ -100,6 +100,13 @@ type ErrorBuilder interface {
 	// Note: paramTypes and resultTypes are present because signature misunderstanding, mismatch or overflow are common.
 	AddFrame(funcName string, paramTypes, resultTypes []api.ValueType, sources []string)
 
+	// StartSection begins a group of frames printed under its own header, for frames that
+	// are not part of the stack the error happened on. The frame budget starts over, so a
+	// long main trace cannot crowd a section out.
+	//
+	// header is printed followed by a colon, e.g. "originally thrown at".
+	StartSection(header string)
+
 	// FromRecovered returns an error with the wasm stack trace appended to it.
 	FromRecovered(recovered interface{}) error
 }
@@ -109,10 +116,19 @@ func NewErrorBuilder() ErrorBuilder {
 }
 
 type stackTrace struct {
-	// frameCount is the number of stack frame currently pushed into lines.
+	// frameCount is the number of stack frame currently pushed into the section being built.
 	frameCount int
 	// lines contains the stack trace and possibly the inlined source code information.
 	lines []string
+	// sections contains the groups started with StartSection, in order. Frames go to the
+	// last one once there is one, so lines holds the main trace alone.
+	sections []traceSection
+}
+
+// traceSection is a group of frames printed under its own header. See StartSection.
+type traceSection struct {
+	header string
+	lines  []string
 }
 
 // GoRuntimeErrorTracePrefix is the prefix coming before the Go runtime stack trace included in the face of runtime.Error.
@@ -128,7 +144,7 @@ func (s *stackTrace) FromRecovered(recovered interface{}) error {
 		return exitErr
 	}
 
-	stack := strings.Join(s.lines, "\n\t")
+	stack := s.trace()
 
 	// If the error was internal, don't mention it was recovered.
 	if wasmErr, ok := recovered.(*wasmruntime.Error); ok {
@@ -153,6 +169,39 @@ func (s *stackTrace) FromRecovered(recovered interface{}) error {
 // MaxFrames is the maximum number of frames to include in the stack trace.
 const MaxFrames = 30
 
+// ExceptionOriginSection is the StartSection header under which an uncaught exception
+// reports where it was first thrown, when that differs from where it was last thrown.
+const ExceptionOriginSection = "originally thrown at"
+
+// trace renders the main trace, then each section under its own header. The caller supplies
+// the main trace's header, so it is joined the way it always was.
+func (s *stackTrace) trace() string {
+	trace := strings.Join(s.lines, "\n\t")
+	for i := range s.sections {
+		sec := &s.sections[i]
+		if len(sec.lines) == 0 {
+			continue
+		}
+		trace += "\n" + sec.header + ":\n\t" + strings.Join(sec.lines, "\n\t")
+	}
+	return trace
+}
+
+// StartSection implements ErrorBuilder.StartSection
+func (s *stackTrace) StartSection(header string) {
+	s.sections = append(s.sections, traceSection{header: header})
+	s.frameCount = 0
+}
+
+// appendLine adds a line to whichever section is being built.
+func (s *stackTrace) appendLine(line string) {
+	if n := len(s.sections); n > 0 {
+		s.sections[n-1].lines = append(s.sections[n-1].lines, line)
+		return
+	}
+	s.lines = append(s.lines, line)
+}
+
 // AddFrame implements ErrorBuilder.AddFrame
 func (s *stackTrace) AddFrame(funcName string, paramTypes, resultTypes []api.ValueType, sources []string) {
 	if s.frameCount == MaxFrames {
@@ -160,11 +209,11 @@ func (s *stackTrace) AddFrame(funcName string, paramTypes, resultTypes []api.Val
 	}
 	s.frameCount++
 	sig := signature(funcName, paramTypes, resultTypes)
-	s.lines = append(s.lines, sig)
+	s.appendLine(sig)
 	for _, source := range sources {
-		s.lines = append(s.lines, "\t"+source)
+		s.appendLine("\t" + source)
 	}
 	if s.frameCount == MaxFrames {
-		s.lines = append(s.lines, "... maybe followed by omitted frames")
+		s.appendLine("... maybe followed by omitted frames")
 	}
 }

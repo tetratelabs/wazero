@@ -132,6 +132,12 @@ func addFuncs(
 		if typeErr != nil {
 			return fmt.Errorf("func[%s] %v", debugName, typeErr)
 		}
+		// A host function is only ever entered from wasm and left back into it, so an exnref
+		// in its signature would be a handle handed to, or taken from, code with no way to
+		// resolve one. See ExnrefInSignature.
+		if ExnrefInSignature(&m.TypeSection[typeIdx]) {
+			return fmt.Errorf("func[%s] has an exnref in its signature, which a host function may not", debugName)
+		}
 		m.FunctionSection = append(m.FunctionSection, typeIdx)
 		m.CodeSection = append(m.CodeSection, hf.Code)
 

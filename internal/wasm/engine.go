@@ -39,6 +39,10 @@ type ModuleEngine interface {
 	// DoneInstantiation is called at the end of the instantiation of the module.
 	DoneInstantiation()
 
+	// ModuleClosed is called once, when the module instance is closed, so that the engine
+	// can drop what the instance's own state was keeping alive.
+	ModuleClosed()
+
 	// NewFunction returns an api.Function for the given function pointed by the given Index.
 	NewFunction(index Index) api.Function
 

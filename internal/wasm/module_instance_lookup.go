@@ -29,7 +29,8 @@ func (m *ModuleInstance) LookupFunction(t *TableInstance, typeId FunctionTypeID,
 			panic(fmt.Sprintf("unexpected GoFunc type: %T", goF))
 		}
 	} else {
-		return fm.Engine.NewFunction(index)
+		// The table can hold a function the host has no way to call, the same as an export can.
+		return hostCallable(fm.Source.FunctionDefinition(index), fm.Engine.NewFunction(index))
 	}
 }
 

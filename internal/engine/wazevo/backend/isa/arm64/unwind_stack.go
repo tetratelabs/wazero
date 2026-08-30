@@ -4,12 +4,11 @@ import (
 	"encoding/binary"
 	"reflect"
 	"unsafe"
-
-	"github.com/tetratelabs/wazero/internal/wasmdebug"
 )
 
 // UnwindStack implements wazevo.unwindStack.
-func UnwindStack(sp, _, top uintptr, returnAddresses []uintptr) []uintptr {
+// maxFrames bounds how many frames are walked; a non-positive value walks the whole stack.
+func UnwindStack(sp, _, top uintptr, returnAddresses []uintptr, maxFrames int) []uintptr {
 	l := int(top - sp)
 
 	var stackBuf []byte
@@ -57,7 +56,7 @@ func UnwindStack(sp, _, top uintptr, returnAddresses []uintptr) []uintptr {
 		sizeOfArgRet := binary.LittleEndian.Uint64(stackBuf[i:])
 		i += 8 + sizeOfArgRet
 		returnAddresses = append(returnAddresses, uintptr(retAddr))
-		if len(returnAddresses) == wasmdebug.MaxFrames {
+		if maxFrames > 0 && len(returnAddresses) == maxFrames {
 			break
 		}
 	}

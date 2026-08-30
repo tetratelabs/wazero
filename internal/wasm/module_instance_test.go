@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -257,6 +258,98 @@ func TestModuleInstance_CallDynamic(t *testing.T) {
 		// Verify our intended side-effect
 		_, ok := fsCtx.LookupFile(3)
 		require.False(t, ok, "expected no opened files")
+	})
+}
+
+// countingCloseEngine counts how many times an instance told its engine it closed.
+type countingCloseEngine struct {
+	ModuleEngine
+	closed atomic.Int32
+}
+
+func (e *countingCloseEngine) ModuleClosed() { e.closed.Add(1) }
+
+// TestModuleInstance_ModuleClosed covers the engine's close notification, which has to
+// arrive exactly once per instance however the instance was closed. An engine holds state
+// keyed to the instance -- the exnrefs its globals and tables name, counted in a store
+// shared with every other instance -- and drops it here, so a missed notification leaks it
+// and a repeated one drops it twice, taking an exception another instance still names.
+func TestModuleInstance_ModuleClosed(t *testing.T) {
+	s := newStore()
+	newInstance := func(t *testing.T) (*ModuleInstance, *countingCloseEngine) {
+		m, err := s.Instantiate(testCtx, &Module{}, t.Name(), nil, nil)
+		require.NoError(t, err)
+		eng := &countingCloseEngine{ModuleEngine: m.Engine}
+		m.Engine = eng
+		require.Equal(t, int32(0), eng.closed.Load())
+		return m, eng
+	}
+
+	for _, tt := range []struct {
+		name  string
+		close func(*testing.T, *ModuleInstance)
+	}{
+		{
+			// What api.Module.Close reaches.
+			name:  "Close",
+			close: func(t *testing.T, m *ModuleInstance) { require.NoError(t, m.Close(testCtx)) },
+		},
+		{
+			// What api.Module.CloseWithExitCode and CloseWithCtxErr reach.
+			name: "CloseWithExitCode",
+			close: func(t *testing.T, m *ModuleInstance) {
+				require.NoError(t, m.CloseWithExitCode(testCtx, 255))
+			},
+		},
+		{
+			// What Store.CloseWithExitCode, and so Runtime.Close, reaches.
+			name: "closeWithExitCode",
+			close: func(t *testing.T, m *ModuleInstance) {
+				require.NoError(t, m.closeWithExitCode(testCtx, 0))
+			},
+		},
+	} {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			m, eng := newInstance(t)
+			tc.close(t, m)
+			require.Equal(t, int32(1), eng.closed.Load())
+
+			// Closing an already closed module is not an error, and says nothing new.
+			tc.close(t, m)
+			require.Equal(t, int32(1), eng.closed.Load())
+		})
+	}
+
+	// CloseModuleOnCanceledOrTimeout defers the closure of resources to FailIfClosed, which
+	// every later call into the module reaches -- and which never clears the flag that sends
+	// it there. So this is the path where one close can notify more than once.
+	t.Run("deferred resource closure", func(t *testing.T) {
+		m, eng := newInstance(t)
+		require.NoError(t, m.closeWithExitCodeWithoutClosingResource(255))
+
+		const calls = 3
+		for i := 0; i < calls; i++ {
+			require.Error(t, m.FailIfClosed())
+		}
+		require.Equal(t, int32(1), eng.closed.Load(),
+			"notified once per FailIfClosed after %d calls: ensureResourcesClosed runs again "+
+				"every time and the notification is the one step in it with nothing to make a "+
+				"second run a no-op", calls)
+	})
+
+	// Whichever close wins the race to set the exit code is the one that notifies.
+	t.Run("concurrent", func(t *testing.T) {
+		m, eng := newInstance(t)
+		hammer.NewHammer(t, 100, 10).Run(func(p, n int) {
+			require.NoError(t, m.Close(testCtx))
+			require.NoError(t, m.closeWithExitCode(testCtx, 0))
+			require.Error(t, m.FailIfClosed())
+		}, nil)
+		if t.Failed() {
+			return
+		}
+		require.Equal(t, int32(1), eng.closed.Load())
 	})
 }
 

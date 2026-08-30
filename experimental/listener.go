@@ -2,10 +2,16 @@ package experimental
 
 import (
 	"context"
+	"errors"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/expctxkeys"
 )
+
+// ErrUnwoundByException is given to FunctionListener.Abort for a frame a wasm exception
+// unwound. The exception may still be caught above it, so this does not mean the call
+// failed, only that this function did not return.
+var ErrUnwoundByException = errors.New("unwound by exception")
 
 // StackIterator allows iterating on each function of the call stack, starting
 // from the top. At least one call to Next() is required to start the iteration.
@@ -81,7 +87,8 @@ type FunctionListener interface {
 	//      See Abort for more details.
 	After(ctx context.Context, mod api.Module, def api.FunctionDefinition, results []uint64)
 
-	// Abort is invoked when a function does not return due to a trap or panic.
+	// Abort is invoked when a function does not return due to a trap, panic,
+	// or exception.
 	//
 	// # Params
 	//
@@ -93,6 +100,8 @@ type FunctionListener interface {
 	// # Notes
 	//
 	//   - api.Memory is meant for inspection, not modification.
+	//   - A frame an exception unwound is aborted whether or not a handler above catches
+	//     it, so a successful call can still abort frames. Those get ErrUnwoundByException.
 	Abort(ctx context.Context, mod api.Module, def api.FunctionDefinition, err error)
 }
 
