@@ -439,7 +439,7 @@ func (e *mockEngine) Close() error {
 }
 
 // CompileModule implements the same method as documented on wasm.Engine.
-func (e *mockEngine) CompileModule(context.Context, *Module, []experimental.FunctionListener, bool) error {
+func (e *mockEngine) CompileModule(context.Context, *Module, []experimental.FunctionListener, bool, uint64) error {
 	return nil
 }
 

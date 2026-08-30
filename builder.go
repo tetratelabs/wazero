@@ -330,7 +330,7 @@ func (b *hostModuleBuilder) Compile(ctx context.Context) (CompiledModule, error)
 		return nil, err
 	}
 
-	if err = b.r.store.Engine.CompileModule(ctx, module, listeners, false); err != nil {
+	if err = b.r.store.Engine.CompileModule(ctx, module, listeners, false, 0); err != nil {
 		return nil, err
 	}
 

@@ -65,11 +65,11 @@ func TestEngine_CompileModule(t *testing.T) {
 				ID: wasm.ModuleID{},
 			}
 
-			err := e.CompileModule(ctx, okModule, nil, false)
+			err := e.CompileModule(ctx, okModule, nil, false, 0)
 			require.NoError(t, err)
 
 			// Compiling same module shouldn't be compiled again, but instead should be cached.
-			err = e.CompileModule(ctx, okModule, nil, false)
+			err = e.CompileModule(ctx, okModule, nil, false, 0)
 			require.NoError(t, err)
 
 			// Pretend the finalizer executed, by invoking them one-by-one.
@@ -96,7 +96,7 @@ func TestEngine_CompileModule_alignment(t *testing.T) {
 		ID: wasm.ModuleID{},
 	}
 
-	err := e.CompileModule(ctx, okModule, nil, false)
+	err := e.CompileModule(ctx, okModule, nil, false, 0)
 	require.NoError(t, err)
 
 	cm, ok := e.getCompiledModuleFromMemory(okModule, false)
@@ -255,14 +255,14 @@ func TestEngine_WasmModulesShareCompiledModule(t *testing.T) {
 		ID: wasm.ModuleID{},
 	}
 
-	err := e.CompileModule(ctx, m, nil, false)
+	err := e.CompileModule(ctx, m, nil, false, 0)
 	require.NoError(t, err)
 
 	cm1, ok := e.compiledModules[m.ID]
 	require.True(t, ok)
 	require.Equal(t, 1, cm1.refCount)
 
-	err = e.CompileModule(ctx, m, nil, false)
+	err = e.CompileModule(ctx, m, nil, false, 0)
 	require.NoError(t, err)
 	cm2, ok := e.compiledModules[m.ID]
 	require.True(t, ok)

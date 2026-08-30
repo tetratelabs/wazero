@@ -2563,7 +2563,7 @@ blk9: () <-- (blk4)
 			b := ssa.NewBuilder()
 
 			offset := wazevoapi.NewModuleContextOffsetData(tc.m, tc.needListener)
-			fc := NewFrontendCompiler(tc.m, b, &offset, tc.ensureTermination, tc.needListener, false)
+			fc := NewFrontendCompiler(tc.m, b, &offset, tc.ensureTermination, 0, tc.needListener, false)
 			typeIndex := tc.m.FunctionSection[tc.targetIndex]
 			code := &tc.m.CodeSection[tc.targetIndex]
 			fc.Init(tc.targetIndex, typeIndex, &tc.m.TypeSection[typeIndex], code.LocalTypes, code.Body, tc.needListener, 0)
@@ -2781,7 +2781,7 @@ func TestKnownSafeBound_valid(t *testing.T) {
 }
 
 func TestCompiler_finalizeKnownSafeBoundsAtTheEndOoBlock(t *testing.T) {
-	c := NewFrontendCompiler(&wasm.Module{}, ssa.NewBuilder(), nil, false, false, false)
+	c := NewFrontendCompiler(&wasm.Module{}, ssa.NewBuilder(), nil, false, 0, false, false)
 	blk := c.ssaBuilder.AllocateBasicBlock()
 	require.True(t, len(c.getKnownSafeBoundsAtTheEndOfBlocks(blk.ID()).View()) == 0)
 	c.ssaBuilder.SetCurrentBlock(blk)
@@ -2802,7 +2802,7 @@ func TestCompiler_finalizeKnownSafeBoundsAtTheEndOoBlock(t *testing.T) {
 
 func TestCompiler_initializeCurrentBlockKnownBounds(t *testing.T) {
 	t.Run("single (sealed)", func(t *testing.T) {
-		c := NewFrontendCompiler(&wasm.Module{}, ssa.NewBuilder(), nil, false, false, false)
+		c := NewFrontendCompiler(&wasm.Module{}, ssa.NewBuilder(), nil, false, 0, false, false)
 		builder := c.ssaBuilder
 		child := builder.AllocateBasicBlock()
 		{
@@ -2833,7 +2833,7 @@ func TestCompiler_initializeCurrentBlockKnownBounds(t *testing.T) {
 		require.Equal(t, ssa.Value(54321), kb.absoluteAddr)
 	})
 	t.Run("single (unsealed)", func(t *testing.T) {
-		c := NewFrontendCompiler(&wasm.Module{}, ssa.NewBuilder(), nil, false, false, false)
+		c := NewFrontendCompiler(&wasm.Module{}, ssa.NewBuilder(), nil, false, 0, false, false)
 		builder := c.ssaBuilder
 		child := builder.AllocateBasicBlock()
 		{
@@ -2863,7 +2863,7 @@ func TestCompiler_initializeCurrentBlockKnownBounds(t *testing.T) {
 		require.NotEqual(t, ssa.Value(54321), kb.absoluteAddr)
 	})
 	t.Run("multiple predecessors", func(t *testing.T) {
-		c := NewFrontendCompiler(&wasm.Module{}, ssa.NewBuilder(), nil, false, false, false)
+		c := NewFrontendCompiler(&wasm.Module{}, ssa.NewBuilder(), nil, false, 0, false, false)
 		builder := c.ssaBuilder
 		child := builder.AllocateBasicBlock()
 		{

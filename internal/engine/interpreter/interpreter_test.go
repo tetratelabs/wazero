@@ -398,7 +398,7 @@ func TestInterpreter_Compile(t *testing.T) {
 			ID: wasm.ModuleID{},
 		}
 
-		err := e.CompileModule(testCtx, errModule, nil, false)
+		err := e.CompileModule(testCtx, errModule, nil, false, 0)
 		require.EqualError(t, err, "handling instruction: apply stack failed for call: reading immediates: EOF")
 
 		// On the compilation failure, all the compiled functions including succeeded ones must be released.
@@ -419,7 +419,7 @@ func TestInterpreter_Compile(t *testing.T) {
 			},
 			ID: wasm.ModuleID{},
 		}
-		err := e.CompileModule(testCtx, okModule, nil, false)
+		err := e.CompileModule(testCtx, okModule, nil, false, 0)
 		require.NoError(t, err)
 
 		compiled, ok := e.compiledFunctions[okModule.ID]
@@ -466,14 +466,14 @@ func TestEngine_WasmModulesShareCompiledFunctions(t *testing.T) {
 		ID: wasm.ModuleID{},
 	}
 
-	err := e.CompileModule(ctx, m, nil, false)
+	err := e.CompileModule(ctx, m, nil, false, 0)
 	require.NoError(t, err)
 
 	cf1, ok := e.compiledFunctions[m.ID]
 	require.True(t, ok)
 	require.Equal(t, 1, cf1.refCount)
 
-	err = e.CompileModule(ctx, m, nil, false)
+	err = e.CompileModule(ctx, m, nil, false, 0)
 	require.NoError(t, err)
 	cf2, ok := e.compiledFunctions[m.ID]
 	require.True(t, ok)

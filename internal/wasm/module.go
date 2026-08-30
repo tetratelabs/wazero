@@ -211,7 +211,7 @@ const (
 
 // AssignModuleID calculates a sha256 checksum on `wasm` and other args, and set Module.ID to the result.
 // See the doc on Module.ID on what it's used for.
-func (m *Module) AssignModuleID(wasm []byte, listeners []experimental.FunctionListener, withEnsureTermination bool) {
+func (m *Module) AssignModuleID(wasm []byte, listeners []experimental.FunctionListener, withEnsureTermination bool, interruptCheckInterval uint64) {
 	h := sha256.New()
 	h.Write(wasm)
 	// Use the pre-allocated space backed by m.ID below.
@@ -225,6 +225,11 @@ func (m *Module) AssignModuleID(wasm []byte, listeners []experimental.FunctionLi
 	// Write the flag of ensureTermination to the checksum.
 	m.ID[0] = boolToByte(withEnsureTermination)
 	h.Write(m.ID[:1])
+	// Write the interruptCheckInterval to the checksum only when it can affect codegen.
+	if withEnsureTermination {
+		binary.LittleEndian.PutUint64(m.ID[:8], interruptCheckInterval)
+		h.Write(m.ID[:8])
+	}
 	// Get checksum by passing the slice underlying m.ID.
 	h.Sum(m.ID[:0])
 }

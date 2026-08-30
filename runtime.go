@@ -258,8 +258,12 @@ func (r *runtime) CompileModule(ctx context.Context, binary []byte) (CompiledMod
 	if err != nil {
 		return nil, err
 	}
-	internal.AssignModuleID(binary, listeners, r.ensureTermination)
-	if err = r.store.Engine.CompileModule(ctx, internal, listeners, r.ensureTermination); err != nil {
+	interruptCheckInterval := experimentalapi.GetInterruptCheckInterval(ctx)
+	if !r.ensureTermination {
+		interruptCheckInterval = 0
+	}
+	internal.AssignModuleID(binary, listeners, r.ensureTermination, interruptCheckInterval)
+	if err = r.store.Engine.CompileModule(ctx, internal, listeners, r.ensureTermination, interruptCheckInterval); err != nil {
 		return nil, err
 	}
 	return c, nil

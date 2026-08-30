@@ -49,7 +49,7 @@ func (e *engine) addCompiledModule(module *wasm.Module, cm *compiledModule) (c *
 	return
 }
 
-func (e *engine) getCompiledModule(module *wasm.Module, listeners []experimental.FunctionListener, ensureTermination bool) (cm *compiledModule, ok bool, err error) {
+func (e *engine) getCompiledModule(module *wasm.Module, listeners []experimental.FunctionListener, ensureTermination bool, interruptCheckInterval uint64) (cm *compiledModule, ok bool, err error) {
 	cm, ok = e.getCompiledModuleFromMemory(module, true)
 	if ok {
 		return
@@ -60,6 +60,7 @@ func (e *engine) getCompiledModule(module *wasm.Module, listeners []experimental
 		cm.module = module
 		cm.sharedFunctions = e.sharedFunctions
 		cm.ensureTermination = ensureTermination
+		cm.interruptCheckInterval = interruptCheckInterval
 		cm.offsets = wazevoapi.NewModuleContextOffsetData(module, len(listeners) > 0)
 		if len(listeners) > 0 {
 			cm.listeners = listeners

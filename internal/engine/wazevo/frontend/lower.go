@@ -1366,16 +1366,98 @@ func (c *Compiler) lowerCurrentOpcode() {
 		c.switchTo(originalLen, loopHeader)
 
 		if c.ensureTermination {
-			checkModuleExitCodePtr := builder.AllocateInstruction().
-				AsLoad(c.execCtxPtrValue,
-					wazevoapi.ExecutionContextOffsetCheckModuleExitCodeTrampolineAddress.U32(),
-					ssa.TypeI64,
-				).Insert(builder).Return()
+			if c.interruptCheckInterval == 0 {
+				// Check every iteration (original behavior).
+				checkModuleExitCodePtr := builder.AllocateInstruction().
+					AsLoad(c.execCtxPtrValue,
+						wazevoapi.ExecutionContextOffsetCheckModuleExitCodeTrampolineAddress.U32(),
+						ssa.TypeI64,
+					).Insert(builder).Return()
 
-			args := c.allocateVarLengthValues(1, c.execCtxPtrValue)
-			builder.AllocateInstruction().
-				AsCallIndirect(checkModuleExitCodePtr, &c.checkModuleExitCodeSig, args).
-				Insert(builder)
+				args := c.allocateVarLengthValues(1, c.execCtxPtrValue)
+				builder.AllocateInstruction().
+					AsCallIndirect(checkModuleExitCodePtr, &c.checkModuleExitCodeSig, args).
+					Insert(builder)
+			} else {
+				// Counter-based checking: only check every N iterations using bitmask.
+				mask := c.interruptCheckInterval - 1
+
+				// Load current counter value directly from execution context.
+				currentLoad := builder.AllocateInstruction()
+				currentLoad.AsLoad(c.execCtxPtrValue,
+					wazevoapi.ExecutionContextOffsetInterruptCounter.U32(),
+					ssa.TypeI64)
+				currentLoad.Insert(builder)
+				currentValue := currentLoad.Return()
+
+				// Increment the counter.
+				one := builder.AllocateInstruction()
+				one.AsIconst64(1)
+				one.Insert(builder)
+
+				increment := builder.AllocateInstruction()
+				increment.AsIadd(currentValue, one.Return())
+				increment.Insert(builder)
+				newValue := increment.Return()
+
+				// Store the incremented value back directly to execution context.
+				store := builder.AllocateInstruction()
+				store.AsStore(ssa.OpcodeStore, newValue, c.execCtxPtrValue,
+					wazevoapi.ExecutionContextOffsetInterruptCounter.U32())
+				store.Insert(builder)
+
+				// Check if we should do context check: (counter & mask) == 0.
+				maskVal := builder.AllocateInstruction()
+				maskVal.AsIconst64(mask)
+				maskVal.Insert(builder)
+
+				masked := builder.AllocateInstruction()
+				masked.AsBand(newValue, maskVal.Return())
+				masked.Insert(builder)
+
+				zero := builder.AllocateInstruction()
+				zero.AsIconst64(0)
+				zero.Insert(builder)
+
+				cond := builder.AllocateInstruction()
+				cond.AsIcmp(masked.Return(), zero.Return(), ssa.IntegerCmpCondEqual)
+				cond.Insert(builder)
+
+				// Conditional branch: if (counter & mask) == 0, do host check.
+				checkBlk := builder.AllocateBasicBlock()
+				afterBlk := builder.AllocateBasicBlock()
+
+				br := builder.AllocateInstruction()
+				br.AsBrnz(cond.Return(), ssa.ValuesNil, checkBlk)
+				br.Insert(builder)
+
+				// Fall through to after block if not time for check.
+				jmp := builder.AllocateInstruction()
+				jmp.AsJump(ssa.ValuesNil, afterBlk)
+				jmp.Insert(builder)
+
+				// Check block: call checkModuleExitCode.
+				builder.SetCurrentBlock(checkBlk)
+
+				checkModuleExitCodePtr := builder.AllocateInstruction()
+				checkModuleExitCodePtr.AsLoad(c.execCtxPtrValue,
+					wazevoapi.ExecutionContextOffsetCheckModuleExitCodeTrampolineAddress.U32(),
+					ssa.TypeI64)
+				checkModuleExitCodePtr.Insert(builder)
+
+				args := c.allocateVarLengthValues(1, c.execCtxPtrValue)
+				call := builder.AllocateInstruction()
+				call.AsCallIndirect(checkModuleExitCodePtr.Return(), &c.checkModuleExitCodeSig, args)
+				call.Insert(builder)
+
+				jmpAfter := builder.AllocateInstruction()
+				jmpAfter.AsJump(ssa.ValuesNil, afterBlk)
+				jmpAfter.Insert(builder)
+
+				builder.Seal(checkBlk)
+				builder.SetCurrentBlock(afterBlk)
+				builder.Seal(afterBlk)
+			}
 		}
 	case wasm.OpcodeIf:
 		bt := c.readBlockType()

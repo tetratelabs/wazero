@@ -144,6 +144,9 @@ type (
 		// localsSaveAreaPtr points to the tryHandler's localsSaveArea slice
 		// backing array. Handlers load locals from this slice.
 		localsSaveAreaPtr uintptr
+		// interruptCounter is incremented on each loop header when interruptCheckInterval is configured.
+		// The exit code check is only performed when (counter & mask) == 0.
+		interruptCounter uint64
 	}
 )
 

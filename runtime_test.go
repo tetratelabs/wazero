@@ -302,7 +302,7 @@ func TestModule_Global(t *testing.T) {
 
 			code := &compiledModule{module: tc.module}
 
-			err := r.store.Engine.CompileModule(testCtx, code.module, nil, false)
+			err := r.store.Engine.CompileModule(testCtx, code.module, nil, false, 0)
 			require.NoError(t, err)
 
 			// Instantiate the module and get the export of the above global
@@ -790,7 +790,7 @@ type mockEngine struct {
 }
 
 // CompileModule implements the same method as documented on wasm.Engine.
-func (e *mockEngine) CompileModule(_ context.Context, module *wasm.Module, _ []experimental.FunctionListener, _ bool) error {
+func (e *mockEngine) CompileModule(_ context.Context, module *wasm.Module, _ []experimental.FunctionListener, _ bool, _ uint64) error {
 	e.cachedModules[module] = struct{}{}
 	return nil
 }

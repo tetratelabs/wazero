@@ -1043,9 +1043,13 @@ func TestModule_declaredFunctionIndexes(t *testing.T) {
 }
 
 func TestModule_AssignModuleID(t *testing.T) {
-	getID := func(bin []byte, lsns []experimental.FunctionListener, withEnsureTermination bool) ModuleID {
+	getID := func(bin []byte, lsns []experimental.FunctionListener, withEnsureTermination bool, interruptCheckInterval ...uint64) ModuleID {
 		m := Module{}
-		m.AssignModuleID(bin, lsns, withEnsureTermination)
+		var interval uint64
+		if len(interruptCheckInterval) > 0 {
+			interval = interruptCheckInterval[0]
+		}
+		m.AssignModuleID(bin, lsns, withEnsureTermination, interval)
 		return m.ID
 	}
 
@@ -1118,6 +1122,19 @@ func TestModule_AssignModuleID(t *testing.T) {
 		require.False(t, exist, i)
 		exists[id] = struct{}{}
 	}
+
+	// Verify interruptCheckInterval affects ID only when ensureTermination is true.
+	id0 := getID([]byte{1, 2, 3}, nil, true, 0)
+	id32 := getID([]byte{1, 2, 3}, nil, true, 32)
+	id64 := getID([]byte{1, 2, 3}, nil, true, 64)
+	require.NotEqual(t, id0, id32)
+	require.NotEqual(t, id0, id64)
+	require.NotEqual(t, id32, id64)
+
+	// When ensureTermination is false, interval is ignored so IDs should match.
+	idNoTerm0 := getID([]byte{1, 2, 3}, nil, false, 0)
+	idNoTerm32 := getID([]byte{1, 2, 3}, nil, false, 32)
+	require.Equal(t, idNoTerm0, idNoTerm32)
 }
 
 type mockListener struct{}
