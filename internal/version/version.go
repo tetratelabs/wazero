@@ -3,13 +3,16 @@ package version
 import (
 	"runtime/debug"
 	"strings"
+	"sync"
 )
 
 // Default is the default version value used when none was found.
 const Default = "dev"
 
-// version holds the current version from the go.mod of downstream users or set by ldflag for wazero CLI.
+// version can be set by ldflag for wazero CLI.
 var version string
+
+var getWazeroVersion = sync.OnceValue(resolveWazeroVersion)
 
 // GetWazeroVersion returns the current version of wazero either in the go.mod or set by ldflag for wazero CLI.
 //
@@ -19,7 +22,11 @@ var version string
 // then this returns "0.1.2-12314124-abcd".
 //
 // Note: this is tested in ./testdata/main_test.go with a separate go.mod to pretend as the wazero user.
-func GetWazeroVersion() (ret string) {
+func GetWazeroVersion() string {
+	return getWazeroVersion()
+}
+
+func resolveWazeroVersion() (ret string) {
 	if len(version) != 0 {
 		return version
 	}
@@ -41,9 +48,6 @@ func GetWazeroVersion() (ret string) {
 	if versionMissing(ret) {
 		return Default // don't return parens
 	}
-
-	// Cache for the subsequent calls.
-	version = ret
 	return ret
 }
 
