@@ -44,11 +44,11 @@ func TestFunctionType_String(t *testing.T) {
 func TestIsReferenceValueType(t *testing.T) {
 	refTypes := []ValueType{ValueTypeFuncref, ValueTypeExternref, ValueTypeExnref}
 	for _, vt := range refTypes {
-		require.True(t, isReferenceValueType(vt), "expected %#x to be a reference type", vt)
+		require.True(t, vt.IsRef(), "expected %#x to be a reference type", vt)
 	}
 	nonRefTypes := []ValueType{ValueTypeI32, ValueTypeI64, ValueTypeF32, ValueTypeF64, ValueTypeV128}
 	for _, vt := range nonRefTypes {
-		require.False(t, isReferenceValueType(vt), "expected %#x to not be a reference type", vt)
+		require.False(t, vt.IsRef(), "expected %#x to not be a reference type", vt)
 	}
 }
 
@@ -306,7 +306,7 @@ func TestValidateConstExpression(t *testing.T) {
 			require.EqualError(t, err, "unexpected EOF")
 			expr = NewConstantExpressionFromOpcode(OpcodeRefNull, []byte{0x80, 0x80, 0x80, 0x80, 0x80})
 			err = (&Module{}).validateConstExpression(nil, 0, &expr, ValueTypeExternref)
-			require.EqualError(t, err, "invalid type for ref.null: 0x80")
+			require.EqualError(t, err, "const expression type mismatch expected externref but got (ref null 0)")
 		})
 	})
 	t.Run("global expr", func(t *testing.T) {
@@ -426,7 +426,7 @@ func TestModule_validateStartSection(t *testing.T) {
 func TestModule_validateGlobals(t *testing.T) {
 	t.Run("too many globals", func(t *testing.T) {
 		m := Module{}
-		err := m.validateGlobals(make([]GlobalType, 10), 0, 9)
+		err := m.validateGlobals(api.CoreFeaturesV2, make([]GlobalType, 10), 0, 9)
 		require.Error(t, err)
 		require.EqualError(t, err, "too many globals in a module")
 	})
@@ -438,7 +438,7 @@ func TestModule_validateGlobals(t *testing.T) {
 				Init: NewConstantExpressionFromOpcode(OpcodeGlobalGet, []byte{1}),
 			},
 		}}
-		err := m.validateGlobals(nil, 0, 9)
+		err := m.validateGlobals(api.CoreFeaturesV2, nil, 0, 9)
 		require.Error(t, err)
 		require.EqualError(t, err, "global index out of range")
 	})
@@ -449,7 +449,7 @@ func TestModule_validateGlobals(t *testing.T) {
 				Init: NewConstantExpressionFromOpcode(OpcodeUnreachable, nil),
 			},
 		}}
-		err := m.validateGlobals(nil, 0, 9)
+		err := m.validateGlobals(api.CoreFeaturesV2, nil, 0, 9)
 		require.Error(t, err)
 		require.EqualError(t, err, "invalid opcode for const expression: 0x0")
 	})
@@ -460,7 +460,7 @@ func TestModule_validateGlobals(t *testing.T) {
 				Init: NewConstantExpressionFromI32(0),
 			},
 		}}
-		err := m.validateGlobals(nil, 0, 9)
+		err := m.validateGlobals(api.CoreFeaturesV2, nil, 0, 9)
 		require.NoError(t, err)
 	})
 	t.Run("ok with imported global", func(t *testing.T) {
@@ -479,7 +479,7 @@ func TestModule_validateGlobals(t *testing.T) {
 			{ValType: ValueTypeI32}, // Imported one.
 			{},                      // the local one trying to validate.
 		}
-		err := m.validateGlobals(globalDeclarations, 0, 9)
+		err := m.validateGlobals(api.CoreFeaturesV2, globalDeclarations, 0, 9)
 		require.NoError(t, err)
 	})
 }

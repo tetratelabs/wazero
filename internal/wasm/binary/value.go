@@ -25,7 +25,11 @@ func decodeValueTypes(r *bytes.Reader, num uint32) ([]wasm.ValueType, error) {
 		switch b {
 		case wasm.ValueTypeI32.Kind(), wasm.ValueTypeF32.Kind(), wasm.ValueTypeI64.Kind(), wasm.ValueTypeF64.Kind(),
 			wasm.ValueTypeExternref.Kind(), wasm.ValueTypeFuncref.Kind(), wasm.ValueTypeV128.Kind(),
-			wasm.ValueTypeExnref.Kind():
+			wasm.ValueTypeExnref.Kind(),
+			// wasm-gc nullable abstract heap-type shorthand bytes.
+			wasm.ValueTypeAnyref.Kind(), wasm.ValueTypeEqref.Kind(), wasm.ValueTypeI31ref.Kind(),
+			wasm.ValueTypeStructref.Kind(), wasm.ValueTypeArrayref.Kind(), wasm.ValueTypeNullref.Kind(),
+			wasm.ValueTypeNoFuncref.Kind(), wasm.ValueTypeNoExternref.Kind(), wasm.ValueTypeNoExnref.Kind():
 			ret = append(ret, wasm.ValueType(b))
 		case wasm.RefPrefixNullable, wasm.RefPrefixNonNullable:
 			vt, err := decodeRefType(r, b == wasm.RefPrefixNullable)
@@ -60,10 +64,15 @@ func decodeRefType(r *bytes.Reader, nullable bool) (wasm.ValueType, error) {
 	case wasm.HeapTypeExn:
 		vt = wasm.ValueTypeExnref
 	default:
-		if ht < 0 {
+		if ht >= 0 {
+			vt = wasm.ValueTypeConcreteRef(uint32(ht), nullable)
+		} else if kindByte, _, isConcrete, ok := wasm.HeapTypeKindFromBinary(ht); ok && !isConcrete {
+			// GC abstract heap types (any/eq/i31/struct/array/none/
+			// nofunc/noextern/noexn).
+			vt = wasm.AbstractRef(kindByte, nullable)
+		} else {
 			return 0, fmt.Errorf("unknown abstract heap type: %d", ht)
 		}
-		vt = wasm.ValueTypeConcreteRef(uint32(ht), nullable)
 	}
 	if !nullable {
 		vt = vt.AsNonNullable()

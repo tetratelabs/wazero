@@ -144,6 +144,17 @@ func NewEngine(ctx context.Context, _ api.CoreFeatures, fc filecache.Cache) wasm
 
 // CompileModule implements wasm.Engine.
 func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listeners []experimental.FunctionListener, ensureTermination bool) (err error) {
+	// The optimizing compiler does not yet support WebAssembly GC (struct
+	// and array composite types and the GC instructions). Reject such
+	// modules with a clear error so they fall back to the interpreter
+	// instead of being silently miscompiled.
+	for i := range module.TypeSection {
+		switch module.TypeSection[i].Form {
+		case wasm.CompositeFormStruct, wasm.CompositeFormArray:
+			return fmt.Errorf("wasm-gc modules (struct/array types) are not supported by the optimizing compiler; use the interpreter")
+		}
+	}
+
 	if wazevoapi.PerfMapEnabled {
 		wazevoapi.PerfMap.Lock()
 		defer wazevoapi.PerfMap.Unlock()

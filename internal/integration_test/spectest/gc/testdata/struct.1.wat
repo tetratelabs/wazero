@@ -1,0 +1,1 @@
+(type (struct (field $x i32) (field $x i32))) 

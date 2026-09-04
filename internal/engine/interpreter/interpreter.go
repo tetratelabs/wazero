@@ -381,6 +381,14 @@ func functionFromUintptr(ptr uintptr) *function {
 	return *(**function)(unsafe.Pointer(wrapped))
 }
 
+func gcStruct(v uint64) *wasm.WasmStruct {
+	return (*wasm.WasmStruct)(wasm.UntagGCPointer(v))
+}
+
+func gcArray(v uint64) *wasm.WasmArray {
+	return (*wasm.WasmArray)(wasm.UntagGCPointer(v))
+}
+
 type snapshot struct {
 	stack  []uint64
 	frames []*callFrame
@@ -625,6 +633,9 @@ func (e *engine) lowerIR(ir *compilationResult, ret *compiledFunction) error {
 		case operationKindBrOnNonNull:
 			e.setLabelAddress(&op.U1, label(op.U1), labelAddressResolutions)
 			e.setLabelAddress(&op.U2, label(op.U2), labelAddressResolutions)
+		case operationKindBrOnCast, operationKindBrOnCastFail:
+			e.setLabelAddress(&op.U1, label(op.U1), labelAddressResolutions)
+			e.setLabelAddress(&op.U2, label(op.U2), labelAddressResolutions)
 		case operationKindReturnCallRef:
 			e.setLabelAddress(&op.Us[1], label(op.Us[1]), labelAddressResolutions)
 		}
@@ -778,6 +789,8 @@ func (ce *callEngine) call(ctx context.Context, params, results []uint64) (_ []u
 	}
 
 	ce.callFunction(ctx, m, ce.f)
+
+	m.GCSweep(ce.stack)
 
 	// This returns a safe copy of the results, instead of a slice view. If we
 	// returned a re-slice, the caller could accidentally or purposefully
@@ -4664,6 +4677,416 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 				frame.pc = op.U2
 			}
 
+		case operationKindRefI31:
+			raw := ce.popValue()
+			// ref.i31 narrows the low 31 bits and produces a non-null i31ref.
+			// The tagged-uintptr representation lets ref.eq distinguish i31
+			// slots from heap-pointer slots at runtime.
+			ce.pushValue(wasm.PackI31(uint32(raw)))
+			frame.pc++
+
+		case operationKindI31GetS:
+			v := ce.popValue()
+			if v == 0 {
+				panic(wasmruntime.ErrRuntimeNullReference)
+			}
+			// i31 refs are always carried as tagged immediates (ref.i31 and
+			// the const-expr evaluator both emit PackI31), so there is no
+			// heap-pointer form to dereference here.
+			ce.pushValue(uint64(uint32(wasm.UnpackI31Signed(v))))
+			frame.pc++
+
+		case operationKindI31GetU:
+			v := ce.popValue()
+			if v == 0 {
+				panic(wasmruntime.ErrRuntimeNullReference)
+			}
+			ce.pushValue(uint64(wasm.UnpackI31Unsigned(v)))
+			frame.pc++
+
+		case operationKindRefEq:
+			// ref.eq: bit-equality on the operand-stack slots. The
+			// tagged-uintptr i31 encoding ensures that two i31 refs
+			// holding the same numeric value also share the same
+			// bit pattern, so the bit comparison delivers
+			// value-equality for i31 pairs and pointer-equality for
+			// heap-pointer pairs simultaneously.
+			b := ce.popValue()
+			a := ce.popValue()
+			if a == b {
+				ce.pushValue(1)
+			} else {
+				ce.pushValue(0)
+			}
+			frame.pc++
+
+		case operationKindAnyConvertExtern:
+			// Tag the externref bit pattern so refMatches can later
+			// distinguish "externref wrapped as anyref" from genuine
+			// heap-pointer anyrefs. Null passes through unchanged.
+			v := ce.popValue()
+			ce.pushValue(wasm.PackExternAsAny(v))
+			frame.pc++
+
+		case operationKindExternConvertAny:
+			// Untag a previously-tagged externref. Heap-pointer anyrefs
+			// (struct/array/i31) are passed through unchanged so the
+			// validator's static externref typing is honoured.
+			v := ce.popValue()
+			if wasm.IsTaggedExternAsAny(v) {
+				ce.pushValue(wasm.UnpackExternAsAny(v))
+			} else {
+				ce.pushValue(v)
+			}
+			frame.pc++
+
+		case operationKindStructNew:
+			typeIdx := uint32(op.U1)
+			fieldCount := int(op.U2)
+			schema := &f.moduleInstance.Source.TypeSection[typeIdx]
+			fields := make([]any, fieldCount)
+			for i := fieldCount - 1; i >= 0; i-- {
+				raw := ce.popValue()
+				fields[i] = encodeFieldValue(schema.Fields[i], raw)
+			}
+			s := wasm.NewWasmStructWith(f.moduleInstance.TypeIDs[typeIdx], fields)
+			ce.pushValue(f.moduleInstance.GCRegister(s))
+			f.moduleInstance.GCMaybeSweep(ce.stack)
+			frame.pc++
+
+		case operationKindStructNewDefault:
+			typeIdx := uint32(op.U1)
+			fieldCount := int(op.U2)
+			schema := &f.moduleInstance.Source.TypeSection[typeIdx]
+			fields := make([]any, fieldCount)
+			for i := 0; i < fieldCount; i++ {
+				fields[i] = wasm.DefaultFieldValue(schema.Fields[i])
+			}
+			s := wasm.NewWasmStructWith(f.moduleInstance.TypeIDs[typeIdx], fields)
+			ce.pushValue(f.moduleInstance.GCRegister(s))
+			f.moduleInstance.GCMaybeSweep(ce.stack)
+			frame.pc++
+
+		case operationKindStructGet, operationKindStructGetS, operationKindStructGetU:
+			typeIdx := uint32(op.U1)
+			fieldIdx := int(op.U2)
+			v := ce.popValue()
+			if v == 0 {
+				panic(wasmruntime.ErrRuntimeNullReference)
+			}
+			s := gcStruct(v)
+			fieldSchema := f.moduleInstance.Source.TypeSection[typeIdx].Fields[fieldIdx]
+			raw := decodeFieldValueRead(fieldSchema, s.Get(fieldIdx), op.Kind)
+			ce.pushValue(raw)
+			frame.pc++
+
+		case operationKindStructSet:
+			typeIdx := uint32(op.U1)
+			fieldIdx := int(op.U2)
+			raw := ce.popValue()
+			v := ce.popValue()
+			if v == 0 {
+				panic(wasmruntime.ErrRuntimeNullReference)
+			}
+			s := gcStruct(v)
+			fieldSchema := f.moduleInstance.Source.TypeSection[typeIdx].Fields[fieldIdx]
+			if err := s.Set(fieldIdx, encodeFieldValue(fieldSchema, raw)); err != nil {
+				panic(err)
+			}
+			frame.pc++
+
+		case operationKindArrayNew:
+			typeIdx := uint32(op.U1)
+			schema := &f.moduleInstance.Source.TypeSection[typeIdx]
+			length := uint32(ce.popValue())
+			rawElem := ce.popValue()
+			stored := encodeFieldValue(schema.ArrayField, rawElem)
+			elems := make([]any, length)
+			for i := range elems {
+				elems[i] = stored
+			}
+			a := wasm.NewWasmArrayWith(f.moduleInstance.TypeIDs[typeIdx], elems)
+			ce.pushValue(f.moduleInstance.GCRegister(a))
+			f.moduleInstance.GCMaybeSweep(ce.stack)
+			frame.pc++
+
+		case operationKindArrayNewDefault:
+			typeIdx := uint32(op.U1)
+			schema := &f.moduleInstance.Source.TypeSection[typeIdx]
+			length := uint32(ce.popValue())
+			def := wasm.DefaultFieldValue(schema.ArrayField)
+			elems := make([]any, length)
+			for i := range elems {
+				elems[i] = def
+			}
+			a := wasm.NewWasmArrayWith(f.moduleInstance.TypeIDs[typeIdx], elems)
+			ce.pushValue(f.moduleInstance.GCRegister(a))
+			f.moduleInstance.GCMaybeSweep(ce.stack)
+			frame.pc++
+
+		case operationKindArrayGet, operationKindArrayGetS, operationKindArrayGetU:
+			typeIdx := uint32(op.U1)
+			idx := uint32(ce.popValue())
+			v := ce.popValue()
+			if v == 0 {
+				panic(wasmruntime.ErrRuntimeNullReference)
+			}
+			a := gcArray(v)
+			if idx >= a.Len() {
+				panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+			}
+			schema := f.moduleInstance.Source.TypeSection[typeIdx].ArrayField
+			var readKind operationKind
+			switch op.Kind {
+			case operationKindArrayGet:
+				readKind = operationKindStructGet
+			case operationKindArrayGetS:
+				readKind = operationKindStructGetS
+			case operationKindArrayGetU:
+				readKind = operationKindStructGetU
+			}
+			ce.pushValue(decodeFieldValueRead(schema, a.Get(idx), readKind))
+			frame.pc++
+
+		case operationKindArraySet:
+			typeIdx := uint32(op.U1)
+			raw := ce.popValue()
+			idx := uint32(ce.popValue())
+			v := ce.popValue()
+			if v == 0 {
+				panic(wasmruntime.ErrRuntimeNullReference)
+			}
+			a := gcArray(v)
+			if idx >= a.Len() {
+				panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+			}
+			schema := f.moduleInstance.Source.TypeSection[typeIdx].ArrayField
+			if err := a.Set(idx, encodeFieldValue(schema, raw)); err != nil {
+				panic(err)
+			}
+			frame.pc++
+
+		case operationKindArrayLen:
+			v := ce.popValue()
+			if v == 0 {
+				panic(wasmruntime.ErrRuntimeNullReference)
+			}
+			a := gcArray(v)
+			ce.pushValue(uint64(a.Len()))
+			frame.pc++
+
+		case operationKindRefTest:
+			v := ce.popValue()
+			matches := refMatches(v, op.B1, op.B3, op.U2 != 0, uint32(op.U1), f.moduleInstance)
+			if matches {
+				ce.pushValue(1)
+			} else {
+				ce.pushValue(0)
+			}
+			frame.pc++
+
+		case operationKindRefCast:
+			v := ce.popValue()
+			matches := refMatches(v, op.B1, op.B3, op.U2 != 0, uint32(op.U1), f.moduleInstance)
+			if !matches {
+				panic(wasmruntime.ErrRuntimeInvalidConversionToInteger)
+			}
+			ce.pushValue(v)
+			frame.pc++
+
+		case operationKindBrOnCast:
+			v := ce.popValue()
+			matches := refMatches(v, op.B1, op.B3, op.Us[1] != 0, uint32(op.Us[0]), f.moduleInstance)
+			// Drop-then-push (matching br_on_non_null): the frame drop range
+			// is computed assuming the carried value is NOT on the stack, so
+			// drop first then re-push the (cast) value for the branch target.
+			if matches {
+				ce.drop(op.U3)
+				ce.pushValue(v)
+				frame.pc = op.U1
+			} else {
+				ce.pushValue(v)
+				frame.pc = op.U2
+			}
+
+		case operationKindBrOnCastFail:
+			v := ce.popValue()
+			matches := refMatches(v, op.B1, op.B3, op.Us[1] != 0, uint32(op.Us[0]), f.moduleInstance)
+			if !matches {
+				ce.drop(op.U3)
+				ce.pushValue(v)
+				frame.pc = op.U1
+			} else {
+				ce.pushValue(v)
+				frame.pc = op.U2
+			}
+
+		case operationKindArrayNewFixed:
+			typeIdx := uint32(op.U1)
+			count := int(op.U2)
+			schema := &f.moduleInstance.Source.TypeSection[typeIdx]
+			elems := make([]any, count)
+			for i := count - 1; i >= 0; i-- {
+				raw := ce.popValue()
+				elems[i] = encodeFieldValue(schema.ArrayField, raw)
+			}
+			a := wasm.NewWasmArrayWith(f.moduleInstance.TypeIDs[typeIdx], elems)
+			ce.pushValue(f.moduleInstance.GCRegister(a))
+			f.moduleInstance.GCMaybeSweep(ce.stack)
+			frame.pc++
+
+		case operationKindArrayFill:
+			typeIdx := uint32(op.U1)
+			count := uint32(ce.popValue())
+			rawVal := ce.popValue()
+			idx := uint32(ce.popValue())
+			v := ce.popValue()
+			if v == 0 {
+				panic(wasmruntime.ErrRuntimeNullReference)
+			}
+			a := gcArray(v)
+			if uint64(idx)+uint64(count) > uint64(a.Len()) {
+				panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+			}
+			schema := f.moduleInstance.Source.TypeSection[typeIdx].ArrayField
+			stored := encodeFieldValue(schema, rawVal)
+			for i := uint32(0); i < count; i++ {
+				if err := a.Set(idx+i, stored); err != nil {
+					panic(err)
+				}
+			}
+			frame.pc++
+
+		case operationKindArrayCopy:
+			count := uint32(ce.popValue())
+			srcIdx := uint32(ce.popValue())
+			srcV := ce.popValue()
+			dstIdx := uint32(ce.popValue())
+			dstV := ce.popValue()
+			if srcV == 0 || dstV == 0 {
+				panic(wasmruntime.ErrRuntimeNullReference)
+			}
+			src := gcArray(srcV)
+			dst := gcArray(dstV)
+			if uint64(srcIdx)+uint64(count) > uint64(src.Len()) ||
+				uint64(dstIdx)+uint64(count) > uint64(dst.Len()) {
+				panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+			}
+			if src == dst && srcIdx < dstIdx {
+				for i := count; i > 0; i-- {
+					if err := dst.Set(dstIdx+i-1, src.Get(srcIdx+i-1)); err != nil {
+						panic(err)
+					}
+				}
+			} else {
+				for i := uint32(0); i < count; i++ {
+					if err := dst.Set(dstIdx+i, src.Get(srcIdx+i)); err != nil {
+						panic(err)
+					}
+				}
+			}
+			frame.pc++
+
+		case operationKindArrayNewData:
+			typeIdx := uint32(op.U1)
+			segIdx := uint32(op.U2)
+			count := uint32(ce.popValue())
+			srcOff := uint32(ce.popValue())
+			schema := f.moduleInstance.Source.TypeSection[typeIdx].ArrayField
+			data := f.moduleInstance.DataInstances[segIdx]
+			elemSize, ok := arrayDataElemSize(schema)
+			if !ok {
+				panic(fmt.Errorf("array.new_data on unsupported element type"))
+			}
+			totalBytes := uint64(count) * uint64(elemSize)
+			if uint64(srcOff)+totalBytes > uint64(len(data)) {
+				panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+			}
+			elems := make([]any, count)
+			for i := uint32(0); i < count; i++ {
+				off := srcOff + i*elemSize
+				elems[i] = readDataElement(schema, data, off)
+			}
+			a := wasm.NewWasmArrayWith(f.moduleInstance.TypeIDs[typeIdx], elems)
+			ce.pushValue(f.moduleInstance.GCRegister(a))
+			f.moduleInstance.GCMaybeSweep(ce.stack)
+			frame.pc++
+
+		case operationKindArrayNewElem:
+			typeIdx := uint32(op.U1)
+			segIdx := uint32(op.U2)
+			count := uint32(ce.popValue())
+			srcOff := uint32(ce.popValue())
+			elem := f.moduleInstance.ElementInstances[segIdx]
+			if uint64(srcOff)+uint64(count) > uint64(len(elem)) {
+				panic(wasmruntime.ErrRuntimeInvalidTableAccess)
+			}
+			schema := f.moduleInstance.Source.TypeSection[typeIdx].ArrayField
+			elems := make([]any, count)
+			for i := uint32(0); i < count; i++ {
+				elems[i] = encodeFieldValue(schema, uint64(elem[srcOff+i]))
+			}
+			a := wasm.NewWasmArrayWith(f.moduleInstance.TypeIDs[typeIdx], elems)
+			ce.pushValue(f.moduleInstance.GCRegister(a))
+			f.moduleInstance.GCMaybeSweep(ce.stack)
+			frame.pc++
+
+		case operationKindArrayInitData:
+			typeIdx := uint32(op.U1)
+			segIdx := uint32(op.U2)
+			count := uint32(ce.popValue())
+			srcOff := uint32(ce.popValue())
+			dstOff := uint32(ce.popValue())
+			arrV := ce.popValue()
+			if arrV == 0 {
+				panic(wasmruntime.ErrRuntimeNullReference)
+			}
+			a := gcArray(arrV)
+			schema := f.moduleInstance.Source.TypeSection[typeIdx].ArrayField
+			data := f.moduleInstance.DataInstances[segIdx]
+			elemSize, ok := arrayDataElemSize(schema)
+			if !ok {
+				panic(fmt.Errorf("array.init_data on unsupported element type"))
+			}
+			if uint64(dstOff)+uint64(count) > uint64(a.Len()) ||
+				uint64(srcOff)+uint64(count)*uint64(elemSize) > uint64(len(data)) {
+				panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+			}
+			for i := uint32(0); i < count; i++ {
+				off := srcOff + i*elemSize
+				v := readDataElement(schema, data, off)
+				if err := a.Set(dstOff+i, v); err != nil {
+					panic(err)
+				}
+			}
+			frame.pc++
+
+		case operationKindArrayInitElem:
+			typeIdx := uint32(op.U1)
+			segIdx := uint32(op.U2)
+			count := uint32(ce.popValue())
+			srcOff := uint32(ce.popValue())
+			dstOff := uint32(ce.popValue())
+			arrV := ce.popValue()
+			if arrV == 0 {
+				panic(wasmruntime.ErrRuntimeNullReference)
+			}
+			a := gcArray(arrV)
+			elem := f.moduleInstance.ElementInstances[segIdx]
+			if uint64(dstOff)+uint64(count) > uint64(a.Len()) {
+				panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+			}
+			if uint64(srcOff)+uint64(count) > uint64(len(elem)) {
+				panic(wasmruntime.ErrRuntimeInvalidTableAccess)
+			}
+			schema := f.moduleInstance.Source.TypeSection[typeIdx].ArrayField
+			for i := uint32(0); i < count; i++ {
+				if err := a.Set(dstOff+i, encodeFieldValue(schema, uint64(elem[srcOff+i]))); err != nil {
+					panic(err)
+				}
+			}
+			frame.pc++
+
 		default:
 			frame.pc++
 		}
@@ -4699,8 +5122,14 @@ func (ce *callEngine) functionForOffset(table *wasm.TableInstance, offset uint64
 	}
 
 	tf := functionFromUintptr(rawPtr)
+	// Accept exact match or any declared supertype via Store.IsSubtype
+	// so a table typed `(ref $T)` accepts function entries declared
+	// `(ref $U)` where $U is a subtype of $T.
 	if tf.typeID != expectedTypeID {
-		panic(wasmruntime.ErrRuntimeIndirectCallTypeMismatch)
+		store := tf.moduleInstance.GetStore()
+		if !store.IsSubtype(tf.typeID, expectedTypeID) {
+			panic(wasmruntime.ErrRuntimeIndirectCallTypeMismatch)
+		}
 	}
 	return tf
 }
@@ -4960,4 +5389,230 @@ func v128Dot(x1Hi, x1Lo, x2Hi, x2Lo uint64) (uint64, uint64) {
 	r7 := int32(int16(x1Hi>>32)) * int32(int16(x2Hi>>32))
 	r8 := int32(int16(x1Hi>>48)) * int32(int16(x2Hi>>48))
 	return uint64(uint32(r1+r2)) | (uint64(uint32(r3+r4)) << 32), uint64(uint32(r5+r6)) | (uint64(uint32(r7+r8)) << 32)
+}
+
+// encodeFieldValue converts an operand-stack uint64 into the Go-typed value
+// stored in a struct/array field, applying narrowing for packed fields.
+func encodeFieldValue(f wasm.FieldType, raw uint64) any {
+	switch f.Kind() {
+	case wasm.ValueTypeI8.Kind():
+		return wasm.NarrowI8(int32(uint32(raw)))
+	case wasm.ValueTypeI16.Kind():
+		return wasm.NarrowI16(int32(uint32(raw)))
+	}
+	switch f.AsImmutable() {
+	case wasm.ValueTypeI32:
+		return int32(uint32(raw))
+	case wasm.ValueTypeI64:
+		return int64(raw)
+	case wasm.ValueTypeF32:
+		return math.Float32frombits(uint32(raw))
+	case wasm.ValueTypeF64:
+		return math.Float64frombits(raw)
+	}
+	if f.IsRef() {
+		if raw == 0 {
+			return nil
+		}
+		if wasm.IsGCRef(raw) {
+			if wasm.IsGCStructRef(raw) {
+				return (*wasm.WasmStruct)(wasm.UntagGCPointer(raw))
+			}
+			return (*wasm.WasmArray)(wasm.UntagGCPointer(raw))
+		}
+		return raw
+	}
+	panic(fmt.Sprintf("unsupported struct/array field type %#x", f.Kind()))
+}
+
+// decodeFieldValueRead reads a stored field value and converts it to the
+// operand-stack uint64 representation, applying sign or zero extension
+// for packed fields based on the read variant.
+func decodeFieldValueRead(f wasm.FieldType, stored any, readKind operationKind) uint64 {
+	switch f.Kind() {
+	case wasm.ValueTypeI8.Kind():
+		v := stored.(uint8)
+		if readKind == operationKindStructGetS {
+			return uint64(uint32(wasm.SignExtendI8(v)))
+		}
+		return uint64(wasm.ZeroExtendI8(v))
+	case wasm.ValueTypeI16.Kind():
+		v := stored.(uint16)
+		if readKind == operationKindStructGetS {
+			return uint64(uint32(wasm.SignExtendI16(v)))
+		}
+		return uint64(wasm.ZeroExtendI16(v))
+	}
+	switch f.AsImmutable() {
+	case wasm.ValueTypeI32:
+		return uint64(uint32(stored.(int32)))
+	case wasm.ValueTypeI64:
+		return uint64(stored.(int64))
+	case wasm.ValueTypeF32:
+		return uint64(math.Float32bits(stored.(float32)))
+	case wasm.ValueTypeF64:
+		return math.Float64bits(stored.(float64))
+	}
+	if f.IsRef() {
+		switch v := stored.(type) {
+		case *wasm.WasmStruct:
+			return wasm.TagGCStructPointer(unsafe.Pointer(v))
+		case *wasm.WasmArray:
+			return wasm.TagGCArrayPointer(unsafe.Pointer(v))
+		case uint64:
+			return v
+		case nil:
+			return 0
+		}
+	}
+	panic(fmt.Sprintf("unsupported struct/array field type %#x", f.Kind()))
+}
+
+// refMatches reports whether the operand-stack uint64 ref value matches
+// the target heap type identified by (kindByte, nullable, isConcrete,
+// typeIdx). Used by ref.test / ref.cast / br_on_cast(_fail).
+//
+// Discrimination strategy without a parallel ref stack:
+//  1. v == 0           -> null reference; matches iff target is nullable.
+//  2. v & 0b11 == 0b01 -> tagged i31; matches i31/eq/any.
+//  3. otherwise        -> heap pointer. Read TypeID from the first
+//     field of the pointed-to object. Look up the
+//     form via the module's TypeSection.
+func refMatches(v uint64, kindByte byte, nullable, isConcrete bool, typeIdx uint32, mi *wasm.ModuleInstance) bool {
+	if v == 0 {
+		return nullable
+	}
+	// Externref targets accept ANY non-null value: externref instances
+	// are raw uintptrs from the host that don't carry an engine TypeID,
+	// so we can't (and shouldn't) discriminate them by heap form. The
+	// test framework increments host externref values to avoid 0, so
+	// these may even alias the i31 tag bit pattern. Handle this case
+	// before any pointer-shape inspection. Note: noextern (the bottom
+	// of the extern hierarchy) only matches null, so reject here.
+	if !isConcrete && wasm.ValueType(kindByte) == wasm.ValueTypeExternref {
+		return true
+	}
+	// Bottom types only match null — handle before any pointer-shape
+	// inspection so raw host refs don't get derefed.
+	if !isConcrete {
+		switch wasm.ValueType(kindByte) {
+		case wasm.ValueTypeNoExternref, wasm.ValueTypeNoExnref, wasm.ValueTypeNullref:
+			return false
+		}
+	}
+	// Externref-wrapped-as-anyref values (produced by any.convert_extern)
+	// carry the 0b11 tag. They do NOT match struct/array/i31/eq targets
+	// (they're host-opaque), and they DO match any; the func family
+	// reduces to false (extern is its own hierarchy).
+	if wasm.IsTaggedExternAsAny(v) {
+		if isConcrete {
+			return false
+		}
+		// Only anyref accepts a wrapped externref; the struct/array/eq/
+		// i31/func families reject. nofuncref / noextern / etc. are
+		// bottoms and only match null.
+		return wasm.ValueType(kindByte) == wasm.ValueTypeAnyref
+	}
+	if wasm.IsTaggedI31(v) {
+		if isConcrete {
+			return false
+		}
+		switch wasm.ValueType(kindByte) {
+		case wasm.ValueTypeI31ref, wasm.ValueTypeEqref, wasm.ValueTypeAnyref:
+			return true
+		}
+		return false
+	}
+	// The remaining non-null value is either a GC ref (struct / array,
+	// tagged bit 61) or a function pointer (no tag bits).
+	store := mi.GetStore()
+	if wasm.IsGCRef(v) {
+		var objTypeID wasm.FunctionTypeID
+		var objForm wasm.CompositeForm
+		if wasm.IsGCStructRef(v) {
+			s := (*wasm.WasmStruct)(wasm.UntagGCPointer(v))
+			objTypeID, objForm = s.TypeID, wasm.CompositeFormStruct
+		} else {
+			a := (*wasm.WasmArray)(wasm.UntagGCPointer(v))
+			objTypeID, objForm = a.TypeID, wasm.CompositeFormArray
+		}
+		if isConcrete {
+			if int(typeIdx) >= len(mi.TypeIDs) {
+				return false
+			}
+			return store.IsSubtype(objTypeID, mi.TypeIDs[typeIdx])
+		}
+		if !store.IsResolvedType(objTypeID) {
+			return false
+		}
+		switch wasm.ValueType(kindByte) {
+		case wasm.ValueTypeAnyref, wasm.ValueTypeEqref:
+			return objForm == wasm.CompositeFormStruct || objForm == wasm.CompositeFormArray
+		case wasm.ValueTypeStructref:
+			return objForm == wasm.CompositeFormStruct
+		case wasm.ValueTypeArrayref:
+			return objForm == wasm.CompositeFormArray
+		}
+		return false
+	}
+	// Function pointer: matches the funcref hierarchy only. The validator
+	// constrains the static type, so v is a genuine function pointer here.
+	tf := functionFromUintptr(uintptr(v))
+	if isConcrete {
+		if int(typeIdx) >= len(mi.TypeIDs) || tf == nil {
+			return false
+		}
+		return store.IsSubtype(tf.typeID, mi.TypeIDs[typeIdx])
+	}
+	switch wasm.ValueType(kindByte) {
+	case wasm.ValueTypeFuncref:
+		// Any non-null funcref-typed value matches funcref.
+		return tf != nil
+	case wasm.ValueTypeNoFuncref:
+		// nofunc is the bottom of the func hierarchy; only null matches.
+		return false
+	}
+	return false
+}
+
+// arrayDataElemSize returns the byte size of one array element when read
+// from a data segment.
+func arrayDataElemSize(f wasm.FieldType) (uint32, bool) {
+	switch f.Kind() {
+	case wasm.ValueTypeI8.Kind():
+		return 1, true
+	case wasm.ValueTypeI16.Kind():
+		return 2, true
+	}
+	switch f.AsImmutable() {
+	case wasm.ValueTypeI32, wasm.ValueTypeF32:
+		return 4, true
+	case wasm.ValueTypeI64, wasm.ValueTypeF64:
+		return 8, true
+	case wasm.ValueTypeV128:
+		return 16, true
+	}
+	return 0, false
+}
+
+// readDataElement decodes a single array element from `data` starting at
+// `off`, returning the Go-typed value the WasmArray.Elements slice stores.
+func readDataElement(f wasm.FieldType, data []byte, off uint32) any {
+	switch f.Kind() {
+	case wasm.ValueTypeI8.Kind():
+		return uint8(data[off])
+	case wasm.ValueTypeI16.Kind():
+		return binary.LittleEndian.Uint16(data[off:])
+	}
+	switch f.AsImmutable() {
+	case wasm.ValueTypeI32:
+		return int32(binary.LittleEndian.Uint32(data[off:]))
+	case wasm.ValueTypeI64:
+		return int64(binary.LittleEndian.Uint64(data[off:]))
+	case wasm.ValueTypeF32:
+		return math.Float32frombits(binary.LittleEndian.Uint32(data[off:]))
+	case wasm.ValueTypeF64:
+		return math.Float64frombits(binary.LittleEndian.Uint64(data[off:]))
+	}
+	panic(fmt.Sprintf("unsupported element type for array.new_data: %#x", f.Kind()))
 }

@@ -77,6 +77,22 @@ func validateTypeForwardRefs(ft *wasm.FunctionType, maxTypeIndex uint32) error {
 			return fmt.Errorf("unknown type index %d in result[%d]", vt.TypeIndex(), i)
 		}
 	}
+	// GC composite types: struct fields, array element, and the declared
+	// supertype must also reference already-defined types (or, within a rec
+	// group, members of the same group).
+	for i, f := range ft.Fields {
+		if !f.IsPacked() && f.IsConcreteRef() && f.TypeIndex() >= maxTypeIndex {
+			return fmt.Errorf("unknown type index %d in field[%d]", f.TypeIndex(), i)
+		}
+	}
+	if ft.Form == wasm.CompositeFormArray {
+		if af := ft.ArrayField; !af.IsPacked() && af.IsConcreteRef() && af.TypeIndex() >= maxTypeIndex {
+			return fmt.Errorf("unknown type index %d in array element", af.TypeIndex())
+		}
+	}
+	if ft.SuperTypeIndex != nil && *ft.SuperTypeIndex >= maxTypeIndex {
+		return fmt.Errorf("unknown supertype index %d", *ft.SuperTypeIndex)
+	}
 	return nil
 }
 
