@@ -1,6 +1,8 @@
 package logging
 
 import (
+	"context"
+	"strings"
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
@@ -183,6 +185,59 @@ func TestIsInLogScope(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			require.Equal(t, tc.expected, IsInLogScope(tc.fnd, tc.scopes))
+		})
+	}
+}
+
+// Test_logFdstat ensures all of fs_rights_base and fs_rights_inheriting are
+// logged. Both are 64-bit fields, and rights are defined up to bit 28.
+func Test_logFdstat(t *testing.T) {
+	tests := []struct {
+		name               string
+		filetype           uint8
+		fdflags            uint16
+		fsRightsBase       uint64
+		fsRightsInheriting uint64
+		expected           string
+	}{
+		{
+			name:     "zero",
+			expected: "{filetype=UNKNOWN,fdflags=,fs_rights_base=,fs_rights_inheriting=}",
+		},
+		{
+			name:               "rights below the 16th bit",
+			filetype:           FILETYPE_REGULAR_FILE,
+			fdflags:            FD_APPEND,
+			fsRightsBase:       uint64(RIGHT_FD_READ | RIGHT_FD_WRITE),
+			fsRightsInheriting: uint64(RIGHT_PATH_OPEN),
+			expected:           "{filetype=REGULAR_FILE,fdflags=APPEND,fs_rights_base=FD_READ|FD_WRITE,fs_rights_inheriting=PATH_OPEN}",
+		},
+		{
+			name:               "rights at or above the 16th bit",
+			filetype:           FILETYPE_DIRECTORY,
+			fsRightsBase:       uint64(RIGHT_PATH_RENAME_SOURCE | RIGHT_FD_FILESTAT_GET | RIGHT_POLL_FD_READWRITE),
+			fsRightsInheriting: uint64(RIGHT_PATH_UNLINK_FILE | RIGHT_SOCK_SHUTDOWN),
+			expected:           "{filetype=DIRECTORY,fdflags=,fs_rights_base=PATH_RENAME_SOURCE|FD_FILESTAT_GET|POLL_FD_READWRITE,fs_rights_inheriting=PATH_UNLINK_FILE|SOCK_SHUTDOWN}",
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			mem := &wasm.MemoryInstance{Buffer: make([]byte, wasm.MemoryPageSize), Min: 1}
+			mod := &wasm.ModuleInstance{MemoryInstance: mem}
+
+			const offset = 8
+			buf := mem.Buffer[offset : offset+24]
+			le.PutUint16(buf[0:], uint16(tc.filetype))
+			le.PutUint16(buf[2:], tc.fdflags)
+			le.PutUint64(buf[8:], tc.fsRightsBase)
+			le.PutUint64(buf[16:], tc.fsRightsInheriting)
+
+			var out strings.Builder
+			logFdstat(0).Log(context.Background(), mod, &out, []uint64{offset})
+			require.Equal(t, tc.expected, out.String())
 		})
 	}
 }

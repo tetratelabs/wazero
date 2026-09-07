@@ -274,6 +274,10 @@ func (i logFilestat) Log(_ context.Context, mod api.Module, w logging.Writer, pa
 
 type logFdstat uint32
 
+// Log writes the fdstat fields: fs_filetype is a u8 at offset 0, fs_flags a
+// u16 at offset 2, and fs_rights_base and fs_rights_inheriting are both the
+// 64-bit rights type, at offsets 8 and 16.
+// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fdstat-struct
 func (i logFdstat) Log(_ context.Context, mod api.Module, w logging.Writer, params []uint64) {
 	offset, byteCount := uint32(params[i]), uint32(24)
 	if buf, ok := mod.Memory().Read(offset, byteCount); ok {
@@ -282,9 +286,9 @@ func (i logFdstat) Log(_ context.Context, mod api.Module, w logging.Writer, para
 		w.WriteString(",fdflags=")                            //nolint
 		w.WriteString(FdFlagsString(int(le.Uint16(buf[2:])))) //nolint
 		w.WriteString(",fs_rights_base=")                     //nolint
-		w.WriteString(RightsString(int(le.Uint16(buf[8:]))))  //nolint
+		w.WriteString(RightsString(int(le.Uint64(buf[8:]))))  //nolint
 		w.WriteString(",fs_rights_inheriting=")               //nolint
-		w.WriteString(RightsString(int(le.Uint16(buf[16:])))) //nolint
+		w.WriteString(RightsString(int(le.Uint64(buf[16:])))) //nolint
 		w.WriteString("}")                                    //nolint
 	}
 }
