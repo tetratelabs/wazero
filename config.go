@@ -134,6 +134,8 @@ type RuntimeConfig interface {
 	// version of wazero due to the known issue of debug.BuildInfo function: https://github.com/golang/go/issues/33976.
 	// As a consequence, your cache won't contain the correct version information and always be treated as `dev` version.
 	// To avoid this issue, you can pass -ldflags "-X github.com/tetratelabs/wazero/internal/version.version=foo" when running tests.
+	// NewCompilationCacheWithDirReadOnly requires hits and rejects guest compilation
+	// on interpreter runtimes, including automatic fallback on unsupported platforms.
 	WithCompilationCache(CompilationCache) RuntimeConfig
 
 	// WithCustomSections toggles parsing of "custom sections". Defaults to false.
