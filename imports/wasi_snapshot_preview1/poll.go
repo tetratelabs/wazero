@@ -89,7 +89,8 @@ func pollOneoffFn(_ context.Context, mod api.Module, params []uint64) sys.Errno 
 		file sys.File
 	}
 	// The timeout is initialized at max Duration, the loop will find the minimum.
-	var timeout time.Duration = 1<<63 - 1
+	const noTimeout = time.Duration(1<<63 - 1)
+	timeout := noTimeout
 	// Count of all the subscriptions that have been already written back to outBuf.
 	// nevents*32 returns at all times the offset where the next event should be written:
 	// this way we ensure that there are no gaps between records.
@@ -166,9 +167,9 @@ func pollOneoffFn(_ context.Context, mod api.Module, params []uint64) sys.Errno 
 	if nevents == nsubscriptions {
 		// We already wrote back all the results. We already wrote this number
 		// earlier to offset `resultNevents`.
-		// We only need to observe the timeout (nonzero if there are clock subscriptions)
+		// We only need to observe the timeout (lowered only by clock subscriptions)
 		// and return.
-		if timeout > 0 {
+		if timeout != noTimeout && timeout > 0 {
 			sysCtx.Nanosleep(int64(timeout))
 		}
 		return 0

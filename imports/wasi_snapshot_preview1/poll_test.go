@@ -63,6 +63,37 @@ func Test_pollOneoff(t *testing.T) {
 	require.Equal(t, nsubscriptions, nevents)
 }
 
+// Test_pollOneoff_NoClockSubscription verifies that a subscription list with no
+// clock subscription returns instead of sleeping on the sentinel timeout:
+// wasi-libc emits no clock subscription for poll(fds, nfds, -1).
+func Test_pollOneoff_NoClockSubscription(t *testing.T) {
+	var slept []int64
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().
+		WithNanosleep(func(ns int64) { slept = append(slept, ns) }))
+	defer r.Close(testCtx)
+
+	in := uint32(0)    // past in
+	out := uint32(128) // past in
+	nsubscriptions := uint32(1)
+	resultNevents := uint32(512) // past out
+
+	maskMemory(t, mod, 1024)
+	mod.Memory().Write(in, fdWriteSubFd(byte(sys.FdStdout)))
+
+	requireErrnoResult(t, wasip1.ErrnoSuccess, mod, wasip1.PollOneoffName, uint64(in), uint64(out),
+		uint64(nsubscriptions), uint64(resultNevents))
+	require.Equal(t, `
+==> wasi_snapshot_preview1.poll_oneoff(in=0,out=128,nsubscriptions=1)
+<== (nevents=1,errno=ESUCCESS)
+`, "\n"+log.String())
+
+	nevents, ok := mod.Memory().ReadUint32Le(resultNevents)
+	require.True(t, ok)
+	require.Equal(t, nsubscriptions, nevents)
+
+	require.Zero(t, len(slept))
+}
+
 func Test_pollOneoff_Errors(t *testing.T) {
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig())
 	defer r.Close(testCtx)
@@ -887,4 +918,16 @@ func (p *pollableFile) Poll(flag experimentalsys.Pflag, timeoutMillis int32) (re
 		time.Sleep(p.sleep)
 	}
 	return p.ready, p.errno
+}
+
+func fdWriteSubFd(fd byte) []byte {
+	return []byte{
+		0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // userdata
+		wasip1.EventTypeFdWrite, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+		fd, 0x0, 0x0, 0x0, // valid writable FD
+		0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+		0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+		0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+		0x0, 0x0, 0x0, 0x0, // pad to 32 bytes
+	}
 }
