@@ -3091,6 +3091,44 @@ var TryTableCatchWithReturnCall = TestCase{
 	},
 }
 
+// CompareFusedAcrossBlocks defines a compare whose operand folds into the
+// compare itself (i64.extend_i32_u on arm64), consumed by a branch in a
+// later block. The store in between forces a new instruction group, so the
+// compare must not be re-materialized at the branch.
+var CompareFusedAcrossBlocks = TestCase{
+	Name: "compare_fused_across_blocks",
+	Module: &wasm.Module{
+		TypeSection:     []wasm.FunctionType{{Params: []wasm.ValueType{i64, i32}, Results: []wasm.ValueType{i32}}},
+		ExportSection:   []wasm.Export{{Name: ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 0}},
+		MemorySection:   &wasm.Memory{Min: 1},
+		FunctionSection: []wasm.Index{0},
+		CodeSection: []wasm.Code{{
+			LocalTypes: []wasm.ValueType{i32},
+			Body: []byte{
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeI64ExtendI32U,
+				wasm.OpcodeI64Eq,
+				wasm.OpcodeLocalSet, 2,
+				// Side effect between the compare and its use.
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeIf, blockSignature_vv,
+				wasm.OpcodeI32Const, 0,
+				wasm.OpcodeI32Const, 0,
+				wasm.OpcodeI32Store, 0x2, 0x0,
+				wasm.OpcodeEnd,
+				wasm.OpcodeLocalGet, 2,
+				wasm.OpcodeIf, blockSignature_vv,
+				wasm.OpcodeI32Const, 7,
+				wasm.OpcodeReturn,
+				wasm.OpcodeEnd,
+				wasm.OpcodeI32Const, 9,
+				wasm.OpcodeEnd,
+			},
+		}},
+	},
+}
+
 var LargeMethodBodyWithManyArgs = TestCase{
 	Name: "large_method_body_with_many_args",
 	Module: &wasm.Module{

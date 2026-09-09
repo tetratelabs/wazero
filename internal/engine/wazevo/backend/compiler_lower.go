@@ -32,6 +32,13 @@ func (c *compiler) lowerBlocks() {
 
 func (c *compiler) lowerBlock(blk ssa.BasicBlock) {
 	mach := c.mach
+	// Every InstructionGroupID belongs to exactly one block (see the doc
+	// comment on ssa.InstructionGroupID), and a block's own group IDs form a
+	// contiguous range starting at its first instruction's. Recording that
+	// here lets MatchPureInstrOneOf tell a definition in this block, safe to
+	// fuse across intervening side effects, from one in an earlier block,
+	// which is never safe to fuse.
+	c.currentBlockStartGID = blk.Root().GroupID()
 	mach.StartBlock(blk)
 
 	// We traverse the instructions in reverse order because we might want to lower multiple

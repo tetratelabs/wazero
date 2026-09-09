@@ -1322,7 +1322,7 @@ func (m *machine) lowerSelect(x, y, cval, ret ssa.Value) {
 		xc, yc, cc := icmp.IcmpData()
 		m.lowerIcmpToFlag(m.c.ValueDefinition(xc), m.c.ValueDefinition(yc), xc.Type() == ssa.TypeI64)
 		cond = condFromSSAIntCmpCond(cc)
-		icmp.Lowered()
+		icmp.MarkLowered()
 	default: // TODO: match ssa.OpcodeFcmp for optimization, but seems a bit complex.
 		cv := m.getOperand_Reg(cvalDef)
 		test := m.allocateInstr().asCmpRmiR(false, cv, cv.reg(), false)

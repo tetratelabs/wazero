@@ -132,25 +132,10 @@ func (m *mockCompiler) MatchInstrOneOf(def backend.SSAValueDefinition, opcodes [
 	return ssa.OpcodeInvalid
 }
 
-// MatchPureInstrOneOf implements backend.Compiler.
+// MatchPureInstrOneOf implements backend.Compiler. This mock only ever models
+// a single block, so the block-boundary restriction is disabled (lowGID 0).
 func (m *mockCompiler) MatchPureInstrOneOf(def backend.SSAValueDefinition, opcodes []ssa.Opcode) ssa.Opcode {
-	instr := def.Instr
-	if !def.IsFromInstr() {
-		return ssa.OpcodeInvalid
-	}
-	if def.RefCount >= 2 {
-		return ssa.OpcodeInvalid
-	}
-	if instr.Lowered() {
-		return ssa.OpcodeInvalid
-	}
-	opcode := instr.Opcode()
-	for _, op := range opcodes {
-		if opcode == op {
-			return opcode
-		}
-	}
-	return ssa.OpcodeInvalid
+	return backend.MatchPureInstrOneOf(def, 0, opcodes)
 }
 
 // Compile implements backend.Compiler.

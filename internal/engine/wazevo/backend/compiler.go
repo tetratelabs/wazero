@@ -87,11 +87,15 @@ type Compiler interface {
 	// Note: caller should be careful to avoid excessive allocation on opcodes slice.
 	MatchInstrOneOf(def SSAValueDefinition, opcodes []ssa.Opcode) ssa.Opcode
 
-	// MatchPureInstrOneOf is like MatchInstrOneOf but without the
-	// instruction-group restriction. It must only be used with pure
-	// (side-effect-free, non-trapping) opcodes whose evaluation can be sunk
-	// to the matching site regardless of intervening side effects, e.g. an
-	// integer comparison sunk into the conditional branch that consumes it.
+	// MatchPureInstrOneOf is like MatchInstrOneOf but, within the block
+	// currently being lowered, without the instruction-group restriction. It
+	// must only be used with pure (side-effect-free, non-trapping) opcodes
+	// whose evaluation can be sunk to the matching site regardless of
+	// intervening side effects, e.g. an integer comparison sunk into the
+	// conditional branch that consumes it. A definition from an earlier
+	// block never matches, regardless of purity: fusing it away would leave
+	// it unmaterialized where other block-scoped backend state, such as the
+	// register allocator's liveness analysis, still expects to find it.
 	// The not-yet-lowered check keeps this sound under any lowering order:
 	// if the definition was already materialized elsewhere, the match fails
 	// and the caller falls back to using the materialized value.
@@ -133,7 +137,17 @@ type RelocationInfo struct {
 type compiler struct {
 	mach       Machine
 	currentGID ssa.InstructionGroupID
-	ssaBuilder ssa.Builder
+	// currentBlockStartGID is the InstructionGroupID of the first instruction
+	// in the basic block currently being lowered. Since a block boundary
+	// always ends in a side-effecting branch, every InstructionGroupID
+	// belongs to exactly one block, and a block's own group IDs form a
+	// contiguous range starting here. MatchPureInstrOneOf uses it to tell a
+	// definition in the current block (safe to fuse across intervening side
+	// effects) from one in an earlier block (never safe to fuse: it would
+	// leave the def unmaterialized where other block-scoped backend state,
+	// e.g. regalloc liveness, still expects to find it).
+	currentBlockStartGID ssa.InstructionGroupID
+	ssaBuilder           ssa.Builder
 	// nextVRegID is the next virtual register ID to be allocated.
 	nextVRegID regalloc.VRegID
 	// ssaValueToVRegs maps ssa.ValueID to regalloc.VReg.
@@ -278,6 +292,7 @@ func (c *compiler) AllocateVReg(typ ssa.Type) regalloc.VReg {
 // Init implements Compiler.Init.
 func (c *compiler) Init() {
 	c.currentGID = 0
+	c.currentBlockStartGID = 0
 	c.nextVRegID = regalloc.VRegIDNonReservedBegin
 	c.returnVRegs = c.returnVRegs[:0]
 	c.mach.Reset()
@@ -323,6 +338,21 @@ func (c *compiler) MatchInstr(def SSAValueDefinition, opcode ssa.Opcode) bool {
 
 // MatchPureInstrOneOf implements Compiler.MatchPureInstrOneOf.
 func (c *compiler) MatchPureInstrOneOf(def SSAValueDefinition, opcodes []ssa.Opcode) ssa.Opcode {
+	return MatchPureInstrOneOf(def, c.currentBlockStartGID, opcodes)
+}
+
+// MatchPureInstrOneOf is the free-standing implementation behind
+// Compiler.MatchPureInstrOneOf, factored out so the ISA packages' test mocks
+// can share it instead of each keeping their own copy.
+//
+// def matches one of opcodes only if it is a not-yet-lowered, single-use
+// instruction whose InstructionGroupID is not older than lowGID. Pass the
+// InstructionGroupID of the first instruction in the block currently being
+// lowered as lowGID (see compiler.currentBlockStartGID) to allow fusion
+// across intervening side effects within that block while still rejecting a
+// definition from an earlier block; pass 0 to disable the restriction
+// entirely, which is what the ISA packages' single-block test mocks do.
+func MatchPureInstrOneOf(def SSAValueDefinition, lowGID ssa.InstructionGroupID, opcodes []ssa.Opcode) ssa.Opcode {
 	instr := def.Instr
 	if !def.IsFromInstr() {
 		return ssa.OpcodeInvalid
@@ -331,6 +361,9 @@ func (c *compiler) MatchPureInstrOneOf(def SSAValueDefinition, opcodes []ssa.Opc
 		return ssa.OpcodeInvalid
 	}
 	if instr.Lowered() {
+		return ssa.OpcodeInvalid
+	}
+	if instr.GroupID() < lowGID {
 		return ssa.OpcodeInvalid
 	}
 	opcode := instr.Opcode()
