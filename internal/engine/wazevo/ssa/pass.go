@@ -264,6 +264,9 @@ func passDeadCodeEliminationOpt(b *builder) {
 		}
 	}
 
+	// Instructions created by later passes continue the numbering from here.
+	b.nextGID = gid
+
 	// Find all the instructions referenced by live instructions transitively.
 	for len(liveInstructions) > 0 {
 		tail := len(liveInstructions) - 1
