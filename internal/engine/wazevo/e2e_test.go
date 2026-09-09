@@ -966,6 +966,13 @@ func TestE2E(t *testing.T) {
 				{params: []uint64{5, 6}, expResults: []uint64{9}},
 			},
 		},
+		{
+			name: "compare_fused_across_split_edge", m: testcases.CompareFusedAcrossSplitEdge.Module,
+			calls: []callCase{
+				{params: []uint64{5, 5}, expResults: []uint64{5}},
+				{params: []uint64{5, 6}, expResults: []uint64{9}},
+			},
+		},
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {

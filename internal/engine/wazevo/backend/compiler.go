@@ -92,13 +92,16 @@ type Compiler interface {
 	// must only be used with pure (side-effect-free, non-trapping) opcodes
 	// whose evaluation can be sunk to the matching site regardless of
 	// intervening side effects, e.g. an integer comparison sunk into the
-	// conditional branch that consumes it. A definition from an earlier
-	// block never matches, regardless of purity: fusing it away would leave
-	// it unmaterialized where other block-scoped backend state, such as the
-	// register allocator's liveness analysis, still expects to find it.
-	// The not-yet-lowered check keeps this sound under any lowering order:
-	// if the definition was already materialized elsewhere, the match fails
-	// and the caller falls back to using the materialized value.
+	// conditional branch that consumes it.
+	//
+	// A definition from another block never matches, regardless of purity.
+	// Blocks are lowered in reverse post-order, so a definition in another
+	// block has usually been lowered already; but Lowered() only records
+	// consumption by a fusion, not ordinary lowering, so it cannot tell. The
+	// definition would then be emitted twice, and anything folded into its
+	// first emission (an extend, say) never gets a register of its own, which
+	// the second emission then reads. Within one block the consumer is always
+	// lowered before the definition it fuses, so this cannot happen.
 	MatchPureInstrOneOf(def SSAValueDefinition, opcodes []ssa.Opcode) ssa.Opcode
 
 	// AddRelocationInfo appends the relocation information for the function reference at the current buffer offset.
@@ -137,17 +140,18 @@ type RelocationInfo struct {
 type compiler struct {
 	mach       Machine
 	currentGID ssa.InstructionGroupID
-	// currentBlockStartGID is the InstructionGroupID of the first instruction
-	// in the basic block currently being lowered. Since a block boundary
-	// always ends in a side-effecting branch, every InstructionGroupID
-	// belongs to exactly one block, and a block's own group IDs form a
-	// contiguous range starting here. MatchPureInstrOneOf uses it to tell a
-	// definition in the current block (safe to fuse across intervening side
-	// effects) from one in an earlier block (never safe to fuse: it would
-	// leave the def unmaterialized where other block-scoped backend state,
-	// e.g. regalloc liveness, still expects to find it).
-	currentBlockStartGID ssa.InstructionGroupID
-	ssaBuilder           ssa.Builder
+	// currentBlockStartGID and currentBlockEndGID are the InstructionGroupIDs
+	// of the first and last instruction of the block currently being lowered.
+	// Group IDs are assigned in one sweep over the blocks and every block ends
+	// in a side-effecting branch, so a block's instructions carry a contiguous
+	// run of IDs that no other block shares (see ssa.InstructionGroupID).
+	// MatchPureInstrOneOf tests a definition against this range to decide
+	// whether it is in the current block. It has to be the whole range, not
+	// just a lower bound: blocks are numbered in allocation order, which is
+	// not dominance order, so a block can be dominated by one numbered after
+	// it, whose definitions would pass a lower bound.
+	currentBlockStartGID, currentBlockEndGID ssa.InstructionGroupID
+	ssaBuilder                               ssa.Builder
 	// nextVRegID is the next virtual register ID to be allocated.
 	nextVRegID regalloc.VRegID
 	// ssaValueToVRegs maps ssa.ValueID to regalloc.VReg.
@@ -292,7 +296,7 @@ func (c *compiler) AllocateVReg(typ ssa.Type) regalloc.VReg {
 // Init implements Compiler.Init.
 func (c *compiler) Init() {
 	c.currentGID = 0
-	c.currentBlockStartGID = 0
+	c.currentBlockStartGID, c.currentBlockEndGID = 0, 0
 	c.nextVRegID = regalloc.VRegIDNonReservedBegin
 	c.returnVRegs = c.returnVRegs[:0]
 	c.mach.Reset()
@@ -338,21 +342,21 @@ func (c *compiler) MatchInstr(def SSAValueDefinition, opcode ssa.Opcode) bool {
 
 // MatchPureInstrOneOf implements Compiler.MatchPureInstrOneOf.
 func (c *compiler) MatchPureInstrOneOf(def SSAValueDefinition, opcodes []ssa.Opcode) ssa.Opcode {
-	return MatchPureInstrOneOf(def, c.currentBlockStartGID, opcodes)
+	return MatchPureInstrOneOf(def, c.currentBlockStartGID, c.currentBlockEndGID, opcodes)
 }
 
 // MatchPureInstrOneOf is the free-standing implementation behind
 // Compiler.MatchPureInstrOneOf, factored out so the ISA packages' test mocks
 // can share it instead of each keeping their own copy.
 //
-// def matches one of opcodes only if it is a not-yet-lowered, single-use
-// instruction whose InstructionGroupID is not older than lowGID. Pass the
-// InstructionGroupID of the first instruction in the block currently being
-// lowered as lowGID (see compiler.currentBlockStartGID) to allow fusion
-// across intervening side effects within that block while still rejecting a
-// definition from an earlier block; pass 0 to disable the restriction
-// entirely, which is what the ISA packages' single-block test mocks do.
-func MatchPureInstrOneOf(def SSAValueDefinition, lowGID ssa.InstructionGroupID, opcodes []ssa.Opcode) ssa.Opcode {
+// def matches one of opcodes only if it is a not-yet-fused, single-use
+// instruction whose InstructionGroupID lies in [lowGID, highGID]. Pass the
+// group IDs of the first and last instruction of the block currently being
+// lowered (see compiler.currentBlockStartGID) to allow fusion across
+// intervening side effects within that block while rejecting a definition
+// from any other block. The ISA packages' test mocks, which only ever model a
+// single block, pass the full range to disable the restriction.
+func MatchPureInstrOneOf(def SSAValueDefinition, lowGID, highGID ssa.InstructionGroupID, opcodes []ssa.Opcode) ssa.Opcode {
 	instr := def.Instr
 	if !def.IsFromInstr() {
 		return ssa.OpcodeInvalid
@@ -363,7 +367,7 @@ func MatchPureInstrOneOf(def SSAValueDefinition, lowGID ssa.InstructionGroupID, 
 	if instr.Lowered() {
 		return ssa.OpcodeInvalid
 	}
-	if instr.GroupID() < lowGID {
+	if gid := instr.GroupID(); gid < lowGID || gid > highGID {
 		return ssa.OpcodeInvalid
 	}
 	opcode := instr.Opcode()

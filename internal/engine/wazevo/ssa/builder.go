@@ -167,6 +167,12 @@ type builder struct {
 	nextValueID ValueID
 	// nextVariable is used by builder.AllocateVariable.
 	nextVariable Variable
+	// nextGID is the first InstructionGroupID not handed out by
+	// passDeadCodeEliminationOpt. Instructions created by later passes, which
+	// today is only the branch splitCriticalEdge adds, take their group IDs
+	// from here, so every block's instructions keep a contiguous run of IDs
+	// unique to that block (see InstructionGroupID).
+	nextGID InstructionGroupID
 
 	// valueAnnotations contains the annotations for each Value, only used for debugging.
 	valueAnnotations map[ValueID]string
@@ -269,6 +275,7 @@ func (b *builder) ReturnBlock() BasicBlock {
 // Init implements Builder.Reset.
 func (b *builder) Init(s *Signature) {
 	b.nextVariable = 0
+	b.nextGID = 0
 	b.currentSignature = s
 	b.zeros = [typeEnd]Value{ValueInvalid, ValueInvalid, ValueInvalid, ValueInvalid, ValueInvalid, ValueInvalid}
 	resetBasicBlock(b.returnBlk)
