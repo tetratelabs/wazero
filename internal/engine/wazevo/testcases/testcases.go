@@ -3092,9 +3092,12 @@ var TryTableCatchWithReturnCall = TestCase{
 }
 
 // CompareFusedAcrossBlocks defines a compare whose operand folds into the
-// compare itself (i64.extend_i32_u on arm64), consumed by a branch in a
-// later block. The store in between forces a new instruction group, so the
-// compare must not be re-materialized at the branch.
+// compare itself (i64.extend_i32_u on arm64), consumed by a branch in a later
+// block, with a store in a block between them. The compare must be lowered
+// once, in its own block, and never fused into the branch: fusing it there
+// would emit it a second time, reading the folded operand's undefined
+// register. Reported against an earlier version of the change that sank
+// comparisons across blocks.
 var CompareFusedAcrossBlocks = TestCase{
 	Name: "compare_fused_across_blocks",
 	Module: &wasm.Module{

@@ -164,12 +164,6 @@ func (m *mockCompiler) MatchInstrOneOf(def backend.SSAValueDefinition, opcodes [
 	return ssa.OpcodeInvalid
 }
 
-// MatchPureInstrOneOf implements backend.Compiler. This mock only ever models
-// a single block, so the block restriction is disabled with the full range.
-func (m *mockCompiler) MatchPureInstrOneOf(def backend.SSAValueDefinition, opcodes []ssa.Opcode) ssa.Opcode {
-	return backend.MatchPureInstrOneOf(def, 0, ^ssa.InstructionGroupID(0), opcodes)
-}
-
 // Compile implements backend.Compiler.
 func (m *mockCompiler) Compile(context.Context) (_ []byte, _ []backend.RelocationInfo, _ error) {
 	return
