@@ -164,7 +164,8 @@ type Module interface {
 	// definitions in this module, keyed on export name.
 	ExportedFunctionDefinitions() map[string]FunctionDefinition
 
-	// TODO: Table
+	// ExportedTable returns a table exported from this module or nil if it wasn't.
+	ExportedTable(name string) Table
 
 	// ExportedMemory returns a memory exported from this module or nil if it wasn't.
 	//
@@ -283,6 +284,31 @@ type MemoryDefinition interface {
 	Min() uint32
 
 	// Max returns the possibly zero max count of 64KB pages, or false if
+	// unbounded.
+	Max() (uint32, bool)
+
+	internalapi.WazeroOnly
+}
+
+// TableDefinition is a WebAssembly table exported in a module
+// (wazero.CompiledModule).
+//
+// See https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/syntax/modules.html#tables
+//
+// # Notes
+//
+//   - This is an interface for decoupling, not third-party implementations.
+//     All implementations are in wazero.
+type TableDefinition interface {
+	ExportDefinition
+
+	// Type returns the reference type of this table's elements: RefTypeFuncref or RefTypeExternref.
+	Type() ValueType
+
+	// Min returns the initial count of elements in this table.
+	Min() uint32
+
+	// Max returns the max count of elements in this table, or false if
 	// unbounded.
 	Max() (uint32, bool)
 
@@ -546,6 +572,57 @@ type MutableGlobal interface {
 	//
 	// See Global.Type for how to encode this value from a Go type.
 	Set(v uint64)
+
+	internalapi.WazeroOnly
+}
+
+// Table is a WebAssembly table exported from an instantiated module (wazero.Runtime InstantiateModule).
+//
+// A table element (a funcref or externref) is represented internally as a raw uintptr, the same Reference
+// type ElementSegment/TableInstance already use. Get, Set and Grow encode and decode that value as a uint64,
+// the same convention Global.Get/MutableGlobal.Set use, via EncodeExternref/DecodeExternref. An externref
+// table stores whatever uintptr the host puts there, often a handle into a host-side registry rather than a
+// real Go pointer, since a raw uintptr isn't visible to the Go garbage collector - see EncodeExternref's doc.
+//
+// Get/Set don't hand back a live Go value directly, the way a table's own host object might suggest: wazero
+// doesn't keep host objects alive against the GC for Global or Memory either, and a table shouldn't be an
+// exception.
+//
+// See https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/syntax/modules.html#tables
+//
+// # Notes
+//
+//   - This is an interface for decoupling, not third-party implementations.
+//     All implementations are in wazero.
+type Table interface {
+	fmt.Stringer
+
+	// Type returns the reference type of this table's elements: RefTypeFuncref or RefTypeExternref.
+	Type() ValueType
+
+	// Size returns the count of elements in the table.
+	//
+	// See https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/exec/instructions.html#xref-syntax-instructions-syntax-instr-table-mathsf-table-size-x
+	Size() uint32
+
+	// Grow increases the table by delta elements, initializing any new elements to init (encoded the same way
+	// Set encodes v). Returns the previous size, or false if the growth was rejected (e.g. delta would exceed the
+	// table's declared maximum) - the same "returns false instead of -1" convention as Memory.Grow.
+	//
+	// See https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/exec/instructions.html#xref-syntax-instructions-syntax-instr-table-mathsf-table-grow-x
+	Grow(delta uint32, init uint64) (previousSize uint32, ok bool)
+
+	// Get returns the raw reference at index i (decode with DecodeExternref for an externref table), or an error
+	// if i is out of bounds.
+	//
+	// See https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/exec/instructions.html#xref-syntax-instructions-syntax-instr-table-mathsf-table-get-x
+	Get(i uint32) (ref uint64, err error)
+
+	// Set writes v (encode with EncodeExternref for an externref table) at index i, or returns an error if i is
+	// out of bounds.
+	//
+	// See https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/exec/instructions.html#xref-syntax-instructions-syntax-instr-table-mathsf-table-set-x
+	Set(i uint32, v uint64) error
 
 	internalapi.WazeroOnly
 }

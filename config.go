@@ -346,6 +346,17 @@ type CompiledModule interface {
 	// memory.
 	ExportedMemories() map[string]api.MemoryDefinition
 
+	// ImportedTables returns all the imported tables
+	// (api.TableDefinition) in this module or nil if there are none.
+	//
+	// Note: Unlike ExportedTables, there is no unique constraint on
+	// imports.
+	ImportedTables() []api.TableDefinition
+
+	// ExportedTables returns all the exported tables
+	// (api.TableDefinition) in this module keyed on export name.
+	ExportedTables() map[string]api.TableDefinition
+
 	// CustomSections returns all the custom sections
 	// (api.CustomSection) in this module keyed on the section name.
 	CustomSections() []api.CustomSection
@@ -402,6 +413,16 @@ func (c *compiledModule) ImportedMemories() []api.MemoryDefinition {
 // ExportedMemories implements CompiledModule.ExportedMemories
 func (c *compiledModule) ExportedMemories() map[string]api.MemoryDefinition {
 	return c.module.ExportedMemories()
+}
+
+// ImportedTables implements CompiledModule.ImportedTables
+func (c *compiledModule) ImportedTables() []api.TableDefinition {
+	return c.module.ImportedTables()
+}
+
+// ExportedTables implements CompiledModule.ExportedTables
+func (c *compiledModule) ExportedTables() map[string]api.TableDefinition {
+	return c.module.ExportedTables()
 }
 
 // CustomSections implements CompiledModule.CustomSections

@@ -326,6 +326,95 @@ func TestModule_Global(t *testing.T) {
 	}
 }
 
+// TestModule_Table covers api.Module.ExportedTable, mirroring
+// TestModule_Global's own no-export/exported table cases directly above.
+func TestModule_Table(t *testing.T) {
+	max := uint32(5)
+
+	tests := []struct {
+		name     string
+		module   *wasm.Module
+		expected bool
+	}{
+		{
+			name:   "no table",
+			module: &wasm.Module{},
+		},
+		{
+			name: "table not exported",
+			module: &wasm.Module{
+				TableSection: []wasm.Table{{Min: 2, Max: &max, Type: wasm.RefTypeExternref}},
+			},
+		},
+		{
+			name: "table exported",
+			module: &wasm.Module{
+				TableSection: []wasm.Table{{Min: 2, Max: &max, Type: wasm.RefTypeExternref}},
+				Exports: map[string]*wasm.Export{
+					"table": {Type: wasm.ExternTypeTable, Name: "table"},
+				},
+			},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			r := NewRuntime(testCtx).(*runtime)
+			defer r.Close(testCtx)
+
+			code := &compiledModule{module: tc.module}
+
+			err := r.store.Engine.CompileModule(testCtx, code.module, nil, false)
+			require.NoError(t, err)
+
+			module, err := r.InstantiateModule(testCtx, code, NewModuleConfig())
+			require.NoError(t, err)
+
+			table := module.ExportedTable("table")
+			if !tc.expected {
+				require.Nil(t, table)
+				return
+			}
+			require.Equal(t, api.ValueTypeExternref, table.Type())
+			require.Equal(t, uint32(2), table.Size())
+
+			// Fresh externref slots start out null (Reference zero).
+			ref, err := table.Get(0)
+			require.NoError(t, err)
+			require.Equal(t, uint64(0), ref)
+
+			// Set/Get round-trips a raw reference.
+			require.NoError(t, table.Set(1, api.EncodeExternref(0xdeadbeef)))
+			ref, err = table.Get(1)
+			require.NoError(t, err)
+			require.Equal(t, uintptr(0xdeadbeef), api.DecodeExternref(ref))
+
+			// Out of bounds access errors rather than panicking.
+			_, err = table.Get(2)
+			require.Error(t, err)
+			require.Error(t, table.Set(2, 0))
+
+			// Grow appends delta elements initialized to init, and returns the
+			// previous size.
+			prev, ok := table.Grow(3, api.EncodeExternref(7))
+			require.True(t, ok)
+			require.Equal(t, uint32(2), prev)
+			require.Equal(t, uint32(5), table.Size())
+			ref, err = table.Get(4)
+			require.NoError(t, err)
+			require.Equal(t, uintptr(7), api.DecodeExternref(ref))
+
+			// Growing past Max is rejected, not silently clamped.
+			_, ok = table.Grow(1, 0)
+			require.False(t, ok)
+			require.Equal(t, uint32(5), table.Size())
+		})
+	}
+}
+
 func TestRuntime_InstantiateModule_UsesContext(t *testing.T) {
 	r := NewRuntime(testCtx)
 	defer r.Close(testCtx)
