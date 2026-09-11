@@ -276,6 +276,27 @@ func (m *ModuleInstance) buildTables(module *Module, skipBoundCheck bool) (err e
 	return
 }
 
+// Get returns the raw reference at index i, or an error if i is out of bounds.
+//
+// See api.Table.Get
+func (t *TableInstance) Get(i uint32) (Reference, error) {
+	if i >= uint32(len(t.References)) {
+		return 0, fmt.Errorf("out of bounds table access %d >= %d", i, len(t.References))
+	}
+	return t.References[i], nil
+}
+
+// Set writes ref at index i, or returns an error if i is out of bounds.
+//
+// See api.Table.Set
+func (t *TableInstance) Set(i uint32, ref Reference) error {
+	if i >= uint32(len(t.References)) {
+		return fmt.Errorf("out of bounds table access %d >= %d", i, len(t.References))
+	}
+	t.References[i] = ref
+	return nil
+}
+
 // checkSegmentBounds fails if the capacity needed for an ElementSegment.Init is larger than limitsType.Min
 //
 // WebAssembly 1.0 (20191205) doesn't forbid growing to accommodate element segments, and spectests are inconsistent.

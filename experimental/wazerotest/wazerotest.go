@@ -105,6 +105,12 @@ func (m *Module) ExportedGlobal(name string) api.Global {
 	return m.exportedGlobals[name]
 }
 
+// ExportedTable implements the same method as documented on api.Module. This
+// test helper doesn't model tables - always returns nil.
+func (m *Module) ExportedTable(name string) api.Table {
+	return nil
+}
+
 // Close implements the same method as documented on api.Closer.
 func (m *Module) Close(ctx context.Context) error {
 	return m.CloseWithExitCode(ctx, 0)

@@ -227,6 +227,15 @@ func (m *ModuleInstance) GlobalVal(idx Index) uint64 {
 	return m.Globals[idx].Val
 }
 
+// ExportedTable implements the same method as documented on api.Module.
+func (m *ModuleInstance) ExportedTable(name string) api.Table {
+	exp, err := m.getExport(name, ExternTypeTable)
+	if err != nil {
+		return nil
+	}
+	return exportedTable{t: m.Tables[exp.Index]}
+}
+
 // ExportedGlobal implements the same method as documented on api.Module.
 func (m *ModuleInstance) ExportedGlobal(name string) api.Global {
 	exp, err := m.getExport(name, ExternTypeGlobal)
