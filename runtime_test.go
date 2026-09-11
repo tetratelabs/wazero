@@ -326,8 +326,7 @@ func TestModule_Global(t *testing.T) {
 	}
 }
 
-// TestModule_Table covers api.Module.ExportedTable - added alongside this
-// fork's ExportedTable/api.Table gap fix (wazero#2461), mirroring
+// TestModule_Table covers api.Module.ExportedTable, mirroring
 // TestModule_Global's own no-export/exported table cases directly above.
 func TestModule_Table(t *testing.T) {
 	max := uint32(5)

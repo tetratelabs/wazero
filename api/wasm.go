@@ -165,9 +165,6 @@ type Module interface {
 	ExportedFunctionDefinitions() map[string]FunctionDefinition
 
 	// ExportedTable returns a table exported from this module or nil if it wasn't.
-	//
-	// wazero#2461 tracks this gap upstream; this fork adds it ahead of that issue being resolved there - see
-	// this fork's README for the divergence/maintenance note.
 	ExportedTable(name string) Table
 
 	// ExportedMemory returns a memory exported from this module or nil if it wasn't.
@@ -581,16 +578,15 @@ type MutableGlobal interface {
 
 // Table is a WebAssembly table exported from an instantiated module (wazero.Runtime InstantiateModule).
 //
-// wazero's internal representation of a table element (a funcref or externref) is a raw uintptr - the same
-// Reference type used to build ElementSegment/TableInstance internally. Get, Set and Grow encode/decode that
-// value as a uint64 on the way in/out, the same convention Global.Get/MutableGlobal.Set already use, and the
-// same one EncodeExternref/DecodeExternref exist for: an externref-typed table stores whatever uintptr the host
-// chose to put there (frequently a handle/index into a host-side registry rather than a real Go pointer, since a
-// raw uintptr is invisible to the Go garbage collector - see EncodeExternref's own doc).
+// A table element (a funcref or externref) is represented internally as a raw uintptr, the same Reference
+// type ElementSegment/TableInstance already use. Get, Set and Grow encode and decode that value as a uint64,
+// the same convention Global.Get/MutableGlobal.Set use, via EncodeExternref/DecodeExternref. An externref
+// table stores whatever uintptr the host puts there, often a handle into a host-side registry rather than a
+// real Go pointer, since a raw uintptr isn't visible to the Go garbage collector - see EncodeExternref's doc.
 //
-// This diverges from the shape proposed in wazero#2461 (`Set(ctx, i, myHostObj any)`, taking a live Go value
-// directly): that shape would require wazero itself to keep host objects alive opposite the GC, which wazero does
-// not do for globals or memory either. Get/Set here stay symmetric with the rest of this package instead.
+// Get/Set don't hand back a live Go value directly, the way a table's own host object might suggest: wazero
+// doesn't keep host objects alive against the GC for Global or Memory either, and a table shouldn't be an
+// exception.
 //
 // See https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/syntax/modules.html#tables
 //

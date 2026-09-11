@@ -193,9 +193,8 @@ type Module struct {
 	MemoryDefinitionSection []MemoryDefinition
 
 	// TableDefinitionSection is a wazero-specific section, mirroring
-	// MemoryDefinitionSection - added alongside ExportedTable (wazero#2461)
-	// so exported tables can be enumerated the same way exported memories
-	// already are.
+	// MemoryDefinitionSection so exported tables can be enumerated the
+	// same way exported memories already are.
 	TableDefinitionSection []TableDefinition
 
 	// DWARFLines is used to emit DWARF based stack trace. This is created from the multiple custom sections

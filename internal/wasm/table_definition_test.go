@@ -7,9 +7,9 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
-// TestModule_BuildTableDefinitions mirrors TestModule_BuildMemoryDefinitions -
-// added alongside ExportedTable (wazero#2461) so CompiledModule.ExportedTables
-// gets the same coverage ExportedMemories already has.
+// TestModule_BuildTableDefinitions mirrors TestModule_BuildMemoryDefinitions
+// so CompiledModule.ExportedTables gets the same coverage ExportedMemories
+// already has.
 func TestModule_BuildTableDefinitions(t *testing.T) {
 	max := uint32(3)
 

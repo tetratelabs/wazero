@@ -245,9 +245,9 @@ func (r *runtime) CompileModule(ctx context.Context, binary []byte) (CompiledMod
 	// TODO: lazy initialization of memory definition.
 	internal.BuildMemoryDefinitions()
 
-	// Same for tables, mirroring BuildMemoryDefinitions - added alongside
-	// ExportedTable (wazero#2461) so CompiledModule.ExportedTables can
-	// enumerate table exports the same way ExportedMemories already does.
+	// Same for tables, mirroring BuildMemoryDefinitions so
+	// CompiledModule.ExportedTables can enumerate table exports the same
+	// way ExportedMemories already does.
 	internal.BuildTableDefinitions()
 
 	c := &compiledModule{module: internal, compiledEngine: r.store.Engine}
