@@ -192,6 +192,12 @@ type Module struct {
 	// MemoryDefinitionSection is a wazero-specific section.
 	MemoryDefinitionSection []MemoryDefinition
 
+	// TableDefinitionSection is a wazero-specific section, mirroring
+	// MemoryDefinitionSection - added alongside ExportedTable (wazero#2461)
+	// so exported tables can be enumerated the same way exported memories
+	// already are.
+	TableDefinitionSection []TableDefinition
+
 	// DWARFLines is used to emit DWARF based stack trace. This is created from the multiple custom sections
 	// as described in https://yurydelendik.github.io/webassembly-dwarf/, though it is not specified in the Wasm
 	// specification: https://github.com/WebAssembly/debugging/issues/1

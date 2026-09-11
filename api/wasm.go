@@ -293,6 +293,31 @@ type MemoryDefinition interface {
 	internalapi.WazeroOnly
 }
 
+// TableDefinition is a WebAssembly table exported in a module
+// (wazero.CompiledModule).
+//
+// See https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/syntax/modules.html#tables
+//
+// # Notes
+//
+//   - This is an interface for decoupling, not third-party implementations.
+//     All implementations are in wazero.
+type TableDefinition interface {
+	ExportDefinition
+
+	// Type returns the reference type of this table's elements: RefTypeFuncref or RefTypeExternref.
+	Type() ValueType
+
+	// Min returns the initial count of elements in this table.
+	Min() uint32
+
+	// Max returns the max count of elements in this table, or false if
+	// unbounded.
+	Max() (uint32, bool)
+
+	internalapi.WazeroOnly
+}
+
 // FunctionDefinition is a WebAssembly function exported in a module
 // (wazero.CompiledModule).
 //
