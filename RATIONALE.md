@@ -1519,20 +1519,6 @@ and as of Go 1.20, these assembler functions are considered as _unsafe_ for asyn
 From the Go runtime point of view, the execution of runtime-generated machine codes is considered as a part of
 that trampoline function. Therefore, runtime-generated machine code is also correctly considered unsafe for async preemption.
 
-## Why context cancellation is handled in Go code rather than native code
-
-Since [wazero v1.0.0-pre.9](https://github.com/tetratelabs/wazero/releases/tag/v1.0.0-pre.9), the runtime
-supports integration with Go contexts to interrupt execution after a timeout, or in response to explicit cancellation.
-This support is internally implemented as a special opcode `builtinFunctionCheckExitCode` that triggers the execution of
-a Go function (`ModuleInstance.FailIfClosed`) that atomically checks a sentinel value at strategic points in the code.
-
-[It _is indeed_ possible to check the sentinel value directly, without leaving the native world][native_check], thus sparing some cycles;
-however, because native code never preempts (see section above), this may lead to a state where the other goroutines
-never get the chance to run, and thus never get the chance to set the sentinel value; effectively preventing
-cancellation from taking place.
-
-[native_check]: https://github.com/tetratelabs/wazero/issues/1409
-
 ## Golang patterns
 
 ### Hammer tests
