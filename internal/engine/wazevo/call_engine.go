@@ -250,6 +250,10 @@ func (c *callEngine) CallWithStack(ctx context.Context, paramResultStack []uint6
 
 // CallWithStack implements api.Function.
 func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint64) (err error) {
+	if ctx.Value(expctxkeys.FuelKey{}) != nil {
+		return experimental.ErrFuelNotSupported
+	}
+
 	snapshotEnabled := ctx.Value(expctxkeys.EnableSnapshotterKey{}) != nil
 	if snapshotEnabled {
 		ctx = context.WithValue(ctx, expctxkeys.SnapshotterKey{}, c)

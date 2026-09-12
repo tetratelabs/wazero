@@ -37,6 +37,8 @@ var (
 	ErrRuntimeUncaughtException = New("uncaught exception")
 	// ErrRuntimeNullReference indicates a null reference was used where a non-null reference was expected.
 	ErrRuntimeNullReference = New("null reference")
+	// ErrRuntimeOutOfFuel indicates that a fuel budget was exhausted during execution.
+	ErrRuntimeOutOfFuel = New("out of fuel")
 )
 
 // Error is returned by a wasm.Engine during the execution of Wasm functions, and they indicate that the Wasm runtime

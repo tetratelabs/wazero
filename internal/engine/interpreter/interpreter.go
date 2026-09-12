@@ -15,6 +15,7 @@ import (
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/expctxkeys"
 	"github.com/tetratelabs/wazero/internal/filecache"
+	"github.com/tetratelabs/wazero/internal/fuel"
 	"github.com/tetratelabs/wazero/internal/internalapi"
 	"github.com/tetratelabs/wazero/internal/moremath"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -182,6 +183,10 @@ type callEngine struct {
 
 	// stackiterator for Listeners to walk frames and stack.
 	stackIterator stackIterator
+
+	// fuel is the meter set by experimental.SetFuel on the call ctx, or nil.
+	// Cached here so the dispatch loop can avoid a ctx.Value lookup per frame.
+	fuel *fuel.Meter
 }
 
 // matchCatchClause checks whether a single catch clause matches the given exception.
@@ -758,6 +763,8 @@ func (ce *callEngine) call(ctx context.Context, params, results []uint64) (_ []u
 		ctx = context.WithValue(ctx, expctxkeys.SnapshotterKey{}, ce)
 	}
 
+	ce.fuel, _ = ctx.Value(expctxkeys.FuelKey{}).(*fuel.Meter)
+
 	defer func() {
 		// If the module closed during the call, and the call didn't err for another reason, set an ExitError.
 		if err == nil {
@@ -894,11 +901,17 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 	typeIDs := moduleInst.TypeIDs
 	dataInstances := moduleInst.DataInstances
 	elementInstances := moduleInst.ElementInstances
+	meter := ce.fuel
 	ce.pushFrame(frame)
 	body := frame.f.parent.body
 	bodyLen := uint64(len(body))
 	for frame.pc < bodyLen {
 		op := &body[frame.pc]
+		if meter != nil && op.Kind != operationKindBuiltinFunctionCheckExitCode {
+			if !meter.Consume(1) {
+				panic(wasmruntime.ErrRuntimeOutOfFuel)
+			}
+		}
 		// TODO: add description of each operation/case
 		// on, for example, how many args are used,
 		// how the stack is modified, etc.
