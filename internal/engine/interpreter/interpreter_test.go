@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"sync"
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
@@ -501,6 +502,46 @@ func TestInterpreter_Compile(t *testing.T) {
 		require.Nil(t, funcs[0].body)
 		require.NotNil(t, funcs[1].body)
 		require.Nil(t, funcs[2].body)
+	})
+	t.Run("lazy concurrent across modules", func(t *testing.T) {
+		e := NewEngine(testCtx, api.CoreFeaturesV1, nil).(*engine)
+		ctx := experimental.WithInterpreterLazyLowering(testCtx)
+
+		// Modules of one engine are lowered from different goroutines, so lowering
+		// must not share state across modules (e.g. a label cache on the engine).
+		// block; br 0; end: lowering resolves label addresses.
+		body := []byte{wasm.OpcodeBlock, 0x40, wasm.OpcodeBr, 0, wasm.OpcodeEnd, wasm.OpcodeEnd}
+		var modules [][]compiledFunction
+		for id := byte(0); id < 8; id++ {
+			// Distinct IDs, as the engine keys compiled modules by ID.
+			module := &wasm.Module{TypeSection: []wasm.FunctionType{{}}, ID: wasm.ModuleID{id}}
+			for range 50 {
+				module.FunctionSection = append(module.FunctionSection, 0)
+				module.CodeSection = append(module.CodeSection, wasm.Code{Body: body})
+			}
+			err := e.CompileModule(ctx, module, nil, false)
+			require.NoError(t, err)
+			funcs, ok := e.getCompiledFunctions(module, false)
+			require.True(t, ok)
+			modules = append(modules, funcs)
+		}
+
+		var wg sync.WaitGroup
+		for _, funcs := range modules {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for i := range funcs {
+					funcs[i].ensureLowered()
+				}
+			}()
+		}
+		wg.Wait()
+		for _, funcs := range modules {
+			for i := range funcs {
+				require.NotNil(t, funcs[i].body)
+			}
+		}
 	})
 }
 
