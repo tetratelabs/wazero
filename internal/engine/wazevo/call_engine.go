@@ -147,6 +147,8 @@ type (
 		// memclrAddress holds the address of memclrNoHeapPointers implemented
 		// by the Go runtime. See memclr.go.
 		memclrAddress uintptr
+		// checkModuleExitCodeCountdown holds the loop iterations left before the next module exit code check.
+		checkModuleExitCodeCountdown int64
 	}
 )
 
@@ -488,6 +490,7 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 			if err := m.FailIfClosed(); err != nil {
 				panic(err)
 			}
+			c.execCtx.checkModuleExitCodeCountdown = wazevoapi.CheckModuleExitCodeInterval
 			c.execCtx.exitCode = wazevoapi.ExitCodeOK
 			afterGoFunctionCallEntrypoint(c.execCtx.goCallReturnAddress, c.execCtxPtr,
 				uintptr(unsafe.Pointer(c.execCtx.stackPointerBeforeGoCall)), c.execCtx.framePointerBeforeGoCall)
