@@ -2748,6 +2748,18 @@ func (m *machine) lowerFcopysign(instr *ssa.Instruction) {
 	nonSignBitReg := m.c.AllocateVReg(x.Type())
 	m.lowerFconst(nonSignBitReg, ^signMask, _64)
 
+	// The mask registers (signBitReg/nonSignBitReg) delay their definition to
+	// constant-materialization time after register allocation (see
+	// lowerConstAfterRegalloc), which happens later than the regalloc
+	// assignment of rm/rn. That allows xmm0 (the call result register) to be
+	// assigned as the machine register backing the mask registers, silently
+	// clobbering the copysign operands via the xmm instructions below and
+	// negating the result. Break that aliasing by first copying rm/rn to
+	// freshly allocated temporaries. See #2555.
+	tmpRM := m.copyToTmp(rm.reg())
+	tmpRN := m.copyToTmp(rn.reg())
+	rm, rn = newOperandReg(tmpRM), newOperandReg(tmpRN)
+
 	// Extract the sign bits of rn.
 	and := m.allocateInstr().asXmmRmR(opAnd, rn, signBitReg)
 	m.insert(and)
