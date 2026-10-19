@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
 	"github.com/tetratelabs/wazero/internal/testing/dwarftestdata"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -272,6 +274,63 @@ func TestDecodeModule_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			_, e := DecodeModule(tc.input, api.CoreFeaturesV1, wasm.MemoryLimitPages, false, false, false)
 			require.EqualError(t, e, tc.expectedErr)
+		})
+	}
+}
+
+// TestDecodeModule_VecSizeTooLarge ensures declared sizes larger than the
+// remaining input are rejected before allocating, e.g. a 15-byte module
+// declaring 2^32-1 imports must not allocate hundreds of GB.
+func TestDecodeModule_VecSizeTooLarge(t *testing.T) {
+	// Large enough to exceed the input, small enough to allocate safely.
+	size := leb128.EncodeUint32(100000)
+
+	// section builds a module containing a single section.
+	section := func(id wasm.SectionID, body ...byte) []byte {
+		ret := append(append(Magic, version...), id)
+		ret = append(ret, leb128.EncodeUint32(uint32(len(body)))...)
+		return append(ret, body...)
+	}
+
+	offset := []byte{wasm.OpcodeI32Const, 0, wasm.OpcodeEnd}
+
+	tests := []struct {
+		name  string
+		input []byte
+	}{
+		{name: "import", input: section(wasm.SectionIDImport, size...)},
+		{name: "function", input: section(wasm.SectionIDFunction, size...)},
+		{name: "table", input: section(wasm.SectionIDTable, size...)},
+		{name: "global", input: section(wasm.SectionIDGlobal, size...)},
+		{name: "export", input: section(wasm.SectionIDExport, size...)},
+		{name: "element", input: section(wasm.SectionIDElement, size...)},
+		{name: "code", input: section(wasm.SectionIDCode, size...)},
+		{name: "data", input: section(wasm.SectionIDData, size...)},
+		{name: "tag", input: section(wasm.SectionIDTag, size...)},
+		{
+			name:  "element init",
+			input: section(wasm.SectionIDElement, append(append([]byte{1, 0}, offset...), size...)...),
+		},
+		{
+			name:  "element const expr",
+			input: section(wasm.SectionIDElement, append(append([]byte{1, 4}, offset...), size...)...),
+		},
+		{
+			name:  "code body",
+			input: section(wasm.SectionIDCode, append([]byte{1}, size...)...),
+		},
+		{
+			name:  "data init",
+			input: section(wasm.SectionIDData, append([]byte{1, byte(dataSegmentPrefixPassive)}, size...)...),
+		},
+	}
+
+	features := api.CoreFeaturesV2 | experimental.CoreFeaturesExceptionHandling
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := DecodeModule(tc.input, features, wasm.MemoryLimitPages, false, false, false)
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "exceeds remaining")
 		})
 	}
 }
