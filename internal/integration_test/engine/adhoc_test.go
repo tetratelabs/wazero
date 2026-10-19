@@ -19,6 +19,7 @@ import (
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/experimental/logging"
 	"github.com/tetratelabs/wazero/experimental/table"
+	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/binaryencoding"
@@ -53,6 +54,7 @@ var tests = map[string]testCase{
 	"un-signed extend global":                                          {f: testGlobalExtend},
 	"user-defined primitive in host func":                              {f: testUserDefinedPrimitiveHostFunc},
 	"ensures invocations terminate on module close":                    {f: testEnsureTerminationOnClose},
+	"releases resources when exiting or trapping after context done":   {f: testCloseAfterContextDoneReleasesResources},
 	"call host function indirectly":                                    {f: callHostFunctionIndirect},
 	"lookup function":                                                  {f: testLookupFunction},
 	"memory grow in recursive call":                                    {f: testMemoryGrowInRecursiveCall},
@@ -109,6 +111,8 @@ func runAllTests(t *testing.T, tests map[string]testCase, config wazero.RuntimeC
 }
 
 var (
+	//go:embed testdata/close_after_cancel.wasm
+	closeAfterCancelWasm []byte
 	//go:embed testdata/unreachable.wasm
 	unreachableWasm []byte
 	//go:embed testdata/recursive.wasm
@@ -130,6 +134,64 @@ var (
 	//go:embed testdata/huge_call_stack_unwind.wasm
 	hugeCallStackUnwind []byte
 )
+
+// freeRecordingMemory is a heap-backed LinearMemory that records Free.
+type freeRecordingMemory struct {
+	buf   []byte
+	freed bool
+}
+
+func (m *freeRecordingMemory) Reallocate(size uint64) []byte {
+	if size > uint64(len(m.buf)) {
+		m.buf = append(m.buf, make([]byte, size-uint64(len(m.buf)))...)
+	}
+	return m.buf[:size]
+}
+
+func (m *freeRecordingMemory) Free() { m.freed = true }
+
+type cancelKey struct{}
+
+// testCloseAfterContextDoneReleasesResources ensures a module closed by its
+// context being done releases its resources even when the guest then exits,
+// traps or overflows the stack before reaching a termination check, which
+// would otherwise have released them.
+func testCloseAfterContextDoneReleasesResources(t *testing.T, r wazero.Runtime) {
+	wasi_snapshot_preview1.MustInstantiate(testCtx, r)
+	_, err := r.NewHostModuleBuilder("host").NewFunctionBuilder().
+		WithFunc(func(ctx context.Context, m api.Module) {
+			ctx.Value(cancelKey{}).(context.CancelFunc)()
+			// The module is closed asynchronously once the context is done.
+			for !m.IsClosed() {
+				time.Sleep(time.Millisecond)
+			}
+		}).Export("cancel").Instantiate(testCtx)
+	require.NoError(t, err)
+	compiled, err := r.CompileModule(testCtx, closeAfterCancelWasm)
+	require.NoError(t, err)
+
+	for _, fn := range []string{"exit", "trap", "overflow"} {
+		t.Run(fn, func(t *testing.T) {
+			var mem *freeRecordingMemory
+			ctx, cancel := context.WithCancel(testCtx)
+			defer cancel()
+			ctx = context.WithValue(ctx, cancelKey{}, cancel)
+			ctx = experimental.WithMemoryAllocator(ctx, experimental.MemoryAllocatorFunc(
+				func(capacity, _ uint64) experimental.LinearMemory {
+					mem = &freeRecordingMemory{buf: make([]byte, 0, capacity)}
+					return mem
+				}))
+			m, err := r.InstantiateModule(ctx, compiled, wazero.NewModuleConfig().WithName(t.Name()))
+			require.NoError(t, err)
+
+			_, err = m.ExportedFunction(fn).Call(ctx)
+			require.Error(t, err)
+			require.True(t, mem.freed, "memory not freed when the call returned")
+
+			require.NoError(t, m.Close(testCtx))
+		})
+	}
+}
 
 func testEnsureTerminationOnClose(t *testing.T, r wazero.Runtime) {
 	compiled, err := r.CompileModule(context.Background(), infiniteLoopWasm)

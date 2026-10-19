@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -384,6 +385,64 @@ func TestModuleInstance_CloseModuleOnCanceledOrTimeout(t *testing.T) {
 		require.Nil(t, err)
 	})
 }
+
+func TestModuleInstance_closeDeferredResources(t *testing.T) {
+	s := newStore()
+
+	t.Run("Close closes them", func(t *testing.T) {
+		closer := &mockCloser{}
+		m := &ModuleInstance{ModuleName: "test", s: s, CodeCloser: closer}
+		require.NoError(t, m.closeWithExitCodeWithoutClosingResource(0))
+		require.Equal(t, 0, closer.called)
+
+		require.NoError(t, m.Close(testCtx))
+		require.Equal(t, 1, closer.called)
+		require.Equal(t, exitCodeFlag(exitCodeFlagResourceClosed), m.Closed.Load()&exitCodeFlagMask)
+
+		require.NoError(t, m.Close(testCtx))
+		require.Equal(t, 1, closer.called)
+	})
+
+	t.Run("at most once", func(t *testing.T) {
+		var calls atomic.Int32
+		m := &ModuleInstance{ModuleName: "test", s: s, CodeCloser: closerFunc(func(context.Context) error {
+			calls.Add(1)
+			return nil
+		})}
+		require.NoError(t, m.closeWithExitCodeWithoutClosingResource(3))
+
+		var wg sync.WaitGroup
+		for range 16 {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				_ = m.closeDeferredResources(testCtx)
+				_ = m.FailIfClosed()
+			}()
+		}
+		wg.Wait()
+		require.Equal(t, int32(1), calls.Load())
+		// The exit code survives.
+		require.EqualError(t, m.FailIfClosed(), "module closed with exit_code(3)")
+	})
+
+	t.Run("nothing to close", func(t *testing.T) {
+		closer := &mockCloser{}
+		open := &ModuleInstance{ModuleName: "test", s: s, CodeCloser: closer}
+		require.NoError(t, open.closeDeferredResources(testCtx))
+		require.Equal(t, 0, closer.called)
+		require.Zero(t, open.Closed.Load())
+
+		closed := &ModuleInstance{ModuleName: "test", s: s, CodeCloser: closer}
+		require.NoError(t, closed.Close(testCtx))
+		require.NoError(t, closed.closeDeferredResources(testCtx))
+		require.Equal(t, 1, closer.called)
+	})
+}
+
+type closerFunc func(context.Context) error
+
+func (f closerFunc) Close(ctx context.Context) error { return f(ctx) }
 
 func TestModuleInstance_CloseWithCtxErr(t *testing.T) {
 	s := newStore()

@@ -321,10 +321,14 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 			for _, lsn := range listeners {
 				lsn.lsn.Abort(ctx, m, lsn.def, err)
 			}
-		} else {
-			if err != wasmruntime.ErrRuntimeStackOverflow { // Stackoverflow case shouldn't be panic (to avoid extreme stack unwinding).
-				err = c.parent.module.FailIfClosed()
-			}
+		}
+
+		// Call FailIfClosed however the call ended, not just when it returned
+		// normally: if the module was closed asynchronously while it ran, it
+		// also closes the resources whose closing was deferred to it.
+		closeErr := c.parent.module.FailIfClosed()
+		if r == nil && err != wasmruntime.ErrRuntimeStackOverflow { // Stackoverflow case shouldn't be panic (to avoid extreme stack unwinding).
+			err = closeErr
 		}
 
 		if err != nil {

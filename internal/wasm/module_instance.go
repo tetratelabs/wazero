@@ -17,7 +17,7 @@ func (m *ModuleInstance) FailIfClosed() (err error) {
 		case exitCodeFlagResourceNotClosed:
 			// This happens when this module is closed asynchronously in CloseModuleOnCanceledOrTimeout,
 			// and the closure of resources have been deferred here.
-			_ = m.ensureResourcesClosed(context.Background())
+			_ = m.closeDeferredResources(context.Background())
 		}
 		return sys.NewExitError(uint32(closed >> 32)) // Unpack the high order bits as the exit code.
 	}
@@ -99,7 +99,11 @@ func (m *ModuleInstance) Close(ctx context.Context) (err error) {
 // CloseWithExitCode implements the same method as documented on api.Module.
 func (m *ModuleInstance) CloseWithExitCode(ctx context.Context, exitCode uint32) (err error) {
 	if !m.setExitCode(exitCode, exitCodeFlagResourceClosed) {
-		return nil // not an error to have already closed
+		// Not an error to have already closed, but if that was asynchronous
+		// and the resources are still open, close them now: the context may
+		// have been done after the last FailIfClosed of the call it watched,
+		// in which case nothing else would close them.
+		return m.closeDeferredResources(ctx)
 	}
 	_ = m.s.deleteModule(m)
 	return m.ensureResourcesClosed(ctx)
@@ -136,6 +140,20 @@ const (
 	// exitCodeFlagResourceNotClosed indicates that the module was closed while resources are not closed yet.
 	exitCodeFlagResourceNotClosed
 )
+
+// closeDeferredResources closes the resources of a module that was closed
+// without closing them (see closeWithExitCodeWithoutClosingResource), at most
+// once however many callers race to do so. It does nothing otherwise.
+func (m *ModuleInstance) closeDeferredResources(ctx context.Context) error {
+	closed := m.Closed.Load()
+	if closed&exitCodeFlagMask != exitCodeFlagResourceNotClosed {
+		return nil
+	}
+	if !m.Closed.CompareAndSwap(closed, closed&^exitCodeFlagMask|exitCodeFlagResourceClosed) {
+		return nil // another caller is closing them
+	}
+	return m.ensureResourcesClosed(ctx)
+}
 
 func (m *ModuleInstance) setExitCode(exitCode uint32, flag exitCodeFlag) bool {
 	closed := flag | uint64(exitCode)<<32 // Store exitCode as high-order bits.
