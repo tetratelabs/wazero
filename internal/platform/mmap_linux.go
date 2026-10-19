@@ -70,3 +70,15 @@ func mmapCodeSegment(size int) ([]byte, error) {
 
 	return unix.Mmap(-1, 0, size, prot, flag)
 }
+
+// MapCodeSegmentFromFile maps size bytes of f, starting at offset, as
+// read-only executable memory. offset must be a multiple of the page size.
+// Unlike MmapCodeSegment followed by a copy, pages are read from the file on
+// first use, and are shared through the page cache with other processes that
+// map the same file. Release the mapping with MunmapCodeSegment.
+func MapCodeSegmentFromFile(f *os.File, offset int64, size int) ([]byte, error) {
+	if size == 0 {
+		panic("BUG: MapCodeSegmentFromFile with zero length")
+	}
+	return unix.Mmap(int(f.Fd()), offset, size, unix.PROT_READ|unix.PROT_EXEC, unix.MAP_PRIVATE)
+}

@@ -1519,6 +1519,29 @@ and as of Go 1.20, these assembler functions are considered as _unsafe_ for asyn
 From the Go runtime point of view, the execution of runtime-generated machine codes is considered as a part of
 that trampoline function. Therefore, runtime-generated machine code is also correctly considered unsafe for async preemption.
 
+### Why is cached native code mapped from the cache file on Linux?
+
+A module's native code is often far larger than the part of it a run executes. Copying it from the compilation cache
+into anonymous memory makes all of it private and resident in every process. So on a file cache hit on Linux, the
+compiler engine maps the code straight from the cache file (`PROT_READ|PROT_EXEC`, `MAP_PRIVATE`) instead. Pages are
+read on first use and live in the page cache, so processes sharing a cache directory share them, and the kernel can
+reclaim them under memory pressure.
+
+To allow this, each cache entry pads the native code to a 64 KiB offset, a multiple of every page size wazero runs on.
+The checksum is still verified, by reading the code through the buffered reader rather than through the mapping.
+
+wazero falls back to copying the code, as before, on other platforms, when the cache entry isn't an `*os.File`, and
+whenever mapping fails, for example because the cache directory is on a `noexec` mount.
+
+Some trade-offs of mapping:
+* The cache file's contents are trusted, as they already were. The file cache replaces an entry by renaming a new
+  file over it, which leaves existing mappings of the old file intact. However, a cache file truncated or modified in
+  place while a module is running changes or removes its code, and touching a truncated page raises `SIGBUS`, which
+  crashes the process.
+* An anonymous code segment can be backed by transparent huge pages. Whether a file mapping is depends on the kernel
+  and file system: on Linux 6.18 with THP enabled, a mapping from ext4 was backed by huge pages, while one from tmpfs
+  wasn't.
+
 ## Why context cancellation is handled in Go code rather than native code
 
 Since [wazero v1.0.0-pre.9](https://github.com/tetratelabs/wazero/releases/tag/v1.0.0-pre.9), the runtime

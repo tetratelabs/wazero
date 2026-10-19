@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"hash/crc32"
 	"io"
+	"os"
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/experimental"
@@ -147,7 +148,22 @@ func (e *engine) getCompiledModuleFromCache(module *wasm.Module) (cm *compiledMo
 	return
 }
 
-var magic = []byte{'W', 'A', 'Z', 'E', 'V', 'O'}
+// magic starts every cache entry. It is also part of the cache key, so
+// changing it when the layout changes makes older entries miss instead of
+// failing to decode. Version 2 aligns the native code to executableAlignment.
+var magic = []byte{'W', 'A', 'Z', 'E', 'V', '2'}
+
+// executableAlignment is the alignment of the native code within a cache
+// entry, so a file cache hit can map it instead of copying it (see
+// platform.MapCodeSegmentFromFile). 64 KiB is a multiple of every page size
+// wazero runs on.
+const executableAlignment = 64 << 10
+
+// executablePadding returns the number of zero bytes between the end of the
+// code length field, at offset in the entry, and the native code.
+func executablePadding(offset int) int {
+	return (executableAlignment - offset%executableAlignment) % executableAlignment
+}
 
 func serializeCompiledModule(wazeroVersion string, cm *compiledModule) io.Reader {
 	buf := bytes.NewBuffer(nil)
@@ -165,6 +181,8 @@ func serializeCompiledModule(wazeroVersion string, cm *compiledModule) io.Reader
 	}
 	// The length of code segment (8 bytes).
 	buf.Write(u64.LeBytes(uint64(len(cm.executable))))
+	// Pad so the native code starts at a multiple of executableAlignment.
+	buf.Write(make([]byte, executablePadding(buf.Len())))
 	// Append the native code.
 	buf.Write(cm.executable)
 	// Append checksum.
@@ -201,6 +219,58 @@ func serializeCompiledModule(wazeroVersion string, cm *compiledModule) io.Reader
 		}
 	}
 	return bytes.NewReader(buf.Bytes())
+}
+
+// readExecutable reads the executableLen bytes of native code at offset in
+// the cache entry, followed by their checksum, from reader. When the entry
+// is a file, it maps the code from the file instead of copying it, and reads
+// the code through reader only to check the checksum. Reading doesn't map the
+// pages into this process, so the code only becomes resident as it runs.
+func readExecutable(rc io.ReadCloser, reader *bufio.Reader, offset int64, executableLen uint64) (_ []byte, err error) {
+	var code []byte
+	mapped := false
+	if f, ok := rc.(*os.File); ok {
+		code, err = platform.MapCodeSegmentFromFile(f, offset, int(executableLen))
+		mapped = err == nil
+	}
+	if !mapped {
+		if code, err = platform.MmapCodeSegment(int(executableLen)); err != nil {
+			return nil, fmt.Errorf("compilationcache: error mmapping executable (len=%d): %v", executableLen, err)
+		}
+	}
+	defer func() {
+		if err != nil {
+			_ = platform.MunmapCodeSegment(code)
+		}
+	}()
+
+	var expected uint32
+	if mapped {
+		h := crc32.New(crc)
+		if _, err = io.CopyN(h, reader, int64(executableLen)); err != nil {
+			return nil, fmt.Errorf("compilationcache: error reading executable (len=%d): %v", executableLen, err)
+		}
+		expected = h.Sum32()
+	} else {
+		if _, err = io.ReadFull(reader, code); err != nil {
+			return nil, fmt.Errorf("compilationcache: error reading executable (len=%d): %v", executableLen, err)
+		}
+		expected = crc32.Checksum(code, crc)
+	}
+
+	var checksum [4]byte
+	if _, err = io.ReadFull(reader, checksum[:]); err != nil {
+		return nil, fmt.Errorf("compilationcache: could not read checksum: %v", err)
+	} else if got := binary.LittleEndian.Uint32(checksum[:]); expected != got {
+		return nil, fmt.Errorf("compilationcache: checksum mismatch (expected %d, got %d)", expected, got)
+	}
+
+	if !mapped {
+		if err = platform.MprotectCodeSegment(code); err != nil {
+			return nil, err
+		}
+	}
+	return code, nil
 }
 
 func deserializeCompiledModule(wazeroVersion string, rc io.ReadCloser) (cm *compiledModule, staleCache bool, err error) {
@@ -259,29 +329,23 @@ func deserializeCompiledModule(wazeroVersion string, rc io.ReadCloser) (cm *comp
 	}
 
 	if executableLen > 0 {
-		executable, err := platform.MmapCodeSegment(int(executableLen))
-		if err != nil {
-			err = fmt.Errorf("compilationcache: error mmapping executable (len=%d): %v", executableLen, err)
-			return nil, false, err
+		offset := cacheHeaderSize + 8*int(functionsNum) + 8
+		padding := executablePadding(offset)
+		if _, err = reader.Discard(padding); err != nil {
+			return nil, false, fmt.Errorf("compilationcache: error reading executable padding: %v", err)
 		}
-
-		_, err = io.ReadFull(reader, executable)
-		if err != nil {
-			err = fmt.Errorf("compilationcache: error reading executable (len=%d): %v", executableLen, err)
-			return nil, false, err
-		}
-
-		expected := crc32.Checksum(executable, crc)
-		if _, err = io.ReadFull(reader, eightBytes[:4]); err != nil {
-			return nil, false, fmt.Errorf("compilationcache: could not read checksum: %v", err)
-		} else if checksum := binary.LittleEndian.Uint32(eightBytes[:4]); expected != checksum {
-			return nil, false, fmt.Errorf("compilationcache: checksum mismatch (expected %d, got %d)", expected, checksum)
-		}
-
-		if err = platform.MprotectCodeSegment(executable); err != nil {
+		var executable []byte
+		if executable, err = readExecutable(rc, reader, int64(offset+padding), executableLen); err != nil {
 			return nil, false, err
 		}
 		cm.executable = executable
+		// cm is discarded if the rest of the entry fails to decode or is
+		// stale, so release the code with it.
+		defer func() {
+			if err != nil || staleCache {
+				_ = platform.MunmapCodeSegment(executable)
+			}
+		}()
 	}
 
 	if _, err := io.ReadFull(reader, eightBytes[:1]); err != nil {
