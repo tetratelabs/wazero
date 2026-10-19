@@ -321,6 +321,14 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 			for _, lsn := range listeners {
 				lsn.lsn.Abort(ctx, m, lsn.def, err)
 			}
+
+			// Even when the call panicked, the module could have been closed with
+			// exitCodeFlagResourceNotClosed (e.g. the context was canceled during
+			// a host call and the guest trapped or called proc_exit right after),
+			// which defers resource closure to FailIfClosed. Call it here so the
+			// resources are released instead of leaking, as the interpreter does
+			// on its panic path. See #2558.
+			_ = m.FailIfClosed()
 		} else {
 			if err != wasmruntime.ErrRuntimeStackOverflow { // Stackoverflow case shouldn't be panic (to avoid extreme stack unwinding).
 				err = c.parent.module.FailIfClosed()
