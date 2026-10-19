@@ -2734,6 +2734,9 @@ func (m *machine) lowerFcopysign(instr *ssa.Instruction) {
 	rn := m.getOperand_Reg(yDef)
 	rd := m.c.VRegOf(instr.Return())
 
+	tmpX := m.copyToTmp(rm.reg())
+	tmpY := m.copyToTmp(rn.reg())
+
 	// Clear the non-sign bits of src via AND with the mask.
 	var opAnd, opOr sseOpcode
 	var signMask uint64
@@ -2749,18 +2752,18 @@ func (m *machine) lowerFcopysign(instr *ssa.Instruction) {
 	m.lowerFconst(nonSignBitReg, ^signMask, _64)
 
 	// Extract the sign bits of rn.
-	and := m.allocateInstr().asXmmRmR(opAnd, rn, signBitReg)
+	and := m.allocateInstr().asXmmRmR(opAnd, newOperandReg(signBitReg), tmpY)
 	m.insert(and)
 
 	// Clear the sign bit of dst via AND with the non-sign bit mask.
-	xor := m.allocateInstr().asXmmRmR(opAnd, rm, nonSignBitReg)
+	xor := m.allocateInstr().asXmmRmR(opAnd, newOperandReg(nonSignBitReg), tmpX)
 	m.insert(xor)
 
 	// Copy the sign bits of src to dst via OR.
-	or := m.allocateInstr().asXmmRmR(opOr, newOperandReg(signBitReg), nonSignBitReg)
+	or := m.allocateInstr().asXmmRmR(opOr, newOperandReg(tmpY), tmpX)
 	m.insert(or)
 
-	m.copyTo(nonSignBitReg, rd)
+	m.copyTo(tmpX, rd)
 }
 
 func (m *machine) lowerBitcast(instr *ssa.Instruction) {

@@ -452,3 +452,75 @@ L2:
 		})
 	}
 }
+
+func TestMachine_lowerFcopysign(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		_64bit bool
+		exp    string
+	}{
+		{
+			name:   "f32",
+			_64bit: false,
+			exp: `
+	movdqu %xmm0, %xmm1?
+	movdqu %xmm1, %xmm2?
+	movl $-2147483648, %r4d?
+	movq %r4d?, %xmm3?
+	movl $2147483647, %r6d?
+	movq %r6d?, %xmm5?
+	andps %xmm3?, %xmm2?
+	andps %xmm5?, %xmm1?
+	orps %xmm2?, %xmm1?
+	movdqu %xmm1?, %xmm2
+`,
+		},
+		{
+			name:   "f64",
+			_64bit: true,
+			exp: `
+	movdqu %xmm0, %xmm1?
+	movdqu %xmm1, %xmm2?
+	movabsq $-9223372036854775808, %r4?
+	movq %r4?, %xmm3?
+	movabsq $9223372036854775807, %r6?
+	movq %r6?, %xmm5?
+	andpd %xmm3?, %xmm2?
+	andpd %xmm5?, %xmm1?
+	orpd %xmm2?, %xmm1?
+	movdqu %xmm1?, %xmm2
+`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, b, m := newSetupWithMockContext()
+			var typ ssa.Type
+			if tc._64bit {
+				typ = ssa.TypeF64
+			} else {
+				typ = ssa.TypeF32
+			}
+			x := b.CurrentBlock().AddParam(b, typ)
+			y := b.CurrentBlock().AddParam(b, typ)
+			ctx.vRegMap[x] = xmm0VReg
+			ctx.vRegMap[y] = xmm1VReg
+			ctx.typeOf[xmm0VReg.ID()] = typ
+			ctx.typeOf[xmm1VReg.ID()] = typ
+			ctx.definitions[x] = backend.SSAValueDefinition{V: x}
+			ctx.definitions[y] = backend.SSAValueDefinition{V: y}
+
+			instr := b.AllocateInstruction()
+			instr.AsFcopysign(x, y)
+			b.InsertInstruction(instr)
+			ret := instr.Return()
+			ctx.vRegMap[ret] = xmm2VReg
+			ctx.typeOf[xmm2VReg.ID()] = typ
+
+			m.lowerFcopysign(instr)
+			m.FlushPendingInstructions()
+			m.rootInstr = m.perBlockHead
+			require.Equal(t, tc.exp, m.Format())
+		})
+	}
+}
+
