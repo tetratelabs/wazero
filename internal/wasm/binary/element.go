@@ -21,7 +21,7 @@ func ensureElementKindFuncRef(r *bytes.Reader) error {
 }
 
 func decodeElementInitValueVector(r *bytes.Reader) ([]wasm.ConstantExpression, error) {
-	vs, _, err := leb128.DecodeUint32(r)
+	vs, err := decodeVecSize(r)
 	if err != nil {
 		return nil, fmt.Errorf("get size of vector: %w", err)
 	}
@@ -42,7 +42,7 @@ func decodeElementInitValueVector(r *bytes.Reader) ([]wasm.ConstantExpression, e
 }
 
 func decodeElementConstExprVector(r *bytes.Reader, elemType wasm.RefType, enabledFeatures api.CoreFeatures) ([]wasm.ConstantExpression, error) {
-	vs, _, err := leb128.DecodeUint32(r)
+	vs, err := decodeVecSize(r)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get the size of constexpr vector: %w", err)
 	}

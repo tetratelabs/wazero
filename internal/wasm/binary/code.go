@@ -11,7 +11,7 @@ import (
 )
 
 func decodeCode(r *bytes.Reader, codeSectionStart uint64, ret *wasm.Code) (err error) {
-	ss, _, err := leb128.DecodeUint32(r)
+	ss, err := decodeVecSize(r)
 	if err != nil {
 		return fmt.Errorf("get the size of code: %w", err)
 	}

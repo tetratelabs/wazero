@@ -65,7 +65,7 @@ func decodeDataSegment(r *bytes.Reader, enabledFeatures api.CoreFeatures, ret *w
 		return
 	}
 
-	vs, _, err := leb128.DecodeUint32(r)
+	vs, err := decodeVecSize(r)
 	if err != nil {
 		err = fmt.Errorf("get the size of vector: %v", err)
 		return
