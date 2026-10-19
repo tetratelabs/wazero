@@ -981,6 +981,9 @@ type Code struct {
 
 	// Body is a sequence of expressions ending in OpcodeEnd
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-expr
+	//
+	// Note: The compiler engine sets this to nil once Engine.CompileModule
+	// succeeds, as it no longer needs it.
 	Body []byte
 
 	// GoFunc is non-nil when IsHostFunction and defined in go, either

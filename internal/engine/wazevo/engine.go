@@ -149,6 +149,17 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listene
 		defer wazevoapi.PerfMap.Unlock()
 	}
 
+	// The native code is all this engine needs from here on, so don't keep
+	// a second copy of the module's code alive for as long as it's compiled:
+	// for a large module, the bodies are tens of megabytes.
+	defer func() {
+		if err == nil {
+			for i := range module.CodeSection {
+				module.CodeSection[i].Body = nil
+			}
+		}
+	}()
+
 	if _, ok, err := e.getCompiledModule(module, listeners, ensureTermination); ok { // cache hit!
 		return nil
 	} else if err != nil {

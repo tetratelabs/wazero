@@ -9,6 +9,7 @@ import (
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/internal/filecache"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -67,6 +68,10 @@ func TestEngine_CompileModule(t *testing.T) {
 
 			err := e.CompileModule(ctx, okModule, nil, false)
 			require.NoError(t, err)
+			// The engine has the native code, so it releases the bodies.
+			for i := range okModule.CodeSection {
+				require.Nil(t, okModule.CodeSection[i].Body, i)
+			}
 
 			// Compiling same module shouldn't be compiled again, but instead should be cached.
 			err = e.CompileModule(ctx, okModule, nil, false)
@@ -78,6 +83,44 @@ func TestEngine_CompileModule(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestEngine_CompileModule_releasesBodiesOnCacheHit(t *testing.T) {
+	ctx := context.Background()
+	fc := filecache.New(t.TempDir())
+	newModule := func() *wasm.Module {
+		return &wasm.Module{
+			TypeSection:     []wasm.FunctionType{{}},
+			FunctionSection: []wasm.Index{0, 0},
+			CodeSection: []wasm.Code{
+				{Body: []byte{wasm.OpcodeEnd}},
+				{Body: []byte{wasm.OpcodeEnd}},
+			},
+			ID: wasm.ModuleID{1},
+		}
+	}
+	requireBodiesReleased := func(m *wasm.Module) {
+		for i := range m.CodeSection {
+			require.Nil(t, m.CodeSection[i].Body, i)
+		}
+	}
+
+	e := NewEngine(ctx, 0, fc).(*engine)
+	require.NoError(t, e.CompileModule(ctx, newModule(), nil, false))
+
+	// In-memory cache hit with a separately decoded module.
+	m := newModule()
+	require.NoError(t, e.CompileModule(ctx, m, nil, false))
+	requireBodiesReleased(m)
+
+	// File cache hit on a fresh engine.
+	m = newModule()
+	cached, ok, err := fc.Get(fileCacheKey(m))
+	require.NoError(t, err)
+	require.True(t, ok)
+	require.NoError(t, cached.Close())
+	require.NoError(t, NewEngine(ctx, 0, fc).CompileModule(ctx, m, nil, false))
+	requireBodiesReleased(m)
 }
 
 func TestEngine_CompileModule_alignment(t *testing.T) {
