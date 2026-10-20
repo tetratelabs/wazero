@@ -223,6 +223,8 @@ func featureName(f CoreFeatures) string {
 		return "exception-handling"
 	case CoreFeatureSIMD << 5: // experimental.CoreFeaturesTypedFunctionReferences
 		return "typed-function-references"
+	case CoreFeatureSIMD << 6: // experimental.CoreFeaturesGC
+		return "gc"
 	}
 	return ""
 }

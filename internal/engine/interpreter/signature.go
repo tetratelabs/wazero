@@ -290,6 +290,43 @@ func (c *compiler) wasmOpcodeSignature(op wasm.Opcode, index uint32) (*signature
 	case wasm.OpcodeBrOnNonNull:
 		// Pop a ref (i64). If non-null, push and branch; if null, fall through.
 		return signature_I64_None, nil
+	case wasm.OpcodeRefEq:
+		// Two refs (uint64) -> i32.
+		return signature_I64I64_I32, nil
+	case wasm.OpcodeGCPrefix:
+		// 0xfb-prefixed sub-opcodes have varying signatures. The caller
+		// passes the sub-opcode in index.
+		switch index {
+		case wasm.OpcodeGCRefI31:
+			return signature_I32_I64, nil
+		case wasm.OpcodeGCI31GetS, wasm.OpcodeGCI31GetU:
+			return signature_I64_I32, nil
+		case wasm.OpcodeGCAnyConvertExtern, wasm.OpcodeGCExternConvertAny:
+			return signature_I64_I64, nil
+		case wasm.OpcodeGCStructNew, wasm.OpcodeGCStructNewDefault,
+			wasm.OpcodeGCStructGet, wasm.OpcodeGCStructGetS, wasm.OpcodeGCStructGetU,
+			wasm.OpcodeGCStructSet,
+			wasm.OpcodeGCArrayNew, wasm.OpcodeGCArrayNewDefault,
+			wasm.OpcodeGCArrayGet, wasm.OpcodeGCArrayGetS, wasm.OpcodeGCArrayGetU,
+			wasm.OpcodeGCArraySet,
+			wasm.OpcodeGCArrayNewFixed, wasm.OpcodeGCArrayFill, wasm.OpcodeGCArrayCopy,
+			wasm.OpcodeGCArrayNewData, wasm.OpcodeGCArrayNewElem,
+			wasm.OpcodeGCArrayInitData, wasm.OpcodeGCArrayInitElem:
+			// Stack manipulation handled dynamically by the compiler.
+			return signature_None_None, nil
+		case wasm.OpcodeGCArrayLen:
+			// pop array ref (uint64), push i32 length.
+			return signature_I64_I32, nil
+		case wasm.OpcodeGCRefTest, wasm.OpcodeGCRefTestNull:
+			return signature_I64_I32, nil
+		case wasm.OpcodeGCRefCast, wasm.OpcodeGCRefCastNull:
+			return signature_I64_I64, nil
+		case wasm.OpcodeGCBrOnCast, wasm.OpcodeGCBrOnCastFail:
+			// Stack manipulation handled dynamically.
+			return signature_None_None, nil
+		default:
+			return nil, fmt.Errorf("unsupported GC sub-opcode in interpreterir: 0x%x", index)
+		}
 	case wasm.OpcodeDrop:
 		return signature_Unknown_None, nil
 	case wasm.OpcodeSelect, wasm.OpcodeTypedSelect:

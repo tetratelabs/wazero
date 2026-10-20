@@ -37,3 +37,14 @@ const CoreFeaturesExceptionHandling = api.CoreFeatureSIMD << 4
 //
 // See https://github.com/WebAssembly/function-references for further details.
 const CoreFeaturesTypedFunctionReferences = api.CoreFeatureSIMD << 5
+
+// CoreFeaturesGC enables the WebAssembly GC proposal (part of Wasm 3.0):
+// struct and array heap types, i31 references, rec groups, sub typing, and
+// the GC instruction set. GC builds on typed function references, so enabling
+// it implies CoreFeaturesTypedFunctionReferences.
+//
+// Note: currently only the interpreter executes GC modules; the optimizing
+// compiler (wazevo) rejects them.
+//
+// See https://github.com/WebAssembly/gc for further details.
+const CoreFeaturesGC = CoreFeaturesTypedFunctionReferences | CoreFeaturesExtendedConst | api.CoreFeatureSIMD<<6

@@ -68,10 +68,10 @@ func decodeElementRefType(r *bytes.Reader) (wasm.RefType, error) {
 		return decodeRefType(r, b == wasm.RefPrefixNullable)
 	default:
 		ret := wasm.ValueType(b)
-		if ret != wasm.RefTypeFuncref && ret != wasm.RefTypeExternref {
-			return 0, fmt.Errorf("invalid ref type for element: 0x%x", b)
+		if ret.IsRef() {
+			return ret, nil
 		}
-		return ret, nil
+		return 0, fmt.Errorf("invalid ref type for element: 0x%x", b)
 	}
 }
 

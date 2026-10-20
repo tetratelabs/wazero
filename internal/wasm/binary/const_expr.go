@@ -79,6 +79,35 @@ func decodeConstantExpression(r *bytes.Reader, enabledFeatures api.CoreFeatures,
 			}
 			// Parsing index.
 			_, _, err = leb128.DecodeUint32(r)
+		case wasm.OpcodeGCPrefix:
+			// GC sub-opcodes in const expressions. The decoder accepts every
+			// sub-opcode the evaluator can run; the evaluator type-checks
+			// once it has the module's TypeSection.
+			sub, _, lerr := leb128.DecodeUint32(r)
+			if lerr != nil {
+				return fmt.Errorf("read GC sub-opcode for const expression: %w", lerr)
+			}
+			switch sub {
+			case wasm.OpcodeGCRefI31,
+				wasm.OpcodeGCAnyConvertExtern, wasm.OpcodeGCExternConvertAny:
+				// No immediate.
+			case wasm.OpcodeGCStructNew, wasm.OpcodeGCStructNewDefault,
+				wasm.OpcodeGCArrayNew, wasm.OpcodeGCArrayNewDefault:
+				// Single type-index immediate.
+				if _, _, lerr := leb128.DecodeUint32(r); lerr != nil {
+					return fmt.Errorf("read GC type index: %w", lerr)
+				}
+			case wasm.OpcodeGCArrayNewFixed:
+				// Type-index + count immediates.
+				if _, _, lerr := leb128.DecodeUint32(r); lerr != nil {
+					return fmt.Errorf("read array.new_fixed type index: %w", lerr)
+				}
+				if _, _, lerr := leb128.DecodeUint32(r); lerr != nil {
+					return fmt.Errorf("read array.new_fixed count: %w", lerr)
+				}
+			default:
+				return fmt.Errorf("GC sub-opcode 0x%x is not yet supported in const expressions", sub)
+			}
 		case wasm.OpcodeVecPrefix:
 			if err := enabledFeatures.RequireEnabled(api.CoreFeatureSIMD); err != nil {
 				return fmt.Errorf("vector instructions are not supported as %w", err)
