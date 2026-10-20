@@ -49,6 +49,20 @@ const (
 	// ExitCodeTryTableLeave is an exit code for leaving a try_table block.
 	// The dispatch loop pops the most recent try handler.
 	ExitCodeTryTableLeave
+	// ExitCodeExnrefSlotFill is an exit code for the write barrier over a run of
+	// exnref-typed table slots, which table.fill writes.
+	ExitCodeExnrefSlotFill
+	// ExitCodeExnrefSlotCopy is an exit code for the write barrier over a run of
+	// exnref-typed table slots copied from elsewhere, which table.copy and table.init write.
+	ExitCodeExnrefSlotCopy
+	// ExitCodeExnrefSlotLoad is an exit code for the read barrier on an exnref-typed global
+	// or table slot: what the slot names becomes reachable from this call, so the runtime
+	// has to pin it before compiled code can hold the handle.
+	ExitCodeExnrefSlotLoad
+	// ExitCodeExnrefSlotStore is an exit code for the write barrier on an exnref-typed
+	// global or table slot: the slot becomes a durable holder of what it now names, and
+	// stops being one for what it held.
+	ExitCodeExnrefSlotStore
 	exitCodeMax
 )
 
@@ -103,6 +117,14 @@ func (e ExitCode) String() string {
 		return "memory_wait32"
 	case ExitCodeMemoryWait64:
 		return "memory_wait64"
+	case ExitCodeExnrefSlotFill:
+		return "exnref_slot_fill"
+	case ExitCodeExnrefSlotCopy:
+		return "exnref_slot_copy"
+	case ExitCodeExnrefSlotLoad:
+		return "exnref_slot_load"
+	case ExitCodeExnrefSlotStore:
+		return "exnref_slot_store"
 	case ExitCodeMemoryNotify:
 		return "memory_notify"
 	case ExitCodeThrowAlloc:

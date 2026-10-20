@@ -2661,6 +2661,11 @@ func TestCompiler_declareSignatures(t *testing.T) {
 			{ID: 15, Params: []ssa.Type{ssa.TypeI64}},
 			// memclr signature.
 			{ID: 16, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64}},
+			// Ref counting signatures.
+			{ID: 17, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64}, Results: []ssa.Type{ssa.TypeI64}},
+			{ID: 18, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI64}},
+			{ID: 19, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI64, ssa.TypeI64}},
+			{ID: 20, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI64, ssa.TypeI64}},
 		}
 
 		require.Equal(t, len(expected), len(declaredSigs))
@@ -2707,6 +2712,11 @@ func TestCompiler_declareSignatures(t *testing.T) {
 			{ID: 23, Params: []ssa.Type{ssa.TypeI64}},
 			// memclr signature.
 			{ID: 24, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64}},
+			// Ref tracking signatures
+			{ID: 25, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64}, Results: []ssa.Type{ssa.TypeI64}},
+			{ID: 26, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI64}},
+			{ID: 27, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI64, ssa.TypeI64}},
+			{ID: 28, Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI64, ssa.TypeI64}},
 		}
 		require.Equal(t, len(expected), len(declaredSigs))
 		for i := 0; i < len(declaredSigs); i++ {

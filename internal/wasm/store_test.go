@@ -480,6 +480,8 @@ func (e *mockModuleEngine) MemoryGrown() { e.memoryGrown++ }
 // DoneInstantiation implements the same method as documented on wasm.ModuleEngine.
 func (e *mockModuleEngine) DoneInstantiation() {}
 
+func (e *mockModuleEngine) ModuleClosed() {}
+
 // FunctionInstanceReference implements the same method as documented on wasm.ModuleEngine.
 func (e *mockModuleEngine) FunctionInstanceReference(i Index) Reference {
 	return e.functionRefs[i]

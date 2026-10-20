@@ -4,8 +4,6 @@ import (
 	"encoding/binary"
 	"reflect"
 	"unsafe"
-
-	"github.com/tetratelabs/wazero/internal/wasmdebug"
 )
 
 func stackView(rbp, top uintptr) []byte {
@@ -22,7 +20,7 @@ func stackView(rbp, top uintptr) []byte {
 }
 
 // UnwindStack implements wazevo.unwindStack.
-func UnwindStack(_, rbp, top uintptr, returnAddresses []uintptr) []uintptr {
+func UnwindStack(_, rbp, top uintptr, returnAddresses []uintptr, maxDepth int) []uintptr {
 	stackBuf := stackView(rbp, top)
 
 	for i := uint64(0); i < uint64(len(stackBuf)); {
@@ -55,7 +53,7 @@ func UnwindStack(_, rbp, top uintptr, returnAddresses []uintptr) []uintptr {
 		retAddr := binary.LittleEndian.Uint64(stackBuf[i+8:])
 		returnAddresses = append(returnAddresses, uintptr(retAddr))
 		i = callerRBP - uint64(rbp)
-		if len(returnAddresses) == wasmdebug.MaxFrames {
+		if len(returnAddresses) == maxDepth && maxDepth > 0 {
 			break
 		}
 	}

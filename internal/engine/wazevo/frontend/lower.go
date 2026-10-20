@@ -624,6 +624,10 @@ func (c *Compiler) lowerCurrentOpcode() {
 			srcOffsetInBytes := builder.AllocateInstruction().AsIshl(srcOffset, three).Insert(builder).Return()
 			srcAddr := builder.AllocateInstruction().AsIadd(srcTableBaseAddr, srcOffsetInBytes).Insert(builder).Return()
 
+			if c.exnrefTable(dstTableIndex) {
+				c.copyExnrefSlots(dstAddr, srcAddr, copySize)
+				break
+			}
 			copySizeInBytes := builder.AllocateInstruction().AsIshl(copySize, three).Insert(builder).Return()
 			c.callMemmove(dstAddr, srcAddr, copySizeInBytes)
 
@@ -673,6 +677,11 @@ func (c *Compiler) lowerCurrentOpcode() {
 			// Calculate the base address of the table.
 			tableBaseAddr := c.loadTableBaseAddr(tableInstancePtr)
 			addr := builder.AllocateInstruction().AsIadd(tableBaseAddr, offsetInBytes).Insert(builder).Return()
+
+			if c.exnrefTable(tableIndex) {
+				c.fillExnrefSlots(addr, value, fillSizeExt)
+				break
+			}
 
 			// Uses the copy trick for faster filling buffer like memory.fill, but in this case we copy 8 bytes at a time.
 			// Tables are rarely huge, so ignore the 8KB maximum.
@@ -928,6 +937,11 @@ func (c *Compiler) lowerCurrentOpcode() {
 			elemInstBaseAddr := builder.AllocateInstruction().AsLoad(elemInstPtr, 0, ssa.TypeI64).Insert(builder).Return()
 			srcAddr := builder.AllocateInstruction().AsIadd(elemInstBaseAddr, srcOffsetInBytes).Insert(builder).Return()
 
+			if c.exnrefTable(tableIndex) {
+				c.copyExnrefSlots(dstAddr, srcAddr, copySize)
+				break
+			}
+
 			copySizeInBytes := builder.AllocateInstruction().AsIshl(copySize, three).Insert(builder).Return()
 			c.callMemmove(dstAddr, srcAddr, copySizeInBytes)
 
@@ -1141,6 +1155,10 @@ func (c *Compiler) lowerCurrentOpcode() {
 		if state.unreachable {
 			break
 		}
+		if c.exnrefGlobal(index) {
+			state.push(c.loadExnrefSlot(c.wasmGlobalAddr(index)))
+			break
+		}
 		v := c.getWasmGlobalValue(index, false)
 		state.push(v)
 	case wasm.OpcodeGlobalSet:
@@ -1149,6 +1167,10 @@ func (c *Compiler) lowerCurrentOpcode() {
 			break
 		}
 		v := state.pop()
+		if c.exnrefGlobal(index) {
+			c.storeExnrefSlot(c.wasmGlobalAddr(index), v)
+			break
+		}
 		c.setWasmGlobalValue(index, v)
 	case wasm.OpcodeLocalGet:
 		index := c.readI32u()
@@ -3493,6 +3515,10 @@ func (c *Compiler) lowerCurrentOpcode() {
 		targetOffsetInTable := state.pop()
 
 		elementAddr := c.lowerAccessTableWithBoundsCheck(tableIndex, targetOffsetInTable)
+		if c.exnrefTable(tableIndex) {
+			c.storeExnrefSlot(elementAddr, r)
+			break
+		}
 		builder.AllocateInstruction().AsStore(ssa.OpcodeStore, r, elementAddr, 0).Insert(builder)
 
 	case wasm.OpcodeTableGet:
@@ -3502,6 +3528,10 @@ func (c *Compiler) lowerCurrentOpcode() {
 		}
 		targetOffsetInTable := state.pop()
 		elementAddr := c.lowerAccessTableWithBoundsCheck(tableIndex, targetOffsetInTable)
+		if c.exnrefTable(tableIndex) {
+			state.push(c.loadExnrefSlot(elementAddr))
+			break
+		}
 		loaded := builder.AllocateInstruction().AsLoad(elementAddr, 0, ssa.TypeI64).Insert(builder).Return()
 		state.push(loaded)
 
@@ -3683,6 +3713,10 @@ func (c *Compiler) lowerCurrentOpcode() {
 				builder.SetCurrentBlock(handlerBlk)
 				c.reloadAfterCall()
 				c.reloadLocalsFromSaveArea()
+				// The handler block is the try_table's exit on this path, so it leaves it,
+				// but only after the reload: leaving moves the locals save area pointer off
+				// this try_table's save area.
+				c.emitTryTableLeave()
 
 				// Resolve the wasm target label.
 				targetBlk, _ := state.brTargetArgNumFor(cc.labelIdx)
@@ -4500,6 +4534,125 @@ func (c *Compiler) reloadMemoryBaseLen() {
 	c.resetAbsoluteAddressInSafeBounds()
 }
 
+// globalType returns the value type of the global at index, imported or defined here.
+func (c *Compiler) globalType(index wasm.Index) wasm.ValueType {
+	if index < c.m.ImportGlobalCount {
+		var seen wasm.Index
+		for i := range c.m.ImportSection {
+			imp := &c.m.ImportSection[i]
+			if imp.Type != wasm.ExternTypeGlobal {
+				continue
+			}
+			if seen == index {
+				return imp.DescGlobal.ValType
+			}
+			seen++
+		}
+		panic("BUG: global index out of range of imported globals")
+	}
+	return c.m.GlobalSection[index-c.m.ImportGlobalCount].Type.ValType
+}
+
+// exnrefGlobal reports whether the global at index holds exnrefs.
+func (c *Compiler) exnrefGlobal(index wasm.Index) bool {
+	return wasm.IsExnref(c.globalType(index))
+}
+
+// tableType returns the element type of the table at index, imported or defined here.
+func (c *Compiler) tableType(index wasm.Index) wasm.ValueType {
+	if index < c.m.ImportTableCount {
+		var seen wasm.Index
+		for i := range c.m.ImportSection {
+			imp := &c.m.ImportSection[i]
+			if imp.Type != wasm.ExternTypeTable {
+				continue
+			}
+			if seen == index {
+				return imp.DescTable.Type
+			}
+			seen++
+		}
+		panic("BUG: table index out of range of imported tables")
+	}
+	return c.m.TableSection[index-c.m.ImportTableCount].Type
+}
+
+// exnrefTable reports whether the table at index holds exnrefs.
+func (c *Compiler) exnrefTable(index wasm.Index) bool {
+	return wasm.IsExnref(c.tableType(index))
+}
+
+// wasmGlobalAddr returns the address of a global's value: inline in the module context for
+// one this module defines, behind a pointer for an imported one.
+func (c *Compiler) wasmGlobalAddr(index wasm.Index) ssa.Value {
+	builder := c.ssaBuilder
+	opaqueOffset := c.offset.GlobalInstanceOffset(index)
+	if index < c.m.ImportGlobalCount {
+		return builder.AllocateInstruction().
+			AsLoad(c.moduleCtxPtrValue, uint32(opaqueOffset), ssa.TypeI64).
+			Insert(builder).Return()
+	}
+	offset := builder.AllocateInstruction().AsIconst64(uint64(opaqueOffset)).Insert(builder).Return()
+	return builder.AllocateInstruction().
+		AsIadd(c.moduleCtxPtrValue, offset).Insert(builder).Return()
+}
+
+// loadExnrefSlot reads an exnref-typed slot through the runtime's read barrier, which pins
+// what it names before compiled code gets the handle.
+func (c *Compiler) loadExnrefSlot(addr ssa.Value) ssa.Value {
+	builder := c.ssaBuilder
+	c.storeCallerModuleContext()
+	trampoline := builder.AllocateInstruction().
+		AsLoad(c.execCtxPtrValue,
+			wazevoapi.ExecutionContextOffsetExnrefSlotLoadTrampolineAddress.U32(),
+			ssa.TypeI64,
+		).Insert(builder).Return()
+	args := c.allocateVarLengthValues(2, c.execCtxPtrValue, addr)
+	v := builder.AllocateInstruction().
+		AsCallIndirect(trampoline, &c.exnrefSlotLoadSig, args).Insert(builder).Return()
+	c.reloadAfterCall()
+	return v
+}
+
+// fillExnrefSlots writes count exnref-typed slots at addr through the runtime's barrier.
+func (c *Compiler) fillExnrefSlots(addr, value, count ssa.Value) {
+	c.callExnrefSlotRun(wazevoapi.ExecutionContextOffsetExnrefSlotFillTrampolineAddress.U32(),
+		&c.exnrefSlotFillSig, addr, value, count)
+}
+
+// copyExnrefSlots copies count exnref-typed slots from src to dst through the runtime's
+// barrier, for table.copy and table.init.
+func (c *Compiler) copyExnrefSlots(dst, src, count ssa.Value) {
+	c.callExnrefSlotRun(wazevoapi.ExecutionContextOffsetExnrefSlotCopyTrampolineAddress.U32(),
+		&c.exnrefSlotCopySig, dst, src, count)
+}
+
+func (c *Compiler) callExnrefSlotRun(trampolineOffset uint32, sig *ssa.Signature, a, b, count ssa.Value) {
+	builder := c.ssaBuilder
+	c.storeCallerModuleContext()
+	trampoline := builder.AllocateInstruction().
+		AsLoad(c.execCtxPtrValue, trampolineOffset, ssa.TypeI64).Insert(builder).Return()
+	args := c.allocateVarLengthValues(4, c.execCtxPtrValue, a, b, count)
+	builder.AllocateInstruction().AsCallIndirect(trampoline, sig, args).Insert(builder)
+	c.reloadAfterCall()
+}
+
+// storeExnrefSlot writes an exnref-typed slot through the runtime's write barrier, which
+// does the write itself so the slot and the runtime's count cannot disagree.
+func (c *Compiler) storeExnrefSlot(addr, v ssa.Value) {
+	builder := c.ssaBuilder
+	c.storeCallerModuleContext()
+	trampoline := builder.AllocateInstruction().
+		AsLoad(c.execCtxPtrValue,
+			wazevoapi.ExecutionContextOffsetExnrefSlotStoreTrampolineAddress.U32(),
+			ssa.TypeI64,
+		).Insert(builder).Return()
+	args := c.allocateVarLengthValues(3, c.execCtxPtrValue, addr, v)
+	builder.AllocateInstruction().
+		AsCallIndirect(trampoline, &c.exnrefSlotStoreSig, args).Insert(builder)
+	c.reloadAfterCall()
+}
+
 func (c *Compiler) setWasmGlobalValue(index wasm.Index, v ssa.Value) {
 	variable := c.globalVariables[index]
 	opaqueOffset := c.offset.GlobalInstanceOffset(index)
@@ -4881,7 +5034,7 @@ func (c *Compiler) loadExnRef() ssa.Value {
 	builder := c.ssaBuilder
 	return builder.AllocateInstruction().
 		AsLoad(c.execCtxPtrValue,
-			wazevoapi.ExecutionContextOffsetExceptionPtr.U32(),
+			wazevoapi.ExecutionContextOffsetExceptionRef.U32(),
 			ssa.TypeI64,
 		).Insert(builder).Return()
 }

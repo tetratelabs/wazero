@@ -79,6 +79,16 @@ type Compiler struct {
 	tryTableEnterSig ssa.Signature
 	// tryTableLeaveSig is the signature for the try_table leave trampoline.
 	tryTableLeaveSig ssa.Signature
+	// exnrefSlotLoadSig and exnrefSlotStoreSig are the signatures for the barriers an
+	// exnref-typed global or table slot is accessed through: (execCtx, slot address) →
+	// (exnref), and (execCtx, slot address, exnref) → (). The runtime does the access
+	// itself, so that it cannot race another barrier on the same slot.
+	exnrefSlotLoadSig  ssa.Signature
+	exnrefSlotStoreSig ssa.Signature
+	// exnrefSlotFillSig and exnrefSlotCopySig are the signatures for the barriers over a
+	// run of exnref-typed table slots: (execCtx, addr, exnref|srcAddr, count) → ().
+	exnrefSlotFillSig ssa.Signature
+	exnrefSlotCopySig ssa.Signature
 	// tryTableMetadata accumulates try_table metadata during compilation.
 	tryTableMetadata tryTableMetadata
 	// tryTableDepth tracks try_table nesting. When > 0, local.set/local.tee
@@ -314,6 +324,34 @@ func (c *Compiler) declareSignatures(listenerOn bool) {
 		Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64},
 	}
 	c.ssaBuilder.DeclareSignature(&c.memclrSig)
+
+	c.exnrefSlotLoadSig = ssa.Signature{
+		ID:      c.memclrSig.ID + 1,
+		Params:  []ssa.Type{ssa.TypeI64 /* exec context */, ssa.TypeI64 /* slot address */},
+		Results: []ssa.Type{ssa.TypeI64 /* exnref */},
+	}
+	c.ssaBuilder.DeclareSignature(&c.exnrefSlotLoadSig)
+
+	c.exnrefSlotStoreSig = ssa.Signature{
+		ID:      c.exnrefSlotLoadSig.ID + 1,
+		Params:  []ssa.Type{ssa.TypeI64 /* exec context */, ssa.TypeI64 /* slot address */, ssa.TypeI64 /* exnref */},
+		Results: []ssa.Type{},
+	}
+	c.ssaBuilder.DeclareSignature(&c.exnrefSlotStoreSig)
+
+	c.exnrefSlotFillSig = ssa.Signature{
+		ID:      c.exnrefSlotStoreSig.ID + 1,
+		Params:  []ssa.Type{ssa.TypeI64 /* exec context */, ssa.TypeI64 /* addr */, ssa.TypeI64 /* exnref */, ssa.TypeI64 /* count */},
+		Results: []ssa.Type{},
+	}
+	c.ssaBuilder.DeclareSignature(&c.exnrefSlotFillSig)
+
+	c.exnrefSlotCopySig = ssa.Signature{
+		ID:      c.exnrefSlotFillSig.ID + 1,
+		Params:  []ssa.Type{ssa.TypeI64 /* exec context */, ssa.TypeI64 /* dst */, ssa.TypeI64 /* src */, ssa.TypeI64 /* count */},
+		Results: []ssa.Type{},
+	}
+	c.ssaBuilder.DeclareSignature(&c.exnrefSlotCopySig)
 }
 
 // SignatureForWasmFunctionType returns the ssa.Signature for the given wasm.FunctionType.

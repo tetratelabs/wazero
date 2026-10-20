@@ -148,6 +148,35 @@ func encodeModule(m *wasm.Module) []byte {
 		return s
 	})
 
+	// Import section (id=2), which precedes the function section.
+	if len(m.ImportSection) > 0 {
+		buf = appendSection(buf, 2, func(s []byte) []byte {
+			s = appendUleb128(s, uint32(len(m.ImportSection)))
+			for i := range m.ImportSection {
+				imp := &m.ImportSection[i]
+				s = appendUleb128(s, uint32(len(imp.Module)))
+				s = append(s, imp.Module...)
+				s = appendUleb128(s, uint32(len(imp.Name)))
+				s = append(s, imp.Name...)
+				s = append(s, imp.Type)
+				switch imp.Type {
+				case wasm.ExternTypeGlobal:
+					s = append(s, byte(imp.DescGlobal.ValType))
+					if imp.DescGlobal.Mutable {
+						s = append(s, 0x01)
+					} else {
+						s = append(s, 0x00)
+					}
+				case wasm.ExternTypeFunc:
+					s = appendUleb128(s, imp.DescFunc)
+				default:
+					panic("unsupported import type in encodeModule")
+				}
+			}
+			return s
+		})
+	}
+
 	// Function section (id=3)
 	buf = appendSection(buf, 3, func(s []byte) []byte {
 		s = appendUleb128(s, uint32(len(m.FunctionSection)))
@@ -156,6 +185,26 @@ func encodeModule(m *wasm.Module) []byte {
 		}
 		return s
 	})
+
+	// Table section (id=4), which precedes the tag section.
+	if len(m.TableSection) > 0 {
+		buf = appendSection(buf, 4, func(s []byte) []byte {
+			s = appendUleb128(s, uint32(len(m.TableSection)))
+			for i := range m.TableSection {
+				t := &m.TableSection[i]
+				s = append(s, byte(t.Type))
+				if t.Max == nil {
+					s = append(s, 0x00)
+					s = appendUleb128(s, t.Min)
+				} else {
+					s = append(s, 0x01)
+					s = appendUleb128(s, t.Min)
+					s = appendUleb128(s, *t.Max)
+				}
+			}
+			return s
+		})
+	}
 
 	// Tag section (id=13)
 	buf = appendSection(buf, 13, func(s []byte) []byte {
@@ -166,6 +215,25 @@ func encodeModule(m *wasm.Module) []byte {
 		}
 		return s
 	})
+
+	// Global section (id=6), which follows the tag section.
+	if len(m.GlobalSection) > 0 {
+		buf = appendSection(buf, 6, func(s []byte) []byte {
+			s = appendUleb128(s, uint32(len(m.GlobalSection)))
+			for i := range m.GlobalSection {
+				g := &m.GlobalSection[i]
+				s = append(s, byte(g.Type.ValType))
+				if g.Type.Mutable {
+					s = append(s, 0x01)
+				} else {
+					s = append(s, 0x00)
+				}
+				s = append(s, g.Init.Data...)
+				s = append(s, wasm.OpcodeEnd)
+			}
+			return s
+		})
+	}
 
 	// Export section (id=7)
 	buf = appendSection(buf, 7, func(s []byte) []byte {
@@ -183,8 +251,12 @@ func encodeModule(m *wasm.Module) []byte {
 	buf = appendSection(buf, 10, func(s []byte) []byte {
 		s = appendUleb128(s, uint32(len(m.CodeSection)))
 		for _, code := range m.CodeSection {
-			// Each code entry: size + locals_count(0) + body
-			funcBody := appendUleb128(nil, 0) // 0 locals
+			// Each code entry: size + locals + body. Each local gets its own group of one.
+			funcBody := appendUleb128(nil, uint32(len(code.LocalTypes)))
+			for _, lt := range code.LocalTypes {
+				funcBody = appendUleb128(funcBody, 1)
+				funcBody = append(funcBody, byte(lt))
+			}
 			funcBody = append(funcBody, code.Body...)
 			s = appendUleb128(s, uint32(len(funcBody)))
 			s = append(s, funcBody...)
