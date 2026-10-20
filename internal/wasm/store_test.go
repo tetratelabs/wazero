@@ -563,6 +563,30 @@ func TestStore_getFunctionTypeID(t *testing.T) {
 	})
 }
 
+// TestStore_GetFunctionTypeID_ConcurrentAfterValidate guards against the data
+// race fixed in Module.Validate (see #2520). Unlike TestStore_hammer, it uses
+// a brand-new FunctionType rather than the pre-warmed, package-level v_v - an
+// already-cached key() is just a safe read, so reusing a warm value would
+// mask the race.
+func TestStore_GetFunctionTypeID_ConcurrentAfterValidate(t *testing.T) {
+	m := &Module{TypeSection: []FunctionType{
+		{Params: []ValueType{ValueTypeI32}, Results: []ValueType{ValueTypeI64}},
+	}}
+	require.NoError(t, m.Validate(api.CoreFeaturesV1))
+	s := newStore()
+
+	P := 8               // max count of goroutines
+	N := 1000            // work per goroutine
+	if testing.Short() { // Adjust down if `-test.short`
+		P = 4
+		N = 100
+	}
+	hammer.NewHammer(t, P, N).Run(func(p, n int) {
+		_, err := s.GetFunctionTypeID(&m.TypeSection[0])
+		require.NoError(t, err)
+	}, nil)
+}
+
 func TestGlobalInstance_initialize(t *testing.T) {
 	t.Run("basic type const expr", func(t *testing.T) {
 		for _, vt := range []ValueType{ValueTypeI32, ValueTypeI64, ValueTypeF32, ValueTypeF64} {

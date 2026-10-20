@@ -282,6 +282,9 @@ func (m *Module) Validate(enabledFeatures api.CoreFeatures) error {
 	for i := range m.TypeSection {
 		tp := &m.TypeSection[i]
 		tp.CacheNumInUint64()
+		// Cache key() now: it's unsynchronized, so calling it for the first
+		// time from concurrent module instances later would race. See #2520.
+		tp.key()
 	}
 
 	if err := m.validateConcreteRefTypes(); err != nil {
