@@ -1663,7 +1663,7 @@ L0 (SSA Block: blk0):
 	mov x129?, x1
 	mov x130?, x2
 	uxtw x132?, w130?
-	ldr w133?, [x129?, #0x10]
+	ldr x133?, [x129?, #0x10]
 	add x134?, x132?, #0x4
 	subs xzr, x133?, x134?
 	mov x27, x128?
@@ -1679,7 +1679,7 @@ L0 (SSA Block: blk0):
 	stp x30, xzr, [sp, #-0x10]!
 	str xzr, [sp, #-0x10]!
 	uxtw x8, w2
-	ldr w9, [x1, #0x10]
+	ldr x9, [x1, #0x10]
 	add x10, x8, #0x4
 	subs xzr, x9, x10
 	mov x27, x0

@@ -1207,29 +1207,17 @@ func (c *Compiler) lowerCurrentOpcode() {
 			break
 		}
 
-		var memSizeInBytes ssa.Value
-		if c.offset.LocalMemoryBegin < 0 {
-			memInstPtr := builder.AllocateInstruction().
-				AsLoad(c.moduleCtxPtrValue, c.offset.ImportedMemoryBegin.U32(), ssa.TypeI64).
-				Insert(builder).
-				Return()
-
-			memSizeInBytes = builder.AllocateInstruction().
-				AsLoad(memInstPtr, memoryInstanceBufSizeOffset, ssa.TypeI32).
-				Insert(builder).
-				Return()
-		} else {
-			memSizeInBytes = builder.AllocateInstruction().
-				AsLoad(c.moduleCtxPtrValue, c.offset.LocalMemoryLen().U32(), ssa.TypeI32).
-				Insert(builder).
-				Return()
-		}
-
+		// The byte length is 64-bit: a 65536-page memory has 1<<32 bytes.
+		memLen := c.getMemoryLenValue(false)
 		amount := builder.AllocateInstruction()
-		amount.AsIconst32(uint32(wasm.MemoryPageSizeInBits))
+		amount.AsIconst64(uint64(wasm.MemoryPageSizeInBits))
 		builder.InsertInstruction(amount)
+		memSizeI64 := builder.AllocateInstruction().
+			AsUshr(memLen, amount.Return()).
+			Insert(builder).
+			Return()
 		memSize := builder.AllocateInstruction().
-			AsUshr(memSizeInBytes, amount.Return()).
+			AsIreduce(memSizeI64, ssa.TypeI32).
 			Insert(builder).
 			Return()
 		state.push(memSize)
@@ -4375,7 +4363,7 @@ func (c *Compiler) memOpSetup(baseAddr ssa.Value, constOffset, operationSizeInBy
 		Insert(builder).
 		Return()
 
-	// Note: memLen is already zero extended to 64-bit space at the load time.
+	// Note: memLen is loaded as a 64-bit value.
 	memLen := c.getMemoryLenValue(false)
 
 	// baseAddrPlusCeil = baseAddr + ceil
@@ -4623,7 +4611,8 @@ func (c *Compiler) getMemoryLenValue(forceReload bool) ssa.Value {
 			addr := builder.AllocateInstruction().AsIadd(c.moduleCtxPtrValue, lenOffset).Insert(builder).Return()
 			load.AsAtomicLoad(addr, 8, ssa.TypeI64)
 		} else {
-			load.AsExtLoad(ssa.OpcodeUload32, c.moduleCtxPtrValue, c.offset.LocalMemoryLen().U32(), true)
+			// A 65536-page memory has 1<<32 bytes, so the length needs all 64 bits.
+			load.AsLoad(c.moduleCtxPtrValue, c.offset.LocalMemoryLen().U32(), ssa.TypeI64)
 		}
 		builder.InsertInstruction(load)
 		ret = load.Return()

@@ -75,6 +75,7 @@ var tests = map[string]testCase{
 	"close table importing module": {f: testCloseTableImportingModule},
 	"close table exporting module": {f: testCloseTableExportingModule},
 	"huge binary":                  {f: testHugeBinary},
+	"4 GiB memory":                 {f: testFourGiBMemory},
 }
 
 func TestEngineCompiler(t *testing.T) {
@@ -2478,4 +2479,105 @@ func testHugeBinary(t *testing.T, r wazero.Runtime) {
 	res, err = last.Call(ctx, 0)
 	require.NoError(t, err)
 	require.Equal(t, uint64(1023*1024/2), res[0])
+}
+
+// testFourGiBMemory ensures a memory with the maximum wasm32 size of 65536
+// pages is usable. Its length in bytes, 1<<32, does not fit in 32 bits.
+func testFourGiBMemory(t *testing.T, r wazero.Runtime) {
+	if testing.Short() {
+		t.Skip("skipping testFourGiBMemory in short mode since it needs 4 GiB of address space")
+	}
+	if math.MaxInt < 1<<32 {
+		t.Skip("skipping testFourGiBMemory since a 4 GiB memory does not fit in the address space")
+	}
+	const pages = 65536
+	misc := func(op wasm.OpcodeMisc) []byte { return []byte{wasm.OpcodeMiscPrefix, byte(op)} }
+	encode := func(imported bool) []byte {
+		m := &wasm.Module{
+			TypeSection: []wasm.FunctionType{
+				{Results: []wasm.ValueType{i32}},
+				{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}},
+				{Params: []wasm.ValueType{i32, i32, i32}},
+				{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32}},
+			},
+			FunctionSection: []wasm.Index{0, 1, 2, 2, 3},
+			CodeSection: []wasm.Code{
+				{Body: []byte{wasm.OpcodeMemorySize, 0, wasm.OpcodeEnd}},
+				{Body: []byte{
+					wasm.OpcodeLocalGet, 0, wasm.OpcodeLocalGet, 1, wasm.OpcodeI32Store8, 0, 0,
+					wasm.OpcodeLocalGet, 0, wasm.OpcodeI32Load8U, 0, 0,
+					wasm.OpcodeEnd,
+				}},
+				{Body: append(append([]byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeLocalGet, 1, wasm.OpcodeLocalGet, 2},
+					misc(wasm.OpcodeMiscMemoryFill)...), 0, wasm.OpcodeEnd)},
+				{Body: append(append([]byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeLocalGet, 1, wasm.OpcodeLocalGet, 2},
+					misc(wasm.OpcodeMiscMemoryCopy)...), 0, 0, wasm.OpcodeEnd)},
+				{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeI32Load, 2, 0, wasm.OpcodeEnd}},
+			},
+			ExportSection: []wasm.Export{
+				{Name: "size", Type: wasm.ExternTypeFunc, Index: 0},
+				{Name: "store_load8", Type: wasm.ExternTypeFunc, Index: 1},
+				{Name: "fill", Type: wasm.ExternTypeFunc, Index: 2},
+				{Name: "copy", Type: wasm.ExternTypeFunc, Index: 3},
+				{Name: "load32", Type: wasm.ExternTypeFunc, Index: 4},
+			},
+		}
+		memory := &wasm.Memory{Min: pages, Max: pages, IsMaxEncoded: true}
+		if imported {
+			m.ImportSection = []wasm.Import{{Type: wasm.ExternTypeMemory, Module: "local", Name: "memory", DescMem: memory}}
+		} else {
+			m.MemorySection = memory
+			m.ExportSection = append(m.ExportSection, wasm.Export{Name: "memory", Type: wasm.ExternTypeMemory, Index: 0})
+		}
+		return binaryencoding.EncodeModule(m)
+	}
+
+	local, err := r.InstantiateWithConfig(testCtx, encode(false), wazero.NewModuleConfig().WithName("local"))
+	require.NoError(t, err)
+	imported, err := r.InstantiateWithConfig(testCtx, encode(true), wazero.NewModuleConfig().WithName("imported"))
+	require.NoError(t, err)
+
+	for _, mod := range []api.Module{local, imported} {
+		t.Run(mod.Name(), func(t *testing.T) {
+			call := func(name string, params ...uint64) ([]uint64, error) {
+				return mod.ExportedFunction(name).Call(testCtx, params...)
+			}
+			res, err := call("size")
+			require.NoError(t, err)
+			require.Equal(t, uint64(pages), res[0])
+
+			for _, addr := range []uint64{0, 1 << 31, math.MaxUint32} {
+				res, err = call("store_load8", addr, 0x5a)
+				require.NoError(t, err)
+				require.Equal(t, uint64(0x5a), res[0])
+			}
+
+			// Bulk operations may end at the last byte of memory.
+			_, err = call("fill", math.MaxUint32-15, 7, 16)
+			require.NoError(t, err)
+			res, err = call("load32", math.MaxUint32-3)
+			require.NoError(t, err)
+			require.Equal(t, uint64(0x07070707), res[0])
+			_, err = call("copy", 0, math.MaxUint32-15, 16)
+			require.NoError(t, err)
+			res, err = call("load32", 12)
+			require.NoError(t, err)
+			require.Equal(t, uint64(0x07070707), res[0])
+
+			// Accesses past the last byte still trap.
+			for _, tc := range []struct {
+				name   string
+				params []uint64
+			}{
+				{"load32", []uint64{math.MaxUint32 - 2}},
+				{"fill", []uint64{math.MaxUint32 - 14, 0, 16}},
+				{"copy", []uint64{math.MaxUint32 - 14, 0, 16}},
+				{"copy", []uint64{0, math.MaxUint32 - 14, 16}},
+			} {
+				_, err = call(tc.name, tc.params...)
+				require.Error(t, err)
+				require.Contains(t, err.Error(), "out of bounds memory access")
+			}
+		})
+	}
 }
