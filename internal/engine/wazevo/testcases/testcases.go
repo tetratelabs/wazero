@@ -3091,6 +3091,89 @@ var TryTableCatchWithReturnCall = TestCase{
 	},
 }
 
+// CompareFusedAcrossBlocks defines a compare whose operand folds into the
+// compare itself (i64.extend_i32_u on arm64), consumed by a branch in a later
+// block, with a store in a block between them. The compare must be lowered
+// once, in its own block, and never fused into the branch: fusing it there
+// would emit it a second time, reading the folded operand's undefined
+// register. Reported against an earlier version of the change that sank
+// comparisons across blocks.
+var CompareFusedAcrossBlocks = TestCase{
+	Name: "compare_fused_across_blocks",
+	Module: &wasm.Module{
+		TypeSection:     []wasm.FunctionType{{Params: []wasm.ValueType{i64, i32}, Results: []wasm.ValueType{i32}}},
+		ExportSection:   []wasm.Export{{Name: ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 0}},
+		MemorySection:   &wasm.Memory{Min: 1},
+		FunctionSection: []wasm.Index{0},
+		CodeSection: []wasm.Code{{
+			LocalTypes: []wasm.ValueType{i32},
+			Body: []byte{
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeI64ExtendI32U,
+				wasm.OpcodeI64Eq,
+				wasm.OpcodeLocalSet, 2,
+				// Side effect between the compare and its use.
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeIf, blockSignature_vv,
+				wasm.OpcodeI32Const, 0,
+				wasm.OpcodeI32Const, 0,
+				wasm.OpcodeI32Store, 0x2, 0x0,
+				wasm.OpcodeEnd,
+				wasm.OpcodeLocalGet, 2,
+				wasm.OpcodeIf, blockSignature_vv,
+				wasm.OpcodeI32Const, 7,
+				wasm.OpcodeReturn,
+				wasm.OpcodeEnd,
+				wasm.OpcodeI32Const, 9,
+				wasm.OpcodeEnd,
+			},
+		}},
+	},
+}
+
+// CompareFusedAcrossSplitEdge is CompareFusedAcrossBlocks with the consuming
+// br_if as the very first instruction of the merge block after the `if`, on an
+// edge that carries a block argument into a block with two predecessors: a
+// critical edge, which gets split. The split swaps a new branch into the merge
+// block as its root; that branch must carry the block's group ID, or the
+// block looks like it starts at group 0 and the compare from the entry block
+// fuses into it across the block boundary.
+var CompareFusedAcrossSplitEdge = TestCase{
+	Name: "compare_fused_across_split_edge",
+	Module: &wasm.Module{
+		TypeSection:     []wasm.FunctionType{{Params: []wasm.ValueType{i64, i32}, Results: []wasm.ValueType{i32}}},
+		ExportSection:   []wasm.Export{{Name: ExportedFunctionName, Type: wasm.ExternTypeFunc, Index: 0}},
+		MemorySection:   &wasm.Memory{Min: 1},
+		FunctionSection: []wasm.Index{0},
+		CodeSection: []wasm.Code{{
+			LocalTypes: []wasm.ValueType{i32},
+			Body: []byte{
+				wasm.OpcodeLocalGet, 0,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeI64ExtendI32U,
+				wasm.OpcodeI64Eq,
+				wasm.OpcodeLocalSet, 2,
+				wasm.OpcodeLocalGet, 1,
+				wasm.OpcodeIf, blockSignature_vv,
+				wasm.OpcodeI32Const, 0,
+				wasm.OpcodeI32Const, 0,
+				wasm.OpcodeI32Store, 0x2, 0x0,
+				wasm.OpcodeEnd,
+				// The merge block holds nothing but this br_if and its jump.
+				wasm.OpcodeBlock, byte(i32), // blocktype (result i32)
+				wasm.OpcodeLocalGet, 1, // the carried argument is a param, so it adds no instruction here
+				wasm.OpcodeLocalGet, 2,
+				wasm.OpcodeBrIf, 0,
+				wasm.OpcodeDrop,
+				wasm.OpcodeI32Const, 9,
+				wasm.OpcodeEnd,
+				wasm.OpcodeEnd,
+			},
+		}},
+	},
+}
+
 var LargeMethodBodyWithManyArgs = TestCase{
 	Name: "large_method_body_with_many_args",
 	Module: &wasm.Module{

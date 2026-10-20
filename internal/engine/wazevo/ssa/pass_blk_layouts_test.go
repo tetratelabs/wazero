@@ -189,6 +189,11 @@ func TestBuilder_splitCriticalEdge(t *testing.T) {
 	dummyJump.AsJump(ValuesNil, dummyBlk2)
 	b.InsertInstruction(dummyJump)
 
+	// Number them as passDeadCodeEliminationOpt would: the strict branch
+	// closes group 5, so the jump after it opens group 6.
+	inst.gid, originalBrz.gid, dummyJump.gid = 5, 5, 6
+	b.nextGID = 7
+
 	predInfo := &basicBlockPredecessorInfo{blk: predBlk, branch: originalBrz}
 	trampoline := b.splitCriticalEdge(predBlk, dummyBlk, predInfo)
 	require.NotNil(t, trampoline)
@@ -203,6 +208,14 @@ func TestBuilder_splitCriticalEdge(t *testing.T) {
 	replacedBrz := predBlk.rootInstr.next
 	require.Equal(t, OpcodeBrz, replacedBrz.opcode)
 	require.Equal(t, trampoline, b.basicBlock(BasicBlockID(replacedBrz.rValue)))
+
+	// The replacement inherits pred's last group and the moved branch gets a
+	// fresh one, so pred keeps the contiguous run [5,6] and the trampoline
+	// gets [7,7], disjoint from it.
+	require.Equal(t, InstructionGroupID(5), replacedBrz.gid)
+	require.Equal(t, InstructionGroupID(6), dummyJump.gid)
+	require.Equal(t, InstructionGroupID(7), originalBrz.gid)
+	require.Equal(t, InstructionGroupID(8), b.nextGID)
 }
 
 func Test_swapInstruction(t *testing.T) {

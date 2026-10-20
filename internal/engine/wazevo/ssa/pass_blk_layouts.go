@@ -286,6 +286,17 @@ func (b *builder) splitCriticalEdge(pred, succ *basicBlock, predInfo *basicBlock
 	default:
 		panic("BUG: critical edge shouldn't be originated from br_table")
 	}
+	// newBranch takes originalBranch's place as pred's terminator, so it
+	// belongs to pred's last group; originalBranch moves out to start a group
+	// of its own in the trampoline. Both are strict-side-effect branches, so
+	// this is how passDeadCodeEliminationOpt would have numbered them, and it
+	// keeps every block's group IDs a contiguous run unique to that block,
+	// which the backend's fusion matchers rely on (see InstructionGroupID).
+	// Without it the swapped-in branch would carry the zero value, and a block
+	// whose root it becomes would look like it starts at group 0.
+	newBranch.gid = originalBranch.gid
+	originalBranch.gid = b.nextGID
+	b.nextGID++
 	swapInstruction(pred, originalBranch, newBranch)
 
 	// Replace the original branch with the new branch.
