@@ -1429,16 +1429,7 @@ func (c *Compiler) lowerCurrentOpcode() {
 		c.switchTo(originalLen, loopHeader)
 
 		if c.ensureTermination {
-			checkModuleExitCodePtr := builder.AllocateInstruction().
-				AsLoad(c.execCtxPtrValue,
-					wazevoapi.ExecutionContextOffsetCheckModuleExitCodeTrampolineAddress.U32(),
-					ssa.TypeI64,
-				).Insert(builder).Return()
-
-			args := c.allocateVarLengthValues(1, c.execCtxPtrValue)
-			builder.AllocateInstruction().
-				AsCallIndirect(checkModuleExitCodePtr, &c.checkModuleExitCodeSig, args).
-				Insert(builder)
+			c.insertCheckModuleExitCode()
 		}
 	case wasm.OpcodeIf:
 		bt := c.readBlockType()
@@ -4989,6 +4980,52 @@ func (c *Compiler) readMemArg() (align, offset uint32) {
 
 	state.pc += int(num)
 	return align, offset
+}
+
+// insertCheckModuleExitCode counts down the loop iterations left before the next
+// check of the module exit code, and calls the check trampoline once none remain.
+// Entering Go on every iteration dominates the cost of loop-heavy code, such as an
+// interpreter's dispatch loop. Checking every
+// wazevoapi.CheckModuleExitCodeInterval iterations still bounds how long a closed
+// module keeps running and how long the Go scheduler waits to preempt it.
+func (c *Compiler) insertCheckModuleExitCode() {
+	builder := c.ssaBuilder
+	checkBlk, continueBlk := builder.AllocateBasicBlock(), builder.AllocateBasicBlock()
+
+	// Decrement the countdown and branch to the check when it reaches zero. A new
+	// execution context starts at zero, so its first loop iteration checks.
+	countdownOffset := wazevoapi.ExecutionContextOffsetCheckModuleExitCodeCountdown.U32()
+	countdown := builder.AllocateInstruction().
+		AsLoad(c.execCtxPtrValue, countdownOffset, ssa.TypeI64).
+		Insert(builder).Return()
+	one := builder.AllocateInstruction().AsIconst64(1).Insert(builder).Return()
+	remaining := builder.AllocateInstruction().AsIsub(countdown, one).Insert(builder).Return()
+	builder.AllocateInstruction().
+		AsStore(ssa.OpcodeStore, remaining, c.execCtxPtrValue, countdownOffset).
+		Insert(builder)
+	zero := builder.AllocateInstruction().AsIconst64(0).Insert(builder).Return()
+	expired := builder.AllocateInstruction().
+		AsIcmp(remaining, zero, ssa.IntegerCmpCondSignedLessThanOrEqual).
+		Insert(builder).Return()
+	builder.AllocateInstruction().AsBrnz(expired, ssa.ValuesNil, checkBlk).Insert(builder)
+	c.insertJumpToBlock(ssa.ValuesNil, continueBlk)
+
+	// Call the trampoline, which checks the exit code and resets the countdown.
+	builder.SetCurrentBlock(checkBlk)
+	checkModuleExitCodePtr := builder.AllocateInstruction().
+		AsLoad(c.execCtxPtrValue,
+			wazevoapi.ExecutionContextOffsetCheckModuleExitCodeTrampolineAddress.U32(),
+			ssa.TypeI64,
+		).Insert(builder).Return()
+	args := c.allocateVarLengthValues(1, c.execCtxPtrValue)
+	builder.AllocateInstruction().
+		AsCallIndirect(checkModuleExitCodePtr, &c.checkModuleExitCodeSig, args).
+		Insert(builder)
+	c.insertJumpToBlock(ssa.ValuesNil, continueBlk)
+
+	builder.SetCurrentBlock(continueBlk)
+	builder.Seal(checkBlk)
+	builder.Seal(continueBlk)
 }
 
 // insertJumpToBlock inserts a jump instruction to the given block in the current block.

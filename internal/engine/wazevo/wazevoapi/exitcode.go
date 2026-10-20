@@ -1,5 +1,9 @@
 package wazevoapi
 
+// CheckModuleExitCodeInterval is the number of loop iterations between checks
+// of the module exit code when the runtime closes modules on context done.
+const CheckModuleExitCodeInterval = 4096
+
 // ExitCode is an exit code of an execution of a function.
 type ExitCode uint32
 

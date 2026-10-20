@@ -76,6 +76,8 @@ const (
 	ExecutionContextOffsetLocalsSaveAreaPtr Offset = 1240
 	// ExecutionContextOffsetMemclrAddress is the offset of `memclrAddress` in executionContext.
 	ExecutionContextOffsetMemclrAddress Offset = 1248
+	// ExecutionContextOffsetCheckModuleExitCodeCountdown is an offset of `checkModuleExitCodeCountdown` field in wazevo.executionContext
+	ExecutionContextOffsetCheckModuleExitCodeCountdown Offset = 1256
 )
 
 // ModuleContextOffsetData allows the compilers to get the information about offsets to the fields of wazevo.moduleContextOpaque,
