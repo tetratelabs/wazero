@@ -27,3 +27,11 @@ func goCallStackView(stackPointerBeforeGoCall *uint64) []uint64 {
 func adjustClonedStack(oldsp, oldTop, sp, fp, top uintptr) {
 	panic("unsupported architecture")
 }
+
+// trampolineWindowBytes returns the size of the trampoline-owned stack
+// region at the given Go-call stack pointer. Unused on unsupported
+// platforms (the compiler engine is unavailable).
+func trampolineWindowBytes(*uint64, uintptr) uintptr { return 0 }
+
+// rebaseTrampolineWindow is unused on unsupported platforms.
+func rebaseTrampolineWindow(*uint64, uintptr, uintptr) {}
