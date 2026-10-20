@@ -351,7 +351,21 @@ type callFrame struct {
 	base int
 }
 
+// lazyLowering is shared by every function of one compiled module. It keeps the
+// IR compiler so function bodies can be lowered on first call instead of eagerly
+// in CompileModule. mux serialises use of the compiler.
+type lazyLowering struct {
+	mux      sync.Mutex
+	compiler *compiler
+	engine   *engine
+}
+
 type compiledFunction struct {
+	lazy      *lazyLowering
+	lowerOnce sync.Once
+	lowerErr  error
+	codeIndex int
+
 	source              *wasm.Module
 	body                []unionOperation
 	exceptionTable      []exceptionTableEntry
@@ -504,7 +518,7 @@ func (f internalFunction) SourceOffsetForPC(pc experimental.ProgramCounter) uint
 const callFrameStackSize = 0
 
 // CompileModule implements the same method as documented on wasm.Engine.
-func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners []experimental.FunctionListener, ensureTermination bool) error {
+func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listeners []experimental.FunctionListener, ensureTermination bool) error {
 	if _, ok := e.getCompiledFunctions(module, true); ok { // cache hit!
 		return nil
 	}
@@ -513,6 +527,10 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 	irCompiler, err := newCompiler(e.enabledFeatures, callFrameStackSize, module, ensureTermination)
 	if err != nil {
 		return err
+	}
+	var lazy *lazyLowering
+	if enabled, _ := ctx.Value(expctxkeys.InterpreterLazyLowering{}).(bool); enabled {
+		lazy = &lazyLowering{compiler: irCompiler, engine: e}
 	}
 	imported := module.ImportFunctionCount
 	for i := range module.CodeSection {
@@ -527,6 +545,10 @@ func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners
 		// which need to be compiled down to
 		if codeSeg := &module.CodeSection[i]; codeSeg.GoFunc != nil {
 			compiled.hostFn = codeSeg.GoFunc
+		} else if lazy != nil {
+			// Lowered on first call; see ensureLowered.
+			compiled.lazy = lazy
+			compiled.codeIndex = i
 		} else {
 			ir, err := irCompiler.Next()
 			if err != nil {
@@ -571,6 +593,35 @@ func (e *engine) NewModuleEngine(module *wasm.Module, instance *wasm.ModuleInsta
 		}
 	}
 	return me, nil
+}
+
+// ensureLowered lowers the function body on its first call. Lowering errors are
+// not expected because the module was fully validated when compiled, but if one
+// happens it is remembered and re-raised on every call: sync.Once treats a
+// panicking function as done, so panicking inside Do would leave later calls
+// running an empty body.
+func (c *compiledFunction) ensureLowered() {
+	if c.lazy == nil {
+		return
+	}
+	c.lowerOnce.Do(func() {
+		lazy := c.lazy
+		lazy.mux.Lock()
+		defer lazy.mux.Unlock()
+		ir, err := lazy.compiler.CompileFunction(c.codeIndex)
+		if err == nil {
+			err = lazy.engine.lowerIR(ir, c)
+		}
+		if err != nil {
+			def := c.source.FunctionDefinition(c.index)
+			c.lowerErr = fmt.Errorf("failed to lower func[%s] to interpreterir: %w", def.DebugName(), err)
+		}
+	})
+	if c.lowerErr != nil {
+		// Raised as a panic like any other runtime fault; callEngine.call
+		// recovers it and returns it as the error of api.Function.Call.
+		panic(c.lowerErr)
+	}
 }
 
 // lowerIR lowers the interpreterir operations to engine friendly struct.
@@ -847,6 +898,8 @@ func (ce *callEngine) recoverOnCall(ctx context.Context, m *wasm.ModuleInstance,
 }
 
 func (ce *callEngine) callFunction(ctx context.Context, m *wasm.ModuleInstance, f *function) {
+	// Lower before any listener runs so stack iteration sees source offsets.
+	f.parent.ensureLowered()
 	if f.parent.hostFn != nil {
 		ce.callGoFuncWithStack(ctx, m, f)
 	} else if lsn := f.parent.listener; lsn != nil {
@@ -894,6 +947,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 	typeIDs := moduleInst.TypeIDs
 	dataInstances := moduleInst.DataInstances
 	elementInstances := moduleInst.ElementInstances
+	frame.f.parent.ensureLowered()
 	ce.pushFrame(frame)
 	body := frame.f.parent.body
 	bodyLen := uint64(len(body))
@@ -4681,6 +4735,8 @@ func (ce *callEngine) resetPc(frame *callFrame, f *function) (body []unionOperat
 	// The compiler is currently allowing proper tail call only across functions
 	// that belong to the same module; thus, we can overwrite the frame in-place.
 	// For details, see internal/engine/RATIONALE.md
+	// Tail calls jump into the target body without going through callFunction.
+	f.parent.ensureLowered()
 	frame.f = f
 	frame.base = len(ce.stack)
 	frame.pc = 0
