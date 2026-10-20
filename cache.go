@@ -59,12 +59,48 @@ func NewCompilationCacheWithDir(dirname string) (CompilationCache, error) {
 	return c, err
 }
 
+// Compilation cache errors can be classified with errors.Is.
+var (
+	// ErrCompilationCacheMiss indicates that a required entry is absent.
+	ErrCompilationCacheMiss = filecache.ErrMiss
+	// ErrCompilationCacheStale indicates an incompatible entry.
+	ErrCompilationCacheStale = filecache.ErrStale
+	// ErrCompilationCacheCorrupt indicates that an entry could not be decoded.
+	ErrCompilationCacheCorrupt = filecache.ErrCorrupt
+	// ErrCompilationCacheIO indicates a directory or entry access failure.
+	ErrCompilationCacheIO = filecache.ErrIO
+	// ErrCompilationCacheUnsupported indicates an engine without persistent cache support.
+	ErrCompilationCacheUnsupported = filecache.ErrUnsupported
+)
+
+// NewCompilationCacheWithDirReadOnly opens an existing persistent compilation cache.
+// Both dirname and its version/OS/architecture subdirectory must already exist.
+// Unlike NewCompilationCacheWithDir, this never creates, writes, or deletes files.
+// Guest modules must hit the in-memory or persistent cache: missing, stale, or
+// corrupt entries return classifiable errors without compiling the guest module.
+// The interpreter (including automatic fallback on unsupported platforms) rejects
+// guest modules with ErrCompilationCacheUnsupported. Host modules are permitted.
+//
+// This is not a zero-code-generation mode: shared/host trampolines and bounded
+// per-type entry preambles for cache hits can still be generated.
+// Cache entries are trusted executable input, not a safe untrusted format. The
+// embedder must protect the directory and use the same wazero version, CPU
+// features, and compilation configuration when warming and reading the cache.
+func NewCompilationCacheWithDirReadOnly(dirname string) (CompilationCache, error) {
+	c := &cache{readOnly: true}
+	if err := c.ensuresFileCache(dirname, version.GetWazeroVersion()); err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrCompilationCacheIO, err)
+	}
+	return c, nil
+}
+
 // cache implements Cache interface.
 type cache struct {
 	// eng is the engine for this cache. If the cache is configured, the engine is shared across multiple instances of
 	// Runtime, and its lifetime is not bound to them. Instead, the engine is alive until Cache.Close is called.
 	engs      [engineKindCount]wasm.Engine
 	fileCache filecache.Cache
+	readOnly  bool
 	initOnces [engineKindCount]sync.Once
 }
 
@@ -93,18 +129,26 @@ func (c *cache) ensuresFileCache(dir string, wazeroVersion string) error {
 		return err
 	}
 
+	ensureDir := mkdir
+	if c.readOnly {
+		ensureDir = existingDir
+	}
 	// Ensure the user-supplied directory.
-	if err = mkdir(dir); err != nil {
+	if err = ensureDir(dir); err != nil {
 		return err
 	}
 
 	// Create a version-specific directory to avoid conflicts.
 	dirname := path.Join(dir, "wazero-"+wazeroVersion+"-"+goruntime.GOARCH+"-"+goruntime.GOOS)
-	if err = mkdir(dirname); err != nil {
+	if err = ensureDir(dirname); err != nil {
 		return err
 	}
 
-	c.fileCache = filecache.New(dirname)
+	if c.readOnly {
+		c.fileCache = filecache.NewReadOnly(dirname)
+	} else {
+		c.fileCache = filecache.New(dirname)
+	}
 	return nil
 }
 
@@ -117,6 +161,17 @@ func mkdir(dirname string) error {
 	} else if err != nil {
 		return err
 	} else if !st.IsDir() {
+		return fmt.Errorf("%s is not dir", dirname)
+	}
+	return nil
+}
+
+func existingDir(dirname string) error {
+	st, err := os.Stat(dirname)
+	if err != nil {
+		return err
+	}
+	if !st.IsDir() {
 		return fmt.Errorf("%s is not dir", dirname)
 	}
 	return nil

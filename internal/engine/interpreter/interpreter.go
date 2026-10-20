@@ -35,14 +35,16 @@ type compiledFunctionWithCount struct {
 
 // engine is an interpreter implementation of wasm.Engine
 type engine struct {
+	requireCacheHit   bool
 	enabledFeatures   api.CoreFeatures
 	compiledFunctions map[wasm.ModuleID]*compiledFunctionWithCount // guarded by mutex.
 	mux               sync.Mutex
 }
 
-func NewEngine(_ context.Context, enabledFeatures api.CoreFeatures, _ filecache.Cache) wasm.Engine {
+func NewEngine(_ context.Context, enabledFeatures api.CoreFeatures, fc filecache.Cache) wasm.Engine {
 	return &engine{
 		enabledFeatures:   enabledFeatures,
+		requireCacheHit:   filecache.ReadOnly(fc),
 		compiledFunctions: map[wasm.ModuleID]*compiledFunctionWithCount{},
 	}
 }
@@ -505,6 +507,9 @@ const callFrameStackSize = 0
 
 // CompileModule implements the same method as documented on wasm.Engine.
 func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners []experimental.FunctionListener, ensureTermination bool) error {
+	if e.requireCacheHit && !module.IsHostModule {
+		return filecache.ErrUnsupported
+	}
 	if _, ok := e.getCompiledFunctions(module, true); ok { // cache hit!
 		return nil
 	}

@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"hash/crc32"
 	"io"
@@ -114,7 +115,7 @@ func (e *engine) getCompiledModuleFromMemory(module *wasm.Module, increaseRefCou
 }
 
 func (e *engine) addCompiledModuleToCache(module *wasm.Module, cm *compiledModule) (err error) {
-	if e.fileCache == nil || module.IsHostModule {
+	if e.fileCache == nil || module.IsHostModule || filecache.ReadOnly(e.fileCache) {
 		return
 	}
 	err = e.fileCache.Add(fileCacheKey(module), serializeCompiledModule(e.wazeroVersion, cm))
@@ -130,6 +131,9 @@ func (e *engine) getCompiledModuleFromCache(module *wasm.Module) (cm *compiledMo
 	var cached io.ReadCloser
 	cached, hit, err = e.fileCache.Get(fileCacheKey(module))
 	if !hit || err != nil {
+		if filecache.ReadOnly(e.fileCache) && err == nil {
+			err = filecache.ErrMiss
+		}
 		return
 	}
 
@@ -139,9 +143,15 @@ func (e *engine) getCompiledModuleFromCache(module *wasm.Module) (cm *compiledMo
 	// Note: cached.Close is ensured to be called in deserializeCodes.
 	cm, staleCache, err = deserializeCompiledModule(e.wazeroVersion, cached)
 	if err != nil {
+		if filecache.ReadOnly(e.fileCache) && !errors.Is(err, filecache.ErrIO) {
+			err = fmt.Errorf("%w: %w", filecache.ErrCorrupt, err)
+		}
 		hit = false
 		return
 	} else if staleCache {
+		if filecache.ReadOnly(e.fileCache) {
+			return nil, false, filecache.ErrStale
+		}
 		return nil, false, e.fileCache.Delete(fileCacheKey(module))
 	}
 	return
@@ -203,11 +213,45 @@ func serializeCompiledModule(wazeroVersion string, cm *compiledModule) io.Reader
 	return bytes.NewReader(buf.Bytes())
 }
 
-func deserializeCompiledModule(wazeroVersion string, rc io.ReadCloser) (cm *compiledModule, staleCache bool, err error) {
-	defer rc.Close()
+// cacheIOReader distinguishes storage failures from ordinary EOF/truncation.
+// Recording the failure also covers readers that return data and an error together.
+type cacheIOReader struct {
+	io.ReadCloser
+	err error
+}
+
+func (r *cacheIOReader) Read(p []byte) (int, error) {
+	n, err := r.ReadCloser.Read(p)
+	if r.err == nil && err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
+		r.err = err
+	}
+	return n, err
+}
+
+func deserializeCompiledModule(wazeroVersion string, reader io.ReadCloser) (*compiledModule, bool, error) {
+	return deserializeCompiledModuleWithUnmap(wazeroVersion, reader, platform.MunmapCodeSegment)
+}
+
+// The unmap parameter lets tests verify ownership on every unsuccessful load.
+func deserializeCompiledModuleWithUnmap(wazeroVersion string, rc io.ReadCloser, unmap func([]byte) error) (cm *compiledModule, staleCache bool, err error) {
+	reads := &cacheIOReader{ReadCloser: rc}
+	defer reads.Close()
 	// The entry is decoded in many small fields, so buffer it rather than
-	// issuing one read per field against the underlying cache file.
-	reader := bufio.NewReader(rc)
+	// issuing one read per field against the underlying cache file. Record
+	// storage errors below the buffer, including errors returned with data.
+	reader := bufio.NewReader(reads)
+	var mapped []byte
+	defer func() {
+		if reads.err != nil {
+			cm, staleCache = nil, false
+			err = errors.Join(fmt.Errorf("%w: %w", filecache.ErrIO, reads.err), err)
+		}
+		if len(mapped) > 0 && (err != nil || staleCache) {
+			if unmapErr := unmap(mapped); unmapErr != nil {
+				err = errors.Join(err, fmt.Errorf("compilationcache: unmap failed: %w", unmapErr))
+			}
+		}
+	}()
 	cacheHeaderSize := len(magic) + 1 /* version size */ + len(wazeroVersion) + 4 /* number of functions */
 
 	// Read the header before the native code.
@@ -265,6 +309,7 @@ func deserializeCompiledModule(wazeroVersion string, rc io.ReadCloser) (cm *comp
 			return nil, false, err
 		}
 
+		mapped = executable
 		_, err = io.ReadFull(reader, executable)
 		if err != nil {
 			err = fmt.Errorf("compilationcache: error reading executable (len=%d): %v", executableLen, err)
@@ -284,11 +329,25 @@ func deserializeCompiledModule(wazeroVersion string, rc io.ReadCloser) (cm *comp
 		cm.executable = executable
 	}
 
+	if executableLen == 0 {
+		if _, err = io.ReadFull(reader, eightBytes[:4]); err != nil {
+			return nil, false, fmt.Errorf("compilationcache: could not read checksum: %v", err)
+		}
+		if binary.LittleEndian.Uint32(eightBytes[:4]) != 0 {
+			return nil, false, fmt.Errorf("compilationcache: nonzero checksum for empty executable")
+		}
+	}
 	if _, err := io.ReadFull(reader, eightBytes[:1]); err != nil {
 		return nil, false, fmt.Errorf("compilationcache: error reading source map presence: %v", err)
 	}
 
+	if eightBytes[0] > 1 {
+		return nil, false, fmt.Errorf("compilationcache: invalid source map presence")
+	}
 	if eightBytes[0] == 1 {
+		if len(cm.executable) == 0 {
+			return nil, false, fmt.Errorf("compilationcache: source map without executable")
+		}
 		sm := &cm.sourceMap
 		sourceMapLen, err := readUint64(reader, &eightBytes)
 		if err != nil {
