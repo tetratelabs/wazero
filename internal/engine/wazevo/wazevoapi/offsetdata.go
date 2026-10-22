@@ -76,6 +76,9 @@ const (
 	ExecutionContextOffsetLocalsSaveAreaPtr Offset = 1240
 	// ExecutionContextOffsetMemclrAddress is the offset of `memclrAddress` in executionContext.
 	ExecutionContextOffsetMemclrAddress Offset = 1248
+	// ExecutionContextOffsetModuleClosedPtr is the offset of `moduleClosedPtr`
+	// Read by compiled code at every loop back-edge or function entry when ensureTermination is on.
+	ExecutionContextOffsetModuleClosedPtr Offset = 1256
 )
 
 // ModuleContextOffsetData allows the compilers to get the information about offsets to the fields of wazevo.moduleContextOpaque,

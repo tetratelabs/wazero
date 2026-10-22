@@ -1519,19 +1519,14 @@ and as of Go 1.20, these assembler functions are considered as _unsafe_ for asyn
 From the Go runtime point of view, the execution of runtime-generated machine codes is considered as a part of
 that trampoline function. Therefore, runtime-generated machine code is also correctly considered unsafe for async preemption.
 
-## Why context cancellation is handled in Go code rather than native code
+## How context cancellation is handled
 
 Since [wazero v1.0.0-pre.9](https://github.com/tetratelabs/wazero/releases/tag/v1.0.0-pre.9), the runtime
 supports integration with Go contexts to interrupt execution after a timeout, or in response to explicit cancellation.
-This support is internally implemented as a special opcode `builtinFunctionCheckExitCode` that triggers the execution of
-a Go function (`ModuleInstance.FailIfClosed`) that atomically checks a sentinel value at strategic points in the code.
 
-[It _is indeed_ possible to check the sentinel value directly, without leaving the native world][native_check], thus sparing some cycles;
-however, because native code never preempts (see section above), this may lead to a state where the other goroutines
-never get the chance to run, and thus never get the chance to set the sentinel value; effectively preventing
-cancellation from taking place.
-
-[native_check]: https://github.com/tetratelabs/wazero/issues/1409
+This support is internally implemented by emitting code to check a flag on every function entry and loop back
+edge to determine if the module has been closed. Implemented naively, this check could fail to operate if no goroutine
+was available to set the module to closed (see https://github.com/wazero/wazero/issues/1409#issuecomment-1530536903); therefore, when respecting cancellation all calls into WASM are surrounded by an entersyscall/exitsycall pair. This releases the thread from the Go runtime while the native code is executing, allowing garbage collection and other goroutines to run. This also means that GOMAXPROCS no longer constrains the number of threads executing WASM code, similar to cgo calls.
 
 ## Golang patterns
 
