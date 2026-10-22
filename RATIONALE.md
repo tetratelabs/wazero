@@ -1519,6 +1519,15 @@ and as of Go 1.20, these assembler functions are considered as _unsafe_ for asyn
 From the Go runtime point of view, the execution of runtime-generated machine codes is considered as a part of
 that trampoline function. Therefore, runtime-generated machine code is also correctly considered unsafe for async preemption.
 
+## How context cancellation is handled
+
+Since [wazero v1.0.0-pre.9](https://github.com/tetratelabs/wazero/releases/tag/v1.0.0-pre.9), the runtime
+supports integration with Go contexts to interrupt execution after a timeout, or in response to explicit cancellation.
+
+This support is internally implemented by emitting code to check a flag on every function entry and loop back
+edge to determine if the module has been closed. Implemented naively, this check could fail to operate if no goroutine
+was available to set the module to closed (see https://github.com/wazero/wazero/issues/1409#issuecomment-1530536903); therefore, when respecting cancellation all calls into WASM are surrounded by an entersyscall/exitsycall pair. This releases the thread from the Go runtime while the native code is executing, allowing garbage collection and other goroutines to run. This also means that GOMAXPROCS no longer constrains the number of threads executing WASM code, similar to cgo calls.
+
 ## Golang patterns
 
 ### Hammer tests

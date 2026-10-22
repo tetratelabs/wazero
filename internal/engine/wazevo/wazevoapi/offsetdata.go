@@ -77,9 +77,7 @@ const (
 	// ExecutionContextOffsetMemclrAddress is the offset of `memclrAddress` in executionContext.
 	ExecutionContextOffsetMemclrAddress Offset = 1248
 	// ExecutionContextOffsetModuleClosedPtr is the offset of `moduleClosedPtr`
-	// (a *uint64 pointing to ModuleInstance.Closed's underlying value).
-	// Read by compiled code at every loop back-edge when ensureTermination is on:
-	// load the pointer, then load the uint64 it points to, branch if non-zero.
+	// Read by compiled code at every loop back-edge or function entry when ensureTermination is on.
 	ExecutionContextOffsetModuleClosedPtr Offset = 1256
 )
 

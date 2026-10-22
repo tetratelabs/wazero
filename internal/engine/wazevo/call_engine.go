@@ -493,9 +493,7 @@ func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint6
 			c.afterGoFunctionCallEntrypoint(c.execCtx.goCallReturnAddress, c.execCtxPtr,
 				uintptr(unsafe.Pointer(c.execCtx.stackPointerBeforeGoCall)), c.execCtx.framePointerBeforeGoCall)
 		case wazevoapi.ExitCodeCheckModuleExitCode:
-			// Note: this operation must be done in Go, not native code. The reason is that
-			// native code cannot be preempted and that means it can block forever if there are not
-			// enough OS threads (which we don't have control over).
+			// Re-enter Go: build the exit error, close resources, and panic to unwind.
 			if err := m.FailIfClosed(); err != nil {
 				panic(err)
 			}
