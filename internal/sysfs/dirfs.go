@@ -4,6 +4,7 @@ import (
 	"io/fs"
 	"os"
 	"path"
+	"runtime"
 
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/internal/platform"
@@ -98,6 +99,13 @@ func (d *dirFS) Symlink(oldName, link string) experimentalsys.Errno {
 	// https://github.com/WebAssembly/wasi-filesystem/blob/v0.2.0/path-resolution.md#symlinks
 	if path.IsAbs(oldName) {
 		return experimentalsys.EPERM
+	}
+	// On Windows, CreateSymbolicLink can report access denied when link already
+	// exists. Check the link itself so even a dangling symlink returns EEXIST.
+	if runtime.GOOS == "windows" {
+		if _, err := os.Lstat(d.join(link)); err == nil {
+			return experimentalsys.EEXIST
+		}
 	}
 	// Note: do not resolve `oldName` relative to this dirFS. The link result is always resolved
 	// when dereference the `link` on its usage (e.g. readlink, read, etc).
