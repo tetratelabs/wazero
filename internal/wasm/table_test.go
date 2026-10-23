@@ -986,7 +986,7 @@ func TestModule_buildTables(t *testing.T) {
 				Tables:  append(tc.importedTables, make([]*TableInstance, len(tc.module.TableSection))...),
 				Globals: tc.importedGlobals,
 			}
-			err := m.buildTables(tc.module, false)
+			err := m.buildTables(tc.module, false, nil)
 			require.NoError(t, err)
 
 			require.Equal(t, tc.expectedTables, m.Tables)
@@ -1072,7 +1072,7 @@ func TestModule_buildTable_Errors(t *testing.T) {
 				Tables:  append(tc.importedTables, make([]*TableInstance, len(tc.module.TableSection))...),
 				Globals: tc.importedGlobals,
 			}
-			err := m.buildTables(tc.module, false)
+			err := m.buildTables(tc.module, false, nil)
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}

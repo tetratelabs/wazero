@@ -359,9 +359,10 @@ func (s *Store) instantiate(
 		return nil, err
 	}
 
+	limiter, _ := ctx.Value(expctxkeys.TableLimiterKey{}).(experimental.TableLimiter)
 	err = m.buildTables(module,
 		// As of reference-types proposal, boundary check must be done after instantiation.
-		s.EnabledFeatures.IsEnabled(api.CoreFeatureReferenceTypes))
+		s.EnabledFeatures.IsEnabled(api.CoreFeatureReferenceTypes), limiter)
 	if err != nil {
 		return nil, err
 	}
